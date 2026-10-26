@@ -15,6 +15,7 @@ import {
   providerOfRuntime,
   providerView,
   runtimeOfProvider,
+  selectedAgentOnLeave,
   signInAnswered,
   startSignIn,
   updateRows,
@@ -84,6 +85,12 @@ assert.equal(projectLine(null), 'A project is a folder on this computer. Your AI
 assert.equal(providerOfRuntime('codex'), 'chatgpt');
 assert.equal(runtimeOfProvider('chatgpt'), 'codex');
 assert.equal(providerOfRuntime('other'), null);
+
+// Sprint 143 (#551, R2, S4, S8): the AI chosen on this welcome is saved as the one new chats start with; nothing else is.
+assert.equal(selectedAgentOnLeave('chatgpt'), 'codex');
+assert.equal(selectedAgentOnLeave('claude'), 'claude-code');
+assert.equal(selectedAgentOnLeave('opencode'), 'opencode');
+assert.equal(selectedAgentOnLeave(null), null, 'skipped, or an AI the update welcome only found ready: nothing is written');
 
 // ── The protocol: exact fields, nothing else ──
 assert.deepEqual(decodeWelcomeRequest({ type: 'welcome/sign-in', provider: 'claude' }), { ok: true, request: { type: 'welcome/sign-in', provider: 'claude' } });

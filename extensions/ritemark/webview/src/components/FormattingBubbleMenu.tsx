@@ -13,6 +13,7 @@ import {
 } from '../lib/workspaceFileSearch'
 import { newCommentId } from '../extensions/comment/CommentMark'
 import { isEquationNodeSelection } from '../extensions/math/mathNodes'
+import { formattingToolbarShows } from './formattingToolbar'
 
 /**
  * FormattingBubbleMenu Component
@@ -266,18 +267,18 @@ export function FormattingBubbleMenu({
         tippyOptions={{
           maxWidth: 'none', // Remove default max-width constraint
         }}
-        shouldShow={({ editor, state }) => {
-          const { selection } = state
-          const { empty } = selection
-
-          if (empty) return false
-          if (editor.isActive('codeBlock')) return false
-          // Sprint 138 (experience 38): a selected equation shows its focus ring
-          // or opens in place; text formatting does not apply to it.
-          if (isEquationNodeSelection(selection)) return false
-
-          return true
-        }}
+        shouldShow={({ editor, state, view, element }) =>
+          formattingToolbarShows({
+            empty: state.selection.empty,
+            inCodeBlock: editor.isActive('codeBlock'),
+            // Sprint 138 (experience 38): a selected equation shows its focus ring
+            // or opens in place; text formatting does not apply to it.
+            equationSelected: isEquationNodeSelection(state.selection),
+            // Sprint 143 (#513): only while the editor (or the toolbar) has the focus, never over a comment's box.
+            editorHasFocus: view.hasFocus(),
+            focusInToolbar: element.contains(element.ownerDocument.activeElement),
+          })
+        }
       >
         {/* The toolbar is an always-white floating pill, so its interactive
             surface token must stay light too — otherwise the theme-aware

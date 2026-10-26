@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — 2.1.0
 
+### Sprint 143: 2.1 fixes (#556, #551, #544, #514, #513, #511, #509, #510)
+
+#### Added
+- **A wait on ChatGPT is shown (#544).** When ChatGPT turns a request away because too many arrive at once, Ritemark's ChatGPT waits as long as ChatGPT says (minutes) and tries again; until now the chat looked frozen. The status line says "ChatGPT is busy. Trying again in 7 minutes.", counting down, and offers Continue with Claude (or another ready AI) while more than a minute is left. If the tries run out, one card says "ChatGPT is busy right now" and when to send again. A plan's usage limit keeps its own card. ChatGPT still starts with the person's own Codex setup and MCP servers; nothing in `~/.codex` changes.
+- **Dismiss on Transcribe's Needs attention cards (#509).** A failed or interrupted card can be removed without restarting; the recording stays where it is.
+
+#### Fixed
+- **Choosing an agent from a comment's @ list assigns the comment (#513).** The formatting toolbar stayed up over the comment and covered @claude, so the click landed on the toolbar and the comment stayed unassigned. The toolbar now shows only while the document has the keyboard focus.
+- **A task's message keeps its line breaks (#511).** A task card's title, Done when and Files, and any message written on several lines, show on their own lines in the AI's sheet, for every AI.
+- **The first chat is with the AI the welcome was finished with (#551).** The chosen AI is saved before the window opens the project, so the first chat is on it even if the welcome's hand-over doesn't arrive, and the hand-over no longer gives up after 20 seconds on ChatGPT or Claude.
+- **Automatic chat titles in the chat's language (#514).** The title is made from the conversation alone, without the person's own Claude settings and skills, which could make an English chat's title Estonian.
+- **Transcribe on Windows says before it starts that an .m4a or .aac needs converting on this device (#509)**, instead of failing after it started; ElevenLabs can still take it.
+- **Ritemark's pickers start in a folder that exists (#510)**, never in a missing Desktop folder.
+- **Switching projects no longer leaves Home's last subscriptions behind (#556)**, and no longer logs "disposable.dispose is not a function".
+
 ### Sprint 142: 2.1 polish (#557, #503, #504, #505, #516, #517, #535; merge 1)
 
 #### Changed

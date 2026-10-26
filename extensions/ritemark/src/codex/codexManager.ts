@@ -26,6 +26,7 @@ import {
   readAgentRuntimePreference,
 } from '../utils/bundledAgentRuntime';
 import { runProcess, type ProcessResult } from '../utils/runProcess';
+import { codexAppServerEnv } from './codexRetry';
 
 /**
  * Shown when the user asks to repair the Codex that ships with Ritemark. It has
@@ -458,6 +459,9 @@ export class CodexManager {
 
       this.process = this.spawnResolvedBinary(status.binaryPath!, this.buildAppServerArgs(status.launchMode), {
         stdio: ['pipe', 'pipe', 'pipe'],
+        // Sprint 143 (#544, R3a): Codex's own log line naming its wait before it tries again reaches stderr.
+        // A log filter for this process only; the person's configuration and ~/.codex are untouched.
+        env: codexAppServerEnv(process.env),
       });
 
       // Set up stdout handler

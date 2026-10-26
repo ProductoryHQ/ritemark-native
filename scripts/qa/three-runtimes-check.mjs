@@ -365,12 +365,11 @@ async function run() {
     }
     await sleep(3000);
     await waitFor(SHEET, TRACE, 90);
-    // The welcome's landing opens a chat with the AI it was finished with. If the chat opened on another AI
-    // (seen once in four runs, not root-caused), pick this AI the way a person would.
-    if (!(await currentModel()) && DEFAULT_MODEL) {
-      step('the project opened its chat on another AI', { ok: true, detail: 'picked this AI from the model menu' });
-      await pickModel(DEFAULT_MODEL);
-    }
+    // The welcome's landing opens a chat with the AI it was finished with. Sprint 143 (#551): a chat on another AI
+    // is a failure of this step, not something to work around; the rest of the run then picks this AI to go on.
+    const landedOn = await currentModel();
+    step(`S3 (#551) the project's first chat is on ${AI_NAME}`, { ok: Boolean(landedOn), detail: landedOn ?? 'another AI' });
+    if (!landedOn && DEFAULT_MODEL) await pickModel(DEFAULT_MODEL);
     const first = await send('In one short sentence: what is in this folder?');
     await sleep(2000); // the counts leave the host just after the turn's result
     const firstReply = report.events.find((event) => event.event === 'first_reply');

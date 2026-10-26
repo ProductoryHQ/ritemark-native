@@ -59,6 +59,7 @@ The five items, in the shape's order:
 | [140 — The first day and the feedback door](sprint-140-first-day/sprint-plan.md) | 2, 5 | The Word spike first; experience 35's ready request on Home by kind of project and the AI's starting points; empty places (Tasks, chats, Transcribe); Home's guidance order; the feedback door: Send feedback in the status bar and Help, one sheet, the Home card from day three | #497 (first), #498, #466 | Experience 35, drawn by the Experience lead | **Approved** 2026-10-26, with the Experience lead's answers D1–D11. It builds the shared "open a visible chat" path |
 | 141 — 2.1's model lineup | 4 | Gemini 4 Argon in `modelConfig.ts` and the bundled catalog; the feed refreshed without breaking 1.12–1.14; Flows' default Gemini model; OpenCode's lists from the providers' live lists (#529, the first to cut) | #532, #530, #531, #529 | — | Plan to write (split from 139 on 26 October) |
 | [142 — 2.1 polish](sprint-142-polish/sprint-plan.md) | — | The smoke test's looks as the Experience lead decided (#557): markers in the AI's lists, File changes everywhere, the switch note that goes, Home's path without a gap; every split button one button in one tone (Jarmo, 26 October); Chat Debug checked (not on a release build); the 2.0 visual follow-ups: sheets' edges, the left column's scrollbars, the tooltip after a click, the board at 1440, Home at 150 px, a restored card's tab, Transcribe a file… as a tab | #557, #503, #504, #505, #516, #535, #508, #517 | Experiences 3 and 35, framework §3 (f4f5a12, bb368b5) | **Approved** 2026-10-26 by the Development manager, under Jarmo's delegation. Merge 1, the extension tier, in [#560](https://github.com/ProductoryHQ/ritemark-native/pull/560); merge 2, the patches (002, 018, 019: File changes, the desk's edge, a restored card's tab), in a PR of its own from `sprint-142-polish-shell` |
+| [143 — 2.1 fixes](sprint-143-fixes/sprint-plan.md) | — | Behaviour bugs around 2.0 and in 2.1's testing, each reproduced first: Home's dispose; the first chat's AI after the welcome; ChatGPT's silent wait on a 429; titles in the chat's language; the mention list under the formatting toolbar; a task's line breaks; ⌘⇧P on Home (only if a person reproduces it); Transcribe's .m4a and Dismiss on Windows; pickers with no Desktop | #556, #551, #544, #514, #513, #511, #507, #509, #510 | 137, 139, 140 merged | **Approved** 2026-10-26 by the Development manager under Jarmo's delegation; building on `sprint-143-fixes` |
 | The release — 2.1 as one release | — | The done list below, the runtime review, version 2.1.0, notes, the Store update, the release itself | #499, #506, the Store | 137–140 merged; 141–143 merged | Not planned yet. It gets a sprint number of its own only if it needs code, as Sprint 136 did for 2.0; otherwise it is the release worktree's steps, as in 2.0.1 |
 
 ### Order
@@ -98,14 +99,14 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 |---|---|---|
 | #502 | Editing a link's address does nothing | 137 (its question 7: the same link code) |
 | #512 | A false "Retry document update" after an AI edit | 137 (its question 7: the same document sync), reproducer first |
-| #507 | ⌘⇧P sometimes does nothing on Home | 140 (Home) |
+| #507 | ⌘⇧P sometimes does nothing on Home | **143** (no code: the films' keys were synthetic; a real keyboard at Gate 2) |
 | #535 | Home scrolls sideways when the AI's sheet is forced open in a very narrow window | 142 (R11) |
 | #516 | The Task board's four columns don't fit at 1440 with both side columns | 142 (R10) |
-| #511 | A task's message in its conversation loses the card's line breaks | 139 (agent-facing) |
-| #513 | Choosing @claude from a comment's mention list doesn't assign the comment | 139 |
-| #514 | An English chat's automatic title came out in Estonian | 139 |
+| #511 | A task's message in its conversation loses the card's line breaks | **143** |
+| #513 | Choosing @claude from a comment's mention list doesn't assign the comment | **143** |
+| #514 | An English chat's automatic title came out in Estonian | **143** |
 | #503, #504, #505, #508 | Shadows under rounded corners; Transcribe's white scrollbar track; a task card's Stop tooltip; a restored card tab's name | 142 (R7, R8, R9, R12), with the Experience lead |
-| #509, #510 | Transcribe on Windows (an .m4a, no Desktop folder) | A Transcribe and Windows pass, or v2.2.0 |
+| #509, #510 | Transcribe on Windows (an .m4a) and the pickers with no Desktop folder | **143** (#509's conversion with Media Foundation filed for 2.2) |
 | #517 | Transcribe a file… as a tab | 142 (R13) |
 | #557 | 2.1's smoke-test looks: Chat Debug, the AI's list markers, File changes, the switch note, Home's path | 142 (R1–R4, R6), with Jarmo's one-tone split button (R5) |
 | #515 | Ship on an Electron carrying Node 24.22.1 (21 October security releases) | The release (shell): checked against the pinned VS Code's Electron at the runtime review |
@@ -121,6 +122,8 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 | 140 | `sprint-140-first-day` | [#543](https://github.com/ProductoryHQ/ritemark-native/pull/543) | #497, #498, #466 | Open, not merged | Passed (technical), 26 Oct | Drafted in `sprint-140-first-day/notes/release-notes.md`, applied at closeout |
 | 142, merge 1 (extension tier) | `sprint-142-polish` | [#560](https://github.com/ProductoryHQ/ritemark-native/pull/560) | #557, #503, #504, #505, #516, #517, #535 | Open, not merged | Passed (technical), 27 Oct | Drafted in `sprint-142-polish/notes/release-notes.md`, applied at closeout |
 | 142, merge 2 (patches 002, 018, 019) | `sprint-142-polish-shell` | — | #557 (File changes), #503 (the desk's edge), #508 | — | — | Drafted with merge 1's, in the same file |
+| Plan: 143 | `plan/sprint-143-fixes` | — | — | Rebased into `sprint-143-fixes` | n/a | n/a |
+| 143 | `sprint-143-fixes` | [#564](https://github.com/ProductoryHQ/ritemark-native/pull/564) | #556, #551, #544, #514, #513, #511, #507, #509, #510 | Open, not merged | Passed (technical), 27 Oct; Windows (A4) and Gate 2 rows open | `CHANGELOG.md` entry; notes at closeout |
 | Release | a `create-release-worktree.sh` worktree, then the version bump | — | #499, #506, the Store | — | — | — |
 
 ## Feature-Complete Checklist
@@ -195,6 +198,10 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
   - File changes heads its panel;
   - the desk's corners are whole;
   - the board's four columns fit at 1440 with both side columns, on Windows at 100%.
+- **The fixes** (143):
+  - five new English chats with Claude get English titles, on Jarmo's Mac with his own skills (S17);
+  - ⌘⇧P and Ctrl+Shift+P on Home with a real keyboard, after a click inside Home, ten presses each (S27–S33; #507 moves to 2.2 if it never fails);
+  - Windows: an .m4a on On-device is refused before it starts and a failed card can be dismissed (S36); with `USERPROFILE=C:\Ritemark`, Transcribe a file… and Add a project ▸ Open a folder… open five times each and quitting leaves no process (S41).
 - **The done list's checks:** a synced folder on both platforms; the Windows first window.
 - **Every release:** an authenticated Claude turn, a Codex turn and the OpenCode permission gate on x64 and Windows.
 

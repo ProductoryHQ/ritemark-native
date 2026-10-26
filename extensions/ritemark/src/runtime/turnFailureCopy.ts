@@ -34,10 +34,13 @@ export type BillingProvider = 'google' | 'openai' | 'anthropic' | 'openrouter';
 
 const BILLING_PROVIDERS: readonly BillingProvider[] = ['google', 'openai', 'anthropic', 'openrouter'];
 
-/** What ran out: a key's prepaid credits, a key's quota, or a plan's usage limit. */
-export type LimitKind = 'credits' | 'quota' | 'plan';
+/**
+ * What ran out: a key's prepaid credits, a key's quota, or a plan's usage limit; or (Sprint 143, #544)
+ * `busy`: the provider turned the request away (429) until Codex's retries ran out, which isn't a plan limit.
+ */
+export type LimitKind = 'credits' | 'quota' | 'plan' | 'busy';
 
-const LIMIT_KINDS: readonly LimitKind[] = ['credits', 'quota', 'plan'];
+const LIMIT_KINDS: readonly LimitKind[] = ['credits', 'quota', 'plan', 'busy'];
 
 /** What a card needs beyond the kind. Every field is optional and checked when read. */
 export interface RuntimeErrorDetail {
@@ -49,6 +52,8 @@ export interface RuntimeErrorDetail {
   limit?: LimitKind;
   /** `limit` on a plan: when it resets, in the AI's own words ("at 3:05 PM", "in 2 hours"). */
   resetsAt?: string;
+  /** `limit`, `busy`: when the service said to try again (ISO time), written in the person's own time format. */
+  retryAt?: string;
   /** `provider`: the AI's process ended mid-turn, so the card says it stopped. */
   exited?: true;
 }
@@ -66,6 +71,7 @@ export function decodeRuntimeErrorDetail(value: unknown): RuntimeErrorDetail | u
   }
   if (typeof input.limit === 'string' && (LIMIT_KINDS as readonly string[]).includes(input.limit)) detail.limit = input.limit as LimitKind;
   if (typeof input.resetsAt === 'string' && input.resetsAt.trim() && input.resetsAt.length <= 64) detail.resetsAt = input.resetsAt.trim();
+  if (typeof input.retryAt === 'string' && input.retryAt.length <= 64 && Number.isFinite(Date.parse(input.retryAt))) detail.retryAt = input.retryAt;
   if (input.exited === true) detail.exited = true;
   return Object.keys(detail).length > 0 ? detail : undefined;
 }
@@ -181,6 +187,51 @@ function stoppedUnexpectedly(name: string): string {
   return `${name} stopped unexpectedly`;
 }
 
+// ── Sprint 143 (#544, R3a): the AI waiting to try again, and the busy card (experience 13, ritemark-dev 0e6911f) ──
+
+function busyTitle(name: string): string {
+  return `${name} is busy right now`;
+}
+
+const BUSY_BODY = 'It turned this request away several times. Send your message again in a few minutes.';
+
+/** A time of day in the person's own format, with no seconds ("3:12 PM", "15:12"): the locale's short time. */
+export function personTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { timeStyle: 'short' });
+}
+
+/**
+ * The status line while the AI waits to try again after the provider turned the request away: the
+ * minutes count down, rounded up; from one minute left "in a minute"; no seconds and no "…". Without the
+ * wait's length (a person's own `RUST_LOG`, a Codex that logs it differently), "soon".
+ */
+export function retryingLine(runtimeId: AgentId, msLeft: number | undefined): string {
+  const name = aiName(runtimeId);
+  if (msLeft === undefined) return `${name} is busy. Trying again soon.`;
+  if (msLeft <= 60_000) return `${name} is busy. Trying again in a minute.`;
+  return `${name} is busy. Trying again in ${Math.ceil(msLeft / 60_000)} minutes.`;
+}
+
+/** "Continue with Claude" ends the line only while more than a minute is left (R3a). */
+export function retryingOffersAlternative(msLeft: number | undefined): boolean {
+  return msLeft !== undefined && msLeft > 60_000;
+}
+
+/**
+ * Continue with <AI>, on the waiting line and on the busy card: it switches this chat and carries the message
+ * over. On the line the turn is still waiting, so its tooltip says the wait stops; on the card nothing is
+ * waiting any more, so it says where the message goes.
+ */
+export function continueWithAction(alternative: AgentId, where: 'waiting' | 'card'): { label: string; tooltip: string } {
+  const other = aiName(alternative);
+  return {
+    label: `Continue with ${other}`,
+    tooltip: where === 'waiting'
+      ? `Stop waiting and continue this chat with ${other}.`
+      : `Send your message to ${other} instead.`,
+  };
+}
+
 /** The provider's own sentence, ending in a stop, or '' when it is only our fallback. */
 function providerWords(name: string, providerSentence: string): string {
   const said = providerSentence.trim();
@@ -225,6 +276,7 @@ export function failureSentence(input: {
       if (detail.limit === 'plan') {
         return `You've used ${name}'s limit for now. ${detail.resetsAt ? `It resets ${detail.resetsAt}.` : 'Try again later.'}`;
       }
+      if (detail.limit === 'busy') return `${busyTitle(name)}. ${BUSY_BODY}`;
       const reason = limitReason(detail);
       return reason && detail.billing
         ? `${BILLING_PAGES[detail.billing].company} stopped this request. ${reason}. ${BILLING_PAGES[detail.billing].wayOn}, then send your message again.`
@@ -244,7 +296,8 @@ export type TurnFailureAction =
   | { kind: 'sign-in'; label: string; tooltip: string }
   | { kind: 'open-key-settings'; label: string; tooltip: string }
   | { kind: 'use-model'; label: string; tooltip: string; modelId: string }
-  | { kind: 'use-runtime'; label: string; tooltip: string; runtimeId: AgentId }
+  /** `carryMessage` (Sprint 143, the busy card): the failed message goes back in the box after the switch. */
+  | { kind: 'use-runtime'; label: string; tooltip: string; runtimeId: AgentId; carryMessage?: true }
   | { kind: 'open-billing'; label: string; tooltip: string; url: string };
 
 export interface TurnFailureCardCopy {
@@ -274,6 +327,8 @@ export function turnFailureCard(input: {
   fallbackModel?: string;
   switchedTo?: string;
   readyAlternative?: AgentId;
+  /** Sprint 143: how a time of day is written; the person's own format by default (tests pass a fixed one). */
+  formatTime?: (iso: string) => string;
 }): TurnFailureCardCopy | null {
   const name = aiName(input.runtimeId);
   const detail = input.detail ?? {};
@@ -316,6 +371,17 @@ export function turnFailureCard(input: {
       };
     }
     case 'limit': {
+      if (detail.limit === 'busy') {
+        // Sprint 143 (#544, R3a): the retries ended in a 429 that isn't a plan limit.
+        const alternative = input.readyAlternative && input.readyAlternative !== input.runtimeId ? input.readyAlternative : undefined;
+        return {
+          title: busyTitle(name),
+          message: detail.retryAt
+            ? `It turned this request away several times. Send your message again after ${(input.formatTime ?? personTime)(detail.retryAt)}.`
+            : BUSY_BODY,
+          ...(alternative ? { action: { kind: 'use-runtime' as const, ...continueWithAction(alternative, 'card'), runtimeId: alternative, carryMessage: true } } : {}),
+        };
+      }
       if (detail.limit === 'plan') {
         const alternative = input.readyAlternative && input.readyAlternative !== input.runtimeId ? input.readyAlternative : undefined;
         return {
@@ -363,8 +429,10 @@ export function turnFailureCard(input: {
  * Sprint 139 (R3): under a card with a way on (sign-in, model, limit), the
  * status line says nothing. Under any other failed turn it says "Failed".
  */
-export function failureSilencesStatusLine(runtimeId: AgentId, kind: RuntimeErrorKind | undefined): boolean {
+export function failureSilencesStatusLine(runtimeId: AgentId, kind: RuntimeErrorKind | undefined, detail?: RuntimeErrorDetail): boolean {
   if (kind !== 'sign-in' && kind !== 'model' && kind !== 'limit') return false;
+  // Sprint 143 (#544, R3a): under the busy card the status line says "Failed".
+  if (kind === 'limit' && detail?.limit === 'busy') return false;
   return turnFailureCard({ runtimeId, kind, sentence: '' }) !== null;
 }
 

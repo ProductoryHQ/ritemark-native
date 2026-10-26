@@ -23,6 +23,15 @@ export const SETTINGS_BUTTON = {
   message: { type: 'transcribe:openSettings' },
 } as const;
 
+/**
+ * Sprint 143 (#509): the buttons of a card under Needs attention. Dismiss is on every failed or
+ * interrupted card (`transcribe:dismissJob`); the audio file is never touched.
+ */
+export const ATTENTION_ACTIONS = {
+  retry: { label: 'Try again', tooltip: 'Transcribe this recording again' },
+  dismiss: { label: 'Dismiss', tooltip: 'Remove this from the list. The recording stays where it is.', message: 'transcribe:dismissJob' },
+} as const;
+
 /** The host asks the panel to start recording: `ritemark.transcribe.record`, the head's Record row. */
 export const RECORD_REQUEST = 'transcribe:recordRequested';
 

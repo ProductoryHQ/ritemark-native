@@ -81,6 +81,7 @@ export function TurnFailureCard({
   errorKind,
   errorDetail,
   isLatest,
+  userPrompt,
 }: {
   runtimeId: AgentId;
   error: string;
@@ -88,12 +89,15 @@ export function TurnFailureCard({
   errorDetail?: RuntimeErrorDetail;
   /** Only the newest turn offers a way on; an older one says what happened. */
   isLatest: boolean;
+  /** Sprint 143 (#544): the turn's message, which the busy card's Continue with puts back in the box. */
+  userPrompt?: string;
 }) {
   const models = useAISidebarStore((s) => s.models);
   const codexModels = useAISidebarStore((s) => s.codexModels);
   const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
   const defaultClaudeModel = useAISidebarStore((s) => s.defaultClaudeModel);
   const selectRuntimeModel = useAISidebarStore((s) => s.selectRuntimeModel);
+  const continueWithAlternative = useAISidebarStore((s) => s.continueWithAlternative);
   const startCodexLogin = useAISidebarStore((s) => s.startCodexLogin);
   const startLogin = useAISidebarStore((s) => s.startLogin);
   const openApiKeySettings = useAISidebarStore((s) => s.openApiKeySettings);
@@ -160,6 +164,9 @@ export function TurnFailureCard({
           onAction: () => {
             if (action.kind === 'use-model') {
               selectRuntimeModel(runtimeId, action.modelId);
+            } else if (action.kind === 'use-runtime' && readyAlternative && action.carryMessage) {
+              // Sprint 143 (#544, R3a): the busy card's Continue with, as the waiting line's.
+              continueWithAlternative(readyAlternative.runtimeId, readyAlternative.modelId, userPrompt ?? '');
             } else if (action.kind === 'use-runtime' && readyAlternative) {
               selectRuntimeModel(readyAlternative.runtimeId, readyAlternative.modelId);
             } else if (action.kind === 'sign-in') {

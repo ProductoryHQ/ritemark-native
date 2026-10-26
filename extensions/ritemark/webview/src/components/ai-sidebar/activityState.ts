@@ -100,10 +100,12 @@ export interface ActivityStatusPresentation {
 
 export function presentActivityState(
   state: ConversationActivityState,
-  opts?: { activeSeconds?: number; waitedSeconds?: number; liveActivity?: string; backgroundCount?: number }
+  opts?: { activeSeconds?: number; waitedSeconds?: number; liveActivity?: string; backgroundCount?: number; retryLine?: string }
 ): ActivityStatusPresentation | null {
   switch (state) {
     case 'running':
+      // Sprint 143 (#544, R3a): the AI waits to try again after the provider turned the request away.
+      if (opts?.retryLine) return { icon: 'clock', tone: 'amber', label: opts.retryLine };
       return {
         icon: 'circle-notch', tone: 'accent', spin: true,
         label: opts?.liveActivity ? `Working — ${opts.liveActivity}` : 'Working…',

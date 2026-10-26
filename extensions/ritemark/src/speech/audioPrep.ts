@@ -56,9 +56,22 @@ export function assertSupportedInput(filePath: string): void {
   );
 }
 
-/** `afconvert` is a macOS system binary; Windows has neither it nor a local engine. */
+/** `afconvert` is a macOS system binary; Windows doesn't have it. */
 export function canConvertLocally(): boolean {
   return process.platform === 'darwin' && fs.existsSync('/usr/bin/afconvert');
+}
+
+/**
+ * Sprint 143 (#509): why an engine can't take this file on this computer, or
+ * null when it can. An engine that reads the format itself always can; one
+ * that doesn't can only after a conversion, which only the Mac does. The
+ * pending card says it before anything starts, in the words the job used to
+ * fail with once it had started.
+ */
+export function cannotTakeOnDevice(extension: string, engineAccepts: string[], canConvert: boolean): string | null {
+  const ext = extension.toLowerCase();
+  if (engineAccepts.includes(ext) || canConvert) return null;
+  return `${ext} files need converting before they can be transcribed on this device. Use .mp3 or .wav, or transcribe with ElevenLabs.`;
 }
 
 export interface PreparedAudio {
@@ -112,11 +125,9 @@ export async function prepareAudio(options: {
     return { path: sourcePath, isTemp: false, wavForPeaks };
   }
 
-  if (!canConvertLocally()) {
-    throw new TranscriptionError(
-      'unsupported-format',
-      `${ext} files need converting before they can be transcribed on this device. Use .mp3 or .wav, or transcribe with ElevenLabs.`,
-    );
+  const refusal = cannotTakeOnDevice(ext, accepts, canConvertLocally());
+  if (refusal) {
+    throw new TranscriptionError('unsupported-format', refusal);
   }
 
   const converted = path.join(workDir, `ritemark-audio-${jobId}.wav`);

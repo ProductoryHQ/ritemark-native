@@ -36,6 +36,7 @@ import { resolveProjectScope } from './conversations/projectScope';
 import type { CommentTaskProjectionV1 } from './commentTasks/types';
 import type { CommentTaskDocument } from './commentTasks/CommentTaskController';
 import { systemLanguage } from './voiceDictation/systemLanguage';
+import { pickerFolder } from './utils/dialogDefaults';
 
 // Properties type for front-matter (Sprint 137: lives with the split and join)
 export type { DocumentProperties };
@@ -1530,6 +1531,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         filters: {
           'Images': ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']
         },
+        // Sprint 143 (#510): a folder that exists, never the operating system's guess.
+        defaultUri: vscode.Uri.file(pickerFolder([
+          document.uri.scheme === 'file' ? path.dirname(document.uri.fsPath) : undefined,
+          vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+        ])),
         title: 'Select Image'
       });
 

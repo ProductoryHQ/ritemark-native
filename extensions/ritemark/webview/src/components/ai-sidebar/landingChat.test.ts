@@ -60,5 +60,48 @@ assert.equal(useAISidebarStore.getState().pendingLanding, null);
 assert.equal(useAISidebarStore.getState().landingPlaceholder?.text, 'Ask OpenCode about this project');
 assert.equal(useAISidebarStore.getState().landingPlaceholder?.runtimeId, 'opencode');
 
+// Sprint 143 (#551, R2, S6): ChatGPT's list arrives late (25 s): the landing still lands on ChatGPT,
+// never left on Claude by a timer.
+{
+  reset();
+  const realNow = Date.now;
+  let clock = realNow();
+  Date.now = () => clock;
+  try {
+    useAISidebarStore.setState({ codexModels: [] });
+    useAISidebarStore.getState().handleExtensionMessage({ type: 'landing:new-chat', runtimeId: 'codex', placeholder: 'Ask ChatGPT about this project' });
+    assert.ok(useAISidebarStore.getState().pendingLanding, 'waits for ChatGPT\'s list');
+    clock += 25_000;
+    useAISidebarStore.getState().handleExtensionMessage({ type: 'ai-stopped' });
+    assert.ok(useAISidebarStore.getState().pendingLanding, 'still waiting after 25 s: no timer for a local list');
+    useAISidebarStore.setState({ codexModels: [{ id: 'gpt-test', name: 'GPT test', description: '' } as never] });
+    useAISidebarStore.getState().handleExtensionMessage({ type: 'ai-stopped' });
+    assert.equal(active().selectedAgent, 'codex', 'the chat is on ChatGPT');
+    assert.equal(useAISidebarStore.getState().landingPlaceholder?.text, 'Ask ChatGPT about this project');
+  } finally {
+    Date.now = realNow;
+  }
+}
+
+// OpenCode with no provider after 20 s gives up as before, and tells the host's log why.
+{
+  reset();
+  const posted: Array<Record<string, unknown>> = [];
+  vscode.postMessage = (message: unknown) => { posted.push(message as Record<string, unknown>); };
+  const realNow = Date.now;
+  let clock = realNow();
+  Date.now = () => clock;
+  try {
+    useAISidebarStore.getState().handleExtensionMessage({ type: 'landing:new-chat', runtimeId: 'opencode', placeholder: 'Ask OpenCode about this project' });
+    clock += 21_000;
+    useAISidebarStore.getState().handleExtensionMessage({ type: 'ai-stopped' });
+    assert.equal(useAISidebarStore.getState().pendingLanding, null, 'OpenCode gave up');
+    assert.ok(posted.some((message) => message.type === 'landing/dropped' && message.runtimeId === 'opencode'), 'the host hears why');
+  } finally {
+    Date.now = realNow;
+    vscode.postMessage = () => undefined;
+  }
+}
+
 vscode.postMessage = originalPostMessage;
 console.log('landingChat tests passed.');

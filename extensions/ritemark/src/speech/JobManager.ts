@@ -42,7 +42,9 @@ export interface EnqueueRequest {
 export type JobEvent =
   | { type: 'job-updated'; job: TranscriptionJob }
   | { type: 'job-completed'; job: TranscriptionJob; session: TranscriptSession }
-  | { type: 'job-failed'; job: TranscriptionJob; error: TranscriptionErrorInfo };
+  | { type: 'job-failed'; job: TranscriptionJob; error: TranscriptionErrorInfo }
+  /** Sprint 143 (#509): a finished job taken off the list (Dismiss). */
+  | { type: 'job-dismissed'; jobId: string };
 
 export interface JobManagerDeps {
   registry: EngineRegistry;
@@ -131,6 +133,20 @@ export class JobManager {
 
     void this.pump();
     return job;
+  }
+
+  /**
+   * Sprint 143 (#509, R8): take a failed, interrupted or cancelled job off the
+   * list. Never a queued or running one, and never the audio file. Returns
+   * whether it went.
+   */
+  dismiss(jobId: string): boolean {
+    const job = this.jobs.get(jobId);
+    if (!job || !(job.state === 'failed' || job.state === 'interrupted' || job.state === 'cancelled')) return false;
+    this.jobs.delete(jobId);
+    this.requests.delete(jobId);
+    this.emit({ type: 'job-dismissed', jobId });
+    return true;
   }
 
   /** Stops the run, kills the child process, and cleans up temp files. */

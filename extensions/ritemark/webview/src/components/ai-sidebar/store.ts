@@ -40,7 +40,7 @@ import type {
   CommentTaskEnqueueOutcome,
 } from '../../../../src/commentTasks/protocol';
 import type { LegacyRitemarkConversationRun } from './conversationModel';
-import { applyCodexPlanApproval, applyCodexPlanUpdate, finalizeCodexTurnResult } from './lifecycle';
+import { applyCodexPlanApproval, applyCodexPlanUpdate, decodeRuntimeRetry, finalizeCodexTurnResult } from './lifecycle';
 import {
   createConversationState,
   isConversationEmpty,
@@ -342,6 +342,11 @@ interface AISidebarState {
   composerFill: { conversationId: string; text: string; cursor: number; nonce: number } | null;
   /** Put words in the open chat's box, focused, the cursor at `cursor`; `origin` tells the host where they came from. */
   fillComposer: (text: string, cursor: number, origin?: { readyRequest?: 'what_is_here' | 'what_for'; startingPoint?: StartingPlace }) => void;
+  /**
+   * Sprint 143 (#544, R3a): Continue with <AI> on the waiting line and the busy card: stop this chat's turn if it
+   * still runs, continue the chat with that AI, and put the message back in the box.
+   */
+  continueWithAlternative: (runtimeId: AgentId, modelId: string, text: string) => void;
   takeComposerFill: () => void;
   /** Sprint 140 (D4): the open chat's box holds no words, so the starting points show. */
   composerEmpty: boolean;
@@ -2239,6 +2244,16 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       }
     },
 
+    continueWithAlternative: (runtimeId, modelId, text) => {
+      const conversation = activeConversation();
+      if (!conversation) return;
+      const running = conversation.codexConversation.some((turn) => turn.isRunning)
+        || conversation.agentConversation.some((turn) => turn.isRunning);
+      if (running) get().cancelRequest();
+      get().selectRuntimeModel(runtimeId, modelId);
+      if (text.trim()) get().fillComposer(text, text.length);
+    },
+
     takeComposerFill: () => set({ composerFill: null }),
 
     setComposerEmpty: (empty) => {
@@ -2262,8 +2277,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           acpProviders: state.acpProviders,
         });
         if (!modelId) {
-          // Not known yet: the next host message may bring it. After 20 s the chat stays as it is.
-          if (Date.now() - pending.since > 20_000) set({ pendingLanding: null });
+          // Not known yet: the next host message may bring it. Sprint 143 (#551, R2): ChatGPT's and Claude's
+          // lists are local and always come, so their landing waits for them; only OpenCode's, which needs
+          // the providers' keys, gives up after 20 s, and says so to the host's log.
+          if (pending.runtimeId === 'opencode' && Date.now() - pending.since > 20_000) {
+            set({ pendingLanding: null });
+            vscode.postMessage({ type: 'landing/dropped', runtimeId: pending.runtimeId, reason: 'no model after 20 s' });
+          }
           return;
         }
         get().selectRuntimeModel(pending.runtimeId, modelId);
@@ -3347,6 +3367,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           patchLastCodexTurn(targetId, (lastTurn) => ({
             ...lastTurn,
             activities: [...lastTurn.activities, message.progress as AgentProgress],
+            // Sprint 143 (#544): the AI went on; its wait is over.
+            retry: undefined,
           }));
           break;
         }
@@ -3357,6 +3379,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           // Sprint 139 (#552): another message (a working note, then the answer) starts a new paragraph.
           patchLastCodexTurn(targetId, (lastTurn) => ({
             ...lastTurn,
+            retry: undefined,
             streamingText: appendStreamedText(lastTurn.streamingText, message.delta, lastTurn.streamingMessageId, message.messageId),
             ...(message.messageId ? { streamingMessageId: message.messageId } : {}),
           }));
@@ -3368,6 +3391,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           if (!targetId) break;
           patchLastCodexTurn(targetId, (lastTurn) => ({
             ...lastTurn,
+            retry: undefined,
             pendingQuestion: {
               requestId: message.requestId,
               questions: message.questions,
@@ -3440,6 +3464,16 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           break;
         }
 
+        case 'codex-retry': {
+          // Sprint 143 (#544, R3a): the AI waits to try again; the status line counts it down.
+          const targetId = routeInbound(message);
+          if (!targetId) break;
+          const retry = decodeRuntimeRetry(message as unknown as Record<string, unknown>);
+          if (!retry) break;
+          patchLastCodexTurn(targetId, (lastTurn) => ({ ...lastTurn, retry }));
+          break;
+        }
+
         case 'agent-approval-request': {
           const targetId = routeInbound(message);
           if (!targetId) break;
@@ -3481,6 +3515,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             // File-write / shell-command / permission approval for Codex + ACP
             patchLastCodexTurn(targetId, (lastTurn) => ({
               ...lastTurn,
+              retry: undefined,
               approval: {
                 approvalType: message.kind === 'file-write' ? 'fileChange' : 'command',
                 requestId: message.requestId,
@@ -3498,6 +3533,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           if (!targetId) break;
           patchLastCodexTurn(targetId, (lastTurn) => ({
             ...lastTurn,
+            retry: undefined,
             approval: {
               approvalType: message.approvalType,
               requestId: message.requestId,

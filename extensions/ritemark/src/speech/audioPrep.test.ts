@@ -13,6 +13,7 @@ import {
   AUDIO_EXTENSIONS,
   VIDEO_EXTENSIONS,
   assertSupportedInput,
+  cannotTakeOnDevice,
   classifyInput,
   computePeaks,
   parseWavHeader,
@@ -142,6 +143,24 @@ async function run(): Promise<void> {
     assert.deepEqual(await computePeaks(silent, 10), [], 'an empty file yields no peaks rather than throwing');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+
+  // ── Sprint 143 (#509, R8, S35): what an engine can't take on this computer ──
+  {
+    const onDevice = ['.mp3', '.wav', '.flac', '.ogg'];
+    // The Mac converts: nothing is refused.
+    assert.equal(cannotTakeOnDevice('.m4a', onDevice, true), null);
+    assert.equal(cannotTakeOnDevice('.aac', onDevice, true), null);
+    // No converter (Windows): .m4a and .aac are refused before anything starts, in the job's own words.
+    assert.equal(
+      cannotTakeOnDevice('.m4a', onDevice, false),
+      '.m4a files need converting before they can be transcribed on this device. Use .mp3 or .wav, or transcribe with ElevenLabs.',
+    );
+    assert.match(cannotTakeOnDevice('.AAC', onDevice, false) ?? '', /^\.aac files need converting/);
+    // What the engine reads itself is never refused.
+    for (const ext of onDevice) assert.equal(cannotTakeOnDevice(ext, onDevice, false), null, `${ext} is read as it is`);
+    // An engine that takes the original file (ElevenLabs) is never refused.
+    assert.equal(cannotTakeOnDevice('.m4a', AUDIO_EXTENSIONS, false), null);
   }
 
   console.log('audioPrep.test.ts: all tests passed');

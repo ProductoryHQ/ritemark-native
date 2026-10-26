@@ -33,6 +33,7 @@ import type { BoardSnapshot } from './protocol';
 import { BOARD_AGENTS, WIP_LIMIT_DEFAULT } from './protocol';
 import { CARD_FOLDER } from './cardTypes';
 import type { BoardHostActions, BoardSurfaceContext } from './boardSurface';
+import { pickerFolder } from '../utils/dialogDefaults';
 
 /** The Tasks place's container id, as the shell reports a click on it. */
 
@@ -244,7 +245,8 @@ export function registerTaskBoard(deps: TaskBoardHostDependencies): TaskBoardHos
       const card = await store.get(cardId);
       if (!card) return;
       const picked = await vscode.window.showOpenDialog({
-        defaultUri: folder.uri,
+        // Sprint 143 (#510): a folder that exists, never the operating system's guess.
+        defaultUri: vscode.Uri.file(pickerFolder([folder.uri.fsPath])),
         canSelectMany: true,
         canSelectFolders: false,
         openLabel: 'Add to card',

@@ -19,7 +19,8 @@ import { isEnabled } from '../features';
 import type { EngineRegistry } from '../speech/engineRegistry';
 import type { JobManager } from '../speech/JobManager';
 import type { SessionStore } from '../speech/SessionStore';
-import { AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, classifyInput } from '../speech/audioPrep';
+import { AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, canConvertLocally, cannotTakeOnDevice, classifyInput } from '../speech/audioPrep';
+import { pickerFolder } from '../utils/dialogDefaults';
 import { probeDurationSec } from '../speech/durationProbe';
 import { sessionIdForPath } from '../speech/SessionStore';
 import { ensureModelDownloaded } from '../voiceDictation/modelManager';
@@ -53,7 +54,8 @@ interface PendingImport {
   audioName: string;
   /** null when it genuinely could not be determined (see durationProbe). */
   durationSec: number | null;
-  estimates: Array<{ engineId: string; costUsd: number | null }>;
+  /** `refusal`: why this engine can't take this file on this computer (Sprint 143, #509). */
+  estimates: Array<{ engineId: string; costUsd: number | null; refusal?: string }>;
 }
 
 export class TranscribeViewProvider implements vscode.WebviewViewProvider {
@@ -140,7 +142,7 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
           canSelectMany: false,
           title: 'Where should Ritemark save recordings?',
           openLabel: 'Save recordings here',
-          defaultUri: vscode.Uri.file(current ?? os.homedir()),
+          defaultUri: vscode.Uri.file(pickerFolder([current])),
         });
         return picked?.[0]?.fsPath;
       },
@@ -268,6 +270,10 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
         case 'transcribe:cancel':
           this._jobs.cancel(message.jobId);
           break;
+        case 'transcribe:dismissJob':
+          // Sprint 143 (#509): a failed or interrupted card goes; the audio file stays.
+          if (typeof message.jobId === 'string') this._jobs.dismiss(message.jobId);
+          break;
         case 'transcribe:openSession':
           void this._openSession(message.sessionId);
           break;
@@ -314,6 +320,8 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
       canSelectMany: false,
       openLabel: 'Add recording',
       filters: { Audio: AUDIO_EXTENSIONS.map((ext) => ext.slice(1)) },
+      // Sprint 143 (#510): a folder that exists, never the operating system's guess.
+      defaultUri: vscode.Uri.file(pickerFolder([currentWorkspaceRoot()])),
     });
     if (picked?.[0]) await this._stageImport(picked[0].fsPath);
   }
@@ -338,10 +346,16 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
     }
 
     const durationSec = await probeDurationSec(audioPath);
-    const estimates = this._registry.supported().map((engine) => ({
-      engineId: engine.id,
-      costUsd: durationSec === null ? null : engine.estimateCostUsd(durationSec),
-    }));
+    const canConvert = canConvertLocally();
+    const estimates = this._registry.supported().map((engine) => {
+      // Sprint 143 (#509): said before anything starts, not after the job has failed.
+      const refusal = cannotTakeOnDevice(path.extname(audioPath), engine.acceptsExtensions, canConvert);
+      return {
+        engineId: engine.id,
+        costUsd: durationSec === null ? null : engine.estimateCostUsd(durationSec),
+        ...(refusal ? { refusal } : {}),
+      };
+    });
 
     this._pending = {
       audioPath,
@@ -355,6 +369,11 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
   private async _start(engineId: EngineId, language: string | null): Promise<void> {
     const pending = this._pending;
     if (!pending) return;
+    // Sprint 143 (#509): an engine that can't take this file on this computer is never started (a stale page).
+    if (pending.estimates.some((estimate) => estimate.engineId === engineId && estimate.refusal)) {
+      await this._pushState();
+      return;
+    }
 
     this._pending = null;
     await this._memento.update('speech:lastEngineId', engineId);
@@ -453,6 +472,7 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
       openLabel: 'Relink recording',
       title: `Find ${path.basename(session.audioPath)}`,
       filters: { Audio: AUDIO_EXTENSIONS.map((ext) => ext.slice(1)) },
+      defaultUri: vscode.Uri.file(pickerFolder([path.dirname(session.audioPath), session.workspaceRoot, currentWorkspaceRoot()])),
     });
     if (!picked?.[0]) return;
 

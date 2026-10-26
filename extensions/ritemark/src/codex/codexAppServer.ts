@@ -12,6 +12,12 @@
 
 import { EventEmitter } from 'events';
 import { CodexManager } from './codexManager';
+import { LineBuffer, parseCodexRetryLine, type CodexRetryWaitHeard } from './codexRetry';
+
+/** Codex's `error` notification, re-emitted under a name an EventEmitter doesn't treat as a crash. */
+export const CODEX_ERROR_EVENT = 'codex/error';
+/** Sprint 143 (#544, R3a): Codex logged how long it waits before trying again (a `CodexRetryWaitHeard`). */
+export const CODEX_RETRY_WAIT_EVENT = 'codex/retry-wait';
 import type {
   JsonRpcRequest,
   JsonRpcResponse,
@@ -48,6 +54,8 @@ export class CodexAppServer extends EventEmitter {
   private buffer = '';
   private lastStderrMessage: string | null = null;
   private sawStderrSinceStart = false;
+  /** Sprint 143 (#544, R3a): stderr by whole lines; a chunk need not end at a line's end. */
+  private readonly stderrLines = new LineBuffer();
   private initializePromise: Promise<InitializeResult> | null = null;
   private readonly trace?: (scope: string, message: string, payload?: unknown) => void;
 
@@ -405,7 +413,28 @@ export class CodexAppServer extends EventEmitter {
   }
 
   private handleStderr(data: string): void {
-    const normalized = data.trim();
+    this.handleStderrLines(this.stderrLines.push(data));
+  }
+
+  /**
+   * Sprint 143 (#544, R3a): every whole line of stderr. Codex's own line naming its wait before it tries
+   * again goes to the runtime (`CODEX_RETRY_WAIT_EVENT`, which pairs it with its turn's notification); the
+   * other lines are kept and logged together, as one chunk's message was before.
+   */
+  private handleStderrLines(lines: string[]): void {
+    const other: string[] = [];
+    for (const line of lines) {
+      const wait = parseCodexRetryLine(line);
+      if (wait) {
+        const heard: CodexRetryWaitHeard = { ...wait, at: Date.now() };
+        this.trace?.('stdio:stderr', 'retry wait', wait);
+        this.emit(CODEX_RETRY_WAIT_EVENT, heard);
+      } else if (line.trim()) {
+        other.push(line);
+      }
+    }
+
+    const normalized = other.join('\n').trim();
     if (!normalized || normalized === this.lastStderrMessage) {
       return;
     }
@@ -417,6 +446,8 @@ export class CodexAppServer extends EventEmitter {
   }
 
   private handleExit(code: number | null): void {
+    // A last line with no newline is still a line.
+    this.handleStderrLines(this.stderrLines.flush());
     this.trace?.('app-server', 'exit', { code });
     for (const [, { reject }] of this.pendingRequests.entries()) {
       reject(new Error('ChatGPT stopped unexpectedly.'));
@@ -481,7 +512,9 @@ export class CodexAppServer extends EventEmitter {
       // Notification (event)
       const notification = message as unknown as JsonRpcNotification;
       this.trace?.('rpc:event', String(notification.method), notification.params);
-      this.emit(notification.method as string, notification.params);
+      // Sprint 143 (#544): Codex's `error` notification can't be emitted as 'error': an EventEmitter throws an
+      // 'error' nobody listens to, which this loop caught and logged as a JSON line it couldn't parse.
+      this.emit(notification.method === 'error' ? CODEX_ERROR_EVENT : notification.method as string, notification.params);
       this.emit('notification', notification);
     }
   }

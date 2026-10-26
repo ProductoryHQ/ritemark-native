@@ -48,7 +48,7 @@ import {
   welcomeKind,
   type ProfileKind,
 } from './updateDetection';
-import { LANDING_KEY, decideLanding, isLandingRecord, landingPlaceholder, type LandingRecord, type ProjectSource } from './landing';
+import { LANDING_KEY, decideLanding, isLandingRecord, landingPlaceholder, whyNoLanding, type LandingRecord, type ProjectSource } from './landing';
 import { createProjectFolder, defaultProjectsParent, documentsFolder, parseRegQueryPersonal, placeLine } from './newProject';
 import { SAMPLE_PROJECT_SOURCE, copySampleProject } from './sampleProject';
 import { projectRows, type ProjectRow } from './recentProjects';
@@ -60,11 +60,13 @@ import {
   initialMemory,
   providerView,
   runtimeOfProvider,
+  selectedAgentOnLeave,
   type ProviderMemory,
   usageAnswerOnLeave,
   usageSwitchOn,
 } from './welcomeState';
 import { folderGone, FOLDER_OPEN_FAILED } from './words';
+import { pickerFolder } from '../utils/dialogDefaults';
 import {
   decodeWelcomeRequest,
   WELCOME_KEY_NAMES,
@@ -257,8 +259,13 @@ class WelcomeController implements vscode.Disposable {
   /** After the reload (R6): land on the folder the welcome sent the person to, once. */
   private async runLanding(): Promise<boolean> {
     const stored = this.context.globalState.get(LANDING_KEY);
-    if (stored === undefined) return false;
     const windowFolder = vscode.workspace.workspaceFolders?.[0]?.uri.toString();
+    // Sprint 143 (#551, R2): a landing that doesn't happen says why in the log, never as a count.
+    const finished = this.context.globalState.get<{ at?: string }>(WELCOME_FINISHED_KEY);
+    const finishedAt = finished?.at ? Date.parse(finished.at) : NaN;
+    const why = windowFolder ? whyNoLanding({ stored, windowFolder, now: Date.now(), welcomeFinishedAt: Number.isFinite(finishedAt) ? finishedAt : undefined }) : null;
+    if (why) console.warn(`[welcome] No landing: ${why}.`);
+    if (stored === undefined) return false;
     const folderExists = isLandingRecord(stored) ? fs.existsSync(vscode.Uri.parse(stored.folder).fsPath) : false;
     const decision = decideLanding({ stored, windowFolder, folderExists, now: Date.now() });
     if (decision.action === 'none') {
@@ -841,7 +848,15 @@ class WelcomeController implements vscode.Disposable {
   }
 
   private async openFolder(): Promise<void> {
-    const picked = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: 'Open' });
+    const documents = await this.documentsFolder();
+    const picked = await vscode.window.showOpenDialog({
+      canSelectFolders: true,
+      canSelectFiles: false,
+      canSelectMany: false,
+      openLabel: 'Open',
+      // Sprint 143 (#510): a folder that exists, never the operating system's guess.
+      defaultUri: vscode.Uri.file(pickerFolder([documents])),
+    });
     if (!picked?.[0]) return;
     await this.goTo(picked[0], 'existing_folder');
   }
@@ -853,7 +868,7 @@ class WelcomeController implements vscode.Disposable {
       canSelectFiles: false,
       canSelectMany: false,
       openLabel: 'Choose',
-      defaultUri: vscode.Uri.file(this.projectsParent ?? documents),
+      defaultUri: vscode.Uri.file(pickerFolder([this.projectsParent, documents])),
     });
     if (!picked?.[0]) return;
     this.projectsParent = picked[0].fsPath;
@@ -953,6 +968,16 @@ class WelcomeController implements vscode.Disposable {
     this.push();
     await this.context.globalState.update(LANDING_KEY, record);
     await this.finish();
+    // Sprint 143 (#551, R2): the chosen AI is the one new chats start with, saved before the reload, so the
+    // project's first chat is on it even if the landing never applies. The landing itself writes the same.
+    const agent = selectedAgentOnLeave(this.readyProvider);
+    if (agent) {
+      try {
+        await vscode.workspace.getConfiguration('ritemark.ai').update('selectedAgent', agent, vscode.ConfigurationTarget.Global);
+      } catch (error) {
+        console.warn('[welcome] Could not save the chosen AI:', error);
+      }
+    }
     try {
       await vscode.commands.executeCommand('vscode.openFolder', folder, { forceNewWindow: false });
     } catch {

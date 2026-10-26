@@ -5,11 +5,32 @@
  * time, red failure, faint stopped. Never says "Done" while a card is pending
  * — that gating lives in deriveActivityState, not here.
  */
+import { useEffect, useState } from 'react';
 import { Icon } from '../ui/Icon';
-import { useActiveConversation } from './store';
+import { Button } from '../ui/button';
+import { Tooltip } from '../ui/tooltip';
+import { useActiveConversation, useAISidebarStore } from './store';
 import { deriveActivityState, presentActivityState } from './activityState';
 import { activeDurationMs } from './types';
-import { failureSilencesStatusLine } from '../../../../src/runtime/turnFailureCopy';
+import { useReadyAlternative } from './TurnFailureCard';
+import {
+  continueWithAction,
+  failureSilencesStatusLine,
+  retryingLine,
+  retryingOffersAlternative,
+} from '../../../../src/runtime/turnFailureCopy';
+
+/** Sprint 143 (#544, R3a): the waiting line's minutes count down; a tick every 15 s is enough. */
+function useNow(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, [active]);
+  return now;
+}
 
 const TONE_CLASS: Record<string, string> = {
   accent: 'text-[var(--r-accent)]',
@@ -43,7 +64,25 @@ export function ActivityStatusLine() {
   const backgroundCount = conversation.backgroundTasks?.length ?? 0;
   const chipCount = Math.max(runningSubagents, backgroundCount);
 
-  const presentation = presentActivityState(state, { activeSeconds, waitedSeconds, liveActivity, backgroundCount });
+  // Sprint 143 (#544, R3a): the AI waits to try again after the provider turned the request away.
+  const lastRuntime = last && 'streamingText' in last
+    ? (last.runtime === 'opencode' ? 'opencode' as const : 'codex' as const)
+    : 'claude-code' as const;
+  const retry = state === 'running' && last && 'retry' in last && last.retry?.busy ? last.retry : undefined;
+  // The tick re-renders every 15 s while a wait counts down; the time itself is read now.
+  useNow(Boolean(retry?.retryAt));
+  const msLeft = retry?.retryAt !== undefined ? Math.max(0, retry.retryAt - Date.now()) : undefined;
+  const alternative = useReadyAlternative(lastRuntime);
+  const continueWithAlternative = useAISidebarStore((s) => s.continueWithAlternative);
+  const offerAlternative = Boolean(retry && alternative && retryingOffersAlternative(msLeft));
+
+  const presentation = presentActivityState(state, {
+    activeSeconds,
+    waitedSeconds,
+    liveActivity,
+    backgroundCount,
+    ...(retry ? { retryLine: retryingLine(lastRuntime, msLeft) } : {}),
+  });
   if (!presentation) return null;
 
   // AgentResponse already renders recoverable Claude auth failures as an
@@ -57,10 +96,9 @@ export function ActivityStatusLine() {
     return null;
   }
   // Sprint 139 (#376): the same under every card with a way on — sign-in, model, limit — for all three AIs.
-  const lastRuntime = last && 'streamingText' in last
-    ? (last.runtime === 'opencode' ? 'opencode' as const : 'codex' as const)
-    : 'claude-code' as const;
-  if (state === 'failed' && terminalResult?.error && failureSilencesStatusLine(lastRuntime, terminalResult.errorKind)) {
+  // Sprint 143 (#544, R3a): except the busy card, under which it says "Failed".
+  const terminalDetail = terminalResult && 'errorDetail' in terminalResult ? terminalResult.errorDetail : undefined;
+  if (state === 'failed' && terminalResult?.error && failureSilencesStatusLine(lastRuntime, terminalResult.errorKind, terminalDetail)) {
     return null;
   }
 
@@ -80,7 +118,19 @@ export function ActivityStatusLine() {
         className={presentation.spin ? 'animate-spin' : undefined}
       />
       {/* Sprint 128: "Done — 1 task still running in the background" may take two lines in a narrow side bar. */}
-      <span className="min-w-0 line-clamp-2">{presentation.label}</span>
+      <span className="min-w-0 line-clamp-2" data-retry-line={retry ? 'true' : undefined}>{presentation.label}</span>
+      {offerAlternative && alternative && last && (
+        <Tooltip label={continueWithAction(alternative.runtimeId, 'waiting').tooltip}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-my-1 ml-auto h-6 shrink-0 px-2 text-[12px]"
+            onClick={() => continueWithAlternative(alternative.runtimeId, alternative.modelId, last.userPrompt ?? '')}
+          >
+            {continueWithAction(alternative.runtimeId, 'waiting').label}
+          </Button>
+        </Tooltip>
+      )}
       {chipCount > 0 && state === 'running' && (
         <span className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--r-accent-soft)] px-1.5 py-0.5 text-[10px] text-[var(--r-accent-deep)]">
           <Icon name="robot" size={12} />

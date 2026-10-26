@@ -64,7 +64,11 @@ export function UserPromptBubble({ children, attachments, activeFilePath, active
           )}
         </div>
       )}
-      {children}
+      {/* Sprint 143 (#511): the person's own line breaks, as written (a task card's title, Done when and Files);
+          a long word or path wraps inside the bubble. */}
+      <div className="whitespace-pre-wrap [overflow-wrap:anywhere]" data-user-prompt-text>
+        {children}
+      </div>
     </div>
   );
 }

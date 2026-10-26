@@ -222,6 +222,7 @@ export function markConversationInterrupted(conversation: ConversationState): Co
     delete next.approval;
     delete next.pendingQuestion;
     delete next.rpcProgressMessage;
+    delete next.retry;
     if (!next.result) {
       next.result = { status: 'interrupted', error: INTERRUPTED_TURN_MESSAGE };
     }

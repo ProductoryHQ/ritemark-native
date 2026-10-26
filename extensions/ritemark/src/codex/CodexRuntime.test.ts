@@ -47,6 +47,8 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 import * as assert from 'assert';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { CodexRuntime, CodexSession, buildCodexBaseInstructions, isCodexSignInFailure } = require('./CodexRuntime') as typeof import('./CodexRuntime');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { CODEX_ERROR_EVENT, CODEX_RETRY_WAIT_EVENT, CodexAppServer } = require('./codexAppServer') as typeof import('./codexAppServer');
 type CodexRuntime = import('./CodexRuntime').CodexRuntime;
 type CodexSession = import('./CodexRuntime').CodexSession;
 import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime';
@@ -584,7 +586,90 @@ async function run() {
     console.log('✓ Test 16: a sign-in failure is told from a network failure');
   }
 
-  console.log('\nAll 16 CodexRuntime tests passed!');
+  // ── Test 17: Sprint 143 (#544, R3a) — Codex's wait to try again reaches its own turn, with its length.
+  {
+    const { runtime, mock } = makeRuntime(['thread-a', 'thread-b']);
+    const retriesA: unknown[] = [];
+    const retriesB: unknown[] = [];
+    await openTurn(runtime, 'conv-a', { ...dummyConfig, onRuntimeRetry: (retry) => retriesA.push(retry) });
+    await openTurn(runtime, 'conv-b', { ...dummyConfig, onRuntimeRetry: (retry) => retriesB.push(retry) });
+    // The notification the app-server sent against the local 429 endpoint (research/reproductions.md).
+    const notice = (threadId: string, turnId: string, n: number) => ({
+      error: { message: `Reconnecting... ${n}/5`, codexErrorInfo: { responseStreamDisconnected: { httpStatusCode: 429 } }, additionalDetails: 'exceeded retry limit, last status: 429 Too Many Requests' },
+      willRetry: true,
+      threadId,
+      turnId,
+    });
+    // The log line came first (the usual order): the wait goes with the notification.
+    const now = Date.now();
+    mock.emit(CODEX_RETRY_WAIT_EVENT, { attempt: 1, of: 5, delayMs: 419_000, turnId: 'turn-a1', at: now });
+    mock.emit(CODEX_ERROR_EVENT, notice('thread-a', 'turn-a1', 1));
+    assert.deepStrictEqual(retriesA, [{ attempt: 1, of: 5, busy: true, retryAt: now + 419_000 }]);
+    assert.deepStrictEqual(retriesB, [], 'only the turn it belongs to hears of it');
+    // The notification came first: the line that follows completes it.
+    mock.emit(CODEX_ERROR_EVENT, notice('thread-b', 'turn-b1', 2));
+    assert.deepStrictEqual(retriesB, [{ attempt: 2, of: 5, busy: true }], 'told at once, without the length');
+    mock.emit(CODEX_RETRY_WAIT_EVENT, { attempt: 2, of: 5, delayMs: 60_000, turnId: 'turn-b1', at: now });
+    assert.deepStrictEqual(retriesB[1], { attempt: 2, of: 5, busy: true, retryAt: now + 60_000 }, 'then again with the length');
+    // The turn's own failure (`willRetry: false`) is turn/completed's, not a retry.
+    mock.emit(CODEX_ERROR_EVENT, { ...notice('thread-a', 'turn-a1', 5), willRetry: false });
+    assert.strictEqual(retriesA.length, 1);
+    console.log('✓ Test 17: Codex retries reach their own turn, with the wait from the log');
+  }
+
+  // ── Test 18: Sprint 143 (#544, the PR's review) — two chats retrying together don't swap their waits.
+  {
+    const { runtime, mock } = makeRuntime(['thread-c', 'thread-d']);
+    const retriesC: Array<{ retryAt?: number }> = [];
+    const retriesD: Array<{ retryAt?: number }> = [];
+    await openTurn(runtime, 'conv-c', { ...dummyConfig, onRuntimeRetry: (retry) => retriesC.push(retry) });
+    await openTurn(runtime, 'conv-d', { ...dummyConfig, onRuntimeRetry: (retry) => retriesD.push(retry) });
+    const notice = (threadId: string, turnId: string) => ({
+      error: { message: 'Reconnecting... 1/5', codexErrorInfo: { responseStreamDisconnected: { httpStatusCode: 429 } } },
+      willRetry: true,
+      threadId,
+      turnId,
+    });
+    const now = Date.now();
+    // Both notifications first, then the lines in the other order, all within the pairing window.
+    mock.emit(CODEX_ERROR_EVENT, notice('thread-c', 'turn-c1'));
+    mock.emit(CODEX_ERROR_EVENT, notice('thread-d', 'turn-d1'));
+    mock.emit(CODEX_RETRY_WAIT_EVENT, { attempt: 1, of: 5, delayMs: 60_000, turnId: 'turn-d1', at: now });
+    mock.emit(CODEX_RETRY_WAIT_EVENT, { attempt: 1, of: 5, delayMs: 419_000, turnId: 'turn-c1', at: now });
+    assert.strictEqual(retriesC.length, 2);
+    assert.strictEqual(retriesD.length, 2);
+    assert.strictEqual(retriesC[1].retryAt, now + 419_000, "C gets C's wait");
+    assert.strictEqual(retriesD[1].retryAt, now + 60_000, "D gets D's wait");
+    console.log("✓ Test 18: two chats retrying together keep their own waits");
+  }
+
+  // ── Test 19: Sprint 143 (#544, the PR's review) — the app-server reads stderr by whole lines.
+  {
+    const server = new CodexAppServer();
+    const waits: Array<{ delayMs: number; turnId?: string }> = [];
+    server.on(CODEX_RETRY_WAIT_EVENT, (wait: { delayMs: number; turnId?: string }) => waits.push(wait));
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const s = server as any;
+      // The retry line split across two chunks, with another line before it in the first.
+      s.handleStderr('\u001b[33m WARN\u001b[0m codex_core::responses_retry: stream disconnected - retrying sampling req');
+      assert.strictEqual(waits.length, 0, 'half a line is not read yet');
+      s.handleStderr('uest (1/5 in 418.99s)... turn_id=turn-x1 retries=1\nERROR codex_core: something else\n');
+      assert.deepStrictEqual(waits.map((w) => [w.delayMs, w.turnId]), [[418_990, 'turn-x1']], 'the whole line is read once');
+      assert.strictEqual(s.lastStderrMessage, 'ERROR codex_core: something else', "the chunk's other line is kept too");
+      // A chunk with the retry line and another line: neither is dropped.
+      s.handleStderr('ERROR first\nretrying sampling request (2/5 in 60s) turn_id=turn-x2\n');
+      assert.deepStrictEqual(waits.map((w) => w.turnId), ['turn-x1', 'turn-x2']);
+      assert.strictEqual(s.lastStderrMessage, 'ERROR first');
+    } finally {
+      console.error = originalError;
+    }
+    console.log('✓ Test 19: stderr is read by whole lines, every line');
+  }
+
+  console.log('\nAll 19 CodexRuntime tests passed!');
 }
 
 run().then(

@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { deriveActivityState, presentActivityState, formatSeconds } from './activityState';
 import { createConversationState, policyOf } from './conversationState';
+import { decodeRuntimeRetry } from './lifecycle';
 import type { ConversationState } from './conversationState';
 import type { AgentConversationTurn, CodexConversationTurn } from './types';
 
@@ -138,5 +139,19 @@ assert.deepEqual(
   policyOf({ runtimeId: 'codex', modelId: '', mode: 'auto', planFirst: true }),
   { autonomy: 'auto', planFirst: true },
 );
+
+// ── Sprint 143 (#544, R3a): the waiting line takes the working line's place, in amber ──
+assert.deepEqual(
+  presentActivityState('running', { liveActivity: 'Thinking...', retryLine: 'ChatGPT is busy. Trying again in 7 minutes.' }),
+  { icon: 'clock', tone: 'amber', label: 'ChatGPT is busy. Trying again in 7 minutes.' },
+);
+assert.equal(presentActivityState('running', {})?.label, 'Working…', 'when the AI tries again, the working words come back');
+{
+  const now = 1_000_000;
+  assert.deepEqual(decodeRuntimeRetry({ busy: true, retryAt: now + 419_000, attempt: 1, of: 5 }, now), { busy: true, retryAt: now + 419_000, attempt: 1, of: 5 });
+  assert.deepEqual(decodeRuntimeRetry({ busy: true, retryAt: now + 5 * 3_600_000 }, now), { busy: true }, 'a wait hours away is nonsense, not counted');
+  assert.deepEqual(decodeRuntimeRetry({ busy: false, attempt: 'x' }, now), { busy: false });
+  assert.equal(decodeRuntimeRetry({ attempt: 1 }, now), null);
+}
 
 console.log('activityState + policyOf tests passed.');

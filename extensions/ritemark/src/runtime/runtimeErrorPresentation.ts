@@ -270,6 +270,59 @@ function resetClause(text: string): string | undefined {
   return undefined;
 }
 
+const DAY_MS = 24 * 3600 * 1000;
+
+/**
+ * Sprint 143 (#544, R3a): when the service said to try again, as an ISO time, from its own words. Either
+ * "in …" ("Please try again in 6m59s", "try again in 420 seconds", "in 7 minutes") or "at …" ("try again at
+ * 3:12 PM", "at 15:12", "at 13:12 UTC", "at 2026-10-27T13:12:00Z"). A time of day with no zone is the
+ * person's own; one already past is tomorrow's. Undefined when it didn't say, or said more than a day away.
+ */
+export function serviceRetryAt(text: string, now = Date.now()): string | undefined {
+  return retryIn(text, now) ?? retryAtTime(text, now);
+}
+
+function retryIn(text: string, now: number): string | undefined {
+  const match = /try again in\s+((?:\d+(?:\.\d+)?\s*(?:h|hours?|m|min|minutes?|s|sec|seconds?)\s*)+)/i.exec(text);
+  if (!match) return undefined;
+  let seconds = 0;
+  for (const part of match[1].matchAll(/(\d+(?:\.\d+)?)\s*(h|hours?|m|min|minutes?|s|sec|seconds?)/gi)) {
+    const value = Number(part[1]);
+    const unit = part[2].toLowerCase();
+    seconds += unit.startsWith('h') ? value * 3600 : unit.startsWith('m') ? value * 60 : value;
+  }
+  if (!(seconds > 0) || seconds > 24 * 3600) return undefined;
+  return new Date(now + Math.ceil(seconds) * 1000).toISOString();
+}
+
+function retryAtTime(text: string, now: number): string | undefined {
+  const iso = /try again (?:at|after)\s+(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)/i.exec(text);
+  if (iso) {
+    const at = Date.parse(iso[1].replace(' ', 'T'));
+    return Number.isFinite(at) && at > now && at - now <= DAY_MS ? new Date(at).toISOString() : undefined;
+  }
+  const clock = /try again (?:at|after)\s+(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(?:([ap])\.?\s?m\b\.?)?\s*(UTC|GMT|Z\b)?/i.exec(text);
+  if (!clock) return undefined;
+  const [, h, m, s, half, utc] = clock;
+  // "at 3" alone is not a time; "at 3pm" and "at 15:00" are.
+  if (m === undefined && !half) return undefined;
+  let hours = Number(h);
+  const minutes = Number(m ?? 0);
+  const seconds = Number(s ?? 0);
+  if (half) {
+    if (hours < 1 || hours > 12) return undefined;
+    hours = (hours % 12) + (half.toLowerCase() === 'p' ? 12 : 0);
+  }
+  if (hours > 23 || minutes > 59 || seconds > 59) return undefined;
+  const day = new Date(now);
+  const on = (plusDays: number) => utc
+    ? Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate() + plusDays, hours, minutes, seconds)
+    : new Date(day.getFullYear(), day.getMonth(), day.getDate() + plusDays, hours, minutes, seconds).getTime();
+  let at = on(0);
+  if (at <= now) at = on(1);
+  return at - now <= DAY_MS + 3600_000 ? new Date(at).toISOString() : undefined;
+}
+
 function finish(
   agentId: AgentId,
   kind: RuntimeErrorKind,
@@ -342,6 +395,12 @@ export function classifyRuntimeError(
     if (code === 'usagelimitexceeded') {
       const resetsAt = resetClause(haystack);
       return finish(agentId, 'limit', providerSentence, hints, { limit: 'plan', ...(resetsAt ? { resetsAt } : {}) });
+    }
+    // Sprint 143 (#544, R3a): ChatGPT turned the request away (429) until Codex's retries ran out; not a plan limit.
+    if (code === 'ratelimitexceeded'
+      || ((code === 'responsetoomanyfailedattempts' || code === 'responsestreamdisconnected') && hints?.httpStatus === 429)) {
+      const retryAt = serviceRetryAt(haystack);
+      return finish(agentId, 'limit', providerSentence, hints, { limit: 'busy', ...(retryAt ? { retryAt } : {}) });
     }
     if (CODEX_NETWORK_CODES.has(code) && hints?.httpStatus === undefined) {
       return finish(agentId, 'network', providerSentence, hints);
