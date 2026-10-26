@@ -205,14 +205,25 @@ async function press(key, code, keyCode, modifiers = 0) {
   }
 }
 
-async function screenshot(name) {
+async function screenshot(name, clip) {
   const client = await connect((await page()).webSocketDebuggerUrl);
   try {
-    const { data } = await client.send('Page.captureScreenshot', { format: 'png' });
+    const { data } = await client.send('Page.captureScreenshot', { format: 'png', ...(clip ? { clip: { ...clip, scale: 1 } } : {}) });
     fs.writeFileSync(path.join(EVIDENCE, name), Buffer.from(data, 'base64'));
   } finally {
     client.close();
   }
+}
+
+/** An element's rect in the workbench: its rect in the webview's frame plus the frame's. */
+async function rectIn(probe, elementExpression) {
+  const target = await webview(probe);
+  if (!target) return null;
+  const rect = await evaluate(target.webSocketDebuggerUrl, `(function(){const af=document.getElementById('active-frame'); const w=af.contentWindow, d=af.contentDocument; const el=(${elementExpression}); if(!el) return null; el.scrollIntoView({block:'center'}); const r=el.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height};})()`);
+  if (!rect) return null;
+  const id = /[?&]id=([^&]+)/.exec(target.url)?.[1] ?? '';
+  const frame = await evaluate((await page()).webSocketDebuggerUrl, `(function(){const f=[...document.querySelectorAll('iframe')].find(i=>i.src.includes(${JSON.stringify(id)})); if(!f) return null; const r=f.getBoundingClientRect(); return {x:r.x,y:r.y};})()`);
+  return frame ? { x: frame.x + rect.x, y: frame.y + rect.y, width: rect.width, height: rect.height } : null;
 }
 
 // ── the instance ───────────────────────────────────────────────────────────
@@ -298,7 +309,7 @@ async function run() {
   if (portBusy()) throw new Error(`port ${PORT} is in use: not this run's instance`);
   // A fresh profile every run, and only ever under a temporary folder.
   const tmpRoots = ['/private/tmp/', '/tmp/', os.tmpdir() + path.sep];
-  if (!tmpRoots.some((root) => path.resolve(PROFILE).startsWith(root)) || path.resolve(PROFILE).split(path.sep).length < 4) {
+  if (!tmpRoots.some((root) => path.resolve(PROFILE).startsWith(root)) || path.resolve(PROFILE).split(path.sep).length < 5) {
     throw new Error(`--profile must be a folder of its own under a temporary folder, not ${PROFILE}`);
   }
   fs.rmSync(PROFILE, { recursive: true, force: true });
@@ -316,10 +327,16 @@ async function run() {
     await launch(null, path.join(PROFILE, 'launch1.log'));
     const WELCOME = "d.body.innerText.includes('Which AI do you use?')";
     const cards = await waitFor(WELCOME, "const c=[...d.querySelectorAll('.rw-choice')].map(c=>c.innerText.replace(/\\n+/g,' | ')); return c.length && !c.some(t=>t.includes('Checking'))? c: null", 60);
-    step('S1 the step-1 cards say which plans work, never Codex', {
+    // Every card keeps its line, signed in or not; the button row says the state.
+    const PLAN_LINES = {
+      ChatGPT: 'Any plan works, free included.',
+      Claude: 'Needs a paid plan, such as Pro or Max.',
+      OpenCode: 'Open models, with an API key of your own.',
+    };
+    step('S1 every step-1 card says which plans work, signed in or not, never Codex', {
       ok: Boolean(cards) && !JSON.stringify(cards).match(/codex/i)
-        && cards.some((card) => card.startsWith('Claude') && (card.includes('Sign in with a paid plan, such as Pro or Max.') || card.includes('Signed in')))
-        && cards.some((card) => card.startsWith('ChatGPT') && (card.includes('Sign in with any plan, free included.') || card.includes('Signed in'))),
+        && Object.entries(PLAN_LINES).every(([name, line]) => cards.some((card) => card.startsWith(name) && card.includes(line)))
+        && cards.every((card) => /Signed in|Sign in|Set up/.test(card)),
       detail: cards,
     });
     await screenshot(`${AI}-1-welcome.png`);
@@ -379,10 +396,17 @@ async function run() {
       ok: refused?.errorKind === 'model' && Boolean(card?.buttons?.length) && !card?.statusLine,
       detail: { result: refused, card },
     });
+    // The provider's raw words are kept in the turn's activity row, labelled as theirs.
+    const theirWords = await inFrame(SHEET, "return [...d.querySelectorAll('button')].map(b=>b.innerText.trim()).find(t=>/ said$/.test(t))||null");
+    step(`the activity row that holds the raw words reads "What ${AI_NAME} said"`, { ok: theirWords === `What ${AI_NAME} said`, detail: theirWords });
     const before = await resultCount();
     if (card?.buttons?.[0]) await clickIn(SHEET, `[...d.querySelectorAll('[data-turn-failure] button')][0]`);
-    const switched = await waitFor(SHEET, "const c=d.querySelector('[data-turn-failure=\"model\"]'); return c&&c.innerText.includes('Switched')? c.innerText: null", 10);
-    step("S25 the card's switch changes the model and resends nothing", { ok: Boolean(switched) && (await resultCount()) === before, detail: switched });
+    const switched = await waitFor(SHEET, "const c=d.querySelector('[data-turn-failure=\"model\"]'); return c&&c.innerText.includes('Now using')? {text:c.innerText, done:Boolean(c.querySelector('[role=status]')), buttons:c.querySelectorAll('button').length}: null", 10);
+    await screenshot(`${AI}-4b-switched.png`);
+    step("S25 the card's switch changes the model and resends nothing; the card says Now using, with the check", {
+      ok: Boolean(switched?.done) && switched.buttons === 0 && !/couldn't|\u2014/.test(switched.text) && (await resultCount()) === before,
+      detail: switched,
+    });
     await sleep(1500);
     const modelEvent = report.events.filter((event) => event.event === 'agent_used').at(-1);
     step('S40/R8 the refused turn is counted with outcome model', { ok: modelEvent?.properties.outcome === 'model', detail: modelEvent && own(modelEvent.properties) });
@@ -392,6 +416,10 @@ async function run() {
     await quit();
     await launch(WORKSPACE, path.join(PROFILE, 'launch2.log'));
     await waitFor(SHEET, TRACE, 90);
+    // The refused chat, as the restart left it: the card says the switch was taken (it may open first).
+    const RESTORED = "const c=d.querySelector('[data-turn-failure=\"model\"]'); return c&&c.innerText.includes('Now using')? {text:c.innerText, buttons:c.querySelectorAll('button').length, statusLine:(d.querySelector('[data-activity-state]')||{}).innerText||null}: null";
+    let restoredCard = await waitFor(SHEET, RESTORED, 8);
+    if (restoredCard) await screenshot(`${AI}-6-restored-card.png`);
     await clickIn(SHEET, "d.querySelector('button[aria-label=\"All conversations\"]')");
     await waitFor(`d.body.innerText.includes(${JSON.stringify(firstTitle)})`, 'return true', 20);
     await clickIn(`d.body.innerText.includes(${JSON.stringify(firstTitle)})`, `[...d.querySelectorAll('*')].find(e=>e.children.length===0&&e.textContent.trim()===${JSON.stringify(firstTitle)})`);
@@ -403,6 +431,37 @@ async function run() {
     const continuation = await inFrame(SHEET, "return (w.__rmRun||[]).filter(m=>m.type==='conversation/continuation-state').map(m=>m.state.mode)");
     step("S33 the next message continues the AI's own thread", { ok: again?.status === 'completed' && continuation?.includes('native-restored'), detail: { continuation } });
     await screenshot(`${AI}-5-after-restart.png`);
+    if (!restoredCard) {
+      await clickIn(SHEET, "[...d.querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').endsWith(' — Recent'))");
+      await sleep(2000);
+      restoredCard = await waitFor(SHEET, RESTORED, 10);
+      if (restoredCard) await screenshot(`${AI}-6-restored-card.png`);
+    }
+    step('S36 after a restart the refused chat says Now using, with no button and nothing on the status line', {
+      ok: Boolean(restoredCard) && restoredCard.buttons === 0 && !restoredCard.statusLine,
+      detail: restoredCard,
+    });
+
+    // 6. Settings: the same plan lines (a signed-in AI shows its account, so its line is not drawn there).
+    // ⌘⇧P from the desk, then the palette row itself (Enter there is not reliable over CDP).
+    await mouse(700, 900);
+    await press('p', 'KeyP', 80, 12);
+    await sleep(800);
+    await insertText('AI Settings');
+    await sleep(1200);
+    const paletteRow = await evaluate((await page()).webSocketDebuggerUrl, "(function(){const r=[...document.querySelectorAll('.quick-input-list .monaco-list-row')].find(r=>(r.getAttribute('aria-label')||'').startsWith('AI Settings')); if(!r) return null; const b=r.getBoundingClientRect(); return {x:b.x+b.width/2,y:b.y+b.height/2};})()");
+    if (paletteRow) await mouse(paletteRow.x, paletteRow.y);
+    const SETTINGS = "d.body.innerText.includes('Claude Account')";
+    const settingsLines = await waitFor(SETTINGS, `const t=d.body.innerText; return t.includes('Ritemark')? {claude:t.includes(${JSON.stringify(PLAN_LINES.Claude)}), opencode:t.includes(${JSON.stringify(PLAN_LINES.OpenCode)}), chatgpt:t.includes(${JSON.stringify(PLAN_LINES.ChatGPT)})}: null`, 30);
+    // Only Claude's card is captured: the ChatGPT card beside it names the signed-in account.
+    const claudeCard = "[...d.querySelectorAll('p')].find(p=>p.innerText.startsWith('Needs a paid plan'))?.closest('.rounded-lg')";
+    const cardText = await inFrame(SETTINGS, `const el=${claudeCard}; return el? el.innerText: null`);
+    const clip = cardText && !cardText.includes('@') ? await rectIn(SETTINGS, claudeCard) : null;
+    if (clip) await screenshot(`${AI}-7-settings-claude.png`, clip);
+    step('S4 Settings: the signed-out cards lead with the same plan lines', {
+      ok: Boolean(settingsLines?.claude && settingsLines?.opencode) && Boolean(clip),
+      detail: { settingsLines, cardText },
+    });
     await quit();
 
     // The counts carry only their listed properties (S56).
