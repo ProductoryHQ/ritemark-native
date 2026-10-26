@@ -12,6 +12,7 @@ function harness(options: { maySend?: boolean } = {}) {
   let stored: unknown;
   let today = '2026-11-02';
   let maySend = options.maySend ?? true;
+  let failing = false;
   let salts = 0;
   const sent: Array<{ name: string; properties: Record<string, unknown> }> = [];
   const notes = new VoiceNotes({
@@ -19,7 +20,7 @@ function harness(options: { maySend?: boolean } = {}) {
     write: async (state) => { stored = state === undefined ? undefined : JSON.parse(JSON.stringify(state)); },
     maySend: () => maySend,
     track: async (name, properties) => {
-      if (!maySend) return false;
+      if (!maySend || failing) return false;
       sent.push({ name, properties: properties as Record<string, unknown> });
       return true;
     },
@@ -33,6 +34,7 @@ function harness(options: { maySend?: boolean } = {}) {
     stored: () => stored as VoiceNotesState | undefined,
     setToday: (day: string) => { today = day; },
     setMaySend: (value: boolean) => { maySend = value; },
+    setFailing: (value: boolean) => { failing = value; },
   };
 }
 
@@ -81,6 +83,21 @@ async function run(): Promise<void> {
     await notes.changedAndSaved(doc);
     assert.equal(sent.length, 1, 'once per capture');
     assert.equal(stored(), undefined, 'the entry is forgotten once its event is sent');
+  }
+
+  // A send that didn't go keeps the entry for the next save; two quick saves send once.
+  {
+    const { notes, sent, setToday, setFailing, stored } = harness();
+    await notes.remember(doc, 'dictation');
+    setToday('2026-11-03');
+    setFailing(true);
+    await notes.changedAndSaved(doc);
+    assert.deepEqual(sent, []);
+    assert.equal(stored()?.entries.length, 1, 'kept: its event was not sent');
+    setFailing(false);
+    await Promise.all([notes.changedAndSaved(doc), notes.changedAndSaved(doc)]);
+    assert.equal(sent.length, 1, 'sent once');
+    assert.equal(stored(), undefined, 'forgotten once sent');
   }
 
   // A second capture of the same document keeps the first day.

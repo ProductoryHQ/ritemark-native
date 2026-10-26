@@ -38,6 +38,8 @@ const REMEMBERED_TURNS = 500;
 
 export class TurnCounter {
   private firstReplyTurn: string | null = null;
+  /** The first message's send: `first_reply` waits for it, so the two always arrive in order. */
+  private firstMessageSent: Promise<unknown> = Promise.resolve();
   private readonly endedTurns = new Set<string>();
 
   constructor(private readonly deps: TurnCountDeps) {}
@@ -52,8 +54,11 @@ export class TurnCounter {
     if (!provider || !this.deps.maySend() || this.deps.firstMessageCounted()) return;
     // Remember the turn first: a turn that ends while the marker is being written still sends first_reply.
     this.firstReplyTurn = turnKey;
-    await this.deps.markFirstMessageCounted();
-    await this.deps.track('first_message_sent', { provider });
+    this.firstMessageSent = (async () => {
+      await this.deps.markFirstMessageCounted();
+      await this.deps.track('first_message_sent', { provider });
+    })();
+    await this.firstMessageSent;
   }
 
   /** A person's turn ended: completed, failed or stopped. */
@@ -68,7 +73,10 @@ export class TurnCounter {
     const isFirst = this.firstReplyTurn === turnKey;
     if (isFirst) this.firstReplyTurn = null;
     await this.deps.track('agent_used', { agent, source, outcome });
-    if (isFirst) await this.deps.track('first_reply', { provider: agent, outcome });
+    if (isFirst) {
+      await this.firstMessageSent.catch(() => undefined);
+      await this.deps.track('first_reply', { provider: agent, outcome });
+    }
   }
 
   /** Tests and diagnostics: the turn whose end sends `first_reply`, if any. */

@@ -77,6 +77,9 @@ function decodeState(value: unknown): VoiceNotesState | undefined {
 }
 
 export class VoiceNotes {
+  /** Notes whose event is on its way, so two quick saves send it once. */
+  private readonly sending = new Set<string>();
+
   constructor(private readonly deps: VoiceNotesDeps) {}
 
   /** A capture happened: a dictation put text in a document, or a Transcribe job became text. */
@@ -118,9 +121,17 @@ export class VoiceNotes {
       if (state.entries.length !== stored.entries.length) await this.deps.write(state);
       return;
     }
-    // Once per capture: the entry goes as its event is sent.
-    await this.deps.write({ salt: state.salt, entries: state.entries.filter((candidate) => candidate !== entry) });
-    await this.deps.track('voice_note_edited', { source: entry.source, days_since_capture: days });
+    // Once per capture: the entry goes once its event was sent. A send that didn't go keeps it for the next save.
+    if (this.sending.has(id)) return;
+    this.sending.add(id);
+    try {
+      if (!(await this.deps.track('voice_note_edited', { source: entry.source, days_since_capture: days }))) return;
+      const latest = this.fresh(decodeState(this.deps.read()), today);
+      const remaining = latest?.entries.filter((candidate) => candidate.id !== id) ?? [];
+      await this.deps.write(latest && remaining.length > 0 ? { salt: latest.salt, entries: remaining } : undefined);
+    } finally {
+      this.sending.delete(id);
+    }
   }
 
   /** At activation and whenever usage data changes: drop what is old, or everything when usage data is off. */

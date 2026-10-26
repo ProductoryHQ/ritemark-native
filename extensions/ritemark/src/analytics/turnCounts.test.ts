@@ -75,10 +75,13 @@ async function run(): Promise<void> {
       track: async (name) => { sent.push(name); return true; },
     });
     const accepting = counter.accepted('c:fast', 'codex', false);
-    await counter.ended('c:fast', 'codex', 'chat', 'stopped');
+    const ending = counter.ended('c:fast', 'codex', 'chat', 'stopped');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(sent.includes('first_reply'), false, 'first_reply waits for first_message_sent');
     release();
-    await accepting;
-    assert.deepEqual(sent.sort(), ['agent_used', 'first_message_sent', 'first_reply'].sort());
+    await Promise.all([accepting, ending]);
+    assert.deepEqual(sent.slice().sort(), ['agent_used', 'first_message_sent', 'first_reply'].sort());
+    assert.ok(sent.indexOf('first_message_sent') < sent.indexOf('first_reply'), `in order: ${sent.join(', ')}`);
   }
 
   // S42: a continuation (an approval, a plan review) is the same turn: counted once.
