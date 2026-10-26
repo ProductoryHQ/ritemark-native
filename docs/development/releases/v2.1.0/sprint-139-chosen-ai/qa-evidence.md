@@ -40,7 +40,7 @@ The scripted run (`scripts/qa/three-runtimes-check.mjs --ai chatgpt --default-mo
 
 The run before it, on the same words, failed two of its own checks: the raw-words row read "1 action completed · What ChatGPT said" (the label now follows the Experience lead's rule: a row that opens the provider's raw text says whose words they are), and the script's way into Settings (F1, Enter) didn't open the palette over CDP (it now uses ⌘⇧P and clicks the palette row).
 
-Seen in those runs: the chat's header said "Interrupted" after a failed or stopped turn (2.0's `conversationStatusLabel` for lifecycle `interrupted`). The Experience lead decided (26 October): the header shows a state only while it is live, so a turn that ended leaves just the title, for all three AIs; the chats list and the rail keep their marks. Built in `a971d9c5` (`headerStatusLabel`, unit-tested for each AI), and the script now checks the header under the refused model's card, live and after the restart. The re-run on `a971d9c5` passed all twelve checks, the header holding just the title under the card, live and after the restart.
+Seen in those runs: the chat's header said "Interrupted" after a failed or stopped turn (2.0's `conversationStatusLabel` for lifecycle `interrupted`). The Experience lead decided (26 October): the header shows a state only while it is live, so a turn that ended leaves just the title, for all three AIs; the chats list and the rail keep their marks. Built in `a971d9c5` (`headerStatusLabel`, unit-tested for each AI), and the script now checks the header under the refused model's card, live and after the restart. The re-run on `a971d9c5` passed all twelve checks, the header holding just the title under the card, live and after the restart. After the rebase onto main at `53a0456a` (Sprint 140), the check ran once more at `39f6c155`, on a fresh profile with two hidden launches: twelve of twelve again.
 
 Getting the harness there took five runs. The earlier failures were the harness's own:
 - it read the chat's title before the AI had named it;
@@ -49,7 +49,7 @@ Getting the harness there took five runs. The earlier failures were the harness'
 
 In one run, the project's chat opened on Claude after the welcome was finished with ChatGPT. That is not root-caused: the update notice was in the corner in that run too. The script now turns the update notice off in its profile, and it picks the AI itself if the chat opens on another one.
 
-Screenshots (not in the repository; on this Mac under `/private/tmp/claude-501/r139-evidence-4/` (the run at `a971d9c5`), for the Development manager and the Experience lead): the welcome's cards, the model card with "What ChatGPT said", the "Now using" card, the restored card, the first chat after the restart, and Settings' Claude card (the script captures only that card, so the ChatGPT card's account e-mail is never in it). The first run's Claude signed-out card with its tooltip is under `/private/tmp/claude-501/r139/`.
+Screenshots (not in the repository; on this Mac under `/private/tmp/claude-501/r139-evidence-5/` (the run after the rebase, at `39f6c155`), for the Development manager and the Experience lead): the welcome's cards, the model card with "What ChatGPT said", the "Now using" card, the restored card, the first chat after the restart, and Settings' Claude card (the script captures only that card, so the ChatGPT card's account e-mail is never in it). The first run's Claude signed-out card with its tooltip is under `/private/tmp/claude-501/r139/`.
 
 ### What the stand-in received (S56)
 
