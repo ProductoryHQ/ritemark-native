@@ -141,17 +141,25 @@ async function click(session, x, y) {
 async function explorerRow(session, label) {
 	// Drawn, wholly inside the tree's visible area, and the element a click there would hit.
 	const find = `(() => { const list = document.querySelector('.explorer-folders-view .monaco-list'); const row = [...document.querySelectorAll('.explorer-folders-view .monaco-list-row')].find(r => r.getAttribute('aria-label') === ${JSON.stringify(label)}); if (!row || !list) return null; const r = row.getBoundingClientRect(); const l = list.getBoundingClientRect(); const x = r.x + Math.min(r.width / 2, 80); const y = r.y + r.height / 2; const hit = document.elementFromPoint(x, y); return r.height && r.top >= l.top && r.bottom <= l.bottom && hit && hit.closest('.monaco-list-row') === row ? [x, y, row.getAttribute('aria-expanded')] : null; })()`;
-	for (let scroll = 0; scroll < 60; scroll++) {
+	const firstRow = `(document.querySelector('.explorer-folders-view .monaco-list-row') || {}).getAttribute?.('aria-label') ?? ''`;
+	let direction = -1;
+	let previousFirst = null;
+	for (let scroll = 0; scroll < 80; scroll++) {
 		const found = await session.evaluate(find);
 		if (found) {
 			return found;
 		}
-		// Scroll to the top first, then down a little at a time.
+		// Scroll up until the top, then down a little at a time.
 		const list = await session.evaluate(`(() => { const l = document.querySelector('.explorer-folders-view .monaco-list'); if (!l) return null; const r = l.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
 		if (!list) {
 			return null;
 		}
-		await session.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: list[0], y: list[1], deltaX: 0, deltaY: scroll === 0 ? -100000 : 200 });
+		const first = await session.evaluate(firstRow);
+		if (direction < 0 && first === previousFirst) {
+			direction = 1;
+		}
+		previousFirst = first;
+		await session.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: list[0], y: list[1], deltaX: 0, deltaY: direction < 0 ? -600 : 200 });
 		await sleep(150);
 	}
 	return null;
