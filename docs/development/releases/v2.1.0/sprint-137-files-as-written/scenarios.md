@@ -82,7 +82,7 @@ Then both blocks are byte-identical.
 ### S12: A break typed in Ritemark
 Given a new paragraph
 When the person types `Line one`, presses Shift+Enter and types `Line two`
-Then the file holds `Line one\` / `Line two`, with nothing after the backslash (pending question 3)
+Then the file holds `Line one\` / `Line two`, with nothing after the backslash (decision 3)
 And after a reopen the editor shows the two lines as it did before the save.
 
 ### S13: Soft breaks inside a quote
