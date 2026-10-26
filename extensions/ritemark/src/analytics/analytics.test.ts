@@ -22,6 +22,10 @@ const ALL_EVENT_NAMES: EventName[] = [
   'ai_signed_in',
   'project_opened',
   'first_message_sent',
+  'ready_request_used',
+  'starting_point_used',
+  'made_something',
+  'feedback_opened',
 ];
 
 // Verify every event name is a valid string (compile-time + runtime)
@@ -42,6 +46,10 @@ const _payloadCheck: {
   ai_signed_in: { provider: 'chatgpt', method: 'account' },
   project_opened: { source: 'sample', has_ai: false },
   first_message_sent: { provider: 'opencode' },
+  ready_request_used: { kind: 'what_is_here', provider: 'chatgpt' },
+  starting_point_used: { place: 'word_or_pdf', edited: true, provider: 'claude' },
+  made_something: { how: 'new_document', after_ready_request: false },
+  feedback_opened: { from: 'ai_info' },
 };
 
 assert.ok(_payloadCheck, 'All payload shapes should be valid');
@@ -54,6 +62,13 @@ const WELCOME_EVENT_KEYS: Record<string, string[]> = {
   project_opened: ['source', 'has_ai'],
   first_message_sent: ['provider'],
 };
+// Sprint 140 (R15, S69): the first day's counts carry no words, names, paths, file counts, accounts or addresses.
+Object.assign(WELCOME_EVENT_KEYS, {
+  ready_request_used: ['kind', 'provider'],
+  starting_point_used: ['place', 'edited', 'provider'],
+  made_something: ['how', 'after_ready_request'],
+  feedback_opened: ['from'],
+});
 for (const [event, keys] of Object.entries(WELCOME_EVENT_KEYS)) {
   assert.deepEqual(Object.keys(_payloadCheck[event as EventName]).sort(), [...keys].sort(), `${event} has only ${keys.join(', ')}`);
   for (const key of keys) {

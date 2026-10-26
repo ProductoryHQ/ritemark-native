@@ -23,7 +23,7 @@
 import type { AgentId } from '../agent/types';
 
 /** Bump when the capability text changes in a way runtimes should re-sync on. */
-export const CAPABILITY_CONTEXT_VERSION = 2;
+export const CAPABILITY_CONTEXT_VERSION = 3;
 
 /**
  * Per-runtime binding details. NOT capability content — just how a runtime names
@@ -174,6 +174,8 @@ const SECTIONS: CapabilitySection[] = [
     render: () =>
       [
         'HONESTY: if the user asks for something Ritemark genuinely does not expose to you, say so plainly rather than inventing or claiming a capability that does not exist.',
+        // Sprint 140 (R1, #497): every AI, whatever the spike decided
+        'When you are asked to read a file and cannot open it (a scanned PDF, a password-protected or unreadable document), say which files you could not open rather than leaving them out silently.',
       ].join('\n'),
   },
 ];

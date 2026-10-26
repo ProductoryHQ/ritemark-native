@@ -12,8 +12,8 @@ import { ConsentGate, buildChannel, readOneXAnswer, usageAnswer, type CaptureCli
 
 interface Sent { event: string; properties: Record<string, unknown>; distinctId: string }
 
-function harness(start: { setting?: boolean; allowed?: boolean; hasKey?: boolean } = {}) {
-  const state = { setting: start.setting, allowed: start.allowed ?? true, hasKey: start.hasKey ?? true };
+function harness(start: { setting?: boolean; allowed?: boolean; hasKey?: boolean; offline?: boolean } = {}) {
+  const state = { setting: start.setting, allowed: start.allowed ?? true, hasKey: start.hasKey ?? true, offline: start.offline ?? false };
   const sent: Sent[] = [];
   let clientsCreated = 0;
   let idsRead = 0;
@@ -27,7 +27,11 @@ function harness(start: { setting?: boolean; allowed?: boolean; hasKey?: boolean
       clientsCreated += 1;
       clientOptions.push(options);
       return {
-        captureImmediate: async (payload) => { sent.push(payload as Sent); },
+        // Sprint 140: posthog.ts's client rejects when PostHog did not accept the event (offline, refused)
+        captureImmediate: async (payload) => {
+          if (state.offline) throw new Error('fetch failed');
+          sent.push(payload as Sent);
+        },
         shutdown: async () => { shutdowns += 1; },
       };
     },
@@ -196,6 +200,30 @@ async function main(): Promise<void> {
     assert.equal(killed.sent.length, 0);
     const noKey = harness({ setting: false, hasKey: false });
     assert.equal(await noKey.gate.sendFeedback(feedback), false);
+  }
+
+  // ── Sprint 140 (R13, R14, R15; S51, S64, S68): sent only when accepted; the card's question; the new counts ──
+  {
+    const week = [{ name: 'feedback_sent' as const, properties: { message: 'A proposal for Harbour', asked: 'made_this_week' as const } }];
+    const off = harness({ setting: false });
+    assert.equal(await off.gate.sendFeedback(week), true, 'the first-week line goes with usage data off');
+    assert.deepEqual(off.sent[0].properties, { message: 'A proposal for Harbour', asked: 'made_this_week', $process_person_profile: false, $geoip_disable: true }, 'the line and the question it answers, nothing else');
+    const offline = harness({ setting: false, offline: true });
+    assert.equal(await offline.gate.sendFeedback(week), false, 'S64: a send that did not go says so');
+    const offlineOn = harness({ setting: true, offline: true });
+    await offlineOn.gate.refresh();
+    assert.equal(await offlineOn.gate.sendFeedback(week), false, 'S60: with usage data on, too');
+    const before = harness();
+    await before.gate.refresh();
+    assert.equal(await before.gate.track('ready_request_used', { kind: 'what_is_here', provider: 'chatgpt' }), false);
+    assert.equal(await before.gate.track('starting_point_used', { place: 'project', edited: false, provider: 'claude' }), false);
+    assert.equal(await before.gate.track('made_something', { how: 'export', after_ready_request: true }), false);
+    assert.equal(await before.gate.track('feedback_opened', { from: 'status_bar' }), false);
+    assert.equal(before.sent.length, 0, 'S68: none of the new counts leaves before a yes');
+    const yes = harness({ setting: true });
+    await yes.gate.refresh();
+    assert.equal(await yes.gate.track('feedback_opened', { from: 'help' }), true);
+    assert.equal(yes.sent.at(-1)?.properties.build_channel, 'prod', 'with build_channel');
   }
 
   // ── On by default (Jarmo, 19 October): the welcome answers on leaving; until then nothing leaves ──

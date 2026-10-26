@@ -116,6 +116,8 @@ test('instructs honest fallback', () => {
   for (const text of [claude, codex, acp]) {
     assert.ok(/say so plainly/i.test(text), 'honesty instruction');
     assert.ok(/inventing or claiming a capability/i.test(text), 'no invented capabilities');
+    // Sprint 140 (R1, #497): every AI says which files it could not open
+    assert.ok(/say which files you could not open/i.test(text), 'the honesty line about unread files');
   }
 });
 
