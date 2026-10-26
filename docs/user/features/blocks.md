@@ -19,6 +19,7 @@ Every piece of content in Ritemark is a "block" - a paragraph, heading, list, or
 | Task List | `/task` | Checklist with checkboxes |
 | Blockquote | `/quote` | Quoted text |
 | Code Block | `/code` | Syntax-highlighted code |
+| Equation | `/equation` | A formula, written in LaTeX and shown typeset |
 | Table | `/table` | Grid of rows and columns |
 | Divider | `/divider` | Horizontal line |
 
@@ -139,6 +140,37 @@ Type the language name after the opening backticks:
 // your code here
 ```
 ````
+
+---
+
+## Equations
+
+ChatGPT, Claude and most people who write formulas in Markdown write them in LaTeX between dollar signs. Ritemark shows them as typeset math, and the file keeps them exactly as they were written, so Obsidian, GitHub, Typora and Pandoc read the same formulas.
+
+| In the file | In Ritemark |
+|---|---|
+| `$\bar{x} = 3.9$` | A formula in the line, at the text's size |
+| `$$` on its own line, the formula, `$$` | A formula centred on its own lines |
+| `\(…\)` and `\[…\]` (how ChatGPT often writes them) | The same as `$…$` and `$$…$$` |
+| `costs $5 and $10` | Text: a dollar amount is never a formula |
+| `\$` | A dollar sign |
+
+**Write one:**
+- Type `$`, the formula, and `$`: it becomes a formula on the closing `$`. Press **Cmd+Z** straight after to keep it as text.
+- Type `$$` and press **Enter** in an empty line, or choose **Equation** from the `/` menu or the **+** menu, for a formula on its own lines.
+
+**Change one:** click it, or select it with the arrow keys and press **Enter**.
+- A formula in a line shows its LaTeX in place, with the result just under it.
+- A formula block opens a field with the result under it, changing as you type. **Enter** makes a new line in the LaTeX.
+- **Esc**, **Tab**, an arrow out of it, or a click elsewhere finishes. Leaving it empty removes it. One **Cmd+Z** brings back what it was.
+
+**A formula Ritemark can't typeset** shows its LaTeX with a small amber mark. Point at the mark to see what is wrong, for example "`\fracc` isn't a command it knows". The rest of the document is unaffected and the LaTeX is kept as it is.
+
+**Copy and paste:** formulas copy as their LaTeX, with their dollar signs. Formulas pasted from ChatGPT's or Claude's pages, or as text with `$…$`, arrive as formulas.
+
+**The AI** sees each formula's LaTeX when you select text or comment on it, and writes LaTeX into the file.
+
+Formulas are typeset with [KaTeX](https://katex.org). They are shown as typeset math in a PDF, as native equations in a Word copy, and as pictures in Google Docs; see [Share](export.md) and [Google Docs](google-docs.md).
 
 ---
 

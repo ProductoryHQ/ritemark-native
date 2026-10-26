@@ -58,6 +58,18 @@ All shortcuts use Mac notation. Cmd = Command key (⌘), Control = Control key (
 
 ---
 
+## Equations
+
+| Action | Shortcut |
+|--------|----------|
+| Formula in a line | Type `$`, the LaTeX, `$` |
+| Formula block | Type `$$` and press Enter in an empty line |
+| Change a selected formula | Enter |
+| Finish changing a formula | Esc (also Tab, or an arrow out of a formula in a line) |
+| Select the formula beside the cursor, then delete it | Backspace, Backspace |
+
+---
+
 ## Editing
 
 | Action | Shortcut |
