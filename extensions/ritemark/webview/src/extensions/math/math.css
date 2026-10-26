@@ -1,0 +1,322 @@
+/* Sprint 138 (#481): equations in the editor, as experience 38 draws them
+   (ritemark-dev product/design/experience/experiences/math/, README "For the build").
+   KaTeX's own stylesheet comes from media/katex/ at run time and is never imported here. */
+
+.ProseMirror {
+  --rm-math-ring: #a5b4fc;               /* indigo-300: the open inline equation's ring */
+  --rm-math-halo: rgba(67, 56, 202, 0.16); /* the open block's 3 px focus halo */
+  --rm-math-amber: #b45309;              /* the typo mark's glyph */
+  --rm-math-shadow: 0 0 0 1px var(--r-hairline), 0 8px 20px -6px rgba(30, 27, 75, 0.22);
+  --rm-math-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+body.vscode-dark .ProseMirror,
+body.ritemark-dark .ProseMirror,
+body[data-vscode-theme-kind='vscode-dark'] .ProseMirror {
+  --rm-math-ring: rgba(165, 180, 252, 0.55);
+  --rm-math-halo: rgba(129, 140, 248, 0.28);
+  --rm-math-amber: var(--r-warning);
+  --rm-math-shadow: 0 0 0 1px var(--r-hairline), 0 8px 20px -6px rgba(0, 0, 0, 0.45);
+}
+
+/* ---- Typeset: the text's ink, inline at 1.08em, display centred at 1.18em ---- */
+.rm-math-inline,
+.rm-math-block {
+  cursor: pointer;
+}
+.rm-math-typeset .katex {
+  font-size: 1.08em;
+  color: var(--r-ink-strong);
+}
+.rm-math-typeset .katex-display {
+  margin: 0.2em 0 0.9em;
+}
+.rm-math-typeset .katex-display > .katex {
+  font-size: 1.18em;
+}
+
+/* Inline: rest, hover (surface-soft, radius 4), focus (2 px ring) */
+.rm-math-inline {
+  position: relative;
+  border-radius: 4px;
+}
+.rm-math-inline:not(.is-open):hover {
+  background: var(--r-surface-soft);
+}
+.rm-math-inline.is-selected {
+  box-shadow: 0 0 0 2px var(--r-accent);
+}
+.rm-math-inline.is-loading {
+  opacity: 0;
+}
+/* Display math written inside a paragraph: centred on its own line there */
+.rm-math-inline-display:not(.is-open) {
+  display: block;
+  text-align: center;
+}
+
+/* ---- Display math in a list item: the item's text (experience 38, decision 6) ----
+   Display style and size, but left at the item's text, 0.2em above and below,
+   as an inline equation in display style: the bullet or number sits on its
+   baseline, and its hover fill and focus ring fit its width. Opened, a block's
+   field is the item's width and its result is left too, so nothing jumps.
+   Top-level display math stays centred. */
+li .rm-math-inline-display:not(.is-open) {
+  display: inline-block;
+  max-width: 100%;
+  margin: 0.2em 0;
+  text-align: left;
+  vertical-align: baseline;
+}
+li .rm-math-typeset .katex-display {
+  margin: 0;
+}
+li .rm-math-typeset .katex-display > .katex,
+li .rm-math-field-result .katex-display > .katex {
+  text-align: left;
+}
+li .rm-math-block {
+  margin: 0.2em 0;
+  text-align: left;
+}
+li .rm-math-block:not(.is-open):not(.is-error):not(.is-source) {
+  width: fit-content;
+  max-width: 100%;
+}
+li .rm-math-field-result {
+  text-align: left;
+}
+
+/* Block: rest, hover (radius 8), focus. The display style's 0.2em above and
+   0.9em below sit outside the block's own box, so the hover fill and the
+   focus ring wrap the whole equation, its superscripts included. */
+.rm-math-block {
+  display: flow-root;
+  margin: 0.2em 0 0.9em;
+  padding: 4px 0;
+  border-radius: 8px;
+  text-align: center;
+}
+.rm-math-block > .rm-math-typeset .katex-display {
+  margin: 0;
+}
+.rm-math-block.is-open,
+.rm-math-block.is-error,
+.rm-math-block.is-source {
+  margin: 0.3em 0 1em;
+  padding: 0;
+}
+.rm-math-block:not(.is-open):not(.is-error):hover {
+  background: var(--r-surface-soft);
+}
+.rm-math-block.is-selected {
+  box-shadow: 0 0 0 2px var(--r-accent);
+}
+.rm-math-block.is-loading {
+  opacity: 0;
+}
+
+/* The source, when KaTeX's stylesheet is not there: the code style, nothing broken */
+.rm-math-inline .rm-math-source {
+  white-space: pre-wrap;
+}
+/* A typo's source and its mark are one unit on the line, as a typeset
+   equation is: the line breaks before them, never inside them. Only a source
+   longer than a whole line wraps within itself. */
+.rm-math-inline.is-error {
+  display: inline-block;
+  max-width: 100%;
+}
+.rm-math-inline.is-error .rm-math-source {
+  overflow-wrap: anywhere;
+}
+.rm-math-block-source {
+  text-align: left;
+  white-space: pre-wrap;
+  font: 400 14px/22px var(--rm-math-mono);
+  color: var(--r-ink-body);
+  background: var(--r-surface-soft);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0;
+}
+
+/* ---- Inline, open: surface-soft, radius 4, padding 0 4, a 1.5 px indigo-300 ring ---- */
+.rm-math-open-box {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  max-width: 100%;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--r-surface-soft);
+  box-shadow: 0 0 0 1.5px var(--rm-math-ring);
+  font: 400 15px/1.5 var(--rm-math-mono);
+  color: var(--r-ink-strong);
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+.rm-math-delimiter {
+  color: var(--r-ink-faint);
+}
+.rm-math-input {
+  field-sizing: content;
+  min-width: 1ch;
+  max-width: min(60ch, 70vw);
+  padding: 0;
+  margin: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  caret-color: var(--r-accent);
+}
+
+/* The result bubble: 8 below, 6 to the left; desk, radius 8, padding 8 14, hairline and a small shadow */
+.rm-math-bubble {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: -6px;
+  z-index: 6;
+  display: block;
+  width: max-content;
+  max-width: min(640px, 80vw);
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--r-surface);
+  box-shadow: var(--rm-math-shadow);
+  font-size: inherit;
+  line-height: normal;
+  white-space: nowrap;
+  text-align: left;
+  cursor: default;
+}
+.rm-math-bubble-error {
+  font-family: var(--ritemark-editor-font-family);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--r-ink-muted);
+  white-space: normal;
+}
+.rm-math-bubble .katex-display {
+  margin: 0;
+}
+
+/* ---- A block, open: the text's width, radius 10, hairline-strong edge, 3 px halo ---- */
+.rm-math-block.is-open {
+  text-align: left;
+  cursor: default;
+}
+.rm-math-field {
+  border-radius: 10px;
+  background: var(--r-surface);
+  box-shadow: inset 0 0 0 1px var(--r-hairline-strong), 0 0 0 3px var(--rm-math-halo);
+  overflow: hidden;
+}
+.rm-math-field-source {
+  padding: 10px 14px 12px;
+  background: var(--r-surface-muted);
+  border-bottom: 1px solid var(--r-hairline);
+}
+.rm-math-field-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font: 500 11px/16px var(--ritemark-ui-font-family);
+  letter-spacing: 0.2px;
+  color: var(--r-ink-muted);
+}
+.rm-math-textarea {
+  display: block;
+  width: 100%;
+  field-sizing: content;
+  min-height: 22px;
+  resize: none;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: 400 14px/22px var(--rm-math-mono);
+  color: var(--r-ink-strong);
+  caret-color: var(--r-accent);
+  white-space: pre-wrap;
+}
+.rm-math-textarea::placeholder {
+  color: var(--r-ink-faint);
+}
+.rm-math-field-result {
+  min-height: 58px;
+  padding: 14px 14px 12px;
+  text-align: center;
+}
+.rm-math-field-result .katex-display {
+  margin: 0;
+}
+.rm-math-field-wait {
+  font: 400 13px/30px var(--ritemark-editor-font-family);
+  color: var(--r-ink-muted);
+}
+.rm-math-stale {
+  opacity: 0.4;
+}
+.rm-math-field-error {
+  margin-top: 4px;
+  font: 400 12px/16px var(--ritemark-editor-font-family);
+  color: var(--r-ink-muted);
+}
+
+/* ---- A typo: the source in the code style, a small amber mark; never red ---- */
+.rm-math-block-error {
+  position: relative;
+  text-align: left;
+  padding: 10px 40px 10px 14px;
+  border-radius: 8px;
+  background: var(--r-surface-soft);
+  font: 400 14px/22px var(--rm-math-mono);
+  color: var(--r-ink-body);
+  white-space: pre-wrap;
+}
+.rm-math-mark {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--r-warning-soft);
+  color: var(--rm-math-amber);
+  cursor: pointer;
+}
+.rm-math-mark-block {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+}
+.rm-math-mark-inline {
+  width: 16px;
+  height: 16px;
+  margin-left: 2px;
+  border-radius: 4px;
+  vertical-align: -2px;
+}
+.rm-math-mark-glyph {
+  display: inline-flex;
+}
+/* In the tooltip (ink in Light, light in Dark): commands in the code face */
+.rm-math-sentence-code {
+  font: 400 12px/18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #c7d2fe;
+  background: none;
+  padding: 0;
+}
+body.vscode-dark .rm-math-sentence-code,
+body.ritemark-dark .rm-math-sentence-code,
+body[data-vscode-theme-kind='vscode-dark'] .rm-math-sentence-code {
+  color: var(--r-accent-darker);
+}
+/* The same sentence in the bubble and under an open block: muted ink throughout */
+.ProseMirror .rm-math-bubble .rm-math-sentence-code,
+.ProseMirror .rm-math-field-error .rm-math-sentence-code {
+  color: inherit;
+  font-size: inherit;
+}

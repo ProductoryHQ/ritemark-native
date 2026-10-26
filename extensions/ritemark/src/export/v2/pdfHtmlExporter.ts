@@ -5,11 +5,72 @@ import PDFDocument from 'pdfkit';
 import { parse, HTMLElement, type Node as HtmlNode, TextNode } from 'node-html-parser';
 import { buildNormalizedExportHtml, type ExportTemplateStyle } from './htmlPipeline';
 import { tryLoadImageSource } from './imageSource';
+import { equationsShownAsSourceSentence } from './mathExportMessage';
+import {
+  collectRuns,
+  layoutRuns,
+  mathRuns,
+  pdfkitSurface,
+  standardFonts,
+  type FontSet,
+  type InlineRun,
+  type PdfSurface,
+} from './pdfInlineLayout';
 import type { ExportV2Request } from './types';
 import { madeSomething } from '../../guidance/madeSomething';
 
 const PAGE_MARGIN = 72;
 const RESERVED_FOOTER_SPACE = 24;
+
+function pageBottom(doc: PDFKit.PDFDocument): number {
+  return doc.page.height - PAGE_MARGIN - RESERVED_FOOTER_SPACE;
+}
+
+/** Sprint 138 (#481, R8, R12): the inline layout's surface over this document. */
+function surfaceOf(doc: PDFKit.PDFDocument): PdfSurface {
+  return pdfkitSurface(doc, () => pageBottom(doc), PAGE_MARGIN);
+}
+
+function bodyFonts(style: ExportTemplateStyle): FontSet {
+  return standardFonts(style.bodyFont, style.codeFont);
+}
+
+/** A heading is bold throughout; its italic is bold italic. */
+function headingFonts(style: ExportTemplateStyle): FontSet {
+  const fonts = standardFonts(style.bodyFont, style.codeFont);
+  return { ...fonts, regular: style.headingFont, bold: style.headingFont, italic: fonts.boldItalic };
+}
+
+/** Lay out a run of inline content across the column from `x`, then leave doc.y below it. */
+function drawRuns(
+  doc: PDFKit.PDFDocument,
+  runs: InlineRun[],
+  style: ExportTemplateStyle,
+  x: number,
+  overrides: { fontSize?: number; fonts?: FontSet; color?: string } = {},
+): void {
+  const width = doc.page.width - PAGE_MARGIN - x;
+  doc.y = layoutRuns(runs, surfaceOf(doc), {
+    x,
+    y: doc.y,
+    width,
+    fontSize: overrides.fontSize ?? style.bodySize,
+    fonts: overrides.fonts ?? bodyFonts(style),
+    color: overrides.color ?? style.textColor,
+    lineGap: style.lineGap,
+  });
+  doc.x = PAGE_MARGIN;
+}
+
+/** Equations that go into the PDF as their source: a typo, or no picture. */
+export function countEquationsShownAsSource(root: HTMLElement): number {
+  return root.querySelectorAll('[data-math]').filter(element => mathRuns(element)[0]?.kind !== 'math').length;
+}
+
+/** Whether an element has anything to draw: text, or an equation. */
+function hasContent(node: HTMLElement): boolean {
+  return !!compactText(getNodeText(node)) || !!node.querySelector('[data-math]') || node.hasAttribute('data-math');
+}
 
 function isElement(node: HtmlNode): node is HTMLElement {
   return node instanceof HTMLElement;
@@ -103,20 +164,27 @@ function renderTable(doc: PDFKit.PDFDocument, table: HTMLElement, style: ExportT
   const columnCount = Math.max(...rowCells.map(cells => cells.length), 1);
   const usableWidth = doc.page.width - PAGE_MARGIN * 2;
   const colWidth = usableWidth / columnCount;
+  const surface = surfaceOf(doc);
 
   rowCells.forEach((cells, rowIndex) => {
-    const cellTexts = Array.from({ length: columnCount }, (_, cellIndex) =>
-      compactText(cells[cellIndex] ? getNodeText(cells[cellIndex]) : '')
+    // Sprint 138 (#481, R8, R12): a cell's text keeps its faces and equations;
+    // the header row is bold.
+    const cellRuns = Array.from({ length: columnCount }, (_, cellIndex) =>
+      cells[cellIndex] ? collectRuns(cells[cellIndex], { bold: rowIndex === 0 }) : []
     );
+    const cellOptions = (x: number, y: number, dryRun: boolean) => ({
+      x: x + 5,
+      y: y + 4,
+      width: colWidth - 10,
+      fontSize: style.bodySize,
+      fonts: bodyFonts(style),
+      color: style.textColor,
+      lineGap: 1,
+      dryRun,
+    });
 
-    const heights = cellTexts.map(text =>
-      Math.max(
-        style.bodySize * 1.6,
-        doc.heightOfString(text || ' ', {
-          width: colWidth - 10,
-          lineGap: 1,
-        }) + 8
-      )
+    const heights = cellRuns.map(runs =>
+      Math.max(style.bodySize * 1.6, layoutRuns(runs, surface, cellOptions(0, 0, true)) + 4)
     );
     const rowHeight = Math.max(...heights);
 
@@ -125,20 +193,13 @@ function renderTable(doc: PDFKit.PDFDocument, table: HTMLElement, style: ExportT
 
     for (let col = 0; col < columnCount; col++) {
       const x = PAGE_MARGIN + col * colWidth;
-      const text = cellTexts[col];
 
       if (rowIndex === 0) {
         doc.rect(x, y, colWidth, rowHeight).fill('#eef3fb');
       }
       doc.rect(x, y, colWidth, rowHeight).lineWidth(0.5).strokeColor(style.borderColor).stroke();
-
-      doc.font(rowIndex === 0 ? style.headingFont : style.bodyFont)
-        .fontSize(style.bodySize)
-        .fillColor(style.textColor)
-        .text(text || ' ', x + 5, y + 4, {
-          width: colWidth - 10,
-          lineGap: 1,
-        });
+      // A row never splits across pages (ensurePageRoom above), so the cell draws in place.
+      layoutRuns(cellRuns[col], { ...surface, roomFor: (_height, at) => at }, cellOptions(x, y, false));
     }
 
     doc.y = y + rowHeight;
@@ -153,15 +214,9 @@ function renderList(doc: PDFKit.PDFDocument, listNode: HTMLElement, ordered: boo
   items.forEach((item, index) => {
     const prefix = ordered ? `${index + 1}. ` : '• ';
     const indent = 16 + depth * 14;
-    const text = compactText(getNodeText(item));
     ensurePageRoom(doc, style.bodySize * 1.8);
-    doc.font(style.bodyFont)
-      .fontSize(style.bodySize)
-      .fillColor(style.textColor)
-      .text(prefix + text, PAGE_MARGIN + indent, doc.y, {
-        width: doc.page.width - PAGE_MARGIN * 2 - indent,
-        lineGap: style.lineGap,
-      });
+    // Sprint 138 (#481, R8, R12): the item's faces and equations, not its flattened text.
+    drawRuns(doc, [{ kind: 'text', text: prefix, face: 'regular' }, ...collectRuns(item)], style, PAGE_MARGIN + indent);
 
     const nestedUl = getImmediateChildren(item, ['ul'])[0];
     const nestedOl = getImmediateChildren(item, ['ol'])[0];
@@ -179,9 +234,23 @@ function renderNode(doc: PDFKit.PDFDocument, node: HtmlNode, documentUri: vscode
   doc.x = PAGE_MARGIN;
 
   const tag = node.tagName;
-  const text = compactText(getNodeText(node));
 
-  if (!text && tag !== 'HR' && tag !== 'IMG' && tag !== 'TABLE' && tag !== 'FIGURE') return;
+  if (!hasContent(node) && tag !== 'HR' && tag !== 'IMG' && tag !== 'TABLE' && tag !== 'FIGURE') return;
+
+  // Sprint 138 (#481, R8): an equation block, centred, scaled to the column if
+  // wider; one Ritemark can't typeset is its source in the code style.
+  if (node.getAttribute('data-math') === 'block') {
+    const [run] = mathRuns(node);
+    if (run.kind === 'math') {
+      ensurePageRoom(doc, run.height + 12);
+      doc.moveDown(0.2);
+      drawRuns(doc, [run], style, PAGE_MARGIN);
+      doc.moveDown(0.3);
+    } else if (run.kind === 'text') {
+      renderCodeBlock(doc, run.text, style);
+    }
+    return;
+  }
 
   switch (tag) {
     case 'H1':
@@ -195,30 +264,46 @@ function renderNode(doc: PDFKit.PDFDocument, node: HtmlNode, documentUri: vscode
       const spaceAfter: Record<string, number> = { H1: 0.3, H2: 0.25, H3: 0.2, H4: 0.15, H5: 0.15, H6: 0.1 };
       // Ensure heading + at least one line of following content stays together
       ensurePageRoom(doc, sizes[tag] * 2.5 + style.bodySize * 2);
+      doc.font(style.headingFont).fontSize(sizes[tag]);
       doc.moveDown(spaceBefore[tag]);
-      doc.font(style.headingFont).fontSize(sizes[tag]).fillColor(style.headingColor).text(text, {
-        lineGap: style.lineGap,
+      drawRuns(doc, collectRuns(node), style, PAGE_MARGIN, {
+        fontSize: sizes[tag],
+        fonts: headingFonts(style),
+        color: style.headingColor,
       });
+      doc.font(style.headingFont).fontSize(sizes[tag]);
       doc.moveDown(spaceAfter[tag]);
       return;
     }
 
     case 'P':
       ensurePageRoom(doc, style.bodySize * 2.5);
-      doc.font(style.bodyFont).fontSize(style.bodySize).fillColor(style.textColor).text(text, {
-        lineGap: style.lineGap,
-      });
+      // Sprint 138 (#481, R8, R12): bold, italic, code and equations, laid out together.
+      drawRuns(doc, collectRuns(node), style, PAGE_MARGIN);
+      doc.font(style.bodyFont).fontSize(style.bodySize);
       doc.moveDown(0.3);
       return;
 
     case 'BLOCKQUOTE': {
       ensurePageRoom(doc, style.bodySize * 2.5);
       const bqStartY = doc.y;
-      doc.font(style.bodyFont).fontSize(style.bodySize).fillColor(style.mutedColor);
-      doc.text(text, PAGE_MARGIN + 18, doc.y, {
-        width: doc.page.width - PAGE_MARGIN * 2 - 18,
-        lineGap: style.lineGap,
+      // Sprint 138 (#481, R8, R12): the quote's paragraphs and equations in its
+      // muted ink; a list inside it keeps its own layout.
+      let pending: InlineRun[] = [];
+      const flush = () => {
+        if (pending.length) drawRuns(doc, pending, style, PAGE_MARGIN + 18, { color: style.mutedColor });
+        pending = [];
+      };
+      node.childNodes.forEach(child => {
+        if (isElement(child) && (child.tagName === 'UL' || child.tagName === 'OL')) {
+          flush();
+          renderList(doc, child, child.tagName === 'OL', 1, style);
+        } else {
+          if (pending.length && isElement(child) && child.tagName === 'P') pending.push({ kind: 'break' });
+          pending.push(...collectRuns(child));
+        }
       });
+      flush();
       const bqEndY = doc.y;
       // Draw left border line
       doc.moveTo(PAGE_MARGIN + 6, bqStartY)
@@ -348,7 +433,9 @@ export async function exportToPDFV2(
       out.on('error', reject);
     });
 
-    vscode.window.showInformationMessage(`PDF exported to ${path.basename(saveUri.fsPath)}`);
+    // Sprint 138 (#481, the plan's decision 5): equations shown as their source are counted.
+    const typos = equationsShownAsSourceSentence(countEquationsShownAsSource(root));
+    vscode.window.showInformationMessage(`PDF exported to ${path.basename(saveUri.fsPath)}${typos ? `. ${typos}` : ''}`);
     madeSomething.note('export'); // Sprint 140 (R15): on success, not on request
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';

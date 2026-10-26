@@ -64,7 +64,9 @@ The template applies only when a Doc is created. If the template has several doc
 | Bullet and numbered lists, nested lists | Kept; a list uses one bullet style, so bullets nested under a numbered item show as a., b. |
 | Task lists | Checkboxes, always unticked: Google's API cannot tick a checkbox |
 | Tables | Kept, first row bold |
-| Quotes, code blocks | Italic quote with a side bar; monospace block on a grey background |
+| Quotes, code blocks | Italic quote, every line at the quote's indent, with a thin side bar; monospace block on a grey background |
+| Formulas (`$…$`, `$$…$$`) | Pictures of the typeset formulas: in their sentence at the text's size, or centred on their own line. Google Docs' API cannot make Docs equations |
+| Formulas in a table cell | Their LaTeX, because Ritemark fills table cells with text; the result notification says so |
 | Images in your document | Uploaded and embedded (PNG, JPEG, GIF; SVG is converted to PNG first) |
 | Images on the web | Embedded; Google fetches them from their address (PNG, JPEG, GIF) |
 | Diagrams (Mermaid, draw.io) | Converted to PNG and embedded |

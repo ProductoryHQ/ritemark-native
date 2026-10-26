@@ -3,8 +3,10 @@ import {
   bodyClearRange,
   buildPublishPlan,
   decodeEntities,
+  hashableExportHtml,
   htmlToBlocks,
   locatePlaceholders,
+  mathNotes,
   placeholderRequests,
   singleTabRequests,
   tableCellRequests,
@@ -213,6 +215,91 @@ assert.deepEqual(bodyClearRange(docWithTokens), { startIndex: 1, endIndex: 89 },
     { deleteTab: { tabId: 'b' } },
     { updateDocumentTabProperties: { tabProperties: { tabId: 'a', title: 'Doc' }, fields: 'title,iconEmoji' } },
   ], "the first tab's children and every other top-level tab go; a deleted tab takes its own children");
+}
+
+// ---------------------------------------------------------------- Sprint 138: equations (R10) and quotes (#408, R11)
+{
+  const png = 'data:image/png;base64,iVBORw0KGgo=';
+  const html = `
+<p>The mean <span data-math="inline" data-latex="\\bar{x}" data-source="$\\bar{x}$" data-display="false" data-status="ok" data-width="16" data-height="20" data-depth="5"><img data-math-image="" src="${png}" alt="\\bar{x}"></span> rose, and <span data-math="inline" data-latex="\\fracc{a}" data-source="$\\fracc{a}$" data-display="false" data-status="error">$\\fracc{a}$</span> is a typo.</p>
+<div data-math="block" data-latex="&#10;E = mc^2&#10;" data-source="$$&#10;E = mc^2&#10;$$" data-display="true" data-status="ok" data-width="80" data-height="24" data-depth="6"><img data-math-image="" src="${png}" alt="E"></div>
+<table><tbody><tr><th><p>Symbol</p></th></tr><tr><td><p><span data-math="inline" data-latex="\\mu" data-source="$\\mu$" data-display="false" data-status="ok" data-width="10" data-height="12" data-depth="3"><img data-math-image="" src="${png}" alt="\\mu"></span> the mean</p></td></tr></tbody></table>
+<blockquote><p>One</p><p>Two</p><blockquote><p>Nested</p></blockquote><ul><li><p>In a list</p></li></ul></blockquote>
+`;
+  const mathBlocks = htmlToBlocks(html);
+  const [paragraph, display, table] = mathBlocks;
+
+  // An inline equation is a token in its sentence, with its picture at the text's size.
+  assert.equal(paragraph.kind, 'paragraph');
+  assert.match(paragraph.text, /^The mean \u2063RITEMARK_MATH_0\u2063 rose, and \$\\fracc\{a\}\$ is a typo\.$/);
+  assert.equal(paragraph.inlineImages?.length, 1);
+  assert.deepEqual(paragraph.inlineImages?.[0].block.math, { source: '$\\bar{x}$', width: 12, height: 15, display: false }, 'px to pt');
+  assert.ok(paragraph.runs.some((r) => r.code && paragraph.text.slice(r.start, r.end) === '$\\fracc{a}$'), 'a typo is its source in the code style');
+  assert.equal(paragraph.mathTypos, 1);
+  assert.equal(mathBlocks.filter((b) => b.kind === 'image').length, 1, 'the inline picture is not lifted out as a block of its own');
+
+  // An equation block is a picture of its own, centred.
+  assert.equal(display.kind, 'image');
+  assert.equal(display.math?.display, true);
+  assert.equal(display.math?.source, '$$\nE = mc^2\n$$');
+
+  // A table cell takes the source; the result says so.
+  assert.equal(table.kind, 'table');
+  assert.deepEqual(table.rows, [['Symbol'], ['$\\mu$ the mean']]);
+  assert.equal(table.mathAsSource, 1);
+  assert.deepEqual(mathNotes(mathBlocks), [
+    'The equation in a table is published as its source, because Google Docs fills table cells with text.',
+    "1 equation couldn't be typeset and shows as its source.",
+  ]);
+
+  const mathPlan = buildPublishPlan(mathBlocks, { spacing: false });
+  assert.equal(mathPlan.images.length, 2, 'both pictures are staged: the inline one and the block');
+  assert.ok(mathPlan.placeholders.some((p) => p.token === '\u2063RITEMARK_MATH_0\u2063'), 'the inline token is located like the others');
+  const centred = mathPlan.requests.find((r) => (r as any).updateParagraphStyle?.paragraphStyle?.alignment === 'CENTER') as any;
+  assert.ok(centred, 'the equation block\'s line is centred');
+
+  // Placed with its size in points; one Google could not fetch is named by its source.
+  const inlineBlock = paragraph.inlineImages![0].block;
+  const located = [{ at: 20, endAt: 37, placeholder: paragraph.inlineImages![0] }, { at: 50, endAt: 70, placeholder: { token: 'x', block: display } }];
+  const batch = placeholderRequests(located, new Map([[inlineBlock, 'https://example.com/a.png']]), new Map());
+  const insert = batch.requests.find((r) => (r as any).insertInlineImage) as any;
+  assert.deepEqual(insert.insertInlineImage.objectSize, { width: { magnitude: 12, unit: 'PT' }, height: { magnitude: 15, unit: 'PT' } });
+  assert.deepEqual(batch.skipped, [{ source: 'the equation $$\nE = mc^2\n$$', reason: 'could not be read' }]);
+
+  // The unchanged-source check ignores the pictures' bytes and sizes, not the sources.
+  const again = html.replace(/iVBORw0KGgo=/g, 'AAAA').replace('data-width="16"', 'data-width="16.4"');
+  assert.equal(hashableExportHtml(again), hashableExportHtml(html), 'a re-drawn picture is not a change');
+  assert.notEqual(hashableExportHtml(html.replace('$\\bar{x}$', '$\\bar{y}$')), hashableExportHtml(html), 'an edited source is');
+  // An equation that could not be drawn this time (no picture, its source as the body) is no change either.
+  const undrawn = html.replace(
+    /<span data-math="inline" data-latex="\\bar\{x\}"[^>]*>[\s\S]*?<\/span>/,
+    '<span data-math="inline" data-latex="\\bar{x}" data-source="$\\bar{x}$" data-display="false" data-status="ok">$\\bar{x}$</span>',
+  );
+  assert.notEqual(undrawn, html, 'the test replaced the drawn equation');
+  assert.equal(hashableExportHtml(undrawn), hashableExportHtml(html), 'drawn or not, the same equation hashes the same');
+
+  // An equation published as its source because it has no picture is counted, as a typo is.
+  const [fallback] = htmlToBlocks('<p>Mean <span data-math="inline" data-latex="x" data-source="$x$" data-display="false" data-status="ok">$x$</span> here.</p>');
+  assert.equal(fallback.mathTypos, 1, 'a valid equation without a picture is counted');
+  assert.deepEqual(mathNotes([fallback]), ["1 equation couldn't be typeset and shows as its source."]);
+
+  // #408: every quote line starts at its indent, the first included; the bar is thin.
+  const quotes = mathBlocks.filter((b) => b.kind === 'quote');
+  assert.deepEqual(quotes.map((b) => [b.text, b.level]), [['One', 1], ['Two', 1], ['Nested', 2], ['In a list', 1]], 'a list inside a quote is quoted too (its lines, as before)');
+  const quoteRequests = buildPublishPlan(quotes, { spacing: false }).requests
+    .map((r) => (r as any).updateParagraphStyle)
+    .filter((s) => s?.paragraphStyle?.borderLeft);
+  assert.equal(quoteRequests.length, 4, 'single, multi-paragraph, nested and a list in a quote');
+  for (const style of quoteRequests) {
+    const p = style.paragraphStyle;
+    assert.deepEqual(p.indentFirstLine, p.indentStart, 'the first line starts at the quote\'s indent');
+    assert.equal(p.borderLeft.width.magnitude, 0.5, 'a thin bar');
+    assert.equal(p.borderLeft.padding.magnitude, 6);
+    assert.equal(style.fields, 'indentStart,indentFirstLine,borderLeft', 'indentFirstLine is in the fields, or Docs ignores it');
+  }
+  assert.deepEqual(quoteRequests.map((s) => s.paragraphStyle.indentStart.magnitude), [18, 18, 36, 18]);
+  const listInQuote = mathBlocks.find((b) => b.text === 'In a list');
+  assert.equal(listInQuote?.kind, 'quote', 'a list inside a quote is quoted too');
 }
 
 console.log('googleDocs/mapper: all assertions passed');

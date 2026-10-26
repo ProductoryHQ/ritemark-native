@@ -23,6 +23,7 @@
  */
 
 import { parse, type HTMLElement } from 'node-html-parser';
+import { equationsShownAsSourceSentence } from '../export/v2/mathExportMessage';
 import type { DocsDocument, DocsStructuralElement, DocsTabOutline } from './GoogleApiClient';
 
 export interface Run {
@@ -51,6 +52,18 @@ export interface Block {
   src?: string;
   title?: string;
   alt?: string;
+  /**
+   * Sprint 138 (#481, R10): an equation's picture. Its size in points (the
+   * text's size for an inline one), whether it is display math (a centred
+   * paragraph of its own), and its source, which names it if it can't be placed.
+   */
+  math?: { source: string; width: number; height: number; display: boolean };
+  /** Sprint 138: inline equation pictures in this block's text, each at its token. */
+  inlineImages?: Placeholder[];
+  /** Sprint 138: equations in this table, published as their source. */
+  mathAsSource?: number;
+  /** Sprint 138: equations Ritemark couldn't typeset, published as their source. */
+  mathTypos?: number;
 }
 
 export const MONO_FONT = 'Roboto Mono';
@@ -80,9 +93,71 @@ export function decodeEntities(text: string): string {
 type Node = HTMLElement & { nodeType: number; rawText: string; rawTagName?: string };
 
 const tagOf = (node: Node): string => (node.rawTagName || '').toLowerCase();
-const textOf = (node: Node): string => decodeEntities(node.textContent ?? '');
 
-function inlineRuns(node: Node, out: { text: string; runs: Run[] }, inherited: Partial<Run> = {}): void {
+// ---- Sprint 138 (#481, R10): equations, as the webview's export pass wrote them ----
+
+const PT_PER_PX = 72 / 96;
+/** Tokens for inline equation pictures, unique within one conversion. */
+let mathSequence = 0;
+
+interface ExportMathElement {
+  source: string;
+  /** A picture to publish, or null: then the source goes as text. */
+  picture: { src: string; width: number; height: number; display: boolean } | null;
+  /**
+   * No picture, so the source goes as text: a typo, or an equation whose
+   * picture could not be drawn. Counted, so the result says so, as PDF and
+   * Word copies do.
+   */
+  typo: boolean;
+}
+
+function readMath(node: Node): ExportMathElement | null {
+  const kind = node.getAttribute?.('data-math');
+  if (kind !== 'inline' && kind !== 'block') return null;
+  const source = decodeEntities(node.getAttribute('data-source') ?? node.getAttribute('data-latex') ?? '');
+  const ok = node.getAttribute('data-status') === 'ok';
+  const src = (node.querySelector('img[data-math-image]') as Node | null)?.getAttribute('src') ?? '';
+  const width = Number.parseFloat(node.getAttribute('data-width') ?? '');
+  const height = Number.parseFloat(node.getAttribute('data-height') ?? '');
+  const display = kind === 'block' || node.getAttribute('data-display') === 'true';
+  const picture = ok && src.startsWith('data:image/png') && width > 0 && height > 0
+    ? { src, width: width * PT_PER_PX, height: height * PT_PER_PX, display }
+    : null;
+  return { source, picture, typo: picture === null };
+}
+
+function mathImageBlock(math: ExportMathElement, picture: NonNullable<ExportMathElement['picture']>): Block {
+  return {
+    kind: 'image',
+    text: '',
+    runs: [],
+    src: picture.src,
+    alt: 'Equation',
+    math: { source: math.source, width: picture.width, height: picture.height, display: picture.display },
+  };
+}
+
+/** A cell's text: a table cell is filled with text, so its equations go as their source. */
+function cellText(node: Node, counts: { math: number; typos: number }): string {
+  let text = '';
+  for (const child of (node.childNodes ?? []) as Node[]) {
+    if (child.nodeType === 3) { text += decodeEntities(child.rawText ?? ''); continue; }
+    const math = readMath(child);
+    if (math) {
+      text += math.source;
+      counts.math++;
+      if (math.typo) counts.typos++;
+      continue;
+    }
+    text += cellText(child, counts);
+  }
+  return text;
+}
+
+interface InlineOut { text: string; runs: Run[]; images?: Placeholder[]; typos?: number }
+
+function inlineRuns(node: Node, out: InlineOut, inherited: Partial<Run> = {}): void {
   for (const child of (node.childNodes ?? []) as Node[]) {
     if (child.nodeType === 3) {
       const text = decodeEntities(child.rawText ?? '');
@@ -94,6 +169,22 @@ function inlineRuns(node: Node, out: { text: string; runs: Run[] }, inherited: P
     }
     const tag = tagOf(child);
     if (tag === 'br') { out.text += VERTICAL_TAB; continue; }
+    // Sprint 138 (#481, R10): an inline equation is a picture in its sentence,
+    // placed later at its token; one that can't be is its source in code style.
+    const math = readMath(child);
+    if (math) {
+      if (math.picture) {
+        const token = `⁣RITEMARK_MATH_${mathSequence++}⁣`;
+        out.text += token;
+        (out.images ??= []).push({ token, block: mathImageBlock(math, math.picture) });
+      } else {
+        const start = out.text.length;
+        out.text += math.source;
+        out.runs.push({ start, end: out.text.length, ...inherited, code: true });
+        if (math.typo) out.typos = (out.typos ?? 0) + 1;
+      }
+      continue;
+    }
     if (tag === 'img') continue;             // images inside prose are lifted out as their own block
     if (tag === 'p' && out.text) out.text += VERTICAL_TAB;   // two paragraphs in one list item
     const next: Partial<Run> = { ...inherited };
@@ -132,26 +223,49 @@ function trimRuns(text: string, runs: Run[]): { text: string; runs: Run[] } {
   };
 }
 
+/** Sprint 138: a block's inline equation pictures and typos, when it has any. */
+function mathExtras(acc: InlineOut): Pick<Block, 'inlineImages' | 'mathTypos'> {
+  return {
+    ...(acc.images?.length ? { inlineImages: acc.images } : {}),
+    ...(acc.typos ? { mathTypos: acc.typos } : {}),
+  };
+}
+
 function blocksFrom(node: Node, depth = 0): Block[] {
   const tag = tagOf(node);
   const collect = () => {
-    const acc = { text: '', runs: [] as Run[] };
+    const acc: InlineOut = { text: '', runs: [] };
     inlineRuns(node, acc);
-    return trimRuns(acc.text, acc.runs);
+    return { ...trimRuns(acc.text, acc.runs), ...mathExtras(acc) };
   };
   // Images that sit inside a paragraph or heading become blocks of their own,
   // directly after it, instead of vanishing (the Word exporter drops an image
-  // wrapped in <p>; this path must not).
+  // wrapped in <p>; this path must not). An equation's picture stays in its sentence.
   const liftedImages = (): Block[] =>
-    (node.querySelectorAll?.('img') ?? []).map((img) => imageBlock(img as Node));
+    (node.querySelectorAll?.('img') ?? [])
+      .filter((img) => !(img as Node).hasAttribute?.('data-math-image'))
+      .map((img) => imageBlock(img as Node));
+
+  // Sprint 138 (#481, R10): an equation block is a centred picture of its own;
+  // one Ritemark can't typeset is its source in the code style.
+  const blockMath = tag === 'div' ? readMath(node) : null;
+  if (blockMath) {
+    if (blockMath.picture) return [mathImageBlock(blockMath, blockMath.picture)];
+    return blockMath.source.split('\n').map((line, index) => ({
+      kind: 'code' as const,
+      text: line,
+      runs: [],
+      ...(index === 0 && blockMath.typo ? { mathTypos: 1 } : {}),
+    }));
+  }
 
   if (/^h[1-6]$/.test(tag)) {
-    const { text, runs } = collect();
-    return [...(text ? [{ kind: 'heading' as const, level: Number(tag[1]), text, runs }] : []), ...liftedImages()];
+    const { text, runs, ...extras } = collect();
+    return [...(text ? [{ kind: 'heading' as const, level: Number(tag[1]), text, runs, ...extras }] : []), ...liftedImages()];
   }
   if (tag === 'p') {
-    const { text, runs } = collect();
-    return [...(text ? [{ kind: 'paragraph' as const, text, runs }] : []), ...liftedImages()];
+    const { text, runs, ...extras } = collect();
+    return [...(text ? [{ kind: 'paragraph' as const, text, runs, ...extras }] : []), ...liftedImages()];
   }
   if (tag === 'img') return [imageBlock(node)];
   if (tag === 'pre') {
@@ -177,7 +291,7 @@ function blocksFrom(node: Node, depth = 0): Block[] {
     const out: Block[] = [];
     for (const li of (node.childNodes ?? []) as Node[]) {
       if (tagOf(li) !== 'li') continue;
-      const own = { text: '', runs: [] as Run[] };
+      const own: InlineOut = { text: '', runs: [] };
       let checkbox: Block['checkbox'] = 'none';
       const dataChecked = li.getAttribute('data-checked');
       if (taskList || li.getAttribute('data-type') === 'taskItem') checkbox = dataChecked === 'true' ? 'checked' : 'unchecked';
@@ -193,12 +307,13 @@ function blocksFrom(node: Node, depth = 0): Block[] {
         inlineRuns({ childNodes: [child] } as unknown as Node, own);
       }
       const { text, runs } = trimRuns(own.text, own.runs);
+      const extras = mathExtras(own);
       if (checkbox === 'none' && /^\[[ xX]\]\s/.test(text)) {
         checkbox = /^\[[xX]\]/.test(text) ? 'checked' : 'unchecked';
         const cut = text.indexOf(']') + 2;
-        out.push({ kind: 'listItem', level: depth, ordered: tag === 'ol', checkbox, text: text.slice(cut), runs: runs.map((r) => ({ ...r, start: Math.max(0, r.start - cut), end: r.end - cut })).filter((r) => r.end > r.start) });
+        out.push({ kind: 'listItem', level: depth, ordered: tag === 'ol', checkbox, text: text.slice(cut), runs: runs.map((r) => ({ ...r, start: Math.max(0, r.start - cut), end: r.end - cut })).filter((r) => r.end > r.start), ...extras });
       } else {
-        out.push({ kind: 'listItem', level: depth, ordered: tag === 'ol', checkbox, text, runs });
+        out.push({ kind: 'listItem', level: depth, ordered: tag === 'ol', checkbox, text, runs, ...extras });
       }
       for (const list of nested) out.push(...blocksFrom(list, depth + 1));
     }
@@ -206,12 +321,20 @@ function blocksFrom(node: Node, depth = 0): Block[] {
   }
   if (tag === 'table') {
     const rows: string[][] = [];
+    const counts = { math: 0, typos: 0 };
     for (const tr of node.querySelectorAll('tr') as Node[]) {
-      rows.push((tr.querySelectorAll('th,td') as Node[]).map((cell) => textOf(cell).replace(/\s+/g, ' ').trim()));
+      rows.push((tr.querySelectorAll('th,td') as Node[]).map((cell) => cellText(cell, counts).replace(/\s+/g, ' ').trim()));
     }
     const width = Math.max(0, ...rows.map((r) => r.length));
     if (!rows.length || !width) return [];
-    return [{ kind: 'table', text: '', runs: [], rows: rows.map((r) => [...r, ...Array(width - r.length).fill('')]) }];
+    return [{
+      kind: 'table',
+      text: '',
+      runs: [],
+      rows: rows.map((r) => [...r, ...Array(width - r.length).fill('')]),
+      ...(counts.math ? { mathAsSource: counts.math } : {}),
+      ...(counts.typos ? { mathTypos: counts.typos } : {}),
+    }];
   }
   const out: Block[] = [];
   for (const child of (node.childNodes ?? []) as Node[]) {
@@ -226,9 +349,44 @@ function blocksFrom(node: Node, depth = 0): Block[] {
 }
 
 export function htmlToBlocks(html: string): Block[] {
+  mathSequence = 0;
   const root = parse(html, { blockTextElements: { pre: true, script: false, style: false, noscript: false } }) as unknown as Node;
   const body = (root.querySelector('body') as Node | null) ?? root;
   return blocksFrom(body).filter((b) => b.text.trim() || b.kind === 'table' || b.kind === 'image' || b.kind === 'rule');
+}
+
+/**
+ * Sprint 138 (#481, R10, decision 5): what the publish result says about
+ * equations: those in tables go as their source (Docs fills cells with
+ * text), and those Ritemark couldn't typeset are counted.
+ */
+export function mathNotes(blocks: Block[]): string[] {
+  const inTables = blocks.reduce((sum, b) => sum + (b.mathAsSource ?? 0), 0);
+  const typos = blocks.reduce((sum, b) => sum + (b.mathTypos ?? 0), 0);
+  const notes: string[] = [];
+  if (inTables) {
+    notes.push(inTables === 1
+      ? 'The equation in a table is published as its source, because Google Docs fills table cells with text.'
+      : `${inTables} equations in tables are published as their source, because Google Docs fills table cells with text.`);
+  }
+  if (typos) notes.push(equationsShownAsSourceSentence(typos));
+  return notes;
+}
+
+/**
+ * The HTML the unchanged-source check hashes: each equation by its source
+ * alone. Its picture's bytes, its measured size, its MathML and whether it
+ * could be drawn at all can differ from one rendering to the next, while the
+ * document has not changed (R10).
+ */
+export function hashableExportHtml(html: string): string {
+  return html.replace(
+    /<(span|div)\b([^>]*\bdata-math="(?:inline|block)"[^>]*)>[\s\S]*?<\/\1>/g,
+    (_element, tag: string, attributes: string) => {
+      const source = /\bdata-source="([^"]*)"/.exec(attributes)?.[1] ?? /\bdata-latex="([^"]*)"/.exec(attributes)?.[1] ?? '';
+      return `<${tag} data-math-source="${source}"></${tag}>`;
+    },
+  );
 }
 
 // ---------------------------------------------------------------- blocks → requests
@@ -280,6 +438,8 @@ export function buildPublishPlan(blocks: Block[], options: PlanOptions): Publish
     const body = block.kind === 'rule' ? '' : block.text;
     text += `${prefix}${body}\n`;
     placed.push({ block, start, end: 1 + text.length - 1 });
+    // Sprint 138 (#481, R10): inline equation pictures, already at their tokens in the text.
+    if (block.inlineImages?.length) placeholders.push(...block.inlineImages);
   }
 
   const requests: unknown[] = text ? [{ insertText: { location: { index: 1 }, text } }] : [];
@@ -309,17 +469,27 @@ export function buildPublishPlan(blocks: Block[], options: PlanOptions): Publish
         }
         break;
       case 'quote':
+        // #408 (Sprint 138, R11): every line starts at the quote's indent, the
+        // first included (a Doc's own first-line indent otherwise wins), and
+        // the bar is a thin line, not a 3 pt block.
         requests.push({
           updateParagraphStyle: {
             range,
             paragraphStyle: {
               indentStart: { magnitude: INDENT_PT * (block.level ?? 1), unit: 'PT' },
-              borderLeft: { color: grey(0.8), width: { magnitude: 3, unit: 'PT' }, padding: { magnitude: 6, unit: 'PT' }, dashStyle: 'SOLID' },
+              indentFirstLine: { magnitude: INDENT_PT * (block.level ?? 1), unit: 'PT' },
+              borderLeft: { color: grey(0.8), width: { magnitude: 0.5, unit: 'PT' }, padding: { magnitude: 6, unit: 'PT' }, dashStyle: 'SOLID' },
             },
-            fields: 'indentStart,borderLeft',
+            fields: 'indentStart,indentFirstLine,borderLeft',
           },
         });
         if (end > start) requests.push({ updateTextStyle: { range: { startIndex: start, endIndex: end }, textStyle: { italic: true }, fields: 'italic' } });
+        break;
+      case 'image':
+        // Sprint 138 (#481, R10): an equation block's picture is centred on its line.
+        if (block.math?.display) {
+          requests.push({ updateParagraphStyle: { range, paragraphStyle: { alignment: 'CENTER' }, fields: 'alignment' } });
+        }
         break;
       case 'rule':
         requests.push({
@@ -420,11 +590,14 @@ export function locatePlaceholders(doc: DocsDocument, placeholders: Placeholder[
  * `data:` URI, and the alt text only as a last resort.
  */
 export function imageLabel(block: Block): string {
+  if (block.math) return `the equation ${block.math.source}`;
   if (block.title) return block.title;
   if (block.src && !block.src.startsWith('data:') && !/vscode-resource|vscode-cdn\.net/.test(block.src)) return block.src;
   if (block.src?.startsWith('data:')) return block.alt ? `${block.alt} (diagram)` : 'a diagram';
   return block.alt || 'an image';
 }
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
 
 export interface PlaceholderBatch {
   requests: unknown[];
@@ -447,8 +620,14 @@ export function placeholderRequests(located: LocatedPlaceholder[], imageUris: Ma
       requests.push({ insertTable: { rows: block.rows.length, columns: block.rows[0].length, location: { index: at } } });
     } else if (block.kind === 'image') {
       const uri = imageUris.get(block);
-      if (uri) requests.push({ insertInlineImage: { uri, location: { index: at } } });
-      else skipped.push({ source: imageLabel(block), reason: reasons.get(block) ?? 'could not be read' });
+      if (uri) {
+        // Sprint 138 (#481, R10): an equation's picture at the size it was typeset
+        // for (the text's size), not its 4× pixels.
+        const objectSize = block.math
+          ? { objectSize: { width: { magnitude: round2(block.math.width), unit: 'PT' }, height: { magnitude: round2(block.math.height), unit: 'PT' } } }
+          : {};
+        requests.push({ insertInlineImage: { uri, location: { index: at }, ...objectSize } });
+      } else skipped.push({ source: imageLabel(block), reason: reasons.get(block) ?? 'could not be read' });
     }
   }
   return { requests, skipped };

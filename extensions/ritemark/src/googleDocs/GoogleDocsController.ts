@@ -256,9 +256,12 @@ export class GoogleDocsController {
         ? `Google Doc synced: "${outcome.binding.title}".`
         : `"${outcome.binding.title}" is already up to date.`;
     const skipped = outcome.kind === 'up-to-date' ? [] : outcome.skippedImages;
+    // Sprint 138 (#481, R10): one sentence each for equations published as their source.
+    const notes = outcome.kind === 'up-to-date' ? [] : outcome.notes ?? [];
+    const told = [message, ...notes].join(' ');
     const choice = skipped.length
-      ? await ui.warn(`${message} ${describeSkipped(skipped)}`, ['Open Google Doc'])
-      : await ui.info(message, ['Open Google Doc']);
+      ? await ui.warn(`${told} ${describeSkipped(skipped)}`, ['Open Google Doc'])
+      : await ui.info(told, ['Open Google Doc']);
     if (choice === 'Open Google Doc') await ui.openExternal(url);
   }
 

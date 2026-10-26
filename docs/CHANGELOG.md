@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — 2.1.0
 
+### Sprint 138: equations and Google Docs quotes (#481, #408)
+
+#### Added
+- **Equations (#481).** Formulas written in LaTeX between dollar signs, as ChatGPT, Claude and most Markdown tools write them, show as typeset math: `$…$` in a sentence, `$$…$$` on their own lines, and ChatGPT's `\(…\)` and `\[…\]`. A dollar amount such as "$5 and $10" stays text. The file keeps every formula exactly as written, so Obsidian, GitHub, Typora and Pandoc read the same formulas, and an edit anywhere else no longer rewrites them. Click a formula, or select it and press Enter, to change its LaTeX in place with the result shown as you type; Esc finishes and one Cmd+Z undoes. Type `$…$` for a new one, or `$$` and Enter, or choose Equation from the `/` menu or the + menu. A formula Ritemark can't typeset shows its LaTeX with an amber mark that says what is wrong, for example "`\fracc` isn't a command it knows". Formulas copy as their LaTeX, the AI sees their LaTeX, and formulas pasted from ChatGPT's or Claude's pages arrive as formulas. The status bar counts them. Typeset with KaTeX, which Ritemark already carried for diagrams; its fonts load only for a document with math.
+- **Equations in shared copies.** A PDF copy typesets them in KaTeX's fonts, on the line's baseline or centred, a wide one scaled to the page. A Word copy has real Word equations you can edit in Word. Google Docs gets them as pictures, because Google's API can't create Docs equations; a formula in a table cell goes as its LaTeX, and the result says so. A formula that can't be typeset goes as its LaTeX, and the message after a PDF or Word copy counts them.
+
+#### Fixed
+- **Quotes in Google Docs (#408).** A quote's second and later lines started at the page margin instead of under its first line. Every line now starts at the quote's indent, beside a thin bar.
+- **Bold, italic and code in PDF copies.** A PDF copy now keeps bold, italic and inline code inside paragraphs, headings, lists, quotes and table cells, where it had dropped them; a table's header row is bold.
+
 ### Sprint 139: the AI you chose keeps working (#376, #417, #479, #473; #496's plan lines)
 
 #### Added

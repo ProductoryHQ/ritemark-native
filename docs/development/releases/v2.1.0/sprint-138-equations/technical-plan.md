@@ -238,3 +238,22 @@ When an audit changes a requirement, `spec.md` changes first.
 | Google Docs' inline pictures sit high | A5 records it; a known limit if so |
 | The film's outputs are wrong at capture | S46 on the release candidate before capture |
 | Ritemark's own Word preview draws exported equations roughly | A known limit (`previews.md`); an issue to file |
+
+## As built: where the code differs from this plan
+
+Narrow choices made during the build, each within a requirement; the PR lists them for the Development manager.
+
+| Plan | As built | Why |
+|---|---|---|
+| `MathInline.ts`, `MathBlock.ts`, `LiteralDollar.ts`; `MathInlineView.tsx`, `MathBlockView.tsx` | one `mathNodes.ts`, one `MathViews.tsx`, plus `mathEditing.ts` (keys, input rule, paste rule) and `mathCount.ts` | the three nodes share their source helpers and the two views their bubble, error mark and commit logic |
+| `escapeLiteralDollars` on each text node | a paragraph-wide pass through a Turndown rule's filter, marking the dollars that would pair with a private-use sentinel the composed escaper turns into `\$` | a dollar pairs across text nodes and marks (`$5 and **$10**`), which a per-node escaper can't see |
+| `mathml2omml`'s output used as is | the wrapper fixes stretchy fences (`m:d`), large-operator operands, upright function names, double-struck and other alphabets, `mtext` edge spaces, `\lvert`, and `m:argPr`/`m:sty`/`w:rPr` order | A4: the converter alone looks wrong in 16 of 40 formulas and loses text in one |
+| (not in the plan) | the status bar counts equations ("65 words · 5 equations") | experience 38's frame 1 draws it |
+| Equation in the block menu | inserted as a new paragraph after the block, then opened | the block menu acts on a block, which an equation never replaces |
+| An icon in `ui/Icon.tsx` | Phosphor's `Function` (ƒ) as `'function'` | the menus' icons are Phosphor's; ƒ is its formula mark |
+| Picture height from KaTeX's box | from the parts' struts (the TeX height and depth); across, from the box and its parts | KaTeX's box is a line box taller than the formula; it opened every PDF line holding an equation by about 2 pt (A3) |
+| `.katex-display` spacing from KaTeX | the block's margins outside its box (`display: flow-root`), KaTeX's margin zero inside | the open block's focus ring otherwise stopped short of the equation |
+| (the Experience lead's check) an equation's node selection counts as selected text | `isEquationNodeSelection` (`mathNodes.ts`): an equation opened by a click, an arrow or Enter is the cursor's place, so no "Working on selected text" chip, no formatting toolbar, and Copy as Markdown takes the whole document; a drag or Shift-arrow selection still carries the source | a click into text sends nothing, so a click into an equation shouldn't either |
+| (the Experience lead's check) an inline typo wraps like text | the typo's source and its mark are one inline block (`math.css`, `.rm-math-inline.is-error`); only a source longer than a whole line wraps inside | `\fracc{a}{b}` broke after `{a}`, away from its mark |
+| `\[…\]` display math by the same two placements as `$$` | `\[…\]` only on lines of its own (`scanInlineMath`'s `opensLine`, worked out from `marked`'s previous token) | 137's corpus file that 2.0.1 saved holds "See \[1\] and \[draft\].": 2.0.1 escaped every literal bracket, so in running text `\[…\]` is brackets (spec R1 changed first) |
+| (experience 38, decision 6) display math in a list item centred like top-level display math | in a list item: display style and size, left at the item's text, 0.2 em above and below; an inline display equation is an inline-block, so the marker sits on its baseline and the hover fill and focus ring fit it; a block is `fit-content` at rest, the item's width when open, its result left (`math.css`) | centred, an equation floats away from its bullet and the list reads as gaps; top-level display math stays centred |

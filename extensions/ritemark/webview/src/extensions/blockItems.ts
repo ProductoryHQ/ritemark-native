@@ -24,6 +24,8 @@ export const blockItems: BlockItemDef[] = [
   { title: 'Task List', description: 'Create a checklist', icon: 'check-square', nodeType: 'taskList' },
   { title: 'Quote', description: 'Insert a blockquote', icon: 'quotes', nodeType: 'blockquote' },
   { title: 'Code Block', description: 'Insert a code block', icon: 'code', nodeType: 'codeBlock' },
+  // Sprint 138 (#481): an equation block, open for writing (experience 38, frame 5).
+  { title: 'Equation', description: 'Insert an equation', icon: 'function', nodeType: 'mathBlock' },
   { title: 'Table', description: 'Insert a 3×3 table', icon: 'table', nodeType: 'table' },
   { title: 'Mermaid Diagram', description: 'Insert a mermaid diagram', icon: 'git-branch', nodeType: 'mermaid' },
   { title: 'Diagram', description: 'Insert a draw.io diagram', icon: 'graph', nodeType: 'drawio' },
@@ -80,6 +82,9 @@ export function executeSlashCommand(editor: any, range: any, item: BlockItemDef)
     case 'mermaid':
       chain.setCodeBlock({ language: 'mermaid' }).run()
       break
+    case 'mathBlock':
+      chain.insertMathBlock().run()
+      break
     case 'table':
       chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
       break
@@ -108,6 +113,12 @@ export function executeBlockInsert(editor: any, pos: number, item: BlockItemDef)
 
   if (item.nodeType === 'table') {
     editor.chain().focus().setTextSelection(pos).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+    return
+  }
+
+  // Sprint 138 (#481): a new empty paragraph at the position becomes the equation block, open.
+  if (item.nodeType === 'mathBlock') {
+    editor.chain().focus().insertContentAt(pos, { type: 'paragraph' }).setTextSelection(pos + 1).insertMathBlock().run()
     return
   }
 

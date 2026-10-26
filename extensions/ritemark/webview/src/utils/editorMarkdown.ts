@@ -37,6 +37,8 @@ import { CommentMark } from '../extensions/comment/CommentMark'
 import { CommentNode } from '../extensions/comment/CommentNode'
 import { commentMarkedExtension } from '../extensions/comment/commentMarkedExtension'
 import { addCommentTurndownRules } from '../extensions/comment/commentTurndownRules'
+import { mathMarkedExtension } from '../extensions/math/mathMarkedExtension'
+import { LiteralDollar, MathBlock, MathInline } from '../extensions/math/mathNodes'
 import { classifyLinkTarget, isSafeRelativePath } from '../lib/linkTargets'
 import { createTurndownService } from './turndownService'
 import { preprocessTaskListHTML } from './taskListRoundTrip'
@@ -62,6 +64,11 @@ import {
 export const editorMarked = new Marked({ breaks: true, gfm: true })
 // Sprint 137 (#270): record how each block was written, as `data-md-*` attributes.
 editorMarked.use(asWrittenMarkedExtension)
+
+// Sprint 138 (#481, R1): math is read always, never behind a flag. Reading it
+// is what keeps formulas safe on save: without it, `$\bar{x}$` is Markdown
+// text whose backslashes and underscores a save would rewrite.
+editorMarked.use(mathMarkedExtension as Parameters<typeof editorMarked.use>[0])
 
 let commentMarkedRegistered = false
 
@@ -306,6 +313,10 @@ export interface EditorExtensionSlots {
   afterImage?: AnyExtension[]
   /** Sprint 94 (#81): the comment-callout mark and node, gated on the flag. */
   commentCallouts?: boolean
+  /** Sprint 138 (#481): the inline equation node; the editor passes its typesetting view. */
+  mathInline?: TipTapNode
+  /** Sprint 138 (#481): the equation block node; the editor passes its typesetting view. */
+  mathBlock?: TipTapNode
 }
 
 /**
@@ -382,6 +393,10 @@ export function createEditorSchemaExtensions(slots: EditorExtensionSlots = {}): 
     // Registered at the highest level — when off, the extensions don't exist,
     // so a document's comments fall back to the plain load/save path.
     ...(slots.commentCallouts ? [CommentMark, CommentNode] : []),
+    // Sprint 138 (#481): equations and `\$`, always (see editorMarked above).
+    slots.mathInline ?? MathInline,
+    slots.mathBlock ?? MathBlock,
+    LiteralDollar,
     // Sprint 137 (#539): inline code no longer excludes every other mark, so
     // a link, bold, italic or strikethrough around code keeps its mark
     // (``[`file.md`](file.md)``, ``**`name` is vendored**``). It comes last, so

@@ -39,7 +39,8 @@ Creates a `.pdf` file that looks great on any device.
 |---------|----------------|
 | Headings | H1 (24pt), H2 (18pt), H3 (14pt) |
 | Paragraphs | 11pt body text |
-| Bold/Italic | Preserved |
+| Bold/Italic/Inline code | Preserved, in paragraphs, headings, lists, quotes and table cells |
+| Equations | Typeset in KaTeX's fonts: in the line on its baseline, or centred on their own lines; one wider than the page is scaled to fit |
 | Links | Link text preserved |
 | Bullet lists | Standard bullets (•) |
 | Numbered lists | Sequential numbers |
@@ -75,6 +76,7 @@ Creates a `.docx` file editable in Microsoft Word, Google Docs, or LibreOffice.
 | Headings | Styled as Heading 1, 2, 3 |
 | Paragraphs | Normal style |
 | Bold/Italic | Preserved |
+| Equations | Word equations you can edit in Word's equation editor; in the line, or centred on their own lines |
 | Lists | Proper bullet/number formatting (incl. nested) |
 | Tables | Formatted tables |
 | Footer | Document label in footer |
@@ -94,11 +96,16 @@ If you've set document properties:
 
 ## Known Limitations
 
+After a PDF or Word copy, the message says how many formulas couldn't be typeset and went out as their LaTeX. Ritemark's own Word preview draws Word equations only roughly; Word, LibreOffice and Pages show them properly.
+
 Some elements have limitations:
 
 | Element | PDF | Word |
 |---------|-----|------|
 | Remote (http/https) images | Not embedded | Not embedded |
+| A formula Ritemark can't typeset | Its LaTeX, in the code style | Its LaTeX, in the code font |
+| A formula alone in a table cell | Typeset | Word centres it, as it does any equation alone in a paragraph |
+| A formula Word's converter can't take | — | A picture of the typeset formula |
 | Very complex merged tables | May need manual adjustment | May need manual adjustment |
 | Advanced CSS from editor | Simplified for print-safe output | Simplified for document-safe output |
 

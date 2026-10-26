@@ -269,6 +269,18 @@ async function main(): Promise<void> {
     assert.equal(google.writes.length, writes, 'no write when nothing changed');
   }
   {
+    // Sprint 138 (#481, R10): an equation's picture is drawn anew on every
+    // publish; only its source counts as a change.
+    const math = (png: string, width: string) => `<p>Version two</p><p>Mean <span data-math="inline" data-latex="x" data-source="$x$" data-display="false" data-status="ok" data-width="${width}" data-height="14" data-depth="3"><img data-math-image="" src="data:image/png;base64,${png}" alt="x"></span></p>`;
+    const first = await publisher.publish(input(math('AAAA', '10')), prompts().p, onStage);
+    assert.equal(first.kind, 'synced', 'adding an equation is a change');
+    const redrawn = prompts();
+    const writes = google.writes.length;
+    const out = await publisher.publish(input(math('BBBB', '10.2')), redrawn.p, onStage);
+    assert.equal(out.kind, 'up-to-date', 'a re-drawn picture is not a change');
+    assert.equal(google.writes.length, writes, 'and writes nothing');
+  }
+  {
     const next = prompts();
     const out = await publisher.publish(input('<p>Version three</p>'), next.p, onStage);
     assert.equal(out.kind, 'synced');

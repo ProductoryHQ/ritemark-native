@@ -12,6 +12,7 @@ import {
   type WorkspaceFileLinkResult,
 } from '../lib/workspaceFileSearch'
 import { newCommentId } from '../extensions/comment/CommentMark'
+import { isEquationNodeSelection } from '../extensions/math/mathNodes'
 
 /**
  * FormattingBubbleMenu Component
@@ -271,6 +272,9 @@ export function FormattingBubbleMenu({
 
           if (empty) return false
           if (editor.isActive('codeBlock')) return false
+          // Sprint 138 (experience 38): a selected equation shows its focus ring
+          // or opens in place; text formatting does not apply to it.
+          if (isEquationNodeSelection(selection)) return false
 
           return true
         }}

@@ -15,15 +15,39 @@ import {
   WidthType,
   BorderStyle,
   ShadingType,
+  AlignmentType,
   type ISectionOptions,
+  type ParagraphChild,
 } from 'docx';
 import { parse, HTMLElement, type Node as HtmlNode, TextNode } from 'node-html-parser';
 import { buildNormalizedExportHtml, type ExportTemplateStyle } from './htmlPipeline';
 import { tryLoadImageSource } from './imageSource';
+import { loadMathConverter, mathToWordChild, readExportMath, type MathmlConverter, type WordMathOutcome } from './mathToWord';
+import { equationsShownAsSourceSentence } from './mathExportMessage';
 import type { ExportV2Request } from './types';
 import { madeSomething } from '../../guidance/madeSomething';
 
 type DocChild = Paragraph | Table;
+
+/**
+ * Sprint 138 (#481, R9): what the export needs for equations, and what it
+ * counts. One per export.
+ */
+interface WordExportContext {
+  convert: MathmlConverter | null;
+  outcomes: WordMathOutcome[];
+}
+
+const NO_MATH: WordExportContext = { convert: null, outcomes: [] };
+
+/** An equation from the webview's export HTML as a Word paragraph child, counted. */
+function wordMathChild(node: HTMLElement, style: ExportTemplateStyle, ctx: WordExportContext): ParagraphChild | null {
+  const math = readExportMath(node);
+  if (!math) return null;
+  const { child, outcome } = mathToWordChild(math, { codeFont: style.codeFont }, ctx.convert);
+  ctx.outcomes.push(outcome);
+  return child;
+}
 
 function getImageDimensions(data: Buffer): { width: number; height: number } | null {
   try {
@@ -73,8 +97,9 @@ function mergeInlineState(base: InlineStyleState, patch: InlineStyleState): Inli
 function collectInlineRuns(
   node: HtmlNode,
   style: ExportTemplateStyle,
-  state: InlineStyleState = {}
-): (TextRun | ExternalHyperlink)[] {
+  state: InlineStyleState = {},
+  ctx: WordExportContext = NO_MATH
+): ParagraphChild[] {
   if (node instanceof TextNode) {
     const text = compactText(node.rawText || '');
     if (!text) return [];
@@ -93,10 +118,16 @@ function collectInlineRuns(
   const tag = node.tagName;
   if (tag === 'BR') return [new TextRun({ break: 1 })];
 
+  // Sprint 138 (#481): an equation is a Word equation, its picture, or its source.
+  if (node.hasAttribute('data-math')) {
+    const math = wordMathChild(node, style, ctx);
+    if (math) return [math];
+  }
+
   if (tag === 'A') {
     const href = node.getAttribute('href') || '';
     const children = node.childNodes.flatMap(child =>
-      collectInlineRuns(child, style, mergeInlineState(state, { bold: false }))
+      collectInlineRuns(child, style, mergeInlineState(state, { bold: false }), ctx)
     );
     if (!href) return children;
     return [
@@ -122,25 +153,25 @@ function collectInlineRuns(
     }
   })();
 
-  return node.childNodes.flatMap(child => collectInlineRuns(child, style, nextState));
+  return node.childNodes.flatMap(child => collectInlineRuns(child, style, nextState, ctx));
 }
 
-function paragraphFromNode(node: HTMLElement, style: ExportTemplateStyle): Paragraph {
-  const runs = node.childNodes.flatMap(child => collectInlineRuns(child, style));
+function paragraphFromNode(node: HTMLElement, style: ExportTemplateStyle, ctx: WordExportContext): Paragraph {
+  const runs = node.childNodes.flatMap(child => collectInlineRuns(child, style, {}, ctx));
   return new Paragraph({
     children: runs.length > 0 ? runs : [new TextRun({ text: '' })],
     spacing: { after: 120 },
   });
 }
 
-function parseList(node: HTMLElement, style: ExportTemplateStyle, ordered: boolean, depth: number): Paragraph[] {
+function parseList(node: HTMLElement, style: ExportTemplateStyle, ordered: boolean, depth: number, ctx: WordExportContext): Paragraph[] {
   const paragraphs: Paragraph[] = [];
   const items = getImmediateChildren(node, ['li']);
   items.forEach((item, index) => {
     const prefix = ordered ? `${index + 1}. ` : '• ';
     const inlineChildren = item.childNodes
       .filter(child => !(isElement(child) && (child.tagName === 'UL' || child.tagName === 'OL')))
-      .flatMap(child => collectInlineRuns(child, style));
+      .flatMap(child => collectInlineRuns(child, style, {}, ctx));
 
     paragraphs.push(new Paragraph({
       children: [new TextRun({ text: prefix }), ...(inlineChildren.length ? inlineChildren : [new TextRun({ text: '' })])],
@@ -150,13 +181,13 @@ function parseList(node: HTMLElement, style: ExportTemplateStyle, ordered: boole
 
     const nestedUl = getImmediateChildren(item, ['ul'])[0];
     const nestedOl = getImmediateChildren(item, ['ol'])[0];
-    if (nestedUl) paragraphs.push(...parseList(nestedUl, style, false, depth + 1));
-    if (nestedOl) paragraphs.push(...parseList(nestedOl, style, true, depth + 1));
+    if (nestedUl) paragraphs.push(...parseList(nestedUl, style, false, depth + 1, ctx));
+    if (nestedOl) paragraphs.push(...parseList(nestedOl, style, true, depth + 1, ctx));
   });
   return paragraphs;
 }
 
-function parseTable(node: HTMLElement, style: ExportTemplateStyle): Table | null {
+function parseTable(node: HTMLElement, style: ExportTemplateStyle, ctx: WordExportContext): Table | null {
   const trNodes = node.querySelectorAll('tr');
   if (trNodes.length === 0) return null;
 
@@ -172,9 +203,11 @@ function parseTable(node: HTMLElement, style: ExportTemplateStyle): Table | null
         },
         children: [
           new Paragraph({
+            // Sprint 138 (#481): the header row goes through the same runs, in
+            // bold, so an equation there is an equation, not its source.
             children: rowIndex === 0
-              ? [new TextRun({ text: compactText(cell.textContent || ''), bold: true, font: style.bodyFont })]
-              : collectInlineRuns(cell, style),
+              ? collectInlineRuns(cell, style, { bold: true }, ctx)
+              : collectInlineRuns(cell, style, {}, ctx),
           }),
         ],
       })),
@@ -187,28 +220,35 @@ function parseTable(node: HTMLElement, style: ExportTemplateStyle): Table | null
   });
 }
 
-function parseBlocks(node: HtmlNode, style: ExportTemplateStyle, documentUri: vscode.Uri): DocChild[] {
+function parseBlocks(node: HtmlNode, style: ExportTemplateStyle, documentUri: vscode.Uri, ctx: WordExportContext = NO_MATH): DocChild[] {
   if (!isElement(node)) return [];
   const tag = node.tagName;
 
+  // Sprint 138 (#481): an equation block is a centred paragraph of its own.
+  if (tag === 'DIV' && node.getAttribute('data-math') === 'block') {
+    const math = wordMathChild(node, style, ctx);
+    if (!math) return [];
+    return [new Paragraph({ children: [math], alignment: AlignmentType.CENTER, spacing: { before: 60, after: 120 } })];
+  }
+
   switch (tag) {
     case 'P':
-      return [paragraphFromNode(node, style)];
+      return [paragraphFromNode(node, style, ctx)];
     case 'H1':
-      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_1, spacing: { before: 360, after: 160 }, keepNext: true })];
+      return [new Paragraph({ children: collectInlineRuns(node, style, {}, ctx), heading: HeadingLevel.HEADING_1, spacing: { before: 360, after: 160 }, keepNext: true })];
     case 'H2':
-      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 140 }, keepNext: true })];
+      return [new Paragraph({ children: collectInlineRuns(node, style, {}, ctx), heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 140 }, keepNext: true })];
     case 'H3':
-      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_3, spacing: { before: 240, after: 120 }, keepNext: true })];
+      return [new Paragraph({ children: collectInlineRuns(node, style, {}, ctx), heading: HeadingLevel.HEADING_3, spacing: { before: 240, after: 120 }, keepNext: true })];
     case 'H4':
-      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_4, spacing: { before: 200, after: 100 }, keepNext: true })];
+      return [new Paragraph({ children: collectInlineRuns(node, style, {}, ctx), heading: HeadingLevel.HEADING_4, spacing: { before: 200, after: 100 }, keepNext: true })];
     case 'H5':
-      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_5, spacing: { before: 160, after: 80 }, keepNext: true })];
+      return [new Paragraph({ children: collectInlineRuns(node, style, {}, ctx), heading: HeadingLevel.HEADING_5, spacing: { before: 160, after: 80 }, keepNext: true })];
     case 'H6':
-      return [new Paragraph({ children: collectInlineRuns(node, style), heading: HeadingLevel.HEADING_6, spacing: { before: 160, after: 80 }, keepNext: true })];
+      return [new Paragraph({ children: collectInlineRuns(node, style, {}, ctx), heading: HeadingLevel.HEADING_6, spacing: { before: 160, after: 80 }, keepNext: true })];
     case 'BLOCKQUOTE':
       return [new Paragraph({
-        children: collectInlineRuns(node, style, { italics: true }),
+        children: collectInlineRuns(node, style, { italics: true }, ctx),
         indent: { left: 480 },
         spacing: { after: 120 },
         border: { left: { style: BorderStyle.SINGLE, size: 6, color: style.borderColor.replace('#', '') } },
@@ -242,11 +282,11 @@ function parseBlocks(node: HtmlNode, style: ExportTemplateStyle, documentUri: vs
       })];
     }
     case 'UL':
-      return parseList(node, style, false, 0);
+      return parseList(node, style, false, 0, ctx);
     case 'OL':
-      return parseList(node, style, true, 0);
+      return parseList(node, style, true, 0, ctx);
     case 'TABLE': {
-      const table = parseTable(node, style);
+      const table = parseTable(node, style, ctx);
       return table ? [table, new Paragraph({ text: '' })] : [];
     }
     case 'HR':
@@ -297,7 +337,7 @@ function parseBlocks(node: HtmlNode, style: ExportTemplateStyle, documentUri: vs
       }
     }
     default:
-      return node.childNodes.flatMap(child => parseBlocks(child, style, documentUri));
+      return node.childNodes.flatMap(child => parseBlocks(child, style, documentUri, ctx));
   }
 }
 
@@ -338,8 +378,11 @@ export async function exportToWordV2(
       }));
     }
 
+    // Sprint 138 (#481): the converter loads only when the document has math.
+    const hasMath = /\sdata-math="/.test(normalized.html);
+    const ctx: WordExportContext = { convert: hasMath ? await loadMathConverter() : null, outcomes: [] };
     nodes.forEach(node => {
-      children.push(...parseBlocks(node, normalized.style, documentUri));
+      children.push(...parseBlocks(node, normalized.style, documentUri, ctx));
     });
 
     const doc = new Document({
@@ -360,7 +403,8 @@ export async function exportToWordV2(
 
     const buffer = await Packer.toBuffer(doc);
     fs.writeFileSync(saveUri.fsPath, buffer);
-    vscode.window.showInformationMessage(`Word exported to ${path.basename(saveUri.fsPath)}`);
+    const typos = equationsShownAsSourceSentence(ctx.outcomes.filter(outcome => outcome === 'source').length);
+    vscode.window.showInformationMessage(`Word exported to ${path.basename(saveUri.fsPath)}${typos ? `. ${typos}` : ''}`);
     madeSomething.note('export'); // Sprint 140 (R15): on success, not on request
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';

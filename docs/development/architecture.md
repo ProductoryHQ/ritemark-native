@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-10-26 (Sprint 137: the editor's Markdown pipeline, files as written, a refused save goes to Ritemark first; Sprint 139: the AI you chose keeps working — one failure classifier and card, a chat's model kept, the turn counts; Sprint 140: the first day's guidance and the feedback door)
+**Last updated:** 2026-10-26 (Sprint 137: the editor's Markdown pipeline, files as written, a refused save goes to Ritemark first; Sprint 139: the AI you chose keeps working — one failure classifier and card, a chat's model kept, the turn counts; Sprint 140: the first day's guidance and the feedback door; Sprint 138: equations, typeset, edited in place and exported)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -364,6 +364,7 @@ Publishing reuses the Word and PDF export HTML (`preprocessTableHTML` → Mermai
 | A checked task item arrives unchecked | The Docs API creates checkbox bullets but cannot tick one. |
 | A mixed list takes one bullet style | A Docs list has one preset, so bullets nested under a numbered item show `a.`/`b.` glyphs. |
 | Sync writes only the first tab | Tabs a user adds in Google Docs later are left alone, and are not overwritten. |
+| Equations are pictures; math in a table cell goes as its source (Sprint 138) | The Docs API cannot create equations, and table cells are filled with text only. |
 
 ### Agent Chat links and conversation actions (Sprint 122)
 
@@ -666,6 +667,40 @@ One door and one sheet replace Send Feedback's four reactions and the Report AI 
 **"Sent" only when the service accepted it.** posthog-node's `captureImmediate` does not reject on a failed request; it emits `'error'`. `analytics/posthog.ts` wraps the client so a send that emitted an error throws, and `sendFeedback` returns false. Then the sheet stays with the message, one line and Open in e-mail (D5). The e-mail route never says sent. With usage data off, the send still goes as the person's own, from a one-off id; `feedback_opened` does not.
 
 **The report's privacy contract holds.** `composeReport(context, body, lastAnswer?)` gains only the answer the person ticked and saw quoted in the sheet; Copy carries the whole answer. `ReportDialog` and the `report/*` messages stay for a shell without the sheet, which falls back to them (R16).
+
+### Equations (Sprint 138, #481)
+
+LaTeX math between dollar signs is read from the file, typeset with KaTeX, edited in place and written back byte for byte. The source of truth is always the LaTeX and its delimiters as written; nothing typeset is ever saved. The decisions and audits are in `docs/development/releases/v2.1.0/sprint-138-equations/`.
+
+| Module (`webview/src/extensions/math/` unless named) | Role |
+|---|---|
+| `mathSyntax.ts` | The one reading of math, shared by load, paste and the input rule: `$…$`, `$$…$$`, `\(…\)` and `\[…\]` by Pandoc's `tex_math_dollars` rules (the first `$` after an opener closes it or the opener is a dollar; a closing `$` not followed by a digit, no space inside the delimiters), so prices stay text. `\[…\]` counts only on lines of its own, because 2.0.1 saved literal brackets as `\[` and `\]`. `escapeLiteralDollars` escapes, at save, only the dollars that would pair: each pair at its closer, until nothing pairs |
+| `mathMarkedExtension.ts` | `marked` tokenizers on the editor's scoped instance (`utils/editorMarkdown.ts`, Sprint 137's pipeline module, added to without changing it): `mathBlock` (never as a list item's first block, which must be a paragraph), `mathInline`, `literalDollar` (a `\$`) |
+| `mathNodes.ts` | Three atom nodes: `mathInline` and `mathBlock` keep the LaTeX and its exact delimiters as attributes (the block keeps its own line breaks); `literalDollar` keeps an escaped dollar. `renderText` gives the source with delimiters, so copy, `textBetween`, the AI's selection and comments carry LaTeX. `parseHTML` also takes KaTeX's own HTML and MathML with a TeX annotation, so rendered math pasted from ChatGPT's and Claude's pages becomes equations |
+| `mathTurndownRules.ts` | Turndown rules (in `utils/turndownService.ts`'s `createTurndownService`) that write each equation from its attributes, never from text Turndown has already escaped, and the paragraph-wide pass that keeps a pairing literal dollar escaped |
+| `mathRender.ts` | Loads KaTeX on demand (the copy Mermaid already ships, one version) and its stylesheet by `<link>` from `media/katex/` beside `webview.js` (`lib/webviewAssets.ts`); a status for loading, ready and unavailable. Typesetting failures become a plain sentence (`mathErrors.ts`) |
+| `MathViews.tsx`, `mathEditing.ts`, `math.css` | React node views as experience 38 draws them: inline equations open in place with a result bubble, blocks open a field with the result under it; Escape, Tab, arrows, a click away or ⌘S finish; one undo step per edit; an empty equation deletes itself. The `$…$` input rule, `$$` and Enter, Enter on a selected equation, and the slash and block menus' Equation (`blockItems.ts`) |
+| `mathCount.ts` | The equation count on the status bar's word count (`ritemarkEditor.ts`) |
+
+**Export.** `webview/src/lib/mathExport.ts` rewrites each equation in the export HTML, as the last pass after Mermaid and SVG inlining, into one form: its source and delimiters, a status (`ok` or `error`), a 4× PNG drawn from KaTeX's own HTML with only the faces it uses embedded, its width, height and depth in CSS px, and KaTeX's MathML. The host then:
+
+- **PDF** (`src/export/v2/pdfInlineLayout.ts`): paragraphs, headings, list items, quotes and table cells are laid out as runs (text in a face, equations as pictures on the baseline, breaks) on pdfkit, so bold, italic, code and equations share a line. A display equation is centred and scaled to the page width. A typo goes as its source in Courier.
+- **Word** (`src/export/v2/mathToWord.ts`): KaTeX's MathML through `mathml2omml` 0.5.0 (LGPL-3.0-or-later), shipped unmodified as an esbuild external in `node_modules` and loaded only when a copy has math. Our wrapper fixes what the converter gets wrong (stretchy fences as `m:d`, large-operator operands, upright function names, double-struck letters, text spaces, `m:argPr` and run-property order). An equation it still can't take becomes its picture; a typo becomes its source.
+- **Google Docs** (`src/googleDocs/mapper.ts`): equations as inline and centred pictures through `insertInlineImage` with `objectSize`; math in a table cell as its source, said in the result. The change hash ignores picture bytes.
+
+After a PDF or Word copy, the message counts the equations that went as their source (`mathExportMessage.ts`).
+
+**Assets.** `media/katex/` (a woff2-only `katex.min.css`, 20 faces, `LICENSE`, `VERSION`) is written by a Vite plugin in `webview/vite.config.ts`, which fails the build on a second KaTeX copy or a version mismatch. Neither `media/katex/` nor `mathml2omml` is in an extension release's file list, so equations ship with a shell release. `scripts/validate-build-output.sh` checks both in the built app.
+
+#### TO BE — known limits carried out of Sprint 138
+
+| Limit | Why |
+|---|---|
+| Math in the AI's sheet shows as source | Decision 7: a later issue |
+| A lone equation in a Word table cell is centred | Word centres an equation alone in its paragraph; a cell's single equation is one |
+| Ritemark's own Word preview draws equations roughly | #538 |
+| Equations in Google Docs are pictures | The Docs API cannot create Docs equations; an inline picture's bottom sits on the baseline, so an equation with depth sits slightly high |
+| Math in a Mermaid label shows its source | Mermaid is drawn with `htmlLabels: false`, and Mermaid typesets label math only in HTML labels |
 
 ## Agent Runtime Architecture
 
@@ -1092,6 +1127,7 @@ interface UnifiedAttachment {
 ```
 tsc --noEmit + esbuild  extension host: 2 bundles (out/extension.js + out/browser/browserMcpAdapter.js)  [Sprint 92 #105]
 Vite → media/webview.js      editors and panels: ~8.3 MB IIFE
+                        + media/katex/ (KaTeX stylesheet + 20 woff2 faces, loaded only for math)  [Sprint 138]
 Vite --mode office → media/office-preview.js   Word + PowerPoint previews: ~2.5 MB IIFE  [Sprint 124, 125]
                         + office-preview.NOTICES.txt (third-party notices)  [Sprint 125]
 apply-patches.sh        applies patches/vscode/001–014.patch to /vscode submodule
@@ -1605,6 +1641,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-10-26 | Sprint 138 | **Equations (#481) and Google Docs quotes (#408).** New `webview/src/extensions/math/` (see *Equations*): `mathSyntax.ts`, `mathMarkedExtension.ts` on `editorMarkdown.ts`'s scoped `marked`, the atom nodes `mathInline`, `mathBlock` and `literalDollar` (`mathNodes.ts`), `mathTurndownRules.ts` in `createTurndownService`, `mathRender.ts` (KaTeX on demand, `media/katex/` by `<link>` from `lib/webviewAssets.ts`), React views (`MathViews.tsx`, `mathEditing.ts`, `math.css`), `mathErrors.ts`, `mathCount.ts`. Equation in the slash and block menus (`blockItems.ts`, the `function` icon). Export: `lib/mathExport.ts` (pictures, metrics, MathML) as the last pass in `App.tsx`'s three exports; `export/v2/pdfInlineLayout.ts` lays PDF paragraphs, headings, lists, quotes and table cells out as runs; `export/v2/mathToWord.ts` wraps `mathml2omml` 0.5.0 (an esbuild external); `wordHtmlExporter.ts` and `pdfHtmlExporter.ts` take equations and count typos (`mathExportMessage.ts`); `googleDocs/mapper.ts` publishes equations as pictures and quotes with `indentFirstLine` and a 0.5 pt bar (#408); the change hash ignores picture bytes. `katex` 0.16.47 pinned exactly in the webview (one copy, Mermaid's); the Vite plugin writes `media/katex/`; `validate-build-output.sh` checks it and `mathml2omml`. `branding/ATTRIBUTION.md`: KaTeX (MIT), `mathml2omml` (LGPL-3.0-or-later, GPL text in `licenses/`). `media/webview.js` 8,675,522 → 8,712,915 bytes (+37,393). |
 | 2026-10-26 | Sprint 137 | **Files come back as written (#270, #539, #454, #502, #512).** Webview: `utils/editorMarkdown.ts` (the pipeline in one module), `utils/markdownAsWritten.ts` (the `data-md-*` attributes, the Turndown rules, `escapeTextRun`), `utils/markdownFidelity.ts` and the corpus in `utils/fidelity-corpus/`, `lib/linkEdit.ts` (the link dialog edits the link, #502), `lib/documentUpdate.ts` (no freeze on an overlapping diff), `document:applied` from a microtask (#512); `StarterKit` without its `code` mark, `Code.extend({ excludes: 'code' })` last, `isAllowedLinkUri`. Extension: `editorSync/frontMatter.ts` (the head byte for byte), `state.encodeDocumentText`, `classifyRefusedSave`, the coordinator's `_ritemark.editorSync.answerSaveConflict`, `document:conflict`'s `openReview`. Shell: patch 014 gains `textFileSaveErrorHandler.ts` and its test (7 files, 16 hunks → 9 files, 22 hunks). See *The editor's Markdown pipeline* and *Editor–disk synchronization*. |
 | 2026-10-26 | Sprint 139 | **The AI you chose keeps working (2.1, merge 1: #376, #417, #479, #473, #496's plan lines).** New: `runtime/turnFailureCopy.ts` (kinds, sentences, cards, `turnOutcome`, billing pages), `runtime/modelSubstitution.ts`, `analytics/turnCounts.ts`, `analytics/voiceNotes.ts`, the webview's `TurnFailureCard.tsx`. `runtimeErrorPresentation.ts` gains `classifyRuntimeError`, `unwrapProviderMessage`, `codexTurnErrorCode`, `acpTurnErrorCode`; `AgentRunner`, `CodexRuntime` and `AcpRuntime` pass their structured codes. Records: `errorKind`/`errorDetail` on failed assistant and boundary events, `composerPreferences.modelByRuntime`, all optional and lenient (`research/record-skew-audit.md`); `conversation/set-composer-preference` gains `modelId`; `acceptRuntimeTurn` takes the turn's model; `ConversationController.savedComposerModel`. The bootstrap carries `defaultClaudeModel`. Events: `agent_used` now `{ agent, source, outcome }` from chats and Flows, `first_reply`, `voice_captured`, `voice_note_edited`; `first_message_sent` after the save; Flow LLM step → `feature_used: flow_llm_step`. Plan lines: `welcomeCopy.PLAN_LINES`, used by the welcome, Add another, Settings and the AI sheet's sign-in cards. `RuntimeNotice` buttons get tooltips. A stop is Stopped, live and restored, for all three AIs (`stopped` on Claude's result, a restored `cancelled` status for ChatGPT and OpenCode), and a 2.0 record's raw envelope is unwrapped when restored. Extension tier only. |
 | 2026-10-26 | Sprint 140 | **The first day and the feedback door (#497, #498, #466).** New `src/guidance/` and `src/feedback/` (see *The first day's guidance* and *The feedback door*). `HomeState.guidance` replaces `whatMoved`, with the sample's `busy` words; new `home/*` requests (ready request, Ask with, hide, sign-in, keys, the feedback card's send, mail and Not now). The AI's sheet: `chat/start` (with `cursor`, where a fill's cursor waits), `starting-place` (host → webview), `guidance/origin` (webview → host, its `place` checked against `STARTING_PLACES`), `StartingPoints.tsx` in place of `EmptyState.tsx`. `chatLinks.rewriteCodexCitations` draws ChatGPT's file citations as links. Capability context version 4 (the honesty line; About this project is the root's `AGENTS.md`). Events `ready_request_used`, `starting_point_used`, `made_something`, `feedback_opened`; `feedback_sent.asked`. `analytics/posthog.ts` makes an immediate send that emitted an error throw, and a feedback send has a client of its own; `reaction_submitted` retired. Patch 018: `ritemarkFeedbackSheet.ts` (`_ritemark.feedbackSheet`, `_ritemark.briefToast`) and its CSS and unit test; patch 015: Help ▸ Send feedback. No R1a, no R7 (#497's spike). |

@@ -22,13 +22,16 @@ As someone opening a document an AI wrote, I want its formulas recognised as mat
 
 Acceptance criteria:
 - **Inline math** is `$…$`: the opening `$` has a non-space character right after it, the closing `$` has a non-space character right before it and no digit right after it, and there is no blank line between them. A `\$` inside does not close it. These are Pandoc's `tex_math_dollars` rules, which #481 calls the CommonMark math rules and which GitHub and Obsidian follow closely (inferred).
+  - *Made exact 26 October, on QA's review:* as in Pandoc, the first unescaped `$` after an opener decides: it closes the equation, or the opener is a dollar sign. No later `$` is tried, so "Costs $5 and the formula $x$ holds." is a price and the equation `x`.
 - **Display math** is `$$…$$`, with no blank line inside. Spaces and line breaks may sit between the delimiters and the formula.
   - On lines of its own, set off from a paragraph by a blank line or starting the block, it is an equation block.
   - Inside a paragraph (no blank line before it), it is display math within that paragraph, shown centred on its own line.
 - **ChatGPT's delimiters:** `\(…\)` is inline math and `\[…\]` display math, by the same two placements (recommended in this plan; decision for Jarmo 3).
+  - *Changed 26 October, on Sprint 137's corpus:* `\[…\]` is display math only on lines of its own (`\[` opening a line, `\]` closing one), as ChatGPT writes it. In running text it stays text, because Ritemark 2.0.1 and earlier saved every literal bracket as `\[` and `\]`: "See \[1\] and \[draft\]." in a file 2.0.1 saved is a sentence with two references, and 137's one-time cleanup writes it back as `[1]` and `[draft]`.
 - **Not math:** anything inside a code span, a fenced or indented code block, an HTML comment or a link's address; `costs $5 and $10`; `$20,000 and $30,000`; `$HOME and $PATH`; a lone `$`.
 - **`\$`** in the file is a literal dollar sign, shown as `$`.
 - Math can sit in paragraphs, headings, list items, quotes and table cells; an equation block can sit at the top level, in a list item and in a quote.
+  - *Made exact 26 October, on QA's review:* an equation that opens a list item (`- $$x$$`, `1. \[y\]`) is display math in the item's first paragraph, because a list item starts with a paragraph; an equation block later in the item stays a block. The list keeps every item.
 
 ### R2: Math is written back as it was
 

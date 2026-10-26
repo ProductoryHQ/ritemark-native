@@ -68,6 +68,54 @@ function thirdPartyNotices(outFile: string) {
   }
 }
 
+/**
+ * Sprint 138 (#481, R13): KaTeX's stylesheet and fonts as files in
+ * `media/katex/`, loaded by the editor only when a document has math.
+ * Inlined, they would add 400 KB (woff2 alone) to 1.5 MB (through this
+ * config's font inlining) to every view (#107), so they are never imported.
+ *
+ * Copied from the one KaTeX the bundle holds: the build fails if the module
+ * graph has two copies of `katex`, or one at another version than the pinned
+ * dependency, since the stylesheet must match the code that typesets.
+ */
+function katexAssets(outDir: string) {
+  return {
+    name: 'ritemark-katex-assets',
+    generateBundle(this: { getModuleIds(): IterableIterator<string>; error(message: string): never }) {
+      const versions = new Map<string, string>()
+      for (const id of this.getModuleIds()) {
+        const dir = packageDirOf(id)
+        if (!dir || path.basename(dir) !== 'katex') continue
+        versions.set(dir, JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).version)
+      }
+      const pinned = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')).dependencies.katex
+      if (versions.size !== 1) {
+        this.error(`webview.js must hold exactly one KaTeX; found ${versions.size}: ${[...versions].map(([dir, v]) => `${v} at ${dir}`).join(', ')}`)
+      }
+      const [[katexDir, version]] = [...versions]
+      if (version !== pinned) {
+        this.error(`webview.js holds KaTeX ${version}, but package.json pins ${pinned}; media/katex/ must match the code`)
+      }
+
+      const dist = path.join(katexDir, 'dist')
+      const target = path.join(outDir, 'katex')
+      fs.mkdirSync(path.join(target, 'fonts'), { recursive: true })
+      // Each @font-face names only its woff2 file, so nothing else is ever requested.
+      const css = fs.readFileSync(path.join(dist, 'katex.min.css'), 'utf8')
+        .replace(/src:url\((fonts\/[^)]+\.woff2)\) format\("woff2"\)(?:,url\([^)]+\) format\("[^"]+"\))*/g, 'src:url($1) format("woff2")')
+      if (/\.(woff|ttf)\)/.test(css)) this.error('katex.min.css still names a font that is not woff2')
+      fs.writeFileSync(path.join(target, 'katex.min.css'), css)
+      const faces = fs.readdirSync(path.join(dist, 'fonts')).filter(name => name.endsWith('.woff2')).sort()
+      for (const face of faces) fs.copyFileSync(path.join(dist, 'fonts', face), path.join(target, 'fonts', face))
+      for (const name of fs.readdirSync(path.join(target, 'fonts'))) {
+        if (!faces.includes(name)) fs.unlinkSync(path.join(target, 'fonts', name))
+      }
+      fs.copyFileSync(path.join(katexDir, 'LICENSE'), path.join(target, 'LICENSE'))
+      fs.writeFileSync(path.join(target, 'VERSION'), `${version}\n`)
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const bundle = mode === 'office' ? BUNDLES.office : BUNDLES.webview
   const sourceMapPath = path.resolve(__dirname, `../media/${bundle.name}.js.map`)
@@ -84,6 +132,7 @@ export default defineConfig(({ mode }) => {
         },
       },
       ...(mode === 'office' ? [thirdPartyNotices(path.resolve(__dirname, '../media/office-preview.NOTICES.txt'))] : []),
+      ...(mode === 'office' ? [] : [katexAssets(path.resolve(__dirname, '../media'))]),
     ],
     build: {
       outDir: '../media',

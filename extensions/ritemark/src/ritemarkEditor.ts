@@ -125,6 +125,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   private static _wordCountStatusBar: vscode.StatusBarItem | null = null;
   /** Last word count reported by each Markdown panel (GH #378). */
   private static readonly _wordCounts = new Map<vscode.WebviewPanel, number>();
+  /** Sprint 138 (experience 38): the equations beside the words, "96 words · 5 equations". */
+  private static readonly _equationCounts = new Map<vscode.WebviewPanel, number>();
   private static _activeMarkdownPanel: vscode.WebviewPanel | null = null;
 
   /**
@@ -153,7 +155,9 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       item.hide();
       return;
     }
-    item.text = `${count} ${count === 1 ? 'word' : 'words'}`;
+    const equations = panel ? RitemarkEditorProvider._equationCounts.get(panel) ?? 0 : 0;
+    item.text = `${count} ${count === 1 ? 'word' : 'words'}`
+      + (equations > 0 ? ` · ${equations} ${equations === 1 ? 'equation' : 'equations'}` : '');
     item.show();
   }
 
@@ -1027,6 +1031,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
           case 'wordCountChanged':
             // Update word count in status bar
             RitemarkEditorProvider._wordCounts.set(webviewPanel, message.wordCount || 0);
+            RitemarkEditorProvider._equationCounts.set(webviewPanel, Number(message.equationCount) || 0);
             RitemarkEditorProvider.refreshWordCountStatusBar();
             return;
 
@@ -1175,6 +1180,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       this.dictationControllers.delete(webview);
 
       RitemarkEditorProvider._wordCounts.delete(webviewPanel);
+      RitemarkEditorProvider._equationCounts.delete(webviewPanel);
       if (RitemarkEditorProvider._activeMarkdownPanel === webviewPanel) {
         RitemarkEditorProvider._activeMarkdownPanel = null;
       }
