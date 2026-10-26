@@ -2957,10 +2957,10 @@ index afa6942390e..06e7b97bf55 100644
  		this.doLayout(Dimension.lift(contentAreaSize), top, left);
 diff --git a/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css b/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css
 new file mode 100644
-index 00000000000..68df55ce141
+index 00000000000..9f8ff5db35b
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css
-@@ -0,0 +1,254 @@
+@@ -0,0 +1,258 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3164,6 +3164,10 @@ index 00000000000..68df55ce141
 +	color: var(--rm-muted);
 +}
 +
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-foot.stacked .ritemark-feedback-foot-note {
++	flex-basis: 100%;
++}
++
 +.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-button {
 +	display: inline-flex;
 +	align-items: center;
@@ -3329,10 +3333,10 @@ index 491c451f7fa..251b2dfaebf 100644
  		}
 diff --git a/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
 new file mode 100644
-index 00000000000..25d3906a501
+index 00000000000..1c524a64f73
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
-@@ -0,0 +1,327 @@
+@@ -0,0 +1,328 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3532,6 +3536,7 @@ index 00000000000..25d3906a501
 +			problem.hidden = !failed;
 +			problem.textContent = failed ? words.sheet.failed : '';
 +			toEmail.hidden = !failed || email;
++			foot.classList.toggle('stacked', !toEmail.hidden); // three buttons: the note takes its own line, the buttons stay on one
 +			primary.textContent = sending ? words.sheet.sending : email ? words.sheet.email.button : failed ? words.sheet.tryAgain : words.sheet.straight.button;
 +			primary.disabled = empty || sending;
 +			toEmail.disabled = empty || sending;
@@ -5428,10 +5433,10 @@ index 6851c3b584c..027d77efbca 100644
  	}
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
 new file mode 100644
-index 00000000000..365993a84b8
+index 00000000000..4cbbdd4c79c
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
-@@ -0,0 +1,145 @@
+@@ -0,0 +1,146 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -5550,6 +5555,7 @@ index 00000000000..365993a84b8
 +		await timeout(0);
 +		assert.deepStrictEqual(offline.visible('.ritemark-feedback-problem'), ['It didn\'t go. Your message is still here: try again, or open it in e-mail.']);
 +		assert.deepStrictEqual(offline.visible('.ritemark-feedback-button'), ['Cancel', 'Open in e-mail', 'Try again'], 'D5: Try again and Open in e-mail');
++		assert.ok(offline.$('.ritemark-feedback-foot').classList.contains('stacked'), 'three buttons: the note on its own line');
 +		assert.strictEqual(offline.$<HTMLTextAreaElement>('.ritemark-feedback-area').value, 'Nice.', 'the message is still there');
 +
 +		const requests: IRitemarkFeedbackSubmit[] = [];
