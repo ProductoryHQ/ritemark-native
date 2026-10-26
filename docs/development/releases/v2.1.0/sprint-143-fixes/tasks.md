@@ -56,6 +56,13 @@ Nothing here starts before the plan is approved. Tick a box only when the change
 - [x] `runtimeErrorPresentation.ts`: the service's time (`serviceRetryAt`)
 - [x] `ActivityStatusLine.tsx`: the countdown tick (15 s) and Continue with <AI>; the busy card's Continue the same (`continueWithAlternative`); "Failed" under the busy card
 - [x] Tests for both, and screenshots of the line and the card
+- [x] After QA and the PR's review (27 October):
+  - the waits paired per turn (`CodexRetryPairing`, by `turn_id`; Test 18);
+  - stderr read by whole lines (`LineBuffer`; Test 19);
+  - the busy card's own Continue tooltip ("Send your message to <AI> instead.");
+  - `serviceRetryAt` reads "at …" too;
+  - the spec's addendum;
+  - `busy-card.png` retaken on the rebased build.
 
 ## Phase 6: Titles (W4, R4)
 
@@ -74,7 +81,7 @@ Nothing here starts before the plan is approved. Tick a box only when the change
 ## Phase 8: The pickers (W9, R9)
 
 - [x] `src/utils/dialogDefaults.ts` (new): `pickerFolder(candidates)`, the first that is a folder now, else the home
-- [x] Every Ritemark `showOpenDialog` starts in a folder that exists (15 of 15). Save dialogs pass a file path, which the main process doesn't check; unchanged
+- [x] Every Ritemark `showOpenDialog` starts in a folder that exists (15 of 15). The 7 save dialogs pass a file path beside the open document, or a remembered folder checked to exist; unchanged (spec, *Addendum*)
 - [x] `dialogDefaults.test.ts`: the cases, and a scan of every `showOpenDialog` in `src/`
 - [ ] W9b, if A4 asks for it: the patch hunk (tier line changed first). Waits on A4
 

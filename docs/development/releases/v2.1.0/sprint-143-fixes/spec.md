@@ -49,7 +49,7 @@ Acceptance criteria:
 - The line goes as soon as ChatGPT continues (text, an activity, a question or an approval), and changes with each retry.
 - When the retries run out on a 429 (`responseTooManyFailedAttempts` or `responseStreamDisconnected` with `httpStatusCode` 429), the turn ends as Sprint 139's limit card for ChatGPT: "ChatGPT is busy right now" / "Too many requests reached ChatGPT. Wait a few minutes, then send your message again." (proposed), never "exceeded retry limit, last status: 429". Its `errorKind` is `limit`, its count's outcome `limit`.
 - The provider's raw words stay in the turn's activity details and Report AI issue, as Sprint 139 keeps them.
-- A retry that isn't a 429 (a dropped connection) shows the same line, which says only that Ritemark is trying again.
+- A retry that isn't a 429 (a dropped connection) shows the same line, which says only that Ritemark is trying again. *Not built: see the Addendum (27 October).*
 
 ### R3a: The wait counted down, and the busy card (revised 2026-10-26)
 
@@ -59,7 +59,7 @@ Acceptance criteria:
 - **The status line** while ChatGPT waits to retry after a 429: "ChatGPT is busy. Trying again in 7 minutes." The minutes count down, rounded up; from one minute left it reads "ChatGPT is busy. Trying again in a minute." No seconds and no "…". The AI's name is the AI's, never "Codex".
 - **How the wait is known.** Codex's notification doesn't carry it (research, the local 429 endpoint); Codex writes it to its log ("retrying sampling request (1/5 in 418.99s)"). Ritemark's own app-server process is started with `RUST_LOG=error,codex_core::responses_retry=warn` when the environment has no `RUST_LOG`, so that one line reaches Ritemark on the process's stderr; Ritemark pairs it with the notification. This is a log filter for Ritemark's own process: the person's configuration, MCP servers and `~/.codex` are untouched (R3's decision stands), and a `RUST_LOG` the person set is left as it is.
 - **When the wait isn't known** (a person's own `RUST_LOG`, or a Codex that logs it differently): "ChatGPT is busy. Trying again soon." (proposed; words for the Experience lead).
-- **Continue with <AI>** ends the line when the wait is over a minute and another AI is ready: a shadcn `Button` with a tooltip ("Stop waiting and continue this chat with Claude"). It stops this turn, switches this chat to that AI, and puts the message back in the box, as the busy card's button does.
+- **Continue with <AI>** ends the line when the wait is over a minute and another AI is ready: a shadcn `Button` with a tooltip ("Stop waiting and continue this chat with Claude"; the busy card's own words are in the Addendum). It stops this turn, switches this chat to that AI, and puts the message back in the box, as the busy card's button does.
 - When ChatGPT tries again, the line goes back to "Working…".
 - **The busy card**, when the retries end in a 429 that isn't a plan limit (Codex's `rateLimitExceeded`; or `responseTooManyFailedAttempts` / `responseStreamDisconnected` with status 429, as the local endpoint showed):
   - heading "ChatGPT is busy right now";
@@ -184,3 +184,18 @@ Each with a recommendation; the sprint plan carries the same list.
 **26 October 2026, the Development manager (Jarmo's delegation):** questions 1–6 decided as recommended; the details are in [sprint-plan.md](sprint-plan.md#approval). The same day:
 - #544's words came from the Experience lead and became R3a;
 - #507's films sent ⌘⇧P with Playwright's keyboard over CDP to the top-level page, never a real keyboard (the Social manager): R7 stays without code, and a person tries it at Gate 2.
+
+## Addendum, 27 October 2026: what was built differs here
+
+Recorded after QA on PR #564; the code stays as built.
+
+- **R3's last bullet is not built.** A retry that isn't a 429 (a dropped connection, Codex's quick reconnect) shows no line: the turn keeps "Working…". The technical plan chose this (W3a), because those retries take seconds, and R3a's words are for a busy ChatGPT. The scenarios change with it:
+  - S11's line is not shown;
+  - S10 reads R3a's line ("ChatGPT is busy. Trying again in 7 minutes."), not "(1 of 5)";
+  - S12 is R3a's busy card, with "Failed" under it, not an empty status line;
+  - S9 holds for the app-server's arguments (none, as on `main`) and `~/.codex`. Its environment gains R3a's `RUST_LOG`; S9 was not run on the branch.
+- **R9: Ritemark's 7 save dialogs are unchanged.** `showSaveDialog` in `ritemarkEditor.ts` (a diagram's image), `transcriptWorkbenchProvider.ts`, `saveAsMarkdown.ts`, `wordExporter.ts`, `pdfExporter.ts`, `v2/wordHtmlExporter.ts` and `v2/pdfHtmlExporter.ts`. Each passes a file path beside the open document, or a remembered folder checked to exist, never the Desktop. R9's "each picker starts in a folder that exists" is built for the 15 open dialogs (`pickerFolder`). Whether a save dialog can still meet the main process's lock is A4's question on Windows, at Gate 2.
+- **R3a: the Continue with <AI> tooltips** (the Development manager's words, 27 October):
+  - on the waiting line, where the turn is still waiting: "Stop waiting and continue this chat with Claude.";
+  - on the busy card, where nothing is waiting: "Send your message to Claude instead."
+- **R3a: the service's time** is read from "try again in …" and from "try again at …" (a time of day in the person's own zone unless the service names one, or a full date and time). "Send your message again after 3:12 PM" is written in the webview's locale, which follows the app's display language.

@@ -39,9 +39,9 @@ The first week's small stumbles go: Home closes cleanly on a switch, the first c
 
 | Area | Requirement | Proven by |
 |---|---|---|
-| Home's subscriptions let go, each in its own `try` | R1 | A unit test; the log after a switch |
+| Home's subscriptions let go, each in its own `try` | R1 | A unit test (`HomePanel.test.ts`), which fails on `main` with the installed app's log line. No running app's log was read after a switch on the branch |
 | The welcome's chosen AI saved before the reload; no give-up for local model lists; a dropped landing logged | R2 | Unit tests; `landing-check.mjs` 20 of 20 on the branch |
-| Codex unchanged at start; Codex's retry shown on the status line; a 429 at the end as a limit card | R3 | Unit tests on the recorded notifications; the app-server against a local 429 endpoint |
+| Codex unchanged at start; Codex's retry shown on the status line; a 429 at the end as a limit card | R3 | Unit tests on the recorded notifications and log lines; the app-server against a local 429 endpoint in planning. The branch's own path (the log filter, stderr, the pairing) never ran live (`qa-evidence.md`) |
 | The title session loads nothing of the person's Claude setup | R4 | A unit test; ChatGPT 10 + 10 on this Mac; Claude at Gate 2 |
 | The formatting toolbar follows the editor's focus | R5 | A unit test; `comment-mention-check.mjs` |
 | The person's message keeps its line breaks | R6 | A unit test; a screenshot |
