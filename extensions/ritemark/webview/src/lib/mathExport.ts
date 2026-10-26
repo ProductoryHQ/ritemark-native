@@ -267,17 +267,28 @@ async function drawEquation(latex: string, display: boolean): Promise<DrawnEquat
     void katexEl.offsetWidth
     await document.fonts.ready
     const box = katexEl.getBoundingClientRect()
-    // KaTeX's content can reach a little outside its box (italic corrections, accents).
+    // Across: KaTeX's content can reach a little outside its box (italic
+    // corrections), so the widest of the box and its parts.
     let left = box.left
-    let top = box.top
     let right = box.right
-    let bottom = box.bottom
     for (const part of Array.from(katexEl.querySelectorAll('.base'))) {
       const rect = part.getBoundingClientRect()
       left = Math.min(left, rect.left)
-      top = Math.min(top, rect.top)
       right = Math.max(right, rect.right)
+    }
+    // Up and down: each part's strut is the formula's TeX height and depth.
+    // The box itself is a line box at KaTeX's line height, taller than the
+    // formula, which would open up every PDF line that holds an equation.
+    let top = Infinity
+    let bottom = -Infinity
+    for (const strut of Array.from(katexEl.querySelectorAll('.strut'))) {
+      const rect = strut.getBoundingClientRect()
+      top = Math.min(top, rect.top)
       bottom = Math.max(bottom, rect.bottom)
+    }
+    if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= top) {
+      top = box.top
+      bottom = box.bottom
     }
     const baseline = probe.getBoundingClientRect().top
     const pad = 1
