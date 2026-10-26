@@ -10,17 +10,10 @@
 import Image from '@tiptap/extension-image'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { ResizableImage } from '../components/ResizableImage'
+import { editorImageOptions } from '../utils/editorMarkdown'
 
 export const ImageExtension = Image.extend({
   addNodeView() {
     return ReactNodeViewRenderer(ResizableImage as any)
   },
-}).configure({
-  inline: false,  // Block-level so /image replaces empty paragraph instead of inserting into it
-  allowBase64: true,
-  HTMLAttributes: {
-    class: 'tiptap-image',
-    loading: 'lazy',
-    decoding: 'async',
-  },
-})
+}).configure(editorImageOptions)

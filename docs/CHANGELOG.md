@@ -29,6 +29,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A chat's OpenCode model is checked when Ritemark starts**, as its Claude and ChatGPT models are: one no longer offered falls back to the first configured model.
 - **A chat saved by 2.0 no longer shows a provider's raw JSON** for a failed ChatGPT or OpenCode turn when reopened; the sentence inside it is shown.
 
+### Sprint 137: files come back as written (#270, #539, #454, #502, #512)
+
+#### Fixed
+- **Files come back as written (#270, Sprint 137).** Opening a Markdown file and saving it writes back what you didn't touch as it was. The parse records how each block was written, as data-only `data-md-*` attributes on the editor's nodes (`webview/src/utils/markdownAsWritten.ts`), and Turndown's rules write it back: list markers, their spacing, tightness and indent (spaces or tabs); soft and hard line breaks; tables' delimiter row, alignment and spacing; thematic breaks; bare and `<…>` addresses; code fences with or without an info string; blocks written directly under one another. No line gains trailing whitespace. Escapes are written only where a character would change what the line means (`escapeTextRun`). Front matter is written back byte for byte when no property changed (`src/editorSync/frontMatter.ts`). The editor's pipeline is one module, `webview/src/utils/editorMarkdown.ts`, which the corpus test (`markdownFidelity.test.ts`, 31 kept, 13 known and 1 cleanup file) drives. Byte-identical after one save: the repository's 1,087 Markdown files 4% → 71%, the team's 132 documents 3% → 89%.
+- **Nothing in the file is lost (#539).** A link to a relative path in another folder is kept (`isAllowedLinkUri`: TipTap's check plus Ritemark's safe relative paths; `javascript:`, `vbscript:`, `data:` and `file:` stay refused). A link or bold around code is kept (the `code` mark is the innermost mark). Images in a row keep their own paragraphs.
+- **One question for one conflict (#454).** A save VS Code refuses as newer, for a document Ritemark's editor holds, goes to Ritemark's document sync first (patch 014, `textFileSaveErrorHandler.ts` → `_ritemark.editorSync.answerSaveConflict`): Ritemark's Review changes when someone else changed the text, with one Ritemark notification when the document's tab is not visible; no question when only the file's date, size or line endings changed, or the disk already holds the person's text; VS Code's notification where Ritemark can't answer.
+- **The link dialog edits the link (#502).** Editing an existing link's address changes it, from anywhere in the link, its edges included (`webview/src/lib/linkEdit.ts`).
+- **No false Retry document update (#512).** `document:applied` is sent from a microtask after the update's transaction, so a window whose animation frames don't run still acknowledges it.
+- **Removing text no longer freezes the editor.** A host update's replacement range is computed with the overlap ProseMirror's `findDiffStart`/`findDiffEnd` can produce moved past the start (`webview/src/lib/documentUpdate.ts`).
+
+#### Changed
+- **New writing uses one plain form (R8):** new lists are `- item` and tight; a typed line break (Shift+Enter) is `line\`; a new thematic break is `---` (`***` as a document's first block). Save as Markdown (Word preview) and Copy as Markdown use the same rules.
+- **Files saved by Ritemark 2.0.1 and earlier** change once on their first save in 2.1: the spaces on blank lines and needless escapes go.
+
+---
+
 ## [2.0.1] — 2026-10-24
 
 A fix release for the Mac and Windows. The OpenCode fix is for the Mac only.

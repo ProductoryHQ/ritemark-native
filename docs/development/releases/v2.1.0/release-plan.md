@@ -112,7 +112,7 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 | Sprint | Planned branch | PR | Issues | Merge status | QA status | Release-note status |
 |---|---|---|---|---|---|---|
 | Plan: 137 and this release plan | `plan/sprint-137-files-as-written` | — | — | Local, not pushed | n/a | n/a |
-| 137 | `sprint-137-files-as-written` | — | #270, #454 | — | — | — |
+| 137 | `sprint-137-files-as-written` | [#553](https://github.com/ProductoryHQ/ritemark-native/pull/553) | #270, #454, #502, #512, #539 | Open, not merged | Passed (technical), 26 Oct | Drafted in `sprint-137-files-as-written/notes/release-notes-draft.md`, applied at closeout |
 | 138 | `sprint-138-…` (named in its plan) | — | #481, #408 | — | — | — |
 | 139 | `sprint-139-chosen-ai` | #550 | #496, #417, #376, #479, #473, #552 | — | passed (technical), 26 Oct | drafted, applied at closeout |
 | 140 | `sprint-140-first-day` | [#543](https://github.com/ProductoryHQ/ritemark-native/pull/543) | #497, #498, #466 | Open, not merged | Passed (technical), 26 Oct | Drafted in `sprint-140-first-day/notes/release-notes.md`, applied at closeout |

@@ -89,6 +89,8 @@ export type DocumentHostMessage =
       revision: number;
       diskHash: string;
       filename: string;
+      /** Open the review at once: the person chose Review changes in Ritemark's notification (#454). */
+      openReview?: boolean;
     });
 
 export type DocumentEditPayload =
@@ -266,7 +268,8 @@ export function parseDocumentHostMessage(value: unknown): DocumentHostMessage {
     };
   }
 
-  exactKeys(input, ['type', 'uri', 'documentSessionId', 'viewEpoch', 'conflictRevision', 'revision', 'diskHash', 'filename']);
+  exactKeys(input, ['type', 'uri', 'documentSessionId', 'viewEpoch', 'conflictRevision', 'revision', 'diskHash', 'filename', 'openReview']);
+  if (input.openReview !== undefined && input.openReview !== true) throw new DocumentProtocolError('openReview must be true when present');
   return {
     type,
     ...identity,
@@ -274,6 +277,7 @@ export function parseDocumentHostMessage(value: unknown): DocumentHostMessage {
     revision: integer(input, 'revision'),
     diskHash: hash(input, 'diskHash'),
     filename: requiredString(input, 'filename', 512),
+    ...(input.openReview === true ? { openReview: true } : {}),
   };
 }
 

@@ -1,11 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { DOMParser } from '@xmldom/xmldom'
-import { marked } from 'marked'
-import { createTurndownService } from './turndownService'
-import {
-  addTipTapTaskListTurndownRules,
-  transformTaskListElements,
-} from './taskListRoundTrip'
+import { createEditorTurndownService, editorMarked } from './editorMarkdown'
+import { transformTaskListElements } from './taskListRoundTrip'
 
 function parseFixture(html: string): Element {
   return new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html').documentElement
@@ -38,7 +34,7 @@ function directChildren(element: Element, tagName: string): Element[] {
 }
 
 function markedFixture(markdown: string): Element {
-  return parseFixture(marked(markdown, { breaks: true, gfm: true }))
+  return parseFixture(editorMarked.parse(markdown) as string)
 }
 
 {
@@ -106,8 +102,7 @@ function markedFixture(markdown: string): Element {
 }
 
 {
-  const service = createTurndownService()
-  addTipTapTaskListTurndownRules(service)
+  const service = createEditorTurndownService()
   const markdown = service.turndown(`
     <ul data-type="taskList">
       <li data-type="taskItem" data-checked="true"><p>Ship RC</p></li>
@@ -128,8 +123,7 @@ function markedFixture(markdown: string): Element {
 }
 
 {
-  const service = createTurndownService()
-  addTipTapTaskListTurndownRules(service)
+  const service = createEditorTurndownService()
   const markdown = service.turndown(`
     <ul data-type="taskList"><li data-type="taskItem" data-checked="true"><p>First</p></li></ul>
     <ul><li><p>Ordinary</p></li></ul>
@@ -146,8 +140,7 @@ function markedFixture(markdown: string): Element {
 }
 
 {
-  const service = createTurndownService()
-  addTipTapTaskListTurndownRules(service)
+  const service = createEditorTurndownService()
   assert.equal(
     service.turndown(`
       <ul data-type="taskList">
@@ -225,8 +218,7 @@ function itemTextStart(item: Element): string {
 }
 
 {
-  const service = createTurndownService()
-  addTipTapTaskListTurndownRules(service)
+  const service = createEditorTurndownService()
   const markdown = service.turndown(`
     <ul data-type="taskList">
       <li data-type="taskItem" data-checked="false"><label contenteditable="false"><input type="checkbox"/><span></span></label><div><p></p></div></li>

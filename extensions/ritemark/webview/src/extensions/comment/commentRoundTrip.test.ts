@@ -5,10 +5,11 @@
  * helpers. The TipTap `getHTML()` layer is exercised in dev-mode manual QA.
  */
 import { strict as assert } from 'assert'
-import { Marked } from 'marked'
-import { createTurndownService } from '../../utils/turndownService'
-import { commentMarkedExtension } from './commentMarkedExtension'
-import { addCommentTurndownRules } from './commentTurndownRules'
+import {
+  createEditorTurndownService,
+  editorMarked,
+  ensureCommentMarkedPipeline,
+} from '../../utils/editorMarkdown'
 import {
   parseCommentBody,
   hasCommentTerminator,
@@ -16,15 +17,15 @@ import {
   stripAgentMentions,
 } from './commentModel'
 
+// The editor's own pipeline with the flag on: the comment tokenizer on
+// `editorMarked`, the editor's Turndown service with the comment rules.
+ensureCommentMarkedPipeline()
+const turndown = createEditorTurndownService()
 function mdToHtml(md: string): string {
-  const m = new Marked({ breaks: true, gfm: true })
-  m.use(commentMarkedExtension as Parameters<typeof m.use>[0])
-  return m.parse(md) as string
+  return editorMarked.parse(md) as string
 }
 function roundTrip(md: string): string {
-  const s = createTurndownService()
-  addCommentTurndownRules(s)
-  return s.turndown(mdToHtml(md))
+  return turndown.turndown(mdToHtml(md))
 }
 const norm = (s: string) => s.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim()
 

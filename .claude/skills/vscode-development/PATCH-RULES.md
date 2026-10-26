@@ -23,7 +23,7 @@ Eighteen patches, numbered 001 through 019 (017 retired with the Getting Started
 | `011-ritemark-cloud-file-error.patch` | Windows | OneDrive/SharePoint cloud-file read errors |
 | `012-ritemark-shell-watchdog.patch` | Updates | Quarantines a broken user-dir extension copy |
 | `013-ritemark-configuration-defaults.patch` | Defaults | product.json `configurationDefaults` on desktop |
-| `014-ritemark-save-receipts.patch` | Saving | Text-file save receipts |
+| `014-ritemark-save-receipts.patch` | Saving | Text-file save receipts; a save refused as newer goes to Ritemark first when its editor holds the document (Sprint 137, #454) |
 | `015-ritemark-help-menu-policy.patch` | Menus | The Help menu focused on Ritemark, with Getting started, Support and Send feedback |
 | `016-ritemark-store-acquisition-policy.patch` | Store policy | No external software-acquisition promotion (Source Control's Git download button) |
 | `018-ritemark-surfaces.patch` | The 2.0 frame | No title row, strips, sheets and gaps, zoom, Ritemark's menus, the left column's head, the welcome alone, a file's extension muted (sizes and drawing) |

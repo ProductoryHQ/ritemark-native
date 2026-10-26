@@ -49,8 +49,10 @@ As someone whose files are read on GitHub and in Obsidian, I want a line break t
 Acceptance criteria:
 - **A soft line break** stays a soft line break: a newline with nothing before it. GitHub and every CommonMark reader keep showing those lines as one paragraph, as they did before Ritemark saved. In the editor it still shows as a new line, as today.
 - **A hard line break** stays in the form it was written: two or more spaces before the newline, or a backslash.
-- **A line break typed in Ritemark** (Shift+Enter, or pasted text with line breaks) is written as a hard break with a backslash at the end of the line (`line\`), with no trailing spaces. *Pending Jarmo's answer to question 3 in [sprint-plan.md](sprint-plan.md).*
+- **A line break typed in Ritemark** (Shift+Enter, or pasted text with line breaks) is written as a hard break with a backslash at the end of the line (`line\`), with no trailing spaces. Decision 3, 26 October.
 - **Inside a quote,** a soft break stays `> one` / `> two`.
+- **Inside a table cell,** a line break is written `<br>`, the one form a cell can hold. *(Scope change, 26 October.)*
+- **A line break at the very end of a paragraph,** which no reader shows, is not written: a backslash there would read as a literal `\` on the next open. *(Scope change, 26 October.)*
 
 ### R3: No whitespace appears at the end of a line
 
@@ -75,6 +77,10 @@ Acceptance criteria:
   - a number and full stop are escaped only at the start of a line, where they would start a list. They are not escaped in a heading (`## 1. Background`), after bold (`**1. Scope**`) or in a table cell;
   - Turndown's other line-start escapes (`-`, `+`, `#`, `>`, `=`) likewise apply only at the start of a line;
   - everything that today stops text from turning into formatting stays escaped (R9's negative fixtures).
+- **Blocks written directly under one another,** with no blank line between them (a paragraph under a heading, a list or table under a line of text, a quote under a paragraph), stay that way. R1's list under a line, made general. *(Scope change, 26 October: the corpus showed the same rewrite for every block, not only lists.)*
+- **A code fence** keeps its info string as written, and a fence written without one stays without one. Today such a fence is written ```` ```plaintext ````, in 19% of the repository's files. Fenced code itself stays exactly as written (R3). *(Scope change, 26 October.)*
+- **A backslash** is escaped only where it would otherwise escape the next character: before ASCII punctuation, or at the end of a line. `C:\Users\me` and `\d+` stay as written. *(Scope change, 26 October: the plan kept today's escaping of every backslash, Turndown's default, which writes `C:\\Users\\me` for `C:\Users\me` in a file nobody edited.)*
+- **A `<`** before a letter, `/`, `!` or `?` is escaped, because the next open would read it as HTML and drop it: `Promise<string>` lost `<string>` on the second open. Every other `<` stays bare. *(Scope change, 26 October, under R6: nothing is lost.)*
 - **A table** keeps:
   - its delimiter row as written (`|---|---|`, `| --- | --- |`, `|:---|---:|`), as long as its number of columns has not changed;
   - its column alignment, always. Today alignment is lost on every save;
@@ -123,7 +129,7 @@ As someone writing in Ritemark, I want what I type to be written in the form mos
 Acceptance criteria:
 - **A new list** (typed, pasted, from the slash menu or the + menu) is written tight, as `- item` or `1. item`, with nested lists indented to the item's text: two spaces under `-`, three under `1.`.
 - **A new item** in an existing list follows that list's form.
-- **A new thematic break** is `---`. The one exception is a document's very first block when the document has no front matter. There it is `***`, because a file starting with `---` reads as front matter.
+- **A new thematic break** is `---`. The one exception is a document's very first block. There it is `***`, because a file starting with `---` reads as front matter. *(Scope change, 26 October: this holds with front matter too. The body is written on its own, and once the last property is removed a body starting with `---` becomes the file's first line.)*
 - **A new line break** follows R2.
 - **New links, images, tables, emphasis and code** are written as today: `[text](url)`, `![alt](src)`, `| a | b |` with `| --- |`, `*em*` and `**strong**`, backtick fences.
 - **Save as Markdown** (Word preview) and **Copy as Markdown** use the same rules. Their output changes to these forms: `- item` and tight lists instead of `-   item`.
@@ -146,7 +152,7 @@ Acceptance criteria:
   No real person's name, path, address or account is in any of them.
 - **The kept set:** every file comes back byte for byte after open and save, and again after a second save. Opening it, typing one word at the end of one paragraph, and saving changes exactly that one line.
 - **The known set:** files with forms outside the bound (*Non-Requirements*). Each has its expected output pinned. The test proves the output is stable on a second save and loses no text, link, mark or image.
-- **The cleanup set:** files saved by Ritemark 2.0.1 and earlier. Their expected output pins the one-time cleanup, R3's spaces on empty lines going away. *Pending question 4.*
+- **The cleanup set:** files saved by Ritemark 2.0.1 and earlier. Their expected output pins the one-time cleanup, R3's spaces on empty lines going away. Decision 4, 26 October.
 - **Negative fixtures:** text that must stay escaped so it does not turn into formatting:
   - `*not italic*` written escaped;
   - `1\. not a list` at the start of a line;
@@ -225,7 +231,7 @@ Acceptance criteria:
 - **Keeping YAML's form when a property is edited** (R5).
 - **Footnotes (#153), equations (#481, Sprint 138)** and anything else new in the format.
 - **Changing VS Code's conflict editor** for documents open only in the text editor.
-- **The link dialog's update bug (#502)** and **the false Retry document update (#512),** unless Jarmo takes them in (question 7).
+- ~~**The link dialog's update bug (#502)** and **the false Retry document update (#512)**~~: taken in by decision 7 (26 October) and fixed in this sprint.
 
 ## Resolved Questions
 
@@ -236,6 +242,19 @@ Acceptance criteria:
   - the approach is data-only attributes from the parse and Turndown rules that read them; the pre-audit's prototype measured it;
   - #454's change goes into patch 014;
   - the corpus test drives the editor's own modules, which means moving the pipeline out of `Editor.tsx` with no change in behaviour.
+
+## Scope changes during the sprint
+
+Made by engineering on 26 October 2026, under the plan's rule for a decision it doesn't cover (the narrowest option the plan's spirit supports, written down in the PR). Each is marked *(Scope change)* above, with its fixture in the corpus:
+
+| Change | Requirement | Where it is pinned |
+|---|---|---|
+| Blocks written directly under one another stay so | R4 (R1 made general) | the corpus (`kept/lists-under-a-line.md`, `kept/meeting-notes.md`, `kept/front-matter-tight.md` and others) |
+| A fence's info string kept; no `plaintext` | R4 | `markdownAsWritten.test.ts`; `kept/claude-answer.md`, `kept/code-spaces.md` |
+| A backslash escaped only before punctuation or at a line's end | R4 | `markdownAsWritten.test.ts`; `kept/escapes-left-alone.md`, `kept/escapes-negative.md` |
+| `<` escaped before a letter, `/`, `!` or `?` | R4, R6 | `markdownAsWritten.test.ts`; the negative fixtures |
+| `<br>` for a break in a table cell; no break at a paragraph's end | R2 | `markdownAsWritten.test.ts` |
+| `***` as the first block with front matter too | R8 | `markdownAsWritten.test.ts` |
 
 ## Open Questions
 

@@ -3,10 +3,13 @@
 # Purpose: Bind Ritemark's local-save receipt to the exact logical text snapshot handed to the file service.
 #
 # Why: Reading the file path from onDidSave can race with an external writer and suppress a real two-writer conflict.
+#      A save VS Code refuses as newer, for a document Ritemark's editor holds, goes to Ritemark's document sync first, so the person
+#      gets one question (Ritemark's Review changes) or none (only the file's date or line endings moved), never two (#454).
 #
-# File(s): src/vs/workbench/api/browser/mainThreadDocuments.ts, src/vs/workbench/api/common/extHost.protocol.ts, src/vs/workbench/api/common/extHostDocumentData.ts, src/vs/workbench/api/common/extHostDocuments.ts, src/vs/workbench/services/textfile/common/textFileEditorModel.ts, src/vs/workbench/services/textfile/common/textfiles.ts, src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
+# File(s): src/vs/workbench/api/browser/mainThreadDocuments.ts, src/vs/workbench/api/common/extHost.protocol.ts, src/vs/workbench/api/common/extHostDocumentData.ts, src/vs/workbench/api/common/extHostDocuments.ts, src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts, src/vs/workbench/contrib/files/test/browser/ritemarkSaveConflict.test.ts, src/vs/workbench/services/textfile/common/textFileEditorModel.ts, src/vs/workbench/services/textfile/common/textfiles.ts, src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
 # Created: 2026-08-31
 # Updated: 2026-10-19 (Sprint 135: carried onto VS Code 1.142.0 unchanged)
+# Updated: 2026-10-26 (Sprint 137, #454: the save-error handler hands a refused save to Ritemark, with VS Code's notification when no answer comes within 3 s: textFileSaveErrorHandler.ts and its test)
 #
 diff --git a/src/vs/workbench/api/browser/mainThreadDocuments.ts b/src/vs/workbench/api/browser/mainThreadDocuments.ts
 index 9827a1a573f..5affedfb204 100644
@@ -107,6 +110,141 @@ index 517568ceb6d..c6b34ed5d93 100644
  	}
  
  	public $acceptDirtyStateChanged(uriComponents: UriComponents, isDirty: boolean): void {
+diff --git a/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts b/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts
+index ce11123d046..61077f7f893 100644
+--- a/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts
++++ b/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts
+@@ -31,6 +31,8 @@ import { Schemas } from '../../../../../base/common/network.js';
+ import { IPreferencesService } from '../../../../services/preferences/common/preferences.js';
+ import { IEditorIdentifier, SaveReason, SideBySideEditor } from '../../../../common/editor.js';
+ import { hash } from '../../../../../base/common/hash.js';
++import { ICommandService } from '../../../../../platform/commands/common/commands.js';
++import { raceTimeout } from '../../../../../base/common/async.js';
+ 
+ export const CONFLICT_RESOLUTION_CONTEXT = 'saveConflictResolutionContext';
+ export const CONFLICT_RESOLUTION_SCHEME = 'conflictResolution';
+@@ -39,6 +41,21 @@ const LEARN_MORE_DIRTY_WRITE_IGNORE_KEY = 'learnMoreDirtyWriteError';
+ 
+ const conflictEditorHelp = localize('userGuide', "Use the actions in the editor tool bar to either undo your changes or overwrite the content of the file with your changes.");
+ 
++// Ritemark (patch 014): Ritemark's document sync answers save conflicts for documents its editor holds (#454).
++export const RITEMARK_EDITOR_ID = 'ritemark.editor';
++export const RITEMARK_ANSWER_SAVE_CONFLICT_COMMAND = '_ritemark.editorSync.answerSaveConflict';
++/** Ritemark (patch 014): how long Ritemark may take to answer before this handler's notification shows. */
++export const RITEMARK_ANSWER_TIMEOUT_MS = 3000;
++
++/**
++ * Ritemark (patch 014, #454): hand a save refused as "newer" to Ritemark, so the person gets one question in
++ * Ritemark's words instead of this notification and Ritemark's Review changes together. Only for a document
++ * Ritemark's editor holds, and never for a save from VS Code's own conflict editor.
++ */
++export function shouldHandSaveConflictToRitemark(isModifiedSince: boolean, editorIds: readonly (string | undefined)[], fromConflictEditor: boolean): boolean {
++	return isModifiedSince && !fromConflictEditor && editorIds.includes(RITEMARK_EDITOR_ID);
++}
++
+ // A handler for text file save error happening with conflict resolution actions
+ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHandler, IWorkbenchContribution {
+ 
+@@ -55,7 +72,8 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
+ 		@IEditorService private readonly editorService: IEditorService,
+ 		@ITextModelService textModelService: ITextModelService,
+ 		@IInstantiationService private readonly instantiationService: IInstantiationService,
+-		@IStorageService private readonly storageService: IStorageService
++		@IStorageService private readonly storageService: IStorageService,
++		@ICommandService private readonly commandService: ICommandService
+ 	) {
+ 		super();
+ 
+@@ -101,7 +119,10 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
+ 		}
+ 	}
+ 
+-	onSaveError(error: unknown, model: ITextFileEditorModel, options: ITextFileSaveOptions): void {
++	onSaveError(error: unknown, model: ITextFileEditorModel, options: ITextFileSaveOptions, ritemarkDeclined?: boolean): void {
++		// Ritemark (patch 014): Ritemark's document sync answers save conflicts for documents its editor holds (#454).
++		if (!ritemarkDeclined && this.handOverToRitemark(error, model, options)) { return; }
++
+ 		const fileOperationError = error as FileOperationError;
+ 		const resource = model.resource;
+ 
+@@ -189,6 +210,44 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
+ 		this.messages.set(model.resource, handle);
+ 	}
+ 
++	/**
++	 * Ritemark (patch 014, #454): Ritemark answers 'overwrite' when nobody else changed the text (a sync client
++	 * touched the file, or the disk already holds the person's text: save over it, no question), 'handled' when
++	 * its own Review changes asks. Anything else, or no answer (Ritemark not running, or not answering within
++	 * `RITEMARK_ANSWER_TIMEOUT_MS`), shows this handler's notification as before, so a conflict is never left
++	 * without a question.
++	 */
++	private handOverToRitemark(error: unknown, model: ITextFileEditorModel, options: ITextFileSaveOptions): boolean {
++		const isModifiedSince = (error as FileOperationError).fileOperationResult === FileOperationResult.FILE_MODIFIED_SINCE;
++		const fromConflictEditor = !!this.activeConflictResolutionResource && isEqual(this.activeConflictResolutionResource, model.resource);
++		const editorIds = isModifiedSince ? this.editorService.findEditors(model.resource).map(({ editor }) => editor.editorId) : [];
++		if (!shouldHandSaveConflictToRitemark(isModifiedSince, editorIds, fromConflictEditor)) {
++			return false;
++		}
++		void this.askRitemark(error, model, options);
++		return true;
++	}
++
++	private async askRitemark(error: unknown, model: ITextFileEditorModel, options: ITextFileSaveOptions): Promise<void> {
++		let answer: unknown;
++		try {
++			// No answer in time (the extension host is busy or stuck) counts as no answer: the notification shows.
++			answer = await raceTimeout(this.commandService.executeCommand<unknown>(RITEMARK_ANSWER_SAVE_CONFLICT_COMMAND, model.resource), RITEMARK_ANSWER_TIMEOUT_MS);
++		} catch {
++			answer = undefined; // the command is not registered: Ritemark is not running
++		}
++		if (answer === 'overwrite') {
++			if (!model.isDisposed()) {
++				// As this handler's own Overwrite does: the refused save left the model in conflict, where an auto save is ignored.
++				await model.save({ ...options, ignoreModifiedSince: true, reason: SaveReason.EXPLICIT });
++			}
++			return;
++		}
++		if (answer !== 'handled') {
++			this.onSaveError(error, model, options, true);
++		}
++	}
++
+ 	override dispose(): void {
+ 		super.dispose();
+ 
+diff --git a/src/vs/workbench/contrib/files/test/browser/ritemarkSaveConflict.test.ts b/src/vs/workbench/contrib/files/test/browser/ritemarkSaveConflict.test.ts
+new file mode 100644
+index 00000000000..48aea09287d
+--- /dev/null
++++ b/src/vs/workbench/contrib/files/test/browser/ritemarkSaveConflict.test.ts
+@@ -0,0 +1,27 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++// Ritemark (patch 014, #454): which refused saves the save-error handler hands to Ritemark.
++
++import assert from 'assert';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
++import { RITEMARK_EDITOR_ID, shouldHandSaveConflictToRitemark } from '../../browser/editors/textFileSaveErrorHandler.js';
++
++suite('Ritemark save conflict hand-over', () => {
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	test('a save refused as newer, for a document Ritemark\'s editor holds, goes to Ritemark', () => {
++		assert.strictEqual(shouldHandSaveConflictToRitemark(true, [RITEMARK_EDITOR_ID], false), true);
++		assert.strictEqual(shouldHandSaveConflictToRitemark(true, ['workbench.editors.files.textFileEditor', RITEMARK_EDITOR_ID], false), true, 'also with a text editor of the same file open (S44)');
++	});
++
++	test('everything else keeps VS Code\'s notification', () => {
++		assert.strictEqual(shouldHandSaveConflictToRitemark(true, ['workbench.editors.files.textFileEditor'], false), false, 'only a text editor holds it (S45)');
++		assert.strictEqual(shouldHandSaveConflictToRitemark(true, [], false), false, 'no editor holds it');
++		assert.strictEqual(shouldHandSaveConflictToRitemark(true, [undefined], false), false, 'an editor without an id');
++		assert.strictEqual(shouldHandSaveConflictToRitemark(false, [RITEMARK_EDITOR_ID], false), false, 'another save error (read-only, permissions)');
++		assert.strictEqual(shouldHandSaveConflictToRitemark(true, [RITEMARK_EDITOR_ID], true), false, 'a save from VS Code\'s own conflict editor');
++	});
++});
 diff --git a/src/vs/workbench/services/textfile/common/textFileEditorModel.ts b/src/vs/workbench/services/textfile/common/textFileEditorModel.ts
 index d7058ab3947..14046806d1f 100644
 --- a/src/vs/workbench/services/textfile/common/textFileEditorModel.ts

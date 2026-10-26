@@ -4,7 +4,7 @@ Track: SDD (auto-detected: 11 user-facing requirements from two issues; the webv
 Override with: "use plain full track"
 Branch: `sprint-137-files-as-written`, created from `origin/main` only after Jarmo approves this plan
 Release tier: shell (`patches/vscode/014-ritemark-save-receipts.patch` gains one file for #454). The #270 work is extension-tier by path, and ships in 2.1.0's shell release (the shape's decision 1).
-Status: **Approved (Phase 2 → 3), 26 October 2026,** by the Development manager under Jarmo's delegation. The sprint branch is created before the first code edit.
+Status: **Phase 5 (cleanup), 26 October 2026.** Approved (Phase 2 → 3) that day by the Development manager under Jarmo's delegation; built on `sprint-137-files-as-written`; Phase 4 passed (QA, technical, after its two blockers were fixed); PR [#553](https://github.com/ProductoryHQ/ritemark-native/pull/553) waits for the manager's merge.
 
 ## SDD Artifacts
 

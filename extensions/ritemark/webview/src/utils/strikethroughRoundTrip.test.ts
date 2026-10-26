@@ -12,18 +12,13 @@
  */
 import { strict as assert } from 'node:assert'
 import { createDocument } from '@mixmark-io/domino'
-import { Marked } from 'marked'
 import { getSchema } from '@tiptap/core'
-import StarterKit from '@tiptap/starter-kit'
 import { DOMParser as PMDOMParser, DOMSerializer, type Node as PMNode } from '@tiptap/pm/model'
-import { createTurndownService } from './turndownService'
-import { addTipTapTaskListTurndownRules } from './taskListRoundTrip'
+import { createEditorSchemaExtensions, createEditorTurndownService, editorMarked } from './editorMarkdown'
 
-// Same options as `editorMarked` in components/Editor.tsx.
-const editorMarked = new Marked({ breaks: true, gfm: true })
-const schema = getSchema([StarterKit])
-const turndown = createTurndownService()
-addTipTapTaskListTurndownRules(turndown)
+// The editor's own pipeline (utils/editorMarkdown.ts).
+const schema = getSchema(createEditorSchemaExtensions())
+const turndown = createEditorTurndownService()
 
 function fromHTML(html: string): PMNode {
   return PMDOMParser.fromSchema(schema).parse(createDocument(html).body)

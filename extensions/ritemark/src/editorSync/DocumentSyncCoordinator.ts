@@ -20,8 +20,10 @@ import {
   canCompleteViewResolution,
   canonicalJson,
   classifyAcceptedModelEdit,
+  classifyRefusedSave,
   classifyStaleViewEdit,
   classifyThreeWay,
+  encodeDocumentText,
   initializeThreeWayState,
   normalizeLogicalText,
   observeLocalSaveReceipts,
@@ -29,6 +31,29 @@ import {
 } from './state';
 
 const POLL_INTERVAL_MS = 3000;
+
+/**
+ * Sprint 137 (#454): VS Code's save-error handler hands a save it refused as
+ * "newer" to this command when Ritemark's editor holds the document (patch
+ * 014). Internal: not in package.json, never in the palette.
+ */
+export const ANSWER_SAVE_CONFLICT_COMMAND = '_ritemark.editorSync.answerSaveConflict';
+
+/**
+ * The answer to a refused save. `overwrite`: nobody else changed the text, so
+ * the shell saves the person's text over the file. `handled`: a real conflict,
+ * and Ritemark's Review changes asks. `false`: Ritemark can't answer, and VS
+ * Code's own notification shows.
+ */
+export type SaveConflictAnswer = 'overwrite' | 'handled' | false;
+
+/**
+ * The most a refused save waits for Ritemark's answer. The shell waits 3 s
+ * (patch 014's `RITEMARK_ANSWER_TIMEOUT_MS`) and then shows VS Code's own
+ * notification; answering `false` a little before that keeps the two from
+ * both asking, and a late decision then does nothing the watcher won't.
+ */
+const ANSWER_SAVE_CONFLICT_BUDGET_MS = 2500;
 
 type UpdateMessage = Extract<DocumentHostMessage, { type: 'document:update' }>;
 type EditMessage = Extract<DocumentViewMessage, { type: 'document:edit' }>;
@@ -91,6 +116,8 @@ interface DocumentRecord {
   panels: Map<vscode.Webview, vscode.WebviewPanel>;
   watcher?: vscode.FileSystemWatcher;
   poll?: NodeJS.Timeout;
+  /** The conflict Ritemark's notification last named, so one conflict asks once (#454). */
+  notifiedConflictRevision?: number;
   queue: Promise<void>;
   disposed: boolean;
   lastLogSignature?: string;
@@ -123,6 +150,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       vscode.workspace.registerTextDocumentContentProvider('ritemark-sync', {
         provideTextDocumentContent: uri => this.virtualDocuments.get(uri.toString()) ?? '',
       }),
+      vscode.commands.registerCommand(ANSWER_SAVE_CONFLICT_COMMAND, (uri: unknown) => this.answerSaveConflict(uri)),
     );
     context.subscriptions.push(this);
   }
@@ -512,6 +540,78 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     this.log(record, 'keep-local');
   }
 
+  /**
+   * VS Code refused to save this document as "newer" (#454, R10, R11): decide
+   * what that refusal means, so the person gets one question or none.
+   */
+  private async answerSaveConflict(uriArgument: unknown): Promise<SaveConflictAnswer> {
+    const uri = uriArgument instanceof vscode.Uri
+      ? uriArgument.toString()
+      : typeof uriArgument === 'string' ? uriArgument : undefined;
+    const record = uri ? this.records.get(uri) : undefined;
+    if (!record || record.disposed || !this.isDiskBacked(record.document)) return false;
+    let late = false;
+    const answer = this.enqueueResult(record, false, async (): Promise<SaveConflictAnswer> => {
+      const disk = await this.readDisk(record.document);
+      if (!disk || late) return false;
+      const decision = classifyRefusedSave({
+        baseDiskLogicalHash: record.baseDiskLogicalHash,
+        diskLogicalHash: disk.logicalHash,
+        modelLogicalHash: logicalHash(record.document.getText()),
+      });
+      if (decision === 'converged' || (decision === 'disk-unchanged' && !record.conflict)) {
+        // R11: the disk already holds the person's text (S49), or still the
+        // text the person started from — a sync client touched it, or rewrote
+        // its line endings (S47). The person's save may go through, with no
+        // question; its receipt then settles Ritemark's own state.
+        this.log(record, `refused-save:${decision}`);
+        return 'overwrite';
+      }
+      // R10: a real conflict. Ritemark's Review changes is the one question.
+      await this.reconcile(record, 'refused-save');
+      if (!record.conflict || late) return false;
+      this.notifyHiddenConflict(record);
+      return 'handled';
+    });
+    let budget: NodeJS.Timeout | undefined;
+    const outOfTime = new Promise<SaveConflictAnswer>(resolve => {
+      budget = setTimeout(() => {
+        late = true;
+        resolve(false);
+      }, ANSWER_SAVE_CONFLICT_BUDGET_MS);
+    });
+    try {
+      return await Promise.race([answer, outOfTime]);
+    } finally {
+      clearTimeout(budget);
+    }
+  }
+
+  /**
+   * When no Ritemark view of the document is visible — its tab is behind
+   * another, or the save came from a text editor of the same file — one
+   * Ritemark notification names it; Review changes brings it forward with the
+   * review open (R10, S43, S44).
+   */
+  private notifyHiddenConflict(record: DocumentRecord): void {
+    const conflict = record.conflict;
+    if (!conflict || record.notifiedConflictRevision === conflict.revision) return;
+    const views = [...record.views.values()].filter(view => !view.disposed);
+    if (views.length === 0 || views.some(view => view.panel.visible)) return;
+    record.notifiedConflictRevision = conflict.revision;
+    const name = path.basename(record.document.uri.fsPath);
+    void vscode.window.showWarningMessage(
+      `"${name}" changed on disk while you were editing it.`,
+      'Review changes',
+    ).then(choice => {
+      if (choice !== 'Review changes' || record.disposed || record.conflict?.revision !== conflict.revision) return;
+      const view = [...record.views.values()].find(candidate => !candidate.disposed);
+      if (!view) return;
+      view.panel.reveal(view.panel.viewColumn, false);
+      this.sendConflict(record, view, true);
+    });
+  }
+
   private async reconcile(record: DocumentRecord, reason: string): Promise<void> {
     if (record.disposed || !this.isDiskBacked(record.document)) return;
     // Receipts created after this point are newer than the disk read and must
@@ -757,7 +857,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     } satisfies DocumentHostMessage);
   }
 
-  private sendConflict(record: DocumentRecord, view: ViewLease): void {
+  private sendConflict(record: DocumentRecord, view: ViewLease, openReview = false): void {
     const conflict = record.conflict;
     if (!conflict || view.disposed) return;
     void view.webview.postMessage({
@@ -769,6 +869,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       revision: record.revision,
       diskHash: conflict.diskValidator,
       filename: path.basename(record.document.uri.fsPath),
+      ...(openReview ? { openReview: true } : {}),
     } satisfies DocumentHostMessage);
   }
 
@@ -887,6 +988,15 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     });
   }
 
+  /** `enqueue`, with the task's result; `fallback` when it fails or the record is gone. */
+  private enqueueResult<T>(record: DocumentRecord, fallback: T, task: () => Promise<T>): Promise<T> {
+    let result = fallback;
+    this.enqueue(record, async () => {
+      result = await task();
+    });
+    return record.queue.then(() => result, () => fallback);
+  }
+
   private clearPending(view: ViewLease): void {
     if (!view.pending) return;
     view.pending.schedule?.cancel();
@@ -1003,9 +1113,7 @@ function snapshot(bytes: Buffer): DiskSnapshot {
 }
 
 function encodeDocumentBytes(content: string, eol: vscode.EndOfLine, hasUtf8Bom: boolean): Uint8Array {
-  const lineEnding = eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
-  const normalized = normalizeLogicalText(content).replace(/\n/g, lineEnding);
-  return Buffer.from(`${hasUtf8Bom ? '\uFEFF' : ''}${normalized}`, 'utf8');
+  return Buffer.from(encodeDocumentText(content, eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n', hasUtf8Bom), 'utf8');
 }
 
 function logicalHash(content: string): string {

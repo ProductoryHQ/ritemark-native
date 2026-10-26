@@ -5,6 +5,7 @@ import {
   canonicalJson,
   canonicalMarkdownProjection,
   classifyAcceptedModelEdit,
+  classifyRefusedSave,
   classifyStaleViewEdit,
   classifyThreeWay,
   ensureTrailingNewline,
@@ -12,6 +13,17 @@ import {
   initializeThreeWayState,
   normalizeLogicalText,
 } from './state';
+
+test('a refused save: converged, disk text unchanged, or a real conflict (#454, R10, R11)', () => {
+  // S49: a tool wrote exactly the person's text.
+  assert.equal(classifyRefusedSave({ baseDiskLogicalHash: 'a', diskLogicalHash: 'b', modelLogicalHash: 'b' }), 'converged');
+  // S47: a sync client touched the file or rewrote its line endings; the words are the ones the person started from.
+  assert.equal(classifyRefusedSave({ baseDiskLogicalHash: 'a', diskLogicalHash: 'a', modelLogicalHash: 'b' }), 'disk-unchanged');
+  // S40: an agent changed the text while the person typed.
+  assert.equal(classifyRefusedSave({ baseDiskLogicalHash: 'a', diskLogicalHash: 'c', modelLogicalHash: 'b' }), 'conflict');
+  // Converged wins even when the base also matches (nothing to save, nothing to ask).
+  assert.equal(classifyRefusedSave({ baseDiskLogicalHash: 'a', diskLogicalHash: 'a', modelLogicalHash: 'a' }), 'converged');
+});
 
 test('three-way classifier keeps ordinary local autosave lag quiet', () => {
   assert.equal(classifyThreeWay({ baseDiskHash: 'a', baseModelHash: 'a', diskHash: 'a', modelHash: 'b' }), 'local-only');

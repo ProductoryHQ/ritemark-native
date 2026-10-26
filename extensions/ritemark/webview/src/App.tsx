@@ -7,7 +7,8 @@ import {
   onInternalEvent,
   InternalEvent,
 } from './bridge'
-import { Editor, getSelectionHTML, turndownService, preprocessTableHTML } from './components/Editor'
+import { Editor, getSelectionHTML } from './components/Editor'
+import { editorTurndownService, preprocessTableHTML } from './utils/editorMarkdown'
 import { SpreadsheetViewer } from './components/SpreadsheetViewer'
 import { PDFViewer } from './components/viewers/PDFViewer'
 import { DocumentHeader, PropertiesModal, ExportMenu, SyncActionButton } from './components/header'
@@ -256,6 +257,8 @@ function App() {
           }
         } else {
           dispatchDocumentViewSync(message)
+          // #454: the person chose Review changes in Ritemark's notification.
+          if (message.type === 'document:conflict' && message.openReview) setShowConflictDialog(true)
         }
         return
       }
@@ -659,7 +662,7 @@ function App() {
     if (!editorRef.current) return
     const html = getSelectionHTML(editorRef.current)
     const cleanedHTML = preprocessTableHTML(html)
-    const markdown = turndownService.turndown(cleanedHTML)
+    const markdown = editorTurndownService.turndown(cleanedHTML)
     writeClipboard(markdown)
   }, [])
 

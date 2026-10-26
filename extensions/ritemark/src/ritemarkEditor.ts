@@ -5,7 +5,6 @@ import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import { parseFrontmatterFromText, serializeFrontmatter, discoverCommands } from './agent/discovery';
 import type { CardPages } from './taskBoard/cardPages';
-import matter from 'gray-matter';
 import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
 import { exportToWordV2 } from './export/v2/wordHtmlExporter';
@@ -28,7 +27,8 @@ import {
 } from './workspaceFileLinks';
 import { DocumentSyncCoordinator } from './editorSync/DocumentSyncCoordinator';
 import type { DocumentEditPayload, DocumentRenderPayload, DocumentSyncBootstrap } from './editorSync/protocol';
-import { canonicalMarkdownProjection, ensureTrailingNewline } from './editorSync/state';
+import { canonicalMarkdownProjection } from './editorSync/state';
+import { joinFrontMatter, splitFrontMatter, type DocumentProperties } from './editorSync/frontMatter';
 import { versionedWebviewAssetUri } from './views/webviewAssetUri';
 import { isRelativeImagePath } from './utils/imagePaths';
 import { resolveDocumentResourceRoots, resolveDocumentRoot, toMarkdownRelativePath } from './webviewResourceRoots';
@@ -37,10 +37,8 @@ import type { CommentTaskProjectionV1 } from './commentTasks/types';
 import type { CommentTaskDocument } from './commentTasks/CommentTaskController';
 import { systemLanguage } from './voiceDictation/systemLanguage';
 
-// Properties type for front-matter
-export interface DocumentProperties {
-  [key: string]: unknown;
-}
+// Properties type for front-matter (Sprint 137: lives with the split and join)
+export type { DocumentProperties };
 
 interface SearchWorkspaceFilesMessage {
   type: 'searchWorkspaceFiles';
@@ -395,7 +393,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       // A card page saves its body only; the board's front matter stays byte for byte.
       const card = RitemarkEditorProvider.cardPages()?.spliceBody(document, payload.content);
       if (card !== null && card !== undefined) return card;
-      return this.serializeFrontMatter(payload.properties, payload.content);
+      return this.serializeFrontMatter(payload.properties, payload.content, document.getText());
     }
     return payload.content;
   }
@@ -899,7 +897,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
               const card = RitemarkEditorProvider.cardPages()?.spliceBody(document, message.content as string);
               const fullContent = card ?? this.serializeFrontMatter(
                 message.properties as DocumentProperties | undefined,
-                message.content as string
+                message.content as string,
+                document.getText()
               );
               this.updateDocument(document, fullContent);
             } else if (fileType === 'csv') {
@@ -915,7 +914,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
               const currentParsed = this.extractFrontMatter(document.getText());
               const newContent = this.serializeFrontMatter(
                 message.properties as DocumentProperties,
-                currentParsed.content
+                currentParsed.content,
+                document.getText()
               );
               this.updateDocument(document, newContent);
             }
@@ -1288,37 +1288,20 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     properties: DocumentProperties;
     hasProperties: boolean;
   } {
-    try {
-      const parsed = matter(rawContent);
-      return {
-        content: parsed.content,
-        properties: parsed.data as DocumentProperties,
-        hasProperties: Object.keys(parsed.data).length > 0
-      };
-    } catch {
-      // If parsing fails, return content as-is with empty properties
-      return {
-        content: rawContent,
-        properties: {},
-        hasProperties: false
-      };
-    }
+    return splitFrontMatter(rawContent);
   }
 
   /**
-   * Serialize properties and content back to markdown with front-matter
+   * Serialize properties and content back to markdown with front-matter.
+   * Sprint 137 (R5): with the document's current text, unchanged properties
+   * keep its front matter byte for byte.
    */
   private serializeFrontMatter(
     properties: DocumentProperties | undefined,
-    content: string
+    content: string,
+    currentText?: string
   ): string {
-    // If no properties or empty properties, return content only
-    if (!properties || Object.keys(properties).length === 0) {
-      return ensureTrailingNewline(content);
-    }
-
-    // Use gray-matter to stringify with YAML front-matter
-    return matter.stringify(content, properties);
+    return joinFrontMatter(properties, content, currentText);
   }
 
   private async downloadMermaidImage(

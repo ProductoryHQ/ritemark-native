@@ -6,20 +6,9 @@ import { Fragment } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
 import { createNodeFromContent } from '@tiptap/core'
 import { sendToExtension, onMessage } from '../bridge'
-import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import BulletList from '@tiptap/extension-bullet-list'
-import { BoundedOrderedList } from '../extensions/BoundedOrderedList'
-import ListItem from '@tiptap/extension-list-item'
-import TaskList from '@tiptap/extension-task-list'
-import TaskItem from '@tiptap/extension-task-item'
 import { CodeBlockWithCopyExtension } from '../extensions/CodeBlockWithCopyExtension'
-import { CustomLink } from '../extensions/CustomLink'
-import { createLowlight, common } from 'lowlight'
-import { Marked } from 'marked'
-import { createTurndownService } from '../utils/turndownService'
 import { sameRelativeImagePath } from '../../../src/utils/imagePaths'
-import { tableExtensions } from '../extensions/tableExtensions'
 import { ImageExtension } from '../extensions/imageExtensions'
 import { SlashCommands } from '../extensions/SlashCommands'
 import { FileLinkSuggestions } from '../extensions/FileLinkSuggestions'
@@ -34,153 +23,24 @@ import { MarginCommentRail } from './MarginCommentRail'
 import { TableOverlayControls } from './TableOverlayControls'
 import { BlockMenu } from './BlockMenu'
 import type { EditorSelection } from '../types/editor'
-import { classifyLinkTarget } from '../lib/linkTargets'
-import { CommentMark } from '../extensions/comment/CommentMark'
-import { CommentNode } from '../extensions/comment/CommentNode'
-import { commentMarkedExtension } from '../extensions/comment/commentMarkedExtension'
-import { addCommentTurndownRules } from '../extensions/comment/commentTurndownRules'
 import type { DocumentApplyTarget } from '../types/documentSync'
+import { documentReplacement } from '../lib/documentUpdate'
 import {
   shouldApplyIncomingEditorValue,
   shouldPublishEditorChange,
 } from '../editorValueReconciliation'
 import {
-  addTipTapTaskListTurndownRules,
-  preprocessTaskListHTML,
-} from '../utils/taskListRoundTrip'
+  applyImageMappings,
+  createEditorSchemaExtensions,
+  editorHTMLToMarkdown,
+  ensureCommentMarkedPipeline,
+  markdownToEditorHTML,
+} from '../utils/editorMarkdown'
 
-// Initialize Turndown for HTML to Markdown conversion.
-// Base config + GFM plugins + pipe-escape rule live in utils/turndownService;
-// TipTap-specific rules (taskItem, taskList, imageWithRelativePath) are layered
-// on top below.
-export const turndownService = createTurndownService()
-
-// Sprint 94 (#81): use a SCOPED `marked` instance for the editor's load path so
-// registering the comment tokenizer never mutates the global `marked` singleton
-// — the AI sidebar's RenderedMarkdown uses that global, and a comment tokenizer
-// on it would turn chat `<!-- ... -->` into visible `<ritemark-comment>` (audit
-// M2). Turndown rules are harmless when no comment nodes exist, so they register
-// unconditionally. The tokenizer registers lazily, gated on the flag, once —
-// otherwise a flag-off document's `<!-- -->` would become a `<ritemark-comment>`
-// the (unregistered) TipTap node then drops, losing the comment.
-addCommentTurndownRules(turndownService)
-
-const editorMarked = new Marked({ breaks: true, gfm: true })
-let commentMarkedRegistered = false
-function ensureCommentMarkedPipeline(): void {
-  if (commentMarkedRegistered) return
-  commentMarkedRegistered = true
-  editorMarked.use(commentMarkedExtension as Parameters<typeof editorMarked.use>[0])
-}
-
-/**
- * Preprocess HTML to unwrap standalone images from paragraph tags
- *
- * marked generates: <p><img src="..." alt=""></p>
- * TipTap with inline:false images expects: <img src="..." alt="">
- *
- * Without this, TipTap creates both an empty paragraph AND an image node,
- * causing extra spacing above images when reopening files.
- */
-function preprocessImageHTML(html: string): string {
-  const temp = document.createElement('div')
-  temp.innerHTML = html
-
-  // Find all paragraphs that contain only an image (and maybe whitespace)
-  temp.querySelectorAll('p').forEach(p => {
-    const img = p.querySelector('img')
-    if (img) {
-      // Check if paragraph only contains the image (no text content besides whitespace)
-      const textContent = p.textContent?.trim() || ''
-      const imgAlt = img.getAttribute('alt') || ''
-
-      // If the only text content is the img alt text (or empty), unwrap the image
-      if (textContent === '' || textContent === imgAlt) {
-        // Replace paragraph with just the image
-        p.replaceWith(img)
-      }
-    }
-  })
-
-  return temp.innerHTML
-}
-
-/**
- * Preprocess HTML to make TipTap tables compatible with turndown-plugin-gfm
- *
- * TipTap generates tables with:
- * 1. <colgroup> elements that break GFM table parser
- * 2. <p> tags inside cells that add unwanted line breaks
- *
- * This function cleans the HTML in the DOM before Turndown processes it
- */
-export function preprocessTableHTML(html: string): string {
-  // Create a temporary DOM element to parse and manipulate HTML
-  const temp = document.createElement('div')
-  temp.innerHTML = html
-
-  // Remove all <colgroup> elements from tables
-  temp.querySelectorAll('colgroup').forEach(colgroup => colgroup.remove())
-
-  // Unwrap <p> tags inside table cells (keep content, remove wrapper)
-  temp.querySelectorAll('td > p, th > p').forEach(p => {
-    const parent = p.parentElement
-    if (parent) {
-      // Move all child nodes of <p> to parent
-      while (p.firstChild) {
-        parent.insertBefore(p.firstChild, p)
-      }
-      // Remove the now-empty <p> tag
-      p.remove()
-    }
-  })
-
-  return temp.innerHTML
-}
-
-addTipTapTaskListTurndownRules(turndownService)
-
-/**
- * Serialize every TipTap document through one canonical Markdown path.
- *
- * The editor's incoming-value reconciliation and outgoing change publication
- * must compare the same representation. Otherwise a harmless TipTap plugin
- * transaction after opening a file can look like a user edit (for example,
- * when the source file has a trailing newline but Turndown does not).
- */
-function serializeEditorHTML(html: string): string {
-  return turndownService.turndown(preprocessTableHTML(html))
-}
-
-// Keep Turndown's default escaping behavior to prevent content corruption
-// The unescape logic below handles loading escaped files correctly
-
-// Create lowlight instance with common languages
-const lowlight = createLowlight(common)
-
-/**
- * Apply image mappings to HTML content
- * Converts relative image paths to webview URIs for display,
- * while storing the original relative path in the title attribute for turndown
- */
-function applyImageMappings(html: string, imageMappings: Record<string, string>): string {
-  if (!imageMappings || Object.keys(imageMappings).length === 0) {
-    return html
-  }
-
-  // Process each mapping
-  let result = html
-  for (const [relativePath, webviewUri] of Object.entries(imageMappings)) {
-    // Escape special regex characters in the path
-    const escapedPath = relativePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    // Replace src="relativePath" with src="webviewUri" title="relativePath"
-    // This preserves the relative path for turndown to use when saving
-    const srcRegex = new RegExp(`src="${escapedPath}"`, 'g')
-    result = result.replace(srcRegex, `src="${webviewUri}" title="${relativePath}"`)
-  }
-
-  return result
-}
+// The editor's Markdown pipeline — `marked` on load, the schema, Turndown on
+// save — lives in utils/editorMarkdown.ts (Sprint 137), so the round-trip and
+// corpus tests drive the same code. The comment `marked` tokenizer registers
+// lazily, gated on the flag (see ensureCommentMarkedPipeline there).
 
 // Helper to read a File as base64 data URL
 function readFileAsBase64(file: File): Promise<string> {
@@ -328,11 +188,8 @@ export function Editor({
     } else {
       // Convert markdown to HTML
       try {
-        const html = editorMarked.parse(value) as string
         // Preprocess: task lists and unwrap standalone images from paragraphs
-        let processed = preprocessTaskListHTML(html)
-        processed = preprocessImageHTML(processed)
-        return processed
+        return markdownToEditorHTML(value)
       } catch (error) {
         console.error('Markdown conversion error:', error)
         return `<p>${value.replace(/\n/g, '</p><p>')}</p>`
@@ -341,122 +198,54 @@ export function Editor({
   })
 
   const editor: TipTapEditor | null = useEditor({
-    extensions: [
-      StarterKit.configure({
-        bulletList: false,
-        orderedList: false,
-        listItem: false,
-        codeBlock: false, // Disable default to use enhanced version
-        heading: {
-          levels: [1, 2, 3, 4, 5, 6],
-        },
-        bold: {
-          HTMLAttributes: {
-            class: 'font-bold',
-          },
-        },
-        italic: {
-          HTMLAttributes: {
-            class: 'italic',
-          },
-        },
-      }),
-      // Sprint 72 R4/R5: makes Mod-Alt-1..6 work from any cursor position
-      // including the TOC click landing boundary. Must come after StarterKit
-      // so this binding gets the first dispatch chance.
-      HeadingLevelShortcuts,
-      // Sprint 126 (#332): binds Shift-Home/Shift-End, which neither TipTap nor
-      // ProseMirror binds. Without them Chrome's native contenteditable default
-      // extended Shift+End to the end of the document, and the next Delete wiped
-      // every block below the caret. Same placement reason as above.
-      SelectionBoundaryKeys,
-      CodeBlockWithCopyExtension.configure({
-        lowlight,
-        defaultLanguage: 'plaintext',
-        HTMLAttributes: {
-          class: 'tiptap-code-block',
-        },
-      }),
-      BulletList.configure({
-        HTMLAttributes: {
-          class: 'tiptap-bullet-list',
-        },
-      }),
-      // Sprint 120 (#280): same as TipTap's ordered list, except a number
-      // only starts a list up to 99, so a year stays prose.
-      BoundedOrderedList.configure({
-        HTMLAttributes: {
-          class: 'tiptap-ordered-list',
-        },
-      }),
-      ListItem.configure({
-        HTMLAttributes: {
-          class: 'tiptap-list-item',
-        },
-      }),
-      TaskList.configure({
-        HTMLAttributes: {
-          class: 'tiptap-task-list',
-        },
-      }),
-      TaskItem.configure({
-        HTMLAttributes: {
-          class: 'tiptap-task-item',
-        },
-        nested: true,
-      }),
-      Placeholder.configure({
-        placeholder: placeholder,
-      }),
-      CustomLink.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          class: 'tiptap-link',
-        },
-        validate: (url) => {
-          const target = classifyLinkTarget(url)
-          // Allow external URLs, in-workspace relative paths, and same-document
-          // anchor links (`#section`). Anchor links are valid Markdown and
-          // shouldn't be stripped by the TipTap Link extension — Sprint 72
-          // separated them out from `internal` so Cmd-click doesn't try to
-          // resolve them as files, but they're still legitimate link targets.
-          return (
-            target.kind === 'external' ||
-            target.kind === 'internal' ||
-            target.kind === 'anchor'
-          )
-        },
-        onLinkClick: (href) => {
-          setExternalLinkEdit({ url: href })
-        },
-      }),
-      ...tableExtensions,
-      ImageExtension,
-      SlashCommands,
-      FileLinkSuggestions,
-      SearchExtension,
-      DictationPlaceholder,
-      GlobalDragHandle.configure({
-        dragHandleWidth: 24,
-        scrollTreshold: 100,
-      }),
-      AutoJoiner.configure({
-        elementsToJoin: ['bulletList', 'orderedList', 'taskList'],
-      }),
-      // Sprint 94 (#81): comment callouts, gated on the kill-switch flag.
-      // Registered at the highest level — when off, the extensions don't exist,
-      // so a document's comments fall back to the plain load/save path.
-      ...(commentCallouts ? [CommentMark, CommentNode] : []),
-    ],
+    // The editor's extensions in their order: the schema and its configuration
+    // from utils/editorMarkdown.ts, with the editor's UI pieces in their slots.
+    extensions: createEditorSchemaExtensions({
+      afterStarterKit: [
+        // Sprint 72 R4/R5: makes Mod-Alt-1..6 work from any cursor position
+        // including the TOC click landing boundary. Must come after StarterKit
+        // so this binding gets the first dispatch chance.
+        HeadingLevelShortcuts,
+        // Sprint 126 (#332): binds Shift-Home/Shift-End, which neither TipTap nor
+        // ProseMirror binds. Without them Chrome's native contenteditable default
+        // extended Shift+End to the end of the document, and the next Delete wiped
+        // every block below the caret. Same placement reason as above.
+        SelectionBoundaryKeys,
+      ],
+      codeBlock: CodeBlockWithCopyExtension,
+      beforeLink: [
+        Placeholder.configure({
+          placeholder: placeholder,
+        }),
+      ],
+      onLinkClick: (href) => {
+        setExternalLinkEdit({ url: href })
+      },
+      image: ImageExtension,
+      afterImage: [
+        SlashCommands,
+        FileLinkSuggestions,
+        SearchExtension,
+        DictationPlaceholder,
+        GlobalDragHandle.configure({
+          dragHandleWidth: 24,
+          scrollTreshold: 100,
+        }),
+        AutoJoiner.configure({
+          elementsToJoin: ['bulletList', 'orderedList', 'taskList'],
+        }),
+      ],
+      commentCallouts,
+    }),
     content: initialContent,
     onCreate: ({ editor }) => {
       // Establish the baseline from TipTap's parsed document, not the source
       // bytes. Plugin transactions after creation are then true no-ops.
-      lastOnChangeValue.current = serializeEditorHTML(editor.getHTML())
+      lastOnChangeValue.current = editorHTMLToMarkdown(editor.getHTML())
       onEditorReady?.(editor)
     },
     onUpdate: ({ editor }) => {
-      const markdown = serializeEditorHTML(editor.getHTML())
+      const markdown = editorHTMLToMarkdown(editor.getHTML())
 
       // Only call onChange if content actually changed
       // This prevents unnecessary re-renders that close bubble menus
@@ -734,7 +523,7 @@ export function Editor({
     if (!editor) return
 
     // Convert current editor HTML back to markdown to compare with incoming value
-    const currentMarkdown = serializeEditorHTML(editor.getHTML())
+    const currentMarkdown = editorHTMLToMarkdown(editor.getHTML())
 
     // Initial mount is an explicit reconciliation reason. Do not infer it from
     // an empty Markdown projection: an empty heading created by `# ` also
@@ -768,14 +557,10 @@ export function Editor({
         // Treat all non-HTML text as markdown (including plain text)
         // marked.js will handle plain text gracefully, converting line breaks to <p> tags
         try {
-          const html = editorMarked.parse(value) as string
-          // Convert GFM task list HTML to TipTap format
-          let processedHtml = preprocessTaskListHTML(html)
-          // Unwrap standalone images from paragraphs
-          processedHtml = preprocessImageHTML(processedHtml)
-          // Apply image mappings to convert relative paths to webview URIs
-          processedHtml = applyImageMappings(processedHtml, imageMappings)
-          processedContent = processedHtml
+          // Convert GFM task list HTML to TipTap format, unwrap standalone
+          // images from paragraphs, and apply image mappings to convert
+          // relative paths to webview URIs
+          processedContent = markdownToEditorHTML(value, imageMappings)
         } catch (error) {
           console.error('Markdown conversion error:', error)
           // Fallback: treat as plain text
@@ -798,16 +583,11 @@ export function Editor({
         const nextDoc = parsed instanceof Fragment
           ? editor.schema.topNodeType.create(null, parsed)
           : parsed
-        const currentDoc = editor.state.doc
-        const start = currentDoc.content.findDiffStart(nextDoc.content)
-        if (start !== null) {
-          const end = currentDoc.content.findDiffEnd(nextDoc.content)
-          if (!end) throw new Error('Could not determine the document update range.')
-          let transaction = editor.state.tr.replace(
-            start,
-            end.a,
-            nextDoc.slice(start, end.b),
-          )
+        // The smallest replacement, with the front and back diffs kept from
+        // overlapping (an overlap froze the editor; lib/documentUpdate.ts).
+        const replacement = documentReplacement(editor.state.doc, nextDoc)
+        if (replacement) {
+          let transaction = editor.state.tr.replace(replacement.from, replacement.to, replacement.slice)
           const mappedAnchor = Math.max(0, Math.min(transaction.doc.content.size, transaction.mapping.map(anchor)))
           const mappedHead = Math.max(0, Math.min(transaction.doc.content.size, transaction.mapping.map(head)))
           transaction = transaction
@@ -835,18 +615,25 @@ export function Editor({
       // Structural application and the fallback both suppress onUpdate. Keep
       // the outgoing baseline aligned with the actual parsed TipTap document,
       // so a later plugin-only update cannot be published as a user edit.
-      lastOnChangeValue.current = serializeEditorHTML(editor.getHTML())
+      lastOnChangeValue.current = editorHTMLToMarkdown(editor.getHTML())
 
       lastExternalValue.current = value
       requestAnimationFrame(() => {
         if (scrollContainer && scrollTop !== undefined) scrollContainer.scrollTop = scrollTop
         if (wasFocused) editor.view.focus()
-        if (syncTarget) onExternalApplied?.(syncTarget)
       })
+      // #512: the acknowledgement does not wait for a frame. The document is
+      // applied once the transaction above is dispatched, and a window behind
+      // other windows (or minimized) runs no animation frames: an ack in one
+      // never came, and the host showed a false "Retry document update" after
+      // its delivery budget, on text the editor already showed. A microtask
+      // runs after this effect, and is not throttled.
+      if (syncTarget) queueMicrotask(() => onExternalApplied?.(syncTarget))
     } else if (syncTarget) {
       // The source view already rendered its own accepted edit. It still owes
-      // the host an acknowledgement for the matching canonical revision.
-      requestAnimationFrame(() => onExternalApplied?.(syncTarget))
+      // the host an acknowledgement for the matching canonical revision —
+      // also without waiting for a frame (#512).
+      queueMicrotask(() => onExternalApplied?.(syncTarget))
     }
   }, [editor, value, imageMappings, scrollContainer, syncTarget, onExternalApplied])
 

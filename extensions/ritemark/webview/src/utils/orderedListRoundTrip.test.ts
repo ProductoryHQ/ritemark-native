@@ -4,18 +4,15 @@
  * The bound in `extensions/BoundedOrderedList.ts` decides what *typing* a
  * number does. This file pins the other half: what the Markdown file can hold,
  * so a later change cannot quietly make the editor promise something the format
- * will not keep. The pipeline is the editor's own — `marked` on load,
- * `createTurndownService()` on save.
+ * will not keep. The pipeline is the editor's own (`utils/editorMarkdown.ts`) —
+ * `editorMarked` on load, `createEditorTurndownService()` on save.
  */
 import { strict as assert } from 'node:assert'
 import { DOMParser } from '@xmldom/xmldom'
-import { Marked } from 'marked'
-import { createTurndownService } from './turndownService'
+import { createEditorTurndownService, editorMarked } from './editorMarkdown'
 
-/** The editor's load path (Editor.tsx `editorMarked`). */
-const editorMarked = new Marked({ breaks: true, gfm: true })
-/** The editor's save path. */
-const turndown = createTurndownService()
+/** The editor's load path is `editorMarked`; its save path: */
+const turndown = createEditorTurndownService()
 
 const parse = (markdown: string): Element =>
   new DOMParser().parseFromString(`<div>${editorMarked.parse(markdown) as string}</div>`, 'text/html')

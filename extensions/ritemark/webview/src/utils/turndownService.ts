@@ -1,6 +1,7 @@
 import TurndownService from 'turndown'
 import { tables, taskListItems } from 'turndown-plugin-gfm'
 import { isRelativeImagePath, isWebviewResourceUri } from '../../../src/utils/imagePaths'
+import { addAsWrittenTurndownRules, blockImage, escapeTextRun, neutraliseBrackets, wrapMarked } from './markdownAsWritten'
 
 /**
  * Create a fresh TurndownService configured with Ritemark's canonical
@@ -9,18 +10,20 @@ import { isRelativeImagePath, isWebviewResourceUri } from '../../../src/utils/im
  * stays consistent across surfaces.
  *
  * Includes:
- *  - ATX headings, fenced code blocks, `-` bullet, `*` italic, `**` bold
+ *  - ATX headings, fenced code blocks, `*` italic, `**` bold
  *  - GFM tables + task list items
  *  - `~~` strikethrough for `<s>`, `<del>` and `<strike>`
  *  - Tilde escaping so literal `~` in ordinary text is not read back as
  *    strikethrough (Turndown's own escaper only covers a leading `~~~`)
- *  - Pipe-escape rule for table cells (the GFM plugin doesn't escape `|`
- *    inside cell content by default and that breaks tables containing code)
  *  - Image rule preferring `title="./..."` over DOM-resolved `src` (used for
- *    both paste-flow and Save-as-Markdown image references)
- *
- * TipTap-specific task-list rules live in `taskListRoundTrip.ts` and are
- * layered on top by `components/Editor.tsx` when the editor loads.
+ *    both paste-flow and Save-as-Markdown image references); an image that is
+ *    a block of its own is written on its own lines
+ *  - Sprint 137 (#270): the as-written rules (`markdownAsWritten.ts`) — lists,
+ *    task lists, line breaks, quotes, thematic breaks, bare addresses, code
+ *    fences and tables written the way the source wrote them, and escapes only
+ *    where a character would change what the line means. HTML without the
+ *    editor's `data-md-*` attributes (paste, Word's Save as Markdown) gets one
+ *    plain form: `- item`, tight lists, `---`, `| --- |`, a backslash break.
  */
 export function createTurndownService(): TurndownService {
   const service = new TurndownService({
@@ -29,6 +32,11 @@ export function createTurndownService(): TurndownService {
     bulletListMarker: '-',
     emDelimiter: '*',
     strongDelimiter: '**',
+    hr: '---',
+    br: '\\',
+    // Inline code keeps the spaces at its edges (`2026. `, `# `): without this
+    // Turndown moves them outside the backticks, which changes the code.
+    preformattedCode: true,
   })
 
   service.use(tables)
@@ -38,8 +46,31 @@ export function createTurndownService(): TurndownService {
   // strikethrough, and Turndown's escaper only covers a leading `~~~`, so a
   // paragraph typed as `a~b~c` was saved verbatim and reopened as
   // `a<del>b</del>c` — the tildes gone, and the next save making it permanent.
-  const escapeMarkdown = service.escape.bind(service)
-  service.escape = (text: string) => escapeLiteralTildes(escapeMarkdown(text))
+  // Escapes only where a character would change what the line means (R4):
+  // `escapeTextRun` is Turndown's escaper without its line-start escapes,
+  // which the paragraph rule applies at the start of each line instead.
+  service.escape = (text: string) => escapeLiteralTildes(escapeTextRun(text))
+
+  // Brackets a mark splits across runs (`[**x**]: y`) are escaped from the
+  // block's text as a whole, which Turndown's per-run escaper cannot see
+  // (`neutraliseBrackets`). Only input with a bracket takes the extra pass; it
+  // is parsed in an inert document, as Turndown parses its own string input.
+  const turndown = service.turndown.bind(service)
+  service.turndown = (input: string | TurndownService.Node): string => {
+    if (typeof document === 'undefined') return turndown(input)
+    if (typeof input === 'string') {
+      if (!/[[\]]/.test(input)) return turndown(input)
+      const inert = document.implementation?.createHTMLDocument?.('') ?? document
+      const root = inert.createElement('div')
+      root.innerHTML = input
+      neutraliseBrackets(root)
+      return turndown(root)
+    }
+    if (!/[[\]]/.test(input.textContent ?? '')) return turndown(input)
+    const root = input.cloneNode(true)
+    neutraliseBrackets(root)
+    return turndown(root as TurndownService.Node)
+  }
 
   // Strikethrough: TipTap's Strike mark renders `<s>`, and `marked` loads
   // `~~x~~` as `<del>`. Turndown has no default rule for either, so without
@@ -52,19 +83,10 @@ export function createTurndownService(): TurndownService {
       return node.nodeName === 'S' || node.nodeName === 'DEL' || node.nodeName === 'STRIKE'
     },
     replacement(content) {
-      return content.trim() ? `~~${escapeStrikeTildes(content)}~~` : content
-    },
-  })
-
-  service.addRule('tableCellWithPipeEscape', {
-    filter: ['th', 'td'],
-    replacement(content, node) {
-      const escapedContent = content.replace(/\|/g, '\\|')
-      const index = node.parentNode
-        ? Array.prototype.indexOf.call(node.parentNode.childNodes, node)
-        : 0
-      const prefix = index === 0 ? '| ' : ' '
-      return prefix + escapedContent + ' |'
+      // Line breaks at the run's edges go outside the tildes (`wrapMarked`).
+      const wrapped = wrapMarked(content, '\u0000')
+      if (!wrapped.includes('\u0000')) return wrapped
+      return wrapped.replace(/\u0000([\s\S]*)\u0000/, (_match, inner: string) => `~~${escapeStrikeTildes(inner)}~~`)
     },
   })
 
@@ -83,9 +105,13 @@ export function createTurndownService(): TurndownService {
       const src = title.startsWith('./') || (isRelativeImagePath(title) && isWebviewResourceUri(displaySrc))
         ? title
         : displaySrc
-      return `![${alt}](${src})`
+      return blockImage(`![${alt}](${src})`, el)
     },
   })
+
+  // The as-written rules, which also escape a table cell's pipes (the GFM
+  // plugin doesn't, and an unescaped `|` breaks a table holding code).
+  addAsWrittenTurndownRules(service)
 
   return service
 }
