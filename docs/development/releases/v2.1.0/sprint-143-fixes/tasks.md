@@ -5,94 +5,95 @@ Nothing here starts before the plan is approved. Tick a box only when the change
 ## Phase 0: Branch and starting tree
 
 - [x] `git checkout -b sprint-143-fixes` from the plan commit rebased on `origin/main` (`84ea15db`); `git branch --show-current` shows it
-- [ ] `media/webview.js` size recorded in `notes/bundle.md` (E4)
-- [ ] Each Mac check of S1–S38 that can fail on `main` run once on `main` at `1e91466c` and its failure recorded in `qa-evidence.md` (E1): S1, S2's throw, S10–S12 (the store fed the recorded notifications), S15, S18 and S21, S23–S26, S35, S37, S40
-- [ ] Asked through the Development manager: the "Ritemark on Windows" session for A4; the Social manager for how the films sent ⌘⇧P (A3); the Experience lead for R3's line and card and R8's words
+- [x] `media/webview.js` size recorded in `notes/bundle.md` (E4)
+- [x] Each unit check that can fail on `main` run against `main`'s file and its failure recorded in `qa-evidence.md` (E1). The running-app checks for R5 and R2 were run on `main` in planning (`research/reproductions.md`)
+- [x] Asked through the Development manager (answered 26–27 October): the Social manager on how the films sent ⌘⇧P (A3); the Experience lead's words for R3 (R3a). The "Ritemark on Windows" session for A4: the manager's to arrange
 
 ## Phase 1: Audits
 
-- [ ] `research/landing-audit.md` (A1; R2): every path from `goTo()` to the first chat's runtime; the three ways forced by hand (no record, a replaced sheet, a held model list), each run once with `research/repro/landing-551.mjs`. A fourth way found changes `spec.md` first
-- [ ] `research/mention-audit.md` (A2; R5): the editor's other floating menus checked against the comment's bubble with the toolbar following the focus
-- [ ] `research/home-keys-audit.md` (A3; R7): how the films sent ⌘⇧P; S27–S32 typed by a person, Mac and Windows, ten presses each, with a trace. Decision: a cause and a place, or #507 to 2.2
-- [ ] `research/windows-pickers-audit.md` (A4; R9), on Windows with `USERPROFILE=C:\Ritemark` and `--log trace`: each picker's default folder, the dialog lock line, the processes after quitting; then with W9a. Decision: W9a enough, a patch hunk (tier line first), or a separate cause for the processes
-- [ ] Where an audit changes a requirement, `spec.md` changes first (Mid-Sprint Scope Change Protocol)
+- [x] `research/landing-audit.md` (A1; R2): every path from `goTo()` to the first chat's runtime and the three ways. The forced runs by hand were **not run**; the file says why and what covers each
+- [ ] `research/mention-audit.md` (A2; R5): **not written.** The comment check found nothing else over the list once the toolbar follows the focus (5 of 5, the option under each click's centre); the other floating menus weren't tried one by one
+- [x] `research/home-keys-audit.md` (A3; R7): the films' method (the Social manager's answer) tried here, 20 of 20 on the dev build and 20 of 20 on the installed 2.0.1. Decision: no code; a person's keyboard at Gate 2
+- [ ] `research/windows-pickers-audit.md` (A4; R9), on Windows: **not run** (no Windows PC here). W9b waits on it
+- [x] Where an audit changes a requirement, `spec.md` changes first: R3a added (the Experience lead's words, the wait's length from Codex's log)
 
 ## Phase 2: Home lets go (W1, R1)
 
-- [ ] `src/views/HomePanel.ts`: the project list's unsubscribe pushed as `{ dispose }`; `dispose()` disposes each in its own `try`, then the panel
-- [ ] `src/views/HomePanel.test.ts` (new, `vscode` stubbed): every subscription and the panel disposed; a throwing one doesn't stop the rest; added to `npm test`
+- [x] `src/views/HomePanel.ts`: the project list's unsubscribe pushed as `{ dispose }`; `dispose()` disposes each in its own `try`, then the panel
+- [x] `src/views/HomePanel.test.ts` (new, `vscode` stubbed): every subscription and the panel disposed; a throwing one doesn't stop the rest; added to `npm test`
 
 ## Phase 3: Line breaks and the toolbar (W6, W5; R6, R5)
 
-- [ ] `webview/.../ai-sidebar/ChatBubbles.tsx`: the message's text in an element with `whitespace-pre-wrap` and wrapping for long words; `ChatMessage.tsx` the same
-- [ ] `webview/.../ai-sidebar/chatBubbles.test.ts` (new, `renderToStaticMarkup`): newlines kept in the pre-wrap element
-- [ ] `webview/src/components/FormattingBubbleMenu.tsx`: `shouldShow` through a pure `formattingToolbarShows` helper that also asks for the editor's (or the toolbar's) focus
-- [ ] `webview/src/components/formattingToolbar.test.ts` (new): hidden with the focus in a comment's box, shown in the editor or the toolbar
-- [ ] Any cover A2 finds: fixed here or filed
+- [x] `webview/.../ai-sidebar/ChatBubbles.tsx`: the message's text in an element with `whitespace-pre-wrap` and `overflow-wrap: anywhere`; `ChatMessage.tsx` the same
+- [x] `webview/.../ai-sidebar/chatBubbles.test.ts` (new, `renderToStaticMarkup`): newlines kept in the pre-wrap element
+- [x] `webview/src/components/FormattingBubbleMenu.tsx`: `shouldShow` through a pure `formattingToolbarShows` helper that also asks for the editor's (or the toolbar's) focus, keeping Sprint 138's equation rule
+- [x] `webview/src/components/formattingToolbar.test.ts` (new): hidden with the focus in a comment's box, shown in the editor or the toolbar
 
 ## Phase 4: The first chat's AI (W2, R2)
 
-- [ ] `src/welcome/welcomeHost.ts` `goTo()`: `ritemark.ai.selectedAgent` written before `vscode.openFolder` when the person chose an AI on this welcome
-- [ ] `webview/.../ai-sidebar/store.ts` `applyPendingLanding`: the 20 s limit for `opencode` only
-- [ ] The dropped landing's reason logged: `runLanding()` (record dropped) and the sheet's `landing/dropped` (wait ended), the host logging both
-- [ ] `landingChat.test.ts`: ChatGPT's late list still lands; OpenCode still gives up after 20 s. A welcome test: the setting written before `openFolder`, only with a chosen AI
-- [ ] `scripts/qa/landing-check.mjs` (from `research/repro/landing-551.mjs`, with `--runs` and `--updates`); `scripts/qa/three-runtimes-check.mjs` fails the step when the landing is wrong instead of picking the AI
+- [x] `src/welcome/welcomeHost.ts` `goTo()`: `ritemark.ai.selectedAgent` written before `vscode.openFolder` when the person chose an AI on this welcome (`welcomeState.selectedAgentOnLeave`)
+- [x] `webview/.../ai-sidebar/store.ts` `applyPendingLanding`: the 20 s limit for `opencode` only
+- [x] The dropped landing's reason logged: `runLanding()` (`landing.whyNoLanding`) and the sheet's `landing/dropped`, the host logging both
+- [x] `landingChat.test.ts`: ChatGPT's late list still lands (fails on `main`); OpenCode still gives up after 20 s. `welcomeState.test.ts`: the AI saved only when chosen. `landing.test.ts`: the log's reasons
+- [x] `scripts/qa/landing-check.mjs`; `scripts/qa/three-runtimes-check.mjs` fails the step when the landing is wrong instead of picking the AI
 
 ## Phase 5: The wait on ChatGPT (W3, R3)
 
-- [ ] `src/codex/CodexRuntime.ts`: the app-server's `error` notification with `willRetry: true` → `config.onRuntimeRetry({ attempt, of, httpStatus })` for the session's current turn; the raw notification to the turn's trace
-- [ ] `src/views/UnifiedViewProvider.ts`: `codex-retry` to the sheet, guarded by `isCurrentRuntimeTurn()`
-- [ ] `webview/.../ai-sidebar/store.ts`: the running turn's `retry`, cleared on the next delta, activity, question, approval or result
-- [ ] `activityState.ts`, `ActivityStatusLine.tsx`: the `retrying` state and its two lines
-- [ ] `src/runtime/runtimeErrorPresentation.ts`: Codex's `responsetoomanyfailedattempts` / `responsestreamdisconnected` with 429 → `limit`, `limit: 'busy'`
-- [ ] `src/runtime/turnFailureCopy.ts`: `LimitKind` `'busy'` and its card, with Continue with another ready AI
-- [ ] Tests: `CodexRuntime.test.ts` (retry routed to its turn only), `runtimeErrorPresentation.test.ts` (the recorded final error), `activityState.test.ts` (the line and its clearing), the copy's card
-- [ ] Confirmed unchanged: `codexManager.ts` spawns the app-server with no arguments; nothing writes `~/.codex` (S9)
+- [x] `src/codex/CodexRuntime.ts`: Codex's `error` notification with `willRetry: true` → `config.onRuntimeRetry` for its own turn; the raw notification to the trace. `codexAppServer.ts` re-emits it as `codex/error` (an unheard EventEmitter `'error'` threw inside the JSON loop)
+- [x] `src/views/UnifiedViewProvider.ts`: `codex-retry` to the sheet, guarded by `isCurrentRuntimeTurn()`
+- [x] `webview/.../ai-sidebar/store.ts`: the running turn's `retry`, cleared on the next delta, activity, question, approval or result
+- [x] `activityState.ts`, `ActivityStatusLine.tsx`: the waiting state
+- [x] `src/runtime/runtimeErrorPresentation.ts`: `ratelimitexceeded`, and `responsetoomanyfailedattempts` / `responsestreamdisconnected` with 429 → `limit`, `limit: 'busy'`
+- [x] `src/runtime/turnFailureCopy.ts`: `LimitKind` `'busy'` and its card, with Continue with another ready AI
+- [x] Tests: `CodexRuntime.test.ts` (Test 17), `runtimeErrorPresentation.test.ts`, `activityState.test.ts`, `continueWithAlternative.test.ts`
+- [x] Codex's start: no arguments added, nothing in `~/.codex` written; one environment variable for Ritemark's own process (R3a)
 
 ## Phase 5a: The countdown and the busy card (W3a, R3a; added 2026-10-26)
 
-- [ ] `src/codex/codexManager.ts`: `RUST_LOG=error,codex_core::responses_retry=warn` for Ritemark's own app-server when the environment has none
-- [ ] `src/codex/codexAppServer.ts`: the retry line parsed from stderr; `CodexRuntime` pairs it with the notification
-- [ ] `turnFailureCopy.ts`: the line's words with the countdown and fallback; the busy card; `limit: 'busy'`, `retryAt`
-- [ ] `runtimeErrorPresentation.ts`: `ratelimitexceeded` and 429 after retries → busy; the service's time
-- [ ] `ActivityStatusLine.tsx`: the countdown tick and Continue with <AI>; the busy card's Continue the same; "Failed" under the busy card
-- [ ] Tests for both, and screenshots of the line and the card
+- [x] `src/codex/codexManager.ts`: `RUST_LOG=error,codex_core::responses_retry=warn` for Ritemark's own app-server when the environment has none (`codexRetry.codexAppServerEnv`)
+- [x] `src/codex/codexAppServer.ts`: the retry line parsed from stderr (`parseCodexRetryLine`); `CodexRuntime` pairs it with the notification, in either order
+- [x] `turnFailureCopy.ts`: `retryingLine` (minutes, "a minute", "soon"), `continueWithAction`, the busy card with and without `retryAt` in the person's time format
+- [x] `runtimeErrorPresentation.ts`: the service's time (`serviceRetryAt`)
+- [x] `ActivityStatusLine.tsx`: the countdown tick (15 s) and Continue with <AI>; the busy card's Continue the same (`continueWithAlternative`); "Failed" under the busy card
+- [x] Tests for both, and screenshots of the line and the card
 
 ## Phase 6: Titles (W4, R4)
 
-- [ ] `src/conversations/ConversationTitleGenerator.ts`: `settingSources: []`, `availableTools: []`
-- [ ] `ConversationTitleGenerator.test.ts`: both options pinned, the prompt still pinned
-- [ ] `scripts/qa/title-language-check.mjs` (new): 10 English and 10 Estonian first messages titled on the bundled Codex with the generator's prompt, turns spaced out
+- [x] `src/conversations/ConversationTitleGenerator.ts`: `settingSources: []`, `availableTools: []`
+- [x] `ConversationTitleGenerator.test.ts`: both options pinned (fails on `main`), the prompt still pinned
+- [ ] `scripts/qa/title-language-check.mjs`: **not built**; the change is Claude-only, and ChatGPT's 36 October titles stand (`qa-evidence.md`)
 
 ## Phase 7: Transcribe (W8, R8)
 
-- [ ] `src/speech/audioPrep.ts`: `cannotTakeOnDevice(ext, engineAccepts, canConvert)`; `prepareAudio` uses it
-- [ ] `src/views/TranscribeViewProvider.ts`: `refusal` on the on-device estimate; `_start` refuses it; `transcribe:dismissJob`
-- [ ] `src/speech/JobManager.ts`: `dismiss(jobId)` for failed and interrupted jobs only
-- [ ] `webview/src/components/transcribe/`: the pending card's disabled engine with its sentence; Dismiss with its tooltip on every Needs attention card
-- [ ] Tests: `audioPrep.test.ts`, `JobManager.test.ts`, the attention row's button and tooltip
+- [x] `src/speech/audioPrep.ts`: `cannotTakeOnDevice(ext, engineAccepts, canConvert)`; `prepareAudio` uses it
+- [x] `src/views/TranscribeViewProvider.ts`: `refusal` on an engine's estimate; `_start` refuses it; `transcribe:dismissJob`
+- [x] `src/speech/JobManager.ts`: `dismiss(jobId)` for failed, interrupted and cancelled jobs only
+- [x] `webview/src/components/transcribe/`: the pending card's disabled engine with its sentence; Dismiss with its tooltip on every Needs attention card; a tooltip on Try again too (`panelChrome.ATTENTION_ACTIONS`)
+- [x] Tests: `audioPrep.test.ts`, `JobManager.test.ts`, `panelChrome.test.ts`
 
 ## Phase 8: The pickers (W9, R9)
 
-- [ ] `src/utils/dialogDefaults.ts` (new): `pickerDefaultUri(projectFolder?)`
-- [ ] Every Ritemark `showOpenDialog`/`showSaveDialog` without a `defaultUri` given one
-- [ ] `dialogDefaults.test.ts`: the three cases; no dialog call in `src/` without `defaultUri`
-- [ ] W9b, if A4 asks for it: the patch hunk (tier line changed first, frame script run)
+- [x] `src/utils/dialogDefaults.ts` (new): `pickerFolder(candidates)`, the first that is a folder now, else the home
+- [x] Every Ritemark `showOpenDialog` starts in a folder that exists (15 of 15). Save dialogs pass a file path, which the main process doesn't check; unchanged
+- [x] `dialogDefaults.test.ts`: the cases, and a scan of every `showOpenDialog` in `src/`
+- [ ] W9b, if A4 asks for it: the patch hunk (tier line changed first). Waits on A4
 
 ## Phase 9: ⌘⇧P on Home (W7, R7)
 
-- [ ] `scripts/qa/home-keys-check.mjs` (from `research/repro/repro-513-507.mjs`'s Home cases)
-- [ ] If A3 reproduced it: the fix in the place A3 names, with the check failing first. Otherwise: the evidence on #507 and the issue moved to 2.2
+- [x] No code (A3's decision). The reproducers are in `research/repro/` (`repro-513-507.mjs`, `repro-507b.mjs`, `repro-507c.mjs`); `scripts/qa/home-keys-check.mjs` not added
+- [ ] Gate 2: a person types S27–S33; without a reproduction, #507 moves to 2.2 with `research/home-keys-audit.md`
 
 ## Phase 10: QA and closeout
 
-- [ ] `npm test` and the webview tests pass; `./scripts/validate-qa.sh`
-- [ ] The scripted checks on the branch: `landing-check.mjs` 20 of 20 (S3), `comment-mention-check.mjs` (S18–S22), `home-keys-check.mjs` (S27–S32), `title-language-check.mjs` (S16)
-- [ ] Manual Mac scenarios: S1, S4, S5, S7, S9, S10–S12 (injected), S23–S25, S34, S37, S38, S43
-- [ ] Windows through the test overlay, as far as the "Ritemark on Windows" session can before the merge: S36, S39–S41, S33
-- [ ] Screenshots of R3's line and card, R5's comment, R6's message and R8's card to the Experience lead before the merge
-- [ ] `media/webview.js` size after (`notes/bundle.md`)
-- [ ] `docs/development/architecture.md` (E5); `docs/CHANGELOG.md`; release notes draft to the Development manager
-- [ ] Gate 2 rows for 2.1's release plan: S17 (Claude titles), S33 (Ctrl+Shift+P), S36 and S41 (Windows), and A3's keyboard try if still open
-- [ ] Issues: #556, #513, #511, #544, #514, #509 closed with their evidence on merge (#514's Claude half and #509's Windows half at Gate 2); #551 closed after S3's 20 of 20 on the branch; #510 after S41; #507 as A3 decides
-- [ ] `qa-evidence.md` written; `release-plan.md`'s tracker row updated
+- [x] `npm test` and the webview tests pass; `tsc --noEmit` for both; the pre-commit validator by hand
+- [x] The scripted checks on the branch: `landing-check.mjs` (S3), `comment-mention-check.mjs` (S18–S22)
+- [x] The sheet on a dev instance: S10–S12 (injected), S23 (a real ChatGPT turn)
+- [ ] Manual Mac scenarios not run: S5, S7 (forced landings), S9 (`ps`), S24–S25, S34, S37–S38 (Transcribe on the Mac), S43 (2.0.1 reading this build's records)
+- [ ] Windows through the test overlay (S33, S36, S39–S41): the "Ritemark on Windows" session's
+- [ ] Screenshots to the Experience lead before the merge (in the PR)
+- [x] `media/webview.js` size after (`notes/bundle.md`)
+- [x] `docs/development/architecture.md` (E5); `docs/CHANGELOG.md`
+- [ ] Release notes draft to the Development manager (the CHANGELOG entry is its source)
+- [x] Gate 2 rows in 2.1's release plan: S17 (Claude titles), S27–S33 (a real keyboard on Home), S36 and S41 (Windows)
+- [ ] Issues on merge: #556, #513, #511, #544, #514, #509 closed with their evidence (#514's Claude half and #509's Windows half at Gate 2); #551 after S3's 20 of 20 (passed on the branch, 27 October); #510 after S41; #507 as A3 decided
+- [x] `qa-evidence.md` written; `release-plan.md`'s tracker row updated

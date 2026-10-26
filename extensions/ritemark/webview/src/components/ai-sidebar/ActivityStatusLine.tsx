@@ -69,8 +69,9 @@ export function ActivityStatusLine() {
     ? (last.runtime === 'opencode' ? 'opencode' as const : 'codex' as const)
     : 'claude-code' as const;
   const retry = state === 'running' && last && 'retry' in last && last.retry?.busy ? last.retry : undefined;
-  const now = useNow(Boolean(retry?.retryAt));
-  const msLeft = retry?.retryAt !== undefined ? Math.max(0, retry.retryAt - now) : undefined;
+  // The tick re-renders every 15 s while a wait counts down; the time itself is read now.
+  useNow(Boolean(retry?.retryAt));
+  const msLeft = retry?.retryAt !== undefined ? Math.max(0, retry.retryAt - Date.now()) : undefined;
   const alternative = useReadyAlternative(lastRuntime);
   const continueWithAlternative = useAISidebarStore((s) => s.continueWithAlternative);
   const offerAlternative = Boolean(retry && alternative && retryingOffersAlternative(msLeft));

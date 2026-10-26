@@ -4,7 +4,7 @@ Track: SDD (auto-detected: nine linked issues, nine user-facing requirements acr
 Override with: "use plain full track"
 Branch: `sprint-143-fixes`, made from `origin/main` at Phase 3, after approval. This plan was written on `plan/sprint-143-fixes`.
 Release tier: extension. Every change planned is under `extensions/ritemark/` (and `scripts/qa/`), and it ships in 2.1.0's shell release. Two audits can add a shell-tier line: A3 (#507) if its cause is in VS Code's webview host, A4 (#510) if the main process's dialog lock needs a patch. Either changes this line before it is built.
-Status: **Approved (Phase 2 → 3), 26 October 2026,** by the Development manager under Jarmo's delegation (*Approval* below). Building on `sprint-143-fixes`, made from the plan commit rebased on `origin/main` at `84ea15db` (Sprint 138 merged).
+Status: **Approved (Phase 2 → 3), 26 October 2026,** by the Development manager under Jarmo's delegation (*Approval* below). **Built** on `sprint-143-fixes` (from the plan commit rebased on `origin/main` at `84ea15db`, Sprint 138 merged), 27 October: R1–R6, R3a, R8, R9's Ritemark half; R7 without code (A3). Evidence in [qa-evidence.md](qa-evidence.md). Waiting: A4 on Windows (R9's possible patch), and the Gate 2 rows. The tier line stays extension: no patch changed.
 
 ## SDD Artifacts
 

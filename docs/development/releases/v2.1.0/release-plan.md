@@ -122,8 +122,8 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 | 140 | `sprint-140-first-day` | [#543](https://github.com/ProductoryHQ/ritemark-native/pull/543) | #497, #498, #466 | Open, not merged | Passed (technical), 26 Oct | Drafted in `sprint-140-first-day/notes/release-notes.md`, applied at closeout |
 | 142, merge 1 (extension tier) | `sprint-142-polish` | [#560](https://github.com/ProductoryHQ/ritemark-native/pull/560) | #557, #503, #504, #505, #516, #517, #535 | Open, not merged | Passed (technical), 27 Oct | Drafted in `sprint-142-polish/notes/release-notes.md`, applied at closeout |
 | 142, merge 2 (patches 002, 018, 019) | `sprint-142-polish-shell` | — | #557 (File changes), #503 (the desk's edge), #508 | — | — | Drafted with merge 1's, in the same file |
-| Plan: 143 | `plan/sprint-143-fixes` | — | — | Local, not pushed | n/a | n/a |
-| 143 | `sprint-143-fixes` | — | #556, #551, #544, #514, #513, #511, #507, #509, #510 | — | — | — |
+| Plan: 143 | `plan/sprint-143-fixes` | — | — | Rebased into `sprint-143-fixes` | n/a | n/a |
+| 143 | `sprint-143-fixes` | PR_LINK | #556, #551, #544, #514, #513, #511, #507, #509, #510 | Open, not merged | Passed (technical), 27 Oct; Windows (A4) and Gate 2 rows open | `CHANGELOG.md` entry; notes at closeout |
 | Release | a `create-release-worktree.sh` worktree, then the version bump | — | #499, #506, the Store | — | — | — |
 
 ## Feature-Complete Checklist
@@ -198,6 +198,10 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
   - File changes heads its panel;
   - the desk's corners are whole;
   - the board's four columns fit at 1440 with both side columns, on Windows at 100%.
+- **The fixes** (143):
+  - five new English chats with Claude get English titles, on Jarmo's Mac with his own skills (S17);
+  - ⌘⇧P and Ctrl+Shift+P on Home with a real keyboard, after a click inside Home, ten presses each (S27–S33; #507 moves to 2.2 if it never fails);
+  - Windows: an .m4a on On-device is refused before it starts and a failed card can be dismissed (S36); with `USERPROFILE=C:\Ritemark`, Transcribe a file… and Add a project ▸ Open a folder… open five times each and quitting leaves no process (S41).
 - **The done list's checks:** a synced folder on both platforms; the Windows first window.
 - **Every release:** an authenticated Claude turn, a Codex turn and the OpenCode permission gate on x64 and Windows.
 
