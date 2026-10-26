@@ -17,6 +17,12 @@ import {
   standaloneClaudeOAuthExpirationError,
   type RuntimeFailureKind,
 } from '../runtime/runtimeErrorPresentation';
+import {
+  decodeRuntimeErrorDetail,
+  isRuntimeErrorKind,
+  type RuntimeErrorDetail,
+  type RuntimeErrorKind,
+} from '../runtime/turnFailureCopy';
 import { fallbackTitleFromPrompt } from './ConversationTitlePolicy';
 
 export const CONVERSATION_SCHEMA_VERSION = 1 as const;
@@ -90,6 +96,14 @@ export interface AssistantMessageEventV1 extends ConversationEventBaseV1 {
   /** Stable recovery metadata for a terminal runtime failure. */
   error?: string;
   failureKind?: RuntimeFailureKind;
+  /**
+   * Sprint 139 (E1, E2): what kind of failure `error` is, and what its card
+   * needs. Optional and read leniently: 2.0.x ignores both, and a value this
+   * build doesn't know is dropped, never a reason to quarantine the chat.
+   * `failureKind` stays as it was: every 2.x build decodes it strictly.
+   */
+  errorKind?: RuntimeErrorKind;
+  errorDetail?: RuntimeErrorDetail;
   /** Provider-observed applied value; absent/null means the provider did not expose it. */
   appliedThinkingEffort?: ExplicitThinkingEffort | null;
   /**
@@ -122,6 +136,9 @@ export interface BoundaryEventV1 extends ConversationEventBaseV1 {
   message: string;
   /** Stable recovery metadata for a failed boundary. */
   failureKind?: RuntimeFailureKind;
+  /** Sprint 139 (E1, E2): as on an assistant message. */
+  errorKind?: RuntimeErrorKind;
+  errorDetail?: RuntimeErrorDetail;
 }
 
 export type DispatchReceiptStateV1 = 'not-sent' | 'ambiguous' | 'accepted';
@@ -462,6 +479,7 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
       ...(input.failureKind === undefined ? {} : {
         failureKind: enumAt(input.failureKind, `${path}.failureKind`, ['authentication', 'api-key-authentication'] as const),
       }),
+      ...lenientErrorFields(input),
       appliedThinkingEffort,
       ...(input.activeDurationMs === undefined ? {} : { activeDurationMs: integerAt(input.activeDurationMs, `${path}.activeDurationMs`) }),
     };
@@ -502,7 +520,18 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
     ...(input.failureKind === undefined ? {} : {
       failureKind: enumAt(input.failureKind, `${path}.failureKind`, ['authentication', 'api-key-authentication'] as const),
     }),
+    ...lenientErrorFields(input),
   };
+}
+
+/**
+ * Sprint 139 (E2): `errorKind` and `errorDetail`, kept only when this build
+ * knows them. Unlike `failureKind`, nothing here can fail a record.
+ */
+function lenientErrorFields(input: Record<string, unknown>): { errorKind?: RuntimeErrorKind; errorDetail?: RuntimeErrorDetail } {
+  if (!isRuntimeErrorKind(input.errorKind)) return {};
+  const errorDetail = decodeRuntimeErrorDetail(input.errorDetail);
+  return { errorKind: input.errorKind, ...(errorDetail ? { errorDetail } : {}) };
 }
 
 function decodeContinuation(value: unknown, path: string): RuntimeContinuationDescriptorV1 {

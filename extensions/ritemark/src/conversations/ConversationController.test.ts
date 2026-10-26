@@ -410,6 +410,7 @@ async function run(): Promise<void> {
       status: 'failed',
       error: 'Claude did not accept your API key. Update it in AI Settings, then resend your message.',
       failureKind: 'api-key-authentication',
+      errorKind: 'sign-in',
     });
     assert.equal(failedSecond.continuations?.['claude-code'], undefined, 'a no-final failure invalidates only that runtime descriptor');
     assert.ok(failedSecond.continuations?.codex === undefined, 'failure does not synthesize descriptors for other runtimes');
@@ -420,6 +421,8 @@ async function run(): Promise<void> {
       'api-key-authentication',
       'the canonical failed boundary persists the recovery category across reloads',
     );
+    // Sprint 139 (E1): the kind is kept beside the sentence, for the card after a restart.
+    assert.equal(failedBoundary?.kind === 'boundary' ? failedBoundary.errorKind : undefined, 'sign-in');
 
     const other = await store.create({
       conversationId: uuid(800),

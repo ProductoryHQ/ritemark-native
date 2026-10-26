@@ -462,6 +462,9 @@ export class ConversationController {
     status: 'completed' | 'failed' | 'cancelled';
     error?: string;
     failureKind?: RuntimeFailureKind;
+    /** Sprint 139 (E1): the failure's kind and its card's data, beside the sentence. */
+    errorKind?: import('../runtime/turnFailureCopy').RuntimeErrorKind;
+    errorDetail?: import('../runtime/turnFailureCopy').RuntimeErrorDetail;
     appliedThinkingEffort?: import('../runtime/thinkingEffort').ExplicitThinkingEffort | null;
     /** Sprint 136 (#488): the turn's working time, kept so a restored chat shows it. */
     activeDurationMs?: number;
@@ -502,6 +505,8 @@ export class ConversationController {
               terminalStatus: input.status,
               ...(input.error ? { error: input.error } : {}),
               ...(input.failureKind ? { failureKind: input.failureKind } : {}),
+              ...(input.error && input.errorKind ? { errorKind: input.errorKind } : {}),
+              ...(input.error && input.errorKind && input.errorDetail ? { errorDetail: input.errorDetail } : {}),
               appliedThinkingEffort: input.appliedThinkingEffort ?? null,
               ...(input.activeDurationMs === undefined ? {} : { activeDurationMs: input.activeDurationMs }),
             }]
@@ -515,6 +520,8 @@ export class ConversationController {
               boundaryKind: input.status === 'cancelled' ? 'cancelled' as const : 'failed' as const,
               message: input.error || (input.status === 'cancelled' ? 'The turn was cancelled.' : 'The turn failed.'),
               ...(input.failureKind ? { failureKind: input.failureKind } : {}),
+              ...(input.error && input.errorKind ? { errorKind: input.errorKind } : {}),
+              ...(input.error && input.errorKind && input.errorDetail ? { errorDetail: input.errorDetail } : {}),
             }];
         const assistantEvent = appendEvents[0];
         const currentDescriptor = current.continuations?.[input.runtimeId];

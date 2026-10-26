@@ -231,6 +231,36 @@ function run(): void {
   assert.equal(turnActiveDurationMs(undefined), undefined);
   assert.equal(turnActiveDurationMs({ durationMs: 1000, waitedMs: 3000 }), 0, 'never negative');
 
+  // Sprint 139 (E1, E2): a failure's kind and card data survive the store, read leniently.
+  const failed = record();
+  failed.events.push({
+    kind: 'assistant-message', eventId: 'assistant-failed', turnId: 'turn-1', sequence: 1,
+    occurredAt: '2026-08-22T10:00:09.000Z', runtimeId: 'codex',
+    content: 'Partial', terminalStatus: 'failed', appliedThinkingEffort: null,
+    error: "ChatGPT couldn't use GPT-6.1 Sol. It isn't available in Ritemark right now.",
+    errorKind: 'model', errorDetail: { model: 'gpt-6.1-sol' },
+  });
+  failed.events.push({
+    kind: 'boundary', eventId: 'boundary-failed', turnId: 'turn-1', sequence: 2,
+    occurredAt: '2026-08-22T10:00:10.000Z', runtimeId: 'codex', boundaryKind: 'failed',
+    message: "Ritemark couldn't reach ChatGPT. Check your connection, then send your message again.", errorKind: 'network',
+  });
+  assert.deepEqual(decodeConversationRecordV1(JSON.parse(JSON.stringify(failed))), failed);
+  const futureKinds = JSON.parse(JSON.stringify(failed)) as { events: Array<Record<string, unknown>> };
+  futureKinds.events[1].errorKind = 'plan-from-a-later-build';
+  futureKinds.events[1].errorDetail = { model: 7, somethingNew: true };
+  futureKinds.events[2].errorDetail = { billing: 'mars' };
+  const readBack = decodeConversationRecordV1(futureKinds);
+  const readAssistant = readBack.events[1] as { errorKind?: string; errorDetail?: unknown; error?: string };
+  assert.equal(readAssistant.errorKind, undefined, 'an unknown kind is dropped, never a quarantine');
+  assert.equal(readAssistant.errorDetail, undefined);
+  assert.equal(readAssistant.error, failed.events[1].kind === 'assistant-message' ? failed.events[1].error : '', 'the sentence stays');
+  assert.equal((readBack.events[2] as { errorKind?: string }).errorKind, 'network');
+  assert.equal((readBack.events[2] as { errorDetail?: unknown }).errorDetail, undefined, 'an unknown provider is dropped');
+  const strictStill = JSON.parse(JSON.stringify(failed)) as { events: Array<Record<string, unknown>> };
+  strictStill.events[1].failureKind = 'model';
+  assert.throws(() => decodeConversationRecordV1(strictStill), /failureKind/, 'failureKind stays strict, as every 2.x build reads it');
+
   console.log('types.test.ts: all tests passed');
 }
 

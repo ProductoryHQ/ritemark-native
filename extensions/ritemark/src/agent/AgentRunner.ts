@@ -47,6 +47,8 @@ import {
 interface RuntimeTurnState {
   filesModified: string[];
   structuredAssistantError: string | undefined;
+  /** Sprint 139 (E1): the SDK's error category, for the classifier. */
+  structuredAssistantErrorCode: string | undefined;
   sawRegularAssistant: boolean;
   planModeActive: boolean;
 }
@@ -162,6 +164,13 @@ export function claudeSdkAssistantError(message: SDKMessage): string | undefined
     .join('\n')
     .trim();
   return text || errorCode || 'Claude could not complete the request.';
+}
+
+/** Sprint 139 (E1): the SDK's structured error category (`rate_limit`, `billing_error`, …), if any. */
+export function claudeSdkAssistantErrorCode(message: SDKMessage): string | undefined {
+  if (message.type !== 'assistant') return undefined;
+  const errorCode = typeof message.error === 'string' ? message.error.trim() : '';
+  return errorCode || undefined;
 }
 
 export function normalizeClaudeSdkSuccessResult(input: {
@@ -466,6 +475,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
 
     let resultText = '';
     let structuredAssistantError: string | undefined;
+    let structuredAssistantErrorCode: string | undefined;
     let sawRegularAssistant = false;
 
     for await (const rawMessage of stream) {
@@ -492,6 +502,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
         const sdkError = claudeSdkAssistantError(message);
         if (sdkError) {
           structuredAssistantError = sdkError;
+          structuredAssistantErrorCode = claudeSdkAssistantErrorCode(message);
         } else {
           sawRegularAssistant = true;
           processAssistantMessage(message, filesModified, emitProgress, message.parent_tool_use_id);
@@ -512,7 +523,13 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
           if (normalized.error) {
             emitProgress('error', normalized.error);
             if (timeoutId) clearTimeout(timeoutId);
-            return { text: '', filesModified: [], metrics, error: normalized.error };
+            return {
+              text: '',
+              filesModified: [],
+              metrics,
+              error: normalized.error,
+              ...(structuredAssistantError && structuredAssistantErrorCode ? { errorCode: structuredAssistantErrorCode } : {}),
+            };
           }
           resultText = normalized.text;
           const durationStr = (metrics.durationMs / 1000).toFixed(1);
@@ -580,6 +597,7 @@ export class AgentSession {
   private _turnResolve: ((result: AgentResult) => void) | null = null;
   private _turnFilesModified: string[] = [];
   private _turnStructuredAssistantError: string | undefined;
+  private _turnStructuredAssistantErrorCode: string | undefined;
   private _turnSawRegularAssistant = false;
   private _emitProgress: ExtendedProgressEmitter | null = null;
   private _emitQuestion: ((question: AgentQuestion) => void) | null = null;
@@ -807,6 +825,7 @@ export class AgentSession {
     // Set per-turn state BEFORE starting/enqueueing
     this._turnFilesModified = [];
     this._turnStructuredAssistantError = undefined;
+    this._turnStructuredAssistantErrorCode = undefined;
     this._turnSawRegularAssistant = false;
     this._turnWaitedMs = 0;
     // In a plan-first turn the whole phase is plan context (native plan mode);
@@ -1051,6 +1070,7 @@ export class AgentSession {
     this._runtimeTurn = {
       filesModified: [],
       structuredAssistantError: undefined,
+      structuredAssistantErrorCode: undefined,
       sawRegularAssistant: false,
       planModeActive: false,
     };
@@ -1079,7 +1099,13 @@ export class AgentSession {
         sawRegularAssistant: turn.sawRegularAssistant,
       });
       result = normalized.error
-        ? { text: '', filesModified: [], metrics, error: normalized.error }
+        ? {
+            text: '',
+            filesModified: [],
+            metrics,
+            error: normalized.error,
+            ...(turn.structuredAssistantError && turn.structuredAssistantErrorCode ? { errorCode: turn.structuredAssistantErrorCode } : {}),
+          }
         : { text: normalized.text, filesModified: this._workspaceFilesModified(turn.filesModified), metrics };
     } else {
       const errorText = error ?? ((message?.errors || []).join('; ') || 'Execution failed');
@@ -1189,6 +1215,7 @@ export class AgentSession {
       this._emitToolApproval = null;
       this._turnFilesModified = [];
       this._turnStructuredAssistantError = undefined;
+      this._turnStructuredAssistantErrorCode = undefined;
       this._turnSawRegularAssistant = false;
       this._planModeActive = false;
       if (this._turnTimeout) {
@@ -1437,8 +1464,10 @@ export class AgentSession {
             });
             if (this._runtimeTurn && !message.parent_tool_use_id) {
               this._runtimeTurn.structuredAssistantError = sdkError;
+              this._runtimeTurn.structuredAssistantErrorCode = claudeSdkAssistantErrorCode(message);
             } else if (this._consumerTurnId === this._turnId) {
               this._turnStructuredAssistantError = sdkError;
+              this._turnStructuredAssistantErrorCode = claudeSdkAssistantErrorCode(message);
             }
           } else {
             traceClaude('sdk', 'assistant message', summarizeAssistantMessage(message));
@@ -1516,11 +1545,13 @@ export class AgentSession {
               });
               if (normalized.error) {
                 this._emitProgress?.('error', normalized.error);
+                const errorCode = this._turnStructuredAssistantError ? this._turnStructuredAssistantErrorCode : undefined;
                 this._forceResolveTurn(this._turnId, {
                   text: '',
                   filesModified: [],
                   metrics,
                   error: normalized.error,
+                  ...(errorCode ? { errorCode } : {}),
                 });
                 continue;
               }

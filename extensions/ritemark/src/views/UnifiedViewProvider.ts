@@ -94,7 +94,8 @@ import type { CardTaskSidebar } from '../taskBoard/CardHandoffLedger';
 import { decodeCommentTaskSidebarMessage } from '../commentTasks/protocol';
 import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runtime/AgentRuntime';
 import type { OneShotSettings } from '../runtime/oneShotTurn';
-import { presentRuntimeError } from '../runtime/runtimeErrorPresentation';
+import { presentRuntimeError, type RuntimeErrorHints } from '../runtime/runtimeErrorPresentation';
+import { aiName } from '../runtime/turnFailureCopy';
 import {
   isThinkingEffort,
   thinkingEffortLabel,
@@ -1000,6 +1001,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const claudeModelDeclaration = isClaudeCode
             ? modelCatalog.getClaudeSessionDeclaration(pinnedModel)
             : undefined;
+          // Sprint 139 (E1): what the classifier knows besides the text.
+          const errorHints = (code?: string, httpStatus?: number): RuntimeErrorHints => ({
+            ...(code ? { code } : {}),
+            ...(httpStatus !== undefined ? { httpStatus } : {}),
+            ...(typeof pinnedModel === 'string' && pinnedModel ? { turnModel: pinnedModel } : {}),
+            usesApiKey: Boolean(anthropicApiKey),
+            names: modelNamesFor(agentId as AgentId),
+          });
           const titleGeneration = ({ userPrompt, assistantResponse }: { userPrompt: string; assistantResponse: string }) =>
             this._conversationTitleGenerator.generate({
               runtimeId: agentId as AgentId,
@@ -1214,9 +1223,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             },
             onComplete: (result) => {
               if (!isCurrentRuntimeTurn()) return;
-              const errorPresentation = presentRuntimeError(agentId as AgentId, result.error, result.failureKind);
+              // Sprint 139 (E1): one classifier for every runtime. A stop is not a failure to classify.
+              const errorPresentation = isCancelledError(result.error)
+                ? (result.error ? { message: result.error } : undefined)
+                : presentRuntimeError(agentId as AgentId, result.error, result.failureKind, errorHints(result.errorCode));
               const error = errorPresentation?.message;
               const failureKind = result.failureKind ?? errorPresentation?.failureKind;
+              const errorKind = errorPresentation && 'errorKind' in errorPresentation ? errorPresentation.errorKind : undefined;
+              const errorDetail = errorPresentation && 'errorDetail' in errorPresentation ? errorPresentation.errorDetail : undefined;
               this._view?.webview.postMessage({
                 type: 'agent-result', conversationId,
                 agentId,
@@ -1225,6 +1239,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 metrics: result.metrics ?? { durationMs: 0, costUsd: null, model: null },
                 error,
                 failureKind,
+                ...(errorKind ? { errorKind } : {}),
+                ...(errorDetail ? { errorDetail } : {}),
               });
               this._refreshExplorerForAgentWrites(result.filesModified);
               if (!terminalCheckpointWritten) {
@@ -1245,6 +1261,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   status,
                   error,
                   failureKind,
+                  ...(status === 'failed' && errorKind ? { errorKind } : {}),
+                  ...(status === 'failed' && errorDetail ? { errorDetail } : {}),
                   appliedThinkingEffort,
                   activeDurationMs: turnActiveDurationMs(result.metrics),
                   generateTitle: titleGeneration,
@@ -1281,11 +1299,28 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             },
             onCodexComplete: (result) => {
               if (!isCurrentRuntimeTurn()) return;
+              // Sprint 139 (#376, E1): ChatGPT's and OpenCode's errors go through the same classifier as
+              // Claude's, so the transcript, the record, comments and cards say one unwrapped sentence.
+              const errorPresentation = result.error && !/cancell?ed|interrupted/i.test(result.status)
+                ? presentRuntimeError(agentId as AgentId, result.error, undefined, errorHints(result.errorCode, result.errorHttpStatus))
+                : undefined;
+              const error = errorPresentation?.message ?? result.error;
+              const errorKind = errorPresentation?.errorKind;
+              const errorDetail = errorPresentation?.errorDetail;
+              // The provider's own words stay in the turn's activity details, for diagnosis.
+              if (errorPresentation && result.error && result.error.trim() !== error) {
+                this._view?.webview.postMessage({
+                  type: 'codex-progress', conversationId,
+                  progress: { type: 'error', message: result.error, timestamp: Date.now() },
+                });
+              }
               this._view?.webview.postMessage({
                 type: 'codex-result', conversationId,
                 agentId,
                 status: result.status,
-                error: result.error,
+                error,
+                ...(errorKind ? { errorKind } : {}),
+                ...(errorDetail ? { errorDetail } : {}),
               });
               this._refreshExplorerForAgentWrites(undefined);
               if (!terminalCheckpointWritten) {
@@ -1306,7 +1341,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   turnId: conversationTurnId,
                   text: streamedResponseText,
                   status,
-                  error: result.error,
+                  error,
+                  ...(status === 'failed' && errorKind ? { errorKind } : {}),
+                  ...(status === 'failed' && errorDetail ? { errorDetail } : {}),
                   appliedThinkingEffort,
                   generateTitle: titleGeneration,
                 }), hostConversationEnabled);
@@ -1316,7 +1353,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   // message (its conclusion), not the opening narration; the
                   // transcript above keeps the whole stream.
                   text: result.lastAgentMessage ?? streamedResponseText,
-                  error: result.error,
+                  error,
                 });
                 if (!runtimeCompleted) this._disposeRuntimeSession(conversationId, agentId as AgentId);
               }
@@ -1324,12 +1361,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             onExit: () => {
               if (!isCurrentRuntimeTurn()) return;
               // Codex app-server died mid-turn — finalize the turn so the webview
-              // isn't stuck on "running" forever.
+              // isn't stuck on "running" forever. Sprint 139 (R3): the chat, the
+              // record and a restored chat say the same one sentence.
+              const exitSentence = `${aiName(agentId)} stopped unexpectedly. Send your message again.`;
               this._view?.webview.postMessage({
                 type: 'codex-result', conversationId,
                 agentId,
                 status: 'error',
-                error: 'ChatGPT stopped unexpectedly. Please try again.',
+                error: exitSentence,
+                errorKind: 'provider',
               });
               if (!terminalCheckpointWritten) {
                 terminalCheckpointWritten = true;
@@ -1343,7 +1383,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   // task calls it interrupted, because that is the state that
                   // offers Retry rather than an error the user cannot act on.
                   status: 'failed',
-                  error: 'Runtime exited unexpectedly.',
+                  error: exitSentence,
+                  errorKind: 'provider',
                 }), hostConversationEnabled);
                 this._applyCommentTaskTerminal(conversationId, conversationTurnId, {
                   status: 'interrupted',
@@ -3732,9 +3773,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         if (turnId && this._activeConversationTurnIds.get(conversationId) === turnId) {
           this._activeConversationTurnIds.delete(conversationId);
         }
-        const errorPresentation = presentRuntimeError(agentId, result.error, undefined);
+        const errorPresentation = isCancelledError(result.error)
+          ? (result.error ? { message: result.error } : undefined)
+          : presentRuntimeError(agentId, result.error, undefined, { code: result.errorCode, names: modelNamesFor(agentId) });
         const error = errorPresentation?.message;
         const failureKind = errorPresentation?.failureKind;
+        const errorKind = errorPresentation && 'errorKind' in errorPresentation ? errorPresentation.errorKind : undefined;
+        const errorDetail = errorPresentation && 'errorDetail' in errorPresentation ? errorPresentation.errorDetail : undefined;
         post({
           type: 'agent-result',
           text: result.text ?? '',
@@ -3742,6 +3787,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           metrics: result.metrics ?? { durationMs: 0, costUsd: null, model: null },
           error,
           failureKind,
+          ...(errorKind ? { errorKind } : {}),
+          ...(errorDetail ? { errorDetail } : {}),
         });
         this._refreshExplorerForAgentWrites(result.filesModified);
         const cancelled = this._consumeCancelIntent(conversationId, turnId);
@@ -3756,6 +3803,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           status,
           error,
           failureKind,
+          ...(status === 'failed' && errorKind ? { errorKind } : {}),
+          ...(status === 'failed' && errorDetail ? { errorDetail } : {}),
           activeDurationMs: turnActiveDurationMs(result.metrics),
         }), hostConversationEnabled);
         if (failureKind === 'authentication' || failureKind === 'api-key-authentication') {
@@ -3883,6 +3932,20 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     return this._continuationHostSecretPromise;
   }
 
+}
+
+/** Sprint 139 (E1): Claude's own stop reads as a stop, never as a failure to classify. */
+function isCancelledError(error: string | undefined): boolean {
+  return Boolean(error && /^execution cancell?ed$/i.test(error.trim()));
+}
+
+/** Sprint 139 (R4): the catalog's labels for a runtime's models, for the turn's sentence. */
+function modelNamesFor(runtimeId: AgentId): { label(modelId: string): string | undefined } {
+  const provider = runtimeId === 'claude-code' ? 'anthropic' : runtimeId === 'codex' ? 'codex' : 'opencode';
+  return {
+    label: (modelId) => modelCatalog.getModel(provider, modelId)?.label
+      ?? (provider === 'opencode' ? modelCatalog.getModels('opencode').find((entry) => entry.id.endsWith(`/${modelId}`))?.label : undefined),
+  };
 }
 
 /** Sprint 127 R6: one transcript line naming the requested and the used model. */

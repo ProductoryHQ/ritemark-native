@@ -440,6 +440,8 @@ async function testSyntheticAuthSuccessEnvelopeFailsTheTurn(): Promise<void> {
     filesModified: [],
     metrics: { durationMs: 1000, costUsd: 0, model: null, waitedMs: 0 },
     error: rawOAuthError,
+    // Sprint 139 (E1): the SDK's category travels with the text, for the classifier.
+    errorCode: 'authentication_failed',
   });
   assert.deepEqual(progress, ['error'], 'synthetic auth failure must never emit thinking or done');
 

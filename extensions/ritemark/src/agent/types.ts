@@ -217,6 +217,8 @@ export interface AgentResult {
   filesModified: string[];
   metrics: AgentMetrics;
   error?: string;
+  /** Sprint 139 (E1): the SDK's structured error category, when the failure carried one. */
+  errorCode?: string;
 }
 
 /**

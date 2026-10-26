@@ -257,6 +257,7 @@ export class ClaudeCodeSession implements RuntimeSession {
         metrics: result.metrics,
         error: result.error,
         failureKind: classifyClaudeAuthenticationError(result.error, Boolean(config.anthropicApiKey)),
+        ...(result.errorCode ? { errorCode: result.errorCode } : {}),
       });
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);

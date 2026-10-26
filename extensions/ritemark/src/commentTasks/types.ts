@@ -21,7 +21,7 @@
 
 import type { AgentId } from '../agent/types';
 import type { ThinkingEffort } from '../runtime/thinkingEffort';
-import type { RuntimeFailureKind } from '../runtime/runtimeErrorPresentation';
+import { unwrapProviderMessage, type RuntimeFailureKind } from '../runtime/runtimeErrorPresentation';
 import type { ProjectScopeDescriptorV1 } from '../conversations/types';
 import { decodeProjectScopeDescriptorV1 } from '../conversations/types';
 
@@ -235,38 +235,10 @@ export interface CommentTaskProjectionV1 {
  */
 export function safeFailureMessage(raw: string | undefined): string {
   const fallback = 'The task failed. Open the conversation for details.';
-  const text = (raw ?? '').trim();
-  if (!text) return fallback;
-
-  // A JSON envelope: take the innermost human `message`, whatever nests it.
-  if (text.startsWith('{') || text.startsWith('[')) {
-    let deepest: string | null = null;
-    const walk = (value: unknown, depth: number): void => {
-      if (depth > 6 || value === null || typeof value !== 'object') return;
-      for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-        if ((key === 'message' || key === 'detail') && typeof child === 'string' && child.trim()) {
-          deepest = child.trim();
-        } else {
-          walk(child, depth + 1);
-        }
-      }
-    };
-    try {
-      walk(JSON.parse(text), 0);
-    } catch {
-      // Not valid JSON after all; fall through to the plain-text path.
-    }
-    if (deepest) return clampSentence(deepest);
-    // It was JSON but carried no message worth showing.
-    return fallback;
-  }
-
-  // A stack trace helps nobody in a margin; keep the first line only.
-  const firstLine = text.split('\n')[0].trim();
-  if (!firstLine || /^\s*at\s/.test(firstLine)) return fallback;
-  // Braces and quote soup mean we are still looking at a payload, not prose.
-  if (/[{}]/.test(firstLine) && firstLine.length > 120) return fallback;
-  return clampSentence(firstLine);
+  // Sprint 139 (E1): the unwrapping is the runtime classifier's, so a comment, a
+  // task card and the chat say the same sentence.
+  const { sentence } = unwrapProviderMessage(raw);
+  return sentence ? clampSentence(sentence) : fallback;
 }
 
 function clampSentence(text: string): string {
