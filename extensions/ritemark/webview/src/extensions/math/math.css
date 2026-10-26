@@ -54,6 +54,38 @@ body[data-vscode-theme-kind='vscode-dark'] .ProseMirror {
   text-align: center;
 }
 
+/* ---- Display math in a list item: the item's text (experience 38, decision 6) ----
+   Display style and size, but left at the item's text, 0.2em above and below,
+   as an inline equation in display style: the bullet or number sits on its
+   baseline, and its hover fill and focus ring fit its width. Opened, a block's
+   field is the item's width and its result is left too, so nothing jumps.
+   Top-level display math stays centred. */
+li .rm-math-inline-display:not(.is-open) {
+  display: inline-block;
+  max-width: 100%;
+  margin: 0.2em 0;
+  text-align: left;
+  vertical-align: baseline;
+}
+li .rm-math-typeset .katex-display {
+  margin: 0;
+}
+li .rm-math-typeset .katex-display > .katex,
+li .rm-math-field-result .katex-display > .katex {
+  text-align: left;
+}
+li .rm-math-block {
+  margin: 0.2em 0;
+  text-align: left;
+}
+li .rm-math-block:not(.is-open):not(.is-error):not(.is-source) {
+  width: fit-content;
+  max-width: 100%;
+}
+li .rm-math-field-result {
+  text-align: left;
+}
+
 /* Block: rest, hover (radius 8), focus. The display style's 0.2em above and
    0.9em below sit outside the block's own box, so the hover fill and the
    focus ring wrap the whole equation, its superscripts included. */

@@ -22,6 +22,8 @@ Walked on 26 October 2026 on a dev instance of the sprint branch on the Mac (App
 | [12-word-mac-typos.png](12-word-mac-typos.png) | The typo report's Word copy: the good equation native, the typos as their source in the code font | — |
 | [13-word-mac-wide-equation.png](13-word-mac-wide-equation.png) | A sum wider than the page: Word breaks the equation over two lines; bold, italic and code in a paragraph, a list and a table | — |
 | [14-selection-chip.png](14-selection-chip.png) | A Shift-arrow selection across an equation: the chip reads "from $\bar{x}_1 = 3.1$ to", the source with its delimiters (R7). Inside the selection, the browser's highlight paints over part of the typeset equation | — |
+| [15-list-equations-light.png](15-list-equations-light.png) | Display math in list items, as decision 6 draws it: display style and size, left at the item's text, the bullet or number on the equation's baseline, 0.2 em above and below; top-level display math still centred. The AI's sheet shows its sign-in card (the test profile) | 38, decision 6 |
+| [16-list-equations-dark.png](16-list-equations-dark.png) | The same in Dark | 38, decision 6 |
 
 The Word audit's evidence (40 formulas, the wrapper against the converter alone) is in [../research/evidence/](../research/evidence/).
 
