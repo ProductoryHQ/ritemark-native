@@ -10,7 +10,7 @@ Release tier: **shell.**
 - **R12** may touch `patches/vscode/019-ritemark-tab-row.patch`, if audit A2 finds core drops the title.
 
 Everything else is extension-tier, under `extensions/ritemark/`. All of it ships in 2.1.0's shell release (the shape's decision 1).
-Status: **Phase 2 (PLAN), waiting for approval.** Plans for 2.1 are approved by the Development manager under Jarmo's delegation of 26 October (`ritemark-dev`: `decisions/log.md`).
+Status: **Approved (Phase 2 → 3), 26 October 2026,** by the Development manager under Jarmo's delegation. Building on `sprint-142-polish`.
 
 ## SDD Artifacts
 
@@ -195,4 +195,18 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Approval
 
-- [ ] Approved by the Development manager under Jarmo's delegation of 26 October 2026 (`ritemark-dev`: `decisions/log.md`).
+- [x] Approved on 26 October 2026 by the Development manager, under Jarmo's delegation of the same day: "ei sprindiplaanid kinnitad sina. midagi ei tohi minu taga oodata kuni Gate 1 RCini" (`ritemark-dev`: `decisions/log.md`). Until 2.1's Gate 1 RC, the manager's word counts for plan approval, sprint start and admin merge of 2.1 work. Release approval stays Jarmo's.
+
+**The plan's questions, decided:**
+1. **Q1, yes.** Home's folder-with-files button, pressed again, opens the chat its request went to. It sends nothing again and never disables.
+2. **Q2, yes.** When the board's chosen agent isn't ready but another is, the main part opens the agent menu.
+3. **Q3, as recommended.** While dictation runs, the language part keeps its rest tone. Pressing it shows the languages unavailable, with "Stop dictation to change the language". The manager asks the Experience lead to confirm; this changes if they differ.
+4. **Q4, yes.** View ▸ Advanced ▸ Source Control is renamed "File changes" (patch 002).
+5. **Q5, yes.** The switch note uses only what the extension can see; the 6 seconds cover the rest.
+6. **Q6, as recommended.** A project folder name wider than the path line wraps at its spaces. The Experience lead is asked to confirm, as for Q3.
+7. **Q7: in Home.** Home holds at a 150 px desk, with no patch.
+8. **Q8, yes.** Below the board's four columns' least width, today's sideways scroll stays for 2.1.
+9. **Q9, yes, after A2.** If only patch 019 can keep a restored card's title, the shell change is accepted.
+10. **Chat Debug:** a Gate 1 / Gate 2 check only, with no code.
+
+**Built on** `sprint-142-polish`, from the plan's commit on `origin/main` at `84ea15db`. Two merges, as planned: merge 1 the extension work, merge 2 the patches. The Development manager merges.
