@@ -104,6 +104,11 @@ interface ExportMathElement {
   source: string;
   /** A picture to publish, or null: then the source goes as text. */
   picture: { src: string; width: number; height: number; display: boolean } | null;
+  /**
+   * No picture, so the source goes as text: a typo, or an equation whose
+   * picture could not be drawn. Counted, so the result says so, as PDF and
+   * Word copies do.
+   */
   typo: boolean;
 }
 
@@ -116,13 +121,10 @@ function readMath(node: Node): ExportMathElement | null {
   const width = Number.parseFloat(node.getAttribute('data-width') ?? '');
   const height = Number.parseFloat(node.getAttribute('data-height') ?? '');
   const display = kind === 'block' || node.getAttribute('data-display') === 'true';
-  return {
-    source,
-    picture: ok && src.startsWith('data:image/png') && width > 0 && height > 0
-      ? { src, width: width * PT_PER_PX, height: height * PT_PER_PX, display }
-      : null,
-    typo: !ok,
-  };
+  const picture = ok && src.startsWith('data:image/png') && width > 0 && height > 0
+    ? { src, width: width * PT_PER_PX, height: height * PT_PER_PX, display }
+    : null;
+  return { source, picture, typo: picture === null };
 }
 
 function mathImageBlock(math: ExportMathElement, picture: NonNullable<ExportMathElement['picture']>): Block {
@@ -372,14 +374,19 @@ export function mathNotes(blocks: Block[]): string[] {
 }
 
 /**
- * The HTML the unchanged-source check hashes: the document's equations by
- * their source, without the bytes of their pictures or their measured sizes,
- * which can differ from one rendering to the next (R10).
+ * The HTML the unchanged-source check hashes: each equation by its source
+ * alone. Its picture's bytes, its measured size, its MathML and whether it
+ * could be drawn at all can differ from one rendering to the next, while the
+ * document has not changed (R10).
  */
 export function hashableExportHtml(html: string): string {
-  return html
-    .replace(/<img data-math-image=""[^>]*>/g, '')
-    .replace(/\sdata-(?:width|height|depth|mathml)="[^"]*"/g, '');
+  return html.replace(
+    /<(span|div)\b([^>]*\bdata-math="(?:inline|block)"[^>]*)>[\s\S]*?<\/\1>/g,
+    (_element, tag: string, attributes: string) => {
+      const source = /\bdata-source="([^"]*)"/.exec(attributes)?.[1] ?? /\bdata-latex="([^"]*)"/.exec(attributes)?.[1] ?? '';
+      return `<${tag} data-math-source="${source}"></${tag}>`;
+    },
+  );
 }
 
 // ---------------------------------------------------------------- blocks → requests

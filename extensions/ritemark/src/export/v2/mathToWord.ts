@@ -354,6 +354,11 @@ export interface ExportMath {
   depth: number;
 }
 
+/** A failure's kind for the log (`TypeError`, `Error`), never its message. */
+export function failureKind(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error;
+}
+
 function numberAttr(element: HTMLElement, name: string): number {
   const value = Number.parseFloat(element.getAttribute(name) ?? '');
   return Number.isFinite(value) && value > 0 ? value : 0;
@@ -400,7 +405,9 @@ export function mathToWordChild(
     try {
       return { child: ommlToParagraphChild(mathmlToOmml(math.mathml, math.display, convert)), outcome: 'equation' };
     } catch (error) {
-      console.warn('[export] equation converted to a picture for Word:', math.latex, error);
+      // Only the kind of failure: the equation and the converter's message can
+      // quote what the person wrote.
+      console.warn(`[export] an equation went to Word as a picture (${failureKind(error)})`);
     }
   }
   if (math.status === 'ok' && math.image && math.width > 0 && math.height > 0) {

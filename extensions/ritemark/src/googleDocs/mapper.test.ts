@@ -270,6 +270,18 @@ assert.deepEqual(bodyClearRange(docWithTokens), { startIndex: 1, endIndex: 89 },
   const again = html.replace(/iVBORw0KGgo=/g, 'AAAA').replace('data-width="16"', 'data-width="16.4"');
   assert.equal(hashableExportHtml(again), hashableExportHtml(html), 'a re-drawn picture is not a change');
   assert.notEqual(hashableExportHtml(html.replace('$\\bar{x}$', '$\\bar{y}$')), hashableExportHtml(html), 'an edited source is');
+  // An equation that could not be drawn this time (no picture, its source as the body) is no change either.
+  const undrawn = html.replace(
+    /<span data-math="inline" data-latex="\\bar\{x\}"[^>]*>[\s\S]*?<\/span>/,
+    '<span data-math="inline" data-latex="\\bar{x}" data-source="$\\bar{x}$" data-display="false" data-status="ok">$\\bar{x}$</span>',
+  );
+  assert.notEqual(undrawn, html, 'the test replaced the drawn equation');
+  assert.equal(hashableExportHtml(undrawn), hashableExportHtml(html), 'drawn or not, the same equation hashes the same');
+
+  // An equation published as its source because it has no picture is counted, as a typo is.
+  const [fallback] = htmlToBlocks('<p>Mean <span data-math="inline" data-latex="x" data-source="$x$" data-display="false" data-status="ok">$x$</span> here.</p>');
+  assert.equal(fallback.mathTypos, 1, 'a valid equation without a picture is counted');
+  assert.deepEqual(mathNotes([fallback]), ["1 equation couldn't be typeset and shows as its source."]);
 
   // #408: every quote line starts at its indent, the first included; the bar is thin.
   const quotes = mathBlocks.filter((b) => b.kind === 'quote');
