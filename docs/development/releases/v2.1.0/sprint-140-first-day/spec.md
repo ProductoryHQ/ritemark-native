@@ -32,6 +32,11 @@ Acceptance criteria:
 - The Word-or-PDF starting points (R8) are offered only for a kind every AI can read after the decision; otherwise a Word file or PDF on the desk gets the project's starting points.
 - Whatever the decision, every AI's standing instructions gain one line: when it cannot open a file it was asked to read, it says which.
 
+**The spike's decision so far (26 October; `research/word-spike.md`):** only ChatGPT could be run. Claude has no readable sign-in on this Mac and OpenCode has no test key; Windows was not run. ChatGPT passes Word documents (3 of 3 first looks on the Mac) and PDFs (5 of 6 Mac runs, one stall). So:
+- **R1a is not built and R1b is not applied.** The request goes as drawn, and every AI gets the honesty line.
+- **The Word-or-PDF starting points stay behind the gate** until every AI has passed a kind: a Word file or PDF in front gets the project's starting points meanwhile.
+- **Claude's and OpenCode's runs, and the Windows rounds, are open.** When they are run, the rule decides again.
+
 ### R2: Home's order
 
 As someone opening a project, I want my own work first, and at most one suggestion under it.
@@ -106,6 +111,7 @@ Acceptance criteria:
 - The ready request's answer ends with two offers, drawn as two cards under the answer: write About this project, and one piece of real work from what the AI found (notes or a brief become an offer, meeting notes a client summary with next steps, materials a handout; the Business lead, 21 October).
 - Each offer card has a title and a muted line, as drawn ("Write About this project" / "The page every AI here reads first"). A click puts the offer's request in the message box; the person presses Send, as with the starting points.
 - The offers come from the AI, the same way for all three AIs. **This requirement is conditional on the spike's part B** (technical plan): if all three AIs offer next steps through Ritemark's offer tool reliably, R7 is built as written. If not, the offers stay in the answer's own words, frame 2 is redrawn by the Experience lead to match, and R7 is recorded here as not built (*Open Questions*, J3).
+- **Not built (26 October).** In part B, ChatGPT called the prototype `offer_next_steps` in 0 of 3 first looks, although the tool was in its list (`research/word-spike.md`). Frame 2 goes back to the Experience lead to redraw with the offers in the answer's words.
 
 ### R8: The AI's empty sheet: at most three starting points
 

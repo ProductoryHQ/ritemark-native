@@ -1,0 +1,115 @@
+{
+  "Training work": [
+    {
+      "file": "Northfield Bank/Northfield Bank notes.docx",
+      "kind": "docx",
+      "facts": [
+        "Tartu",
+        "March",
+        "40 branch managers",
+        "30 October",
+        "Rüütli",
+        "savings hall"
+      ]
+    },
+    {
+      "file": "Riverside Hospital/Session plan, ward managers.docx",
+      "kind": "docx",
+      "facts": [
+        "12 November",
+        "night shift",
+        "Thursday"
+      ]
+    },
+    {
+      "file": "Harbour Logistics/Proposal to Harbour Logistics.docx",
+      "kind": "docx",
+      "facts": [
+        "4 December",
+        "Mari Tamm",
+        "week 2",
+        "2,400",
+        "2400",
+        "9,600",
+        "Muuga"
+      ]
+    },
+    {
+      "file": "Northfield Bank/Northfield tender.pdf",
+      "kind": "pdf",
+      "facts": [
+        "48,000",
+        "48 000",
+        "48000",
+        "60%"
+      ]
+    },
+    {
+      "file": "Contracts/Riverside Hospital contract.pdf",
+      "kind": "pdf",
+      "facts": [
+        "June 2027",
+        "six reschedules",
+        "6 reschedules",
+        "six fee-free",
+        "reschedule"
+      ]
+    }
+  ],
+  "Training PDFs": [
+    {
+      "file": "Northfield tender.pdf",
+      "kind": "pdf",
+      "facts": [
+        "48,000",
+        "48 000",
+        "48000"
+      ]
+    },
+    {
+      "file": "Riverside Hospital contract.pdf",
+      "kind": "pdf",
+      "facts": [
+        "30 June 2027",
+        "six reschedules",
+        "6 reschedules"
+      ]
+    },
+    {
+      "file": "Harbour survey results.pdf",
+      "kind": "pdf",
+      "facts": [
+        "3.9",
+        "21 of",
+        "twenty-one",
+        "3.1"
+      ]
+    },
+    {
+      "file": "Venue offer, Tartu.pdf",
+      "kind": "pdf",
+      "facts": [
+        "380"
+      ]
+    },
+    {
+      "file": "Trainer CV, Mari Tamm.pdf",
+      "kind": "pdf",
+      "facts": [
+        "eleven years",
+        "11 years",
+        "Finnish"
+      ]
+    }
+  ],
+  "open_document": {
+    "file": "Harbour Logistics/Proposal to Harbour Logistics.docx",
+    "question": "What did we promise Harbour about the team survey?",
+    "facts": [
+      "4 December",
+      "Mari Tamm",
+      "week 2"
+    ],
+    "decoy": "to be decided"
+  }
+}

@@ -1,0 +1,20 @@
+{
+ "name": "chatgpt-open-word-1",
+ "runtimeId": "codex",
+ "mode": "Permission mode: Auto",
+ "runtime": "ChatGPT, GPT-6.1 Sol, thinking effort Auto",
+ "openFile": "Harbour Logistics/Proposal to Harbour Logistics.docx",
+ "message": "What did we promise Harbour about the team survey?",
+ "elapsedMs": 45544,
+ "timedOut": false,
+ "lifecycle": {
+  "state": "idle"
+ },
+ "activities": [],
+ "attentions": [],
+ "boundaries": [],
+ "answer": {
+  "status": "completed",
+  "content": "We promised Harbour:\n- A **short team survey in week 2** of the programme.\n- **Mari Tamm** would run it.\n- Results would be back to the shift leaders **by 4 December**.\n\nThat’s explicit in the [proposal](./Harbour%20Logistics/Proposal%20to%20Harbour%20Logistics.docx). The [Harbour notes](./Harbour%20Logistics/Harbour%20notes.md) still say “to be decided,” so they conflict with the proposal."
+ }
+}
