@@ -39,7 +39,7 @@ The hand-over therefore sits at the top of `onSaveError`, one place for every pa
 
 ## 4. `executeCommand` before the extension registers
 
-`ICommandService.executeCommand` first fires the `onCommand:` activation event and waits for registered extensions, then rejects with "command not found" when nothing registered the id. The command is registered in `DocumentSyncCoordinator`'s constructor, which runs when the extension activates; a Ritemark editor cannot exist before that, so a document Ritemark's editor holds always has the command. If the extension host has died, the rejection is caught and VS Code's notification shows (`askRitemark`'s `catch`). The command id starts with `_`, so it is never in the palette, and it is not in `package.json`.
+`ICommandService.executeCommand` first fires the `onCommand:` activation event and waits for registered extensions, then rejects with "command not found" when nothing registered the id. The command is registered in `DocumentSyncCoordinator`'s constructor, which runs when the extension activates; a Ritemark editor cannot exist before that, so a document Ritemark's editor holds always has the command. If the extension host has died, the rejection is caught and VS Code's notification shows (`askRitemark`'s `catch`). If it is alive but busy, the shell waits at most 3 s (`raceTimeout`, `RITEMARK_ANSWER_TIMEOUT_MS`) and then shows VS Code's notification; the coordinator gives up at 2.5 s and answers `false` itself, and a decision that comes later neither saves nor notifies (QA on #553). The command id starts with `_`, so it is never in the palette, and it is not in `package.json`.
 
 ## 5. The decision and each answer's end state
 

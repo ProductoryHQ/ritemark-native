@@ -51,7 +51,7 @@ On the branch, each of these files comes back byte for byte after two saves (the
 
 The corpus files are modelled on each tool's output, written by the team: no real tool export was captured here.
 
-- **Kept (30):** ChatGPT's and Claude's answers, an Obsidian note (front matter with a comment, tab-indented lists, `[[wikilinks]]`, `> [!note]`), a Google Docs export (`* ` bullets, numbered lists, tables with `:----` delimiter rows), meeting notes, a consultant's proposal, an analyst's report, a trainer's handout, a GitHub-style README without HTML, Ritemark's own Save as Markdown, #270's two fixtures, and one file per form (lists, breaks, tables, thematic breaks, escapes and the negative escapes, front matter, code spans, comments, a CRLF file and a UTF-8 BOM file).
+- **Kept (31):** ChatGPT's and Claude's answers, an Obsidian note (front matter with a comment, tab-indented lists, `[[wikilinks]]`, `> [!note]`), a Google Docs export (`* ` bullets, numbered lists, tables with `:----` delimiter rows), meeting notes, a consultant's proposal, an analyst's report, a trainer's handout, a GitHub-style README without HTML, Ritemark's own Save as Markdown, #270's two fixtures, and one file per form (lists, breaks, tables, thematic breaks, escapes and the negative escapes, brackets around marks (added after QA's review), front matter, code spans, comments, a CRLF file and a UTF-8 BOM file).
 - **Known (13):** the forms outside the bound, each with its pinned output ([notes/out-of-bound.md](../notes/out-of-bound.md)).
 - **Cleanup (1):** a file as Ritemark 2.0.1 saved it, with the one-time cleanup pinned (decision 4).
 

@@ -9,13 +9,14 @@ Tools: `scripts/qa/markdown-roundtrip-check.mjs` (open, edit, save, read the byt
 | Check | Result |
 |---|---|
 | `npm run test:editor-sync` files, one by one (state, protocol, delivery, save receipt, front matter, the reducer, the reconciler, the task-list, tilde, strikethrough, ordered-list, image-path, comment and security round trips, `markdownAsWritten`, `markdownFidelity`, `linkEdit`, `documentUpdate`, the acknowledgement check, Save as Markdown, the card file, agent front matter) | 24 of 24 pass |
-| The corpus test (`markdownFidelity.test.ts`) | 30 kept files byte-identical after one and two saves, the one-word edit changes one line in each, CRLF and BOM kept; 13 known outputs and the cleanup output pinned and stable; no link, mark or image lost (one listed exception); the look baseline equal apart from R6's listed exceptions; no trailing whitespace |
+| The corpus test (`markdownFidelity.test.ts`) | 31 kept files (with `brackets-around-marks.md`, added after QA's B1) byte-identical after one and two saves, the one-word edit changes one line in each, CRLF and BOM kept; 13 known outputs and the cleanup output pinned and stable; no link, mark or image lost (one listed exception); the look baseline equal apart from R6's listed exceptions; no trailing whitespace |
 | Webview and extension `tsc --noEmit` | exit 0, exit 0 |
 | `npm run compile` (extension), `npm run build` (webview, both modes) | exit 0 |
 | VS Code: `./scripts/test.sh --grep "Ritemark save conflict\|TextFileEditorModel"` | 55 passing |
 | VS Code: `npm run typecheck-client`, `npm run build-fast -- --client-only` | exit 0 |
 | Patches from the pin: dry run, apply, a second run, the stacking check | 18 / 18 / 0 applied (18 already) / OK ([notes/patches-before.md](notes/patches-before.md)) |
 | Pre-commit validator, by hand with `CLAUDE_PROJECT_DIR` on the worktree | passed |
+| QA's bracket fuzz (85,410 cases: a mark between bracket sequences), and the same widened to strike, code, a link and a comment mark with four characters after (567,575 cases) | 0 regressions against `main` in either, after the split-bracket fix; 112 before it (QA on #553) |
 | Corpus measures, before and after ([notes/corpus-before.md](notes/corpus-before.md)) | repository 4% → 71%, team documents 3% → 89%, READMEs 4% → 16% byte-identical after one save |
 
 ## Scenarios
@@ -88,6 +89,7 @@ The last build of the branch, a fresh copy of the corpus, one launch:
 |---|---|---|
 | #502 the link dialog edits the link | App (probe: the dialog's title and button say Edit; the file gets the new address); Test (`linkEdit.test.ts`) | Pass |
 | #512 a false Retry document update | App (an outside write while the editor's animation frames are suspended, the one property of a window behind others that CDP can give it) | The new text shows, no Retry in 12 s. On `main`, Retry at 5.5 s. A real occluded window was not used |
+| Brackets a mark splits (QA's B1 on #553): `[**x**]: y` reopened as a definition and the paragraph was gone | Test (`markdownAsWritten.test.ts`, 11 cases: bold, italics, strike, code, a comment mark, brackets inside a link's text); the corpus (`kept/brackets-around-marks.md`); the two fuzzes | Pass |
 | The editor freeze on an overlapping diff | Test (`documentUpdate.test.ts`: a removed paragraph that ends like its neighbour); App (the touch-and-delete runs over the kept set, where `main`'s editor froze) | No freeze |
 
 ## Not run here, and why

@@ -98,11 +98,11 @@ Nothing here starts before Jarmo approves the plan. Tick a box only when the cha
 - [x] Manual QA on the Mac: S1–S49, evidence in `qa-evidence.md`, with what could not be run here and why *(what could not be run is listed there)*
 - [ ] The look: S32's screenshots of `main` and the branch, to the Experience lead with the PR (memory: match the Experience prototype) *(not done)*
 - [x] `./scripts/validate-qa.sh`; the pre-commit validator run by hand on the worktree (`CLAUDE_PROJECT_DIR="$PWD"`)
-- [ ] PR opened; `qa-validator` review; the Development manager's smoke test; Jarmo's "admin merge", naming the PR *(PR opened; the review, the smoke test by the manager and the merge are pending)*
+- [ ] PR opened; `qa-validator` review; the Development manager's smoke test; Jarmo's "admin merge", naming the PR *(PR #553 opened; QA passed (technical) after B1, split brackets, and B2 were fixed; the smoke test and the merge are the manager's)*
 - [ ] After the merge: a production build from a clean-room worktree at the merged commit, as a build check (E5)
 - [ ] After the merge: the Windows round from main for S38 and S40–S48 (E5)
 - [ ] After the merge: the drift check for patch 014 on the newest VS Code release, into the release plan's risk register (E5)
 - [ ] The out-of-bound list as one GitHub issue for after 2.1, with each fixture and today's output; the Development manager files it (E6) *(drafted in `notes/out-of-bound.md`)*
 - [ ] Linked issues: #270 and #454 closed with evidence, or updated with what is left
-- [ ] Release plan: tracker, feature-complete rows and risk register updated
+- [x] Release plan: tracker, feature-complete rows and risk register updated *(the tracker row: PR, issues, QA and notes; the risk rows stay open until the merge)*
 - [ ] `node ./scripts/worktree-hygiene.mjs --report` (cleaning is Jarmo's call)

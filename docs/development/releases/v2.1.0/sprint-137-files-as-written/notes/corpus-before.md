@@ -2,7 +2,7 @@
 
 `scripts/qa/markdown-fidelity-measure.mjs` with `--harness` pointed at a copy of `main`'s pipeline (08761e71) for *before*, and the branch's own harness for *after*. Each file is opened and saved through the editor's code as the corpus test does; the numbers are files, never content.
 
-## The kept set (30 files, `fidelity-corpus/kept/`)
+## The kept set (30 files, `fidelity-corpus/kept/`, before `brackets-around-marks.md` was added after QA's review)
 
 The corpus test fails on `main`'s behaviour: 2 of the 30 kept files come back byte for byte after one open and save. On the branch, 30 of 30, after one save and after two, and a one-word edit changes exactly one line in each.
 
