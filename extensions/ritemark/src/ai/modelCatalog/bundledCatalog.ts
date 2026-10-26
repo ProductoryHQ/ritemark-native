@@ -108,9 +108,12 @@ export const BUNDLED_CATALOG: ModelCatalog = {
     opencode: {
       defaults: {},
       models: [
-        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4), label: 'Gemini 4 Argon', description: 'Google — flagship reasoning', tier: 'high', deprecated: false, order: 0 },
-        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.PRO_3_1_PREVIEW), label: 'Gemini 3.1 Pro', description: 'Google — most capable, deep reasoning', tier: 'high', deprecated: false, order: 1 },
-        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.FLASH_3_8), label: 'Gemini 3.8 Flash', description: 'Google — current fast model', tier: 'medium', deprecated: false, order: 2 },
+        // Sprint 141 decision 10: the first row is OpenCode's one-shot model and the composer's
+        // first choice, so it is one Google's free tier serves (3.8 Flash; Argon and 3.1 Pro
+        // are "Not available" on it, Gemini API pricing page of 2026-10-26).
+        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.FLASH_3_8), label: 'Gemini 3.8 Flash', description: 'Google — current fast model', tier: 'medium', deprecated: false, order: 0 },
+        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4), label: 'Gemini 4 Argon', description: 'Google — flagship reasoning', tier: 'high', deprecated: false, order: 1 },
+        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.PRO_3_1_PREVIEW), label: 'Gemini 3.1 Pro', description: 'Google — most capable, deep reasoning', tier: 'high', deprecated: false, order: 2 },
         { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.FLASH_LITE_3_5), label: 'Gemini 3.5 Flash Lite', description: 'Google — current low-cost model', tier: 'low', deprecated: false, order: 3 },
         { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.PRO_2_5), label: 'Gemini 2.5 Pro', description: 'Retained for saved selections', tier: 'high', deprecated: true, order: 4 },
         { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_1), label: 'GPT-6.1 Sol', description: 'OpenAI — latest agentic workhorse', tier: 'high', deprecated: false, order: 5 },

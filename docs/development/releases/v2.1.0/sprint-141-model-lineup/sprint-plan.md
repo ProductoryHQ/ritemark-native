@@ -244,7 +244,7 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 - [x] Approved on 26 October 2026 by the Development manager, under Jarmo's delegation of the same day: "ei sprindiplaanid kinnitad sina. midagi ei tohi minu taga oodata kuni Gate 1 RCini" (ritemark-dev `decisions/log.md`, 26 October). Until 2.1's Gate 1 RC, the manager's word counts for plan approval, sprint start and admin merge of 2.1 work. Release approval (Gate 1, Gate 2, publish) stays Jarmo's.
 
-**The decisions, all nine as recommended:**
+**The decisions, all nine as recommended, and a tenth:**
 1. **#529's design:**
    - OpenCode's own model list is the runnability authority;
    - Google's and OpenAI's lists for the person's key narrow it, where Ritemark already asks for Flows;
@@ -264,5 +264,11 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
      - 1.14: 29 people (16 active in the last 7 days);
      - 2.0.x: 14 people (all active in the last 7 days).
    - A1 records them as its result.
+
+10. **OpenCode's Google group leads with a model Google's free tier serves** (the Development manager under Jarmo's delegation, 27 October, from item 6 of the merge-1 report).
+    - **Why:** the group's first row is OpenCode's one-shot model and the composer's first choice. Many people bring a free AI Studio key, and their first turn shouldn't land on an error card.
+    - **The source:** Google's Gemini API pricing page (<https://ai.google.dev/gemini-api/docs/pricing>, last updated 2026-10-26). For the free tier it lists Gemini 3.8 Flash and 3.5 Flash Lite as "Free of charge", and Gemini 4 Argon and 3.1 Pro as "Not available". The rate-limits page (same date) points to AI Studio for per-model free limits and has no free-tier table of its own.
+    - **The change:** Gemini 3.8 Flash is first in OpenCode's Google group in the bundled catalog and the candidate feed, with Argon second. `check:model-feed` re-run: exit 0, and every release from 1.8.1 now gets 3.8 Flash as that group's first row (`research/feed-check-report.md`).
+    - **Left alone:** Flows' Gemini list (Argon first) and default (3.5 Flash Lite), OpenRouter's group, and the other lineups.
 
 **After the approval:** #558 joined on 26 October (R12), and A2's findings added R13 and revised R5. Both are under the scope-change protocol, with `spec.md` first.

@@ -21,7 +21,7 @@ A scenario that needs a provider key says **Not runnable** and is recorded that 
 Given a fresh profile and no network
 When a Flow's LLM step is switched to Gemini
 Then its model list starts with Gemini 4 Argon
-And the bootstrap payload's OpenCode `google` group starts with Gemini 4 Argon
+And the bootstrap payload's OpenCode `google` group starts with Gemini 3.8 Flash, then Gemini 4 Argon (decision 10, 27 October; it first read "starts with Gemini 4 Argon")
 And its `openrouter` group contains Gemini 4 Argon (`google/gemini-4-argon`).
 
 ### S2: Online with today's feed, Argon once

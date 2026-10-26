@@ -77,3 +77,10 @@ Claude's live list (Claude Code 2.1.310, unauthenticated): `sonnet`, `opus`, `fa
 - The webview build: `media/webview.js` +16 bytes, `office-preview.js` byte for byte (`notes/bundle.md`).
 - The pre-commit validator, run by hand with `CLAUDE_PROJECT_DIR` set to the worktree: pass.
 - `./scripts/validate-qa.sh`: see the PR.
+
+## Decision 10, 27 October
+
+- **The change:** OpenCode's Google group now leads with Gemini 3.8 Flash (free tier, per Google's pricing page of 2026-10-26), with Argon second.
+- **Tests:** `modelCatalog.test.ts` covers the new order and an unchanged Flows list and default; `feedExport.test.ts` passes.
+- **`check:model-feed`** was re-run on a freshly exported candidate: exit 0 with `--accept legacy:codex`. Every release from 1.8.1 gets 3.8 Flash as the group's first row; before, it was 3.1 Pro (1.8.1–1.14.0) or Argon (2.0.x).
+- **Correction:** the payload listed under *The AI sheet's payload* above was captured before this change, so it still shows Argon first.

@@ -49,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Sprint 141: 2.1's model lineup (#532, #531, #530, #558)
 
 #### Added
-- **Gemini 4 Argon (#532).** Google's flagship reasoning model is first in a Flow's Gemini list and in OpenCode's Google group, and joins OpenCode's OpenRouter group, even before Ritemark has fetched its model list.
+- **Gemini 4 Argon (#532).** Google's flagship reasoning model is first in a Flow's Gemini list, and joins OpenCode's Google and OpenRouter groups, even before Ritemark has fetched its model list. OpenCode's Google group starts with Gemini 3.8 Flash, which a free AI Studio key can use.
 - **Current models in OpenCode.** OpenCode's Claude group gains Sonnet 5.5, Opus 5.5 and Haiku 5.5, its OpenAI group GPT-6.1 Sol, and its OpenRouter group Claude Sonnet 5.5 and GPT-6.1 Sol.
 
 #### Changed

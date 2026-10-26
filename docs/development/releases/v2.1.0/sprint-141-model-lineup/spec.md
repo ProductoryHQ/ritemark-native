@@ -37,6 +37,10 @@ Acceptance criteria:
 - Online, the feed's hand-added Argon rows (ritemark-public `c4808be`) and the bundled rows show Argon once, not twice.
 - The bundled catalog's `updatedAt` moves to the day the lineup changes, so the bundled rows count as newer than the current feed.
 
+**R1, revised 2026-10-27 (decision 10):**
+- **OpenCode's Google group lists Gemini 3.8 Flash first and Argon second.** The group's first row is OpenCode's one-shot model and the composer's first choice, and Google's pricing page (2026-10-26) puts Argon and 3.1 Pro outside the free tier and 3.8 Flash in it.
+- **Unchanged:** Flows' Gemini list keeps Argon first, and OpenRouter's group keeps its order.
+
 ### R2: OpenCode's hand-made lists follow the lineup (#529's fallback; *Open Questions* 3)
 
 As someone who uses OpenCode with my own key, I want its lists to carry the current models, even when the live lists of R10 aren't available.

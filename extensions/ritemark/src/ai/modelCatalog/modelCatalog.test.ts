@@ -725,11 +725,21 @@ test('versionLt compares dotted-numeric versions correctly', () => {
 
 const FEED_C4808BE = validateCatalog(JSON.parse(fs.readFileSync(path.join(__dirname, 'testdata', 'feed-c4808be.json'), 'utf8')));
 
-test('S141 R1/S1: offline, Argon leads Flows\' Gemini list and OpenCode\'s Google group, and OpenRouter has it', () => {
+test('S141 R1/S1: offline, Argon leads Flows\' Gemini list, is in OpenCode\'s Google group, and OpenRouter has it', () => {
   const r = resolveAll({}, null, null, BUNDLED_CATALOG, APP);
   assert.strictEqual(r.gemini.models[0].id, GEMINI_MODEL_IDS.ARGON_4);
-  assert.strictEqual(r.opencode.models.find((m) => m.id.startsWith('google/'))?.id, `google/${GEMINI_MODEL_IDS.ARGON_4}`);
+  const google = r.opencode.models.filter((m) => m.id.startsWith('google/')).map((m) => m.id);
+  assert.ok(google.includes(`google/${GEMINI_MODEL_IDS.ARGON_4}`));
   assert.ok(r.opencode.models.some((m) => m.id === `openrouter/google/${GEMINI_MODEL_IDS.ARGON_4}`));
+});
+
+test('S141 decision 10: OpenCode\'s Google group leads with a free-tier model, Argon second', () => {
+  const r = resolveAll({}, null, null, BUNDLED_CATALOG, APP);
+  const google = r.opencode.models.filter((m) => m.id.startsWith('google/')).map((m) => m.id);
+  assert.deepStrictEqual(google.slice(0, 2), [`google/${GEMINI_MODEL_IDS.FLASH_3_8}`, `google/${GEMINI_MODEL_IDS.ARGON_4}`]);
+  // Flows' Gemini list and default are unchanged.
+  assert.strictEqual(r.gemini.models[0].id, GEMINI_MODEL_IDS.ARGON_4);
+  assert.strictEqual(r.gemini.defaults['flow-llm'], GEMINI_MODEL_IDS.FLASH_LITE_3_5);
 });
 
 test('S141 R1/S2: with the feed of c4808be, Argon is listed once and the bundled lineup and defaults hold', () => {

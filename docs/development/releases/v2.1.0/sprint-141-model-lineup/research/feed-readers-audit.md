@@ -64,6 +64,7 @@ The `getDefault` rule was read from each tag's `index.ts`, and `check:model-feed
 - **OpenCode's first row:**
   - Gemini 3.1 Pro up to 1.14.0, Gemini 4 Argon from 2.0.0, unchanged (Argon has been in the feed since 24 October);
   - OpenCode has no default; the first row is the one-shot model.
+  - *Re-run after decision 10 (27 October):* Gemini 3.8 Flash for every release. It is on Google's free tier; Argon and 3.1 Pro aren't.
 - **Shared rows on 1.12.0 and later take 2.1's presentation:**
   - Opus 4.8 and Haiku 4.5 are "Retained for saved selections";
   - the 2.5 Gemini rows are deprecated.
