@@ -85,7 +85,9 @@ The Development manager's QA of #560 at 971ea67f passed every technical gate and
 
 ## Merge 2 (patches 002, 018, 019, and the review's Home and Excel items), 27 October 2026
 
-On `sprint-142-polish-shell`, cut from `sprint-142-polish` and rebased onto its QA follow-up (0d300035).
+On `sprint-142-polish-shell`, based on main: first on #560's squash commit 72f509e8, then rebased onto 5019e42b (#564, Sprint 143) for the follow-up below.
+
+**Automated (each time, the last on the rebased tree):** the webview's `tsc --noEmit` and both bundles, the extension's `npm run compile`, `npm test` (the whole chain, with `cardFile.test.ts`'s new `cardTabWrite` cases), the pre-commit validator by hand (`CLAUDE_PROJECT_DIR` set to the worktree) and `scripts/validate-qa.sh`: all pass.
 
 **The patches.**
 - The workbench edits went through `scripts/create-patch.sh`, one temporary patch per file, folded into the patch that owns the file: `ritemarkSurfaces.css` and `compositeBarActions.ts` replaced in 018; `scm.contribution.ts` added to 018, in path order; `layoutActions.ts` replaced in 002; `customEditorInputFactory.ts` added to 019. Each patch's header has a Sprint 142 paragraph.
@@ -97,15 +99,17 @@ On `sprint-142-polish-shell`, cut from `sprint-142-polish` and rebased onto its 
 | Scenario | Result | Evidence |
 |---|---|---|
 | S8 More's File changes | Pass: More lists File changes with the SCM icon (and Chat Debug, which shows in dev builds only; Gate 1 and Gate 2 check it is gone on a release build); the panel's head reads File changes | `qa/merge2-light-more-file-changes.png`, `qa/merge2-light-file-changes-panel.png` |
-| S9 its tooltip, S11 inside | Not run | — |
+| S9 its tooltip, S11 inside | Not run. Known, for #567's follow-up: the panel's Repositories and Graph views and the Settings group still say Source Control; the palette was not checked | — |
 | S10 View ▸ Advanced | Pass: read from the menus the workbench sends to the Mac's menu bar (`lastKnownMenubarData` in the profile's `storage.json`): "File changes" | — |
 | S46 the desk's corners, Light | Pass: the hairline whole round the 10 radius at both ends, over Home's webview; no shadow | `qa/merge2-light-desk-corner.png`, `qa/merge2-light-desk-top-left.png` |
 | S48 Dark | Pass, in true Ritemark Dark (see the note below): the desk's `box-shadow` is `none` and its `::after` draws `inset 0 0 0 1px` white 8%, whole round the corner; a tab's menu over the desk is in the theme's `menu.background` (#1E1B4B), lifted by its hairline and black at 40% | `qa/merge2-dark-desk-corner.png`, `qa/dark-q30-menu-over-desk.png` (re-taken) |
 | S47, S49 | Not run: the AI's sheet's edge is merge 1's (`.rm-ai-sheet`); two desks, an empty desk and the welcome alone were not set up | — |
 | S51 frame geometry | Pass: 22 of 22, as main (`research/a6-frame-geometry-main.json`). `frame-screenshots.mjs --compare` not run: no main baseline set | — |
-| S62 the restored background card tab | Pass: after a relaunch, the tab read "Draft Module 4 from the brief" at its first sample (2.9 s after launch) and never the file's name; after Reload Window, the same at 2.7 s. On main the same tab read `v3n6t1-video-before-each-module.md` (A2) | `qa/merge2-light-restored-card-tab.png` |
-| S63, S64 | Not run | — |
-| A card opened from the board | Pass: the title at the first sample (68 ms) | — |
+| S62 the restored background card tab | Pass: after a relaunch, the tab read "Draft Module 4 from the brief" at its first sample (2.9 s after the watcher started with the launch) and never the file's name; after Reload Window, the same at 2.7 s. On main the same tab read `v3n6t1-video-before-each-module.md` (A2) | `qa/merge2-light-restored-card-tab.png`, `research/m2-tabwatch-restore.txt`, `research/m2-tabwatch-reload.txt` |
+| S63 the active restored card and the AI's chip | Pass: the card tab active at quit; after a relaunch it read "Draft Module 4 from the brief" (active) at its first sample, 3.0 s, never the file's name, and the AI's chip above the message box named the card by its title. (The capture's AI column was first 170 wide: the profile kept the width from the 330 px emulation; dragged back to 400 for the capture) | `qa/merge2-light-s63-restored-active-card.png`, `research/m2-tabwatch-s63-active.txt` |
+| S64 | Not run | — |
+| A card opened from the board | Pass: the title at the first sample (68 ms) | `research/m2-tabwatch-open.txt` |
+| A restored card tab whose file no longer reads as a card (the QA of #565; `ritemarkEditor.ts`) | Pass, after the fix: the card file's `ritemark: task/1` changed to `note/1` while Ritemark was closed; after a relaunch the tab showed the saved card title at its first sample (2.9 s, the workbench's restore), then its file's name, `m4d7r2-draft-module-4.md`, at 3.4 s, with the Markdown file icon, not the task mark. Before the fix, by the code (not run live): nothing was written in this case (no card title then, none now), so the card title stayed. With the title fixed but not yet the icon (run live): the name came back with the task mark still on it, because the panel clears an icon it never set without telling the workbench. The file was put back afterwards | `qa/merge2-light-restored-not-a-card.png`, `research/m2-tabwatch-not-a-card.txt`; `cardFile.test.ts` (`cardTabWrite`) |
 | The path at a 152 px desk | Pass: the folder's name is the title above it, so the line is the folder icon and › only; the label keeps the whole path ("…/proj/Leadership programme. Show its files in Documents") | `qa/merge2-light-home-152-path-tooltip.png` |
 | The cut button's tooltip at 152 | Pass: "Ask ChatGPT to draft Module 4" first, then what it does; the tooltip 136 wide inside the 152 page (it ran 222 wide past the edge before `ui/tooltip.tsx` capped it at the page less 16) | same |
 | Open in Excel | Pass: an outline button with the arrow-out-of-a-box icon, as Open in Word (`qa/light-q14-word-open-rest.png`) | `qa/merge2-light-open-in-excel.png` |

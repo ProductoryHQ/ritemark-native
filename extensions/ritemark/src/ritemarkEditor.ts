@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import { parseFrontmatterFromText, serializeFrontmatter, discoverCommands } from './agent/discovery';
 import type { CardPages } from './taskBoard/cardPages';
+import { cardTabWrite } from './taskBoard/cardFile';
 import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
 import { exportToWordV2 } from './export/v2/wordHtmlExporter';
@@ -764,21 +765,28 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     // #477: a card page's tab shows its card's title and the task mark, as
     // drawn (the Experience lead, 2026-10-20), and follows an edit of the title.
     // Every other file keeps its file name and icon.
-    let cardTabTitle: string | null = null;
+    // Sprint 142 (#508): for a file in the card folder the tab is written the first time whatever it reads as, so a
+    // tab restored with a card's title and mark (patch 019) whose file no longer reads as a card gets its file's own
+    // name and icon back. Every other file starts at null: nothing to write, as before.
+    let cardTabTitle: string | null | undefined = cardPage ? undefined : null;
     const applyCardTab = () => {
       // Sprint 142 (R12, #508): before the board is up, nothing here knows whether this file is a card, so the tab
       // keeps the name its restore gave it (a card's title, patch 019) rather than being set back to the file's
       if (!cardPages) return;
       const title = cardPage ? cardPages.cardTitleFor(document) ?? null : null;
-      if (title === cardTabTitle) return;
+      const write = cardTabWrite(cardTabTitle, title);
+      if (!write) return;
+      const first = cardTabTitle === undefined;
       cardTabTitle = title;
-      webviewPanel.title = title ?? path.basename(document.uri.fsPath);
-      webviewPanel.iconPath = title
-        ? {
-          light: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'card-tab-light.svg'),
-          dark: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'card-tab-dark.svg'),
-        }
-        : undefined;
+      webviewPanel.title = write.title;
+      const cardIcon = {
+        light: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'card-tab-light.svg'),
+        dark: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'card-tab-dark.svg'),
+      };
+      // The workbench restores a tab's icon with its title, but this panel starts knowing no icon, and clearing an
+      // icon it never set sends nothing; so the first time a restored mark must go, the mark is set, then cleared
+      if (first && !write.card) webviewPanel.iconPath = cardIcon;
+      webviewPanel.iconPath = write.card ? cardIcon : undefined;
     };
     applyCardTab();
     const cardTabWatcher = cardPage

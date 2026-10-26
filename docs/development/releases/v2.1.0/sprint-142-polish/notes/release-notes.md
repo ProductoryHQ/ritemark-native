@@ -8,7 +8,7 @@
 - **Home shows a long folder path cut in the middle,** keeping your project's own folder whole, with the whole path in its tooltip.
 - **A file you transcribe opens as a tab,** and its transcript fills in there, as a recording made in Ritemark does.
 - **The Task board fits a 1440-wide window** with both side columns showing.
-- **File changes is its name everywhere:** in More, at the head of its panel, in the command palette and in View ▸ Advanced.
+- **File changes is what Source Control is called** in More, at the head of its panel and in View ▸ Advanced. (Known, for #567's follow-up: its Repositories and Graph views and the Settings group still say Source Control.)
 - **Smaller fixes:**
   - no white strip beside the left column's scrolling lists on Windows;
   - a tooltip no longer stays up after a click;

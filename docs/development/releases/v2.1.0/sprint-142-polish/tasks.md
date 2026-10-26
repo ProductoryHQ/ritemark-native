@@ -142,7 +142,8 @@ How the numbers map:
 - [x] Manual QA (`qa-evidence.md`, merge 2):
   - S8 and S10 pass, S9 and S11 not run;
   - S46 and S48 pass, S47 and S49 not run;
-  - S62 passes, S63 and S64 not run.
+  - S62 and S63 pass, S64 not run;
+  - from the QA of #565: a restored card tab whose file no longer reads as a card gets its file's name and icon back (`ritemarkEditor.ts`, `cardTabWrite` in `cardFile.ts`), tested and run live.
 
   Screenshots to the Experience lead.
 - [x] Added from the Development manager's review of #560 (27 Oct): the path line keeps only its folder icon and › when the folder's name is the project's title; a task opened as a tab shows its title (the open case already did; the restore case is 019); the narrowest Home's cut button has its whole words in its tooltip, and a tooltip is never wider than the page; Open in Excel is an outline button with the arrow-out-of-a-box icon, as Open in Word
