@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import type { ConversationProjectionV1 } from '../../../../src/conversations/protocol';
-import { projectionToConversation } from './conversationProjection';
+import { projectionToConversation, reconcileRestoredModels, type RestoreCatalogs } from './conversationProjection';
 
 const projection: ConversationProjectionV1 = {
   schemaVersion: 1,
@@ -145,5 +145,44 @@ assert.deepEqual(restoredFailed.codexConversation[1].result, {
 }, "ChatGPT's restored failure keeps its sentence and card (2.0 restored only the status)");
 assert.equal(restoredFailed.agentConversation[0].result?.errorKind, 'network');
 assert.equal(restoredFailed.codexConversation[0].result?.error, undefined, 'a completed turn carries no failure');
+
+// Sprint 139 (#417, R6): a chat comes back on its own model, not the open chat's (S33–S36).
+const openChat = projectionToConversation(projection);
+openChat.selectedModel = 'claude-opus-5-5';
+openChat.codexSelectedModel = 'gpt-5.6-sol';
+openChat.opencodeSelectedModel = 'opencode:openai/gpt-5.6';
+const savedModelProjection = structuredClone(projection);
+savedModelProjection.composerPreferences = {
+  thinkingEffortByRuntime: {},
+  modelByRuntime: { codex: 'gpt-6-luna', opencode: 'google/gemini-4-argon' },
+};
+const ownModel = projectionToConversation(savedModelProjection, openChat);
+assert.equal(ownModel.codexSelectedModel, 'gpt-6-luna', "the older chat shows its own model, not the open chat's (S36)");
+assert.equal(ownModel.opencodeSelectedModel, 'opencode:google/gemini-4-argon');
+assert.equal(ownModel.selectedModel, 'claude-opus-5-5', 'an AI the chat never used keeps the current pick');
+assert.equal(ownModel.pendingRuntime.modelId, 'gpt-6-luna', 'the composer runs the model its button shows');
+const fromTwoZero = projectionToConversation(projection, openChat);
+assert.equal(fromTwoZero.codexSelectedModel, 'gpt-5.6-sol', 'a chat saved by 2.0 behaves as before (S39)');
+
+const catalogs: RestoreCatalogs = {
+  claude: [{ id: 'claude-sonnet-5', label: 'Sonnet 5', description: '' }, { id: 'claude-opus-5-5', label: 'Opus 5.5', description: '' }],
+  claudeDefault: 'claude-sonnet-5',
+  codex: [{ id: 'gpt-6-luna', label: 'GPT-6 Luna', description: '' }, { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', description: '', isDefault: true }],
+  opencodeEnabled: true,
+  acpProviders: { google: true, openai: false, anthropic: false, openrouter: false },
+  byok: { google: [{ id: 'gemini-4-argon', label: 'Gemini 4 Argon', description: '' }] },
+};
+const kept = reconcileRestoredModels(ownModel, catalogs);
+assert.equal(kept.codexSelectedModel, 'gpt-6-luna', 'a saved model the catalog offers is kept');
+assert.equal(kept.opencodeSelectedModel, 'opencode:google/gemini-4-argon');
+const retired = structuredClone(ownModel);
+retired.codexSelectedModel = 'gpt-5.5-retired';
+retired.pendingRuntime = { ...retired.pendingRuntime, modelId: 'gpt-5.5-retired' };
+retired.opencodeSelectedModel = 'opencode:google/gemini-2-old';
+const fellBack = reconcileRestoredModels(retired, catalogs);
+assert.equal(fellBack.codexSelectedModel, 'gpt-5.6-sol', "a model no longer offered falls back to the catalog's default (S38)");
+assert.equal(fellBack.pendingRuntime.modelId, 'gpt-5.6-sol');
+assert.equal(fellBack.opencodeSelectedModel, 'opencode:google/gemini-4-argon');
+assert.equal(reconcileRestoredModels(retired, { ...catalogs, claude: [] }), retired, 'before the catalog arrives, nothing changes');
 
 console.log('conversationProjection.test.ts: all tests passed');

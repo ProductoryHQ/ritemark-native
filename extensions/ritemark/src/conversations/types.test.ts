@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { decodeConversationRecordV1, turnActiveDurationMs, type ConversationRecordV1 } from './types';
+import { decodeConversationRecordV1, turnActiveDurationMs, withSavedModel, type ConversationRecordV1 } from './types';
 import { resolveProjectScope } from './projectScope';
 import type { RuntimeContinuationDescriptorV1 } from '../runtime/continuation';
 
@@ -260,6 +260,25 @@ function run(): void {
   const strictStill = JSON.parse(JSON.stringify(failed)) as { events: Array<Record<string, unknown>> };
   strictStill.events[1].failureKind = 'model';
   assert.throws(() => decodeConversationRecordV1(strictStill), /failureKind/, 'failureKind stays strict, as every 2.x build reads it');
+
+  // Sprint 139 (#417, R6, E2): a chat's saved model, read leniently.
+  const withModel = record();
+  withModel.composerPreferences = { thinkingEffortByRuntime: {}, modelByRuntime: { codex: 'gpt-6-luna', opencode: 'google/gemini-4-argon' } };
+  assert.deepEqual(decodeConversationRecordV1(JSON.parse(JSON.stringify(withModel))), withModel);
+  const oddModels = JSON.parse(JSON.stringify(withModel)) as { composerPreferences: Record<string, unknown> };
+  oddModels.composerPreferences.modelByRuntime = { codex: 42, opencode: 'x'.repeat(300), 'claude-code': 'claude-sonnet-5', gemini: 'flash', '': 'y' };
+  assert.deepEqual(
+    decodeConversationRecordV1(oddModels).composerPreferences,
+    { thinkingEffortByRuntime: {}, modelByRuntime: { 'claude-code': 'claude-sonnet-5' } },
+    'what this build can not use is dropped, never a quarantine',
+  );
+  const notAMap = JSON.parse(JSON.stringify(withModel)) as { composerPreferences: Record<string, unknown> };
+  notAMap.composerPreferences.modelByRuntime = ['gpt'];
+  assert.deepEqual(decodeConversationRecordV1(notAMap).composerPreferences, { thinkingEffortByRuntime: {} });
+  assert.deepEqual(withSavedModel({ thinkingEffortByRuntime: {} }, 'codex', 'gpt-6-luna'), { thinkingEffortByRuntime: {}, modelByRuntime: { codex: 'gpt-6-luna' } });
+  const unchanged = { thinkingEffortByRuntime: {}, modelByRuntime: { codex: 'gpt-6-luna' } };
+  assert.equal(withSavedModel(unchanged, 'codex', 'gpt-6-luna'), unchanged, 'the same model is no change');
+  assert.equal(withSavedModel(unchanged, 'codex', undefined), unchanged);
 
   console.log('types.test.ts: all tests passed');
 }

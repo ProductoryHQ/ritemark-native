@@ -67,7 +67,7 @@ import { deriveActivityState } from './activityState';
 import { applyTaskProgress, endRunningCards, markCardStopping, tasksEndedLine } from './backgroundWork';
 import { resolveInboundConversationId } from './conversationRouting';
 import { MAX_PINNED_CONVERSATIONS } from './conversationActionsModel';
-import { projectionToConversation } from './conversationProjection';
+import { projectionToConversation, reconcileRestoredModels, type RestoreCatalogs } from './conversationProjection';
 import type { StartingPlace } from '../../../../src/guidance/startingPlace';
 import type {
   AgentId,
@@ -903,6 +903,19 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     answer('no-conversation');
   }
 
+  /** Sprint 139 (R6): the model lists a restored chat is checked against. */
+  function restoreCatalogs(): RestoreCatalogs {
+    const state = get();
+    return {
+      claude: state.models,
+      claudeDefault: state.defaultClaudeModel,
+      codex: state.codexModels,
+      opencodeEnabled: state.opencodeEnabled,
+      acpProviders: state.acpProviders,
+      byok: state.byokProviderModels,
+    };
+  }
+
   /** Load a conversation from durable history into the open set without opening it. */
   function loadConversationInBackground(conversationId: string, done: (loaded: boolean) => void): void {
     const requestId = nextId();
@@ -911,7 +924,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         done(false);
         return;
       }
-      const restored = projectionToConversation(projection, undefined);
+      const restored = reconcileRestoredModels(projectionToConversation(projection, undefined), restoreCatalogs());
       // The user may have opened it meanwhile; never replace a live copy.
       if (!get().conversations[restored.id]) {
         set({ conversations: { ...get().conversations, [restored.id]: restored } });
@@ -1301,6 +1314,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       }
       if (runtimeId === 'claude-code' && conversation.selectedModel !== modelId) {
         vscode.postMessage({ type: 'ai-select-model', modelId, conversationId: conversation.id });
+      }
+      // Sprint 139 (#417, R6): a saved chat remembers the pick, even if nothing is sent before a restart.
+      const summary = get().hostConversations.find((item) => item.conversationId === conversation.id);
+      if (summary && get().conversationRolloutMode !== 'legacy' && pendingModelId) {
+        postConversationRequest({
+          type: 'conversation/set-composer-preference',
+          conversationId: conversation.id,
+          bindingGeneration: summary.bindingGeneration,
+          agentId: runtimeId,
+          modelId: pendingModelId,
+        });
       }
     },
 
@@ -2569,7 +2593,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             }
             const projection = data.conversation as ConversationProjectionV1;
             const current = get();
-            const restored = projectionToConversation(projection, current.activeConversationId ? current.conversations[current.activeConversationId] : undefined);
+            const restored = reconcileRestoredModels(
+              projectionToConversation(projection, current.activeConversationId ? current.conversations[current.activeConversationId] : undefined),
+              restoreCatalogs(),
+            );
             const conversations = { ...current.conversations, [restored.id]: restored };
             const activeConversationId = restored.id;
             set({

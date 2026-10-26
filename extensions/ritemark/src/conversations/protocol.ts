@@ -1,4 +1,5 @@
 import {
+  MAX_SAVED_MODEL_ID_CHARS,
   assertConversationId,
   type ConversationAttachmentMetadataV1,
   type ConversationEventV1,
@@ -47,7 +48,9 @@ export type ConversationRequest =
       conversationId: string;
       bindingGeneration: number;
       agentId: AgentId;
-      thinkingEffort: ThinkingEffort;
+      thinkingEffort?: ThinkingEffort;
+      /** Sprint 139 (#417, R6): the model picked for this AI in this chat. */
+      modelId?: string;
     })
   | (RequestBase & { type: 'conversation/rename'; conversationId: string; bindingGeneration: number; title: string })
   | (RequestBase & { type: 'conversation/delete'; conversationId: string; bindingGeneration: number; stopRunning: boolean; recovery?: boolean })
@@ -215,17 +218,24 @@ export function parseConversationRequest(value: unknown): ConversationRequest {
     };
   }
   if (type === 'conversation/set-composer-preference') {
-    exactKeys(input, ['type', 'requestId', 'conversationId', 'bindingGeneration', 'agentId', 'thinkingEffort']);
+    exactKeys(input, ['type', 'requestId', 'conversationId', 'bindingGeneration', 'agentId', 'thinkingEffort', 'modelId']);
     const agentId = requiredString(input, 'agentId', 32) as AgentId;
     if (!DISPATCHABLE_RUNTIME_IDS.has(agentId)) throw new ConversationProtocolError('agentId is unknown');
-    if (!isThinkingEffort(input.thinkingEffort)) throw new ConversationProtocolError('thinkingEffort is unknown');
+    if (input.thinkingEffort !== undefined && !isThinkingEffort(input.thinkingEffort)) {
+      throw new ConversationProtocolError('thinkingEffort is unknown');
+    }
+    const modelId = optionalString(input, 'modelId', MAX_SAVED_MODEL_ID_CHARS);
+    if (input.thinkingEffort === undefined && modelId === undefined) {
+      throw new ConversationProtocolError('thinkingEffort or modelId is required');
+    }
     return {
       type,
       requestId,
       conversationId: id(input, 'conversationId'),
       bindingGeneration: integer(input, 'bindingGeneration'),
       agentId,
-      thinkingEffort: input.thinkingEffort,
+      ...(input.thinkingEffort !== undefined ? { thinkingEffort: input.thinkingEffort as ThinkingEffort } : {}),
+      ...(modelId !== undefined ? { modelId } : {}),
     };
   }
   if (type === 'conversation/rename') {

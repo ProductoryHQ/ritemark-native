@@ -96,6 +96,7 @@ import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runt
 import type { OneShotSettings } from '../runtime/oneShotTurn';
 import { presentRuntimeError, type RuntimeErrorHints } from '../runtime/runtimeErrorPresentation';
 import { aiName, trustedBillingUrl } from '../runtime/turnFailureCopy';
+import { modelSubstitutionForTurn } from '../runtime/modelSubstitution';
 import {
   isThinkingEffort,
   thinkingEffortLabel,
@@ -760,6 +761,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             ? modelCatalog.getModel('anthropic', requestedModelInput)
             : undefined;
           const requestedModel = requestedClaudeModel?.id ?? requestedModelInput;
+          // Sprint 139 (#417, R6): the model this turn runs, saved with the chat when the turn is accepted.
+          const turnModelId = agentId === 'claude-code'
+            ? requestedModel
+            : (typeof model === 'string' && model ? model : undefined);
           const effortCapability = this._thinkingEffortCapability(
             clientConversationId,
             agentId as AgentId,
@@ -783,10 +788,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           }
           let acceptedConversation: import('../conversations/types').ConversationRecordV1 | null = null;
           let hostConversationEnabled = false;
+          // Sprint 139 (R6): the chat's own saved model for this AI, read before this turn saves its own.
+          let chatSavedModel: string | undefined;
           try {
             await this._turnsLeftByRestart;
             hostConversationEnabled = await this._conversationController.currentRolloutMode() !== 'legacy';
             if (hostConversationEnabled) {
+              chatSavedModel = await this._conversationController.savedComposerModel(clientConversationId, agentId as AgentId);
               if (message.conversationContinuation === true) {
                 const current = await this._conversationController.runtimeConversation(clientConversationId);
                 const continuedTurnId = typeof message.conversationTurnId === 'string'
@@ -814,6 +822,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                       : typeof message.prompt === 'string' ? message.prompt : '',
                     mode: message.approvalMode === 'ask' ? 'ask' : message.planFirst === true ? 'plan' : 'auto',
                     thinkingEffort,
+                    ...(turnModelId ? { modelId: turnModelId } : {}),
                     attachments: Array.isArray(attachments)
                       ? attachments.map((attachment: { name?: string; kind?: string; mediaType?: string; data?: string }) => ({
                           name: attachment.name ?? 'Attachment',
@@ -1482,14 +1491,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               }
               // Keyed by the accepted id: the first turn of a new conversation
               // replaces the sidebar's client id with a canonical one.
+              // Sprint 139 (R6): the chat's own saved model, for all three AIs; a chat with none
+              // saved (a new chat, or one from 2.0) compares with Claude's app-wide pick, as before.
               const modelSubstitution = this._modelSubstitutionNamed.has(conversationId)
                 ? undefined
-                : modelCatalog.substitutionForTurn('anthropic', savedClaudeModel, requestedModel);
+                : turnModelSubstitution(agentId as AgentId, chatSavedModel, savedClaudeModel, turnModelId);
               if (modelSubstitution) {
                 this._modelSubstitutionNamed.add(conversationId);
                 sessionConfig.onProgress({
                   type: 'init',
-                  message: modelSubstitutionNotice(modelSubstitution.from, modelSubstitution.to),
+                  message: modelSubstitutionNotice(agentId as AgentId, modelSubstitution.from, modelSubstitution.to),
                   timestamp: Date.now(),
                 });
               }
@@ -3956,8 +3967,30 @@ function modelNamesFor(runtimeId: AgentId): { label(modelId: string): string | u
   };
 }
 
+function catalogProviderOf(runtimeId: AgentId): 'anthropic' | 'codex' | 'opencode' {
+  return runtimeId === 'claude-code' ? 'anthropic' : runtimeId === 'codex' ? 'codex' : 'opencode';
+}
+
+/** Sprint 139 (#417, R6): the turn's substitution, from the chat's own saved model (`runtime/modelSubstitution.ts`). */
+function turnModelSubstitution(
+  runtimeId: AgentId,
+  chatSavedModel: string | undefined,
+  appWideClaudeModel: modelCatalog.RequestedModelResolution | undefined,
+  turnModel: string | undefined,
+): { from: string; to: string } | undefined {
+  const provider = catalogProviderOf(runtimeId);
+  return modelSubstitutionForTurn({
+    runtimeId,
+    chatSavedModel,
+    turnModel,
+    catalog: { idOf: (id) => modelCatalog.getModel(provider, id)?.id },
+    appWideSubstitution: () => modelCatalog.substitutionForTurn('anthropic', appWideClaudeModel, turnModel),
+  });
+}
+
 /** Sprint 127 R6: one transcript line naming the requested and the used model. */
-function modelSubstitutionNotice(requested: string, usedId: string): string {
-  const used = modelCatalog.getModel('anthropic', usedId)?.label ?? usedId;
+function modelSubstitutionNotice(runtimeId: AgentId, requested: string, usedId: string): string {
+  const provider = catalogProviderOf(runtimeId);
+  const used = modelCatalog.getModel(provider, usedId)?.label ?? usedId;
   return `${requested} isn't available right now — using ${used}.`;
 }

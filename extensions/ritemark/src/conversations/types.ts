@@ -169,7 +169,17 @@ export interface MigrationProvenanceV1 {
 
 export interface ConversationComposerPreferencesV1 {
   thinkingEffortByRuntime: Partial<Record<AgentId, ThinkingEffort>>;
+  /**
+   * Sprint 139 (#417, R6): for each AI the chat has used, the model it last ran
+   * or the person last chose in it, so the chat comes back on it. Optional and
+   * read leniently: 2.0.x ignores it (and drops it when it writes the chat
+   * back), and an entry that isn't a short string is dropped.
+   */
+  modelByRuntime?: Partial<Record<AgentId, string>>;
 }
+
+/** Sprint 139 (R6): a saved model id is at most this long. */
+export const MAX_SAVED_MODEL_ID_CHARS = 256;
 
 export interface ConversationRecordV1 {
   schemaVersion: typeof CONVERSATION_SCHEMA_VERSION;
@@ -614,7 +624,30 @@ function decodeComposerPreferences(value: unknown, path: string): ConversationCo
     if (!isThinkingEffort(effort)) fail(`${path}.thinkingEffortByRuntime.${key}`, 'a canonical thinking effort');
     thinkingEffortByRuntime[runtimeId] = effort;
   }
-  return { thinkingEffortByRuntime };
+  const modelByRuntime = decodeModelByRuntime(input.modelByRuntime);
+  return { thinkingEffortByRuntime, ...(modelByRuntime ? { modelByRuntime } : {}) };
+}
+
+/** Sprint 139 (E2): never a reason to quarantine a chat: anything this build can't use is dropped. */
+function decodeModelByRuntime(value: unknown): Partial<Record<AgentId, string>> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const models: Partial<Record<AgentId, string>> = {};
+  for (const [key, model] of Object.entries(value as Record<string, unknown>)) {
+    if (key !== 'claude-code' && key !== 'codex' && key !== 'opencode') continue;
+    if (typeof model !== 'string' || !model.trim() || model.length > MAX_SAVED_MODEL_ID_CHARS) continue;
+    models[key] = model;
+  }
+  return Object.keys(models).length > 0 ? models : undefined;
+}
+
+/** Sprint 139 (R6): the composer preferences with one AI's model saved, or unchanged when it already is. */
+export function withSavedModel(
+  preferences: ConversationComposerPreferencesV1,
+  runtimeId: AgentId,
+  modelId: string | undefined,
+): ConversationComposerPreferencesV1 {
+  if (!modelId || modelId.length > MAX_SAVED_MODEL_ID_CHARS || preferences.modelByRuntime?.[runtimeId] === modelId) return preferences;
+  return { ...preferences, modelByRuntime: { ...(preferences.modelByRuntime ?? {}), [runtimeId]: modelId } };
 }
 
 function validateRecordRelationships(record: ConversationRecordV1): void {

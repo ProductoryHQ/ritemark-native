@@ -10,10 +10,11 @@ import {
   type ConversationResultMessage,
 } from './protocol';
 import { ConversationStore, ConversationStoreError } from './ConversationStore';
-import type {
-  ConversationCheckpointV1,
-  ConversationRecordV1,
-  DispatchReceiptStateV1,
+import {
+  withSavedModel,
+  type ConversationCheckpointV1,
+  type ConversationRecordV1,
+  type DispatchReceiptStateV1,
 } from './types';
 import type { ConversationRolloutMode } from './ConversationCutoverState';
 import { AGENTS, type AgentId } from '../agent/types';
@@ -152,7 +153,8 @@ export class ConversationController {
           scopeId: this.dependencies.currentScope().scopeId,
           bindingGeneration: request.bindingGeneration,
           agentId: request.agentId,
-          thinkingEffort: request.thinkingEffort,
+          ...(request.thinkingEffort !== undefined ? { thinkingEffort: request.thinkingEffort } : {}),
+          ...(request.modelId !== undefined ? { modelId: request.modelId } : {}),
         });
         this.emitChanged(updated);
         return result(request, { conversation: projectConversation(updated) });
@@ -432,6 +434,8 @@ export class ConversationController {
     mode?: string | null;
     thinkingEffort?: import('../runtime/thinkingEffort').ThinkingEffort;
     attachments?: Array<{ name: string; kind: string; mediaType: string | null; sizeBytes: number | null }>;
+    /** Sprint 139 (#417, R6): the model the host resolved for this turn, saved with it. */
+    modelId?: string;
   }): Promise<ConversationRecordV1> {
     const existing = input.conversationId && /^[0-9a-f]{8}-/i.test(input.conversationId)
       ? await this.dependencies.store.get(input.conversationId)
@@ -451,7 +455,21 @@ export class ConversationController {
         data: '',
       })),
     };
-    return this.persistAcceptedTurn(request);
+    return this.persistAcceptedTurn(request, input.modelId);
+  }
+
+  /**
+   * Sprint 139 (#417, R6): the model this chat last ran or the person last
+   * chose for this AI, read before a turn is accepted (which saves the new one).
+   * Undefined for a chat with none saved (one from 2.0, or a new chat).
+   */
+  async savedComposerModel(conversationId: string | undefined, runtimeId: AgentId): Promise<string | undefined> {
+    if (!conversationId || !/^[0-9a-f]{8}-/i.test(conversationId)) return undefined;
+    try {
+      return (await this.dependencies.store.get(conversationId))?.composerPreferences.modelByRuntime?.[runtimeId];
+    } catch {
+      return undefined;
+    }
   }
 
   async completeRuntimeTurn(input: {
@@ -750,7 +768,10 @@ export class ConversationController {
     return result(request, { conversation: projectConversation(record), dispatched });
   }
 
-  private async persistAcceptedTurn(request: Extract<ConversationRequest, { type: 'conversation/accept-turn' }>): Promise<ConversationRecordV1> {
+  private async persistAcceptedTurn(
+    request: Extract<ConversationRequest, { type: 'conversation/accept-turn' }>,
+    modelId?: string,
+  ): Promise<ConversationRecordV1> {
     const scope = this.dependencies.currentScope();
     const now = this.now().toISOString();
     const turnId = request.turnId ?? this.randomId();
@@ -836,9 +857,11 @@ export class ConversationController {
             : null;
         event.sequence = (transitionBoundary?.sequence ?? (current.events[current.events.length - 1]?.sequence ?? -1)) + 1;
         receipt.sequence = event.sequence + 1;
+        const composerPreferences = withSavedModel(current.composerPreferences, request.agentId, modelId);
         return {
           lifecycle: { state: 'working', activeTurnId: turnId },
           appendEvents: [...(transitionBoundary ? [transitionBoundary] : []), event, receipt],
+          ...(composerPreferences !== current.composerPreferences ? { composerPreferences } : {}),
           ...(priorRuntime && current.continuations?.[priorRuntime]
             ? { continuationUpdate: { runtimeId: priorRuntime, descriptor: null } }
             : {}),
@@ -851,9 +874,11 @@ export class ConversationController {
         title: normalizeManualTitle(request.title ?? '') ?? fallbackTitleFromPrompt(request.text),
         lifecycle: { state: 'working', activeTurnId: turnId },
         events: [event, receipt],
-        composerPreferences: {
-          thinkingEffortByRuntime: { [request.agentId]: request.thinkingEffort ?? 'auto' },
-        },
+        composerPreferences: withSavedModel(
+          { thinkingEffortByRuntime: { [request.agentId]: request.thinkingEffort ?? 'auto' } },
+          request.agentId,
+          modelId,
+        ),
       });
     }
 
