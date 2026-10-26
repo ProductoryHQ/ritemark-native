@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — 2.1.0
+
+### Sprint 139: the AI you chose keeps working (#376, #417, #479, #473; #496's plan lines)
+
+#### Added
+- **Which plans work, before you sign in (#496).** The welcome's AI cards, Add another, Ritemark Settings and the AI's own sign-in cards say it: ChatGPT "Sign in with any plan, free included.", Claude "Sign in with a paid plan, such as Pro or Max.", OpenCode "Open models, with an API key of your own." A card that shows a state (Checking…, Signed in, a sign-in's reason) shows that instead.
+- **One card for a failed turn, with one way on (#376).** ChatGPT's ended sign-in offers Sign in to ChatGPT; OpenCode's refused key opens AI Settings; a model the AI refuses offers its default (Use GPT-6.1 Sol), which switches the chat's model and doesn't resend; a limit says whose it is (Google, OpenAI, Anthropic, OpenRouter, or the plan's own, with its reset time when the AI gives one). Anthropic's console opens from a button; the other billing pages are named in words, because Ritemark would ask before opening them.
+- **Counts of AI use, with no text (#479, #473).** Each turn with an AI, from a chat or a Flow, with which AI and how it ended; whether the first message got a reply; voice captures, and voice notes changed again on a later day. Never a message, an answer, a model, a file or a project. These counts need ritemark.app's privacy page to list them before 2.1 publishes.
+
+#### Changed
+- **One sentence, once (#376).** A failed turn from Claude, ChatGPT or OpenCode shows the provider's sentence once, never its JSON, and the status line says only "Failed". A restored ChatGPT or OpenCode failure keeps its sentence. Claude's refused-model sentence now reads like the others: "Claude couldn't use … It isn't available in Ritemark right now."
+- **A chat keeps its model (#417).** After a restart, a reload or opening it from the Conversations list, a chat comes back on the model it last used with each AI, and a message continues that AI's own thread. A model no longer offered falls back to the default, said once before the turn.
+- **`first_message_sent` is counted once the message is saved**, so a message that was never sent isn't counted.
+
+#### Fixed
+- **A stopped turn reads Stopped after a restart.** A ChatGPT or OpenCode turn stopped with Stop read "Failed" once the chat was reopened, and a stopped Claude turn could read "Done". Now a stop is Stopped for all three AIs, live and after a restart (found by Sprint 140's QA).
+- **A chat saved by 2.0 no longer shows a provider's raw JSON** for a failed ChatGPT or OpenCode turn when reopened; the sentence inside it is shown.
+
 ## [2.0.1] — 2026-10-24
 
 A fix release for the Mac and Windows. The OpenCode fix is for the Mac only.

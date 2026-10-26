@@ -4,7 +4,7 @@ Track: SDD (auto-detected: five linked issues and 12 user-facing requirements ac
 Override with: "use plain full track"
 Branch: `sprint-139-chosen-ai`, made from `origin/main` at Phase 3, after approval. This plan was written on `plan/sprint-139-chosen-ai`.
 Release tier: extension. Every change is under `extensions/ritemark/`, and it ships in 2.1.0's shell release (the shape's decision 1). If audit A3 puts billing hosts into `branding/product.json`, or the drawn amber dot needs a patch-018 style, this line changes to shell before that is built.
-Status: **Approved (Phase 2 → 3), 26 October 2026,** by the Development manager under Jarmo's delegation. The sprint branch is created before the first code edit.
+Status: **Approved (Phase 2 → 3), 26 October 2026,** by the Development manager under Jarmo's delegation. The sprint branch is created before the first code edit. **Merge 1 built** on `sprint-139-chosen-ai` (26 October): W1–W3, W5–W8; evidence in [qa-evidence.md](qa-evidence.md). Merge 2 (W4, the refusal card) waits for audit A1. The tier line stays extension (A3 put no host in `branding/product.json`; no patch changed).
 
 ## SDD Artifacts
 
