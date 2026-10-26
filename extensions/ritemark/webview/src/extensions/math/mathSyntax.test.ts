@@ -8,7 +8,6 @@ import { strict as assert } from 'node:assert'
 import {
   escapeLiteralDollars,
   inlineMathSource,
-  literalMathPairs,
   nextMathStart,
   normalizeInlineLatex,
   scanBlockMath,
@@ -81,10 +80,30 @@ const cases: [string, string[]][] = [
   ['Inline over a soft break $a +\nb$.', ['$a +\nb$']],
   ['Escaped dollar inside $a\\$b$ stays inside.', ['$a\\$b$']],
   ['Stars $a*b*c$ and underscores $a_1$', ['$a*b*c$', '$a_1$']],
-  ['$a $b$ is one: the second dollar follows a space', ['$a $b$']],
 ]
 for (const [line, expected] of cases) {
   assert.deepEqual(equationsIn(line), expected, `math in ${JSON.stringify(line)}`)
+}
+
+// ---- Pandoc's pairing: the first unescaped `$` after an opener decides ----
+// It closes the equation, or the opener gives up and is a dollar sign; no
+// later `$` is tried. Each line is what `pandoc -f markdown` reads as math.
+const pandoc: [string, string[]][] = [
+  ['Costs $5 and the formula $x$ holds.', ['$x$']],
+  ['The report cost $12,000 and covers $n=5$ stores.', ['$n=5$']],
+  ['$a $b$ c', ['$b$']],
+  ['From $5 to $10 ($x$).', ['$10 ($']],
+  ['$x$5 is not math, and $5 has no closer', []],
+  ['$x$, $y$ and $z$.', ['$x$', '$y$', '$z$']],
+  ['Each costs $5$ here.', ['$5$']],
+  ['The total $x + y$ and $z$.', ['$x + y$', '$z$']],
+  ['Mixed $a$b$ text', ['$a$']],
+  ['A space after the opener $ x$ and before the closer $x $ are not math.', []],
+  ['An escaped closer $a\\$ b$ is inside.', ['$a\\$ b$']],
+  ['Three prices $1, $2 and $3.', []],
+]
+for (const [line, expected] of pandoc) {
+  assert.deepEqual(equationsIn(line), expected, `Pandoc reads ${JSON.stringify(line)}`)
 }
 
 {
@@ -109,13 +128,15 @@ for (const [line, expected] of cases) {
 
 // ---- the save path's escaper ----
 {
-  assert.equal(escapeLiteralDollars('$x$'), '\\$x\\$', 'typed math-looking text is escaped')
+  assert.equal(escapeLiteralDollars('$x$'), '$x\\$', 'typed math-looking text: its closer is escaped')
   assert.equal(escapeLiteralDollars('costs $5 and $10'), 'costs $5 and $10', 'prices stay as typed')
   assert.equal(escapeLiteralDollars('$HOME'), '$HOME')
-  assert.equal(escapeLiteralDollars('$$x$$'), '\\$\\$x\\$\\$', 'both dollars of a display pair')
+  assert.equal(escapeLiteralDollars('$$x$$'), '$$x\\$\\$', 'both dollars of a display closer')
   assert.equal(escapeLiteralDollars('\\$x$'), '\\$x$', 'an escaped dollar is left alone, and the other cannot pair')
-  assert.equal(escapeLiteralDollars('$a $b$ c$'), '\\$a $b\\$ c$', 'left to right, as marked reads it')
-  assert.deepEqual(literalMathPairs('a $x$ b'), [{ index: 2, length: 1 }, { index: 4, length: 1 }])
+  assert.equal(escapeLiteralDollars('$a $b$ c$'), '$a $b\\$ c\\$', 'broken at `$b$`, then `$b … c$` pairs and is broken too')
+  // The amounts stay as typed; only the pair Pandoc would read is escaped.
+  assert.equal(escapeLiteralDollars('from $5 to $10 ($x$)'), 'from $5 to $10 (\\$x\\$)', 'the amounts stay as typed; the formula\'s dollars are escaped')
+  assert.deepEqual(equationsIn(escapeLiteralDollars('from $5 to $10 ($x$)')), [], 'and nothing pairs on reopening')
 }
 
 // ---- an edited inline equation ----

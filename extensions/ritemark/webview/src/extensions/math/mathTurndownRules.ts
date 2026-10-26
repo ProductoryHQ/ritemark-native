@@ -20,7 +20,7 @@
  * a private-use character, which the escaper then writes as `\$`.
  */
 import type TurndownService from 'turndown'
-import { CLOSING_DELIMITER, inlineMathSource, isEscapedAt, scanInlineMath, type MathDelimiter } from './mathSyntax'
+import { CLOSING_DELIMITER, firstDollarPair, inlineMathSource, type MathDelimiter } from './mathSyntax'
 
 /** Stands in for a typed `$` that has to be written `\$`. */
 const PAIRING_DOLLAR = '\ue0d0'
@@ -40,8 +40,6 @@ interface ScanChar {
   char: string
   /** A typed `$` that may be escaped: the text node and which of its dollars it is. */
   literal?: { node: Text; ordinal: number }
-  /** Set on an equation's first character: where the equation ends; `marked` reads it whole. */
-  mathEnd?: number
 }
 
 /**
@@ -89,9 +87,9 @@ function collectScanChars(element: Element, escape: Escape, out: ScanChar[]): vo
     }
     const source = mathElementSource(el)
     if (source !== null) {
-      const start = out.length
+      // An equation's own dollars are never typed: they never open a pair
+      // and are never escaped, but a typed dollar may pair with one.
       for (const char of source) out.push({ char })
-      if (out.length > start) out[start].mathEnd = out.length
       continue
     }
     if (tag === 'BR') {
@@ -119,11 +117,9 @@ function collectScanChars(element: Element, escape: Escape, out: ScanChar[]): vo
 }
 
 /**
- * Mark the typed dollars in one text block that `marked` would open (or close)
- * an equation with. Scans left to right as `marked` does: an equation is read
- * whole; at a typed `$` that would start math, that `$` (and its partner, when
- * the partner is typed too) is marked, and scanning goes on right after it,
- * because what lay between them is now read as text again.
+ * Mark the typed dollars in one text block that `marked` would otherwise read
+ * as an equation's delimiters on reopening, and no others: the fewest that
+ * leave every typed dollar a dollar and every equation the same equation.
  */
 export function markPairingDollars(element: Element, escape: Escape): void {
   const chars: ScanChar[] = []
@@ -138,42 +134,31 @@ export function markPairingDollars(element: Element, escape: Escape): void {
     marked.set(entry.literal.node, ordinals)
     return true
   }
-  /** Equation positions shift as backslashes go in; keep `mathEnd` pointing at the same character. */
   const insertBackslash = (at: number) => {
     chars.splice(at, 0, { char: '\\' })
-    for (const entry of chars) if (entry.mathEnd !== undefined && entry.mathEnd > at) entry.mathEnd++
   }
 
-  let index = 0
-  while (index < chars.length) {
-    const entry = chars[index]
-    if (entry.mathEnd !== undefined) {
-      index = entry.mathEnd
-      continue
-    }
-    if (entry.char === '$' && entry.literal) {
-      const text = chars.map(c => c.char).join('')
-      const match = isEscapedAt(text, index) ? null : scanInlineMath(text, index)
-      if (match && (match.delimiter === '$' || match.delimiter === '$$')) {
-        const width = match.delimiter.length
-        const closeAt = index + match.raw.length - width
-        // The closer first, so the opener's indices stay put.
-        for (let offset = width - 1; offset >= 0; offset--) {
-          if (mark(chars[closeAt + offset])) insertBackslash(closeAt + offset)
-        }
-        // Then the opener's typed dollars. When its second `$` is an
-        // equation's own, scanning resumes at that equation.
-        let next = index
-        for (let offset = 0; offset < width && chars[next]?.literal; offset++) {
-          mark(chars[next])
-          insertBackslash(next)
-          next += 2
-        }
-        index = next
-        continue
+  // The leftmost pair that a typed dollar opens is broken, then the block is
+  // read again, until nothing pairs (as `escapeLiteralDollars` does). A pair
+  // is broken at its closer when the closer is typed, so a typed amount before
+  // a typed formula keeps its form; at its opener when the closer is an
+  // equation's own delimiter, which is never touched.
+  for (;;) {
+    const text = chars.map(c => c.char).join('')
+    const pair = firstDollarPair(text, at => !!chars[at]?.literal)
+    if (!pair) break
+    let broke = false
+    // Right to left, so the indices still to visit stay put.
+    for (let offset = pair.width - 1; offset >= 0; offset--) {
+      if (mark(chars[pair.close + offset])) {
+        insertBackslash(pair.close + offset)
+        broke = true
       }
     }
-    index++
+    if (broke) continue
+    for (let offset = pair.width - 1; offset >= 0; offset--) {
+      if (mark(chars[pair.open + offset])) insertBackslash(pair.open + offset)
+    }
   }
 
   for (const [node, ordinals] of marked) {

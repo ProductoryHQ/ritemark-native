@@ -44,7 +44,19 @@ export const mathMarkedExtension = {
     {
       name: 'mathBlock',
       level: 'block' as const,
-      tokenizer(src: string): MathBlockToken | undefined {
+      tokenizer(
+        this: { lexer: { state: { top: boolean } } },
+        src: string,
+        tokens: Array<{ type: string }> = [],
+      ): MathBlockToken | undefined {
+        // A list item opens with a paragraph (`listItem` is `paragraph
+        // block*`), so an equation that opens an item (`- $$x$$`, `1. \[y\]`)
+        // is display math in that paragraph, not a block: a block there would
+        // be lifted out of the item and the list would lose it. `marked`
+        // lexes an item's blocks with `top` false; later blocks in the item
+        // may be equation blocks.
+        const opensListItem = this.lexer.state.top === false && tokens.every(token => token.type === 'space')
+        if (opensListItem) return undefined
         const match = scanBlockMath(src)
         if (!match) return undefined
         // Consume the closing line's newline too, as `marked`'s own block

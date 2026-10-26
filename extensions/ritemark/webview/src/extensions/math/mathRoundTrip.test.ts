@@ -108,7 +108,7 @@ function nodePositions(doc: PMNode, name: string): number[] {
 // Through the editor's own load and save, and through what the host does with
 // the file's text (Sprint 137's `openAndSave`): every line comes back, the
 // list lines, soft breaks and quotes around the math included.
-for (const name of ['forms.md', 'prose-dollars.md', 'edge-cases.md', 'analyst-report.md']) {
+for (const name of ['forms.md', 'prose-dollars.md', 'edge-cases.md', 'analyst-report.md', 'lists.md']) {
   const source = fixture(name)
   const doc = load(source)
   const saved = save(doc)
@@ -117,6 +117,32 @@ for (const name of ['forms.md', 'prose-dollars.md', 'edge-cases.md', 'analyst-re
   assert.equal(save(load(saved)), saved, `${name}: a second save changes nothing`)
   assert.equal(saved, projection(source), `${name}: the editor writes the whole file back`)
   assert.equal(openAndSave(source), source, `${name}: open and save give the file back byte for byte`)
+}
+
+// ---- an equation that opens a list item stays in its item ----
+// `listItem` is `paragraph block*`: an equation block can't open an item, so
+// there it is display math in the item's paragraph. Each list keeps its items.
+{
+  const cases: [string, string, number][] = [
+    ['- $$E = mc^2$$\n- $$F = ma$$', 'listItem', 2],
+    ['1. $$x = 1$$\n2. $$x = 2$$', 'listItem', 2],
+    ['1. \\[x^2 + y^2 = r^2\\]', 'listItem', 1],
+    ['- [ ] $$x$$\n- [x] done', 'taskItem', 2],
+    ['- outer\n  - $$x$$', 'listItem', 2],
+    ['1. one\n   1. \\[y\\]\n2. two', 'listItem', 3],
+    ['> - $$x$$\n> - text', 'listItem', 2],
+  ]
+  for (const [source, item, items] of cases) {
+    const doc = load(source)
+    assert.equal(nodesOf(doc, item).length, items, `${JSON.stringify(source)}: every item is kept`)
+    assert.equal(nodesOf(doc, 'mathBlock').length, 0, `${JSON.stringify(source)}: no block lifted out of an item`)
+    assert.ok(nodesOf(doc, 'mathInline').length >= 1, `${JSON.stringify(source)}: the equation is in the item`)
+    assert.equal(openAndSave(`${source}\n`), `${source}\n`, `${JSON.stringify(source)}: byte for byte`)
+  }
+  // An equation block after an item's first paragraph is a block in the item.
+  const later = load('- The law:\n\n  $$\n  E = mc^2\n  $$')
+  assert.equal(nodesOf(later, 'mathBlock').length, 1, 'a block later in an item stays a block')
+  assert.equal(nodesOf(later, 'bulletList').length, 1)
 }
 
 // ---- the report: every equation becomes a node; prices and `\$` stay text ----
@@ -168,15 +194,42 @@ const typed = (html: string) => save(fromHTML(html))
 {
   assert.equal(typed('<p>It costs $5.</p>'), 'It costs $5.')
   assert.equal(typed('<p>costs $5 and $10</p>'), 'costs $5 and $10')
-  assert.equal(typed('<p>$x$</p>'), '\\$x\\$', 'typed text that looks like math is escaped')
+  assert.equal(typed('<p>$x$</p>'), '$x\\$', 'typed text that looks like math: its closer is escaped')
   assert.equal(nodesOf(load(typed('<p>$x$</p>')), 'mathInline').length, 0, 'and reopens as text')
   assert.equal(load(typed('<p>$x$</p>')).textContent, '$x$')
-  assert.equal(typed('<p>$$x$$</p>'), '\\$\\$x\\$\\$')
-  assert.equal(typed('<p>$a $b$ c$</p>'), '\\$a \\$b\\$ c\\$', 'left to right, every pair')
+  assert.equal(typed('<p>$$x$$</p>'), '$$x\\$\\$')
+  assert.equal(load(typed('<p>$$x$$</p>')).textContent, '$$x$$')
+  assert.equal(typed('<p>$a $b$ c$</p>'), '$a $b\\$ c\\$', 'every pair broken at its closer, until nothing pairs')
+  assert.equal(load(typed('<p>$a $b$ c$</p>')).textContent, '$a $b$ c$', 'and it reopens as the same text')
+  assert.equal(typed('<p>from $5 to $10 ($x$)</p>'), 'from $5 to $10 (\\$x\\$)', 'typed amounts stay as typed')
+  assert.equal(load(typed('<p>from $5 to $10 ($x$)</p>')).textContent, 'from $5 to $10 ($x$)', 'and it reopens as the same text')
+  assert.equal(nodesOf(load(typed('<p>from $5 to $10 ($x$)</p>')), 'mathInline').length, 0, 'and nothing reopens as math')
 
   // A typed price before an equation would pair with the equation's own dollar.
+  // Every typed sentence comes back as typed text: no equation, no character changed.
+  for (const sentence of [
+    'Costs $5 and the formula $x$ holds.',
+    'The report cost $12,000 and covers $n=5$ stores.',
+    'From $5 to $10 ($x$).',
+    '$x$, $y$ and $z$.',
+    'Each costs $5$ here.',
+    'Mixed $a$b$ text',
+    'Three prices $1, $2 and $3.',
+    'Two in a row $a$$b$ and a lone $.',
+    'Between $20,000 and $30,000 a year, $x$ and $$y$$.',
+  ]) {
+    const reopened = load(typed(`<p>${sentence}</p>`))
+    assert.equal(nodesOf(reopened, 'mathInline').length, 0, `typed text stays text: ${sentence}`)
+    assert.equal(reopened.textContent, sentence, `and comes back as typed: ${sentence}`)
+  }
+
+  // A typed dollar that would pair with an equation's own opener: the typed one is escaped.
+  const against = typed('<p>$a<span data-math="inline" data-delimiter="$" data-latex="x">$x$</span> end</p>')
+  assert.equal(against, '\\$a$x$ end', 'the equation\'s delimiters are never touched')
+  assert.deepEqual(nodesOf(load(against), 'mathInline').map(node => node.attrs.latex), ['x'])
+
   const priced = typed('<p>costs $5 and <span data-math="inline" data-delimiter="$" data-latex="x">$x$</span> total</p>')
-  assert.equal(priced, 'costs \\$5 and $x$ total', 'the typed dollar is escaped, the equation kept')
+  assert.equal(priced, 'costs $5 and $x$ total', 'Pandoc does not pair the price with the equation: nothing to escape')
   const reopened = load(priced)
   assert.deepEqual(nodesOf(reopened, 'mathInline').map(node => node.attrs.latex), ['x'], 'one equation, the same one')
   assert.equal(reopened.textContent.startsWith('costs $5 and '), true)

@@ -192,6 +192,8 @@ const LOOK_EXCEPTIONS: Record<string, { blocks: number[]; why: string }> = {
   // Sprint 138 (#481): every block but the title holds an equation or a `\$`.
   // Its baseline is Sprint 137's tip, which opens it as main does (text).
   'kept/equations.md': { blocks: [1, 2, 3, 4, 5, 6, 7], why: 'Sprint 138: equations open as equations, `\\$` as a dollar' },
+  // Sprint 138: each list (and the quote holding one) has an equation in an item.
+  'kept/equations-in-lists.md': { blocks: [2, 4, 6, 8, 10, 12, 14, 16], why: 'Sprint 138: equations in list items open as equations' },
 }
 
 function differingBlocks(baseline: { json: unknown }, current: { json: unknown }): number[] {

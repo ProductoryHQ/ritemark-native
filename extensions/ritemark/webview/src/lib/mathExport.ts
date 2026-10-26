@@ -142,7 +142,8 @@ export async function prepareMathForExport(
         try {
           parts.push(`data-mathml="${escapeAttribute(renderer.mathml(latex, display))}"`)
         } catch (error) {
-          console.warn('[export] MathML failed for an equation', error)
+          // Only the kind of failure: KaTeX's message quotes the LaTeX.
+          console.warn(`[export] MathML failed for an equation (${error instanceof Error ? error.name : typeof error})`)
         }
       }
       if (status === 'ready') {
@@ -151,7 +152,7 @@ export async function prepareMathForExport(
           parts.push(`data-width="${round(drawn.width)}"`, `data-height="${round(drawn.height)}"`, `data-depth="${round(drawn.depth)}"`)
           body = `<img data-math-image="" src="${drawn.png}" alt="${escapeAttribute(latex)}">`
         } catch (error) {
-          console.warn('[export] an equation could not be drawn; its source goes instead', error)
+          console.warn(`[export] an equation could not be drawn; its source goes instead (${error instanceof Error ? error.name : typeof error})`)
         }
       }
     }

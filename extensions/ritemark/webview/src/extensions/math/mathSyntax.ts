@@ -106,19 +106,22 @@ function scanBracketDisplay(src: string, at: number): InlineMathMatch | null {
   return /^[ \t]*(?:\n|$)/.test(src.slice(at + match.raw.length)) ? match : null
 }
 
+/**
+ * `$…$` as Pandoc reads it: the first unescaped `$` after the opener decides.
+ * It closes the equation (no space before it, no digit after it), or the
+ * opener gives up and is a dollar sign. Pandoc never looks further for a
+ * better closer, so "Costs $5 and the formula $x$ holds." is a price and one
+ * equation, `x`, not the equation `5 and the formula $x`.
+ */
 function scanInlineDollar(src: string, at: number): InlineMathMatch | null {
   const contentStart = at + 1
   if (isSpace(src[contentStart]) || src[contentStart] === '$') return null
-  let close = findUnescaped(src, '$', contentStart)
-  while (close >= 0) {
-    const inside = src.slice(contentStart, close)
-    if (BLANK_LINE.test(inside)) return null
-    if (!isSpace(src[close - 1]) && !isDigit(src[close + 1]) && close > contentStart) {
-      return { delimiter: '$', latex: inside, raw: src.slice(at, close + 1) }
-    }
-    close = findUnescaped(src, '$', close + 1)
-  }
-  return null
+  const close = findUnescaped(src, '$', contentStart)
+  if (close < 0) return null
+  const inside = src.slice(contentStart, close)
+  if (BLANK_LINE.test(inside)) return null
+  if (isSpace(src[close - 1]) || isDigit(src[close + 1])) return null
+  return { delimiter: '$', latex: inside, raw: src.slice(at, close + 1) }
 }
 
 function scanDisplayDollars(src: string, at: number): InlineMathMatch | null {
@@ -175,53 +178,50 @@ export function nextMathStart(src: string): number | undefined {
   return match ? match.index : undefined
 }
 
-export interface DelimiterSpan {
-  /** Index of the delimiter in the text. */
-  index: number
-  /** Its length: 1 for `$`, 2 for `$$`. */
-  length: number
+export interface DollarPair {
+  /** Where the opening delimiter starts. */
+  open: number
+  /** Where the closing delimiter starts. */
+  close: number
+  /** The delimiters' width: 1 for `$`, 2 for `$$`. */
+  width: number
 }
 
 /**
- * The literal dollars in a run of text that a reader would pair up as math:
- * both delimiters of every `$…$` and `$$…$$` that `scanInlineMath` finds,
- * scanning left to right as `marked` does. Backslash-escaped dollars are
- * already literal and are skipped. Used by the save path to escape exactly
- * these, so `$5`, `costs $5 and $10` and `$HOME` are written as they are.
+ * The leftmost `$…$` or `$$…$$` in `text` as `marked` reads it (Pandoc's
+ * rule), opening at a dollar that `opens` accepts. Backslash-escaped dollars
+ * are literal and never open or close one.
  */
-export function literalMathPairs(text: string): DelimiterSpan[] {
-  const spans: DelimiterSpan[] = []
+export function firstDollarPair(text: string, opens: (index: number) => boolean = () => true): DollarPair | null {
   let at = text.indexOf('$')
   while (at >= 0) {
-    if (isEscapedAt(text, at)) {
-      at = text.indexOf('$', at + 1)
-      continue
+    if (!isEscapedAt(text, at) && opens(at)) {
+      const match = scanInlineMath(text, at)
+      if (match && (match.delimiter === '$' || match.delimiter === '$$')) {
+        const width = match.delimiter.length
+        return { open: at, close: at + match.raw.length - width, width }
+      }
     }
-    const match = scanInlineMath(text, at)
-    if (match && (match.delimiter === '$' || match.delimiter === '$$')) {
-      const width = match.delimiter.length
-      spans.push({ index: at, length: width })
-      spans.push({ index: at + match.raw.length - width, length: width })
-      at = text.indexOf('$', at + match.raw.length)
-    } else {
-      // `$$` that does not pair as display math is two single dollars to `marked`.
-      at = text.indexOf('$', at + 1)
-    }
+    // `$$` that does not pair as display math is two single dollars to `marked`.
+    at = text.indexOf('$', at + 1)
   }
-  return spans
+  return null
 }
 
-/** Write `\$` for every dollar in `text` that would otherwise pair up as math on reopening. */
+/**
+ * Write `\$` for the dollars in typed `text` that would otherwise pair up as
+ * math on reopening, and for no others. The leftmost pair is broken at its
+ * closer and the text is read again, because a dollar that no longer closes
+ * one pair may close another; until nothing pairs. So `costs $5 and $10` and
+ * `$HOME` are written as typed, and in `from $5 to $10 ($x$)` the amounts stay
+ * and the formula's dollars are escaped: `from $5 to $10 (\$x\$)`.
+ */
 export function escapeLiteralDollars(text: string): string {
-  const spans = literalMathPairs(text)
-  if (spans.length === 0) return text
-  let output = ''
-  let cursor = 0
-  for (const span of spans) {
-    output += text.slice(cursor, span.index) + '\\$'.repeat(span.length)
-    cursor = span.index + span.length
+  let output = text
+  for (let pair = firstDollarPair(output); pair; pair = firstDollarPair(output)) {
+    output = output.slice(0, pair.close) + '\\$'.repeat(pair.width) + output.slice(pair.close + pair.width)
   }
-  return output + text.slice(cursor)
+  return output
 }
 
 /**
