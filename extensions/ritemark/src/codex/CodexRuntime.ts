@@ -869,7 +869,12 @@ export class CodexRuntime implements AgentRuntime {
         if (params.itemId && last.itemId !== params.itemId) session._lastAgentMessage = { itemId: params.itemId, text: params.delta };
         else last.text += params.delta;
       }
-      session?.config?.onProgress({ type: 'text', message: params.delta, timestamp: Date.now() });
+      session?.config?.onProgress({
+        type: 'text',
+        message: params.delta,
+        timestamp: Date.now(),
+        ...(params.itemId ? { messageId: params.itemId } : {}),
+      });
     });
 
     this._appServer.on('item/plan/delta', (params: { delta: string; threadId?: string }) => {

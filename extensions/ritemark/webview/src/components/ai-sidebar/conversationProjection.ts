@@ -42,7 +42,9 @@ function offered(models: ModelOption[], id: string): string | undefined {
   return models.find((model) => model.id === id || model.resolvedModel === id || model.aliases?.includes(id))?.id;
 }
 
-function offeredOpenCode(catalogs: RestoreCatalogs, composite: string): boolean {
+type OpenCodeCatalogs = Pick<RestoreCatalogs, 'opencodeEnabled' | 'acpProviders' | 'byok'>;
+
+function offeredOpenCode(catalogs: OpenCodeCatalogs, composite: string): boolean {
   const bare = composite.replace(/^opencode:/, '');
   const slash = bare.indexOf('/');
   if (slash <= 0) return false;
@@ -50,13 +52,22 @@ function offeredOpenCode(catalogs: RestoreCatalogs, composite: string): boolean 
   return Boolean(catalogs.acpProviders?.[vendor]) && Boolean(catalogs.byok?.[vendor]?.some((model) => model.id === bare.slice(slash + 1)));
 }
 
-function firstOpenCode(catalogs: RestoreCatalogs): string {
+function firstOpenCode(catalogs: OpenCodeCatalogs): string {
   if (!catalogs.opencodeEnabled || !catalogs.acpProviders || !catalogs.byok) return '';
   for (const vendor of ['google', 'openai', 'anthropic', 'openrouter'] as const) {
     const first = catalogs.acpProviders[vendor] ? catalogs.byok[vendor]?.[0] : undefined;
     if (first) return `opencode:${vendor}/${first.id}`;
   }
   return '';
+}
+
+/**
+ * The OpenCode model a chat keeps: its own while a configured provider still
+ * offers it, else the first configured one. With no OpenCode catalog yet, the
+ * saved one stays. The bootstrap and a restored chat use the same rule.
+ */
+export function reconciledOpenCodeModel(saved: string, catalogs: OpenCodeCatalogs): string {
+  return saved && offeredOpenCode(catalogs, saved) ? saved : firstOpenCode(catalogs) || saved;
 }
 
 /**
@@ -75,9 +86,7 @@ export function reconcileRestoredModels(conversation: ConversationState, catalog
   const codexSelectedModel = catalogs.codex.length === 0
     ? conversation.codexSelectedModel
     : (conversation.codexSelectedModel && offered(catalogs.codex, conversation.codexSelectedModel)) || codexDefault;
-  const opencodeSelectedModel = conversation.opencodeSelectedModel && offeredOpenCode(catalogs, conversation.opencodeSelectedModel)
-    ? conversation.opencodeSelectedModel
-    : firstOpenCode(catalogs) || conversation.opencodeSelectedModel;
+  const opencodeSelectedModel = reconciledOpenCodeModel(conversation.opencodeSelectedModel, catalogs);
   const runtimeId = conversation.pendingRuntime.runtimeId;
   const pendingModel = runtimeId === 'claude-code'
     ? selectedModel

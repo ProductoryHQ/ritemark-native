@@ -400,6 +400,8 @@ export interface CodexConversationTurn {
   activeFileLabel?: string;
   attachments?: FileAttachment[];
   streamingText: string;
+  /** The message the last streamed delta belonged to, so the next message starts a new paragraph (#552). */
+  streamingMessageId?: string;
   activities: AgentProgress[];
   approval?: CodexApprovalRequest;
   pendingQuestion?: CodexQuestion;
@@ -526,7 +528,7 @@ export type ExtensionMessage =
   | { type: 'codex:status'; status: CodexSidebarStatus; generation?: number; revision?: number }
   | ({ type: 'codex-progress'; progress: AgentProgress } & ConversationScopedMessage)
   | ({ type: 'codex-rpc-progress'; method: string; message: string } & ConversationScopedMessage)
-  | ({ type: 'codex-streaming'; delta: string } & ConversationScopedMessage)
+  | ({ type: 'codex-streaming'; delta: string; messageId?: string } & ConversationScopedMessage)
   | ({ type: 'codex-question'; requestId: string | number; questions: Array<AgentQuestionItem & { id: string }> } & ConversationScopedMessage)
   | ({ type: 'codex-plan-text-delta'; delta: string } & ConversationScopedMessage)
   | ({ type: 'codex-plan-update'; explanation?: string | null; plan: CodexPlanStep[] } & ConversationScopedMessage)

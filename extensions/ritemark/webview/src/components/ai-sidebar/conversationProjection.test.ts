@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import type { ConversationProjectionV1 } from '../../../../src/conversations/protocol';
-import { projectionToConversation, reconcileRestoredModels, type RestoreCatalogs } from './conversationProjection';
+import { projectionToConversation, reconciledOpenCodeModel, reconcileRestoredModels, type RestoreCatalogs } from './conversationProjection';
 
 const projection: ConversationProjectionV1 = {
   schemaVersion: 1,
@@ -219,5 +219,11 @@ assert.equal(fellBack.codexSelectedModel, 'gpt-5.6-sol', "a model no longer offe
 assert.equal(fellBack.pendingRuntime.modelId, 'gpt-5.6-sol');
 assert.equal(fellBack.opencodeSelectedModel, 'opencode:google/gemini-4-argon');
 assert.equal(reconcileRestoredModels(retired, { ...catalogs, claude: [] }), retired, 'before the catalog arrives, nothing changes');
+// The bootstrap's rule for OpenCode is the same one.
+assert.equal(reconciledOpenCodeModel('opencode:google/gemini-4-argon', catalogs), 'opencode:google/gemini-4-argon', 'offered: kept');
+assert.equal(reconciledOpenCodeModel('opencode:google/gemini-2-old', catalogs), 'opencode:google/gemini-4-argon', 'retired: the first configured');
+assert.equal(reconciledOpenCodeModel('', catalogs), 'opencode:google/gemini-4-argon', 'none yet: the first configured');
+assert.equal(reconciledOpenCodeModel('opencode:google/gemini-2-old', { opencodeEnabled: true, acpProviders: undefined, byok: undefined }),
+  'opencode:google/gemini-2-old', 'no OpenCode catalog yet: kept');
 
 console.log('conversationProjection.test.ts: all tests passed');

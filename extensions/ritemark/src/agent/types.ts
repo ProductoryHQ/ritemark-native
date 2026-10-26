@@ -89,6 +89,8 @@ export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'pla
 export interface AgentProgress {
   type: AgentProgressType;
   message: string;
+  /** For streamed text: the message this delta belongs to (ChatGPT's item id). Sprint 139 (#552). */
+  messageId?: string;
   tool?: string;
   file?: string;
   timestamp: number;
@@ -104,6 +106,23 @@ export interface AgentProgress {
   subagentStatus?: 'running' | 'completed' | 'failed' | 'stopped' | 'ended';
   /** Sprint 128: the task runs in the background (the turn may end before it). */
   backgrounded?: boolean;
+}
+
+/**
+ * Sprint 139 (#552): streamed text, one message after another. A delta that
+ * starts another message (another id) starts a new paragraph, so ChatGPT's
+ * working note and the answer after it don't run together ("…time.## What's
+ * here") and the answer's first heading stays a heading.
+ */
+export function appendStreamedText(
+  text: string,
+  delta: string,
+  previousMessageId: string | undefined,
+  messageId: string | undefined,
+): string {
+  if (!text || !messageId || !previousMessageId || messageId === previousMessageId) return text + delta;
+  const separator = text.endsWith('\n\n') ? '' : text.endsWith('\n') ? '\n' : '\n\n';
+  return text + separator + delta;
 }
 
 /** Sprint 128: one entry of the work still running in the background. */
