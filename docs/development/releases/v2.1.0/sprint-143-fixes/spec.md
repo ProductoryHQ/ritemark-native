@@ -51,6 +51,24 @@ Acceptance criteria:
 - The provider's raw words stay in the turn's activity details and Report AI issue, as Sprint 139 keeps them.
 - A retry that isn't a 429 (a dropped connection) shows the same line, which says only that Ritemark is trying again.
 
+### R3a: The wait counted down, and the busy card (revised 2026-10-26)
+
+The Experience lead's words for R3 (experience 13, `experiences/states/README.md`, ritemark-dev `0e6911f`), approved by the Development manager the day the plan was. They replace R3's proposed words; R3's other criteria stand.
+
+Acceptance criteria:
+- **The status line** while ChatGPT waits to retry after a 429: "ChatGPT is busy. Trying again in 7 minutes." The minutes count down, rounded up; from one minute left it reads "ChatGPT is busy. Trying again in a minute." No seconds and no "…". The AI's name is the AI's, never "Codex".
+- **How the wait is known.** Codex's notification doesn't carry it (research, the local 429 endpoint); Codex writes it to its log ("retrying sampling request (1/5 in 418.99s)"). Ritemark's own app-server process is started with `RUST_LOG=error,codex_core::responses_retry=warn` when the environment has no `RUST_LOG`, so that one line reaches Ritemark on the process's stderr; Ritemark pairs it with the notification. This is a log filter for Ritemark's own process: the person's configuration, MCP servers and `~/.codex` are untouched (R3's decision stands), and a `RUST_LOG` the person set is left as it is.
+- **When the wait isn't known** (a person's own `RUST_LOG`, or a Codex that logs it differently): "ChatGPT is busy. Trying again soon." (proposed; words for the Experience lead).
+- **Continue with <AI>** ends the line when the wait is over a minute and another AI is ready: a shadcn `Button` with a tooltip ("Stop waiting and continue this chat with Claude"). It stops this turn, switches this chat to that AI, and puts the message back in the box, as the busy card's button does.
+- When ChatGPT tries again, the line goes back to "Working…".
+- **The busy card**, when the retries end in a 429 that isn't a plan limit (Codex's `rateLimitExceeded`; or `responseTooManyFailedAttempts` / `responseStreamDisconnected` with status 429, as the local endpoint showed):
+  - heading "ChatGPT is busy right now";
+  - body "It turned this request away several times. Send your message again in a few minutes.", or "Send your message again after 3:12 PM" when the service gave a time ("try again in …" or "at …" in its words), written in the person's own time format;
+  - Continue with <AI> only when another AI is ready (the line's behaviour above);
+  - the status line under it says "Failed".
+- `usageLimitExceeded` keeps Sprint 139's plan-limit card.
+- Tests cover both: the line's countdown, its fallback, its Continue; the card with and without a time, with and without another AI.
+
 ### R4: Automatic titles are in the chat's own language (#514)
 
 As someone who writes to the AI in English on a computer with Estonian around it, I want my chat's automatic title in English.
@@ -163,4 +181,6 @@ Each with a recommendation; the sprint plan carries the same list.
 
 ## Resolved Questions
 
-None yet.
+**26 October 2026, the Development manager (Jarmo's delegation):** questions 1–6 decided as recommended; the details are in [sprint-plan.md](sprint-plan.md#approval). The same day:
+- #544's words came from the Experience lead and became R3a;
+- #507's films sent ⌘⇧P with Playwright's keyboard over CDP to the top-level page, never a real keyboard (the Social manager): R7 stays without code, and a person tries it at Gate 2.

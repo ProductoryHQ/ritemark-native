@@ -4,7 +4,7 @@ Track: SDD (auto-detected: nine linked issues, nine user-facing requirements acr
 Override with: "use plain full track"
 Branch: `sprint-143-fixes`, made from `origin/main` at Phase 3, after approval. This plan was written on `plan/sprint-143-fixes`.
 Release tier: extension. Every change planned is under `extensions/ritemark/` (and `scripts/qa/`), and it ships in 2.1.0's shell release. Two audits can add a shell-tier line: A3 (#507) if its cause is in VS Code's webview host, A4 (#510) if the main process's dialog lock needs a patch. Either changes this line before it is built.
-Status: **Phase 2 (Plan), awaiting approval.** Approval comes from the Development manager under Jarmo's delegation of 26 October (ritemark-dev `decisions/log.md`). No code before it; the sprint branch is created before the first code edit.
+Status: **Approved (Phase 2 → 3), 26 October 2026,** by the Development manager under Jarmo's delegation (*Approval* below). Building on `sprint-143-fixes`, made from the plan commit rebased on `origin/main` at `84ea15db` (Sprint 138 merged).
 
 ## SDD Artifacts
 
@@ -139,4 +139,18 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Approval
 
-- [ ] Approved by the Development manager under Jarmo's delegation of 26 October 2026 (ritemark-dev `decisions/log.md`).
+- [x] Approved on 26 October 2026 by the Development manager, under Jarmo's delegation of the same day: "ei sprindiplaanid kinnitad sina. midagi ei tohi minu taga oodata kuni Gate 1 RCini" (ritemark-dev `decisions/log.md`). Release approval (Gate 1, Gate 2, publish) stays Jarmo's.
+
+**The plan's questions, decided:**
+1. **#544:** Codex starts as it does today, with the person's own configuration and MCP servers. The wait is shown instead: a status-line line while Codex waits to retry, and a 429 at the end becomes a limit card through Sprint 139's classifier and cards. The Experience lead's words followed the same day (below).
+2. **#514:** yes. The title session loads none of the person's own Claude settings and has no tools.
+3. **#509:** .m4a is refused on Windows in 2.1, and every failed card can be dismissed. The Development manager files the Media Foundation conversion for 2.2.
+4. **#551:** yes, R2's three changes; the issue stays open until 20 of 20 runs pass on the branch.
+5. **#510:** as recommended. If A4 can't run before the feature freeze, the Ritemark half ships and the rest moves to 2.2.
+6. **#507:** no code. A person tries S27–S32 on a real keyboard at Gate 2; without a reproduction it moves to 2.2 with the evidence.
+
+**After the approval, the same day:**
+- **A3's answer (#507), from the Social manager:** the films' ⌘⇧P was synthetic, never a real keyboard: Playwright's `connectOverCDP` on RC1's port, then `page.keyboard.press('Meta+Shift+p')` on the main workbench page, which is CDP `Input.dispatchKeyEvent` to the top-level window target. It happened on Home, usually just after a click inside Home's webview; Go to File (⌘P) failed the same way; a click on the window chrome first made it work every time (ritemark-web `docs/programs/social-video/capture/take.cjs`, around lines 470–481). So it is very likely a capture artifact. Recorded in `research/home-keys-audit.md`, with one more try of that exact method on this branch's dev build.
+- **The Experience lead's words for #544** (experience 13's table, `experiences/states/README.md`, ritemark-dev `0e6911f`). They need the wait's length, which Codex's notification doesn't carry, so R3 is revised as R3a under the scope-change protocol ([spec.md](spec.md#r3a-the-wait-counted-down-and-the-busy-card-revised-2026-10-26)):
+  - the status line: "ChatGPT is busy. Trying again in 7 minutes.", counting down in whole minutes, rounded up, "Trying again in a minute" from one minute left, no seconds and no "…"; with a wait over a minute and another AI ready, it ends with "Continue with Claude" (or the ready AI's name), which stops the turn and carries the message over, as the card's button does; when the AI tries again, the line goes back to its working words;
+  - the card when the retries end in a 429 that isn't a plan limit (Codex's `rateLimitExceeded`): "ChatGPT is busy right now" / "It turned this request away several times. Send your message again in a few minutes.", or "Send your message again after 3:12 PM" with a time from the service, in the person's own time format; Continue with <AI> only when another AI is ready; the status line says "Failed". `usageLimitExceeded` keeps the plan-limit card.

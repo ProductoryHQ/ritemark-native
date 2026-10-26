@@ -4,7 +4,7 @@ Nothing here starts before the plan is approved. Tick a box only when the change
 
 ## Phase 0: Branch and starting tree
 
-- [ ] `git checkout -b sprint-143-fixes` from `origin/main`; `git branch --show-current` shows it
+- [x] `git checkout -b sprint-143-fixes` from the plan commit rebased on `origin/main` (`84ea15db`); `git branch --show-current` shows it
 - [ ] `media/webview.js` size recorded in `notes/bundle.md` (E4)
 - [ ] Each Mac check of S1–S38 that can fail on `main` run once on `main` at `1e91466c` and its failure recorded in `qa-evidence.md` (E1): S1, S2's throw, S10–S12 (the store fed the recorded notifications), S15, S18 and S21, S23–S26, S35, S37, S40
 - [ ] Asked through the Development manager: the "Ritemark on Windows" session for A4; the Social manager for how the films sent ⌘⇧P (A3); the Experience lead for R3's line and card and R8's words
@@ -48,6 +48,15 @@ Nothing here starts before the plan is approved. Tick a box only when the change
 - [ ] `src/runtime/turnFailureCopy.ts`: `LimitKind` `'busy'` and its card, with Continue with another ready AI
 - [ ] Tests: `CodexRuntime.test.ts` (retry routed to its turn only), `runtimeErrorPresentation.test.ts` (the recorded final error), `activityState.test.ts` (the line and its clearing), the copy's card
 - [ ] Confirmed unchanged: `codexManager.ts` spawns the app-server with no arguments; nothing writes `~/.codex` (S9)
+
+## Phase 5a: The countdown and the busy card (W3a, R3a; added 2026-10-26)
+
+- [ ] `src/codex/codexManager.ts`: `RUST_LOG=error,codex_core::responses_retry=warn` for Ritemark's own app-server when the environment has none
+- [ ] `src/codex/codexAppServer.ts`: the retry line parsed from stderr; `CodexRuntime` pairs it with the notification
+- [ ] `turnFailureCopy.ts`: the line's words with the countdown and fallback; the busy card; `limit: 'busy'`, `retryAt`
+- [ ] `runtimeErrorPresentation.ts`: `ratelimitexceeded` and 429 after retries → busy; the service's time
+- [ ] `ActivityStatusLine.tsx`: the countdown tick and Continue with <AI>; the busy card's Continue the same; "Failed" under the busy card
+- [ ] Tests for both, and screenshots of the line and the card
 
 ## Phase 6: Titles (W4, R4)
 
