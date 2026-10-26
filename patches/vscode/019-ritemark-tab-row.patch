@@ -33,11 +33,17 @@ of the desk in front (ritemarkNewTab.ts; R21).
 Sprint 135: rebased onto VS Code 1.142.0. The pinned tabs' width is summed in upstream's loop and
 RITEMARK_TABS_INSET is added after it; Close all chains its filter after upstream's CannotClose filter; the empty
 desk's tiles render into the watermark's wrapper.
+Sprint 142 (2.1 polish, #508; the sprint's research/restored-card-tab-audit.md, A2): a tab that had a title of its own (a
+task card's) comes back with it after a restart or Reload Window, from the first paint, instead of its file's name until
+it is opened. The custom editor's serializer passes the saved title as preferredName; a saved title that is only the
+file's own name stays unset, so a file renamed while the window was closed shows its new name
+(contrib/customEditor/browser/customEditorInputFactory.ts).
 Built from the Experience lead's proof of concept (branch poc/2.0-surfaces), with the DOM walks replaced.
 
 Files: workbench/browser/parts/editor/{editor,editorCommands,editorGroupView,editorGroupWatermark,editorTabsControl,
 multiEditorTabsControl,ritemarkEmptyDesk,ritemarkFoldedTabs,ritemarkNewTab,singleEditorTabsControl}.ts; workbench/contrib/terminal/browser/{ritemarkTerminalBar,ritemarkTerminalTabs,
-terminalEditor,terminalEditorInput,terminalInstance,terminalMenus}.ts; and the two tests above.
+terminalEditor,terminalEditorInput,terminalInstance,terminalMenus}.ts; workbench/contrib/customEditor/browser/
+customEditorInputFactory.ts (Sprint 142); and the two tests above.
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index ac63294495c..8717025e650 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.ts
@@ -1075,6 +1081,31 @@ index 05c6ecb9a54..2f3a608c528 100644
  				}
  			);
  
+diff --git a/src/vs/workbench/contrib/customEditor/browser/customEditorInputFactory.ts b/src/vs/workbench/contrib/customEditor/browser/customEditorInputFactory.ts
+index 3a5453e5e6f..64e97613de8 100644
+--- a/src/vs/workbench/contrib/customEditor/browser/customEditorInputFactory.ts
++++ b/src/vs/workbench/contrib/customEditor/browser/customEditorInputFactory.ts
+@@ -5,7 +5,7 @@
+ 
+ import { Disposable } from '../../../../base/common/lifecycle.js';
+ import { Schemas } from '../../../../base/common/network.js';
+-import { isEqual } from '../../../../base/common/resources.js';
++import { basename, isEqual } from '../../../../base/common/resources.js';
+ import { URI, UriComponents } from '../../../../base/common/uri.js';
+ import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+ import { IWorkbenchContribution } from '../../../common/contributions.js';
+@@ -103,7 +103,10 @@ export class CustomEditorInputSerializer extends WebviewEditorInputSerializer {
+ 			resource: data.editorResource,
+ 			viewType: data.viewType,
+ 			webviewTitle: data.title,
+-			preferredName: undefined,
++			// Ritemark 2.1 (Sprint 142, #508): a tab that had a title of its own (a task card's) comes back with it from the
++			// first paint, not with its file's name until it is opened. A saved title that is the file's own name stays
++			// unset, so a file renamed while the window was closed still shows its new name.
++			preferredName: data.title && data.title !== basename(data.editorResource) ? data.title : undefined,
+ 			iconPath: data.iconPath,
+ 		}, webview, { startsDirty: data.dirty, backupId: data.backupId });
+ 		if (typeof data.group === 'number') {
 diff --git a/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalBar.ts
 new file mode 100644
 index 00000000000..1699503e2b0

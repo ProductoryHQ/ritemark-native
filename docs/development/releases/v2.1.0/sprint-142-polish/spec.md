@@ -90,6 +90,7 @@ Acceptance criteria:
 - If the project's own folder name alone is wider than the line, it wraps at its spaces onto a second line instead (*Open Questions* 6). The line never scrolls sideways.
   - *(revised 2026-10-26, the Experience lead's answer to Q6; experience 3, ritemark-dev 76b3a50)*: a name with no spaces breaks anywhere, and the › stays after its last word.
   - *(revised 2026-10-27, built)*: when not even "…/" fits beside the folder's name, the line is the folder's name on its own. It stays on one line when that fits, and wraps only when the name alone is wider.
+  - *(revised 2026-10-27, the Development manager's review of #560, merge 2)*: when the line can show only the folder's name and that name is the project's title just above it, the line shows only its folder icon and ›; the full path stays in the tooltip. At the narrowest Home the first-day card's button may cut its words, as long as its tooltip starts with them whole (and no tooltip is wider than the page). Open in Excel is an outline button with the arrow-out-of-a-box icon, as Open in Word is.
 - The full path is in the line's tooltip, as its first line (unchanged).
 - A short path shows whole, with no ellipsis. A Windows path cuts at its backslashes.
 - The cut follows the desk's width as it changes (window resize, a side column shown or hidden).

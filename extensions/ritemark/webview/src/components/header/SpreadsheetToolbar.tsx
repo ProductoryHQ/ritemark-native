@@ -73,14 +73,15 @@ export function SpreadsheetToolbar({
             (R5d, #557): one button, in one tone (framework §3), with Ritemark's tooltips, not native ones. */}
         {hasSecondary ? (
           <SplitButton
-            tone="quiet"
+            tone="outline"
             className="spreadsheet-open"
             main={{
               label: <span className="split-btn-text">{primaryLabel}</span>,
-              icon: <Icon name="arrow-up-right" size={16} tone="inherit" />,
+              icon: <Icon name="arrow-square-out" size={14} tone="inherit" />,
               tooltip: `${primaryLabel}, to edit it there`,
               ariaLabel: primaryLabel,
               onClick: () => primaryAction?.(),
+              className: 'px-2.5', // the viewers' Open in Word, to the pixel: one action, one look (experience 3, b7fef7b)
             }}
             menu={{
               label: 'Open in another app',
@@ -96,8 +97,8 @@ export function SpreadsheetToolbar({
           />
         ) : (
           <Tooltip label={`${primaryLabel}, to edit it there`}>
-            <Button type="button" variant="ghost" size="sm" className="spreadsheet-open" aria-label={primaryLabel} onClick={() => primaryAction?.()}>
-              <Icon name="arrow-up-right" size={16} tone="inherit" />
+            <Button type="button" variant="outline" size="sm" className="spreadsheet-open" aria-label={primaryLabel} onClick={() => primaryAction?.()}>
+              <Icon name="arrow-square-out" size={14} tone="inherit" />
               <span className="split-btn-text">{primaryLabel}</span>
             </Button>
           </Tooltip>

@@ -26,8 +26,8 @@ Eighteen patches, numbered 001 through 019 (017 retired with the Getting Started
 | `014-ritemark-save-receipts.patch` | Saving | Text-file save receipts; a save refused as newer goes to Ritemark first when its editor holds the document (Sprint 137, #454) |
 | `015-ritemark-help-menu-policy.patch` | Menus | The Help menu focused on Ritemark, with Getting started, Support and Send feedback |
 | `016-ritemark-store-acquisition-policy.patch` | Store policy | No external software-acquisition promotion (Source Control's Git download button) |
-| `018-ritemark-surfaces.patch` | The 2.0 frame | No title row, strips, sheets and gaps, zoom, Ritemark's menus, the left column's head, the welcome alone, a file's extension muted (sizes and drawing) |
-| `019-ritemark-tab-row.patch` | The 2.0 tab row | Tab sizes, the +, folded tabs, permanent tabs, terminals as tabs, an empty desk's tiles |
+| `018-ritemark-surfaces.patch` | The 2.0 frame | No title row, strips, sheets and gaps, zoom, Ritemark's menus, the left column's head, the welcome alone, a file's extension muted, File changes as Source Control's name, the desk's whole edge (sizes, drawing and names) |
+| `019-ritemark-tab-row.patch` | The 2.0 tab row | Tab sizes, the +, folded tabs, permanent tabs, terminals as tabs, an empty desk's tiles, a restored task tab's title |
 
 **Rule:** Patches must not overlap in domain. Two patches may touch one file (002 and 018 share `titlebarPart.ts`,
 `auxiliaryBarPart.ts` and `paneCompositePart.ts`: placement and drawing), but no hunk may build on another patch's

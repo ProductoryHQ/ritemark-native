@@ -91,6 +91,14 @@ Tab stays inside. Its button asks the extension's _ritemark.feedback.submit; the
 accepted, keeps the message with one line, Try again and Open in e-mail when it did not go (D5), and becomes frame 5's
 hand-off, with Copy and Done, when an e-mail app was asked to open. It resolves with sent, mailed or cancelled.
 
+Sprint 142 (2.1 polish, merge 2): File changes is Source Control's name everywhere (#557, experience 3): the SCM view
+container's title and its views' container title (contrib/scm/browser/scm.contribution.ts), so More, the panel's head,
+the palette and View ▸ Advanced (002) all read it; More's own name for it goes (compositeBarActions.ts). The desk's edge
+is whole (#503; framework §4; the sprint's research/sheet-edges-audit.md, A6): the desk sits flush with the boxes that
+clip it, so it has no shadow and draws its hairline inside its own box with ::after, over a webview's layer too
+(.ritemark-desk-webview); the welcome alone draws none. ritemark.sheetShadow stays for what floats (menus, dialogs,
+quick input, toasts), not the desk or the AI's sheet.
+
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
 platform/window/common/window.ts; platform/windows/electron-main/windowImpl.ts; workbench/browser/{layout,style}.ts;
@@ -99,7 +107,8 @@ paneCompositePart,ritemarkFrameMenu,ritemarkFrameStrip,ritemarkMenu,ritemarkWelc
 parts/editor/editorPart.ts; parts/notifications/{notificationsCenter,notificationsToasts,notificationsViewer}.ts;
 parts/sidebar/{ritemarkProjectHead,sidebarPart}.ts; parts/statusbar/statusbarPart.ts + media/statusbarpart.css;
 parts/ritemarkFeedbackSheet.ts + parts/media/ritemarkFeedbackSheet.css (Sprint 140);
-parts/titlebar/titlebarPart.ts; contrib/files/browser/views/explorerViewer.ts; contrib/webview/browser/overlayWebview.ts;
+parts/titlebar/titlebarPart.ts; contrib/files/browser/views/explorerViewer.ts; contrib/scm/browser/scm.contribution.ts (Sprint 142);
+contrib/webview/browser/overlayWebview.ts;
 electron-browser/desktop.contribution.ts; electron-browser/parts/titlebar/titlebarPart.ts;
 services/actions/common/menusExtensionPoint.ts; services/layout/browser/layoutService.ts.
 Tests: workbench/test/browser/parts/ritemarkWindowSizes.test.ts (R14), base/test/browser/iconLabel.test.ts (Sprint 133,
@@ -808,10 +817,10 @@ index 75f9238fd75..68ad7c003b7 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..1c35204abed
+index 00000000000..eee03ea02ff
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1794 @@
+@@ -0,0 +1,1815 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -999,11 +1008,27 @@ index 00000000000..1c35204abed
 +
 +/* 1. The desk: each editor group's editor area is one raised sheet */
 +
++/* Sprint 142 (#503; framework §4): a sheet's edge is drawn whole or not at all. The desk sits flush with the boxes that
++   clip it (the editor part's grid on its right and bottom, the left column's on its left), so an outset hairline and
++   a shadow were cut there. Its hairline is drawn inside its own box, above a webview's layer too (::after), and it has
++   no shadow: the frame gives a shadow no room (Sprint 142's research/sheet-edges-audit.md, A6) */
 +.monaco-workbench .part.editor .editor-group-container > .editor-container {
 +	background-color: var(--rm-desk) !important; /* !important: set inline from editor.background */
 +	border-radius: var(--rm-radius);
-+	box-shadow: 0 0 0 1px var(--rm-hairline), 0 1px 3px var(--rm-shadow), 0 6px 16px var(--rm-shadow);
++	box-shadow: none;
 +	overflow: hidden;
++	position: relative; /* the hairline's box is the desk's own, not the group's with its tab row */
++}
++
++.monaco-workbench .part.editor .editor-group-container > .editor-container::after,
++.ritemark-desk-webview::after {
++	content: '';
++	position: absolute;
++	inset: 0;
++	border-radius: inherit;
++	box-shadow: inset 0 0 0 1px var(--rm-hairline);
++	pointer-events: none;
++	z-index: 10;
 +}
 +
 +/* A webview on the desk (the Markdown editor, CSV, PDF, Word) is a layer of its own: round it too (overlayWebview.ts) */
@@ -2488,6 +2513,11 @@ index 00000000000..1c35204abed
 +	border-radius: 0;
 +}
 +
++.monaco-workbench.ritemark-welcome-alone .part.editor .editor-group-container > .editor-container::after,
++.monaco-workbench.ritemark-welcome-alone .ritemark-desk-webview::after {
++	display: none; /* the welcome alone lies on the ground, with no desk's edge (Sprint 142) */
++}
++
 +
 +/*
 + * An empty desk offers the + menu's first three as tiles: Text, Table and Web page (R6, S49; ritemarkEmptyDesk.ts;
@@ -2789,7 +2819,7 @@ index 168ae722004..37f11376eb1 100644
 +	registerWorkbenchContribution2(RitemarkAiColumnGuard.ID, RitemarkAiColumnGuard, WorkbenchPhase.BlockRestore);
 +}
 diff --git a/src/vs/workbench/browser/parts/compositeBarActions.ts b/src/vs/workbench/browser/parts/compositeBarActions.ts
-index fe7bce2f083..71fd1bb112b 100644
+index fe7bce2f083..560ac7b9c8e 100644
 --- a/src/vs/workbench/browser/parts/compositeBarActions.ts
 +++ b/src/vs/workbench/browser/parts/compositeBarActions.ts
 @@ -8,7 +8,7 @@ import { Action, IAction, Separator } from '../../../base/common/actions.js';
@@ -2818,14 +2848,13 @@ index fe7bce2f083..71fd1bb112b 100644
  			classNames: ThemeIcon.asClassNameArray(Codicon.more)
  		});
  	}
-@@ -463,52 +464,49 @@ export class CompositeOverflowActivityAction extends CompositeBarAction {
+@@ -463,52 +464,48 @@ export class CompositeOverflowActivityAction extends CompositeBarAction {
  	}
  }
  
-+/** Ritemark 2.0: Ritemark's names and lines for the places More lists (comparison/README.md, "Every function, today and now"). */
++/** Ritemark 2.0: Ritemark's names and lines for the places More lists (comparison/README.md, "Every function, today and now"). File changes is the SCM container's own title since Sprint 142 (scm.contribution.ts). */
 +const RITEMARK_PLACE_WORDS = new Map<string, { label: string; detail?: string }>([
 +	['workbench.view.ritemark.copilotChatLauncher', { label: localize('ritemark.more.copilotChat', "Copilot Chat"), detail: localize('ritemark.more.copilotChatDetail', "GitHub's chat, opens as a tab") }],
-+	['workbench.view.scm', { label: localize('ritemark.more.fileChanges', "File changes") }],
 +]);
 +
  export class CompositeOverflowActivityActionViewItem extends CompositeBarActionViewItem {
@@ -5201,6 +5230,28 @@ index 8178f4c4edc..ce07f487a4f 100644
  	isIgnored(resource: URI, rootResource: URI, isDirectory: boolean): boolean {
  		const ignoreFile = this.ignoreTreesPerRoot.get(rootResource.toString())?.findSubstr(resource);
  		const isIncludedInTraversal = ignoreFile?.isPathIncludedInTraversal(resource.path, isDirectory);
+diff --git a/src/vs/workbench/contrib/scm/browser/scm.contribution.ts b/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
+index 22920b5f2d1..b627614e08a 100644
+--- a/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
++++ b/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
+@@ -55,7 +55,7 @@ const sourceControlViewIcon = registerIcon('source-control-view-icon', Codicon.s
+ 
+ const viewContainer = Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegistry).registerViewContainer({
+ 	id: VIEWLET_ID,
+-	title: localize2('source control', 'Source Control'),
++	title: localize2('ritemark.fileChanges', "File changes"), // Ritemark 2.1 (Sprint 142, #557): File changes is its name everywhere (experience 3)
+ 	ctorDescriptor: new SyncDescriptor(SCMViewPaneContainer),
+ 	storageId: 'workbench.scm.views.state',
+ 	icon: sourceControlViewIcon,
+@@ -65,7 +65,7 @@ const viewContainer = Registry.as<IViewContainersRegistry>(ViewContainerExtensio
+ }, ViewContainerLocation.Sidebar, { doNotRegisterOpenCommand: true });
+ 
+ const viewsRegistry = Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry);
+-const containerTitle = localize('source control view', "Source Control");
++const containerTitle = localize('ritemark.fileChangesView', "File changes"); // Ritemark 2.1 (Sprint 142, #557)
+ 
+ viewsRegistry.registerViewWelcomeContent(VIEW_PANE_ID, {
+ 	content: localize('no open repo', "No source control providers registered."),
 diff --git a/src/vs/workbench/contrib/splash/browser/partsSplash.ts b/src/vs/workbench/contrib/splash/browser/partsSplash.ts
 index 43cd923deb6..9365ad8152a 100644
 --- a/src/vs/workbench/contrib/splash/browser/partsSplash.ts

@@ -94,7 +94,8 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
             icon: busy
               ? <Icon name="circle-notch" size={14} tone="inherit" className="animate-spin motion-reduce:animate-none" />
               : <Icon name="chat-circle" size={14} tone="inherit" />,
-            tooltip: mainTip(card, name),
+            // The button's whole words first: on the narrowest desk the button cuts them (experience 3, b7fef7b)
+            tooltip: <><span className="block font-semibold">{busy ? busy.button : card.button}</span><span className="block">{mainTip(card, name)}</span></>,
             className: 'rh-split-main',
             onClick: () => {
               if (!card.aiReady) return openMenu(true)

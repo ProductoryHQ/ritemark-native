@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Ritemark's pickers start in a folder that exists (#510)**, never in a missing Desktop folder.
 - **Switching projects no longer leaves Home's last subscriptions behind (#556)**, and no longer logs "disposable.dispose is not a function".
 
-### Sprint 142: 2.1 polish (#557, #503, #504, #505, #516, #517, #535; merge 1)
+### Sprint 142: 2.1 polish (#557, #503, #504, #505, #508, #516, #517, #535; merges 1 and 2)
 
 #### Changed
 - **Lists in the AI's answers have their bullets and numbers back (#557).** In muted ink, hanging in the indent the list had, so the text doesn't move: a filled bullet, then a hollow one, then a square; numbers in even figures, a list that starts at 3 starting at 3, and a task list showing its boxes without a bullet.
@@ -34,12 +34,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A transcribed file opens as a tab (#517).** When its transcription starts, a file from Transcribe a file… (or a recording made in Ritemark) opens in the Transcript Workbench, and the transcript fills in there. It doesn't take the keyboard, and opens behind a document you are typing in.
 - **The Task board fits the default 1440 window with both side columns (#516).** Its four columns share the desk down to 160 each; only a narrower desk scrolls sideways.
 - **The AI's sheet draws a whole edge (#503).** An inset hairline instead of a cut outline and shadow. What floats over the window (menus, dialogs, quick input, the editor's toolbars) keeps its shadow: in Ritemark's ink in Light, black at 40% in Dark, and none in high contrast.
+- **File changes is Source Control's name everywhere (#557; merge 2, patches 018 and 002).** In More, at the head of its panel, in the command palette and in View ▸ Advanced.
+- **The desk draws a whole edge (#503; merge 2, patch 018).** Its hairline is drawn inside its own box, over a document's webview too, so no corner is cut; it has no shadow, as the AI's sheet has none.
+- **Home at its narrowest (merge 2).** When the folder's name is the project's title just above it, the path line shows only the folder icon and ›, with the whole path in its tooltip. The first-day card's button may cut its words there; its tooltip starts with them whole, and no tooltip is wider than the page.
+- **Open in Excel looks like Open in Word (merge 2):** an outline button with the arrow-out-of-a-box icon.
 
 #### Fixed
 - **No white strip beside a scrolling list in the left column (#504).** Transcribe, Home's projects, Tasks, Agents and Browser: the scrollbar's track is the ground, and a thin slider shows while you point at the list or it scrolls.
 - **A tooltip no longer stays up after a click (#505).** A button that takes another's place when clicked (Give to becoming Stop) no longer shows its tooltip for the whole turn. Tooltips follow the pointer, and still show for the keyboard.
 - **Home fits a very narrow desk (#535).** With the AI's sheet forced open in the narrowest window, Home no longer scrolls sideways: the name steps down to fit, Change image keeps its icon inside the cover, and the times go under the names.
 - **The spreadsheet's Open in Excel** has Ritemark's tooltips instead of the system's.
+- **A task's tab keeps its title after a restart (#508; merge 2, patch 019).** A task card's page brought back by a restart or Reload Window shows the task's title from the first paint, not its file's name until it is opened. A file renamed while Ritemark was closed still shows its new name.
 
 ### Sprint 138: equations and Google Docs quotes (#481, #408)
 
