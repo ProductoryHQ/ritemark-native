@@ -2957,10 +2957,10 @@ index afa6942390e..06e7b97bf55 100644
  		this.doLayout(Dimension.lift(contentAreaSize), top, left);
 diff --git a/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css b/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css
 new file mode 100644
-index 00000000000..8b057131432
+index 00000000000..68df55ce141
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css
-@@ -0,0 +1,255 @@
+@@ -0,0 +1,254 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3022,7 +3022,7 @@ index 00000000000..8b057131432
 +	padding: 8px 12px;
 +	border: none;
 +	border-radius: 8px;
-+	resize: vertical;
++	resize: none;
 +	field-sizing: content; /* the field grows with the words, from 112 */
 +	background: var(--rm-desk);
 +	color: var(--vscode-foreground);
@@ -3048,9 +3048,8 @@ index 00000000000..8b057131432
 +	cursor: pointer;
 +}
 +
-+.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-check[hidden],
 +.monaco-workbench .ritemark-feedback-sheet [hidden] {
-+	display: none;
++	display: none !important; /* !important: beats this sheet's own display rules (flex rows, inline-flex buttons) */
 +}
 +
 +.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-check input {

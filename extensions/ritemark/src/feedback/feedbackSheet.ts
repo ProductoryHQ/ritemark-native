@@ -58,6 +58,9 @@ export type FeedbackSubmitResult =
   | { route: 'straight'; outcome: 'accepted' | 'failed' }
   | { route: 'email'; outcome: ReportTransportOutcome | 'invalid'; kindLabel: string; shown: string; copyText: string };
 
+/** What the workbench's sheet resolves with once it closes (patch 018's `RitemarkFeedbackSheetOutcome`). */
+export type FeedbackSheetOutcome = 'sent' | 'mailed' | 'cancelled';
+
 export interface FeedbackDependencies {
   appVersion: string;
   /** The open chat's last answer on the AI's sheet, from its record; null without one. */
@@ -112,9 +115,10 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
       lastAnswer: last && answer ? { chatTitle: last.title, quote: answer.text, shortened: answer.shortened } : null,
       words: FEEDBACK_COPY,
     };
-    let result: { outcome?: string } | undefined;
+    // The sheet resolves with what happened: 'sent', 'mailed' or 'cancelled'.
+    let result: FeedbackSheetOutcome | undefined;
     try {
-      result = await vscode.commands.executeCommand<{ outcome?: string }>(FEEDBACK_SHEET_COMMAND, spec);
+      result = await vscode.commands.executeCommand<FeedbackSheetOutcome>(FEEDBACK_SHEET_COMMAND, spec);
     } catch {
       // A shell without the sheet (patch 018 before 2.1): 2.0's ways, so nothing is lost (R16).
       if (spec.aiIssue) {
@@ -131,7 +135,7 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
       // The sheet answered: its buttons can no longer send under this token.
       if (open?.token === token) open = null;
     }
-    if (result?.outcome === 'sent') void vscode.window.showInformationMessage(FEEDBACK_COPY.toast.accepted);
+    if (result === 'sent') void vscode.window.showInformationMessage(FEEDBACK_COPY.toast.accepted);
   };
 
   const submit = async (raw: unknown): Promise<FeedbackSubmitResult | null> => {

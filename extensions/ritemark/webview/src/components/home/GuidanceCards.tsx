@@ -5,7 +5,7 @@
  * (`src/guidance/`), so the page only draws them and says what the person did.
  */
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { HomeAi, HomeAiId, HomeGuidance } from '../../../../src/projects/protocol'
 import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
@@ -43,6 +43,15 @@ function mainTip(card: ReadyRequest, name: string): string {
 export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: ReadyRequest; keysResult: { ok: boolean; message: string | null } | null; onKeysClosed: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [keySheet, setKeySheet] = useState(false)
+  // Ask with opens under the whole split button, its left edge on the main button's (experience 35, frame 1)
+  const splitRef = useRef<HTMLSpanElement>(null)
+  const [menuOffset, setMenuOffset] = useState(0)
+  const openMenu = (open: boolean) => {
+    const split = splitRef.current
+    const more = split?.querySelector('.rh-split-more')
+    if (open && split && more) setMenuOffset(split.getBoundingClientRect().left - more.getBoundingClientRect().left)
+    setMenuOpen(open)
+  }
   const chosen = card.ais.find((ai) => ai.id === card.ai)
   const name = chosen?.name ?? 'Claude'
   const choose = (ai: HomeAi) => {
@@ -60,14 +69,14 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
       </Tooltip>
       <p className="rh-guide-body">{card.body}</p>
       <div className="rh-guide-go">
-        <span className="rh-split">
+        <span className="rh-split" ref={splitRef}>
           <Tooltip label={mainTip(card, name)}>
-            <Button size="sm" className="rh-split-main" onClick={() => (card.aiReady ? send({ type: 'home/ready-request' }) : setMenuOpen(true))}>
+            <Button size="sm" className="rh-split-main" onClick={() => (card.aiReady ? send({ type: 'home/ready-request' }) : openMenu(true))}>
               <Icon name="chat-circle" size={14} tone="inherit" />
               <span className="truncate">{card.button}</span>
             </Button>
           </Tooltip>
-          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen} modal={false}>
+          <DropdownMenu open={menuOpen} onOpenChange={openMenu} modal={false}>
             <Tooltip label="Choose which AI asks">
               <DropdownMenuTrigger asChild>
                 <Button size="sm" className="rh-split-more" aria-label="Ask with">
@@ -75,7 +84,7 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
                 </Button>
               </DropdownMenuTrigger>
             </Tooltip>
-            <DropdownMenuContent align="start" className="rh-askwith">
+            <DropdownMenuContent align="start" alignOffset={menuOffset} className="rh-askwith">
               <div className="rh-askwith-hd" role="presentation">Ask with</div>
               {card.ais.map((ai) => {
                 const words = stateWords(ai)
