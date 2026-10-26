@@ -33,6 +33,10 @@ export const external = [
   '@anthropic-ai/claude-agent-sdk',
   '@agentclientprotocol/sdk',
   'pdfkit',
+  // Sprint 138 (#481): the MathML → Word equation converter. LGPL-3.0-or-later,
+  // so it ships unmodified as its own replaceable module, never inlined; ESM
+  // only, loaded through `new Function` like the agent SDKs (mathToWord.ts).
+  'mathml2omml',
 ];
 
 // Sprint 119: Google's installed-app OAuth client, read from the environment.
