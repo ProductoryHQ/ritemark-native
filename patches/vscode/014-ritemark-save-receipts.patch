@@ -9,7 +9,7 @@
 # File(s): src/vs/workbench/api/browser/mainThreadDocuments.ts, src/vs/workbench/api/common/extHost.protocol.ts, src/vs/workbench/api/common/extHostDocumentData.ts, src/vs/workbench/api/common/extHostDocuments.ts, src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts, src/vs/workbench/contrib/files/test/browser/ritemarkSaveConflict.test.ts, src/vs/workbench/services/textfile/common/textFileEditorModel.ts, src/vs/workbench/services/textfile/common/textfiles.ts, src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
 # Created: 2026-08-31
 # Updated: 2026-10-19 (Sprint 135: carried onto VS Code 1.142.0 unchanged)
-# Updated: 2026-10-26 (Sprint 137, #454: the save-error handler hands a refused save to Ritemark: textFileSaveErrorHandler.ts and its test)
+# Updated: 2026-10-26 (Sprint 137, #454: the save-error handler hands a refused save to Ritemark, with VS Code's notification when no answer comes within 3 s: textFileSaveErrorHandler.ts and its test)
 #
 diff --git a/src/vs/workbench/api/browser/mainThreadDocuments.ts b/src/vs/workbench/api/browser/mainThreadDocuments.ts
 index 9827a1a573f..5affedfb204 100644
@@ -111,24 +111,27 @@ index 517568ceb6d..c6b34ed5d93 100644
  
  	public $acceptDirtyStateChanged(uriComponents: UriComponents, isDirty: boolean): void {
 diff --git a/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts b/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts
-index ce11123d046..abc2d99cd0e 100644
+index ce11123d046..61077f7f893 100644
 --- a/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts
 +++ b/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts
-@@ -31,6 +31,7 @@ import { Schemas } from '../../../../../base/common/network.js';
+@@ -31,6 +31,8 @@ import { Schemas } from '../../../../../base/common/network.js';
  import { IPreferencesService } from '../../../../services/preferences/common/preferences.js';
  import { IEditorIdentifier, SaveReason, SideBySideEditor } from '../../../../common/editor.js';
  import { hash } from '../../../../../base/common/hash.js';
 +import { ICommandService } from '../../../../../platform/commands/common/commands.js';
++import { raceTimeout } from '../../../../../base/common/async.js';
  
  export const CONFLICT_RESOLUTION_CONTEXT = 'saveConflictResolutionContext';
  export const CONFLICT_RESOLUTION_SCHEME = 'conflictResolution';
-@@ -39,6 +40,19 @@ const LEARN_MORE_DIRTY_WRITE_IGNORE_KEY = 'learnMoreDirtyWriteError';
+@@ -39,6 +41,21 @@ const LEARN_MORE_DIRTY_WRITE_IGNORE_KEY = 'learnMoreDirtyWriteError';
  
  const conflictEditorHelp = localize('userGuide', "Use the actions in the editor tool bar to either undo your changes or overwrite the content of the file with your changes.");
  
 +// Ritemark (patch 014): Ritemark's document sync answers save conflicts for documents its editor holds (#454).
 +export const RITEMARK_EDITOR_ID = 'ritemark.editor';
 +export const RITEMARK_ANSWER_SAVE_CONFLICT_COMMAND = '_ritemark.editorSync.answerSaveConflict';
++/** Ritemark (patch 014): how long Ritemark may take to answer before this handler's notification shows. */
++export const RITEMARK_ANSWER_TIMEOUT_MS = 3000;
 +
 +/**
 + * Ritemark (patch 014, #454): hand a save refused as "newer" to Ritemark, so the person gets one question in
@@ -142,7 +145,7 @@ index ce11123d046..abc2d99cd0e 100644
  // A handler for text file save error happening with conflict resolution actions
  export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHandler, IWorkbenchContribution {
  
-@@ -55,7 +69,8 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
+@@ -55,7 +72,8 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
  		@IEditorService private readonly editorService: IEditorService,
  		@ITextModelService textModelService: ITextModelService,
  		@IInstantiationService private readonly instantiationService: IInstantiationService,
@@ -152,7 +155,7 @@ index ce11123d046..abc2d99cd0e 100644
  	) {
  		super();
  
-@@ -101,7 +116,10 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
+@@ -101,7 +119,10 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
  		}
  	}
  
@@ -164,15 +167,16 @@ index ce11123d046..abc2d99cd0e 100644
  		const fileOperationError = error as FileOperationError;
  		const resource = model.resource;
  
-@@ -189,6 +207,42 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
+@@ -189,6 +210,44 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
  		this.messages.set(model.resource, handle);
  	}
  
 +	/**
 +	 * Ritemark (patch 014, #454): Ritemark answers 'overwrite' when nobody else changed the text (a sync client
 +	 * touched the file, or the disk already holds the person's text: save over it, no question), 'handled' when
-+	 * its own Review changes asks. Anything else, or no answer (Ritemark not running), shows this handler's
-+	 * notification as before, so a conflict is never left without a question.
++	 * its own Review changes asks. Anything else, or no answer (Ritemark not running, or not answering within
++	 * `RITEMARK_ANSWER_TIMEOUT_MS`), shows this handler's notification as before, so a conflict is never left
++	 * without a question.
 +	 */
 +	private handOverToRitemark(error: unknown, model: ITextFileEditorModel, options: ITextFileSaveOptions): boolean {
 +		const isModifiedSince = (error as FileOperationError).fileOperationResult === FileOperationResult.FILE_MODIFIED_SINCE;
@@ -188,7 +192,8 @@ index ce11123d046..abc2d99cd0e 100644
 +	private async askRitemark(error: unknown, model: ITextFileEditorModel, options: ITextFileSaveOptions): Promise<void> {
 +		let answer: unknown;
 +		try {
-+			answer = await this.commandService.executeCommand<unknown>(RITEMARK_ANSWER_SAVE_CONFLICT_COMMAND, model.resource);
++			// No answer in time (the extension host is busy or stuck) counts as no answer: the notification shows.
++			answer = await raceTimeout(this.commandService.executeCommand<unknown>(RITEMARK_ANSWER_SAVE_CONFLICT_COMMAND, model.resource), RITEMARK_ANSWER_TIMEOUT_MS);
 +		} catch {
 +			answer = undefined; // the command is not registered: Ritemark is not running
 +		}

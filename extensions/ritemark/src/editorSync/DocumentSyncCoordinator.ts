@@ -47,6 +47,14 @@ export const ANSWER_SAVE_CONFLICT_COMMAND = '_ritemark.editorSync.answerSaveConf
  */
 export type SaveConflictAnswer = 'overwrite' | 'handled' | false;
 
+/**
+ * The most a refused save waits for Ritemark's answer. The shell waits 3 s
+ * (patch 014's `RITEMARK_ANSWER_TIMEOUT_MS`) and then shows VS Code's own
+ * notification; answering `false` a little before that keeps the two from
+ * both asking, and a late decision then does nothing the watcher won't.
+ */
+const ANSWER_SAVE_CONFLICT_BUDGET_MS = 2500;
+
 type UpdateMessage = Extract<DocumentHostMessage, { type: 'document:update' }>;
 type EditMessage = Extract<DocumentViewMessage, { type: 'document:edit' }>;
 type ConflictActionMessage = Extract<DocumentViewMessage, { type: 'document:conflict-action' }>;
@@ -542,9 +550,10 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       : typeof uriArgument === 'string' ? uriArgument : undefined;
     const record = uri ? this.records.get(uri) : undefined;
     if (!record || record.disposed || !this.isDiskBacked(record.document)) return false;
-    return this.enqueueResult(record, false, async (): Promise<SaveConflictAnswer> => {
+    let late = false;
+    const answer = this.enqueueResult(record, false, async (): Promise<SaveConflictAnswer> => {
       const disk = await this.readDisk(record.document);
-      if (!disk) return false;
+      if (!disk || late) return false;
       const decision = classifyRefusedSave({
         baseDiskLogicalHash: record.baseDiskLogicalHash,
         diskLogicalHash: disk.logicalHash,
@@ -560,10 +569,22 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       }
       // R10: a real conflict. Ritemark's Review changes is the one question.
       await this.reconcile(record, 'refused-save');
-      if (!record.conflict) return false;
+      if (!record.conflict || late) return false;
       this.notifyHiddenConflict(record);
       return 'handled';
     });
+    let budget: NodeJS.Timeout | undefined;
+    const outOfTime = new Promise<SaveConflictAnswer>(resolve => {
+      budget = setTimeout(() => {
+        late = true;
+        resolve(false);
+      }, ANSWER_SAVE_CONFLICT_BUDGET_MS);
+    });
+    try {
+      return await Promise.race([answer, outOfTime]);
+    } finally {
+      clearTimeout(budget);
+    }
   }
 
   /**
