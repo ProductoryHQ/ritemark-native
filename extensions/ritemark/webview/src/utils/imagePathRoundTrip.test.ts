@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createTurndownService } from './turndownService'
+import { createEditorTurndownService } from './editorMarkdown'
 import { isRelativeImagePath, isWebviewResourceUri, sameRelativeImagePath } from '../../../src/utils/imagePaths'
 
 // ── Which paths count as "beside the document" ─────────────────────────────
@@ -18,7 +18,7 @@ assert.equal(sameRelativeImagePath('img\\a.png', './img/a.png'), true)
 assert.equal(sameRelativeImagePath('../a.png', 'a.png'), false)
 
 // ── Saving writes the Markdown path back, never the display URI ───────────
-const service = createTurndownService()
+const service = createEditorTurndownService()
 const display = 'https://file%2B.vscode-resource.vscode-cdn.net/Users/me/docs/img/a.png?v=17'
 const save = (html: string) => service.turndown(`<p>${html}</p>`)
 

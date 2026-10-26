@@ -18,22 +18,11 @@ import { getSchema, inputRulesPlugin, type Editor } from '@tiptap/core'
 import { EditorState, type Transaction } from '@tiptap/pm/state'
 import { undoInputRule } from '@tiptap/pm/inputrules'
 import { DOMSerializer } from '@tiptap/pm/model'
-import { Marked } from 'marked'
-import StarterKit from '@tiptap/starter-kit'
-import BulletList from '@tiptap/extension-bullet-list'
-import ListItem from '@tiptap/extension-list-item'
 import { BoundedOrderedList } from './BoundedOrderedList'
-import { createTurndownService } from '../utils/turndownService'
+import { createEditorSchemaExtensions, createEditorTurndownService, editorMarked } from '../utils/editorMarkdown'
 
-const extensions = [
-  StarterKit.configure({ bulletList: false, orderedList: false, listItem: false }),
-  BulletList,
-  ListItem,
-  BoundedOrderedList,
-]
-const schema = getSchema(extensions)
-const turndown = createTurndownService()
-const editorMarked = new Marked({ breaks: true, gfm: true })
+const schema = getSchema(createEditorSchemaExtensions())
+const turndown = createEditorTurndownService()
 
 /** The ordered-list input rules exactly as the extension builds them. */
 const rules = (
