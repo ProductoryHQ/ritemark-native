@@ -59,10 +59,26 @@
 
 ### The bundle
 
-`media/webview.js`: 8,712,915 → 8,720,135 bytes (+7,220).
+`media/webview.js`: 8,712,915 → 8,720,135 bytes (+7,220); 8,720,526 after the QA follow-up below.
 
 ### Open for the Experience lead
 
 - The switch note, the path's wrap, Home at 152 px, and each split button's states, from the light captures above.
 - The desk's edge is merge 2.
 - A6 found Home's switch note already uses the kit's toast shadow (ink 18%/12%), so it is unchanged.
+
+## Merge 1, QA follow-up (27 October 2026)
+
+The Development manager's QA of #560 at 971ea67f passed every technical gate and asked for one more commit on `sprint-142-polish`.
+
+| Item | What changed | Evidence |
+|---|---|---|
+| B1 | `release-plan.md`: 142's Sprints row is Approved, with #560; the tracker has merge 1's row (#560, Open, Passed (technical) 27 Oct, notes drafted) and merge 2's; the stale "Plan: 142" row is gone | — |
+| N1 | At a 152 px desk the card's × sat on its heading. The narrow rule's `padding-right` lost to the card's own rule further down, and a wider padding alone can't help: the heading's longest word ("ChatGPT") is wider than the line leaves it, so it ran on under the ×. Now, at 200 and below, the icon keeps the ×'s line, the words go under it at the card's whole width, and the body and button take that width (`.rh-desk` first, so the rules win). Measured: the × at 104–128 on the icon's line; the heading's words from the line below; `scrollWidth` 152/152 | `qa/light-q26-home-152-desk.png` (re-taken) |
+| N2 | The board's not-ready tooltip keeps the runtime's own reason after the generic sentence: "ChatGPT is not ready. Choose another agent. ChatGPT is signed out. Sign in and try again." | `splitButton.test.ts` |
+| N3 | `ritemark.sheetShadow`: Dark `#00000066` (black at 40%), Light ink `#1E1B4B12` unchanged, high contrast none (the Experience lead, framework §4 and the kit, `ritemark-dev` 30f0adb). The workbench's menus, dialogs and quick input, the Mermaid toolbar and the Agents place's cards take it from the token. Live in Ritemark Dark: a tab's menu over the desk computes `0 0 0 1px` hairline, `0 10px 24px -6px rgba(0,0,0,.4)`, `0 4px 8px -4px rgba(0,0,0,.4)`. The desk and the AI's sheet stop using the token in merge 2 (patch 018) | `qa/dark-q30-menu-over-desk.png` |
+| N5 | The folder's "Ask … what is here" pressed again within 10 s, before the AI took the request, was a silent no-op. Busy would disable the button, which R5b and §3's "never disabled" rule out, so the press now brings the AI's sheet forward on the chat the first press sent (`readyPressAction` → `reveal`, by the sheet's own id from its origin note), sending nothing again; before the sheet has named that chat, it shows the AI's sheet | `guidance.test.ts` (two new cases) |
+
+**Ran:** the webview's `tsc --noEmit` and both bundles, the extension's `npm run compile`, and `npm test` (the whole chain) — all pass; the validator by hand. Live on the hidden instance (CDP 9242, the same throwaway profile), with this branch's bundles: N1 at the emulated 330 px window with the AI's sheet forced open, and N3 in Ritemark Dark. The instance's `vscode/` tree carried merge 2's uncommitted workbench changes, which don't touch the menus' shadow.
+
+**Not run live:** N5's second press (pressing it would send the sample folder's request to a real AI) and N2's tooltip (no runtime here was signed out). Both are unit-tested.

@@ -155,6 +155,7 @@ Acceptance criteria (the Experience lead's rule on #503, framework §4 Elevation
 - **The desk's shadow** is shadow-md (0 4px 6px and 0 2px 4px, ink 8% and 6%), and the AI's sheet's is shadow-xs (0 1px 2px, ink 5%).
 - **Each shadow has its room,** the 8 of ground, inside the box that paints it. Where the editor part can't give the desk that room without moving the frame's measured edges, the desk keeps its hairline and drops its shadow. Never a cut shadow or a cut hairline.
 - **The sheet shadow colour** (`ritemark.sheetShadow`) is ink in Light and transparent in Dark: Ritemark Dark draws hairlines only.
+  - *(revised 2026-10-27, QA N3; the Experience lead, framework §4 and the kit, `ritemark-dev` 30f0adb)*: transparent in Dark reached too far. The desk and the AI's sheet draw hairlines only, with no shadow, in both themes, and in merge 2 they stop using the token. Whatever floats keeps a shadow in Dark: menus, dialogs, quick input, the editor's bubbles and toolbars, a card being dragged. So the token is ink in Light (`#1E1B4B12`), black at 40% in Dark (`#00000066`), and none in high contrast.
 - **Brought onto the kit:**
   - the Agent Library's cards;
   - Home's switch note (ink 18% today);

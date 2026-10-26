@@ -37,9 +37,10 @@ function unavailableWords(runtime: BoardRuntimeView): string {
 /**
  * The button's state from the board's agents (pure, tested): the whole button off, or on with its main part either
  * running the chosen agent or, when that one isn't ready and another is, opening the menu; and the main part's tooltip.
+ * A chosen agent that isn't ready keeps its own reason after the generic sentence (Sprint 142 QA N2), as before R5c.
  */
 export function agentSplitState(input: {
-  runtimes: Pick<BoardRuntimeView, 'id' | 'label' | 'usable'>[]
+  runtimes: (Pick<BoardRuntimeView, 'id' | 'label' | 'usable'> & { message?: string | null })[]
   selected: AgentId
   disabled: boolean
   disabledReason?: string
@@ -57,7 +58,9 @@ export function agentSplitState(input: {
       ? 'Set up Claude, ChatGPT or OpenCode in the AI sidebar first'
       : usable
         ? input.tip(name)
-        : `${name} is not ready. Choose another agent.`
+        : current?.message
+          ? `${name} is not ready. Choose another agent. ${current.message}`
+          : `${name} is not ready. Choose another agent.`
   return { disabled, mainOpensMenu, mainTip, name, anyUsable }
 }
 

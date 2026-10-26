@@ -190,11 +190,13 @@ assert.equal(startingPlaceFrom(7), undefined);
 assert.equal(STARTING_PLACES.length, 7);
 
 // Sprint 142 (R5b, Q1): the ready request's press never needs a disabled button for the folder or the empty project
-assert.deepEqual(readyPressAction({ kind: 'sample', sentChat: null, sinceLastPressMs: null, filledChat: null }), { action: 'give' }, 'the sample through the board');
-assert.deepEqual(readyPressAction({ kind: 'files', sentChat: null, sinceLastPressMs: null, filledChat: null }), { action: 'send' }, 'the folder: the first press sends');
-assert.deepEqual(readyPressAction({ kind: 'files', sentChat: null, sinceLastPressMs: 2000, filledChat: null }), { action: 'wait' }, 'a second press before the chat is known sends nothing again');
-assert.deepEqual(readyPressAction({ kind: 'files', sentChat: { id: 'c-1', answered: false }, sinceLastPressMs: 3000, filledChat: null }), { action: 'open', conversationId: 'c-1' }, 'a second press opens the chat it went to');
-assert.deepEqual(readyPressAction({ kind: 'files', sentChat: { id: 'c-1', answered: true }, sinceLastPressMs: 60_000, filledChat: null }), { action: 'send' }, 'an answered request is asked again in a new chat');
-assert.deepEqual(readyPressAction({ kind: 'files', sentChat: null, sinceLastPressMs: FILES_PRESS_SETTLE_MS + 1, filledChat: null }), { action: 'send' }, 'a press long after one that never reached a chat sends again');
-assert.deepEqual(readyPressAction({ kind: 'empty', sentChat: null, sinceLastPressMs: null, filledChat: null }), { action: 'fill', conversationId: null }, 'the empty project: the first press fills a new chat');
-assert.deepEqual(readyPressAction({ kind: 'empty', sentChat: null, sinceLastPressMs: null, filledChat: 'local-7' }), { action: 'fill', conversationId: 'local-7' }, 'a second press opens the chat it filled');
+assert.deepEqual(readyPressAction({ kind: 'sample', sentChat: null, sinceLastPressMs: null, pendingChat: null, filledChat: null }), { action: 'give' }, 'the sample through the board');
+assert.deepEqual(readyPressAction({ kind: 'files', sentChat: null, sinceLastPressMs: null, pendingChat: null, filledChat: null }), { action: 'send' }, 'the folder: the first press sends');
+// QA N5: a second press before the AI took the request is never a silent no-op: it brings the sent chat forward
+assert.deepEqual(readyPressAction({ kind: 'files', sentChat: null, sinceLastPressMs: 2000, pendingChat: 'local-3', filledChat: null }), { action: 'reveal', conversationId: 'local-3' }, 'a second press before the AI took it opens the chat the first press sent, sending nothing again');
+assert.deepEqual(readyPressAction({ kind: 'files', sentChat: null, sinceLastPressMs: 200, pendingChat: null, filledChat: null }), { action: 'reveal', conversationId: null }, 'before the sheet has named that chat, the press still brings the AI sheet forward');
+assert.deepEqual(readyPressAction({ kind: 'files', sentChat: { id: 'c-1', answered: false }, sinceLastPressMs: 3000, pendingChat: 'local-3', filledChat: null }), { action: 'open', conversationId: 'c-1' }, 'a second press opens the chat it went to');
+assert.deepEqual(readyPressAction({ kind: 'files', sentChat: { id: 'c-1', answered: true }, sinceLastPressMs: 60_000, pendingChat: null, filledChat: null }), { action: 'send' }, 'an answered request is asked again in a new chat');
+assert.deepEqual(readyPressAction({ kind: 'files', sentChat: null, sinceLastPressMs: FILES_PRESS_SETTLE_MS + 1, pendingChat: 'local-3', filledChat: null }), { action: 'send' }, 'a press long after one that never reached a chat sends again');
+assert.deepEqual(readyPressAction({ kind: 'empty', sentChat: null, sinceLastPressMs: null, pendingChat: null, filledChat: null }), { action: 'fill', conversationId: null }, 'the empty project: the first press fills a new chat');
+assert.deepEqual(readyPressAction({ kind: 'empty', sentChat: null, sinceLastPressMs: null, pendingChat: null, filledChat: 'local-7' }), { action: 'fill', conversationId: 'local-7' }, 'a second press opens the chat it filled');

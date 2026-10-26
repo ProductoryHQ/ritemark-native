@@ -194,13 +194,20 @@ export class GuidanceHost implements vscode.Disposable {
       kind,
       sentChat: kind === 'files' && record.chatId ? { id: record.chatId, answered: await this.answered(record.chatId) } : null,
       sinceLastPressMs: this.filesPressedAt === null ? null : Date.now() - this.filesPressedAt,
+      pendingChat: kind === 'files' ? this.newestOrigin('what_is_here') : null,
       filledChat: this.newestOrigin('what_for'),
     });
     if (press.action === 'open') {
       await this.deps.openConversation?.(press.conversationId);
       return;
     }
-    if (press.action === 'wait') return;
+    if (press.action === 'reveal') {
+      // QA N5: the chat the first press sent comes forward on the AI's sheet, its box focused; nothing is sent again.
+      // The sheet reopens a chat by its own id and writes nothing into it without `fill`.
+      if (press.conversationId) await this.deps.startChat({ runtimeId: chosen.ai, text: '', send: false, conversationId: press.conversationId });
+      else await vscode.commands.executeCommand('ritemark.unifiedView.focus');
+      return;
+    }
     if (kind === 'sample') {
       const answer = await this.deps.give(SAMPLE_CARD_ID, chosen.ai);
       if (!answer?.ok) {

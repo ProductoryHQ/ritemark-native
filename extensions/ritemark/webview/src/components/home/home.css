@@ -310,7 +310,14 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   .rh-cover .rh-chip-label { display: none; }
   .rh-cover .rh-chip-button { padding: 0 6px; }
   .rh-desk .rh-row, .rh-desk .rh-file { flex-wrap: wrap; height: auto; min-height: 40px; padding: 6px 0; row-gap: 2px; }
-  .rh-guide .rh-guide-hd { padding-right: 24px; } /* the card's heading keeps clear of its × */
+  /* The card's heading keeps clear of its × (QA N1): the icon keeps the ×'s line, the words go under it at the card's
+     whole width, and the body and the button take that width too. A wider padding alone can't: the heading's longest
+     word is wider than what the line leaves it, so it ran on under the ×. `.rh-desk` first, so these win over the
+     card's own rules further down (the old padding here lost to them). */
+  .rh-desk .rh-guide { padding: 12px; }
+  .rh-desk .rh-guide .rh-guide-hd { flex-wrap: wrap; row-gap: 6px; padding-right: 0; }
+  .rh-desk .rh-guide .rh-guide-x { right: 8px; top: 10px; }
+  .rh-desk .rh-guide .rh-guide-body, .rh-desk .rh-guide .rh-guide-sub, .rh-desk .rh-guide .rh-guide-go { margin-left: 0; }
   .rh-row .rh-when { flex-basis: calc(100% - 40px); margin-left: 40px; }
   .rh-file .rh-when { flex-basis: calc(100% - 24px); margin-left: 24px; }
 }

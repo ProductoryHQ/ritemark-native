@@ -96,7 +96,7 @@ How the numbers map:
 ## Phase 4: The other visible fixes (W7 webview, W8, W9, W10, W11, W13; W12 if in the extension)
 
 - [x] `index.css` `.rm-ai-sheet`: the inset hairline and no shadow, which A6 shows has no room (R7)
-- [x] `package.json` `ritemark.sheetShadow`: ink in Light, transparent in Dark (R7)
+- [x] `package.json` `ritemark.sheetShadow`: ink in Light, transparent in Dark (R7). Revised 27 October (QA N3): black at 40% in Dark, so what floats keeps its shadow; none in high contrast
 - [x] Onto the kit:
   - the Agents place's cards follow the sheet shadow's colour;
   - Mermaid's expand toolbar takes the kit's floating shadow (`Editor.tsx`);

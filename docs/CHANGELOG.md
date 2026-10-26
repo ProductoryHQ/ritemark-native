@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Home's folder path is cut in the middle without a gap (#557).** The ellipsis touches the next character, the start gives way before the parent folder, and the project's own folder is never cut: a name too long for the line wraps at its spaces, with the › after its last word. The whole path is in the tooltip.
 - **A transcribed file opens as a tab (#517).** When its transcription starts, a file from Transcribe a file… (or a recording made in Ritemark) opens in the Transcript Workbench, and the transcript fills in there. It doesn't take the keyboard, and opens behind a document you are typing in.
 - **The Task board fits the default 1440 window with both side columns (#516).** Its four columns share the desk down to 160 each; only a narrower desk scrolls sideways.
-- **The AI's sheet draws a whole edge (#503).** An inset hairline instead of a cut outline and shadow; the shadows under floating sheets are in Ritemark's ink, and Ritemark Dark draws hairlines only.
+- **The AI's sheet draws a whole edge (#503).** An inset hairline instead of a cut outline and shadow. What floats over the window (menus, dialogs, quick input, the editor's toolbars) keeps its shadow: in Ritemark's ink in Light, black at 40% in Dark, and none in high contrast.
 
 #### Fixed
 - **No white strip beside a scrolling list in the left column (#504).** Transcribe, Home's projects, Tasks, Agents and Browser: the scrollbar's track is the ground, and a thin slider shows while you point at the list or it scrolls.

@@ -50,6 +50,8 @@ const runtimes = [
 const tip = (agent: string) => `Try this task again with ${agent}`
 assert.deepEqual(agentSplitState({ runtimes, selected: 'claude-code', disabled: false, tip }), { disabled: false, mainOpensMenu: false, mainTip: 'Try this task again with Claude', name: 'Claude', anyUsable: true }, 'the chosen agent is ready: the main part runs it')
 assert.deepEqual(agentSplitState({ runtimes, selected: 'codex', disabled: false, tip }), { disabled: false, mainOpensMenu: true, mainTip: 'ChatGPT is not ready. Choose another agent.', name: 'ChatGPT', anyUsable: true }, 'not ready, another is: the main part opens the menu, never half disabled')
+const signedOut = runtimes.map((runtime) => (runtime.id === 'codex' ? { ...runtime, message: 'ChatGPT is signed out. Sign in and try again.' } : runtime))
+assert.equal(agentSplitState({ runtimes: signedOut, selected: 'codex', disabled: false, tip }).mainTip, 'ChatGPT is not ready. Choose another agent. ChatGPT is signed out. Sign in and try again.', "the runtime's own reason after the generic sentence (QA N2)")
 assert.equal(agentSplitState({ runtimes, selected: 'claude-code', disabled: true, tip }).disabled, true, 'pending: the whole button')
 assert.deepEqual(agentSplitState({ runtimes, selected: 'claude-code', disabled: false, disabledReason: 'Claude is already reviewing this', tip }).mainTip, 'Claude is already reviewing this')
 const none = runtimes.map((runtime) => ({ ...runtime, usable: false }))
