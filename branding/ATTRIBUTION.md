@@ -42,9 +42,18 @@ Source: <https://github.com/phosphor-icons/core/blob/main/LICENSE>
 Ritemark typesets equations with [KaTeX](https://katex.org) 0.16.47 (Sprint 138, #481).
 KaTeX's code is inside `extensions/ritemark/media/webview.js` (the copy Mermaid brings);
 its stylesheet and fonts ship as files in `extensions/ritemark/media/katex/`, with
-KaTeX's licence beside them (`media/katex/LICENSE`).
+both licences beside them: `media/katex/LICENSE` for the code and `media/katex/OFL.txt`
+for the fonts.
 
-KaTeX and its fonts are distributed under the MIT licence.
+KaTeX's code and stylesheet are distributed under the MIT licence, below.
+
+KaTeX's fonts (`media/katex/fonts/*.woff2`) are distributed under the SIL Open Font
+License, Version 1.1: Copyright (c) 2009-2010, Design Science, Inc.
+(<www.mathjax.org>); Copyright (c) 2014-2018 Khan Academy (<www.khanacademy.org>);
+with Reserved Font Names KaTeX_AMS, KaTeX_Caligraphic, KaTeX_Fraktur, KaTeX_Main,
+KaTeX_Math, KaTeX_SansSerif, KaTeX_Script, KaTeX_Size1, KaTeX_Size2, KaTeX_Size3,
+KaTeX_Size4 and KaTeX_Typewriter (from the fonts' own name tables). Ritemark ships
+them unmodified; the licence text is in `media/katex/OFL.txt`.
 
 ```
 The MIT License (MIT)

@@ -213,6 +213,7 @@ if [[ -d "$EXT_PATH" ]]; then
   # release; without them, equations show as their source and Word gets pictures.
   check_file_size "$EXT_PATH/media/katex/katex.min.css" 10000 "KaTeX stylesheet (media/katex)"
   check_file_size "$EXT_PATH/media/katex/LICENSE" 500 "KaTeX licence (media/katex)"
+  check_file_size "$EXT_PATH/media/katex/OFL.txt" 4000 "KaTeX fonts' licence, SIL OFL 1.1 (media/katex)"
   echo -n "Checking KaTeX fonts (media/katex/fonts)... "
   KATEX_FACES=$(find "$EXT_PATH/media/katex/fonts" -name "*.woff2" -size +0 2>/dev/null | wc -l | tr -d ' ')
   if [[ "$KATEX_FACES" -ne 20 ]]; then
@@ -225,6 +226,8 @@ if [[ -d "$EXT_PATH" ]]; then
   check_content "$EXT_PATH/media/webview.js" "$(tr -d '[:space:]' < "$EXT_PATH/media/katex/VERSION" 2>/dev/null || echo katex-version-missing)" "webview.js holds the KaTeX of media/katex"
   check_file_size "$EXT_PATH/node_modules/mathml2omml/dist/index.js" 10000 "mathml2omml (Word equations)"
   check_file_size "$EXT_PATH/node_modules/mathml2omml/LICENSE" 5000 "mathml2omml licence (LGPL-3.0)"
+  # The LGPL incorporates the GPL's terms; its text ships beside the extension (branding/ATTRIBUTION.md).
+  check_file_size "$EXT_PATH/licenses/GPL-3.0.txt" 30000 "GPL-3.0 text, for mathml2omml's LGPL (licenses/)"
 fi
 
 # -----------------------------------------------------------------------------
