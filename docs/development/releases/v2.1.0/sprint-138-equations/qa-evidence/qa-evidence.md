@@ -53,7 +53,7 @@ The Word audit's evidence (40 formulas, the wrapper against the converter alone)
 | S37 an equation Word can't take | pass in unit tests (picture fallback) | `mathToWord.test.ts` |
 | S38 other readers | Word for Mac only; LibreOffice, Pages and a Google Docs import not run | [A4](../research/word-equations-audit.md) |
 | S39–S41 Google Docs | not run: no test account; unit tests only | [A5](../research/google-docs-audit.md) |
-| S42 the bundle | pass: +36.4 KB, one KaTeX | [notes/bundle.md](../notes/bundle.md) |
+| S42 the bundle | pass: +36.6 KB, one KaTeX | [notes/bundle.md](../notes/bundle.md) |
 | S43 the production build | not run: after the merge, from a clean-room worktree | — |
 | S44 Mermaid | pass in the editor and the PDF: the diagram renders. Math in a Mermaid label shows its `$$…$$` source, because Ritemark draws Mermaid with `htmlLabels: false` (unchanged by this sprint); not compared side by side with 2.0.1 | dev instance |
 | S45 the 2.0.1 regression set; S46 before the film | not run | Windows session and the release candidate |

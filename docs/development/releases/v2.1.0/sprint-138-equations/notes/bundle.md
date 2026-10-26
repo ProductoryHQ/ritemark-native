@@ -4,7 +4,7 @@ Measured on 26 October 2026. "Before" is `b5ae122f` (Sprint 137's pipeline extra
 
 | File | Before | After | Change |
 |---|---|---|---|
-| `media/webview.js` | 8,612,316 | 8,648,733 | **+36,417 bytes (35.6 KiB)**, under the plan's 40 KB |
+| `media/webview.js` | 8,612,316 | 8,648,962 | **+36,646 bytes (35.8 KiB)**, under the plan's 40 KB |
 | `media/office-preview.js` | 2,576,131 | 2,582,480 | +6,349 (the shared `ui/Icon.tsx` and editor modules it also imports) |
 | `out/extension.js` | 5,650,663 | 5,678,780 | +28,117 (the PDF layout, the Word wrapper, Google Docs' math) |
 | `media/katex/` (new) | — | 282,600 bytes in 23 files | `katex.min.css` (woff2 only), 20 woff2 faces (259,792 bytes), `LICENSE`, `VERSION` |
