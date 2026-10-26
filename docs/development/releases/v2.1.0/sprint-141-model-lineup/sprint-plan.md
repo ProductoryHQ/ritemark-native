@@ -11,7 +11,7 @@ Release tier: shell, because of W4's runtime updates:
 
 Everything else is under `extensions/ritemark/src/` and `webview/`, extension-tier, and ships in 2.1.0's shell release. If the runtime review decides no update, this line changes to extension.
 
-Status: **Approved (Phase 2 → 3), 26 October 2026,** by the Development manager under Jarmo's delegation of the same day, with all nine decisions as recommended (*Approval*, below). Phase 3 is under way on `sprint-141-model-lineup`. #558 joined the same day under the scope-change protocol (R12, with R13 from A2).
+Status: **Approved (Phase 2 → 3), 26 October 2026,** by the Development manager under Jarmo's delegation of the same day, with all nine decisions as recommended (*Approval*, below). **Merge 1 built** on `sprint-141-model-lineup` (27 October): W1–W4 and W2b, with the evidence in [qa-evidence.md](qa-evidence.md). Merge 2 (W5, #529) follows A3's go. The tier line is confirmed: shell (the runtimes moved). #558 joined the same day under the scope-change protocol (R12, with R13 from A2).
 
 ## SDD Artifacts
 

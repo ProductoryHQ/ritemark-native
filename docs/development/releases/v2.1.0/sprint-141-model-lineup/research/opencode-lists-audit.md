@@ -47,9 +47,33 @@ Audit for R2 and R10 (#529), 26–27 October 2026. It used:
 - **What Ritemark does with it:** `AcpManager` keeps `configOptions` for each session (`src/acp/acpManager.ts:178`, `:197`, `:247`), and reads only the thought level from it.
 - **`opencode models [provider] --verbose`** prints the same set with each model's full record (`capabilities.toolcall`, `status`, `limit`). But it loads the whole project first (config, plugins, language servers), so it isn't light.
 
-## The keyless run
+## The keyless run (27 October, OpenCode 1.19.4)
 
-Filled in on the OpenCode that ships (1.19.4) before merge 2: the free models listed, the list's shape, and the time and process cost of each way to read it.
+**Set-up:** the bundled `opencode acp`, with no provider key in its environment, and its XDG config, data, cache and state folders isolated, so the person's own OpenCode config and stored keys didn't apply. HOME unchanged.
+
+**What it answered** (`initialize`, then two `session/new` on the same process):
+- **Timing:** `initialize` took 419 ms from spawn, the first `session/new` 320 ms, and a second one 4 ms.
+- **Config options:**
+  - `model` (category `model`, type `select`) with 10 options;
+  - `mode` (2 options).
+
+  Each model option has exactly `value` and `name`. The current value is `opencode/big-pickle`.
+- **The models:** the ten are OpenCode's own free models (`opencode/beam-free`, `opencode/big-pickle`, `opencode/deepseek-v4.1-flash-free`, and so on). No provider appears without its key.
+- **The second session's list** is the same as the first's.
+
+**Also run, with the same isolation:** `verify-agent-runtimes.sh` passed OpenCode's permission gate with `opencode/beam-free` (`runtime-review.md`).
+
+**What this proves:**
+- Reading OpenCode's list costs nothing new: Ritemark already makes `session/new` for every OpenCode chat, and the list comes with it.
+- The list's shape (`value`, `name`) matches the source.
+
+**What it can't prove without keys:** the list for a provider with a key. The fixtures for the tests are built from the models.dev registry OpenCode reads, which is what the source says it lists: every model of a listed provider except `deprecated` and `alpha`.
+
+## Decision (go, merge 2)
+
+- **The source:** the `model` option of every `session/new` and resume `AcpManager` makes, handed to the catalog (`noteOpenCodeModels`). It is kept in globalState (`modelCatalog_opencodeModels_v1`) for the next start. Until the first OpenCode chat ever, the static rows serve.
+- **The menu stays short:** a model the catalog doesn't curate is offered only when it is at least as new as the newest curated model of its family (Gemini 4, GPT-6.1, Claude 5.5 today), after dropping non-chat routes. The rest stay resolvable, `hidden`. On today's registry that is a handful of new rows (the merge-2 tests count them).
+- **The S38 risk:** Google's own list can't narrow away the 2.5 models for a new key (A2), so narrowing only drops a new, unknown model that Google's list doesn't name at all.
 
 ## Design (proposal for merge 2)
 

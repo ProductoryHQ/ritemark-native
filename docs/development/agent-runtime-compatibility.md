@@ -10,6 +10,44 @@ Ritemark now depends on these Claude Code behaviours (Phase 0 on 2.1.289 / SDK 0
 - `perTaskStopAffordance: true` makes `interrupt()` spare background tasks; `Query.stopTask` stops one (`status: 'stopped'`).
 - `session_state_changed` is emitted only with `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS` (not used).
 
+## v2.1.0 (Sprint 141) — Claude Code 2.1.310 / SDK 0.3.310, Codex 0.164.0, OpenCode 1.19.4 — 2026-10-27
+
+**Change:**
+- Claude Code `2.1.304` → `2.1.310`, with Claude Agent SDK `0.3.304` → `0.3.310` in lockstep;
+- Codex `0.163.0` → `0.164.0`;
+- OpenCode `1.19.3` → `1.19.4`.
+
+OpenCode's ripgrep `15.1.0`, Codex's ripgrep `15.2.0` and the ACP SDK `1.4.0` are unchanged. The Codex package layout is unchanged.
+
+**Why:** the per-release runtime review (`releases/v2.1.0/sprint-141-model-lineup/research/runtime-review.md`). Each was npm `latest`, or the latest Codex GitHub release, on 2026-10-26. The Development manager decided under Jarmo's delegation, 2026-10-26 (Sprint 141, decision 8): update all three.
+- **Claude Code:**
+  - 2.1.305 fixes 2.1.304's failure on gateways that reject tool search;
+  - 2.1.307 waits up to 15 s on `setModel()`;
+  - 2.1.309 asks about more Bash commands: a compound `cd` with git, and `sed -i` as an ordinary Bash approval;
+  - the SDK's API changes are additive.
+- **Codex:**
+  - additive JSON-RPC only;
+  - a resumed thread keeps its saved service tier, reasoning summary and personality;
+  - the same signing identifier (`codex-app-server`);
+  - `mcp_oauth_refresh_coordination` on by default, which re-reads `Codex MCP Credentials` at a token refresh (*Codex and the keychain* in the review).
+- **OpenCode:** Bun 1.4.4 with its TLS, HTTP and `fetch` security fixes; nothing on ACP, permissions or MCP.
+
+| Check | Result |
+|---|---|
+| Manifest rows (darwin-arm64, darwin-x64, win32-x64) | pass. Nine rows moved, every value measured by script from the published artifacts. Each npm integrity matched the registry's `dist.integrity`, and each Codex archive matched GitHub's asset digest and holds exactly the listed members. `fetch-agent-runtimes.mjs --all-platforms` gives PASS for all twelve rows, and so does `--verify-only --all-platforms` (exit 0). |
+| Lockstep pins | pass. `validate-agent-runtime-manifest.mjs` approves `2.1.310` / `0.3.310`, `0.164.0` and `1.19.4`; its tests, `list-agent-runtime-files.test.mjs` and `fetch-agent-runtimes.test.mjs` pass (17/17). |
+| SDK type surface | pass. `npm run compile` (tsc and esbuild) is clean against 0.3.310, and the full `npm test` passes, with `anthropicCatalogCheck.test.ts`'s pin at 2.1.310. |
+| Version discovery on darwin-arm64 | pass. `verify-agent-runtimes.sh`: `claude` 2.1.310, `opencode` 1.19.4, its ripgrep 15.1.0, `codex-app-server` 0.164.0; the code-mode host starts. The Codex Windows sandbox helpers check is SKIP (win32-x64 only): **not proven here**. |
+| OpenCode permission gate (HARD GATE) | pass, with the first free model on offer, `opencode/beam-free`, and OpenCode's XDG folders isolated: a write pauses, a denial blocks, an approval writes. Cancel settles with `stopReason: cancelled` and the process alive. Two chunks arrived after the cancel (8 → 10), which the script accepts. |
+| Codex code signature | `codesign -dv` on 0.164.0's `codex-app-server` (darwin-arm64, darwin-x64): `Identifier=codex-app-server`, `TeamIdentifier=2DC432GLL2`, the same identifier as 0.163.0's. Ritemark's re-sign keeps it. |
+| Claude model listing (2.1.310, unauthenticated, `CLAUDE_CONFIG_DIR` isolated, in a dev instance) | pass. `sonnet`, `opus`, `fable` and `haiku`; Opus 4.8 and Haiku 4.5 hidden. `model-picker-probe.mjs` was **not run**: it changes `HOME` for its CLI. |
+| Codex model list (0.164.0, isolated `CODEX_HOME`, unauthenticated) | `model/list`: `gpt-6.1-sol` (default), `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`: the same list as 0.162.1. |
+| `check:anthropic-models` (catalog v3183) | pass. OK, with no warnings. |
+| The keychain with Ritemark's re-signed `codex-app-server` | **not proven here.** Only a signed build re-signs it. Gate 2 on the candidate: count prompts at start and after a token refresh, with `~/.codex/config.toml` backed up. |
+| Sprint 128 background probes | **not proven here.** They need Jarmo's Claude sign-in. |
+| Authenticated turns on each runtime | **not proven here.** No sign-in or key was used; Codex was kept off the shared `~/.codex`. Release test checklist. |
+| Native execution (darwin-x64, win32-x64) | **not proven here.** Gate 2 and PR CI. |
+
 ## v2.0.0 — Claude Code 2.1.304 / SDK 0.3.304, Codex 0.163.0, OpenCode 1.19.3 — 2026-10-20
 
 **Change:** Claude Code `2.1.296` → `2.1.304` with Claude Agent SDK `0.3.296` → `0.3.304` in lockstep; Codex `0.162.1` → `0.163.0`; OpenCode `1.19.0` → `1.19.3`. OpenCode's ripgrep `15.1.0`, Codex's ripgrep `15.2.0` and ACP SDK `1.4.0` are unchanged. **Codex's macOS package no longer ships its patched `zsh`** ([openai/codex#52213](https://github.com/openai/codex/pull/52213)), so the `zsh` member is gone from both Mac Codex rows, from `CODEX_MEMBERS` in `validate-agent-runtime-manifest.mjs` and from `list-agent-runtime-files.test.mjs` (7 installed files per Mac target, 9 on Windows). The Windows Codex layout is unchanged. Codex's macOS ripgrep has new hashes because the package was re-signed; it carries the same 15.2.0 build string (`15.2.0` rev `e89fff89ac`) as the Windows `rg.exe`, which is byte-identical to 0.162.1's.

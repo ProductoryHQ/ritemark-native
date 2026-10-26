@@ -52,8 +52,8 @@ test('the captured catalog parses: version, expiry and the Claude Code models', 
   assert.strictEqual(catalog.models.find((model) => model.name === 'Sonnet 5')!.minClaudeCodeVersion, undefined);
 });
 
-test('S38: this repository passes — Claude Code 2.1.304 and the bundled lineup cover the catalog', () => {
-  assert.deepStrictEqual(bundledClaudeCodeVersions(MANIFEST), ['2.1.304']);
+test('S38: this repository passes — Claude Code 2.1.310 and the bundled lineup cover the catalog', () => {
+  assert.deepStrictEqual(bundledClaudeCodeVersions(MANIFEST), ['2.1.310']);
   const result = checkAnthropicCatalog({ catalog: parsed(), claudeCodeVersions: bundledClaudeCodeVersions(MANIFEST), bundledModelIds: BUNDLED_IDS });
   assert.deepStrictEqual(result.alerts, []);
   assert.deepStrictEqual(result.warnings, []);

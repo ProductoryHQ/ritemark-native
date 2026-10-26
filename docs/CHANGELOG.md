@@ -46,6 +46,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The spreadsheet's Open in Excel** has Ritemark's tooltips instead of the system's.
 - **A task's tab keeps its title after a restart (#508; merge 2, patch 019).** A task card's page brought back by a restart or Reload Window shows the task's title from the first paint, not its file's name until it is opened. A file renamed while Ritemark was closed still shows its new name.
 
+### Sprint 141: 2.1's model lineup (#532, #531, #530, #558)
+
+#### Added
+- **Gemini 4 Argon (#532).** Google's flagship reasoning model is first in a Flow's Gemini list and in OpenCode's Google group, and joins OpenCode's OpenRouter group, even before Ritemark has fetched its model list.
+- **Current models in OpenCode.** OpenCode's Claude group gains Sonnet 5.5, Opus 5.5 and Haiku 5.5, its OpenAI group GPT-6.1 Sol, and its OpenRouter group Claude Sonnet 5.5 and GPT-6.1 Sol.
+
+#### Changed
+- **A new Gemini step in a Flow starts on Gemini 3.5 Flash Lite (#531).** Google now offers the Gemini 2.5 models only to people who used them before, so a new Google account couldn't run a Flow's default. The 2.5 models stay in the lists, marked as kept for saved selections, and a saved Flow keeps its model.
+- **The Flow editor proposes the model the step runs on** when you leave it unset; both now come from Ritemark's model list.
+- **The bundled AI tools are current:** Claude Code 2.1.310, Codex 0.164.0 and OpenCode 1.19.4.
+
+#### Fixed
+- **Your Google AI Studio key no longer travels in web addresses (#558).** Ritemark sends it in a request header, so it can't end up in proxy logs or error messages.
+- **A Gemini step refused for its model says so:** "Google doesn't offer Gemini 2.5 Flash to this API key. Choose another model in this step, then run the Flow again." An answer that used up the step's Max tokens says that too, instead of "No response from Gemini API".
+- **Flows' Gemini list holds every model Google offers your key,** not just the first page of Google's list.
+
 ### Sprint 138: equations and Google Docs quotes (#481, #408)
 
 #### Added

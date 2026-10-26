@@ -471,7 +471,8 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
 
       <Field label="Model" description={error ? `⚠️ ${error}` : isLoading ? 'Loading models...' : undefined}>
         <Select
-          value={data.model || models[0]?.id || ''}
+          // Sprint 141 R4: an unset step shows the model it runs on (the catalog's default), as its card does.
+          value={data.model || getDefaultLLMModel(provider) || models[0]?.id || ''}
           onValueChange={(value) => onUpdate({ model: value })}
           disabled={isLoading}
         >
@@ -732,7 +733,8 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
             : error ? `⚠️ ${error}` : undefined}
       >
         <Select
-          value={data.model || models[0]?.id || ''}
+          // Sprint 141 R4: an unset step shows the model it runs on, as the run's default.
+          value={data.model || getDefaultImageModel(provider) || models[0]?.id || ''}
           onValueChange={(value) => onUpdate({ model: value })}
           disabled={loading}
         >

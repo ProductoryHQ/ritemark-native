@@ -121,6 +121,30 @@ The ACP SDK stays at 1.4.0. If `latest` moves before the update is written, it s
 - OpenCode: <https://github.com/anomalyco/opencode/releases/tag/v1.19.4> and its compare with v1.19.3
 - npm registry (`npm view <package> version time dist-tags`), 26 October 2026
 
-## Verified at the update
+## Verified at the update (27 October)
 
-Filled in when the manifest moves (W4).
+- **Manifest:** nine rows moved (Claude Code, Codex and OpenCode on darwin-arm64, darwin-x64 and win32-x64); OpenCode's ripgrep rows are unchanged.
+  - Every value was measured by script from the published artifacts.
+  - Each npm integrity matched the registry's `dist.integrity`, and each Codex archive matched GitHub's asset digest.
+  - The Codex archives hold exactly the 0.163.0 members: four on macOS, six on Windows.
+- **The signature on the shipped Codex binary:** `codesign -dv` on 0.164.0's `bin/codex-app-server` (darwin-arm64 and darwin-x64) reads `Identifier=codex-app-server`, `TeamIdentifier=2DC432GLL2`, the same identifier as 0.163.0's. After Ritemark's `--force` re-sign it keeps that identifier under team JKBSC3ZDT5, so the designated requirement does not change.
+- **Pins and checks:**
+  - `validate-agent-runtime-manifest.mjs` approves 2.1.310 / 0.3.310, 0.164.0 and 1.19.4;
+  - its tests, `list-agent-runtime-files.test.mjs` and `fetch-agent-runtimes.test.mjs` pass (17/17);
+  - `fetch-agent-runtimes.mjs --all-platforms` gives PASS for all twelve rows, and `--verify-only --all-platforms` does too;
+  - `npm run compile` (tsc and esbuild) is clean against SDK 0.3.310, and the full `npm test` passes;
+  - `anthropicCatalogCheck.test.ts`'s pin moved to 2.1.310.
+- **`verify-agent-runtimes.sh` on darwin-arm64,** with OpenCode's XDG folders isolated so the gate didn't touch the person's own OpenCode:
+  - version discovery passes: `claude` 2.1.310, `opencode` 1.19.4, its ripgrep 15.1.0, `codex-app-server` 0.164.0, and the code-mode host starts;
+  - **OpenCode's permission gate (HARD GATE)** passes with the first free model on offer, `opencode/beam-free`: a write pauses, a denial blocks, an approval writes;
+  - `session/cancel` settles with `stopReason: cancelled` and the process alive. Two chunks arrived after the cancel (8 → 10; 2.0.0's run had 12 → 12), and the script counts that as a pass;
+  - the Windows sandbox helpers check is SKIP (win32-x64 only): **not proven here**.
+- **Claude Code 2.1.310's model list** (in the dev instance, unauthenticated, `CLAUDE_CONFIG_DIR` isolated): `sonnet`, `opus`, `fable` and `haiku`, the default representative `sonnet`; Opus 4.8 and Haiku 4.5 hidden. The lineup doesn't change. Sprint 127's `model-picker-probe.mjs` was not run: it changes `HOME` for the CLI it starts, which this sprint's rules forbid.
+- **Codex 0.164.0's `model/list`** (isolated `CODEX_HOME`, unauthenticated): `gpt-6.1-sol` (default), `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`. The same list as 0.162.1's; the catalog's Codex default, GPT-6.1 Sol, agrees.
+- **`check:anthropic-models` after the update:** OK, catalog v3183, bundled Claude Code 2.1.310, no warnings.
+- **Not run:**
+  - authenticated turns on any of the three: no Claude sign-in or provider key; Codex was kept off Jarmo's shared `~/.codex`, so that a newer Codex doesn't touch his own state;
+  - Sprint 128's background probes (Jarmo's Claude sign-in);
+  - an approval card for `sed -i` (2.1.309);
+  - the keychain check on a signed build (Gate 2);
+  - native execution on darwin-x64 and win32-x64 (Gate 2 and CI).
