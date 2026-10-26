@@ -81,13 +81,13 @@ If Ritemark can't reach the AI provider, the sidebar shows an **AI Offline** bad
 
 ### Report AI issue doesn't open an email
 
-**Report AI issue** in the status bar hands your report to your computer's email app; Ritemark never sends it itself. The report window tells you what happened, and your report always stays in it:
+**Send feedback** goes through your computer's e-mail app when you tick **This is about something the AI said or did** or **I'd like an answer**; Ritemark never sends that e-mail itself. The sheet tells you what happened, and your message always stays in it:
 
-- **Your email app is opening**: find the new message in your email app, check it, and press Send there. The report isn't sent until you do.
-- **No email app is set up on this computer**: click **Copy report** under the text box and email the report to info@productory.eu from the email you normally use. This is expected on a computer without an email app; it isn't an error.
-- **This report is too long to open in an email app**: email links can only carry a limited amount of text. Click **Copy report** and email it to info@productory.eu yourself, so nothing is cut off.
+- **Your e-mail app is opening**: find the new message in your e-mail app, check it, and press Send there. It isn't on its way until you do.
+- **No e-mail app answered**: click **Copy** and send it to info@productory.eu from the e-mail you normally use. This is expected on a computer without an e-mail app; it isn't an error.
+- **This is too long for an e-mail link**: e-mail links can only carry a limited amount of text. Click **Copy** and send it to info@productory.eu yourself, so nothing is cut off.
 
-If the window says your email app is opening but nothing appears, use **Copy report** the same way. The address is always shown under the text box as **Write to us: info@productory.eu**, so you can also write to it directly. See [AI Agents → Reporting AI output](features/ai-agents.md#reporting-ai-output).
+If the sheet says your e-mail app is opening but nothing appears, use **Copy** the same way. With neither box ticked, **Send** sends your message straight from Ritemark instead, with no e-mail app. See [AI Agents → Reporting AI output](features/ai-agents.md#reporting-ai-output).
 
 ---
 
@@ -226,4 +226,4 @@ If you've found a bug:
 | File won't save | Check folder permissions |
 | Slow performance | Restart Ritemark |
 | File changes says Git is missing | Install Git, then click **reload** |
-| Report AI issue shows no email | **Copy report**, then email info@productory.eu |
+| Report AI issue shows no e-mail | **Copy**, then e-mail info@productory.eu |

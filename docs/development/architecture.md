@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-10-19 (Sprint 135: VS Code 1.142.0 — the browser bridge on agent audiences; Sprint 134: the project at the centre)
+**Last updated:** 2026-10-26 (Sprint 140: the first day's guidance and the feedback door; Sprint 135: VS Code 1.142.0 — the browser bridge on agent audiences)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -271,6 +271,8 @@ comment-task/accept  ──────────→   validate ids in the Tex
 Sprint 130 (task board) built Give to agent on this path and closed four audit gaps for comment tasks too: an answered approval or question reports `running` again (G3); Codex and OpenCode results come from the turn's last message, not everything streamed (G4); a queued task can only be removed, not edited (G5); a dispatch exception records `failed` (G6). Turn events now go to a list of task listeners (G1) and `comment-task/enqueue` can open a new conversation without activating it (G2). The gaps in the table above are unchanged.
 
 ### AI output reporting (Sprint 126)
+
+*Since Sprint 140 both entry points open the feedback sheet as an AI issue (see *The feedback door*); `reportStatusBar.ts` keeps only the command id, and the modules below are the sheet's e-mail route.*
 
 Microsoft Store policy 11.16 requires a working way for a user to report inappropriate generated output. Two entry points — a status bar item at right/priority 99 (between the AI status at 100 and scheduled tasks at 98) and an entry in the AI Information dialog — open one webview dialog. Both route through the host: the AI Information entry sends `report/request-open` rather than opening locally, because the host is the only side that knows the app version.
 
@@ -587,6 +589,45 @@ VS Code's routes: Open Recent, Open Folder…, a folder dropped on the Dock icon
 ### Settings' foot: Advanced settings (Sprint 134)
 
 ⌘, (Ctrl+, on Windows) opens Ritemark Settings (`ritemark.aiSettings`) since Sprint 132. Some settings live only on VS Code's own settings page: the feature switches, the update mode and channel, the excluded folders and the transcription export folder. So the foot of Ritemark Settings has one link, Advanced settings (`webview …/settings/AdvancedSettingsLink.tsx`). It posts `settings:openAdvanced`, and `RitemarkSettingsProvider` runs `workbench.action.openSettings`. Nothing else on the page moved. The palette's "Preferences: Open Settings" stays (R21 keeps it).
+
+### The first day's guidance (Sprint 140, #498)
+
+Home shows at most one guidance card under Waiting for you, in the drawn order: What moved, the ready request, the feedback card. The AI's empty chat shows starting points chosen by what is in front. Everything the guidance remembers is in one global-state key; nothing is written in a project's folder.
+
+| Module | Owns |
+|---|---|
+| `guidance/guidanceState.ts` | Pure: the one card due (`guidanceCard`); on a day the ready request showed, the feedback card waits (D1); `releaseOf` (major.minor), `withSavedDay`, `feedbackDue` (the third saved day) |
+| `guidance/readyRequest.ts` | Pure: the kind (`files`, `empty`, `sample` by card `m4d7r2`), whether it is due (`foundBy: 'opened'` only, not gone), its words with the AI's name, which AI the card offers (`cardAi`) |
+| `guidance/folderCounts.ts` | The counts line from names alone (`readdir` with types, no `stat`, so online-only files are never fetched; dot names, `node_modules` and `.ritemark` skipped; 10,000 names at most) |
+| `guidance/guidanceStore.ts` | `ritemark.guidance.v1`: per project the ready request's record (`gone: answered \| chat \| hidden`, its chat id, the chosen AI); per release the saved days and the feedback card's answer; the last day the ready request showed. Decoded defensively |
+| `guidance/startingPlace.ts` | What is in front → a place (`project`, `empty_project`, `sample`, `short_text`, `long_text`, `table`, `word_or_pdf`); `READ_KINDS_EVERY_AI_PASSED` keeps Word and PDF on the project's points until every AI passes #497's spike |
+| `guidance/madeSomething.ts` | `made_something` once per way per window session (a new document's first save, an export, a publish, a file written during an AI turn), with whether a ready request came first |
+| `guidance/GuidanceHost.ts` | The `vscode` side: Home's card for each push, the press, Ask with's sign-ins, the feedback card's send, the counts |
+
+**A visible chat from the host.** `UnifiedViewProvider.startChat({ runtimeId, text, send, origin })` posts `chat/start` (held until `sidebar/ready`): the store reuses a blank chat or makes one, puts it in front with that AI, and either sends `text` through the runtime's own send or puts it in the box with the cursor at its end. The webview answers a filled or sent request with `guidance/origin` (`readyRequest` or `startingPoint {place, text}`), and the host ties the chat id to the project's record. Sprint 139 reuses this path. The sample's request is the board's Give of `m4d7r2` (`BoardController.give`), not a chat.
+
+**The card goes by the record, not a timer.** Each Home push reads the chat index by the project's scope: the ready request's chat answered (a completed `assistant-message` in its record), or any other chat of the person's own in the project, takes it away for good; × hides it per project. The sample's goes when the hand-off ledger says `m4d7r2` finished.
+
+**Starting points fill, never send.** `ai-sidebar/StartingPoints.tsx` (with `startingPointWords.ts`) replaces 2.0's examples that sent at once; at most three, hidden (keeping their room) while the box holds the person's words. `starting-place` carries the place from the host on tab, text and file changes.
+
+**Word and PDF reading** stayed with each AI (#497's spike: ChatGPT passed both on the Mac; Claude, OpenCode and Windows were not run). Every AI's capability context gained one honesty line (version 3): name the files it could not open.
+
+### The feedback door (Sprint 140, #466)
+
+One door and one sheet replace Send Feedback's four reactions and the Report AI issue window's entry points.
+
+| Module | Owns |
+|---|---|
+| `feedback/feedbackCopy.ts` | Every word of the door, the sheet, the hand-off and the thank-you; `emailRouteStrings()` for the honesty test |
+| `feedback/feedbackRoute.ts` | Pure: neither box ticked → straight from Ritemark; either box → the person's own e-mail app; the last answer shortened at a sentence end to fit the 1,800-character link, marked `[shortened]` |
+| `feedback/feedbackSheet.ts` | `ritemark.feedback.open {from, kind}` (status bar, Help, AI information, the command), the open chat's last answer from its record, and `_ritemark.feedback.submit` for the sheet: the straight route through `ConsentGate.sendFeedback`, the e-mail route through Sprint 126's `composeReport` and `openReportMail` |
+| `feedback/feedbackStatusBar.ts` | "Send feedback" at right, priority 97; `ritemark.reportAIOutput` and `ritemark.reactions` open the sheet |
+| Patch 018 `ritemarkFeedbackSheet.ts` | The sheet over the window (`_ritemark.feedbackSheet`): VS Code's dialog cannot change its buttons as boxes change or stay open after a press, so the sheet is its own DOM on the dialog's dimmed block, in experience 31's style. Every word comes from the extension. It resolves `sent`, `mailed` or `cancelled` |
+| Patch 015 `helpActions.ts` | Help ▸ Send feedback after Support, in the allowlist |
+
+**"Sent" only when the service accepted it.** posthog-node's `captureImmediate` does not reject on a failed request; it emits `'error'`. `analytics/posthog.ts` wraps the client so a send that emitted an error throws, and `sendFeedback` returns false. Then the sheet stays with the message, one line and Open in e-mail (D5). The e-mail route never says sent. With usage data off, the send still goes as the person's own, from a one-off id; `feedback_opened` does not.
+
+**The report's privacy contract holds.** `composeReport(context, body, lastAnswer?)` gains only the answer the person ticked and saw quoted in the sheet; Copy carries the whole answer. `ReportDialog` and the `report/*` messages stay for a shell without the sheet, which falls back to them (R16).
 
 ## Agent Runtime Architecture
 
@@ -1524,6 +1565,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-10-26 | Sprint 140 | **The first day and the feedback door (#497, #498, #466).** New `src/guidance/` and `src/feedback/` (see *The first day's guidance* and *The feedback door*). `HomeState.guidance` replaces `whatMoved`; new `home/*` requests (ready request, Ask with, hide, sign-in, keys, the feedback card's send, mail and Not now). The AI's sheet: `chat/start`, `starting-place` (host → webview), `guidance/origin` (webview → host), `StartingPoints.tsx` in place of `EmptyState.tsx`. `chatLinks.rewriteCodexCitations` draws ChatGPT's file citations as links. Capability context version 3 (the honesty line). Events `ready_request_used`, `starting_point_used`, `made_something`, `feedback_opened`; `feedback_sent.asked`. `analytics/posthog.ts` makes an immediate send that emitted an error throw. Patch 018: `ritemarkFeedbackSheet.ts` and its CSS and unit test; patch 015: Help ▸ Send feedback. No R1a, no R7 (#497's spike). |
 | 2026-10-23 | Sprint 136 | **2.0.0 released (#490, #491, #492, #494, #495, #500).** Extension:
 - a task card's tab carries its title and the task mark (`ritemarkEditor.ts` `applyCardTab`, `cardFile.cardTitleOf`);
 - the AI's chip follows the active tab only, with a delete-only watcher (`UnifiedViewProvider`);

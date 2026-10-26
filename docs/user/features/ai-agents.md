@@ -339,32 +339,29 @@ For the longer data-flow explanation and current provider links, open **AI infor
 
 ## Reporting AI output
 
-> New in v1.11.0.
+> New in v1.11.0. In v2.1 it is part of **Send feedback**.
 
-If an agent gives you output that is inappropriate or harmful, you can report it to the Ritemark team.
+If an agent gives you output that is wrong, unsafe or not what you asked for, you can report it to the Ritemark team. There are four ways in, and all open the same sheet over the window:
 
-There are two ways in, and both open the same window:
+- **Send feedback** in the status bar at the bottom of the window, beside the **AI Ready** indicator. It is always there.
+- **Help ▸ Send feedback** in the menu bar.
+- **AI information** (the ⓘ button beside the message box) has a **Report an AI issue** link. It opens the sheet titled **Report an AI issue**, with **This is about something the AI said or did** already ticked.
+- **Send Feedback** in All commands.
 
-- **Report AI issue** in the status bar at the bottom of the window, beside the **AI Ready** indicator. It is always there, whether or not the AI sidebar is open. Clicking it opens the AI sidebar with the report window.
-- **AI information** (the ⓘ button beside the composer) has a **Report AI output** section with a link of the same name.
+Write what happened in the box. Then:
 
-The **Report AI output** window shows exactly what the report will contain:
+- **Neither box ticked**: **Send** sends your message straight from Ritemark to the people who make Ritemark. Only the words you typed go: no document, no chat, no file name, no address. When the service has accepted it, Ritemark says **Thank you. It's with the people who make Ritemark.** If it didn't go (for example, you are offline), the sheet keeps your message and offers **Try again** or **Open in e-mail**. This works even with usage data off.
+- **This is about something the AI said or did**, or **I'd like an answer**, ticked: the button reads **Open in e-mail**, and your message goes through your own e-mail app to **info@productory.eu**, so you see exactly what goes and send it yourself. Ritemark never asks for your address.
+- In a chat with an answer, **Add the AI's last answer in this chat** quotes that answer in the sheet. Only that answer goes, and you see it before anything leaves. An answer too long for an e-mail link is shortened at a sentence end and marked **[shortened]**; **Copy** takes the whole answer.
 
-- **Included with your report**: two lines Ritemark adds. One is the Ritemark version and your platform (for example `Ritemark 1.11.0 (darwin)` on a Mac, or `(win32)` on Windows). The other is the time you opened the window, in UTC.
-- **What went wrong?**: an empty box for you to paste the AI output and say what is wrong with it. It holds up to 8,000 characters.
+The e-mail adds two lines Ritemark knows: the Ritemark version and your platform, and the time, in UTC. Nothing else is added.
 
-Nothing else goes into the report. Ritemark takes nothing from your conversations, your documents or your account. Nothing is filtered out; the report window never has access to them in the first place. The window starts empty every time you open it.
+After **Open in e-mail**, the sheet says **Your e-mail app is opening** and shows what went in. It isn't on its way until you press Send in your e-mail app; Ritemark never says it was sent, because it only knows it passed the message to your e-mail app. **Copy** and **Done** stay on the sheet:
 
-Click **Open email** to hand the report to your email app as a new message to **info@productory.eu**, the address the Ritemark team monitors. You can read and change the whole message there, including the two lines Ritemark added, and nothing is sent until you press Send in your email app. Ritemark never tells you the report was sent, because it only knows that it passed the report to your email app, not what happened next. The window says **Your email app is opening** and reminds you that the report hasn't been sent yet.
+- **No e-mail app answered**: copy it and send it to info@productory.eu from any e-mail. This is a normal outcome, not an error.
+- **This is too long for an e-mail link**: e-mail links can only carry a limited amount of text, so Ritemark won't open your e-mail app and risk cutting it short. Copy it and send it yourself.
 
-Your report stays in the window whatever happens, and **Copy report** (under the text box) copies all of it:
-
-- **No email app is set up on this computer**: copy the report and email it to info@productory.eu yourself. This is a normal outcome, not an error.
-- **This report is too long to open in an email app**: email links can only carry a limited amount of text, so Ritemark won't open your email app and risk cutting the report short. Copy it and email it yourself.
-
-The address is always on screen under the text box as **Write to us: info@productory.eu**.
-
-If no email appears, see [Troubleshooting](../troubleshooting.md#report-ai-issue-doesnt-open-an-email).
+If no e-mail appears, see [Troubleshooting](../troubleshooting.md#report-ai-issue-doesnt-open-an-email).
 
 ---
 
@@ -376,7 +373,7 @@ If no email appears, see [Troubleshooting](../troubleshooting.md#report-ai-issue
 
 Credentials are stored locally using the operating system's secure storage and the installed runtime. AI sidebar requests are not proxied through a Productory server; the selected runtime connects to its provider using your account or key. Files stay on your computer as files, but prompts and relevant file, selection, attachment, browser, conversation, and tool context can be transmitted when you invoke cloud-connected AI.
 
-Separately, Ritemark sends anonymous product-usage events to PostHog when usage data is on (the default). Those events cover app sessions, feature/agent use, and reactions; they do not include prompt or file contents, names, or where you are. On a first start, nothing is sent until you leave the welcome with the switch on. If you explicitly submit written feedback with **Send Feedback**, the feedback text you enter is sent with that event, even with usage data off. To turn usage data off, turn off **Share anonymous usage data to improve Ritemark** on the welcome, or the same switch under **Usage data** in Ritemark Settings (Cmd+, on macOS, Ctrl+, on Windows).
+Separately, Ritemark sends anonymous product-usage events to PostHog when usage data is on (the default). Those events cover app sessions, feature/agent use, the first day's guidance (whether a ready request or a starting point was used, and whether something was made), and which door opened Send feedback; they do not include prompt or file contents, names, file counts, or where you are. On a first start, nothing is sent until you leave the welcome with the switch on. If you send feedback straight from Ritemark with **Send feedback** (neither box ticked) or the card on Home, the text you wrote is sent with that event, even with usage data off. To turn usage data off, turn off **Share anonymous usage data to improve Ritemark** on the welcome, or the same switch under **Usage data** in Ritemark Settings (Cmd+, on macOS, Ctrl+, on Windows).
 
 ---
 

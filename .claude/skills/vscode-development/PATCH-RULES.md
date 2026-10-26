@@ -24,7 +24,7 @@ Eighteen patches, numbered 001 through 019 (017 retired with the Getting Started
 | `012-ritemark-shell-watchdog.patch` | Updates | Quarantines a broken user-dir extension copy |
 | `013-ritemark-configuration-defaults.patch` | Defaults | product.json `configurationDefaults` on desktop |
 | `014-ritemark-save-receipts.patch` | Saving | Text-file save receipts |
-| `015-ritemark-help-menu-policy.patch` | Menus | The Help menu focused on Ritemark, with Getting started and Support |
+| `015-ritemark-help-menu-policy.patch` | Menus | The Help menu focused on Ritemark, with Getting started, Support and Send feedback |
 | `016-ritemark-store-acquisition-policy.patch` | Store policy | No external software-acquisition promotion (Source Control's Git download button) |
 | `018-ritemark-surfaces.patch` | The 2.0 frame | No title row, strips, sheets and gaps, zoom, Ritemark's menus, the left column's head, the welcome alone, a file's extension muted (sizes and drawing) |
 | `019-ritemark-tab-row.patch` | The 2.0 tab row | Tab sizes, the +, folded tabs, permanent tabs, terminals as tabs, an empty desk's tiles |
@@ -223,7 +223,7 @@ Before declaring ANY patch change complete, verify ALL of the following. Do not 
 - [ ] Run menu NOT visible
 - [ ] Terminal menu NOT visible
 - [ ] Window menu visible
-- [ ] Help menu: Getting started, Support, View License, Advanced ▸ Toggle Developer Tools
+- [ ] Help menu: Getting started, Support, Send feedback, View License, Advanced ▸ Toggle Developer Tools
 
 On the Mac the menus can be read from the profile's `storage.json` (`lastKnownMenubarData`) without opening them.
 
