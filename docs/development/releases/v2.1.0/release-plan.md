@@ -58,7 +58,8 @@ The five items, in the shape's order:
 | [139 — The chosen AI keeps working](sprint-139-chosen-ai/sprint-plan.md) | 4 | Which plans work, on each step-1 card and in Settings; the refusal card for Claude Free, its words after the reproduction; one-sentence errors for ChatGPT and OpenCode; a chat's model kept across restarts; the first reply's outcome and the bets' counts; the model items | #496, #417, #376, #479, #473 | — | **Approved** 2026-10-26. The refusal card's words wait on a Claude Free reproduction; the model items moved to 141 |
 | [140 — The first day and the feedback door](sprint-140-first-day/sprint-plan.md) | 2, 5 | The Word spike first; experience 35's ready request on Home by kind of project and the AI's starting points; empty places (Tasks, chats, Transcribe); Home's guidance order; the feedback door: Send feedback in the status bar and Help, one sheet, the Home card from day three | #497 (first), #498, #466 | Experience 35, drawn by the Experience lead | **Approved** 2026-10-26, with the Experience lead's answers D1–D11. It builds the shared "open a visible chat" path |
 | 141 — 2.1's model lineup | 4 | Gemini 4 Argon in `modelConfig.ts` and the bundled catalog; the feed refreshed without breaking 1.12–1.14; Flows' default Gemini model; OpenCode's lists from the providers' live lists (#529, the first to cut) | #532, #530, #531, #529 | — | Plan to write (split from 139 on 26 October) |
-| The release — 2.1 as one release | — | The done list below, the runtime review, version 2.1.0, notes, the Store update, the release itself | #499, #506, the Store | 137–140 merged | Not planned yet. It gets a sprint number (142) only if it needs code, as Sprint 136 did for 2.0; otherwise it is the release worktree's steps, as in 2.0.1 |
+| [142 — 2.1 polish](sprint-142-polish/sprint-plan.md) | — | The smoke test's looks as the Experience lead decided (#557): markers in the AI's lists, File changes everywhere, the switch note that goes, Home's path without a gap; every split button one button in one tone (Jarmo, 26 October); Chat Debug checked (not on a release build); the 2.0 visual follow-ups: sheets' edges, the left column's scrollbars, the tooltip after a click, the board at 1440, Home at 150 px, a restored card's tab, Transcribe a file… as a tab | #557, #503, #504, #505, #516, #535, #508, #517 | Experiences 3 and 35, framework §3 (f4f5a12, bb368b5) | Plan written 26 October, waiting for approval. Shell-tier in part (patch 018: File changes, the desk's edge) |
+| The release — 2.1 as one release | — | The done list below, the runtime review, version 2.1.0, notes, the Store update, the release itself | #499, #506, the Store | 137–140 merged; 141–143 merged | Not planned yet. It gets a sprint number of its own only if it needs code, as Sprint 136 did for 2.0; otherwise it is the release worktree's steps, as in 2.0.1 |
 
 ### Order
 
@@ -98,13 +99,15 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 | #502 | Editing a link's address does nothing | 137 (its question 7: the same link code) |
 | #512 | A false "Retry document update" after an AI edit | 137 (its question 7: the same document sync), reproducer first |
 | #507 | ⌘⇧P sometimes does nothing on Home | 140 (Home) |
-| #535 | Home scrolls sideways when the AI's sheet is forced open in a very narrow window | 140 (Home) |
-| #516 | The Task board's four columns don't fit at 1440 with both side columns | 140, or after 2.1 with the Task board's redraw |
+| #535 | Home scrolls sideways when the AI's sheet is forced open in a very narrow window | 142 (R11) |
+| #516 | The Task board's four columns don't fit at 1440 with both side columns | 142 (R10) |
 | #511 | A task's message in its conversation loses the card's line breaks | 139 (agent-facing) |
 | #513 | Choosing @claude from a comment's mention list doesn't assign the comment | 139 |
 | #514 | An English chat's automatic title came out in Estonian | 139 |
-| #503, #504, #505, #508 | Shadows under rounded corners; Transcribe's white scrollbar track; a task card's Stop tooltip; a restored card tab's name | One small polish pass, with the Experience lead |
-| #509, #510, #517 | Transcribe on Windows (an .m4a, no Desktop folder) and Transcribe a file… as a tab | A Transcribe and Windows pass, or v2.2.0 |
+| #503, #504, #505, #508 | Shadows under rounded corners; Transcribe's white scrollbar track; a task card's Stop tooltip; a restored card tab's name | 142 (R7, R8, R9, R12), with the Experience lead |
+| #509, #510 | Transcribe on Windows (an .m4a, no Desktop folder) | A Transcribe and Windows pass, or v2.2.0 |
+| #517 | Transcribe a file… as a tab | 142 (R13) |
+| #557 | 2.1's smoke-test looks: Chat Debug, the AI's list markers, File changes, the switch note, Home's path | 142 (R1–R4, R6), with Jarmo's one-tone split button (R5) |
 | #515 | Ship on an Electron carrying Node 24.22.1 (21 October security releases) | The release (shell): checked against the pinned VS Code's Electron at the runtime review |
 
 ## Sprint / Issue / PR Tracker
@@ -116,6 +119,8 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 | 138 | `sprint-138-equations` | [#545](https://github.com/ProductoryHQ/ritemark-native/pull/545) | #481, #408 | Open, not merged | Passed (technical), 26 Oct | Drafted in `sprint-138-equations/notes/release-notes-and-reply.md`, applied at closeout |
 | 139 | `sprint-139-chosen-ai` | #550 | #496, #417, #376, #479, #473, #552 | — | passed (technical), 26 Oct | drafted, applied at closeout |
 | 140 | `sprint-140-first-day` | [#543](https://github.com/ProductoryHQ/ritemark-native/pull/543) | #497, #498, #466 | Open, not merged | Passed (technical), 26 Oct | Drafted in `sprint-140-first-day/notes/release-notes.md`, applied at closeout |
+| Plan: 142 | `plan/sprint-142-polish` | — | — | Local, not pushed | n/a | n/a |
+| 142 | `sprint-142-polish` | two PRs: extension-tier, then the patches | #557, #503, #504, #505, #508, #516, #517, #535 | — | — | — |
 | Release | a `create-release-worktree.sh` worktree, then the version bump | — | #499, #506, the Store | — | — | — |
 
 ## Feature-Complete Checklist
@@ -185,6 +190,11 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
   - the ready request on a folder of Word files, on an empty project and on the sample;
   - the starting points;
   - the feedback door from the status bar and Help.
+- **Polish** (142):
+  - More lists no Chat Debug, and the app has no `extensions/copilot`, on the Mac and on Windows;
+  - File changes heads its panel;
+  - the desk's corners are whole;
+  - the board's four columns fit at 1440 with both side columns, on Windows at 100%.
 - **The done list's checks:** a synced folder on both platforms; the Windows first window.
 - **Every release:** an authenticated Claude turn, a Codex turn and the OpenCode permission gate on x64 and Windows.
 
