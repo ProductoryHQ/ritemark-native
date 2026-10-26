@@ -439,6 +439,18 @@ export function cardTitleOf(text: string): string | null {
   return parsed.kind === 'card' ? parsed.card.title : null;
 }
 
+/**
+ * What a card page's tab is given next (#477), or null when it already has it. `shown` is the card title the tab
+ * was last given: null for none, undefined before the first time (where the editor starts a file in the card
+ * folder). The first time always writes (Sprint 142, #508):
+ * a tab restored with a card's title (patch 019) whose file no longer reads as a card goes back to its file's own
+ * name. The empty title is VS Code's own default, the file's name on the tab and its path in the tooltip.
+ */
+export function cardTabWrite(shown: string | null | undefined, cardTitle: string | null): { title: string; card: boolean } | null {
+  if (shown !== undefined && shown === cardTitle) return null;
+  return { title: cardTitle ?? '', card: cardTitle !== null };
+}
+
 export function cardFileName(title: string, copy = 1): string {
   return copy > 1 ? `${cardSlug(title)}-${copy}.md` : `${cardSlug(title)}.md`;
 }

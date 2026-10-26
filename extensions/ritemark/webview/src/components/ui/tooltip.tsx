@@ -59,7 +59,9 @@ export function Tooltip({
             side={side}
             sideOffset={6}
             collisionPadding={8}
-            className="z-[100] max-w-[240px] rounded-[8px] bg-[var(--r-ink-strong)] px-2.5 py-1.5 font-ui text-[12px] leading-[1.35] text-[var(--r-surface)] shadow-lg"
+            // Never wider than the page less its collision padding: a tooltip in a desk of 152 wraps its words instead
+            // of running past the edge (Sprint 142 merge 2, the narrowest Home's cut button)
+            className="z-[100] max-w-[min(240px,calc(100vw_-_16px))] rounded-[8px] bg-[var(--r-ink-strong)] px-2.5 py-1.5 font-ui text-[12px] leading-[1.35] text-[var(--r-surface)] shadow-lg"
           >
             {label}
             <TooltipPrimitive.Arrow className="fill-[var(--r-ink-strong)]" />

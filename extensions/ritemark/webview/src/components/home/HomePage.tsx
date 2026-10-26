@@ -19,7 +19,7 @@ import type { HomeMessage, HomeState } from '../../../../src/projects/protocol'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
-import { middleCut, noteEndsOn, othersWords, recentIcon, SWITCH_NOTE_MS, waitingIcon, waitingWords, whenWords } from './homeWords'
+import { middleCut, noteEndsOn, othersWords, placeParts, recentIcon, SWITCH_NOTE_MS, waitingIcon, waitingWords, whenWords } from './homeWords'
 import { ConversationBubbleIcon } from '../ai-sidebar/ConversationBubbleIcon'
 import { send } from './homeClient'
 import { GuidanceCard } from './GuidanceCards'
@@ -87,7 +87,7 @@ const useLayoutEffectInPage = typeof document === 'undefined' ? useEffect : useL
  * The line's room is the container's width less what the line holds besides the path (its icons, gaps, padding).
  * With `caret`, the › is drawn here, so a folder name that has to wrap keeps it after its last word.
  */
-function PlaceText({ place, caret = false }: { place: string; caret?: boolean }) {
+function PlaceText({ place, caret = false, title }: { place: string; caret?: boolean; title?: string }) {
   const ref = useRef<HTMLSpanElement>(null)
   const [cut, setCut] = useState<{ text: string; wrap: boolean; glue: boolean }>({ text: place, wrap: false, glue: false })
   useLayoutEffectInPage(() => {
@@ -106,7 +106,11 @@ function PlaceText({ place, caret = false }: { place: string; caret?: boolean })
       const cutNow = room <= 0 ? { text: place, wrap: true } : middleCut(place, fits)
       // The last word keeps the › on its line only when the two fit a line; a longer word breaks anywhere
       const glue = cutNow.wrap && caret && cutNow.text.includes(' ') && fits(cutNow.text.slice(cutNow.text.lastIndexOf(' ') + 1))
-      const next = { ...cutNow, glue }
+      // When the line could show only the folder's name and that is the project's title just above, it shows only its
+      // icon and ›; the whole path stays in the tooltip (experience 3, ritemark-dev b7fef7b)
+      const folder = placeParts(place).folder
+      const sameAsTitle = Boolean(title) && cutNow.text === folder && cutNow.text !== place && folder === title
+      const next = sameAsTitle ? { text: '', wrap: false, glue: false } : { ...cutNow, glue }
       setCut((current) => (current.text === next.text && current.wrap === next.wrap && current.glue === next.glue ? current : next))
     }
     measure()
@@ -114,8 +118,9 @@ function PlaceText({ place, caret = false }: { place: string; caret?: boolean })
     observer.observe(container)
     void document.fonts?.ready.then(measure)
     return () => observer.disconnect()
-  }, [place, caret])
+  }, [place, caret, title])
   const caretIcon = caret ? <Icon name="caret-right" size={12} tone="muted" className="rh-place-caret" /> : null
+  if (cut.text === '') return <span ref={ref} className="rh-place-text rh-place-iconly">{caretIcon}</span>
   // A name that wraps keeps the › after its last word (experience 3, ritemark-dev 76b3a50): the last word and the ›
   // go to a line together. A name with no spaces breaks anywhere instead.
   const lastSpace = cut.glue ? cut.text.lastIndexOf(' ') : -1
@@ -139,7 +144,7 @@ function Head({ state }: { state: HomeState }) {
       <Tooltip label={<><span className="block break-all">{project.place}</span><span className="block">Show its files in Documents</span></>} side="bottom" className="block max-w-full">
         <Button variant="ghost" className="rh-place max-w-full justify-start" onClick={() => send({ type: 'home/open-documents' })} aria-label={`${project.place}. Show its files in Documents`}>
           <Icon name="folder-simple" size={14} tone="inherit" />
-          <PlaceText place={project.place} caret />
+          <PlaceText place={project.place} caret title={project.name} />
         </Button>
       </Tooltip>
       <ProjectLine line={project.line} />

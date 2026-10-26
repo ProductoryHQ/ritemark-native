@@ -3,6 +3,7 @@ import {
   CARD_LIMITS,
   cardFileName,
   cardSlug,
+  cardTabWrite,
   cardTitleOf,
   checkDoneWhen,
   checkFiles,
@@ -331,6 +332,15 @@ function main(): void {
   assert.equal(cardTitleOf(EXAMPLE), 'Rewrite the launch plan intro');
   assert.equal(cardTitleOf('# Brief\n\nNot a card.'), null, 'a plain document has no card title');
   assert.equal(cardTitleOf('---\nritemark: task/1\nid: k3f9x2\ntitle: [unclosed\n---\n'), null, 'a broken card opens as a plain document');
+
+  // Sprint 142 (#508): the card page's tab. The first time always writes, so a restored card title goes when the
+  // file no longer reads as a card; after that only a change is written.
+  assert.deepEqual(cardTabWrite(undefined, null), { title: '', card: false }, 'restored with a card title, no longer a card: back to the file\'s own name');
+  assert.deepEqual(cardTabWrite(undefined, 'Draft Module 4'), { title: 'Draft Module 4', card: true }, 'a card: its title and the task mark');
+  assert.equal(cardTabWrite(null, null), null, 'still not a card: nothing to write');
+  assert.equal(cardTabWrite('Draft Module 4', 'Draft Module 4'), null, 'the same title: nothing to write');
+  assert.deepEqual(cardTabWrite('Draft Module 4', 'Draft Module 5'), { title: 'Draft Module 5', card: true }, 'a title edit follows');
+  assert.deepEqual(cardTabWrite('Draft Module 4', null), { title: '', card: false }, 'a card that stops reading as one goes back to its file\'s name');
 
   console.log('taskBoard/cardFile: all assertions passed');
 }

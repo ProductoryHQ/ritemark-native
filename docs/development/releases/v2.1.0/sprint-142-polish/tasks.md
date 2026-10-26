@@ -131,22 +131,23 @@ How the numbers map:
 
 ## Phase 6: The shell-tier parts and merge 2 (W2, W7's desk, W12 if patched)
 
-- [ ] Patch 018, `scm.contribution.ts`: the container's title "File changes"; More's `workbench.view.scm` entry removed (R2)
-- [ ] Patch 002: View ▸ Advanced ▸ File changes, if Q4 is yes (R2)
-- [ ] Patch 018, `.editor-container`:
-  - the inset hairline;
-  - shadow-md;
-  - the 8 of ground inside the painter, or the hairline alone (A6) (R7)
-- [ ] Patch 019, if A2 says so: the card's restored title (R12)
-- [ ] Each through `./scripts/create-patch.sh` onto its existing patch; `./scripts/apply-patches.sh --dry-run` clean (E6)
-- [ ] `frame-geometry.mjs` as on main; `frame-screenshots.mjs --compare` against main (S51)
-- [ ] Manual QA:
-  - S8–S11;
-  - S46–S49;
-  - S62–S64 if patched.
+- [x] Patch 018, `scm.contribution.ts`: the container's title "File changes"; More's `workbench.view.scm` entry removed (R2)
+- [x] Patch 002: View ▸ Advanced ▸ File changes, if Q4 is yes (R2)
+- [x] Patch 018, `.editor-container`:
+  - the inset hairline (`::after`, over a webview's layer too);
+  - no shadow: A6 found no room, so the hairline alone (R7); the desk no longer uses `ritemark.sheetShadow` (QA N3)
+- [x] Patch 019, as A2 says: the card's restored title (R12), in `customEditorInputFactory.ts`
+- [x] Each through `./scripts/create-patch.sh` onto its existing patch; `./scripts/apply-patches.sh --dry-run` clean from the pin (18 can apply, 0 conflicts), and the re-applied files byte-identical to the edited ones (E6)
+- [x] `frame-geometry.mjs` as on main (22 of 22, as main). `frame-screenshots.mjs --compare` not run: no main baseline set was captured (S51)
+- [x] Manual QA (`qa-evidence.md`, merge 2):
+  - S8 and S10 pass, S9 and S11 not run;
+  - S46 and S48 pass, S47 and S49 not run;
+  - S62 and S63 pass, S64 not run;
+  - from the QA of #565: a restored card tab whose file no longer reads as a card gets its file's name and icon back (`ritemarkEditor.ts`, `cardTabWrite` in `cardFile.ts`), tested and run live.
 
   Screenshots to the Experience lead.
-- [ ] `CLAUDE.md`'s patch rows (018, and 002 and 019 if changed) (E5)
+- [x] Added from the Development manager's review of #560 (27 Oct): the path line keeps only its folder icon and › when the folder's name is the project's title; a task opened as a tab shows its title (the open case already did; the restore case is 019); the narrowest Home's cut button has its whole words in its tooltip, and a tooltip is never wider than the page; Open in Excel is an outline button with the arrow-out-of-a-box icon, as Open in Word
+- [x] `CLAUDE.md`'s patch rows (018, 002 and 019) (E5)
 - [ ] PR opened; `qa-validator` review; the Development manager's smoke test; admin merge under the delegation
 
 ## Phase 7: Closeout

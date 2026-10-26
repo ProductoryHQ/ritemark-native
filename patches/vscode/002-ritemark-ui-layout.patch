@@ -23,6 +23,8 @@ Sprint 135: rebased onto VS Code 1.142.0. The places row and the 40-high header,
   compositeSize is upstream's (actionHeight + actionGap, 40 with Modern UI off, which product.json pins); the
   Appearance submenu stays out of View; layoutActions.ts also drops its KeyMod/KeyCode import, used at 1.142 only
   by the Cmd+B binding this patch removes.
+Sprint 142 (2.1 polish, #557, Q4): View ▸ Advanced's Source Control entry reads File changes, its name everywhere (018
+  names the view container).
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 index 833787070f3..164ba274dfd 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
@@ -81,7 +83,7 @@ index 833787070f3..164ba274dfd 100644
  				icon,
  			}, location);
 diff --git a/src/vs/workbench/browser/actions/layoutActions.ts b/src/vs/workbench/browser/actions/layoutActions.ts
-index f7b82f298f7..c0589d974ad 100644
+index f7b82f298f7..e8bbceb8706 100644
 --- a/src/vs/workbench/browser/actions/layoutActions.ts
 +++ b/src/vs/workbench/browser/actions/layoutActions.ts
 @@ -10,7 +10,6 @@ import { IConfigurationService } from '../../../platform/configuration/common/co
@@ -162,7 +164,7 @@ index f7b82f298f7..c0589d974ad 100644
 +	group: '1_views',
 +	command: {
 +		id: 'workbench.view.scm',
-+		title: localize('miViewSCMAdvanced', "Source Control"),
++		title: localize('miViewSCMAdvanced', "File changes"), // Ritemark 2.1 (Sprint 142, #557, Q4): its name everywhere
 +	},
  	order: 1
  });
