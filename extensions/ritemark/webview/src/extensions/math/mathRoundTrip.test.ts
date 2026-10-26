@@ -1,0 +1,209 @@
+/**
+ * Sprint 138 (#481, R2): math is written back as it was. Run with `npx tsx <this file>`.
+ *
+ * Drives the editor's own pipeline (`utils/editorMarkdown.ts`): on load
+ * `markdownToEditorHTML`, then TipTap's own parse (its whitespace pass and
+ * `preserveWhitespace: 'full'`, as `createNodeFromContent` does); on save
+ * `getHTML()` and `editorHTMLToMarkdown`. The DOM is domino, Turndown's own.
+ *
+ * Before Sprint 138 a save doubled every backslash in a formula, dropped the
+ * backslash of `\{`, `\,` and `\%`, escaped `_` and turned `\(x\)` into `(x)`
+ * (research/today.md), so one edited word rewrote every equation in a file.
+ */
+import { strict as assert } from 'node:assert'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { createDocument } from '@mixmark-io/domino'
+import { getSchema, getTextBetween, getTextSerializersFromSchema } from '@tiptap/core'
+import { DOMParser as PMDOMParser, DOMSerializer, type Node as PMNode } from '@tiptap/pm/model'
+import {
+  createEditorSchemaExtensions,
+  editorHTMLToMarkdown,
+  editorMarked,
+  markdownToEditorHTML,
+} from '../../utils/editorMarkdown'
+
+// The load and save helpers build their temporary DOM with `document`. Every
+// browser's NodeList has `forEach`; domino's does not.
+const hostDocument = createDocument('<!doctype html><html><body></body></html>')
+const nodeListPrototype = Object.getPrototypeOf(hostDocument.querySelectorAll('p')) as { forEach?: unknown }
+nodeListPrototype.forEach ??= Array.prototype.forEach
+// A browser's classList is iterable (the code block's parse rule spreads it).
+const tokenListPrototype = Object.getPrototypeOf(hostDocument.body.classList) as Record<symbol, unknown>
+tokenListPrototype[Symbol.iterator] ??= Array.prototype[Symbol.iterator]
+;(globalThis as { document?: unknown }).document = hostDocument
+
+const here = path.dirname(fileURLToPath(import.meta.url))
+const fixture = (name: string) => fs.readFileSync(path.join(here, 'fixtures', name), 'utf8')
+
+const schema = getSchema(createEditorSchemaExtensions())
+
+/** TipTap's `elementFromString` drops the newline-only text `marked` puts between tags. */
+function removeWhitespaces(node: Node): Node {
+  for (let index = node.childNodes.length - 1; index >= 0; index--) {
+    const child = node.childNodes[index]
+    if (child.nodeType === 3 && child.nodeValue && /^(\n\s\s|\n)$/.test(child.nodeValue)) node.removeChild(child)
+    else if (child.nodeType === 1) removeWhitespaces(child)
+  }
+  return node
+}
+
+function fromHTML(html: string): PMNode {
+  const body = createDocument(`<!doctype html><html><body>${html}</body></html>`).body
+  return PMDOMParser.fromSchema(schema).parse(removeWhitespaces(body), { preserveWhitespace: 'full' })
+}
+
+const load = (markdown: string): PMNode => fromHTML(markdownToEditorHTML(markdown))
+
+function getHTML(doc: PMNode): string {
+  const document = createDocument()
+  const container = document.createElement('div')
+  container.appendChild(DOMSerializer.fromSchema(schema).serializeFragment(doc.content, { document }))
+  return container.innerHTML
+}
+
+const save = (doc: PMNode): string => editorHTMLToMarkdown(getHTML(doc))
+
+/** The editor never carries the file's trailing newline; the host keeps it. */
+const projection = (markdown: string) => markdown.replace(/\n+$/, '')
+
+/** Every equation in a Markdown text, as `marked` reads it, in order. */
+function equations(markdown: string): string[] {
+  const found: string[] = []
+  const walk = (tokens: unknown[]) => {
+    for (const token of tokens as Array<Record<string, unknown>>) {
+      if (token.type === 'mathInline' || token.type === 'mathBlock') found.push(String(token.raw).replace(/\n$/, ''))
+      for (const key of ['tokens', 'items', 'header', 'rows'] as const) {
+        const value = token[key]
+        if (Array.isArray(value)) walk(value.flat() as unknown[])
+      }
+      if (Array.isArray((token as { cells?: unknown[] }).cells)) walk(((token as { cells: unknown[] }).cells).flat())
+    }
+  }
+  walk(editorMarked.lexer(markdown))
+  return found
+}
+
+function nodesOf(doc: PMNode, name: string): PMNode[] {
+  const found: PMNode[] = []
+  doc.descendants(node => {
+    if (node.type.name === name) found.push(node)
+  })
+  return found
+}
+
+// ---- the fixtures, byte for byte ----
+// Lists, soft line breaks and a quote's blank line are Sprint 137's (#270):
+// until it lands, a list item is written `-   item` with a blank line between
+// items, a soft break as a hard one, and a quote's empty line as `> `. Math
+// inside them is still written back untouched, which is what this sprint
+// owns; the whole file is byte for byte once 137 is in.
+const WAITS_FOR_137 = /^(\s*[-*+]\s|\s*\d+[.)]\s|\s+$|$|>\s*$)/
+for (const name of ['forms.md', 'prose-dollars.md', 'edge-cases.md', 'analyst-report.md']) {
+  const source = fixture(name)
+  const doc = load(source)
+  const saved = save(doc)
+
+  assert.deepEqual(equations(saved), equations(source), `${name}: every equation is written back exactly`)
+  assert.equal(save(load(saved)), saved, `${name}: a second save changes nothing`)
+
+  if (saved === projection(source)) continue
+  const before = projection(source).split('\n')
+  const after = saved.split('\n')
+  const changed = [...after.filter(line => !before.includes(line)), ...before.filter(line => !after.includes(line))]
+  const outside137 = changed.filter(line => !WAITS_FOR_137.test(line))
+  assert.deepEqual(outside137, [], `${name}: only list lines may differ before Sprint 137; saved:\n${saved}`)
+  console.log(`  ${name}: math byte for byte; ${changed.length} list line(s) wait for Sprint 137`)
+}
+
+// ---- the report: every equation becomes a node; prices and `\$` stay text ----
+{
+  const doc = load(fixture('analyst-report.md'))
+  assert.equal(nodesOf(doc, 'mathBlock').length, 2, 'two equation blocks')
+  assert.equal(nodesOf(doc, 'mathInline').length, 13, 'thirteen inline equations, the table and the list included')
+  assert.equal(nodesOf(doc, 'literalDollar').length, 2, 'the two escaped prices')
+  assert.ok(doc.textContent.includes('$12,000 per warehouse'), 'an escaped price reads as a price')
+}
+
+// ---- prose dollars never become math ----
+{
+  const doc = load(fixture('prose-dollars.md'))
+  assert.equal(nodesOf(doc, 'mathInline').length + nodesOf(doc, 'mathBlock').length, 0, 'no equations in prose')
+}
+
+// ---- code, links and comments keep their dollars ----
+{
+  assert.deepEqual(equations('A comment <!-- $not$ math --> in a line.'), [], 'an inline HTML comment is not math')
+  assert.deepEqual(equations('<!-- $not$ math -->'), [], 'a comment block is not math')
+  assert.deepEqual(equations('<https://example.com/$x$>'), [], 'an autolink is not math')
+  assert.deepEqual(equations('    $indented code$'), [], 'an indented code block is not math')
+}
+{
+  const doc = load(fixture('edge-cases.md'))
+  const inline = nodesOf(doc, 'mathInline').map(node => node.attrs.latex)
+  assert.ok(!inline.includes('x') || inline.filter(latex => latex === 'x').length === 1, 'only the link text\'s $x$ is math, not its address')
+  assert.ok(doc.textContent.includes('$$ y $$'), 'code keeps its dollars')
+  assert.ok(nodesOf(doc, 'mathBlock').length === 1, 'the quote holds an equation block')
+}
+
+// ---- typed dollars: written as typed unless they would pair up ----
+const typed = (html: string) => save(fromHTML(html))
+{
+  assert.equal(typed('<p>It costs $5.</p>'), 'It costs $5.')
+  assert.equal(typed('<p>costs $5 and $10</p>'), 'costs $5 and $10')
+  assert.equal(typed('<p>$x$</p>'), '\\$x\\$', 'typed text that looks like math is escaped')
+  assert.equal(nodesOf(load(typed('<p>$x$</p>')), 'mathInline').length, 0, 'and reopens as text')
+  assert.equal(load(typed('<p>$x$</p>')).textContent, '$x$')
+  assert.equal(typed('<p>$$x$$</p>'), '\\$\\$x\\$\\$')
+  assert.equal(typed('<p>$a $b$ c$</p>'), '\\$a \\$b\\$ c\\$', 'left to right, every pair')
+
+  // A typed price before an equation would pair with the equation's own dollar.
+  const priced = typed('<p>costs $5 and <span data-math="inline" data-delimiter="$" data-latex="x">$x$</span> total</p>')
+  assert.equal(priced, 'costs \\$5 and $x$ total', 'the typed dollar is escaped, the equation kept')
+  const reopened = load(priced)
+  assert.deepEqual(nodesOf(reopened, 'mathInline').map(node => node.attrs.latex), ['x'], 'one equation, the same one')
+  assert.equal(reopened.textContent.startsWith('costs $5 and '), true)
+
+  // A typed dollar right before an equation block's opener in the same line.
+  const touching = typed('<p>a $<span data-math="inline" data-delimiter="$$" data-latex="y">$$y$$</span></p>')
+  assert.deepEqual(nodesOf(load(touching), 'mathInline').map(node => node.attrs.latex), ['y'], 'the equation survives a dollar typed against it')
+
+  // A typed backslash before a dollar.
+  const slashed = typed('<p>a\\$b$</p>')
+  assert.equal(load(slashed).textContent, 'a\\$b$', 'a typed backslash and dollars come back as typed')
+  assert.equal(nodesOf(load(slashed), 'mathInline').length, 0)
+
+  // Dollars in code and in other paragraphs do not pair across.
+  assert.equal(typed('<p>$a</p><p>b$</p>'), '$a\n\nb$', 'no pairing across paragraphs')
+  assert.equal(typed('<p>$a <code>b</code> c</p>'), '$a `b` c')
+}
+
+// ---- an edited equation keeps its form ----
+{
+  const doc = load('$$\n\\int_0^1 x^2 \\, dx\n$$')
+  const [block] = nodesOf(doc, 'mathBlock')
+  const edited = doc.type.create(null, [block.type.create({ ...block.attrs, latex: block.attrs.latex.replace('x^2', 'x^3') })])
+  assert.equal(save(edited), '$$\n\\int_0^1 x^3 \\, dx\n$$', 'a block stays on its own lines')
+
+  const emptied = doc.type.create(null, [block.type.create({ ...block.attrs, latex: '' }), schema.nodes.paragraph.create(null, schema.text('after'))])
+  assert.equal(save(emptied), 'after', 'an emptied block is gone from the file')
+}
+
+// ---- the AI, comments and the clipboard see the source ----
+{
+  const doc = load('The slope $\\hat{\\beta}$ and \\$5.\n\n$$\nE = mc^2\n$$')
+  assert.equal(doc.textBetween(0, doc.content.size, '\n'), 'The slope $\\hat{\\beta}$ and $5.\n$$\nE = mc^2\n$$', 'textBetween gives the source')
+  const clipboard = getTextBetween(doc, { from: 0, to: doc.content.size }, { blockSeparator: '\n', textSerializers: getTextSerializersFromSchema(schema) })
+  assert.ok(clipboard.includes('$\\hat{\\beta}$') && clipboard.includes('$$\nE = mc^2\n$$'), 'clipboard text carries the source')
+  // The word count passes ' ' for leaves: an equation is not a word.
+  assert.equal(doc.textBetween(0, doc.content.size, ' ', ' ').trim().split(/\s+/).length, 4)
+}
+
+// ---- a document without math saves as it did ----
+{
+  const plain = 'Plain text with a ~tilde and a [link](https://example.com).\n\n**Bold** and *italic*.'
+  assert.equal(save(load(plain)), plain)
+}
+
+console.log('mathRoundTrip: all assertions passed')

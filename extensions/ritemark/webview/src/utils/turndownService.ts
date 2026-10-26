@@ -1,6 +1,7 @@
 import TurndownService from 'turndown'
 import { tables, taskListItems } from 'turndown-plugin-gfm'
 import { isRelativeImagePath, isWebviewResourceUri } from '../../../src/utils/imagePaths'
+import { addMathTurndownRules } from '../extensions/math/mathTurndownRules'
 import { addAsWrittenTurndownRules, blockImage, escapeTextRun, neutraliseBrackets, wrapMarked } from './markdownAsWritten'
 
 /**
@@ -112,6 +113,9 @@ export function createTurndownService(): TurndownService {
   // The as-written rules, which also escape a table cell's pipes (the GFM
   // plugin doesn't, and an unescaped `|` breaks a table holding code).
   addAsWrittenTurndownRules(service)
+  // Sprint 138 (#481, R2): equations written back as they were, `\$` kept,
+  // and a typed `$` escaped only when it would pair up as math on reopening.
+  addMathTurndownRules(service)
 
   return service
 }
