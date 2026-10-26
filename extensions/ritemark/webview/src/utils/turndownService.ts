@@ -1,7 +1,7 @@
 import TurndownService from 'turndown'
 import { tables, taskListItems } from 'turndown-plugin-gfm'
 import { isRelativeImagePath, isWebviewResourceUri } from '../../../src/utils/imagePaths'
-import { addAsWrittenTurndownRules, blockImage, escapeTextRun, wrapMarked } from './markdownAsWritten'
+import { addAsWrittenTurndownRules, blockImage, escapeTextRun, neutraliseBrackets, wrapMarked } from './markdownAsWritten'
 
 /**
  * Create a fresh TurndownService configured with Ritemark's canonical
@@ -50,6 +50,27 @@ export function createTurndownService(): TurndownService {
   // `escapeTextRun` is Turndown's escaper without its line-start escapes,
   // which the paragraph rule applies at the start of each line instead.
   service.escape = (text: string) => escapeLiteralTildes(escapeTextRun(text))
+
+  // Brackets a mark splits across runs (`[**x**]: y`) are escaped from the
+  // block's text as a whole, which Turndown's per-run escaper cannot see
+  // (`neutraliseBrackets`). Only input with a bracket takes the extra pass; it
+  // is parsed in an inert document, as Turndown parses its own string input.
+  const turndown = service.turndown.bind(service)
+  service.turndown = (input: string | TurndownService.Node): string => {
+    if (typeof document === 'undefined') return turndown(input)
+    if (typeof input === 'string') {
+      if (!/[[\]]/.test(input)) return turndown(input)
+      const inert = document.implementation?.createHTMLDocument?.('') ?? document
+      const root = inert.createElement('div')
+      root.innerHTML = input
+      neutraliseBrackets(root)
+      return turndown(root)
+    }
+    if (!/[[\]]/.test(input.textContent ?? '')) return turndown(input)
+    const root = input.cloneNode(true)
+    neutraliseBrackets(root)
+    return turndown(root as TurndownService.Node)
+  }
 
   // Strikethrough: TipTap's Strike mark renders `<s>`, and `marked` loads
   // `~~x~~` as `<del>`. Turndown has no default rule for either, so without

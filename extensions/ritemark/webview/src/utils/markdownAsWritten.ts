@@ -420,9 +420,12 @@ const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u
  *    `escapeLineStarts`; `~~~` keeps Turndown's run-start escape;
  *  - an underscore between letters or digits stays bare: CommonMark never
  *    reads an underscore inside a word as emphasis;
- *  - a square bracket stays bare unless the run holds `](`, `][` or `]:`, the
- *    only ways a bracket in plain text could become a link or a definition;
- *    then each `[` is escaped, which is enough.
+ *  - a square bracket stays bare unless its block's text holds `](`, `][` or
+ *    `]:`, the only ways a bracket in plain text could become a link or a
+ *    definition; then each `[` is escaped, which is enough. The block's text,
+ *    not the run's: a mark can split the brackets (`neutraliseBrackets` turns
+ *    them into placeholders before Turndown runs, and they are written escaped
+ *    here). Without that pass (no DOM), the run's own text is checked.
  *  - a `<` that would open an HTML tag, a comment or an autolink (`<string>`,
  *    `<!--`, `<https://…>`) is escaped: unescaped, the next open reads it as
  *    HTML and the editor drops it with its text;
@@ -433,7 +436,7 @@ const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u
  */
 export function escapeTextRun(text: string): string {
   let escaped = text
-    .replace(/\\(?=[!-\/:-@[-`{-~]|$)/g, '\\\\')
+    .replace(/\\(?=[!-\/:-@[-`{-~]|$)/g, '\\\\')
     .replace(/\*/g, '\\*')
     .replace(/`/g, '\\`')
     .replace(/^~~~/, '\\~~~')
@@ -444,7 +447,72 @@ export function escapeTextRun(text: string): string {
     return before && after && LETTER_OR_DIGIT.test(before) && LETTER_OR_DIGIT.test(after) ? match : '\\_'
   })
   if (/\][([:]/.test(text)) escaped = escaped.replace(/\[/g, '\\[')
-  return escaped
+  return escaped.replace(//g, '\\[').replace(//g, '\\]')
+}
+
+/** A bracket `neutraliseBrackets` marked for escaping; `escapeTextRun` writes it `\[` or `\]`. */
+const OPEN_BRACKET = ''
+const CLOSE_BRACKET = ''
+
+/** Elements that sit inside a line of text: their text belongs to the block around them. */
+const INLINE_ELEMENTS = new Set([
+  'A', 'ABBR', 'B', 'BDI', 'BDO', 'BR', 'CITE', 'DATA', 'DEL', 'DFN', 'EM', 'FONT', 'I', 'IMG', 'INPUT', 'INS',
+  'KBD', 'LABEL', 'MARK', 'Q', 'S', 'SAMP', 'SMALL', 'SPAN', 'STRIKE', 'STRONG', 'SUB', 'SUP', 'TIME', 'U', 'VAR',
+  'WBR',
+])
+
+/**
+ * Brackets a mark splits (R6: nothing is lost). Turndown escapes one text run
+ * at a time, but a link or a definition can be made of several runs:
+ * `[` + **x** + `]: y` writes `[**x**]: y`, which the next open reads as a
+ * link-reference definition, and the paragraph is gone; `[` + **a** + `](b)`
+ * reopens as a link. So the check reads each block's text as a whole: when it
+ * holds `](`, `][` or `]:`, every `[` in the block's text is escaped, in
+ * whichever run it is. Inside a link every bracket is escaped, since the
+ * link's own `[…]` would otherwise end early or nest. Code is literal and left
+ * alone, in the check too.
+ *
+ * Runs on a DOM before Turndown; the brackets become placeholders that
+ * `escapeTextRun` writes escaped. Idempotent.
+ */
+export function neutraliseBrackets(root: Node): void {
+  const blocks = new Map<Node, Text[]>()
+  const collect = (node: Node, block: Node): void => {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === 3) {
+        const runs = blocks.get(block) ?? []
+        runs.push(child as Text)
+        blocks.set(block, runs)
+      } else if (child.nodeType === 1 && child.nodeName !== 'CODE' && child.nodeName !== 'PRE') {
+        collect(child, INLINE_ELEMENTS.has(child.nodeName) ? block : child)
+      }
+    }
+  }
+  collect(root, root)
+  for (const runs of blocks.values()) {
+    const opensSomething = /\][([:]/.test(runs.map(run => run.nodeValue ?? '').join(''))
+    for (const run of runs) {
+      const value = run.nodeValue ?? ''
+      if (!/[[\]]/.test(value)) continue
+      if (insideLink(run)) {
+        run.nodeValue = value.replace(/\[/g, OPEN_BRACKET).replace(/\]/g, CLOSE_BRACKET)
+      } else if (opensSomething) {
+        run.nodeValue = value.replace(/\[/g, OPEN_BRACKET)
+      }
+    }
+  }
+}
+
+function insideLink(node: Node): boolean {
+  for (let parent = node.parentNode; parent; parent = parent.parentNode) {
+    if (parent.nodeName === 'A') return true
+  }
+  return false
+}
+
+/** Text as the author wrote it, for rules that compare it (a bare address). */
+function restoreBrackets(text: string): string {
+  return text.replace(//g, '[').replace(//g, ']')
 }
 
 // ---------------------------------------------------------------------------
@@ -866,7 +934,7 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
     replacement(content, node) {
       const link = node as HTMLAnchorElement
       const href = link.getAttribute('href') as string
-      const text = link.textContent ?? ''
+      const text = restoreBrackets(link.textContent ?? '')
       const plain = link.children.length === 0
       const sameAddress = text === href || `mailto:${text}` === href || `http://${text}` === href
       if (plain && sameAddress) {

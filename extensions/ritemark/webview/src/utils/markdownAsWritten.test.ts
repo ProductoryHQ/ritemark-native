@@ -148,6 +148,41 @@ assert.equal(escapeLineStart('---', false), '\\---', 'a setext underline or rule
 assert.equal(wrapMarked('\\\nbold\\\n', '**'), '\\\n**bold**\\\n', 'line breaks stay outside a mark')
 assert.equal(wrapMarked('\\\n', '**'), '\\\n', 'a mark around a break alone writes nothing')
 
+// ---- R6: brackets a mark splits (QA on #553) ----
+// Turndown escapes one text run at a time; a link or a definition can be made of several runs. The check reads
+// the block's text as a whole (`neutraliseBrackets`).
+{
+  const html = createEditorTurndownService()
+  const comment = '<mark data-comment-id="c1" data-comment="" class="ritemark-comment-mark">'
+  const cases: Array<[string, string, string]> = [
+    ['<p>[<strong>x</strong>]: y</p>', '\\[**x**]: y', 'a definition split by bold'],
+    ['<p>[<em>x</em>]:y</p>', '\\[*x*]:y', 'and by italics'],
+    ['<p>[<strong>a</strong>](b)</p>', '\\[**a**](b)', 'a link split by bold'],
+    ['<p>[a][<strong>b</strong>]</p>', '\\[a]\\[**b**]', 'a reference link split by bold'],
+    ['<p>[a<s>b</s>](c)</p>', '\\[a~~b~~](c)', 'a link split by a strike'],
+    ['<p>[<code>x</code>](b)</p>', '\\[`x`](b)', 'a link split by code'],
+    [`<p>[a${comment}]</mark>(c)</p>`, '\\[a](c)', 'a link split by a comment mark, which writes no delimiter'],
+    ['<p><a href="https://u.test">chapter [2]</a></p>', '[chapter \\[2\\]](https://u.test)', 'brackets inside a link\'s text'],
+    ['<p><a href="https://u.test">a]b</a></p>', '[a\\]b](https://u.test)', 'a lone closing bracket inside a link\'s text'],
+    ['<p>See [1] and <strong>[draft]</strong>.</p>', 'See [1] and **[draft]**.', 'brackets that open nothing stay bare'],
+    ['<p>A <code>[a](b)</code> span</p>', 'A `[a](b)` span', 'code stays literal'],
+  ]
+  for (const [input, expected, why] of cases) {
+    const markdown = html.turndown(input)
+    assert.equal(markdown, expected, why)
+    let links = 0
+    let definitionLost = false
+    const reopened = openDocument(markdown).doc
+    reopened.descendants(node => {
+      if (node.marks.some(mark => mark.type.name === 'link')) links++
+    })
+    if (reopened.textContent.trim() === '') definitionLost = true
+    assert.equal(definitionLost, false, `${why}: the paragraph survives the next open`)
+    assert.equal(links > 0, input.includes('<a '), `${why}: no link appears, and a link stays one`)
+  }
+  assert.equal(roundTrip('\\[**draft**]: open dates'), '\\[**draft**]: open dates\n', 'the escaped form comes back as written')
+}
+
 // ---- R4: tables ----
 {
   assert.equal(roundTrip('| Name | Qty |\n|:---|---:|\n| x | |'), '| Name | Qty |\n|:---|---:|\n| x | |\n', 'delimiter row, alignment, spacing and an empty cell')
