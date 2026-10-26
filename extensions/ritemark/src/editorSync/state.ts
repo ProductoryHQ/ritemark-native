@@ -91,6 +91,17 @@ export function normalizeLogicalText(content: string): string {
 }
 
 /**
+ * The text a document is written to disk as: its logical text with the
+ * document's own line endings, and its UTF-8 byte order mark when it had one
+ * (the coordinator's `encodeDocumentBytes`; Sprint 137 R9 drives it from the
+ * corpus test).
+ */
+export function encodeDocumentText(content: string, lineEnding: '\n' | '\r\n', hasUtf8Bom: boolean): string {
+  const normalized = normalizeLogicalText(content).replace(/\n/g, lineEnding);
+  return `${hasUtf8Bom ? '\uFEFF' : ''}${normalized}`;
+}
+
+/**
  * A saved Markdown body always ends in exactly one trailing newline, matching
  * POSIX/Git conventions. `gray-matter`'s `stringify` already guarantees this
  * when front matter is present; documents without front matter bypass it and

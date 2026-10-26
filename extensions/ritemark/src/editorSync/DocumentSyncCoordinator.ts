@@ -22,6 +22,7 @@ import {
   classifyAcceptedModelEdit,
   classifyStaleViewEdit,
   classifyThreeWay,
+  encodeDocumentText,
   initializeThreeWayState,
   normalizeLogicalText,
   observeLocalSaveReceipts,
@@ -1003,9 +1004,7 @@ function snapshot(bytes: Buffer): DiskSnapshot {
 }
 
 function encodeDocumentBytes(content: string, eol: vscode.EndOfLine, hasUtf8Bom: boolean): Uint8Array {
-  const lineEnding = eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
-  const normalized = normalizeLogicalText(content).replace(/\n/g, lineEnding);
-  return Buffer.from(`${hasUtf8Bom ? '\uFEFF' : ''}${normalized}`, 'utf8');
+  return Buffer.from(encodeDocumentText(content, eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n', hasUtf8Bom), 'utf8');
 }
 
 function logicalHash(content: string): string {
