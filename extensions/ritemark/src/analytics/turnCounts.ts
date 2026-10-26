@@ -50,8 +50,9 @@ export class TurnCounter {
     if (continuation) return;
     const provider = agentFamily(runtimeId);
     if (!provider || !this.deps.maySend() || this.deps.firstMessageCounted()) return;
-    await this.deps.markFirstMessageCounted();
+    // Remember the turn first: a turn that ends while the marker is being written still sends first_reply.
     this.firstReplyTurn = turnKey;
+    await this.deps.markFirstMessageCounted();
     await this.deps.track('first_message_sent', { provider });
   }
 

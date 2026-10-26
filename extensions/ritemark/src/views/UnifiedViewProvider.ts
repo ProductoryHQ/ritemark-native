@@ -1205,7 +1205,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               ? [...DEFAULT_TOOLS, ..._toolsInjector.claudeAllowedTools(toolGroups)]
               : undefined,
             live: isClaudeCode
-              ? this._claudeLiveHooks(conversationId, agentId as AgentId, bindingGeneration, hostConversationEnabled)
+              ? this._claudeLiveHooks(conversationId, agentId as AgentId, bindingGeneration, hostConversationEnabled, Boolean(anthropicApiKey))
               : undefined,
             onProgress: (progress) => {
               if (!isCurrentRuntimeTurn()) return;
@@ -1319,13 +1319,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               const error = errorPresentation?.message ?? result.error;
               const errorKind = errorPresentation?.errorKind;
               const errorDetail = errorPresentation?.errorDetail;
-              // The provider's own words stay in the turn's activity details, for diagnosis.
-              if (errorPresentation && result.error && result.error.trim() !== error) {
-                this._view?.webview.postMessage({
-                  type: 'codex-progress', conversationId,
-                  progress: { type: 'error', message: result.error, timestamp: Date.now() },
-                });
-              }
+              // The provider's own words stay in the turn's activity details, for diagnosis. They travel
+              // with the result, so they never show as the running turn's live line.
+              const rawError = errorPresentation && result.error && result.error.trim() !== error ? result.error : undefined;
               this._view?.webview.postMessage({
                 type: 'codex-result', conversationId,
                 agentId,
@@ -1333,6 +1329,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 error,
                 ...(errorKind ? { errorKind } : {}),
                 ...(errorDetail ? { errorDetail } : {}),
+                ...(rawError ? { rawError } : {}),
               });
               this._refreshExplorerForAgentWrites(undefined);
               if (!terminalCheckpointWritten) {
@@ -3750,6 +3747,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     agentId: AgentId,
     bindingGeneration: number,
     hostConversationEnabled: boolean,
+    usesApiKey = false,
   ): import('../agent/types').AgentLiveHooks {
     const post = (message: Record<string, unknown>) => this._view?.webview.postMessage({ conversationId, agentId, ...message });
     let runtimeTurnId: string | null = null;
@@ -3799,7 +3797,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         }
         const errorPresentation = isCancelledError(result.error)
           ? (result.error ? { message: result.error } : undefined)
-          : presentRuntimeError(agentId, result.error, undefined, { code: result.errorCode, names: modelNamesFor(agentId) });
+          : presentRuntimeError(agentId, result.error, undefined, { code: result.errorCode, usesApiKey, names: modelNamesFor(agentId) });
         const error = errorPresentation?.message;
         const failureKind = errorPresentation?.failureKind;
         const errorKind = errorPresentation && 'errorKind' in errorPresentation ? errorPresentation.errorKind : undefined;

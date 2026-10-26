@@ -142,7 +142,9 @@ export class VoiceNotes {
   /** Is this document watched? (A cheap check before the event path.) */
   watches(documentUri: string): boolean {
     const state = decodeState(this.deps.read());
-    return Boolean(state?.entries.some((entry) => entry.id === this.deps.hash(state.salt, documentUri)));
+    if (!state || state.entries.length === 0) return false;
+    const id = this.deps.hash(state.salt, documentUri);
+    return state.entries.some((entry) => entry.id === id);
   }
 
   /** The list without entries older than 30 days; undefined when nothing is left. */

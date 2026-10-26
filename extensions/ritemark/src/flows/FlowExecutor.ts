@@ -17,11 +17,8 @@ import { executeImageNode } from './nodes/ImageNodeExecutor';
 import { executeSaveFileNode } from './nodes/SaveFileNodeExecutor';
 import { executeClaudeCodeNode } from './nodes/ClaudeCodeNodeExecutor';
 import { executeCodexNode } from './nodes/CodexNodeExecutor';
-import { randomUUID } from 'crypto';
 import { countTurnEnded, trackEvent } from '../analytics/posthog';
-import { classifyRuntimeError } from '../runtime/runtimeErrorPresentation';
-import { turnOutcome } from '../runtime/turnFailureCopy';
-import type { AgentId } from '../agent/types';
+import { countedAgentStep } from './flowTurnCounts';
 
 /**
  * Progress callback
@@ -82,29 +79,6 @@ function getExecutionOrder(nodes: FlowNode[], edges: { source: string; target: s
 }
 
 /**
- * Sprint 139 (R7): a Flow's Claude or ChatGPT step is an agent turn, counted as
- * `agent_used` with `source: flow` when it ends, with its outcome. No text.
- */
-async function countedAgentStep<T>(runtimeId: AgentId, abortSignal: AbortSignal | undefined, run: () => Promise<T>): Promise<T> {
-  const turnKey = `flow:${randomUUID()}`;
-  const failed = (message: string): void => {
-    const kind = abortSignal?.aborted ? undefined : classifyRuntimeError(runtimeId, message)?.kind;
-    void countTurnEnded(turnKey, runtimeId, 'flow', turnOutcome(abortSignal?.aborted ? 'cancelled' : 'failed', kind));
-  };
-  try {
-    const result = await run();
-    // A step can also end with its error in the result (a timeout, the AI's own failure).
-    const error = result && typeof result === 'object' ? (result as { error?: unknown }).error : undefined;
-    if (typeof error === 'string' && error.trim()) failed(error);
-    else void countTurnEnded(turnKey, runtimeId, 'flow', 'arrived');
-    return result;
-  } catch (error) {
-    failed(error instanceof Error ? error.message : String(error));
-    throw error;
-  }
-}
-
-/**
  * Execute a single node based on its type
  */
 async function executeNode(
@@ -135,10 +109,11 @@ async function executeNode(
       return await executeSaveFileNode(node, context);
 
     case 'claude-code':
-      return await countedAgentStep('claude-code', abortSignal, () => executeClaudeCodeNode(node, context, abortSignal));
+      // Sprint 139 (R7): counted as agent_used, source flow, when the step ends.
+      return await countedAgentStep('claude-code', abortSignal, () => executeClaudeCodeNode(node, context, abortSignal), countTurnEnded);
 
     case 'codex':
-      return await countedAgentStep('codex', abortSignal, () => executeCodexNode(node, context, abortSignal));
+      return await countedAgentStep('codex', abortSignal, () => executeCodexNode(node, context, abortSignal), countTurnEnded);
 
     default:
       console.error('[FlowExecutor] Unknown node type! Full node:', JSON.stringify(node, null, 2));

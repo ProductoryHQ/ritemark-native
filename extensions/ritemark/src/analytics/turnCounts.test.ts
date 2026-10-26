@@ -64,6 +64,23 @@ async function run(): Promise<void> {
     assert.equal(counter.pendingFirstReply(), 'c:first');
   }
 
+  // A first turn that ends while the marker is still being written still sends first_reply.
+  {
+    let release: () => void = () => {};
+    const sent: string[] = [];
+    const counter = new TurnCounter({
+      maySend: () => true,
+      firstMessageCounted: () => false,
+      markFirstMessageCounted: () => new Promise<void>((resolve) => { release = resolve; }),
+      track: async (name) => { sent.push(name); return true; },
+    });
+    const accepting = counter.accepted('c:fast', 'codex', false);
+    await counter.ended('c:fast', 'codex', 'chat', 'stopped');
+    release();
+    await accepting;
+    assert.deepEqual(sent.sort(), ['agent_used', 'first_message_sent', 'first_reply'].sort());
+  }
+
   // S42: a continuation (an approval, a plan review) is the same turn: counted once.
   {
     const { counter, sent } = harness({ counted: true });

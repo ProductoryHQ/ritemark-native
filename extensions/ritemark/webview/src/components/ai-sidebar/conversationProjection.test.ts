@@ -146,6 +146,26 @@ assert.deepEqual(restoredFailed.codexConversation[1].result, {
 assert.equal(restoredFailed.agentConversation[0].result?.errorKind, 'network');
 assert.equal(restoredFailed.codexConversation[0].result?.error, undefined, 'a completed turn carries no failure');
 
+// A chat saved by 2.0 kept ChatGPT's raw envelope: restored, it is unwrapped, never JSON (review finding).
+const twoZeroFailure = structuredClone(projection);
+twoZeroFailure.events.push(
+  {
+    kind: 'user-message', eventId: 'user-old', turnId: 'turn-old', sequence: 4,
+    occurredAt: '2026-08-23T10:05:00.000Z', runtimeId: 'codex', text: 'Old', mode: 'agent', attachments: [],
+  },
+  {
+    kind: 'boundary', eventId: 'boundary-old', turnId: 'turn-old', sequence: 5,
+    occurredAt: '2026-08-23T10:05:01.000Z', runtimeId: 'codex', boundaryKind: 'failed',
+    message: '{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The \'gpt-6.1-sol\' model is not supported when using Codex with a ChatGPT account."}}',
+  },
+);
+const restoredTwoZero = projectionToConversation(twoZeroFailure);
+assert.equal(
+  restoredTwoZero.codexConversation[1].result?.error,
+  "The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.",
+);
+assert.equal(restoredTwoZero.codexConversation[1].result?.errorKind, undefined, 'no kind is invented for an old record');
+
 // Sprint 139 (#417, R6): a chat comes back on its own model, not the open chat's (S33–S36).
 const openChat = projectionToConversation(projection);
 openChat.selectedModel = 'claude-opus-5-5';

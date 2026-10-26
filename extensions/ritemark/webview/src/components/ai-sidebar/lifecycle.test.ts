@@ -333,6 +333,23 @@ function testPlanModeResultWithoutStructuredUpdateStillRequiresReview() {
     'a plan-mode turn that ends with plain-text plan output must still enter review even without codex-plan-update'
   );
   assert.equal(finalizedTurn.isRunning, false);
+
+  // Sprint 139: a failure keeps the provider's own words in the activity details, and its kind.
+  const failedTurn = finalizeCodexTurnResult(turn, {
+    status: 'failed',
+    error: "ChatGPT couldn't use GPT-5.4 Mini. It isn't available in Ritemark right now.",
+    errorKind: 'model',
+    errorDetail: { model: 'gpt-5.4-mini' },
+    rawError: '{"type":"error","status":400}',
+  });
+  assert.equal(failedTurn.activities[failedTurn.activities.length - 1]?.type, 'error');
+  assert.equal(failedTurn.activities[failedTurn.activities.length - 1]?.message, '{"type":"error","status":400}');
+  assert.deepEqual(failedTurn.result, {
+    status: 'failed',
+    error: "ChatGPT couldn't use GPT-5.4 Mini. It isn't available in Ritemark right now.",
+    errorKind: 'model',
+    errorDetail: { model: 'gpt-5.4-mini' },
+  });
 }
 
 // Sprint 103 R1 (D4): prompt-text plan-mode detection removed — plan-first is

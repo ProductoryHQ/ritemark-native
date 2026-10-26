@@ -528,7 +528,7 @@ export type ExtensionMessage =
   | ({ type: 'codex-question'; requestId: string | number; questions: Array<AgentQuestionItem & { id: string }> } & ConversationScopedMessage)
   | ({ type: 'codex-plan-text-delta'; delta: string } & ConversationScopedMessage)
   | ({ type: 'codex-plan-update'; explanation?: string | null; plan: CodexPlanStep[] } & ConversationScopedMessage)
-  | ({ type: 'codex-result'; status?: string; error?: string; errorKind?: RuntimeErrorKind; errorDetail?: RuntimeErrorDetail } & ConversationScopedMessage)
+  | ({ type: 'codex-result'; status?: string; error?: string; errorKind?: RuntimeErrorKind; errorDetail?: RuntimeErrorDetail; rawError?: string } & ConversationScopedMessage)
   | ({ type: 'codex-approval'; approvalType: 'command' | 'fileChange'; requestId: string | number; command?: string; workingDir?: string; fileChanges?: Record<string, unknown> } & ConversationScopedMessage)
   // Onboarding messages
   | { type: 'onboarding:status'; status: OnboardingStatus }

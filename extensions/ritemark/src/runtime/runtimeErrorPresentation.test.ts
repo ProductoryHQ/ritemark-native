@@ -228,6 +228,10 @@ assert.equal(unwrapProviderMessage('Error: boom\n    at Object.<anonymous> (/x.j
 assert.equal(classifyRuntimeError('opencode', 'No model is selected for OpenCode. Pick one in the model selector below the message box, then try again.')?.sentence,
   'No model is selected for OpenCode. Pick one in the model selector below the message box, then try again.');
 assert.equal(classifyRuntimeError('codex', '   '), undefined);
+assert.equal(unwrapProviderMessage('{"error":"Model gpt-x is not available for this workspace."}').sentence,
+  'Model gpt-x is not available for this workspace.', 'a plain {"error": "<text>"} body gives its text');
+assert.equal(unwrapProviderMessage('{"error":"invalid_request_error"}').sentence, undefined, 'a bare code is not a sentence');
+assert.equal(unwrapProviderMessage('{"error":"x y z","message":"The real sentence."}').sentence, 'The real sentence.', 'message wins');
 
 // The runtimes' structured codes, read leniently.
 assert.deepEqual(codexTurnErrorCode({ message: 'x', codexErrorInfo: 'unauthorized' }), { code: 'unauthorized' });

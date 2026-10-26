@@ -1,6 +1,7 @@
 import type { ConversationProjectionV1 } from '../../../../src/conversations/protocol';
 import type { RuntimeId } from '../../../../src/conversations/types';
 import { createConversationState, type ConversationState } from './conversationState';
+import { unwrapProviderMessage } from '../../../../src/runtime/runtimeErrorPresentation';
 import type { AcpProviderFlags, AgentConversationTurn, AgentId, ByokModelOption, CodexConversationTurn, ModelOption } from './types';
 
 function runtimeAgent(runtime: RuntimeId | undefined): AgentId {
@@ -9,10 +10,17 @@ function runtimeAgent(runtime: RuntimeId | undefined): AgentId {
 
 type TerminalEvent = Extract<ConversationProjectionV1['events'][number], { kind: 'assistant-message' | 'boundary' }>;
 
-/** The failure sentence a terminal event carries, or undefined when the turn didn't fail. */
+/**
+ * The failure sentence a terminal event carries, or undefined when the turn didn't fail. A chat
+ * saved by 2.0 (no `errorKind`) may hold a provider's raw envelope: it is unwrapped, never shown
+ * as JSON (Sprint 139, #376).
+ */
 function terminalError(event: TerminalEvent): string | undefined {
-  if (event.kind === 'boundary') return event.boundaryKind === 'failed' ? event.message : undefined;
-  return event.terminalStatus === 'failed' ? event.error ?? 'The turn failed.' : undefined;
+  const raw = event.kind === 'boundary'
+    ? (event.boundaryKind === 'failed' ? event.message : undefined)
+    : (event.terminalStatus === 'failed' ? event.error ?? 'The turn failed.' : undefined);
+  if (raw === undefined || event.errorKind) return raw;
+  return unwrapProviderMessage(raw).sentence ?? 'The turn failed.';
 }
 
 /** The model lists a restored chat is checked against (Sprint 139, R6). */

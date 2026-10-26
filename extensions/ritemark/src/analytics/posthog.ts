@@ -180,7 +180,8 @@ export function initAnalytics(context: vscode.ExtensionContext): void {
       }
     }),
     vscode.workspace.onDidChangeTextDocument((event) => {
-      if (event.contentChanges.length === 0) return;
+      // Only documents on disk can be voice notes (output channels and the like change all the time).
+      if (event.contentChanges.length === 0 || event.document.uri.scheme !== 'file') return;
       const uri = event.document.uri.toString();
       if (!changedSinceSave.has(uri) && notes.watches(uri)) changedSinceSave.add(uri);
     }),

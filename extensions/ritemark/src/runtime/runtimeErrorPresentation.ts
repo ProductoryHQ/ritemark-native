@@ -143,10 +143,14 @@ function clampSentence(text: string, max = MAX_SENTENCE_CHARS): string {
 
 function walkEnvelope(value: unknown, codes: Set<string>): string | null {
   let deepest: string | null = null;
+  // `{"error": "<text>"}`: the text, when nothing nests a `message` or `detail`.
+  let bareError: string | null = null;
   const walk = (node: unknown, depth: number): void => {
     if (depth > 6 || node === null || typeof node !== 'object') return;
     for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
-      if ((key === 'message' || key === 'detail') && typeof child === 'string' && child.trim()) {
+      if (key === 'error' && typeof child === 'string' && child.trim() && !/^[a-z_]+$/.test(child.trim())) {
+        bareError = child.trim();
+      } else if ((key === 'message' || key === 'detail') && typeof child === 'string' && child.trim()) {
         deepest = child.trim();
       } else if ((key === 'type' || key === 'code' || key === 'status') && (typeof child === 'string' || typeof child === 'number')) {
         codes.add(String(child).toLowerCase());
@@ -156,7 +160,7 @@ function walkEnvelope(value: unknown, codes: Set<string>): string | null {
     }
   };
   walk(value, 0);
-  return deepest;
+  return deepest ?? bareError;
 }
 
 /**

@@ -9,7 +9,6 @@
  * sentence as a line. Claude's sign-in cards stay in AgentResponse.
  */
 
-import { useState } from 'react';
 import { Icon, type PhosphorIconName } from '../ui/Icon';
 import { RuntimeNotice } from './RuntimeNotice';
 import { useActiveConversation, useAISidebarStore } from './store';
@@ -57,7 +56,6 @@ export function TurnFailureCard({
   const selectRuntimeModel = useAISidebarStore((s) => s.selectRuntimeModel);
   const startCodexLogin = useAISidebarStore((s) => s.startCodexLogin);
   const openApiKeySettings = useAISidebarStore((s) => s.openApiKeySettings);
-  const [switchedTo, setSwitchedTo] = useState<string | undefined>(undefined);
   const conversation = useActiveConversation();
 
   const names: ModelNames = {
@@ -73,8 +71,9 @@ export function TurnFailureCard({
       ? defaultCodexModelId(codexModels)
       : undefined;
 
-  // A chat already on the catalog's default (the switch was taken before a restart, or the
-  // restore fell back to it) says so, rather than offering the switch again.
+  // "Switched" follows the chat's own model: the switch was taken (now or before a restart), or the
+  // restore fell back to the default. A switch the person declines (Claude's background-work
+  // question) leaves the card offering it.
   const currentModel = runtimeId === 'claude-code'
     ? conversation.selectedModel
     : runtimeId === 'codex'
@@ -92,7 +91,7 @@ export function TurnFailureCard({
     sentence: error,
     names,
     fallbackModel,
-    switchedTo: switchedTo ?? alreadySwitched,
+    switchedTo: alreadySwitched,
   });
 
   if (!card) {
@@ -110,7 +109,7 @@ export function TurnFailureCard({
       <RuntimeNotice
         title={card.title}
         message={card.message}
-        tone={switchedTo ?? alreadySwitched ? 'success' : 'warning'}
+        tone={alreadySwitched ? 'success' : 'warning'}
         primaryAction={action ? {
           label: action.label,
           icon: ACTION_ICONS[action.kind] ?? 'arrow-square-out',
@@ -118,7 +117,6 @@ export function TurnFailureCard({
           onAction: () => {
             if (action.kind === 'use-model') {
               selectRuntimeModel(runtimeId, action.modelId);
-              setSwitchedTo(action.modelId);
             } else if (action.kind === 'sign-in') {
               startCodexLogin();
             } else if (action.kind === 'open-key-settings') {

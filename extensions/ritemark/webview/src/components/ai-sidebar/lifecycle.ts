@@ -75,7 +75,14 @@ export function applyCodexPlanApproval(
 
 export function finalizeCodexTurnResult(
   turn: CodexConversationTurn,
-  result: { status?: string; error?: string; errorKind?: NonNullable<CodexConversationTurn['result']>['errorKind']; errorDetail?: NonNullable<CodexConversationTurn['result']>['errorDetail'] }
+  result: {
+    status?: string;
+    error?: string;
+    errorKind?: NonNullable<CodexConversationTurn['result']>['errorKind'];
+    errorDetail?: NonNullable<CodexConversationTurn['result']>['errorDetail'];
+    /** Sprint 139: the provider's own words, kept in the turn's activity details for diagnosis. */
+    rawError?: string;
+  }
 ): CodexConversationTurn {
   const fallbackPlanText = (!turn.planText || !turn.planText.trim())
     ? turn.streamingText
@@ -92,6 +99,9 @@ export function finalizeCodexTurnResult(
 
   return {
     ...turn,
+    ...(result.rawError
+      ? { activities: [...turn.activities, { type: 'error' as const, message: result.rawError, timestamp: Date.now() }] }
+      : {}),
     isRunning: false,
     pendingQuestion: undefined,
     planText: fallbackPlanText,
