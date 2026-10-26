@@ -333,12 +333,22 @@ export function TranscribePanel() {
                   ? 'There is 1 in another project.'
                   : `There are ${state.otherProjectCount} in other projects.`}
               </>
+            ) : state.hasProject ? (
+              // Sprint 140 (R9; the Experience lead's words, 26 October): an empty library says what Transcribe is
+              // for. Never "on this computer" (ElevenLabs uploads) and never "who said what" (not every engine can).
+              <>
+                <span className="text-ink-strong">No recordings yet.</span>
+                <br />
+                {host?.enabled
+                  ? 'Transcribe turns a meeting, an interview or a call into text you and the AI can work with. Record one, or transcribe a file you have.'
+                  : 'Transcribe turns a meeting, an interview or a call into text you and the AI can work with. Transcribe a file you have to start.'}
+                <br />
+                {state.acceptedExtensions.join(', ')}
+              </>
             ) : (
               <>
-                {/* Sprint 134 (R16): with a project open, the head's rows are Record and Transcribe a file… */}
-                {state.hasProject
-                  ? (host?.enabled ? 'Record, or transcribe a file.' : 'Transcribe a file to start.')
-                  : (host?.enabled ? 'Record or add a recording to transcribe it.' : 'Add a recording to transcribe it.')}
+                {/* Sprint 134 (R16): no project open: today's words */}
+                {host?.enabled ? 'Record or add a recording to transcribe it.' : 'Add a recording to transcribe it.'}
                 <br />
                 {state.acceptedExtensions.join(', ')}
               </>

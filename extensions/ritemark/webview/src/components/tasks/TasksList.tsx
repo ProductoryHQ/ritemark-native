@@ -23,7 +23,7 @@ import { act, useBoardUi } from './boardUi'
 import { CardMenu } from './CardMenu'
 import { DeleteConfirm } from './DeleteConfirm'
 import { CallActions, CardGlyph, GivePromptPanel, HeaderIconButton, TitleField, toneClass, useNow, usePresenter } from './CardParts'
-import { STAGE_NAMES } from './taskCopy'
+import { STAGE_NAMES, aiPeopleName, emptyTasksWords } from './taskCopy'
 import { filterGroups, nextSearch, shownCards, taskGroups, type SearchEvent, type SearchState, type TaskGroup } from './taskList'
 import { Notice } from './Notice'
 import { UnreadableCards } from './UnreadableCards'
@@ -166,16 +166,13 @@ export function TasksList({ snapshot }: { snapshot: BoardSnapshot }) {
       ) : null}
       <div ref={scroller} className="tb-scroll tb-list flex-1">
         {empty ? (
-          <div className="tb-calm">
-            <div className="tb-calm-title">Nothing waits for you</div>
-            <p>Write a task for yourself or for an agent. When an agent needs you, its task waits here, marked.</p>
-            <Tooltip label="Write a task. It goes to the top of To do">
-              <Button type="button" size="sm" variant="outline" onClick={newTask}>
-                <Icon name="plus" size={16} tone="inherit" />
-                New task
-              </Button>
-            </Tooltip>
-          </div>
+          // Sprint 140 (R9; experience 29, frame 2): each stage says it is empty; New task is on the bar.
+          <>
+            <div className="tb-group" role="heading" aria-level={2}><span>{STAGE_NAMES.todo}</span></div>
+            <p className="tb-none-line">{emptyTasksWords(aiPeopleName(snapshot.defaultRuntime)).todo}</p>
+            <div className="tb-group" role="heading" aria-level={2}><span>{STAGE_NAMES.doing}</span></div>
+            <p className="tb-none-line">{emptyTasksWords(aiPeopleName(snapshot.defaultRuntime)).doing}</p>
+          </>
         ) : query && shown.length === 0 ? (
           <p className="tb-none">No task has “{query}” in its title.</p>
         ) : (
@@ -258,7 +255,7 @@ function Stage({
             <span className="tb-group-n">{number}</span>
           )}
         </div>
-        {group.cards.length ? rows(group.cards) : <p className="tb-none-line">{doing ? 'Nothing in progress.' : 'No tasks yet.'}</p>}
+        {group.cards.length ? rows(group.cards) : <p className="tb-none-line">{doing ? emptyTasksWords(aiPeopleName(snapshot.defaultRuntime)).doing : emptyTasksWords('').todo}</p>}
       </>
     )
   }

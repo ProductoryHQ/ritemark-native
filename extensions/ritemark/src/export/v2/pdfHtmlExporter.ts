@@ -6,6 +6,7 @@ import { parse, HTMLElement, type Node as HtmlNode, TextNode } from 'node-html-p
 import { buildNormalizedExportHtml, type ExportTemplateStyle } from './htmlPipeline';
 import { tryLoadImageSource } from './imageSource';
 import type { ExportV2Request } from './types';
+import { madeSomething } from '../../guidance/madeSomething';
 
 const PAGE_MARGIN = 72;
 const RESERVED_FOOTER_SPACE = 24;
@@ -348,6 +349,7 @@ export async function exportToPDFV2(
     });
 
     vscode.window.showInformationMessage(`PDF exported to ${path.basename(saveUri.fsPath)}`);
+    madeSomething.note('export'); // Sprint 140 (R15): on success, not on request
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     vscode.window.showErrorMessage(`Failed to export PDF (V2): ${msg}`);

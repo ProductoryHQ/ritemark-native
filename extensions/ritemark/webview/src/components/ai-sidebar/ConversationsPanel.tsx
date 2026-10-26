@@ -6,7 +6,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { ConversationBubbleIcon } from './ConversationBubbleIcon';
 import { useConversationDialogs } from './ConversationDialogs';
 import { conversationPinState, conversationStatusLabel, type ConversationPinState } from './conversationActionsModel';
-import { useAISidebarStore } from './store';
+import { useActiveConversation, useAISidebarStore } from './store';
+import { StartingPoints } from './StartingPoints';
 
 function relativeTime(value: string): string {
   const timestamp = Date.parse(value);
@@ -175,6 +176,8 @@ export function ConversationsPanel() {
   const unpin = useAISidebarStore((state) => state.unpinConversation);
   const moveEarlier = useAISidebarStore((state) => state.moveEarlierConversation);
   const toggle = useAISidebarStore((state) => state.toggleHistoryPanel);
+  const selectedAgent = useActiveConversation().selectedAgent;
+  const aiName = selectedAgent === 'codex' ? 'ChatGPT' : selectedAgent === 'opencode' ? 'OpenCode' : 'Claude';
   const notice = useAISidebarStore((state) => state.conversationStoreNotice);
   const { requestRename, requestDelete, dialogs } = useConversationDialogs();
 
@@ -218,7 +221,16 @@ export function ConversationsPanel() {
       </div>
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3">
         {notice && <div role="status" className="mx-2 mb-3 flex items-start gap-2 rounded-lg border border-[var(--r-hairline)] bg-[var(--r-surface)] px-3 py-2 text-[12px] leading-[1.45] text-[var(--r-ink-strong)] shadow-[0_1px_2px_rgba(30,27,75,0.04)]"><span className="mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--r-warning-soft)] text-[var(--r-warning)]"><Icon name="warning" size={12} tone="inherit" /></span><span className="min-w-0 flex-1">{notice}</span></div>}
-        {ordered.length === 0 && !notice && <div className="flex h-full flex-col items-center justify-center px-6 text-center text-[12px] text-[var(--r-ink-muted)]"><Icon name="chat-circle" size={20} className="mb-3 opacity-50" /><div>No conversations yet</div><div className="mt-1 text-[11px]">Start a conversation and it will appear here.</div></div>}
+        {/* Sprint 140 (R9; experience 29, frame 3, in 2.0's word, D8): where chats are kept, then where to start one */}
+        {ordered.length === 0 && !notice && (
+          <div className="flex h-full flex-col">
+            <div className="px-2 pt-1">
+              <p className="m-0 text-[13px] font-semibold leading-[19px] text-[var(--r-ink-strong)]">No conversations yet.</p>
+              <p className="m-0 mt-0.5 max-w-[240px] text-[12px] leading-[19px] text-[var(--r-ink-body)]">A conversation you start belongs to this project and is kept private, on this computer, never in the project’s folder. Start one below, or from one of these.</p>
+            </div>
+            <StartingPoints aiName={aiName} onPicked={toggle} />
+          </div>
+        )}
         {pinned.length > 0 && <div className="mb-4"><div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--r-ink-muted)]">Pinned</div>{renderRows(pinned)}</div>}
         {activeRecent.length > 0 && <div className="mb-4"><div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--r-ink-muted)]">Active &amp; recent</div>{renderRows(activeRecent)}</div>}
         {earlier.length > 0 && <div><div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--r-ink-muted)]">Project unknown</div>{renderEarlierRows()}</div>}

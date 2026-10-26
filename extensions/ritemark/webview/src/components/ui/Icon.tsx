@@ -133,6 +133,11 @@ import {
   User,
   CaretLeft,
   GoogleLogo,
+  ChatCenteredText,
+  Cube,
+  EnvelopeSimple,
+  OpenAiLogo,
+  PencilSimpleLine,
 } from '@phosphor-icons/react'
 
 export type IconSize = 12 | 14 | 16 | 20
@@ -272,6 +277,12 @@ const iconMap = {
   'wrench': Wrench,
   'x': X,
   'x-circle': XCircle,
+  // Sprint 140: the ready request's icons, experience 19's AI icons in Ask with, the feedback door's
+  'chat-centered-text': ChatCenteredText,
+  'cube': Cube,
+  'envelope-simple': EnvelopeSimple,
+  'open-ai-logo': OpenAiLogo,
+  'pencil-simple-line': PencilSimpleLine,
 } as const satisfies Record<string, PhosphorIconComponent>
 
 export type PhosphorIconName = keyof typeof iconMap

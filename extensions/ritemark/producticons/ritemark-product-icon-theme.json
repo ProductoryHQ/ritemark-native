@@ -13,6 +13,10 @@
     }
   ],
   "iconDefinitions": {
+    "feedback": {
+      "fontId": "phosphor-400",
+      "fontCharacter": "\\e166"
+    },
     "explorer-view-icon": {
       "fontId": "phosphor-400",
       "fontCharacter": "\\e256"

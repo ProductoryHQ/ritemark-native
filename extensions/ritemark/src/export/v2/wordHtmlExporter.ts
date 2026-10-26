@@ -21,6 +21,7 @@ import { parse, HTMLElement, type Node as HtmlNode, TextNode } from 'node-html-p
 import { buildNormalizedExportHtml, type ExportTemplateStyle } from './htmlPipeline';
 import { tryLoadImageSource } from './imageSource';
 import type { ExportV2Request } from './types';
+import { madeSomething } from '../../guidance/madeSomething';
 
 type DocChild = Paragraph | Table;
 
@@ -360,6 +361,7 @@ export async function exportToWordV2(
     const buffer = await Packer.toBuffer(doc);
     fs.writeFileSync(saveUri.fsPath, buffer);
     vscode.window.showInformationMessage(`Word exported to ${path.basename(saveUri.fsPath)}`);
+    madeSomething.note('export'); // Sprint 140 (R15): on success, not on request
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     vscode.window.showErrorMessage(`Failed to export Word (V2): ${msg}`);

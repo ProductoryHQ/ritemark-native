@@ -435,3 +435,75 @@ body.vscode-dark .rp-row:not(.missing) .rp-mini, body[data-vscode-theme-kind='vs
 .rp-row .rp-missing { margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 4px; font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
 .rp-add { margin-top: 8px; color: var(--r-ink-strong); }
 .rp-empty { margin: 8px; font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+
+/* Sprint 140 (R2, R3, R14): the one guidance card under Waiting for you: the ready request (experience 35, .ready
+   and .split) and the first-week question (experience 34, .ask1). The card's shape is experience 34's: the page's
+   width, 14 by 16 padding, radius 10, the strong hairline. */
+.rh-guide {
+  position: relative;
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--r-surface);
+  box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 1px 3px rgba(30, 27, 75, 0.06);
+}
+.rh-guide .rh-guide-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding-right: 28px;
+  font: 600 15px/22px var(--ritemark-ui-font-family);
+  color: var(--r-ink-strong);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.rh-guide .rh-guide-hd > svg { flex: none; color: var(--r-accent); }
+.rh-guide .rh-guide-x { position: absolute; right: 10px; top: 12px; }
+.rh-guide .rh-guide-x > button { width: 24px; height: 24px; border-radius: 6px; color: var(--r-ink-muted); }
+.rh-guide .rh-guide-body { margin: 2px 0 12px 24px; font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.rh-guide .rh-guide-sub { margin: 2px 0 10px 24px; font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+.rh-guide .rh-guide-go { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-left: 24px; }
+.rh-guide .rh-guide-note { font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+.rh-guide .rh-guide-problem { margin: 10px 0 0 24px; font: 400 12px/18px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+
+/* The split button: its main part names the AI; its 28-wide caret opens Ask with */
+.rh-split { position: relative; display: inline-flex; min-width: 0; max-width: 100%; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(67, 56, 202, 0.25); }
+.rh-split > span { display: inline-flex; min-width: 0; }
+.rh-split .rh-split-main,
+.rh-split .rh-split-more { height: 28px; box-shadow: none; font: 500 13px/28px var(--ritemark-ui-font-family); }
+.rh-split .rh-split-main { min-width: 0; gap: 6px; padding: 0 10px; border-radius: 6px 0 0 6px; }
+.rh-split .rh-split-more { width: 28px; padding: 0; border-radius: 0 6px 6px 0; box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.28); }
+.rh-split .rh-split-more[data-state="open"] { background: #3730a3; }
+body.vscode-dark .rh-split .rh-split-more[data-state="open"] { background: color-mix(in srgb, var(--r-accent) 80%, black); }
+
+/* Ask with: the menus' sheet (kit .menu), rows 32, the AI's state at the right */
+.rh-askwith { min-width: 220px; padding: 6px; border-radius: 10px; }
+.rh-askwith .rh-askwith-hd { padding: 8px 10px 4px; font: 600 11px/14px var(--ritemark-ui-font-family); letter-spacing: 0.5px; text-transform: uppercase; color: var(--r-ink-muted); }
+.rh-askwith .rh-askwith-it { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border-radius: 6px; font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong); cursor: pointer; }
+.rh-askwith .rh-askwith-ic { display: inline-grid; place-items: center; width: 18px; color: var(--r-ink-muted); }
+.rh-askwith .rh-askwith-sub { margin-left: auto; padding-left: 16px; font-size: 12px; color: var(--r-ink-muted); }
+.rh-askwith .rh-askwith-chk { margin-left: auto; color: var(--r-accent); }
+.rh-ai-c { width: 18px; height: 18px; border-radius: 50%; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); box-shadow: inset 0 0 0 1px var(--r-hairline-strong); color: var(--r-ink-strong); font: 700 9px/18px var(--ritemark-ui-font-family); text-align: center; flex: none; }
+
+/* The first-week question (experience 34, frame 1): one line, Send and Not now */
+.rh-ask .rh-ask-in {
+  display: block;
+  box-sizing: border-box;
+  width: calc(100% - 24px);
+  height: 36px;
+  margin-left: 24px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--r-hairline-strong);
+  background: var(--r-surface);
+  font: 400 13px/20px var(--ritemark-ui-font-family);
+  color: var(--r-ink-strong);
+  outline: none;
+}
+.rh-ask .rh-ask-in::placeholder { color: var(--r-ink-faint); }
+.rh-ask .rh-ask-in:focus { box-shadow: inset 0 0 0 1px var(--r-accent), 0 0 0 3px var(--r-ring-color, rgba(67, 56, 202, 0.1)); }
+.rh-ask .rh-ask-acts { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0 24px; }
+.rh-ask .rh-ask-acts button { height: 28px; padding: 0 10px; border-radius: 6px; font: 500 13px/28px var(--ritemark-ui-font-family); }
+.rh-guide .rh-quiet { color: var(--r-ink-body); }

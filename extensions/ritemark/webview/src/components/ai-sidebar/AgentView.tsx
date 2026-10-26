@@ -5,7 +5,7 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { Icon } from '../ui/Icon';
 import { useAISidebarStore, useActiveConversation } from './store';
-import { EmptyState } from './EmptyState';
+import { StartingPoints } from './StartingPoints';
 import { AgentResponse } from './AgentResponse';
 import { AgentQuestion } from './AgentQuestion';
 import { AgentPlanApproval } from './AgentPlanApproval';
@@ -144,7 +144,6 @@ export function AgentTurnBlock({
 export function AgentView() {
   const { agentConversation, codexConversation, selectedAgent } = useActiveConversation();
   const isMixedRuntime = codexConversation.length > 0;
-  const sendAgentMessage = useAISidebarStore((s) => s.sendAgentMessage);
   const answerAgentQuestion = useAISidebarStore((s) => s.answerAgentQuestion);
   const approvePlan = useAISidebarStore((s) => s.approvePlan);
   const rejectPlan = useAISidebarStore((s) => s.rejectPlan);
@@ -173,8 +172,8 @@ export function AgentView() {
   }, []);
 
   if (agentConversation.length === 0) {
-    // Name the AI in use (Sprint 133: the landing puts OpenCode's people here too).
-    return <EmptyState variant="agent" aiName={selectedAgent === 'opencode' ? 'OpenCode' : 'Claude'} onPrompt={sendAgentMessage} />;
+    // Sprint 140 (R8): the starting points, the same for every AI, which fill the box rather than send at once.
+    return <StartingPoints aiName={selectedAgent === 'opencode' ? 'OpenCode' : 'Claude'} />;
   }
 
   return (

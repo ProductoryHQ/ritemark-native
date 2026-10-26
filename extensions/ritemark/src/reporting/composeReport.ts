@@ -74,12 +74,24 @@ export function reportContextLines(context: ReportContextV1): string[] {
  * complain is the worst possible time to be strict — and the clip is visible
  * in the field before anything is sent.
  */
-export function composeReport(context: ReportContextV1, body: string): string {
+export function composeReport(context: ReportContextV1, body: string, lastAnswer?: string): string {
   const clipped = body.slice(0, MAX_REPORT_BODY_CHARS).trimEnd();
-  return [...reportContextLines(context), '', clipped].join('\n').trimEnd();
+  const lines = [...reportContextLines(context), '', clipped];
+  // Sprint 140 (R12; Jarmo, 15 September): the AI's last answer, only when the person ticked it and saw it in the
+  // sheet, quoted as shown there. Nothing else from the chat: not its title, not the other turns.
+  if (lastAnswer && lastAnswer.trim()) {
+    lines.push('', LAST_ANSWER_LABEL, ...lastAnswer.trimEnd().split('\n').map((line) => (line ? `> ${line}` : '>')));
+  }
+  return lines.join('\n').trimEnd();
 }
 
+/** The line above a quoted last answer in the e-mail. */
+export const LAST_ANSWER_LABEL = "The AI's last answer:";
+
+/** What the e-mail is about: an AI issue (Sprint 126's report), or feedback that wants an answer (Sprint 140). */
+export type ReportKind = 'ai-issue' | 'feedback';
+
 /** Subject line for the mail handler. Carries no report content. */
-export function reportSubject(context: ReportContextV1): string {
-  return `Ritemark ${context.appVersion} — AI output report`;
+export function reportSubject(context: ReportContextV1, kind: ReportKind = 'ai-issue'): string {
+  return kind === 'feedback' ? `Ritemark ${context.appVersion} — feedback` : `Ritemark ${context.appVersion} — AI output report`;
 }

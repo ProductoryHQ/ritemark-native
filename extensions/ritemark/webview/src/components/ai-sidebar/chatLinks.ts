@@ -35,6 +35,14 @@ export function classifyChatHref(rawHref: string | null | undefined): ChatLinkTa
   // Codex review (PR #176): "README.md:12" — a root-level path with a line
   // suffix — must not be mistaken for a scheme. Strip the suffix first.
   const withoutLine = stripLineSuffix(href);
+  // Sprint 140: a Windows path ("C:\\Work\\Plan.docx", as Codex cites files on Windows) is a file, not a "c:" scheme.
+  let windowsPath = href;
+  try {
+    windowsPath = decodeURIComponent(href);
+  } catch {
+    // keep raw href if percent-decoding fails
+  }
+  if (/^[a-z]:[\\/]/i.test(windowsPath)) return { kind: 'file', path: stripLineSuffix(windowsPath) };
   // Any other scheme (mailto:, vscode:, command:, data:, javascript:) is not
   // ours to open from chat content — but the click says so instead of doing
   // nothing.
@@ -48,6 +56,23 @@ export function classifyChatHref(rawHref: string | null | undefined): ChatLinkTa
     // keep raw href if percent-decoding fails
   }
   return { kind: 'file', path: stripLineSuffix(decoded) };
+}
+
+/**
+ * Sprint 140 (the #497 spike): Codex 0.163 cites a file it read as
+ * `:codex-file-citation{path="/…/Tender.pdf" purpose="source"}`, which 2.0.1
+ * drew as raw text in ChatGPT's answers. It becomes a link to the file, by its
+ * name, which opens it as any other file link in chat does.
+ */
+export function rewriteCodexCitations(content: string): string {
+  return content.replace(/:codex-file-citation\{([^}\n]*)\}/g, (whole, attributes: string) => {
+    const path = /(?:^|\s)path="([^"\n]+)"/.exec(attributes)?.[1];
+    if (!path) return whole;
+    const name = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+    const label = name.replace(/([\\`*_[\]])/g, '\\$1');
+    const href = encodeURI(path).replace(/\(/g, '%28').replace(/\)/g, '%29');
+    return `[${label}](${href})`;
+  });
 }
 
 /** "docs/plan.md:42" → "docs/plan.md" (line suffix is a convention, not a path). */

@@ -50,6 +50,28 @@ export function agentName(id: AgentId): string {
   return RUNTIME_LABELS[id]
 }
 
+/** Sprint 140 (R9): the AI as people know it, for the empty places' sentences. */
+export function aiPeopleName(id: AgentId): string {
+  return id === 'codex' ? 'ChatGPT' : id === 'opencode' ? 'OpenCode' : 'Claude'
+}
+
+/**
+ * Sprint 140 (R9; experience 29, frame 2, without "Ask Claude for something that changes documents: it becomes a
+ * task.", which 2.0 does not do and Jarmo's 15 October rule rules out: J4). Tasks says what it is for when it is empty.
+ */
+export function emptyTasksWords(ai: string): { title: string; sentence: string; ways: { glyph: PhosphorIconName; words: string }[]; todo: string; doing: string } {
+  return {
+    title: 'Nothing waits for you',
+    sentence: `Tasks are work in progress, yours or ${ai}'s. Whatever needs your answer or your check shows here first, and the count on Tasks says how many.`,
+    ways: [
+      { glyph: 'plus', words: `Write a task yourself, and give it to ${ai} or keep it.` },
+      { glyph: 'lightbulb', words: 'Keep an idea in Ideas until you decide.' },
+    ],
+    todo: 'No tasks yet.',
+    doing: `Nothing in progress. When ${ai} needs you, its task waits here, marked.`,
+  }
+}
+
 /** How long something has waited: "just now", "12 min", "2h", "3d". */
 export function waited(sinceIso: string | null | undefined, now: Date): string {
   if (!sinceIso) return 'just now'

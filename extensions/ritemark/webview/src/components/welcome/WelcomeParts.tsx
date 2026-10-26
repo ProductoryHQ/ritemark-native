@@ -367,11 +367,14 @@ export function KeySheet({
   keysSet,
   result,
   onClose,
+  onSave = (sheetTarget, keys) => send({ type: 'welcome/save-keys', target: sheetTarget, keys }),
 }: {
   target: KeySheetTarget | null
   keysSet: Record<WelcomeKeyName, boolean>
   result: { ok: boolean; message: string | null } | null
   onClose: () => void
+  /** Sprint 140 (R4): Home's Ask with draws the same sheet and saves through its own host. */
+  onSave?: (target: KeySheetTarget, keys: Partial<Record<WelcomeKeyName, string>>) => void
 }) {
   const [values, setValues] = useState<Partial<Record<WelcomeKeyName, string>>>({})
   const [saving, setSaving] = useState(false)
@@ -394,7 +397,7 @@ export function KeySheet({
     setSaving(true)
     const keys: Partial<Record<WelcomeKeyName, string>> = {}
     for (const field of fields) if (values[field]?.trim()) keys[field] = values[field]!.trim()
-    send({ type: 'welcome/save-keys', target: target ?? 'claude', keys })
+    onSave(target ?? 'claude', keys)
   }
   return (
     // Experience 31's dialog (the Experience lead, 18 October): a title, the words, the fields, Cancel and Done;

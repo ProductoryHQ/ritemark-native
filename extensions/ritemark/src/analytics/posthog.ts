@@ -103,13 +103,27 @@ export function initAnalytics(context: vscode.ExtensionContext): void {
         // carries `$geoip_disable` (consent.ts).
         disableGeoip: true,
       });
+      // Sprint 140 (R13, D6; research/feedback-delivery-audit.md): posthog-node's captureImmediate never rejects:
+      // a request that failed after its retries is only emitted as 'error'. So a send counts as accepted only
+      // when no error was emitted while it ran, and the feedback sheet can say "sent" only when it was.
+      let errors = 0;
+      let lastError: unknown;
       client.on('error', (error) => {
+        errors += 1;
+        lastError = error;
         console.warn('[Ritemark Analytics] PostHog error:', error);
       });
       if (process.env.RITEMARK_POSTHOG_DEBUG === '1') {
         client.debug();
       }
-      return client;
+      return {
+        captureImmediate: async (payload) => {
+          const before = errors;
+          await client.captureImmediate(payload);
+          if (errors > before) throw lastError instanceof Error ? lastError : new Error('PostHog did not accept the event');
+        },
+        shutdown: () => client.shutdown(),
+      };
     },
     oneOffId: () => generateUUID(),
     anonymousId: () => {

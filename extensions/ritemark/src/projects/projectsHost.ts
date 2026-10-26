@@ -16,6 +16,7 @@ import { promises as fsp, realpathSync } from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import type { TaskBoardHost } from '../taskBoard/taskBoardHost';
+import type { GuidanceHost } from '../guidance/GuidanceHost';
 import { HOME_VIEW_TYPE, HomeHost } from '../views/HomePanel';
 import { registerPermanentTabs, registerPlaceClicks } from '../views/permanentTabs';
 import { ProjectsViewProvider } from '../views/ProjectsViewProvider';
@@ -36,6 +37,8 @@ export interface ProjectsHostDependencies {
   openConversation: (conversationId: string) => Promise<void>;
   workingChats: () => { conversationId: string; runtimeId: string | null }[];
   stopWorkingChats: () => Promise<void>;
+  /** Sprint 140: the first day's guidance, Home's one card; null without a project. */
+  guidance: GuidanceHost | null;
 }
 
 export interface ProjectsHost {
@@ -147,6 +150,7 @@ export function registerProjects(deps: ProjectsHostDependencies): ProjectsHost {
     boardEnabled: deps.boardEnabled,
     openConversation: deps.openConversation,
     onProjectsChanged: () => projectsView?.refresh(),
+    guidance: deps.guidance,
   }) : undefined;
   const revealHome = async (): Promise<void> => {
     await home?.reveal({ viewColumn: vscode.ViewColumn.One });
