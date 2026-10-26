@@ -9,7 +9,7 @@ import { Icon } from '../ui/Icon';
 import { useActiveConversation } from './store';
 import { deriveActivityState, presentActivityState } from './activityState';
 import { activeDurationMs } from './types';
-import { failureShowsCard } from '../../../../src/runtime/turnFailureCopy';
+import { failureSilencesStatusLine } from '../../../../src/runtime/turnFailureCopy';
 
 const TONE_CLASS: Record<string, string> = {
   accent: 'text-[var(--r-accent)]',
@@ -56,11 +56,11 @@ export function ActivityStatusLine() {
   if (state === 'failed' && (failureKind === 'authentication' || failureKind === 'api-key-authentication')) {
     return null;
   }
-  // Sprint 139 (#376): the same for every card — sign-in, model, limit — for all three AIs.
+  // Sprint 139 (#376): the same under every card with a way on — sign-in, model, limit — for all three AIs.
   const lastRuntime = last && 'streamingText' in last
     ? (last.runtime === 'opencode' ? 'opencode' as const : 'codex' as const)
     : 'claude-code' as const;
-  if (state === 'failed' && terminalResult?.error && failureShowsCard(lastRuntime, terminalResult.errorKind)) {
+  if (state === 'failed' && terminalResult?.error && failureSilencesStatusLine(lastRuntime, terminalResult.errorKind)) {
     return null;
   }
 

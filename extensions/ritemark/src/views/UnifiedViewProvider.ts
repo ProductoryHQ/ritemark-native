@@ -95,7 +95,8 @@ import { decodeCommentTaskSidebarMessage } from '../commentTasks/protocol';
 import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runtime/AgentRuntime';
 import type { OneShotSettings } from '../runtime/oneShotTurn';
 import { presentRuntimeError, type RuntimeErrorHints } from '../runtime/runtimeErrorPresentation';
-import { aiName, trustedBillingUrl, turnOutcome } from '../runtime/turnFailureCopy';
+import { failureSentence, trustedBillingUrl, turnOutcome } from '../runtime/turnFailureCopy';
+import { appendStreamedText } from '../agent/types';
 import { modelSubstitutionForTurn } from '../runtime/modelSubstitution';
 import {
   isThinkingEffort,
@@ -889,6 +890,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           }
           let terminalCheckpointWritten = false;
           let streamedResponseText = '';
+          let streamedMessageId: string | undefined;
           let appliedThinkingEffort: ExplicitThinkingEffort | null = null;
           const skipActiveFile = message.skipActiveFile === true;
           const skipBrowserContext = message.skipBrowserContext === true;
@@ -1213,8 +1215,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 this._view?.webview.postMessage({ type: 'agent-progress', conversationId, agentId, progress });
               } else {
                 if (progress.type === 'text') {
-                  streamedResponseText += progress.message;
-                  this._view?.webview.postMessage({ type: 'codex-streaming', conversationId, delta: progress.message });
+                  // Sprint 139 (#552): another message starts a new paragraph, in the record as in the sheet.
+                  streamedResponseText = appendStreamedText(streamedResponseText, progress.message, streamedMessageId, progress.messageId);
+                  streamedMessageId = progress.messageId ?? streamedMessageId;
+                  this._view?.webview.postMessage({
+                    type: 'codex-streaming',
+                    conversationId,
+                    delta: progress.message,
+                    ...(progress.messageId ? { messageId: progress.messageId } : {}),
+                  });
                 } else {
                   this._view?.webview.postMessage({ type: 'codex-progress', conversationId, progress });
                 }
@@ -1323,8 +1332,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               const errorKind = errorPresentation?.errorKind;
               const errorDetail = errorPresentation?.errorDetail;
               // The provider's own words stay in the turn's activity details, for diagnosis. They travel
-              // with the result, so they never show as the running turn's live line.
-              const rawError = errorPresentation && result.error && result.error.trim() !== error ? result.error : undefined;
+              // with the result, so they never show as the running turn's live line. Words the sentence
+              // already says, as they were, are not kept twice.
+              const rawText = result.error?.trim();
+              const rawError = errorPresentation && rawText && !error?.includes(rawText) ? result.error : undefined;
               this._view?.webview.postMessage({
                 type: 'codex-result', conversationId,
                 agentId,
@@ -1376,13 +1387,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               // Codex app-server died mid-turn — finalize the turn so the webview
               // isn't stuck on "running" forever. Sprint 139 (R3): the chat, the
               // record and a restored chat say the same one sentence.
-              const exitSentence = `${aiName(agentId)} stopped unexpectedly. Send your message again.`;
+              const exitDetail = { exited: true } as const;
+              const exitSentence = failureSentence({ runtimeId: agentId as AgentId, kind: 'provider', detail: exitDetail, providerSentence: '' });
               this._view?.webview.postMessage({
                 type: 'codex-result', conversationId,
                 agentId,
                 status: 'error',
                 error: exitSentence,
                 errorKind: 'provider',
+                errorDetail: exitDetail,
               });
               if (!terminalCheckpointWritten) {
                 terminalCheckpointWritten = true;
@@ -1399,6 +1412,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   status: 'failed',
                   error: exitSentence,
                   errorKind: 'provider',
+                  errorDetail: exitDetail,
                 }), hostConversationEnabled);
                 this._applyCommentTaskTerminal(conversationId, conversationTurnId, {
                   status: 'interrupted',
@@ -3805,6 +3819,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         const failureKind = errorPresentation?.failureKind;
         const errorKind = errorPresentation && 'errorKind' in errorPresentation ? errorPresentation.errorKind : undefined;
         const errorDetail = errorPresentation && 'errorDetail' in errorPresentation ? errorPresentation.errorDetail : undefined;
+        // Read the person's Stop before the result is posted, so a stopped follow-up says Stopped
+        // in the sheet too, not Done (Sprint 139, as the person's own turns).
+        const cancelled = this._consumeCancelIntent(conversationId, turnId);
         post({
           type: 'agent-result',
           text: result.text ?? '',
@@ -3814,9 +3831,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           failureKind,
           ...(errorKind ? { errorKind } : {}),
           ...(errorDetail ? { errorDetail } : {}),
+          ...(cancelled ? { stopped: true } : {}),
         });
         this._refreshExplorerForAgentWrites(result.filesModified);
-        const cancelled = this._consumeCancelIntent(conversationId, turnId);
         const status: 'completed' | 'failed' | 'cancelled' = cancelled ? 'cancelled' : error ? 'failed' : 'completed';
         // No title generation: the conversation already has its title.
         this._runConversationCheckpoint(conversationId, () => this._conversationController.completeRuntimeTurn({

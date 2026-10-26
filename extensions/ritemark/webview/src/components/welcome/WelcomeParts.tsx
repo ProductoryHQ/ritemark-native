@@ -79,9 +79,9 @@ export function ProviderCard({
   const titleId = `rw-card-${view.id}`
   // A button names its AI and is described by the card's words and state (S2).
   const describedBy = `${titleId}-line ${titleId}-state`
-  // Sprint 139 (R1): the plan line belongs to a card that offers Sign in. A card that shows a state shows
-  // that state instead: the reason a sign-in ended here, or Signed in in its foot.
-  const line = view.reason ?? (view.phase === 'ready' && !isOpenCode ? '' : PLAN_LINES[view.id])
+  // Sprint 139 (R1): every card keeps its plan line, signed in or not; the foot says the state. Only
+  // the reason a sign-in ended here takes the line's place.
+  const line = view.reason ?? PLAN_LINES[view.id]
 
   if (view.phase === 'signing-in') {
     return (

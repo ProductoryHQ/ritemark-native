@@ -13,13 +13,14 @@ export const PROVIDER_NAMES: Record<WelcomeProviderId, string> = {
 }
 
 /**
- * Sprint 139 (R1, #496): which plans work, said before anyone signs in, on the
- * welcome's step-1 cards, Add another, Ritemark Settings and the AI sheet's own
- * sign-in cards. One place, so the four can't drift.
+ * Sprint 139 (R1, #496): which plans work, on the welcome's step-1 cards, Add
+ * another, Ritemark Settings and the AI sheet's own sign-in cards. A fact that
+ * doesn't change with sign-in, so a card keeps its line when signed in; the
+ * button row says the state. One place, so the four can't drift.
  */
 export const PLAN_LINES: Record<WelcomeProviderId, string> = {
-  chatgpt: 'Sign in with any plan, free included.',
-  claude: 'Sign in with a paid plan, such as Pro or Max.',
+  chatgpt: 'Any plan works, free included.',
+  claude: 'Needs a paid plan, such as Pro or Max.',
   opencode: 'Open models, with an API key of your own.',
 }
 

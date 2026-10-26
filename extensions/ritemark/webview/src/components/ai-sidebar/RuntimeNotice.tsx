@@ -76,7 +76,6 @@ export function RuntimeNotice({
                     type="button"
                     size="sm"
                     variant="secondary"
-                    className="whitespace-nowrap"
                     onClick={secondaryAction.onAction}
                     disabled={secondaryAction.disabled}
                   >
@@ -90,7 +89,6 @@ export function RuntimeNotice({
                   <Button
                     type="button"
                     size="sm"
-                    className="whitespace-nowrap"
                     onClick={primaryAction.onAction}
                     disabled={primaryAction.disabled}
                   >

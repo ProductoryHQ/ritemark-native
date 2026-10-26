@@ -13,13 +13,8 @@ import { ActivityDetails } from './ActivityDetails';
 import { chatFontStyle } from './ChatBubbles';
 import { extractPlanDisplayText, planTurnNeedsApproval } from './planText';
 import { RuntimeNotice } from './RuntimeNotice';
-import { TurnFailureCard } from './TurnFailureCard';
-import {
-  deriveRuntimeAvailabilities,
-  listReadyAlternatives,
-  resolveAvailableRuntimeModel,
-  RUNTIME_LABELS,
-} from './runtimeAvailability';
+import { TurnFailureCard, useReadyAlternative } from './TurnFailureCard';
+import { RUNTIME_LABELS } from './runtimeAvailability';
 
 import type { AgentConversationTurn } from './types';
 
@@ -96,43 +91,14 @@ export function AgentResponse({ turn }: AgentResponseProps) {
   const setupError = useAISidebarStore((s) => s.setupError);
   const dismissedAuthRecoveryTurnIds = useAISidebarStore((s) => s.dismissedAuthRecoveryTurnIds);
   const dismissAuthRecovery = useAISidebarStore((s) => s.dismissAuthRecovery);
-  const runtimeHydration = useAISidebarStore((s) => s.runtimeHydration);
-  const setupStatus = useAISidebarStore((s) => s.setupStatus);
-  const codexStatus = useAISidebarStore((s) => s.codexStatus);
-  const opencodeEnabled = useAISidebarStore((s) => s.opencodeEnabled);
-  const acpProviders = useAISidebarStore((s) => s.acpProviders);
-  const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
-  const models = useAISidebarStore((s) => s.models);
-  const codexModels = useAISidebarStore((s) => s.codexModels);
   const selectRuntimeModel = useAISidebarStore((s) => s.selectRuntimeModel);
   const activeConversation = useActiveConversation();
   const [rejectInput, setRejectInput] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
 
-  const availabilities = deriveRuntimeAvailabilities({
-    runtimeHydration,
-    setupStatus,
-    codexStatus,
-    opencodeEnabled,
-    acpProviders,
-    byokProviderModels,
-  });
-  const alternativeCandidate = listReadyAlternatives(availabilities, 'claude-code')[0] ?? null;
-  const alternativeModelId = alternativeCandidate
-    ? resolveAvailableRuntimeModel(alternativeCandidate, {
-        claude: activeConversation.selectedModel,
-        codex: activeConversation.codexSelectedModel,
-        opencode: activeConversation.opencodeSelectedModel,
-      }, {
-        claude: models,
-        codex: codexModels,
-        opencode: byokProviderModels,
-        acpProviders,
-      }) ?? ''
-    : '';
-  const readyAlternative = alternativeCandidate && alternativeModelId
-    ? alternativeCandidate
-    : null;
+  const alternative = useReadyAlternative('claude-code');
+  const readyAlternative = alternative?.runtimeId ?? null;
+  const alternativeModelId = alternative?.modelId ?? '';
 
   if (!result) return null;
 

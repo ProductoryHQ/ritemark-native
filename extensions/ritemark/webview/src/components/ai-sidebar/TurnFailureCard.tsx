@@ -4,15 +4,16 @@
  *
  * The host's one classifier names the failure's kind and data
  * (`errorKind`, `errorDetail`); this draws the card from them, live and after
- * a restart, and never reads the provider's text. A failure with no card (no
- * connection, the provider's own words, or a chat saved by 2.0) shows its one
- * sentence as a line. Claude's sign-in cards stay in AgentResponse.
+ * a restart, and never reads the provider's raw text. A failure with no card (no
+ * kind: a chat saved by 2.0) shows its one sentence as a line. Claude's
+ * sign-in cards stay in AgentResponse.
  */
 
 import { Icon, type PhosphorIconName } from '../ui/Icon';
 import { RuntimeNotice } from './RuntimeNotice';
 import { useActiveConversation, useAISidebarStore } from './store';
 import { defaultCodexModelId } from './modelPresentation';
+import { deriveRuntimeAvailabilities, listReadyAlternatives, resolveAvailableRuntimeModel } from './runtimeAvailability';
 import { vscode } from '../../lib/vscode';
 import { turnFailureCard, type ModelNames } from '../../../../src/runtime/turnFailureCopy';
 import type { AgentId, ByokModelOption, ModelOption, RuntimeErrorDetail, RuntimeErrorKind } from './types';
@@ -32,8 +33,47 @@ const ACTION_ICONS: Record<string, PhosphorIconName> = {
   'sign-in': 'sign-in',
   'open-key-settings': 'key',
   'use-model': 'arrows-clockwise',
+  'use-runtime': 'chat-circle',
   'open-billing': 'arrow-square-out',
 };
+
+/**
+ * Another AI that is ready now, with the model this chat would use with it, or
+ * null. The signed-out card's Use ChatGPT and the plan limit's Continue with
+ * both take it, so the two offer the same AI the same way.
+ */
+export function useReadyAlternative(runtimeId: AgentId): { runtimeId: AgentId; modelId: string } | null {
+  const runtimeHydration = useAISidebarStore((s) => s.runtimeHydration);
+  const setupStatus = useAISidebarStore((s) => s.setupStatus);
+  const codexStatus = useAISidebarStore((s) => s.codexStatus);
+  const opencodeEnabled = useAISidebarStore((s) => s.opencodeEnabled);
+  const acpProviders = useAISidebarStore((s) => s.acpProviders);
+  const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
+  const models = useAISidebarStore((s) => s.models);
+  const codexModels = useAISidebarStore((s) => s.codexModels);
+  const conversation = useActiveConversation();
+
+  const candidate = listReadyAlternatives(deriveRuntimeAvailabilities({
+    runtimeHydration,
+    setupStatus,
+    codexStatus,
+    opencodeEnabled,
+    acpProviders,
+    byokProviderModels,
+  }), runtimeId)[0] ?? null;
+  if (!candidate) return null;
+  const modelId = resolveAvailableRuntimeModel(candidate, {
+    claude: conversation.selectedModel,
+    codex: conversation.codexSelectedModel,
+    opencode: conversation.opencodeSelectedModel,
+  }, {
+    claude: models,
+    codex: codexModels,
+    opencode: byokProviderModels,
+    acpProviders,
+  });
+  return modelId ? { runtimeId: candidate, modelId } : null;
+}
 
 export function TurnFailureCard({
   runtimeId,
@@ -55,8 +95,10 @@ export function TurnFailureCard({
   const defaultClaudeModel = useAISidebarStore((s) => s.defaultClaudeModel);
   const selectRuntimeModel = useAISidebarStore((s) => s.selectRuntimeModel);
   const startCodexLogin = useAISidebarStore((s) => s.startCodexLogin);
+  const startLogin = useAISidebarStore((s) => s.startLogin);
   const openApiKeySettings = useAISidebarStore((s) => s.openApiKeySettings);
   const conversation = useActiveConversation();
+  const readyAlternative = useReadyAlternative(runtimeId);
 
   const names: ModelNames = {
     label: (id) => runtimeId === 'claude-code'
@@ -92,6 +134,7 @@ export function TurnFailureCard({
     names,
     fallbackModel,
     switchedTo: alreadySwitched,
+    readyAlternative: readyAlternative?.runtimeId,
   });
 
   if (!card) {
@@ -109,7 +152,7 @@ export function TurnFailureCard({
       <RuntimeNotice
         title={card.title}
         message={card.message}
-        tone={alreadySwitched ? 'success' : 'warning'}
+        tone={card.done ? 'success' : 'warning'}
         primaryAction={action ? {
           label: action.label,
           icon: ACTION_ICONS[action.kind] ?? 'arrow-square-out',
@@ -117,8 +160,13 @@ export function TurnFailureCard({
           onAction: () => {
             if (action.kind === 'use-model') {
               selectRuntimeModel(runtimeId, action.modelId);
+            } else if (action.kind === 'use-runtime' && readyAlternative) {
+              selectRuntimeModel(readyAlternative.runtimeId, readyAlternative.modelId);
             } else if (action.kind === 'sign-in') {
-              startCodexLogin();
+              // Each AI's own sign-in; OpenCode signs in with a key.
+              if (runtimeId === 'codex') startCodexLogin();
+              else if (runtimeId === 'claude-code') startLogin();
+              else openApiKeySettings();
             } else if (action.kind === 'open-key-settings') {
               openApiKeySettings();
             } else if (action.kind === 'open-billing' && errorDetail?.billing) {

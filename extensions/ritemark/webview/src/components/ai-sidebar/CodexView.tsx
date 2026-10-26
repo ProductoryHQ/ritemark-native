@@ -186,6 +186,7 @@ export function CodexTurn({
           activities={turn.activities}
           isRunning={turn.isRunning}
           lastActivity={lastActivity}
+          runtimeLabel={runtimeLabel}
         />
       )}
 
@@ -316,16 +317,21 @@ function ActivitySection({
   activities,
   isRunning,
   lastActivity,
+  runtimeLabel,
 }: {
   activities: AgentProgress[];
   isRunning: boolean;
   lastActivity: AgentProgress | null;
+  /** ChatGPT or OpenCode: the provider's own words are labelled as theirs. */
+  runtimeLabel: string;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   const count = activities.length;
   // Sprint 139: the provider's own words after a failure are kept here, but they aren't an action.
   const actions = activities.filter((activity) => activity.type !== 'error').length;
+  const theirWords = actions < count ? `What ${runtimeLabel} said` : undefined;
+  const completed = actions > 0 ? `${actions} action${actions !== 1 ? 's' : ''} completed` : undefined;
   const latestMessage = lastActivity?.message || '';
 
   return (
@@ -348,7 +354,7 @@ function ActivitySection({
         <span className="text-[11px] opacity-50 truncate">
           {isRunning
             ? `${latestMessage}${count > 1 ? ` (${count} actions)` : ''}`
-            : actions > 0 ? `${actions} action${actions !== 1 ? 's' : ''} completed` : 'Details'
+            : [completed, theirWords].filter(Boolean).join(' · ')
           }
         </span>
       </button>

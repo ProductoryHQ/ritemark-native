@@ -8,10 +8,13 @@ import assert from 'node:assert/strict'
 import { COPY, PLAN_LINES, PROVIDER_NAMES } from './welcomeCopy'
 
 assert.deepEqual(PLAN_LINES, {
-  chatgpt: 'Sign in with any plan, free included.',
-  claude: 'Sign in with a paid plan, such as Pro or Max.',
+  chatgpt: 'Any plan works, free included.',
+  claude: 'Needs a paid plan, such as Pro or Max.',
   opencode: 'Open models, with an API key of your own.',
-}, "the three lines, in Jarmo's words (shape decision, 21 October)")
+}, "the three lines, facts that don't change with sign-in (the Experience lead, 26 October)")
+for (const line of Object.values(PLAN_LINES)) {
+  assert.doesNotMatch(line, /sign in/i, 'a line says which plans work, not what to do: the button row says Sign in')
+}
 assert.equal(new Set(Object.values(PLAN_LINES)).size, 3, 'one line per provider')
 assert.equal(COPY.openCodeLine, PLAN_LINES.opencode, "OpenCode's line is unchanged")
 assert.ok(!('accountLine' in COPY), 'the shared line that said nothing about plans is gone')

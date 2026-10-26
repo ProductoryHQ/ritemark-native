@@ -195,7 +195,10 @@ export function unwrapProviderMessage(raw: string | undefined): UnwrappedError {
       }
       return { sentence: undefined, envelopeCodes };
     } catch {
-      // Not JSON after all: read it as text.
+      // Not JSON after all. Text that starts like an envelope is a payload cut short
+      // (`{"type":"error","error":{"message":"Oops it bro`), never a sentence.
+      if (/^[[{]\s*["[{]/.test(text.slice(braceAt))) return { sentence: undefined, envelopeCodes };
+      // Otherwise read it as text.
     }
   }
 

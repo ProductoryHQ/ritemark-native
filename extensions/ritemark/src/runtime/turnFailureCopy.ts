@@ -49,6 +49,8 @@ export interface RuntimeErrorDetail {
   limit?: LimitKind;
   /** `limit` on a plan: when it resets, in the AI's own words ("at 3:05 PM", "in 2 hours"). */
   resetsAt?: string;
+  /** `provider`: the AI's process ended mid-turn, so the card says it stopped. */
+  exited?: true;
 }
 
 const MAX_DETAIL_TEXT = 256;
@@ -64,6 +66,7 @@ export function decodeRuntimeErrorDetail(value: unknown): RuntimeErrorDetail | u
   }
   if (typeof input.limit === 'string' && (LIMIT_KINDS as readonly string[]).includes(input.limit)) detail.limit = input.limit as LimitKind;
   if (typeof input.resetsAt === 'string' && input.resetsAt.trim() && input.resetsAt.length <= 64) detail.resetsAt = input.resetsAt.trim();
+  if (input.exited === true) detail.exited = true;
   return Object.keys(detail).length > 0 ? detail : undefined;
 }
 
@@ -83,8 +86,10 @@ interface BillingPage {
   company: string;
   /** What the credits or quota belong to. */
   product: string;
-  /** Where the person adds credits, for the words when there is no button. */
+  /** The page's name, for a button's tooltip. */
   place: string;
+  /** Where to go, in words, before ", then send your message again." */
+  wayOn: string;
   /** The page itself. */
   url: string;
   /**
@@ -103,13 +108,15 @@ export const BILLING_PAGES: Record<BillingProvider, BillingPage> = {
     company: 'Google',
     product: 'Gemini API',
     place: 'Google AI Studio',
+    wayOn: 'Add credits in Google AI Studio',
     url: 'https://aistudio.google.com/',
     trusted: false,
   },
   openai: {
     company: 'OpenAI',
     product: 'OpenAI API',
-    place: "OpenAI's billing settings",
+    place: "OpenAI's platform",
+    wayOn: "Check your plan and billing on OpenAI's platform",
     url: 'https://platform.openai.com/settings/organization/billing',
     trusted: false,
   },
@@ -117,6 +124,7 @@ export const BILLING_PAGES: Record<BillingProvider, BillingPage> = {
     company: 'Anthropic',
     product: 'Anthropic API',
     place: 'the Claude Console',
+    wayOn: 'Add credits in the Claude Console',
     url: 'https://console.anthropic.com/settings/billing',
     trusted: true,
     buttonLabel: 'Open Claude Console',
@@ -125,6 +133,7 @@ export const BILLING_PAGES: Record<BillingProvider, BillingPage> = {
     company: 'OpenRouter',
     product: 'OpenRouter',
     place: "OpenRouter's credits page",
+    wayOn: "Add credits on OpenRouter's credits page",
     url: 'https://openrouter.ai/settings/credits',
     trusted: false,
   },
@@ -146,18 +155,51 @@ function modelLabel(names: ModelNames | undefined, modelId: string): string {
   return names?.label(modelId) ?? modelId;
 }
 
+/** "Your Gemini API credits have run out", or undefined when the company isn't known. */
 function limitReason(detail: RuntimeErrorDetail): string | undefined {
   const page = detail.billing ? BILLING_PAGES[detail.billing] : undefined;
   if (!page) return undefined;
   return detail.limit === 'quota'
-    ? `your ${page.product} key has reached its quota`
-    : `your ${page.product} credits have run out`;
+    ? `Your ${page.product} key has reached its quota`
+    : `Your ${page.product} credits have run out`;
+}
+
+/** The words of a card with no button for a model: the person picks one. */
+const CHOOSE_ANOTHER_MODEL = "It isn't available right now. Choose another model in the model menu, then send your message again.";
+const SEND_AGAIN = 'Send your message again.';
+
+/** The heading of a key the provider refused, by company when known. */
+function keyRefusedTitle(detail: RuntimeErrorDetail): string {
+  return detail.billing ? `${BILLING_PAGES[detail.billing].company} didn't accept the API key` : 'OpenCode needs a working API key';
+}
+
+function couldNotFinish(name: string): string {
+  return `${name} couldn't finish this request`;
+}
+
+function stoppedUnexpectedly(name: string): string {
+  return `${name} stopped unexpectedly`;
+}
+
+/** The provider's own sentence, ending in a stop, or '' when it is only our fallback. */
+function providerWords(name: string, providerSentence: string): string {
+  const said = providerSentence.trim();
+  if (!said || said === `${couldNotFinish(name)}.`) return '';
+  return /[.!?]$/.test(said) ? said : `${said}.`;
+}
+
+/** The provider's sentence once, then the way on, unless its last words already give one. */
+function withSendAgain(said: string): string {
+  if (!said) return SEND_AGAIN;
+  return /(send your message again|try again(?: later)?)\.$/i.test(said) ? said : `${said} ${SEND_AGAIN}`;
 }
 
 /**
  * The turn's one sentence, as the transcript shows it when there is no card
- * and as the conversation record keeps it. `providerSentence` is the
- * provider's own sentence, unwrapped, for the kinds that use it.
+ * and as the conversation record, comment tasks and task cards keep it.
+ * `providerSentence` is the provider's own sentence, unwrapped, for the kinds
+ * that use it. Each sentence is its card's heading and body, so the words read
+ * the same with or without the card.
  */
 export function failureSentence(input: {
   runtimeId: AgentId;
@@ -170,30 +212,30 @@ export function failureSentence(input: {
   const detail = input.detail ?? {};
   switch (input.kind) {
     case 'sign-in':
-      if (input.runtimeId === 'codex') return 'Your ChatGPT sign-in has ended. Sign in again, then send your message again.';
-      if (input.runtimeId === 'opencode') {
-        const company = detail.billing ? BILLING_PAGES[detail.billing].company : "OpenCode's provider";
-        return `${company} didn't accept the API key. Check it in AI Settings, then send your message again.`;
-      }
+      if (input.runtimeId === 'codex') return 'Your ChatGPT sign-in has ended. Sign in, then send your message again.';
+      if (input.runtimeId === 'opencode') return `${keyRefusedTitle(detail)}. Check it in AI Settings, then send your message again.`;
       return input.providerSentence;
-    case 'model':
-      return detail.model
-        ? `${name} couldn't use ${modelLabel(input.names, detail.model)}. It isn't available in Ritemark right now.`
-        : `${name} couldn't use the chosen model. It isn't available in Ritemark right now.`;
+    case 'model': {
+      const failed = detail.model ? modelLabel(input.names, detail.model) : 'the chosen model';
+      return input.runtimeId === 'opencode'
+        ? `${name} couldn't use ${failed}. ${CHOOSE_ANOTHER_MODEL}`
+        : `${name} couldn't use ${failed}. It isn't available in Ritemark right now.`;
+    }
     case 'limit': {
       if (detail.limit === 'plan') {
-        return `You've used ${name}'s limit for now.${detail.resetsAt ? ` It resets ${detail.resetsAt}.` : ''}`;
+        return `You've used ${name}'s limit for now. ${detail.resetsAt ? `It resets ${detail.resetsAt}.` : 'Try again later.'}`;
       }
       const reason = limitReason(detail);
       return reason && detail.billing
-        ? `${BILLING_PAGES[detail.billing].company} stopped this request: ${reason}.`
+        ? `${BILLING_PAGES[detail.billing].company} stopped this request. ${reason}. ${BILLING_PAGES[detail.billing].wayOn}, then send your message again.`
         : input.providerSentence;
     }
     case 'network':
       return `Ritemark couldn't reach ${name}. Check your connection, then send your message again.`;
     case 'provider':
     default:
-      return input.providerSentence;
+      if (detail.exited) return `${stoppedUnexpectedly(name)}. ${SEND_AGAIN}`;
+      return `${couldNotFinish(name)}. ${withSendAgain(providerWords(name, input.providerSentence))}`;
   }
 }
 
@@ -202,20 +244,26 @@ export type TurnFailureAction =
   | { kind: 'sign-in'; label: string; tooltip: string }
   | { kind: 'open-key-settings'; label: string; tooltip: string }
   | { kind: 'use-model'; label: string; tooltip: string; modelId: string }
+  | { kind: 'use-runtime'; label: string; tooltip: string; runtimeId: AgentId }
   | { kind: 'open-billing'; label: string; tooltip: string; url: string };
 
 export interface TurnFailureCardCopy {
   title: string;
   message: string;
   action?: TurnFailureAction;
+  /** The card says the way on was taken (the model switch), with the green check. */
+  done?: true;
 }
 
 /**
- * The card a failed turn shows in place of the red line, or null when the
- * turn shows only its sentence (no connection, or the provider's own words).
+ * The card a failed turn shows in place of the red line, or null when there
+ * is no kind to draw it from (a chat saved by 2.0, or Claude's sign-in, whose
+ * cards go by `failureKind`).
  *
  * `fallbackModel` is the catalog's default for this AI. `switchedTo` is set
  * once the person took the model card's switch, so the card says so.
+ * `readyAlternative` is another AI that is ready now, for the plan limit's
+ * Continue with, as the signed-out card's Use ChatGPT.
  */
 export function turnFailureCard(input: {
   runtimeId: AgentId;
@@ -225,6 +273,7 @@ export function turnFailureCard(input: {
   names?: ModelNames;
   fallbackModel?: string;
   switchedTo?: string;
+  readyAlternative?: AgentId;
 }): TurnFailureCardCopy | null {
   const name = aiName(input.runtimeId);
   const detail = input.detail ?? {};
@@ -233,14 +282,14 @@ export function turnFailureCard(input: {
       if (input.runtimeId === 'codex') {
         return {
           title: 'ChatGPT needs you to sign in again',
-          message: input.sentence,
+          message: 'Your sign-in has ended. Sign in, then send your message again.',
           action: { kind: 'sign-in', label: 'Sign in to ChatGPT', tooltip: "Opens ChatGPT's sign-in page in your browser." },
         };
       }
       if (input.runtimeId === 'opencode') {
         return {
-          title: 'OpenCode needs a working API key',
-          message: input.sentence,
+          title: keyRefusedTitle(detail),
+          message: 'Check it in AI Settings, then send your message again.',
           action: { kind: 'open-key-settings', label: 'Open AI Settings', tooltip: 'Opens Ritemark Settings, where your API keys are.' },
         };
       }
@@ -248,14 +297,12 @@ export function turnFailureCard(input: {
       return null;
     case 'model': {
       const failed = detail.model;
-      const title = failed ? `${name} couldn't use ${modelLabel(input.names, failed)}` : `${name} couldn't use the chosen model`;
       if (input.switchedTo) {
-        return { title, message: `Switched to ${modelLabel(input.names, input.switchedTo)} — send your message again when you're ready.` };
+        return { title: `Now using ${modelLabel(input.names, input.switchedTo)}`, message: "Send your message again when you're ready.", done: true };
       }
+      const title = failed ? `${name} couldn't use ${modelLabel(input.names, failed)}` : `${name} couldn't use the chosen model`;
       const fallback = input.fallbackModel && input.fallbackModel !== failed ? input.fallbackModel : undefined;
-      if (!fallback) {
-        return { title, message: "It isn't available in Ritemark right now. Choose another model in the model menu below." };
-      }
+      if (!fallback) return { title, message: CHOOSE_ANOTHER_MODEL };
       const fallbackLabel = modelLabel(input.names, fallback);
       return {
         title,
@@ -270,36 +317,54 @@ export function turnFailureCard(input: {
     }
     case 'limit': {
       if (detail.limit === 'plan') {
+        const alternative = input.readyAlternative && input.readyAlternative !== input.runtimeId ? input.readyAlternative : undefined;
         return {
           title: `You've used ${name}'s limit for now`,
           message: detail.resetsAt ? `It resets ${detail.resetsAt}.` : 'Try again later.',
+          ...(alternative ? {
+            action: {
+              kind: 'use-runtime' as const,
+              label: `Continue with ${aiName(alternative)}`,
+              tooltip: `Continue this chat with ${aiName(alternative)}.`,
+              runtimeId: alternative,
+            },
+          } : {}),
         };
       }
       const page = detail.billing ? BILLING_PAGES[detail.billing] : undefined;
       const reason = limitReason(detail);
       if (!page || !reason) return { title: `${name} stopped this request`, message: input.sentence };
-      const said = `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.`;
+      const message = `${reason}. ${page.wayOn}, then send your message again.`;
       if (page.trusted && page.buttonLabel) {
         return {
           title: `${page.company} stopped this request`,
-          message: `${said} Add credits, then send your message again.`,
+          message,
           action: { kind: 'open-billing', label: page.buttonLabel, tooltip: `Opens ${page.place} in your browser.`, url: page.url },
         };
       }
-      return {
-        title: `${page.company} stopped this request`,
-        message: `${said} Add credits in ${page.place}, then send your message again.`,
-      };
+      return { title: `${page.company} stopped this request`, message };
     }
     case 'network':
-    case 'provider':
+      return { title: `Ritemark couldn't reach ${name}`, message: 'Check your connection, then send your message again.' };
+    case 'provider': {
+      if (detail.exited) return { title: stoppedUnexpectedly(name), message: SEND_AGAIN };
+      // The record keeps "<AI> couldn't finish this request. <their words> Send your message again.";
+      // the card's heading is the first part, its body the rest.
+      const heading = `${couldNotFinish(name)}. `;
+      const body = input.sentence.startsWith(heading) ? input.sentence.slice(heading.length) : withSendAgain(providerWords(name, input.sentence));
+      return { title: couldNotFinish(name), message: body };
+    }
     default:
       return null;
   }
 }
 
-/** Sprint 139 (R3): a failed turn with a card says nothing on the status line below it. */
-export function failureShowsCard(runtimeId: AgentId, kind: RuntimeErrorKind | undefined): boolean {
+/**
+ * Sprint 139 (R3): under a card with a way on (sign-in, model, limit), the
+ * status line says nothing. Under any other failed turn it says "Failed".
+ */
+export function failureSilencesStatusLine(runtimeId: AgentId, kind: RuntimeErrorKind | undefined): boolean {
+  if (kind !== 'sign-in' && kind !== 'model' && kind !== 'limit') return false;
   return turnFailureCard({ runtimeId, kind, sentence: '' }) !== null;
 }
 

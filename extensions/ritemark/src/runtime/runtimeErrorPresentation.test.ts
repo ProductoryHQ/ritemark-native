@@ -12,7 +12,8 @@ import {
   unwrapProviderMessage,
 } from './runtimeErrorPresentation';
 import {
-  failureShowsCard,
+  failureSentence,
+  failureSilencesStatusLine,
   decodeRuntimeErrorDetail,
   isRuntimeErrorKind,
   trustedBillingUrl,
@@ -60,14 +61,14 @@ assert.deepEqual(presentRuntimeError('claude-code', rawOAuthError, 'api-key-auth
 });
 
 assert.deepEqual(presentRuntimeError('claude-code', 'Workspace unavailable'), {
-  message: 'Workspace unavailable',
+  message: "Claude couldn't finish this request. Workspace unavailable. Send your message again.",
   errorKind: 'provider',
 });
 
 // Authentication copy must stay runtime-specific: another runtime using a
 // similar phrase should keep its own recovery UX.
 assert.deepEqual(presentRuntimeError('codex', rawOAuthError), {
-  message: rawOAuthError,
+  message: `ChatGPT couldn't finish this request. ${rawOAuthError}. Send your message again.`,
   errorKind: 'provider',
 });
 
@@ -99,7 +100,7 @@ assert.deepEqual(
 );
 assert.equal(
   presentRuntimeError('codex', 'not_found_error model: gpt-x')?.message,
-  'not_found_error model: gpt-x',
+  "ChatGPT couldn't finish this request. not_found_error model: gpt-x. Send your message again.",
   'other runtimes keep their own diagnostics',
 );
 console.log('runtimeErrorPresentation: Sprint 127 model-unavailable presentation passes');
@@ -133,7 +134,7 @@ assert.deepEqual(
 // A3. ChatGPT: the sign-in ended — by Codex's structured code, and by its own words.
 assert.deepEqual(classifyRuntimeError('codex', 'unexpected status 401 Unauthorized', { code: 'unauthorized' }), {
   kind: 'sign-in',
-  sentence: 'Your ChatGPT sign-in has ended. Sign in again, then send your message again.',
+  sentence: 'Your ChatGPT sign-in has ended. Sign in, then send your message again.',
 });
 assert.equal(
   classifyRuntimeError('codex', 'Your access token could not be refreshed because your refresh token has expired. Please log out and sign in again.')?.kind,
@@ -150,6 +151,8 @@ assert.deepEqual(
   { limit: 'plan' },
   'no reset time is invented',
 );
+assert.equal(classifyRuntimeError('codex', "You've hit your usage limit. Try again later.")?.sentence,
+  "You've used ChatGPT's limit for now. Try again later.");
 
 // A5. ChatGPT: no connection only without an HTTP status; a server that answered is the provider's own error.
 assert.equal(classifyRuntimeError('codex', 'stream disconnected before completion: error sending request', { code: 'responseStreamDisconnected' })?.kind, 'network');
@@ -161,7 +164,7 @@ assert.equal(classifyRuntimeError('codex', 'error sending request for url (https
 const googleCredits = 'Internal error: Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing.';
 assert.deepEqual(classifyRuntimeError('opencode', googleCredits, { turnModel: 'google/gemini-4-argon' }), {
   kind: 'limit',
-  sentence: 'Google stopped this request: your Gemini API credits have run out.',
+  sentence: 'Google stopped this request. Your Gemini API credits have run out. Add credits in Google AI Studio, then send your message again.',
   detail: { billing: 'google', limit: 'credits' },
 });
 assert.equal(unwrapProviderMessage(googleCredits).sentence?.startsWith('Your prepayment credits'), true, 'the ACP wrapper is dropped');
@@ -169,7 +172,7 @@ assert.equal(unwrapProviderMessage(googleCredits).sentence?.startsWith('Your pre
 // A7. OpenCode: an OpenAI key out of quota (documented `insufficient_quota` envelope).
 assert.deepEqual(
   classifyRuntimeError('opencode', '{"error":{"message":"You exceeded your current quota, please check your plan and billing details.","type":"insufficient_quota","code":"insufficient_quota"}}', { turnModel: 'openai/gpt-5.6' }),
-  { kind: 'limit', sentence: 'OpenAI stopped this request: your OpenAI API key has reached its quota.', detail: { billing: 'openai', limit: 'quota' } },
+  { kind: 'limit', sentence: "OpenAI stopped this request. Your OpenAI API key has reached its quota. Check your plan and billing on OpenAI's platform, then send your message again.", detail: { billing: 'openai', limit: 'quota' } },
 );
 // Google's 429 uses the same words; the provider comes from the text, else from the model.
 assert.equal(
@@ -185,7 +188,7 @@ assert.deepEqual(classifyRuntimeError('claude-code', 'Your credit balance is too
 // With a Claude.ai sign-in a billing error is audit A1's question (#496): nothing is guessed.
 assert.deepEqual(classifyRuntimeError('claude-code', 'Your account cannot use this.', { code: 'billing_error' }), {
   kind: 'provider',
-  sentence: 'Your account cannot use this.',
+  sentence: "Claude couldn't finish this request. Your account cannot use this. Send your message again.",
 });
 // A9. OpenRouter's credits.
 assert.equal(classifyRuntimeError('opencode', 'Insufficient credits. Add more using https://openrouter.ai/settings/credits', { turnModel: 'openrouter/qwen3' })?.detail?.billing, 'openrouter');
@@ -193,7 +196,7 @@ assert.equal(classifyRuntimeError('opencode', 'Insufficient credits. Add more us
 // A10. OpenCode: a model the provider doesn't serve, by OpenCode's error name, and by provider text.
 assert.deepEqual(
   classifyRuntimeError('opencode', 'Internal error: Model not found: google/gemini-9-nope', { code: 'ProviderModelNotFoundError', turnModel: 'google/gemini-9-nope' }),
-  { kind: 'model', sentence: "OpenCode couldn't use google/gemini-9-nope. It isn't available in Ritemark right now.", detail: { model: 'google/gemini-9-nope' } },
+  { kind: 'model', sentence: "OpenCode couldn't use google/gemini-9-nope. It isn't available right now. Choose another model in the model menu, then send your message again.", detail: { model: 'google/gemini-9-nope' } },
 );
 assert.equal(classifyRuntimeError('opencode', 'models/gemini-9-nope is not found for API version v1beta, or is not supported for generateContent.')?.detail?.model, 'gemini-9-nope');
 
@@ -218,19 +221,28 @@ assert.equal(classifyRuntimeError('opencode', 'fetch failed')?.kind, 'network');
 // A13. Envelopes unwrapped; ordinary text untouched; nothing to say falls back to one plain sentence.
 assert.equal(
   classifyRuntimeError('claude-code', 'API Error: 500 {"type":"error","error":{"type":"api_error","message":"Internal server error"}}')?.sentence,
-  'Internal server error',
+  "Claude couldn't finish this request. Internal server error. Send your message again.",
+  "anything else: the heading, the provider's sentence once, then the way on",
 );
-assert.equal(classifyRuntimeError('codex', '{"type":"error","status":500}')?.sentence, "ChatGPT couldn't finish this request.");
+assert.equal(classifyRuntimeError('codex', '{"type":"error","status":500}')?.sentence,
+  "ChatGPT couldn't finish this request. Send your message again.", 'with nothing to say, the heading is said once');
 assert.equal(unwrapProviderMessage('The API returned invalid_request_error while I was reading.').sentence,
   'The API returned invalid_request_error while I was reading.', 'prose stays as it is');
 assert.equal(unwrapProviderMessage('Error: boom\n    at Object.<anonymous> (/x.js:1:1)').sentence, 'Error: boom');
 // AcpRuntime's describeAcpTurnError() keeps its one case; the classifier passes its sentence through.
 assert.equal(classifyRuntimeError('opencode', 'No model is selected for OpenCode. Pick one in the model selector below the message box, then try again.')?.sentence,
-  'No model is selected for OpenCode. Pick one in the model selector below the message box, then try again.');
+  "OpenCode couldn't finish this request. No model is selected for OpenCode. Pick one in the model selector below the message box, then try again.",
+  'words that already give a way on get no second one');
 assert.equal(classifyRuntimeError('codex', '   '), undefined);
 assert.equal(unwrapProviderMessage('{"error":"Model gpt-x is not available for this workspace."}').sentence,
   'Model gpt-x is not available for this workspace.', 'a plain {"error": "<text>"} body gives its text');
 assert.equal(unwrapProviderMessage('{"error":"invalid_request_error"}').sentence, undefined, 'a bare code is not a sentence');
+// A truncated envelope, however short, is a payload: never the sentence.
+const truncated = '{"type":"error","error":{"message":"Oops it broke';
+assert.equal(unwrapProviderMessage(truncated).sentence, undefined);
+assert.equal(unwrapProviderMessage(`API Error: 500 ${truncated}`).sentence, undefined, 'after a short prefix too');
+assert.equal(classifyRuntimeError('codex', truncated)?.sentence, "ChatGPT couldn't finish this request. Send your message again.");
+assert.equal(unwrapProviderMessage('Use {name} in the template.').sentence, 'Use {name} in the template.', 'prose with a brace stays prose');
 assert.equal(unwrapProviderMessage('{"error":"x y z","message":"The real sentence."}').sentence, 'The real sentence.', 'message wins');
 
 // The runtimes' structured codes, read leniently.
@@ -261,38 +273,94 @@ assert.deepEqual(turnFailureCard({
   runtimeId: 'codex', kind: 'model', detail: { model: 'gpt-5.6-sol' }, sentence: '', names, fallbackModel: 'gpt-5.6-sol',
 }), {
   title: "ChatGPT couldn't use GPT-5.6 Sol",
-  message: "It isn't available in Ritemark right now. Choose another model in the model menu below.",
+  message: "It isn't available right now. Choose another model in the model menu, then send your message again.",
 }, 'the default is the model that failed: no button (S26)');
-assert.equal(turnFailureCard({ runtimeId: 'opencode', kind: 'model', detail: { model: 'google/x' }, sentence: '' })?.action, undefined,
-  'OpenCode has no catalog default, so no button (S28)');
-assert.equal(turnFailureCard({
+assert.deepEqual(turnFailureCard({ runtimeId: 'opencode', kind: 'model', detail: { model: 'google/x' }, sentence: '' }), {
+  title: "OpenCode couldn't use google/x",
+  message: "It isn't available right now. Choose another model in the model menu, then send your message again.",
+}, 'OpenCode has no catalog default, so no button (S28)');
+assert.deepEqual(turnFailureCard({
   runtimeId: 'codex', kind: 'model', detail: { model: 'gpt-6.1-sol' }, sentence: '', names, fallbackModel: 'gpt-5.6-sol', switchedTo: 'gpt-5.6-sol',
-})?.message, "Switched to GPT-5.6 Sol — send your message again when you're ready.");
+}), { title: 'Now using GPT-5.6 Sol', message: "Send your message again when you're ready.", done: true }, 'after the switch: the new model, with the check');
 assert.deepEqual(turnFailureCard({ runtimeId: 'opencode', kind: 'limit', detail: { billing: 'google', limit: 'credits' }, sentence: '' }), {
   title: 'Google stopped this request',
   message: 'Your Gemini API credits have run out. Add credits in Google AI Studio, then send your message again.',
 }, 'an untrusted billing host gets words, not a button that would ask first (A3)');
-assert.equal(turnFailureCard({ runtimeId: 'opencode', kind: 'limit', detail: { billing: 'anthropic', limit: 'credits' }, sentence: '' })?.action?.kind, 'open-billing');
+assert.deepEqual(turnFailureCard({ runtimeId: 'opencode', kind: 'limit', detail: { billing: 'openai', limit: 'quota' }, sentence: '' }), {
+  title: 'OpenAI stopped this request',
+  message: "Your OpenAI API key has reached its quota. Check your plan and billing on OpenAI's platform, then send your message again.",
+}, 'each company names where to go');
+assert.deepEqual(turnFailureCard({ runtimeId: 'opencode', kind: 'limit', detail: { billing: 'anthropic', limit: 'credits' }, sentence: '' }), {
+  title: 'Anthropic stopped this request',
+  message: 'Your Anthropic API credits have run out. Add credits in the Claude Console, then send your message again.',
+  action: { kind: 'open-billing', label: 'Open Claude Console', tooltip: 'Opens the Claude Console in your browser.', url: 'https://console.anthropic.com/settings/billing' },
+});
 assert.equal(trustedBillingUrl('anthropic'), 'https://console.anthropic.com/settings/billing');
 assert.equal(trustedBillingUrl('google'), undefined);
 assert.deepEqual(turnFailureCard({ runtimeId: 'codex', kind: 'limit', detail: { limit: 'plan', resetsAt: 'at 3:05 PM' }, sentence: '' }), {
   title: "You've used ChatGPT's limit for now",
   message: 'It resets at 3:05 PM.',
+}, 'no other AI ready: no button');
+assert.deepEqual(turnFailureCard({ runtimeId: 'codex', kind: 'limit', detail: { limit: 'plan' }, sentence: '', readyAlternative: 'claude-code' }), {
+  title: "You've used ChatGPT's limit for now",
+  message: 'Try again later.',
+  action: { kind: 'use-runtime', label: 'Continue with Claude', tooltip: 'Continue this chat with Claude.', runtimeId: 'claude-code' },
+}, 'another AI is ready: Continue with it, as the signed-out card does');
+assert.equal(turnFailureCard({ runtimeId: 'codex', kind: 'limit', detail: { limit: 'plan' }, sentence: '', readyAlternative: 'codex' })?.action, undefined,
+  'never the same AI');
+assert.deepEqual(turnFailureCard({ runtimeId: 'codex', kind: 'sign-in', sentence: 's' }), {
+  title: 'ChatGPT needs you to sign in again',
+  message: 'Your sign-in has ended. Sign in, then send your message again.',
+  action: { kind: 'sign-in', label: 'Sign in to ChatGPT', tooltip: "Opens ChatGPT's sign-in page in your browser." },
 });
-assert.equal(turnFailureCard({ runtimeId: 'codex', kind: 'sign-in', sentence: 's' })?.action?.label, 'Sign in to ChatGPT');
-assert.equal(turnFailureCard({ runtimeId: 'opencode', kind: 'sign-in', sentence: 's' })?.action?.kind, 'open-key-settings');
+assert.deepEqual(turnFailureCard({ runtimeId: 'opencode', kind: 'sign-in', detail: { billing: 'google' }, sentence: 's' }), {
+  title: "Google didn't accept the API key",
+  message: 'Check it in AI Settings, then send your message again.',
+  action: { kind: 'open-key-settings', label: 'Open AI Settings', tooltip: 'Opens Ritemark Settings, where your API keys are.' },
+});
+assert.equal(turnFailureCard({ runtimeId: 'opencode', kind: 'sign-in', sentence: 's' })?.title, 'OpenCode needs a working API key', 'the company when known');
+assert.equal(failureSentence({ runtimeId: 'opencode', kind: 'sign-in', providerSentence: '' }),
+  'OpenCode needs a working API key. Check it in AI Settings, then send your message again.');
 assert.equal(turnFailureCard({ runtimeId: 'claude-code', kind: 'sign-in', sentence: 's' }), null, "Claude's sign-in cards stay as they are");
-assert.equal(turnFailureCard({ runtimeId: 'codex', kind: 'network', sentence: 's' }), null, 'no connection: the sentence alone');
-assert.equal(turnFailureCard({ runtimeId: 'codex', kind: 'provider', sentence: 's' }), null);
+assert.deepEqual(turnFailureCard({ runtimeId: 'codex', kind: 'network', sentence: 's' }), {
+  title: "Ritemark couldn't reach ChatGPT",
+  message: 'Check your connection, then send your message again.',
+});
+const anythingElse = failureSentence({ runtimeId: 'codex', kind: 'provider', providerSentence: 'The server is busy' });
+assert.equal(anythingElse, "ChatGPT couldn't finish this request. The server is busy. Send your message again.");
+assert.deepEqual(turnFailureCard({ runtimeId: 'codex', kind: 'provider', sentence: anythingElse }), {
+  title: "ChatGPT couldn't finish this request",
+  message: 'The server is busy. Send your message again.',
+}, "the provider's sentence once, under the heading");
+const exited = failureSentence({ runtimeId: 'opencode', kind: 'provider', detail: { exited: true }, providerSentence: '' });
+assert.equal(exited, 'OpenCode stopped unexpectedly. Send your message again.');
+assert.deepEqual(turnFailureCard({ runtimeId: 'opencode', kind: 'provider', detail: { exited: true }, sentence: exited }), {
+  title: 'OpenCode stopped unexpectedly',
+  message: 'Send your message again.',
+});
 assert.equal(turnFailureCard({ runtimeId: 'codex', kind: undefined, sentence: 's' }), null, 'a 2.0 record: the sentence alone');
 
-// The status line says nothing under a card, and "Failed" under a sentence (R3).
-assert.equal(failureShowsCard('codex', 'model'), true);
-assert.equal(failureShowsCard('opencode', 'limit'), true);
-assert.equal(failureShowsCard('codex', 'sign-in'), true);
-assert.equal(failureShowsCard('claude-code', 'sign-in'), false, "Claude's sign-in card is AgentResponse's (by failureKind)");
-assert.equal(failureShowsCard('claude-code', 'network'), false);
-assert.equal(failureShowsCard('codex', undefined), false);
+// No em dash in any card or sentence, and never Codex.
+for (const runtimeId of ['claude-code', 'codex', 'opencode'] as const) {
+  for (const kind of ['sign-in', 'limit', 'model', 'network', 'provider'] as const) {
+    for (const detail of [undefined, { model: 'm' }, { limit: 'plan' as const }, { billing: 'google' as const, limit: 'credits' as const }, { exited: true as const }]) {
+      const sentence = failureSentence({ runtimeId, kind, detail, providerSentence: 'Their words.' });
+      const card = turnFailureCard({ runtimeId, kind, detail, sentence, fallbackModel: 'f', switchedTo: kind === 'model' ? 'f' : undefined });
+      const words = JSON.stringify({ sentence, card });
+      assert.ok(!words.includes('\u2014'), `no em dash: ${words}`);
+      assert.ok(!/codex/i.test(words), `never Codex: ${words}`);
+    }
+  }
+}
+
+// The status line says nothing under a card with a way on, and "Failed" under any other (R3).
+assert.equal(failureSilencesStatusLine('codex', 'model'), true);
+assert.equal(failureSilencesStatusLine('opencode', 'limit'), true);
+assert.equal(failureSilencesStatusLine('codex', 'sign-in'), true);
+assert.equal(failureSilencesStatusLine('claude-code', 'sign-in'), false, "Claude's sign-in card is AgentResponse's (by failureKind)");
+assert.equal(failureSilencesStatusLine('claude-code', 'network'), false);
+assert.equal(failureSilencesStatusLine('codex', 'provider'), false);
+assert.equal(failureSilencesStatusLine('codex', undefined), false);
 
 // The outcome counts (R8) come from the same kinds.
 assert.equal(turnOutcome('completed', undefined), 'arrived');
@@ -306,5 +374,7 @@ assert.equal(isRuntimeErrorKind('plan'), false, 'no plan kind before audit A1');
 assert.equal(isRuntimeErrorKind('model'), true);
 assert.deepEqual(decodeRuntimeErrorDetail({ model: 'gpt-x', billing: 'aws', limit: 'tokens', resetsAt: 42, future: true }), { model: 'gpt-x' });
 assert.equal(decodeRuntimeErrorDetail('nope'), undefined);
+assert.deepEqual(decodeRuntimeErrorDetail({ exited: true }), { exited: true });
+assert.equal(decodeRuntimeErrorDetail({ exited: 'yes' }), undefined);
 assert.equal(decodeRuntimeErrorDetail({ model: 'x'.repeat(300) }), undefined);
 console.log('runtimeErrorPresentation: Sprint 139 card copy passes');
