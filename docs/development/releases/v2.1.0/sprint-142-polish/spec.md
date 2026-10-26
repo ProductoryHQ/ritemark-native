@@ -158,6 +158,10 @@ Acceptance criteria (the Experience lead's rule on #503, framework §4 Elevation
   - the Agent Library's cards;
   - Home's switch note (ink 18% today);
   - the Mermaid diagram's expand toolbar (slate 24% today).
+- *(revised 2026-10-26, after audit A6; `research/sheet-edges-audit.md`)*:
+  - In 2.1's frame, the desk and the AI's sheet both sit flush with the boxes that clip them. The 8 of ground around each belongs to the neighbouring part's padding.
+  - Neither can have its shadow's room without moving part boundaries in patch 018's layout. So in 2.1 **both keep a whole inset hairline and no shadow**: the Experience lead's fallback on #503, and framework §4's "the sheet keeps its hairline only".
+  - The shadows' room is a layout change noted for 2.2.
 - **Unchanged:**
   - the floating sheets (menus, More), the chosen tab, the cards on Home and the welcome, and the desk's webviews (the Experience lead: "fine as they are");
   - the frame's measured edges (`scripts/qa/frame-geometry.mjs` passes as on main).
