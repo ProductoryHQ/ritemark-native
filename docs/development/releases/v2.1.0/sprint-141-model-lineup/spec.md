@@ -67,6 +67,13 @@ Acceptance criteria:
 - A Flow saved on a 2.5 model keeps it and runs it as before. Nothing moves a saved step to another model.
 - According to #531, Google's models page (updated 22 October) lists 2.5 as legacy, with access limited to past users. A2 re-reads it. Whether a new account's key is refused is **not proven**: it needs a key from a new Google account (*Not runnable*, below).
 
+**R3, revised 2026-10-26 after A2** (`research/gemini-default-audit.md`):
+- **The default is Gemini 3.5 Flash Lite.** Google documents that thinking tokens count against `maxOutputTokens`, and that a request can stop at `MAX_TOKENS` with truncated or empty output. Gemini 3.8 Flash thinks at `medium` by default, so R3's rule chose 3.5 Flash Lite.
+- **3.5 Flash Lite also thinks,** at `minimal` by default ("minimal does not guarantee that thinking is off"). It is not "a model that doesn't reason", as R3 first said.
+- Google's models page tells new projects to use "3.5 Flash-Lite or 3.8 Flash".
+- The page does not use the word "legacy". It says access to the 2.5 models is limited to users who used them before, that they are not deprecated, and that no shutdown date is announced. The limit dates from 18 September 2026 (Google's changelog).
+- The rows' wording, "Retained for saved selections", stands.
+
 ### R4: One default, in the editor and in the run (#531, an adjacent fix)
 
 As someone building a Flow, I want the model the editor proposes to be the one the step runs when I leave it unset.
@@ -93,6 +100,15 @@ Acceptance criteria:
 - The raw response stays in the run's details for diagnosis.
 - What a new account actually sees for a 2.5 model is not proven (no key). Until it is seen, only the documented wording is matched.
 
+**R5, revised 2026-10-26 after A2** (`research/gemini-default-audit.md`):
+- **Google's error page doesn't document a model-specific error for generateContent.** It lists 404 `NOT_FOUND` as "the requested resource wasn't found". Two wordings for a refused model are publicly reported on Google's own developer forum, so they count as seen errors:
+  - "This model models/gemini-2.5-flash is no longer available to new users." (404 `NOT_FOUND`, reported from July and in September 2026);
+  - "… is not found for API version v1beta, or is not supported for generateContent".
+
+  So the match is structural, not on words: a 404 `NOT_FOUND` from a model call whose error message names that model (`models/<id>`) is R5's refusal. Any other 404 shows Google's own sentence.
+- **An answer cut off at Max tokens says so.** When Google returns `finishReason: MAX_TOKENS` and no text, the step says "The answer used up this step's Max tokens before any text came back. Raise Max tokens in this step, then run the Flow again." (proposed words). Today it says "No response from Gemini API". Thinking models make this more likely, and the docs say so.
+- Google returns an invalid key as 400 `INVALID_ARGUMENT` with reason `API_KEY_INVALID`, not as 401. Today's key sentence keys on the message text and is unchanged.
+
 ### R6: The export keeps what older apps need (#530)
 
 As the person refreshing the feed, I want the export to keep the fields that only older apps need, so a refresh can't take a model away from them.
@@ -112,6 +128,12 @@ Acceptance criteria:
   - defaults come from the bundled lineup;
   - an unknown provider is kept.
 - A bundled row may carry `minAppVersion` to gate the row for older apps through the feed. That version must be no higher than the version `main` builds, so that dev runs and tests still see the row. A gate above it is a hand edit in the feed at publish time, and R6 carries it on.
+
+**R6, revised 2026-10-27 after A1** (`research/feed-readers-audit.md`):
+- **No bundled row carries `minAppVersion`.** Before activation, `modelCatalog` resolves with app version `0.0.0`, so a bundled gate would hide the row from the build itself until activation, whatever its version.
+- The gates for older apps are listed once, in `src/ai/modelCatalog/feedGates.ts`, and the export adds them to the published feed.
+- A stricter gate already in the feed is kept.
+- Fields are carried on only from a curated feed row. An automated row's fields belonged to the withdrawn publisher, and the curated bundled row replaces it whole.
 
 ### R7: 2.1 declares to its Claude Code only what it doesn't know (#530; *Open Questions* 6)
 
@@ -226,6 +248,37 @@ Acceptance criteria:
   - OpenCode's rows (R2, R10) are checked on the OpenCode that ships.
 - A newer runtime that appears after the merge is the release's call, not this sprint's.
 
+### R12: The Gemini key never travels in a URL (#558; added 2026-10-26)
+
+Added by the Development manager on 26 October under the scope-change protocol: "You're already in those files, and it's small."
+
+As someone who saved a Google AI Studio key in Ritemark, I want it kept out of URLs. A URL ends up in proxy and gateway logs, crash reports and error messages.
+
+Acceptance criteria:
+- Every request Ritemark makes to `generativelanguage.googleapis.com` sends the key in the `x-goog-api-key` header and nothing in the URL's query. Google's API overview says every request "must include a x-goog-api-key header". The call sites:
+  - the model probe (`providerDiscovery.ts`, `discoverGemini`);
+  - the Flow editor's image-model list (`FlowEditorProvider.ts`);
+  - a Flow's Gemini LLM step (`LLMNodeExecutor.ts`);
+  - its Imagen and Gemini image steps (`ImageNodeExecutor.ts`);
+  - Settings' Google key Test (`RitemarkSettingsProvider.ts`, which #558 didn't list).
+- No error message, log line or run detail that Ritemark writes contains the key.
+- **A test** scans the extension's source and fails on any Gemini URL with `key=` in it, the way `modelConfig.test.ts` scans for model ids.
+- Each call site has a unit test with a mocked `fetch` that checks the header and the URL.
+- Without a key, nothing else can prove it. No request reaches Google from a test.
+- OpenCode's own Google calls are OpenCode's (the key reaches it as an environment variable), and so out of scope.
+
+### R13: Gemini's model list is read in full (A2's finding; added 2026-10-26)
+
+As someone with a Google key, I want Flows' Gemini list to hold every model Google offers me, not just the first page.
+
+Google's `models.list` returns 50 models per page by default, with a `nextPageToken` for the rest (API reference). `discoverGemini()` reads only the first page.
+
+Acceptance criteria:
+- The probe asks for Google's largest page and follows `nextPageToken`, up to a fixed number of pages, within the probe's timeout.
+- A failed later page keeps the pages already read.
+- A unit test with mocked pages checks both.
+- `models.list` doesn't check what a key may use: Google's troubleshooting page says a 200 "doesn't guarantee" inference access. So narrowing OpenCode's list by Google's (R10) can't drop the 2.5 models for a new account. R10's narrowing still drops a model Google doesn't list at all.
+
 ## Engineering requirements
 
 ### E1: One home for ids and lists
@@ -288,7 +341,7 @@ Acceptance criteria:
 - **Hiding deprecated rows from menus.** Only Claude below 5 is hidden, as today.
 - **The ACP SDK 2.x update.** It is a major version, with its own review.
 - **Electron and Node** (#515). They stay in the release's own runtime step, on the pinned VS Code.
-- **Moving the Gemini API key out of the request URL.** `discoverGemini()` and the Gemini step both send it as `?key=`. A header would be better, but changing it can't be proven without a key. It is filed as an issue instead.
+- ~~**Moving the Gemini API key out of the request URL.**~~ Moved into scope on 26 October as R12 (#558).
 - **Publishing the feed before 2.1** (*Open Questions* 7).
 
 ## Not runnable without keys
@@ -326,6 +379,8 @@ Runnable without keys:
 ## Open Questions
 
 All are for the Development manager, who approves 2.1's plans under Jarmo's delegation. Each has a recommendation. The sprint plan repeats them under *Decisions*.
+
+**Decided on 26 October, all nine as recommended** (`sprint-plan.md`, *Approval*). For decision 9, the User lead's counts (26 September – 26 October) show 37 people on 1.8.1–1.11.0, 4 of them active in the last 7 days, so GPT-6 Astra is accepted as their static fallback.
 
 1. **#529's design.**
    - Recommended:

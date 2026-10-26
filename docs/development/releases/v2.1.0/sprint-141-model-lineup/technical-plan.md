@@ -170,6 +170,7 @@ No new runtime, no change to `AgentRuntime`, no new subsystem. The `remote-model
   - **OpenCode's OpenAI group:** GPT-6.1 Sol first.
   - **OpenCode's OpenRouter group:** Argon, Claude Sonnet 5.5 and GPT-6.1 Sol.
   - **Gates:** a bundled row may carry `minAppVersion` ≤ `main`'s version (2.0.1 today) when A1 needs it for the feed. A unit test checks every bundled gate against `package.json`'s version.
+    - *Revised 27 October (R6, after A1):* no bundled gate at all. The catalog resolves as `0.0.0` before activation. Gates live in `feedGates.ts`, applied by the export, and a unit test checks that no bundled row has one.
   - **`updatedAt`** moves to the merge's day. The header comment records the lineup's change and the runtime versions.
 - **Tests:**
   - `modelConfig.test.ts`: the literal scan, and the Argon and default rows;
@@ -201,6 +202,29 @@ No new runtime, no change to `AgentRuntime`, no new subsystem. The `remote-model
     - key, quota and rate limit unchanged;
   - `FlowEditorProvider`'s config message carries the catalog's defaults (a test feed);
   - the webview: a new Gemini step takes `defaults.flowLLMGemini`.
+
+## Workstream 2b: The Gemini key and list (R12, R13, R5 revised; added 2026-10-26)
+
+- **One request helper,** `src/ai/geminiRequest.ts` (new, pure apart from `fetch`):
+  - `geminiUrl(version: 'v1' | 'v1beta', path: string, query?: Record<string, string>)` builds a URL that never takes a key;
+  - `geminiHeaders(apiKey, extra?)` returns `{ 'x-goog-api-key': apiKey, ...extra }`.
+
+  Every call site uses them:
+  - `providerDiscovery.ts` `discoverGemini`;
+  - `FlowEditorProvider.ts` `fetchGeminiImageModels`;
+  - `LLMNodeExecutor.ts`'s Gemini path;
+  - `ImageNodeExecutor.ts`'s Imagen `predict` and Gemini image paths;
+  - `RitemarkSettingsProvider.ts`'s Google key Test.
+
+  `fetchJson()` in `providerDiscovery.ts` already takes headers.
+- **The scan:** `src/ai/geminiRequest.test.ts` walks `src/` and `webview/src/` as `modelConfig.test.ts` does. It fails on a line that has `generativelanguage.googleapis.com` and `key=`, or on a template that appends `key=` to a Gemini URL. A fixture string proves the scan can fail.
+- **Call-site tests,** with `globalThis.fetch` replaced:
+  - each sends the header, and no URL query holds the value;
+  - an error path never puts the value in its message.
+- **R13:** `discoverGemini` asks for `pageSize=1000` (Google's documented maximum for `models.list`) and follows `nextPageToken` up to 5 pages. Each page has its own timeout. A failed later page returns what was read.
+- **R5 revised:**
+  - `providerModelRefusal()` matches a 404 `NOT_FOUND` whose message names `models/<id>` for the step's model;
+  - the Gemini path reads `candidates[0].finishReason` and, for `MAX_TOKENS` with no text, throws the Max-tokens sentence.
 
 ## Workstream 3: The feed tooling (R6–R9)
 

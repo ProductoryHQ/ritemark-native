@@ -3,7 +3,7 @@
 Track: SDD (auto-detected: four linked issues and the release's runtime review, across the model catalog, the feed in another repository, Flows' host and editor, and OpenCode's runtime; version-skew edge cases over fourteen shipped releases with two resolvers)
 Override with: "use plain full track"
 
-Branch: `sprint-141-model-lineup`, made from `origin/main` at Phase 3, after approval. This plan was written on `plan/sprint-141-model-lineup`.
+Branch: `sprint-141-model-lineup`, made on 26 October from the plan commit rebased on `origin/main` at `84ea15db` (Sprint 138's merge). The plan was written on `plan/sprint-141-model-lineup`.
 
 Release tier: shell, because of W4's runtime updates:
 - `extensions/ritemark/binaries/agents/manifest.json`, a shell-tier path;
@@ -11,12 +11,12 @@ Release tier: shell, because of W4's runtime updates:
 
 Everything else is under `extensions/ritemark/src/` and `webview/`, extension-tier, and ships in 2.1.0's shell release. If the runtime review decides no update, this line changes to extension.
 
-Status: **Plan (Phase 2), awaiting approval.** The Development manager approves 2.1's plans under Jarmo's delegation of 26 October (ritemark-dev `decisions/log.md`). No code is written before that.
+Status: **Approved (Phase 2 → 3), 26 October 2026,** by the Development manager under Jarmo's delegation of the same day, with all nine decisions as recommended (*Approval*, below). Phase 3 is under way on `sprint-141-model-lineup`. #558 joined the same day under the scope-change protocol (R12, with R13 from A2).
 
 ## SDD Artifacts
 
-- [spec.md](spec.md): the behaviour contract, R1–R11 and E1–E6.
-- [scenarios.md](scenarios.md): S1–S48, the manual QA matrix.
+- [spec.md](spec.md): the behaviour contract, R1–R13 and E1–E6.
+- [scenarios.md](scenarios.md): S1–S55, the manual QA matrix.
 - [technical-plan.md](technical-plan.md): what exists today, what was checked while planning, the four audits, workstreams W1–W6, two merges and the release step.
 - [tasks.md](tasks.md): the implementation checklist by phase.
 - This file: intent, decisions, status.
@@ -34,6 +34,7 @@ The release is 2.1.0 (`release-plan.md`, beside this folder). Its shape is in `r
 - [#530](https://github.com/ProductoryHQ/ritemark-native/issues/530): refresh the model feed to the current lineup without breaking older apps (R6–R9).
 - [#529](https://github.com/ProductoryHQ/ritemark-native/issues/529): OpenCode's model lists from the providers' live lists, as Flows' are (R2, R10). The first to cut.
 - The release's runtime review (R11): memory `feedback_release_runtime_review`; the release plan's *Runtime versions* and Feature-Complete Checklist.
+- [#558](https://github.com/ProductoryHQ/ritemark-native/issues/558): the Gemini API key goes in the `x-goog-api-key` header, not the request URL (R12; added 26 October).
 
 ## MVP Scope
 
@@ -50,6 +51,8 @@ The release is 2.1.0 (`release-plan.md`, beside this folder). Its shape is in `r
 | `check:model-feed`: every release's resolver against the candidate | R9 |
 | OpenCode's lists from OpenCode's own list, narrowed by the provider, filtered | R10 (merge 2) |
 | The runtime review and updates; `check:anthropic-models` | R11 |
+| The Gemini key in a header at every call site, never in a URL (#558) | R12 (added 26 October) |
+| Gemini's model list read in full, every page (A2's finding) | R13 (added 26 October) |
 | One home for ids, version skew, tests, the bundle, docs, Windows | E1–E6 |
 
 **Not in this sprint:**
@@ -59,8 +62,9 @@ The release is 2.1.0 (`release-plan.md`, beside this folder). Its shape is in `r
 - hiding deprecated rows from menus;
 - the ACP SDK 2.x update;
 - Electron and Node (#515, the release's step);
-- the Gemini key's move from the URL to a header (filed as an issue: unprovable without a key);
 - publishing the feed before 2.1.
+
+The plan first listed the Gemini key's move to a header here, filed as #558. The Development manager added it on 26 October (R12).
 
 ## What the planning check found
 
@@ -132,10 +136,18 @@ What runs without keys:
   - no tombstones while 1.8.1–1.11.0 read the feed;
   - Flows' default is written once, and the editor takes it from the catalog (R4);
   - a saved Flow, chat or pick never moves to another model by itself.
+- **2026-10-26 (the Development manager, the approval):** the plan approved with all nine decisions as recommended (*Approval*). Two additions to decision 8 and 9 are recorded there.
+- **2026-10-26 (the Development manager, scope change):** #558 joins this sprint: "You're already in those files, and it's small." It becomes R12, with every Gemini call site and a test that no Gemini request URL carries `key=`, proven with unit tests and request mocks only. The Settings page's key Test (`RitemarkSettingsProvider.ts:1130`), which #558 didn't list, is one of those call sites.
+- **2026-10-26 (engineering, after A2):**
+  - Google documents that thinking tokens count against `maxOutputTokens`, and that a turn can stop at `MAX_TOKENS` with truncated or empty output. Gemini 3.8 Flash thinks at `medium` by default. So, by R3's own rule, Flows' Gemini default is **Gemini 3.5 Flash Lite**. It thinks at `minimal` by default; it is not a model that doesn't reason, as R3 first said.
+  - Google's own advice for new projects names both models.
+  - Two adjacent findings join under the protocol:
+    - an answer cut off at Max tokens says so (R5, revised);
+    - Gemini's model list is read in full, past its first 50 models (R13).
 
 ## Decisions
 
-Nine. Each has a recommendation, and [spec.md](spec.md#open-questions) carries the same list. The Development manager decides them under the delegation. None is a release gate.
+Nine. Each has a recommendation, and [spec.md](spec.md#open-questions) carries the same list. The Development manager decides them under the delegation. None is a release gate. **Decided on 26 October, all as recommended** (*Approval*).
 
 1. **#529's design.** I recommend:
    - OpenCode's own model list as the runnability authority, as Claude Code's is for Claude;
@@ -193,6 +205,8 @@ HARD RULE #1 holds:
 - [ ] The release skill says how to refresh the feed and how to hand-edit it (R9).
 - [ ] OpenCode's groups follow OpenCode's own list with a key, and fall back to the static rows without one (R10, merge 2, or moved to v2.2.0 with A3).
 - [ ] The runtime review is written; the decided updates pass their verification; `check:anthropic-models` is OK (R11).
+- [ ] No Gemini request URL carries the key; every call site sends `x-goog-api-key`; a test enforces it (R12, #558).
+- [ ] Gemini's model list is read past its first page (R13).
 - [ ] At 2.1's publication, the feed is published with its report (R8, the release step).
 
 ## Risks
@@ -228,4 +242,27 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Approval
 
-- [ ] Approved by the Development manager under Jarmo's delegation of 26 October 2026.
+- [x] Approved on 26 October 2026 by the Development manager, under Jarmo's delegation of the same day: "ei sprindiplaanid kinnitad sina. midagi ei tohi minu taga oodata kuni Gate 1 RCini" (ritemark-dev `decisions/log.md`, 26 October). Until 2.1's Gate 1 RC, the manager's word counts for plan approval, sprint start and admin merge of 2.1 work. Release approval (Gate 1, Gate 2, publish) stays Jarmo's.
+
+**The decisions, all nine as recommended:**
+1. **#529's design:**
+   - OpenCode's own model list is the runnability authority;
+   - Google's and OpenAI's lists for the person's key narrow it, where Ritemark already asks for Flows;
+   - OpenRouter is limited to the lineup's families.
+2. **#529 without a Google key:** built last as merge 2 and shipped on the keyless proofs, with the key proof listed as not run. It is cut to v2.2.0 if A3 shows that reading the list needs a new process per probe, or can't be filtered to a short menu.
+3. **R2:** OpenCode's hand-made rows follow the lineup, on the public lists' evidence; turns not run.
+4. **Flows' Gemini default:** Gemini 3.8 Flash, or 3.5 Flash Lite by A2's rule, changed without a run. A2 then applied the rule: 3.5 Flash Lite (*Product Decisions*, 26 October, after A2).
+5. **The Gemini 2.5 rows:** kept, deprecated, "Retained for saved selections", last; no tombstone.
+6. **Sonnet 5.5's declaration:** carried in the feed for 1.12.0 (R6); 2.1 takes declarations for its bundled Claude models from its own catalog (R7).
+7. **The feed** is published with 2.1's publication as a release step in `ritemark-public`, with `check:model-feed`'s report, and gets a checklist row in the release plan.
+8. **The runtime updates:** all three to their latest at merge 1, and the ACP SDK stays at 1.4.0.
+   - *Addition:* check that the Codex 0.164.0 update, with `codesign-app.sh`'s agent signing, doesn't bring back the keychain prompt storm. The Codex Keychain items written by OpenAI's Codex don't list Ritemark's re-signed `codex-app-server` (`releases/v2.0.0/sprint-136-release/research/runtime-review.md`, *Codex and the keychain*).
+   - The result is in `research/runtime-review.md`.
+9. **1.8.1–1.11.0's static Codex default:** GPT-6 Astra is accepted as their fallback.
+   - The User lead's PostHog counts (26 September – 26 October, test profiles removed):
+     - 1.8.1–1.11.0: 37 people, most of them one-time 1.11 Store newcomers; 4 active in the last 7 days;
+     - 1.14: 29 people (16 active in the last 7 days);
+     - 2.0.x: 14 people (all active in the last 7 days).
+   - A1 records them as its result.
+
+**After the approval:** #558 joined on 26 October (R12), and A2's findings added R13 and revised R5. Both are under the scope-change protocol, with `spec.md` first.

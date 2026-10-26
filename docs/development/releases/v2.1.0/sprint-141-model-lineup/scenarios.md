@@ -257,3 +257,43 @@ An authenticated Claude turn on the new Claude Code, and Sprint 128's background
 
 ### S48: Windows
 The updated runtimes on the Windows build from the merge (CI), then in 2.1's Gate 2: a Codex turn and the OpenCode permission gate.
+
+## Feature: The Gemini key never travels in a URL (R12, #558; added 2026-10-26)
+
+Unit tests with a mocked `fetch`. No request reaches Google, and no real key is used.
+
+### S49: Every call site sends the header
+Given a placeholder key value in the test's fake secret store
+When each Gemini call runs (the model probe, a Flow's LLM step, its Imagen and Gemini image steps, the Flow editor's image-model list, Settings' Google key Test)
+Then the request carries `x-goog-api-key` with that value
+And its URL has no query parameter holding the key.
+
+### S50: The source scan (negative)
+When the source scan runs
+Then it finds no `generativelanguage.googleapis.com` URL with `key=` in `src/` or `webview/src/`
+And, on a fixture line that puts `?key=` in such a URL, it fails and names the file.
+
+### S51: Errors don't carry the key
+Given each call site's request fails (an HTTP error, a thrown `fetch`)
+Then the message Ritemark shows or logs does not contain the key value.
+
+## Feature: Gemini's model list is read in full (R13; added 2026-10-26)
+
+### S52: Every page
+Given a mocked `models.list` with two pages, joined by `nextPageToken`
+Then the probe returns the models of both pages, asking for the largest page size.
+
+### S53: A later page fails (negative)
+Given the second page fails or times out
+Then the probe returns the first page's models.
+
+## Feature: R5, revised after A2 (added 2026-10-26)
+
+### S54: "No longer available to new users"
+Given a Gemini step on `gemini-2.5-flash`
+When Google answers 404 `NOT_FOUND` with "This model models/gemini-2.5-flash is no longer available to new users." (the wording reported on Google's forum)
+Then the run says R5's sentence for Gemini 2.5 Flash, once.
+
+### S55: An answer cut off at Max tokens
+Given a Gemini step whose response has `finishReason: MAX_TOKENS` and no text
+Then the run says the answer used up the step's Max tokens, and to raise it, instead of "No response from Gemini API".

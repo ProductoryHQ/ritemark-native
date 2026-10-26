@@ -73,6 +73,20 @@ Nothing here starts before the plan is approved. Tick a box only when the change
   - the webview's new Gemini step
 - [ ] `.claude/skills/ritemark-flows/SKILL.md`: the model list points to `modelConfig.ts` and the catalog's defaults (E5)
 
+## Phase 3b: The Gemini key and list (W2b; R12, R13, R5 revised; added 2026-10-26)
+
+- [ ] `src/ai/geminiRequest.ts` (new): `geminiUrl()` and `geminiHeaders()` (R12)
+- [ ] Every Gemini call site uses them (R12):
+  - `providerDiscovery.ts`;
+  - `FlowEditorProvider.ts`;
+  - `LLMNodeExecutor.ts`;
+  - `ImageNodeExecutor.ts` (both paths);
+  - `RitemarkSettingsProvider.ts`
+- [ ] `geminiRequest.test.ts`: the source scan with its failing fixture, and the helper (S50)
+- [ ] Call-site tests with a mocked `fetch`: the header, the URL, error messages free of the key (S49, S51)
+- [ ] `discoverGemini`: `pageSize=1000`, `nextPageToken` up to 5 pages, a failed page keeps the rest; tested (R13, S52, S53)
+- [ ] `LLMNodeExecutor`: the structural 404 refusal and the `MAX_TOKENS` sentence; tested (R5 revised, S54, S55)
+
 ## Phase 4: The feed tooling (W3)
 
 - [ ] `src/ai/modelCatalog/feedExport.ts`: `carryOver()` for `claudeCode` and `minAppVersion` (R6)
