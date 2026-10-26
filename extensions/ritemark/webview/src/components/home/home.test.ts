@@ -52,7 +52,7 @@ function home(overrides: Partial<HomeState> = {}): HomeState {
     ],
     empty: false,
     boardEnabled: true,
-    whatMoved: false,
+    guidance: null,
     copilotChat: false,
     switchedFrom: null,
     missing: null,
@@ -104,8 +104,8 @@ assert.deepEqual(posted, [], 'drawing Home sends nothing')
 
 const movedLines = (state: HomeState) => parse(render(state)).querySelectorAll('.rh-moved').map(words)
 assert.equal(movedLines(home()).length, 0, 'no What moved unless the profile came from Ritemark 1')
-assert.deepEqual(movedLines(home({ whatMoved: true })).map((line) => line.split(' ').slice(0, 4).join(' ')), ['The terminal is a', 'Settings and Help are'], 'no Copilot Chat line without Copilot Chat')
-assert.deepEqual(movedLines(home({ whatMoved: true, copilotChat: true })).map((line) => line.split(' ').slice(0, 4).join(' ')), ['The terminal is a', 'Copilot Chat is in', 'Settings and Help are'])
+assert.deepEqual(movedLines(home({ guidance: { card: 'what-moved' } })).map((line) => line.split(' ').slice(0, 4).join(' ')), ['The terminal is a', 'Settings and Help are'], 'no Copilot Chat line without Copilot Chat')
+assert.deepEqual(movedLines(home({ guidance: { card: 'what-moved' }, copilotChat: true })).map((line) => line.split(' ').slice(0, 4).join(' ')), ['The terminal is a', 'Copilot Chat is in', 'Settings and Help are'])
 
 // ── Empty (R4, S39): the starts and a drop target, no Last changed ──
 
@@ -265,11 +265,62 @@ assert.match(render(home()), /aria-label="~\/Documents\/Leadership programme\. S
 const missingPath = parse(render(home({ missing: { id: 'old-work', name: 'Old work', mark: 'OW', place: '~/Projects/Clients/Old work', here: false } }))).querySelector('.rh-path .rh-place-cut')
 assert.equal(missingPath?.text, '~/Projects/Clients/Old work', 'a missing project’s path is cut the same way, and reads whole')
 // What moved's first line never leaves "+." alone on a line (the Experience lead, #525)
-assert.match(render(home({ whatMoved: true })), /a new one comes from the\u00a0\+\./)
+assert.match(render(home({ guidance: { card: 'what-moved' } })), /a new one comes from the\u00a0\+\./)
 // The cover, the page and the toast: the page and the cover sit in the desk's container, the toast outside it (a container would pin it)
 const fitted = parse(render(home({ switchedFrom: { name: 'Sales proposal Q4' } } as Partial<HomeState>)))
 assert.ok(fitted.querySelector('.rh-fit > .rh-cover') && fitted.querySelector('.rh-fit > .rh-page'), 'the cover and the page are in .rh-fit')
 assert.ok(fitted.querySelector('.rh-desk > .rh-toast'), 'the toast stays outside .rh-fit')
+
+// ── Sprint 140 (R2, R3, R14; S6, S9, S10, S13, S14, S15, S19, S61): the one guidance card, under Waiting for you ──
+
+const ais = [
+  { id: 'claude-code', name: 'Claude', state: 'ready' },
+  { id: 'codex', name: 'ChatGPT', state: 'sign-in' },
+  { id: 'opencode', name: 'OpenCode', state: 'set-up' },
+] as const
+const keysSet = { 'google-ai-key': false, 'openai-api-key': false, 'anthropic-api-key': false, 'openrouter-api-key': false }
+const ready = (overrides: Record<string, unknown> = {}): HomeState['guidance'] => ({
+  card: 'ready-request',
+  kind: 'files',
+  icon: 'folder-simple',
+  heading: 'Nothing in this folder was moved or changed',
+  body: 'Claude works only inside it. 37 files: 20 Word documents, 10 PDFs, 4 spreadsheets and 3 text documents.',
+  button: 'Ask Claude what is here',
+  note: 'Reads the names, then the five newest documents.',
+  hide: 'Hide this in Training work',
+  ai: 'claude-code',
+  aiReady: true,
+  ais: [...ais],
+  keysSet,
+  problem: null,
+  ...overrides,
+} as HomeState['guidance'])
+const withCard = parse(render(home({ guidance: ready() })))
+assert.deepEqual(withCard.querySelectorAll('section').map((section) => section.getAttribute('aria-label') ?? section.getAttribute('aria-labelledby')),
+  ['Waiting for you', 'rh-guide-head', 'Start something in Leadership programme', 'Last changed in Leadership programme'], 'S6, S9: Waiting for you first, then the one card, then Start something')
+const guide = withCard.querySelector('.rh-guide')!
+assert.equal(words(guide.querySelector('.rh-guide-hd')!), 'Nothing in this folder was moved or changed', 'S10: the heading')
+assert.equal(words(guide.querySelector('.rh-guide-body')!), 'Claude works only inside it. 37 files: 20 Word documents, 10 PDFs, 4 spreadsheets and 3 text documents.')
+assert.equal(words(guide.querySelector('.rh-split-main')!), 'Ask Claude what is here')
+assert.equal(words(guide.querySelector('.rh-guide-note')!), 'Reads the names, then the five newest documents.')
+assert.deepEqual(guide.querySelectorAll('button').map((button) => button.getAttribute('aria-label') ?? words(button)), ['Hide this in Training work', 'Ask Claude what is here', 'Ask with'], 'S15: the ×, the button and its caret, all named')
+assert.equal(withCard.querySelectorAll('.rh-moved').length, 0, 'one card at a time')
+// S19: no AI ready: the card still shows and names Claude
+assert.match(render(home({ guidance: ready({ aiReady: false }) })), /Ask Claude what is here/)
+// A press that did not start says so on the card
+assert.match(render(home({ guidance: ready({ problem: 'That card is no longer on the board.' }) })), /role="status">That card is no longer on the board\./)
+
+// S61: the first-week question (experience 34, frame 1), with Send off until something is typed
+const asking = parse(render(home({ guidance: { card: 'feedback', heading: 'What did you make with Ritemark this week?', lede: 'One line is plenty. It goes to the people who make Ritemark, and we read every one.', placeholder: 'A proposal, notes, a module…', sending: false, problem: null } })))
+const ask = asking.querySelector('.rh-ask')!
+assert.equal(words(ask.querySelector('.rh-guide-hd')!), 'What did you make with Ritemark this week?')
+assert.equal(ask.querySelector('input')?.getAttribute('placeholder'), 'A proposal, notes, a module…')
+assert.deepEqual(ask.querySelectorAll('button').map(words), ['Send', 'Not now'], 'no ×: Send and Not now')
+assert.ok(ask.querySelector('button')!.hasAttribute('disabled'), 'Send is off while the field is empty')
+// S64: a send that did not go says so in one line, and offers the e-mail route
+const failed = parse(render(home({ guidance: { card: 'feedback', heading: 'What did you make with Ritemark this week?', lede: '…', placeholder: '…', sending: false, problem: "It didn't go. Your message is still here: try again, or open it in e-mail." } })))
+assert.deepEqual(failed.querySelector('.rh-ask')!.querySelectorAll('button').map(words), ['Try again', 'Open in e-mail', 'Not now'])
+assert.match(failed.toString(), /role="alert">It didn(&#x27;|')t go\./)
 
 assert.deepEqual(posted, [], 'drawing sends nothing to the host')
 console.log('home: all assertions passed')

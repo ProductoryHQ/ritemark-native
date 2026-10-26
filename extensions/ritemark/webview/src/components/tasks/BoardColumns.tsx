@@ -19,7 +19,7 @@ import type { BoardTab } from '../../../../src/taskBoard/protocol'
 import { CardMenu } from './CardMenu'
 import { CardGlyph, GivePromptPanel, HeaderIconButton, StateGlyph, TitleField, toneClass, useNow, usePresenter } from './CardParts'
 import { Button } from '../ui/button'
-import { DONE_WINDOW_DAYS, STAGE_NAMES, finishedRecently, type CardPresentation } from './taskCopy'
+import { DONE_WINDOW_DAYS, STAGE_NAMES, aiPeopleName, emptyTasksWords, finishedRecently, type CardPresentation } from './taskCopy'
 import { UnreadableCards } from './UnreadableCards'
 
 const HINTS: Record<CardStage, string> = {
@@ -60,6 +60,11 @@ export function BoardColumns({ snapshot, onShowTab }: { snapshot: BoardSnapshot;
     if (!id || !target || target.stage !== stage) return
     if (target.beforeId === id) return
     void moveCard(id, stage, target.beforeId ? { beforeCardId: target.beforeId } : { atEnd: true })
+  }
+
+  // Sprint 140 (R9; experience 29, frame 2): an empty board says what Tasks are for; New task stays on the bar.
+  if (snapshot.cards.length === 0 && snapshot.archived.length === 0 && snapshot.unreadable.length === 0) {
+    return <EmptyBoard ai={aiPeopleName(snapshot.defaultRuntime)} />
   }
 
   return (
@@ -318,5 +323,21 @@ function Tile({
         <CardMenu card={card} p={p} snapshot={snapshot} className="relative z-10" />
       </span>
     </div>
+  )
+}
+
+function EmptyBoard({ ai }: { ai: string }) {
+  const words = emptyTasksWords(ai)
+  return (
+    <section className="tb-emptyboard" aria-labelledby="tb-empty-title">
+      <span className="tb-emptyboard-ic" aria-hidden="true"><Icon name="check-square" size={20} tone="inherit" /></span>
+      <h2 className="tb-emptyboard-title" id="tb-empty-title">{words.title}</h2>
+      <p>{words.sentence}</p>
+      <ul className="tb-emptyboard-ways">
+        {words.ways.map((way) => (
+          <li key={way.words}><Icon name={way.glyph} size={16} tone="inherit" />{way.words}</li>
+        ))}
+      </ul>
+    </section>
   )
 }

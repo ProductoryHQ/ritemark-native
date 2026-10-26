@@ -9,7 +9,7 @@ import { useMemo, useCallback, useState } from 'react';
 import { marked } from 'marked';
 import { cn } from '../../lib/utils';
 import { vscode } from '../../lib/vscode';
-import { classifyChatHref, stripLineSuffix } from './chatLinks';
+import { classifyChatHref, rewriteCodexCitations, stripLineSuffix } from './chatLinks';
 import { ChatLinkMenu, type ChatLinkMenuRequest } from './ChatLinkMenu';
 
 // Configure marked for safety + good defaults
@@ -27,7 +27,7 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
   const html = useMemo(() => {
     if (!content) return '';
     try {
-      return marked.parse(content) as string;
+      return marked.parse(rewriteCodexCitations(content)) as string;
     } catch {
       return content;
     }

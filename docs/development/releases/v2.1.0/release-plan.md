@@ -115,7 +115,7 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 | 137 | `sprint-137-files-as-written` | — | #270, #454 | — | — | — |
 | 138 | `sprint-138-…` (named in its plan) | — | #481, #408 | — | — | — |
 | 139 | `sprint-139-chosen-ai` | — | #496, #417, #376, #479, #473, #529–#532 | — | — | — |
-| 140 | `sprint-140-first-day` | — | #497, #498, #466 | — | — | — |
+| 140 | `sprint-140-first-day` | [#543](https://github.com/ProductoryHQ/ritemark-native/pull/543) | #497, #498, #466 | Open, not merged | Passed (technical), 26 Oct | Drafted in `sprint-140-first-day/notes/release-notes.md`, applied at closeout |
 | Release | a `create-release-worktree.sh` worktree, then the version bump | — | #499, #506, the Store | — | — | — |
 
 ## Feature-Complete Checklist

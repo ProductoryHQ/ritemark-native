@@ -4,6 +4,7 @@
  */
 
 import * as vscode from 'vscode';
+import { startingPlaceFrom, type StartingPlace } from '../guidance/startingPlace';
 import * as fs from 'fs';
 import * as os from 'os';
 import { randomBytes, randomUUID } from 'crypto';
@@ -179,6 +180,38 @@ export interface AgentTaskListener {
   applyTurnTerminal(conversationId: string, conversationTurnId: string, outcome: AgentTaskTerminalOutcome): Promise<void> | void;
 }
 
+/**
+ * Sprint 140 (R5): "open a visible chat with this request in this AI", the host's one path for it (Sprint 139's
+ * refusal card reuses it). `send` sends the text at once as the person's own first message; otherwise it waits in
+ * the message box with the cursor at its end. A blank chat is reused, as the + does.
+ */
+export interface ChatStartRequest {
+  runtimeId: AgentId;
+  text: string;
+  send: boolean;
+  /** For a fill (`send: false`): where the cursor waits; the end of `text` when absent. */
+  cursor?: number;
+  /** Which ready request it is, so its chat is known and counted (R6, R15). */
+  origin?: 'what_is_here' | 'what_for';
+}
+
+/** Sprint 140: what the sheet said about a chat it filled or started: the ready request's, or a starting point's. */
+export interface ChatOrigin {
+  conversationId: string;
+  readyRequest?: 'what_is_here' | 'what_for';
+  startingPoint?: { place: StartingPlace; text: string };
+}
+
+/** Sprint 140 (R6, R15): a turn the host accepted from the sheet, with the conversation's canonical id. */
+export interface AcceptedTurn {
+  clientConversationId: string;
+  conversationId: string;
+  runtimeId: AgentId;
+  text: string;
+  /** A task's or a comment's turn, not a chat the person started. */
+  fromTask: boolean;
+}
+
 export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'ritemark.unifiedView';
 
@@ -203,6 +236,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * window is.
    */
   private _pendingLandingChat: { runtimeId: AgentId; placeholder: string } | null = null;
+  /** Sprint 140 (R5): a chat Home's ready request asked for before the sidebar's page was ready. */
+  private _pendingChatStart: ChatStartRequest | null = null;
+  /** Sprint 140 (R8): the empty sheet's starting place, sent again whenever the page (re)loads. */
+  private _startingPlace: { place: string; hasAbout: boolean } | null = null;
+  /** Sprint 140 (R6, R15): who hears about each accepted turn, and about the sheet's guidance origins. */
+  private readonly _turnListeners: Array<(turn: AcceptedTurn) => void> = [];
+  private readonly _originListeners: Array<(origin: ChatOrigin) => void> = [];
   /** Sprint 134 (R4): a chat Home asked to open before the sidebar's page was ready. */
   private _pendingSelectConversation: string | null = null;
   /**
@@ -596,7 +636,28 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             this._pendingSelectConversation = null;
             void webviewView.webview.postMessage({ type: 'conversation/select', conversationId });
           }
+          if (this._startingPlace) void webviewView.webview.postMessage({ type: 'starting-place', ...this._startingPlace });
+          if (this._pendingChatStart) {
+            const start = this._pendingChatStart;
+            this._pendingChatStart = null;
+            void webviewView.webview.postMessage({ type: 'chat/start', ...start });
+          }
           break;
+
+        case 'guidance/origin': {
+          // Sprint 140 (R6, R15): the sheet filled or started this chat from a ready request or a starting point.
+          const conversationId = typeof message.conversationId === 'string' && message.conversationId.length <= 128 ? message.conversationId : null;
+          if (!conversationId) break;
+          const readyRequest = message.readyRequest === 'what_is_here' || message.readyRequest === 'what_for' ? message.readyRequest : undefined;
+          const point = message.startingPoint as { place?: unknown; text?: unknown } | undefined;
+          const place = startingPlaceFrom(point?.place);
+          const startingPoint = point && place && typeof point.text === 'string' && point.text.length <= 400
+            ? { place, text: point.text }
+            : undefined;
+          if (!readyRequest && !startingPoint) break;
+          for (const listener of this._originListeners) listener({ conversationId, ...(readyRequest ? { readyRequest } : {}), ...(startingPoint ? { startingPoint } : {}) });
+          break;
+        }
 
         case 'conversation/active':
           this._noteActiveConversation(
@@ -605,10 +666,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'report/request-open':
-          // The AI Information entry asks the host to open the window rather
-          // than opening it itself, so both entry points get the same context
-          // (RQ5) from the one place that actually knows the app version.
-          void this.openReportWindow();
+          // Sprint 140 (R10, R12): AI information's "Report an AI issue" opens the feedback sheet ready for an AI
+          // issue, as the status bar's door and Help do; the sheet falls back to the report window on a shell
+          // without it.
+          void vscode.commands.executeCommand('ritemark.feedback.open', { from: 'ai_info', kind: 'ai-issue' });
           break;
 
         case 'report/open-mail': {
@@ -772,6 +833,20 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             break;
           }
           const conversationId = acceptedConversation?.conversationId ?? clientConversationId;
+          // Sprint 140 (R6, R15): the first day's guidance hears about every accepted turn.
+          for (const listener of this._turnListeners) {
+            try {
+              listener({
+                clientConversationId,
+                conversationId,
+                runtimeId: agentId as AgentId,
+                text: typeof message.displayPrompt === 'string' ? message.displayPrompt : typeof message.prompt === 'string' ? message.prompt : '',
+                fromTask: typeof message.taskId === 'string',
+              });
+            } catch (error) {
+              console.warn('[Guidance] A turn listener failed:', error);
+            }
+          }
           const bindingGeneration = acceptedConversation?.bindingGeneration ?? 0;
           const conversationTurnId = typeof message.conversationTurnId === 'string' && message.conversationTurnId.length <= 128
             ? message.conversationTurnId
@@ -1718,6 +1793,66 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     this._pendingLandingChat = { runtimeId, placeholder };
+  }
+
+  /**
+   * Sprint 140 (R5): open a visible chat with this request in this AI, in front on the AI's sheet: sent at once as
+   * the person's own first message, or waiting in the message box with the cursor at its end. The sheet reuses a
+   * blank chat. Held until the sidebar's page is ready, like the landing. Sprint 139's refusal card reuses it.
+   */
+  public async startChat(request: ChatStartRequest): Promise<void> {
+    await vscode.commands.executeCommand('ritemark.unifiedView.focus');
+    this._view?.show(false);
+    if (this._view && this._sidebarReady) {
+      void this._view.webview.postMessage({ type: 'chat/start', ...request });
+      return;
+    }
+    this._pendingChatStart = request;
+  }
+
+  /** Sprint 140 (R6, R15): hear each turn the host accepts from the sheet. */
+  public onTurnAccepted(listener: (turn: AcceptedTurn) => void): vscode.Disposable {
+    this._turnListeners.push(listener);
+    return { dispose: () => this._turnListeners.splice(this._turnListeners.indexOf(listener), 1) };
+  }
+
+  /** Sprint 140 (R6, R15): hear what the sheet says a chat was started or filled from. */
+  public onChatOrigin(listener: (origin: ChatOrigin) => void): vscode.Disposable {
+    this._originListeners.push(listener);
+    return { dispose: () => this._originListeners.splice(this._originListeners.indexOf(listener), 1) };
+  }
+
+  /** Sprint 140 (R8): the empty sheet's starting place and whether About this project exists. */
+  public setStartingPlace(place: string, hasAbout: boolean): void {
+    if (this._startingPlace?.place === place && this._startingPlace.hasAbout === hasAbout) return;
+    this._startingPlace = { place, hasAbout };
+    if (this._view && this._sidebarReady) void this._view.webview.postMessage({ type: 'starting-place', place, hasAbout });
+  }
+
+  /**
+   * Sprint 140 (R12): the AI's last answer in the chat open on the sheet, from its durable record, the same for all
+   * three AIs; null when the chat has none.
+   */
+  public async lastAnswerOfOpenChat(): Promise<{ title: string; text: string } | null> {
+    const conversationId = this._activeConversationId;
+    if (!conversationId) return null;
+    try {
+      const record = await this._conversationController.runtimeConversation(conversationId);
+      for (let index = record.events.length - 1; index >= 0; index -= 1) {
+        const event = record.events[index];
+        if (event.kind === 'assistant-message' && event.terminalStatus === 'completed' && event.content.trim()) {
+          return { title: record.title, text: event.content };
+        }
+      }
+    } catch {
+      // No record for it (a blank chat, the legacy store): no last answer.
+    }
+    return null;
+  }
+
+  /** Sprint 140 (R15): a turn is running in this window, so a new file is the AI's work. */
+  public hasWorkingTurn(): boolean {
+    return this._activeConversationTurnIds.size > 0;
   }
 
   /**

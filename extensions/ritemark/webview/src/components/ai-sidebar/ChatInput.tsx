@@ -515,6 +515,28 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
     setValue(activeConversationId ? (draftsRef.current[activeConversationId] ?? '') : '');
   }, [activeConversationId, setComposerDraft]);
 
+  // Sprint 140 (R5, R8): words put in the box from outside it (a starting point, Home's ready request): the box takes
+  // them, gets the focus and the cursor waits where the fill says. After the thread-switch effect, so it wins.
+  const composerFill = useAISidebarStore((s) => s.composerFill);
+  const takeComposerFill = useAISidebarStore((s) => s.takeComposerFill);
+  const setComposerEmpty = useAISidebarStore((s) => s.setComposerEmpty);
+  useEffect(() => {
+    if (!composerFill || composerFill.conversationId !== activeConversationId) return;
+    const { text, cursor } = composerFill;
+    setValue(text);
+    takeComposerFill();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(cursor, cursor);
+    }));
+  }, [composerFill, activeConversationId, takeComposerFill]);
+  // D4: the starting points step aside while the box holds words, and come back when it is empty.
+  useEffect(() => {
+    setComposerEmpty(value.trim() === '');
+  }, [value, setComposerEmpty]);
+
   const clearChat = useAISidebarStore((s) => s.clearChat);
   // Sprint 99 (R11): '/new' goes through the same cap gate as the rail's '+'.
   const requestNewThread = useAISidebarStore((s) => s.requestNewThread);
@@ -1124,6 +1146,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
     <>
     <div
       ref={containerRef}
+      data-composer=""
       className={`relative px-3 py-2.5 ${
         // Sprint 74 R2: no separator stripe above a notch — the notch visually
         // belongs to the input card, so the container border-top is dropped

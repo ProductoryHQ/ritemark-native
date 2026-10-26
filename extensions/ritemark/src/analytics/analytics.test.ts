@@ -16,12 +16,15 @@ const ALL_EVENT_NAMES: EventName[] = [
   'app_session_start',
   'feature_used',
   'agent_used',
-  'reaction_submitted',
   'feedback_sent',
   'welcome_shown',
   'ai_signed_in',
   'project_opened',
   'first_message_sent',
+  'ready_request_used',
+  'starting_point_used',
+  'made_something',
+  'feedback_opened',
 ];
 
 // Verify every event name is a valid string (compile-time + runtime)
@@ -36,12 +39,15 @@ const _payloadCheck: {
   app_session_start: { version: '1.0.0', platform: 'darwin' },
   feature_used: { feature: 'editor' },
   agent_used: { agent: 'claude' },
-  reaction_submitted: { reaction: 'love_it', message: 'Great app!' },
-  feedback_sent: { message: 'Please add dark mode', reaction: 'good' },
+  feedback_sent: { message: 'Please add dark mode' },
   welcome_shown: { kind: 'fresh' },
   ai_signed_in: { provider: 'chatgpt', method: 'account' },
   project_opened: { source: 'sample', has_ai: false },
   first_message_sent: { provider: 'opencode' },
+  ready_request_used: { kind: 'what_is_here', provider: 'chatgpt' },
+  starting_point_used: { place: 'word_or_pdf', edited: true, provider: 'claude' },
+  made_something: { how: 'new_document', after_ready_request: false },
+  feedback_opened: { from: 'ai_info' },
 };
 
 assert.ok(_payloadCheck, 'All payload shapes should be valid');
@@ -54,6 +60,13 @@ const WELCOME_EVENT_KEYS: Record<string, string[]> = {
   project_opened: ['source', 'has_ai'],
   first_message_sent: ['provider'],
 };
+// Sprint 140 (R15, S69): the first day's counts carry no words, names, paths, file counts, accounts or addresses.
+Object.assign(WELCOME_EVENT_KEYS, {
+  ready_request_used: ['kind', 'provider'],
+  starting_point_used: ['place', 'edited', 'provider'],
+  made_something: ['how', 'after_ready_request'],
+  feedback_opened: ['from'],
+});
 for (const [event, keys] of Object.entries(WELCOME_EVENT_KEYS)) {
   assert.deepEqual(Object.keys(_payloadCheck[event as EventName]).sort(), [...keys].sort(), `${event} has only ${keys.join(', ')}`);
   for (const key of keys) {
@@ -110,17 +123,7 @@ assert.match(uuid2, uuidRegex, `UUID should match v4 format: ${uuid2}`);
 // UUIDs should be unique
 assert.notStrictEqual(uuid1, uuid2, 'Two generated UUIDs should be different');
 
-// ── 4. Reaction choices ─────────────────────────────────────
-
-const REACTION_VALUES = ['love_it', 'good', 'okay', 'needs_work'];
-
-// All values should be non-empty snake_case strings
-for (const value of REACTION_VALUES) {
-  assert.match(value, /^[a-z_]+$/, `Reaction value should be snake_case: ${value}`);
-}
-
-// Should have exactly 4 choices
-assert.strictEqual(REACTION_VALUES.length, 4, 'Should have exactly 4 reaction choices');
+// ── 4. (Sprint 140: the four reaction choices retired with `reaction_submitted`) ──
 
 // ── 5. Track event suppression logic ────────────────────────
 

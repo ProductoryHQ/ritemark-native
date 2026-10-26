@@ -68,6 +68,7 @@ import { applyTaskProgress, endRunningCards, markCardStopping, tasksEndedLine } 
 import { resolveInboundConversationId } from './conversationRouting';
 import { MAX_PINNED_CONVERSATIONS } from './conversationActionsModel';
 import { projectionToConversation } from './conversationProjection';
+import type { StartingPlace } from '../../../../src/guidance/startingPlace';
 import type {
   AgentId,
   AgentInfo,
@@ -103,6 +104,19 @@ import type {
 export type { ConversationState, PendingRuntimeSelection } from './conversationState';
 
 export type ClaudeLoginState = 'idle' | 'pending' | 'success' | 'error';
+
+/** Sprint 140 (R5): the host's request for a visible chat (`UnifiedViewProvider.startChat`). */
+export interface ChatStartMessage {
+  runtimeId: AgentId;
+  text: string;
+  send: boolean;
+  /** For a fill: where the cursor waits; the end of `text` when absent. */
+  cursor?: number;
+  origin?: 'what_is_here' | 'what_for';
+}
+
+/** Sprint 140 (R8): the empty sheet's places, as the host names them (`src/guidance/startingPlace.ts`). */
+const STARTING_PLACES: readonly StartingPlace[] = ['project', 'empty_project', 'word_or_pdf', 'short_text', 'long_text', 'table', 'sample'];
 
 let msgCounter = 0;
 function nextId(): string {
@@ -320,9 +334,24 @@ interface AISidebarState {
    */
   landingPlaceholder: { conversationId: string; runtimeId: AgentId; text: string } | null;
   /** The landing waits until its runtime's model is known (OpenCode's needs the providers' keys first). */
-  pendingLanding: { runtimeId: AgentId; text: string; since: number } | null;
+  pendingLanding: { runtimeId: AgentId; text: string; since: number; start?: ChatStartMessage } | null;
   openLandingChat: (runtimeId: AgentId, text: string) => void;
   applyPendingLanding: () => void;
+  /**
+   * Sprint 140 (R5): the host's "open a visible chat with this request in this AI": a new chat in front (a blank
+   * one reused), the AI chosen, then the text sent at once or put in the box with the cursor at its end.
+   */
+  startChatFromHost: (request: ChatStartMessage) => void;
+  /** Sprint 140 (R8): the empty sheet's starting place, from the host. */
+  startingPlace: { place: StartingPlace; hasAbout: boolean } | null;
+  /** Sprint 140 (R8, D4): a fill for the composer of one chat, with where the cursor waits; ChatInput takes it. */
+  composerFill: { conversationId: string; text: string; cursor: number; nonce: number } | null;
+  /** Put words in the open chat's box, focused, the cursor at `cursor`; `origin` tells the host where they came from. */
+  fillComposer: (text: string, cursor: number, origin?: { readyRequest?: 'what_is_here' | 'what_for'; startingPoint?: StartingPlace }) => void;
+  takeComposerFill: () => void;
+  /** Sprint 140 (D4): the open chat's box holds no words, so the starting points show. */
+  composerEmpty: boolean;
+  setComposerEmpty: (empty: boolean) => void;
   conversationRolloutMode: 'unknown' | 'legacy' | 'host-canonical' | 'host-compat';
   /** Current host flag; absent on an older host means enabled. */
   durableAgentConversationsEnabled: boolean;
@@ -1026,6 +1055,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     showHistoryPanel: false,
     landingPlaceholder: null,
     pendingLanding: null,
+    startingPlace: null,
+    composerFill: null,
+    composerEmpty: true,
     conversationRolloutMode: 'unknown',
     durableAgentConversationsEnabled: true,
     hostConversations: [],
@@ -2155,6 +2187,32 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       get().applyPendingLanding();
     },
 
+    startChatFromHost: (request) => {
+      get().startNewConversation();
+      set({ pendingLanding: { runtimeId: request.runtimeId, text: '', since: Date.now(), start: request } });
+      get().applyPendingLanding();
+    },
+
+    fillComposer: (text, cursor, origin) => {
+      const conversationId = get().activeConversationId;
+      if (!conversationId) return;
+      set({ composerFill: { conversationId, text, cursor, nonce: Date.now() } });
+      if (origin?.readyRequest || origin?.startingPoint) {
+        vscode.postMessage({
+          type: 'guidance/origin',
+          conversationId,
+          ...(origin.readyRequest ? { readyRequest: origin.readyRequest } : {}),
+          ...(origin.startingPoint ? { startingPoint: { place: origin.startingPoint, text } } : {}),
+        });
+      }
+    },
+
+    takeComposerFill: () => set({ composerFill: null }),
+
+    setComposerEmpty: (empty) => {
+      if (get().composerEmpty !== empty) set({ composerEmpty: empty });
+    },
+
     applyPendingLanding: () => {
       const pending = get().pendingLanding;
       const conversation = activeConversation();
@@ -2177,6 +2235,20 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           return;
         }
         get().selectRuntimeModel(pending.runtimeId, modelId);
+      }
+      if (pending.start) {
+        // Sprint 140 (R5): the ready request goes as the person's own first message, or waits in the box.
+        const start = pending.start;
+        set({ pendingLanding: null, landingPlaceholder: null });
+        if (!start.send) {
+          get().fillComposer(start.text, start.cursor ?? start.text.length, start.origin ? { readyRequest: start.origin } : undefined);
+          return;
+        }
+        if (start.origin) vscode.postMessage({ type: 'guidance/origin', conversationId: conversation.id, readyRequest: start.origin });
+        if (start.runtimeId === 'codex') get().sendCodexMessage(start.text);
+        else if (start.runtimeId === 'opencode') get().sendOpenCodeMessage(start.text);
+        else get().sendAgentMessage(start.text);
+        return;
       }
       set({
         pendingLanding: null,
@@ -2940,6 +3012,26 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         case 'landing:new-chat':
           get().openLandingChat(message.runtimeId, message.placeholder);
           break;
+
+        case 'chat/start': {
+          // Sprint 140 (R5): the host's one path for a visible chat with a request (Home's ready request).
+          const runtimeId = message.runtimeId === 'codex' || message.runtimeId === 'opencode' || message.runtimeId === 'claude-code' ? message.runtimeId : null;
+          if (!runtimeId || typeof message.text !== 'string') break;
+          get().startChatFromHost({
+            runtimeId,
+            text: message.text,
+            send: message.send === true,
+            ...(typeof message.cursor === 'number' && Number.isInteger(message.cursor) && message.cursor >= 0 && message.cursor <= message.text.length ? { cursor: message.cursor } : {}),
+            ...(message.origin === 'what_is_here' || message.origin === 'what_for' ? { origin: message.origin } : {}),
+          });
+          break;
+        }
+
+        case 'starting-place': {
+          const place = STARTING_PLACES.find((candidate) => candidate === message.place);
+          if (place) set({ startingPlace: { place, hasAbout: message.hasAbout === true } });
+          break;
+        }
 
         case 'clear-chat':
           // "New chat" (ritemark.newChat command). Route through

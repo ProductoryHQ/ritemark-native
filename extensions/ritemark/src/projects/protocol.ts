@@ -59,6 +59,52 @@ export interface HomeProject {
   coverUrl: string | null;
 }
 
+/** Sprint 140 (R4): an AI in the ready request's Ask with, by the name people know. */
+export type HomeAiId = 'claude-code' | 'codex' | 'opencode';
+export interface HomeAi {
+  id: HomeAiId;
+  name: AiName;
+  /** ready: chosen at once; sign-in / set-up: through the welcome's own flows first. */
+  state: 'ready' | 'sign-in' | 'set-up' | 'checking' | 'signing-in';
+}
+
+export type HomeKeyName = 'google-ai-key' | 'openai-api-key' | 'anthropic-api-key' | 'openrouter-api-key';
+
+/** Sprint 140 (R2, R3, R14): the one guidance card under Waiting for you, or none. */
+export type HomeGuidance =
+  | { card: 'what-moved' }
+  | {
+      card: 'ready-request';
+      kind: 'files' | 'empty' | 'sample';
+      icon: 'folder-simple' | 'pencil-simple-line' | 'check-square';
+      heading: string;
+      body: string;
+      button: string;
+      note: string;
+      hide: string;
+      /** The AI the button names. */
+      ai: HomeAiId;
+      /** False: no AI is ready, so the button opens Ask with (D3). */
+      aiReady: boolean;
+      ais: HomeAi[];
+      /** OpenCode's keys already saved, for its Set up sheet. */
+      keysSet: Record<HomeKeyName, boolean>;
+      /** One line when a press did not start (a board that can't give the card, say). */
+      problem: string | null;
+      /** The sample's hand-over while the board starts it: the button's words, with a spinner, and the note. */
+      busy: { button: string; note: string } | null;
+    }
+  | {
+      card: 'feedback';
+      heading: string;
+      lede: string;
+      placeholder: string;
+      /** The send is on its way. */
+      sending: boolean;
+      /** The send did not go (R13, D5); what was typed stays in the field. */
+      problem: string | null;
+    };
+
 export interface HomeState {
   platform: HomePlatform;
   project: HomeProject;
@@ -71,8 +117,11 @@ export interface HomeState {
   /** No documents at all: experience 29, frame 1. */
   empty: boolean;
   boardEnabled: boolean;
-  /** Experience 32, frame 5: shown once on a profile updated from Ritemark 1. */
-  whatMoved: boolean;
+  /**
+   * Sprint 140 (R2): at most one guidance card, under Waiting for you: What moved (experience 32, frame 5: once
+   * on a profile updated from Ritemark 1), the ready request, or the feedback card.
+   */
+  guidance: HomeGuidance | null;
   /** Copilot Chat is installed and enabled, so What moved can say it is in More (Sprint 136). */
   copilotChat: boolean;
   /** "Switched to … Go back": the project this window came from. */
@@ -85,7 +134,7 @@ export interface HomeState {
 }
 
 /** Host → Home. */
-export type HomeMessage = { type: 'home/state'; state: HomeState };
+export type HomeMessage = { type: 'home/state'; state: HomeState } | HomeKeysSaved;
 
 export type StartKind = 'text' | 'table' | 'web';
 
@@ -106,7 +155,19 @@ export type HomeRequest =
   | { type: 'home/dismiss-missing' }
   | { type: 'home/add-files' }
   | { type: 'home/drop-files'; uris: string[] }
-  | { type: 'home/dismiss-notice' };
+  | { type: 'home/dismiss-notice' }
+  // Sprint 140 (R4–R6, R14): the guidance card
+  | { type: 'home/ready-request' }
+  | { type: 'home/ready-request-ai'; ai: HomeAiId }
+  | { type: 'home/ready-request-hide' }
+  | { type: 'home/sign-in'; ai: HomeAiId }
+  | { type: 'home/save-keys'; keys: Partial<Record<HomeKeyName, string>> }
+  | { type: 'home/feedback-send'; text: string }
+  | { type: 'home/feedback-mail'; text: string }
+  | { type: 'home/feedback-not-now' };
+
+/** Host → Home: OpenCode's keys were saved, or why not (the welcome's sheet, shared). */
+export type HomeKeysSaved = { type: 'home/keys-saved'; ok: boolean; message: string | null };
 
 export interface ProjectRow {
   id: string;
@@ -157,6 +218,8 @@ function exactKeys(message: Record<string, unknown>, allowed: readonly string[])
 }
 
 const isText = (value: unknown): value is string => typeof value === 'string' && value.length <= MAX_TEXT;
+const HOME_AI_IDS: readonly HomeAiId[] = ['claude-code', 'codex', 'opencode'];
+const HOME_KEY_NAMES: readonly HomeKeyName[] = ['google-ai-key', 'openai-api-key', 'anthropic-api-key', 'openrouter-api-key'];
 const isId = (value: unknown): value is string => typeof value === 'string' && /^[a-z]+:[A-Za-z0-9_-]{1,128}$/.test(value);
 
 export function decodeHomeRequest(raw: unknown): Decoded<HomeRequest> {
@@ -174,8 +237,35 @@ export function decodeHomeRequest(raw: unknown): Decoded<HomeRequest> {
     case 'home/dismiss-missing':
     case 'home/add-files':
     case 'home/dismiss-notice':
+    case 'home/ready-request':
+    case 'home/ready-request-hide':
+    case 'home/feedback-not-now':
       problem = check([]);
       return problem ? fail(problem) : { ok: true, request: { type: raw.type } };
+    case 'home/ready-request-ai':
+    case 'home/sign-in':
+      problem = check(['ai']);
+      if (problem) return fail(problem);
+      if (!HOME_AI_IDS.includes(raw.ai as HomeAiId)) return fail('ai must be claude-code, codex or opencode');
+      return { ok: true, request: { type: raw.type, ai: raw.ai as HomeAiId } };
+    case 'home/save-keys': {
+      problem = check(['keys']);
+      if (problem) return fail(problem);
+      if (!isObject(raw.keys)) return fail('keys must be an object');
+      const keys: Partial<Record<HomeKeyName, string>> = {};
+      for (const [name, value] of Object.entries(raw.keys)) {
+        if (!HOME_KEY_NAMES.includes(name as HomeKeyName)) return fail(`unknown key "${name}"`);
+        if (typeof value !== 'string' || value.length > 512) return fail('a key must be text');
+        keys[name as HomeKeyName] = value;
+      }
+      return { ok: true, request: { type: 'home/save-keys', keys } };
+    }
+    case 'home/feedback-send':
+    case 'home/feedback-mail':
+      problem = check(['text']);
+      if (problem) return fail(problem);
+      if (!isText(raw.text) || !raw.text.trim()) return fail('text must be written');
+      return { ok: true, request: { type: raw.type, text: raw.text } };
     case 'home/set-line':
       problem = check(['line']);
       if (problem) return fail(problem);

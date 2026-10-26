@@ -18,6 +18,7 @@ import type { GoogleAccountService } from './GoogleAccountService';
 import type { GoogleDocsBindingStore } from './GoogleDocsBindingStore';
 import type { GoogleDocsPublisher, PublishOutcome, SkippedImage } from './GoogleDocsPublisher';
 import { decodeEditorRequest, decodeSettingsRequest } from './protocol';
+import { madeSomething } from '../guidance/madeSomething';
 import {
   GOOGLE_DOCS_ERROR_COPY,
   GoogleDocsError,
@@ -246,6 +247,8 @@ export class GoogleDocsController {
   private async reportOutcome(outcome: PublishOutcome): Promise<void> {
     const { ui } = this.deps;
     if (outcome.kind === 'cancelled') return;
+    // Sprint 140 (R15): a publish that created or synced the Google Doc made something
+    if (outcome.kind === 'created' || outcome.kind === 'synced') madeSomething.note('publish');
     const url = docUrlFor(outcome.binding.fileId);
     const message = outcome.kind === 'created'
       ? `Google Doc created: "${outcome.binding.title}". Future Syncs update this same document.`

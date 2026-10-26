@@ -14,6 +14,7 @@ import { UserPromptBubble, AIResponseBubble } from './ChatBubbles';
 import { AgentQuestion } from './AgentQuestion';
 import { PlanReviewCard } from './PlanReviewCard';
 import { RenderedMarkdown } from './RenderedMarkdown';
+import { StartingPoints } from './StartingPoints';
 import { extractPlanDisplayText } from './planText';
 import type { CodexConversationTurn, AgentProgress, CodexSidebarStatus } from './types';
 
@@ -48,27 +49,20 @@ export function CodexView() {
   }, [codexConversation]);
 
   if (codexConversation.length === 0) {
+    // Sprint 140 (R8): the same starting points as Claude's and OpenCode's empty chat; the compatibility notice stays
+    // above them. Named as people know it (Sprint 133): ChatGPT.
     return (
-      <div className="flex-1 flex items-center justify-center p-6 text-center">
-        <div className="max-w-xs">
-          {showCompatibilityNotice && (
-            <div className="mb-4 text-left">
-              <CompatibilityNotice
-                title={compatibilityNotice.title}
-                message={compatibilityNotice.message}
-                bullets={compatibilityNotice.bullets}
-                onDismiss={() => dismissCodexNotice(compatibilityNotice.key)}
-              />
-            </div>
-          )}
-          <Icon name="terminal" size={20} className="mx-auto mb-3 opacity-30" />
-          {/* Named as people know it (Sprint 133): the welcome and the landing say ChatGPT. */}
-          <p className="text-sm font-medium opacity-70">ChatGPT can work with your files</p>
-          <p className="text-xs opacity-50 mt-1">
-            Type a message to start.
-          </p>
-        </div>
-      </div>
+      <StartingPoints
+        aiName="ChatGPT"
+        notice={showCompatibilityNotice ? (
+          <CompatibilityNotice
+            title={compatibilityNotice.title}
+            message={compatibilityNotice.message}
+            bullets={compatibilityNotice.bullets}
+            onDismiss={() => dismissCodexNotice(compatibilityNotice.key)}
+          />
+        ) : undefined}
+      />
     );
   }
 

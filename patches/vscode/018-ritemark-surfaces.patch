@@ -82,6 +82,15 @@ positioning); ritemarkSurfaces.css styles the empty desk through .editor-group-w
 Depends on 007: the hook in paneCompositeBar.ts uses the ICommandService that 007 injects into
 ViewContainerActivityAction (no shared lines, so the stacking check cannot see it; regenerate 018 if 007 drops it).
 
+Sprint 140 (2.1, R11–R13; experience 34, frames 2, 3 and 5): the feedback sheet over the whole window
+(ritemarkFeedbackSheet.ts and media/ritemarkFeedbackSheet.css, loaded by desktop.contribution.ts), 440 wide over the
+dimmed window. The extension opens it with _ritemark.feedbackSheet and gives every word; the sheet's route words follow
+its two boxes live (the AI box puts the last answer's box in place of "I'd like an answer", as frame 3 draws it), Send
+is off until something is typed, Enter makes a new line, Cmd+Enter (Ctrl+Enter) presses the button, Escape closes it,
+Tab stays inside. Its button asks the extension's _ritemark.feedback.submit; the sheet closes when the message was
+accepted, keeps the message with one line, Try again and Open in e-mail when it did not go (D5), and becomes frame 5's
+hand-off, with Copy and Done, when an e-mail app was asked to open. It resolves with sent, mailed or cancelled.
+
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
 platform/window/common/window.ts; platform/windows/electron-main/windowImpl.ts; workbench/browser/{layout,style}.ts;
@@ -89,12 +98,14 @@ workbench/browser/media/ritemarkSurfaces.css; workbench/browser/parts/{composite
 paneCompositePart,ritemarkFrameMenu,ritemarkFrameStrip,ritemarkMenu,ritemarkWelcomeAlone,ritemarkWindowSizes}.ts; workbench/browser/labels.ts; parts/auxiliarybar/auxiliaryBarPart.ts;
 parts/editor/editorPart.ts; parts/notifications/{notificationsCenter,notificationsToasts,notificationsViewer}.ts;
 parts/sidebar/{ritemarkProjectHead,sidebarPart}.ts; parts/statusbar/statusbarPart.ts + media/statusbarpart.css;
+parts/ritemarkFeedbackSheet.ts + parts/media/ritemarkFeedbackSheet.css (Sprint 140);
 parts/titlebar/titlebarPart.ts; contrib/files/browser/views/explorerViewer.ts; contrib/webview/browser/overlayWebview.ts;
 electron-browser/desktop.contribution.ts; electron-browser/parts/titlebar/titlebarPart.ts;
 services/actions/common/menusExtensionPoint.ts; services/layout/browser/layoutService.ts.
 Tests: workbench/test/browser/parts/ritemarkWindowSizes.test.ts (R14), base/test/browser/iconLabel.test.ts (Sprint 133,
 R13), workbench/test/browser/parts/ritemarkSwitchGuard.test.ts and base/test/browser/ui/dialog/ritemarkDialogFocus.test.ts
-(Sprint 134, R9), workbench/test/browser/parts/ritemarkMenu.test.ts (Sprint 134, R8: one flyout); run with
+(Sprint 134, R9), workbench/test/browser/parts/ritemarkMenu.test.ts (Sprint 134, R8: one flyout),
+workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts (Sprint 140: the route words, the keys, after pressing); run with
 ./scripts/test.sh --grep Ritemark.
 diff --git a/src/vs/base/browser/ui/dialog/dialog.ts b/src/vs/base/browser/ui/dialog/dialog.ts
 index 34d22b5d162..644a11f194a 100644
@@ -2944,6 +2955,270 @@ index afa6942390e..06e7b97bf55 100644
  
  		// Layout editor container
  		this.doLayout(Dimension.lift(contentAreaSize), top, left);
+diff --git a/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css b/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css
+new file mode 100644
+index 00000000000..9f8ff5db35b
+--- /dev/null
++++ b/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css
+@@ -0,0 +1,258 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/*
++ * Ritemark 2.1 (Sprint 140): the feedback sheet, to experience 34's numbers (feedback.html: .dim, .fsheet and its parts):
++ * 440 wide, padding 20, radius 12, over the window dimmed in ink (ritemarkSurfaces.css dims .monaco-dialog-modal-block).
++ * Colours come from the theme, through the surfaces' tokens, so Ritemark Light and Ritemark Dark both follow.
++ */
++
++.monaco-workbench .ritemark-feedback-block {
++	position: fixed;
++	inset: 0;
++	z-index: 2575; /* as VS Code's dialogs: above context views, below the workbench hover */
++	display: flex;
++	justify-content: center;
++	align-items: center;
++}
++
++.monaco-workbench .ritemark-feedback-sheet {
++	box-sizing: border-box;
++	width: 440px;
++	max-width: calc(100vw - 32px);
++	max-height: calc(100vh - 64px);
++	overflow-y: auto;
++	padding: 20px;
++	border-radius: 12px;
++	background: var(--rm-desk);
++	color: var(--vscode-foreground);
++	box-shadow: 0 0 0 1px var(--rm-hairline), 0 24px 48px -12px color-mix(in srgb, var(--vscode-foreground) 28%, transparent), 0 8px 16px -8px color-mix(in srgb, var(--vscode-foreground) 12%, transparent);
++	font-size: 13px;
++	line-height: 20px;
++}
++
++.monaco-workbench.vs-dark .ritemark-feedback-sheet {
++	box-shadow: 0 0 0 1px var(--rm-hairline), 0 24px 48px -12px var(--rm-shadow), 0 8px 16px -8px var(--rm-shadow);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-title {
++	margin: 0 0 4px;
++	font-size: 15px;
++	font-weight: 600;
++	line-height: 20px;
++	color: var(--vscode-foreground);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-lede {
++	margin: 0 0 14px;
++	color: var(--rm-body);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-area {
++	display: block;
++	box-sizing: border-box;
++	width: 100%;
++	min-height: 112px;
++	max-height: 240px;
++	padding: 8px 12px;
++	border: none;
++	border-radius: 8px;
++	resize: none;
++	field-sizing: content; /* the field grows with the words, from 112 */
++	background: var(--rm-desk);
++	color: var(--vscode-foreground);
++	box-shadow: inset 0 0 0 1px var(--vscode-checkbox-border);
++	font: inherit;
++	outline: none;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-area::placeholder {
++	color: var(--vscode-input-placeholderForeground);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-area:focus {
++	box-shadow: inset 0 0 0 1px var(--vscode-focusBorder), 0 0 0 3px color-mix(in srgb, var(--vscode-focusBorder) 18%, transparent);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-check {
++	display: flex;
++	align-items: flex-start;
++	gap: 8px;
++	margin: 12px 0 0;
++	color: var(--rm-body);
++	cursor: pointer;
++}
++
++.monaco-workbench .ritemark-feedback-sheet [hidden] {
++	display: none !important; /* !important: beats this sheet's own display rules (flex rows, inline-flex buttons) */
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-check input {
++	appearance: none;
++	flex: none;
++	width: 14px;
++	height: 14px;
++	margin: 3px 0 0;
++	border-radius: 4px;
++	box-shadow: inset 0 0 0 1px var(--vscode-checkbox-border);
++	background: var(--rm-desk);
++	display: grid;
++	place-items: center;
++	cursor: pointer;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-check input:checked {
++	background: var(--vscode-button-background);
++	box-shadow: none;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-check input:checked::after {
++	content: '';
++	width: 7px;
++	height: 4px;
++	margin-top: -2px;
++	border-left: 1.5px solid var(--vscode-button-foreground);
++	border-bottom: 1.5px solid var(--vscode-button-foreground);
++	transform: rotate(-45deg);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-check input:focus-visible {
++	outline: 2px solid var(--vscode-focusBorder);
++	outline-offset: 2px;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-check-words {
++	display: flex;
++	flex-direction: column;
++	min-width: 0;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-check-note {
++	font-size: 12px;
++	line-height: 18px;
++	color: var(--rm-muted);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-quote {
++	margin-top: 8px;
++	padding: 8px 10px;
++	border-radius: 8px;
++	background: var(--rm-ground);
++	font-size: 12px;
++	line-height: 18px;
++	color: var(--rm-body);
++	white-space: pre-wrap;
++	overflow-wrap: anywhere;
++	max-height: 160px;
++	overflow-y: auto;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-quote b {
++	display: block;
++	margin-bottom: 2px;
++	font-weight: 600;
++	color: var(--vscode-foreground);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-quote-note {
++	margin-top: 4px;
++	color: var(--rm-muted);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-via {
++	display: flex;
++	gap: 8px;
++	margin: 16px 0 0;
++	padding: 10px 12px;
++	border-radius: 8px;
++	background: var(--rm-ground);
++	font-size: 12px;
++	line-height: 18px;
++	color: var(--rm-body);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-via .codicon {
++	flex: none;
++	margin-top: 2px;
++	font-size: 14px;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-problem {
++	margin: 14px 0 0;
++	color: var(--vscode-foreground);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-foot {
++	display: flex;
++	flex-wrap: wrap;
++	align-items: center;
++	justify-content: flex-end;
++	gap: 8px;
++	margin-top: 20px;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-foot-note {
++	flex: 1 1 140px;
++	min-width: 0;
++	font-size: 12px;
++	line-height: 18px;
++	color: var(--rm-muted);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-foot.stacked .ritemark-feedback-foot-note {
++	flex-basis: 100%;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-button {
++	display: inline-flex;
++	align-items: center;
++	gap: 6px;
++	height: 32px;
++	padding: 0 14px;
++	border: none;
++	border-radius: 8px;
++	white-space: nowrap; /* a button's words stay on one line */
++	font: inherit;
++	font-weight: 500;
++	cursor: pointer;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-button.ghost {
++	background: var(--rm-desk);
++	color: var(--vscode-foreground);
++	box-shadow: inset 0 0 0 1px var(--vscode-checkbox-border);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-button.ghost:hover {
++	background: var(--rm-ground);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-button.primary {
++	background: var(--vscode-button-background);
++	color: var(--vscode-button-foreground);
++	box-shadow: 0 0 0 2px var(--rm-desk), 0 0 0 4px color-mix(in srgb, var(--vscode-focusBorder) 28%, transparent);
++}
++
++.monaco-workbench.vs-dark .ritemark-feedback-sheet .ritemark-feedback-button.primary {
++	box-shadow: 0 0 0 2px var(--rm-desk), 0 0 0 4px color-mix(in srgb, var(--vscode-focusBorder) 40%, transparent);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-button.primary:hover {
++	background: var(--vscode-button-hoverBackground);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-button:disabled {
++	opacity: 0.5;
++	cursor: default;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-button:focus-visible {
++	outline: 2px solid var(--vscode-focusBorder);
++	outline-offset: 2px;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-button .codicon {
++	font-size: 14px;
++}
 diff --git a/src/vs/workbench/browser/parts/notifications/notificationsCenter.ts b/src/vs/workbench/browser/parts/notifications/notificationsCenter.ts
 index 38e722820da..f9fbe8c1a61 100644
 --- a/src/vs/workbench/browser/parts/notifications/notificationsCenter.ts
@@ -3056,6 +3331,406 @@ index 491c451f7fa..251b2dfaebf 100644
  			availableWidth = Math.max(AbstractPaneCompositePart.MIN_COMPOSITE_BAR_WIDTH, availableWidth - this.getToolbarWidth());
  			this.paneCompositeBar.value.layout(availableWidth, this.dimension.height);
  		}
+diff --git a/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
+new file mode 100644
+index 00000000000..cba8ccded9b
+--- /dev/null
++++ b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
+@@ -0,0 +1,394 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/*
++ * Ritemark 2.1 (Sprint 140, R11–R13; experience 34, frames 2, 3 and 5): the feedback sheet over the whole window, in
++ * experience 31's dialog style (440 wide, the window dimmed behind it). The extension opens it with the hidden command
++ * `_ritemark.feedbackSheet` and gives every word, so the words can change without an app release; the sheet asks the
++ * extension's `_ritemark.feedback.submit` to send (the straight route) or to open the person's e-mail app (either box
++ * ticked), and shows what happened: it closes when the message was accepted, stays with one line when it did not go,
++ * and turns into frame 5's hand-off when an e-mail app was asked to open, with Copy and Done. Never "sent" when only
++ * an e-mail app opened.
++ *
++ * Keys: Enter makes a new line, ⌘Enter (Ctrl+Enter on Windows) presses the sheet's button, Escape closes it and sends
++ * nothing; Tab stays inside the sheet. The command resolves with what happened: sent, mailed or cancelled.
++ */
++
++import './media/ritemarkFeedbackSheet.css';
++import { $, addDisposableListener, append, EventType } from '../../../base/browser/dom.js';
++import { getDefaultHoverDelegate } from '../../../base/browser/ui/hover/hoverDelegateFactory.js';
++import { Event } from '../../../base/common/event.js';
++import { DisposableStore, IDisposable } from '../../../base/common/lifecycle.js';
++import { isMacintosh } from '../../../base/common/platform.js';
++import Severity from '../../../base/common/severity.js';
++import { IClipboardService } from '../../../platform/clipboard/common/clipboardService.js';
++import { CommandsRegistry, ICommandService } from '../../../platform/commands/common/commands.js';
++import { IHoverService } from '../../../platform/hover/browser/hover.js';
++import { ILayoutService } from '../../../platform/layout/browser/layoutService.js';
++import { INotificationService } from '../../../platform/notification/common/notification.js';
++
++const SHEET_COMMAND = '_ritemark.feedbackSheet';
++const SUBMIT_COMMAND = '_ritemark.feedback.submit';
++const BRIEF_TOAST_COMMAND = '_ritemark.briefToast';
++
++/** How long a brief toast stays: the thank-you goes by itself after a few seconds (experience 35, The build checked). */
++export const RITEMARK_BRIEF_TOAST_MS = 4000;
++
++/** The words the extension gives (its `feedbackCopy.ts`); only what the sheet draws is listed. */
++export interface IRitemarkFeedbackWords {
++	readonly sheet: {
++		readonly feedback: { readonly title: string; readonly lede: string; readonly placeholder: string };
++		readonly aiIssue: { readonly title: string; readonly lede: string; readonly placeholder: string };
++		readonly aiBox: string;
++		readonly answerBox: string;
++		readonly answerNote: string;
++		readonly lastAnswerBox: string;
++		readonly lastAnswerNoteBefore: string;
++		readonly lastAnswerNoteAfter: string;
++		readonly shortenedNote: string;
++		readonly straight: { readonly button: string; readonly foot: string };
++		readonly email: { readonly button: string; readonly foot: string; readonly via: string };
++		readonly cancel: string;
++		readonly sending: string;
++		readonly failed: string;
++		readonly tryAgain: string;
++		readonly openInEmail: string;
++	};
++	readonly handoff: {
++		readonly opened: { readonly title: string; readonly report: string; readonly message: string };
++		readonly noHandler: { readonly title: string; readonly lede: string };
++		readonly tooLong: { readonly title: string; readonly lede: string };
++		readonly foot: string;
++		readonly copy: string;
++		readonly copied: string;
++		readonly done: string;
++	};
++	/** Each button's hover hint, and why Send waits; absent from an extension older than 2.1's QA, which draws none. */
++	readonly hints?: {
++		readonly cancel: string;
++		readonly send: string;
++		readonly openInEmail: string;
++		readonly tryAgain: string;
++		readonly writeFirst: string;
++		readonly copy: string;
++		readonly done: string;
++	};
++}
++
++export interface IRitemarkFeedbackSheetSpec {
++	readonly token: string;
++	readonly kind: 'feedback' | 'ai-issue';
++	readonly aiIssue: boolean;
++	readonly lastAnswer: { readonly chatTitle: string; readonly quote: string; readonly shortened: boolean } | null;
++	readonly words: IRitemarkFeedbackWords;
++}
++
++export interface IRitemarkFeedbackSubmit {
++	readonly token: string;
++	readonly route: 'straight' | 'email';
++	readonly text: string;
++	readonly aiIssue: boolean;
++	readonly wantAnswer: boolean;
++	readonly withAnswer: boolean;
++}
++
++export type RitemarkFeedbackSubmitResult =
++	| { readonly route: 'straight'; readonly outcome: 'accepted' | 'failed' }
++	| { readonly route: 'email'; readonly outcome: 'opened' | 'no-handler' | 'too-long' | 'invalid'; readonly kindLabel: string; readonly shown: string; readonly copyText: string }
++	| null | undefined;
++
++export type RitemarkFeedbackSheetOutcome = 'sent' | 'mailed' | 'cancelled';
++
++/** Either box ticked goes through the person's own e-mail app (R11). */
++export function ritemarkFeedbackRoute(aiIssue: boolean, wantAnswer: boolean): 'straight' | 'email' {
++	return aiIssue || wantAnswer ? 'email' : 'straight';
++}
++
++/** ⌘Enter on the Mac and Ctrl+Enter elsewhere press the sheet's button; Escape closes it; plain Enter is a new line. */
++export function ritemarkFeedbackKey(event: { readonly key: string; readonly metaKey: boolean; readonly ctrlKey: boolean; readonly altKey: boolean; readonly shiftKey: boolean }, mac: boolean): 'submit' | 'cancel' | undefined {
++	if (event.key === 'Escape') {
++		return 'cancel';
++	}
++	if (event.key === 'Enter' && !event.altKey && !event.shiftKey && (mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey)) {
++		return 'submit';
++	}
++	return undefined;
++}
++
++interface ISheetDeps {
++	submit(request: IRitemarkFeedbackSubmit): Promise<RitemarkFeedbackSubmitResult>;
++	copy(text: string): Promise<void>;
++	readonly mac: boolean;
++	/** A hover hint on a button (the workbench's hover service); its words are read when the hover shows. */
++	hint?(element: HTMLElement, content: () => string): IDisposable;
++}
++
++function button(parent: HTMLElement, label: string, kind: 'primary' | 'ghost'): HTMLButtonElement {
++	const element = append(parent, $(`button.ritemark-feedback-button.${kind}`)) as HTMLButtonElement;
++	element.type = 'button';
++	element.textContent = label;
++	return element;
++}
++
++function box(parent: HTMLElement, label: string, note: string | undefined): { row: HTMLElement; input: HTMLInputElement } {
++	const row = append(parent, $('label.ritemark-feedback-check'));
++	const input = append(row, $('input')) as HTMLInputElement;
++	input.type = 'checkbox';
++	const words = append(row, $('span.ritemark-feedback-check-words'));
++	append(words, $('span')).textContent = label;
++	if (note) {
++		append(words, $('span.ritemark-feedback-check-note')).textContent = note;
++	}
++	return { row, input };
++}
++
++/** Draw the sheet in `container` and resolve with what happened once it closes. */
++export function showRitemarkFeedbackSheet(container: HTMLElement, spec: IRitemarkFeedbackSheetSpec, deps: ISheetDeps): Promise<RitemarkFeedbackSheetOutcome> {
++	const words = spec.words;
++	const store = new DisposableStore();
++	const previouslyFocused = container.ownerDocument.activeElement as HTMLElement | null;
++	const block = append(container, $('.monaco-dialog-modal-block.dimmed.ritemark-feedback-block'));
++	const sheet = append(block, $('.ritemark-feedback-sheet'));
++	sheet.setAttribute('role', 'dialog');
++	sheet.setAttribute('aria-modal', 'true');
++	sheet.setAttribute('aria-labelledby', 'ritemark-feedback-title');
++	sheet.setAttribute('aria-describedby', 'ritemark-feedback-lede');
++
++	return new Promise<RitemarkFeedbackSheetOutcome>(resolve => {
++		let closed = false;
++		const close = (outcome: RitemarkFeedbackSheetOutcome) => {
++			if (closed) {
++				return;
++			}
++			closed = true;
++			store.dispose();
++			block.remove();
++			previouslyFocused?.focus?.();
++			resolve(outcome);
++		};
++
++		// ── The message: frames 2 and 3 ──
++		const kindWords = spec.kind === 'ai-issue' ? words.sheet.aiIssue : words.sheet.feedback;
++		const title = append(sheet, $('h3#ritemark-feedback-title.ritemark-feedback-title'));
++		title.textContent = kindWords.title;
++		const lede = append(sheet, $('p#ritemark-feedback-lede.ritemark-feedback-lede'));
++		lede.textContent = kindWords.lede;
++		const area = append(sheet, $('textarea.ritemark-feedback-area')) as HTMLTextAreaElement;
++		area.placeholder = kindWords.placeholder;
++		area.setAttribute('aria-label', kindWords.title);
++		area.maxLength = 8000;
++		const ai = box(sheet, words.sheet.aiBox, undefined);
++		ai.input.checked = spec.aiIssue;
++		const last = spec.lastAnswer ? box(sheet, words.sheet.lastAnswerBox, `${words.sheet.lastAnswerNoteBefore}${spec.lastAnswer.chatTitle}${words.sheet.lastAnswerNoteAfter}`) : undefined;
++		const quote = spec.lastAnswer ? append(sheet, $('.ritemark-feedback-quote')) : undefined;
++		if (quote && spec.lastAnswer) {
++			append(quote, $('.ritemark-feedback-quote-text')).textContent = spec.lastAnswer.quote;
++			if (spec.lastAnswer.shortened) {
++				append(quote, $('.ritemark-feedback-quote-note')).textContent = words.sheet.shortenedNote;
++			}
++		}
++		const answer = box(sheet, words.sheet.answerBox, words.sheet.answerNote);
++		const via = append(sheet, $('.ritemark-feedback-via'));
++		append(via, $('span.codicon.codicon-mail'));
++		append(via, $('span')).textContent = words.sheet.email.via;
++		const problem = append(sheet, $('p.ritemark-feedback-problem'));
++		problem.setAttribute('role', 'alert');
++		const foot = append(sheet, $('.ritemark-feedback-foot'));
++		const footNote = append(foot, $('span.ritemark-feedback-foot-note'));
++		const cancel = button(foot, words.sheet.cancel, 'ghost');
++		const toEmail = button(foot, words.sheet.openInEmail, 'ghost');
++		const primary = button(foot, words.sheet.straight.button, 'primary');
++
++		let sending = false;
++		let failed = false;
++		const route = () => ritemarkFeedbackRoute(ai.input.checked, answer.input.checked);
++		// Each button says what it does on hover, and a disabled Send says why it waits (QA, 26 October)
++		const hints = words.hints;
++		if (hints && deps.hint) {
++			store.add(deps.hint(cancel, () => hints.cancel));
++			store.add(deps.hint(toEmail, () => area.value.trim() ? hints.openInEmail : hints.writeFirst));
++			store.add(deps.hint(primary, () => !area.value.trim() ? hints.writeFirst : route() === 'email' ? hints.openInEmail : failed ? hints.tryAgain : hints.send));
++		}
++		/** The route's words, live as the boxes change (R11, R12; experience 34 frame 3: the AI box puts the last answer's box where "I'd like an answer" was). */
++		const update = () => {
++			const email = route() === 'email';
++			const empty = area.value.trim().length === 0;
++			answer.row.hidden = ai.input.checked;
++			if (last && quote) {
++				last.row.hidden = !ai.input.checked;
++				quote.hidden = !(ai.input.checked && last.input.checked);
++			}
++			via.hidden = !email;
++			footNote.textContent = email ? words.sheet.email.foot : words.sheet.straight.foot;
++			problem.hidden = !failed;
++			problem.textContent = failed ? words.sheet.failed : '';
++			toEmail.hidden = !failed || email;
++			foot.classList.toggle('stacked', !toEmail.hidden); // three buttons: the note takes its own line, the buttons stay on one
++			primary.textContent = sending ? words.sheet.sending : email ? words.sheet.email.button : failed ? words.sheet.tryAgain : words.sheet.straight.button;
++			primary.disabled = empty || sending;
++			toEmail.disabled = empty || sending;
++			for (const input of [area, ai.input, answer.input, last?.input]) {
++				if (input) {
++					input.disabled = sending;
++				}
++			}
++		};
++
++		// ── After pressing: frames 4 and 5 ──
++		const handOff = (result: Extract<RitemarkFeedbackSubmitResult, { route: 'email' }>) => {
++			const outcome = result.outcome === 'opened' ? words.handoff.opened : result.outcome === 'too-long' ? words.handoff.tooLong : words.handoff.noHandler;
++			sheet.textContent = '';
++			sheet.classList.add('handoff');
++			append(sheet, $('h3#ritemark-feedback-title.ritemark-feedback-title')).textContent = outcome.title;
++			append(sheet, $('p#ritemark-feedback-lede.ritemark-feedback-lede')).textContent = result.outcome === 'opened'
++				? (spec.kind === 'ai-issue' || ai.input.checked ? words.handoff.opened.report : words.handoff.opened.message)
++				: (outcome as { lede: string }).lede;
++			const shown = append(sheet, $('.ritemark-feedback-quote'));
++			append(shown, $('b')).textContent = result.kindLabel;
++			append(shown, $('.ritemark-feedback-quote-text')).textContent = result.shown;
++			const handoffFoot = append(sheet, $('.ritemark-feedback-foot'));
++			// "Didn't open? …" only after an e-mail app was asked to open; too long or no e-mail app already says so above
++			append(handoffFoot, $('span.ritemark-feedback-foot-note')).textContent = result.outcome === 'opened' ? words.handoff.foot : '';
++			const copy = button(handoffFoot, words.handoff.copy, 'ghost');
++			copy.prepend($('span.codicon.codicon-copy'));
++			const done = button(handoffFoot, words.handoff.done, 'primary');
++			if (hints && deps.hint) {
++				store.add(deps.hint(copy, () => hints.copy));
++				store.add(deps.hint(done, () => hints.done));
++			}
++			store.add(addDisposableListener(copy, EventType.CLICK, async () => {
++				await deps.copy(result.copyText);
++				copy.lastChild!.textContent = words.handoff.copied;
++				setTimeout(() => {
++					if (copy.isConnected) {
++						copy.lastChild!.textContent = words.handoff.copy;
++					}
++				}, 2000);
++			}));
++			store.add(addDisposableListener(done, EventType.CLICK, () => close('mailed')));
++			done.focus();
++		};
++
++		const submit = async (forceEmail: boolean) => {
++			const text = area.value.trim();
++			if (!text || sending) {
++				return;
++			}
++			const chosen = forceEmail ? 'email' : route();
++			sending = chosen === 'straight';
++			update();
++			const result = await deps.submit({ token: spec.token, route: chosen, text, aiIssue: ai.input.checked, wantAnswer: answer.input.checked, withAnswer: Boolean(last?.input.checked && ai.input.checked) });
++			sending = false;
++			if (closed) {
++				return;
++			}
++			if (result?.route === 'straight') {
++				if (result.outcome === 'accepted') {
++					close('sent');
++					return;
++				}
++				failed = true; // D5: the sheet stays with the message, one line, and the e-mail route
++				update();
++				primary.focus();
++				return;
++			}
++			if (result?.route === 'email' && result.outcome !== 'invalid') {
++				handOff(result);
++				return;
++			}
++			failed = true;
++			update();
++		};
++
++		store.add(addDisposableListener(area, EventType.INPUT, () => update()));
++		for (const input of [ai.input, answer.input, last?.input]) {
++			if (input) {
++				store.add(addDisposableListener(input, EventType.CHANGE, () => update()));
++			}
++		}
++		store.add(addDisposableListener(cancel, EventType.CLICK, () => close('cancelled')));
++		store.add(addDisposableListener(primary, EventType.CLICK, () => void submit(false)));
++		store.add(addDisposableListener(toEmail, EventType.CLICK, () => void submit(true)));
++		store.add(addDisposableListener(sheet, EventType.KEY_DOWN, (event: KeyboardEvent) => {
++			const action = ritemarkFeedbackKey(event, deps.mac);
++			if (action === 'cancel') {
++				event.preventDefault();
++				event.stopPropagation();
++				close(sheet.classList.contains('handoff') ? 'mailed' : 'cancelled');
++			} else if (action === 'submit' && !sheet.classList.contains('handoff')) {
++				event.preventDefault();
++				event.stopPropagation();
++				void submit(false);
++			} else if (event.key === 'Tab') {
++				// Tab stays in the sheet
++				const focusable = [...sheet.querySelectorAll<HTMLElement>('textarea, input, button')].filter(element => !element.hidden && !(element as HTMLButtonElement).disabled && element.offsetParent !== null);
++				const first = focusable[0];
++				const lastFocusable = focusable[focusable.length - 1];
++				const active = sheet.ownerDocument.activeElement;
++				if (event.shiftKey && active === first) {
++					event.preventDefault();
++					lastFocusable?.focus();
++				} else if (!event.shiftKey && active === lastFocusable) {
++					event.preventDefault();
++					first?.focus();
++				}
++			}
++			// A modal sheet: the workbench's own shortcuts wait until it closes (typing keeps its default)
++			event.stopPropagation();
++		}));
++		// Focus stays inside the sheet while it is open: anything that takes it elsewhere in the window gives it back
++		store.add(addDisposableListener(sheet, EventType.FOCUS_OUT, (event: FocusEvent) => {
++			const next = event.relatedTarget as Node | null;
++			if (next && sheet.contains(next)) {
++				return;
++			}
++			setTimeout(() => {
++				const active = sheet.ownerDocument.activeElement;
++				if (!closed && sheet.isConnected && !(active && sheet.contains(active))) {
++					const target = [...sheet.querySelectorAll<HTMLElement>('textarea, input, button')].find(element => !element.hidden && !(element as HTMLButtonElement).disabled && element.offsetParent !== null);
++					target?.focus();
++				}
++			}, 0);
++		}));
++		// A press on the dimmed window outside the sheet does nothing: Escape and Cancel close it (experience 31).
++		store.add(addDisposableListener(block, EventType.MOUSE_DOWN, (event: MouseEvent) => {
++			if (event.target === block) {
++				event.preventDefault();
++				area.focus();
++			}
++		}));
++
++		update();
++		area.focus();
++	});
++}
++
++CommandsRegistry.registerCommand(SHEET_COMMAND, (accessor, spec: IRitemarkFeedbackSheetSpec) => {
++	const layoutService = accessor.get(ILayoutService);
++	const commandService = accessor.get(ICommandService);
++	const clipboardService = accessor.get(IClipboardService);
++	const hoverService = accessor.get(IHoverService);
++	return showRitemarkFeedbackSheet(layoutService.activeContainer, spec, {
++		submit: request => commandService.executeCommand<RitemarkFeedbackSubmitResult>(SUBMIT_COMMAND, request),
++		copy: text => clipboardService.writeText(text),
++		mac: isMacintosh,
++		hint: (element, content) => hoverService.setupManagedHover(getDefaultHoverDelegate('mouse'), element, content),
++	});
++});
++
++/**
++ * A toast that says a thing happened and goes by itself (the feedback thank-you, 2.0's notification toast): an
++ * extension's information message stays until the window has focus and then for 10 s; this one closes after
++ * RITEMARK_BRIEF_TOAST_MS wherever it is. Resolves true when shown, so the extension knows to show nothing itself.
++ */
++CommandsRegistry.registerCommand(BRIEF_TOAST_COMMAND, (accessor, message: unknown) => {
++	if (typeof message !== 'string' || !message.trim()) {
++		return false;
++	}
++	const handle = accessor.get(INotificationService).notify({ severity: Severity.Info, message });
++	const timer = setTimeout(() => handle.close(), RITEMARK_BRIEF_TOAST_MS);
++	Event.once(handle.onDidClose)(() => clearTimeout(timer));
++	return true;
++});
 diff --git a/src/vs/workbench/browser/parts/ritemarkFrameMenu.ts b/src/vs/workbench/browser/parts/ritemarkFrameMenu.ts
 new file mode 100644
 index 00000000000..a16fb914c93
@@ -4565,10 +5240,10 @@ index 86d357e665c..9b9f66fd54b 100644
  		this._syncOuterEdgeClasses(part);
  
 diff --git a/src/vs/workbench/electron-browser/desktop.contribution.ts b/src/vs/workbench/electron-browser/desktop.contribution.ts
-index 41250d7b714..b51654a5969 100644
+index 41250d7b714..c6fc8a12257 100644
 --- a/src/vs/workbench/electron-browser/desktop.contribution.ts
 +++ b/src/vs/workbench/electron-browser/desktop.contribution.ts
-@@ -28,7 +28,9 @@ import { NativeWindow } from './window.js';
+@@ -28,7 +28,10 @@ import { NativeWindow } from './window.js';
  import { ModifierKeyEmitter } from '../../base/browser/dom.js';
  import { applicationConfigurationNodeBase, securityConfigurationNodeBase } from '../common/configuration.js';
  import { MAX_ZOOM_LEVEL, MIN_ZOOM_LEVEL } from '../../platform/window/electron-browser/window.js';
@@ -4576,10 +5251,11 @@ index 41250d7b714..b51654a5969 100644
 +import '../browser/parts/ritemarkWindowSizes.js'; // Ritemark 2.0: the window makes room for the document (R14)
 +import '../browser/parts/ritemarkWelcomeAlone.js'; // Ritemark 2.0: the welcome alone on the ground (Sprint 133, R1)
 +import '../browser/parts/ritemarkSwitchGuard.js'; // Ritemark 2.0: a switch asks while chats work (Sprint 134, R9)
++import '../browser/parts/ritemarkFeedbackSheet.js'; // Ritemark 2.1: the feedback sheet over the window (Sprint 140, R11)
  
  // Actions
  (function registerActions(): void {
-@@ -281,7 +283,7 @@ import product from '../../platform/product/common/product.js';
+@@ -281,7 +284,7 @@ import product from '../../platform/product/common/product.js';
  						localize(`window.menuStyle.native`, "Use the native menu. This is ignored when {0} is set to {1}.", '`#window.titleBarStyle#`', '`custom`'),
  						localize(`window.menuStyle.inherit`, "Matches the menu style to the title bar style defined in {0}.", '`#window.titleBarStyle#`'),
  					],
@@ -4588,7 +5264,7 @@ index 41250d7b714..b51654a5969 100644
  				'scope': ConfigurationScope.APPLICATION,
  				'markdownDescription': isMacintosh ?
  					localize('window.menuStyle.mac', "Adjust the context menu appearances to either be native by the OS, custom, or inherited from the title bar style defined in {0}.", '`#window.titleBarStyle#`') :
-@@ -291,7 +293,7 @@ import product from '../../platform/product/common/product.js';
+@@ -291,7 +294,7 @@ import product from '../../platform/product/common/product.js';
  			'window.dialogStyle': {
  				'type': 'string',
  				'enum': ['native', 'custom'],
@@ -4821,6 +5497,193 @@ index 6851c3b584c..027d77efbca 100644
  	if (!hasCustomTitlebar(configurationService)) {
  		return false;
  	}
+diff --git a/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
+new file mode 100644
+index 00000000000..cbc04c05f48
+--- /dev/null
++++ b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
+@@ -0,0 +1,181 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { mainWindow } from '../../../../base/browser/window.js';
++import { timeout } from '../../../../base/common/async.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
++import { IRitemarkFeedbackSheetSpec, IRitemarkFeedbackSubmit, RitemarkFeedbackSubmitResult, ritemarkFeedbackKey, ritemarkFeedbackRoute, showRitemarkFeedbackSheet } from '../../../browser/parts/ritemarkFeedbackSheet.js';
++
++/**
++ * Ritemark 2.1 (Sprint 140, R11–R13; S51–S58): the feedback sheet's route words change with its boxes, its keys,
++ * and what it does after pressing: it closes when the message was accepted, stays with one line when it did not go,
++ * and hands over to the e-mail app with Copy and Done.
++ */
++suite('Ritemark feedback sheet', () => {
++
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	const words: IRitemarkFeedbackSheetSpec['words'] = {
++		sheet: {
++			feedback: { title: 'Send feedback', lede: 'What worked…', placeholder: '' },
++			aiIssue: { title: 'Report an AI issue', lede: 'Tell us…', placeholder: 'What happened?' },
++			aiBox: 'This is about something the AI said or did',
++			answerBox: 'I\'d like an answer',
++			answerNote: 'This opens your e-mail app instead…',
++			lastAnswerBox: 'Add the AI\'s last answer in this chat',
++			lastAnswerNoteBefore: 'Only that answer, from "',
++			lastAnswerNoteAfter: '". You see it here before it\'s sent.',
++			shortenedNote: 'Shortened to fit an e-mail. Copy takes the whole answer.',
++			straight: { button: 'Send', foot: 'Your documents and chats are never included.' },
++			email: { button: 'Open in e-mail', foot: 'Only what you see here goes.', via: 'This opens your e-mail app…' },
++			cancel: 'Cancel',
++			sending: 'Sending…',
++			failed: 'It didn\'t go. Your message is still here: try again, or open it in e-mail.',
++			tryAgain: 'Try again',
++			openInEmail: 'Open in e-mail',
++		},
++		handoff: {
++			opened: { title: 'Your e-mail app is opening', report: 'Your report is in a new e-mail…', message: 'Your message is in a new e-mail…' },
++			noHandler: { title: 'No e-mail app answered', lede: 'Copy it…' },
++			tooLong: { title: 'This is too long for an e-mail link', lede: 'Copy it…' },
++			foot: 'Didn\'t open? Copy it and send it to info@productory.eu.',
++			copy: 'Copy',
++			copied: 'Copied',
++			done: 'Done',
++		},
++		hints: { cancel: 'Closes this', send: 'Sends it', openInEmail: 'Opens your e-mail app', tryAgain: 'Sends it again', writeFirst: 'Write something first', copy: 'Copies it', done: 'Closes this' },
++	};
++
++	function open(spec: Partial<IRitemarkFeedbackSheetSpec>, submit: (request: IRitemarkFeedbackSubmit) => Promise<RitemarkFeedbackSubmitResult>) {
++		const container = mainWindow.document.createElement('div');
++		mainWindow.document.body.appendChild(container);
++		const copied: string[] = [];
++		const hints = new Map<HTMLElement, () => string>();
++		const outcome = showRitemarkFeedbackSheet(container, { token: 't', kind: 'feedback', aiIssue: false, lastAnswer: null, words, ...spec }, { submit, copy: async text => { copied.push(text); }, mac: true, hint: (element, content) => { hints.set(element, content); return { dispose: () => hints.delete(element) }; } });
++		const $ = <T extends HTMLElement>(selector: string) => container.querySelector<T>(selector)!;
++		const visible = (selector: string) => [...container.querySelectorAll<HTMLElement>(selector)].filter(element => !element.closest('[hidden]')).map(element => element.textContent);
++		const type = (text: string) => {
++			const area = $<HTMLTextAreaElement>('.ritemark-feedback-area');
++			area.value = text;
++			area.dispatchEvent(new Event('input'));
++		};
++		const tick = (index: number) => {
++			const input = [...container.querySelectorAll<HTMLInputElement>('.ritemark-feedback-check input')][index];
++			input.checked = !input.checked;
++			input.dispatchEvent(new Event('change'));
++		};
++		const hint = (element: HTMLElement) => hints.get(element)?.();
++		return { container, outcome, copied, $, visible, type, tick, hint, dispose: () => container.remove() };
++	}
++
++	test('the route follows the boxes, and the keys', () => {
++		assert.deepStrictEqual(
++			[ritemarkFeedbackRoute(false, false), ritemarkFeedbackRoute(true, false), ritemarkFeedbackRoute(false, true)],
++			['straight', 'email', 'email']);
++		const key = (key: string, mods: { metaKey?: boolean; ctrlKey?: boolean } = {}) => ({ key, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...mods });
++		assert.deepStrictEqual(
++			[ritemarkFeedbackKey(key('Enter'), true), ritemarkFeedbackKey(key('Enter', { metaKey: true }), true), ritemarkFeedbackKey(key('Enter', { ctrlKey: true }), false), ritemarkFeedbackKey(key('Enter', { metaKey: true }), false), ritemarkFeedbackKey(key('Escape'), false)],
++			[undefined, 'submit', 'submit', undefined, 'cancel']);
++	});
++
++	test('the words change live with the boxes; Send is off until something is typed', async () => {
++		const sheet = open({}, async () => ({ route: 'straight', outcome: 'accepted' }));
++		const button = () => sheet.$<HTMLButtonElement>('.ritemark-feedback-button.primary');
++		assert.deepStrictEqual([button().textContent, button().disabled, sheet.$('.ritemark-feedback-foot-note').textContent, sheet.$('.ritemark-feedback-via').hidden], ['Send', true, 'Your documents and chats are never included.', true]);
++		assert.deepStrictEqual([sheet.hint(button()), sheet.hint(sheet.$('.ritemark-feedback-button.ghost'))], ['Write something first', 'Closes this'], 'a disabled Send says why; every button has a hint');
++		sheet.type('The comments in the margin are great.');
++		assert.strictEqual(sheet.hint(button()), 'Sends it');
++		sheet.tick(1); // I'd like an answer
++		assert.strictEqual(sheet.hint(button()), 'Opens your e-mail app');
++		assert.deepStrictEqual([button().textContent, button().disabled, sheet.$('.ritemark-feedback-foot-note').textContent, sheet.$('.ritemark-feedback-via').hidden], ['Open in e-mail', false, 'Only what you see here goes.', false]);
++		sheet.$<HTMLButtonElement>('.ritemark-feedback-button.ghost').click(); // Cancel
++		assert.strictEqual(await sheet.outcome, 'cancelled');
++		sheet.dispose();
++	});
++
++	test('a modal sheet: named for screen readers, focus kept inside, Escape closes', async () => {
++		const sheet = open({}, async () => null);
++		const dialog = sheet.$('.ritemark-feedback-sheet');
++		assert.deepStrictEqual([dialog.getAttribute('role'), dialog.getAttribute('aria-modal'), sheet.$(`#${dialog.getAttribute('aria-labelledby')}`)?.textContent], ['dialog', 'true', 'Send feedback']);
++		assert.strictEqual(mainWindow.document.activeElement, sheet.$('.ritemark-feedback-area'), 'the message field has focus');
++		const outside = mainWindow.document.body.appendChild(mainWindow.document.createElement('button'));
++		outside.focus();
++		// The test window may not have the system's focus, and then Chromium sends no focus events: send the one a person's click would
++		sheet.$('.ritemark-feedback-area').dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: outside }));
++		await timeout(10);
++		assert.ok(dialog.contains(mainWindow.document.activeElement), 'focus came back into the sheet');
++		outside.remove();
++		sheet.$('.ritemark-feedback-area').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
++		assert.strictEqual(await sheet.outcome, 'cancelled');
++		sheet.dispose();
++	});
++
++	test('an AI issue: the box ticked, the last answer\'s box in place of the answer\'s, its quote shown when ticked', async () => {
++		const sheet = open({ kind: 'ai-issue', aiIssue: true, lastAnswer: { chatTitle: 'Tighten Module 3', quote: 'It said… [shortened]', shortened: true } }, async () => null);
++		assert.deepStrictEqual(sheet.visible('.ritemark-feedback-check > .ritemark-feedback-check-words > span:first-child'), ['This is about something the AI said or did', 'Add the AI\'s last answer in this chat']);
++		assert.strictEqual(sheet.$('.ritemark-feedback-quote').hidden, true, 'off by default');
++		sheet.tick(1);
++		assert.strictEqual(sheet.$('.ritemark-feedback-quote').hidden, false);
++		assert.ok(sheet.$('.ritemark-feedback-quote').textContent!.includes('Shortened to fit an e-mail.'));
++		sheet.$<HTMLButtonElement>('.ritemark-feedback-button.ghost').click();
++		await sheet.outcome;
++		sheet.dispose();
++	});
++
++	test('after pressing: closed when accepted, one line when it did not go, the hand-off for the e-mail route', async () => {
++		const accepted = open({}, async () => ({ route: 'straight', outcome: 'accepted' }));
++		accepted.type('Nice.');
++		accepted.$<HTMLButtonElement>('.ritemark-feedback-button.primary').click();
++		assert.strictEqual(await accepted.outcome, 'sent');
++		assert.strictEqual(accepted.container.querySelector('.ritemark-feedback-sheet'), null, 'the sheet closed');
++		accepted.dispose();
++
++		const offline = open({}, async () => ({ route: 'straight', outcome: 'failed' }));
++		offline.type('Nice.');
++		offline.$<HTMLButtonElement>('.ritemark-feedback-button.primary').click();
++		await timeout(0);
++		assert.deepStrictEqual(offline.visible('.ritemark-feedback-problem'), ['It didn\'t go. Your message is still here: try again, or open it in e-mail.']);
++		assert.deepStrictEqual(offline.visible('.ritemark-feedback-button'), ['Cancel', 'Open in e-mail', 'Try again'], 'D5: Try again and Open in e-mail');
++		assert.ok(offline.$('.ritemark-feedback-foot').classList.contains('stacked'), 'three buttons: the note on its own line');
++		assert.strictEqual(offline.$<HTMLTextAreaElement>('.ritemark-feedback-area').value, 'Nice.', 'the message is still there');
++
++		const requests: IRitemarkFeedbackSubmit[] = [];
++		const mail = open({}, async request => {
++			requests.push(request);
++			return { route: 'email', outcome: 'opened', kindLabel: 'Send feedback', shown: 'Please write back.', copyText: 'the whole e-mail' };
++		});
++		mail.type('Please write back.');
++		mail.tick(1);
++		mail.$<HTMLButtonElement>('.ritemark-feedback-button.primary').click();
++		await timeout(0);
++		assert.deepStrictEqual(requests.map(request => request.route), ['email']);
++		assert.strictEqual(mail.$('.ritemark-feedback-title').textContent, 'Your e-mail app is opening');
++		assert.ok(!/\bsent\b/i.test(mail.$('.ritemark-feedback-sheet').textContent!), 'never "sent" when only an e-mail app opened');
++		const [copy, done] = [...mail.container.querySelectorAll<HTMLButtonElement>('.ritemark-feedback-button')];
++		copy.click();
++		await timeout(0);
++		assert.deepStrictEqual(mail.copied, ['the whole e-mail']);
++		assert.strictEqual(mail.$('.ritemark-feedback-foot-note').textContent, 'Didn\'t open? Copy it and send it to info@productory.eu.');
++		done.click();
++		assert.strictEqual(await mail.outcome, 'mailed');
++		mail.dispose();
++
++		const tooLong = open({}, async () => ({ route: 'email', outcome: 'too-long', kindLabel: 'Send feedback', shown: 'Long.', copyText: 'Long.' }));
++		tooLong.type('Long.');
++		tooLong.tick(1);
++		tooLong.$<HTMLButtonElement>('.ritemark-feedback-button.primary').click();
++		await timeout(0);
++		assert.strictEqual(tooLong.$('.ritemark-feedback-title').textContent, 'This is too long for an e-mail link');
++		assert.strictEqual(tooLong.$('.ritemark-feedback-foot-note').textContent, '', 'no "Didn\'t open?" when nothing was asked to open');
++		[...tooLong.container.querySelectorAll<HTMLButtonElement>('.ritemark-feedback-button')].at(-1)!.click();
++		assert.strictEqual(await tooLong.outcome, 'mailed');
++		tooLong.dispose();
++
++		offline.$<HTMLButtonElement>('.ritemark-feedback-button.ghost').click();
++		await offline.outcome;
++		offline.dispose();
++	});
++});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkMenu.test.ts b/src/vs/workbench/test/browser/parts/ritemarkMenu.test.ts
 new file mode 100644
 index 00000000000..7924086e116

@@ -2,8 +2,10 @@
  * Home (Sprint 134, R4, R11, R13): the project's own page, first tab on the desk.
  * - the cover (Ritemark's picture, or the project's own) with Change image;
  * - the project's mark and name, the folder it works in (opens Documents), its line;
- * - What moved, once, on a profile updated from Ritemark 1 (experience 32, frame 5);
  * - Waiting for you, with what waits in the other projects;
+ * - Sprint 140 (R2): at most one guidance card under it: What moved, once, on a
+ *   profile updated from Ritemark 1 (experience 32, frame 5); the ready request
+ *   (experience 35); or the first-week question (experience 34, frame 1);
  * - Start something in <project>: Text, Table, Web page;
  * - Last changed in <project>; an empty project's drop target (experience 29, frame 1);
  * - a project of the list whose folder is not found (experience 33, frame 2).
@@ -20,6 +22,7 @@ import { Tooltip } from '../ui/tooltip'
 import { othersWords, placeParts, recentIcon, waitingIcon, waitingWords, whenWords } from './homeWords'
 import { ConversationBubbleIcon } from '../ai-sidebar/ConversationBubbleIcon'
 import { send } from './homeClient'
+import { GuidanceCard } from './GuidanceCards'
 import './home.css'
 
 function useNow(intervalMs = 60_000): number {
@@ -294,8 +297,9 @@ export function HomeView({ state, coverDefault, now }: { state: HomeState; cover
             </Tooltip>
           </div>
         )}
-        {state.whatMoved && <WhatMoved copilotChat={state.copilotChat} />}
+        {/* Waiting for you first, whatever it holds; then at most one guidance card (Sprint 140, R2) */}
         <Waiting state={state} now={now} />
+        <GuidanceCard guidance={state.guidance} whatMoved={<WhatMoved copilotChat={state.copilotChat} />} />
         <StartSomething name={state.project.name} />
         {state.empty ? <DropFiles /> : <LastChanged state={state} now={now} />}
       </main>

@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import type { ConversationSummaryV1 } from '../../../../src/conversations/types';
 import { Icon, type PhosphorIconName } from '../ui/Icon';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '../ui/context-menu';
@@ -6,7 +6,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { ConversationBubbleIcon } from './ConversationBubbleIcon';
 import { useConversationDialogs } from './ConversationDialogs';
 import { conversationPinState, conversationStatusLabel, type ConversationPinState } from './conversationActionsModel';
-import { useAISidebarStore } from './store';
+import { useActiveConversation, useAISidebarStore } from './store';
+import { StartingPoints } from './StartingPoints';
 
 function relativeTime(value: string): string {
   const timestamp = Date.parse(value);
@@ -163,6 +164,28 @@ export function EarlierConversationRow({
   );
 }
 
+/** The message box's height from the sheet's bottom while `on`, followed as it grows; 0 when off or not drawn. */
+function useComposerSpace(on: boolean): number {
+  const [space, setSpace] = useState(0);
+  useLayoutEffect(() => {
+    const composer = on ? document.querySelector<HTMLElement>('[data-composer]') : null;
+    if (!composer) {
+      setSpace(0);
+      return;
+    }
+    const measure = () => setSpace(Math.max(0, Math.round(window.innerHeight - composer.getBoundingClientRect().top)));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(composer);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [on]);
+  return space;
+}
+
 export function ConversationsPanel() {
   const summaries = useAISidebarStore((state) => state.hostConversations);
   const earlier = useAISidebarStore((state) => state.earlierConversations);
@@ -175,6 +198,8 @@ export function ConversationsPanel() {
   const unpin = useAISidebarStore((state) => state.unpinConversation);
   const moveEarlier = useAISidebarStore((state) => state.moveEarlierConversation);
   const toggle = useAISidebarStore((state) => state.toggleHistoryPanel);
+  const selectedAgent = useActiveConversation().selectedAgent;
+  const aiName = selectedAgent === 'codex' ? 'ChatGPT' : selectedAgent === 'opencode' ? 'OpenCode' : 'Claude';
   const notice = useAISidebarStore((state) => state.conversationStoreNotice);
   const { requestRename, requestDelete, dialogs } = useConversationDialogs();
 
@@ -183,6 +208,10 @@ export function ConversationsPanel() {
     [summaries],
   );
   const pinned = ordered.filter((summary) => pinnedIds.includes(summary.conversationId));
+  // Sprint 140 (R9; experience 29, frame 3): with no conversations the panel ends above the message box, so
+  // "Start one below" has a box below it; with a list it covers the sheet as in 2.0.
+  const empty = ordered.length === 0 && !notice;
+  const composerSpace = useComposerSpace(empty);
   const activeRecent = ordered.filter((summary) => !pinnedIds.includes(summary.conversationId));
 
   const renderRows = (rows: ConversationSummaryV1[]) => rows.map((summary) => {
@@ -211,14 +240,23 @@ export function ConversationsPanel() {
   ));
 
   return (
-    <section className="absolute inset-y-0 left-0 right-[56px] z-50 flex flex-col bg-[var(--r-surface)]" aria-label="All conversations">
+    <section className="absolute inset-y-0 left-0 right-[56px] z-50 flex flex-col bg-[var(--r-surface)]" style={composerSpace ? { bottom: composerSpace } : undefined} aria-label="All conversations">
       <div className="flex items-center justify-between gap-2 border-b border-[var(--r-hairline)] px-4 py-3">
         <div className="min-w-0"><h2 className="m-0 truncate text-[14px] font-semibold">Conversations</h2><p className="m-0 mt-0.5 text-[11px] text-[var(--r-ink-muted)]">Saved in this project</p></div>
         <button type="button" onClick={toggle} aria-label="Close conversations" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] hover:bg-[var(--r-surface-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)]"><Icon name="x" size={16} /></button>
       </div>
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3">
         {notice && <div role="status" className="mx-2 mb-3 flex items-start gap-2 rounded-lg border border-[var(--r-hairline)] bg-[var(--r-surface)] px-3 py-2 text-[12px] leading-[1.45] text-[var(--r-ink-strong)] shadow-[0_1px_2px_rgba(30,27,75,0.04)]"><span className="mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--r-warning-soft)] text-[var(--r-warning)]"><Icon name="warning" size={12} tone="inherit" /></span><span className="min-w-0 flex-1">{notice}</span></div>}
-        {ordered.length === 0 && !notice && <div className="flex h-full flex-col items-center justify-center px-6 text-center text-[12px] text-[var(--r-ink-muted)]"><Icon name="chat-circle" size={20} className="mb-3 opacity-50" /><div>No conversations yet</div><div className="mt-1 text-[11px]">Start a conversation and it will appear here.</div></div>}
+        {/* Sprint 140 (R9; experience 29, frame 3, in 2.0's word, D8): where chats are kept, then where to start one */}
+        {empty && (
+          <div className="flex h-full flex-col">
+            <div className="px-2 pt-1">
+              <p className="m-0 text-[13px] font-semibold leading-[19px] text-[var(--r-ink-strong)]">No conversations yet.</p>
+              <p className="m-0 mt-0.5 max-w-[240px] text-[12px] leading-[19px] text-[var(--r-ink-body)]">A conversation you start belongs to this project and is kept private, on this computer, never in the project’s folder. Start one below, or from one of these.</p>
+            </div>
+            <StartingPoints aiName={aiName} onPicked={toggle} sentence={false} />
+          </div>
+        )}
         {pinned.length > 0 && <div className="mb-4"><div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--r-ink-muted)]">Pinned</div>{renderRows(pinned)}</div>}
         {activeRecent.length > 0 && <div className="mb-4"><div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--r-ink-muted)]">Active &amp; recent</div>{renderRows(activeRecent)}</div>}
         {earlier.length > 0 && <div><div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--r-ink-muted)]">Project unknown</div>{renderEarlierRows()}</div>}

@@ -16,7 +16,10 @@ import { discoverAnthropic, discoverOpenAI, discoverGemini, discoverCodex } from
 import { getSetupStatus } from './agent/setup';
 import { CodexManager } from './codex/codexManager';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
-import { registerReportStatusBar } from './reporting/reportStatusBar';
+import { registerFeedback } from './feedback/feedbackSheet';
+import { registerFeedbackStatusBar } from './feedback/feedbackStatusBar';
+import { GuidanceHost } from './guidance/GuidanceHost';
+import { madeSomething } from './guidance/madeSomething';
 import { CommentTaskStore, commentTaskStoreDir } from './commentTasks/CommentTaskStore';
 import { CommentTaskController } from './commentTasks/CommentTaskController';
 import { registerTaskBoard, type TaskBoardHost } from './taskBoard/taskBoardHost';
@@ -154,6 +157,7 @@ async function createDraftAndOpen(
     }
   }
   const uri = vscode.Uri.file(filePath);
+  madeSomething.noteDraft(filePath); // Sprint 140 (R15): a new document, counted when first saved
   await vscode.commands.executeCommand('vscode.openWith', uri, viewType, {
     preview: false,
     preserveFocus: false,
@@ -421,12 +425,17 @@ export function activate(context: vscode.ExtensionContext) {
     unifiedViewProvider,
   );
 
-  // ── AI output reporting (Sprint 126, RQ1) ──────────────────────────────────
+  // ── The feedback door (Sprint 140, R10–R13; was Sprint 126's AI output reporting) ──
   // Microsoft Store policy 11.16 wants a discoverable, working way to report
-  // inappropriate generated output. The status bar item is on screen from
-  // launch, whether or not the sidebar is open, and shares its window with the
-  // entry inside the AI Information dialog.
-  registerReportStatusBar(context, () => unifiedViewProvider.openReportWindow());
+  // inappropriate generated output. "Send feedback" in the status bar is on
+  // screen from launch, its tooltip names AI issues, and its sheet (patch 018)
+  // has the AI-issue box; AI information keeps its labelled "Report an AI issue".
+  registerFeedback(context, {
+    appVersion: String(context.extension.packageJSON.version ?? 'unknown'),
+    lastAnswer: () => unifiedViewProvider.lastAnswerOfOpenChat(),
+    openReportWindow: () => unifiedViewProvider.openReportWindow(),
+  });
+  registerFeedbackStatusBar(context);
 
   // ── Comment tasks (Sprint 117, #292) ───────────────────────────────────────
   // One host-owned ledger for "send this comment to an agent". Composed here,
@@ -512,6 +521,28 @@ export function activate(context: vscode.ExtensionContext) {
   // Sprint 134 (Ritemark 2.0, step 3): the project at the centre. Home's place holds the projects list
   // (in 1.x's Home launcher's slot, `ritemark.homeView`), Home is the project's own first tab, Home and
   // Tasks are the first two tabs, and switching projects asks first while a chat works.
+  // Sprint 140: the first day's guidance: Home's one card, the empty sheet's starting place, the day-one counts.
+  const guidanceFolder = vscode.workspace.workspaceFolders?.[0];
+  const guidance = guidanceFolder?.uri.scheme === 'file' && !vscode.workspace.workspaceFile ? new GuidanceHost({
+    context,
+    folder: guidanceFolder,
+    runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
+    startChat: (request) => unifiedViewProvider.startChat(request),
+    startCodexSignIn: (onStatus) => unifiedViewProvider.startCodexSignIn(onStatus),
+    stopCodexSignIn: () => unifiedViewProvider.stopCodexSignIn(),
+    give: async (cardId, runtimeId) => {
+      const board = isEnabled('task-board') ? taskBoard?.controller ?? null : null;
+      if (!board) return null;
+      const answer = await board.give(cardId, runtimeId);
+      return answer.ok ? { ok: true } : { ok: false, message: answer.message };
+    },
+    hasWorkingTurn: () => unifiedViewProvider.hasWorkingTurn(),
+    setStartingPlace: (place, hasAbout) => unifiedViewProvider.setStartingPlace(place, hasAbout),
+    onTurnAccepted: (listener) => unifiedViewProvider.onTurnAccepted(listener),
+    onChatOrigin: (listener) => unifiedViewProvider.onChatOrigin(listener),
+  }) : null;
+  if (guidance) context.subscriptions.push(guidance);
+
   projectsHost = registerProjects({
     context,
     taskBoard,
@@ -519,6 +550,7 @@ export function activate(context: vscode.ExtensionContext) {
     openConversation: (conversationId) => unifiedViewProvider.openConversation(conversationId),
     workingChats: () => unifiedViewProvider.workingChats(),
     stopWorkingChats: () => unifiedViewProvider.stopWorkingChats(),
+    guidance,
   });
 
   // Sprint 108: Transcribe. Flag-gated (D4 ships it on Windows too). Where the

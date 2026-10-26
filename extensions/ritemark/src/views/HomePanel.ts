@@ -22,6 +22,8 @@ import { ProjectSwitcher, type SwitchedFrom } from '../projects/switchProject';
 import type { ProjectWaiting, WaitingReader } from '../projects/waiting';
 import { UPDATED_FROM_1X_KEY } from '../welcome/updateDetection';
 import { displayPlace } from '../welcome/recentProjects';
+import type { GuidanceHost, HomeGuidanceInput } from '../guidance/GuidanceHost';
+import { normalizeProjectUri } from '../conversations/projectScope';
 
 export const HOME_VIEW_TYPE = 'ritemark.home';
 export const WHAT_MOVED_SEEN_KEY = 'ritemark.whatMovedSeen';
@@ -43,6 +45,8 @@ export interface HomeHostDependencies {
   openConversation: (conversationId: string) => Promise<void>;
   /** The projects list: a project of the list was chosen whose folder is not found. */
   onProjectsChanged: () => void;
+  /** Sprint 140: the first day's guidance (Home's one card); null in a window with none. */
+  guidance: GuidanceHost | null;
 }
 
 /** One per window: computes Home's state, answers its requests, and owns its panel. */
@@ -82,6 +86,8 @@ export class HomeHost implements vscode.Disposable {
     this.disposables.push(deps.projectList.onDidChange(() => this.scheduleRedraw()) as unknown as vscode.Disposable);
     // Copilot Chat installed, enabled or removed: What moved's line follows it.
     this.disposables.push(vscode.extensions.onDidChange(() => this.scheduleRedraw()));
+    // Sprint 140: the guidance card follows a sign-in, a press, a send
+    if (deps.guidance) this.disposables.push(deps.guidance.onDidChange(() => this.scheduleRedraw(0)));
   }
 
   private subscribeBoard(): (() => void) | undefined {
@@ -296,7 +302,54 @@ export class HomeHost implements vscode.Disposable {
         this.notice = null;
         await this.push();
         return;
+      // Sprint 140 (R4–R6, R14): the guidance card
+      case 'home/ready-request': {
+        const input = await this.guidanceInput();
+        if (input) await this.deps.guidance?.pressReadyRequest(input);
+        return;
+      }
+      case 'home/ready-request-ai':
+        await this.deps.guidance?.chooseAi(folder.uri.toString(), request.ai);
+        return;
+      case 'home/ready-request-hide':
+        await this.deps.guidance?.hide(folder.uri.toString());
+        return;
+      case 'home/sign-in':
+        await this.deps.guidance?.signIn(folder.uri.toString(), request.ai);
+        return;
+      case 'home/save-keys': {
+        const result = await this.deps.guidance?.saveKeys(folder.uri.toString(), request.keys) ?? { ok: false, message: null };
+        await this.panel?.webview.postMessage({ type: 'home/keys-saved', ...result });
+        return;
+      }
+      case 'home/feedback-send':
+        await this.deps.guidance?.sendFeedbackLine(request.text);
+        return;
+      case 'home/feedback-not-now':
+        await this.deps.guidance?.feedbackNotNow();
+        return;
+      case 'home/feedback-mail':
+        await this.deps.guidance?.mailFeedbackLine(request.text);
+        return;
     }
+  }
+
+  /** What the guidance needs from this host's own reads (Sprint 140). */
+  private async guidanceInput(recent?: { empty: boolean; pointers: Set<string> }): Promise<HomeGuidanceInput | null> {
+    const { folder, context } = this.deps;
+    const files = recent ?? await this.recentFiles();
+    const entry = (await this.deps.projectList.entries(folder.uri.toString())).find((candidate) => sameFolder(candidate.folderUri, folder.uri.toString()));
+    return {
+      folderUri: folder.uri.toString(),
+      folderPath: folder.uri.fsPath,
+      projectName: folder.name,
+      empty: files.empty,
+      whatMoved: showWhatMoved(context.globalState.get<unknown>(UPDATED_FROM_1X_KEY), context.globalState.get<unknown>(WHAT_MOVED_SEEN_KEY)),
+      foundBy: entry?.foundBy ?? null,
+      chatIndex: await this.deps.waiting.readChatIndex(),
+      handoffs: await this.deps.waiting.readHandoffs(folder.uri.fsPath),
+      skipAtRoot: new Set([...files.pointers].map((file) => path.basename(file))),
+    };
   }
 
   /** Find it…: the folder picker at the old place's nearest parent that is there. */
@@ -394,6 +447,15 @@ export class HomeHost implements vscode.Disposable {
     })));
     // Last changed, and whether the project holds anything at all.
     const recent = await this.recentFiles();
+    // Sprint 140 (R2): the one guidance card under Waiting for you
+    const whatMoved = showWhatMoved(context.globalState.get<unknown>(UPDATED_FROM_1X_KEY), context.globalState.get<unknown>(WHAT_MOVED_SEEN_KEY));
+    const guidanceInput = this.deps.guidance ? await this.guidanceInput(recent) : null;
+    const guidance = this.deps.guidance && guidanceInput
+      ? await this.deps.guidance.homeGuidance(guidanceInput).catch((error) => {
+          console.warn('[Home] The guidance card could not be read:', error);
+          return whatMoved ? { card: 'what-moved' as const } : null;
+        })
+      : whatMoved ? { card: 'what-moved' as const } : null;
     return {
       platform,
       project: {
@@ -408,7 +470,7 @@ export class HomeHost implements vscode.Disposable {
       recent: recent.items,
       empty: recent.empty,
       boardEnabled: this.deps.boardEnabled(),
-      whatMoved: showWhatMoved(context.globalState.get<unknown>(UPDATED_FROM_1X_KEY), context.globalState.get<unknown>(WHAT_MOVED_SEEN_KEY)),
+      guidance,
       copilotChat: vscode.extensions.getExtension(COPILOT_CHAT_EXTENSION_ID) !== undefined,
       switchedFrom: this.switchedFrom ? { name: this.switchedFrom.name } : null,
       missing: this.missing ? { id: this.missing.id, name: this.missing.name, mark: this.missing.mark, place: this.missing.place, here: this.missing.folderUri === folder.uri.toString() } : null,
@@ -416,12 +478,12 @@ export class HomeHost implements vscode.Disposable {
     };
   }
 
-  private async recentFiles(): Promise<{ items: HomeState['recent']; empty: boolean }> {
+  private async recentFiles(): Promise<{ items: HomeState['recent']; empty: boolean; pointers: Set<string> }> {
     const folder = this.deps.folder;
     // Hidden folders too (.claude's agents, .github, …): Last changed is the person's documents (QA, 19 October)
     const exclude = '{**/node_modules/**,**/.*/**,**/.DS_Store}';
     const any = await vscode.workspace.findFiles(new vscode.RelativePattern(folder, '**/*'), exclude, 1);
-    if (any.length === 0) return { items: [], empty: true };
+    if (any.length === 0) return { items: [], empty: true, pointers: new Set() };
     const pattern = `**/*{${[...RECENT_EXTENSIONS, '.flow.json'].join(',')}}`;
     const found = await vscode.workspace.findFiles(new vscode.RelativePattern(folder, pattern), exclude, FILE_SCAN_LIMIT);
     const files = (await Promise.all(found.map(async (uri) => {
@@ -441,7 +503,7 @@ export class HomeHost implements vscode.Disposable {
     }
     const items = recentItems(folder.uri.fsPath, files, pointers);
     this.recentPaths = new Map(items.map(({ item, path: filePath }) => [item.id, filePath]));
-    return { items: items.map(({ item }) => item), empty: false };
+    return { items: items.map(({ item }) => item), empty: false, pointers };
   }
 
   private async push(): Promise<void> {
@@ -454,6 +516,14 @@ export class HomeHost implements vscode.Disposable {
     if (this.redrawTimer) clearTimeout(this.redrawTimer);
     this.disposables.forEach((disposable) => disposable.dispose());
     this.panel?.dispose();
+  }
+}
+
+function sameFolder(a: string, b: string): boolean {
+  try {
+    return normalizeProjectUri(a) === normalizeProjectUri(b);
+  } catch {
+    return a === b;
   }
 }
 

@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { writeImageRelativeTo } from '../utils/imageWriter';
 import { trackEvent } from '../analytics/posthog';
+import { madeSomething } from '../guidance/madeSomething';
 
 export interface SaveAsMarkdownImage {
   filename: string;
@@ -87,6 +88,8 @@ export async function saveAsMarkdownHandler(
       Buffer.from(payload.markdown, 'utf8')
     );
 
+    // Sprint 140 (R15): Make an editable copy makes a new document in the project
+    madeSomething.note('new_document');
     void trackEvent('feature_used', {
       feature: 'save_as_markdown',
       source: payload.source,

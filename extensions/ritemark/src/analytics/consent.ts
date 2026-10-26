@@ -113,9 +113,7 @@ export interface ConsentDeps {
 }
 
 /** Feedback's events, which the person sends themselves (G3). */
-export type FeedbackEvent =
-  | { name: 'reaction_submitted'; properties: EventPayloads['reaction_submitted'] }
-  | { name: 'feedback_sent'; properties: EventPayloads['feedback_sent'] };
+export type FeedbackEvent = { name: 'feedback_sent'; properties: EventPayloads['feedback_sent'] };
 
 /** The welcome's events, held in memory until the person answers (R8; Jarmo, 18 October). */
 export type HeldEventName = 'welcome_shown' | 'ai_signed_in';
@@ -197,25 +195,25 @@ export class ConsentGate {
 
   /**
    * Feedback the person chose to send (Sprint 133, the v1.14 parity list's G3; Jarmo, 19 October): pressing Send is
-   * their own choice, so it goes even with usage data off. With a yes it is sent as any event. Without one, only the
-   * events given go out (the reaction and what they typed), from a client made for this send alone: a one-off id
-   * that is never stored, no location, none of the shared properties, no session start and none of the held welcome
-   * events. The answer is unchanged. The kill switch still stops it.
+   * their own choice, so it goes even with usage data off. With a yes it is sent as any event, with the stored id and
+   * the shared properties. Without one, only the events given go out (what they typed): a one-off id that is never
+   * stored, no location, none of the shared properties, no session start and none of the held welcome events. The
+   * answer is unchanged. The kill switch still stops it.
+   *
+   * Either way it goes through a client made for this send alone, so its result is this send's own (Sprint 140, QA):
+   * the shared client's error count can be moved by another event at the same moment.
    */
   async sendFeedback(events: ReadonlyArray<FeedbackEvent>): Promise<boolean> {
     if (!this.deps.analyticsAllowed()) return false;
-    if (this.maySend()) {
-      let sent = true;
-      for (const event of events) sent = (await this.track(event.name, event.properties as never)) && sent;
-      return sent;
-    }
+    const yes = this.maySend();
     const client = this.deps.createClient({ oneOff: true });
     if (!client) return false;
-    const distinctId = this.deps.oneOffId();
+    const distinctId = yes ? this.deps.anonymousId() : this.deps.oneOffId();
+    const shared = yes ? this.deps.sharedProperties() : {};
     let sent = true;
     try {
       for (const event of events) {
-        await client.captureImmediate({ distinctId, event: event.name, properties: { ...event.properties, $process_person_profile: false, $geoip_disable: true } });
+        await client.captureImmediate({ distinctId, event: event.name, properties: { ...event.properties, ...shared, $process_person_profile: false, $geoip_disable: true } });
       }
     } catch (error) {
       this.deps.log?.('Failed to send feedback', error);

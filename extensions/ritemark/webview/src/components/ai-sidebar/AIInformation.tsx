@@ -24,6 +24,7 @@ import {
   type DisclosureContextInput,
 } from './aiDisclosure';
 import { REPORT_COPY } from '../../../../src/reporting/reportCopy';
+import { FEEDBACK_COPY } from '../../../../src/feedback/feedbackCopy';
 
 interface AIInformationDialogProps {
   identity: AIIdentity;
@@ -232,21 +233,26 @@ export function AIInformationDialog({
             <section className="rounded-lg border border-[var(--r-hairline)] bg-[var(--r-surface)] p-3" aria-labelledby="ai-report-output">
               <h3 id="ai-report-output" className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--r-ink-strong)]">
                 <Icon name="warning-circle" size={14} />
-                {REPORT_COPY.informationEntryLabel}
+                {/* Sprint 140 (R10, R16): the labelled way to report AI output (Store policy 11.16), now the feedback sheet's AI issue */}
+                {FEEDBACK_COPY.sheet.aiIssue.title}
               </h3>
               <p className="mt-1 text-[10px] leading-relaxed text-[var(--r-ink-muted)]">
                 {REPORT_COPY.informationEntryDetail}
               </p>
-              <button
-                type="button"
-                onClick={() => {
-                  onOpenChange(false);
-                  onReport();
-                }}
-                className="mt-2 bg-transparent p-0 text-[11px] font-semibold text-[var(--r-accent-deep)] hover:underline focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]"
-              >
-                {REPORT_COPY.dialogTitle}
-              </button>
+              <Tooltip label="Opens the feedback sheet, ready for an AI issue" side="top" className="mt-2 inline-flex">
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  onClick={() => {
+                    onOpenChange(false);
+                    onReport();
+                  }}
+                  className="h-auto p-0 text-[11px] font-semibold text-[var(--r-accent-deep)]"
+                >
+                  {FEEDBACK_COPY.sheet.aiIssue.title}
+                </Button>
+              </Tooltip>
             </section>
 
             <div className="flex flex-wrap gap-x-3 gap-y-1.5 border-t border-[var(--r-hairline)] pt-3">

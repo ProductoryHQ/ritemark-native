@@ -12,8 +12,8 @@ import { ConsentGate, buildChannel, readOneXAnswer, usageAnswer, type CaptureCli
 
 interface Sent { event: string; properties: Record<string, unknown>; distinctId: string }
 
-function harness(start: { setting?: boolean; allowed?: boolean; hasKey?: boolean } = {}) {
-  const state = { setting: start.setting, allowed: start.allowed ?? true, hasKey: start.hasKey ?? true };
+function harness(start: { setting?: boolean; allowed?: boolean; hasKey?: boolean; offline?: boolean } = {}) {
+  const state = { setting: start.setting, allowed: start.allowed ?? true, hasKey: start.hasKey ?? true, offline: start.offline ?? false };
   const sent: Sent[] = [];
   let clientsCreated = 0;
   let idsRead = 0;
@@ -27,7 +27,11 @@ function harness(start: { setting?: boolean; allowed?: boolean; hasKey?: boolean
       clientsCreated += 1;
       clientOptions.push(options);
       return {
-        captureImmediate: async (payload) => { sent.push(payload as Sent); },
+        // Sprint 140: posthog.ts's client rejects when PostHog did not accept the event (offline, refused)
+        captureImmediate: async (payload) => {
+          if (state.offline) throw new Error('fetch failed');
+          sent.push(payload as Sent);
+        },
         shutdown: async () => { shutdowns += 1; },
       };
     },
@@ -153,14 +157,14 @@ async function main(): Promise<void> {
   // ── G3: feedback the person sends goes with usage data off, and only it ──
   {
     const feedback = [
-      { name: 'reaction_submitted' as const, properties: { reaction: 'good', message: 'Nice' } },
-      { name: 'feedback_sent' as const, properties: { message: 'Nice', reaction: 'good' } },
+      { name: 'feedback_sent' as const, properties: { message: 'Nice' } },
+      { name: 'feedback_sent' as const, properties: { message: 'And one more thing', asked: 'made_this_week' as const } },
     ];
     // Usage data off (a no)
     const off = harness({ setting: false });
     await off.gate.refresh();
     assert.equal(await off.gate.sendFeedback(feedback), true);
-    assert.deepEqual(off.sent.map((s) => s.event), ['reaction_submitted', 'feedback_sent'], 'only the feedback: no session start');
+    assert.deepEqual(off.sent.map((s) => s.event), ['feedback_sent', 'feedback_sent'], 'only the feedback: no session start');
     for (const s of off.sent) {
       assert.equal(s.distinctId, 'one-off-1', 'a one-off id');
       assert.equal(s.properties.build_channel, undefined, 'none of the shared properties');
@@ -178,7 +182,7 @@ async function main(): Promise<void> {
     await unknown.gate.refresh();
     await unknown.gate.trackWelcome('welcome_shown', { kind: 'fresh' });
     assert.equal(await unknown.gate.sendFeedback(feedback.slice(0, 1)), true);
-    assert.deepEqual(unknown.sent.map((s) => s.event), ['reaction_submitted'], 'never the held welcome events');
+    assert.deepEqual(unknown.sent.map((s) => s.event), ['feedback_sent'], 'never the held welcome events');
     assert.equal(unknown.gate.heldCount(), 1);
     assert.equal(unknown.gate.answer(), 'unknown');
 
@@ -189,6 +193,7 @@ async function main(): Promise<void> {
     const sentOn = on.sent.filter((s) => s.event !== 'app_session_start');
     assert.deepEqual(sentOn.map((s) => s.distinctId), ['anon-1', 'anon-1']);
     assert.equal(sentOn[0].properties.build_channel, 'prod');
+    assert.ok(on.clientOptions.some((options) => options?.oneOff === true), 'a client of its own, so the result is this send\'s (QA, 26 October)');
 
     // The kill switch still stops it; a build with no key sends nothing
     const killed = harness({ setting: false, allowed: false });
@@ -196,6 +201,30 @@ async function main(): Promise<void> {
     assert.equal(killed.sent.length, 0);
     const noKey = harness({ setting: false, hasKey: false });
     assert.equal(await noKey.gate.sendFeedback(feedback), false);
+  }
+
+  // ── Sprint 140 (R13, R14, R15; S51, S64, S68): sent only when accepted; the card's question; the new counts ──
+  {
+    const week = [{ name: 'feedback_sent' as const, properties: { message: 'A proposal for Harbour', asked: 'made_this_week' as const } }];
+    const off = harness({ setting: false });
+    assert.equal(await off.gate.sendFeedback(week), true, 'the first-week line goes with usage data off');
+    assert.deepEqual(off.sent[0].properties, { message: 'A proposal for Harbour', asked: 'made_this_week', $process_person_profile: false, $geoip_disable: true }, 'the line and the question it answers, nothing else');
+    const offline = harness({ setting: false, offline: true });
+    assert.equal(await offline.gate.sendFeedback(week), false, 'S64: a send that did not go says so');
+    const offlineOn = harness({ setting: true, offline: true });
+    await offlineOn.gate.refresh();
+    assert.equal(await offlineOn.gate.sendFeedback(week), false, 'S60: with usage data on, too');
+    const before = harness();
+    await before.gate.refresh();
+    assert.equal(await before.gate.track('ready_request_used', { kind: 'what_is_here', provider: 'chatgpt' }), false);
+    assert.equal(await before.gate.track('starting_point_used', { place: 'project', edited: false, provider: 'claude' }), false);
+    assert.equal(await before.gate.track('made_something', { how: 'export', after_ready_request: true }), false);
+    assert.equal(await before.gate.track('feedback_opened', { from: 'status_bar' }), false);
+    assert.equal(before.sent.length, 0, 'S68: none of the new counts leaves before a yes');
+    const yes = harness({ setting: true });
+    await yes.gate.refresh();
+    assert.equal(await yes.gate.track('feedback_opened', { from: 'help' }), true);
+    assert.equal(yes.sent.at(-1)?.properties.build_channel, 'prod', 'with build_channel');
   }
 
   // ── On by default (Jarmo, 19 October): the welcome answers on leaving; until then nothing leaves ──
@@ -246,7 +275,7 @@ async function main(): Promise<void> {
     assert.deepEqual(readOneXAnswer(undefined, true), { answer: 'yes', carryOver: true });
     // Feedback sent with usage data off carries no location either
     const off = harness({ setting: false });
-    assert.equal(await off.gate.sendFeedback([{ name: 'feedback_sent', properties: { kind: 'reaction', has_text: false } as never }]), true);
+    assert.equal(await off.gate.sendFeedback([{ name: 'feedback_sent', properties: { message: 'Nice' } }]), true);
     assert.ok(off.sent.every((s) => s.properties.$geoip_disable === true));
   }
 

@@ -2,7 +2,7 @@
  * chatLinks tests — chat markdown link classification.
  */
 import assert from 'node:assert/strict'
-import { chatLinkMenu, classifyChatHref, stripLineSuffix } from './chatLinks'
+import { chatLinkMenu, classifyChatHref, rewriteCodexCitations, stripLineSuffix } from './chatLinks'
 
 // Workspace-relative and absolute paths are file targets.
 assert.deepEqual(classifyChatHref('koondfail.md'), { kind: 'file', path: 'koondfail.md' })
@@ -78,5 +78,17 @@ assert.deepEqual(labels(chatLinkMenu({ kind: 'local', local: 'outside-file' }, '
   'locate:Show in File Explorer',
   'copy:Copy path',
 ])
+
+// Sprint 140: Codex's file citations become links by the file's name, never raw text
+assert.equal(
+  rewriteCodexCitations('| Oct 25 | :codex-file-citation{path="/private/tmp/s140/Training PDFs/Fernhollow tender.pdf" purpose="source"} | €48,000 |'),
+  '| Oct 25 | [Fernhollow tender.pdf](/private/tmp/s140/Training%20PDFs/Fernhollow%20tender.pdf) | €48,000 |',
+)
+assert.equal(rewriteCodexCitations('See :codex-file-citation{purpose="source" path="C:\\Work\\Plan (v2).docx"}.'), 'See [Plan (v2).docx](C:%5CWork%5CPlan%20%28v2%29.docx).', 'a Windows path, its brackets kept out of the link')
+assert.equal(rewriteCodexCitations('No citation: {path="x"}'), 'No citation: {path="x"}', 'only the directive')
+assert.equal(rewriteCodexCitations(':codex-file-citation{purpose="source"}'), ':codex-file-citation{purpose="source"}', 'without a path it is left alone')
+assert.deepEqual(classifyChatHref('C:%5CWork%5CPlan%20%28v2%29.docx'), { kind: 'file', path: 'C:\\Work\\Plan (v2).docx' }, 'a Windows path is a file, not a c: scheme')
+assert.deepEqual(classifyChatHref('D:/Notes/a.md:12'), { kind: 'file', path: 'D:/Notes/a.md' })
+assert.deepEqual(classifyChatHref('/private/tmp/s140/Training%20PDFs/Fernhollow%20tender.pdf'), { kind: 'file', path: '/private/tmp/s140/Training PDFs/Fernhollow tender.pdf' }, 'the link opens the file')
 
 console.log('chatLinks tests passed.')

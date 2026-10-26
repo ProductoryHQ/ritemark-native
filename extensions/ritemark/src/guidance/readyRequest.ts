@@ -1,0 +1,162 @@
+/**
+ * Sprint 140 (R3–R6; experience 35): the ready request on Home. Its kind, its
+ * words with the AI's name, the AI it names first, and whether it is due. Pure:
+ * no `vscode` import, so every rule is tested.
+ */
+
+import type { AgentId } from '../agent/types';
+
+/** A folder with files (not empty, not the sample), an empty project, or the sample. */
+export type ReadyKind = 'files' | 'empty' | 'sample';
+
+/** The `ready_request_used` event's `kind` (R15). */
+export type ReadyEventKind = 'what_is_here' | 'what_for' | 'module_4';
+
+export type AiName = 'Claude' | 'ChatGPT' | 'OpenCode';
+
+/** The sample's own task for the AI; every copy of the sample since 2.0 holds it. */
+export const SAMPLE_CARD_ID = 'm4d7r2';
+
+/** The order the card falls back through when the sheet's AI is not ready (R4). */
+export const AI_ORDER: readonly AgentId[] = ['claude-code', 'codex', 'opencode'];
+
+export const AI_NAMES: Record<AgentId, AiName> = { 'claude-code': 'Claude', codex: 'ChatGPT', opencode: 'OpenCode' };
+
+/** What the folder's request sends at once, and what the empty project's puts in the box (R5). */
+/** The empty project's request: the person's sentence goes where the cursor waits, after "This project is for ". */
+const EMPTY_LEAD = 'This project is for ';
+
+export const READY_REQUEST_TEXT = {
+  // Experience 35, frame 2 redrawn (26 October): the two offers are in the answer's words, so the request asks for them.
+  files: 'What is here? Look at the names first, read only the five newest documents, and end with two things you could do next.',
+  // Experience 35, frame 3 redrawn (26 October): the card's promise is in what is sent, on a second line the person sees
+  // and can change; the person's sentence goes where the cursor waits.
+  empty: `${EMPTY_LEAD}\nThen write About this project from it, and a first outline as a document.`,
+} as const;
+
+/**
+ * #497's spike, per AI: whether a first look reads the newest Word files and PDFs (`research/word-spike.md`). Only
+ * ChatGPT has run, and it passed both; an AI not yet run is not promised more than the names (the Experience lead,
+ * 26 October). Changes when the spike's open runs are made.
+ */
+export const FIRST_LOOK_READS_DOCUMENTS: Record<AiName, boolean> = { ChatGPT: true, Claude: false, OpenCode: false };
+
+/** Where the cursor waits in the empty project's request: after "This project is for ". */
+export const READY_REQUEST_CURSOR_EMPTY = EMPTY_LEAD.length;
+
+export const EVENT_KIND: Record<ReadyKind, ReadyEventKind> = { files: 'what_is_here', empty: 'what_for', sample: 'module_4' };
+
+export type ReadyIcon = 'folder-simple' | 'pencil-simple-line' | 'check-square';
+
+export interface ReadyRequestWords {
+  icon: ReadyIcon;
+  heading: string;
+  body: string;
+  button: string;
+  note: string;
+  /** The ×'s name and tooltip. */
+  hide: string;
+  /** The sample's hand-over, while the board starts it: the button's words (with a spinner) and the note. */
+  busy: { button: string; note: string } | null;
+}
+
+export function readyKindOf(project: { empty: boolean; sample: boolean }): ReadyKind {
+  if (project.sample) return 'sample';
+  return project.empty ? 'empty' : 'files';
+}
+
+/** The card's words (experience 35, frames 1, 3 and 4), the AI's name following Ask with. */
+export function readyRequestWords(kind: ReadyKind, ai: AiName, projectName: string, counts: string | null): ReadyRequestWords {
+  const hide = `Hide this in ${projectName}`;
+  switch (kind) {
+    case 'files':
+      return {
+        icon: 'folder-simple',
+        heading: 'Nothing in this folder was moved or changed',
+        body: counts ? `${ai} works only inside it. ${counts}` : `${ai} works only inside it.`,
+        button: `Ask ${ai} what is here`,
+        // The note is true for the AI chosen: the names, and the five newest only where the spike says it reads them
+        note: FIRST_LOOK_READS_DOCUMENTS[ai] ? 'Reads the names, then the five newest documents.' : 'Reads the names first.',
+        hide,
+        busy: null,
+      };
+    case 'empty':
+      return {
+        icon: 'pencil-simple-line',
+        heading: 'Start with what this project is for',
+        body: `A sentence is enough. ${ai} writes About this project from it, and a first outline as a document.`,
+        button: `Tell ${ai} what this project is for`,
+        note: 'Nothing goes until you press Send.',
+        hide,
+        busy: null,
+      };
+    case 'sample':
+      return {
+        icon: 'check-square',
+        heading: `${ai} can draft Module 4`,
+        body: `It reads the brief and the interviews with shift leaders, then writes Module 4 like Modules 1 to 3. It's the task on the board for ${ai}.`,
+        button: `Ask ${ai} to draft Module 4`,
+        note: 'Reads two documents, writes a new one.',
+        hide,
+        busy: { button: `Giving it to ${ai}…`, note: 'It shows in Doing in a moment.' },
+      };
+  }
+}
+
+/** Why the card went, for good, in one project. A refused or failed request is not one of them (R6). */
+export type ReadyGone = 'answered' | 'chat' | 'hidden';
+
+/** What this computer keeps about one project's ready request (never in the project's folder, E2). */
+export interface ReadyRecord {
+  gone?: ReadyGone;
+  /** The chat the card's request went to; a new press replaces it. */
+  chatId?: string;
+  /** The AI chosen on the card. */
+  ai?: AgentId;
+}
+
+export interface ReadyDueInput {
+  /** How the project joined Ritemark's list; only a project met first gets the card (R6). */
+  foundBy: 'opened' | 'recent' | 'chats' | null;
+  record: ReadyRecord | undefined;
+  /** The project's chats that are neither the card's request nor a task's hand-off. */
+  ownChats: number;
+}
+
+/**
+ * Due on the Home of a project Ritemark met for the first time (opened, or the
+ * sample, which the welcome opens), until it has gone. A chat of the person's
+ * own ends it, so a project that already had a chat never shows it.
+ */
+export function readyRequestDue(input: ReadyDueInput): boolean {
+  if (input.foundBy !== 'opened') return false;
+  if (input.record?.gone) return false;
+  return input.ownChats === 0;
+}
+
+/**
+ * What a redraw learned that ends the card for good: the request was answered,
+ * or a chat of the person's own exists. Undefined when nothing changed.
+ */
+/** `sampleLeftToDo`: the sample's card `m4d7r2` is no longer in To do (handed over, so it shows in Doing). */
+export function readyGoneNow(input: { kind: ReadyKind; ownChats: number; requestAnswered: boolean; sampleLeftToDo: boolean }): ReadyGone | undefined {
+  if (input.kind === 'sample' ? input.sampleLeftToDo : input.requestAnswered) return 'answered';
+  if (input.ownChats > 0) return 'chat';
+  return undefined;
+}
+
+export type AiState = 'ready' | 'sign-in' | 'set-up' | 'checking' | 'signing-in';
+
+/**
+ * The AI the card names (R4): the one chosen on the card when it is ready; else
+ * the sheet's AI for new chats when it is ready; else the first ready AI in the
+ * order Claude, ChatGPT, OpenCode; with none ready, the sheet's AI, else Claude.
+ */
+export function cardAi(input: { chosen: AgentId | undefined; sheetAi: AgentId | undefined; states: Partial<Record<AgentId, AiState>> }): { ai: AgentId; ready: boolean } {
+  const ready = (id: AgentId | undefined): id is AgentId => Boolean(id && input.states[id] === 'ready');
+  if (ready(input.chosen)) return { ai: input.chosen, ready: true };
+  if (ready(input.sheetAi)) return { ai: input.sheetAi, ready: true };
+  const first = AI_ORDER.find((id) => ready(id));
+  if (first) return { ai: first, ready: true };
+  return { ai: 'claude-code', ready: false };
+}

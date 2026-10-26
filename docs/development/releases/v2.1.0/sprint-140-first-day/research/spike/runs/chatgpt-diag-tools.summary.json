@@ -1,0 +1,20 @@
+{
+ "name": "chatgpt-diag-tools",
+ "runtimeId": "codex",
+ "mode": "Permission mode: Auto",
+ "runtime": "ChatGPT, GPT-6.1 Sol, thinking effort Auto",
+ "openFile": null,
+ "message": "Without using any tools, list the names of the tools whose names start with ritemark_ that you can call. Names only.",
+ "elapsedMs": 12525,
+ "timedOut": false,
+ "lifecycle": {
+  "state": "idle"
+ },
+ "activities": [],
+ "attentions": [],
+ "boundaries": [],
+ "answer": {
+  "status": "completed",
+  "content": "ritemark_board_add_card\nritemark_board_ask_user\nritemark_board_list_cards\nritemark_board_move_card\nritemark_board_read_card\nritemark_board_report_result\nritemark_board_update_card\nritemark_browser_click\nritemark_browser_fill\nritemark_browser_navigate\nritemark_browser_scroll\nritemark_browser_snapshot\nritemark_browser_type\nritemark_offers_offer_next_steps"
+ }
+}

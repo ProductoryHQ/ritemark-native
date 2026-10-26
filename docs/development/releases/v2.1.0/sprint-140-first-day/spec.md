@@ -32,6 +32,11 @@ Acceptance criteria:
 - The Word-or-PDF starting points (R8) are offered only for a kind every AI can read after the decision; otherwise a Word file or PDF on the desk gets the project's starting points.
 - Whatever the decision, every AI's standing instructions gain one line: when it cannot open a file it was asked to read, it says which.
 
+**The spike's decision so far (26 October; `research/word-spike.md`):** only ChatGPT could be run. Claude has no readable sign-in on this Mac and OpenCode has no test key; Windows was not run. ChatGPT passes Word documents (3 of 3 first looks on the Mac) and PDFs (5 of 6 Mac runs, one stall). So:
+- **R1a is not built and R1b is not applied.** The request goes as drawn, and every AI gets the honesty line.
+- **The Word-or-PDF starting points stay behind the gate** until every AI has passed a kind: a Word file or PDF in front gets the project's starting points meanwhile.
+- **Claude's and OpenCode's runs, and the Windows rounds, are open.** When they are run, the rule decides again.
+
 ### R2: Home's order
 
 As someone opening a project, I want my own work first, and at most one suggestion under it.
@@ -78,9 +83,12 @@ Acceptance criteria:
 As someone pressing the card's button, I want the request to go where I can see it, with the AI I chose.
 
 Acceptance criteria:
-- **A folder with files:** a new chat opens in front on the AI's sheet with the chosen AI, and the message "What is here? Look at the names first, and read only the five newest documents." is sent at once, as a normal first message the person can read (experience 35, frame 2). Under R1b the message gains R1b's words.
+- **A folder with files:** a new chat opens in front on the AI's sheet with the chosen AI, and the message "What is here? Look at the names first, read only the five newest documents, and end with two things you could do next." is sent at once, as a normal first message the person can read (experience 35, frame 2, redrawn 26 October: the two offers are in the answer's words, since R7 is not built). Under R1b the message gains R1b's words.
+  - *Changed 26 October (the Experience lead's build check):* the card's note is true for the AI chosen: "Reads the names, then the five newest documents." for an AI the spike passed for Word and PDF (today ChatGPT), "Reads the names first." for one it has not.
 - **An empty project:** a new chat opens in front with the chosen AI, "This project is for " is put in the message box with the cursor after it, and the box has focus. Nothing is sent (experience 35, frame 3). There is no microphone: 2.0's message box has no dictation (#498's comment).
+  - *Changed 26 October (after QA: in one run ChatGPT answered in the chat and wrote nothing, so the card's promise was not kept; the Experience lead redrew frame 3).* The card's words stay. The box holds two lines, both seen before Send and both the person's to change: "This project is for " with the cursor after it, then "Then write About this project from it, and a first outline as a document." No hidden instruction.
 - **The sample:** the sample's card `m4d7r2` runs as the board's Give to Claude runs it (`BoardController.give`), with the chosen AI (experience 35, frame 4).
+  - *Changed 26 October (the Experience lead's build check):* while the board starts it (about 15 seconds in QA), the button is disabled and reads "Giving it to <AI>…" with a small spinner, and the note reads "It shows in Doing in a moment." The card goes when the task leaves To do (it shows in Doing). Once the sample's card has run, the sample's starting points are the project's.
 - An existing blank chat is reused rather than a second blank one made, as the + does today.
 - Each works the same with Claude, ChatGPT and OpenCode (E1).
 
@@ -106,6 +114,7 @@ Acceptance criteria:
 - The ready request's answer ends with two offers, drawn as two cards under the answer: write About this project, and one piece of real work from what the AI found (notes or a brief become an offer, meeting notes a client summary with next steps, materials a handout; the Business lead, 21 October).
 - Each offer card has a title and a muted line, as drawn ("Write About this project" / "The page every AI here reads first"). A click puts the offer's request in the message box; the person presses Send, as with the starting points.
 - The offers come from the AI, the same way for all three AIs. **This requirement is conditional on the spike's part B** (technical plan): if all three AIs offer next steps through Ritemark's offer tool reliably, R7 is built as written. If not, the offers stay in the answer's own words, frame 2 is redrawn by the Experience lead to match, and R7 is recorded here as not built (*Open Questions*, J3).
+- **Not built (26 October).** In part B, ChatGPT called the prototype `offer_next_steps` in 0 of 3 first looks, although the tool was in its list (`research/word-spike.md`). Frame 2 goes back to the Experience lead to redraw with the offers in the answer's words.
 
 ### R8: The AI's empty sheet: at most three starting points
 
@@ -152,7 +161,7 @@ Acceptance criteria:
 - **The status bar:** "Send feedback" with the chat-text icon, in body ink, in the right group immediately before the bell, with the tooltip "Send feedback or report an AI issue". Hover and pressed fills as the bar's other items. It replaces the status bar's "Report AI issue" (experience 34).
 - **Help ▸ Send feedback** opens the same sheet (patch 015), on the Mac's menu bar and in Windows' menu.
 - **AI information's link** reads "Report an AI issue" and opens the same sheet ready for an AI issue (R12). Store policy 11.16's two always-present entry points stay: the status bar's door, whose tooltip names AI issues, and AI information's labelled link.
-- **All commands' "Send Feedback"** (`ritemark.reactions`) opens the same sheet (*Open Questions*, J2).
+- **All commands' "Send feedback"** (`ritemark.reactions`, in Ritemark's words since 26 October, as on the status bar) opens the same sheet (*Open Questions*, J2).
 - With usage data on, opening the sheet counts once (R15).
 
 ### R11: The sheet
@@ -185,7 +194,7 @@ Acceptance criteria:
 As someone who pressed the button, I want to be told truthfully what happened.
 
 Acceptance criteria:
-- **The straight route, when it went:** the sheet closes and a toast says "Thank you. It's with the people who make Ritemark." (experience 34, frame 4). It says so only when the send was accepted; when Ritemark cannot know that, the words claim no more than it knows (*Open Questions*, D6).
+- **The straight route, when it went:** the sheet closes and a toast says "Thank you. It's with the people who make Ritemark." (experience 34, frame 4: 2.0's notification toast, which goes by itself after a few seconds; the Experience lead, 26 October). It says so only when the send was accepted; when Ritemark cannot know that, the words claim no more than it knows (*Open Questions*, D6).
 - **The straight route, when it did not go** (offline, the service unreachable, usage data's kill switch): the sheet stays open with the message, one sentence saying it didn't go, and the e-mail route offered (words from the Experience lead; *Open Questions*, D5).
 - **The e-mail route** shows frame 5's sheet: "Your e-mail app is opening", "Your report is in a new e-mail to info@productory.eu. It isn't on its way until you press Send there.", what went into the e-mail in a quoted block, "Didn't open? Copy it and send it to info@productory.eu.", Copy and Done. Never "sent" when only an e-mail app opened. When no e-mail app answers, or the message is too long for a link, the same sheet says so and Copy stays (Sprint 126's three outcomes).
 
@@ -196,6 +205,7 @@ As someone who has used Ritemark for a few days, I want to be asked once what I 
 Acceptance criteria:
 - On Home, as the guidance card (R2): the chat-text icon, "What did you make with Ritemark this week?", "One line is plenty. It goes to the people who make Ritemark, and we read every one.", a one-line field with the placeholder "A proposal, notes, a module…", Send and Not now (experience 34, frame 1). No ×.
 - It is due from the third day on which the person saved a document in Ritemark during this release (local calendar days, counted on this computer from the release's first start). It is never shown during work, as a dialog or as a toast.
+- A send from the card that did not go keeps the words, says "It didn't go. Your words are still here: try again, or open it in e-mail.", and offers Try again (primary), Open in e-mail and Not now (the Experience lead, 26 October).
 - On a day when the ready request showed on Home, the feedback card waits for the next day Home opens; on that day it takes the guidance place even where the ready request is still due, and the ready request returns after it (*Open Questions*, D1).
 - Send goes by the straight route (R11), from Home, with what was typed; Send is disabled while the field is empty. Not now closes it. Either ends it until the next release (a release is a major.minor version: an extension update within 2.1 is not a new release).
 - If the send does not go, the card stays with what was typed and says so in one line (R13's words).
