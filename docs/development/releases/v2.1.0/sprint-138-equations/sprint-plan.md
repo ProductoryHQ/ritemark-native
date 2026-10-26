@@ -123,15 +123,15 @@ No feature flag. Reading math is what keeps formulas safe on save; a switch that
 
 ## Success Criteria
 
-- [ ] `analyst-report.md` and the corpus open and save byte for byte, untouched and with an edit elsewhere (R1, R2).
-- [ ] Dollar amounts and code stay text; `\$` stays `\$` (R1, R2).
-- [ ] Equations typeset in Light and Dark, read by VoiceOver; a document without math loads nothing of KaTeX's (R3).
-- [ ] Equations are edited in place and written with `$…$`, `$$` + Enter and the menus; a typo shows its source quietly (R4–R6).
-- [ ] The AI's prompt, a comment, Copy as Markdown and clipboard text carry the source; pasted rendered math becomes equations (R7).
-- [ ] The report's PDF has typeset math with KaTeX's look, sharp at 200%, and keeps bold and italic (R8, R12).
-- [ ] The report's Word file opens with no repair prompt on the Mac and Windows, with native equations (R9).
-- [ ] A published Google Doc shows equations as pictures, and its quotes start at their indent with a thin border (R10, R11).
-- [ ] `webview.js` grows by at most 40 KB with one KaTeX; the production build carries `media/katex/` and `mathml2omml` (R13, E2, E5).
+- [x] `analyst-report.md` and the corpus open and save byte for byte, untouched and with an edit elsewhere (R1, R2). *All math fixtures and 137's corpus with `kept/equations.md` and `kept/equations-in-lists.md`, 47 files*
+- [x] Dollar amounts and code stay text; `\$` stays `\$` (R1, R2). *Pandoc's pairing: the first `$` after an opener decides*
+- [ ] Equations typeset in Light and Dark, read by VoiceOver; a document without math loads nothing of KaTeX's (R3). *All but VoiceOver, not run (MathML is in the DOM)*
+- [x] Equations are edited in place and written with `$…$`, `$$` + Enter and the menus; a typo shows its source quietly (R4–R6).
+- [ ] The AI's prompt, a comment, Copy as Markdown and clipboard text carry the source; pasted rendered math becomes equations (R7). *Open: a comment (S28), the three runtimes' prompts and pasting from the live pages*
+- [x] The report's PDF has typeset math with KaTeX's look, sharp at 200%, and keeps bold and italic (R8, R12). *On the Mac*
+- [ ] The report's Word file opens with no repair prompt on the Mac and Windows, with native equations (R9). *The Mac passes; Windows is open*
+- [ ] A published Google Doc shows equations as pictures, and its quotes start at their indent with a thin border (R10, R11). *Open: no Google test account*
+- [ ] `webview.js` grows by at most 40 KB with one KaTeX; the production build carries `media/katex/` and `mathml2omml` (R13, E2, E5). *+36.8 KB with one KaTeX; the production build is open (S43)*
 - [ ] Documents without math, Mermaid and the 2.0.1 regression set behave as before, on the Mac and Windows (R14).
 - [ ] The film's document passes S46 on the release candidate before capture (E3).
 
