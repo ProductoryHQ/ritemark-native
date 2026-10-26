@@ -279,6 +279,7 @@ export function AISidebar() {
             primaryAction={{
               label: 'Try again',
               icon: 'arrows-clockwise',
+              tooltip: `Start checking ${runtimeLabel} again.`,
               onAction: () => {
                 setRuntimeTimedOut(false);
                 vscode.postMessage({ type: 'agent:status/recheck', runtimeId: selectedAgent });

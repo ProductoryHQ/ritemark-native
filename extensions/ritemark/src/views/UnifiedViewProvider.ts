@@ -95,7 +95,7 @@ import { decodeCommentTaskSidebarMessage } from '../commentTasks/protocol';
 import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runtime/AgentRuntime';
 import type { OneShotSettings } from '../runtime/oneShotTurn';
 import { presentRuntimeError, type RuntimeErrorHints } from '../runtime/runtimeErrorPresentation';
-import { aiName } from '../runtime/turnFailureCopy';
+import { aiName, trustedBillingUrl } from '../runtime/turnFailureCopy';
 import {
   isThinkingEffort,
   thinkingEffortLabel,
@@ -1597,6 +1597,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         case 'agent-setup:open-node-download':
           await vscode.env.openExternal(vscode.Uri.parse('https://nodejs.org/en/download'));
           break;
+
+        // Sprint 139 (R5): a limit card's billing page. Only a page on a trusted link domain opens, so it
+        // opens with no question first (audit A3); the webview names the provider, never a URL.
+        case 'turn-failure/open-billing': {
+          const url = typeof message.provider === 'string' ? trustedBillingUrl(message.provider) : undefined;
+          if (url) await vscode.env.openExternal(vscode.Uri.parse(url));
+          break;
+        }
 
         case 'agent-setup:check':
           clearSetupCache();

@@ -90,6 +90,8 @@ export function buildAgentSidebarBootstrap(input: AgentSidebarBootstrapInput): A
     opencodeEnabled: input.opencodeEnabled,
     selectedAgent,
     selectedModel,
+    // Sprint 139 (R4): the catalog's default, which a refused-model card offers.
+    defaultClaudeModel: findModelEntry(input.claudeModels, input.defaultClaudeModel)?.id ?? input.claudeModels[0].id,
     agents: input.agents,
     models: input.claudeModels,
     codexModels: input.codexModels,

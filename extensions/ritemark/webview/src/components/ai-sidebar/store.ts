@@ -308,6 +308,8 @@ interface AISidebarState {
   // ── Codex runtime status (APP-GLOBAL — one binary, one auth) ──
   codexEnabled: boolean;
   codexModels: ModelOption[];
+  /** Sprint 139 (R4): the catalog's Claude default, which a refused-model card offers. */
+  defaultClaudeModel: string;
   codexStatus: CodexSidebarStatus;
   dismissedCodexNoticeKey: string | null;
 
@@ -1034,6 +1036,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     codexEnabled: false,
     codexModels: [],
+    defaultClaudeModel: '',
     codexStatus: DEFAULT_CODEX_STATUS,
     dismissedCodexNoticeKey: null,
 
@@ -2772,6 +2775,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             agents: message.agents,
             models: newClaudeModels,
             codexModels: newCodexModels,
+            defaultClaudeModel: bootstrap?.defaultClaudeModel ?? get().defaultClaudeModel,
             codexStatus: incomingCodexStatus,
             dismissedCodexNoticeKey: getCodexCompatibilityNoticeKey(incomingCodexStatus)
               ? get().dismissedCodexNoticeKey
@@ -3219,6 +3223,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                   metrics: message.metrics || { durationMs: 0, costUsd: null, model: null },
                   error: message.error,
                   failureKind: message.failureKind,
+                  ...(message.error && message.errorKind ? { errorKind: message.errorKind } : {}),
+                  ...(message.error && message.errorKind && message.errorDetail ? { errorDetail: message.errorDetail } : {}),
                 },
               };
             },
@@ -3371,6 +3377,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               return finalizeCodexTurnResult(lastTurn, {
                 status: message.status,
                 error: message.error,
+                errorKind: message.errorKind,
+                errorDetail: message.errorDetail,
               });
             },
             { requireRunning: false },

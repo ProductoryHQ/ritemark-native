@@ -102,6 +102,9 @@ assert.equal(
 
 // presentation: done label carries active seconds; idle renders nothing
 assert.equal(presentActivityState('idle'), null);
+// Sprint 139 (#376): only "Failed", for every AI; the turn's one sentence is right above it.
+assert.equal(presentActivityState('failed')!.label, 'Failed');
+assert.equal(presentActivityState('failed')!.tone, 'red');
 assert.match(presentActivityState('done', { activeSeconds: 92 })!.label, /1m 32s/);
 assert.equal(presentActivityState('done', { activeSeconds: 0 })!.label, 'Done', '#488: no "Done in 0.0s"');
 assert.equal(presentActivityState('done', {})!.label, 'Done');

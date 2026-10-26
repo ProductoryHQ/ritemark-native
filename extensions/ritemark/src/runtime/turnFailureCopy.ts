@@ -297,6 +297,11 @@ export function turnFailureCard(input: {
   }
 }
 
+/** Sprint 139 (R3): a failed turn with a card says nothing on the status line below it. */
+export function failureShowsCard(runtimeId: AgentId, kind: RuntimeErrorKind | undefined): boolean {
+  return turnFailureCard({ runtimeId, kind, sentence: '' }) !== null;
+}
+
 /** Sprint 139 (R8): a turn's outcome, as `first_reply` and `agent_used` name it. */
 export type TurnOutcome =
   | 'arrived'

@@ -75,7 +75,7 @@ export function applyCodexPlanApproval(
 
 export function finalizeCodexTurnResult(
   turn: CodexConversationTurn,
-  result: { status?: string; error?: string }
+  result: { status?: string; error?: string; errorKind?: NonNullable<CodexConversationTurn['result']>['errorKind']; errorDetail?: NonNullable<CodexConversationTurn['result']>['errorDetail'] }
 ): CodexConversationTurn {
   const fallbackPlanText = (!turn.planText || !turn.planText.trim())
     ? turn.streamingText
@@ -96,7 +96,12 @@ export function finalizeCodexTurnResult(
     pendingQuestion: undefined,
     planText: fallbackPlanText,
     requiresPlanReview: turn.requiresPlanReview || shouldRequirePlanReview,
-    result: { status: result.status || 'success', error: result.error },
+    result: {
+      status: result.status || 'success',
+      error: result.error,
+      ...(result.error && result.errorKind ? { errorKind: result.errorKind } : {}),
+      ...(result.error && result.errorKind && result.errorDetail ? { errorDetail: result.errorDetail } : {}),
+    },
   };
 }
 

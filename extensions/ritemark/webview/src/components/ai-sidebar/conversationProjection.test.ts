@@ -111,4 +111,39 @@ const timed = projectionToConversation(timedProjection);
 assert.equal(timed.agentConversation[0].result?.metrics?.durationMs, 8000, 'the saved working time comes back');
 assert.equal(timed.agentConversation[1].result?.metrics, undefined, 'no saved time: no metrics, never a zero');
 
+// Sprint 139 (#376, S21): a restored failed turn says the same sentence and draws the same card.
+const failedProjection = structuredClone(projection);
+failedProjection.lifecycle = { state: 'interrupted', turnId: 'turn-model', reason: 'failed' };
+failedProjection.runtimeSummary = ['codex', 'claude-code'];
+failedProjection.events.push(
+  {
+    kind: 'user-message', eventId: 'user-model', turnId: 'turn-model', sequence: 4,
+    occurredAt: '2026-08-23T10:05:00.000Z', runtimeId: 'codex', text: 'Again', mode: 'agent', attachments: [],
+  },
+  {
+    kind: 'boundary', eventId: 'boundary-model', turnId: 'turn-model', sequence: 5,
+    occurredAt: '2026-08-23T10:05:01.000Z', runtimeId: 'codex', boundaryKind: 'failed',
+    message: "ChatGPT couldn't use GPT-6.1 Sol. It isn't available in Ritemark right now.",
+    errorKind: 'model', errorDetail: { model: 'gpt-6.1-sol' },
+  },
+  {
+    kind: 'user-message', eventId: 'user-net', turnId: 'turn-net', sequence: 6,
+    occurredAt: '2026-08-23T10:06:00.000Z', runtimeId: 'claude-code', text: 'Hi', mode: 'agent', attachments: [],
+  },
+  {
+    kind: 'boundary', eventId: 'boundary-net', turnId: 'turn-net', sequence: 7,
+    occurredAt: '2026-08-23T10:06:01.000Z', runtimeId: 'claude-code', boundaryKind: 'failed',
+    message: "Ritemark couldn't reach Claude. Check your connection, then send your message again.", errorKind: 'network',
+  },
+);
+const restoredFailed = projectionToConversation(failedProjection);
+assert.deepEqual(restoredFailed.codexConversation[1].result, {
+  status: 'failed',
+  error: "ChatGPT couldn't use GPT-6.1 Sol. It isn't available in Ritemark right now.",
+  errorKind: 'model',
+  errorDetail: { model: 'gpt-6.1-sol' },
+}, "ChatGPT's restored failure keeps its sentence and card (2.0 restored only the status)");
+assert.equal(restoredFailed.agentConversation[0].result?.errorKind, 'network');
+assert.equal(restoredFailed.codexConversation[0].result?.error, undefined, 'a completed turn carries no failure');
+
 console.log('conversationProjection.test.ts: all tests passed');

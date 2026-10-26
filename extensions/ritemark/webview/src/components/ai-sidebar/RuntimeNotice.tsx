@@ -1,11 +1,14 @@
 import { Button } from '../ui/button';
 import { Icon, type PhosphorIconName } from '../ui/Icon';
+import { Tooltip } from '../ui/tooltip';
 
 export interface RuntimeNoticeAction {
   label: string;
   icon: PhosphorIconName;
   onAction: () => void;
   disabled?: boolean;
+  /** Sprint 139 (#376): every button says what it does, or why it can't be pressed. */
+  tooltip: string;
 }
 
 interface RuntimeNoticeProps {
@@ -68,27 +71,33 @@ export function RuntimeNotice({
           {hasActions && (
             <div className={`flex w-full flex-wrap items-center justify-end gap-1 ${statusLabel ? 'mt-1' : ''}`}>
               {secondaryAction && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={secondaryAction.onAction}
-                  disabled={secondaryAction.disabled}
-                >
-                  <Icon name={secondaryAction.icon} size={12} tone="inherit" />
-                  {secondaryAction.label}
-                </Button>
+                <Tooltip label={secondaryAction.tooltip}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="whitespace-nowrap"
+                    onClick={secondaryAction.onAction}
+                    disabled={secondaryAction.disabled}
+                  >
+                    <Icon name={secondaryAction.icon} size={12} tone="inherit" />
+                    {secondaryAction.label}
+                  </Button>
+                </Tooltip>
               )}
               {primaryAction && (
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={primaryAction.onAction}
-                  disabled={primaryAction.disabled}
-                >
-                  <Icon name={primaryAction.icon} size={12} tone="inherit" />
-                  {primaryAction.label}
-                </Button>
+                <Tooltip label={primaryAction.tooltip}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="whitespace-nowrap"
+                    onClick={primaryAction.onAction}
+                    disabled={primaryAction.disabled}
+                  >
+                    <Icon name={primaryAction.icon} size={12} tone="inherit" />
+                    {primaryAction.label}
+                  </Button>
+                </Tooltip>
               )}
             </div>
           )}

@@ -7,6 +7,14 @@ function runtimeAgent(runtime: RuntimeId | undefined): AgentId {
   return runtime === 'codex' || runtime === 'opencode' ? runtime : 'claude-code';
 }
 
+type TerminalEvent = Extract<ConversationProjectionV1['events'][number], { kind: 'assistant-message' | 'boundary' }>;
+
+/** The failure sentence a terminal event carries, or undefined when the turn didn't fail. */
+function terminalError(event: TerminalEvent): string | undefined {
+  if (event.kind === 'boundary') return event.boundaryKind === 'failed' ? event.message : undefined;
+  return event.terminalStatus === 'failed' ? event.error ?? 'The turn failed.' : undefined;
+}
+
 export function projectionToConversation(
   projection: ConversationProjectionV1,
   previous?: ConversationState,
@@ -56,6 +64,9 @@ export function projectionToConversation(
               ? { error: terminalEvent.error ?? 'The turn failed.' }
               : {}),
           ...(terminalEvent.failureKind ? { failureKind: terminalEvent.failureKind } : {}),
+          // Sprint 139 (#376): a restored failed turn draws the same card as the live one.
+          ...(terminalError(terminalEvent) && terminalEvent.errorKind ? { errorKind: terminalEvent.errorKind } : {}),
+          ...(terminalError(terminalEvent) && terminalEvent.errorKind && terminalEvent.errorDetail ? { errorDetail: terminalEvent.errorDetail } : {}),
         } } : {}),
         isRunning: projection.lifecycle.state === 'working' && projection.lifecycle.activeTurnId === user.turnId,
         isPlan: user.mode === 'plan',
@@ -75,6 +86,11 @@ export function projectionToConversation(
           status: terminalEvent.kind === 'boundary'
             ? terminalEvent.boundaryKind === 'cancelled' ? 'cancelled' : 'failed'
             : terminalEvent.terminalStatus ?? 'completed',
+          // Sprint 139 (#376): ChatGPT's and OpenCode's restored failures say their sentence again
+          // (2.0 restored only "Failed"), and draw their card.
+          ...(terminalError(terminalEvent) ? { error: terminalError(terminalEvent) } : {}),
+          ...(terminalError(terminalEvent) && terminalEvent.errorKind ? { errorKind: terminalEvent.errorKind } : {}),
+          ...(terminalError(terminalEvent) && terminalEvent.errorKind && terminalEvent.errorDetail ? { errorDetail: terminalEvent.errorDetail } : {}),
         } } : {}),
         isRunning: projection.lifecycle.state === 'working' && projection.lifecycle.activeTurnId === user.turnId,
         timestamp,

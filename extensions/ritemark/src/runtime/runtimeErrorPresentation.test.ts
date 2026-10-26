@@ -12,6 +12,7 @@ import {
   unwrapProviderMessage,
 } from './runtimeErrorPresentation';
 import {
+  failureShowsCard,
   decodeRuntimeErrorDetail,
   isRuntimeErrorKind,
   trustedBillingUrl,
@@ -280,6 +281,14 @@ assert.equal(turnFailureCard({ runtimeId: 'claude-code', kind: 'sign-in', senten
 assert.equal(turnFailureCard({ runtimeId: 'codex', kind: 'network', sentence: 's' }), null, 'no connection: the sentence alone');
 assert.equal(turnFailureCard({ runtimeId: 'codex', kind: 'provider', sentence: 's' }), null);
 assert.equal(turnFailureCard({ runtimeId: 'codex', kind: undefined, sentence: 's' }), null, 'a 2.0 record: the sentence alone');
+
+// The status line says nothing under a card, and "Failed" under a sentence (R3).
+assert.equal(failureShowsCard('codex', 'model'), true);
+assert.equal(failureShowsCard('opencode', 'limit'), true);
+assert.equal(failureShowsCard('codex', 'sign-in'), true);
+assert.equal(failureShowsCard('claude-code', 'sign-in'), false, "Claude's sign-in card is AgentResponse's (by failureKind)");
+assert.equal(failureShowsCard('claude-code', 'network'), false);
+assert.equal(failureShowsCard('codex', undefined), false);
 
 // The outcome counts (R8) come from the same kinds.
 assert.equal(turnOutcome('completed', undefined), 'arrived');

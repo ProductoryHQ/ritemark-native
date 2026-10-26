@@ -5,6 +5,9 @@
  */
 
 import type { AgentSidebarProtocolMessage } from '../../../../src/views/agentSidebarProtocol';
+import type { RuntimeErrorDetail, RuntimeErrorKind } from '../../../../src/runtime/turnFailureCopy';
+
+export type { RuntimeErrorDetail, RuntimeErrorKind } from '../../../../src/runtime/turnFailureCopy';
 
 // ── Agent types (mirrored from extension src/agent/types.ts) ──
 
@@ -283,6 +286,9 @@ export interface AgentConversationTurn {
     metrics?: AgentMetrics;
     error?: string;
     failureKind?: RuntimeFailureKind;
+    /** Sprint 139 (#376): the failure's kind and its card's data, from the host's one classifier. */
+    errorKind?: RuntimeErrorKind;
+    errorDetail?: RuntimeErrorDetail;
   };
   isRunning: boolean;
   /** Turn ended with a plan that needs user approval */
@@ -405,6 +411,9 @@ export interface CodexConversationTurn {
   result?: {
     status: string;
     error?: string;
+    /** Sprint 139 (#376): the failure's kind and its card's data, from the host's one classifier. */
+    errorKind?: RuntimeErrorKind;
+    errorDetail?: RuntimeErrorDetail;
   };
   isRunning: boolean;
   /**
@@ -488,7 +497,7 @@ export type ExtensionMessage =
   | ({ type: 'agent-turn-started'; turnId: string; origin: 'background-task' } & ConversationScopedMessage)
   | ({ type: 'agent-question'; question: AgentQuestion } & ConversationScopedMessage)
   | ({ type: 'agent-plan-approval'; request: AgentPlanApprovalRequest } & ConversationScopedMessage)
-  | ({ type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string; failureKind?: RuntimeFailureKind } & ConversationScopedMessage)
+  | ({ type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string; failureKind?: RuntimeFailureKind; errorKind?: RuntimeErrorKind; errorDetail?: RuntimeErrorDetail } & ConversationScopedMessage)
   | ({ type: 'agent-approval-request'; requestId: string; agentId: string; kind: 'file-write' | 'shell-command' | 'permission' | 'plan'; filePath?: string; diff?: string; command?: string; workingDir?: string; permissionLabel?: string; planText?: string } & ConversationScopedMessage)
   | { type: 'agent-setup:progress'; progress: InstallProgress }
   | { type: 'agent-setup:complete'; status: SetupStatus; environmentStatus?: AgentEnvironmentStatus; generation?: number; revision?: number }
@@ -519,7 +528,7 @@ export type ExtensionMessage =
   | ({ type: 'codex-question'; requestId: string | number; questions: Array<AgentQuestionItem & { id: string }> } & ConversationScopedMessage)
   | ({ type: 'codex-plan-text-delta'; delta: string } & ConversationScopedMessage)
   | ({ type: 'codex-plan-update'; explanation?: string | null; plan: CodexPlanStep[] } & ConversationScopedMessage)
-  | ({ type: 'codex-result'; status?: string; error?: string } & ConversationScopedMessage)
+  | ({ type: 'codex-result'; status?: string; error?: string; errorKind?: RuntimeErrorKind; errorDetail?: RuntimeErrorDetail } & ConversationScopedMessage)
   | ({ type: 'codex-approval'; approvalType: 'command' | 'fileChange'; requestId: string | number; command?: string; workingDir?: string; fileChanges?: Record<string, unknown> } & ConversationScopedMessage)
   // Onboarding messages
   | { type: 'onboarding:status'; status: OnboardingStatus }

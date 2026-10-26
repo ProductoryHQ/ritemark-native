@@ -97,7 +97,7 @@ export interface ActivityStatusPresentation {
 
 export function presentActivityState(
   state: ConversationActivityState,
-  opts?: { activeSeconds?: number; waitedSeconds?: number; errorFirstLine?: string; liveActivity?: string; backgroundCount?: number }
+  opts?: { activeSeconds?: number; waitedSeconds?: number; liveActivity?: string; backgroundCount?: number }
 ): ActivityStatusPresentation | null {
   switch (state) {
     case 'running':
@@ -118,10 +118,8 @@ export function presentActivityState(
         label: opts?.activeSeconds ? `Done in ${formatSeconds(opts.activeSeconds)}` : 'Done',
       };
     case 'failed':
-      return {
-        icon: 'x-circle', tone: 'red',
-        label: opts?.errorFirstLine ? `Failed — ${opts.errorFirstLine}` : 'Failed',
-      };
+      // Sprint 139 (#376): only "Failed", for every AI. The turn's one sentence is right above it.
+      return { icon: 'x-circle', tone: 'red', label: 'Failed' };
     case 'cancelled':
       return { icon: 'x', tone: 'faint', label: 'Stopped' };
     case 'done-background':

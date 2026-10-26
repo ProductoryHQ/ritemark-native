@@ -16,6 +16,7 @@ import { PlanReviewCard } from './PlanReviewCard';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import { StartingPoints } from './StartingPoints';
 import { extractPlanDisplayText } from './planText';
+import { TurnFailureCard } from './TurnFailureCard';
 import type { CodexConversationTurn, AgentProgress, CodexSidebarStatus } from './types';
 
 export function CodexView() {
@@ -81,6 +82,7 @@ export function CodexView() {
           key={turn.id}
           turn={turn}
           isMixedRuntime={isMixedRuntime}
+          isLatest={turn.id === codexConversation[codexConversation.length - 1]?.id}
           onApprove={(requestId) => handleCodexApproval(requestId, true)}
           onReject={(requestId) => handleCodexApproval(requestId, false)}
           onAnswerQuestion={answerCodexQuestion}
@@ -128,6 +130,7 @@ export function getCompatibilityNotice(status: CodexSidebarStatus): {
 export function CodexTurn({
   turn,
   isMixedRuntime,
+  isLatest = true,
   onApprove,
   onReject,
   onAnswerQuestion,
@@ -136,6 +139,8 @@ export function CodexTurn({
 }: {
   turn: CodexConversationTurn;
   isMixedRuntime: boolean;
+  /** Sprint 139: only the newest turn's failure card offers a way on. */
+  isLatest?: boolean;
   onApprove: (requestId: string | number) => void;
   onReject: (requestId: string | number) => void;
   onAnswerQuestion: (turnId: string, question: NonNullable<CodexConversationTurn['pendingQuestion']>, answers: Record<string, string>) => void;
@@ -242,11 +247,16 @@ export function CodexTurn({
         </div>
       )}
 
-      {/* Error */}
+      {/* Sprint 139 (#376): the failure as one sentence, or its card, once — never the provider's JSON. */}
       {turn.result?.error && (
-        <div className="flex items-start gap-2 text-xs text-[var(--vscode-testing-iconFailed)] pl-2">
-          <Icon name="warning" size={12} className="mt-0.5 shrink-0" />
-          <span>{turn.result.error}</span>
+        <div className="text-xs">
+          <TurnFailureCard
+            runtimeId={turn.runtime === 'opencode' ? 'opencode' : 'codex'}
+            error={turn.result.error}
+            errorKind={turn.result.errorKind}
+            errorDetail={turn.result.errorDetail}
+            isLatest={isLatest}
+          />
         </div>
       )}
 
