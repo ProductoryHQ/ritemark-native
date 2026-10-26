@@ -80,7 +80,7 @@ One launch on the trusted folder, ChatGPT as the starting AI:
 | `codex-result`, failed, `limit`/`busy` | "Failed" | "ChatGPT is busy right now" / "It turned this request away several times. Send your message again in a few minutes." No button: no other AI is ready on this Mac |
 | the same with `retryAt` in seven minutes | "Failed" | First run: "… Send your message again after 0:15." That build wrote `hour: 'numeric'`. Retaken on the rebased build (27 October, one launch): "… Send your message again after 01:40.", the webview's `en-GB` short time, as `personTime` writes it (`busy-card.png`) |
 
-The chat's header read "Working" under the injected card, because the real turn was still running on the host; with a real 429 the host's own result ends the turn.
+The chat's header read "Working" under the injected card only because of the injection. The header reads the host's record of the chat (`hostConversations` → `headerStatusLabel`), and an injected message never reaches the host, whose real turn was still running. A real 429 that runs out of retries ends in Codex's `turn/completed`, which goes to `onCodexComplete` in `UnifiedViewProvider`. That one handler posts the card's `codex-result` and calls `completeRuntimeTurn` with `status: 'failed'` (the turn has an error). That moves the record to `interrupted` (reason `failed`), for which the header shows nothing (`conversationActionsModel.test.ts`, for all three AIs).
 
 **Continue with <AI>** couldn't be shown live (no other AI is ready on this Mac); `continueWithAlternative.test.ts` covers it: the waiting turn is stopped, the chat continues with Claude, the message is back in the box, nothing is sent.
 
