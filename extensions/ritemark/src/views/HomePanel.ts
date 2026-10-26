@@ -14,7 +14,7 @@ import * as vscode from 'vscode';
 import type { BoardController } from '../taskBoard/BoardController';
 import type { BoardSnapshot } from '../taskBoard/protocol';
 import { isPointerOnly } from '../projects/aboutFile';
-import { recentItems, RECENT_EXTENSIONS, othersOf, showWhatMoved, waitingItems } from '../projects/homeState';
+import { recentItems, RECENT_EXTENSIONS, othersOf, showWhatMoved, switchNoteEndsOnHost, waitingItems } from '../projects/homeState';
 import { projectInitials, readProject, setProjectCover, setProjectLine, nodeProjectFileFs } from '../projects/projectFile';
 import type { ProjectList } from '../projects/ProjectList';
 import { decodeHomeRequest, type HomeRequest, type HomeState } from '../projects/protocol';
@@ -47,6 +47,8 @@ export interface HomeHostDependencies {
   onProjectsChanged: () => void;
   /** Sprint 140: the first day's guidance (Home's one card); null in a window with none. */
   guidance: GuidanceHost | null;
+  /** Sprint 142 (R3): a message the AI's sheet accepted. */
+  onTurnAccepted?: (listener: () => void) => vscode.Disposable;
 }
 
 /** One per window: computes Home's state, answers its requests, and owns its panel. */
@@ -62,6 +64,8 @@ export class HomeHost implements vscode.Disposable {
   /** OK on the unreadable project file's note: it stays hidden until the window reloads (S3). */
   private unreadableSeen = false;
   private switchedFrom: SwitchedFrom | null;
+  /** When the switch note was first drawn on a visible Home (R3); null before. */
+  private switchedShownAt: number | null = null;
   private missing: { id: string; folderUri: string; name: string; mark: string; place: string } | null = null;
 
   constructor(private readonly deps: HomeHostDependencies) {
@@ -88,6 +92,17 @@ export class HomeHost implements vscode.Disposable {
     this.disposables.push(vscode.extensions.onDidChange(() => this.scheduleRedraw()));
     // Sprint 140: the guidance card follows a sign-in, a press, a send
     if (deps.guidance) this.disposables.push(deps.guidance.onDidChange(() => this.scheduleRedraw(0)));
+    // Sprint 142 (R3): a message sent on the AI's sheet ends the switch note
+    if (deps.onTurnAccepted && this.switchedFrom) this.disposables.push(deps.onTurnAccepted(() => this.endSwitchedNote('turn-accepted')));
+  }
+
+  /** Sprint 142 (R3): the person started something the host can see; the note goes and does not come back. */
+  private endSwitchedNote(event: 'home-hidden' | 'turn-accepted'): void {
+    if (!this.switchedFrom) return;
+    const shownFor = this.switchedShownAt === null ? null : Date.now() - this.switchedShownAt;
+    if (!switchNoteEndsOnHost(event, shownFor)) return;
+    this.switchedFrom = null;
+    void this.push();
   }
 
   private subscribeBoard(): (() => void) | undefined {
@@ -192,6 +207,9 @@ export class HomeHost implements vscode.Disposable {
           this.scheduleRedraw(0);
           // The list beside Home counts from the same fresh read (R3, S9)
           this.deps.onProjectsChanged();
+        } else {
+          // Sprint 142 (R3): another tab chosen or opened on Home's desk ends the switch note
+          this.endSwitchedNote('home-hidden');
         }
       }),
     ];
@@ -510,6 +528,7 @@ export class HomeHost implements vscode.Disposable {
     if (!this.panel || !this.ready) return;
     const state = await this.state();
     await this.panel.webview.postMessage({ type: 'home/state', state });
+    if (state.switchedFrom && this.switchedShownAt === null && this.panel?.visible) this.switchedShownAt = Date.now();
   }
 
   dispose(): void {

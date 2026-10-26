@@ -74,6 +74,28 @@ For row-level actions in dense UI (Library table, settings rows, sidebar items),
 
 Ghost buttons are how you get from "a table row has 4 actions" to a readable row without accruing visual weight.
 
+## Split button — one button, in one tone (2026-10-26, Sprint 142)
+
+Jarmo, 26 October: "splitbuttons should not look like this in two tones" (framework §3, `ritemark-dev`: `product/design/experience/framework.md`). Use `webview/src/components/ui/split-button.tsx`; never two `Button`s side by side with their own states.
+
+- **One fill in every state.** The main part and the caret share it, parted by one 1 px line: 28% white on a filled (`primary`) button, the hairline on an `outline` or `quiet` one.
+- **Rest, hover and pressed are the whole button's.** Pointing at the caret lightens the main part too; pressing either part presses the whole (`.rm-split` owns the fill, the indigo shadow and the press).
+- **Menu open keeps the rest tone.** The menu is the sign; no darker caret.
+- **Disabled and busy are the whole button's** (`disabled`, `busy` props): both parts off, never one half. When the chosen option isn't available but another is, the main part opens the menu instead of being switched off.
+- **While the main part is on** (dictating), the whole button shows it, and the caret still opens its menu; what can't change then is unavailable, with one line saying why.
+- **Only the keyboard's focus ring outlines one part**, the one that has the focus.
+
+```tsx
+<SplitButton
+  tone="primary"            // or "outline", "quiet"
+  busy={handingOver}        // the whole button, caret too
+  main={{ label: 'Ask Claude what is here', icon, tooltip, onClick }}
+  menu={{ label: 'Ask with', tooltip: 'Choose which AI asks', content: <>…DropdownMenuItems…</> }}
+/>
+```
+
+A split button with its own menu keeps the same rules: the spreadsheet's Open in Excel uses `SplitButton`; dictation (`VoiceDictationButton.tsx`) keeps its own language menu and draws the same states in its own CSS.
+
 ## Focus ring — always the same
 
 ```css

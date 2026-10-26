@@ -32,7 +32,7 @@ import { countsLine, listFileNames } from './folderCounts';
 import { feedbackDue, guidanceCard, localDay } from './guidanceState';
 import { GuidanceStore } from './guidanceStore';
 import { madeSomething } from './madeSomething';
-import { AI_NAMES, AI_ORDER, cardAi, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyRequestDue, readyRequestWords, SAMPLE_CARD_ID, type AiState, type ReadyKind } from './readyRequest';
+import { AI_NAMES, AI_ORDER, cardAi, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyPressAction, readyRequestDue, readyRequestWords, SAMPLE_CARD_ID, type AiState, type ReadyKind } from './readyRequest';
 import { startingPlaceOf, wordCount, type FrontEditor } from './startingPlace';
 
 const PROVIDER: Record<AgentId, WelcomeProvider> = { 'claude-code': 'claude', codex: 'chatgpt', opencode: 'opencode' };
@@ -53,6 +53,8 @@ export interface GuidanceDependencies {
   setStartingPlace(place: string, hasAbout: boolean): void;
   onTurnAccepted(listener: (turn: AcceptedTurn) => void): vscode.Disposable;
   onChatOrigin(listener: (origin: ChatOrigin) => void): vscode.Disposable;
+  /** Sprint 142 (R5b): open a chat on the AI's sheet by its id. */
+  openConversation?(conversationId: string): Promise<void>;
 }
 
 /** What Home's host read for its own state, passed in so nothing is read twice. */
@@ -79,6 +81,8 @@ export class GuidanceHost implements vscode.Disposable {
   private readonly signingIn = new Set<AgentId>();
   private aiCache: { at: number; states: Partial<Record<AgentId, AiState>> } | null = null;
   private readyProblem: string | null = null;
+  /** Sprint 142 (R5b): when the folder's request was last sent from Home. */
+  private filesPressedAt: number | null = null;
   private feedback: { sending: boolean; problem: string | null } = { sending: false, problem: null };
   private placeTimer: ReturnType<typeof setTimeout> | undefined;
   /** The counts line per folder, listed once and listed again only after a file is created or deleted there (QA). */
@@ -185,6 +189,25 @@ export class GuidanceHost implements vscode.Disposable {
     if (!chosen.ready) return; // Ask with opens instead (D3), on the page
     this.readyProblem = null;
     const provider = PROVIDER[chosen.ai];
+    // Sprint 142 (R5b): a second press opens the chat the first one started; the button is never disabled for it
+    const press = readyPressAction({
+      kind,
+      sentChat: kind === 'files' && record.chatId ? { id: record.chatId, answered: await this.answered(record.chatId) } : null,
+      sinceLastPressMs: this.filesPressedAt === null ? null : Date.now() - this.filesPressedAt,
+      pendingChat: kind === 'files' ? this.newestOrigin('what_is_here') : null,
+      filledChat: this.newestOrigin('what_for'),
+    });
+    if (press.action === 'open') {
+      await this.deps.openConversation?.(press.conversationId);
+      return;
+    }
+    if (press.action === 'reveal') {
+      // QA N5: the chat the first press sent comes forward on the AI's sheet, its box focused; nothing is sent again.
+      // The sheet reopens a chat by its own id and writes nothing into it without `fill`.
+      if (press.conversationId) await this.deps.startChat({ runtimeId: chosen.ai, text: '', send: false, conversationId: press.conversationId });
+      else await vscode.commands.executeCommand('ritemark.unifiedView.focus');
+      return;
+    }
     if (kind === 'sample') {
       const answer = await this.deps.give(SAMPLE_CARD_ID, chosen.ai);
       if (!answer?.ok) {
@@ -198,13 +221,30 @@ export class GuidanceHost implements vscode.Disposable {
       return;
     }
     if (kind === 'files') {
+      this.filesPressedAt = Date.now();
       madeSomething.noteReadyRequestUsed();
       void trackEvent('ready_request_used', { kind: 'what_is_here', provider });
       await this.deps.startChat({ runtimeId: chosen.ai, text: READY_REQUEST_TEXT.files, send: true, origin: 'what_is_here' });
       return;
     }
-    // The empty project's request waits for the person's words; it counts when they send it (R15).
-    await this.deps.startChat({ runtimeId: chosen.ai, text: READY_REQUEST_TEXT.empty, cursor: READY_REQUEST_CURSOR_EMPTY, send: false, origin: 'what_for' });
+    // The empty project's request waits for the person's words; it counts when they send it (R15). A second press
+    // opens the same chat, putting the request back only into an empty box (Sprint 142, R5b).
+    const reopen = press.action === 'fill' ? press.conversationId : null;
+    await this.deps.startChat({
+      runtimeId: chosen.ai,
+      text: READY_REQUEST_TEXT.empty,
+      cursor: READY_REQUEST_CURSOR_EMPTY,
+      send: false,
+      origin: 'what_for',
+      ...(reopen ? { conversationId: reopen, fill: 'if-empty' as const } : {}),
+    });
+  }
+
+  /** Sprint 142 (R5b): the sheet's own id of the newest chat this ready request filled and that hasn't been sent. */
+  private newestOrigin(readyRequest: 'what_is_here' | 'what_for'): string | null {
+    let newest: string | null = null;
+    for (const origin of this.origins.values()) if (origin.readyRequest === readyRequest) newest = origin.conversationId;
+    return newest;
   }
 
   async chooseAi(folderUri: string, ai: AgentId): Promise<void> {

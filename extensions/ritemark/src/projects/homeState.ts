@@ -106,3 +106,15 @@ export function showWhatMoved(updatedFrom1x: unknown, seen: unknown): boolean {
   const updated = updatedFrom1x === true || (typeof updatedFrom1x === 'object' && updatedFrom1x !== null);
   return updated && seen !== true;
 }
+
+/**
+ * Sprint 142 (R3; experience 3, #557): the project-switch note goes when the person starts something. The page hears
+ * its own presses, keys and drags; the host hears the rest that the extension can see (Q5): Home hidden by another
+ * tab, and a message sent on the AI's sheet. A change in the first moments after the note shows is the window
+ * settling after the switch (its tabs restored, Home brought forward), not the person.
+ */
+export const SWITCH_NOTE_SETTLE_MS = 1500;
+export function switchNoteEndsOnHost(event: 'home-hidden' | 'turn-accepted', shownForMs: number | null): boolean {
+  if (shownForMs === null || shownForMs < SWITCH_NOTE_SETTLE_MS) return false;
+  return event === 'home-hidden' || event === 'turn-accepted';
+}

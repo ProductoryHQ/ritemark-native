@@ -141,11 +141,11 @@ export function VoiceDictationButton() {
   const isActive = state !== 'idle' && state !== 'error'
 
   // Handle dropdown toggle
+  // Sprint 142 (R5d; framework §3, ritemark-dev 76b3a50): while dictating, the caret still opens its menu; the
+  // languages are unavailable there, with one line saying why
   const handleDropdownClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!isActive) {
-      setShowDropdown(!showDropdown)
-    }
+    setShowDropdown(!showDropdown)
   }
 
   // A pick only sets the language; dictation starts on the next press of the
@@ -196,14 +196,22 @@ export function VoiceDictationButton() {
   const stateLabel = isActive ? dictationStateCopy(state, mode, '').label : null
   const shownLanguage = isActive ? (currentLanguage || lastLanguage) : lastLanguage
 
+  // Sprint 142 (R5d, #557): one button, in one tone (framework §3). While dictating, the whole button shows it, the
+  // caret in the same ink; while the text is put in, the whole button waits. Never one half faded.
+  const finishing = state === 'finishing'
   return (
-    <div className="dictation-split-btn" ref={dropdownRef}>
+    <div
+      className={`dictation-split-btn${state === 'listening' ? ' dictation-listening' : ''}`}
+      ref={dropdownRef}
+      data-busy={finishing ? '' : undefined}
+      aria-busy={finishing || undefined}
+    >
       {/* Primary button - start/stop dictation */}
       <Tooltip label={title}>
         <button
-          className={`dictation-primary ${state === 'listening' ? 'dictation-primary-listening' : ''}`}
+          className="dictation-primary"
           onClick={handlePrimaryClick}
-          disabled={state === 'finishing'}
+          disabled={finishing}
           aria-label={title}
           style={{ color }}
         >
@@ -220,28 +228,30 @@ export function VoiceDictationButton() {
           aria-label="Dictation language"
           aria-expanded={showDropdown}
           onClick={handleDropdownClick}
-          disabled={isActive}
-          style={{ color: isActive ? 'var(--r-ink-disabled)' : 'var(--r-ink-strong)' }}
+          disabled={finishing}
+          style={{ color: isActive ? color : 'var(--r-ink-strong)' }}
         >
           <span className="dictation-label">{shownLanguage.toUpperCase()}</span>
           <Icon name="caret-down" size={12} />
         </button>
       </Tooltip>
 
-      {/* Language dropdown */}
+      {/* Language dropdown. While dictating nothing in it can change: the rows are unavailable and one line says why;
+          the language in use keeps its check (framework §3, ritemark-dev 76b3a50). */}
       {showDropdown && (
         <div className="dictation-dropdown">
           <div className="dictation-dropdown-header">Language</div>
           {recentLanguages.map(code => (
             <button
               key={code}
-              className={`dictation-dropdown-item ${code === lastLanguage ? 'active' : ''}`}
-              aria-current={code === lastLanguage ? 'true' : undefined}
+              className={`dictation-dropdown-item ${code === shownLanguage ? 'active' : ''}`}
+              aria-current={code === shownLanguage ? 'true' : undefined}
+              disabled={isActive}
               onClick={() => handleLanguageSelect(code)}
             >
               <span className="dictation-dropdown-name">
                 <span className="dictation-dropdown-tick">
-                  {code === lastLanguage ? <Icon name="check" size={14} /> : null}
+                  {code === shownLanguage ? <Icon name="check" size={14} /> : null}
                 </span>
                 {getLanguageName(code)}
               </span>
@@ -251,6 +261,7 @@ export function VoiceDictationButton() {
           <div className="dictation-dropdown-divider" />
           <button
             className="dictation-dropdown-item dictation-dropdown-more"
+            disabled={isActive}
             onClick={() => {
               setShowDropdown(false)
               setShowFullPicker(true)
@@ -260,6 +271,7 @@ export function VoiceDictationButton() {
           </button>
           <button
             className="dictation-dropdown-item dictation-dropdown-settings"
+            disabled={isActive}
             onClick={() => {
               setShowDropdown(false)
               setShowSettings(true)
@@ -267,6 +279,7 @@ export function VoiceDictationButton() {
           >
             Settings...
           </button>
+          {isActive && <div className="dictation-dropdown-note" role="note">Stop dictation to change the language</div>}
         </div>
       )}
 
@@ -327,8 +340,13 @@ export function VoiceDictationButton() {
           cursor: not-allowed;
         }
 
-        .dictation-dropdown-trigger:disabled {
+        /* One button, in one tone (Sprint 142): busy is the whole button's */
+        .dictation-split-btn[data-busy] {
           opacity: 0.5;
+        }
+
+        .dictation-split-btn[data-busy]:hover {
+          background: transparent;
         }
 
         .dictation-split-btn:active {
@@ -417,9 +435,32 @@ export function VoiceDictationButton() {
           font-size: 12px;
         }
 
-        /* Pulsing animation for listening state */
-        .dictation-primary-listening {
+        /* While dictating nothing in the menu can change (Sprint 142; framework §3) */
+        .dictation-dropdown-item:disabled {
+          cursor: default;
+          color: var(--r-ink-muted);
+          background: transparent;
+        }
+
+        .dictation-dropdown-item.active:disabled {
+          background: var(--r-accent-soft);
+          color: var(--r-ink-body);
+        }
+
+        .dictation-dropdown-note {
+          padding: 6px 12px 8px;
+          font-size: 12px;
+          line-height: 16px;
+          color: var(--r-ink-muted);
+        }
+
+        /* Pulsing animation for listening state: the whole button's (Sprint 142, one tone) */
+        .dictation-listening {
           animation: pulse-dictation 2s ease-in-out infinite;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .dictation-listening { animation: none; }
         }
 
         @keyframes pulse-dictation {

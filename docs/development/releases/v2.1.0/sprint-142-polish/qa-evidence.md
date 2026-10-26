@@ -1,0 +1,84 @@
+# Sprint 142 QA evidence
+
+## Merge 1 (extension tier), 26–27 October 2026
+
+**The environment.**
+- The dev build of `sprint-142-polish`, on a CoW clone of Sprint 140's `vscode/`, reset to the pin `d956e8a6` with all 18 patches applied (`apply-patches.sh`: 18 applied, 0 failed) and `npm run transpile-client`.
+- `node_modules` cloned from Sprint 138's worktree, whose lockfiles match `main`. A build of unmodified `main` reproduced the committed `media/webview.js` and `office-preview.js` byte for byte.
+- One hidden instance (`open -n -g -j`):
+  - CDP 9242;
+  - a throwaway `--user-data-dir`, `--extensions-dir` and `--shared-data-dir` under `/private/tmp/claude-501/s142/`;
+  - `--use-mock-keychain`, `RITEMARK_BUILD_CHANNEL=test`, usage data off (`ritemark.features.analytics: false`);
+  - the three backgrounding flags.
+
+  Rebuilt webviews were loaded with ⌘R (Reload Window), and the instance was quit at the end. No SecurityAgent prompt appeared.
+- **Workspaces:**
+  - a copy of the sample project at a long path, `/private/tmp/claude-501/s142/T/rm-smoke-20261026/proj/Leadership programme`, with a Word file and an Excel file added;
+  - an empty project, `Team offsite 2027`.
+
+**Automated:**
+- `npm test` in `extensions/ritemark`: the whole chain passes, including the new `splitButton.test.ts`, and `home.test.ts`, `homeState.test.ts`, `guidance.test.ts` and `workbenchProtocol.test.ts` with the new cases;
+- `npm run typecheck` (webview) and `npm run compile` (extension, with `tsc --noEmit`): clean.
+
+### What ran, by scenario
+
+| Scenario | Result | Evidence |
+|---|---|---|
+| S1–S5 lists | Pass. Computed `list-style-type`: disc, circle, square; decimal; a task list `none`. The first item's text at x 48 on a list at x 28 (the 20 px indent, as on main). Rendered by injecting the AI's Markdown into the sheet: no AI turn was sent | `qa/light-q6-ai-lists.png` |
+| S7 Dark lists | Not captured; markers use `--r-ink-muted`, which Dark defines | — |
+| S12 the note | Pass: one line, 569 px wide on a 784 px desk | `qa/light-q22-switch-note.png` |
+| S13 6 s | Pass: gone 6.2 s after it showed, twice | `notewatch` logs |
+| S14 hover | Pass: held under the pointer for 20 s; gone about 6 s after the pointer left | `qa/light-q23-switch-note-hovered.png` |
+| S16 a press on Home | Pass: gone 0.3 s after a press 1.5 s into the note. A press 0.1 s after it first painted did not end it: the effect wasn't listening yet | — |
+| S17 typing | Pass (synthetic `keydown` in Home): Tab kept it, "a" ended it | — |
+| S18 files dragged over | Pass (synthetic `dragenter` with `Files`) | — |
+| S19 another tab | Pass: the Task board chosen 2 s into the note, back to Home 1.4 s later: gone | — |
+| S15, S20, S21, S22 | Not run: focus within the note, the narrow-desk wrap of the note, Go back, reduced motion. Go back's code is unchanged | — |
+| S23, S24 path | Pass at a 544 px desk: `/private/tmp/claude-501/s142/T/rm-smoke-2…/proj/Leadership programme`. The gap between the ellipsis and "/" is −0.01 px, measured from the glyphs. On main the same width left a visible gap: `qa/audit-r4-path-gap-main.png` | `qa/light-q24-path-560.png` |
+| S25 a folder name wider than the line | Pass at a 224 px desk: "Leadership / programme ›". At a 152 px desk the words themselves are wider than the line and break, as the rule's last resort | `qa/light-q27-path-wrap-224.png`, `qa/light-q26-home-152-desk.png` |
+| S28–S30 Home's split button | Pass: one fill; hovering the caret darkens the whole button; with the menu open and the pointer away, the rest tone; the keyboard ring on one part at a time | `qa/light-q1…q5-*.png` |
+| S31–S33 the empty project's second press | Unit-tested only (`readyPressAction`, `refillOnReopen`). Live, the ready requests here are the sample's: ChatGPT was ready through the Mac's own Codex, and a press would have sent work | — |
+| S34 the sample's 15 s | Unit-tested (`splitButtonState`: busy turns off both parts). Not pressed live: it gives the task to ChatGPT | — |
+| S35 the folder's second press | Unit-tested only | — |
+| S36–S40 board buttons | Give to (filled) and Review with (outline) at rest and with the caret hovered: pass. Disabled, not-ready (Q2) and Send to: unit-tested (`agentSplitState`) | `qa/light-q8…q9`, `q12…q13` |
+| S41 dictation | Hover on the whole button and the idle menu: pass. Dictating wasn't run: it asks for the microphone, a system prompt on Jarmo's screen | `qa/light-q10…q11` |
+| S42 Word's Open in Word | Pass | `qa/light-q14…q15` |
+| S43 Open in Excel | Pass; the caret's tooltip is Ritemark's ("Open in another app") | `qa/light-q16…q17` |
+| S44 Dark | Home's split button: one lavender tone with the 28% line | `qa/dark-q29-ready-request.png` |
+| S52, S53 scrollbars | The track: computed `scrollbar-color` was `rgba(148,163,184,.25) rgb(255,255,255)` on main (audit A3) and is `… rgba(0,0,0,0)` now; the slider shows while the pointer is in the page and for a second after a scroll (`data-scrolling`, checked). **This Mac shows overlay scrollbars**, so the track itself can't be seen here. The Windows round is where it shows | — |
+| S54–S56 tooltip | Pass: the probe that does what `useKeepFocus` does (a mouse click, then a script focus on "Change image") now opens no tooltip; Shift+Tab, Tab to the same button opens it. On main the same probe kept it open with the pointer away (`qa/audit-a4-tooltip-stays.png`) | — |
+| S57 the board at 1440 | Pass: four columns of 175 on a 784 px desk; the board's scroller 784/784 | `qa/light-q7-board-1440.png` |
+| S60 Home at the 402 minimum, sheet forced | Pass: a 224 px desk, `scrollWidth` 224/224 (Change image inside, the times under the names). The first try found the times 8 px over; fixed | `qa/light-q25-home-402-sheet-open.png` |
+| S60 at #535's 152 px desk (emulated 330 px window, sheet forced) | Pass: 152/152, the name on two lines at 20 px, Change image's icon inside the cover | `qa/light-q26-home-152-desk.png` |
+| S62–S64 restored card tab | Merge 2 (patch 019). On this build, a card tab restored by Reload Window still reads `v3n6t1-video-before-each-module.md`, as A2 predicts | — |
+| S65 Transcribe a file | Pass: the import plus Transcribe opened `interview.wav` as a tab ("Transcribing…"), and the transcript filled in there with the on-device engine. The keyboard stayed in the panel | `qa/light-q21-transcribe-tab-opened.png` |
+| S66 behind a document | Unit-tested only. A hidden test window is never the OS's focused window, so `window.state.focused` is false and the tab opens in front by the rule | — |
+| S67 ElevenLabs | Not run: no key | — |
+| S68 Record | Not run: microphone. It goes through the same `_start()` | — |
+| S71 Windows overlay | Not run in this session | — |
+
+### The bundle
+
+`media/webview.js`: 8,712,915 → 8,720,135 bytes (+7,220); 8,720,526 after the QA follow-up below.
+
+### Open for the Experience lead
+
+- The switch note, the path's wrap, Home at 152 px, and each split button's states, from the light captures above.
+- The desk's edge is merge 2.
+- A6 found Home's switch note already uses the kit's toast shadow (ink 18%/12%), so it is unchanged.
+
+## Merge 1, QA follow-up (27 October 2026)
+
+The Development manager's QA of #560 at 971ea67f passed every technical gate and asked for one more commit on `sprint-142-polish`.
+
+| Item | What changed | Evidence |
+|---|---|---|
+| B1 | `release-plan.md`: 142's Sprints row is Approved, with #560; the tracker has merge 1's row (#560, Open, Passed (technical) 27 Oct, notes drafted) and merge 2's; the stale "Plan: 142" row is gone | — |
+| N1 | At a 152 px desk the card's × sat on its heading. The narrow rule's `padding-right` lost to the card's own rule further down, and a wider padding alone can't help: the heading's longest word ("ChatGPT") is wider than the line leaves it, so it ran on under the ×. Now, at 200 and below, the icon keeps the ×'s line, the words go under it at the card's whole width, and the body and button take that width (`.rh-desk` first, so the rules win). Measured: the × at 104–128 on the icon's line; the heading's words from the line below; `scrollWidth` 152/152 | `qa/light-q26-home-152-desk.png` (re-taken) |
+| N2 | The board's not-ready tooltip keeps the runtime's own reason after the generic sentence: "ChatGPT is not ready. Choose another agent. ChatGPT is signed out. Sign in and try again." | `splitButton.test.ts` |
+| N3 | `ritemark.sheetShadow`: Dark `#00000066` (black at 40%), Light ink `#1E1B4B12` unchanged, high contrast none (the Experience lead, framework §4 and the kit, `ritemark-dev` 30f0adb). The workbench's menus, dialogs and quick input, the Mermaid toolbar and the Agents place's cards take it from the token. Live in Ritemark Dark: a tab's menu over the desk computes `0 0 0 1px` hairline, `0 10px 24px -6px rgba(0,0,0,.4)`, `0 4px 8px -4px rgba(0,0,0,.4)`. The desk and the AI's sheet stop using the token in merge 2 (patch 018) | `qa/dark-q30-menu-over-desk.png` |
+| N5 | The folder's "Ask … what is here" pressed again within 10 s, before the AI took the request, was a silent no-op. Busy would disable the button, which R5b and §3's "never disabled" rule out, so the press now brings the AI's sheet forward on the chat the first press sent (`readyPressAction` → `reveal`, by the sheet's own id from its origin note), sending nothing again; before the sheet has named that chat, it shows the AI's sheet | `guidance.test.ts` (two new cases) |
+
+**Ran:** the webview's `tsc --noEmit` and both bundles, the extension's `npm run compile`, and `npm test` (the whole chain) — all pass; the validator by hand. Live on the hidden instance (CDP 9242, the same throwaway profile), with this branch's bundles: N1 at the emulated 330 px window with the AI's sheet forced open, and N3 in Ritemark Dark. The instance's `vscode/` tree carried merge 2's uncommitted workbench changes, which don't touch the menus' shadow.
+
+**Not run live:** N5's second press (pressing it would send the sample folder's request to a real AI) and N2's tooltip (no runtime here was signed out). Both are unit-tested.

@@ -226,6 +226,11 @@ export class BrowserPanelProvider
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <style>
+    /* Sprint 142 (#504): the list scrolls on the ground. VS Code's webview defaults paint the scrollbar's track in the
+       editor's background, a white strip here; the slider is thin and shows while the pointer is on the list. */
+    html { scrollbar-color: transparent transparent; }
+    * { scrollbar-width: thin; }
+    :hover { scrollbar-color: var(--vscode-scrollbarSlider-background) transparent; }
     :root {
       --r-accent: #4338CA;
       --r-accent-soft: rgba(67, 56, 202, 0.10);

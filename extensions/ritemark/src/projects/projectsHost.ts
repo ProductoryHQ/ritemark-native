@@ -39,6 +39,8 @@ export interface ProjectsHostDependencies {
   stopWorkingChats: () => Promise<void>;
   /** Sprint 140: the first day's guidance, Home's one card; null without a project. */
   guidance: GuidanceHost | null;
+  /** Sprint 142 (R3): a message the AI's sheet accepted, which ends Home's switch note. */
+  onTurnAccepted?: (listener: () => void) => vscode.Disposable;
 }
 
 export interface ProjectsHost {
@@ -151,6 +153,7 @@ export function registerProjects(deps: ProjectsHostDependencies): ProjectsHost {
     openConversation: deps.openConversation,
     onProjectsChanged: () => projectsView?.refresh(),
     guidance: deps.guidance,
+    onTurnAccepted: deps.onTurnAccepted,
   }) : undefined;
   const revealHome = async (): Promise<void> => {
     await home?.reveal({ viewColumn: vscode.ViewColumn.One });

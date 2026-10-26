@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — 2.1.0
 
+### Sprint 142: 2.1 polish (#557, #503, #504, #505, #516, #517, #535; merge 1)
+
+#### Changed
+- **Lists in the AI's answers have their bullets and numbers back (#557).** In muted ink, hanging in the indent the list had, so the text doesn't move: a filled bullet, then a hollow one, then a square; numbers in even figures, a list that starts at 3 starting at 3, and a task list showing its boxes without a bullet.
+- **Every split button is one button, in one tone (#557).** Home's first-day card, the Task board's Give to, Review with, Retry with and Send to, dictation, Word's and PowerPoint's Open in…, and the spreadsheet's Open in Excel. Hover, press, disabled and busy are the whole button's; the menu open keeps its rest tone; only the keyboard's focus ring outlines one part. The empty project's "Tell … what this project is for" never turns off: pressed again, it opens the same chat, focused, and puts the request back if the box was cleared. Pressed again, the folder's "Ask … what is here" opens the chat its request went to and sends nothing twice. While the sample's task is handed over, the whole button waits, its caret too. On the board, a chosen agent that isn't ready opens the agent menu instead of half the button turning grey. While dictating, the whole button shows it, and its language menu still opens, with the languages unavailable and a line saying why.
+- **The project-switch note goes when it has done its job (#557).** One line at the foot of Home, as wide as its words. It goes after 6 seconds (it stays while you point at it or tab to it), and at once when you start something: a click or a key on Home, files dragged over, another tab, or a message sent to the AI.
+- **Home's folder path is cut in the middle without a gap (#557).** The ellipsis touches the next character, the start gives way before the parent folder, and the project's own folder is never cut: a name too long for the line wraps at its spaces, with the › after its last word. The whole path is in the tooltip.
+- **A transcribed file opens as a tab (#517).** When its transcription starts, a file from Transcribe a file… (or a recording made in Ritemark) opens in the Transcript Workbench, and the transcript fills in there. It doesn't take the keyboard, and opens behind a document you are typing in.
+- **The Task board fits the default 1440 window with both side columns (#516).** Its four columns share the desk down to 160 each; only a narrower desk scrolls sideways.
+- **The AI's sheet draws a whole edge (#503).** An inset hairline instead of a cut outline and shadow. What floats over the window (menus, dialogs, quick input, the editor's toolbars) keeps its shadow: in Ritemark's ink in Light, black at 40% in Dark, and none in high contrast.
+
+#### Fixed
+- **No white strip beside a scrolling list in the left column (#504).** Transcribe, Home's projects, Tasks, Agents and Browser: the scrollbar's track is the ground, and a thin slider shows while you point at the list or it scrolls.
+- **A tooltip no longer stays up after a click (#505).** A button that takes another's place when clicked (Give to becoming Stop) no longer shows its tooltip for the whole turn. Tooltips follow the pointer, and still show for the keyboard.
+- **Home fits a very narrow desk (#535).** With the AI's sheet forced open in the narrowest window, Home no longer scrolls sideways: the name steps down to fit, Change image keeps its icon inside the cover, and the times go under the names.
+- **The spreadsheet's Open in Excel** has Ritemark's tooltips instead of the system's.
+
 ### Sprint 138: equations and Google Docs quotes (#481, #408)
 
 #### Added

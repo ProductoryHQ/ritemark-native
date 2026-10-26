@@ -216,8 +216,10 @@ export function boardHtml(
   const nonce = nonceOf();
   const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'webview.js'));
   const background = editorType === 'tasks-panel' ? 'var(--vscode-sideBar-background)' : 'var(--vscode-editor-background)';
+  // Sprint 142 (#504): the left column's list scrolls on the ground (index.css, html.rm-ground)
+  const ground = editorType === 'tasks-panel' ? ' class="rm-ground"' : '';
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en"${ground}>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">

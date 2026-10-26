@@ -160,3 +160,34 @@ export function cardAi(input: { chosen: AgentId | undefined; sheetAi: AgentId | 
   if (first) return { ai: first, ready: true };
   return { ai: 'claude-code', ready: false };
 }
+
+/** Sprint 142 (R5b): a press this soon after the folder's request was sent waits for its chat rather than send again. */
+export const FILES_PRESS_SETTLE_MS = 10_000;
+
+/**
+ * Sprint 142 (R5b; experience 35, "one button, in one tone"; Q1): what a press of the ready request does, so the
+ * button never has to be disabled for the folder or the empty project. The sample's hand-over is the board's.
+ * - folder: open the chat its request went to while it is unanswered; otherwise send it in a new chat. A press within
+ *   10 s of the first, before the AI took the request, is never a silent no-op and never a disabled button (QA N5):
+ *   it brings the AI's sheet forward on the chat the first press sent, by the sheet's own id when the sheet has said it;
+ * - empty project: open the chat it filled before, the request put back only into an empty box; otherwise a new one.
+ */
+export function readyPressAction(input: {
+  kind: ReadyKind;
+  /** The folder's request: its chat once the AI took it, and whether that chat has an answer. */
+  sentChat: { id: string; answered: boolean } | null;
+  /** The folder's request was pressed this long ago and its chat isn't known yet. */
+  sinceLastPressMs: number | null;
+  /** The sheet's own id of the folder's request's chat, from the first press, before the AI took it. */
+  pendingChat: string | null;
+  /** The sheet's own id of the empty project's chat, from the first press. */
+  filledChat: string | null;
+}): { action: 'give' } | { action: 'open'; conversationId: string } | { action: 'reveal'; conversationId: string | null } | { action: 'send' } | { action: 'fill'; conversationId: string | null } {
+  if (input.kind === 'sample') return { action: 'give' };
+  if (input.kind === 'files') {
+    if (input.sentChat && !input.sentChat.answered) return { action: 'open', conversationId: input.sentChat.id };
+    if (!input.sentChat && input.sinceLastPressMs !== null && input.sinceLastPressMs < FILES_PRESS_SETTLE_MS) return { action: 'reveal', conversationId: input.pendingChat };
+    return { action: 'send' };
+  }
+  return { action: 'fill', conversationId: input.filledChat };
+}
