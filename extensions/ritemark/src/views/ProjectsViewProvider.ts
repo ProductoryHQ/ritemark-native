@@ -224,8 +224,9 @@ export class ProjectsViewProvider implements vscode.WebviewViewProvider, vscode.
 function projectsHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
   const nonce = createHash('sha256').update(`${Math.random()}${Date.now()}`).digest('hex').slice(0, 32);
   const script = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'webview.js'));
+  // Sprint 142 (#504): the list scrolls on the ground (index.css, html.rm-ground)
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="rm-ground">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">

@@ -1,5 +1,8 @@
-import React from 'react'
+import { Button } from '../ui/button'
+import { DropdownMenuItem } from '../ui/dropdown-menu'
 import { Icon } from '../ui/Icon'
+import { SplitButton } from '../ui/split-button'
+import { Tooltip } from '../ui/tooltip'
 import { defaultSpreadsheetApp, isMac } from '../../hooks/usePlatform'
 import type { DocumentSyncAction } from './DocumentSyncAction'
 
@@ -28,9 +31,6 @@ export function SpreadsheetToolbar({
   hasExcel,
   syncAction,
 }: SpreadsheetToolbarProps) {
-  const [showDropdown, setShowDropdown] = React.useState(false)
-  const dropdownRef = React.useRef<HTMLDivElement>(null)
-
   // Determine primary and secondary actions based on Excel availability
   const altAppLabel = `Open in ${defaultSpreadsheetApp}`
   const primaryAction = hasExcel && onOpenInExcel ? onOpenInExcel : onOpenInNumbers
@@ -41,20 +41,6 @@ export function SpreadsheetToolbar({
     : onOpenInExcel
   const secondaryLabel = hasExcel && onOpenInExcel ? altAppLabel : 'Open in Excel'
   const hasSecondary = !!secondaryAction
-
-  // Close dropdown when clicking outside
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false)
-      }
-    }
-
-    if (showDropdown) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showDropdown])
 
   return (
     <header className="spreadsheet-toolbar">
@@ -71,61 +57,51 @@ export function SpreadsheetToolbar({
 
         {/* Derived action: absent while the rendered document matches host state. */}
         {syncAction && (
-          <button
-            className={`refresh-button ${syncAction.kind}`}
-            onClick={syncAction.onClick}
-            aria-label={syncAction.label}
-            title={syncAction.title ?? syncAction.label}
-          >
-            <Icon name={syncAction.kind === 'conflict' ? 'warning' : 'arrow-clockwise'} size={16} />
-            <span className="refresh-text">{syncAction.label}</span>
-          </button>
+          <Tooltip label={syncAction.title ?? syncAction.label}>
+            <button
+              className={`refresh-button ${syncAction.kind}`}
+              onClick={syncAction.onClick}
+              aria-label={syncAction.label}
+            >
+              <Icon name={syncAction.kind === 'conflict' ? 'warning' : 'arrow-clockwise'} size={16} />
+              <span className="refresh-text">{syncAction.label}</span>
+            </button>
+          </Tooltip>
         )}
 
-        {/* Right side: Split button */}
-        <div className="split-button-container" ref={dropdownRef}>
-          <div className="split-button">
-            {/* Primary action */}
-            <button
-              className="split-btn-primary"
-              onClick={primaryAction}
-              aria-label={primaryLabel}
-              title={primaryLabel}
-            >
-              <Icon name="arrow-up-right" size={16} />
+        {/* Right side: Open in Excel (or the Mac's spreadsheet app), with the other app behind its caret. Sprint 142
+            (R5d, #557): one button, in one tone (framework §3), with Ritemark's tooltips, not native ones. */}
+        {hasSecondary ? (
+          <SplitButton
+            tone="quiet"
+            className="spreadsheet-open"
+            main={{
+              label: <span className="split-btn-text">{primaryLabel}</span>,
+              icon: <Icon name="arrow-up-right" size={16} tone="inherit" />,
+              tooltip: `${primaryLabel}, to edit it there`,
+              ariaLabel: primaryLabel,
+              onClick: () => primaryAction?.(),
+            }}
+            menu={{
+              label: 'Open in another app',
+              tooltip: 'Open in another app',
+              content: (
+                <DropdownMenuItem onSelect={() => secondaryAction?.()}>
+                  {/* Table for Excel, a grid for Numbers */}
+                  {secondaryLabel.includes('Excel') ? <Icon name="table" size={14} tone="inherit" /> : <Icon name="grid-nine" size={14} tone="inherit" />}
+                  <span>{secondaryLabel}</span>
+                </DropdownMenuItem>
+              ),
+            }}
+          />
+        ) : (
+          <Tooltip label={`${primaryLabel}, to edit it there`}>
+            <Button type="button" variant="ghost" size="sm" className="spreadsheet-open" aria-label={primaryLabel} onClick={() => primaryAction?.()}>
+              <Icon name="arrow-up-right" size={16} tone="inherit" />
               <span className="split-btn-text">{primaryLabel}</span>
-            </button>
-
-            {/* Dropdown toggle (only if there's a secondary option) */}
-            {hasSecondary && (
-              <button
-                className="split-btn-dropdown"
-                onClick={() => setShowDropdown(!showDropdown)}
-                aria-label="More options"
-                title="More options"
-              >
-                <Icon name="caret-down" size={14} />
-              </button>
-            )}
-          </div>
-
-          {/* Dropdown menu */}
-          {showDropdown && hasSecondary && (
-            <div className="dropdown-menu">
-              <button
-                className="dropdown-item"
-                onClick={() => {
-                  secondaryAction?.()
-                  setShowDropdown(false)
-                }}
-              >
-                {/* Table2 for Excel, Grid3X3 for Numbers */}
-                {secondaryLabel.includes('Excel') ? <Icon name="table" size={14} /> : <Icon name="grid-nine" size={14} />}
-                <span>{secondaryLabel}</span>
-              </button>
-            </div>
-          )}
-        </div>
+            </Button>
+          </Tooltip>
+        )}
       </div>
 
       <style>{`
@@ -155,68 +131,6 @@ export function SpreadsheetToolbar({
           font-weight: 500;
         }
 
-        /* Split button container */
-        .split-button-container {
-          position: relative;
-        }
-
-        /* Split button wrapper */
-        .split-button {
-          display: flex;
-          align-items: stretch;
-          border-radius: 6px;
-          overflow: hidden;
-        }
-
-        /* Shared button styles */
-        .split-btn-primary,
-        .split-btn-dropdown {
-          display: flex;
-          align-items: center;
-          border: none;
-          background: transparent;
-          color: var(--r-ink-strong);
-          font-size: 13px;
-          font-family: var(--ritemark-ui-font-family);
-          cursor: pointer;
-          transition: background-color 0.15s ease;
-        }
-
-        /* Primary button */
-        .split-btn-primary {
-          gap: 6px;
-          padding: 6px 10px;
-          border-radius: 6px 0 0 6px;
-        }
-
-        .split-btn-primary:hover {
-          background: var(--r-surface-soft);
-        }
-
-        .split-btn-primary:active {
-          background: var(--r-surface-muted, var(--r-surface-soft));
-        }
-
-        /* Dropdown toggle */
-        .split-btn-dropdown {
-          padding: 6px 6px;
-          border-left: 1px solid var(--r-hairline);
-          border-radius: 0 6px 6px 0;
-        }
-
-        .split-btn-dropdown:hover {
-          background: var(--r-surface-soft);
-        }
-
-        .split-btn-dropdown:active {
-          background: var(--r-surface-muted, var(--r-surface-soft));
-        }
-
-        /* When no secondary option, round all corners */
-        .split-button:not(:has(.split-btn-dropdown)) .split-btn-primary {
-          border-radius: 6px;
-        }
-
         /* Button text - hidden on narrow viewports */
         .split-btn-text {
           display: inline;
@@ -228,43 +142,6 @@ export function SpreadsheetToolbar({
           .split-btn-text {
             display: none;
           }
-        }
-
-        /* Dropdown menu */
-        .dropdown-menu {
-          position: absolute;
-          top: calc(100% + 4px);
-          right: 0;
-          min-width: 180px;
-          background: var(--vscode-menu-background);
-          border: 1px solid var(--vscode-menu-border);
-          border-radius: 6px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-          padding: 4px;
-          z-index: 1000;
-        }
-
-        /* Dropdown item */
-        .dropdown-item {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          width: 100%;
-          padding: 8px 12px;
-          border: none;
-          border-radius: 4px;
-          background: transparent;
-          color: var(--vscode-menu-foreground);
-          font-size: 13px;
-          font-family: var(--ritemark-ui-font-family);
-          cursor: pointer;
-          text-align: left;
-          transition: background-color 0.15s ease;
-        }
-
-        .dropdown-item:hover {
-          background: var(--vscode-menu-selectionBackground);
-          color: var(--vscode-menu-selectionForeground);
         }
 
         /* Refresh button - matches DocumentHeader style */

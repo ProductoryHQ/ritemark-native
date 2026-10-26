@@ -196,6 +196,12 @@ export interface ChatStartRequest {
   cursor?: number;
   /** Which ready request it is, so its chat is known and counted (R6, R15). */
   origin?: 'what_is_here' | 'what_for';
+  /**
+   * Sprint 142 (R5b): the sheet's own id of a chat this request opened before. The sheet opens that chat and focuses
+   * its box, and with `fill: 'if-empty'` puts the text back only if the box is empty; a chat that is gone gets a new one.
+   */
+  conversationId?: string;
+  fill?: 'if-empty';
 }
 
 /** Sprint 140: what the sheet said about a chat it filled or started: the ready request's, or a starting point's. */

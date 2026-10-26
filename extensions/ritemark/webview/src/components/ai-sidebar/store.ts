@@ -114,6 +114,18 @@ export interface ChatStartMessage {
   /** For a fill: where the cursor waits; the end of `text` when absent. */
   cursor?: number;
   origin?: 'what_is_here' | 'what_for';
+  /** Sprint 142 (R5b): a chat this request opened before: open it again, and put the text back only into an empty box. */
+  conversationId?: string;
+  fill?: 'if-empty';
+}
+
+/**
+ * Sprint 142 (R5b; experience 35): what reopening a chat for Home's ready request does to its box (pure, tested): the
+ * request goes back in, the cursor where the request says, only when the box is empty; the person's own words stay.
+ */
+export function refillOnReopen(box: string, request: { text: string; cursor?: number }): { text: string; cursor: number } | null {
+  if (box.trim() !== '') return null;
+  return { text: request.text, cursor: request.cursor ?? request.text.length };
 }
 
 /** Sprint 140 (R8): the empty sheet's places, as the host names them (`src/guidance/startingPlace.ts`). */
@@ -2195,6 +2207,19 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     },
 
     startChatFromHost: (request) => {
+      // Sprint 142 (R5b): a second press of Home's ready request opens the chat its first press filled, focused; the
+      // request goes back into an empty box. A chat that is gone (closed, or dropped as empty) gets a new one.
+      const reopen = request.conversationId ? get().conversations[request.conversationId] : undefined;
+      if (reopen) {
+        const state = get();
+        const box = reopen.id === state.activeConversationId
+          ? (state.composerEmpty ? '' : 'words')
+          : (state.composerDrafts[reopen.id] ?? '');
+        state.switchConversation(reopen.id);
+        const refill = request.fill === 'if-empty' ? refillOnReopen(box, request) : null;
+        if (refill) set({ composerFill: { conversationId: reopen.id, text: refill.text, cursor: refill.cursor, nonce: Date.now() } });
+        return;
+      }
       get().startNewConversation();
       set({ pendingLanding: { runtimeId: request.runtimeId, text: '', since: Date.now(), start: request } });
       get().applyPendingLanding();
@@ -3032,6 +3057,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             send: message.send === true,
             ...(typeof message.cursor === 'number' && Number.isInteger(message.cursor) && message.cursor >= 0 && message.cursor <= message.text.length ? { cursor: message.cursor } : {}),
             ...(message.origin === 'what_is_here' || message.origin === 'what_for' ? { origin: message.origin } : {}),
+            ...(typeof message.conversationId === 'string' && message.conversationId ? { conversationId: message.conversationId } : {}),
+            ...(message.fill === 'if-empty' ? { fill: 'if-empty' as const } : {}),
           });
           break;
         }

@@ -765,7 +765,10 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     // Every other file keeps its file name and icon.
     let cardTabTitle: string | null = null;
     const applyCardTab = () => {
-      const title = cardPage ? cardPages?.cardTitleFor(document) ?? null : null;
+      // Sprint 142 (R12, #508): before the board is up, nothing here knows whether this file is a card, so the tab
+      // keeps the name its restore gave it (a card's title, patch 019) rather than being set back to the file's
+      if (!cardPages) return;
+      const title = cardPage ? cardPages.cardTitleFor(document) ?? null : null;
       if (title === cardTabTitle) return;
       cardTabTitle = title;
       webviewPanel.title = title ?? path.basename(document.uri.fsPath);

@@ -31,15 +31,74 @@ export function whenWords(iso: string, now: number, precision: 'minutes' | 'days
 }
 
 /**
- * A folder's path, cut in the middle on a narrow desk (#525): the start, which takes the ellipsis, and the
- * last two folders, which stay whole. `~/Documents/Ritemark/Harbour` is `~/Documents` and `/Ritemark/Harbour`.
- * A Windows path splits at its backslashes.
+ * A folder's path in three parts, for the cut in the middle (#525; Sprint 142 R4, #557): the start, the project's
+ * parent folder and the project's own folder. `~/Documents/Ritemark/Harbour` is `~/Documents`, `/Ritemark/` and
+ * `Harbour`. A Windows path splits at its backslashes. A path of one or two parts is all folder.
  */
-export function placeParts(place: string): { head: string; tail: string } {
+export function placeParts(place: string): { start: string; parent: string; folder: string } {
   const separator = place.includes('/') || !place.includes('\\') ? '/' : '\\'
   const parts = place.split(separator)
-  if (parts.length < 3) return { head: place, tail: '' }
-  return { head: parts.slice(0, -2).join(separator), tail: separator + parts.slice(-2).join(separator) }
+  if (parts.length < 3) return { start: '', parent: '', folder: place }
+  return { start: parts.slice(0, -2).join(separator), parent: separator + parts[parts.length - 2] + separator, folder: parts[parts.length - 1] }
+}
+
+export const ELLIPSIS = '…'
+
+/**
+ * Sprint 142 R4 (experience 3, #557): the path line as one string, cut in the middle when `fits` says the whole path
+ * doesn't. The start gives way first, from its end, then the parent folder; the ellipsis joins what is left with no
+ * space ("/private/tmp/rm-smo…/proj/Leadership programme"). The project's own folder is never cut: when even
+ * "…/Folder" doesn't fit, the line is the folder's name on its own, and `wrap` says it wraps at its spaces (anywhere,
+ * if it has none), as experience 3 draws it.
+ */
+export function middleCut(place: string, fits: (text: string) => boolean): { text: string; wrap: boolean } {
+  if (fits(place)) return { text: place, wrap: false }
+  const { start, parent, folder } = placeParts(place)
+  if (!parent) return { text: place, wrap: true }
+  // The longest of a run of candidates (longest first) that fits; candidates shrink as `keep` falls
+  const longest = (count: number, make: (keep: number) => string): string | null => {
+    let low = 0
+    let high = count - 1
+    let found: string | null = null
+    while (low <= high) {
+      const keep = Math.floor((low + high) / 2)
+      const text = make(keep)
+      if (fits(text)) {
+        found = text
+        low = keep + 1
+      } else {
+        high = keep - 1
+      }
+    }
+    return found
+  }
+  // The start, from all but its last character down to none ("…/proj/Folder")
+  const fromStart = longest(start.length, (keep) => start.slice(0, keep).trimEnd() + ELLIPSIS + parent + folder)
+  if (fromStart) return { text: fromStart, wrap: false }
+  // Then the parent folder's name, down to none ("…/Folder")
+  const separator = parent[0]
+  const parentName = parent.slice(1, -1)
+  const fromParent = longest(parentName.length, (keep) =>
+    keep === 0 ? ELLIPSIS + separator + folder : ELLIPSIS + separator + parentName.slice(0, keep).trimEnd() + ELLIPSIS + separator + folder)
+  if (fromParent) return { text: fromParent, wrap: false }
+  // The folder's name on its own, on one line if it fits there, wrapped if not
+  return { text: folder, wrap: !fits(folder) }
+}
+
+/** Sprint 142 R3 (experience 3; experience 36's Done note): the switch note goes this long after it shows. */
+export const SWITCH_NOTE_MS = 6000
+
+/**
+ * Sprint 142 R3: what on Home ends the switch note at once, because the person started something: a press on the
+ * page outside the note, a key typed (Tab only moves the focus, and a modifier alone types nothing), or files
+ * dragged over Home. Inside the note, a press or a key is the person using the note.
+ */
+export function noteEndsOn(event: { type: 'pointerdown' | 'keydown' | 'dragenter'; insideNote: boolean; key?: string; files?: boolean }): boolean {
+  if (event.type === 'dragenter') return event.files === true
+  if (event.insideNote) return false
+  if (event.type === 'pointerdown') return true
+  const key = event.key ?? ''
+  return !['Tab', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Fn'].includes(key)
 }
 
 /** Home's row fits about this much of a quoted message beside its lead and time at the page's width. */

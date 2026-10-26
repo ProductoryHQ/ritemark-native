@@ -546,6 +546,11 @@ export class AgentLibraryViewProvider implements vscode.WebviewViewProvider {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
   <style>
+    /* Sprint 142 (#504): the list scrolls on the ground. VS Code's webview defaults paint the scrollbar's track in the
+       editor's background, a white strip here; the slider is thin and shows while the pointer is on the list. */
+    html { scrollbar-color: transparent transparent; }
+    * { scrollbar-width: thin; }
+    :hover { scrollbar-color: var(--vscode-scrollbarSlider-background) transparent; }
     /* === Ritemark 2.0 (experience 31): the Agents place in the column's list language; colours from the theme === */
     @font-face { font-family: 'Phosphor'; src: url('${phosphorUri}') format('woff2'); font-display: block; }
     /* Brand font: Ritemark UI is Sofia Sans, never the system stack */

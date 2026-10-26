@@ -1317,7 +1317,8 @@ export function Editor({
           background: var(--r-surface) !important;
           border: 1px solid var(--r-hairline-strong) !important;
           border-radius: 10px !important;
-          box-shadow: 0 6px 24px rgba(15, 23, 42, 0.24) !important;
+          /* Sprint 142 (#503): the kit's floating sheet (kit: .menu, .bubble), in ink; Dark draws the hairline only */
+          box-shadow: 0 10px 24px -6px var(--vscode-ritemark-sheetShadow, rgba(30, 27, 75, 0.16)), 0 4px 8px -4px var(--vscode-ritemark-sheetShadow, rgba(30, 27, 75, 0.08)) !important;
           padding: 6px !important;
           color: var(--r-ink-strong) !important;
         }

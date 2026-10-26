@@ -8,9 +8,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { HomeAi, HomeAiId, HomeGuidance } from '../../../../src/projects/protocol'
 import { Button } from '../ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { DropdownMenuItem } from '../ui/dropdown-menu'
 import { Icon } from '../ui/Icon'
 import { Input } from '../ui/input'
+import { SplitButton } from '../ui/split-button'
 import { Tooltip } from '../ui/tooltip'
 import { KeySheet } from '../welcome/WelcomeParts'
 import { send } from './homeClient'
@@ -45,7 +46,9 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
   const [menuOpen, setMenuOpen] = useState(false)
   const [keySheet, setKeySheet] = useState(false)
   // Ask with opens under the whole split button, its left edge on the main button's (experience 35, frame 1)
-  // The sample's hand-over takes some seconds before the board shows it in Doing: the button waits, and is not pressed twice
+  // The sample's hand-over takes some seconds before the board shows it in Doing: the whole button waits, caret too,
+  // and is not pressed twice. The other two kinds never wait: a second press opens the chat the first one started
+  // (Sprint 142 R5b; experience 35, "The split button is one button, in one tone").
   const [pressing, setPressing] = useState(false)
   useEffect(() => {
     if (!pressing) return
@@ -61,7 +64,7 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
   const [menuOffset, setMenuOffset] = useState(0)
   const openMenu = (open: boolean) => {
     const split = splitRef.current
-    const more = split?.querySelector('.rh-split-more')
+    const more = split?.querySelector('.rm-split-more')
     if (open && split && more) setMenuOffset(split.getBoundingClientRect().left - more.getBoundingClientRect().left)
     setMenuOpen(open)
   }
@@ -82,52 +85,58 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
       </Tooltip>
       <p className="rh-guide-body">{card.body}</p>
       <div className="rh-guide-go">
-        <span className="rh-split" ref={splitRef}>
-          <Tooltip label={mainTip(card, name)}>
-            <Button size="sm" className="rh-split-main" disabled={pressing} aria-busy={pressing || undefined} onClick={() => {
+        <SplitButton
+          className="rh-split"
+          wrapperRef={splitRef}
+          busy={pressing}
+          main={{
+            label: busy ? busy.button : card.button,
+            icon: busy
+              ? <Icon name="circle-notch" size={14} tone="inherit" className="animate-spin motion-reduce:animate-none" />
+              : <Icon name="chat-circle" size={14} tone="inherit" />,
+            tooltip: mainTip(card, name),
+            className: 'rh-split-main',
+            onClick: () => {
               if (!card.aiReady) return openMenu(true)
-              setPressing(true)
+              if (card.kind === 'sample') setPressing(true)
               send({ type: 'home/ready-request' })
-            }}>
-              {busy
-                ? <Icon name="circle-notch" size={14} tone="inherit" className="animate-spin motion-reduce:animate-none" />
-                : <Icon name="chat-circle" size={14} tone="inherit" />}
-              <span className="truncate">{busy ? busy.button : card.button}</span>
-            </Button>
-          </Tooltip>
-          <DropdownMenu open={menuOpen} onOpenChange={openMenu} modal={false}>
-            <Tooltip label="Choose which AI asks">
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" className="rh-split-more" aria-label="Ask with">
-                  <Icon name="caret-down" size={12} tone="inherit" />
-                </Button>
-              </DropdownMenuTrigger>
-            </Tooltip>
-            <DropdownMenuContent align="start" alignOffset={menuOffset} className="rh-askwith">
-              <div className="rh-askwith-hd" role="presentation">Ask with</div>
-              {card.ais.map((ai) => {
-                const words = stateWords(ai)
-                const busy = ai.state === 'signing-in' || ai.state === 'checking'
-                return (
-                  <DropdownMenuItem
-                    key={ai.id}
-                    disabled={busy}
-                    onSelect={() => choose(ai)}
-                    role="menuitemradio"
-                    aria-checked={ai.id === card.ai && card.aiReady}
-                    className="rh-askwith-it"
-                  >
-                    <span className="rh-askwith-ic"><AiMark id={ai.id} /></span>
-                    <span className="rh-askwith-name">{ai.name}</span>
-                    {words
-                      ? <span className="rh-askwith-sub">{words}</span>
-                      : ai.id === card.ai && card.aiReady ? <Icon name="check" size={14} tone="inherit" className="rh-askwith-chk" /> : null}
-                  </DropdownMenuItem>
-                )
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </span>
+            },
+          }}
+          menu={{
+            label: 'Ask with',
+            tooltip: 'Choose which AI asks',
+            open: menuOpen,
+            onOpenChange: openMenu,
+            align: 'start',
+            alignOffset: menuOffset,
+            contentClassName: 'rh-askwith',
+            content: (
+              <>
+                <div className="rh-askwith-hd" role="presentation">Ask with</div>
+                {card.ais.map((ai) => {
+                  const words = stateWords(ai)
+                  const signingIn = ai.state === 'signing-in' || ai.state === 'checking'
+                  return (
+                    <DropdownMenuItem
+                      key={ai.id}
+                      disabled={signingIn}
+                      onSelect={() => choose(ai)}
+                      role="menuitemradio"
+                      aria-checked={ai.id === card.ai && card.aiReady}
+                      className="rh-askwith-it"
+                    >
+                      <span className="rh-askwith-ic"><AiMark id={ai.id} /></span>
+                      <span className="rh-askwith-name">{ai.name}</span>
+                      {words
+                        ? <span className="rh-askwith-sub">{words}</span>
+                        : ai.id === card.ai && card.aiReady ? <Icon name="check" size={14} tone="inherit" className="rh-askwith-chk" /> : null}
+                    </DropdownMenuItem>
+                  )
+                })}
+              </>
+            ),
+          }}
+        />
         <span className="rh-guide-note" role={busy ? 'status' : undefined}>{busy ? busy.note : card.note}</span>
       </div>
       {card.problem && <p className="rh-guide-problem" role="status">{card.problem}</p>}

@@ -259,11 +259,65 @@ body[data-vscode-theme-kind='vscode-dark'],
   background-color: var(--vscode-ritemark-ground, var(--vscode-sideBar-background));
 }
 
+/* Sprint 142 R7 (#503; framework §4, "a sheet's edge is drawn whole or not at all"): the sheet sits flush with its
+   webview's left and bottom edges, so an outset hairline and a shadow were cut there. The hairline is an inset ring,
+   inside the sheet's own box, and there is no shadow: the build can't give it its 8 of ground (audit A6). */
 .rm-ai-sheet {
   background-color: var(--vscode-ritemark-aiSheet, var(--r-surface));
   border-radius: 10px;
-  box-shadow: 0 0 0 1px var(--vscode-ritemark-sheetBorder, var(--r-hairline)), 0 1px 2px var(--vscode-ritemark-sheetShadow, rgba(15, 23, 42, 0.05));
+  box-shadow: inset 0 0 0 1px var(--vscode-ritemark-sheetBorder, var(--r-hairline));
 }
+
+/* Sprint 142 R5 (#557; framework §3, Jarmo 26 October): a split button is one button, in one tone. The wrapper owns
+   the fill's states, the shadow and the press; the parts keep only the keyboard's focus ring, each its own.
+   ui/split-button.tsx draws it; dictation and the spreadsheet's Open in Excel use the same classes. */
+.rm-split { position: relative; display: inline-flex; align-items: stretch; min-width: 0; max-width: 100%; border-radius: 6px; vertical-align: middle; transition: transform 150ms ease, opacity 150ms ease; }
+.rm-split > .rm-split-slot { display: inline-flex; min-width: 0; }
+.rm-split > .rm-split-slot:last-child { flex: none; }
+.rm-split .rm-split-part { box-shadow: none; transform: none; transition: background-color 150ms ease, color 150ms ease; }
+.rm-split .rm-split-part:hover, .rm-split .rm-split-part:active { box-shadow: none; transform: none; }
+.rm-split .rm-split-part:disabled { opacity: 1; }
+.rm-split .rm-split-main { min-width: 0; max-width: 100%; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.rm-split .rm-split-more { flex: none; border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 8px; padding-right: 8px; }
+.rm-split .rm-split-part:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--r-accent); outline-offset: 1px; }
+.rm-split:not([data-disabled]):has(.rm-split-part:active) { transform: scale(0.98); }
+.rm-split[data-disabled] { opacity: 0.5; }
+.rm-split[data-disabled] .rm-split-part { cursor: default; }
+/* Filled (primary): one indigo, the caret parted by a line at 28% white; the indigo shadow is the whole button's */
+.rm-split[data-tone="primary"] { box-shadow: var(--ritemark-shadow-indigo-sm); }
+.rm-split[data-tone="primary"] .rm-split-part,
+.rm-split[data-tone="primary"] .rm-split-part:hover,
+.rm-split[data-tone="primary"] .rm-split-part[data-state="open"] { background-color: var(--primary); color: var(--primary-foreground); }
+.rm-split[data-tone="primary"]:not([data-disabled]):hover { box-shadow: var(--ritemark-shadow-indigo-md); }
+.rm-split[data-tone="primary"]:not([data-disabled]):hover .rm-split-part { background-color: var(--primary-hover); }
+.rm-split[data-tone="primary"] .rm-split-more { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.28); }
+/* Outline: one frame on the wrapper, the parts transparent inside it, the caret parted by the frame's hairline */
+.rm-split[data-tone="outline"] { background-color: var(--r-surface); box-shadow: inset 0 0 0 1px var(--r-hairline-strong); }
+.rm-split[data-tone="outline"] .rm-split-part,
+.rm-split[data-tone="outline"] .rm-split-part:hover,
+.rm-split[data-tone="outline"] .rm-split-part[data-state="open"] { background-color: transparent; border-color: transparent; color: var(--r-ink-strong); }
+.rm-split[data-tone="outline"]:not([data-disabled]):hover { background-color: var(--r-surface-soft); }
+.rm-split[data-tone="outline"] .rm-split-more { box-shadow: inset 1px 0 0 var(--r-hairline-strong); }
+/* Quiet (a bar's button): no frame at rest, the ground's fill on hover, the caret's hairline shown with it */
+.rm-split[data-tone="quiet"] .rm-split-part,
+.rm-split[data-tone="quiet"] .rm-split-part:hover,
+.rm-split[data-tone="quiet"] .rm-split-part[data-state="open"] { background-color: transparent; }
+.rm-split[data-tone="quiet"]:not([data-disabled]):hover { background-color: var(--r-surface-soft); }
+.rm-split[data-tone="quiet"]:not([data-disabled]):hover .rm-split-more { box-shadow: inset 1px 0 0 var(--r-hairline); }
+
+/* Sprint 142 R8 (#504): VS Code's webview defaults paint every scrollbar's track in the editor's background
+   (`html { scrollbar-color: … var(--vscode-editor-background) }`, white in Ritemark Light), a white strip on the
+   ground and on the AI's sheet. The track is the surface's own. On the ground (the left column's places,
+   html.rm-ground) lists scroll on a thin slider that shows while the pointer is on them or they scroll, as
+   Documents' tree does (audit A3). */
+html { scrollbar-color: var(--vscode-scrollbarSlider-background) transparent; }
+html.rm-ground, html.rm-ground * { scrollbar-width: thin; }
+html.rm-ground { scrollbar-color: transparent transparent; }
+/* The page itself often scrolls (Transcribe's list grows the page): html takes the slider while the pointer is in it */
+html.rm-ground:hover,
+html.rm-ground[data-scrolling],
+html.rm-ground :hover,
+html.rm-ground [data-scrolling] { scrollbar-color: var(--vscode-scrollbarSlider-background) transparent; }
 
 /* Ritemark 2.0: a table without Add row closes on its area's border, with no line after its last row (DataTable.tsx) */
 .rm-grid-closed > tbody > tr:last-child > td {

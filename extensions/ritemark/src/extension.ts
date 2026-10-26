@@ -540,6 +540,7 @@ export function activate(context: vscode.ExtensionContext) {
     setStartingPlace: (place, hasAbout) => unifiedViewProvider.setStartingPlace(place, hasAbout),
     onTurnAccepted: (listener) => unifiedViewProvider.onTurnAccepted(listener),
     onChatOrigin: (listener) => unifiedViewProvider.onChatOrigin(listener),
+    openConversation: (conversationId) => unifiedViewProvider.openConversation(conversationId),
   }) : null;
   if (guidance) context.subscriptions.push(guidance);
 
@@ -551,6 +552,7 @@ export function activate(context: vscode.ExtensionContext) {
     workingChats: () => unifiedViewProvider.workingChats(),
     stopWorkingChats: () => unifiedViewProvider.stopWorkingChats(),
     guidance,
+    onTurnAccepted: (listener) => unifiedViewProvider.onTurnAccepted(() => listener()),
   });
 
   // Sprint 108: Transcribe. Flag-gated (D4 ships it on Windows too). Where the

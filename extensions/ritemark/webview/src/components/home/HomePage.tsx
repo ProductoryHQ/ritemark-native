@@ -14,12 +14,12 @@
  * sends what the person does. Every name is drawn as text, never as markup.
  */
 
-import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import type { HomeMessage, HomeState } from '../../../../src/projects/protocol'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
-import { othersWords, placeParts, recentIcon, waitingIcon, waitingWords, whenWords } from './homeWords'
+import { middleCut, noteEndsOn, othersWords, recentIcon, SWITCH_NOTE_MS, waitingIcon, waitingWords, whenWords } from './homeWords'
 import { ConversationBubbleIcon } from '../ai-sidebar/ConversationBubbleIcon'
 import { send } from './homeClient'
 import { GuidanceCard } from './GuidanceCards'
@@ -78,11 +78,54 @@ function ProjectLine({ line }: { line: string }) {
   )
 }
 
-/** The folder's path, cut in the middle when the desk is narrow (#525) */
-function PlaceText({ place }: { place: string }) {
-  const { head, tail } = placeParts(place)
-  if (!tail) return <span className="rh-place-text">{place}</span>
-  return <span className="rh-place-text rh-place-cut"><span className="rh-place-head">{head}</span><span className="rh-place-tail">{tail}</span></span>
+// A layout effect in the page, a plain effect when the page is rendered to markup (the tests)
+const useLayoutEffectInPage = typeof document === 'undefined' ? useEffect : useLayoutEffect
+
+/**
+ * The folder's path, cut in the middle when the desk is narrow (#525; Sprint 142 R4, #557). One text node, measured,
+ * so the ellipsis touches the next character: CSS's text-overflow left the rest of the start's box empty after it.
+ * The line's room is the container's width less what the line holds besides the path (its icons, gaps, padding).
+ * With `caret`, the › is drawn here, so a folder name that has to wrap keeps it after its last word.
+ */
+function PlaceText({ place, caret = false }: { place: string; caret?: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const [cut, setCut] = useState<{ text: string; wrap: boolean; glue: boolean }>({ text: place, wrap: false, glue: false })
+  useLayoutEffectInPage(() => {
+    const span = ref.current
+    const owner = span?.parentElement
+    const container = owner?.parentElement
+    if (!span || !owner || !container) return
+    const canvas = document.createElement('canvas').getContext('2d')
+    const measure = () => {
+      if (!canvas) return
+      const style = getComputedStyle(span)
+      canvas.font = style.font
+      const caretWidth = caret ? 18 : 0
+      const room = container.clientWidth - (owner.offsetWidth - span.offsetWidth) - caretWidth
+      const fits = (text: string) => canvas.measureText(text).width <= room
+      const cutNow = room <= 0 ? { text: place, wrap: true } : middleCut(place, fits)
+      // The last word keeps the › on its line only when the two fit a line; a longer word breaks anywhere
+      const glue = cutNow.wrap && caret && cutNow.text.includes(' ') && fits(cutNow.text.slice(cutNow.text.lastIndexOf(' ') + 1))
+      const next = { ...cutNow, glue }
+      setCut((current) => (current.text === next.text && current.wrap === next.wrap && current.glue === next.glue ? current : next))
+    }
+    measure()
+    const observer = new ResizeObserver(() => measure())
+    observer.observe(container)
+    void document.fonts?.ready.then(measure)
+    return () => observer.disconnect()
+  }, [place, caret])
+  const caretIcon = caret ? <Icon name="caret-right" size={12} tone="muted" className="rh-place-caret" /> : null
+  // A name that wraps keeps the › after its last word (experience 3, ritemark-dev 76b3a50): the last word and the ›
+  // go to a line together. A name with no spaces breaks anywhere instead.
+  const lastSpace = cut.glue ? cut.text.lastIndexOf(' ') : -1
+  return (
+    <span ref={ref} className={`rh-place-text${cut.wrap ? ' rh-place-wrap' : ''}`}>
+      {lastSpace > 0 && caretIcon
+        ? <>{cut.text.slice(0, lastSpace + 1)}<span className="rh-place-last">{cut.text.slice(lastSpace + 1)}{caretIcon}</span></>
+        : <>{cut.text}{caretIcon}</>}
+    </span>
+  )
 }
 
 function Head({ state }: { state: HomeState }) {
@@ -96,8 +139,7 @@ function Head({ state }: { state: HomeState }) {
       <Tooltip label={<><span className="block break-all">{project.place}</span><span className="block">Show its files in Documents</span></>} side="bottom" className="block max-w-full">
         <Button variant="ghost" className="rh-place max-w-full justify-start" onClick={() => send({ type: 'home/open-documents' })} aria-label={`${project.place}. Show its files in Documents`}>
           <Icon name="folder-simple" size={14} tone="inherit" />
-          <PlaceText place={project.place} />
-          <Icon name="caret-right" size={12} tone="muted" />
+          <PlaceText place={project.place} caret />
         </Button>
       </Tooltip>
       <ProjectLine line={project.line} />
@@ -281,7 +323,7 @@ export function HomeView({ state, coverDefault, now }: { state: HomeState; cover
       <div className="rh-fit">
       <div className="rh-cover" style={{ backgroundImage: `url("${cover.replace(/"/g, '%22')}")` }} role="img" aria-label="The project's cover picture">
         <Tooltip label="Choose a picture for this project's cover" className="rh-change">
-          <Button className="rh-chip-button" onClick={() => send({ type: 'home/change-cover' })}><Icon name="image" size={14} tone="inherit" />Change image</Button>
+          <Button className="rh-chip-button" aria-label="Change image" onClick={() => send({ type: 'home/change-cover' })}><Icon name="image" size={14} tone="inherit" /><span className="rh-chip-label">Change image</span></Button>
         </Tooltip>
       </div>
       <main className="rh-page">
@@ -304,17 +346,88 @@ export function HomeView({ state, coverDefault, now }: { state: HomeState; cover
         {state.empty ? <DropFiles /> : <LastChanged state={state} now={now} />}
       </main>
       </div>
-      {state.switchedFrom && (
-        <div className="rh-toast" role="status">
-          <span>Switched to {state.project.name}. {state.switchedFrom.name} is kept as you left it.</span>
-          <Tooltip label={`Switch back to ${state.switchedFrom.name}`}>
-            <Button variant="ghost" size="sm" className="rh-toast-action" onClick={() => send({ type: 'home/go-back' })}>Go back</Button>
-          </Tooltip>
-          <Tooltip label="Hide this note">
-            <Button variant="ghost" size="icon-sm" className="rh-toast-action" aria-label="Hide this note" onClick={() => send({ type: 'home/dismiss-switched' })}><Icon name="x" size={12} tone="inherit" /></Button>
-          </Tooltip>
-        </div>
-      )}
+      {state.switchedFrom && <SwitchNote here={state.project.name} from={state.switchedFrom.name} />}
+    </div>
+  )
+}
+
+/**
+ * "Switched to … kept as you left it." with Go back (experience 3, frame 3; Sprint 142 R3, #557). One line at the
+ * desk's foot. It goes 6 seconds after it shows, held while the pointer is on it or it has the keyboard's focus,
+ * and at once when the person starts something on Home: a press outside it, a key, files dragged over, or Home
+ * losing the keyboard to the rest of the window. The host ends it for a tab chosen or a message sent.
+ */
+function SwitchNote({ here, from }: { here: string; from: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [hovered, setHovered] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const gone = useRef(false)
+  const end = useCallback(() => {
+    if (gone.current) return
+    gone.current = true
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (reduce) {
+      send({ type: 'home/dismiss-switched' })
+      return
+    }
+    setLeaving(true)
+    window.setTimeout(() => send({ type: 'home/dismiss-switched' }), 160)
+  }, [])
+  // Six seconds, started again whenever the pointer and the focus have both left it
+  useEffect(() => {
+    if (hovered || focused) return
+    const timer = window.setTimeout(end, SWITCH_NOTE_MS)
+    return () => window.clearTimeout(timer)
+  }, [hovered, focused, end])
+  // At once, when the person starts something on Home
+  useEffect(() => {
+    const shownAt = Date.now()
+    const inside = (target: EventTarget | null) => target instanceof Node && Boolean(ref.current?.contains(target))
+    const onPointer = (event: PointerEvent) => {
+      if (noteEndsOn({ type: 'pointerdown', insideNote: inside(event.target) })) end()
+    }
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (noteEndsOn({ type: 'keydown', insideNote: inside(event.target), key: event.key })) end()
+    }
+    const onDrag = (event: globalThis.DragEvent) => {
+      const files = Array.from(event.dataTransfer?.types ?? []).some((type) => type === 'Files' || type === 'text/uri-list')
+      if (noteEndsOn({ type: 'dragenter', insideNote: false, files })) end()
+    }
+    // The window settling after the switch can move the focus; only the person's own move ends the note
+    const onBlur = () => {
+      if (Date.now() - shownAt > 1500) end()
+    }
+    window.addEventListener('pointerdown', onPointer, true)
+    window.addEventListener('keydown', onKey, true)
+    window.addEventListener('dragenter', onDrag, true)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('pointerdown', onPointer, true)
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('dragenter', onDrag, true)
+      window.removeEventListener('blur', onBlur)
+    }
+  }, [end])
+  return (
+    <div
+      ref={ref}
+      className={`rh-toast${leaving ? ' leaving' : ''}`}
+      role="status"
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false)
+      }}
+    >
+      <span>Switched to {here}. {from} is kept as you left it.</span>
+      <Tooltip label={`Switch back to ${from}`}>
+        <Button variant="ghost" size="sm" className="rh-toast-action" onClick={() => send({ type: 'home/go-back' })}>Go back</Button>
+      </Tooltip>
+      <Tooltip label="Hide this note">
+        <Button variant="ghost" size="icon-sm" className="rh-toast-action" aria-label="Hide this note" onClick={() => send({ type: 'home/dismiss-switched' })}><Icon name="x" size={12} tone="inherit" /></Button>
+      </Tooltip>
     </div>
   )
 }

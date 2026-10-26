@@ -194,12 +194,23 @@ export const markdownStyles = `
   line-height: 1.5;
 }
 
-/* Lists */
+/* Lists (Sprint 142 R1, #557): Tailwind's preflight takes the markers off every list; the AI's answers
+   get them back, in muted ink, hanging in the 20px indent the list already has, so the text stays put
+   (experience 35, "Found later, in 2.1's smoke test"). The browser's own disc, circle and square. */
 .rendered-markdown ul,
 .rendered-markdown ol {
   margin: 6px 0;
   padding-left: 20px;
 }
+.rendered-markdown ul { list-style: disc outside; }
+.rendered-markdown ul ul { list-style-type: circle; }
+.rendered-markdown ul ul ul { list-style-type: square; }
+.rendered-markdown ol { list-style: decimal outside; }
+.rendered-markdown li::marker { color: var(--r-ink-muted); }
+.rendered-markdown ol > li::marker { font-variant-numeric: tabular-nums; }
+/* A task list (- [ ] …) shows its checkbox, not a bullet before it */
+.rendered-markdown li:has(> input[type="checkbox"]:first-child),
+.rendered-markdown li:has(> p:first-child > input[type="checkbox"]:first-child) { list-style: none; }
 .rendered-markdown li {
   margin: 2px 0;
 }

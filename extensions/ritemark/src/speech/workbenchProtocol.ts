@@ -75,6 +75,16 @@ export function parseTranscriptWorkbenchRequest(value: unknown): TranscriptWorkb
   throw new WorkbenchProtocolError(`Unknown workbench message type: ${type}`);
 }
 
+/**
+ * Sprint 142 (R13, #517; experience 20, frame 2): a recording opens as a tab when its transcription starts, and it
+ * never takes the keyboard from a document the person is typing in. With a document in front (Ritemark's editor or
+ * a text editor) in a focused window, the tab opens behind it; otherwise it comes forward, the keyboard staying put.
+ */
+export function workbenchOpensBehind(activeTab: { kind: 'text' } | { kind: 'custom'; viewType: string } | { kind: 'other' } | null, windowFocused: boolean): boolean {
+  if (!windowFocused || !activeTab) return false;
+  return activeTab.kind === 'text' || (activeTab.kind === 'custom' && activeTab.viewType === 'ritemark.editor');
+}
+
 function exactKeys(input: Record<string, unknown>, allowed: readonly string[]): void {
   const allowlist = new Set(allowed);
   const extra = Object.keys(input).find((key) => !allowlist.has(key));

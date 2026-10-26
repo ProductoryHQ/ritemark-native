@@ -231,14 +231,17 @@ export function SplitButton({
   actions: SplitAction[];
 }) {
   const compact = useContext(CompactContext)
+  // Sprint 142 (R5d, #557): one button, in one tone (framework §3): the shared outline frame (index.css .rm-split),
+  // hover and press on the whole button, the menu open in its rest tone
+  const split = actions.length > 0
   return (
-    <div className="flex h-8 shrink-0 items-stretch overflow-hidden rounded-md border border-hairline-strong bg-surface">
-      <Tooltip label={tooltip}>
+    <div className="rm-split h-8 shrink-0" data-tone="outline">
+      <Tooltip label={tooltip} className="rm-split-slot">
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="h-full rounded-none whitespace-nowrap px-2.5 text-ink-strong"
+          className={`rm-split-part ${split ? 'rm-split-main' : ''} h-full whitespace-nowrap px-2.5 text-ink-strong`}
           aria-label={compact ? label : undefined}
           onClick={onClick}
         >
@@ -246,13 +249,12 @@ export function SplitButton({
           {!compact && label}
         </Button>
       </Tooltip>
-      {actions.length > 0 && (
+      {split && (
         <>
-          <div className="w-px bg-hairline-strong" aria-hidden />
           <DropdownMenu modal={false}>
-            <Tooltip label={menuLabel}>
+            <Tooltip label={menuLabel} className="rm-split-slot">
               <DropdownMenuTrigger asChild>
-                <Button type="button" variant="ghost" size="icon-sm" className="h-full w-7 rounded-none text-ink-body" aria-label={menuLabel}>
+                <Button type="button" variant="ghost" size="icon-sm" className="rm-split-part rm-split-more h-full w-7 text-ink-body" aria-label={menuLabel}>
                   <Icon name="caret-down" size={12} tone="inherit" />
                 </Button>
               </DropdownMenuTrigger>

@@ -27,6 +27,8 @@ import { RecordingController } from '../speech/recording/RecordingController';
 import { decodeRecordingRequest, isRecordingMessage } from '../speech/recording/protocol';
 import { nodeSinkFs } from '../speech/recording/WavRecordingSink';
 import type { EngineId, TranscriptionJob, TranscriptSession } from '../speech/types';
+import { TRANSCRIPT_WORKBENCH_VIEW_TYPE } from '../speech/activeTranscript';
+import { workbenchOpensBehind } from '../speech/workbenchProtocol';
 import { countVoiceCapture } from '../analytics/posthog';
 
 /** What a row in the panel needs; deliberately not the whole session. */
@@ -368,6 +370,31 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
     });
     this._countedJobs.set(job.id, this._recordedPaths.has(pending.audioPath) ? 'recorded' : 'file');
     await this._pushState();
+    await this._openStarted(pending.audioPath);
+  }
+
+  /**
+   * Sprint 142 (R13, #517; experience 20, frame 2; audit A5): a recording opens as a tab when its transcription
+   * starts, a file and a recording made here alike, and the transcript fills in there. It never takes the keyboard:
+   * with a document in front it opens behind it.
+   */
+  private async _openStarted(audioPath: string): Promise<void> {
+    const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+    const activeTab = input instanceof vscode.TabInputText
+      ? { kind: 'text' as const }
+      : input instanceof vscode.TabInputCustom
+        ? { kind: 'custom' as const, viewType: input.viewType }
+        : input ? { kind: 'other' as const } : null;
+    const behind = workbenchOpensBehind(activeTab, vscode.window.state.focused);
+    try {
+      await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(audioPath), TRANSCRIPT_WORKBENCH_VIEW_TYPE, {
+        preview: false,
+        preserveFocus: true,
+        background: behind,
+      });
+    } catch (error) {
+      console.warn('[Transcribe] Could not open the recording as a tab:', error);
+    }
   }
 
   // ── sessions ──────────────────────────────────────────────────────────────
@@ -547,8 +574,9 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
     const nonce = getNonce();
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'webview.js'));
 
+    // Sprint 142 (#504): the recordings scroll on the ground (index.css, html.rm-ground)
     return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="rm-ground">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">

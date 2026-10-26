@@ -4,10 +4,14 @@ import App from './App'
 import './index.css'
 import { watchRitemarkThemeClass } from './utils/themeClass'
 import { captureWebviewScriptUrl } from './lib/webviewAssets'
+import { watchScrollingMark } from './lib/scrollingMark'
 
 // Sprint 138 (#481): webview.js's own URL, while it is still known, for the
 // files next to it in media/ (KaTeX's stylesheet and fonts).
 captureWebviewScriptUrl()
+
+// Sprint 142 (#504): a list on the ground shows its slider while it scrolls
+watchScrollingMark()
 
 // Lazy load FlowEditor to avoid loading React Flow for markdown files
 const FlowEditor = lazy(() =>

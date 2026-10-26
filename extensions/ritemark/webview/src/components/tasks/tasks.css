@@ -21,17 +21,9 @@
 .tb-actions.stack { flex-direction: column; gap: 6px; }
 .tb-opt { width: 100%; justify-content: flex-start !important; }
 .tb-opt span { overflow: hidden; text-overflow: ellipsis; }
-/* The split button stays inside its column: the label shrinks to an ellipsis
-   (its tooltip says it in full) and the arrow stays whole (W15, 170 px). */
-.tb-split { display: inline-flex; min-width: 0; max-width: 100%; }
-.tb-split > :first-child { display: flex; min-width: 0; }
-.tb-split > :first-child > button { max-width: 100%; }
-.tb-split > :last-child { flex-shrink: 0; }
-.tb-split > :first-child, .tb-split > :first-child > button { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
-.tb-split > :last-child, .tb-split > :last-child > button { border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
-.tb-split > :last-child > button { border-left: 1px solid rgba(255,255,255,.24); padding-left: 8px !important; padding-right: 8px !important; }
-.tb-split-outline > :last-child > button { border-left-color: var(--r-hairline-strong); margin-left: -1px; }
-.tb-split > :first-child > button:disabled + *, .tb-split button:disabled { opacity: .6; }
+/* The split button stays inside its column: the label shrinks to an ellipsis (its tooltip says it in full) and the
+   arrow stays whole (W15, 170 px). One button in one tone: the shared .rm-split (index.css; Sprint 142, R5). */
+.tb-split { max-width: 100%; }
 .tb-label { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--r-ink-faint); margin: 20px 0 8px; }
 .tb-label:first-child { margin-top: 0; }
 .tb-sub { margin-top: 2px; font-size: 12px; color: var(--r-ink-muted); }
@@ -55,7 +47,9 @@
 .tb-tab[aria-selected="true"] { color: var(--r-ink-strong); font-weight: 600; border-bottom-color: var(--r-accent); }
 .tb-count { font-size: 11px; font-weight: 600; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--r-surface-soft); color: var(--r-ink-muted); }
 .tb-tab[aria-selected="true"] .tb-count.hot, .tb-count.hot { background: var(--r-accent-soft); color: var(--r-accent-deep); }
-.tb-cols { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 12px; padding: 16px 24px 12px; min-width: 964px; align-items: start; }
+/* Sprint 142 R10 (#516): the four columns fit 1440's desk with both side columns showing (784 wide; the Tasks
+   experience's frame 1 draws them about 168 each). Below four of 160 the board scrolls sideways, as before (Q8). */
+.tb-cols { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 12px; padding: 16px 24px 12px; min-width: 724px; align-items: start; }
 .tb-col { background: var(--r-surface-muted); border-radius: 10px; padding: 8px; min-height: 120px; }
 .tb-col.drop { box-shadow: inset 0 0 0 2px var(--r-accent-soft); }
 .tb-colhead { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 6px; margin: -8px -8px 0; padding: 12px 12px 8px 14px; border-radius: 10px 10px 0 0; background: var(--r-surface-muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--r-ink-muted); } /* sticks while a long column scrolls, so its + and count stay in reach */

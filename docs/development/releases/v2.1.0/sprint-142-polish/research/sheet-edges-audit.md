@@ -32,8 +32,8 @@ Run on 26 October 2026 on a dev build of `main` at `84ea15db`, with the patches 
 - **`ritemark.sheetShadow`:** ink at 7% in Light (`#1E1B4B12`), transparent in Dark. Floating sheets (menus, More, dialogs) keep their shadows in Light, in ink, and draw hairlines only in Dark, as the kit does.
 - **Brought onto the kit:**
   - the Agents place's cards: `0 1px 2px` in the sheet shadow, already ink after the colour change;
-  - Home's switch note: the kit's toast shadow, ink 8% and 6%;
-  - Mermaid's expand toolbar: the kit's floating shadow, in ink instead of slate 24%.
+  - Home's switch note: already the kit's `.toast` shadow (`0 4px 6px -1px` ink 18%, `0 2px 4px -2px` ink 12%), so unchanged;
+  - Mermaid's expand toolbar: the kit's floating shadow (`.menu`, `.bubble`), in the sheet shadow instead of slate 24%.
 
 ## The desk at 1440 (R10)
 

@@ -89,6 +89,7 @@ Acceptance criteria:
 - **The order things give way:** the start goes first, then the project's parent folder. The end, the project's own folder, is never cut.
 - If the project's own folder name alone is wider than the line, it wraps at its spaces onto a second line instead (*Open Questions* 6). The line never scrolls sideways.
   - *(revised 2026-10-26, the Experience lead's answer to Q6; experience 3, ritemark-dev 76b3a50)*: a name with no spaces breaks anywhere, and the › stays after its last word.
+  - *(revised 2026-10-27, built)*: when not even "…/" fits beside the folder's name, the line is the folder's name on its own. It stays on one line when that fits, and wraps only when the name alone is wider.
 - The full path is in the line's tooltip, as its first line (unchanged).
 - A short path shows whole, with no ellipsis. A Windows path cuts at its backslashes.
 - The cut follows the desk's width as it changes (window resize, a side column shown or hidden).

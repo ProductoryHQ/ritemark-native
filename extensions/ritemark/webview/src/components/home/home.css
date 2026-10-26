@@ -99,15 +99,17 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   gap: 6px;
   max-width: 100%;
 }
-.rh-place .rh-place-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* The path is cut in the middle (#525): the start takes the ellipsis, the last two folders stay whole and
-   give way only when nothing else is left. A shrink of a million against 1 makes the start take all of the
-   overflow first: the last part's share stays under Chrome's layout unit, where 1000 against 1 still cut it by a
-   fraction of a pixel and drew its ellipsis. Its own 1 then lets it give way completely after the start is at
-   its least (shrinks that add up to less than 1 leave part of the overflow in place). */
-.rh-place-text.rh-place-cut { display: flex; }
-.rh-place-cut .rh-place-head { flex: 0 1000000 auto; min-width: 1.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rh-place-cut .rh-place-tail { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The path is cut in the middle (#525; Sprint 142 R4, #557): HomePage's PlaceText measures it and draws one string,
+   so the ellipsis touches the next character; the start gives way first, then the parent folder, never the
+   project's own folder. Nothing here cuts it, and nothing hides what the measure kept. */
+.rh-place .rh-place-text { flex: 0 1 auto; min-width: 0; white-space: nowrap; }
+.rh-place-caret { display: inline-block; margin-left: 6px; vertical-align: -1px; }
+/* A folder name wider than the line on its own wraps at its spaces, or anywhere if it has none, with the › after
+   its last word (experience 3, Sprint 142; ritemark-dev 76b3a50) */
+.rh-place:has(.rh-place-wrap) { height: auto; min-height: 24px; align-items: flex-start; white-space: normal; text-align: left; }
+.rh-place:has(.rh-place-wrap) > svg { margin-top: 5px; }
+.rh-place-text.rh-place-wrap { white-space: normal; overflow-wrap: anywhere; }
+.rh-place-wrap .rh-place-last { white-space: nowrap; }
 
 .rh-line {
   display: block;
@@ -298,6 +300,21 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
 @container rh-desk (max-width: 388px) {
   .rh-card-head .rh-card-action { flex-basis: 100%; margin-left: 0; }
 }
+/* Sprint 142 R11 (#535): the AI's sheet forced open in a very narrow window leaves the desk about 150 wide (this
+   container about 120). Home still fits it, as framework §4 asks of every page on the desk: the name steps down so a
+   word fits its line (it breaks inside a word only when one alone is wider), Change image keeps only its icon inside
+   the cover, the rows' times go under their names, and the tiles are one across at any width. */
+@container rh-desk (max-width: 200px) {
+  .rh-name { font-size: 20px; line-height: 26px; letter-spacing: 0; }
+  .rh-cover .rh-change { right: 8px; bottom: 8px; }
+  .rh-cover .rh-chip-label { display: none; }
+  .rh-cover .rh-chip-button { padding: 0 6px; }
+  .rh-desk .rh-row, .rh-desk .rh-file { flex-wrap: wrap; height: auto; min-height: 40px; padding: 6px 0; row-gap: 2px; }
+  .rh-guide .rh-guide-hd { padding-right: 24px; } /* the card's heading keeps clear of its × */
+  .rh-row .rh-when { flex-basis: calc(100% - 40px); margin-left: 40px; }
+  .rh-file .rh-when { flex-basis: calc(100% - 24px); margin-left: 24px; }
+}
+.rh-tiles { grid-template-columns: repeat(auto-fit, minmax(min(168px, 100%), 1fr)); }
 .rh-moved { display: flex; align-items: center; gap: 10px; min-height: 32px; font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
 .rh-moved .rh-ic { width: 22px; height: 22px; border-radius: 6px; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); display: grid; place-items: center; flex: none; }
 .rh-moved b { font-weight: 600; color: var(--r-ink-strong); }
@@ -314,7 +331,9 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
 .rh-missing p { margin: 0 0 8px; font: 400 14px/20px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
 .rh-missing .rh-path .rh-place-text { min-width: 0; }
 .rh-missing .rh-path > svg { flex: none; } /* the folder keeps its size when the path is cut (#525) */
-.rh-missing .rh-path { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 6px; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); font: 500 13px/24px var(--ritemark-ui-font-family); color: var(--r-ink-strong); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rh-missing .rh-path { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 8px; border-radius: 6px; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); font: 500 13px/24px var(--ritemark-ui-font-family); color: var(--r-ink-strong); max-width: 100%; white-space: nowrap; }
+.rh-missing .rh-path:has(.rh-place-wrap) { align-items: flex-start; }
+.rh-missing .rh-path:has(.rh-place-wrap) > svg { margin-top: 5px; }
 .rh-missing .rh-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 12px; }
 /* Back to the open project: a long name takes the ellipsis (#525) */
 .rh-back { max-width: 100%; }
@@ -336,7 +355,8 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
 }
 .rh-notice .rh-notice-action { margin-left: auto; flex: none; }
 
-/* "Switched to …" with Go back (experience 3, frame 3) */
+/* "Switched to …" with Go back (experience 3, frame 3). Sprint 142 R3 (#557): one line, as wide as its words, up to
+   the desk's width less 24 on each side; it wraps only on a narrower desk, the ✕ at its end. */
 .rh-toast {
   position: fixed;
   left: 50%;
@@ -345,7 +365,9 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   display: flex;
   align-items: center;
   gap: 16px;
-  max-width: calc(100% - 32px);
+  width: max-content;
+  max-width: calc(100% - 48px);
+  transition: opacity 160ms ease;
   padding: 8px 8px 8px 14px;
   border-radius: 8px;
   background: var(--ritemark-ink-strong); /* the kit's ink, in Light; Dark below */
@@ -354,7 +376,10 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   box-shadow: 0 4px 6px -1px rgba(30, 27, 75, 0.18), 0 2px 4px -2px rgba(30, 27, 75, 0.12);
   z-index: 20;
 }
-.rh-toast .rh-toast-action { height: 24px; padding: 0 8px; color: #C7D2FE; background: transparent; }
+.rh-toast.leaving { opacity: 0; }
+.rh-toast > span { min-width: 0; }
+.rh-toast .rh-toast-action { flex: none; height: 24px; padding: 0 8px; color: #C7D2FE; background: transparent; }
+@media (prefers-reduced-motion: reduce) { .rh-toast { transition: none; } }
 .rh-toast .rh-toast-action:hover { background: rgba(255, 255, 255, 0.12); color: #ffffff; }
 /* In Dark the note turns lavender with dark ink, as the kit draws it (kit: .dark .toast) */
 body.vscode-dark .rh-toast, body[data-vscode-theme-kind='vscode-dark'] .rh-toast { background: #C7D2FE; color: #16132F; }
@@ -468,14 +493,11 @@ body.vscode-dark .rp-row:not(.missing) .rp-mini, body[data-vscode-theme-kind='vs
 .rh-guide .rh-guide-problem { margin: 10px 0 0 24px; font: 400 12px/18px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
 
 /* The split button: its main part names the AI; its 28-wide caret opens Ask with */
-.rh-split { position: relative; display: inline-flex; min-width: 0; max-width: 100%; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(67, 56, 202, 0.25); }
-.rh-split > span { display: inline-flex; min-width: 0; }
-.rh-split .rh-split-main,
-.rh-split .rh-split-more { height: 28px; box-shadow: none; font: 500 13px/28px var(--ritemark-ui-font-family); }
-.rh-split .rh-split-main { min-width: 0; gap: 6px; padding: 0 10px; border-radius: 6px 0 0 6px; }
-.rh-split .rh-split-more { width: 28px; padding: 0; border-radius: 0 6px 6px 0; box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.28); }
-.rh-split .rh-split-more[data-state="open"] { background: #3730a3; }
-body.vscode-dark .rh-split .rh-split-more[data-state="open"] { background: color-mix(in srgb, var(--r-accent) 80%, black); }
+/* The ready request's split button: the shared one (ui/split-button.tsx, index.css .rm-split; one tone, Sprint 142
+   R5), at the card's measures: 28 high, a 28-wide caret, 13/28 type */
+.rh-split .rm-split-part { height: 28px; font: 500 13px/28px var(--ritemark-ui-font-family); }
+.rh-split .rm-split-main { gap: 6px; padding: 0 10px; }
+.rh-split .rm-split-more { width: 28px; padding: 0; }
 
 /* Ask with: the menus' sheet (kit .menu), rows 32, the AI's state at the right */
 .rh-askwith { min-width: 220px; padding: 6px; border-radius: 10px; }

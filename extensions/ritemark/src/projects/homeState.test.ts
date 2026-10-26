@@ -11,7 +11,7 @@ import * as path from 'path';
 import { callsOf } from '../taskBoard/BoardController';
 import type { Card } from '../taskBoard/cardFile';
 import type { CardHandoffRecordV1 } from '../taskBoard/CardTaskStore';
-import { aiNameOf, kindOf, othersOf, RECENT_EXTENSIONS, RECENT_LIMIT, recentItems, waitingItems, type ChangedFile, showWhatMoved } from './homeState';
+import { aiNameOf, kindOf, othersOf, RECENT_EXTENSIONS, RECENT_LIMIT, recentItems, waitingItems, type ChangedFile, showWhatMoved, switchNoteEndsOnHost, SWITCH_NOTE_SETTLE_MS } from './homeState';
 import { decodeHomeRequest } from './protocol';
 import { cardItems, chatsWaiting, handoffViewsFor, summarize, type ChatIndexEntry, type ProjectWaiting } from './waiting';
 
@@ -158,5 +158,11 @@ assert.equal(showWhatMoved({ at: '2026-10-19T08:00:00.000Z' }, undefined), true)
 assert.equal(showWhatMoved(true, undefined), true);
 assert.equal(showWhatMoved({ at: '2026-10-19T08:00:00.000Z' }, true), false, 'Got it');
 assert.equal(showWhatMoved(undefined, undefined), false, 'a fresh profile never sees it');
+
+// Sprint 142 (R3, #557): the host ends the switch note for a tab chosen or a message sent, once the window has settled
+assert.equal(switchNoteEndsOnHost('home-hidden', null), false, 'not before the note was shown');
+assert.equal(switchNoteEndsOnHost('home-hidden', SWITCH_NOTE_SETTLE_MS - 1), false, 'the window settling after the switch');
+assert.equal(switchNoteEndsOnHost('home-hidden', SWITCH_NOTE_SETTLE_MS + 500), true, 'another tab chosen');
+assert.equal(switchNoteEndsOnHost('turn-accepted', 4000), true, 'a message sent on the AI’s sheet');
 
 console.log('projects/homeState: all assertions passed');

@@ -12,7 +12,7 @@ import * as path from 'path';
 import { COUNT_LIMIT, countsLine, fileKindOf, listFileNames } from './folderCounts';
 import { feedbackDue, guidanceCard, localDay, releaseOf, withSavedDay } from './guidanceState';
 import { decodeGuidanceState, GUIDANCE_KEY, GuidanceStore, type MementoLike } from './guidanceStore';
-import { AI_NAMES, cardAi, EVENT_KIND, FIRST_LOOK_READS_DOCUMENTS, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyRequestDue, readyRequestWords } from './readyRequest';
+import { AI_NAMES, cardAi, EVENT_KIND, FILES_PRESS_SETTLE_MS, FIRST_LOOK_READS_DOCUMENTS, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyPressAction, readyRequestDue, readyRequestWords } from './readyRequest';
 import { READ_KINDS_EVERY_AI_PASSED, startingPlaceOf, wordCount, STARTING_PLACES, startingPlaceFrom } from './startingPlace';
 
 const repeat = (name: string, n: number) => Array.from({ length: n }, (_, i) => `${i}${name}`);
@@ -188,3 +188,13 @@ assert.equal(startingPlaceFrom('table'), 'table');
 assert.equal(startingPlaceFrom('anything else'), undefined, 'an unknown place is dropped');
 assert.equal(startingPlaceFrom(7), undefined);
 assert.equal(STARTING_PLACES.length, 7);
+
+// Sprint 142 (R5b, Q1): the ready request's press never needs a disabled button for the folder or the empty project
+assert.deepEqual(readyPressAction({ kind: 'sample', sentChat: null, sinceLastPressMs: null, filledChat: null }), { action: 'give' }, 'the sample through the board');
+assert.deepEqual(readyPressAction({ kind: 'files', sentChat: null, sinceLastPressMs: null, filledChat: null }), { action: 'send' }, 'the folder: the first press sends');
+assert.deepEqual(readyPressAction({ kind: 'files', sentChat: null, sinceLastPressMs: 2000, filledChat: null }), { action: 'wait' }, 'a second press before the chat is known sends nothing again');
+assert.deepEqual(readyPressAction({ kind: 'files', sentChat: { id: 'c-1', answered: false }, sinceLastPressMs: 3000, filledChat: null }), { action: 'open', conversationId: 'c-1' }, 'a second press opens the chat it went to');
+assert.deepEqual(readyPressAction({ kind: 'files', sentChat: { id: 'c-1', answered: true }, sinceLastPressMs: 60_000, filledChat: null }), { action: 'send' }, 'an answered request is asked again in a new chat');
+assert.deepEqual(readyPressAction({ kind: 'files', sentChat: null, sinceLastPressMs: FILES_PRESS_SETTLE_MS + 1, filledChat: null }), { action: 'send' }, 'a press long after one that never reached a chat sends again');
+assert.deepEqual(readyPressAction({ kind: 'empty', sentChat: null, sinceLastPressMs: null, filledChat: null }), { action: 'fill', conversationId: null }, 'the empty project: the first press fills a new chat');
+assert.deepEqual(readyPressAction({ kind: 'empty', sentChat: null, sinceLastPressMs: null, filledChat: 'local-7' }), { action: 'fill', conversationId: 'local-7' }, 'a second press opens the chat it filled');
