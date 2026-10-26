@@ -1,5 +1,4 @@
 import { BubbleMenu, type Editor as TipTapEditor } from '@tiptap/react'
-import { getMarkRange } from '@tiptap/core'
 import { useState, useEffect, useRef } from 'react'
 import { Icon } from './ui/Icon'
 import * as Dialog from '@radix-ui/react-dialog'
@@ -7,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { modKey } from '@/hooks/usePlatform'
 import { openExternalUrl, openInternalLink } from '../bridge'
 import { classifyLinkTarget } from '../lib/linkTargets'
+import { applyLinkEdit, linkRangeAt } from '../lib/linkEdit'
 import {
   requestWorkspaceFileSearch,
   type WorkspaceFileLinkResult,
@@ -50,26 +50,27 @@ export function FormattingBubbleMenu({
   const [fileSearchLoading, setFileSearchLoading] = useState(false)
   const [selectedFileIndex, setSelectedFileIndex] = useState(0)
   const linkInputRef = useRef<HTMLInputElement>(null)
+  // The address of the link the person clicked (#502): the edit applies to that
+  // link's whole range, even from a click at its edge.
+  const clickedHrefRef = useRef<string | undefined>(undefined)
   const isFileSearchMode = linkUrl.trim().startsWith('@')
 
   // Handle external link edit trigger (from clicking a link in the editor)
   useEffect(() => {
     if (externalLinkEdit) {
       setLinkUrl(externalLinkEdit.url)
+      clickedHrefRef.current = externalLinkEdit.url
       // Pre-populate display text (Sprint 74 R4 / #93). Clicking a link leaves
-      // a collapsed cursor inside it, so read the full link-mark range for the
-      // field. NOTE: do NOT mutate the editor selection here — dispatching a
-      // transaction inside this effect triggers a React render loop (#185).
-      // handleSetLink recomputes the same range when applying the update.
+      // a collapsed cursor inside it or at its edge, so read the full link
+      // range for the field (#502). NOTE: do NOT mutate the editor selection
+      // here — dispatching a transaction inside this effect triggers a React
+      // render loop (#185). handleSetLink recomputes the same range.
       if (editor) {
         const { from, to } = editor.state.selection
         if (from !== to) {
           setLinkDisplayText(editor.state.doc.textBetween(from, to, ' '))
         } else {
-          const range = getMarkRange(
-            editor.state.selection.$from,
-            editor.state.schema.marks.link,
-          )
+          const range = linkRangeAt(editor.state, externalLinkEdit.url)
           setLinkDisplayText(
             range ? editor.state.doc.textBetween(range.from, range.to, ' ') : '',
           )
@@ -133,6 +134,7 @@ export function FormattingBubbleMenu({
         if (!empty && !editor.isActive('codeBlock')) {
           const previousUrl = editor.getAttributes('link').href
           const { from, to } = editor.state.selection
+          clickedHrefRef.current = undefined
           setLinkUrl(previousUrl || '')
           setLinkDisplayText(editor.state.doc.textBetween(from, to, ' '))
           setUrlError('')
@@ -148,6 +150,10 @@ export function FormattingBubbleMenu({
   // No click-outside handler needed - Radix Dialog handles this automatically
 
   if (!editor) return null
+
+  // Edit, not Add, whenever the dialog works on an existing link — also from a
+  // click at the link's edge, where `isActive('link')` is false (#502).
+  const editingLink = editor.isActive('link') || !!linkRangeAt(editor.state, clickedHrefRef.current)
 
   /**
    * Applies or updates a link on the selected text.
@@ -166,55 +172,22 @@ export function FormattingBubbleMenu({
       return
     }
 
-    // Sprint 74 R4 (#93): if the user provided display text that differs from
-    // the current selection, replace the selection (or insert at the cursor)
-    // with that text carrying the link mark. Empty/unchanged display text
-    // preserves the original setLink behaviour.
-    const displayText = linkDisplayText.trim()
-    // When the cursor sits collapsed inside an existing link, operate on the
-    // whole link-mark range so Update replaces its text instead of inserting
-    // at the cursor (#93). With a real selection, respect it as-is.
-    const sel = editor.state.selection
-    let from = sel.from
-    let to = sel.to
-    if (sel.empty) {
-      const markRange = getMarkRange(sel.$from, editor.state.schema.marks.link)
-      if (markRange) {
-        from = markRange.from
-        to = markRange.to
-      }
-    }
-    const selectedText = from !== to ? editor.state.doc.textBetween(from, to, ' ') : ''
-
-    let success: boolean
-    if (displayText && displayText !== selectedText) {
-      success = editor
-        .chain()
-        .focus()
-        .command(({ tr, state }) => {
-          const linkMark = state.schema.marks.link.create({ href: target.href })
-          const textNode = state.schema.text(displayText, [linkMark])
-          if (from !== to) {
-            tr.replaceWith(from, to, textNode)
-          } else {
-            tr.insert(from, textNode)
-          }
-          return true
-        })
-        .run()
-    } else {
-      success = editor
-        .chain()
-        .focus()
-        .setLink({ href: target.href })
-        .run()
-    }
+    // Sprint 74 R4 (#93): display text that differs from the link's text
+    // replaces it. #502: the address applies to the link's whole range — a
+    // click leaves a collapsed cursor inside the link or at its edge, and
+    // `setLink` on that cursor only set a mark for future typing.
+    const success = editor
+      .chain()
+      .focus()
+      .command(({ tr, state }) => applyLinkEdit(state, tr, target.href, linkDisplayText, clickedHrefRef.current))
+      .run()
 
     if (success) {
       setShowLinkDialog(false)
       setLinkUrl('')
       setLinkDisplayText('')
       setUrlError('')
+      clickedHrefRef.current = undefined
     } else {
       setUrlError('Cannot add link here (links not allowed in this context)')
     }
@@ -224,7 +197,11 @@ export function FormattingBubbleMenu({
    * Removes the link from selected text while preserving the text itself.
    */
   const handleRemoveLink = () => {
-    editor.chain().focus().unsetLink().run()
+    // The whole clicked link, also from a click at its edge (#502).
+    const range = linkRangeAt(editor.state, clickedHrefRef.current)
+    const chain = editor.chain().focus()
+    ;(range ? chain.setTextSelection({ from: range.from, to: range.to }) : chain).unsetLink().run()
+    clickedHrefRef.current = undefined
     setShowLinkDialog(false)
     setLinkUrl('')
     setLinkDisplayText('')
@@ -236,6 +213,7 @@ export function FormattingBubbleMenu({
    * Display text pre-populates from the current selection (Sprint 74 R4).
    */
   const handleOpenLinkDialog = () => {
+    clickedHrefRef.current = undefined
     const previousUrl = editor.getAttributes('link').href
     const { from, to } = editor.state.selection
     setLinkUrl(previousUrl || '')
@@ -486,7 +464,7 @@ export function FormattingBubbleMenu({
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
           <Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-surface rounded-lg shadow-xl p-6 z-50 w-96">
             <Dialog.Title className="text-lg font-semibold mb-4">
-              {editor.isActive('link') ? 'Edit Link' : 'Add Link'}
+              {editingLink ? 'Edit Link' : 'Add Link'}
             </Dialog.Title>
             <div className="space-y-4">
               <div>
@@ -602,7 +580,7 @@ export function FormattingBubbleMenu({
               </div>
               <div className="flex gap-2 justify-end">
                 {/* Remove button only shown when editing existing link */}
-                {editor.isActive('link') && (
+                {editingLink && (
                   <Button
                     onClick={handleRemoveLink}
                     variant="destructive"
@@ -623,7 +601,7 @@ export function FormattingBubbleMenu({
                   variant="default"
                 >
                   <Icon name="check" size={20} />
-                  {editor.isActive('link') ? 'Update' : 'Add'}
+                  {editingLink ? 'Update' : 'Add'}
                 </Button>
               </div>
             </div>

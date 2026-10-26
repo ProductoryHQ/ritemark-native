@@ -24,6 +24,7 @@ import { TableOverlayControls } from './TableOverlayControls'
 import { BlockMenu } from './BlockMenu'
 import type { EditorSelection } from '../types/editor'
 import type { DocumentApplyTarget } from '../types/documentSync'
+import { documentReplacement } from '../lib/documentUpdate'
 import {
   shouldApplyIncomingEditorValue,
   shouldPublishEditorChange,
@@ -582,16 +583,11 @@ export function Editor({
         const nextDoc = parsed instanceof Fragment
           ? editor.schema.topNodeType.create(null, parsed)
           : parsed
-        const currentDoc = editor.state.doc
-        const start = currentDoc.content.findDiffStart(nextDoc.content)
-        if (start !== null) {
-          const end = currentDoc.content.findDiffEnd(nextDoc.content)
-          if (!end) throw new Error('Could not determine the document update range.')
-          let transaction = editor.state.tr.replace(
-            start,
-            end.a,
-            nextDoc.slice(start, end.b),
-          )
+        // The smallest replacement, with the front and back diffs kept from
+        // overlapping (an overlap froze the editor; lib/documentUpdate.ts).
+        const replacement = documentReplacement(editor.state.doc, nextDoc)
+        if (replacement) {
+          let transaction = editor.state.tr.replace(replacement.from, replacement.to, replacement.slice)
           const mappedAnchor = Math.max(0, Math.min(transaction.doc.content.size, transaction.mapping.map(anchor)))
           const mappedHead = Math.max(0, Math.min(transaction.doc.content.size, transaction.mapping.map(head)))
           transaction = transaction
@@ -625,12 +621,19 @@ export function Editor({
       requestAnimationFrame(() => {
         if (scrollContainer && scrollTop !== undefined) scrollContainer.scrollTop = scrollTop
         if (wasFocused) editor.view.focus()
-        if (syncTarget) onExternalApplied?.(syncTarget)
       })
+      // #512: the acknowledgement does not wait for a frame. The document is
+      // applied once the transaction above is dispatched, and a window behind
+      // other windows (or minimized) runs no animation frames: an ack in one
+      // never came, and the host showed a false "Retry document update" after
+      // its delivery budget, on text the editor already showed. A microtask
+      // runs after this effect, and is not throttled.
+      if (syncTarget) queueMicrotask(() => onExternalApplied?.(syncTarget))
     } else if (syncTarget) {
       // The source view already rendered its own accepted edit. It still owes
-      // the host an acknowledgement for the matching canonical revision.
-      requestAnimationFrame(() => onExternalApplied?.(syncTarget))
+      // the host an acknowledgement for the matching canonical revision —
+      // also without waiting for a frame (#512).
+      queueMicrotask(() => onExternalApplied?.(syncTarget))
     }
   }, [editor, value, imageMappings, scrollContainer, syncTarget, onExternalApplied])
 
