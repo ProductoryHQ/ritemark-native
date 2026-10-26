@@ -2,7 +2,9 @@
 
 26 October 2026, on the Mac (Apple silicon), the sprint branch's dev build. Each check launched hidden with its own short profile under `$TMPDIR`, `--use-mock-keychain`, `RITEMARK_BUILD_CHANNEL=test`, CDP on 9232, and usage data pointed at a local stand-in on 127.0.0.1:9241 (nothing left the Mac). Driven over CDP; screenshots in `qa/` (halved to 1440 × 900). The only AI signed in was ChatGPT (Jarmo's existing sign-in; nobody signed in or out). Claude had no readable sign-in, OpenCode no test key; Windows was not run.
 
-Fixtures: Training work (the spike's 37 files, plus `Notes/Long draft.md` of 903 words and `Notes/Sessions.csv` for S36–S37), Board report 2027 (empty), Leadership programme (the sample).
+Fixtures: Training work (the spike's 37 files, plus `Notes/Long draft.md` of 903 words and `Notes/Sessions.csv` for S36–S37), Board report 2027 (empty), Leadership programme (the sample). The fixture's bank is Fernhollow Bank (renamed on 26 October from a real bank's name); every screenshot showing it was retaken.
+
+**After the Experience lead's build check (26 October)** the changed checks were re-run on fresh profiles (f: Training work; g and i: empty Board report 2027 folders; h: a fresh copy of the sample), and their screenshots replaced: the first look's new message and ChatGPT's answer ending with two things it could do next; the empty project's two lines and what ChatGPT made from them; the sample's hand-over words and its starting points after; "Send feedback" in All commands; the thank-you closing by itself; the first-week card's send that did not go.
 
 Unit tests: `npm test` in `extensions/ritemark` (all pass, with the new `guidance.test.ts`, `startingPointWords.test.ts`, `feedback.test.ts`, and the changed `home.test.ts`, `consent.test.ts`, `analytics.test.ts`, `capabilityContext.test.ts`, `chatLinks.test.ts`); VS Code's `ritemarkFeedbackSheet.test.ts` (4) and `menubarControl.test.ts`; `typecheck-client` clean; patches applied from the pin, a second run clean, the stacking check and the pre-commit validator passing.
 
@@ -19,14 +21,14 @@ Unit tests: `npm test` in `extensions/ritemark` (all pass, with the new `guidanc
 | S10 | Pass: the card, its counts line and note, as frame 1 | `qa/light-f1-home-card.png` |
 | S11 | Unit tests; 10,400 names in 34 ms, "More than 10,000 files." | `guidance.test.ts`; `research/confirmations.md` |
 | S12 | Not run (no synced folder) | — |
-| S13 | Pass, Light and Dark | `qa/light-s13-empty-project-card.png`, `qa/dark-s13-empty-project-card.png` |
+| S13 | Pass, Light and Dark. Re-run with ChatGPT after the build check: the person's sentence in the first line, Send; ChatGPT wrote `AGENTS.md` (Home's About this project), the `CLAUDE.md` pointer (`@AGENTS.md`) and `board-report-2027-outline.md`, then said what it did; the card went. (The run before the capability line wrote "About this project.md", which Home does not show as About this project.) | `qa/light-s13-empty-project-card.png`, `qa/dark-s13-empty-project-card.png`, `qa/light-s13-empty-answered.png` |
 | S14 | Pass, Light and Dark | `qa/light-s14-sample-card.png`, `qa/dark-s14-sample-card.png` |
 | S15 | Dark passes; keyboard and screen readers not run | the dark shots |
 | S16 | Partly: Ask with's menu, its states (Claude "Sign in", ChatGPT ✓, OpenCode "Set up") and its place under the button; choosing another ready AI not run (one AI ready) | `qa/light-f1-ask-with.png`, `qa/dark-f1-ask-with.png` |
 | S17, S18, S19 | Not run: no sign-in, no OpenCode key, and no way to have no AI ready without signing out | — |
-| S20 | Pass with ChatGPT (sent at once, the chat in front, answered) | earlier run in profile b |
-| S21 | Pass: "This project is for " in the box, caret at 20, focused, nothing sent | `qa/light-s21-empty-filled.png` |
-| S22 | Pass with ChatGPT: Give of `m4d7r2`, Doing, then Ready to review, Module 4 written, the chat on the rail. About 15 s before the board showed it: the button now waits (`7e857e0f`) | `qa/light-s22-after-give.png` |
+| S20 | Pass with ChatGPT: "What is here? Look at the names first, read only the five newest documents, and end with two things you could do next." sent at once in a chat in front; answered in 38 s, reading the five newest and ending with "Two things I could do next" (frame 2 redrawn) | `qa/light-s20-first-look.png` |
+| S21 | Pass: the box holds "This project is for " and, on the next line, "Then write About this project from it, and a first outline as a document."; the caret at 20, focused, nothing sent | `qa/light-s21-empty-filled.png`, `qa/light-s21-empty-typed.png` |
+| S22 | Pass with ChatGPT: Give of `m4d7r2`; while it starts the button reads "Giving it to ChatGPT…" with a spinner, disabled, and the note "It shows in Doing in a moment."; the card went when the task showed in Doing; the sample's starting points are then the project's (What is here? · Find what I wrote about…, About this project already there). Module 4 written, Ready to review | `qa/light-s22-giving.png`, `qa/light-s22-after-give.png` |
 | S23 | Not checked | — |
 | S24 | Pass: gone once answered (folder and empty kinds); a gone card stayed gone after a restart (profile c). Reload Window after "answered" not checked on its own | CDP log |
 | S25 | Not run (no free plan, network not cut) | — |
@@ -48,12 +50,12 @@ Unit tests: `npm test` in `extensions/ritemark` (all pass, with the new `guidanc
 | S47 | Pass on the Mac: AI Ready, Send feedback, the bell; no Report AI issue; the tooltip | CDP log |
 | S48 | Pass on the Mac: Help ▸ Getting started, Support, Send feedback; opens the sheet | menubar data; CDP log |
 | S49 | Pass: "Report an AI issue", the box ticked | `qa/light-s49-ai-issue.png` |
-| S50 | Pass: one "Send Feedback" in All commands opens the sheet | `qa/light-s50-palette.png` |
-| S51 | Pass, usage data on and off: `feedback_sent {message}` only; off, from a one-off id | `qa/light-fb2-sheet.png`, `qa/light-fb4-sent-toast.png`; `research/feedback-delivery-audit.md` |
+| S50 | Pass: one "Send feedback" in All commands opens the sheet | `qa/light-s50-palette.png` |
+| S51 | Pass, usage data on and off: `feedback_sent {message}` only; off, from a one-off id. The thank-you closes by itself after 4 s | `qa/light-fb2-sheet.png`, `qa/light-fb4-sent-toast.png`; `research/feedback-delivery-audit.md` |
 | S52 | Partly: the note, Open in e-mail and the foot as drawn; pressing it with a real mail app not run (it would open Jarmo's Mail) | `qa/light-fb2-sheet-email-route.png` |
-| S53 | Pass on the Mac: Enter adds a line, ⌘Enter sends, Escape closes and nothing goes | CDP log |
-| S54 | Pass: Send and Open in e-mail disabled with nothing typed | CDP log; unit test |
-| S55 | Partly: the box, the quote from ChatGPT's answer; the e-mail's content by unit test | `qa/light-s55-last-answer.png`; `feedback.test.ts` |
+| S53 | Pass on the Mac: Enter adds a line, ⌘Enter sends, Escape closes and nothing goes. By hand (QA asked, as the sheet keeps every key from the workbench): ⌘A selected all, ⌘C then ⌘V pasted it, ⌘Z undid the paste, nothing prevented a key's default, Escape closed it (keys sent with the Mac's editing commands, as the Edit menu delivers them; the clipboard put back after) | CDP log |
+| S54 | Pass: Send and Open in e-mail disabled with nothing typed; hovering Send says "Write something first", and every button has a hint | `qa/light-sheet-send-hint.png`; unit test |
+| S55 | Partly: the box, the quote from ChatGPT's first look; the e-mail's content by unit test | `qa/light-s55-last-answer.png`; `feedback.test.ts` |
 | S56 | Unit tests (`shortenAnswer`, `[shortened]`, Copy's whole answer) | `feedback.test.ts` |
 | S57 | Pass: no last-answer box without a chat | `qa/light-s49-ai-issue.png` |
 | S58 | Pass in its too-long state (no mail app opened), Light and Dark; the opening state by unit test | `qa/light-s58-handoff-too-long.png` |
@@ -62,8 +64,8 @@ Unit tests: `npm test` in `extensions/ritemark` (all pass, with the new `guidanc
 | S61 | Pass: two seeded saved days, a save today, the card | `qa/light-s61-feedback-card.png`, `qa/dark-s61-feedback-card.png` |
 | S62 | Unit tests only | `guidance.test.ts` |
 | S63 | Pass: Send with a line, `asked: made_this_week`, the card gone; within a release by unit test | CDP log |
-| S64 | Partly: the sheet's send with usage data off goes; the card's send offline not run | `research/feedback-delivery-audit.md` |
-| S65 | Partly: `what_for` only when sent, `module_4` at the press; `what_is_here` was sent before the stand-in ran | CDP log |
+| S64 | Pass: the sheet's send with usage data off goes; the card's send with the stand-in answering 503 keeps the words, says "It didn't go. Your words are still here: try again, or open it in e-mail." with Try again, Open in e-mail and Not now; Try again then went (`asked: made_this_week`) | `qa/light-s64-card-did-not-go.png`; `research/feedback-delivery-audit.md` |
+| S65 | Pass with ChatGPT: `what_is_here` at the press, `what_for` only when sent, `module_4` at the press | CDP log |
 | S66 | Pass: `{place: project, edited: false}`, then `edited: true` | CDP log |
 | S67 | Partly: a new document's first save once, and the sample's Module 4, both `after_ready_request: true`; export, publish and the sync-client negative not run | CDP log |
 | S68 | Pass: `from` for status_bar, help, command, ai_info; with usage data off none of the new events left. Before the welcome is left: unit test | CDP log; `consent.test.ts` |
@@ -81,8 +83,14 @@ Unit tests: `npm test` in `extensions/ritemark` (all pass, with the new `guidanc
 - The empty chats panel said "Start one below" over the message box; it now ends above it (`2b188ac1`).
 - The sample's press showed nothing for about 15 s and could be pressed twice (`7e857e0f`).
 - "Didn't open?" under a hand-off where nothing was asked to open (`28fa9f89`).
+- The sheet had no name for screen readers: its title's and lede's ids were never set (VS Code's `$` reads `tag#id.class`, not `tag.class#id`), so `aria-labelledby` pointed at nothing (`b9b108ab`, with a test).
+- The thank-you stayed until the window had focus and then for 10 s; it now closes by itself after 4 s (`b9b108ab`).
+- Asked to write About this project, ChatGPT wrote "About this project.md": no AI knew that Ritemark's About this project is the root's `AGENTS.md`. The capability context now says so, for every AI (`6a3fe7cc`; the re-run wrote `AGENTS.md` and the pointer).
 
 ## Found, not fixed (outside this sprint's files)
 
-- A ChatGPT turn stopped with Stop reads "Failed" after a restart: the record's boundary is `cancelled`, `conversationProjection.ts` turns it into `status: 'cancelled'`, and `activityState.ts:84` treats only `interrupted` as a cancel. A one-line fix there.
-- The empty project's card promises "ChatGPT writes About this project from it, and a first outline as a document", but the filled request carries only the person's sentence, and in one run ChatGPT answered in the chat and wrote nothing. Either the card's words change, or the request gains an instruction: a product call.
+- A ChatGPT turn stopped with Stop reads "Failed" after a restart: the record's boundary is `cancelled`, `conversationProjection.ts` turns it into `status: 'cancelled'`, and `activityState.ts:84` treats only `interrupted` as a cancel. Goes to Sprint 139, which owns the status line.
+- ChatGPT's working note and its answer run together: "…by modification time.## What's here", so the answer's first heading shows as raw Markdown (`light-s20-first-look.png`, top). The sheet's `codex-streaming` appends each delta to the turn's text (`store.ts`, `streamingText + message.delta`) with no break between ChatGPT's separate messages.
+- ChatGPT's first turn in a fresh profile took about 6 minutes in the spike: #544.
+
+The empty project's promise, found in the first QA pass, is fixed: the request now carries it on a second line the person sees (frame 3 redrawn).
