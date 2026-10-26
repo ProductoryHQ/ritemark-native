@@ -328,7 +328,8 @@ function ActivitySection({
   const [expanded, setExpanded] = useState(false);
 
   const count = activities.length;
-  // Sprint 139: the provider's own words after a failure are kept here, but they aren't an action.
+  // Sprint 139: the provider's own words after a failure are kept here, but they aren't an action. A row
+  // that opens them says whose words they are (the Experience lead): "What ChatGPT said".
   const actions = activities.filter((activity) => activity.type !== 'error').length;
   const theirWords = actions < count ? `What ${runtimeLabel} said` : undefined;
   const completed = actions > 0 ? `${actions} action${actions !== 1 ? 's' : ''} completed` : undefined;
@@ -354,7 +355,7 @@ function ActivitySection({
         <span className="text-[11px] opacity-50 truncate">
           {isRunning
             ? `${latestMessage}${count > 1 ? ` (${count} actions)` : ''}`
-            : [completed, theirWords].filter(Boolean).join(' · ')
+            : theirWords ?? completed
           }
         </span>
       </button>
