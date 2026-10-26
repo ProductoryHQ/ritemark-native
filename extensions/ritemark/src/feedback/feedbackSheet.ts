@@ -139,7 +139,8 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
     const sheet = open;
     if (!request || !sheet || request.token !== sheet.token || !request.text.trim()) return null;
     const text = request.text.trim();
-    if (routeOf(request) === 'straight') {
+    // The sheet's own "Open in e-mail" after a send that did not go (D5) asks for the e-mail route with no box ticked.
+    if (request.route === 'straight' && routeOf(request) === 'straight') {
       // The message and nothing else: no address, no document, no chat, no path (R11).
       const accepted = await sendFeedback([{ name: 'feedback_sent', properties: { message: text } }]);
       return { route: 'straight', outcome: accepted ? 'accepted' : 'failed' };

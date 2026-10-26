@@ -9,6 +9,8 @@ Sprint 133: Getting started joins Support in Help, where 1.x's first page linked
 Sprint 135: rebased onto VS Code 1.142.0. The main menu's registrations moved upstream to
 menubar.contribution.ts; the Help allowlist stays in menubarControl.ts, which now imports MenuRegistry itself.
 Upstream added its own menubarControl.test.ts (Open Recent's labels); this patch's suite is appended to it.
+Sprint 140 (R10, D7): Help ▸ Send feedback after Support (ritemark.help.sendFeedback, in the allowlist), opening the
+extension's feedback sheet through ritemark.feedback.open; off the palette, where the extension's own Send Feedback is.
 ---
 diff --git a/src/vs/platform/actions/common/actions.ts b/src/vs/platform/actions/common/actions.ts
 index 0df05b689ce..3400905b234 100644
@@ -23,7 +25,7 @@ index 0df05b689ce..3400905b234 100644
  	static readonly MenubarNewBreakpointMenu = new MenuId('MenubarNewBreakpointMenu');
  	static readonly PanelAlignmentMenu = new MenuId('PanelAlignmentMenu');
 diff --git a/src/vs/workbench/browser/actions/helpActions.ts b/src/vs/workbench/browser/actions/helpActions.ts
-index 8251c4a4292..9469cfe27dc 100644
+index 8251c4a4292..7633b7f5897 100644
 --- a/src/vs/workbench/browser/actions/helpActions.ts
 +++ b/src/vs/workbench/browser/actions/helpActions.ts
 @@ -127,11 +127,14 @@ class OpenDocumentationUrlAction extends Action2 {
@@ -43,7 +45,7 @@ index 8251c4a4292..9469cfe27dc 100644
  			},
  			category: Categories.Help,
  			f1: true,
-@@ -154,6 +157,34 @@ class OpenDocumentationUrlAction extends Action2 {
+@@ -154,6 +157,61 @@ class OpenDocumentationUrlAction extends Action2 {
  	}
  }
  
@@ -75,22 +77,50 @@ index 8251c4a4292..9469cfe27dc 100644
 +	}
 +}
 +
++/** Ritemark (Sprint 140, R10; experience 34): Help ▸ Send feedback opens the extension's feedback sheet, after Support (D7). */
++class OpenRitemarkSendFeedbackAction extends Action2 {
++
++	static readonly ID = 'ritemark.help.sendFeedback';
++
++	constructor() {
++		super({
++			id: OpenRitemarkSendFeedbackAction.ID,
++			title: {
++				...localize2('ritemarkSendFeedback', "Send feedback"),
++				mnemonicTitle: localize({ key: 'miRitemarkSendFeedback', comment: ['&& denotes a mnemonic'] }, "Send &&feedback"),
++			},
++			category: Categories.Help,
++			f1: false, // All commands keeps the extension's own "Send Feedback" (ritemark.reactions), which opens the same sheet
++			menu: {
++				id: MenuId.MenubarHelpMenu,
++				group: '1_welcome',
++				order: 4
++			}
++		});
++	}
++
++	run(accessor: ServicesAccessor): Promise<unknown> {
++		return accessor.get(ICommandService).executeCommand('ritemark.feedback.open', { from: 'help' });
++	}
++}
++
  class OpenNewsletterSignupUrlAction extends Action2 {
  
  	static readonly ID = 'workbench.action.openNewsletterSignupUrl';
-@@ -379,6 +410,10 @@ if (OpenTipsAndTricksUrlAction.AVAILABLE) {
+@@ -379,6 +437,11 @@ if (OpenTipsAndTricksUrlAction.AVAILABLE) {
  	registerAction2(OpenTipsAndTricksUrlAction);
  }
  
 +if (product.applicationName === 'ritemark') {
 +	registerAction2(OpenRitemarkGettingStartedAction);
++	registerAction2(OpenRitemarkSendFeedbackAction);
 +}
 +
  if (OpenDocumentationUrlAction.AVAILABLE) {
  	registerAction2(OpenDocumentationUrlAction);
  }
 diff --git a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
-index 9d3f6af4e6b..8267bffdf35 100644
+index 9d3f6af4e6b..0378eeff47e 100644
 --- a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
 +++ b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
 @@ -5,7 +5,7 @@
@@ -102,7 +132,7 @@ index 9d3f6af4e6b..8267bffdf35 100644
  import { MenuBarVisibility, IWindowOpenable, getMenuBarVisibility, MenuSettings, hasNativeMenu } from '../../../../platform/window/common/window.js';
  import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
  import { IAction, Action, SubmenuAction, Separator, IActionRunner, ActionRunner, WorkbenchActionExecutedEvent, WorkbenchActionExecutedClassification, toAction } from '../../../../base/common/actions.js';
-@@ -43,9 +43,62 @@ import { defaultMenuStyles } from '../../../../platform/theme/browser/defaultSty
+@@ -43,9 +43,63 @@ import { defaultMenuStyles } from '../../../../platform/theme/browser/defaultSty
  import { mainWindow } from '../../../../base/browser/window.js';
  import { ActivityBarPosition } from '../../../services/layout/browser/layoutService.js';
  import { truncateMiddle } from '../../../../base/common/strings.js';
@@ -113,6 +143,7 @@ index 9d3f6af4e6b..8267bffdf35 100644
 +const RITEMARK_HELP_MENU_ACTION_IDS = new Set([
 +	'ritemark.help.openGettingStarted',
 +	'workbench.action.openDocumentationUrl',
++	'ritemark.help.sendFeedback', // Sprint 140 (R10, D7): Getting started, Support, Send feedback
 +	'workbench.action.openLicenseUrl',
 +	'workbench.action.showAboutDialog',
 +]);
@@ -165,7 +196,7 @@ index 9d3f6af4e6b..8267bffdf35 100644
  export abstract class MenubarControl extends Disposable {
  
  	protected keys = [
-@@ -144,6 +197,11 @@ export abstract class MenubarControl extends Disposable {
+@@ -144,6 +198,11 @@ export abstract class MenubarControl extends Disposable {
  		this.menuUpdater.schedule();
  	}
  
@@ -177,7 +208,7 @@ index 9d3f6af4e6b..8267bffdf35 100644
  	protected calculateActionLabel(action: { id: string; label: string }): string {
  		const label = action.label;
  		switch (action.id) {
-@@ -493,10 +551,6 @@ export class CustomMenubarControl extends MenubarControl {
+@@ -493,10 +552,6 @@ export class CustomMenubarControl extends MenubarControl {
  		this._onVisibilityChange.fire(visible);
  	}
  
@@ -188,7 +219,7 @@ index 9d3f6af4e6b..8267bffdf35 100644
  	private readonly reinstallDisposables = this._register(new DisposableStore());
  	private readonly updateActionsDisposables = this._register(new DisposableStore());
  	private setupCustomMenubar(firstTime: boolean): void {
-@@ -606,7 +660,7 @@ export class CustomMenubarControl extends MenubarControl {
+@@ -606,7 +661,7 @@ export class CustomMenubarControl extends MenubarControl {
  					if (!this.focusInsideMenubar) {
  						const actions: IAction[] = [];
  						menuChangedDisposable.clear();
@@ -197,7 +228,7 @@ index 9d3f6af4e6b..8267bffdf35 100644
  						this.menubar?.updateMenu({ actions, label: mnemonicMenuLabel(this.topLevelTitles[title]) });
  					}
  				}));
-@@ -618,7 +672,7 @@ export class CustomMenubarControl extends MenubarControl {
+@@ -618,7 +673,7 @@ export class CustomMenubarControl extends MenubarControl {
  						if (!this.focusInsideMenubar) {
  							const actions: IAction[] = [];
  							webMenuChangedDisposable.clear();
@@ -206,7 +237,7 @@ index 9d3f6af4e6b..8267bffdf35 100644
  							this.menubar?.updateMenu({ actions, label: mnemonicMenuLabel(this.topLevelTitles[title]) });
  						}
  					}));
-@@ -628,7 +682,7 @@ export class CustomMenubarControl extends MenubarControl {
+@@ -628,7 +683,7 @@ export class CustomMenubarControl extends MenubarControl {
  			const actions: IAction[] = [];
  			if (menu) {
  				this.updateActionsDisposables.clear();
@@ -258,7 +289,7 @@ index 716f2280413..ea9ea240939 100644
  				if (menubarMenu.items.length === 0) {
  					return false; // Menus are incomplete
 diff --git a/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts b/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts
-index 36c109a8fc6..47f6f6d5ac5 100644
+index 36c109a8fc6..a7c1cdc5f11 100644
 --- a/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts
 +++ b/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts
 @@ -4,13 +4,13 @@
@@ -286,7 +317,7 @@ index 36c109a8fc6..47f6f6d5ac5 100644
  import { IWorkbenchEnvironmentService } from '../../../../services/environment/common/environmentService.js';
  import { IHostService } from '../../../../services/host/browser/host.js';
  import { IPreferencesService } from '../../../../services/preferences/common/preferences.js';
-@@ -106,3 +106,69 @@ suite('MenubarControl', () => {
+@@ -106,3 +106,72 @@ suite('MenubarControl', () => {
  		]);
  	});
  });
@@ -298,6 +329,7 @@ index 36c109a8fc6..47f6f6d5ac5 100644
 +	test('Help is a fail-closed product allowlist with normalized separators', () => {
 +		const gettingStarted = new Action('ritemark.help.openGettingStarted', 'Getting started');
 +		const support = new Action('workbench.action.openDocumentationUrl', 'Support');
++		const sendFeedback = new Action('ritemark.help.sendFeedback', 'Send feedback');
 +		const license = new Action('workbench.action.openLicenseUrl', 'View License');
 +		const about = new Action('workbench.action.showAboutDialog', 'About Ritemark');
 +		const advanced = new SubmenuItemAction({
@@ -311,6 +343,7 @@ index 36c109a8fc6..47f6f6d5ac5 100644
 +			new Separator(),
 +			gettingStarted,
 +			support,
++			sendFeedback,
 +			new Separator(),
 +			new Action('workbench.action.askVScode', 'Ask @vscode'),
 +			new Separator(),
@@ -326,6 +359,7 @@ index 36c109a8fc6..47f6f6d5ac5 100644
 +		assert.deepStrictEqual(ids(result), [
 +			gettingStarted.id,
 +			support.id,
++			sendFeedback.id,
 +			Separator.ID,
 +			license.id,
 +			Separator.ID,
