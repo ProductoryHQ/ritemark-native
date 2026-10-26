@@ -186,6 +186,7 @@ export function UnifiedConversationView() {
                 <CodexTurn
                   turn={item.turn}
                   isMixedRuntime={isMixedRuntime}
+                  isLatest={index === merged.length - 1}
                   onApprove={(requestId) => handleCodexApproval(requestId, true)}
                   onReject={(requestId) => handleCodexApproval(requestId, false)}
                   onAnswerQuestion={answerCodexQuestion}

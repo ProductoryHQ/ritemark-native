@@ -17,6 +17,12 @@ import {
   standaloneClaudeOAuthExpirationError,
   type RuntimeFailureKind,
 } from '../runtime/runtimeErrorPresentation';
+import {
+  decodeRuntimeErrorDetail,
+  isRuntimeErrorKind,
+  type RuntimeErrorDetail,
+  type RuntimeErrorKind,
+} from '../runtime/turnFailureCopy';
 import { fallbackTitleFromPrompt } from './ConversationTitlePolicy';
 
 export const CONVERSATION_SCHEMA_VERSION = 1 as const;
@@ -90,6 +96,14 @@ export interface AssistantMessageEventV1 extends ConversationEventBaseV1 {
   /** Stable recovery metadata for a terminal runtime failure. */
   error?: string;
   failureKind?: RuntimeFailureKind;
+  /**
+   * Sprint 139 (E1, E2): what kind of failure `error` is, and what its card
+   * needs. Optional and read leniently: 2.0.x ignores both, and a value this
+   * build doesn't know is dropped, never a reason to quarantine the chat.
+   * `failureKind` stays as it was: every 2.x build decodes it strictly.
+   */
+  errorKind?: RuntimeErrorKind;
+  errorDetail?: RuntimeErrorDetail;
   /** Provider-observed applied value; absent/null means the provider did not expose it. */
   appliedThinkingEffort?: ExplicitThinkingEffort | null;
   /**
@@ -122,6 +136,9 @@ export interface BoundaryEventV1 extends ConversationEventBaseV1 {
   message: string;
   /** Stable recovery metadata for a failed boundary. */
   failureKind?: RuntimeFailureKind;
+  /** Sprint 139 (E1, E2): as on an assistant message. */
+  errorKind?: RuntimeErrorKind;
+  errorDetail?: RuntimeErrorDetail;
 }
 
 export type DispatchReceiptStateV1 = 'not-sent' | 'ambiguous' | 'accepted';
@@ -152,7 +169,17 @@ export interface MigrationProvenanceV1 {
 
 export interface ConversationComposerPreferencesV1 {
   thinkingEffortByRuntime: Partial<Record<AgentId, ThinkingEffort>>;
+  /**
+   * Sprint 139 (#417, R6): for each AI the chat has used, the model it last ran
+   * or the person last chose in it, so the chat comes back on it. Optional and
+   * read leniently: 2.0.x ignores it (and drops it when it writes the chat
+   * back), and an entry that isn't a short string is dropped.
+   */
+  modelByRuntime?: Partial<Record<AgentId, string>>;
 }
+
+/** Sprint 139 (R6): a saved model id is at most this long. */
+export const MAX_SAVED_MODEL_ID_CHARS = 256;
 
 export interface ConversationRecordV1 {
   schemaVersion: typeof CONVERSATION_SCHEMA_VERSION;
@@ -462,6 +489,7 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
       ...(input.failureKind === undefined ? {} : {
         failureKind: enumAt(input.failureKind, `${path}.failureKind`, ['authentication', 'api-key-authentication'] as const),
       }),
+      ...lenientErrorFields(input),
       appliedThinkingEffort,
       ...(input.activeDurationMs === undefined ? {} : { activeDurationMs: integerAt(input.activeDurationMs, `${path}.activeDurationMs`) }),
     };
@@ -502,7 +530,18 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
     ...(input.failureKind === undefined ? {} : {
       failureKind: enumAt(input.failureKind, `${path}.failureKind`, ['authentication', 'api-key-authentication'] as const),
     }),
+    ...lenientErrorFields(input),
   };
+}
+
+/**
+ * Sprint 139 (E2): `errorKind` and `errorDetail`, kept only when this build
+ * knows them. Unlike `failureKind`, nothing here can fail a record.
+ */
+function lenientErrorFields(input: Record<string, unknown>): { errorKind?: RuntimeErrorKind; errorDetail?: RuntimeErrorDetail } {
+  if (!isRuntimeErrorKind(input.errorKind)) return {};
+  const errorDetail = decodeRuntimeErrorDetail(input.errorDetail);
+  return { errorKind: input.errorKind, ...(errorDetail ? { errorDetail } : {}) };
 }
 
 function decodeContinuation(value: unknown, path: string): RuntimeContinuationDescriptorV1 {
@@ -585,7 +624,30 @@ function decodeComposerPreferences(value: unknown, path: string): ConversationCo
     if (!isThinkingEffort(effort)) fail(`${path}.thinkingEffortByRuntime.${key}`, 'a canonical thinking effort');
     thinkingEffortByRuntime[runtimeId] = effort;
   }
-  return { thinkingEffortByRuntime };
+  const modelByRuntime = decodeModelByRuntime(input.modelByRuntime);
+  return { thinkingEffortByRuntime, ...(modelByRuntime ? { modelByRuntime } : {}) };
+}
+
+/** Sprint 139 (E2): never a reason to quarantine a chat: anything this build can't use is dropped. */
+function decodeModelByRuntime(value: unknown): Partial<Record<AgentId, string>> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const models: Partial<Record<AgentId, string>> = {};
+  for (const [key, model] of Object.entries(value as Record<string, unknown>)) {
+    if (key !== 'claude-code' && key !== 'codex' && key !== 'opencode') continue;
+    if (typeof model !== 'string' || !model.trim() || model.length > MAX_SAVED_MODEL_ID_CHARS) continue;
+    models[key] = model;
+  }
+  return Object.keys(models).length > 0 ? models : undefined;
+}
+
+/** Sprint 139 (R6): the composer preferences with one AI's model saved, or unchanged when it already is. */
+export function withSavedModel(
+  preferences: ConversationComposerPreferencesV1,
+  runtimeId: AgentId,
+  modelId: string | undefined,
+): ConversationComposerPreferencesV1 {
+  if (!modelId || modelId.length > MAX_SAVED_MODEL_ID_CHARS || preferences.modelByRuntime?.[runtimeId] === modelId) return preferences;
+  return { ...preferences, modelByRuntime: { ...(preferences.modelByRuntime ?? {}), [runtimeId]: modelId } };
 }
 
 function validateRecordRelationships(record: ConversationRecordV1): void {

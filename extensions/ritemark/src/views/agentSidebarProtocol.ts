@@ -14,6 +14,8 @@ export interface AgentSidebarBootstrapMessage {
   opencodeEnabled: boolean;
   selectedAgent: AgentId;
   selectedModel: string;
+  /** Sprint 139 (R4): the catalog's Claude default (`modelCatalog.getDefault`), for the refused-model card. */
+  defaultClaudeModel?: string;
   agents: AgentInfo[];
   models: ModelEntry[];
   codexModels: ModelEntry[];

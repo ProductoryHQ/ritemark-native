@@ -124,11 +124,11 @@ This goes first: R2, R4, R5 and R8 all read its kinds.
 - **`TurnFailureCard`** (new, `webview/src/components/ai-sidebar/`), built on `RuntimeNotice`, is used by `AgentResponse` (Claude) and `CodexView` (ChatGPT, OpenCode) for a failed turn with an `errorKind`. It picks title, message and action from the kind, the runtime's people-name and the catalog's labels. Claude's existing sign-in card stays as it is for its two `failureKind`s.
 - **`RuntimeNotice`** buttons gain tooltips (`ui/tooltip.tsx`; memory: every button gets a tooltip), for every card that uses it.
 - **Actions:**
-  - **Use <default>** (R4): `selectRuntimeModel(runtime, modelCatalog default)`, through the bootstrap's catalog lists. No resend. The card's text changes to "Switched to …".
+  - **Use <default>** (R4): `selectRuntimeModel(runtime, modelCatalog default)`, through the bootstrap's catalog lists. No resend. The card's text changes to "Now using …", with the green check.
   - **Open <billing page>** (R5): a host message that opens the provider's page (A3).
-  - **Use <other AI>** (R5) and **Use ChatGPT** (R2): W4's "ask the same in a new chat".
+  - **Continue with <other AI>** (R5, the plan's limit) and **Use ChatGPT** (R2): the signed-out card's mechanism (`useReadyAlternative`, then `selectRuntimeModel`): this chat continues with that AI.
   - **Sign in to ChatGPT** (R3): the sheet's existing ChatGPT sign-in (`startCodexSignIn`).
-- **The status line:** `presentActivityState` drops `errorFirstLine`. A failed turn says "Failed", and a turn with a card says nothing, extending today's rule for Claude's sign-in card to every card.
+- **The status line:** `presentActivityState` drops `errorFirstLine`. A failed turn says "Failed", and a turn with a card that has a way on (sign-in, model, limit) says nothing, extending today's rule for Claude's sign-in card (`failureSilencesStatusLine`).
 - **`CodexView`'s red line** is replaced by the card or by the sentence, once.
 - **Restored chats:** the projection carries `errorKind` (`conversationProjection.ts`), so a restored turn draws the same card.
 - **Tests:** webview tests for each kind's card, the status line, and a restored turn.

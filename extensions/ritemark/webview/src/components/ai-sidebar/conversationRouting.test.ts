@@ -211,6 +211,27 @@ function testCodexStreamingRoutesToTheAttributedConversation() {
   }
 }
 
+// #552: ChatGPT's working note and its answer are separate messages, so they read as separate paragraphs.
+function testSeparateCodexMessagesAreSeparateParagraphs() {
+  try {
+    seedTwoConversations(
+      { codexConversation: [makeCodexTurn({ id: 'a-1' })] },
+      { codexConversation: [makeCodexTurn({ id: 'b-1' })] },
+    );
+    const store = useAISidebarStore.getState();
+    store.handleExtensionMessage({ type: 'codex-streaming', conversationId: 'conv-a', delta: 'I sorted the files ', messageId: 'msg-1' });
+    store.handleExtensionMessage({ type: 'codex-streaming', conversationId: 'conv-a', delta: 'by modification time.', messageId: 'msg-1' });
+    store.handleExtensionMessage({ type: 'codex-streaming', conversationId: 'conv-a', delta: "## What's here", messageId: 'msg-2' });
+    store.handleExtensionMessage({ type: 'codex-streaming', conversationId: 'conv-a', delta: '\n- notes.md', messageId: 'msg-2' });
+    assert.equal(
+      useAISidebarStore.getState().conversations['conv-a'].codexConversation[0].streamingText,
+      "I sorted the files by modification time.\n\n## What's here\n- notes.md",
+    );
+  } finally {
+    resetStore();
+  }
+}
+
 function testUnknownConversationIdIsDroppedNotMisrouted() {
   const { warnings, restore } = silenceConsoleWarn();
   try {
@@ -421,6 +442,7 @@ function main() {
   testListOpenConversationsIsCreationOrdered();
   testKnownConversationIdLandsInThatConversation();
   testCodexStreamingRoutesToTheAttributedConversation();
+  testSeparateCodexMessagesAreSeparateParagraphs();
   testUnknownConversationIdIsDroppedNotMisrouted();
   testUnknownConversationIdIsDroppedForCodexStreamToo();
   testMissingConversationIdFallsBackToActiveWithOneWarning();

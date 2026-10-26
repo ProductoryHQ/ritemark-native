@@ -50,7 +50,7 @@ const { CodexRuntime, CodexSession, buildCodexBaseInstructions, isCodexSignInFai
 type CodexRuntime = import('./CodexRuntime').CodexRuntime;
 type CodexSession = import('./CodexRuntime').CodexSession;
 import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime';
-import type { AgentProgress } from '../agent/types';
+import { appendStreamedText, type AgentProgress } from '../agent/types';
 
 // ── Mock CodexAppServer ──────────────────────────────────────────────────────
 
@@ -289,6 +289,28 @@ async function run() {
     singleMock.emit('item/agentMessage/delta', { delta: 'unambiguous legacy event' });
     assert.deepStrictEqual(singleText, ['unambiguous legacy event'], 'missing thread id keeps singleton compatibility');
     console.log('✓ Test 6: B3 — streamed deltas route by threadId, orphans dropped');
+  }
+
+  // ── Test 6b: #552 — each delta names its message, so separate messages can read as separate paragraphs.
+  {
+    const { runtime, mock } = makeRuntime(['thread-a']);
+    const deltas: Array<{ message: string; messageId?: string }> = [];
+    await openTurn(runtime, 'conv-a', {
+      ...dummyConfig,
+      onProgress: (p: AgentProgress) => { if (p.type === 'text') deltas.push({ message: p.message, messageId: p.messageId }); },
+    });
+    mock.emit('item/agentMessage/delta', { threadId: 'thread-a', itemId: 'msg-1', delta: 'by modification time.' });
+    mock.emit('item/agentMessage/delta', { threadId: 'thread-a', itemId: 'msg-2', delta: "## What's here" });
+    assert.deepStrictEqual(deltas, [
+      { message: 'by modification time.', messageId: 'msg-1' },
+      { message: "## What's here", messageId: 'msg-2' },
+    ]);
+    const joined = deltas.reduce<{ text: string; id?: string }>((acc, d) => ({ text: appendStreamedText(acc.text, d.message, acc.id, d.messageId), id: d.messageId ?? acc.id }), { text: '' });
+    assert.strictEqual(joined.text, "by modification time.\n\n## What's here", 'a new message starts a new paragraph');
+    assert.strictEqual(appendStreamedText('a', 'b', 'm1', 'm1'), 'ab', 'the same message joins as it streams');
+    assert.strictEqual(appendStreamedText('a\n', 'b', 'm1', 'm2'), 'a\n\nb');
+    assert.strictEqual(appendStreamedText('a', 'b', undefined, undefined), 'ab', 'no ids (OpenCode): as before');
+    console.log('✓ Test 6b: #552 — separate messages are separate paragraphs');
   }
 
   // ── Test 7: B2 REGRESSION — turn/completed clears only its own turn id.

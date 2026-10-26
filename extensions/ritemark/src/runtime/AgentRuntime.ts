@@ -37,6 +37,8 @@ export interface RuntimeTurnResult {
   error?: string;
   /** Stable, auth-method-aware recovery category; provider text stays diagnostic-only. */
   failureKind?: RuntimeFailureKind;
+  /** Sprint 139 (E1): the runtime's structured error code, for the one classifier. */
+  errorCode?: string;
 }
 
 /**
@@ -162,7 +164,15 @@ export interface RuntimeSessionConfig {
    * its own, so a task's result is the agent's conclusion rather than the
    * first sentence it streamed. Absent when the runtime cannot tell messages apart.
    */
-  onCodexComplete?: (result: { status: string; error?: string; lastAgentMessage?: string }) => void;
+  onCodexComplete?: (result: {
+    status: string;
+    error?: string;
+    lastAgentMessage?: string;
+    /** Sprint 139 (E1): Codex's `codexErrorInfo` variant, or OpenCode's ACP error name. */
+    errorCode?: string;
+    /** The HTTP status that came with the code, when there was one. */
+    errorHttpStatus?: number;
+  }) => void;
   /** Codex approval policy (passed to threadStart) */
   codexApprovalPolicy?: string;
   /** Codex sandbox mode (passed to threadStart) */

@@ -73,15 +73,18 @@ export function deriveActivityState(c: ConversationState): ConversationActivityS
   // must say so — never a plain "Done" while work still runs. (Live set from
   // the SDK; waiting states above still outrank this.)
   const backgroundRunning = (c.backgroundTasks?.length ?? 0) > 0;
+  // A turn the person stopped is Stopped, never Failed — live, and after a restart (Sprint 139, #376).
+  if ((last.result as { stopped?: boolean }).stopped) return backgroundRunning ? 'stopped-background' : 'cancelled';
   const error = last.result.error;
   if (error) {
     if (/cancel/i.test(error)) return backgroundRunning ? 'stopped-background' : 'cancelled';
     return 'failed';
   }
   if (backgroundRunning) return 'done-background';
-  // Codex results carry a status string; 'interrupted' is a cancel.
+  // Codex results carry a status string. A live stop says 'interrupted'; a restored one
+  // says 'cancelled' (the record's boundary), and both are a stop.
   const status = (last.result as { status?: string }).status;
-  if (status === 'interrupted') return 'cancelled';
+  if (status === 'interrupted' || status === 'cancelled') return 'cancelled';
   if (status && status !== 'success' && status !== 'completed') return 'failed';
   return 'done';
 }
@@ -97,7 +100,7 @@ export interface ActivityStatusPresentation {
 
 export function presentActivityState(
   state: ConversationActivityState,
-  opts?: { activeSeconds?: number; waitedSeconds?: number; errorFirstLine?: string; liveActivity?: string; backgroundCount?: number }
+  opts?: { activeSeconds?: number; waitedSeconds?: number; liveActivity?: string; backgroundCount?: number }
 ): ActivityStatusPresentation | null {
   switch (state) {
     case 'running':
@@ -118,10 +121,8 @@ export function presentActivityState(
         label: opts?.activeSeconds ? `Done in ${formatSeconds(opts.activeSeconds)}` : 'Done',
       };
     case 'failed':
-      return {
-        icon: 'x-circle', tone: 'red',
-        label: opts?.errorFirstLine ? `Failed — ${opts.errorFirstLine}` : 'Failed',
-      };
+      // Sprint 139 (#376): only "Failed", for every AI. The turn's one sentence is right above it.
+      return { icon: 'x-circle', tone: 'red', label: 'Failed' };
     case 'cancelled':
       return { icon: 'x', tone: 'faint', label: 'Stopped' };
     case 'done-background':

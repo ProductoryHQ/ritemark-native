@@ -91,6 +91,7 @@ export function RuntimeAvailabilityNotice({
     ? {
         label: `Use ${RUNTIME_LABELS[alternativeRuntime]}`,
         icon: 'chat-circle',
+        tooltip: `Continue this chat with ${RUNTIME_LABELS[alternativeRuntime]}.`,
         onAction: () => selectRuntimeModel(alternativeRuntime, alternativeModel),
       }
     : undefined;
@@ -100,6 +101,7 @@ export function RuntimeAvailabilityNotice({
     recoveryAction = {
       label: 'Try again',
       icon: 'arrows-clockwise',
+      tooltip: `Check ${RUNTIME_LABELS[runtimeId]} again.`,
       onAction: () => vscode.postMessage({ type: 'agent:status/recheck', runtimeId }),
     };
   } else if (runtimeId === 'claude-code') {
@@ -107,31 +109,33 @@ export function RuntimeAvailabilityNotice({
       recoveryAction = {
         label: alternativeAction ? 'Sign in' : 'Sign in to Claude',
         icon: 'sign-in',
+        tooltip: "Opens Claude's sign-in page in your browser.",
         onAction: () => startLogin(),
       };
     } else if (availability.state === 'not-installed') {
-      recoveryAction = { label: 'Install Claude', icon: 'wrench', onAction: startInstall };
+      recoveryAction = { label: 'Install Claude', icon: 'wrench', tooltip: 'Set up Claude in Ritemark.', onAction: startInstall };
     } else if (availability.state === 'broken') {
       recoveryAction = setupStatus?.repairAction === 'reload'
-        ? { label: 'Reload Window', icon: 'arrows-clockwise', onAction: reloadWindow }
-        : { label: 'Repair Claude', icon: 'wrench', onAction: startInstall };
+        ? { label: 'Reload Window', icon: 'arrows-clockwise', tooltip: 'Reload this window to finish setting up Claude.', onAction: reloadWindow }
+        : { label: 'Repair Claude', icon: 'wrench', tooltip: "Set up Claude's files again.", onAction: startInstall };
     } else if (availability.state === 'disabled' || availability.state === 'needs-configuration') {
-      recoveryAction = { label: 'Open AI Settings', icon: 'gear', onAction: openAgentSettings };
+      recoveryAction = { label: 'Open AI Settings', icon: 'gear', tooltip: 'Opens Ritemark Settings for this AI.', onAction: openAgentSettings };
     }
   } else if (runtimeId === 'codex') {
     if (availability.state === 'needs-auth') {
       recoveryAction = {
         label: alternativeAction ? 'Sign in' : 'Sign in with ChatGPT',
         icon: 'sign-in',
+        tooltip: "Opens ChatGPT's sign-in page in your browser.",
         onAction: startCodexLogin,
       };
     } else if (availability.state === 'broken') {
-      recoveryAction = { label: 'Repair ChatGPT', icon: 'wrench', onAction: repairCodex };
+      recoveryAction = { label: 'Repair ChatGPT', icon: 'wrench', tooltip: "Set up ChatGPT's files again.", onAction: repairCodex };
     } else if (availability.state === 'disabled' || availability.state === 'needs-configuration') {
-      recoveryAction = { label: 'Open AI Settings', icon: 'gear', onAction: openAgentSettings };
+      recoveryAction = { label: 'Open AI Settings', icon: 'gear', tooltip: 'Opens Ritemark Settings for this AI.', onAction: openAgentSettings };
     }
   } else if (availability.state !== 'auth-in-progress') {
-    recoveryAction = { label: 'Open AI Settings', icon: 'gear', onAction: openAgentSettings };
+    recoveryAction = { label: 'Open AI Settings', icon: 'gear', tooltip: 'Opens Ritemark Settings for this AI.', onAction: openAgentSettings };
   }
 
   if (availability.state === 'ready' || availability.state === 'checking') {

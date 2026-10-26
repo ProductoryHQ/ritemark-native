@@ -59,6 +59,7 @@ function harness(overrides: { modelExists?: boolean; mode?: DictationMode; recal
   let waiting: (() => void) | null = null;
   let clock = 0;
   const remembered: number[] = [];
+  const captured: number[] = [];
   const controller = new DictationController(
     { postMessage: async (message: unknown) => { messages.push(message as Record<string, unknown>); return true; } },
     { extensionPath: '/nowhere' },
@@ -74,6 +75,7 @@ function harness(overrides: { modelExists?: boolean; mode?: DictationMode; recal
       now: () => clock,
       // The tagged test audio is not speech-like; the speech check has its own tests.
       audioLevel: overrides.audioLevel ?? (() => LOUD),
+      onCaptured: () => { captured.push(clock); },
       transcribe: (wav) => new Promise<TranscriptionResult>((resolve) => {
         clock += overrides.callMs ?? 0;
         calls.push({ wav, finish: resolve });
@@ -91,7 +93,7 @@ function harness(overrides: { modelExists?: boolean; mode?: DictationMode; recal
   const texts = () => messages.filter(m => m.type === 'dictation:transcription').map(m => m.text);
   const problems = () => messages.filter(m => m.type === 'dictation:problem').map(m => m.problem);
   const statuses = () => messages.filter(m => m.type === 'dictation:status').map(m => m.status);
-  return { controller, messages, notices, calls, state, callStarted, texts, problems, statuses, remembered };
+  return { controller, messages, notices, calls, state, callStarted, texts, problems, statuses, remembered, captured };
 }
 
 function ok(text: string): TranscriptionResult {
@@ -140,6 +142,8 @@ async function run(): Promise<void> {
     await h.controller.stopDictation();
     assert.deepEqual(h.texts(), ['üks', 'kaks kolm']);
     assert.equal(h.messages.at(-1)?.status, 'idle');
+    // Sprint 139 (R10): a dictation that put text in the document is one capture.
+    assert.equal(h.captured.length, 1);
   }
 
   // One call never exceeds MAX_CALL_SECONDS; the rest waits for the next one.
@@ -428,6 +432,7 @@ async function run(): Promise<void> {
     assert.deepEqual(h.texts(), [], `${mode}: nothing invented`);
     assert.deepEqual(h.problems(), ['mic-silent'], `${mode}: "Ritemark heard nothing"`);
     assert.equal(h.messages.at(-1)?.status, 'idle');
+    assert.deepEqual(h.captured, [], `${mode}: no text, no capture counted (Sprint 139 R10)`);
   }
 
   // Bug C (re-test): weak audio that comes out as whisper's silence phrase is dropped,

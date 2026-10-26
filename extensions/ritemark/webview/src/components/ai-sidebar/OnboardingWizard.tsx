@@ -10,6 +10,7 @@ import type { ReactNode } from 'react';
 import { Icon } from '../ui/Icon';
 import { useAISidebarStore } from './store';
 import type { OnboardingDependency, OnboardingInstallState, OnboardingStatus } from './types';
+import { PLAN_LINES } from '../welcome/welcomeCopy';
 
 type WizardStep = 'checklist' | 'authenticate' | 'ready';
 
@@ -220,7 +221,7 @@ function AuthenticateStep({
         <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4">
           <div className="text-sm font-semibold mb-1">Sign in to Claude</div>
           <p className="text-xs leading-5 opacity-75 mb-3">
-            Connect your Claude.ai account to get started.
+            {PLAN_LINES.claude}
           </p>
           <div className="flex flex-wrap gap-2">
             <ActionButton onClick={onLoginClaude}>
@@ -239,7 +240,7 @@ function AuthenticateStep({
         <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4">
           <div className="text-sm font-semibold mb-1">Sign in to ChatGPT</div>
           <p className="text-xs leading-5 opacity-75 mb-3">
-            Connect your ChatGPT account to get started.
+            {PLAN_LINES.chatgpt}
           </p>
           <div className="flex flex-wrap gap-2">
             <ActionButton onClick={onLoginCodex}>

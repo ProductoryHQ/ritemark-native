@@ -44,6 +44,7 @@ import {
 } from '../runtime/continuation';
 import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import { thinkingEffortLabel } from '../runtime/thinkingEffort';
+import { acpTurnErrorCode } from '../runtime/runtimeErrorPresentation';
 
 type PendingApproval = (result: { approved: boolean; alwaysAllow: boolean }) => void;
 
@@ -276,7 +277,8 @@ export class AcpSession implements RuntimeSession {
       }
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
-      config.onCodexComplete?.({ status: 'error', error: describeAcpTurnError(raw) });
+      const errorCode = acpTurnErrorCode(err);
+      config.onCodexComplete?.({ status: 'error', error: describeAcpTurnError(raw), ...(errorCode ? { errorCode } : {}) });
     }
   }
 
@@ -340,7 +342,7 @@ export class AcpSession implements RuntimeSession {
  * its empty-turn soft error. The bump turned a silent failure into a loud one,
  * which is an improvement — but the raw message says nothing about what to do.
  */
-function describeAcpTurnError(raw: string): string {
+export function describeAcpTurnError(raw: string): string {
   if (/no provider available/i.test(raw)) {
     return 'No model is selected for OpenCode. Pick one in the model selector below the message box, then try again.';
   }

@@ -13,12 +13,8 @@ import { ActivityDetails } from './ActivityDetails';
 import { chatFontStyle } from './ChatBubbles';
 import { extractPlanDisplayText, planTurnNeedsApproval } from './planText';
 import { RuntimeNotice } from './RuntimeNotice';
-import {
-  deriveRuntimeAvailabilities,
-  listReadyAlternatives,
-  resolveAvailableRuntimeModel,
-  RUNTIME_LABELS,
-} from './runtimeAvailability';
+import { TurnFailureCard, useReadyAlternative } from './TurnFailureCard';
+import { RUNTIME_LABELS } from './runtimeAvailability';
 
 import type { AgentConversationTurn } from './types';
 
@@ -48,6 +44,8 @@ interface RecoveryNoticeProps {
   tone?: 'warning' | 'progress' | 'success' | 'error';
   actionLabel?: string;
   actionIcon?: 'key' | 'sign-in' | 'arrow-counter-clockwise' | 'check';
+  /** Every button says what it does (Sprint 139). */
+  actionTooltip?: string;
   statusLabel?: string;
   actionDisabled?: boolean;
   onAction?: () => void;
@@ -59,6 +57,7 @@ function RecoveryNotice({
   tone = 'warning',
   actionLabel,
   actionIcon,
+  actionTooltip,
   statusLabel,
   actionDisabled = false,
   onAction,
@@ -72,6 +71,7 @@ function RecoveryNotice({
       primaryAction={actionLabel && actionIcon && onAction ? {
         label: actionLabel,
         icon: actionIcon,
+        tooltip: actionTooltip ?? actionLabel,
         onAction,
         disabled: actionDisabled,
       } : undefined}
@@ -91,43 +91,14 @@ export function AgentResponse({ turn }: AgentResponseProps) {
   const setupError = useAISidebarStore((s) => s.setupError);
   const dismissedAuthRecoveryTurnIds = useAISidebarStore((s) => s.dismissedAuthRecoveryTurnIds);
   const dismissAuthRecovery = useAISidebarStore((s) => s.dismissAuthRecovery);
-  const runtimeHydration = useAISidebarStore((s) => s.runtimeHydration);
-  const setupStatus = useAISidebarStore((s) => s.setupStatus);
-  const codexStatus = useAISidebarStore((s) => s.codexStatus);
-  const opencodeEnabled = useAISidebarStore((s) => s.opencodeEnabled);
-  const acpProviders = useAISidebarStore((s) => s.acpProviders);
-  const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
-  const models = useAISidebarStore((s) => s.models);
-  const codexModels = useAISidebarStore((s) => s.codexModels);
   const selectRuntimeModel = useAISidebarStore((s) => s.selectRuntimeModel);
   const activeConversation = useActiveConversation();
   const [rejectInput, setRejectInput] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
 
-  const availabilities = deriveRuntimeAvailabilities({
-    runtimeHydration,
-    setupStatus,
-    codexStatus,
-    opencodeEnabled,
-    acpProviders,
-    byokProviderModels,
-  });
-  const alternativeCandidate = listReadyAlternatives(availabilities, 'claude-code')[0] ?? null;
-  const alternativeModelId = alternativeCandidate
-    ? resolveAvailableRuntimeModel(alternativeCandidate, {
-        claude: activeConversation.selectedModel,
-        codex: activeConversation.codexSelectedModel,
-        opencode: activeConversation.opencodeSelectedModel,
-      }, {
-        claude: models,
-        codex: codexModels,
-        opencode: byokProviderModels,
-        acpProviders,
-      }) ?? ''
-    : '';
-  const readyAlternative = alternativeCandidate && alternativeModelId
-    ? alternativeCandidate
-    : null;
+  const alternative = useReadyAlternative('claude-code');
+  const readyAlternative = alternative?.runtimeId ?? null;
+  const alternativeModelId = alternative?.modelId ?? '';
 
   if (!result) return null;
 
@@ -161,6 +132,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
             message="You can continue this conversation now. Resend your last message when you’re ready."
             actionLabel="OK"
             actionIcon="check"
+            actionTooltip="Close this note."
             onAction={() => dismissAuthRecovery(turn.id)}
           />
         </div>
@@ -176,6 +148,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
             message={setupError || 'Ritemark could not confirm the sign-in. Please try again.'}
             actionLabel="Try again"
             actionIcon="arrow-counter-clockwise"
+            actionTooltip="Opens Claude's sign-in page in your browser again."
             onAction={() => startLogin(turn.id)}
           />
         </div>
@@ -192,15 +165,18 @@ export function AgentResponse({ turn }: AgentResponseProps) {
           secondaryAction={readyAlternative ? {
               label: usesApiKey ? 'Update key' : 'Sign in',
               icon: usesApiKey ? 'key' as const : 'sign-in' as const,
+              tooltip: usesApiKey ? 'Opens Ritemark Settings, where your Anthropic API key is.' : "Opens Claude's sign-in page in your browser.",
               onAction: usesApiKey ? openApiKeySettings : () => startLogin(turn.id),
             } : undefined}
           primaryAction={readyAlternative ? {
               label: `Use ${RUNTIME_LABELS[readyAlternative]}`,
               icon: 'chat-circle' as const,
+              tooltip: `Continue this chat with ${RUNTIME_LABELS[readyAlternative]}.`,
               onAction: () => selectRuntimeModel(readyAlternative, alternativeModelId),
             } : {
                 label: usesApiKey ? 'Update API key' : 'Sign in to Claude',
                 icon: usesApiKey ? 'key' as const : 'sign-in' as const,
+                tooltip: usesApiKey ? 'Opens Ritemark Settings, where your Anthropic API key is.' : "Opens Claude's sign-in page in your browser.",
                 onAction: usesApiKey ? openApiKeySettings : () => startLogin(turn.id),
               }}
         />
@@ -218,6 +194,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
           message="Long conversations accumulate token usage. Starting a new chat gives the agent full context capacity."
           actionLabel="Start new chat"
           actionIcon="arrow-counter-clockwise"
+          actionTooltip="Start a new chat with the same AI."
           onAction={() => requestNewThread()}
         />
         <ActivityDetails activities={activities} metrics={result.metrics} />
@@ -225,14 +202,21 @@ export function AgentResponse({ turn }: AgentResponseProps) {
     );
   }
 
-  // Generic error result
-  if (result.error) {
+  // Sprint 139 (#376): every other failure — one sentence, or its card, once. A turn the person
+  // stopped is not a failure: the status line says Stopped, and nothing red shows here.
+  if (result.error && !result.stopped) {
+    const lastAgent = activeConversation.agentConversation[activeConversation.agentConversation.length - 1];
+    const lastCodex = activeConversation.codexConversation[activeConversation.codexConversation.length - 1];
+    const isLatest = lastAgent?.id === turn.id && (!lastCodex || lastCodex.timestamp <= turn.timestamp);
     return (
       <div style={chatFontStyle}>
-        <div className="flex items-start gap-2 text-[var(--r-error)]">
-          <Icon name="warning-circle" size={14} className="shrink-0 mt-0.5" />
-          <span>{result.error}</span>
-        </div>
+        <TurnFailureCard
+          runtimeId="claude-code"
+          error={result.error}
+          errorKind={result.errorKind}
+          errorDetail={result.errorDetail}
+          isLatest={isLatest}
+        />
         <ActivityDetails activities={activities} metrics={result.metrics} />
       </div>
     );

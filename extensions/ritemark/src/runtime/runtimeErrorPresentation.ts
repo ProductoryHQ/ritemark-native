@@ -1,4 +1,14 @@
 import type { AgentId } from '../agent/types';
+import {
+  AI_NAMES,
+  failureSentence,
+  type BillingProvider,
+  type ModelNames,
+  type RuntimeErrorDetail,
+  type RuntimeErrorKind,
+} from './turnFailureCopy';
+
+export type { RuntimeErrorDetail, RuntimeErrorKind } from './turnFailureCopy';
 
 export type RuntimeFailureKind = 'authentication' | 'api-key-authentication';
 
@@ -84,45 +94,391 @@ export function classifyClaudeAuthenticationError(
   return usesApiKey ? 'api-key-authentication' : 'authentication';
 }
 
+// ── Sprint 139 (#376, R3–R5, E1): one classifier for all three AIs ──────────
+
+/** The longest sentence a turn shows; a provider's text beyond it is cut at a word. */
+const MAX_SENTENCE_CHARS = 500;
+
+/** What the runtime knew besides the text. Structured codes win over any text match. */
+export interface RuntimeErrorHints {
+  /**
+   * A structured error code: Claude's SDK error category (`rate_limit`,
+   * `billing_error`, …), Codex's `codexErrorInfo` variant (`usageLimitExceeded`,
+   * `unauthorized`, …), or OpenCode's ACP error name (`ProviderModelNotFoundError`).
+   */
+  code?: string;
+  /** The HTTP status that came with the code, when the runtime gave one. */
+  httpStatus?: number;
+  /** The model the turn ran on (OpenCode: `provider/model`). */
+  turnModel?: string;
+  /** Claude: the turn ran with an API key, not a Claude.ai sign-in. */
+  usesApiKey?: boolean;
+  /** The catalog's model labels, for the sentence. */
+  names?: ModelNames;
+}
+
+export interface ClassifiedRuntimeError {
+  kind: RuntimeErrorKind;
+  /** One sentence, unwrapped, never JSON. */
+  sentence: string;
+  /** Claude's two sign-in kinds, unchanged (records accept only these). */
+  failureKind?: RuntimeFailureKind;
+  detail?: RuntimeErrorDetail;
+}
+
+interface UnwrappedError {
+  /** The human sentence the provider wrote, or undefined when there is none. */
+  sentence: string | undefined;
+  /** Every `type`, `code` and `status` value found in an envelope, lower-cased. */
+  envelopeCodes: Set<string>;
+}
+
+function clampSentence(text: string, max = MAX_SENTENCE_CHARS): string {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  if (clean.length <= max) return clean;
+  const window = clean.slice(0, max);
+  const stop = Math.max(window.lastIndexOf('. '), window.lastIndexOf(' '));
+  return `${(stop > 40 ? window.slice(0, stop) : window).trimEnd()}…`;
+}
+
+function walkEnvelope(value: unknown, codes: Set<string>): string | null {
+  let deepest: string | null = null;
+  // `{"error": "<text>"}`: the text, when nothing nests a `message` or `detail`.
+  let bareError: string | null = null;
+  const walk = (node: unknown, depth: number): void => {
+    if (depth > 6 || node === null || typeof node !== 'object') return;
+    for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
+      if (key === 'error' && typeof child === 'string' && child.trim() && !/^[a-z_]+$/.test(child.trim())) {
+        bareError = child.trim();
+      } else if ((key === 'message' || key === 'detail') && typeof child === 'string' && child.trim()) {
+        deepest = child.trim();
+      } else if ((key === 'type' || key === 'code' || key === 'status') && (typeof child === 'string' || typeof child === 'number')) {
+        codes.add(String(child).toLowerCase());
+      } else {
+        walk(child, depth + 1);
+      }
+    }
+  };
+  walk(value, 0);
+  return deepest ?? bareError;
+}
+
+/**
+ * Dig the provider's own sentence out of whatever a runtime reported: a JSON
+ * envelope (`{"type":"error","error":{"message":"…"}}`), the same envelope after
+ * a short prefix (`API Error: 404 {…}`, `unexpected status 400: {…}`), or the
+ * ACP wrapper OpenCode puts round a provider's text (`Internal error: …`).
+ * A stack trace keeps its first line only.
+ */
+export function unwrapProviderMessage(raw: string | undefined): UnwrappedError {
+  const envelopeCodes = new Set<string>();
+  let text = (raw ?? '').trim();
+  if (!text) return { sentence: undefined, envelopeCodes };
+  // OpenCode's ACP `RequestError.internalError(data, message)` (bundled OpenCode, audit A2).
+  text = text.replace(/^Internal error:\s+(?=\S)/i, '');
+
+  const braceAt = text.search(/[[{]/);
+  if (braceAt >= 0 && braceAt <= 60) {
+    const prefix = text.slice(0, braceAt).trim();
+    try {
+      const parsed = JSON.parse(text.slice(braceAt));
+      const inner = walkEnvelope(parsed, envelopeCodes);
+      for (const status of prefix.match(/\b[45]\d\d\b/g) ?? []) envelopeCodes.add(status);
+      if (inner) {
+        // An envelope inside the envelope (a provider's body quoted in a message).
+        const nested = inner.startsWith('{') ? unwrapProviderMessage(inner) : null;
+        if (nested?.sentence) {
+          for (const code of nested.envelopeCodes) envelopeCodes.add(code);
+          return { sentence: nested.sentence, envelopeCodes };
+        }
+        return { sentence: clampSentence(inner), envelopeCodes };
+      }
+      return { sentence: undefined, envelopeCodes };
+    } catch {
+      // Not JSON after all. Text that starts like an envelope is a payload cut short
+      // (`{"type":"error","error":{"message":"Oops it bro`), never a sentence.
+      if (/^[[{]\s*["[{]/.test(text.slice(braceAt))) return { sentence: undefined, envelopeCodes };
+      // Otherwise read it as text.
+    }
+  }
+
+  const firstLine = text.split('\n').map((line) => line.trim()).find(Boolean) ?? '';
+  if (!firstLine || /^\s*at\s/.test(firstLine)) return { sentence: undefined, envelopeCodes };
+  // Braces and quote soup mean a payload, not prose.
+  if (/[{}]/.test(firstLine) && firstLine.length > 120) return { sentence: undefined, envelopeCodes };
+  return { sentence: clampSentence(firstLine), envelopeCodes };
+}
+
+/** The provider of an OpenCode model id (`google/gemini-…` → google). */
+function billingProviderOfModel(model: string | undefined): BillingProvider | undefined {
+  const vendor = model?.replace(/^opencode:/, '').split('/')[0]?.toLowerCase();
+  return vendor === 'google' || vendor === 'openai' || vendor === 'anthropic' || vendor === 'openrouter'
+    ? vendor
+    : undefined;
+}
+
+/**
+ * Model refusals, each from an error seen or read in the bundled runtime
+ * (audit A2's corpus). The first capture group is the model.
+ */
+const MODEL_REFUSED_PATTERNS: Array<{ runtimes: AgentId[]; pattern: RegExp }> = [
+  // Codex, #376 (seen 2026-10-01): the ChatGPT account can't run this model in Codex.
+  { runtimes: ['codex'], pattern: /The '([^']{1,120})' model is not supported when using Codex/i },
+  // Codex, seen in a comment task 2026-09-14: the bundled Codex is older than the model.
+  { runtimes: ['codex'], pattern: /The '([^']{1,120})' model requires a newer version of Codex/i },
+  // OpenCode's own ProviderModelNotFoundError text (bundled OpenCode, error.chain.modelNotFound).
+  { runtimes: ['opencode'], pattern: /Model not found:\s*([\w./:@-]{1,160})/i },
+  // Providers' documented model-not-found bodies, passed on by OpenCode.
+  { runtimes: ['opencode'], pattern: /models\/([\w.-]{1,120}) is not found/i },
+  { runtimes: ['opencode'], pattern: /The model `([^`]{1,120})` does not exist/i },
+  { runtimes: ['opencode'], pattern: /([\w./:-]{1,160}) is not a valid model ID/i },
+];
+
+const KEY_REFUSED_PATTERNS: RegExp[] = [
+  /provider authentication required/i, // OpenCode's ACPAuthRequiredError
+  /API key not valid/i, // Google
+  /Incorrect API key provided/i, // OpenAI
+  /invalid x-api-key/i, // Anthropic
+  /No auth credentials found/i, // OpenRouter
+];
+
+const CODEX_SIGN_IN_PATTERNS: RegExp[] = [
+  // The bundled Codex's own words when its ChatGPT token can't be renewed.
+  /access token could not be refreshed/i,
+  /refresh token (?:has expired|was already used|was rejected)/i,
+  /please (?:log out and )?sign in again/i,
+];
+
+// Words for "couldn't connect" in the runtimes and in Node, including OpenCode's own list of network failures.
+const NETWORK_PATTERNS: RegExp[] = [
+  /\b(?:ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH|ENETDOWN)\b/,
+  /getaddrinfo/i,
+  /^(?:API Error:\s*)?Connection error\.?$/i,
+  /^fetch failed$/i,
+  /error sending request for url/i,
+  /network connection was lost|network request failed|failed to fetch/i,
+];
+
+const CODEX_NETWORK_CODES = new Set(['httpconnectionfailed', 'responsestreamconnectionfailed', 'responsestreamdisconnected']);
+
+/** "try again at 3:05 PM." → "at 3:05 PM"; "resets 3pm (Europe/Tallinn)" → "at 3pm (Europe/Tallinn)". */
+function resetClause(text: string): string | undefined {
+  const tryAgain = /try again (at|in) ([^.\n]{1,48}?)(?:\.\s|\.$|$)/i.exec(text);
+  if (tryAgain) return `${tryAgain[1].toLowerCase()} ${tryAgain[2].trim()}`;
+  const resets = /\bresets? (at |in )?([^.·\n]{1,48}?)(?:[.·\n]|$)/i.exec(text);
+  if (resets) return `${(resets[1] ?? 'at ').toLowerCase()}${resets[2].trim()}`;
+  return undefined;
+}
+
+function finish(
+  agentId: AgentId,
+  kind: RuntimeErrorKind,
+  providerSentence: string,
+  hints: RuntimeErrorHints | undefined,
+  detail?: RuntimeErrorDetail,
+  failureKind?: RuntimeFailureKind,
+): ClassifiedRuntimeError {
+  const sentence = failureSentence({ runtimeId: agentId, kind, detail, providerSentence, names: hints?.names });
+  return {
+    kind,
+    sentence,
+    ...(failureKind ? { failureKind } : {}),
+    ...(detail && Object.keys(detail).length > 0 ? { detail } : {}),
+  };
+}
+
+/**
+ * Turn a runtime's terminal error into a kind and one sentence. Only a turn's
+ * terminal error ever reaches this — never an answer's text — so an answer that
+ * talks about an error stays an answer.
+ *
+ * Order: a structured code from the runtime; then the provider's envelope,
+ * unwrapped; then anchored matchers built from errors that were seen (audit A2);
+ * else the provider's own sentence as kind `provider`. Anything unmatched still
+ * shows once, unwrapped, never as JSON.
+ */
+export function classifyRuntimeError(
+  agentId: AgentId,
+  raw: string | undefined,
+  hints?: RuntimeErrorHints & { failureKind?: RuntimeFailureKind },
+): ClassifiedRuntimeError | undefined {
+  if (!raw?.trim()) return undefined;
+  const code = hints?.code?.trim().toLowerCase();
+  const { sentence: unwrapped, envelopeCodes } = unwrapProviderMessage(raw);
+  const name = AI_NAMES[agentId] ?? 'The AI';
+  const providerSentence = unwrapped ?? `${name} couldn't finish this request.`;
+  const haystack = `${unwrapped ?? ''}\n${raw}`;
+
+  // 1. Claude's two sign-in kinds, as before (Sprint 127, v1.10.0 RC).
+  if (agentId === 'claude-code') {
+    const failureKind = hints?.failureKind
+      ?? (code === 'authentication_failed' ? (hints?.usesApiKey ? 'api-key-authentication' : 'authentication') : undefined)
+      ?? classifyClaudeAuthenticationError(raw, hints?.usesApiKey === true);
+    if (failureKind === 'authentication') {
+      return { kind: 'sign-in', sentence: 'Your Claude session has expired. Sign in again, then resend your message.', failureKind };
+    }
+    if (failureKind === 'api-key-authentication') {
+      return { kind: 'sign-in', sentence: 'Claude did not accept your API key. Update it in AI Settings, then resend your message.', failureKind };
+    }
+  }
+
+  // 2. Structured codes.
+  if (agentId === 'claude-code' && code) {
+    if (code === 'model_not_found') {
+      const model = claudeUnavailableModel(raw) ?? hints?.turnModel;
+      return finish(agentId, 'model', providerSentence, hints, model ? { model } : undefined);
+    }
+    if (code === 'rate_limit') {
+      const resetsAt = resetClause(haystack);
+      return finish(agentId, 'limit', providerSentence, hints, { limit: 'plan', ...(resetsAt ? { resetsAt } : {}) });
+    }
+    // With a Claude.ai sign-in, what a billing error means is audit A1's question (#496): no guess here.
+    if (code === 'billing_error' && hints?.usesApiKey) {
+      return finish(agentId, 'limit', providerSentence, hints, { billing: 'anthropic', limit: 'credits' });
+    }
+  }
+  if (agentId === 'codex' && code) {
+    if (code === 'unauthorized') return finish(agentId, 'sign-in', providerSentence, hints);
+    if (code === 'usagelimitexceeded') {
+      const resetsAt = resetClause(haystack);
+      return finish(agentId, 'limit', providerSentence, hints, { limit: 'plan', ...(resetsAt ? { resetsAt } : {}) });
+    }
+    if (CODEX_NETWORK_CODES.has(code) && hints?.httpStatus === undefined) {
+      return finish(agentId, 'network', providerSentence, hints);
+    }
+  }
+  if (agentId === 'opencode' && code) {
+    if (code === 'providermodelnotfounderror') {
+      const model = MODEL_REFUSED_PATTERNS
+        .filter((entry) => entry.runtimes.includes('opencode'))
+        .map((entry) => entry.pattern.exec(haystack)?.[1])
+        .find(Boolean) ?? hints?.turnModel;
+      return finish(agentId, 'model', providerSentence, hints, model ? { model } : undefined);
+    }
+    if (code === 'providerautherror' || code === 'acpauthrequirederror' || code === 'auth_required') {
+      const billing = billingProviderOfModel(hints?.turnModel);
+      return finish(agentId, 'sign-in', providerSentence, hints, billing ? { billing } : undefined);
+    }
+  }
+
+  // 3. Anchored matchers from the corpus.
+  if (agentId === 'claude-code') {
+    const unavailable = claudeUnavailableModel(raw);
+    if (unavailable) return finish(agentId, 'model', providerSentence, hints, { model: unavailable });
+  }
+  for (const { runtimes, pattern } of MODEL_REFUSED_PATTERNS) {
+    if (!runtimes.includes(agentId)) continue;
+    const model = pattern.exec(haystack)?.[1]?.trim();
+    if (model) return finish(agentId, 'model', providerSentence, hints, { model });
+  }
+  if (agentId === 'codex' && CODEX_SIGN_IN_PATTERNS.some((pattern) => pattern.test(haystack))) {
+    return finish(agentId, 'sign-in', providerSentence, hints);
+  }
+  if (agentId === 'codex' && /You've hit your usage limit/i.test(haystack)) {
+    const resetsAt = resetClause(haystack);
+    return finish(agentId, 'limit', providerSentence, hints, { limit: 'plan', ...(resetsAt ? { resetsAt } : {}) });
+  }
+
+  // Keys, credits and quotas: OpenCode's providers, and Claude with an API key.
+  if (agentId === 'opencode' || (agentId === 'claude-code' && hints?.usesApiKey)) {
+    const modelProvider = agentId === 'claude-code' ? 'anthropic' : billingProviderOfModel(hints?.turnModel);
+    if (agentId === 'opencode' && KEY_REFUSED_PATTERNS.some((pattern) => pattern.test(haystack))) {
+      return finish(agentId, 'sign-in', providerSentence, hints, modelProvider ? { billing: modelProvider } : undefined);
+    }
+    // Google, seen 2026-10-24 (Jarmo): "Your prepayment credits are depleted. Please go to AI Studio …".
+    if (/prepayment credits are depleted/i.test(haystack)) {
+      return finish(agentId, 'limit', providerSentence, hints, { billing: 'google', limit: 'credits' });
+    }
+    // Anthropic's documented billing error.
+    if (/credit balance is too low/i.test(haystack)) {
+      return finish(agentId, 'limit', providerSentence, hints, { billing: 'anthropic', limit: 'credits' });
+    }
+    // OpenRouter's documented 402.
+    if ((modelProvider === 'openrouter' || /openrouter/i.test(haystack)) && /insufficient credits|requires more credits/i.test(haystack)) {
+      return finish(agentId, 'limit', providerSentence, hints, { billing: 'openrouter', limit: 'credits' });
+    }
+    // OpenAI's `insufficient_quota`, and Google's and OpenAI's shared "exceeded your current quota".
+    const quota = envelopeCodes.has('insufficient_quota') || /insufficient_quota/.test(raw)
+      || /exceeded your current quota/i.test(haystack) || /RESOURCE_EXHAUSTED/.test(raw);
+    if (quota) {
+      const billing = /ai\.google\.dev|generativelanguage|gemini/i.test(haystack) || /RESOURCE_EXHAUSTED/.test(raw)
+        ? 'google'
+        : /platform\.openai\.com|insufficient_quota/i.test(haystack)
+          ? 'openai'
+          : modelProvider;
+      if (billing) return finish(agentId, 'limit', providerSentence, hints, { billing, limit: 'quota' });
+    }
+  }
+
+  if (NETWORK_PATTERNS.some((pattern) => pattern.test(unwrapped ?? raw.trim()))) {
+    return finish(agentId, 'network', providerSentence, hints);
+  }
+
+  // 4. Anything else: the provider's own sentence.
+  return finish(agentId, 'provider', providerSentence, hints);
+}
+
+export interface RuntimeErrorPresentationV2 extends RuntimeErrorPresentation {
+  errorKind?: RuntimeErrorKind;
+  errorDetail?: RuntimeErrorDetail;
+}
+
 /**
  * Convert provider/runtime failures into stable user-facing categories.
  *
- * The raw provider error remains in Claude's activity trace for diagnostics;
- * the transcript gets copy that explains what the user can do next.
+ * The raw provider error remains in the turn's activity trace for diagnostics;
+ * the transcript gets one sentence that says what happened and what to do.
  */
 export function presentRuntimeError(
   agentId: AgentId,
   error: string | undefined,
   failureKind?: RuntimeFailureKind,
-): RuntimeErrorPresentation | undefined {
-  if (!error) return undefined;
+  hints?: RuntimeErrorHints,
+): RuntimeErrorPresentationV2 | undefined {
+  const classified = classifyRuntimeError(agentId, error, { ...hints, failureKind });
+  if (!classified) return undefined;
+  return {
+    message: classified.sentence,
+    ...(classified.failureKind ? { failureKind: classified.failureKind } : {}),
+    errorKind: classified.kind,
+    ...(classified.detail ? { errorDetail: classified.detail } : {}),
+  };
+}
 
-  const classifiedFailure = agentId === 'claude-code'
-    ? failureKind ?? classifyClaudeAuthenticationError(error, false)
-    : undefined;
-
-  if (classifiedFailure === 'authentication') {
+/**
+ * Sprint 139 (E1): the structured part of a Codex turn error. The bundled
+ * app-server's `TurnError` carries `codexErrorInfo` beside `message`: a plain
+ * variant (`"unauthorized"`, `"usageLimitExceeded"`, …) or one with data
+ * (`{ "httpConnectionFailed": { "httpStatusCode": 502 } }`). Read leniently: a
+ * shape this build doesn't know gives no code, and the text still classifies.
+ */
+export function codexTurnErrorCode(error: unknown): { code?: string; httpStatus?: number } {
+  if (!error || typeof error !== 'object') return {};
+  const info = (error as { codexErrorInfo?: unknown }).codexErrorInfo;
+  if (typeof info === 'string' && info.trim()) return { code: info.trim() };
+  if (info && typeof info === 'object' && !Array.isArray(info)) {
+    const [variant, data] = Object.entries(info as Record<string, unknown>)[0] ?? [];
+    if (!variant) return {};
+    const status = data && typeof data === 'object' ? (data as { httpStatusCode?: unknown }).httpStatusCode : undefined;
     return {
-      message: 'Your Claude session has expired. Sign in again, then resend your message.',
-      failureKind: 'authentication',
+      code: variant,
+      ...(typeof status === 'number' && Number.isFinite(status) ? { httpStatus: status } : {}),
     };
   }
+  return {};
+}
 
-  if (classifiedFailure === 'api-key-authentication') {
-    return {
-      message: 'Claude did not accept your API key. Update it in AI Settings, then resend your message.',
-      failureKind: 'api-key-authentication',
-    };
-  }
-
-  // Deliberately no failureKind: persisted conversation and comment-task
-  // records accept only the authentication kinds.
-  const unavailableModel = agentId === 'claude-code' ? claudeUnavailableModel(error) : undefined;
-  if (unavailableModel) {
-    return {
-      message: `Claude can't use ${unavailableModel} with this account. Choose another model in the model menu, then resend your message.`,
-    };
-  }
-
-  return { message: error };
+/**
+ * Sprint 139 (E1): what OpenCode's ACP error says besides its text. The bundled
+ * OpenCode answers a provider failure with `RequestError.internalError({ errorName }, message)`
+ * and a missing or refused key with `authRequired` (JSON-RPC -32000). The
+ * classifier reads the name before any text.
+ */
+export function acpTurnErrorCode(err: unknown): string | undefined {
+  if (!err || typeof err !== 'object') return undefined;
+  const { code, data } = err as { code?: unknown; data?: unknown };
+  const errorName = data && typeof data === 'object' ? (data as { errorName?: unknown }).errorName : undefined;
+  if (typeof errorName === 'string' && errorName.trim()) return errorName.trim();
+  if (code === -32000) return 'auth_required';
+  return undefined;
 }

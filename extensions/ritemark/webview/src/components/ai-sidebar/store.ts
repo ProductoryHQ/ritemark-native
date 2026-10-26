@@ -67,7 +67,8 @@ import { deriveActivityState } from './activityState';
 import { applyTaskProgress, endRunningCards, markCardStopping, tasksEndedLine } from './backgroundWork';
 import { resolveInboundConversationId } from './conversationRouting';
 import { MAX_PINNED_CONVERSATIONS } from './conversationActionsModel';
-import { projectionToConversation } from './conversationProjection';
+import { projectionToConversation, reconciledOpenCodeModel, reconcileRestoredModels, type RestoreCatalogs } from './conversationProjection';
+import { appendStreamedText } from '../../../../src/agent/types';
 import type { StartingPlace } from '../../../../src/guidance/startingPlace';
 import type {
   AgentId,
@@ -209,27 +210,6 @@ function computeContextState(_turns: AgentConversationTurn[]) {
   return { estimatedTokens: 0, contextUsagePercent: 0, showContextWarning: false };
 }
 
-/**
- * First available OpenCode model as a composite "opencode:<provider>/<id>" value,
- * picking the first configured provider's first model. Used to give the OpenCode
- * picker a sensible default (Claude/Codex already default to their first model) so
- * the composer never shows "Select a model…" with a valid, key-backed provider.
- */
-function firstAvailableOpenCodeModel(
-  enabled: boolean,
-  providers: AcpProviderFlags | undefined,
-  models: Record<string, ByokModelOption[]> | undefined,
-): string {
-  if (!enabled || !providers || !models) return '';
-  for (const provider of ['google', 'openai', 'anthropic', 'openrouter'] as const) {
-    if (providers[provider]) {
-      const first = models[provider]?.[0];
-      if (first) return `opencode:${provider}/${first.id}`;
-    }
-  }
-  return '';
-}
-
 function reconciledModelId(models: ModelOption[], id: string): string | undefined {
   return models.find((model) => (
     model.id === id
@@ -308,6 +288,8 @@ interface AISidebarState {
   // ── Codex runtime status (APP-GLOBAL — one binary, one auth) ──
   codexEnabled: boolean;
   codexModels: ModelOption[];
+  /** Sprint 139 (R4): the catalog's Claude default, which a refused-model card offers. */
+  defaultClaudeModel: string;
   codexStatus: CodexSidebarStatus;
   dismissedCodexNoticeKey: string | null;
 
@@ -901,6 +883,19 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     answer('no-conversation');
   }
 
+  /** Sprint 139 (R6): the model lists a restored chat is checked against. */
+  function restoreCatalogs(): RestoreCatalogs {
+    const state = get();
+    return {
+      claude: state.models,
+      claudeDefault: state.defaultClaudeModel,
+      codex: state.codexModels,
+      opencodeEnabled: state.opencodeEnabled,
+      acpProviders: state.acpProviders,
+      byok: state.byokProviderModels,
+    };
+  }
+
   /** Load a conversation from durable history into the open set without opening it. */
   function loadConversationInBackground(conversationId: string, done: (loaded: boolean) => void): void {
     const requestId = nextId();
@@ -909,7 +904,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         done(false);
         return;
       }
-      const restored = projectionToConversation(projection, undefined);
+      const restored = reconcileRestoredModels(projectionToConversation(projection, undefined), restoreCatalogs());
       // The user may have opened it meanwhile; never replace a live copy.
       if (!get().conversations[restored.id]) {
         set({ conversations: { ...get().conversations, [restored.id]: restored } });
@@ -1034,6 +1029,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     codexEnabled: false,
     codexModels: [],
+    defaultClaudeModel: '',
     codexStatus: DEFAULT_CODEX_STATUS,
     dismissedCodexNoticeKey: null,
 
@@ -1298,6 +1294,17 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       }
       if (runtimeId === 'claude-code' && conversation.selectedModel !== modelId) {
         vscode.postMessage({ type: 'ai-select-model', modelId, conversationId: conversation.id });
+      }
+      // Sprint 139 (#417, R6): a saved chat remembers the pick, even if nothing is sent before a restart.
+      const summary = get().hostConversations.find((item) => item.conversationId === conversation.id);
+      if (summary && get().conversationRolloutMode !== 'legacy' && pendingModelId) {
+        postConversationRequest({
+          type: 'conversation/set-composer-preference',
+          conversationId: conversation.id,
+          bindingGeneration: summary.bindingGeneration,
+          agentId: runtimeId,
+          modelId: pendingModelId,
+        });
       }
     },
 
@@ -2566,7 +2573,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             }
             const projection = data.conversation as ConversationProjectionV1;
             const current = get();
-            const restored = projectionToConversation(projection, current.activeConversationId ? current.conversations[current.activeConversationId] : undefined);
+            const restored = reconcileRestoredModels(
+              projectionToConversation(projection, current.activeConversationId ? current.conversations[current.activeConversationId] : undefined),
+              restoreCatalogs(),
+            );
             const conversations = { ...current.conversations, [restored.id]: restored };
             const activeConversationId = restored.id;
             set({
@@ -2716,26 +2726,23 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             const isActiveBlankConversation = applyHostDefault
               && conversation.id === activeId
               && isConversationEmpty(conversation);
+            // Sprint 139 (#417): a chat keeps its OpenCode model while a configured provider offers it,
+            // else the first configured one, as a restored chat does.
+            const opencodeSelectedModel = reconciledOpenCodeModel(conversation.opencodeSelectedModel, {
+              opencodeEnabled,
+              acpProviders,
+              byok: byokProviderModels,
+            });
             const incomingPendingModel = incomingRuntimeId === 'codex'
               ? codexSelectedModel
               : incomingRuntimeId === 'opencode'
-                ? (conversation.opencodeSelectedModel || firstAvailableOpenCodeModel(
-                    opencodeEnabled,
-                    acpProviders,
-                    byokProviderModels,
-                  )).replace(/^opencode:/, '')
+                ? opencodeSelectedModel.replace(/^opencode:/, '')
                 : selectedModel;
             conversations[conversation.id] = {
               ...conversation,
               selectedModel,
               codexSelectedModel,
-              // Default the OpenCode picker to the first configured model (state isn't
-              // persisted across window reloads, so it resets to '' otherwise).
-              opencodeSelectedModel: conversation.opencodeSelectedModel || firstAvailableOpenCodeModel(
-                opencodeEnabled,
-                acpProviders,
-                byokProviderModels,
-              ),
+              opencodeSelectedModel,
               // A thread bound to Claude runs the model its button shows: a queued
               // prompt and the AI disclosure read `pendingRuntime.modelId`.
               ...(conversation.pendingRuntime.runtimeId === 'claude-code'
@@ -2772,6 +2779,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             agents: message.agents,
             models: newClaudeModels,
             codexModels: newCodexModels,
+            defaultClaudeModel: bootstrap?.defaultClaudeModel ?? get().defaultClaudeModel,
             codexStatus: incomingCodexStatus,
             dismissedCodexNoticeKey: getCodexCompatibilityNoticeKey(incomingCodexStatus)
               ? get().dismissedCodexNoticeKey
@@ -2821,13 +2829,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           if (message.revision !== undefined && message.revision < get().sidebarStatusRevisions.opencode) break;
           const conversations: Record<string, ConversationState> = {};
           for (const conversation of Object.values(get().conversations)) {
+            // OpenCode's providers often arrive after the bootstrap: the same rule, now they are known.
             conversations[conversation.id] = {
               ...conversation,
-              opencodeSelectedModel: conversation.opencodeSelectedModel || firstAvailableOpenCodeModel(
-                message.enabled,
-                message.providers,
-                get().byokProviderModels,
-              ),
+              opencodeSelectedModel: reconciledOpenCodeModel(conversation.opencodeSelectedModel, {
+                opencodeEnabled: message.enabled,
+                acpProviders: message.providers,
+                byok: get().byokProviderModels,
+              }),
             };
           }
           set({
@@ -3219,6 +3228,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                   metrics: message.metrics || { durationMs: 0, costUsd: null, model: null },
                   error: message.error,
                   failureKind: message.failureKind,
+                  ...(message.error && message.errorKind ? { errorKind: message.errorKind } : {}),
+                  ...(message.error && message.errorKind && message.errorDetail ? { errorDetail: message.errorDetail } : {}),
+                  ...(message.stopped ? { stopped: true } : {}),
                 },
               };
             },
@@ -3315,9 +3327,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         case 'codex-streaming': {
           const targetId = routeInbound(message);
           if (!targetId) break;
+          // Sprint 139 (#552): another message (a working note, then the answer) starts a new paragraph.
           patchLastCodexTurn(targetId, (lastTurn) => ({
             ...lastTurn,
-            streamingText: lastTurn.streamingText + message.delta,
+            streamingText: appendStreamedText(lastTurn.streamingText, message.delta, lastTurn.streamingMessageId, message.messageId),
+            ...(message.messageId ? { streamingMessageId: message.messageId } : {}),
           }));
           break;
         }
@@ -3371,6 +3385,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               return finalizeCodexTurnResult(lastTurn, {
                 status: message.status,
                 error: message.error,
+                errorKind: message.errorKind,
+                errorDetail: message.errorDetail,
+                rawError: message.rawError,
               });
             },
             { requireRunning: false },

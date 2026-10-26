@@ -71,7 +71,7 @@ import { createRuntime } from '../runtime/runtimeFactory';
 import { RitemarkToolsInjector } from '../runtime/RitemarkToolsInjector';
 import { boardToolsAvailable, toolGroupsFor, toolSetKey } from '../runtime/ritemarkTools';
 import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
-import { trackFirstMessageSent } from '../analytics/posthog';
+import { countTurnAccepted, countTurnEnded } from '../analytics/posthog';
 import * as modelCatalog from '../ai/modelCatalog';
 import { renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
 import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
@@ -94,7 +94,10 @@ import type { CardTaskSidebar } from '../taskBoard/CardHandoffLedger';
 import { decodeCommentTaskSidebarMessage } from '../commentTasks/protocol';
 import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runtime/AgentRuntime';
 import type { OneShotSettings } from '../runtime/oneShotTurn';
-import { presentRuntimeError } from '../runtime/runtimeErrorPresentation';
+import { presentRuntimeError, type RuntimeErrorHints } from '../runtime/runtimeErrorPresentation';
+import { failureSentence, trustedBillingUrl, turnOutcome } from '../runtime/turnFailureCopy';
+import { appendStreamedText } from '../agent/types';
+import { modelSubstitutionForTurn } from '../runtime/modelSubstitution';
 import {
   isThinkingEffort,
   thinkingEffortLabel,
@@ -743,8 +746,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
         case 'agent-execute': {
           const { agentId, model, attachments } = message;
-          // Sprint 133 (R8): the profile's first message, once, only with usage data on.
-          void trackFirstMessageSent(String(agentId));
           // Sprint 99: every conversation-scoped message carries its conversation.
           // A missing id means a webview path that has not been migrated yet.
           const clientConversationId: string = message.conversationId ?? DEFAULT_CONVERSATION_ID;
@@ -759,6 +760,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             ? modelCatalog.getModel('anthropic', requestedModelInput)
             : undefined;
           const requestedModel = requestedClaudeModel?.id ?? requestedModelInput;
+          // Sprint 139 (#417, R6): the model this turn runs, saved with the chat when the turn is accepted.
+          const turnModelId = agentId === 'claude-code'
+            ? requestedModel
+            : (typeof model === 'string' && model ? model : undefined);
           const effortCapability = this._thinkingEffortCapability(
             clientConversationId,
             agentId as AgentId,
@@ -782,10 +787,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           }
           let acceptedConversation: import('../conversations/types').ConversationRecordV1 | null = null;
           let hostConversationEnabled = false;
+          // Sprint 139 (R6): the chat's own saved model for this AI, read before this turn saves its own.
+          let chatSavedModel: string | undefined;
           try {
             await this._turnsLeftByRestart;
             hostConversationEnabled = await this._conversationController.currentRolloutMode() !== 'legacy';
             if (hostConversationEnabled) {
+              chatSavedModel = await this._conversationController.savedComposerModel(clientConversationId, agentId as AgentId);
               if (message.conversationContinuation === true) {
                 const current = await this._conversationController.runtimeConversation(clientConversationId);
                 const continuedTurnId = typeof message.conversationTurnId === 'string'
@@ -813,6 +821,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                       : typeof message.prompt === 'string' ? message.prompt : '',
                     mode: message.approvalMode === 'ask' ? 'ask' : message.planFirst === true ? 'plan' : 'auto',
                     thinkingEffort,
+                    ...(turnModelId ? { modelId: turnModelId } : {}),
                     attachments: Array.isArray(attachments)
                       ? attachments.map((attachment: { name?: string; kind?: string; mediaType?: string; data?: string }) => ({
                           name: attachment.name ?? 'Attachment',
@@ -855,6 +864,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               : undefined;
           const runtimeTurnToken = Symbol(`${agentId}:${conversationTurnId ?? 'legacy'}`);
           this._activeRuntimeTurnTokens.set(conversationId, runtimeTurnToken);
+          // Sprint 139 (R7, R8): the turn, counted with no text. Its first message is counted only now that it is
+          // saved (it was counted before the save in 2.0); a continuation is the same turn.
+          const countedTurnKey = `${conversationId}:${conversationTurnId ?? randomUUID()}`;
+          void countTurnAccepted(countedTurnKey, String(agentId), message.conversationContinuation === true);
           // Sprint 117: a cancel arrives without a turn id, so remember which
           // turn is live in this conversation before anything can be cancelled.
           if (conversationTurnId) this._activeConversationTurnIds.set(conversationId, conversationTurnId);
@@ -877,6 +890,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           }
           let terminalCheckpointWritten = false;
           let streamedResponseText = '';
+          let streamedMessageId: string | undefined;
           let appliedThinkingEffort: ExplicitThinkingEffort | null = null;
           const skipActiveFile = message.skipActiveFile === true;
           const skipBrowserContext = message.skipBrowserContext === true;
@@ -1000,6 +1014,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const claudeModelDeclaration = isClaudeCode
             ? modelCatalog.getClaudeSessionDeclaration(pinnedModel)
             : undefined;
+          // Sprint 139 (E1): what the classifier knows besides the text.
+          const errorHints = (code?: string, httpStatus?: number): RuntimeErrorHints => ({
+            ...(code ? { code } : {}),
+            ...(httpStatus !== undefined ? { httpStatus } : {}),
+            ...(typeof pinnedModel === 'string' && pinnedModel ? { turnModel: pinnedModel } : {}),
+            usesApiKey: Boolean(anthropicApiKey),
+            names: modelNamesFor(agentId as AgentId),
+          });
           const titleGeneration = ({ userPrompt, assistantResponse }: { userPrompt: string; assistantResponse: string }) =>
             this._conversationTitleGenerator.generate({
               runtimeId: agentId as AgentId,
@@ -1185,7 +1207,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               ? [...DEFAULT_TOOLS, ..._toolsInjector.claudeAllowedTools(toolGroups)]
               : undefined,
             live: isClaudeCode
-              ? this._claudeLiveHooks(conversationId, agentId as AgentId, bindingGeneration, hostConversationEnabled)
+              ? this._claudeLiveHooks(conversationId, agentId as AgentId, bindingGeneration, hostConversationEnabled, Boolean(anthropicApiKey))
               : undefined,
             onProgress: (progress) => {
               if (!isCurrentRuntimeTurn()) return;
@@ -1193,8 +1215,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 this._view?.webview.postMessage({ type: 'agent-progress', conversationId, agentId, progress });
               } else {
                 if (progress.type === 'text') {
-                  streamedResponseText += progress.message;
-                  this._view?.webview.postMessage({ type: 'codex-streaming', conversationId, delta: progress.message });
+                  // Sprint 139 (#552): another message starts a new paragraph, in the record as in the sheet.
+                  streamedResponseText = appendStreamedText(streamedResponseText, progress.message, streamedMessageId, progress.messageId);
+                  streamedMessageId = progress.messageId ?? streamedMessageId;
+                  this._view?.webview.postMessage({
+                    type: 'codex-streaming',
+                    conversationId,
+                    delta: progress.message,
+                    ...(progress.messageId ? { messageId: progress.messageId } : {}),
+                  });
                 } else {
                   this._view?.webview.postMessage({ type: 'codex-progress', conversationId, progress });
                 }
@@ -1214,9 +1243,19 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             },
             onComplete: (result) => {
               if (!isCurrentRuntimeTurn()) return;
-              const errorPresentation = presentRuntimeError(agentId as AgentId, result.error, result.failureKind);
+              // Sprint 139 (E1): one classifier for every runtime. A stop is not a failure to classify.
+              const errorPresentation = isCancelledError(result.error)
+                ? (result.error ? { message: result.error } : undefined)
+                : presentRuntimeError(agentId as AgentId, result.error, result.failureKind, errorHints(result.errorCode));
               const error = errorPresentation?.message;
               const failureKind = result.failureKind ?? errorPresentation?.failureKind;
+              const errorKind = errorPresentation && 'errorKind' in errorPresentation ? errorPresentation.errorKind : undefined;
+              const errorDetail = errorPresentation && 'errorDetail' in errorPresentation ? errorPresentation.errorDetail : undefined;
+              // Cancel normalisation (F24). Claude answers `session.cancel()`
+              // with an ordinary error-free result, so "no error" alone is not
+              // evidence of completion — the user's own intent decides. Read once,
+              // before the result is posted, so the sheet says Stopped too (Sprint 139).
+              const stoppedByPerson = !terminalCheckpointWritten && this._consumeCancelIntent(conversationId, conversationTurnId);
               this._view?.webview.postMessage({
                 type: 'agent-result', conversationId,
                 agentId,
@@ -1225,17 +1264,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 metrics: result.metrics ?? { durationMs: 0, costUsd: null, model: null },
                 error,
                 failureKind,
+                ...(errorKind ? { errorKind } : {}),
+                ...(errorDetail ? { errorDetail } : {}),
+                ...(stoppedByPerson ? { stopped: true } : {}),
               });
               this._refreshExplorerForAgentWrites(result.filesModified);
               if (!terminalCheckpointWritten) {
                 terminalCheckpointWritten = true;
-                // Cancel normalisation (F24). Claude answers `session.cancel()`
-                // with an ordinary error-free result, so "no error" alone is not
-                // evidence of completion — the user's own intent decides.
-                const cancelled = this._consumeCancelIntent(conversationId, conversationTurnId);
+                const cancelled = stoppedByPerson;
                 const status: 'completed' | 'failed' | 'cancelled' = cancelled
                   ? 'cancelled'
                   : error ? 'failed' : 'completed';
+                void countTurnEnded(countedTurnKey, String(agentId), 'chat', turnOutcome(status, errorKind));
                 this._runConversationCheckpoint(conversationId, () => this._conversationController.completeRuntimeTurn({
                   conversationId,
                   bindingGeneration,
@@ -1245,6 +1285,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   status,
                   error,
                   failureKind,
+                  ...(status === 'failed' && errorKind ? { errorKind } : {}),
+                  ...(status === 'failed' && errorDetail ? { errorDetail } : {}),
                   appliedThinkingEffort,
                   activeDurationMs: turnActiveDurationMs(result.metrics),
                   generateTitle: titleGeneration,
@@ -1281,11 +1323,27 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             },
             onCodexComplete: (result) => {
               if (!isCurrentRuntimeTurn()) return;
+              // Sprint 139 (#376, E1): ChatGPT's and OpenCode's errors go through the same classifier as
+              // Claude's, so the transcript, the record, comments and cards say one unwrapped sentence.
+              const errorPresentation = result.error && !/cancell?ed|interrupted/i.test(result.status)
+                ? presentRuntimeError(agentId as AgentId, result.error, undefined, errorHints(result.errorCode, result.errorHttpStatus))
+                : undefined;
+              const error = errorPresentation?.message ?? result.error;
+              const errorKind = errorPresentation?.errorKind;
+              const errorDetail = errorPresentation?.errorDetail;
+              // The provider's own words stay in the turn's activity details, for diagnosis. They travel
+              // with the result, so they never show as the running turn's live line. Words the sentence
+              // already says, as they were, are not kept twice.
+              const rawText = result.error?.trim();
+              const rawError = errorPresentation && rawText && !error?.includes(rawText) ? result.error : undefined;
               this._view?.webview.postMessage({
                 type: 'codex-result', conversationId,
                 agentId,
                 status: result.status,
-                error: result.error,
+                error,
+                ...(errorKind ? { errorKind } : {}),
+                ...(errorDetail ? { errorDetail } : {}),
+                ...(rawError ? { rawError } : {}),
               });
               this._refreshExplorerForAgentWrites(undefined);
               if (!terminalCheckpointWritten) {
@@ -1299,6 +1357,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 const status: 'completed' | 'failed' | 'cancelled' = cancelled
                   ? 'cancelled'
                   : runtimeCompleted ? 'completed' : 'failed';
+                void countTurnEnded(countedTurnKey, String(agentId), 'chat', turnOutcome(status, errorKind));
                 this._runConversationCheckpoint(conversationId, () => this._conversationController.completeRuntimeTurn({
                   conversationId,
                   bindingGeneration,
@@ -1306,7 +1365,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   turnId: conversationTurnId,
                   text: streamedResponseText,
                   status,
-                  error: result.error,
+                  error,
+                  ...(status === 'failed' && errorKind ? { errorKind } : {}),
+                  ...(status === 'failed' && errorDetail ? { errorDetail } : {}),
                   appliedThinkingEffort,
                   generateTitle: titleGeneration,
                 }), hostConversationEnabled);
@@ -1316,7 +1377,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   // message (its conclusion), not the opening narration; the
                   // transcript above keeps the whole stream.
                   text: result.lastAgentMessage ?? streamedResponseText,
-                  error: result.error,
+                  error,
                 });
                 if (!runtimeCompleted) this._disposeRuntimeSession(conversationId, agentId as AgentId);
               }
@@ -1324,15 +1385,21 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             onExit: () => {
               if (!isCurrentRuntimeTurn()) return;
               // Codex app-server died mid-turn — finalize the turn so the webview
-              // isn't stuck on "running" forever.
+              // isn't stuck on "running" forever. Sprint 139 (R3): the chat, the
+              // record and a restored chat say the same one sentence.
+              const exitDetail = { exited: true } as const;
+              const exitSentence = failureSentence({ runtimeId: agentId as AgentId, kind: 'provider', detail: exitDetail, providerSentence: '' });
               this._view?.webview.postMessage({
                 type: 'codex-result', conversationId,
                 agentId,
                 status: 'error',
-                error: 'ChatGPT stopped unexpectedly. Please try again.',
+                error: exitSentence,
+                errorKind: 'provider',
+                errorDetail: exitDetail,
               });
               if (!terminalCheckpointWritten) {
                 terminalCheckpointWritten = true;
+                void countTurnEnded(countedTurnKey, String(agentId), 'chat', turnOutcome('failed', 'provider'));
                 this._runConversationCheckpoint(conversationId, () => this._conversationController.completeRuntimeTurn({
                   conversationId,
                   bindingGeneration,
@@ -1343,7 +1410,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   // task calls it interrupted, because that is the state that
                   // offers Retry rather than an error the user cannot act on.
                   status: 'failed',
-                  error: 'Runtime exited unexpectedly.',
+                  error: exitSentence,
+                  errorKind: 'provider',
+                  errorDetail: exitDetail,
                 }), hostConversationEnabled);
                 this._applyCommentTaskTerminal(conversationId, conversationTurnId, {
                   status: 'interrupted',
@@ -1441,14 +1510,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               }
               // Keyed by the accepted id: the first turn of a new conversation
               // replaces the sidebar's client id with a canonical one.
+              // Sprint 139 (R6): the chat's own saved model, for all three AIs; a chat with none
+              // saved (a new chat, or one from 2.0) compares with Claude's app-wide pick, as before.
               const modelSubstitution = this._modelSubstitutionNamed.has(conversationId)
                 ? undefined
-                : modelCatalog.substitutionForTurn('anthropic', savedClaudeModel, requestedModel);
+                : turnModelSubstitution(agentId as AgentId, chatSavedModel, savedClaudeModel, turnModelId);
               if (modelSubstitution) {
                 this._modelSubstitutionNamed.add(conversationId);
                 sessionConfig.onProgress({
                   type: 'init',
-                  message: modelSubstitutionNotice(modelSubstitution.from, modelSubstitution.to),
+                  message: modelSubstitutionNotice(agentId as AgentId, modelSubstitution.from, modelSubstitution.to),
                   timestamp: Date.now(),
                 });
               }
@@ -1556,6 +1627,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         case 'agent-setup:open-node-download':
           await vscode.env.openExternal(vscode.Uri.parse('https://nodejs.org/en/download'));
           break;
+
+        // Sprint 139 (R5): a limit card's billing page. Only a page on a trusted link domain opens, so it
+        // opens with no question first (audit A3); the webview names the provider, never a URL.
+        case 'turn-failure/open-billing': {
+          const url = typeof message.provider === 'string' ? trustedBillingUrl(message.provider) : undefined;
+          if (url) await vscode.env.openExternal(vscode.Uri.parse(url));
+          break;
+        }
 
         case 'agent-setup:check':
           clearSetupCache();
@@ -3685,6 +3764,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     agentId: AgentId,
     bindingGeneration: number,
     hostConversationEnabled: boolean,
+    usesApiKey = false,
   ): import('../agent/types').AgentLiveHooks {
     const post = (message: Record<string, unknown>) => this._view?.webview.postMessage({ conversationId, agentId, ...message });
     let runtimeTurnId: string | null = null;
@@ -3732,9 +3812,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         if (turnId && this._activeConversationTurnIds.get(conversationId) === turnId) {
           this._activeConversationTurnIds.delete(conversationId);
         }
-        const errorPresentation = presentRuntimeError(agentId, result.error, undefined);
+        const errorPresentation = isCancelledError(result.error)
+          ? (result.error ? { message: result.error } : undefined)
+          : presentRuntimeError(agentId, result.error, undefined, { code: result.errorCode, usesApiKey, names: modelNamesFor(agentId) });
         const error = errorPresentation?.message;
         const failureKind = errorPresentation?.failureKind;
+        const errorKind = errorPresentation && 'errorKind' in errorPresentation ? errorPresentation.errorKind : undefined;
+        const errorDetail = errorPresentation && 'errorDetail' in errorPresentation ? errorPresentation.errorDetail : undefined;
+        // Read the person's Stop before the result is posted, so a stopped follow-up says Stopped
+        // in the sheet too, not Done (Sprint 139, as the person's own turns).
+        const cancelled = this._consumeCancelIntent(conversationId, turnId);
         post({
           type: 'agent-result',
           text: result.text ?? '',
@@ -3742,9 +3829,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           metrics: result.metrics ?? { durationMs: 0, costUsd: null, model: null },
           error,
           failureKind,
+          ...(errorKind ? { errorKind } : {}),
+          ...(errorDetail ? { errorDetail } : {}),
+          ...(cancelled ? { stopped: true } : {}),
         });
         this._refreshExplorerForAgentWrites(result.filesModified);
-        const cancelled = this._consumeCancelIntent(conversationId, turnId);
         const status: 'completed' | 'failed' | 'cancelled' = cancelled ? 'cancelled' : error ? 'failed' : 'completed';
         // No title generation: the conversation already has its title.
         this._runConversationCheckpoint(conversationId, () => this._conversationController.completeRuntimeTurn({
@@ -3756,6 +3845,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           status,
           error,
           failureKind,
+          ...(status === 'failed' && errorKind ? { errorKind } : {}),
+          ...(status === 'failed' && errorDetail ? { errorDetail } : {}),
           activeDurationMs: turnActiveDurationMs(result.metrics),
         }), hostConversationEnabled);
         if (failureKind === 'authentication' || failureKind === 'api-key-authentication') {
@@ -3885,8 +3976,44 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
 }
 
+/** Sprint 139 (E1): Claude's own stop reads as a stop, never as a failure to classify. */
+function isCancelledError(error: string | undefined): boolean {
+  return Boolean(error && /^execution cancell?ed$/i.test(error.trim()));
+}
+
+/** Sprint 139 (R4): the catalog's labels for a runtime's models, for the turn's sentence. */
+function modelNamesFor(runtimeId: AgentId): { label(modelId: string): string | undefined } {
+  const provider = runtimeId === 'claude-code' ? 'anthropic' : runtimeId === 'codex' ? 'codex' : 'opencode';
+  return {
+    label: (modelId) => modelCatalog.getModel(provider, modelId)?.label
+      ?? (provider === 'opencode' ? modelCatalog.getModels('opencode').find((entry) => entry.id.endsWith(`/${modelId}`))?.label : undefined),
+  };
+}
+
+function catalogProviderOf(runtimeId: AgentId): 'anthropic' | 'codex' | 'opencode' {
+  return runtimeId === 'claude-code' ? 'anthropic' : runtimeId === 'codex' ? 'codex' : 'opencode';
+}
+
+/** Sprint 139 (#417, R6): the turn's substitution, from the chat's own saved model (`runtime/modelSubstitution.ts`). */
+function turnModelSubstitution(
+  runtimeId: AgentId,
+  chatSavedModel: string | undefined,
+  appWideClaudeModel: modelCatalog.RequestedModelResolution | undefined,
+  turnModel: string | undefined,
+): { from: string; to: string } | undefined {
+  const provider = catalogProviderOf(runtimeId);
+  return modelSubstitutionForTurn({
+    runtimeId,
+    chatSavedModel,
+    turnModel,
+    catalog: { idOf: (id) => modelCatalog.getModel(provider, id)?.id },
+    appWideSubstitution: () => modelCatalog.substitutionForTurn('anthropic', appWideClaudeModel, turnModel),
+  });
+}
+
 /** Sprint 127 R6: one transcript line naming the requested and the used model. */
-function modelSubstitutionNotice(requested: string, usedId: string): string {
-  const used = modelCatalog.getModel('anthropic', usedId)?.label ?? usedId;
+function modelSubstitutionNotice(runtimeId: AgentId, requested: string, usedId: string): string {
+  const provider = catalogProviderOf(runtimeId);
+  const used = modelCatalog.getModel(provider, usedId)?.label ?? usedId;
   return `${requested} isn't available right now — using ${used}.`;
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import type { ConversationProjectionV1 } from '../../../../src/conversations/protocol';
-import { projectionToConversation } from './conversationProjection';
+import { projectionToConversation, reconciledOpenCodeModel, reconcileRestoredModels, type RestoreCatalogs } from './conversationProjection';
 
 const projection: ConversationProjectionV1 = {
   schemaVersion: 1,
@@ -110,5 +110,120 @@ timedProjection.events = [
 const timed = projectionToConversation(timedProjection);
 assert.equal(timed.agentConversation[0].result?.metrics?.durationMs, 8000, 'the saved working time comes back');
 assert.equal(timed.agentConversation[1].result?.metrics, undefined, 'no saved time: no metrics, never a zero');
+
+// Sprint 139 (#376, S21): a restored failed turn says the same sentence and draws the same card.
+const failedProjection = structuredClone(projection);
+failedProjection.lifecycle = { state: 'interrupted', turnId: 'turn-model', reason: 'failed' };
+failedProjection.runtimeSummary = ['codex', 'claude-code'];
+failedProjection.events.push(
+  {
+    kind: 'user-message', eventId: 'user-model', turnId: 'turn-model', sequence: 4,
+    occurredAt: '2026-08-23T10:05:00.000Z', runtimeId: 'codex', text: 'Again', mode: 'agent', attachments: [],
+  },
+  {
+    kind: 'boundary', eventId: 'boundary-model', turnId: 'turn-model', sequence: 5,
+    occurredAt: '2026-08-23T10:05:01.000Z', runtimeId: 'codex', boundaryKind: 'failed',
+    message: "ChatGPT couldn't use GPT-6.1 Sol. It isn't available in Ritemark right now.",
+    errorKind: 'model', errorDetail: { model: 'gpt-6.1-sol' },
+  },
+  {
+    kind: 'user-message', eventId: 'user-net', turnId: 'turn-net', sequence: 6,
+    occurredAt: '2026-08-23T10:06:00.000Z', runtimeId: 'claude-code', text: 'Hi', mode: 'agent', attachments: [],
+  },
+  {
+    kind: 'boundary', eventId: 'boundary-net', turnId: 'turn-net', sequence: 7,
+    occurredAt: '2026-08-23T10:06:01.000Z', runtimeId: 'claude-code', boundaryKind: 'failed',
+    message: "Ritemark couldn't reach Claude. Check your connection, then send your message again.", errorKind: 'network',
+  },
+);
+const restoredFailed = projectionToConversation(failedProjection);
+assert.deepEqual(restoredFailed.codexConversation[1].result, {
+  status: 'failed',
+  error: "ChatGPT couldn't use GPT-6.1 Sol. It isn't available in Ritemark right now.",
+  errorKind: 'model',
+  errorDetail: { model: 'gpt-6.1-sol' },
+}, "ChatGPT's restored failure keeps its sentence and card (2.0 restored only the status)");
+assert.equal(restoredFailed.agentConversation[0].result?.errorKind, 'network');
+assert.equal(restoredFailed.codexConversation[0].result?.error, undefined, 'a completed turn carries no failure');
+
+// A chat saved by 2.0 kept ChatGPT's raw envelope: restored, it is unwrapped, never JSON (review finding).
+const twoZeroFailure = structuredClone(projection);
+twoZeroFailure.events.push(
+  {
+    kind: 'user-message', eventId: 'user-old', turnId: 'turn-old', sequence: 4,
+    occurredAt: '2026-08-23T10:05:00.000Z', runtimeId: 'codex', text: 'Old', mode: 'agent', attachments: [],
+  },
+  {
+    kind: 'boundary', eventId: 'boundary-old', turnId: 'turn-old', sequence: 5,
+    occurredAt: '2026-08-23T10:05:01.000Z', runtimeId: 'codex', boundaryKind: 'failed',
+    message: '{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The \'gpt-6.1-sol\' model is not supported when using Codex with a ChatGPT account."}}',
+  },
+);
+const restoredTwoZero = projectionToConversation(twoZeroFailure);
+assert.equal(
+  restoredTwoZero.codexConversation[1].result?.error,
+  "The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.",
+);
+assert.equal(restoredTwoZero.codexConversation[1].result?.errorKind, undefined, 'no kind is invented for an old record');
+
+// A turn the person stopped comes back as a stop, for every AI (Sprint 140's QA found ChatGPT's read Failed).
+const stoppedProjection = structuredClone(projection);
+stoppedProjection.runtimeSummary = ['codex', 'claude-code'];
+stoppedProjection.events.push(
+  { kind: 'user-message', eventId: 'u-s1', turnId: 't-s1', sequence: 4, occurredAt: '2026-08-23T10:07:00.000Z', runtimeId: 'codex', text: 'Stop me', mode: 'agent', attachments: [] },
+  { kind: 'boundary', eventId: 'b-s1', turnId: 't-s1', sequence: 5, occurredAt: '2026-08-23T10:07:01.000Z', runtimeId: 'codex', boundaryKind: 'cancelled', message: 'The turn was cancelled.' },
+  { kind: 'user-message', eventId: 'u-s2', turnId: 't-s2', sequence: 6, occurredAt: '2026-08-23T10:08:00.000Z', runtimeId: 'claude-code', text: 'Stop me too', mode: 'agent', attachments: [] },
+  { kind: 'boundary', eventId: 'b-s2', turnId: 't-s2', sequence: 7, occurredAt: '2026-08-23T10:08:01.000Z', runtimeId: 'claude-code', boundaryKind: 'cancelled', message: 'The turn was cancelled.' },
+);
+const restoredStops = projectionToConversation(stoppedProjection);
+assert.equal(restoredStops.codexConversation[1].result?.status, 'cancelled');
+assert.equal(restoredStops.codexConversation[1].result?.error, undefined, 'a stop carries no failure sentence');
+assert.equal(restoredStops.agentConversation[0].result?.stopped, true);
+assert.equal(restoredStops.agentConversation[0].result?.error, undefined);
+
+// Sprint 139 (#417, R6): a chat comes back on its own model, not the open chat's (S33–S36).
+const openChat = projectionToConversation(projection);
+openChat.selectedModel = 'claude-opus-5-5';
+openChat.codexSelectedModel = 'gpt-5.6-sol';
+openChat.opencodeSelectedModel = 'opencode:openai/gpt-5.6';
+const savedModelProjection = structuredClone(projection);
+savedModelProjection.composerPreferences = {
+  thinkingEffortByRuntime: {},
+  modelByRuntime: { codex: 'gpt-6-luna', opencode: 'google/gemini-4-argon' },
+};
+const ownModel = projectionToConversation(savedModelProjection, openChat);
+assert.equal(ownModel.codexSelectedModel, 'gpt-6-luna', "the older chat shows its own model, not the open chat's (S36)");
+assert.equal(ownModel.opencodeSelectedModel, 'opencode:google/gemini-4-argon');
+assert.equal(ownModel.selectedModel, 'claude-opus-5-5', 'an AI the chat never used keeps the current pick');
+assert.equal(ownModel.pendingRuntime.modelId, 'gpt-6-luna', 'the composer runs the model its button shows');
+const fromTwoZero = projectionToConversation(projection, openChat);
+assert.equal(fromTwoZero.codexSelectedModel, 'gpt-5.6-sol', 'a chat saved by 2.0 behaves as before (S39)');
+
+const catalogs: RestoreCatalogs = {
+  claude: [{ id: 'claude-sonnet-5', label: 'Sonnet 5', description: '' }, { id: 'claude-opus-5-5', label: 'Opus 5.5', description: '' }],
+  claudeDefault: 'claude-sonnet-5',
+  codex: [{ id: 'gpt-6-luna', label: 'GPT-6 Luna', description: '' }, { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', description: '', isDefault: true }],
+  opencodeEnabled: true,
+  acpProviders: { google: true, openai: false, anthropic: false, openrouter: false },
+  byok: { google: [{ id: 'gemini-4-argon', label: 'Gemini 4 Argon', description: '' }] },
+};
+const kept = reconcileRestoredModels(ownModel, catalogs);
+assert.equal(kept.codexSelectedModel, 'gpt-6-luna', 'a saved model the catalog offers is kept');
+assert.equal(kept.opencodeSelectedModel, 'opencode:google/gemini-4-argon');
+const retired = structuredClone(ownModel);
+retired.codexSelectedModel = 'gpt-5.5-retired';
+retired.pendingRuntime = { ...retired.pendingRuntime, modelId: 'gpt-5.5-retired' };
+retired.opencodeSelectedModel = 'opencode:google/gemini-2-old';
+const fellBack = reconcileRestoredModels(retired, catalogs);
+assert.equal(fellBack.codexSelectedModel, 'gpt-5.6-sol', "a model no longer offered falls back to the catalog's default (S38)");
+assert.equal(fellBack.pendingRuntime.modelId, 'gpt-5.6-sol');
+assert.equal(fellBack.opencodeSelectedModel, 'opencode:google/gemini-4-argon');
+assert.equal(reconcileRestoredModels(retired, { ...catalogs, claude: [] }), retired, 'before the catalog arrives, nothing changes');
+// The bootstrap's rule for OpenCode is the same one.
+assert.equal(reconciledOpenCodeModel('opencode:google/gemini-4-argon', catalogs), 'opencode:google/gemini-4-argon', 'offered: kept');
+assert.equal(reconciledOpenCodeModel('opencode:google/gemini-2-old', catalogs), 'opencode:google/gemini-4-argon', 'retired: the first configured');
+assert.equal(reconciledOpenCodeModel('', catalogs), 'opencode:google/gemini-4-argon', 'none yet: the first configured');
+assert.equal(reconciledOpenCodeModel('opencode:google/gemini-2-old', { opencodeEnabled: true, acpProviders: undefined, byok: undefined }),
+  'opencode:google/gemini-2-old', 'no OpenCode catalog yet: kept');
 
 console.log('conversationProjection.test.ts: all tests passed');

@@ -44,6 +44,7 @@ import {
 import { isExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import { toolSetKey } from '../runtime/ritemarkTools';
+import { codexTurnErrorCode } from '../runtime/runtimeErrorPresentation';
 
 // ── Codex-specific constants ────────────────────────────────────────────────
 
@@ -868,7 +869,12 @@ export class CodexRuntime implements AgentRuntime {
         if (params.itemId && last.itemId !== params.itemId) session._lastAgentMessage = { itemId: params.itemId, text: params.delta };
         else last.text += params.delta;
       }
-      session?.config?.onProgress({ type: 'text', message: params.delta, timestamp: Date.now() });
+      session?.config?.onProgress({
+        type: 'text',
+        message: params.delta,
+        timestamp: Date.now(),
+        ...(params.itemId ? { messageId: params.itemId } : {}),
+      });
     });
 
     this._appServer.on('item/plan/delta', (params: { delta: string; threadId?: string }) => {
@@ -911,8 +917,15 @@ export class CodexRuntime implements AgentRuntime {
         session._onTurnCompleted(params.turn.id);
         const config = session.config;
         const errorMsg = formatCodexTurnError(params.turn.error);
+        const { code: errorCode, httpStatus: errorHttpStatus } = codexTurnErrorCode(params.turn.error);
         const lastAgentMessage = session._lastAgentMessage.text.trim();
-        config.onCodexComplete?.({ status: params.turn.status, error: errorMsg, ...(lastAgentMessage ? { lastAgentMessage } : {}) });
+        config.onCodexComplete?.({
+          status: params.turn.status,
+          error: errorMsg,
+          ...(lastAgentMessage ? { lastAgentMessage } : {}),
+          ...(errorMsg && errorCode ? { errorCode } : {}),
+          ...(errorMsg && errorHttpStatus !== undefined ? { errorHttpStatus } : {}),
+        });
         config.onProgress({ type: 'done', message: '', timestamp: Date.now() });
       },
     );

@@ -410,6 +410,7 @@ async function run(): Promise<void> {
       status: 'failed',
       error: 'Claude did not accept your API key. Update it in AI Settings, then resend your message.',
       failureKind: 'api-key-authentication',
+      errorKind: 'sign-in',
     });
     assert.equal(failedSecond.continuations?.['claude-code'], undefined, 'a no-final failure invalidates only that runtime descriptor');
     assert.ok(failedSecond.continuations?.codex === undefined, 'failure does not synthesize descriptors for other runtimes');
@@ -420,6 +421,8 @@ async function run(): Promise<void> {
       'api-key-authentication',
       'the canonical failed boundary persists the recovery category across reloads',
     );
+    // Sprint 139 (E1): the kind is kept beside the sentence, for the card after a restart.
+    assert.equal(failedBoundary?.kind === 'boundary' ? failedBoundary.errorKind : undefined, 'sign-in');
 
     const other = await store.create({
       conversationId: uuid(800),
@@ -538,6 +541,50 @@ async function run(): Promise<void> {
     const queuedUserEvent = [...queuedTurn.events].reverse().find((event) => event.kind === 'user-message');
     assert.equal(queuedUserEvent?.kind === 'user-message' ? queuedUserEvent.thinkingEffort : null, 'high', 'queued turn keeps its immutable effort snapshot');
     assert.equal(queuedTurn.composerPreferences.thinkingEffortByRuntime.codex, 'low', 'dispatching a queued turn does not overwrite the current Composer draft preference');
+
+    // Sprint 139 (#417, R6): the model is saved at an accepted turn and on a pick, per AI, beside thinking effort.
+    const modelTurn = await controller.acceptRuntimeTurn({
+      conversationId: moved.data.conversation.conversationId,
+      agentId: 'codex',
+      text: 'Run on Luna',
+      modelId: 'gpt-6-luna',
+    });
+    assert.deepEqual(modelTurn.composerPreferences.modelByRuntime, { codex: 'gpt-6-luna' }, 'the turn saves the model it ran on');
+    assert.equal(modelTurn.composerPreferences.thinkingEffortByRuntime.codex, 'low', 'and leaves the effort alone');
+    const pickedBefore = await store.get(moved.data.conversation.conversationId);
+    const picked = await controller.handle({
+      type: 'conversation/set-composer-preference',
+      requestId: 'pick-model',
+      conversationId: moved.data.conversation.conversationId,
+      bindingGeneration: moved.data.conversation.bindingGeneration,
+      agentId: 'opencode',
+      modelId: 'google/gemini-4-argon',
+    });
+    assert.equal(picked.ok, true);
+    const afterPick = await store.get(moved.data.conversation.conversationId);
+    assert.deepEqual(afterPick?.composerPreferences.modelByRuntime, { codex: 'gpt-6-luna', opencode: 'google/gemini-4-argon' }, 'each AI keeps its own');
+    assert.equal(afterPick?.lastActivityAt, pickedBefore?.lastActivityAt, 'a pick is a draft control, not activity');
+    assert.equal(await controller.savedComposerModel(moved.data.conversation.conversationId, 'codex'), 'gpt-6-luna');
+    assert.equal(await controller.savedComposerModel(moved.data.conversation.conversationId, 'claude-code'), undefined);
+    assert.equal(await controller.savedComposerModel('default', 'codex'), undefined, 'a webview-only id has no record');
+    const samePick = await controller.handle({
+      type: 'conversation/set-composer-preference',
+      requestId: 'pick-same-model',
+      conversationId: moved.data.conversation.conversationId,
+      bindingGeneration: moved.data.conversation.bindingGeneration,
+      agentId: 'opencode',
+      modelId: 'google/gemini-4-argon',
+    });
+    assert.equal(samePick.ok, true);
+    assert.equal((await store.get(moved.data.conversation.conversationId))?.revision, afterPick?.revision, 'the same pick writes nothing');
+    const neither = await controller.handle({
+      type: 'conversation/set-composer-preference',
+      requestId: 'pick-nothing',
+      conversationId: moved.data.conversation.conversationId,
+      bindingGeneration: moved.data.conversation.bindingGeneration,
+      agentId: 'codex',
+    });
+    assert.equal(neither.ok, false, 'a preference message names an effort or a model');
 
     const unknownToDelete = await store.create({
       scopeId: unknownScope.scopeId,

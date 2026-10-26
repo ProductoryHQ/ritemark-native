@@ -20,8 +20,11 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash, randomBytes } from 'crypto';
 import { isEnabled } from '../features';
-import type { EventName, EventPayloads } from './events';
+import type { EventName, EventPayloads, TurnOutcome, VoiceSource } from './events';
+import { TurnCounter } from './turnCounts';
+import { localDay, VOICE_NOTES_KEY, VoiceNotes } from './voiceNotes';
 import {
   ConsentGate,
   buildChannel,
@@ -60,6 +63,10 @@ export const ANSWER_KEY = 'ritemark.analytics.answeredV2';
 
 let gate: ConsentGate | null = null;
 let extensionContext: vscode.ExtensionContext | null = null;
+/** Sprint 139 (R7, R8): AI turns, counted with no text. */
+let turnCounter: TurnCounter | null = null;
+/** Sprint 139 (R10): voice captures, and the local list of documents that began with one. */
+let voiceNotes: VoiceNotes | null = null;
 
 /** The person's own value of the setting: the default (false) is never mistaken for an answer. */
 function readSetting(): boolean | undefined {
@@ -145,14 +152,70 @@ export function initAnalytics(context: vscode.ExtensionContext): void {
     log: (message, error) => console.warn(`[Ritemark Analytics] ${message}:`, error),
   });
 
+  const consent = gate;
+  turnCounter = new TurnCounter({
+    maySend: () => consent.maySend(),
+    firstMessageCounted: () => context.globalState.get<boolean>(FIRST_MESSAGE_KEY) === true,
+    markFirstMessageCounted: async () => { await context.globalState.update(FIRST_MESSAGE_KEY, true); },
+    track: (name, properties) => consent.track(name, properties),
+  });
+  voiceNotes = new VoiceNotes({
+    read: () => context.globalState.get(VOICE_NOTES_KEY),
+    write: async (state) => { await context.globalState.update(VOICE_NOTES_KEY, state); },
+    maySend: () => consent.maySend(),
+    track: (name, properties) => consent.track(name, properties),
+    today: () => localDay(new Date()),
+    randomSalt: () => randomBytes(16).toString('hex'),
+    hash: (salt, text) => createHash('sha256').update(`${salt}\0${text}`).digest('hex'),
+  });
+  const notes = voiceNotes;
+  // Sprint 139 (R10): a watched document changed, then saved, is "edited again" when the day is later.
+  const changedSinceSave = new Set<string>();
+
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration('ritemark.analytics.enabled') || event.affectsConfiguration('ritemark.features.analytics')) {
-        void gate?.refresh();
+        // Turning usage data off clears the voice list at once (R10).
+        void gate?.refresh().then(() => notes.prune());
       }
-    })
+    }),
+    vscode.workspace.onDidChangeTextDocument((event) => {
+      // Only documents on disk can be voice notes (output channels and the like change all the time).
+      if (event.contentChanges.length === 0 || event.document.uri.scheme !== 'file') return;
+      const uri = event.document.uri.toString();
+      if (!changedSinceSave.has(uri) && notes.watches(uri)) changedSinceSave.add(uri);
+    }),
+    vscode.workspace.onDidSaveTextDocument((document) => {
+      const uri = document.uri.toString();
+      if (!changedSinceSave.delete(uri)) return;
+      void notes.changedAndSaved(uri);
+    }),
   );
-  void gate.refresh();
+  void gate.refresh().then(() => notes.prune());
+}
+
+/**
+ * Sprint 139 (R8): a person's turn was saved and is about to run. Counts the
+ * profile's first message (now after the save, so a message that was never
+ * sent isn't counted), once, with usage data on.
+ */
+export async function countTurnAccepted(turnKey: string, runtimeId: string, continuation: boolean): Promise<void> {
+  await turnCounter?.accepted(turnKey, runtimeId, continuation);
+}
+
+/** Sprint 139 (R7, R8): a person's turn ended. `agent_used` with its outcome, and `first_reply` for the first. */
+export async function countTurnEnded(turnKey: string, runtimeId: string, source: 'chat' | 'flow', outcome: TurnOutcome): Promise<void> {
+  await turnCounter?.ended(turnKey, runtimeId, source, outcome);
+}
+
+/** Sprint 139 (R10): a dictation put text in a document, or a Transcribe job became text. */
+export async function countVoiceCapture(source: VoiceSource, input?: 'recorded' | 'file'): Promise<void> {
+  await voiceNotes?.captured(source, input);
+}
+
+/** Sprint 139 (R10): watch a document that began with a voice capture, on this computer only. */
+export async function rememberVoiceNote(documentUri: vscode.Uri, source: VoiceSource): Promise<void> {
+  await voiceNotes?.remember(documentUri.toString(), source);
 }
 
 /**
@@ -213,24 +276,15 @@ export async function setUsageData(on: boolean, from: AnswerSource): Promise<voi
   await extensionContext?.globalState.update(ANSWER_KEY, recorded);
   await vscode.workspace.getConfiguration('ritemark').update('analytics.enabled', on, vscode.ConfigurationTarget.Global);
   await gate?.refresh();
+  // Sprint 139 (R10): usage data off clears the voice list at once.
+  await voiceNotes?.prune();
 }
 
 /** globalState: the profile's first message has been counted (R8). */
 const FIRST_MESSAGE_KEY = 'ritemark.analytics.firstMessageSent';
 
-/**
- * `first_message_sent`, once per profile, and only when usage data is on when
- * the message is sent. The marker is written only when the event is sent, so
- * nothing about it is stored before a yes.
- */
-export async function trackFirstMessageSent(runtimeId: string): Promise<void> {
-  const context = extensionContext;
-  if (!context || !gate?.maySend() || context.globalState.get<boolean>(FIRST_MESSAGE_KEY)) return;
-  const provider = runtimeId === 'claude-code' ? 'claude' : runtimeId === 'codex' ? 'chatgpt' : runtimeId === 'opencode' ? 'opencode' : null;
-  if (!provider) return;
-  await context.globalState.update(FIRST_MESSAGE_KEY, true);
-  await gate.track('first_message_sent', { provider });
-}
+// `first_message_sent` is the turn counter's (`countTurnAccepted`): once per profile, only with usage data
+// on when the message is saved; the marker is written only when the event is sent (Sprint 133 R8, Sprint 139).
 
 /**
  * Flush pending events and shut down the client.

@@ -17,6 +17,7 @@ import {
   decodeConversationRecordV1,
   decodeTombstoneV1,
   summarizeConversationRecord,
+  withSavedModel,
   lastReplyAtOf,
   hasUnreadReply,
   type ConversationCheckpointV1,
@@ -330,7 +331,9 @@ export class ConversationStore {
     scopeId: string;
     bindingGeneration: number;
     agentId: AgentId;
-    thinkingEffort: ThinkingEffort;
+    thinkingEffort?: ThinkingEffort;
+    /** Sprint 139 (#417, R6): the model the person picked for this AI in this chat. */
+    modelId?: string;
   }): Promise<ConversationRecordV1> {
     return this.serialized(async () => {
       await this.ensureInitialized();
@@ -348,14 +351,21 @@ export class ConversationStore {
         throw new ConversationStoreError('stale-binding', 'Conversation binding generation is stale');
       }
 
+      const withEffort = input.thinkingEffort === undefined
+        ? current.composerPreferences
+        : {
+            ...current.composerPreferences,
+            thinkingEffortByRuntime: {
+              ...current.composerPreferences.thinkingEffortByRuntime,
+              [input.agentId]: input.thinkingEffort,
+            },
+          };
+      const composerPreferences = withSavedModel(withEffort, input.agentId, input.modelId);
+      // A pick of the model already saved writes nothing.
+      if (composerPreferences === current.composerPreferences) return current;
       const next = decodeConversationRecordV1({
         ...current,
-        composerPreferences: {
-          thinkingEffortByRuntime: {
-            ...current.composerPreferences.thinkingEffortByRuntime,
-            [input.agentId]: input.thinkingEffort,
-          },
-        },
+        composerPreferences,
         revision: current.revision + 1,
         // Draft controls are not conversation activity and must not reorder
         // the user's recent-chat rail.

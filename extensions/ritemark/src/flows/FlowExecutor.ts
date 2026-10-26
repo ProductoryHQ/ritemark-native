@@ -17,7 +17,8 @@ import { executeImageNode } from './nodes/ImageNodeExecutor';
 import { executeSaveFileNode } from './nodes/SaveFileNodeExecutor';
 import { executeClaudeCodeNode } from './nodes/ClaudeCodeNodeExecutor';
 import { executeCodexNode } from './nodes/CodexNodeExecutor';
-import { trackEvent } from '../analytics/posthog';
+import { countTurnEnded, trackEvent } from '../analytics/posthog';
+import { countedAgentStep } from './flowTurnCounts';
 
 /**
  * Progress callback
@@ -97,7 +98,8 @@ async function executeNode(
       return context.inputs;
 
     case 'llm-prompt':
-      void trackEvent('agent_used', { agent: 'ritemark_llm' });
+      // Sprint 139 (R7): a Flow's LLM step is a provider API call, not an agent, so it is a feature.
+      void trackEvent('feature_used', { feature: 'flow_llm_step' });
       return await executeLLMNode(node, context);
 
     case 'image-prompt':
@@ -107,12 +109,11 @@ async function executeNode(
       return await executeSaveFileNode(node, context);
 
     case 'claude-code':
-      void trackEvent('agent_used', { agent: 'claude' });
-      return await executeClaudeCodeNode(node, context, abortSignal);
+      // Sprint 139 (R7): counted as agent_used, source flow, when the step ends.
+      return await countedAgentStep('claude-code', abortSignal, () => executeClaudeCodeNode(node, context, abortSignal), countTurnEnded);
 
     case 'codex':
-      void trackEvent('agent_used', { agent: 'codex' });
-      return await executeCodexNode(node, context, abortSignal);
+      return await countedAgentStep('codex', abortSignal, () => executeCodexNode(node, context, abortSignal), countTurnEnded);
 
     default:
       console.error('[FlowExecutor] Unknown node type! Full node:', JSON.stringify(node, null, 2));
