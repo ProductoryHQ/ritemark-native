@@ -12,7 +12,7 @@ import { Tooltip } from '../ui/tooltip'
 import { Icon } from '../ui/Icon'
 import { Dialog, DialogContent, DialogTitle } from '../ui/dialog'
 import type { ProjectView, ProviderView, WelcomeKeyName, WelcomeProviderId } from '../../../../src/welcome/protocol'
-import { COPY, PROVIDER_NAMES, browserOpened } from './welcomeCopy'
+import { COPY, PLAN_LINES, PROVIDER_NAMES, browserOpened } from './welcomeCopy'
 import { send } from './welcomeClient'
 
 export function Spinner() {
@@ -79,7 +79,9 @@ export function ProviderCard({
   const titleId = `rw-card-${view.id}`
   // A button names its AI and is described by the card's words and state (S2).
   const describedBy = `${titleId}-line ${titleId}-state`
-  const line = view.reason ?? (isOpenCode ? COPY.openCodeLine : COPY.accountLine)
+  // Sprint 139 (R1): the plan line belongs to a card that offers Sign in. A card that shows a state shows
+  // that state instead: the reason a sign-in ended here, or Signed in in its foot.
+  const line = view.reason ?? (view.phase === 'ready' && !isOpenCode ? '' : PLAN_LINES[view.id])
 
   if (view.phase === 'signing-in') {
     return (

@@ -13,6 +13,7 @@ import { vscode } from '../../lib/vscode';
 import { Slider } from '../ui/slider';
 import { AI_INFORMATION_URL } from '../ai-sidebar/aiDisclosure';
 import { GoogleDocsSettingsCard, type GoogleDocsSettingsProjection } from './GoogleDocsSettingsCard';
+import { PLAN_LINES } from '../welcome/welcomeCopy';
 
 interface SettingsData {
   codexIntegration: boolean;
@@ -501,7 +502,8 @@ export function RitemarkSettings() {
           ) : settings.componentStatus.claudeCode.state === 'needs-auth' ? (
             <>
               <p className="text-xs text-ink-muted mb-3">
-                Sign in to start using Claude. Choose Claude.ai for the simplest setup, or paste an Anthropic API key if you prefer.
+                {/* Sprint 139 (R1): which plans work, in the welcome's words. */}
+                {PLAN_LINES.claude} Choose Claude.ai for the simplest setup, or paste an Anthropic API key if you prefer.
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -704,8 +706,7 @@ export function RitemarkSettings() {
             ) : !codexAuth.authenticated ? (
               <>
                 <p className="text-xs text-ink-muted mb-3">
-                  Sign in with your ChatGPT account. No API key is needed.
-                  Any ChatGPT account works, Free included. Paid plans get higher limits.
+                  {PLAN_LINES.chatgpt} No API key is needed. Paid plans get higher limits.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {codexLoading ? (
@@ -836,9 +837,10 @@ export function RitemarkSettings() {
         {/* OpenCode runtime settings — only when the opencode-integration flag is on */}
         {settings.opencodeEnabled && (
           <div className="mb-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
-            <label className="text-sm font-medium text-ink-strong block mb-2">
+            <label className="text-sm font-medium text-ink-strong block mb-1">
               OpenCode
             </label>
+            <p className="text-xs text-ink-muted mb-2">{PLAN_LINES.opencode}</p>
             <ToggleRow
               label="Auto-approve edits & tool calls"
               description="Skip the approval card and let OpenCode edit files and run tools within the workspace automatically. Writes outside the workspace are still blocked. Use with caution."

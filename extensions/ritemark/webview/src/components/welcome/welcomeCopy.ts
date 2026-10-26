@@ -12,6 +12,17 @@ export const PROVIDER_NAMES: Record<WelcomeProviderId, string> = {
   opencode: 'OpenCode',
 }
 
+/**
+ * Sprint 139 (R1, #496): which plans work, said before anyone signs in, on the
+ * welcome's step-1 cards, Add another, Ritemark Settings and the AI sheet's own
+ * sign-in cards. One place, so the four can't drift.
+ */
+export const PLAN_LINES: Record<WelcomeProviderId, string> = {
+  chatgpt: 'Sign in with any plan, free included.',
+  claude: 'Sign in with a paid plan, such as Pro or Max.',
+  opencode: 'Open models, with an API key of your own.',
+}
+
 export const COPY = {
   freshTitle: 'Welcome to Ritemark',
   freshLine: 'Ritemark turns a folder on your computer into a workspace where ChatGPT, Claude or open models work with you.',
@@ -21,8 +32,7 @@ export const COPY = {
   stepOne: '1 · Your AI',
   stepTwo: '2 · Set up project',
   whichAi: 'Which AI do you use?',
-  accountLine: 'Sign in with the account you already use.',
-  openCodeLine: 'Open models, with an API key of your own.',
+  openCodeLine: PLAN_LINES.opencode,
   moreThanOne: 'You can use more than one.',
   apiKeys: 'API keys',
   skip: 'Skip for now',
