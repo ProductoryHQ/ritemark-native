@@ -217,10 +217,19 @@ export function retryingOffersAlternative(msLeft: number | undefined): boolean {
   return msLeft !== undefined && msLeft > 60_000;
 }
 
-/** The line's and the busy card's Continue with <AI>: it stops this turn and carries the message over. */
-export function continueWithAction(alternative: AgentId): { label: string; tooltip: string } {
+/**
+ * Continue with <AI>, on the waiting line and on the busy card: it switches this chat and carries the message
+ * over. On the line the turn is still waiting, so its tooltip says the wait stops; on the card nothing is
+ * waiting any more, so it says where the message goes.
+ */
+export function continueWithAction(alternative: AgentId, where: 'waiting' | 'card'): { label: string; tooltip: string } {
   const other = aiName(alternative);
-  return { label: `Continue with ${other}`, tooltip: `Stop waiting and continue this chat with ${other}. Your message goes back in the box.` };
+  return {
+    label: `Continue with ${other}`,
+    tooltip: where === 'waiting'
+      ? `Stop waiting and continue this chat with ${other}.`
+      : `Send your message to ${other} instead.`,
+  };
 }
 
 /** The provider's own sentence, ending in a stop, or '' when it is only our fallback. */
@@ -370,7 +379,7 @@ export function turnFailureCard(input: {
           message: detail.retryAt
             ? `It turned this request away several times. Send your message again after ${(input.formatTime ?? personTime)(detail.retryAt)}.`
             : BUSY_BODY,
-          ...(alternative ? { action: { kind: 'use-runtime' as const, ...continueWithAction(alternative), runtimeId: alternative, carryMessage: true } } : {}),
+          ...(alternative ? { action: { kind: 'use-runtime' as const, ...continueWithAction(alternative, 'card'), runtimeId: alternative, carryMessage: true } } : {}),
         };
       }
       if (detail.limit === 'plan') {

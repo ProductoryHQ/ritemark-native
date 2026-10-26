@@ -120,14 +120,14 @@ export function ActivityStatusLine() {
       {/* Sprint 128: "Done — 1 task still running in the background" may take two lines in a narrow side bar. */}
       <span className="min-w-0 line-clamp-2" data-retry-line={retry ? 'true' : undefined}>{presentation.label}</span>
       {offerAlternative && alternative && last && (
-        <Tooltip label={continueWithAction(alternative.runtimeId).tooltip}>
+        <Tooltip label={continueWithAction(alternative.runtimeId, 'waiting').tooltip}>
           <Button
             variant="ghost"
             size="sm"
             className="-my-1 ml-auto h-6 shrink-0 px-2 text-[12px]"
             onClick={() => continueWithAlternative(alternative.runtimeId, alternative.modelId, last.userPrompt ?? '')}
           >
-            {continueWithAction(alternative.runtimeId).label}
+            {continueWithAction(alternative.runtimeId, 'waiting').label}
           </Button>
         </Tooltip>
       )}

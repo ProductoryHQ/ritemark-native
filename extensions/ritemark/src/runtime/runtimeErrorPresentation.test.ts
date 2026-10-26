@@ -13,6 +13,7 @@ import {
   unwrapProviderMessage,
 } from './runtimeErrorPresentation';
 import {
+  continueWithAction,
   failureSentence,
   failureSilencesStatusLine,
   decodeRuntimeErrorDetail,
@@ -404,6 +405,24 @@ console.log('runtimeErrorPresentation: Sprint 139 card copy passes');
   assert.equal(serviceRetryAt('Please try again in 420 seconds.', 0), new Date(420_000).toISOString());
   assert.equal(serviceRetryAt('try again in 7 minutes', 0), new Date(420_000).toISOString());
   assert.equal(serviceRetryAt('try again later', 0), undefined);
+  // "at …": a time of day is the person's own (local), one already past is tomorrow's; a zone or a date is kept.
+  {
+    const now = new Date(2026, 9, 27, 14, 0, 0).getTime();
+    assert.equal(serviceRetryAt('Rate limit reached. Please try again at 3:12 PM.', now), new Date(2026, 9, 27, 15, 12).toISOString());
+    assert.equal(serviceRetryAt('try again at 15:12', now), new Date(2026, 9, 27, 15, 12).toISOString());
+    assert.equal(serviceRetryAt('try again at 3pm', now), new Date(2026, 9, 27, 15, 0).toISOString());
+    assert.equal(serviceRetryAt('try again at 3:12 p.m.', now), new Date(2026, 9, 27, 15, 12).toISOString());
+    assert.equal(serviceRetryAt('try again at 12:05 AM', now), new Date(2026, 9, 28, 0, 5).toISOString(), 'past today: tomorrow');
+    assert.equal(serviceRetryAt('try again at 9:30', now), new Date(2026, 9, 28, 9, 30).toISOString(), 'past today: tomorrow');
+    assert.equal(serviceRetryAt('try again at 3', now), undefined, 'a number alone is not a time');
+    assert.equal(serviceRetryAt('try again at 3 apples', now), undefined);
+    assert.equal(serviceRetryAt('try again at 25:00', now), undefined);
+    const utcNow = Date.UTC(2026, 9, 27, 12, 0, 0);
+    assert.equal(serviceRetryAt('Please try again at 13:12 UTC.', utcNow), new Date(Date.UTC(2026, 9, 27, 13, 12)).toISOString());
+    assert.equal(serviceRetryAt('try again at 2026-10-27T13:12:00Z', utcNow), '2026-10-27T13:12:00.000Z');
+    assert.equal(serviceRetryAt('try again at 2026-10-25T13:12:00Z', utcNow), undefined, 'a time already gone');
+    assert.equal(serviceRetryAt('try again at 2026-11-05T13:12:00Z', utcNow), undefined, 'more than a day away');
+  }
 
   // The card: without a time, with one, with another AI ready; the status line says "Failed" under it.
   assert.deepEqual(turnFailureCard({ runtimeId: 'codex', kind: 'limit', detail: { limit: 'busy' }, sentence: '' }), {
@@ -417,10 +436,13 @@ console.log('runtimeErrorPresentation: Sprint 139 card copy passes');
   assert.deepEqual(turnFailureCard({ runtimeId: 'codex', kind: 'limit', detail: { limit: 'busy' }, sentence: '', readyAlternative: 'claude-code' })?.action, {
     kind: 'use-runtime',
     label: 'Continue with Claude',
-    tooltip: 'Stop waiting and continue this chat with Claude. Your message goes back in the box.',
+    tooltip: 'Send your message to Claude instead.',
     runtimeId: 'claude-code',
     carryMessage: true,
-  });
+  }, 'on the card nothing is waiting, so the tooltip says where the message goes');
+  // On the waiting line the turn is still waiting: its tooltip says the wait stops.
+  assert.deepEqual(continueWithAction('claude-code', 'waiting'), { label: 'Continue with Claude', tooltip: 'Stop waiting and continue this chat with Claude.' });
+  assert.deepEqual(continueWithAction('opencode', 'card'), { label: 'Continue with OpenCode', tooltip: 'Send your message to OpenCode instead.' });
   assert.equal(turnFailureCard({ runtimeId: 'codex', kind: 'limit', detail: { limit: 'busy' }, sentence: '', readyAlternative: 'codex' })?.action, undefined, 'never the same AI');
   assert.equal(failureSilencesStatusLine('codex', 'limit', { limit: 'busy' }), false, '"Failed" under the busy card');
   assert.equal(failureSilencesStatusLine('codex', 'limit', { limit: 'plan' }), true, 'the plan card keeps the line silent');
