@@ -161,10 +161,10 @@ async function executeGeminiLLM(model, systemPrompt, userPrompt, temperature, ma
         throw new Error('GOOGLE_AI_KEY not set in .env_local');
     }
     const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${userPrompt}` : userPrompt;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`; // key in a header (#558)
     const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
         body: JSON.stringify({
             contents: [{ parts: [{ text: fullPrompt }] }],
             generationConfig: {

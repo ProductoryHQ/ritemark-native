@@ -58,17 +58,19 @@ function productionSources(): Array<{ file: string; source: string }> {
         if (entry.name !== 'node_modules') walk(full);
         continue;
       }
-      if (!/\.tsx?$/.test(entry.name) || /\.test\.tsx?$/.test(entry.name)) continue;
+      if (!/\.(?:tsx?|[cm]?js)$/.test(entry.name) || /\.test\.[cm]?[jt]sx?$/.test(entry.name)) continue;
       out.push({ file: path.relative(root, full), source: fs.readFileSync(full, 'utf8') });
     }
   };
   walk(path.join(root, 'src'));
   walk(path.join(root, 'webview', 'src'));
+  // Developer scripts too (run-flow-test sent the key in the URL until the QA pass).
+  walk(path.join(root, 'scripts'));
   return out;
 }
 
 async function main(): Promise<void> {
-  await test('S50: no production source puts a key in a Gemini URL', () => {
+  await test('S50: no source or script puts a key in a Gemini URL', () => {
     assert.deepEqual(scanForKeyInUrl(productionSources()), []);
   });
 

@@ -84,3 +84,21 @@ Claude's live list (Claude Code 2.1.310, unauthenticated): `sonnet`, `opus`, `fa
 - **Tests:** `modelCatalog.test.ts` covers the new order and an unchanged Flows list and default; `feedExport.test.ts` passes.
 - **`check:model-feed`** was re-run on a freshly exported candidate: exit 0 with `--accept legacy:codex`. Every release from 1.8.1 gets 3.8 Flash as the group's first row; before, it was 3.1 Pro (1.8.1–1.14.0) or Argon (2.0.x).
 - **Correction:** the payload listed under *The AI sheet's payload* above was captured before this change, so it still shows Argon first.
+- **The CHANGELOG's free-key line** ("which a free AI Studio key can use") rests on Google's pricing page, https://ai.google.dev/gemini-api/docs/pricing (updated 2026-10-26), which lists Gemini 3.8 Flash as free of charge on the free tier. It was not run: no Google key was used, so S12 (a run on the new default) and S40 (a new Google model with a key) were not run.
+
+## QA pass, 27 October
+
+After the qa-validator review of #562 at `a73bf362`:
+- **Rebased** onto `origin/main` at `72f509e8` (#560). `package.json` keeps main's home, guidance and splitButton tests plus this sprint's; `media/webview.js` was rebuilt, not merged; the CHANGELOG, `architecture.md` and `release-plan.md` keep both sprints' rows.
+- **`scripts/run-flow-test.ts` and `.js`:** the developer script sent the Gemini key as `?key=` in the URL. It now sends it in the `x-goog-api-key` header, and S50's scan in `geminiRequest.test.ts` now covers `scripts/` too.
+- **`webview/src/config/modelConfig.test.ts`** is now in `npm test`.
+- **Checks on this branch's head:** see *Checks, QA pass* below.
+
+### Checks, QA pass
+
+Run on the rebased branch with this pass's changes, before the commit that records them (on top of `873d5556`):
+- `npm run compile`: exit 0.
+- `npm test` (the full chain, now with `webview/src/config/modelConfig.test.ts`): exit 0.
+- The webview's `tsc --noEmit`: clean.
+- `./scripts/validate-qa.sh`: exit 0 ("Codex QA validation passed").
+- The pre-commit validator, run by hand with `CLAUDE_PROJECT_DIR` set to the worktree: pass.
