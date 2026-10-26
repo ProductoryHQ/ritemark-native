@@ -54,11 +54,24 @@ body[data-vscode-theme-kind='vscode-dark'] .ProseMirror {
   text-align: center;
 }
 
-/* Block: rest, hover (radius 8), focus */
+/* Block: rest, hover (radius 8), focus. The display style's 0.2em above and
+   0.9em below sit outside the block's own box, so the hover fill and the
+   focus ring wrap the whole equation, its superscripts included. */
 .rm-math-block {
-  margin: 0.3em 0 1em;
+  display: flow-root;
+  margin: 0.2em 0 0.9em;
+  padding: 4px 0;
   border-radius: 8px;
   text-align: center;
+}
+.rm-math-block > .rm-math-typeset .katex-display {
+  margin: 0;
+}
+.rm-math-block.is-open,
+.rm-math-block.is-error,
+.rm-math-block.is-source {
+  margin: 0.3em 0 1em;
+  padding: 0;
 }
 .rm-math-block:not(.is-open):not(.is-error):hover {
   background: var(--r-surface-soft);
@@ -68,9 +81,6 @@ body[data-vscode-theme-kind='vscode-dark'] .ProseMirror {
 }
 .rm-math-block.is-loading {
   opacity: 0;
-}
-.rm-math-block > .rm-math-typeset .katex-display {
-  margin: 0.2em 0 0.9em;
 }
 
 /* The source, when KaTeX's stylesheet is not there: the code style, nothing broken */

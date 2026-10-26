@@ -27,7 +27,9 @@ import type { GoogleDocsBindingStore } from './GoogleDocsBindingStore';
 import {
   bodyClearRange,
   buildPublishPlan,
+  hashableExportHtml,
   htmlToBlocks,
+  mathNotes,
   locatePlaceholders,
   placeholderRequests,
   singleTabRequests,
@@ -60,8 +62,8 @@ export interface SkippedImage {
 }
 
 export type PublishOutcome =
-  | { kind: 'created'; binding: GoogleDocsBindingV1; skippedImages: SkippedImage[] }
-  | { kind: 'synced'; binding: GoogleDocsBindingV1; skippedImages: SkippedImage[] }
+  | { kind: 'created'; binding: GoogleDocsBindingV1; skippedImages: SkippedImage[]; notes?: string[] }
+  | { kind: 'synced'; binding: GoogleDocsBindingV1; skippedImages: SkippedImage[]; notes?: string[] }
   | { kind: 'up-to-date'; binding: GoogleDocsBindingV1 }
   | { kind: 'cancelled' };
 
@@ -191,7 +193,7 @@ export class GoogleDocsPublisher {
       // The Doc exists and must not be orphaned in silence: hand back its link.
       throw new GoogleDocsError('local-binding-failed', 'Could not save the publishing link', { docUrl: docUrlFor(file.id) });
     }
-    return { kind: 'created', binding, skippedImages: skipped };
+    return { kind: 'created', binding, skippedImages: skipped, notes: mathNotes(blocks) };
   }
 
   // ---------------------------------------------------------------- sync
@@ -252,7 +254,7 @@ export class GoogleDocsPublisher {
     } catch {
       throw new GoogleDocsError('local-binding-failed', 'Synced, but could not record it', { docUrl: docUrlFor(binding.fileId) });
     }
-    return { kind: 'synced', binding: next, skippedImages: skipped };
+    return { kind: 'synced', binding: next, skippedImages: skipped, notes: mathNotes(blocks) };
   }
 
   // ---------------------------------------------------------------- shared
@@ -262,7 +264,8 @@ export class GoogleDocsPublisher {
       // The product's own chokepoint strips Ritemark comments and unsafe
       // markup before anything is sent (R4).
       const normalized = buildNormalizedExportHtml(input.html, { title: '', author: '', date: '' } as never, 'default');
-      return { blocks: htmlToBlocks(normalized.html), sourceHash: sha256(normalized.html) };
+      // Sprint 138 (#481, R10): an equation counts by its source, never its picture's bytes.
+      return { blocks: htmlToBlocks(normalized.html), sourceHash: sha256(hashableExportHtml(normalized.html)) };
     } catch (error) {
       throw new GoogleDocsError('conversion-failed', `Could not prepare the document: ${String(error)}`);
     }

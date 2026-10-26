@@ -30,7 +30,7 @@ export function mathAssetsStatus(): MathAssetsStatus {
   return status
 }
 
-/** KaTeX, once `prepareMath()` has resolved `ready`. */
+/** KaTeX, once `prepareMath()` has resolved (also when only the stylesheet is missing). */
 export function loadedKatex(): Katex | null {
   return katex
 }
@@ -52,6 +52,9 @@ export function katexStylesheetUrl(): string | null {
   return webviewAssetUrl(`katex/katex.min.css?v=${KATEX_VERSION}`)
 }
 
+/** How long the stylesheet may take before equations show as sources instead. */
+const STYLESHEET_TIMEOUT_MS = 10000
+
 function loadStylesheet(href: string): Promise<boolean> {
   return new Promise(resolve => {
     const existing = document.querySelector<HTMLLinkElement>('link[data-ritemark-katex]')
@@ -63,8 +66,15 @@ function loadStylesheet(href: string): Promise<boolean> {
     link.rel = 'stylesheet'
     link.href = href
     link.dataset.ritemarkKatex = ''
-    link.onload = () => resolve(true)
-    link.onerror = () => resolve(false)
+    const timer = window.setTimeout(() => resolve(false), STYLESHEET_TIMEOUT_MS)
+    link.onload = () => {
+      window.clearTimeout(timer)
+      resolve(true)
+    }
+    link.onerror = () => {
+      window.clearTimeout(timer)
+      resolve(false)
+    }
     document.head.appendChild(link)
   })
 }
@@ -82,12 +92,10 @@ export function prepareMath(): Promise<MathAssetsStatus> {
         import('katex').then(m => (m.default ?? m) as Katex).catch(() => null),
         href ? loadStylesheet(href) : Promise.resolve(false),
       ])
-      if (!module || !styled) {
-        setStatus('unavailable')
-        return status
-      }
+      // KaTeX's code is in the bundle either way; without the stylesheet the
+      // views show sources, but the export can still check and write MathML.
       katex = module
-      setStatus('ready')
+      setStatus(module && styled ? 'ready' : 'unavailable')
       return status
     })()
   }

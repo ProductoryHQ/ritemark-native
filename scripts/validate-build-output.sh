@@ -206,6 +206,25 @@ if [[ -d "$EXT_PATH" ]]; then
   # (esbuild does not minify/mangle, so the method name survives verbatim).
   check_content "$EXT_PATH/out/extension.js" "resolveCustomTextEditor" "extension.js contains editor code"
   check_file_size "$EXT_PATH/package.json" 500 "package.json"
+
+  # Sprint 138 (#481, R13): equations. KaTeX's stylesheet and its 20 woff2 faces
+  # live next to webview.js (loaded only when a document has math), and the Word
+  # equation converter is an external module. All reach people only with an app
+  # release; without them, equations show as their source and Word gets pictures.
+  check_file_size "$EXT_PATH/media/katex/katex.min.css" 10000 "KaTeX stylesheet (media/katex)"
+  check_file_size "$EXT_PATH/media/katex/LICENSE" 500 "KaTeX licence (media/katex)"
+  echo -n "Checking KaTeX fonts (media/katex/fonts)... "
+  KATEX_FACES=$(find "$EXT_PATH/media/katex/fonts" -name "*.woff2" -size +0 2>/dev/null | wc -l | tr -d ' ')
+  if [[ "$KATEX_FACES" -ne 20 ]]; then
+    echo -e "${RED}FAIL${NC}"
+    echo "  Found $KATEX_FACES woff2 faces, expected 20."
+    ERRORS=$((ERRORS + 1))
+  else
+    echo -e "${GREEN}OK${NC} (20 faces)"
+  fi
+  check_content "$EXT_PATH/media/webview.js" "$(tr -d '[:space:]' < "$EXT_PATH/media/katex/VERSION" 2>/dev/null || echo katex-version-missing)" "webview.js holds the KaTeX of media/katex"
+  check_file_size "$EXT_PATH/node_modules/mathml2omml/dist/index.js" 10000 "mathml2omml (Word equations)"
+  check_file_size "$EXT_PATH/node_modules/mathml2omml/LICENSE" 5000 "mathml2omml licence (LGPL-3.0)"
 fi
 
 # -----------------------------------------------------------------------------

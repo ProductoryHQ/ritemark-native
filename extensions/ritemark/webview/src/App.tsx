@@ -26,6 +26,7 @@ import { dictationPlaceholderPos } from './extensions/DictationPlaceholder'
 import { InlineTableOfContents } from './components/InlineTableOfContents'
 import { inlineMermaidDiagramsForExport } from './lib/mermaidExport'
 import { inlineSvgImagesForExport } from './lib/svgRasterExport'
+import { prepareMathForExport } from './lib/mathExport'
 import { writeClipboard } from './lib/clipboard'
 import { getHeadings } from './lib/headingUtils'
 import type { Heading } from './lib/headingUtils'
@@ -617,7 +618,7 @@ function App() {
   // Export handlers
   const handleExportPDF = useCallback(async (templateId = 'default') => {
     const rawHtml = editorRef.current ? preprocessTableHTML(editorRef.current.getHTML()) : ''
-    const html = await inlineSvgImagesForExport(await inlineMermaidDiagramsForExport(rawHtml))
+    const html = await prepareMathForExport(await inlineSvgImagesForExport(await inlineMermaidDiagramsForExport(rawHtml)), 'pdf')
 
     sendToExtension('exportPDF', {
       content, // markdown fallback (V1 compatibility)
@@ -629,7 +630,7 @@ function App() {
 
   const handleExportWord = useCallback(async (templateId = 'default') => {
     const rawHtml = editorRef.current ? preprocessTableHTML(editorRef.current.getHTML()) : ''
-    const html = await inlineSvgImagesForExport(await inlineMermaidDiagramsForExport(rawHtml))
+    const html = await prepareMathForExport(await inlineSvgImagesForExport(await inlineMermaidDiagramsForExport(rawHtml)), 'word')
 
     sendToExtension('exportWord', {
       markdown: content, // markdown fallback (V1 compatibility)
@@ -644,7 +645,7 @@ function App() {
   // destination from its own link record, never from the webview.
   const handlePublishGoogleDocs = useCallback(async () => {
     const rawHtml = editorRef.current ? preprocessTableHTML(editorRef.current.getHTML()) : ''
-    const html = await inlineSvgImagesForExport(await inlineMermaidDiagramsForExport(rawHtml))
+    const html = await prepareMathForExport(await inlineSvgImagesForExport(await inlineMermaidDiagramsForExport(rawHtml)), 'google')
     const title = typeof properties.title === 'string' && properties.title.trim() ? properties.title.trim() : null
     sendToExtension('google-docs/publish', { html, title })
   }, [properties])
