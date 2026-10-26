@@ -159,7 +159,7 @@ def touch(path, days_ago, hour=10):
 # (relative path, kind, days ago, title, paragraphs, fact words)
 TRAINING_WORK = [
     # The five newest: 3 Word documents, 2 PDFs
-    ('Northfield Bank/Northfield Bank notes.docx', 'docx', 1.0, 'Northfield Bank: meeting notes', [
+    ('Fernhollow Bank/Fernhollow Bank notes.docx', 'docx', 1.0, 'Fernhollow Bank: meeting notes', [
         'Monday, with the head of HR and two branch managers.',
         '## What they want',
         'A programme for 40 branch managers who now lead mixed teams of advisers and digital staff. The pilot group meets in Tartu in March, in the old savings hall on Rüütli street.',
@@ -180,8 +180,8 @@ TRAINING_WORK = [
         '## Price',
         'Four modules, 2,400 euros each, travel included.',
     ], ['4 December', 'Mari Tamm', 'week 2', '2,400', '2400', '9,600', 'Muuga']),
-    ('Northfield Bank/Northfield tender.pdf', 'pdf', 2.2, 'Northfield Bank: request for tenders', [
-        'Northfield Bank invites proposals for a leadership programme for branch managers.',
+    ('Fernhollow Bank/Fernhollow tender.pdf', 'pdf', 2.2, 'Fernhollow Bank: request for tenders', [
+        'Fernhollow Bank invites proposals for a leadership programme for branch managers.',
         'The budget ceiling for the whole programme is 48,000 euros, excluding VAT.',
         'Proposals are evaluated on content (60%), price (30%) and references (10%).',
     ], ['48,000', '48 000', '48000', '60%']),
@@ -200,8 +200,8 @@ TRAINING_WORK = [
     ('Riverside Hospital/Feedback from session 1.docx', 'docx', 55, 'Feedback from session 1', ['Eleven of twelve said the pairs practice was the most useful part.'], []),
     ('Riverside Hospital/Handout, difficult conversations.docx', 'docx', 62, 'Handout: difficult conversations', ['Name what you saw, say what it means for the ward, ask what they need.'], []),
     ('Riverside Hospital/Interview with the head nurse.docx', 'docx', 70, 'Interview with the head nurse', ['She wants the managers to say no more often, and kindly.'], []),
-    ('Northfield Bank/Northfield first call.docx', 'docx', 80, 'Northfield Bank: first call', ['They found us through the Riverside programme.'], []),
-    ('Northfield Bank/Branch visit, Pärnu.docx', 'docx', 90, 'Branch visit: Pärnu', ['The Pärnu branch has nine advisers and three digital staff.'], []),
+    ('Fernhollow Bank/Fernhollow first call.docx', 'docx', 80, 'Fernhollow Bank: first call', ['They found us through the Riverside programme.'], []),
+    ('Fernhollow Bank/Branch visit, Pärnu.docx', 'docx', 90, 'Branch visit: Pärnu', ['The Pärnu branch has nine advisers and three digital staff.'], []),
     ('Templates/Proposal template.docx', 'docx', 120, 'Proposal template', ['Context, what we propose, how it runs, price, references.'], []),
     ('Templates/Session plan template.docx', 'docx', 130, 'Session plan template', ['Goal, timing, materials, exercises, close.'], []),
     ('Templates/Workshop evaluation form.docx', 'docx', 140, 'Workshop evaluation form', ['Rate each exercise from 1 to 5.'], []),
@@ -210,7 +210,7 @@ TRAINING_WORK = [
     ('Invoices/Reminder letter.docx', 'docx', 320, 'Payment reminder', ['A friendly reminder, sent after 30 days.'], []),
     # Older PDFs: 6 with text, 2 scanned
     ('Contracts/Harbour Logistics contract.pdf', 'pdf', 30, 'Training services agreement: Harbour Logistics', ['Signed. Four modules over one autumn.'], []),
-    ('Contracts/Northfield NDA.pdf', 'pdf', 75, 'Confidentiality agreement: Northfield Bank', ['Both parties keep the branch figures confidential.'], []),
+    ('Contracts/Fernhollow NDA.pdf', 'pdf', 75, 'Confidentiality agreement: Fernhollow Bank', ['Both parties keep the branch figures confidential.'], []),
     ('Invoices/Invoice 2025-031.pdf', 'pdf', 200, 'Invoice 2025-031', ['Harbour Logistics, module 1, 2,400 euros.'], []),
     ('Invoices/Invoice 2025-044.pdf', 'pdf', 190, 'Invoice 2025-044', ['Riverside Hospital, session 1, 1,800 euros.'], []),
     ('Riverside Hospital/Riverside brochure.pdf', 'pdf', 100, 'Riverside Hospital: about us', ['A hospital of 640 beds by the river.'], []),
@@ -218,7 +218,7 @@ TRAINING_WORK = [
     ('Contracts/Signed order, Riverside (scan).pdf', 'scan', 95, 'Order confirmation', ['Riverside Hospital orders five sessions for ward managers. Signed by the head nurse.'], []),
     ('Invoices/Receipt, venue hire (scan).pdf', 'scan', 210, 'Receipt: venue hire', ['Venue hire, Tallinn, one day, 350 euros. Paid in cash.'], []),
     # Spreadsheets (4)
-    ('Northfield Bank/Northfield budget.xlsx', 'xlsx', 3.5, None, [['Item', 'Euros'], ['Trainer days', 9600], ['Venue', 1400], ['Materials', 600]], []),
+    ('Fernhollow Bank/Fernhollow budget.xlsx', 'xlsx', 3.5, None, [['Item', 'Euros'], ['Trainer days', 9600], ['Venue', 1400], ['Materials', 600]], []),
     ('Invoices/Invoices 2025.xlsx', 'xlsx', 150, None, [['Invoice', 'Client', 'Euros'], ['2025-031', 'Harbour Logistics', 2400], ['2025-044', 'Riverside Hospital', 1800]], []),
     ('Harbour Logistics/Participants.xlsx', 'xlsx', 25, None, [['Name', 'Shift'], ['Shift leader A', 'Night'], ['Shift leader B', 'Day']], []),
     ('Riverside Hospital/Attendance.xlsx', 'xlsx', 50, None, [['Session', 'Present'], [1, 11], [2, 12]], []),
@@ -231,8 +231,8 @@ TRAINING_WORK = [
 # ── Training PDFs ───────────────────────────────────────────────────────────
 
 TRAINING_PDFS = [
-    ('Northfield tender.pdf', 'pdf', 1.0, 'Northfield Bank: request for tenders', [
-        'Northfield Bank invites proposals for a leadership programme for branch managers.',
+    ('Fernhollow tender.pdf', 'pdf', 1.0, 'Fernhollow Bank: request for tenders', [
+        'Fernhollow Bank invites proposals for a leadership programme for branch managers.',
         'The budget ceiling for the whole programme is 48,000 euros, excluding VAT.',
     ], ['48,000', '48 000', '48000']),
     ('Riverside Hospital contract.pdf', 'pdf', 1.4, 'Training services agreement: Riverside Hospital', [
@@ -248,7 +248,7 @@ TRAINING_PDFS = [
         'Mari Tamm has trained shift leaders in ports for eleven years and speaks Estonian, Finnish and English.',
     ], ['eleven years', '11 years', 'Finnish']),
     ('Harbour Logistics contract.pdf', 'pdf', 30, 'Training services agreement: Harbour Logistics', ['Signed. Four modules over one autumn.'], []),
-    ('Northfield NDA.pdf', 'pdf', 75, 'Confidentiality agreement: Northfield Bank', ['Both parties keep the branch figures confidential.'], []),
+    ('Fernhollow NDA.pdf', 'pdf', 75, 'Confidentiality agreement: Fernhollow Bank', ['Both parties keep the branch figures confidential.'], []),
     ('Terminal safety rules.pdf', 'pdf', 110, 'Muuga terminal: safety rules', ['Hard hats beyond the yellow line.'], []),
     ('Signed order, Riverside (scan).pdf', 'scan', 95, 'Order confirmation', ['Riverside Hospital orders five sessions for ward managers.'], []),
     ('Receipt, venue hire (scan).pdf', 'scan', 210, 'Receipt: venue hire', ['Venue hire, Tallinn, one day, 350 euros.'], []),

@@ -1,7 +1,7 @@
 {
   "Training work": [
     {
-      "file": "Northfield Bank/Northfield Bank notes.docx",
+      "file": "Fernhollow Bank/Fernhollow Bank notes.docx",
       "kind": "docx",
       "facts": [
         "Tartu",
@@ -35,7 +35,7 @@
       ]
     },
     {
-      "file": "Northfield Bank/Northfield tender.pdf",
+      "file": "Fernhollow Bank/Fernhollow tender.pdf",
       "kind": "pdf",
       "facts": [
         "48,000",
@@ -58,7 +58,7 @@
   ],
   "Training PDFs": [
     {
-      "file": "Northfield tender.pdf",
+      "file": "Fernhollow tender.pdf",
       "kind": "pdf",
       "facts": [
         "48,000",
