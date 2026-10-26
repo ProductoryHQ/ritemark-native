@@ -4,13 +4,15 @@ Walked on 26 October 2026 on a dev instance of the sprint branch on the Mac (App
 
 ## Screenshots
 
+02, 03, 04, 05, 07 and 08 were re-taken after the Experience lead's check of experience 38 (the selection chip and the inline typo's wrapping); 14 is new.
+
 | File | What it shows | Experience 38 frame |
 |---|---|---|
 | [01-typeset-light.png](01-typeset-light.png) | The report typeset: inline equations at the text's size, two display equations centred; the status bar's "65 words · 5 equations" | 1 |
-| [02-inline-open-light.png](02-inline-open-light.png) | An inline equation open: its LaTeX in place with faint delimiters, the result bubble under it; the AI's sheet shows "Working on selected text $\bar{x}_2 = 3.9$" | 2 |
+| [02-inline-open-light.png](02-inline-open-light.png) | An inline equation open: its LaTeX in place with faint delimiters, the result bubble under it. Opening it by a click puts no "Working on selected text" chip in the AI's sheet, as a click into text doesn't | 2 |
 | [03-block-open-light.png](03-block-open-light.png) | A block open: "Equation · LaTeX", "Esc to finish", the field, the result under it changing as typed | 3 |
-| [04-typos-light.png](04-typos-light.png) | A block typo (`\fracc`) and two inline typos, each its source with the amber mark; the good equation above typesets | 4 |
-| [05-typo-tooltip.png](05-typo-tooltip.png) | The mark's tooltip: "Ritemark can't typeset this: `\fracc` isn't a command it knows." | 4 |
+| [04-typos-light.png](04-typos-light.png) | A block typo (`\fracc`) and two inline typos, each its source with the amber mark; the good equation above typesets. An inline typo and its mark are one unit on the line: `\fracc{a}{b}` moves to the next line whole, rather than breaking after `{a}` | 4 |
+| [05-typo-tooltip.png](05-typo-tooltip.png) | The mark's tooltip: "Ritemark can't typeset this: `\fracc` isn't a command it knows." (cropped from the first walk; the block and its tooltip are unchanged) | 4 |
 | [06-new-block-empty.png](06-new-block-empty.png) | A new equation from the `/` menu: the placeholder "For example \frac{a}{b}" and "The equation shows here as you type." The paragraph split above it comes from the scripted test's click landing mid-sentence before it typed a new paragraph, not from the equation | 5 |
 | [07-inline-open-dark.png](07-inline-open-dark.png) | Frame 2 in Dark | 2 |
 | [08-block-open-dark.png](08-block-open-dark.png) | Frame 3 in Dark | 3 |
@@ -19,6 +21,7 @@ Walked on 26 October 2026 on a dev instance of the sprint branch on the Mac (App
 | [11-word-mac.png](11-word-mac.png) | The report's Word copy in Word for Mac (saved as PDF by Word): native equations, inline and display. A lone equation in a table cell is centred by Word | — |
 | [12-word-mac-typos.png](12-word-mac-typos.png) | The typo report's Word copy: the good equation native, the typos as their source in the code font | — |
 | [13-word-mac-wide-equation.png](13-word-mac-wide-equation.png) | A sum wider than the page: Word breaks the equation over two lines; bold, italic and code in a paragraph, a list and a table | — |
+| [14-selection-chip.png](14-selection-chip.png) | A Shift-arrow selection across an equation: the chip reads "from $\bar{x}_1 = 3.1$ to", the source with its delimiters (R7). Inside the selection, the browser's highlight paints over part of the typeset equation | — |
 
 The Word audit's evidence (40 formulas, the wrapper against the converter alone) is in [../research/evidence/](../research/evidence/).
 
@@ -41,9 +44,9 @@ The Word audit's evidence (40 formulas, the wrapper against the converter alone)
 | S20–S23 editing in place, emptying, the cursor passing | pass | dev instance (02, 03, 07, 08) |
 | S24 typing `$…$`; S25 `$$` and Enter, `/` menu, block menu | pass | dev instance (06) |
 | S26 an unknown command | pass | dev instance (04, 05) |
-| S27 the AI sees the source | at the source: the AI's sheet carries the LaTeX with delimiters (02); not traced through Claude, ChatGPT and OpenCode, because the test profile has no sign-in | dev instance |
+| S27 the AI sees the source | at the source: a dragged or Shift-arrow selection carries the LaTeX with delimiters (14); opening an equation by a click or Enter sends no selection (02, 03); not traced through Claude, ChatGPT and OpenCode, because the test profile has no sign-in | dev instance; `mathRoundTrip.test.ts` |
 | S28 a comment on an equation | not run | — |
-| S29 Copy as Markdown | pass: the clipboard equals the file (bar its final newline), `$…$` included | dev instance |
+| S29 Copy as Markdown | pass: the clipboard equals the file (bar its final newline), `$…$` included; with an equation open, Copy as Markdown now takes the whole document, as with a cursor in text (the same rule in `getSelectionHTML`; not clicked through) | dev instance |
 | S30 paste from ChatGPT's and Claude's pages; S31 plain text with math | pass with synthetic paste events carrying KaTeX's HTML, MathML with a TeX annotation, and plain `$…$`; not pasted from the live sites | dev instance |
 | S32 the report as PDF; S33 a wide equation; S34 bold, italic and code; S35 a typo at export | pass on the Mac; the message reads "3 equations couldn't be typeset and show as their source." | dev instance (09, 10) |
 | S36 the report as Word | pass in Word for Mac; Word for Windows not run | (11–13) |
