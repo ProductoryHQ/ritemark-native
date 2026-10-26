@@ -236,8 +236,9 @@ export function AgentResponse({ turn }: AgentResponseProps) {
     );
   }
 
-  // Sprint 139 (#376): every other failure — one sentence, or its card, once.
-  if (result.error) {
+  // Sprint 139 (#376): every other failure — one sentence, or its card, once. A turn the person
+  // stopped is not a failure: the status line says Stopped, and nothing red shows here.
+  if (result.error && !result.stopped) {
     const lastAgent = activeConversation.agentConversation[activeConversation.agentConversation.length - 1];
     const lastCodex = activeConversation.codexConversation[activeConversation.codexConversation.length - 1];
     const isLatest = lastAgent?.id === turn.id && (!lastCodex || lastCodex.timestamp <= turn.timestamp);

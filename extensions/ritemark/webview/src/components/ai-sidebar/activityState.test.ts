@@ -31,6 +31,16 @@ function codexTurn(partial: Partial<CodexConversationTurn>): CodexConversationTu
 // idle
 assert.equal(deriveActivityState(conv({})), 'idle');
 
+// Sprint 139 (#376, Sprint 140's QA): a stop is Stopped, never Failed — live and after a restart, for all three AIs.
+assert.equal(deriveActivityState(conv({ codexConversation: [codexTurn({ result: { status: 'interrupted' } })] })), 'cancelled', 'ChatGPT/OpenCode live stop');
+assert.equal(deriveActivityState(conv({ codexConversation: [codexTurn({ result: { status: 'cancelled' } })] })), 'cancelled', 'ChatGPT/OpenCode restored stop (it read Failed)');
+assert.equal(deriveActivityState(conv({ agentConversation: [agentTurn({ result: { text: '', filesModified: [], stopped: true } })] })), 'cancelled', 'Claude stop, live or restored');
+assert.equal(
+  deriveActivityState(conv({ agentConversation: [agentTurn({ result: { text: '', filesModified: [], stopped: true } })], backgroundTasks: [{ taskId: 't' }] as never })),
+  'stopped-background',
+);
+assert.equal(deriveActivityState(conv({ codexConversation: [codexTurn({ result: { status: 'failed', error: 'x' } })] })), 'failed', 'a real failure is still Failed');
+
 // running
 assert.equal(
   deriveActivityState(conv({ agentConversation: [agentTurn({ isRunning: true })] })),

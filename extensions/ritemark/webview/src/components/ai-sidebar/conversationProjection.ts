@@ -10,6 +10,11 @@ function runtimeAgent(runtime: RuntimeId | undefined): AgentId {
 
 type TerminalEvent = Extract<ConversationProjectionV1['events'][number], { kind: 'assistant-message' | 'boundary' }>;
 
+/** The record's end of a turn the person stopped. */
+function terminalStopped(event: TerminalEvent): boolean {
+  return event.kind === 'boundary' ? event.boundaryKind === 'cancelled' : event.terminalStatus === 'cancelled';
+}
+
 /**
  * The failure sentence a terminal event carries, or undefined when the turn didn't fail. A chat
  * saved by 2.0 (no `errorKind`) may hold a provider's raw envelope: it is unwrapped, never shown
@@ -137,6 +142,8 @@ export function projectionToConversation(
               ? { error: terminalEvent.error ?? 'The turn failed.' }
               : {}),
           ...(terminalEvent.failureKind ? { failureKind: terminalEvent.failureKind } : {}),
+          // Sprint 139: a turn the person stopped reads Stopped after a restart, not Done or Failed.
+          ...(terminalStopped(terminalEvent) ? { stopped: true } : {}),
           // Sprint 139 (#376): a restored failed turn draws the same card as the live one.
           ...(terminalError(terminalEvent) && terminalEvent.errorKind ? { errorKind: terminalEvent.errorKind } : {}),
           ...(terminalError(terminalEvent) && terminalEvent.errorKind && terminalEvent.errorDetail ? { errorDetail: terminalEvent.errorDetail } : {}),

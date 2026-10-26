@@ -166,6 +166,21 @@ assert.equal(
 );
 assert.equal(restoredTwoZero.codexConversation[1].result?.errorKind, undefined, 'no kind is invented for an old record');
 
+// A turn the person stopped comes back as a stop, for every AI (Sprint 140's QA found ChatGPT's read Failed).
+const stoppedProjection = structuredClone(projection);
+stoppedProjection.runtimeSummary = ['codex', 'claude-code'];
+stoppedProjection.events.push(
+  { kind: 'user-message', eventId: 'u-s1', turnId: 't-s1', sequence: 4, occurredAt: '2026-08-23T10:07:00.000Z', runtimeId: 'codex', text: 'Stop me', mode: 'agent', attachments: [] },
+  { kind: 'boundary', eventId: 'b-s1', turnId: 't-s1', sequence: 5, occurredAt: '2026-08-23T10:07:01.000Z', runtimeId: 'codex', boundaryKind: 'cancelled', message: 'The turn was cancelled.' },
+  { kind: 'user-message', eventId: 'u-s2', turnId: 't-s2', sequence: 6, occurredAt: '2026-08-23T10:08:00.000Z', runtimeId: 'claude-code', text: 'Stop me too', mode: 'agent', attachments: [] },
+  { kind: 'boundary', eventId: 'b-s2', turnId: 't-s2', sequence: 7, occurredAt: '2026-08-23T10:08:01.000Z', runtimeId: 'claude-code', boundaryKind: 'cancelled', message: 'The turn was cancelled.' },
+);
+const restoredStops = projectionToConversation(stoppedProjection);
+assert.equal(restoredStops.codexConversation[1].result?.status, 'cancelled');
+assert.equal(restoredStops.codexConversation[1].result?.error, undefined, 'a stop carries no failure sentence');
+assert.equal(restoredStops.agentConversation[0].result?.stopped, true);
+assert.equal(restoredStops.agentConversation[0].result?.error, undefined);
+
 // Sprint 139 (#417, R6): a chat comes back on its own model, not the open chat's (S33–S36).
 const openChat = projectionToConversation(projection);
 openChat.selectedModel = 'claude-opus-5-5';

@@ -289,6 +289,8 @@ export interface AgentConversationTurn {
     /** Sprint 139 (#376): the failure's kind and its card's data, from the host's one classifier. */
     errorKind?: RuntimeErrorKind;
     errorDetail?: RuntimeErrorDetail;
+    /** Sprint 139: a turn the person stopped (live from the host, or the record's cancelled end). */
+    stopped?: boolean;
   };
   isRunning: boolean;
   /** Turn ended with a plan that needs user approval */
@@ -497,7 +499,7 @@ export type ExtensionMessage =
   | ({ type: 'agent-turn-started'; turnId: string; origin: 'background-task' } & ConversationScopedMessage)
   | ({ type: 'agent-question'; question: AgentQuestion } & ConversationScopedMessage)
   | ({ type: 'agent-plan-approval'; request: AgentPlanApprovalRequest } & ConversationScopedMessage)
-  | ({ type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string; failureKind?: RuntimeFailureKind; errorKind?: RuntimeErrorKind; errorDetail?: RuntimeErrorDetail } & ConversationScopedMessage)
+  | ({ type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string; failureKind?: RuntimeFailureKind; errorKind?: RuntimeErrorKind; errorDetail?: RuntimeErrorDetail; stopped?: boolean } & ConversationScopedMessage)
   | ({ type: 'agent-approval-request'; requestId: string; agentId: string; kind: 'file-write' | 'shell-command' | 'permission' | 'plan'; filePath?: string; diff?: string; command?: string; workingDir?: string; permissionLabel?: string; planText?: string } & ConversationScopedMessage)
   | { type: 'agent-setup:progress'; progress: InstallProgress }
   | { type: 'agent-setup:complete'; status: SetupStatus; environmentStatus?: AgentEnvironmentStatus; generation?: number; revision?: number }

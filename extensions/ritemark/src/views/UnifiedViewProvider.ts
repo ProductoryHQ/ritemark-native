@@ -1242,6 +1242,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               const failureKind = result.failureKind ?? errorPresentation?.failureKind;
               const errorKind = errorPresentation && 'errorKind' in errorPresentation ? errorPresentation.errorKind : undefined;
               const errorDetail = errorPresentation && 'errorDetail' in errorPresentation ? errorPresentation.errorDetail : undefined;
+              // Cancel normalisation (F24). Claude answers `session.cancel()`
+              // with an ordinary error-free result, so "no error" alone is not
+              // evidence of completion — the user's own intent decides. Read once,
+              // before the result is posted, so the sheet says Stopped too (Sprint 139).
+              const stoppedByPerson = !terminalCheckpointWritten && this._consumeCancelIntent(conversationId, conversationTurnId);
               this._view?.webview.postMessage({
                 type: 'agent-result', conversationId,
                 agentId,
@@ -1252,14 +1257,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 failureKind,
                 ...(errorKind ? { errorKind } : {}),
                 ...(errorDetail ? { errorDetail } : {}),
+                ...(stoppedByPerson ? { stopped: true } : {}),
               });
               this._refreshExplorerForAgentWrites(result.filesModified);
               if (!terminalCheckpointWritten) {
                 terminalCheckpointWritten = true;
-                // Cancel normalisation (F24). Claude answers `session.cancel()`
-                // with an ordinary error-free result, so "no error" alone is not
-                // evidence of completion — the user's own intent decides.
-                const cancelled = this._consumeCancelIntent(conversationId, conversationTurnId);
+                const cancelled = stoppedByPerson;
                 const status: 'completed' | 'failed' | 'cancelled' = cancelled
                   ? 'cancelled'
                   : error ? 'failed' : 'completed';

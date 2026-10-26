@@ -3252,6 +3252,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                   failureKind: message.failureKind,
                   ...(message.error && message.errorKind ? { errorKind: message.errorKind } : {}),
                   ...(message.error && message.errorKind && message.errorDetail ? { errorDetail: message.errorDetail } : {}),
+                  ...(message.stopped ? { stopped: true } : {}),
                 },
               };
             },

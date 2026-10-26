@@ -324,6 +324,8 @@ function ActivitySection({
   const [expanded, setExpanded] = useState(false);
 
   const count = activities.length;
+  // Sprint 139: the provider's own words after a failure are kept here, but they aren't an action.
+  const actions = activities.filter((activity) => activity.type !== 'error').length;
   const latestMessage = lastActivity?.message || '';
 
   return (
@@ -346,7 +348,7 @@ function ActivitySection({
         <span className="text-[11px] opacity-50 truncate">
           {isRunning
             ? `${latestMessage}${count > 1 ? ` (${count} actions)` : ''}`
-            : `${count} action${count !== 1 ? 's' : ''} completed`
+            : actions > 0 ? `${actions} action${actions !== 1 ? 's' : ''} completed` : 'Details'
           }
         </span>
       </button>
