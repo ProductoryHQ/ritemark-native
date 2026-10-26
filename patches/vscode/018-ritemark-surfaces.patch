@@ -3333,10 +3333,10 @@ index 491c451f7fa..251b2dfaebf 100644
  		}
 diff --git a/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
 new file mode 100644
-index 00000000000..1c524a64f73
+index 00000000000..59ce46078dc
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
-@@ -0,0 +1,328 @@
+@@ -0,0 +1,329 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3560,7 +3560,8 @@ index 00000000000..1c524a64f73
 +			append(shown, $('b')).textContent = result.kindLabel;
 +			append(shown, $('.ritemark-feedback-quote-text')).textContent = result.shown;
 +			const handoffFoot = append(sheet, $('.ritemark-feedback-foot'));
-+			append(handoffFoot, $('span.ritemark-feedback-foot-note')).textContent = words.handoff.foot;
++			// "Didn't open? …" only after an e-mail app was asked to open; too long or no e-mail app already says so above
++			append(handoffFoot, $('span.ritemark-feedback-foot-note')).textContent = result.outcome === 'opened' ? words.handoff.foot : '';
 +			const copy = button(handoffFoot, words.handoff.copy, 'ghost');
 +			copy.prepend($('span.codicon.codicon-copy'));
 +			const done = button(handoffFoot, words.handoff.done, 'primary');
@@ -5433,10 +5434,10 @@ index 6851c3b584c..027d77efbca 100644
  	}
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
 new file mode 100644
-index 00000000000..4cbbdd4c79c
+index 00000000000..339390f0da9
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
-@@ -0,0 +1,146 @@
+@@ -0,0 +1,158 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -5574,9 +5575,21 @@ index 00000000000..4cbbdd4c79c
 +		copy.click();
 +		await timeout(0);
 +		assert.deepStrictEqual(mail.copied, ['the whole e-mail']);
++		assert.strictEqual(mail.$('.ritemark-feedback-foot-note').textContent, 'Didn\'t open? Copy it and send it to info@productory.eu.');
 +		done.click();
 +		assert.strictEqual(await mail.outcome, 'mailed');
 +		mail.dispose();
++
++		const tooLong = open({}, async () => ({ route: 'email', outcome: 'too-long', kindLabel: 'Send feedback', shown: 'Long.', copyText: 'Long.' }));
++		tooLong.type('Long.');
++		tooLong.tick(1);
++		tooLong.$<HTMLButtonElement>('.ritemark-feedback-button.primary').click();
++		await timeout(0);
++		assert.strictEqual(tooLong.$('.ritemark-feedback-title').textContent, 'This is too long for an e-mail link');
++		assert.strictEqual(tooLong.$('.ritemark-feedback-foot-note').textContent, '', 'no "Didn\'t open?" when nothing was asked to open');
++		[...tooLong.container.querySelectorAll<HTMLButtonElement>('.ritemark-feedback-button')].at(-1)!.click();
++		assert.strictEqual(await tooLong.outcome, 'mailed');
++		tooLong.dispose();
 +
 +		offline.$<HTMLButtonElement>('.ritemark-feedback-button.ghost').click();
 +		await offline.outcome;
