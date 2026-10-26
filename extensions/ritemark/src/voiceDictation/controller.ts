@@ -187,6 +187,8 @@ export interface DictationDeps {
   now: () => number;
   /** How much of the audio could be speech; silence is never transcribed. */
   audioLevel: (pcm: Buffer) => AudioLevel;
+  /** Sprint 139 (R10): a dictation ended having put text in the document. */
+  onCaptured?: () => void;
 }
 
 export class DictationController {
@@ -302,6 +304,7 @@ export class DictationController {
         await this.ensureDraining();
       }
       this.flushHeld();
+      if (this.producedText) this.deps.onCaptured?.();
       if (!this.producedText && !this.strongAudio && !this.reported && this.capturedBytes >= BYTES_PER_SECOND) {
         // Only silence came in: a muted microphone, or one the system blocks.
         this.reported = true;

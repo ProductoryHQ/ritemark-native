@@ -21,7 +21,7 @@ import type { SessionStore } from './speech/SessionStore';
 import { recordingRenameTarget, sessionIdForPath } from './speech/SessionStore';
 import { probeDurationSec } from './speech/durationProbe';
 import type { EngineId, TranscriptionJob } from './speech/types';
-import { trackEvent } from './analytics/posthog';
+import { rememberVoiceNote, trackEvent } from './analytics/posthog';
 import { saveTranscriptTo } from './speech/autoExport';
 import { generateInsights, insightsWorkspacePath } from './speech/insights';
 import { getSetupStatus } from './agent/setup';
@@ -441,6 +441,8 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
     await this._context.globalState.update(LAST_SAVE_DIR_KEY, dir);
 
     const filePath = await saveTranscriptTo(this._store, session, dir);
+    // Sprint 139 (R10): the transcript is now a document; watch it, on this computer only, for a change on a later day.
+    if (filePath) void rememberVoiceNote(vscode.Uri.file(filePath), 'transcribe');
     if (!filePath) return; // the user declined the overwrite
     void vscode.window.showInformationMessage(`Transcript saved to ${path.basename(filePath)}.`);
     await this._push(fsPath, panel);

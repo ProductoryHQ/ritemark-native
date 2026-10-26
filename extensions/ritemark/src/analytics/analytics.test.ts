@@ -25,6 +25,9 @@ const ALL_EVENT_NAMES: EventName[] = [
   'starting_point_used',
   'made_something',
   'feedback_opened',
+  'first_reply',
+  'voice_captured',
+  'voice_note_edited',
 ];
 
 // Verify every event name is a valid string (compile-time + runtime)
@@ -38,7 +41,7 @@ const _payloadCheck: {
 } = {
   app_session_start: { version: '1.0.0', platform: 'darwin' },
   feature_used: { feature: 'editor' },
-  agent_used: { agent: 'claude' },
+  agent_used: { agent: 'claude', source: 'chat', outcome: 'arrived' },
   feedback_sent: { message: 'Please add dark mode' },
   welcome_shown: { kind: 'fresh' },
   ai_signed_in: { provider: 'chatgpt', method: 'account' },
@@ -48,6 +51,9 @@ const _payloadCheck: {
   starting_point_used: { place: 'word_or_pdf', edited: true, provider: 'claude' },
   made_something: { how: 'new_document', after_ready_request: false },
   feedback_opened: { from: 'ai_info' },
+  first_reply: { provider: 'chatgpt', outcome: 'provider_error' },
+  voice_captured: { source: 'transcribe', input: 'recorded' },
+  voice_note_edited: { source: 'dictation', days_since_capture: 3 },
 };
 
 assert.ok(_payloadCheck, 'All payload shapes should be valid');
@@ -71,6 +77,21 @@ for (const [event, keys] of Object.entries(WELCOME_EVENT_KEYS)) {
   assert.deepEqual(Object.keys(_payloadCheck[event as EventName]).sort(), [...keys].sort(), `${event} has only ${keys.join(', ')}`);
   for (const key of keys) {
     assert.doesNotMatch(key, /path|name|file|message|account|email|folder/i, `${event}.${key} names nothing personal`);
+  }
+}
+
+// Sprint 139 (R7–R11, S56): the new counts carry only the properties the privacy page lists, and nothing
+// that names a person, a document or what was said.
+const SPRINT_139_EVENT_KEYS: Record<string, string[]> = {
+  agent_used: ['agent', 'source', 'outcome'],
+  first_reply: ['provider', 'outcome'],
+  voice_captured: ['source', 'input'],
+  voice_note_edited: ['source', 'days_since_capture'],
+};
+for (const [event, keys] of Object.entries(SPRINT_139_EVENT_KEYS)) {
+  assert.deepEqual(Object.keys(_payloadCheck[event as EventName]).sort(), [...keys].sort(), `${event} has only ${keys.join(', ')}`);
+  for (const key of keys) {
+    assert.doesNotMatch(key, /path|name|file|message|account|email|folder|model|text|project|language|length/i, `${event}.${key} names nothing personal`);
   }
 }
 

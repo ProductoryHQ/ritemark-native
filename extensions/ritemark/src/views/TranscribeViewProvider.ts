@@ -27,6 +27,7 @@ import { RecordingController } from '../speech/recording/RecordingController';
 import { decodeRecordingRequest, isRecordingMessage } from '../speech/recording/protocol';
 import { nodeSinkFs } from '../speech/recording/WavRecordingSink';
 import type { EngineId, TranscriptionJob, TranscriptSession } from '../speech/types';
+import { countVoiceCapture } from '../analytics/posthog';
 
 /** What a row in the panel needs; deliberately not the whole session. */
 interface RecordingSummary {
@@ -58,6 +59,12 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
 
   private _view: vscode.WebviewView | null = null;
   private _pending: PendingImport | null = null;
+  /**
+   * Sprint 139 (R10): the jobs this panel started, and whether each audio was recorded here, so a recording or
+   * file that becomes text counts as one capture (a Transcript Workbench re-run is not a new capture).
+   */
+  private readonly _countedJobs = new Map<string, 'recorded' | 'file'>();
+  private readonly _recordedPaths = new Set<string>();
   /** Whether the library is showing every project's recordings, not just this one's. */
   private _showAllProjects = false;
   private readonly _disposables: vscode.Disposable[] = [];
@@ -84,6 +91,9 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
       dispose: this._jobs.onEvent((event) => {
         void this._pushState();
         if (event.type === 'job-completed') {
+          const input = this._countedJobs.get(event.job.id);
+          this._countedJobs.delete(event.job.id);
+          if (input && event.session.segments.length > 0) void countVoiceCapture('transcribe', input);
           void this._onJobCompleted(event.session);
         }
       }),
@@ -132,7 +142,10 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
         });
         return picked?.[0]?.fsPath;
       },
-      stageImport: (finalPath) => this._stageImport(finalPath),
+      stageImport: (finalPath) => {
+        this._recordedPaths.add(finalPath);
+        return this._stageImport(finalPath);
+      },
       moveToTrash: async (filePath) => {
         await vscode.workspace.fs.delete(vscode.Uri.file(filePath), { useTrash: true });
       },
@@ -344,7 +357,7 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
     this._pending = null;
     await this._memento.update('speech:lastEngineId', engineId);
 
-    this._jobs.enqueue({
+    const job = this._jobs.enqueue({
       audioPath: pending.audioPath,
       engineId,
       workspaceRoot: currentWorkspaceRoot(),
@@ -353,6 +366,7 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
       durationSec: pending.durationSec ?? 0,
       language,
     });
+    this._countedJobs.set(job.id, this._recordedPaths.has(pending.audioPath) ? 'recorded' : 'file');
     await this._pushState();
   }
 

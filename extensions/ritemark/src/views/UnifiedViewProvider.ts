@@ -71,7 +71,7 @@ import { createRuntime } from '../runtime/runtimeFactory';
 import { RitemarkToolsInjector } from '../runtime/RitemarkToolsInjector';
 import { boardToolsAvailable, toolGroupsFor, toolSetKey } from '../runtime/ritemarkTools';
 import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
-import { trackFirstMessageSent } from '../analytics/posthog';
+import { countTurnAccepted, countTurnEnded } from '../analytics/posthog';
 import * as modelCatalog from '../ai/modelCatalog';
 import { renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
 import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
@@ -95,7 +95,7 @@ import { decodeCommentTaskSidebarMessage } from '../commentTasks/protocol';
 import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runtime/AgentRuntime';
 import type { OneShotSettings } from '../runtime/oneShotTurn';
 import { presentRuntimeError, type RuntimeErrorHints } from '../runtime/runtimeErrorPresentation';
-import { aiName, trustedBillingUrl } from '../runtime/turnFailureCopy';
+import { aiName, trustedBillingUrl, turnOutcome } from '../runtime/turnFailureCopy';
 import { modelSubstitutionForTurn } from '../runtime/modelSubstitution';
 import {
   isThinkingEffort,
@@ -745,8 +745,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
         case 'agent-execute': {
           const { agentId, model, attachments } = message;
-          // Sprint 133 (R8): the profile's first message, once, only with usage data on.
-          void trackFirstMessageSent(String(agentId));
           // Sprint 99: every conversation-scoped message carries its conversation.
           // A missing id means a webview path that has not been migrated yet.
           const clientConversationId: string = message.conversationId ?? DEFAULT_CONVERSATION_ID;
@@ -865,6 +863,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               : undefined;
           const runtimeTurnToken = Symbol(`${agentId}:${conversationTurnId ?? 'legacy'}`);
           this._activeRuntimeTurnTokens.set(conversationId, runtimeTurnToken);
+          // Sprint 139 (R7, R8): the turn, counted with no text. Its first message is counted only now that it is
+          // saved (it was counted before the save in 2.0); a continuation is the same turn.
+          const countedTurnKey = `${conversationId}:${conversationTurnId ?? randomUUID()}`;
+          void countTurnAccepted(countedTurnKey, String(agentId), message.conversationContinuation === true);
           // Sprint 117: a cancel arrives without a turn id, so remember which
           // turn is live in this conversation before anything can be cancelled.
           if (conversationTurnId) this._activeConversationTurnIds.set(conversationId, conversationTurnId);
@@ -1261,6 +1263,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 const status: 'completed' | 'failed' | 'cancelled' = cancelled
                   ? 'cancelled'
                   : error ? 'failed' : 'completed';
+                void countTurnEnded(countedTurnKey, String(agentId), 'chat', turnOutcome(status, errorKind));
                 this._runConversationCheckpoint(conversationId, () => this._conversationController.completeRuntimeTurn({
                   conversationId,
                   bindingGeneration,
@@ -1343,6 +1346,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 const status: 'completed' | 'failed' | 'cancelled' = cancelled
                   ? 'cancelled'
                   : runtimeCompleted ? 'completed' : 'failed';
+                void countTurnEnded(countedTurnKey, String(agentId), 'chat', turnOutcome(status, errorKind));
                 this._runConversationCheckpoint(conversationId, () => this._conversationController.completeRuntimeTurn({
                   conversationId,
                   bindingGeneration,
@@ -1382,6 +1386,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               });
               if (!terminalCheckpointWritten) {
                 terminalCheckpointWritten = true;
+                void countTurnEnded(countedTurnKey, String(agentId), 'chat', turnOutcome('failed', 'provider'));
                 this._runConversationCheckpoint(conversationId, () => this._conversationController.completeRuntimeTurn({
                   conversationId,
                   bindingGeneration,

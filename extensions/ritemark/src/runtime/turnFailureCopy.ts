@@ -11,6 +11,7 @@
  */
 
 import type { AgentId } from '../agent/types';
+import type { TurnOutcome } from '../analytics/events';
 
 /**
  * The kinds of failure Ritemark tells apart. Stored as `errorKind` on a failed
@@ -303,16 +304,7 @@ export function failureShowsCard(runtimeId: AgentId, kind: RuntimeErrorKind | un
 }
 
 /** Sprint 139 (R8): a turn's outcome, as `first_reply` and `agent_used` name it. */
-export type TurnOutcome =
-  | 'arrived'
-  | 'sign_in'
-  | 'plan'
-  | 'limit'
-  | 'model'
-  | 'network'
-  | 'provider_error'
-  | 'stopped'
-  | 'other';
+export type { TurnOutcome } from '../analytics/events';
 
 export function turnOutcome(status: 'completed' | 'failed' | 'cancelled', kind: RuntimeErrorKind | undefined): TurnOutcome {
   if (status === 'completed') return 'arrived';

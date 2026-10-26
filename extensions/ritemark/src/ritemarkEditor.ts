@@ -17,7 +17,7 @@ import { isAppInstalled, openInExternalApp, openCsvInExcelWithHints, getSpreadsh
 import { writeImageRelativeTo, parseImageDataUrl } from './utils/imageWriter';
 import { ensureProjectSubfolder } from './projects/projectFolderGuard';
 import { addPointerLine, isAboutFile, needsNote, nodeAboutFileFs, readAboutState } from './projects/aboutFile';
-import { trackEvent } from './analytics/posthog';
+import { countVoiceCapture, rememberVoiceNote, trackEvent } from './analytics/posthog';
 import { resolveInternalLinkTarget, isMarkdownFile } from './internalLinkResolver';
 import {
   buildWorkspaceFileLinkResult,
@@ -972,7 +972,14 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             {
               let controller = this.dictationControllers.get(webview);
               if (!controller) {
-                controller = new DictationController(webview, this.context);
+                controller = new DictationController(webview, this.context, {
+                  // Sprint 139 (R10): count the capture, and watch this document, on this computer only, for a
+                  // change on a later day. No text, audio, name or path leaves the computer.
+                  onCaptured: () => {
+                    void countVoiceCapture('dictation');
+                    void rememberVoiceNote(document.uri, 'dictation');
+                  },
+                });
                 this.dictationControllers.set(webview, controller);
               }
               controller.startDictation(message.language as string || 'en');
