@@ -20,7 +20,7 @@ import { trackEvent } from '../analytics/posthog';
 import type { WelcomeProvider } from '../analytics/events';
 import { normalizeProjectUri, resolveProjectScope } from '../conversations/projectScope';
 import { FEEDBACK_COPY } from '../feedback/feedbackCopy';
-import { sendWeekLine } from '../feedback/feedbackSheet';
+import { sendWeekLine, showBriefToast } from '../feedback/feedbackSheet';
 import { composeReport, narrowReportContext, REPORT_RECIPIENT, reportSubject } from '../reporting/composeReport';
 import { openReportMail } from '../reporting/reportTransport';
 import type { HomeAi, HomeGuidance, HomeKeyName } from '../projects/protocol';
@@ -32,7 +32,7 @@ import { countsLine, listFileNames } from './folderCounts';
 import { feedbackDue, guidanceCard, localDay } from './guidanceState';
 import { GuidanceStore } from './guidanceStore';
 import { madeSomething } from './madeSomething';
-import { AI_NAMES, AI_ORDER, cardAi, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyRequestDue, readyRequestWords, SAMPLE_CARD_ID, type AiState, type ReadyKind } from './readyRequest';
+import { AI_NAMES, AI_ORDER, cardAi, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyRequestDue, readyRequestWords, SAMPLE_CARD_ID, type AiState, type ReadyKind } from './readyRequest';
 import { startingPlaceOf, wordCount, type FrontEditor } from './startingPlace';
 
 const PROVIDER: Record<AgentId, WelcomeProvider> = { 'claude-code': 'claude', codex: 'chatgpt', opencode: 'opencode' };
@@ -118,6 +118,8 @@ export class GuidanceHost implements vscode.Disposable {
   // ── Home's card (R2–R6, R14) ─────────────────────────────────────────────
 
   async homeGuidance(input: HomeGuidanceInput): Promise<HomeGuidance | null> {
+    // Home redraws on board changes too: the sample's starting points follow its card (experience 35, The build checked)
+    this.schedulePlace();
     const key = normalizeProjectUri(input.folderUri);
     let record = this.store.project(key);
     const sample = await isSample(input.folderPath);
@@ -130,7 +132,8 @@ export class GuidanceHost implements vscode.Disposable {
         kind,
         ownChats,
         requestAnswered: record.chatId ? await this.answered(record.chatId) : false,
-        sampleCompleted: input.handoffs.some((handoff) => handoff.cardId === SAMPLE_CARD_ID && handoff.state === 'completed'),
+        // The sample's card goes when its task shows in Doing (experience 35, The build checked): it left To do
+        sampleLeftToDo: kind === 'sample' && !(await sampleCardWaits(input.folderPath)),
       });
       if (gone) record = await this.store.updateProject(key, (current) => ({ ...current, gone }));
     }
@@ -195,7 +198,7 @@ export class GuidanceHost implements vscode.Disposable {
       return;
     }
     // The empty project's request waits for the person's words; it counts when they send it (R15).
-    await this.deps.startChat({ runtimeId: chosen.ai, text: READY_REQUEST_TEXT.empty, send: false, origin: 'what_for' });
+    await this.deps.startChat({ runtimeId: chosen.ai, text: READY_REQUEST_TEXT.empty, cursor: READY_REQUEST_CURSOR_EMPTY, send: false, origin: 'what_for' });
   }
 
   async chooseAi(folderUri: string, ai: AgentId): Promise<void> {
@@ -285,9 +288,9 @@ export class GuidanceHost implements vscode.Disposable {
     if (sent) {
       await this.store.answerFeedback('sent');
       this.feedback = { sending: false, problem: null };
-      void vscode.window.showInformationMessage(FEEDBACK_COPY.toast.accepted);
+      void showBriefToast(FEEDBACK_COPY.toast.accepted);
     } else {
-      this.feedback = { sending: false, problem: FEEDBACK_COPY.sheet.failed };
+      this.feedback = { sending: false, problem: FEEDBACK_COPY.card.failed };
     }
     this.changed.fire();
   }
@@ -307,7 +310,7 @@ export class GuidanceHost implements vscode.Disposable {
     // Handed over: the question has its answer for this release; the mail is the person's to send.
     await this.store.answerFeedback('sent');
     this.feedback = { sending: false, problem: null };
-    void vscode.window.showInformationMessage(`${FEEDBACK_COPY.handoff.opened.title}. ${FEEDBACK_COPY.handoff.opened.message}`);
+    void showBriefToast(`${FEEDBACK_COPY.handoff.opened.title}. ${FEEDBACK_COPY.handoff.opened.message}`);
     this.changed.fire();
   }
 
@@ -382,7 +385,7 @@ export class GuidanceHost implements vscode.Disposable {
     if (!folder) return;
     const root = folder.uri.fsPath;
     const [sample, listed, hasAbout] = await Promise.all([
-      isSample(root),
+      sampleCardWaits(root),
       listFileNames(root, { limit: 0 }),
       fsp.access(path.join(root, 'AGENTS.md')).then(() => true, () => false),
     ]);
@@ -442,6 +445,23 @@ async function isSample(folderPath: string): Promise<boolean> {
   try {
     const names = await fsp.readdir(path.join(folderPath, '.ritemark', 'tasks'));
     return names.some((name) => name === `${SAMPLE_CARD_ID}.md` || name.startsWith(`${SAMPLE_CARD_ID}-`));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The sample's starting points while its card `m4d7r2` still waits in To do; once it has run (Doing, Review, Done),
+ * the sample is a project like any other (experience 35, The build checked, 26 October). Read from the card's
+ * front matter only.
+ */
+async function sampleCardWaits(folderPath: string): Promise<boolean> {
+  try {
+    const dir = path.join(folderPath, '.ritemark', 'tasks');
+    const name = (await fsp.readdir(dir)).find((entry) => entry === `${SAMPLE_CARD_ID}.md` || entry.startsWith(`${SAMPLE_CARD_ID}-`));
+    if (!name) return false;
+    const head = (await fsp.readFile(path.join(dir, name), 'utf8')).slice(0, 2048);
+    return /^stage:\s*['"]?todo['"]?\s*$/m.test(head);
   } catch {
     return false;
   }

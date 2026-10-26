@@ -12,7 +12,7 @@ import * as path from 'path';
 import { COUNT_LIMIT, countsLine, fileKindOf, listFileNames } from './folderCounts';
 import { feedbackDue, guidanceCard, localDay, releaseOf, withSavedDay } from './guidanceState';
 import { decodeGuidanceState, GUIDANCE_KEY, GuidanceStore, type MementoLike } from './guidanceStore';
-import { AI_NAMES, cardAi, EVENT_KIND, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyRequestDue, readyRequestWords } from './readyRequest';
+import { AI_NAMES, cardAi, EVENT_KIND, FIRST_LOOK_READS_DOCUMENTS, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyRequestDue, readyRequestWords } from './readyRequest';
 import { READ_KINDS_EVERY_AI_PASSED, startingPlaceOf, wordCount } from './startingPlace';
 
 const repeat = (name: string, n: number) => Array.from({ length: n }, (_, i) => `${i}${name}`);
@@ -58,10 +58,14 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
     heading: 'Nothing in this folder was moved or changed',
     body: 'Claude works only inside it. 144 files: 61 Word documents, 38 PDFs, 22 spreadsheets, 9 text documents and 14 others.',
     button: 'Ask Claude what is here',
-    note: 'Reads the names, then the five newest documents.',
+    note: 'Reads the names first.',
     hide: 'Hide this in Training work',
-  });
+    busy: null,
+  }, 'Claude has no spike result yet, so its note promises only the names');
   assert.equal(readyRequestWords('files', 'ChatGPT', 'Training work', null).body, 'ChatGPT works only inside it.', 'S16: the AI renames the body; no counts until they are read');
+  assert.equal(readyRequestWords('files', 'ChatGPT', 'Training work', null).note, 'Reads the names, then the five newest documents.', 'ChatGPT passed the spike for Word and PDF');
+  assert.equal(readyRequestWords('files', 'OpenCode', 'Training work', null).note, 'Reads the names first.');
+  assert.deepEqual(FIRST_LOOK_READS_DOCUMENTS, { ChatGPT: true, Claude: false, OpenCode: false }, 'the spike so far (research/word-spike.md)');
   assert.deepEqual(readyRequestWords('empty', 'Claude', 'Board report 2027', null), {
     icon: 'pencil-simple-line',
     heading: 'Start with what this project is for',
@@ -69,6 +73,7 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
     button: 'Tell Claude what this project is for',
     note: 'Nothing goes until you press Send.',
     hide: 'Hide this in Board report 2027',
+    busy: null,
   });
   assert.deepEqual(readyRequestWords('sample', 'OpenCode', 'Leadership programme', null), {
     icon: 'check-square',
@@ -77,9 +82,12 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
     button: 'Ask OpenCode to draft Module 4',
     note: 'Reads two documents, writes a new one.',
     hide: 'Hide this in Leadership programme',
+    busy: { button: 'Giving it to OpenCode…', note: 'It shows in Doing in a moment.' },
   });
-  assert.equal(READY_REQUEST_TEXT.files, 'What is here? Look at the names first, and read only the five newest documents.');
-  assert.equal(READY_REQUEST_TEXT.empty, 'This project is for ');
+  assert.equal(READY_REQUEST_TEXT.files, 'What is here? Look at the names first, read only the five newest documents, and end with two things you could do next.', 'frame 2 redrawn');
+  // Frame 3 redrawn: the person's sentence after "This project is for ", then the card's promise on the next line
+  assert.equal(READY_REQUEST_TEXT.empty, 'This project is for \nThen write About this project from it, and a first outline as a document.');
+  assert.equal(READY_REQUEST_CURSOR_EMPTY, 'This project is for '.length);
   assert.deepEqual(EVENT_KIND, { files: 'what_is_here', empty: 'what_for', sample: 'module_4' });
   assert.deepEqual(AI_NAMES, { 'claude-code': 'Claude', codex: 'ChatGPT', opencode: 'OpenCode' }, 'never Codex');
 
@@ -92,11 +100,11 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
   assert.equal(readyRequestDue({ foundBy: 'opened', record: undefined, ownChats: 1 }), false, 'S28: a project added in 2.0 that already has a chat');
   assert.equal(readyRequestDue({ foundBy: 'opened', record: { gone: 'hidden' }, ownChats: 0 }), false, 'S27: its ×');
   assert.equal(readyRequestDue({ foundBy: 'opened', record: { chatId: 'c1' }, ownChats: 0 }), true, 'S25: a request that failed leaves it');
-  assert.equal(readyGoneNow({ kind: 'files', ownChats: 0, requestAnswered: true, sampleCompleted: false }), 'answered', 'S24');
-  assert.equal(readyGoneNow({ kind: 'files', ownChats: 0, requestAnswered: false, sampleCompleted: true }), undefined, 'a folder ignores the sample');
-  assert.equal(readyGoneNow({ kind: 'sample', ownChats: 0, requestAnswered: false, sampleCompleted: true }), 'answered', 'the sample: the hand-off finished');
-  assert.equal(readyGoneNow({ kind: 'empty', ownChats: 2, requestAnswered: false, sampleCompleted: false }), 'chat', 'S26: a chat of one\'s own');
-  assert.equal(readyGoneNow({ kind: 'empty', ownChats: 0, requestAnswered: false, sampleCompleted: false }), undefined, 'S25: refused or failed: it stays');
+  assert.equal(readyGoneNow({ kind: 'files', ownChats: 0, requestAnswered: true, sampleLeftToDo: false }), 'answered', 'S24');
+  assert.equal(readyGoneNow({ kind: 'files', ownChats: 0, requestAnswered: false, sampleLeftToDo: true }), undefined, 'a folder ignores the sample');
+  assert.equal(readyGoneNow({ kind: 'sample', ownChats: 0, requestAnswered: false, sampleLeftToDo: true }), 'answered', 'the sample: its card left To do (shows in Doing)');
+  assert.equal(readyGoneNow({ kind: 'empty', ownChats: 2, requestAnswered: false, sampleLeftToDo: false }), 'chat', 'S26: a chat of one\'s own');
+  assert.equal(readyGoneNow({ kind: 'empty', ownChats: 0, requestAnswered: false, sampleLeftToDo: false }), undefined, 'S25: refused or failed: it stays');
 
   // ── The AI it names (R4, S16, S19) ──
 
@@ -155,8 +163,8 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
   assert.equal(startingPlaceOf(null, 'files'), 'project', 'S33');
   assert.equal(startingPlaceOf(null, 'empty'), 'empty_project', 'S34');
   assert.equal(startingPlaceOf(null, 'sample'), 'sample', 'S38');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Northfield Bank notes.docx' }, 'files'), 'project', 'S35: gate closed: the project\'s');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Northfield Bank notes.docx' }, 'files', { word: true, pdf: false }), 'word_or_pdf', 'S35: gate open');
+  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files'), 'project', 'S35: gate closed: the project\'s');
+  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', { word: true, pdf: false }), 'word_or_pdf', 'S35: gate open');
   assert.equal(startingPlaceOf({ viewType: 'ritemark.pdfViewer', fileName: 'Tender.pdf' }, 'files', { word: true, pdf: false }), 'project', 'a PDF follows its own kind');
   assert.equal(startingPlaceOf({ viewType: 'ritemark.pdfViewer', fileName: 'Tender.pdf' }, 'files', { word: false, pdf: true }), 'word_or_pdf');
   assert.equal(startingPlaceOf({ viewType: 'ritemark.editor', fileName: 'Outline.md', words: 19 }, 'files'), 'short_text', 'S36');

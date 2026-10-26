@@ -1,5 +1,5 @@
 /**
- * All commands' "Send Feedback" (`ritemark.reactions`; the editor title's
+ * All commands' "Send feedback" (`ritemark.reactions`; the editor title's
  * hidden feedback button runs it too).
  *
  * Sprint 140 (J2; experience 34, decision 2: only a message): it opens the

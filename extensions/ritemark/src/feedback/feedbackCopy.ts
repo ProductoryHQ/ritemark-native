@@ -80,6 +80,8 @@ export const FEEDBACK_COPY = {
     placeholder: 'A proposal, notes, a module…',
     send: 'Send',
     notNow: 'Not now',
+    /** The card's send that did not go: Try again (primary), Open in e-mail and Not now (the Experience lead, 26 October). */
+    failed: "It didn't go. Your words are still here: try again, or open it in e-mail.",
   },
 } as const;
 

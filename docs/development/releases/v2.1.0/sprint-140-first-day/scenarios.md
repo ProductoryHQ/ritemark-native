@@ -113,7 +113,9 @@ Then the AI's sheet shows a new chat in front with that AI, and the message "Wha
 
 ### S21: An empty project (each AI)
 When the person presses Tell <AI> what this project is for
-Then a new chat opens in front with that AI, the box holds "This project is for " with the cursor after it and has focus, and nothing is sent.
+Then a new chat opens in front with that AI, the box holds "This project is for " with the cursor after it and has focus, and on the next line "Then write About this project from it, and a first outline as a document." (spec R5, changed 26 October); nothing is sent
+When the person writes what the project is for and presses Send
+Then the AI writes About this project (`AGENTS.md`) and a first outline as a new document in the project, and says what it did.
 
 ### S22: The sample (each AI)
 When the person presses Ask <AI> to draft Module 4
@@ -183,7 +185,7 @@ Then the empty chat shows "What shall we work on?", "<AI> can work across your o
 Then the starting points are This project is for… · Plan a first document with me (experience 35, frame 3).
 
 ### S35: A Word file and a PDF in front (each AI)
-Given `Northfield Bank notes.docx` in front, with ChatGPT
+Given `Fernhollow Bank notes.docx` in front, with ChatGPT
 Then the starting points are Summarise this in five points · Turn this into a one-page brief · What does this say about…? (experience 35, frame 5); the same for a PDF, unless the spike left that kind out (R1), when the project's points show.
 
 ### S36: Short and long text

@@ -188,6 +188,8 @@ export interface ChatStartRequest {
   runtimeId: AgentId;
   text: string;
   send: boolean;
+  /** For a fill (`send: false`): where the cursor waits; the end of `text` when absent. */
+  cursor?: number;
   /** Which ready request it is, so its chat is known and counted (R6, R15). */
   origin?: 'what_is_here' | 'what_for';
 }

@@ -27,6 +27,7 @@ assert.equal(FEEDBACK_COPY.sheet.email.foot, 'Only what you see here goes.');
 assert.equal(FEEDBACK_COPY.sheet.email.via, 'This opens your e-mail app with a message to info@productory.eu, so you see exactly what goes and send it yourself.');
 assert.equal(FEEDBACK_COPY.sheet.failed, "It didn't go. Your message is still here: try again, or open it in e-mail.", 'D5');
 assert.equal(FEEDBACK_COPY.toast.accepted, "Thank you. It's with the people who make Ritemark.", 'D6: only when the service accepted it');
+assert.equal(FEEDBACK_COPY.card.failed, "It didn't go. Your words are still here: try again, or open it in e-mail.", 'the first-week card\'s send that did not go');
 assert.equal(FEEDBACK_COPY.handoff.opened.report, "Your report is in a new e-mail to info@productory.eu. It isn't on its way until you press Send there.");
 assert.equal(FEEDBACK_COPY.sheet.shortenedNote, 'Shortened to fit an e-mail. Copy takes the whole answer.', 'D10');
 assert.equal(REPORT_RECIPIENT, 'info@productory.eu', 'the shape\'s decision 7');

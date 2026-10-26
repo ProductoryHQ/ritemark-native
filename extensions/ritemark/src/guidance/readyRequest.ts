@@ -23,10 +23,26 @@ export const AI_ORDER: readonly AgentId[] = ['claude-code', 'codex', 'opencode']
 export const AI_NAMES: Record<AgentId, AiName> = { 'claude-code': 'Claude', codex: 'ChatGPT', opencode: 'OpenCode' };
 
 /** What the folder's request sends at once, and what the empty project's puts in the box (R5). */
+/** The empty project's request: the person's sentence goes where the cursor waits, after "This project is for ". */
+const EMPTY_LEAD = 'This project is for ';
+
 export const READY_REQUEST_TEXT = {
-  files: 'What is here? Look at the names first, and read only the five newest documents.',
-  empty: 'This project is for ',
+  // Experience 35, frame 2 redrawn (26 October): the two offers are in the answer's words, so the request asks for them.
+  files: 'What is here? Look at the names first, read only the five newest documents, and end with two things you could do next.',
+  // Experience 35, frame 3 redrawn (26 October): the card's promise is in what is sent, on a second line the person sees
+  // and can change; the person's sentence goes where the cursor waits.
+  empty: `${EMPTY_LEAD}\nThen write About this project from it, and a first outline as a document.`,
 } as const;
+
+/**
+ * #497's spike, per AI: whether a first look reads the newest Word files and PDFs (`research/word-spike.md`). Only
+ * ChatGPT has run, and it passed both; an AI not yet run is not promised more than the names (the Experience lead,
+ * 26 October). Changes when the spike's open runs are made.
+ */
+export const FIRST_LOOK_READS_DOCUMENTS: Record<AiName, boolean> = { ChatGPT: true, Claude: false, OpenCode: false };
+
+/** Where the cursor waits in the empty project's request: after "This project is for ". */
+export const READY_REQUEST_CURSOR_EMPTY = EMPTY_LEAD.length;
 
 export const EVENT_KIND: Record<ReadyKind, ReadyEventKind> = { files: 'what_is_here', empty: 'what_for', sample: 'module_4' };
 
@@ -40,6 +56,8 @@ export interface ReadyRequestWords {
   note: string;
   /** The ×'s name and tooltip. */
   hide: string;
+  /** The sample's hand-over, while the board starts it: the button's words (with a spinner) and the note. */
+  busy: { button: string; note: string } | null;
 }
 
 export function readyKindOf(project: { empty: boolean; sample: boolean }): ReadyKind {
@@ -57,8 +75,10 @@ export function readyRequestWords(kind: ReadyKind, ai: AiName, projectName: stri
         heading: 'Nothing in this folder was moved or changed',
         body: counts ? `${ai} works only inside it. ${counts}` : `${ai} works only inside it.`,
         button: `Ask ${ai} what is here`,
-        note: 'Reads the names, then the five newest documents.',
+        // The note is true for the AI chosen: the names, and the five newest only where the spike says it reads them
+        note: FIRST_LOOK_READS_DOCUMENTS[ai] ? 'Reads the names, then the five newest documents.' : 'Reads the names first.',
         hide,
+        busy: null,
       };
     case 'empty':
       return {
@@ -68,6 +88,7 @@ export function readyRequestWords(kind: ReadyKind, ai: AiName, projectName: stri
         button: `Tell ${ai} what this project is for`,
         note: 'Nothing goes until you press Send.',
         hide,
+        busy: null,
       };
     case 'sample':
       return {
@@ -77,6 +98,7 @@ export function readyRequestWords(kind: ReadyKind, ai: AiName, projectName: stri
         button: `Ask ${ai} to draft Module 4`,
         note: 'Reads two documents, writes a new one.',
         hide,
+        busy: { button: `Giving it to ${ai}…`, note: 'It shows in Doing in a moment.' },
       };
   }
 }
@@ -116,8 +138,9 @@ export function readyRequestDue(input: ReadyDueInput): boolean {
  * What a redraw learned that ends the card for good: the request was answered,
  * or a chat of the person's own exists. Undefined when nothing changed.
  */
-export function readyGoneNow(input: { kind: ReadyKind; ownChats: number; requestAnswered: boolean; sampleCompleted: boolean }): ReadyGone | undefined {
-  if (input.kind === 'sample' ? input.sampleCompleted : input.requestAnswered) return 'answered';
+/** `sampleLeftToDo`: the sample's card `m4d7r2` is no longer in To do (handed over, so it shows in Doing). */
+export function readyGoneNow(input: { kind: ReadyKind; ownChats: number; requestAnswered: boolean; sampleLeftToDo: boolean }): ReadyGone | undefined {
+  if (input.kind === 'sample' ? input.sampleLeftToDo : input.requestAnswered) return 'answered';
   if (input.ownChats > 0) return 'chat';
   return undefined;
 }

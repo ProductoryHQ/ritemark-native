@@ -110,6 +110,8 @@ export interface ChatStartMessage {
   runtimeId: AgentId;
   text: string;
   send: boolean;
+  /** For a fill: where the cursor waits; the end of `text` when absent. */
+  cursor?: number;
   origin?: 'what_is_here' | 'what_for';
 }
 
@@ -2239,7 +2241,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         const start = pending.start;
         set({ pendingLanding: null, landingPlaceholder: null });
         if (!start.send) {
-          get().fillComposer(start.text, start.text.length, start.origin ? { readyRequest: start.origin } : undefined);
+          get().fillComposer(start.text, start.cursor ?? start.text.length, start.origin ? { readyRequest: start.origin } : undefined);
           return;
         }
         if (start.origin) vscode.postMessage({ type: 'guidance/origin', conversationId: conversation.id, readyRequest: start.origin });
@@ -3019,6 +3021,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             runtimeId,
             text: message.text,
             send: message.send === true,
+            ...(typeof message.cursor === 'number' && Number.isInteger(message.cursor) && message.cursor >= 0 && message.cursor <= message.text.length ? { cursor: message.cursor } : {}),
             ...(message.origin === 'what_is_here' || message.origin === 'what_for' ? { origin: message.origin } : {}),
           });
           break;

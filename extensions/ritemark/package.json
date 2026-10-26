@@ -207,7 +207,7 @@
       },
       {
         "command": "ritemark.reactions",
-        "title": "Send Feedback",
+        "title": "Send feedback",
         "icon": "$(thumbsup)"
       },
       {

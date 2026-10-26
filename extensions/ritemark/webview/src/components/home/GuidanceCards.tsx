@@ -54,6 +54,8 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
   useEffect(() => {
     if (card.problem) setPressing(false)
   }, [card.problem])
+  // The sample's hand-over says what is happening while it starts (experience 35, The build checked)
+  const busy = pressing ? card.busy ?? null : null
   const splitRef = useRef<HTMLSpanElement>(null)
   const [menuOffset, setMenuOffset] = useState(0)
   const openMenu = (open: boolean) => {
@@ -86,8 +88,10 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
               setPressing(true)
               send({ type: 'home/ready-request' })
             }}>
-              <Icon name="chat-circle" size={14} tone="inherit" />
-              <span className="truncate">{card.button}</span>
+              {busy
+                ? <Icon name="circle-notch" size={14} tone="inherit" className="animate-spin motion-reduce:animate-none" />
+                : <Icon name="chat-circle" size={14} tone="inherit" />}
+              <span className="truncate">{busy ? busy.button : card.button}</span>
             </Button>
           </Tooltip>
           <DropdownMenu open={menuOpen} onOpenChange={openMenu} modal={false}>
@@ -123,7 +127,7 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
             </DropdownMenuContent>
           </DropdownMenu>
         </span>
-        <span className="rh-guide-note">{card.note}</span>
+        <span className="rh-guide-note" role={busy ? 'status' : undefined}>{busy ? busy.note : card.note}</span>
       </div>
       {card.problem && <p className="rh-guide-problem" role="status">{card.problem}</p>}
       <KeySheet

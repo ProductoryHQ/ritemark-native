@@ -91,6 +91,8 @@ export type HomeGuidance =
       keysSet: Record<HomeKeyName, boolean>;
       /** One line when a press did not start (a board that can't give the card, say). */
       problem: string | null;
+      /** The sample's hand-over while the board starts it: the button's words, with a spinner, and the note. */
+      busy: { button: string; note: string } | null;
     }
   | {
       card: 'feedback';

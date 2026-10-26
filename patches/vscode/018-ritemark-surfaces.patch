@@ -3333,10 +3333,10 @@ index 491c451f7fa..251b2dfaebf 100644
  		}
 diff --git a/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
 new file mode 100644
-index 00000000000..59ce46078dc
+index 00000000000..8d293c098d0
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
-@@ -0,0 +1,329 @@
+@@ -0,0 +1,367 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3357,14 +3357,21 @@ index 00000000000..59ce46078dc
 +
 +import './media/ritemarkFeedbackSheet.css';
 +import { $, addDisposableListener, append, EventType } from '../../../base/browser/dom.js';
++import { Event } from '../../../base/common/event.js';
 +import { DisposableStore } from '../../../base/common/lifecycle.js';
 +import { isMacintosh } from '../../../base/common/platform.js';
++import Severity from '../../../base/common/severity.js';
 +import { IClipboardService } from '../../../platform/clipboard/common/clipboardService.js';
 +import { CommandsRegistry, ICommandService } from '../../../platform/commands/common/commands.js';
 +import { ILayoutService } from '../../../platform/layout/browser/layoutService.js';
++import { INotificationService } from '../../../platform/notification/common/notification.js';
 +
 +const SHEET_COMMAND = '_ritemark.feedbackSheet';
 +const SUBMIT_COMMAND = '_ritemark.feedback.submit';
++const BRIEF_TOAST_COMMAND = '_ritemark.briefToast';
++
++/** How long a brief toast stays: the thank-you goes by itself after a few seconds (experience 35, The build checked). */
++export const RITEMARK_BRIEF_TOAST_MS = 4000;
 +
 +/** The words the extension gives (its `feedbackCopy.ts`); only what the sheet draws is listed. */
 +export interface IRitemarkFeedbackWords {
@@ -3489,9 +3496,9 @@ index 00000000000..59ce46078dc
 +
 +		// ── The message: frames 2 and 3 ──
 +		const kindWords = spec.kind === 'ai-issue' ? words.sheet.aiIssue : words.sheet.feedback;
-+		const title = append(sheet, $('h3.ritemark-feedback-title#ritemark-feedback-title'));
++		const title = append(sheet, $('h3#ritemark-feedback-title.ritemark-feedback-title'));
 +		title.textContent = kindWords.title;
-+		const lede = append(sheet, $('p.ritemark-feedback-lede#ritemark-feedback-lede'));
++		const lede = append(sheet, $('p#ritemark-feedback-lede.ritemark-feedback-lede'));
 +		lede.textContent = kindWords.lede;
 +		const area = append(sheet, $('textarea.ritemark-feedback-area')) as HTMLTextAreaElement;
 +		area.placeholder = kindWords.placeholder;
@@ -3552,8 +3559,8 @@ index 00000000000..59ce46078dc
 +			const outcome = result.outcome === 'opened' ? words.handoff.opened : result.outcome === 'too-long' ? words.handoff.tooLong : words.handoff.noHandler;
 +			sheet.textContent = '';
 +			sheet.classList.add('handoff');
-+			append(sheet, $('h3.ritemark-feedback-title#ritemark-feedback-title')).textContent = outcome.title;
-+			append(sheet, $('p.ritemark-feedback-lede#ritemark-feedback-lede')).textContent = result.outcome === 'opened'
++			append(sheet, $('h3#ritemark-feedback-title.ritemark-feedback-title')).textContent = outcome.title;
++			append(sheet, $('p#ritemark-feedback-lede.ritemark-feedback-lede')).textContent = result.outcome === 'opened'
 +				? (spec.kind === 'ai-issue' || ai.input.checked ? words.handoff.opened.report : words.handoff.opened.message)
 +				: (outcome as { lede: string }).lede;
 +			const shown = append(sheet, $('.ritemark-feedback-quote'));
@@ -3642,6 +3649,22 @@ index 00000000000..59ce46078dc
 +					first?.focus();
 +				}
 +			}
++			// A modal sheet: the workbench's own shortcuts wait until it closes (typing keeps its default)
++			event.stopPropagation();
++		}));
++		// Focus stays inside the sheet while it is open: anything that takes it elsewhere in the window gives it back
++		store.add(addDisposableListener(sheet, EventType.FOCUS_OUT, (event: FocusEvent) => {
++			const next = event.relatedTarget as Node | null;
++			if (next && sheet.contains(next)) {
++				return;
++			}
++			setTimeout(() => {
++				const active = sheet.ownerDocument.activeElement;
++				if (!closed && sheet.isConnected && !(active && sheet.contains(active))) {
++					const target = [...sheet.querySelectorAll<HTMLElement>('textarea, input, button')].find(element => !element.hidden && !(element as HTMLButtonElement).disabled && element.offsetParent !== null);
++					target?.focus();
++				}
++			}, 0);
 +		}));
 +		// A press on the dimmed window outside the sheet does nothing: Escape and Cancel close it (experience 31).
 +		store.add(addDisposableListener(block, EventType.MOUSE_DOWN, (event: MouseEvent) => {
@@ -3665,6 +3688,21 @@ index 00000000000..59ce46078dc
 +		copy: text => clipboardService.writeText(text),
 +		mac: isMacintosh,
 +	});
++});
++
++/**
++ * A toast that says a thing happened and goes by itself (the feedback thank-you, 2.0's notification toast): an
++ * extension's information message stays until the window has focus and then for 10 s; this one closes after
++ * RITEMARK_BRIEF_TOAST_MS wherever it is. Resolves true when shown, so the extension knows to show nothing itself.
++ */
++CommandsRegistry.registerCommand(BRIEF_TOAST_COMMAND, (accessor, message: unknown) => {
++	if (typeof message !== 'string' || !message.trim()) {
++		return false;
++	}
++	const handle = accessor.get(INotificationService).notify({ severity: Severity.Info, message });
++	const timer = setTimeout(() => handle.close(), RITEMARK_BRIEF_TOAST_MS);
++	Event.once(handle.onDidClose)(() => clearTimeout(timer));
++	return true;
 +});
 diff --git a/src/vs/workbench/browser/parts/ritemarkFrameMenu.ts b/src/vs/workbench/browser/parts/ritemarkFrameMenu.ts
 new file mode 100644
@@ -5434,10 +5472,10 @@ index 6851c3b584c..027d77efbca 100644
  	}
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
 new file mode 100644
-index 00000000000..339390f0da9
+index 00000000000..0a5f2168d1d
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
-@@ -0,0 +1,158 @@
+@@ -0,0 +1,175 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -5526,6 +5564,23 @@ index 00000000000..339390f0da9
 +		sheet.tick(1); // I'd like an answer
 +		assert.deepStrictEqual([button().textContent, button().disabled, sheet.$('.ritemark-feedback-foot-note').textContent, sheet.$('.ritemark-feedback-via').hidden], ['Open in e-mail', false, 'Only what you see here goes.', false]);
 +		sheet.$<HTMLButtonElement>('.ritemark-feedback-button.ghost').click(); // Cancel
++		assert.strictEqual(await sheet.outcome, 'cancelled');
++		sheet.dispose();
++	});
++
++	test('a modal sheet: named for screen readers, focus kept inside, Escape closes', async () => {
++		const sheet = open({}, async () => null);
++		const dialog = sheet.$('.ritemark-feedback-sheet');
++		assert.deepStrictEqual([dialog.getAttribute('role'), dialog.getAttribute('aria-modal'), sheet.$(`#${dialog.getAttribute('aria-labelledby')}`)?.textContent], ['dialog', 'true', 'Send feedback']);
++		assert.strictEqual(mainWindow.document.activeElement, sheet.$('.ritemark-feedback-area'), 'the message field has focus');
++		const outside = mainWindow.document.body.appendChild(mainWindow.document.createElement('button'));
++		outside.focus();
++		// The test window may not have the system's focus, and then Chromium sends no focus events: send the one a person's click would
++		sheet.$('.ritemark-feedback-area').dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: outside }));
++		await timeout(10);
++		assert.ok(dialog.contains(mainWindow.document.activeElement), 'focus came back into the sheet');
++		outside.remove();
++		sheet.$('.ritemark-feedback-area').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 +		assert.strictEqual(await sheet.outcome, 'cancelled');
 +		sheet.dispose();
 +	});

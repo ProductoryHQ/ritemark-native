@@ -27,6 +27,7 @@ import { answerForSheet, mailKindOf, routeOf } from './feedbackRoute';
 export const FEEDBACK_OPEN_COMMAND = 'ritemark.feedback.open';
 export const FEEDBACK_SUBMIT_COMMAND = '_ritemark.feedback.submit';
 /** Registered by patch 018 in the workbench. */
+export const FEEDBACK_BRIEF_TOAST_COMMAND = '_ritemark.briefToast';
 export const FEEDBACK_SHEET_COMMAND = '_ritemark.feedbackSheet';
 
 export type FeedbackDoor = 'status_bar' | 'help' | 'ai_info' | 'command';
@@ -128,14 +129,14 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
       const text = await vscode.window.showInputBox({ title: FEEDBACK_COPY.sheet.feedback.title, prompt: FEEDBACK_COPY.sheet.feedback.lede, ignoreFocusOut: true });
       if (!text?.trim()) return;
       const sent = await sendFeedback([{ name: 'feedback_sent', properties: { message: text.trim() } }]);
-      if (sent) void vscode.window.showInformationMessage(FEEDBACK_COPY.toast.accepted);
+      if (sent) void showBriefToast(FEEDBACK_COPY.toast.accepted);
       else void vscode.window.showWarningMessage(FEEDBACK_COPY.sheet.failed);
       return;
     } finally {
       // The sheet answered: its buttons can no longer send under this token.
       if (open?.token === token) open = null;
     }
-    if (result === 'sent') void vscode.window.showInformationMessage(FEEDBACK_COPY.toast.accepted);
+    if (result === 'sent') void showBriefToast(FEEDBACK_COPY.toast.accepted);
   };
 
   const submit = async (raw: unknown): Promise<FeedbackSubmitResult | null> => {
@@ -175,4 +176,14 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
 /** The first-week card's send (R14, D11): the straight route, from Home, marked with the question it answers. */
 export async function sendWeekLine(text: string): Promise<boolean> {
   return sendFeedback([{ name: 'feedback_sent', properties: { message: text.trim(), asked: 'made_this_week' } }]);
+}
+
+/**
+ * A toast that goes by itself after a few seconds (patch 018's `_ritemark.briefToast`): the thank-you is 2.0's
+ * notification toast, and it does not stay (experience 35, The build checked). A shell without the command gets an
+ * ordinary information message.
+ */
+export async function showBriefToast(text: string): Promise<void> {
+  const shown = await vscode.commands.executeCommand<boolean>(FEEDBACK_BRIEF_TOAST_COMMAND, text).then((value) => value === true, () => false);
+  if (!shown) void vscode.window.showInformationMessage(text);
 }
