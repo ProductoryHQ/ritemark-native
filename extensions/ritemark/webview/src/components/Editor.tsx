@@ -18,6 +18,7 @@ import { SearchExtension } from '../extensions/SearchExtension'
 import { DictationPlaceholder } from '../extensions/DictationPlaceholder'
 import { MathBlockWithView, MathEditing, MathInlineWithView } from '../extensions/math/mathEditing'
 import { countEquations } from '../extensions/math/mathCount'
+import { isEquationNodeSelection } from '../extensions/math/mathNodes'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
 import AutoJoiner from 'tiptap-extension-auto-joiner'
 import { FormattingBubbleMenu } from './FormattingBubbleMenu'
@@ -407,7 +408,14 @@ export function Editor({
       if (!ctx.editor) {
         return null
       }
-      const { from, to, empty } = ctx.editor.state.selection
+      const { selection } = ctx.editor.state
+      // Sprint 138: clicking or Entering an equation selects its node to open
+      // it. That is the cursor's place, as a click into text is, so the AI gets
+      // no "selected text"; a dragged or Shift-arrow selection still does.
+      const opened = isEquationNodeSelection(selection)
+      const from = selection.from
+      const to = opened ? selection.from : selection.to
+      const empty = opened || selection.empty
       const doc = ctx.editor.state.doc
       const text = doc.textBetween(from, to, ' ')
 
@@ -1617,8 +1625,9 @@ export function Editor({
 export function getSelectionHTML(editor: TipTapEditor): string {
   const { from, to, empty } = editor.state.selection
 
-  // No selection - return full document HTML
-  if (empty) {
+  // No selection - return full document HTML. An equation opened by a click
+  // is the cursor's place, not a selection (Sprint 138).
+  if (empty || isEquationNodeSelection(editor.state.selection)) {
     return editor.getHTML()
   }
 

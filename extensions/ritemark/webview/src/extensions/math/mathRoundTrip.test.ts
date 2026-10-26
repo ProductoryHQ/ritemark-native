@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url'
 import { createDocument } from '@mixmark-io/domino'
 import { getSchema, getTextBetween, getTextSerializersFromSchema } from '@tiptap/core'
 import { DOMParser as PMDOMParser, DOMSerializer, type Node as PMNode } from '@tiptap/pm/model'
+import { NodeSelection, TextSelection } from '@tiptap/pm/state'
+import { isEquationNodeSelection } from './mathNodes'
 import {
   createEditorSchemaExtensions,
   editorHTMLToMarkdown,
@@ -89,6 +91,14 @@ function nodesOf(doc: PMNode, name: string): PMNode[] {
   const found: PMNode[] = []
   doc.descendants(node => {
     if (node.type.name === name) found.push(node)
+  })
+  return found
+}
+
+function nodePositions(doc: PMNode, name: string): number[] {
+  const found: number[] = []
+  doc.descendants((node, pos) => {
+    if (node.type.name === name) found.push(pos)
   })
   return found
 }
@@ -198,6 +208,18 @@ const typed = (html: string) => save(fromHTML(html))
   assert.ok(clipboard.includes('$\\hat{\\beta}$') && clipboard.includes('$$\nE = mc^2\n$$'), 'clipboard text carries the source')
   // The word count passes ' ' for leaves: an equation is not a word.
   assert.equal(doc.textBetween(0, doc.content.size, ' ', ' ').trim().split(/\s+/).length, 4)
+
+  // A click or Enter opens an equation by selecting its node: that is the
+  // cursor's place, not "selected text" for the AI. A drag or Shift-arrow
+  // selection over the same equation is, and carries its source.
+  const inlinePos = nodePositions(doc, 'mathInline')[0]
+  const blockPos = nodePositions(doc, 'mathBlock')[0]
+  assert.ok(isEquationNodeSelection(NodeSelection.create(doc, inlinePos)), 'an opened inline equation is not a text selection')
+  assert.ok(isEquationNodeSelection(NodeSelection.create(doc, blockPos)), 'an opened block is not a text selection')
+  const dragged = TextSelection.create(doc, inlinePos - 4, inlinePos + 1)
+  assert.ok(!isEquationNodeSelection(dragged), 'a dragged selection is')
+  assert.equal(doc.textBetween(dragged.from, dragged.to, ' '), 'ope $\\hat{\\beta}$', 'and carries the source with its delimiters')
+  assert.ok(!isEquationNodeSelection(TextSelection.create(doc, 1, 4)), 'a selection of text alone is not an equation')
 }
 
 // ---- a document without math saves as it did ----

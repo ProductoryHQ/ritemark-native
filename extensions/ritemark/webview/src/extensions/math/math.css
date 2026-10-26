@@ -87,6 +87,16 @@ body[data-vscode-theme-kind='vscode-dark'] .ProseMirror {
 .rm-math-inline .rm-math-source {
   white-space: pre-wrap;
 }
+/* A typo's source and its mark are one unit on the line, as a typeset
+   equation is: the line breaks before them, never inside them. Only a source
+   longer than a whole line wraps within itself. */
+.rm-math-inline.is-error {
+  display: inline-block;
+  max-width: 100%;
+}
+.rm-math-inline.is-error .rm-math-source {
+  overflow-wrap: anywhere;
+}
 .rm-math-block-source {
   text-align: left;
   white-space: pre-wrap;

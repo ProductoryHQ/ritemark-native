@@ -20,9 +20,23 @@
  */
 import { Node, mergeAttributes, type Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
+import { NodeSelection, type Selection } from '@tiptap/pm/state'
 import { CLOSING_DELIMITER, inlineMathSource, type MathDelimiter } from './mathSyntax'
 
 const DELIMITERS: MathDelimiter[] = ['$', '$$', '\\(', '\\[']
+
+/**
+ * The selection a click, an arrow key or Enter makes on an equation: the
+ * equation's node, opened or about to open. It is where the cursor is, not a
+ * selection of text, so neither the formatting toolbar nor the AI's
+ * "Working on selected text" chip takes it. A selection a person makes (a
+ * drag, Shift with the arrows) is a text selection, and still carries the
+ * equation's source (R7).
+ */
+export function isEquationNodeSelection(selection: Selection): boolean {
+  return selection instanceof NodeSelection
+    && (selection.node.type.name === 'mathInline' || selection.node.type.name === 'mathBlock')
+}
 
 function readDelimiter(value: string | null): MathDelimiter | null {
   return value !== null && (DELIMITERS as string[]).includes(value) ? (value as MathDelimiter) : null
