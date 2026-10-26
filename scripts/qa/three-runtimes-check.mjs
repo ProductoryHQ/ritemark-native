@@ -390,10 +390,10 @@ async function run() {
     await waitFor(SHEET, TRACE, 10);
     await pickModel(REFUSED_MODEL);
     const refused = await send('Say hi.');
-    const card = await waitFor(SHEET, "const c=d.querySelector('[data-turn-failure=\"model\"]'); return c? {text:c.innerText, buttons:[...c.querySelectorAll('button')].map(b=>b.innerText.trim()), statusLine:(d.querySelector('[data-activity-state]')||{}).innerText||null}: null", 20);
+    const card = await waitFor(SHEET, "const c=d.querySelector('[data-turn-failure=\"model\"]'); return c? {text:c.innerText, buttons:[...c.querySelectorAll('button')].map(b=>b.innerText.trim()), statusLine:(d.querySelector('[data-activity-state]')||{}).innerText||null, header:(d.querySelector('header[aria-label=\"Current conversation\"] [role=status]')||{}).innerText||null}: null", 20);
     await screenshot(`${AI}-4-model-card.png`);
-    step('S25 a refused model shows one card, and nothing on the status line', {
-      ok: refused?.errorKind === 'model' && Boolean(card?.buttons?.length) && !card?.statusLine,
+    step('S25 a refused model shows one card, and nothing on the status line or in the header', {
+      ok: refused?.errorKind === 'model' && Boolean(card?.buttons?.length) && !card?.statusLine && !card?.header,
       detail: { result: refused, card },
     });
     // The provider's raw words are kept in the turn's activity row, labelled as theirs.
@@ -417,7 +417,7 @@ async function run() {
     await launch(WORKSPACE, path.join(PROFILE, 'launch2.log'));
     await waitFor(SHEET, TRACE, 90);
     // The refused chat, as the restart left it: the card says the switch was taken (it may open first).
-    const RESTORED = "const c=d.querySelector('[data-turn-failure=\"model\"]'); return c&&c.innerText.includes('Now using')? {text:c.innerText, buttons:c.querySelectorAll('button').length, statusLine:(d.querySelector('[data-activity-state]')||{}).innerText||null}: null";
+    const RESTORED = "const c=d.querySelector('[data-turn-failure=\"model\"]'); return c&&c.innerText.includes('Now using')? {text:c.innerText, buttons:c.querySelectorAll('button').length, statusLine:(d.querySelector('[data-activity-state]')||{}).innerText||null, header:(d.querySelector('header[aria-label=\"Current conversation\"] [role=status]')||{}).innerText||null}: null";
     let restoredCard = await waitFor(SHEET, RESTORED, 8);
     if (restoredCard) await screenshot(`${AI}-6-restored-card.png`);
     await clickIn(SHEET, "d.querySelector('button[aria-label=\"All conversations\"]')");
@@ -437,8 +437,8 @@ async function run() {
       restoredCard = await waitFor(SHEET, RESTORED, 10);
       if (restoredCard) await screenshot(`${AI}-6-restored-card.png`);
     }
-    step('S36 after a restart the refused chat says Now using, with no button and nothing on the status line', {
-      ok: Boolean(restoredCard) && restoredCard.buttons === 0 && !restoredCard.statusLine,
+    step('S36 after a restart the refused chat says Now using, with no button, nothing on the status line and just the title in the header', {
+      ok: Boolean(restoredCard) && restoredCard.buttons === 0 && !restoredCard.statusLine && !restoredCard.header,
       detail: restoredCard,
     });
 

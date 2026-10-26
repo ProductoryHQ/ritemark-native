@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Icon } from '../ui/Icon';
 import { Tooltip } from '../ui/tooltip';
 import { useConversationDialogs } from './ConversationDialogs';
-import { conversationPinState, conversationStatusLabel } from './conversationActionsModel';
+import { conversationPinState, headerStatusLabel } from './conversationActionsModel';
 import { useAISidebarStore } from './store';
 import { deriveThreadTitle, NEW_THREAD_TITLE } from './threadStatus';
 
@@ -34,7 +34,8 @@ export function ConversationHeader() {
 
   const summary = activeId ? summaries.find((item) => item.conversationId === activeId) ?? null : null;
   const title = summary?.title ?? (activeConversation ? deriveThreadTitle(activeConversation) : NEW_THREAD_TITLE);
-  const status = summary ? conversationStatusLabel(summary) : null;
+  // Only a live state (working, needs you); a turn that ended leaves just the title (Sprint 139).
+  const status = summary ? headerStatusLabel(summary) : null;
   const pinState = summary ? conversationPinState(summary.conversationId, title, pinnedIds) : null;
   const menuLabel = `More actions for ${title}`;
 

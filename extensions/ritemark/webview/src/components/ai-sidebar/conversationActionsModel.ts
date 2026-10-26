@@ -49,6 +49,18 @@ export function deleteConfirmLabel(summary: Pick<ConversationSummaryV1, 'lifecyc
   return isConversationRunning(summary) ? 'Stop and delete' : 'Delete';
 }
 
+/**
+ * Sprint 139 (the Experience lead, 26 October): the chat's own header shows a
+ * state only while it is live, while the AI works or waits for the person (an
+ * approval or a question). A turn that ended, by an answer, a failure or a
+ * stop, leaves just the title: the turn itself says what happened. The same
+ * for Claude, ChatGPT and OpenCode. The chats list and the rail keep their
+ * marks for a chat whose last turn failed ({@link conversationStatusLabel}).
+ */
+export function headerStatusLabel(summary: Pick<ConversationSummaryV1, 'lifecycle'>): string | null {
+  return isConversationRunning(summary) ? conversationStatusLabel(summary) : null;
+}
+
 /** Short status for a conversation that is not idle; null when there is nothing to say. */
 export function conversationStatusLabel(summary: Pick<ConversationSummaryV1, 'lifecycle'>): string | null {
   switch (summary.lifecycle.state) {

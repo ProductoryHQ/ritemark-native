@@ -12,6 +12,7 @@ import {
   conversationPinState,
   conversationStatusLabel,
   deleteConfirmLabel,
+  headerStatusLabel,
   isConversationRunning,
 } from './conversationActionsModel';
 
@@ -67,6 +68,24 @@ const interrupted: Lifecycle = { state: 'interrupted', turnId: null, reason: 're
   assert.equal(conversationStatusLabel(withLifecycle(working)), 'Working');
   assert.equal(conversationStatusLabel(withLifecycle(needsUser)), 'Needs you');
   assert.equal(conversationStatusLabel(withLifecycle(interrupted)), 'Interrupted');
+}
+
+// Sprint 139 (the Experience lead, 26 October): the chat's header shows a state only while it is live.
+// A turn that ended by an answer, a failure or a stop leaves just the title, for all three AIs; the
+// chats list keeps its word for a chat whose last turn ended badly.
+{
+  for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
+    const summary = (lifecycle: Lifecycle) => ({ lifecycle, runtimeSummary: [runtime] });
+    assert.equal(headerStatusLabel(summary(working)), 'Working', runtime);
+    assert.equal(headerStatusLabel(summary(needsUser)), 'Needs you', runtime);
+    assert.equal(headerStatusLabel(summary({ state: 'needs-user', activeTurnId: 't1', attentionKind: 'question' })), 'Needs you', runtime);
+    assert.equal(headerStatusLabel(summary(idle)), null, `${runtime}: an answer leaves just the title`);
+    for (const reason of ['failed', 'cancelled', 'restart', 'runtime-released', 'deleted-running'] as const) {
+      const ended: Lifecycle = { state: 'interrupted', turnId: 't1', reason };
+      assert.equal(headerStatusLabel(summary(ended)), null, `${runtime}: no "Interrupted" in the header after ${reason}`);
+      assert.equal(conversationStatusLabel(summary(ended)), 'Interrupted', 'the chats list keeps its word');
+    }
+  }
 }
 
 console.log('conversationActionsModel.test.ts: all tests passed');
