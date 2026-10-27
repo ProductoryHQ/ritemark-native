@@ -2,7 +2,7 @@
   "nameShort": "Ritemark",
   "nameLong": "Ritemark",
   "applicationName": "ritemark",
-  "ritemarkVersion": "2.0.1",
+  "ritemarkVersion": "2.1.0",
   "builtInExtensionsEnabledWithAutoUpdates": [],
   "defaultChatAgent": {
     "providerExtensionId": "vscode.github-authentication",
