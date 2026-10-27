@@ -41,6 +41,8 @@ export interface AiStatusSources {
   /** The chat open on the AI's sheet, as the sheet last reported it; null when it reported none. */
   openChat(): OpenChatReport | null;
   onDidChangeOpenChat(listener: () => void): vscode.Disposable;
+  /** The model catalog changed (`modelCatalog.onUpdate`): OpenCode's readiness follows its model list. */
+  onDidUpdateModels(listener: () => void): vscode.Disposable;
 }
 
 const DOT_COLORS: Record<AiStatusDot, string> = {
@@ -68,6 +70,9 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
   context.subscriptions.push(dot, words);
 
   const cache = new Map<AgentId, { at: number; value: RuntimeAvailability }>();
+  // One probe at a time per AI, and a probe that an invalidation overtook is not kept (its epoch moved on)
+  const inFlight = new Map<AgentId, Promise<RuntimeAvailability>>();
+  const epoch = new Map<AgentId, number>();
   let generation = 0;
   let timer: NodeJS.Timeout | undefined;
   let started = false;
@@ -75,9 +80,17 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
   async function availability(runtimeId: AgentId): Promise<RuntimeAvailability> {
     const hit = cache.get(runtimeId);
     if (hit && Date.now() - hit.at < REUSE_MS) return hit.value;
-    const value = await sources.runtimeAvailability(runtimeId);
-    cache.set(runtimeId, { at: Date.now(), value });
-    return value;
+    const running = inFlight.get(runtimeId);
+    if (running) return running;
+    const startedEpoch = epoch.get(runtimeId) ?? 0;
+    const probe = sources.runtimeAvailability(runtimeId)
+      .then((value) => {
+        if ((epoch.get(runtimeId) ?? 0) === startedEpoch) cache.set(runtimeId, { at: Date.now(), value });
+        return value;
+      })
+      .finally(() => { if (inFlight.get(runtimeId) === probe) inFlight.delete(runtimeId); });
+    inFlight.set(runtimeId, probe);
+    return probe;
   }
 
   function draw(view: AiStatusView): void {
@@ -126,7 +139,11 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
   }
 
   function schedule(forget?: AgentId[]): void {
-    for (const runtimeId of forget ?? []) cache.delete(runtimeId);
+    for (const runtimeId of forget ?? []) {
+      cache.delete(runtimeId);
+      inFlight.delete(runtimeId);
+      epoch.set(runtimeId, (epoch.get(runtimeId) ?? 0) + 1);
+    }
     if (!started) return;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
@@ -144,6 +161,8 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
     { dispose: onCodex },
     connectivityChanged.event(() => schedule()),
     context.secrets.onDidChange(() => schedule(['opencode'])),
+    // OpenCode's readiness also follows its model list, as the welcome's does
+    sources.onDidUpdateModels(() => schedule(['opencode'])),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration('ritemark.ai.selectedAgent')) schedule();
     }),

@@ -167,6 +167,13 @@ Done when:
 - **Then, only if the cause is small and extension-side:** the AI column is revealed at activation (without taking focus, and not while the welcome is open), keeping the later focus; and with a landing pending, the permanent-tab check runs at once instead of after 800 ms. Done when, in 10 of 10 switches on the dev build, Home is in front without a "Loading..." frame and the AI column is visible within 300 ms of Home.
 - **Otherwise** (the cause is the workbench's restore, a patch-tier change): no code in 144. #569 becomes an RC check at Gate 1: measured on the candidate the same way; if the gap is under 300 ms there, #569 closes with that evidence; if not, it is a 2.1 bug with the measurement, and the patch-tier fix (patch 002 keeping the AI column's container; Home restored as the active editor when a landing is pending) is planned then.
 
+#### P5, measured (27 October, during the sprint)
+
+Ten switches on the dev build (`qa-evidence.md`, S37 and S38):
+- **Before:** a document in front for 1.3–1.4 s before Home; Home at 3.6–3.8 s; the AI column 3.2–4.6 s after Home, at about 6.9 s: the 4 s timer after activation. Both of Ritemark's timers were the cause of what happens after activation, so the extension-side change was made.
+- **After:** the AI column at activation (2.9–3.1 s), before Home in 9 of 10; Home at 3.1–3.4 s; a document in front for 0.7–0.9 s.
+- **What is left happens before the extension activates** (the workbench restores the document at about 2.4 s, the extension runs at about 2.9 s): the document in front until then, and, when the workbench restores Home first, the AI column 0.56 s after it. That part is P5's *Otherwise*: #569 is checked on the candidate (S40); a production build starts faster than a dev build, so the gap there is measured, not assumed. If it is over 300 ms, the patch-tier fix (patch 002 keeping the AI column's container; Home restored as the active editor when a landing is pending) is planned from that measurement.
+
 ## Engineering requirements
 
 - **E1, provenance.** `source_commit` and `RITEMARK_RELEASE_COMMIT` keep their meaning: the ritemark-native commit whose product bytes ship. The harness commit is `workflow_commit`, in the same repository.

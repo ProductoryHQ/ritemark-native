@@ -69,6 +69,7 @@ async function main(): Promise<void> {
   const probes: string[] = [];
   let openChat: { agentId: 'claude-code' | 'codex' | 'opencode'; signInEnded: boolean } | null = null;
   const openChatListeners: Array<() => void> = [];
+  const modelListeners: Array<() => void> = [];
 
   initAiStatusItem(
     { subscriptions: [], secrets: { onDidChange: (l: Listener<unknown>) => { secretListeners.push(l); return { dispose() {} }; } } } as never,
@@ -79,6 +80,7 @@ async function main(): Promise<void> {
       },
       openChat: () => openChat,
       onDidChangeOpenChat: (listener) => { openChatListeners.push(listener); return { dispose() {} }; },
+      onDidUpdateModels: (listener) => { modelListeners.push(listener); return { dispose() {} }; },
     },
   );
   const [dot, words] = items;
@@ -130,6 +132,15 @@ async function main(): Promise<void> {
   for (const l of configListeners) l({ affectsConfiguration: (key) => key === 'ritemark.ai.selectedAgent' });
   await sleep(400);
   assert.equal(words.text, 'OpenCode ready');
+
+  // OpenCode's model list changes: OpenCode is probed again, once even when two changes arrive together.
+  usable.opencode = false;
+  probes.length = 0;
+  for (const l of modelListeners) l();
+  for (const l of modelListeners) l();
+  await sleep(400);
+  assert.equal(words.text, 'No AI yet', 'the new list is read');
+  assert.equal(probes.filter((id) => id === 'opencode').length, 1, 'one probe for one burst');
 
   // The click opens the AI's sheet.
   await commands.get('ritemark.aiStatus.open')?.();

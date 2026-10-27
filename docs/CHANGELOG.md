@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — 2.1.0
 
+### Sprint 144, part 2: polish from the 2.1 smoke test (#569)
+
+#### Changed
+- **The status bar says which AI you are talking to.** Instead of "AI Ready" whenever the internet answered, it names the AI your next message goes to: "Claude ready" with a green dot, "Claude: sign in" or "sign in again", "No AI yet" when no AI is signed in, and "Offline" with a grey dot when there is no internet. It follows sign-ins and switching between chats, for Claude, ChatGPT and OpenCode.
+- **No "Experimental" badges on Claude and ChatGPT** in Settings: they are Ritemark's main AIs.
+- **The AI sheet's sign-in buttons** match the rest of Ritemark: their icons take the colour of their words, and each says what it does on hover.
+
+#### Fixed
+- **A Flow step's model picker is usable at once.** It stayed greyed with "Loading models..." for 5 seconds every time a step was selected, because Ritemark answered the request with the wrong kind of list; an Image step now gets the image models.
+- **A Flow step's Delete row no longer cuts through Temperature and Max Tokens** in a short window: it scrolls with the fields.
+- **After switching projects, the AI column is there with the window** instead of arriving 3–4 seconds after Home, and Home comes forward sooner (#569).
+
 ### Sprint 144, part 1: the release harness (#506, #515)
 
 #### Security

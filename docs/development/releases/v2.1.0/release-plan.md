@@ -182,6 +182,10 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 - **Main is frozen** from the first release-candidate build until publication.
 - **The feed** is generated with `--existing-feed-url` naming v2.0.1's feed and all three assets.
 
+### Gate 1 additions
+
+- **#569, the project switch** (Sprint 144, P5, S40): on the arm64 candidate, `node scripts/qa/project-check.mjs --port <port> --switch-to <project> --measure 10` between two projects each left with a document in front. #569 closes if the AI column follows Home by under 300 ms and no document is in front before Home; otherwise it is a 2.1 bug with that record (the dev build left 0.7–0.9 s of a document and up to 0.56 s of the AI column, both before the extension activates).
+
 ### Gate 2 checklist (first draft, completed by each sprint)
 
 - **An update from 2.0.1** with a lived-in profile:
