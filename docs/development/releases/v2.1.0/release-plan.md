@@ -60,7 +60,8 @@ The five items, in the shape's order:
 | [141 — 2.1's model lineup](sprint-141-model-lineup/sprint-plan.md) | 4 | Gemini 4 Argon in `modelConfig.ts` and the bundled catalog; OpenCode's hand-made rows brought to the lineup; Flows' Gemini default (Gemini 3.5 Flash Lite, after audit A2); the feed refreshed for every release from 1.8.1 and checked by `check:model-feed`, published with 2.1; the Gemini key in a header (#558); the runtime review and updates; OpenCode's lists from OpenCode's own list (#529, merge 2, the first to cut) | #532, #531, #530, #529, #558 | — | **Approved** 2026-10-26 with all nine decisions as recommended; building on `sprint-141-model-lineup` |
 | [142 — 2.1 polish](sprint-142-polish/sprint-plan.md) | — | The smoke test's looks as the Experience lead decided (#557): markers in the AI's lists, File changes everywhere, the switch note that goes, Home's path without a gap; every split button one button in one tone (Jarmo, 26 October); Chat Debug checked (not on a release build); the 2.0 visual follow-ups: sheets' edges, the left column's scrollbars, the tooltip after a click, the board at 1440, Home at 150 px, a restored card's tab, Transcribe a file… as a tab | #557, #503, #504, #505, #516, #535, #508, #517 | Experiences 3 and 35, framework §3 (f4f5a12, bb368b5) | **Approved** 2026-10-26 by the Development manager, under Jarmo's delegation. Merge 1, the extension tier, in [#560](https://github.com/ProductoryHQ/ritemark-native/pull/560); merge 2, the patches (002, 018, 019: File changes, the desk's edge, a restored card's tab), in a PR of its own from `sprint-142-polish-shell` |
 | [143 — 2.1 fixes](sprint-143-fixes/sprint-plan.md) | — | Behaviour bugs around 2.0 and in 2.1's testing, each reproduced first: Home's dispose; the first chat's AI after the welcome; ChatGPT's silent wait on a 429; titles in the chat's language; the mention list under the formatting toolbar; a task's line breaks; ⌘⇧P on Home (only if a person reproduces it); Transcribe's .m4a and Dismiss on Windows; pickers with no Desktop | #556, #551, #544, #514, #513, #511, #507, #509, #510 | 137, 139, 140 merged | **Approved** 2026-10-26 by the Development manager under Jarmo's delegation; building on `sprint-143-fixes` |
-| The release — 2.1 as one release | — | The done list below, the runtime review, version 2.1.0, notes, the Store update, the release itself | #499, #506, the Store | 137–140 merged; 141–143 merged | Not planned yet. It gets a sprint number of its own only if it needs code, as Sprint 136 did for 2.0; otherwise it is the release worktree's steps, as in 2.0.1 |
+| [144 — The release harness, and polish from the smoke test](sprint-144-release-harness/sprint-plan.md) | — | **Part 1 (shell):** the release's code before the candidate: the Windows build on the free `windows-latest` runner with the repository public (measured green in 37.5 min), and no toggle anywhere in the release path (#506); Electron 43.8.3 through patch 020, moved to the first 43.x with Node 24.22.1 if Electron publishes it before the version bump, or the risk written (#515); the done list's Windows checks (#499, #276, #501) on a Windows build of `main` before the candidate, no code for them in advance. **Part 2 (extension, its own PR):** the smoke test of `c99a8596`: the sign-in card's buttons, Settings' "Experimental" badges, the status bar's AI item in the Experience lead's words, the Flow step panel's footer and model picker, the project switch measured (#569) | #506, #515, #569 | 141–143 merged | **Proposed** 2026-10-27, for the Development manager |
+| The release — 2.1 as one release | — | The done list below, the runtime review, version 2.1.0, notes, the Store update, the release itself | #499, the Store | 137–144 merged | The release worktree's steps, as in 2.0.1: its code is Sprint 144 |
 
 ### Order
 
@@ -109,7 +110,7 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 | #509, #510 | Transcribe on Windows (an .m4a) and the pickers with no Desktop folder | **143** (#509's conversion with Media Foundation filed for 2.2) |
 | #517 | Transcribe a file… as a tab | 142 (R13) |
 | #557 | 2.1's smoke-test looks: Chat Debug, the AI's list markers, File changes, the switch note, Home's path | 142 (R1–R4, R6), with Jarmo's one-tone split button (R5) |
-| #515 | Ship on an Electron carrying Node 24.22.1 (21 October security releases) | The release (shell): checked against the pinned VS Code's Electron at the runtime review |
+| #515 | Ship on an Electron carrying Node 24.22.1 (21 October security releases) | **144** (R3, R4): no Electron had it on 27 October; patch 020 moves to it if one is published before the version bump |
 
 ## Sprint / Issue / PR Tracker
 
@@ -125,7 +126,10 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 | 142, merge 2 (patches 002, 018, 019) | `sprint-142-polish-shell` | [#565](https://github.com/ProductoryHQ/ritemark-native/pull/565) | #557 (File changes), #503 (the desk's edge), #508 | Merged 27 Oct (beac93b2) | No blockers at 8830ea17, 27 Oct; the Experience lead signed off (9aaef19); the follow-up (a restored tab that is no longer a card, S63) rebased onto 5019e42b | Drafted with merge 1's, in the same file |
 | Plan: 143 | `plan/sprint-143-fixes` | — | — | Rebased into `sprint-143-fixes` | n/a | n/a |
 | 143 | `sprint-143-fixes` | [#564](https://github.com/ProductoryHQ/ritemark-native/pull/564) | #556, #551, #544, #514, #513, #511, #507, #509, #510 | Merged 27 Oct (5019e42b) | Passed (technical), 27 Oct; Windows (A4) and Gate 2 rows open | `CHANGELOG.md` entry; notes at closeout |
-| Release | a `create-release-worktree.sh` worktree, then the version bump | — | #499, #506, the Store | — | — | — |
+| Plan: 144 | `plan/sprint-144-release-harness` | Draft, docs only | #506, #515, #569 | — | n/a | n/a |
+| 144, Part 1 (shell) | `sprint-144-release-harness` | — | #506, #515 | — | — | `CHANGELOG.md` line for the Electron; notes at closeout |
+| 144, Part 2 (extension) | `sprint-144-release-harness-polish` | — | #569; the smoke test's P1–P4 | — | — | `CHANGELOG.md` entry; notes at closeout |
+| Release | a `create-release-worktree.sh` worktree, then the version bump | — | #499, the Store | — | — | — |
 
 ## Feature-Complete Checklist
 
@@ -161,10 +165,10 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 | **Ready requests can spend the person's AI plan and reach too far** | Medium | The first look reads the names and the five newest documents, and says so (140) | Open |
 | **Synced folders:** online-only files and a sync client writing alongside Ritemark make the check bigger than it looks if it fails | Medium | Checked early on both platforms (#499); Sprint 137's R11 for saves | Open |
 | **Patch 014 grows** (#454); the feedback door may need patch 015 for Help ▸ Send feedback | Low | One hunk each, the drift check at each merge | Open |
-| **The GitHub Actions budget:** $26.04 of $40 used by 21 October, about seven Windows 8-core builds' room | Medium | Checked before the release builds (Jarmo) | Open |
-| **Windows CI and the stars** (#506) | Medium | CI without the visibility toggle before the candidate | Open |
+| **The GitHub Actions budget:** $26.04 of $40 used by 21 October, about seven Windows 8-core builds' room ($29.53 on 27 October, all 8-core) | Medium | Checked before the release builds (Jarmo). Retired by Sprint 144's R1 once it merges: the Windows build moves to the free runner | Open |
+| **Windows CI and the stars** (#506) | Medium | Sprint 144 R1–R2: the build on the free `windows-latest` runner, measured by a probe run while planning (`sprint-144-release-harness/research/windows-ci-audit.md`) | Open: Sprint 144's plan |
 | **The Store:** certification notes must describe the feedback path exactly (11.16); a newly signed installer may meet SmartScreen warnings | Medium | The notes written from Sprint 140's final behaviour; SmartScreen expected, not a blocker (memory: Windows signing and Smart App Control) | Open |
-| **Node security releases** (#515) | Medium | The runtime review checks the pinned VS Code's Electron and Node | Open |
+| **Node security releases** (#515) | Medium | Sprint 144 R3–R4 (`sprint-144-release-harness/research/electron-node-audit.md`). On 27 October no Electron carried Node 24.22.1; the fix is merged on Electron's 43 line, unreleased. Patch 020 takes 43.8.3 now (Chromium backports, the eMudhra distrust) and the first 43.x with Node 24.22.1 if it is published before the version bump; otherwise 2.1 ships with this risk written and #515 open. The Brotli flaw doesn't reach Chromium 150; one Ritemark path fetches an outside URL with Node (Flows' Save File) | Open: Sprint 144's plan |
 | **Small numbers:** 54 new people in three weeks; a week's change is mostly noise | Low | Read over 2.1's first full weeks, not one | Standing |
 
 ## Gates
