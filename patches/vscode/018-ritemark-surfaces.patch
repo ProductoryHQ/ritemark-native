@@ -124,11 +124,13 @@ desk and its tab are one tone; the AI's sheet keeps its own (#2b294d). What floa
 beside or lies across, and a menu that lands on a control covers it whole, corners included, or keeps 4 clear of it:
 the + menu and the folded tabs' menu open 4 below the desk's top line (their edge at 49 for the line at 44) and end 8
 in from the desk's right edge (019 places them from the desk), so they cover the document bar's Share whole; their width
-is a whole pixel (calc-size), so the edge is crisp. You's menu ends 4 past You's right edge, covering the AI rail's +
-and history whole. The left column's slider stops 2 CSS pixels short of the desk's left hairline at every scale. And
-the left column lays its content out again when the head's rows change after its first draw (a window that opens on
-Documents drew its head before the extension's New and Search existed, and the tree ran 64 past the column's foot,
-under the status bar): ritemarkProjectHead.ts fires onDidChangeRows, sidebarPart.ts lays out again.
+is a whole pixel (calc-size), so the edge is crisp. The folded tabs' button ("N ⌄") is a whole pixel wide the same way,
+so its left edge and its hover and open fill land on whole device pixels. You's menu ends 4 past You's right edge,
+covering the AI rail's + and history whole. The left column's slider stops 2 CSS pixels short of the desk's left
+hairline at every scale. And the left column lays its content out again when the head's rows change after its first
+draw (a window that opens on Documents drew its head before the extension's New and Search existed, and the tree ran
+64 past the column's foot, under the status bar): ritemarkProjectHead.ts fires onDidChangeRows, sidebarPart.ts lays
+out again.
 
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
@@ -848,10 +850,10 @@ index 75f9238fd75..68ad7c003b7 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..4bb0fe7848a
+index 00000000000..380c2122910
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1895 @@
+@@ -0,0 +1,1896 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1687,6 +1689,7 @@ index 00000000000..4bb0fe7848a
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .ritemark-more-tabs {
++	width: calc-size(max-content, round(up, size, 1px)); /* a whole pixel: placed from the + at the row's end, its left edge (and its hover and open fill) then lands on whole device pixels at 1× and 2× (2.1.0's join pass) */
 +	padding: 0 6px 0 8px;
 +	gap: 2px;
 +	font-size: 12px;
