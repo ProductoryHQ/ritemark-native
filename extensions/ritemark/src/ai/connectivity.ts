@@ -14,6 +14,8 @@ import { anyProbeSucceeds, nextConnectivityState } from './connectivityPolicy';
 
 // Event emitter for connectivity changes
 export const connectivityChanged = new vscode.EventEmitter<{ isOnline: boolean }>();
+// Fires once, when a probe round first succeeds (Sprint 144, P3): until then `isOnline()` is only the starting guess.
+export const internetAnswered = new vscode.EventEmitter<void>();
 
 // Online if ANY of these responds. A single vendor's outage — or a network
 // that blocks one of them — must not read as "offline". Any HTTP response
@@ -31,8 +33,9 @@ const QUICK_RECHECK_DELAY_MS = 5000;
 
 let _isOnline = true;
 let _failStreak = 0;
+let _hasAnswered = false;
 let _pendingCheck: Promise<void> | null = null;
-let _statusBarItem: vscode.StatusBarItem | null = null;
+let _firstRound: Promise<void> | null = null;
 let _checkInterval: NodeJS.Timeout | null = null;
 let _quickRecheckTimer: NodeJS.Timeout | null = null;
 
@@ -41,6 +44,15 @@ let _quickRecheckTimer: NodeJS.Timeout | null = null;
  */
 export function isOnline(): boolean {
   return _isOnline;
+}
+
+/**
+ * Whether the internet has answered at least once since activation. `isOnline()` starts true and one failed round
+ * leaves it true (GH #193), so an offline start reads as online until the second failed round; anything that would
+ * claim the internet works (the status bar's "Claude ready") waits for this instead.
+ */
+export function hasInternetAnswered(): boolean {
+  return _hasAnswered;
 }
 
 function probeEndpoint(endpoint: { hostname: string; path: string }): Promise<boolean> {
@@ -96,6 +108,8 @@ async function runCheckRound(): Promise<void> {
   const next = nextConnectivityState(_isOnline, _failStreak, probeOk);
   _isOnline = next.isOnline;
   _failStreak = next.failStreak;
+  const firstAnswer = probeOk && !_hasAnswered;
+  if (firstAnswer) _hasAnswered = true;
 
   if (_quickRecheckTimer) {
     clearTimeout(_quickRecheckTimer);
@@ -113,45 +127,25 @@ async function runCheckRound(): Promise<void> {
       `[ritemark connectivity] ${_isOnline ? 'back online' : `offline after ${_failStreak} consecutive failed probe rounds`}`
     );
     connectivityChanged.fire({ isOnline: _isOnline });
-    updateStatusBar();
   }
+  if (firstAnswer) internetAnswered.fire();
 }
 
 /**
- * Update status bar indicator
+ * Resolves after the first probe round, so a reader of `isOnline()` doesn't start on the initial guess. The status
+ * bar's AI item (`aiStatusItem.ts`, Sprint 144 P3) waits on it; this module no longer draws a status bar item of its
+ * own, since "AI Ready" claimed what a network probe can't know.
  */
-function updateStatusBar(): void {
-  if (!_statusBarItem) return;
-
-  if (_isOnline) {
-    _statusBarItem.text = '$(cloud) AI Ready';
-    _statusBarItem.tooltip = 'Connected to AI service';
-    _statusBarItem.backgroundColor = undefined;
-  } else {
-    _statusBarItem.text = '$(cloud-offline) AI Offline';
-    _statusBarItem.tooltip = 'No internet connection - AI features unavailable';
-    _statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
-  }
+export function whenFirstConnectivityRound(): Promise<void> {
+  return _firstRound ?? Promise.resolve();
 }
 
 /**
  * Initialize connectivity monitoring
  */
 export function initConnectivity(context: vscode.ExtensionContext): void {
-  // Create status bar item
-  _statusBarItem = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Right,
-    100
-  );
-  _statusBarItem.name = 'Ritemark AI Status';
-  _statusBarItem.command = 'ritemark.showAIPanel';
-  context.subscriptions.push(_statusBarItem);
-
-  // Initial check - always update status bar on init
-  updateStatus().then(() => {
-    updateStatusBar();
-    _statusBarItem?.show();
-  });
+  // Initial check
+  _firstRound = updateStatus();
 
   // Periodic check
   _checkInterval = setInterval(() => {
@@ -168,6 +162,7 @@ export function initConnectivity(context: vscode.ExtensionContext): void {
         clearTimeout(_quickRecheckTimer);
       }
       connectivityChanged.dispose();
+      internetAnswered.dispose();
     }
   });
 }

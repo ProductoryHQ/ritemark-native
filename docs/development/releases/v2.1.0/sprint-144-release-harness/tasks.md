@@ -59,38 +59,56 @@ Nothing below is ticked until its change is on its branch (or, for a run, its ru
 
 ## Phase 6: The sign-in card and Settings (P1, P2, W5, W6)
 
-- [ ] `OnboardingWizard.tsx`: every button the shared `Button` with a `Tooltip`; `ActionButton` and `SecondaryButton` deleted
-- [ ] `OnboardingWizard.test.tsx` (or the existing test file beside it): each button's callback (S23)
-- [ ] `RitemarkSettings.tsx`: the two badges removed, the comment at :631
-- [ ] Screenshots S21, S22, S24 in Light and Dark, to the Experience lead
+- [x] `OnboardingWizard.tsx`: every button the shared `Button` with a `Tooltip`; `ActionButton` and `SecondaryButton` deleted
+- [x] `OnboardingWizard.test.ts`: each button's callback (S23)
+- [x] `RitemarkSettings.tsx`: the two badges removed, the comment at :631
+- [x] Screenshots S21, S22, S24 in Light and Dark, to the Experience lead
 
 ## Phase 7: The status bar's AI item (P3, W7)
 
-- [ ] `src/ai/aiStatusItem.ts`: the item(s) and `describeAiStatus`, with the Experience lead's words
-- [ ] `src/ai/connectivity.ts`: no longer owns the item; probing and `connectivityChanged` unchanged
-- [ ] `webview/src/components/ai-sidebar/store.ts`: `conversation/active` carries the open chat's `agentId`, sent again when it changes
-- [ ] `src/views/UnifiedViewProvider.ts`: `onDidChangeOpenChat` from `_noteActiveConversation`; the last failed turn's `errorKind` readable for the open chat
-- [ ] `src/extension.ts`: the item created with its sources and events
-- [ ] `src/ai/aiStatusItem.test.ts` (S32) and the host re-derivation test
-- [ ] S25–S31 on a dev launch with an isolated profile; screenshots of each reachable state, to the Experience lead
+- [x] `src/ai/aiStatusItem.ts`: the item(s) and `describeAiStatus`, with the Experience lead's words
+- [x] `src/ai/connectivity.ts`: no longer owns the item; probing and `connectivityChanged` unchanged
+- [x] `webview/src/components/ai-sidebar/store.ts`: `conversation/active` carries the open chat's `agentId`, sent again when it changes
+- [x] `src/views/UnifiedViewProvider.ts`: `onDidChangeOpenChat` from `_noteActiveConversation`; the last failed turn's `errorKind` readable for the open chat
+- [x] `src/extension.ts`: the item created with its sources and events
+- [x] `src/ai/aiStatusItem.test.ts` (S32) and the host re-derivation test
+- [x] S25–S31 on a dev launch with an isolated profile; screenshots of each reachable state (No AI yet, Offline), to the Experience lead. The signed-in states need an AI account or key and are unit-tested only (`qa-evidence.md`)
 
 ## Phase 8: The Flow step panel (P4, W8)
 
-- [ ] `NodeConfigPanel.tsx`: the Delete row inside the scroll area
-- [ ] `FlowEditorProvider.ts:164`: the reply's `modelType` from `message.modelType`, with its test
-- [ ] `NodeConfigPanel.tsx`: the picker greyed only with no list; the LLM list through `modelOptionsWithPersistedSelection`
-- [ ] The harness against the rebuilt bundle (S33–S35); S36 in a dev launch
+- [x] `NodeConfigPanel.tsx`: the Delete row inside the scroll area
+- [x] `FlowEditorProvider.ts:164`: the reply's `modelType` from `message.modelType`, with its test
+- [x] `NodeConfigPanel.tsx`: the picker greyed only with no list; the LLM list through `modelOptionsWithPersistedSelection`
+- [x] The harness against the rebuilt bundle (S33–S35); S36 in a dev launch
 
 ## Phase 9: The project switch (P5, W9)
 
-- [ ] `scripts/qa/project-check.mjs --switch-to`: the 50 ms poll and its record
-- [ ] S37: ten switches measured, with temporary host stamps (removed before the PR); the record in `qa-evidence.md`
-- [ ] Only if S37 shows Ritemark's timers: `src/extension.ts:377–380` and `src/views/permanentTabs.ts:153`; S38, S39
-- [ ] Otherwise: #569's RC check written into the release plan's Gate 1 list (S40)
+- [x] `scripts/qa/project-check.mjs --switch-to`: the 50 ms poll and its record
+- [x] S37: ten switches measured from the page's side (its time origin; no host stamps were needed: the AI column's moment shows the activation); the record in `qa-evidence.md`
+- [x] Only if S37 shows Ritemark's timers: `src/extension.ts:377–380` and `src/views/permanentTabs.ts:153`; S38, S39
+- [x] What is left (before activation) is #569's RC check in the release plan's Gate 1 list (S40)
 
 ## Phase 10: Part 2's QA and closeout
 
-- [ ] Webview bundle rebuilt; the pre-commit validator by hand; `qa-validator`
+- [x] Webview bundle rebuilt; the pre-commit validator by hand; `qa-validator`
 - [ ] The smoke test on a dev launch; PR, extension tier; the manager's merge
-- [ ] `docs/CHANGELOG.md`: one entry for Parts 1 and 2; release notes at the release's closeout
-- [ ] The autosave on step selection: raised with the manager (P4's note)
+- [x] `docs/CHANGELOG.md`: an entry for each part; release notes at the release's closeout
+- [x] The autosave on step selection: raised with the manager (P4's note), filed as #571 for 2.2
+
+## Phase 11: The review round on #574 (27 October)
+
+The Experience lead's answer (`3c0a2ae`) and QA's findings on `415a9be9`, in one push:
+- [x] No dot: the dot's item and colours removed; the words and tooltips kept; spec, scenarios, technical plan, tests
+- [x] The themes' `statusBarItem.hoverBackground` and `statusBarItem.activeBackground`, Light and Dark; real pressed shots of the AI item and Send feedback
+- [x] "Installed" (and step 1's "Ready") in muted ink, checks in ink
+- [x] The Copilot toast's source confirmed in `qa-evidence.md`
+- [x] QA's blocker: both start-up reveals with `{ preserveFocus: true }`; the live keyboard check, with a before
+- [x] "Ready" waits for the internet's first answer (`hasInternetAnswered`)
+- [x] ChatGPT's `login-started` and `repair-started` filtered; the others probed cheapest first, written into the spec
+- [x] `aiStatusItem.test.ts` on mocked time
+- [x] `OnboardingWizard.tsx`'s native `title` and the delete confirm's buttons: `Tooltip`
+- [x] User docs (`ai-agents.md`, `troubleshooting.md`), `release-plan.md` rows, CHANGELOG
+- [x] Filed for v2.2.0: the two tooltip looks in Light (#576); the hand-rolled `<button>`s in `RitemarkSettings.tsx` and `NodeConfigPanel.tsx` (#577)
+- [x] The Image step's card names the model a run uses, as its panel does (`imageStepModel`, `ImageNode.test.ts`)
+- [x] The no-key line in the Experience lead's words, its Settings link, and a run's error in the same sentence; "You're all set!" in ink
+- [x] S20: Gate 2 on the RC, with the File Provider consent (the manager, 27 Oct); nothing created in either drive

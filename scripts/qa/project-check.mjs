@@ -3,7 +3,7 @@
  * project-check.mjs - check the project at the centre in a running window (Sprint 134, E3).
  *
  * Usage: node scripts/qa/project-check.mjs --port <cdp-port> [--user-data-dir <dir>] [--close-all]
- *          [--switch-to <folder name>] [--share-question] [--board-off]
+ *          [--switch-to <folder name> [--measure <n>]] [--share-question] [--board-off]
  *
  * Connects over the Chrome DevTools Protocol to a Ritemark dev instance started with --remote-debugging-port (see
  * .claude/skills/ritemark-automation; launch it with `open -n -g` and an isolated --user-data-dir, never on Jarmo's
@@ -17,6 +17,10 @@
  * - Switching (with --switch-to): File ▸ Open Recent to that folder switches in place onto its Home, which says
  *   "Switched to …" (S32); Open Recent back restores the first project's tabs in their order (R9, S30). Nothing may
  *   be working in a chat, or Ritemark asks.
+ * - Timing the switch (with --switch-to and --measure <n>, Sprint 144 P5, #569): n more switches back and forth, each
+ *   followed every 50 ms from the new window's first moment: when Home comes to the front, how long a document is in
+ *   front before it (its editor says "Loading..." until the extension answers), and when the AI column shows. PASS
+ *   when the AI column follows Home within 300 ms and no document is in front first, every time.
  * - The share question (with --share-question): a page served by this script, opened from Browser's New page, asks on
  *   the AI's sheet, and while it waits the tab row works: Home comes forward and the + opens its menu (R20, S55, #455).
  *   On a profile that shares pages without asking, the question does not come and the check is SKIPPED.
@@ -299,6 +303,85 @@ if (switchTo) {
 	await sleep(2500);
 	const restored = (await tabs()).map(tab => tab.label.replace(/, (pinned|preview|modified).*$/, ''));
 	check(`back in ${here}, its tabs as they were`, back.includes(here) && JSON.stringify(restored) === JSON.stringify(order), `${restored.length} tabs${JSON.stringify(restored) === JSON.stringify(order) ? ', same order' : `: ${restored.join(' | ')}`}`, order.join(' | '));
+}
+
+// Sprint 144 (P5, #569): time the switch. Each switch (Open Recent, back and forth) is followed from the new window's
+// first moment: every 50 ms, which tab is in front, whether that is a document (its editor says "Loading..." until the
+// extension answers), and whether the AI column is shown. Times are from the new page's own time origin.
+const measureRuns = Number(option('measure', '0'));
+if (switchTo && measureRuns > 0) {
+	const here = (await evaluate('document.title')).split(' — ').pop();
+	const timings = [];
+	for (let run = 0; run < measureRuns; run++) {
+		const target = run % 2 === 0 ? switchTo : here;
+		const oldOrigin = await evaluate('performance.timeOrigin');
+		await sleep(3000); // the sheet settles after the last reload
+		// Leave with a document in front, as a person working in it does: that is the editor the next restore shows
+		await click('a document\'s tab', `[...${TABS}].find(tab => { const label = tab.getAttribute('aria-label') || ''; return !label.startsWith('Home') && !label.startsWith('Task board'); })`).catch(() => console.log('…  (no document open to leave in front)'));
+		await sleep(800);
+		await command('File: Open Recent...');
+		await typeInto('quick-input', target, true);
+		// A switch reloads the same window: follow the workbench page, reconnecting as the reload drops the session,
+		// and keep only samples from the new document (a new time origin)
+		let probe = null;
+		let probeId = 0;
+		const probeWaiting = new Map();
+		const openProbe = async () => {
+			const page = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(candidate => candidate.type === 'page' && candidate.url.includes('workbench'));
+			if (!page) {
+				return null;
+			}
+			const socketToPage = new WebSocket(page.webSocketDebuggerUrl);
+			await new Promise((resolve, reject) => { socketToPage.addEventListener('open', resolve, { once: true }); socketToPage.addEventListener('error', reject, { once: true }); });
+			socketToPage.addEventListener('message', event => { const message = JSON.parse(event.data); probeWaiting.get(message.id)?.(message.result?.result?.value ?? null); probeWaiting.delete(message.id); });
+			return socketToPage;
+		};
+		const sample = () => new Promise(resolve => {
+			const id = ++probeId;
+			probeWaiting.set(id, resolve);
+			probe.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { returnByValue: true, expression: `(() => { const tab = document.querySelector('.part.editor .tabs-container > .tab.active'); const aux = document.querySelector('.part.auxiliarybar'); const r = aux?.getBoundingClientRect(); return { origin: performance.timeOrigin, t: Math.round(performance.now()), front: tab?.getAttribute('aria-label') ?? null, aux: !!(aux && aux.offsetParent && r && r.width > 0), title: document.title }; })()` } }));
+			setTimeout(() => resolve(null), 500);
+		});
+		const timeline = [];
+		const deadline = Date.now() + 20000;
+		while (Date.now() < deadline) {
+			if (!probe || probe.readyState !== WebSocket.OPEN) {
+				probe = await openProbe().catch(() => null);
+				if (!probe) {
+					await sleep(25);
+					continue;
+				}
+			}
+			const value = await sample().catch(() => null);
+			if (value && value.origin !== oldOrigin) {
+				timeline.push(value);
+				if (value.front?.startsWith('Home') && value.aux && timeline.filter(entry => entry.front?.startsWith('Home') && entry.aux).length > 20) {
+					break;
+				}
+			}
+			await sleep(40);
+		}
+		probe?.close();
+		if (!timeline.length) {
+			check(`switch ${run + 1} to ${target} timed`, false, 'no sample from the new window within 20 s');
+			break;
+		}
+		const firstFront = timeline.find(entry => entry.front);
+		const homeAt = timeline.find(entry => entry.front?.startsWith('Home'))?.t ?? null;
+		const auxAt = timeline.find(entry => entry.aux)?.t ?? null;
+		const documentInFront = timeline.filter(entry => entry.front && !entry.front.startsWith('Home') && !entry.front.startsWith('Task board'));
+		const documentMs = documentInFront.length ? documentInFront[documentInFront.length - 1].t - documentInFront[0].t + 50 : 0;
+		timings.push({ run: run + 1, target, firstTabAt: firstFront?.t ?? null, firstTab: firstFront?.front ?? null, homeAt, auxAt, documentMs, auxAfterHome: homeAt !== null && auxAt !== null ? auxAt - homeAt : null });
+		console.log(`…  switch ${run + 1} → ${target}: first tab "${firstFront?.front ?? '(none)'}" at ${firstFront?.t ?? '?'} ms; Home in front at ${homeAt ?? 'never'} ms; a document in front for ${documentMs} ms; AI column at ${auxAt ?? 'never'} ms (${homeAt !== null && auxAt !== null ? `${auxAt - homeAt} ms after Home` : 'n/a'})`);
+		await connect(target);
+	}
+	if (timings.length) {
+		const worst = Math.max(...timings.map(timing => timing.auxAfterHome ?? Infinity));
+		const anyDocument = timings.some(timing => timing.documentMs > 0);
+		check(`after ${timings.length} switches, the AI column within 300 ms of Home`, worst <= 300, `worst ${worst === Infinity ? 'never shown' : `${worst} ms`}`, '300 ms or less');
+		check(`after ${timings.length} switches, no document in front before Home`, !anyDocument, anyDocument ? `a document was in front in ${timings.filter(timing => timing.documentMs > 0).length} of ${timings.length}, up to ${Math.max(...timings.map(timing => timing.documentMs))} ms` : 'Home came first every time');
+		console.log(JSON.stringify(timings));
+	}
 }
 
 // The share question while the tab row works

@@ -328,8 +328,8 @@ function deliver(message: Record<string, unknown>): void {
   assert.equal(postedOf('sidebar/ready').length, 1, 'one hydration handshake');
   assert.deepEqual(
     postedOf('conversation/active'),
-    [{ type: 'conversation/active', conversationId: 'first' }],
-    'readiness reports the open conversation in the same breath',
+    [{ type: 'conversation/active', conversationId: 'first', agentId: 'claude-code', signInEnded: false }],
+    'readiness reports the open conversation in the same breath (Sprint 144 P3: with its AI)',
   );
 
   useAISidebarStore.getState().switchConversation('second');
@@ -350,6 +350,38 @@ function deliver(message: Record<string, unknown>): void {
   assert.equal(postedOf('sidebar/ready').length, 1, 'the handshake is once per session');
 }
 
+// ── 8b. Sprint 144 (P3): the report follows the open chat's AI and a sign-in that ended ──
+{
+  resetAll();
+  seed('claude-chat');
+  seed('chatgpt-chat', { selectedAgent: 'codex' });
+  useAISidebarStore.setState({ activeConversationId: 'claude-chat', ready: true });
+  posted.length = 0;
+
+  useAISidebarStore.getState().switchConversation('chatgpt-chat');
+  assert.deepEqual(
+    postedOf('conversation/active').map((m) => [m.conversationId, m.agentId, m.signInEnded]),
+    [['chatgpt-chat', 'codex', false]],
+    'switching to a chat on another AI names that AI',
+  );
+
+  const failedTurn = { id: 't1', runtime: 'codex', isRunning: false, timestamp: 1, result: { status: 'failed', error: 'Signed out', errorKind: 'sign-in' } };
+  useAISidebarStore.setState((s) => ({
+    conversations: { ...s.conversations, 'chatgpt-chat': { ...s.conversations['chatgpt-chat'], codexConversation: [failedTurn as never] } },
+  }));
+  assert.deepEqual(postedOf('conversation/active').slice(-1)[0], { type: 'conversation/active', conversationId: 'chatgpt-chat', agentId: 'codex', signInEnded: true }, 'a turn that failed on sign-in is reported');
+
+  const okTurn = { id: 't2', runtime: 'codex', isRunning: false, timestamp: 2, result: { status: 'completed' } };
+  useAISidebarStore.setState((s) => ({
+    conversations: { ...s.conversations, 'chatgpt-chat': { ...s.conversations['chatgpt-chat'], codexConversation: [failedTurn as never, okTurn as never] } },
+  }));
+  assert.equal(postedOf('conversation/active').slice(-1)[0]?.signInEnded, false, 'a message that goes through ends it');
+
+  const count = postedOf('conversation/active').length;
+  useAISidebarStore.setState((s) => ({ conversations: { ...s.conversations } }));
+  assert.equal(postedOf('conversation/active').length, count, 'nothing new, nothing sent');
+}
+
 // ── 9. "Open conversation" selects the task's own destination (R4) ──
 {
   resetAll();
@@ -362,7 +394,7 @@ function deliver(message: Record<string, unknown>): void {
   assert.equal(useAISidebarStore.getState().activeConversationId, 'there', 'the named conversation is shown');
   assert.deepEqual(
     postedOf('conversation/active'),
-    [{ type: 'conversation/active', conversationId: 'there' }],
+    [{ type: 'conversation/active', conversationId: 'there', agentId: 'claude-code', signInEnded: false }],
     'the host learns the new destination immediately',
   );
 

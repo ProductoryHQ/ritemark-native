@@ -81,6 +81,7 @@ The shape's done list, checked on the release candidate. A failure is a first-we
 - [ ] **Synced folders (#499).**
   - The welcome opens a OneDrive, SharePoint or Google Drive synced folder as a project, on the Mac and on Windows, including online-only files.
   - Saving and the agent work there without conflicts. Sprint 137's R11 is the save half: a sync client touching a file asks nothing.
+  - **On the Mac: Gate 2 on the RC, with the File Provider consent** (Sprint 144's S20, 27 October). macOS asks each app once for the files a sync client manages under `~/Library/CloudStorage` ("… would like to access files managed by Google Drive"), and the answer belongs to that app, so a dev build's answer wouldn't carry over to the signed candidate. Jarmo answers the dialog himself when he tests the candidate, on his personal Google Drive, and on a OneDrive that isn't the work tenant's (this Mac's OneDrive is only the work tenant, `OneDrive-ProductoryServicesOÜ`, which stays out of tests). Nothing was created in either drive during the sprint.
 - [ ] **The Windows first window (#276, closed in 2.0).**
   - On a fresh profile and on an update from 2.0.1, the first window opens on the welcome and then Home with the AI in view, not on a terminal or an empty desk.
   - #501, a restored terminal before the welcome on a slow first start after an update, is checked in the same run.
@@ -126,9 +127,9 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 | 142, merge 2 (patches 002, 018, 019) | `sprint-142-polish-shell` | [#565](https://github.com/ProductoryHQ/ritemark-native/pull/565) | #557 (File changes), #503 (the desk's edge), #508 | Merged 27 Oct (beac93b2) | No blockers at 8830ea17, 27 Oct; the Experience lead signed off (9aaef19); the follow-up (a restored tab that is no longer a card, S63) rebased onto 5019e42b | Drafted with merge 1's, in the same file |
 | Plan: 143 | `plan/sprint-143-fixes` | — | — | Rebased into `sprint-143-fixes` | n/a | n/a |
 | 143 | `sprint-143-fixes` | [#564](https://github.com/ProductoryHQ/ritemark-native/pull/564) | #556, #551, #544, #514, #513, #511, #507, #509, #510 | Merged 27 Oct (5019e42b) | Passed (technical), 27 Oct; Windows (A4) and Gate 2 rows open | `CHANGELOG.md` entry; notes at closeout |
-| Plan: 144 | `plan/sprint-144-release-harness` | Draft, docs only | #506, #515, #569 | — | n/a | n/a |
-| 144, Part 1 (shell) | `sprint-144-release-harness` | — | #506, #515 | — | — | `CHANGELOG.md` line for the Electron; notes at closeout |
-| 144, Part 2 (extension) | `sprint-144-release-harness-polish` | — | #569; the smoke test's P1–P4 | — | — | `CHANGELOG.md` entry; notes at closeout |
+| Plan: 144 | `plan/sprint-144-release-harness` | [#570](https://github.com/ProductoryHQ/ritemark-native/pull/570) | #506, #515, #569 | Merged 27 Oct (1a63b8cb) | n/a | n/a |
+| 144, Part 1 (shell) | `sprint-144-release-harness` | [#572](https://github.com/ProductoryHQ/ritemark-native/pull/572); the signing step's follow-up [#575](https://github.com/ProductoryHQ/ritemark-native/pull/575) | #506, #515 | #572 merged 27 Oct (9a9ea48a); #575 open | Passed (technical), 27 Oct; the first signed Windows run on `windows-latest` is S1 | `CHANGELOG.md` line for the Electron; notes at closeout |
+| 144, Part 2 (extension; the themes' status bar fills ship with the shell) | `sprint-144-release-harness-polish` | [#574](https://github.com/ProductoryHQ/ritemark-native/pull/574) | #569; the smoke test's P1–P4 | Open | QA's one blocker (the reveals took focus) and its small fixes in; the Experience lead's answer (no dot, the fills) in | `CHANGELOG.md` entry; notes at closeout |
 | Release | a `create-release-worktree.sh` worktree, then the version bump | — | #499, the Store | — | — | — |
 
 ## Feature-Complete Checklist
@@ -181,6 +182,10 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
   - Windows CI (`release-manager`, the `release` skill).
 - **Main is frozen** from the first release-candidate build until publication.
 - **The feed** is generated with `--existing-feed-url` naming v2.0.1's feed and all three assets.
+
+### Gate 1 additions
+
+- **#569, the project switch** (Sprint 144, P5, S40): on the arm64 candidate, `node scripts/qa/project-check.mjs --port <port> --switch-to <project> --measure 10` between two projects each left with a document in front. #569 closes if the AI column follows Home by under 300 ms and no document is in front before Home; otherwise it is a 2.1 bug with that record (the dev build left 0.7–0.9 s of a document and up to 0.56 s of the AI column, both before the extension activates).
 
 ### Gate 2 checklist (first draft, completed by each sprint)
 

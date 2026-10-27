@@ -6,8 +6,9 @@
  * Replaces the fragmented per-agent setup screens during first-run.
  */
 
-import type { ReactNode } from 'react';
 import { Icon } from '../ui/Icon';
+import { Button } from '../ui/button';
+import { Tooltip } from '../ui/tooltip';
 import { useAISidebarStore } from './store';
 import type { OnboardingDependency, OnboardingInstallState, OnboardingStatus } from './types';
 import { PLAN_LINES } from '../welcome/welcomeCopy';
@@ -149,13 +150,12 @@ function ChecklistStep({
         <p className="text-xs opacity-60">
           Install at least one AI assistant.
         </p>
-        <button
-          onClick={onRecheck}
-          className="inline-flex items-center gap-1.5 text-xs text-[var(--r-accent)] hover:underline"
-        >
-          <Icon name="arrows-clockwise" size={12} />
-          Re-check
-        </button>
+        <Tooltip label="Check again what is installed and signed in">
+          <Button type="button" variant="link" size="sm" className="h-auto gap-1.5 p-0 text-xs" onClick={onRecheck}>
+            <Icon name="arrows-clockwise" size={12} />
+            Re-check
+          </Button>
+        </Tooltip>
       </div>
     </div>
   );
@@ -224,14 +224,18 @@ function AuthenticateStep({
             {PLAN_LINES.claude}
           </p>
           <div className="flex flex-wrap gap-2">
-            <ActionButton onClick={onLoginClaude}>
-              <Icon name="sign-in" size={14} />
-              Sign in with Claude.ai
-            </ActionButton>
-            <SecondaryButton onClick={onApiKey}>
-              <Icon name="key" size={14} />
-              Use API key
-            </SecondaryButton>
+            <Tooltip label="Sign in with your Claude account in the browser">
+              <Button type="button" size="sm" className="text-xs" onClick={onLoginClaude}>
+                <Icon name="sign-in" size={14} />
+                Sign in with Claude.ai
+              </Button>
+            </Tooltip>
+            <Tooltip label="Use an Anthropic API key instead, in Settings">
+              <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onApiKey}>
+                <Icon name="key" size={14} />
+                Use API key
+              </Button>
+            </Tooltip>
           </div>
         </div>
       )}
@@ -243,22 +247,23 @@ function AuthenticateStep({
             {PLAN_LINES.chatgpt}
           </p>
           <div className="flex flex-wrap gap-2">
-            <ActionButton onClick={onLoginCodex}>
-              <Icon name="sign-in" size={14} />
-              Sign in with ChatGPT
-            </ActionButton>
+            <Tooltip label="Sign in with your ChatGPT account in the browser">
+              <Button type="button" size="sm" className="text-xs" onClick={onLoginCodex}>
+                <Icon name="sign-in" size={14} />
+                Sign in with ChatGPT
+              </Button>
+            </Tooltip>
           </div>
         </div>
       )}
 
       <div className="flex justify-end">
-        <button
-          onClick={onRecheck}
-          className="inline-flex items-center gap-1.5 text-xs text-[var(--r-accent)] hover:underline"
-        >
-          <Icon name="arrows-clockwise" size={12} />
-          Re-check
-        </button>
+        <Tooltip label="Check again what is installed and signed in">
+          <Button type="button" variant="link" size="sm" className="h-auto gap-1.5 p-0 text-xs" onClick={onRecheck}>
+            <Icon name="arrows-clockwise" size={12} />
+            Re-check
+          </Button>
+        </Tooltip>
       </div>
     </div>
   );
@@ -281,17 +286,20 @@ function ReadyStep({
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-5 text-center py-8">
-      <div className="w-10 h-10 rounded-full bg-[var(--vscode-testing-iconPassed)]/20 flex items-center justify-center mb-3">
-        <Icon name="check" size={20} className="text-[var(--vscode-testing-iconPassed)]" />
+      {/* Sprint 144: ink, not green; green is only ever the small ready dot (the Experience lead) */}
+      <div className="w-10 h-10 rounded-full bg-[var(--r-surface-muted)] flex items-center justify-center mb-3">
+        <Icon name="check" size={20} className="text-[var(--r-ink-muted)]" />
       </div>
       <h3 className="text-sm font-semibold mb-1.5">You're all set!</h3>
       <p className="text-xs text-[var(--r-ink-muted)] mb-4">
         {agentName} is ready to help you with your documents.
       </p>
-      <ActionButton onClick={onGetStarted}>
-        <Icon name="rocket" size={14} />
-        Get Started
-      </ActionButton>
+      <Tooltip label={`Start your first chat with ${agentName}`}>
+        <Button type="button" size="sm" className="text-xs" onClick={onGetStarted}>
+          <Icon name="rocket" size={14} />
+          Get Started
+        </Button>
+      </Tooltip>
     </div>
   );
 }
@@ -324,26 +332,32 @@ function DependencyRow({
       </div>
       <div>
         {installed ? (
-          <span className="text-xs text-[var(--vscode-testing-iconPassed)]">Ready</span>
+          <span className="text-xs text-[var(--r-ink-muted)]">Ready</span>
         ) : isInstalling ? (
           <span className="text-xs opacity-60">Installing...</span>
         ) : isFailed ? (
-          <button
-            onClick={onInstall}
-            className="text-xs text-[var(--vscode-testing-iconFailed)] hover:underline"
-          >
-            Retry
-          </button>
+          <Tooltip label={`Try installing ${label} again`}>
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="h-auto p-0 text-xs text-[color:var(--vscode-testing-iconFailed)]"
+              onClick={onInstall}
+            >
+              Retry
+            </Button>
+          </Tooltip>
         ) : disabled ? (
-          <span className="text-xs opacity-40" title={disabledHint}>{disabledHint}</span>
+          <Tooltip label={disabledHint}>
+            <span className="text-xs opacity-40">{disabledHint}</span>
+          </Tooltip>
         ) : (
-          <button
-            onClick={onInstall}
-            className="inline-flex items-center gap-1 text-xs text-[var(--r-accent)] hover:underline"
-          >
-            <Icon name="download" size={12} />
-            Install
-          </button>
+          <Tooltip label={`Install ${label}`}>
+            <Button type="button" variant="link" size="sm" className="h-auto gap-1 p-0 text-xs" onClick={onInstall}>
+              <Icon name="download" size={12} />
+              Install
+            </Button>
+          </Tooltip>
         )}
       </div>
     </div>
@@ -371,7 +385,7 @@ function CompactRow({
     <div className="flex items-center justify-between py-0.5">
       <div className="flex items-center gap-2">
         {installed ? (
-          <Icon name="check" size={14} className="text-[var(--vscode-testing-iconPassed)]" />
+          <Icon name="check" size={14} className="text-[var(--r-ink-body)]" />
         ) : optional ? (
           <Icon name="minus" size={14} className="opacity-30" />
         ) : (
@@ -381,18 +395,17 @@ function CompactRow({
       </div>
       <div className="flex items-center gap-2">
         {suffix && (
-          <span className={`text-xs ${installed ? 'text-[var(--vscode-testing-iconPassed)]' : 'opacity-40'}`}>
+          <span className={`text-xs ${installed ? 'text-[var(--r-ink-muted)]' : 'opacity-40'}`}>
             {suffix}
           </span>
         )}
         {onInstall && !installed && !isInstalling && (
-          <button
-            onClick={onInstall}
-            className="inline-flex items-center gap-1 text-xs text-[var(--r-accent)] hover:underline"
-          >
-            <Icon name="download" size={12} />
-            Install
-          </button>
+          <Tooltip label={`Install ${label}`}>
+            <Button type="button" variant="link" size="sm" className="h-auto gap-1 p-0 text-xs" onClick={onInstall}>
+              <Icon name="download" size={12} />
+              Install
+            </Button>
+          </Tooltip>
         )}
         {isInstalling && (
           <span className="text-xs opacity-60">Installing...</span>
@@ -415,49 +428,10 @@ function StatusIcon({
     return <Icon name="circle-notch" size={14} className="animate-spin text-[var(--r-accent)]" />;
   }
   if (installed) {
-    return <Icon name="check" size={14} className="text-[var(--vscode-testing-iconPassed)]" />;
+    return <Icon name="check" size={14} className="text-[var(--r-ink-body)]" />;
   }
   if (failed) {
     return <Icon name="x" size={14} className="text-[var(--vscode-testing-iconFailed)]" />;
   }
   return <Icon name="x" size={14} className="opacity-40" />;
-}
-
-// ── Shared buttons ──
-
-function ActionButton({
-  children,
-  onClick,
-  disabled = false,
-}: {
-  children: ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex items-center gap-2 rounded-md bg-[var(--r-accent)] px-3 py-2 text-xs font-medium text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {children}
-    </button>
-  );
-}
-
-function SecondaryButton({
-  children,
-  onClick,
-}: {
-  children: ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-md bg-[var(--vscode-button-secondaryBackground)] px-3 py-2 text-xs font-medium text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
-    >
-      {children}
-    </button>
-  );
 }

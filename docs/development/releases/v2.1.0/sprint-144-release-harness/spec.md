@@ -128,15 +128,24 @@ The Experience lead's answers to this plan's three questions (ritemark-dev `b058
 
    If VS Code can't give one hover fill across two items, the dot's item takes no hover and isn't clickable, so only the words light up. The screenshots must show the hover and pressed states.
 
+**Revised 27 October: no dot in 2.1** (the Experience lead, ritemark-dev `3c0a2ae`, experience 13, option 3). The build measured the gap between the dot's item and the words at 16 px, VS Code's own item padding, which only a patch to the status bar could close. So in 2.1 the item is its words only: the separate dot item and its colours are gone, and every state keeps its words and tooltip above. A coloured dot may return in 2.2, only when one status bar item can draw it 6 px from its words with one hover.
+
+**The status bar's hover and pressed fills** (the same answer): Ritemark's themes set neither, so VS Code's defaults showed, and in Light the pressed fill was paler than the ground. Both themes now set them, which covers Send feedback too:
+- Light: `statusBarItem.hoverBackground` `#E2E8F0`, `statusBarItem.activeBackground` `#CBD5E1`;
+- Dark: `statusBarItem.hoverBackground` `#C7D2FE1F`, `statusBarItem.activeBackground` `#C7D2FE2E`.
+
+The themes are files in `extensions/ritemark/themes/`, outside what an extension release ships, so the fills reach people with 2.1's shell release.
+
 Done when:
 - The item follows the person live, for Claude, ChatGPT and OpenCode alike: a sign-in, a sign-out, a key added or removed (OpenCode), a switch between open chats on different AIs, a new chat, a change of the default AI, and the internet going and coming back each change it within two seconds, without a reload.
 - It is right before the AI's sheet has ever been opened (the source is the host's, not the sheet's).
 - "Claude ready" and its siblings name the AI by its label (Claude, ChatGPT, OpenCode).
 - "<AI>: sign in again" (tooltip "Your <AI> sign-in has ended") shows when the open chat's last turn on that AI failed with `errorKind: 'sign-in'`, until a message goes through. "<AI>: sign in" (tooltip "Sign in to <AI> to work with it here") shows when that AI's availability is `needs-auth` without such a failure, and another AI is signed in; with no AI signed in at all, "No AI yet".
 - "<AI> needs a paid plan" (tooltip "Your <AI> plan doesn't include working in Ritemark") shows only from a plan-refusal signal. None exists on the host today (`src/runtime/turnFailureCopy.ts:21–24`: "There is no plan refusal kind yet"); the state is built and tested, and wired when Sprint 139's #496 classifier gains that kind after a Claude Free reproduction. Until then it can't appear, and the plan says so.
-- Probing adds no new cost at window start: only the AI in question is probed (ChatGPT's probe starts its app server), and results are reused for a short time the way Home's guidance does (`GuidanceHost.ts:444–456`).
-- A unit test covers every state, Offline first, each AI's name, the dot's colour, the tooltips, and that no text says "AI", "service" or "connected" except "No AI yet".
-- Screenshots of each reachable state in Light and Dark.
+- Probing adds no new cost at window start: only the AI in question is probed (ChatGPT's probe starts its app server), and results are reused for a short time the way Home's guidance does (`GuidanceHost.ts:444–456`). *Revised after QA (27 October):* when that AI can't take a turn, the others are probed too, because "No AI yet" and "Claude: sign in" differ only by whether another AI can. They go cheapest first (OpenCode reads its keys, Claude its CLI's status, ChatGPT asks its app server) and stop at the first that can. This adds no app-server start: the AI's sheet reads Claude's and ChatGPT's status itself when it starts (`UnifiedViewProvider`'s hydration), and in a project window it now starts with the window (P5).
+- "Ready" only after the internet has answered once (QA, 27 October). Connectivity starts on a guess of online, and an offline start keeps that guess until its second failed round (`FAILURES_TO_GO_OFFLINE`, unchanged), so "Claude ready" could show for about 5 s with no internet. Until the first answer the item shows nothing for a signed-in AI; "No AI yet", "sign in" and "sign in again" don't depend on the internet and show at once.
+- A unit test covers every state, Offline first, each AI's name, words only (one item, no dot), the tooltips, and that no text says "AI", "service" or "connected" except "No AI yet".
+- Screenshots of each reachable state in Light and Dark, and of the item and Send feedback held down (pressed) in both.
 
 ### P4: The Flow editor's step panel keeps its fields whole and its model picker usable
 
@@ -166,6 +175,13 @@ Done when:
 - **First, measured:** `scripts/qa/project-check.mjs --switch-to` (extended) stamps, every 50 ms after the reload, which tab is in front, whether any frame shows "Loading...", and whether the AI column is visible, for 10 switches on a dev build at 1440 × 900; with temporary timestamps in the extension host's log at activation, the editor's resolve, `ensurePermanentTabs` and the AI view's resolve.
 - **Then, only if the cause is small and extension-side:** the AI column is revealed at activation (without taking focus, and not while the welcome is open), keeping the later focus; and with a landing pending, the permanent-tab check runs at once instead of after 800 ms. Done when, in 10 of 10 switches on the dev build, Home is in front without a "Loading..." frame and the AI column is visible within 300 ms of Home.
 - **Otherwise** (the cause is the workbench's restore, a patch-tier change): no code in 144. #569 becomes an RC check at Gate 1: measured on the candidate the same way; if the gap is under 300 ms there, #569 closes with that evidence; if not, it is a 2.1 bug with the measurement, and the patch-tier fix (patch 002 keeping the AI column's container; Home restored as the active editor when a landing is pending) is planned then.
+
+#### P5, measured (27 October, during the sprint)
+
+Ten switches on the dev build (`qa-evidence.md`, S37 and S38):
+- **Before:** a document in front for 1.3–1.4 s before Home; Home at 3.6–3.8 s; the AI column 3.2–4.6 s after Home, at about 6.9 s: the 4 s timer after activation. Both of Ritemark's timers were the cause of what happens after activation, so the extension-side change was made.
+- **After:** the AI column at activation (2.9–3.1 s), before Home in 9 of 10; Home at 3.1–3.4 s; a document in front for 0.7–0.9 s.
+- **What is left happens before the extension activates** (the workbench restores the document at about 2.4 s, the extension runs at about 2.9 s): the document in front until then, and, when the workbench restores Home first, the AI column 0.56 s after it. That part is P5's *Otherwise*: #569 is checked on the candidate (S40); a production build starts faster than a dev build, so the gap there is measured, not assumed. If it is over 300 ms, the patch-tier fix (patch 002 keeping the AI column's container; Home restored as the active editor when a landing is pending) is planned from that measurement.
 
 ## Engineering requirements
 

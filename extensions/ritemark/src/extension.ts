@@ -11,6 +11,7 @@ import { DrawioEditorProvider } from './drawioEditorProvider';
 import { isEnabled } from './features';
 import { initAPIKeyManager } from './ai/apiKeyManager';
 import { initConnectivity } from './ai/connectivity';
+import { initAiStatusItem } from './ai/aiStatusItem';
 import * as modelCatalog from './ai/modelCatalog';
 import { discoverAnthropic, discoverOpenAI, discoverGemini, discoverCodex } from './ai/modelCatalog/providerDiscovery';
 import { getSetupStatus } from './agent/setup';
@@ -372,11 +373,12 @@ export function activate(context: vscode.ExtensionContext) {
     }
   })();
 
-  // Focus AI panel after extension views register (terminal init finishes first and grabs focus).
-  // Not while the welcome is open: it is alone in the window (Sprint 133, R1).
+  // Show the AI panel after extension views register (terminal init finishes first and grabs focus).
+  // Not while the welcome is open: it is alone in the window (Sprint 133, R1). It shows the column without taking the
+  // keyboard from what has it, a document or a terminal (Sprint 144, P5).
   setTimeout(() => {
     if (welcomeHost?.isOpen()) return;
-    vscode.commands.executeCommand('ritemark.unifiedView.focus');
+    vscode.commands.executeCommand('ritemark.unifiedView.focus', { preserveFocus: true });
   }, 4000);
 
   // Initialize API key manager (must be first)
@@ -386,7 +388,7 @@ export function activate(context: vscode.ExtensionContext) {
   setLLMExtensionContext(context);
   setImageNodeExtensionContext(context);
 
-  // Initialize connectivity monitoring (status bar + online detection)
+  // Initialize connectivity monitoring (online detection; the status bar's AI item reads it, below)
   initConnectivity(context);
 
   // Initialize analytics: nothing is sent before the person's yes, on by default from the welcome (Sprint 133, R7)
@@ -424,6 +426,14 @@ export function activate(context: vscode.ExtensionContext) {
     }),
     unifiedViewProvider,
   );
+
+  // The status bar's AI item (Sprint 144, P3): the AI the next message goes to, and what Ritemark knows about it.
+  initAiStatusItem(context, {
+    runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
+    openChat: () => unifiedViewProvider.openChatReport(),
+    onDidChangeOpenChat: (listener) => unifiedViewProvider.onDidChangeOpenChat(listener),
+    onDidUpdateModels: (listener) => modelCatalog.onUpdate(() => listener()),
+  });
 
   // ── The feedback door (Sprint 140, R10–R13; was Sprint 126's AI output reporting) ──
   // Microsoft Store policy 11.16 wants a discoverable, working way to report
@@ -782,6 +792,16 @@ export function activate(context: vscode.ExtensionContext) {
     entries: () => projectsHost!.projectList.entries(vscode.workspace.workspaceFolders?.[0]?.uri.toString()),
     revealHome: () => projectsHost!.revealHome(),
   } : undefined);
+
+  // Sprint 144 (P5, #569): in a project window the AI column comes back with the window. The layout starts it hidden
+  // and only the 4 s focus above brought it back, so Home laid out at full width and reflowed when it came (measured:
+  // 3.2-4.6 s after Home on every switch). The later focus still runs, for the terminal's sake. Never beside the welcome,
+  // which is alone in a window with no folder and in the update welcome (Sprint 133, R1): it opens after an await, so
+  // ask whether it may open, not whether it is open.
+  // It shows the column and leaves the keyboard where it is, as the task board's handoff does (UnifiedViewProvider).
+  if (vscode.workspace.workspaceFolders?.length && !welcomeHost?.mayOpenAtStart()) {
+    void vscode.commands.executeCommand('ritemark.unifiedView.focus', { preserveFocus: true });
+  }
 
   // Register chat history command (toggles history panel in webview)
   context.subscriptions.push(

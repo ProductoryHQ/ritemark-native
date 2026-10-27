@@ -4,7 +4,7 @@ Track: SDD (auto-detected: two shell-tier harness changes resting on measurement
 Override with: "use plain full track"
 Branches, made from `origin/main` at Phase 3, after approval: `sprint-144-release-harness` (Part 1, shell tier) and `sprint-144-release-harness-polish` (Part 2, extension tier), one PR each. This plan was written on `plan/sprint-144-release-harness`.
 Release tier: **Part 1 shell** (`.github/workflows/build-windows.yml`, `patches/vscode/`); **Part 2 extension** (`extensions/ritemark/` only). 2.1 is a shell release already.
-Status: **Approved and started (Phase 2 → 3), 27 October 2026,** by the Development manager under Jarmo's delegation (*Approval* below). Code starts on the two sprint branches after this plan merges. The planning measurement ran on a scratch branch (`scratch/sprint-144-free-runner-probe`), which changes nothing on `main`; P4's reproduction is a harness under `research/repro/`, outside the product.
+Status: **Building, 27 October 2026.** Approved and started by the Development manager under Jarmo's delegation (*Approval* below). **Part 1** merged as `9a9ea48a` (#572); `CLAUDE.md`'s patch table followed in #573 (`0523c6d6`); the Windows and macOS x64 runs on `main` are the Development manager's. **Part 2** built on `sprint-144-release-harness-polish`, its own PR: P1–P4 done, P5's extension-side half done and the rest an RC check (`qa-evidence.md`).
 
 ## SDD Artifacts
 

@@ -45,6 +45,7 @@ import {
   createConversationState,
   isConversationEmpty,
   isRuntimeHandoff,
+  openChatAiReport,
   policyOf,
   type ConversationState,
   type PendingRuntimeSelection,
@@ -3652,12 +3653,23 @@ export function hydrateConversations(conversations: ConversationState[], activeI
 
 let sidebarReadyPosted = false;
 let lastReportedConversationId: string | null = null;
+let lastReportedAiKey: string | null = null;
 
-function reportActiveConversation(conversationId: string | null, force = false): void {
+/**
+ * Sprint 144 (P3): the report also carries the open chat's AI and whether its last turn on that AI failed on sign-in,
+ * for the status bar's AI item, and is sent again when either changes (switching between chats on different AIs,
+ * changing a chat's AI, a turn that ends).
+ */
+function reportActiveConversation(state: Pick<AISidebarState, 'activeConversationId' | 'conversations'>, force = false): void {
+  const conversationId = state.activeConversationId;
   if (!conversationId) return;
-  if (!force && conversationId === lastReportedConversationId) return;
+  const conversation = state.conversations[conversationId];
+  const ai = conversation ? openChatAiReport(conversation) : null;
+  const aiKey = ai ? `${ai.agentId}:${ai.signInEnded}` : null;
+  if (!force && conversationId === lastReportedConversationId && aiKey === lastReportedAiKey) return;
   lastReportedConversationId = conversationId;
-  vscode.postMessage({ type: 'conversation/active', conversationId });
+  lastReportedAiKey = aiKey;
+  vscode.postMessage({ type: 'conversation/active', conversationId, ...(ai ? { agentId: ai.agentId, signInEnded: ai.signInEnded } : {}) });
 }
 
 useAISidebarStore.subscribe((state, previous) => {
@@ -3667,15 +3679,15 @@ useAISidebarStore.subscribe((state, previous) => {
     // The host holds comment-task enqueues behind this handshake (D6), so the
     // destination has to be known in the same breath as readiness — restated
     // even if this store already reported it while the host was still loading.
-    reportActiveConversation(state.activeConversationId, true);
+    reportActiveConversation(state, true);
     return;
   }
   // Before hydration there is nothing worth binding: the host holds comment-task
   // enqueues until the handshake, and the handshake reports the open
   // conversation itself. Reporting earlier would only be noise.
   if (!state.ready) return;
-  if (state.activeConversationId !== previous.activeConversationId) {
-    reportActiveConversation(state.activeConversationId);
+  if (state.activeConversationId !== previous.activeConversationId || state.conversations !== previous.conversations) {
+    reportActiveConversation(state);
   }
 });
 
@@ -3683,4 +3695,5 @@ useAISidebarStore.subscribe((state, previous) => {
 export function resetSidebarHandshakeForTest(): void {
   sidebarReadyPosted = false;
   lastReportedConversationId = null;
+  lastReportedAiKey = null;
 }

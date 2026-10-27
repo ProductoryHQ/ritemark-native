@@ -297,6 +297,7 @@ export function registerProjects(deps: ProjectsHostDependencies): ProjectsHost {
     // R9: a window a switch in place opened lands on Home, once
     let land = ProjectSwitcher.takeLanding(context, folder ? folder.uri.toString() : null);
     context.subscriptions.push(registerPermanentTabs({
+      landingPending: land, // Sprint 144 (P5, #569): Home comes forward at once
       landOnHome: () => {
         const value = land;
         land = false;

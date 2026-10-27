@@ -140,34 +140,37 @@ export function NodeConfigPanel() {
           />
         )}
 
-      </div>
-
-        {/* Delete button at bottom (not for Trigger node) */}
+        {/* Delete at the end of the step's fields (not for the Trigger). Sprint 144 P4: it scrolls with the fields, so
+            it never sits on the scroll area's edge cutting through Temperature and Max Tokens. */}
         {!isTriggerNode && (
-          <div className="flex-none px-4 pb-4 pt-2">
+          <div className="pt-2">
             {showDeleteConfirm ? (
               <div className="p-3 rounded bg-[var(--vscode-inputValidation-errorBackground)] border border-[var(--vscode-inputValidation-errorBorder)]">
                 <p className="text-sm text-[var(--r-ink-strong)] mb-3">
                   Delete "{nodeLabel}"? This cannot be undone.
                 </p>
                 <div className="flex gap-2">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleDeleteConfirm}
-                    className="flex-1 bg-[var(--r-error)] text-white hover:opacity-90"
-                  >
-                    <Icon name="trash" size={14} className="mr-1" />
-                    Delete
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleDeleteCancel}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
+                  <Tooltip label="Remove this step from the flow for good" className="flex-1">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleDeleteConfirm}
+                      className="w-full bg-[var(--r-error)] text-white hover:opacity-90"
+                    >
+                      <Icon name="trash" size={14} className="mr-1" />
+                      Delete
+                    </Button>
+                  </Tooltip>
+                  <Tooltip label="Keep this step" className="flex-1">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleDeleteCancel}
+                      className="w-full"
+                    >
+                      Cancel
+                    </Button>
+                  </Tooltip>
                 </div>
               </div>
             ) : (
@@ -185,6 +188,7 @@ export function NodeConfigPanel() {
             )}
           </div>
         )}
+      </div>
     </div>
   );
 }
@@ -193,7 +197,7 @@ export function NodeConfigPanel() {
 interface FieldProps {
   label: string;
   children: React.ReactNode;
-  description?: string;
+  description?: React.ReactNode;
 }
 
 function Field({ label, children, description }: FieldProps) {
@@ -386,13 +390,17 @@ interface LLMNodeConfigProps {
 }
 
 // Model config is received from extension - use helper functions
-import { getLLMModels, getImageModels, getDefaultLLMModel, getDefaultImageModel, modelOptionsWithPersistedSelection } from '../../config/modelConfig';
+import { getLLMModels, getDefaultLLMModel, getDefaultImageModel, modelOptionsWithPersistedSelection, modelListWaiting, offeredImageModels, setFetchedImageModels } from '../../config/modelConfig';
 
 function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
   const provider = data.provider || 'openai';
   const [models, setModels] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Sprint 144 P4: the known list and the saved model stay usable while the host refreshes the list; the picker waits
+  // only when it has no list at all. A saved model missing from the list stays visible, as on the Image step.
+  const modelOptions = modelOptionsWithPersistedSelection(models, data.model);
+  const waiting = modelListWaiting(isLoading, models.length);
 
   // Fetch models from API when provider changes
   useEffect(() => {
@@ -469,18 +477,27 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
         </Select>
       </Field>
 
-      <Field label="Model" description={error ? `⚠️ ${error}` : isLoading ? 'Loading models...' : undefined}>
+      <Field
+        label="Model"
+        description={error
+          ? `⚠️ ${error}`
+          : waiting
+            ? 'Loading models...'
+            : modelOptions.unavailable
+              ? 'Saved model is no longer available. Choose a replacement.'
+              : undefined}
+      >
         <Select
           // Sprint 141 R4: an unset step shows the model it runs on (the catalog's default), as its card does.
           value={data.model || getDefaultLLMModel(provider) || models[0]?.id || ''}
           onValueChange={(value) => onUpdate({ model: value })}
-          disabled={isLoading}
+          disabled={waiting}
         >
           <SelectTrigger>
-            <SelectValue placeholder={isLoading ? 'Loading...' : 'Select model'} />
+            <SelectValue placeholder={waiting ? 'Loading...' : 'Select model'} />
           </SelectTrigger>
           <SelectContent>
-            {models.map((m) => (
+            {modelOptions.models.map((m) => (
               <SelectItem key={m.id} value={m.id}>
                 {m.name}
               </SelectItem>
@@ -646,19 +663,24 @@ interface ImageNodeConfigProps {
 
 function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
   const provider = data.provider || 'openai';
+  // Sprint 144 P4: the list the step's card reads too (`offeredImageModels`), so both name the same model
   const [models, setModels] = React.useState<Array<{ id: string; name: string }>>(
-    getImageModels(provider)
+    offeredImageModels(provider)
   );
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // Sprint 144: what fixes the error, when the host names it (a Google image step with no key: Settings at that key)
+  const [errorAction, setErrorAction] = React.useState<{ label: string; settingsSection: string } | null>(null);
   const modelOptions = modelOptionsWithPersistedSelection(models, data.model);
+  const waiting = modelListWaiting(loading, models.length); // Sprint 144 P4, as on the LLM step
 
   // Fetch models when provider changes
   React.useEffect(() => {
     // Reset to fallback immediately when provider changes
-    setModels(getImageModels(provider));
+    setModels(offeredImageModels(provider));
     setLoading(true);
     setError(null);
+    setErrorAction(null);
 
     // Request image models from extension
     vscode.postMessage({ type: 'flow:getModels', provider, modelType: 'image' });
@@ -670,9 +692,11 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
         setLoading(false);
         if (message.error) {
           setError(message.error);
+          setErrorAction(message.errorAction ?? null);
           // Keep fallback models (already set)
         } else if (message.models && message.models.length > 0) {
           setModels(message.models);
+          setFetchedImageModels(provider, message.models);
         }
         // If empty, keep fallback models
       }
@@ -726,20 +750,39 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
 
       <Field
         label="Model"
-        description={loading
+        description={waiting
           ? 'Loading models...'
           : modelOptions.unavailable
             ? 'Saved model is no longer available. Choose a replacement.'
-            : error ? `⚠️ ${error}` : undefined}
+            : error && errorAction
+              ? (
+                // Sprint 144, the Experience lead's words: the step can't run without the key, so say so, no warning
+                // sign, with the fix as a link ("This step needs a Google AI API key to run. Add it in Settings")
+                <>
+                  {error}{' '}
+                  <Tooltip label="Open Settings at the Google AI API key">
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0 text-xs"
+                      onClick={() => vscode.postMessage({ type: 'flow:openSettings', section: errorAction.settingsSection })}
+                    >
+                      {errorAction.label}
+                    </Button>
+                  </Tooltip>
+                </>
+              )
+              : error ? `⚠️ ${error}` : undefined}
       >
         <Select
           // Sprint 141 R4: an unset step shows the model it runs on, as the run's default.
           value={data.model || getDefaultImageModel(provider) || models[0]?.id || ''}
           onValueChange={(value) => onUpdate({ model: value })}
-          disabled={loading}
+          disabled={waiting}
         >
           <SelectTrigger>
-            <SelectValue placeholder={loading ? 'Loading...' : 'Select model'} />
+            <SelectValue placeholder={waiting ? 'Loading...' : 'Select model'} />
           </SelectTrigger>
           <SelectContent>
             {modelOptions.models.map((m) => (

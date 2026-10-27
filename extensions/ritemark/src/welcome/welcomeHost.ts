@@ -146,6 +146,11 @@ function carryOverRitemark1Answer(context: vscode.ExtensionContext): void {
 export interface WelcomeHost {
   /** The welcome is open in this window. */
   isOpen(): boolean;
+  /**
+   * Sprint 144 (P5): the welcome may open alone at this start (a window with no folder, the update welcome, or a
+   * restored welcome tab), decided before it has opened. The AI column is not brought forward early then.
+   */
+  mayOpenAtStart(): boolean;
 }
 
 export function registerWelcome(context: vscode.ExtensionContext, profileKind: ProfileKind, aiSheet: WelcomeAiSheet, projects?: WelcomeProjects): WelcomeHost {
@@ -160,7 +165,7 @@ export function registerWelcome(context: vscode.ExtensionContext, profileKind: P
     }),
   );
   void controller.start();
-  return { isOpen: () => controller.isOpen() };
+  return { isOpen: () => controller.isOpen(), mayOpenAtStart: () => controller.mayOpenAtStart() };
 }
 
 type OpenReason = 'start' | 'command' | 'folder-gone';
@@ -237,6 +242,14 @@ class WelcomeController implements vscode.Disposable {
 
   isOpen(): boolean {
     return this.panel !== null;
+  }
+
+  /** Sprint 144 (P5): `start()` opens the welcome after an await, so `isOpen()` is still false right after it begins. */
+  mayOpenAtStart(): boolean {
+    const hasFolder = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
+    return this.panel !== null
+      || opensAtStart({ kind: this.kind, hasFolder, openingFiles: false })
+      || this.restoredWelcomeTabs().length > 0;
   }
 
   dispose(): void {

@@ -293,6 +293,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * is where a comment task goes. Null until the sidebar reports one.
    */
   private _activeConversationId: string | null = null;
+  /**
+   * Sprint 144 (P3): the open chat's AI, and whether its last turn on that AI failed on sign-in, as the sheet reports
+   * them with `conversation/active`. The status bar's AI item reads it; null when the sheet reported none.
+   */
+  private _openChatReport: { agentId: AgentId; signInEnded: boolean } | null = null;
+  private readonly _openChatListeners: Array<() => void> = [];
   /** Resolvers waiting for the sidebar's first `conversation/active` report. */
   private _activeConversationWaiters: Array<(conversationId: string | null) => void> = [];
   /** Pending `comment-task/enqueue` handshakes, keyed by taskId. */
@@ -677,6 +683,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           this._noteActiveConversation(
             typeof message.conversationId === 'string' ? message.conversationId : null,
           );
+          // Sprint 144 (P3): the open chat's AI for the status bar. An older sheet sends no agentId: nothing changes.
+          if (message.agentId === 'claude-code' || message.agentId === 'codex' || message.agentId === 'opencode') {
+            this._setOpenChatReport({ agentId: message.agentId, signInEnded: message.signInEnded === true });
+          }
           break;
 
         case 'report/request-open':
@@ -1825,6 +1835,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         // A disposed sidebar has no open conversation. Remembering the last one
         // would bind a comment task to a destination nobody is looking at.
         this._activeConversationId = null;
+        this._setOpenChatReport(null);
       }
     });
     this._refreshBrowserContextPolling();
@@ -2266,6 +2277,24 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     void this._conversationController.markRead(conversationId).catch((error) => {
       console.warn('[Conversations] Could not mark a chat read:', error);
     });
+  }
+
+  /** Sprint 144 (P3): the open chat's AI as the sheet last reported it, for the status bar's AI item. */
+  public openChatReport(): { agentId: AgentId; signInEnded: boolean } | null {
+    return this._openChatReport;
+  }
+
+  /** Sprint 144 (P3): hear when the open chat, its AI, or its sign-in state changes. */
+  public onDidChangeOpenChat(listener: () => void): vscode.Disposable {
+    this._openChatListeners.push(listener);
+    return { dispose: () => { const at = this._openChatListeners.indexOf(listener); if (at >= 0) this._openChatListeners.splice(at, 1); } };
+  }
+
+  private _setOpenChatReport(report: { agentId: AgentId; signInEnded: boolean } | null): void {
+    const before = this._openChatReport;
+    if (before?.agentId === report?.agentId && before?.signInEnded === report?.signInEnded) return;
+    this._openChatReport = report;
+    for (const listener of [...this._openChatListeners]) listener();
   }
 
   private _noteActiveConversation(conversationId: string | null): void {

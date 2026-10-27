@@ -112,6 +112,9 @@ When S1's installer updates it and the app starts the first time
 Then the time a restored terminal is in front before the welcome is recorded (2.0's retest: 6–14 s); if it is in front at all after the welcome appears, #501 is a 2.1 bug with that recording
 
 ### S20: A synced folder on the Mac (#499, with the manager's OK)
+
+*Moved to Gate 2 on the RC (the manager, 27 October): macOS's File Provider consent is per app, so it is answered on the signed candidate by Jarmo; the work tenant's OneDrive stays out. See `qa-evidence.md`.*
+
 Given a dev build here, and a new empty folder "Ritemark 2.1 sync test" inside this Mac's OneDrive folder and one inside its Google Drive folder
 When the welcome opens each as a project, a document is created, edited and saved, and the AI edits it
 Then each opens, the saves ask nothing, and the AI's write raises no conflict
@@ -148,13 +151,13 @@ And every feature that worked before still works (no flag changed)
 ### S25: A fresh profile that chose Skip
 Given a fresh profile, online, whose welcome ended with Skip
 When the first window settles
-Then the item reads "No AI yet", with no dot, tooltip "Sign in to an AI to work with it here"
+Then the item reads "No AI yet", tooltip "Sign in to an AI to work with it here"
 And a click opens the AI's sheet on its sign-in card
 
 ### S26: Signing in names the AI
 Given S25's window
 When the person signs in to ChatGPT on the sheet
-Then within two seconds the item reads "ChatGPT ready" with a green dot, tooltip "Signed in to ChatGPT"
+Then within two seconds the item reads "ChatGPT ready", tooltip "Signed in to ChatGPT"
 
 ### S27: Two AIs, two chats
 Given Claude and ChatGPT both signed in, a chat with Claude and a chat with ChatGPT open
@@ -169,7 +172,7 @@ Then the item reads "OpenCode ready", and then "No AI yet"
 ### S29: Offline comes first
 Given "Claude ready"
 When the internet goes and the probe fails twice
-Then the item reads "Offline" with a grey dot, in body ink, no warning background, tooltip "No internet. Your documents work as usual and save on this computer."
+Then the item reads "Offline", in body ink, no warning background, tooltip "No internet. Your documents work as usual and save on this computer."
 And when the internet comes back, "Claude ready" again
 
 ### S30: A sign-in that ended
