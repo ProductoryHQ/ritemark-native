@@ -103,11 +103,15 @@ quick input, toasts), not the desk or the AI's sheet.
 Sprint 144 (2.1.0's Gate 1, #503's follow-up): the chosen tab joins the desk again with no line beneath it, as in 2.0
 (framework §1, "joined to it like a browser tab"; Jarmo's Gate 1 finding on the release candidate). Sprint 142's
 hairline lies inside the desk's box, where the tab row (clipped at the desk's top, and under the hairline's layer) can't
-cover it. So the desk lays its own colour over its top edge under the chosen tab and its two fillets, 9 each side and
-1.5 high (.editor-container::before): fixed, and placed by the chosen tab with CSS anchor positioning (anchor-name on
-.tab.active, anchor-scope on each editor group, so each desk follows its own tab), at z-index 11, over the hairline (10)
-and a desk webview's layer. The other edges, the top edge beside the tab, the corners, no shadow and the welcome alone
-stay as Sprint 142 drew them.
+cover it. So the desk lays its own colour over its top edge under the chosen tab and its two fillets
+(.editor-container::before): a fillet and its hairline past each side (--rm-fillet-box, from --rm-fillet and
+--rm-hairline-width, which the fillets and the hairlines now read too) and 1.5 hairlines high, at z-index 11, over the
+hairline (10) and a desk webview's layer. It is fixed and placed by anchor positioning: the chosen tab (anchor-name on
+.tab.active) gives its ends; it stays inside the desk's two top corners, the radius in from each side (the Experience
+lead, experience 3: the corner's curve is never cut and nothing lands on the ground), and inside the tab row's scrolling
+box, so it ends where a fillet cut at the row's end does. Its default anchor is the title row, which never scrolls (with
+the tab as the default, a scrolled tab row in a very narrow desk shifted the bounds too); anchor-scope keeps each desk
+to its own. The other edges, the top edge beside the tab, no shadow and the welcome alone stay as Sprint 142 drew them.
 
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
@@ -827,10 +831,10 @@ index 75f9238fd75..68ad7c003b7 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..bbb69641289
+index 00000000000..5cc43b611f9
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1843 @@
+@@ -0,0 +1,1860 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -866,6 +870,9 @@ index 00000000000..bbb69641289
 +	--rm-body: var(--vscode-tab-inactiveForeground); /* the kit's body ink: #475569 in Light, #C7D2FE in Dark */
 +	--rm-muted: var(--vscode-descriptionForeground); /* the kit's muted ink: #617187 in Light, #94A3B8 in Dark */
 +	--rm-radius: 10px;
++	--rm-hairline-width: 1px; /* the desk's and the chosen tab's edge */
++	--rm-fillet: 8px; /* the radius where the chosen tab meets the desk */
++	--rm-fillet-box: calc(var(--rm-fillet) + var(--rm-hairline-width)); /* a fillet with its hairline */
 +	/* the room the window controls take at the left (the Mac's traffic lights) and the right (Windows' buttons) */
 +	--rm-lights: 0px;
 +	--rm-buttons: 0px;
@@ -1036,7 +1043,7 @@ index 00000000000..bbb69641289
 +	position: absolute;
 +	inset: 0;
 +	border-radius: inherit;
-+	box-shadow: inset 0 0 0 1px var(--rm-hairline);
++	box-shadow: inset 0 0 0 var(--rm-hairline-width) var(--rm-hairline);
 +	pointer-events: none;
 +	z-index: 10;
 +}
@@ -1044,11 +1051,24 @@ index 00000000000..bbb69641289
 +/* Sprint 144 (Gate 1, #503's follow-up): the chosen tab joins the desk with no line beneath it, as in 2.0 (framework §1:
 +   "joined to it like a browser tab"). The hairline above lies inside the desk's box, where the tab row (clipped at the
 +   desk's top, and under the hairline's layer) can't cover it. So the desk lays its own colour over its top edge under
-+   the chosen tab and its two fillets (9 each side), and nowhere else: the other edges, and the top edge beside the tab,
-+   stay whole. The chosen tab places it (anchor positioning, as VS Code places webviews; fixed, so a tab outside the
-+   desk's box can be its anchor), each desk by its own tab (anchor-scope), over the hairline (10) and a webview's layer */
++   the chosen tab and its two fillets (a fillet and its hairline each side), and nowhere else: the other edges, and the
++   top edge beside the tab, stay whole. The cover keeps inside the desk's two top corners (the radius in from each side),
++   so their curves are never cut and nothing lands on the ground, and inside the tab row's own clip, so it reaches no
++   further than the tab and fillets you can see (a fillet cut at the row's end, in a narrow desk). The chosen tab places
++   it (anchor positioning, as VS Code places webviews; fixed, so a tab outside the desk's box can be its anchor); the
++   title row, as wide as the desk, and the tab row's scrolling box bound it; each desk by its own (anchor-scope); it lies
++   over the hairline (10) and a webview's layer. Its default anchor is the title row, which never scrolls: with the tab
++   as the default, a scrolled tab row (a very narrow desk) shifted the bounds too and let the cover past the corner */
 +.monaco-workbench .part.editor .editor-group-container {
-+	anchor-scope: --ritemark-chosen-tab;
++	anchor-scope: --ritemark-chosen-tab, --ritemark-desk-top, --ritemark-tab-row;
++}
++
++.monaco-workbench .part.editor .editor-group-container > .title {
++	anchor-name: --ritemark-desk-top;
++}
++
++.monaco-workbench .part.editor .editor-group-container > .title > .tabs-and-actions-container > .monaco-scrollable-element {
++	anchor-name: --ritemark-tab-row;
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.active {
@@ -1058,11 +1078,12 @@ index 00000000000..bbb69641289
 +.monaco-workbench .part.editor .editor-group-container:not(.empty) > .editor-container::before {
 +	content: '';
 +	position: fixed;
-+	position-anchor: --ritemark-chosen-tab;
++	position-anchor: --ritemark-desk-top;
 +	top: anchor(bottom);
-+	left: calc(anchor(left) - 9px / var(--ritemark-zoom-factor, 1)); /* the tab row keeps its size through zoom (R3), and so do its fillets */
-+	right: calc(anchor(right) - 9px / var(--ritemark-zoom-factor, 1));
-+	height: 1.5px; /* the 1px hairline takes part of a second device pixel at a zoom or display scale that isn't whole */
++	/* the tab row keeps its size through zoom (R3), and so do its fillets; the desk and its corners zoom */
++	left: max(calc(anchor(--ritemark-chosen-tab left) - var(--rm-fillet-box) / var(--ritemark-zoom-factor, 1)), calc(anchor(--ritemark-desk-top left) + var(--rm-radius)), anchor(--ritemark-tab-row left));
++	right: max(calc(anchor(--ritemark-chosen-tab right) - var(--rm-fillet-box) / var(--ritemark-zoom-factor, 1)), calc(anchor(--ritemark-desk-top right) + var(--rm-radius)), anchor(--ritemark-tab-row right));
++	height: calc(var(--rm-hairline-width) * 1.5); /* the hairline takes part of a second device pixel at a zoom or display scale that isn't whole */
 +	background-color: var(--rm-desk);
 +	pointer-events: none;
 +	z-index: 11;
@@ -1359,7 +1380,7 @@ index 00000000000..bbb69641289
 +.monaco-workbench .part.editor .tabs-container > .tab.active {
 +	background-color: var(--rm-desk) !important; /* !important: as the tabs' rule above */
 +	border-radius: 8px 8px 0 0;
-+	box-shadow: 0 0 0 1px var(--rm-hairline) !important; /* !important: multieditortabscontrol.css's chosen and hovered tab shadows are more specific. not VS Code's inset shade, which greys the tab's top against the desk */
++	box-shadow: 0 0 0 var(--rm-hairline-width) var(--rm-hairline) !important; /* !important: multieditortabscontrol.css's chosen and hovered tab shadows are more specific. not VS Code's inset shade, which greys the tab's top against the desk */
 +	z-index: 2;
 +}
 +
@@ -1401,18 +1422,18 @@ index 00000000000..bbb69641289
 +	content: '';
 +	position: absolute;
 +	bottom: 0;
-+	width: 9px;
-+	height: 9px;
++	width: var(--rm-fillet-box);
++	height: var(--rm-fillet-box);
 +}
 +
 +.monaco-workbench .part.editor .tabs-container > .tab.active > .tab-border-bottom-container::before {
-+	left: -9px;
-+	background: radial-gradient(circle at 0 0, transparent 8px, var(--rm-hairline) 8.25px, var(--rm-hairline) 8.75px, var(--rm-desk) 9px);
++	left: calc(-1 * var(--rm-fillet-box));
++	background: radial-gradient(circle at 0 0, transparent var(--rm-fillet), var(--rm-hairline) calc(var(--rm-fillet) + var(--rm-hairline-width) / 4), var(--rm-hairline) calc(var(--rm-fillet) + var(--rm-hairline-width) * 3 / 4), var(--rm-desk) var(--rm-fillet-box));
 +}
 +
 +.monaco-workbench .part.editor .tabs-container > .tab.active > .tab-border-bottom-container::after {
-+	right: -9px;
-+	background: radial-gradient(circle at 100% 0, transparent 8px, var(--rm-hairline) 8.25px, var(--rm-hairline) 8.75px, var(--rm-desk) 9px);
++	right: calc(-1 * var(--rm-fillet-box));
++	background: radial-gradient(circle at 100% 0, transparent var(--rm-fillet), var(--rm-hairline) calc(var(--rm-fillet) + var(--rm-hairline-width) / 4), var(--rm-hairline) calc(var(--rm-fillet) + var(--rm-hairline-width) * 3 / 4), var(--rm-desk) var(--rm-fillet-box));
 +}
 +
 +/* No fade over the label's end (it takes the hover colour and reads as a shadow beside the close button); a long
