@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Fixed
 - **A Flow step's model picker is usable at once.** It stayed greyed with "Loading models..." for 5 seconds every time a step was selected, because Ritemark answered the request with the wrong kind of list. An Image step now gets the image models: opening one asks OpenAI or Google for its list with your key, as an LLM step's list already did through the model catalog. Without a key it keeps the built-in list and says so under Model ("OpenAI API key not configured"); a saved model the list no longer has shows as "Unavailable: <model>" until you choose another. Both lines were there before but never reached an Image step.
+- **An Image step's card names the model it runs on.** It showed one fixed name per provider ("GPT Image 1.5", "Nano Banana Pro") whatever the step had saved; now its Model row matches the step's panel, including "Unavailable: <model>" for a model the provider no longer offers, which fails when the flow runs.
 - **A Flow step's Delete row no longer cuts through Temperature and Max Tokens** in a short window: it scrolls with the fields.
 - **After switching projects, the AI column comes back when Ritemark starts in the window**, before Home in 9 of 10 measured switches, instead of 3–4 seconds after Home, and it no longer takes the keyboard from the document you were in. What remains (the document in front for under a second before Home, while the window loads) happens before Ritemark runs; it is #569's check on the release candidate.
 

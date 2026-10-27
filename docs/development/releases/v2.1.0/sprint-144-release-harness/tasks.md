@@ -108,4 +108,7 @@ The Experience lead's answer (`3c0a2ae`) and QA's findings on `415a9be9`, in one
 - [x] `aiStatusItem.test.ts` on mocked time
 - [x] `OnboardingWizard.tsx`'s native `title` and the delete confirm's buttons: `Tooltip`
 - [x] User docs (`ai-agents.md`, `troubleshooting.md`), `release-plan.md` rows, CHANGELOG
-- [x] Filed for v2.2.0: the two tooltip looks in Light; the hand-rolled `<button>`s in `RitemarkSettings.tsx` and `NodeConfigPanel.tsx`
+- [x] Filed for v2.2.0: the two tooltip looks in Light (#576); the hand-rolled `<button>`s in `RitemarkSettings.tsx` and `NodeConfigPanel.tsx` (#577)
+- [x] The Image step's card names the model a run uses, as its panel does (`imageStepModel`, `ImageNode.test.ts`)
+- [ ] The no-key line's words: waiting for the Experience lead
+- [ ] S20 on Google Drive only (the manager, 27 Oct); OneDrive's half to the Windows session or Gate 2

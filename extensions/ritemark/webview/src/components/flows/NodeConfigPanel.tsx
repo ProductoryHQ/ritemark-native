@@ -390,7 +390,7 @@ interface LLMNodeConfigProps {
 }
 
 // Model config is received from extension - use helper functions
-import { getLLMModels, getImageModels, getDefaultLLMModel, getDefaultImageModel, modelOptionsWithPersistedSelection, modelListWaiting } from '../../config/modelConfig';
+import { getLLMModels, getDefaultLLMModel, getDefaultImageModel, modelOptionsWithPersistedSelection, modelListWaiting, offeredImageModels, setFetchedImageModels } from '../../config/modelConfig';
 
 function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
   const provider = data.provider || 'openai';
@@ -663,8 +663,9 @@ interface ImageNodeConfigProps {
 
 function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
   const provider = data.provider || 'openai';
+  // Sprint 144 P4: the list the step's card reads too (`offeredImageModels`), so both name the same model
   const [models, setModels] = React.useState<Array<{ id: string; name: string }>>(
-    getImageModels(provider)
+    offeredImageModels(provider)
   );
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -674,7 +675,7 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
   // Fetch models when provider changes
   React.useEffect(() => {
     // Reset to fallback immediately when provider changes
-    setModels(getImageModels(provider));
+    setModels(offeredImageModels(provider));
     setLoading(true);
     setError(null);
 
@@ -691,6 +692,7 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
           // Keep fallback models (already set)
         } else if (message.models && message.models.length > 0) {
           setModels(message.models);
+          setFetchedImageModels(provider, message.models);
         }
         // If empty, keep fallback models
       }

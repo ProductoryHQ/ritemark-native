@@ -96,6 +96,11 @@ export function getDefaultImageModel(provider: 'openai' | 'gemini'): string {
     : currentConfig.defaults.flowImageGemini;
 }
 
+/** How a saved model the list no longer offers is named, in a step's picker and on its card. */
+export function unavailableModelName(id: string): string {
+  return `Unavailable: ${id}`;
+}
+
 /** Keep a saved model visible without adding unavailable models to new-choice lists. */
 export function modelOptionsWithPersistedSelection(
   models: ModelInfo[],
@@ -105,9 +110,52 @@ export function modelOptionsWithPersistedSelection(
     return { models, unavailable: false };
   }
   return {
-    models: [{ id: selectedId, name: `Unavailable: ${selectedId}` }, ...models],
+    models: [{ id: selectedId, name: unavailableModelName(selectedId) }, ...models],
     unavailable: true,
   };
+}
+
+// Sprint 144 (P4): the image lists the host answered a step's `flow:getModels` with. A step's card and its panel
+// read the same list, so they name the same model; until the host has answered, both read the built-in list.
+const fetchedImageModels: Partial<Record<'openai' | 'gemini', ModelInfo[]>> = {};
+const imageModelListeners = new Set<() => void>();
+
+/** The panel stores the host's answer here (a non-empty list only; an error keeps the built-in one). */
+export function setFetchedImageModels(provider: 'openai' | 'gemini', models: ModelInfo[]): void {
+  if (models.length === 0) return;
+  fetchedImageModels[provider] = models;
+  for (const listener of [...imageModelListeners]) listener();
+}
+
+/** The image models a step offers: the host's answer once it came, else the built-in list. */
+export function offeredImageModels(provider: 'openai' | 'gemini'): ModelInfo[] {
+  return fetchedImageModels[provider] ?? getImageModels(provider);
+}
+
+/** For `useSyncExternalStore`: called when a host's answer changes `offeredImageModels`. */
+export function subscribeImageModels(listener: () => void): () => void {
+  imageModelListeners.add(listener);
+  return () => { imageModelListeners.delete(listener); };
+}
+
+/**
+ * The model an Image step runs on, as its card and its panel both name it (Sprint 144, P4). A run sends the saved
+ * model as it is, or the provider's default when none is saved (`ImageNodeExecutor`, no substitution), so:
+ * - by its name when the offered list has it;
+ * - "Unavailable: <id>" for a saved model the list doesn't offer, as the panel's picker says (OpenAI removed its
+ *   DALL·E models from the API on 12 May 2026, so a step saved on one fails when it runs);
+ * - its id when the list is still empty (unknown is not unavailable), and for a default the list doesn't name.
+ */
+export function imageStepModel(
+  savedModel: string | undefined,
+  defaultModel: string,
+  offered: ModelInfo[],
+): { id: string; label: string; unavailable: boolean } {
+  const id = savedModel || defaultModel;
+  const known = offered.find(model => model.id === id);
+  if (known) return { id, label: known.name, unavailable: false };
+  if (savedModel && offered.length > 0) return { id, label: unavailableModelName(id), unavailable: true };
+  return { id, label: id, unavailable: false };
 }
 
 /**
