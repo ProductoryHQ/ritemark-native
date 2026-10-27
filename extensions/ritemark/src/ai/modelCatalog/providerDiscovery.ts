@@ -14,6 +14,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { discoverClaudeModels } from '../../agent/discoverModels';
+import { listGeminiModels } from '../geminiRequest';
 import type { ModelEntry, ModelThinkingEffort } from './schema';
 import { isExplicitThinkingEffort, type ExplicitThinkingEffort } from '../../runtime/thinkingEffort';
 import {
@@ -148,15 +149,14 @@ export async function discoverOpenAI(apiKey: string | null): Promise<ModelEntry[
   return models.length > 0 ? models : null;
 }
 
-/** Gemini `GET /v1/models`, filtered to models that support `generateContent`. */
-export async function discoverGemini(apiKey: string | null): Promise<ModelEntry[] | null> {
+/**
+ * Gemini `GET /v1/models`, filtered to models that support `generateContent`.
+ * Sprint 141: the key goes in a header (R12, #558), and every page is read (R13).
+ */
+export async function discoverGemini(apiKey: string | null, fetchImpl: typeof fetch = fetch): Promise<ModelEntry[] | null> {
   if (!apiKey) return null;
-  const json = (await fetchJson(
-    `https://generativelanguage.googleapis.com/v1/models?key=${encodeURIComponent(apiKey)}`,
-    {},
-  )) as { models?: Array<{ name?: string; displayName?: string; supportedGenerationMethods?: string[] }> } | null;
-  const models = json?.models;
-  if (!Array.isArray(models) || models.length === 0) return null;
+  const { models } = await listGeminiModels(apiKey, { version: 'v1', timeoutMs: PROBE_TIMEOUT_MS, fetchImpl });
+  if (models.length === 0) return null;
   const out = models
     .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
     .map((m, i) => {

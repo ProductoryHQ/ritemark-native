@@ -57,7 +57,7 @@ The five items, in the shape's order:
 | [138 — Equations and Google Docs quotes](sprint-138-equations/sprint-plan.md) | 3 | `$…$` and `$$…$$` typeset in the editor, PDF and Word, plain Markdown in the file, a dollar amount in prose left as text (CommonMark's math rules); Word as native equations if a free converter does it simply, an image otherwise (decision 4), never raw LaTeX; KaTeX's fonts in the app; Google Docs quote blocks at their indent with a thin border | #481, #408 | 137's pipeline module, or 138's math extension moves with it (*Order* below) | **Approved** 2026-10-26; the editor's math waits for 137's merge, while audits, Word, export, fonts and #408 start now. Drawing: experience 38 |
 | [139 — The chosen AI keeps working](sprint-139-chosen-ai/sprint-plan.md) | 4 | Which plans work, on each step-1 card and in Settings; the refusal card for Claude Free, its words after the reproduction; one-sentence errors for ChatGPT and OpenCode; a chat's model kept across restarts; the first reply's outcome and the bets' counts; the model items | #496, #417, #376, #479, #473 | — | **Approved** 2026-10-26. The refusal card's words wait on a Claude Free reproduction; the model items moved to 141 |
 | [140 — The first day and the feedback door](sprint-140-first-day/sprint-plan.md) | 2, 5 | The Word spike first; experience 35's ready request on Home by kind of project and the AI's starting points; empty places (Tasks, chats, Transcribe); Home's guidance order; the feedback door: Send feedback in the status bar and Help, one sheet, the Home card from day three | #497 (first), #498, #466 | Experience 35, drawn by the Experience lead | **Approved** 2026-10-26, with the Experience lead's answers D1–D11. It builds the shared "open a visible chat" path |
-| 141 — 2.1's model lineup | 4 | Gemini 4 Argon in `modelConfig.ts` and the bundled catalog; the feed refreshed without breaking 1.12–1.14; Flows' default Gemini model; OpenCode's lists from the providers' live lists (#529, the first to cut) | #532, #530, #531, #529 | — | Plan to write (split from 139 on 26 October) |
+| [141 — 2.1's model lineup](sprint-141-model-lineup/sprint-plan.md) | 4 | Gemini 4 Argon in `modelConfig.ts` and the bundled catalog; OpenCode's hand-made rows brought to the lineup; Flows' Gemini default (Gemini 3.5 Flash Lite, after audit A2); the feed refreshed for every release from 1.8.1 and checked by `check:model-feed`, published with 2.1; the Gemini key in a header (#558); the runtime review and updates; OpenCode's lists from OpenCode's own list (#529, merge 2, the first to cut) | #532, #531, #530, #529, #558 | — | **Approved** 2026-10-26 with all nine decisions as recommended; building on `sprint-141-model-lineup` |
 | [142 — 2.1 polish](sprint-142-polish/sprint-plan.md) | — | The smoke test's looks as the Experience lead decided (#557): markers in the AI's lists, File changes everywhere, the switch note that goes, Home's path without a gap; every split button one button in one tone (Jarmo, 26 October); Chat Debug checked (not on a release build); the 2.0 visual follow-ups: sheets' edges, the left column's scrollbars, the tooltip after a click, the board at 1440, Home at 150 px, a restored card's tab, Transcribe a file… as a tab | #557, #503, #504, #505, #516, #535, #508, #517 | Experiences 3 and 35, framework §3 (f4f5a12, bb368b5) | **Approved** 2026-10-26 by the Development manager, under Jarmo's delegation. Merge 1, the extension tier, in [#560](https://github.com/ProductoryHQ/ritemark-native/pull/560); merge 2, the patches (002, 018, 019: File changes, the desk's edge, a restored card's tab), in a PR of its own from `sprint-142-polish-shell` |
 | [143 — 2.1 fixes](sprint-143-fixes/sprint-plan.md) | — | Behaviour bugs around 2.0 and in 2.1's testing, each reproduced first: Home's dispose; the first chat's AI after the welcome; ChatGPT's silent wait on a 429; titles in the chat's language; the mention list under the formatting toolbar; a task's line breaks; ⌘⇧P on Home (only if a person reproduces it); Transcribe's .m4a and Dismiss on Windows; pickers with no Desktop | #556, #551, #544, #514, #513, #511, #507, #509, #510 | 137, 139, 140 merged | **Approved** 2026-10-26 by the Development manager under Jarmo's delegation; building on `sprint-143-fixes` |
 | The release — 2.1 as one release | — | The done list below, the runtime review, version 2.1.0, notes, the Store update, the release itself | #499, #506, the Store | 137–140 merged; 141–143 merged | Not planned yet. It gets a sprint number of its own only if it needs code, as Sprint 136 did for 2.0; otherwise it is the release worktree's steps, as in 2.0.1 |
@@ -120,10 +120,11 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 | 138 | `sprint-138-equations` | [#545](https://github.com/ProductoryHQ/ritemark-native/pull/545) | #481, #408 | Open, not merged | Passed (technical), 26 Oct | Drafted in `sprint-138-equations/notes/release-notes-and-reply.md`, applied at closeout |
 | 139 | `sprint-139-chosen-ai` | #550 | #496, #417, #376, #479, #473, #552 | — | passed (technical), 26 Oct | drafted, applied at closeout |
 | 140 | `sprint-140-first-day` | [#543](https://github.com/ProductoryHQ/ritemark-native/pull/543) | #497, #498, #466 | Open, not merged | Passed (technical), 26 Oct | Drafted in `sprint-140-first-day/notes/release-notes.md`, applied at closeout |
+| 141 | `sprint-141-model-lineup` | [#562](https://github.com/ProductoryHQ/ritemark-native/pull/562) (merge 1) | #532, #531, #530, #558; #529 in merge 2 | Open, not merged | Technical QA in `sprint-141-model-lineup/qa-evidence.md` | `docs/CHANGELOG.md` entry; release notes at closeout |
 | 142, merge 1 (extension tier) | `sprint-142-polish` | [#560](https://github.com/ProductoryHQ/ritemark-native/pull/560) | #557, #503, #504, #505, #516, #517, #535 | Merged 27 Oct (72f509e8); #504, #505, #516, #517 and #535 closed | Passed (technical), 27 Oct | Drafted in `sprint-142-polish/notes/release-notes.md`, applied at closeout |
-| 142, merge 2 (patches 002, 018, 019) | `sprint-142-polish-shell` | [#565](https://github.com/ProductoryHQ/ritemark-native/pull/565) | #557 (File changes), #503 (the desk's edge), #508 | Open, not merged | No blockers at 8830ea17, 27 Oct; the Experience lead signed off (9aaef19); the follow-up (a restored tab that is no longer a card, S63) rebased onto 5019e42b | Drafted with merge 1's, in the same file |
+| 142, merge 2 (patches 002, 018, 019) | `sprint-142-polish-shell` | [#565](https://github.com/ProductoryHQ/ritemark-native/pull/565) | #557 (File changes), #503 (the desk's edge), #508 | Merged 27 Oct (beac93b2) | No blockers at 8830ea17, 27 Oct; the Experience lead signed off (9aaef19); the follow-up (a restored tab that is no longer a card, S63) rebased onto 5019e42b | Drafted with merge 1's, in the same file |
 | Plan: 143 | `plan/sprint-143-fixes` | — | — | Rebased into `sprint-143-fixes` | n/a | n/a |
-| 143 | `sprint-143-fixes` | [#564](https://github.com/ProductoryHQ/ritemark-native/pull/564) | #556, #551, #544, #514, #513, #511, #507, #509, #510 | Open, not merged | Passed (technical), 27 Oct; Windows (A4) and Gate 2 rows open | `CHANGELOG.md` entry; notes at closeout |
+| 143 | `sprint-143-fixes` | [#564](https://github.com/ProductoryHQ/ritemark-native/pull/564) | #556, #551, #544, #514, #513, #511, #507, #509, #510 | Merged 27 Oct (5019e42b) | Passed (technical), 27 Oct; Windows (A4) and Gate 2 rows open | `CHANGELOG.md` entry; notes at closeout |
 | Release | a `create-release-worktree.sh` worktree, then the version bump | — | #499, #506, the Store | — | — | — |
 
 ## Feature-Complete Checklist
@@ -141,7 +142,8 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
   Each is listed for `ritemark-web`'s privacy lines (the shape, §6).
 - [ ] ritemark-web privacy lines (Traffic's draft ritemark-web#512) merged before 2.1 publishes.
 - [ ] The done list above, ticked on the candidate.
-- [ ] Runtime review done for the gap since 2.0.1, and `check:anthropic-models` OK.
+- [ ] Runtime review done for the gap since 2.0.1, and `check:anthropic-models` OK (Sprint 141, `sprint-141-model-lineup/research/runtime-review.md`; re-run on the release source).
+- [ ] Model feed published to ritemark-public at 2.1's publication, with `check:model-feed`'s report (Sprint 141 R8, R9). This is a cross-repo release step: export the candidate from the release source with `--merge`, add the hand gates, run the check, put its report in the release evidence, then commit `feeds/model-catalog.json` as `jarmo-productory`.
 - [ ] Version 2.1.0 in all six version files; release notes and `CHANGELOG.md` cover everything merged since v2.0.1.
 - [ ] Windows and macOS x64 CI green on `main` before the candidate is cut, Windows without the visibility toggle (#506).
 - [ ] The GitHub Actions budget checked before the release builds, so a Windows build can't stop halfway ($40 a month; Jarmo's call).
@@ -207,11 +209,17 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 
 ## Runtime versions
 
-To be reviewed at the release (memory: release = runtime review + notes).
+Reviewed in Sprint 141 on 26 October (`sprint-141-model-lineup/research/runtime-review.md`; memory: release = runtime review + notes). The Development manager decided on 26 October to update all three at Sprint 141's merge 1 (its decision 8).
 
-- **2.0.1 bundles:** Claude Code 2.1.304 (SDK 0.3.304), Codex 0.163.0 and OpenCode 1.19.3.
-- **npm `latest` on 23 October:** 2.1.309, 0.164.0 and 1.19.4.
-- **`check:anthropic-models`** runs at the release source.
+| Runtime | 2.0.1 bundles | Latest on 26 October | Decision |
+|---|---|---|---|
+| Claude Code / Agent SDK | 2.1.304 / 0.3.304 | 2.1.310 / 0.3.310 (2.1.311 is `next`) | Update to 2.1.310 / 0.3.310 |
+| Codex | 0.163.0 | 0.164.0 (23 October) | Update; the keychain question is checked in the review |
+| OpenCode | 1.19.3 | 1.19.4 (22 October) | Update |
+| ACP SDK | 1.4.0 | 2.0.2 | Stays at 1.4.0 (a major version, its own review) |
+
+- **`check:anthropic-models`** returned OK on `main` on 26 October (catalog v3177, no warnings). It runs again after the update and at the release source.
+- **A newer runtime** published after Sprint 141's merge is the release's call.
 
 ## Decisions
 

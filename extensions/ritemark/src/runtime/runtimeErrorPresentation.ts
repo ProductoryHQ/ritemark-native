@@ -209,6 +209,21 @@ export function unwrapProviderMessage(raw: string | undefined): UnwrappedError {
   return { sentence: clampSentence(firstLine), envelopeCodes };
 }
 
+/**
+ * Sprint 141 R5: did Google refuse the model a Gemini API call asked for? Matched on
+ * structure, not on words: a 404 `NOT_FOUND` whose message names `models/<model>`.
+ * Google documents 404 only as "the requested resource wasn't found"; both wordings
+ * seen for a refused model name it ("… is no longer available to new users", "… is not
+ * found for API version v1beta, or is not supported for generateContent"; audit A2).
+ */
+export function isGoogleModelRefusal(status: number, body: unknown, model: string): boolean {
+  if (status !== 404 || !model) return false;
+  const error = (body as { error?: { status?: unknown; message?: unknown } } | undefined)?.error;
+  if (typeof error?.message !== 'string') return false;
+  if (error.status !== undefined && error.status !== 'NOT_FOUND') return false;
+  return error.message.includes(`models/${model}`);
+}
+
 /** The provider of an OpenCode model id (`google/gemini-…` → google). */
 function billingProviderOfModel(model: string | undefined): BillingProvider | undefined {
   const vendor = model?.replace(/^opencode:/, '').split('/')[0]?.toLowerCase();
@@ -230,6 +245,9 @@ const MODEL_REFUSED_PATTERNS: Array<{ runtimes: AgentId[]; pattern: RegExp }> = 
   { runtimes: ['opencode'], pattern: /Model not found:\s*([\w./:@-]{1,160})/i },
   // Providers' documented model-not-found bodies, passed on by OpenCode.
   { runtimes: ['opencode'], pattern: /models\/([\w.-]{1,120}) is not found/i },
+  // Google, for a 2.5 model and a key from a new account (seen on Google's developer forum,
+  // July and September 2026; Sprint 141 audit A2).
+  { runtimes: ['opencode'], pattern: /models\/([\w.-]{1,120}) is no longer available to new users/i },
   { runtimes: ['opencode'], pattern: /The model `([^`]{1,120})` does not exist/i },
   { runtimes: ['opencode'], pattern: /([\w./:-]{1,160}) is not a valid model ID/i },
 ];

@@ -106,7 +106,7 @@ Generates images using AI models.
   "data": {
     "label": "Generate Image",
     "provider": "openai",         // or "gemini"
-    "model": "gpt-image-1.5",     // see Model Config
+    "model": "gpt-image-2",     // see Model Config
     "prompt": "A photo of {Topic}",
     "inputImages": [],            // for image editing
     "action": "auto",             // "auto", "generate", "edit"
@@ -168,22 +168,16 @@ Variables are case-sensitive and match node/input labels.
 
 ## Model Configuration
 
-Available models are defined in `extensions/ritemark/src/ai/modelConfig.ts`.
+Don't copy model ids into this skill or into a flow by hand; they go stale. They live in one place:
+- **The ids:** `extensions/ritemark/src/ai/modelConfig.ts` (`OPENAI_MODEL_IDS`, `GEMINI_MODEL_IDS`, the image ids).
+- **The lists and the LLM steps' defaults:** `extensions/ritemark/src/ai/modelCatalog/`. A step's `flow-llm` default comes from the catalog, and the model feed can change it (`DEFAULT_MODELS.flowLLM` and `flowLLMGemini` are the bundled ones).
+- **The image steps' defaults:** `DEFAULT_MODELS.flowImage` and `flowImageGemini`.
 
-**OpenAI LLM models:**
-- `gpt-5-mini` (default, fast)
-- `gpt-5` (most capable)
-- `gpt-4o`
+**Writing a flow:**
+- Leave `model` out of an LLM step to run on the current default.
+- Set it only when the flow needs a particular model, and pick the id from `modelConfig.ts`.
 
-**OpenAI Image models:**
-- `gpt-image-1.5` (default)
-
-**Gemini LLM models:**
-- `gemini-2.5-flash`
-- `gemini-3-pro`
-
-**Gemini Image models:**
-- `imagen-4`
+Since 2.1, Flows' Gemini default is Gemini 3.5 Flash Lite, because Google limits the 2.5 models to past users (Sprint 141). A saved step keeps its model.
 
 ## Example Flows
 
@@ -297,7 +291,7 @@ Available models are defined in `extensions/ritemark/src/ai/modelConfig.ts`.
       "data": {
         "label": "Product Image",
         "provider": "openai",
-        "model": "gpt-image-1.5",
+        "model": "gpt-image-2",
         "prompt": "Professional product photo of {Product}, white background, studio lighting",
         "size": "1024x1024",
         "quality": "hd",

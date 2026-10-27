@@ -708,18 +708,47 @@ cd extensions/ritemark && npm run check:anthropic-models
   - `./scripts/verify-agent-runtimes.sh` on the release Mac
 - Record the results in the compatibility matrix. Pre-commit check 11 requires it.
 
-**3. Hand edits to the feed.** `feeds/model-catalog.json` in `jarmo-productory/ritemark-public` is optional and edited by hand. It adds or hides models without a release; it is the only remote channel for OpenAI, Gemini, Codex and OpenCode.
-- Start every edit from the current lineup, so older apps that take a fresher feed as a whole stay correct:
+**3. The model feed.** `feeds/model-catalog.json` in `jarmo-productory/ritemark-public` adds or hides models without a release. It is the only remote channel for OpenAI, Gemini, Codex and OpenCode.
 
-  ```bash
-  cd extensions/ritemark
-  npx tsx scripts/export-bundled-model-catalog.ts --merge <ritemark-public>/feeds/model-catalog.json > /tmp/model-catalog.json
-  cp /tmp/model-catalog.json <ritemark-public>/feeds/model-catalog.json
-  ```
+**Who reads it.** Every Ritemark from 1.8.1 reads the same document (Sprint 141, `releases/v2.1.0/sprint-141-model-lineup/research/feed-readers-audit.md`), with two resolvers:
+- 1.8.1–1.11.0 take it whole;
+- 1.12.0 and later merge it row by row, and a fresher document's row wins for an id both have.
 
-  Never redirect straight onto the file being merged, because the shell empties it before it is read. Bump `updatedAt` with every edit.
-- To hide a model everywhere, set `"retired": true` on its row, and keep the row.
-- A row may declare a model to Claude Code (`claudeCode.inject`) only when Anthropic's catalog gives that model no `min_claude_code_version`, or one the bundled Claude Code meets.
+So one edit reaches every release at once, and `npm run check:model-feed` shows what each one will see before you publish.
+
+**The refresh at each shell release** (publish with the release, after Gate 2; it is a cross-repo release step):
+
+```bash
+cd extensions/ritemark                          # in the release worktree
+git fetch --tags                                # the check reads every release tag
+npx tsx scripts/export-bundled-model-catalog.ts --merge <ritemark-public>/feeds/model-catalog.json > /tmp/model-catalog.json
+npm run check:model-feed -- --candidate /tmp/model-catalog.json \
+  --current <ritemark-public>/feeds/model-catalog.json --accept legacy:codex --out /tmp/model-feed-report.md
+cp /tmp/model-catalog.json <ritemark-public>/feeds/model-catalog.json   # then commit as jarmo-productory
+```
+
+- **The export** starts from the release's bundled lineup and keeps what older apps need:
+  - a curated feed row's `claudeCode` and `minAppVersion` when the bundled row has none;
+  - automated rows and tombstones;
+  - the gates in `src/ai/modelCatalog/feedGates.ts`.
+- **A gate goes in `feedGates.ts`, never on a bundled row.** The catalog resolves as app version 0.0.0 before activation, so a bundled gate hides the row from the build itself.
+- **The check** resolves the current and the candidate feed with each release's own code. It exits 1 when:
+  - a release's validator rejects the candidate;
+  - a provider has no rows;
+  - a default that resolved before falls back.
+
+  `--accept legacy:codex` accepts 1.8.1–1.11.0's Codex fallback (Sprint 141, decision 9). Put the report in the release evidence.
+- **`updatedAt` is the publish time**, so the feed is newer than every bundled catalog. That is safe only because the feed is then the newest release's lineup.
+- **Never redirect straight onto the file being merged.** The shell empties it before it is read.
+
+**A hand edit between releases** (as `c4808be` added Gemini 4 Argon):
+- Add the new row with its own `addedAt` and leave the document's `updatedAt` alone. The row then reaches every release whose bundled catalog is older than its `addedAt`, without the feed's older shared rows winning over newer bundled ones.
+- Gate it with `minAppVersion` to the first release whose runtime was run with it.
+- Changing a default or a row that releases also bundle needs `updatedAt` moved. Run `check:model-feed` first; it shows the defaults every release will take.
+
+**Rules for any edit:**
+- To hide a model everywhere, set `"retired": true` on its row and keep the row. 1.8.1–1.11.0 don't know `retired` and show a tombstone as an ordinary row, so the check's report must show that this is acceptable for them.
+- A row may declare a model to Claude Code (`claudeCode.inject`) only when Anthropic's catalog gives that model no `min_claude_code_version`, or one the bundled Claude Code meets. 2.1 and later take a bundled model's declaration from their own catalog (Sprint 141 R7), so a declaration aimed at an older release can't change their sessions.
 
 v1.12.0 gate: the check passes on the release source, and the build bundles Claude Code 2.1.281 with SDK 0.3.281.
 

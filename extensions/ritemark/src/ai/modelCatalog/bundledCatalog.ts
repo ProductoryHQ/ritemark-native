@@ -22,12 +22,20 @@
  * v2.0.0 (2026-10-20): Claude Code 2.1.304; its live model list is the same as 2.1.296's
  * (the Sprint 127 probes), so the lineup does not change.
  * `npm run check:anthropic-models` re-checks that before each release (R10).
+ * v2.1.0 (2026-10-26, Sprint 141): Gemini 4 Argon joins Flows' Gemini list and OpenCode's
+ * Google and OpenRouter groups (#532); OpenCode's groups follow the lineup (Claude 5.5s,
+ * GPT-6.1 Sol), with OpenRouter's own ids (R2); Flows' Gemini default is 3.5 Flash Lite,
+ * and the 2.5 models are retained for saved selections (#531). Flows' defaults are written
+ * once, in `DEFAULT_MODELS`. No row carries `minAppVersion`: before activation the catalog
+ * resolves as app version 0.0.0, so a gate here would hide the row from this build itself.
+ * Gates for older apps are the feed's (`feedGates.ts`, applied by the export).
  */
 
 import type { ModelCatalog } from './schema';
 import {
   CLAUDE_MODEL_IDS,
   CODEX_MODEL_IDS,
+  DEFAULT_MODELS,
   GEMINI_MODEL_IDS,
   OPENAI_MODEL_IDS,
   OPENROUTER_MODEL_IDS,
@@ -36,7 +44,7 @@ import {
 
 export const BUNDLED_CATALOG: ModelCatalog = {
   schemaVersion: 1,
-  updatedAt: '2026-10-19T00:00:00Z',
+  updatedAt: '2026-10-26T00:00:00Z',
   providers: {
     anthropic: {
       defaults: { 'claude-code': CLAUDE_MODEL_IDS.SONNET_5_5 },
@@ -53,7 +61,7 @@ export const BUNDLED_CATALOG: ModelCatalog = {
       ],
     },
     openai: {
-      defaults: { 'flow-llm': OPENAI_MODEL_IDS.GPT_5_2 },
+      defaults: { 'flow-llm': DEFAULT_MODELS.flowLLM },
       models: [
         { id: OPENAI_MODEL_IDS.ASTRA, label: 'GPT-6 Astra', description: 'Most capable model for complex work', tier: 'high', deprecated: false, order: 0 },
         { id: OPENAI_MODEL_IDS.SOL, label: 'GPT-5.6 Sol', description: 'Reliable agentic workhorse', tier: 'high', deprecated: false, order: 1 },
@@ -68,14 +76,15 @@ export const BUNDLED_CATALOG: ModelCatalog = {
       ],
     },
     gemini: {
-      defaults: { 'flow-llm': GEMINI_MODEL_IDS.FLASH_2_5 },
+      defaults: { 'flow-llm': DEFAULT_MODELS.flowLLMGemini },
       models: [
-        { id: GEMINI_MODEL_IDS.PRO_3_1_PREVIEW, label: 'Gemini 3.1 Pro', description: 'Most capable Gemini with reasoning', tier: 'high', deprecated: false, order: 0 },
-        { id: GEMINI_MODEL_IDS.FLASH_3_8, label: 'Gemini 3.8 Flash', description: 'Current fast Gemini model', tier: 'medium', deprecated: false, order: 1 },
-        { id: GEMINI_MODEL_IDS.FLASH_LITE_3_5, label: 'Gemini 3.5 Flash Lite', description: 'Current low-cost Gemini model', tier: 'low', deprecated: false, order: 2 },
-        { id: GEMINI_MODEL_IDS.PRO_2_5, label: 'Gemini 2.5 Pro', description: 'Powerful, complex tasks', tier: 'high', deprecated: false, order: 3 },
-        { id: GEMINI_MODEL_IDS.FLASH_2_5, label: 'Gemini 2.5 Flash', description: 'Fast and efficient (stable)', tier: 'low', deprecated: false, order: 4 },
-        { id: GEMINI_MODEL_IDS.FLASH_LITE_2_5, label: 'Gemini 2.5 Flash Lite', description: 'Cheapest Gemini 2.5 model', tier: 'low', deprecated: false, order: 5 },
+        { id: GEMINI_MODEL_IDS.ARGON_4, label: 'Gemini 4 Argon', description: "Google's flagship reasoning model", tier: 'high', deprecated: false, order: 0 },
+        { id: GEMINI_MODEL_IDS.PRO_3_1_PREVIEW, label: 'Gemini 3.1 Pro', description: 'Most capable Gemini with reasoning', tier: 'high', deprecated: false, order: 1 },
+        { id: GEMINI_MODEL_IDS.FLASH_3_8, label: 'Gemini 3.8 Flash', description: 'Current fast Gemini model', tier: 'medium', deprecated: false, order: 2 },
+        { id: GEMINI_MODEL_IDS.FLASH_LITE_3_5, label: 'Gemini 3.5 Flash Lite', description: 'Current low-cost Gemini model', tier: 'low', deprecated: false, order: 3 },
+        { id: GEMINI_MODEL_IDS.PRO_2_5, label: 'Gemini 2.5 Pro', description: 'Retained for saved selections', tier: 'high', deprecated: true, order: 4 },
+        { id: GEMINI_MODEL_IDS.FLASH_2_5, label: 'Gemini 2.5 Flash', description: 'Retained for saved selections', tier: 'low', deprecated: true, order: 5 },
+        { id: GEMINI_MODEL_IDS.FLASH_LITE_2_5, label: 'Gemini 2.5 Flash Lite', description: 'Retained for saved selections', tier: 'low', deprecated: true, order: 6 },
       ],
     },
     codex: {
@@ -94,31 +103,44 @@ export const BUNDLED_CATALOG: ModelCatalog = {
     },
     // opencode is BYOK/multi-vendor: ids are composite `<vendor>/<model>`; consumers
     // group by the id prefix. Kept in sync with the curated OpenCode picker list.
+    // Sprint 141 R2: a row joins when the provider's own public list and models.dev
+    // (OpenCode's registry) both name it, with tool calling.
     opencode: {
       defaults: {},
       models: [
-        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.PRO_3_1_PREVIEW), label: 'Gemini 3.1 Pro', description: 'Google — most capable, deep reasoning', tier: 'high', deprecated: false, order: 0 },
-        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.FLASH_3_8), label: 'Gemini 3.8 Flash', description: 'Google — current fast model', tier: 'medium', deprecated: false, order: 1 },
-        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.FLASH_LITE_3_5), label: 'Gemini 3.5 Flash Lite', description: 'Google — current low-cost model', tier: 'low', deprecated: false, order: 2 },
-        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.PRO_2_5), label: 'Gemini 2.5 Pro', description: 'Google — proven, large context', tier: 'high', deprecated: false, order: 3 },
-        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.ASTRA), label: 'GPT-6 Astra', description: 'OpenAI — most capable', tier: 'high', deprecated: false, order: 4 },
-        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL), label: 'GPT-5.6 Sol', description: 'OpenAI — reliable agentic model', tier: 'high', deprecated: false, order: 5 },
-        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.TERRA), label: 'GPT-5.6 Terra', description: 'OpenAI — balanced agentic model', tier: 'medium', deprecated: false, order: 6 },
-        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.LUNA), label: 'GPT-5.6 Luna', description: 'OpenAI — fast agentic model', tier: 'low', deprecated: false, order: 7 },
-        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.GPT_5_2), label: 'GPT-5.2', description: 'OpenAI — stable reasoning model', tier: 'high', deprecated: false, order: 8 },
-        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.GPT_4O), label: 'GPT-4o', description: 'OpenAI — fast multimodal generalist', tier: 'medium', deprecated: false, order: 9 },
-        { id: toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.SONNET_5), label: 'Claude Sonnet 5', description: 'Anthropic — fast & capable', tier: 'medium', deprecated: false, order: 10 },
-        { id: toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.OPUS_5), label: 'Claude Opus 5', description: 'Anthropic — most powerful', tier: 'high', deprecated: false, order: 11 },
-        { id: toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.OPUS_4_8), label: 'Claude Opus 4.8', description: 'Anthropic — previous Opus generation', tier: 'high', deprecated: false, order: 12 },
-        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.SONNET_5)), label: 'Claude Sonnet 5', description: 'OpenRouter — Anthropic via OpenRouter', tier: 'medium', deprecated: false, order: 13 },
-        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('google', GEMINI_MODEL_IDS.PRO_3_1_PREVIEW)), label: 'Gemini 3.1 Pro', description: 'OpenRouter — Google via OpenRouter', tier: 'high', deprecated: false, order: 14 },
-        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('google', GEMINI_MODEL_IDS.FLASH_3_8)), label: 'Gemini 3.8 Flash', description: 'OpenRouter — Google via OpenRouter', tier: 'medium', deprecated: false, order: 15 },
-        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.ASTRA)), label: 'GPT-6 Astra', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'high', deprecated: false, order: 16 },
-        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL)), label: 'GPT-5.6 Sol', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'high', deprecated: false, order: 17 },
-        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.TERRA)), label: 'GPT-5.6 Terra', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'medium', deprecated: false, order: 18 },
-        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.LUNA)), label: 'GPT-5.6 Luna', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'low', deprecated: false, order: 19 },
-        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.GPT_5_2)), label: 'GPT-5.2', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'high', deprecated: false, order: 20 },
-        { id: toOpenCodeModelId('openrouter', OPENROUTER_MODEL_IDS.LLAMA_3_3_70B_INSTRUCT), label: 'Llama 3.3 70B', description: 'OpenRouter — open-weight, low cost', tier: 'low', deprecated: false, order: 21 },
+        // Sprint 141 decision 10: the first row is OpenCode's one-shot model and the composer's
+        // first choice, so it is one Google's free tier serves (3.8 Flash; Argon and 3.1 Pro
+        // are "Not available" on it, Gemini API pricing page of 2026-10-26).
+        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.FLASH_3_8), label: 'Gemini 3.8 Flash', description: 'Google — current fast model', tier: 'medium', deprecated: false, order: 0 },
+        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4), label: 'Gemini 4 Argon', description: 'Google — flagship reasoning', tier: 'high', deprecated: false, order: 1 },
+        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.PRO_3_1_PREVIEW), label: 'Gemini 3.1 Pro', description: 'Google — most capable, deep reasoning', tier: 'high', deprecated: false, order: 2 },
+        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.FLASH_LITE_3_5), label: 'Gemini 3.5 Flash Lite', description: 'Google — current low-cost model', tier: 'low', deprecated: false, order: 3 },
+        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.PRO_2_5), label: 'Gemini 2.5 Pro', description: 'Retained for saved selections', tier: 'high', deprecated: true, order: 4 },
+        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_1), label: 'GPT-6.1 Sol', description: 'OpenAI — latest agentic workhorse', tier: 'high', deprecated: false, order: 5 },
+        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.ASTRA), label: 'GPT-6 Astra', description: 'OpenAI — most capable', tier: 'high', deprecated: false, order: 6 },
+        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL), label: 'GPT-5.6 Sol', description: 'OpenAI — reliable agentic model', tier: 'high', deprecated: false, order: 7 },
+        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.TERRA), label: 'GPT-5.6 Terra', description: 'OpenAI — balanced agentic model', tier: 'medium', deprecated: false, order: 8 },
+        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.LUNA), label: 'GPT-5.6 Luna', description: 'OpenAI — fast agentic model', tier: 'low', deprecated: false, order: 9 },
+        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.GPT_5_2), label: 'GPT-5.2', description: 'OpenAI — stable reasoning model', tier: 'high', deprecated: false, order: 10 },
+        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.GPT_4O), label: 'GPT-4o', description: 'OpenAI — fast multimodal generalist', tier: 'medium', deprecated: false, order: 11 },
+        { id: toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.SONNET_5_5), label: 'Claude Sonnet 5.5', description: 'Anthropic — fast & capable', tier: 'medium', deprecated: false, order: 12 },
+        { id: toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.OPUS_5_5), label: 'Claude Opus 5.5', description: 'Anthropic — most capable', tier: 'high', deprecated: false, order: 13 },
+        { id: toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.HAIKU_5_5), label: 'Claude Haiku 5.5', description: 'Anthropic — quick & light', tier: 'low', deprecated: false, order: 14 },
+        { id: toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.SONNET_5), label: 'Claude Sonnet 5', description: 'Anthropic — previous Sonnet', tier: 'medium', deprecated: false, order: 15 },
+        { id: toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.OPUS_5), label: 'Claude Opus 5', description: 'Anthropic — previous Opus', tier: 'high', deprecated: false, order: 16 },
+        { id: toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.OPUS_4_8), label: 'Claude Opus 4.8', description: 'Anthropic — previous Opus generation', tier: 'high', deprecated: false, order: 17 },
+        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4)), label: 'Gemini 4 Argon', description: 'OpenRouter — Google via OpenRouter', tier: 'high', deprecated: false, order: 18 },
+        { id: toOpenCodeModelId('openrouter', OPENROUTER_MODEL_IDS.CLAUDE_SONNET_5_5), label: 'Claude Sonnet 5.5', description: 'OpenRouter — Anthropic via OpenRouter', tier: 'medium', deprecated: false, order: 19 },
+        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.SONNET_5)), label: 'Claude Sonnet 5', description: 'OpenRouter — Anthropic via OpenRouter', tier: 'medium', deprecated: false, order: 20 },
+        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_1)), label: 'GPT-6.1 Sol', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'high', deprecated: false, order: 21 },
+        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('google', GEMINI_MODEL_IDS.PRO_3_1_PREVIEW)), label: 'Gemini 3.1 Pro', description: 'OpenRouter — Google via OpenRouter', tier: 'high', deprecated: false, order: 22 },
+        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('google', GEMINI_MODEL_IDS.FLASH_3_8)), label: 'Gemini 3.8 Flash', description: 'OpenRouter — Google via OpenRouter', tier: 'medium', deprecated: false, order: 23 },
+        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.ASTRA)), label: 'GPT-6 Astra', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'high', deprecated: false, order: 24 },
+        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL)), label: 'GPT-5.6 Sol', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'high', deprecated: false, order: 25 },
+        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.TERRA)), label: 'GPT-5.6 Terra', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'medium', deprecated: false, order: 26 },
+        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.LUNA)), label: 'GPT-5.6 Luna', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'low', deprecated: false, order: 27 },
+        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.GPT_5_2)), label: 'GPT-5.2', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'high', deprecated: false, order: 28 },
+        { id: toOpenCodeModelId('openrouter', OPENROUTER_MODEL_IDS.LLAMA_3_3_70B_INSTRUCT), label: 'Llama 3.3 70B', description: 'OpenRouter — open-weight, low cost', tier: 'low', deprecated: false, order: 29 },
       ],
     },
   },

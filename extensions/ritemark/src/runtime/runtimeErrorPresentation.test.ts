@@ -4,6 +4,7 @@ import {
   acpTurnErrorCode,
   classifyClaudeAuthenticationError,
   classifyRuntimeError,
+  isGoogleModelRefusal,
   codexTurnErrorCode,
   isClaudeAuthenticationError,
   presentRuntimeError,
@@ -203,6 +204,14 @@ assert.deepEqual(
   { kind: 'model', sentence: "OpenCode couldn't use google/gemini-9-nope. It isn't available right now. Choose another model in the model menu, then send your message again.", detail: { model: 'google/gemini-9-nope' } },
 );
 assert.equal(classifyRuntimeError('opencode', 'models/gemini-9-nope is not found for API version v1beta, or is not supported for generateContent.')?.detail?.model, 'gemini-9-nope');
+// Sprint 141 (A2): Google's words for a 2.5 model and a new account's key, seen on Google's forum.
+assert.equal(classifyRuntimeError('opencode', 'This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use a newer model.')?.detail?.model, 'gemini-2.5-flash');
+assert.equal(classifyRuntimeError('opencode', 'This model models/gemini-2.5-flash is no longer available to new users.')?.kind, 'model');
+// Sprint 141 R5: a refused model, by structure (404 NOT_FOUND naming the model).
+assert.equal(isGoogleModelRefusal(404, { error: { status: 'NOT_FOUND', message: 'This model models/gemini-2.5-flash is no longer available to new users.' } }, 'gemini-2.5-flash'), true);
+assert.equal(isGoogleModelRefusal(404, { error: { status: 'NOT_FOUND', message: 'Requested entity was not found.' } }, 'gemini-2.5-flash'), false);
+assert.equal(isGoogleModelRefusal(403, { error: { status: 'PERMISSION_DENIED', message: 'models/gemini-2.5-flash' } }, 'gemini-2.5-flash'), false);
+assert.equal(isGoogleModelRefusal(404, { error: { status: 'NOT_FOUND', message: 'models/gemini-2.5-flash-lite is not found' } }, 'gemini-2.5-flash-lite'), true);
 
 // A11. OpenCode: a refused or missing key opens Settings' keys.
 assert.deepEqual(classifyRuntimeError('opencode', 'provider authentication required', { code: 'auth_required', turnModel: 'google/gemini-4-argon' }), {
