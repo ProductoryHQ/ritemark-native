@@ -39,7 +39,7 @@
 | S24, S25 | Pass | `runtimeDeclarations.test.ts`. The request-capture probe was not run: it changes `HOME` for its CLI |
 | S26–S31 | Pass | `research/feed-check-report.md` (exit 0 with `--accept legacy:codex`); `research/feed-readers-audit.md` for the declaration replay. S31 also in `feedExport.test.ts` |
 | S32–S34 | Pass | `checkModelFeed.test.ts` |
-| S35–S41 | Merge 2 | — |
+| S35–S41 | Merge 2 | See *Merge 2*, below |
 | S42 | Pass | `check:anthropic-models`: OK, catalog v3183, Claude Code 2.1.310 |
 | S43 | Pass | `fetch-agent-runtimes` 12/12 PASS; `verify-agent-runtimes.sh` all executed checks pass, one SKIP (Windows sandbox helpers) |
 | S44 | Pass | Claude Code 2.1.310's live list in the dev instance: `sonnet`, `opus`, `fable`, `haiku`; the lineup unchanged |
@@ -109,6 +109,37 @@ Run on the rebased branch with this pass's changes, before the commit that recor
 Run on the branch rebased onto `beac93b2` at `71a3a1cc`, before the commit that records them. A fresh webview build matched the committed bundle byte for byte.
 - `npm run compile`: exit 0.
 - `npm test` (main's chain with Sprint 143's and 142's tests plus this sprint's; `runtimeErrorPresentation` passes its Sprint 127, 139, 141 and 143 cases): exit 0.
+- The webview's `tsc --noEmit`: clean.
+- `./scripts/validate-qa.sh`: exit 0.
+- The pre-commit validator, run by hand with `CLAUDE_PROJECT_DIR` set to the worktree: pass.
+
+## Merge 2 (R10, #529), 27 October
+
+| Scenario | Result | Evidence |
+|---|---|---|
+| S35 | Pass, on merge 2 restacked on merge 1's `3bf3805b` (on `origin/main` `beac93b2`, decision 10 included). Earlier passes: `28d5eb57`, whose merge 1 predated decision 10, and `3fe3342d` on merge 1's `d3857ab1` | `opencodeLiveList.test.ts` with A3's fixture (the list OpenCode 1.19.4 builds from the models.dev registry for the four providers' keys): catalog labels and order for known models, OpenCode's name for a new one (GPT-6.1 Terra). The Google group's first row is Gemini 3.8 Flash, Argon second (decision 10) |
+| S36 | Pass | The same: no embedding, speech, image, live, batch or real-time routes; OpenRouter limited to the lineup's families plus Llama 3.3 70B. Offered per group: Google 5, OpenAI 8, Anthropic 5, OpenRouter 16 |
+| S37 | Pass | A vendor without live rows keeps its static rows, and OpenCode stays ready (`deriveRuntimeAvailabilities`) |
+| S38 | Pass | No live list gives today's static list. In a dev instance of the merge-2 build with no OpenCode session yet, the AI sheet's payload offers Google 5, OpenAI 7, Anthropic 5 and OpenRouter 12: the static rows. No catalog error in the log |
+| S39 | Pass | The keyless run (`research/opencode-lists-audit.md`): 10 free `opencode/*` models, `{ value, name }` only, the first `session/new` in 320 ms and a second in 4 ms. None becomes a Ritemark row |
+| S40 | **Not run** | Needs a Google key |
+| S41 | **Not run** | No Windows PC access from this session |
+
+- **What can't be seen without a key.** The composer shows OpenCode's groups only for a provider with a key, so the new menu can't be shown in a screenshot here. The Experience lead's look waits for a key, or for Gate 2.
+- **The parts not unit-tested.** The wiring (`AcpManager.onModelOptions` to `noteOpenCodeModels`) is checked by `tsc` and the AcpRuntime and acpManager tests. The globalState round trip has no test of its own: it is a plain read and write.
+
+### Merge 2's restack, 27 October
+
+- **Restacked** on merge 1's QA-pass head `d3857ab1` (on `origin/main` `72f509e8`), then again on merge 1's final head `3bf3805b` (on `origin/main` `beac93b2`); the second time only `package.json`'s test line and this file conflicted. Conflicts: the CHANGELOG, `architecture.md` and this file kept both merges' text; `package.json` keeps merge 1's test chain plus `opencodeLiveList.test.ts`. No webview source changes in merge 2, so `media/webview.js` is merge 1's.
+- **The fix the restack needed:** `opencodeLiveList.test.ts`'s S35 expected Argon as the first row; with decision 10 it is Gemini 3.8 Flash.
+- **Checks on the restacked branch, before the commit that records them:** see *Checks, merge 2's restack* below.
+
+
+### Checks, merge 2's restack
+
+Run on the restacked branch at `daaa0b5a` (merge 1's `d3857ab1` plus merge 2's two commits), and again after the final restack at `42fdd230` (merge 1's `3bf3805b` on `beac93b2`, plus merge 2's three commits), before the commit that records them. Both times:
+- `npm run compile`: exit 0.
+- `npm test` (merge 1's chain plus `opencodeLiveList.test.ts`; `runtimeErrorPresentation` passes): exit 0.
 - The webview's `tsc --noEmit`: clean.
 - `./scripts/validate-qa.sh`: exit 0.
 - The pre-commit validator, run by hand with `CLAUDE_PROJECT_DIR` set to the worktree: pass.

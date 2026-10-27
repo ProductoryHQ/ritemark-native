@@ -46,11 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The spreadsheet's Open in Excel** has Ritemark's tooltips instead of the system's.
 - **A task's tab keeps its title after a restart (#508; merge 2, patch 019).** A task card's page brought back by a restart or Reload Window shows the task's title from the first paint, not its file's name until it is opened. A file renamed while Ritemark was closed still shows its new name.
 
-### Sprint 141: 2.1's model lineup (#532, #531, #530, #558)
+### Sprint 141: 2.1's model lineup (#532, #531, #530, #558, #529)
 
 #### Added
 - **Gemini 4 Argon (#532).** Google's flagship reasoning model is first in a Flow's Gemini list, and joins OpenCode's Google and OpenRouter groups, even before Ritemark has fetched its model list. OpenCode's Google group starts with Gemini 3.8 Flash, which a free AI Studio key can use.
 - **Current models in OpenCode.** OpenCode's Claude group gains Sonnet 5.5, Opus 5.5 and Haiku 5.5, its OpenAI group GPT-6.1 Sol, and its OpenRouter group Claude Sonnet 5.5 and GPT-6.1 Sol.
+- **OpenCode's model lists follow OpenCode itself (#529).** After your first OpenCode chat, each provider you have a key for lists the models the bundled OpenCode can run. A model a provider adds shows up without a Ritemark update, and older variants stay out of the menu.
 
 #### Changed
 - **A new Gemini step in a Flow starts on Gemini 3.5 Flash Lite (#531).** Google now offers the Gemini 2.5 models only to people who used them before, so a new Google account couldn't run a Flow's default. The 2.5 models stay in the lists, marked as kept for saved selections, and a saved Flow keeps its model.

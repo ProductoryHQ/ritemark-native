@@ -216,6 +216,8 @@ Acceptance criteria:
 - No new process per probe beyond what A3 accepts. Nothing new leaves the computer: OpenCode's own list is read locally, and the provider requests are the ones Flows already make.
 - **Done when (#529):** with a Google key, a model Google adds shows up in OpenCode's list without a feed edit or a release, and a turn on it works. This is **not runnable** without a Google key; the keyless proofs are in *scenarios.md* (S35–S41).
 
+**R10, as built (27 October, after A3):** the rows offered are each curated model OpenCode lists, plus a new model of the lineup's families only when it is at least as new as the newest curated one; older new models stay resolvable but hidden. This is the short-menu rule A3 chose (`research/opencode-lists-audit.md`). The acceptance criteria are unchanged.
+
 ### R11: The release's runtime review
 
 As the people releasing 2.1, we want the bundled agent runtimes current, and the model lineup to match them.

@@ -45,6 +45,7 @@ import {
 import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import { thinkingEffortLabel } from '../runtime/thinkingEffort';
 import { acpTurnErrorCode } from '../runtime/runtimeErrorPresentation';
+import { noteOpenCodeModels } from '../ai/modelCatalog';
 
 type PendingApproval = (result: { approved: boolean; alwaysAllow: boolean }) => void;
 
@@ -530,6 +531,8 @@ export class AcpRuntime implements AgentRuntime {
       mcpServers,
       requestPermission: (params) => this._handlePermission(params),
       approveWrite: (request) => this._handleWriteApproval(request),
+      // Sprint 141 R10: OpenCode's own model list feeds the model menu.
+      onModelOptions: (options) => noteOpenCodeModels(options),
       onProgress: (progress, sessionId) => {
         const session = this._sessionsByAcpId.get(sessionId);
         session?.markDispatchAccepted();

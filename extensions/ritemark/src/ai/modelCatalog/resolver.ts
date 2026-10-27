@@ -82,7 +82,12 @@ function resolveProvider(
 
   let source: ProvenanceSource;
   let models: ModelEntry[];
-  if (live && live.length > 0) {
+  if (live && live.length > 0 && provider === 'opencode') {
+    // Sprint 141 R10: OpenCode's list covers only the vendors it was read for; every
+    // other vendor keeps its static rows, so a key without a live list still has a group.
+    source = 'live';
+    models = mergeOpenCodeVendors(live, staticModels, defaults, bundledPC);
+  } else if (live && live.length > 0) {
     source = 'live';
     models = enrichLive(live, { models: staticModels, defaults }, bundledPC);
   } else {
@@ -365,6 +370,33 @@ function enrichCatalogCapabilities(
     ...model,
     thinkingEffort: model.thinkingEffort ?? bundledById.get(model.id)?.thinkingEffort,
   }));
+}
+
+/** The vendor of an OpenCode route (`google/gemini-…` → google). */
+function openCodeVendor(id: string): string {
+  return id.split('/')[0];
+}
+
+/**
+ * Sprint 141 R10: per vendor, OpenCode's live rows enriched from the static rows of
+ * that vendor; the static rows of every vendor the live list doesn't cover. An id
+ * appears once.
+ */
+function mergeOpenCodeVendors(
+  live: ModelEntry[],
+  staticModels: ModelEntry[],
+  defaults: Partial<Record<Surface, string>>,
+  bundled: ProviderCatalog | null,
+): ModelEntry[] {
+  const liveVendors = new Set(live.map((row) => openCodeVendor(row.id)));
+  const covered = staticModels.filter((row) => liveVendors.has(openCodeVendor(row.id)));
+  const others = staticModels.filter((row) => !liveVendors.has(openCodeVendor(row.id)));
+  const seen = new Set<string>();
+  return [...enrichLive(live, { models: covered, defaults }, bundled), ...others].filter((row) => {
+    if (seen.has(row.id)) return false;
+    seen.add(row.id);
+    return true;
+  });
 }
 
 /**

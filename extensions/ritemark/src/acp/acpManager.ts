@@ -62,6 +62,11 @@ export interface AcpManagerConfig {
   mcpServers?: unknown[];
   /** Permission handler — Phase 4 renders the approval UI. */
   requestPermission: (params: RequestPermissionRequest) => Promise<RequestPermissionResponse>;
+  /**
+   * Sprint 141 R10: OpenCode's own model list, from the `model` config option of a
+   * new or resumed session — every model this OpenCode can run.
+   */
+  onModelOptions?: (options: Array<{ value: string; name?: string }>) => void;
   /** Write approval gate for the fs proxy (R4 — no silent writes). */
   approveWrite: AcpWriteApproval;
   /**
@@ -126,6 +131,30 @@ function thoughtLevelCurrent(options: SessionConfigOption[]): string | null {
     : null;
 }
 
+/**
+ * Sprint 141 R10: the `model` config option's choices, as `{ value, name }`. OpenCode
+ * sends a flat list; grouped options are flattened.
+ */
+export function openCodeModelOptions(configOptions: readonly SessionConfigOption[]): Array<{ value: string; name?: string }> {
+  const option = configOptions.find((candidate) => {
+    const record = candidate as unknown as Record<string, unknown>;
+    return record.id === 'model' || record.configId === 'model' || record.category === 'model';
+  }) as unknown as { options?: unknown[] } | undefined;
+  const out: Array<{ value: string; name?: string }> = [];
+  const visit = (entries: unknown[] | undefined): void => {
+    for (const entry of entries ?? []) {
+      if (typeof entry !== 'object' || entry === null) continue;
+      const record = entry as Record<string, unknown>;
+      if (Array.isArray(record.options)) visit(record.options);
+      if (typeof record.value === 'string' && record.value.length <= 200) {
+        out.push({ value: record.value, ...(typeof record.name === 'string' ? { name: record.name } : {}) });
+      }
+    }
+  };
+  visit(option?.options);
+  return out.slice(0, 2000);
+}
+
 export class AcpManager {
   private readonly config: AcpManagerConfig;
   private client: AcpClient | null = null;
@@ -179,6 +208,7 @@ export class AcpManager {
       initialThoughtLevel: thoughtLevelCurrent(session.configOptions ?? []),
       currentModel: null,
     });
+    this.reportModelOptions(session.configOptions ?? []);
     this.emit(session.sessionId, 'init', 'Starting OpenCode session…');
     traceAcp('manager', 'started', { sessionId: session.sessionId, liveSessions: this.sessions.size });
     return session.sessionId;
@@ -198,8 +228,20 @@ export class AcpManager {
       initialThoughtLevel: thoughtLevelCurrent(session.configOptions ?? []),
       currentModel: null,
     });
+    this.reportModelOptions(session.configOptions ?? []);
     this.emit(sessionId, 'init', 'Resuming OpenCode session…');
     traceAcp('manager', 'resumed', { liveSessions: this.sessions.size });
+  }
+
+  /** Sprint 141 R10: hand OpenCode's model list to the catalog; never throws. */
+  private reportModelOptions(configOptions: SessionConfigOption[]): void {
+    if (!this.config.onModelOptions) return;
+    try {
+      const options = openCodeModelOptions(configOptions);
+      if (options.length > 0) this.config.onModelOptions(options);
+    } catch {
+      // A list we can't read leaves the catalog's static rows in place.
+    }
   }
 
   private async ensureClient(): Promise<AcpClient> {

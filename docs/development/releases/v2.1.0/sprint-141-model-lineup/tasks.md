@@ -142,17 +142,23 @@ Nothing here starts before the plan is approved. Tick a box only when the change
 
 ## Phase 7: OpenCode's live lists and merge 2 (W5), if A3 says go
 
-- [ ] `src/ai/modelCatalog/opencodeLiveList.ts` (new): `filterOpenCodeModels()`, `narrowToProvider()` (R10)
-- [ ] `src/ai/modelCatalog/providerDiscovery.ts`: `discoverOpenCode()` with A3's read; `src/acp/acpManager.ts` keeps the last `session/new` model option, if A3 chose (a) or (c) (R10)
-- [ ] `src/ai/modelCatalog/resolver.ts`: the per-vendor merge for `opencode` (R10)
-- [ ] `src/extension.ts`: `results.opencode` in the discovery provider; a BYOK key change calls `modelCatalog.refreshDiscovery()` (R10)
-- [ ] Tests:
+A3 said go (27 October). As built, the shape differs from the plan's names, as the technical plan's W5 note says:
+- one function, `openCodeLiveRows()`, filters and narrows;
+- `AcpManager` hands the `session/new` model option to `modelCatalog.noteOpenCodeModels()`, which keeps it and re-resolves;
+- `extension.ts` is unchanged: the catalog adds the live rows to every discovery result itself (`withOpenCodeLive`).
+
+
+- [x] `src/ai/modelCatalog/opencodeLiveList.ts` (new): `filterOpenCodeModels()`, `narrowToProvider()` (R10)
+- [x] `src/ai/modelCatalog/providerDiscovery.ts`: `discoverOpenCode()` with A3's read; `src/acp/acpManager.ts` keeps the last `session/new` model option, if A3 chose (a) or (c) (R10)
+- [x] `src/ai/modelCatalog/resolver.ts`: the per-vendor merge for `opencode` (R10)
+- [x] `src/extension.ts`: `results.opencode` in the discovery provider; a BYOK key change calls `modelCatalog.refreshDiscovery()` (R10)
+- [x] Tests:
   - the filter, the narrowing, the per-vendor merge and the fallback with A3's fixtures;
   - the readiness invariant;
   - Claude below 5 hidden (S35–S38, E3)
-- [ ] Manual QA: S35–S39. S40 recorded as not run. Windows overlay: S41
-- [ ] Screenshots of the composer's OpenCode groups (built from the fixtures) to the Experience lead
-- [ ] `architecture.md`: OpenCode's live layer; the version-history row amended (E5)
+- [x] QA: S35–S39 by unit tests with A3's fixtures and the keyless run. S40 recorded as not run (no key). S41 (Windows overlay) not run in this session
+- [ ] Screenshots of the composer's OpenCode groups to the Experience lead. **Not possible without a key**: the composer shows OpenCode's groups only for providers with a key. The menu each group would show is listed in `qa-evidence.md` instead
+- [x] `architecture.md`: OpenCode's live layer; the version-history row amended (E5)
 - [ ] PR. Then:
   - `qa-validator`;
   - the Development manager's smoke test;

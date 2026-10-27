@@ -42,6 +42,7 @@ import {
   withBundledDeclarations,
 } from './runtimeDeclarations';
 import type { ModelCatalog, ModelEntry, Provider, Surface } from './schema';
+import { openCodeLiveRows, type OpenCodeModelOption } from './opencodeLiveList';
 
 export type { ModelEntry, Provider, Surface } from './schema';
 export type { ResolvedProvider, ProvenanceSource, DiscoveryResults, RequestedModelResolution } from './resolver';
@@ -63,6 +64,9 @@ let _discovery: DiscoveryResults = {};
 let _declarations: ClaudeRuntimeDeclarations = NO_CLAUDE_DECLARATIONS;
 let _lastFeedCheck = 0;
 let _discoveryProvider: DiscoveryProvider | null = null;
+/** Sprint 141 R10: OpenCode's own model list, from its last session (globalState). */
+let _openCodeOptions: OpenCodeModelOption[] = [];
+const OPENCODE_OPTIONS_KEY = 'modelCatalog_opencodeModels_v1';
 let _probe: Promise<void> | null = null;
 let _probeAgain = false;
 const _timers: Array<ReturnType<typeof setInterval>> = [];
@@ -76,6 +80,7 @@ export function setDiscoveryProvider(provider: DiscoveryProvider): void {
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   _context = context;
   _appVersion = context.extension?.packageJSON?.version ?? '0.0.0';
+  _openCodeOptions = readOpenCodeOptions(context.globalState.get<unknown>(OPENCODE_OPTIONS_KEY));
 
   // Immediate synchronous-quality resolve (cache + bundled) so getModels() is
   // populated before the first network round-trip.
@@ -165,7 +170,46 @@ async function probeOnce(): Promise<void> {
       next = {};
     }
   }
-  _discovery = next;
+  _discovery = withOpenCodeLive(next);
+  resolveAndEmit();
+}
+
+function readOpenCodeOptions(raw: unknown): OpenCodeModelOption[] {
+  const options = (raw as { options?: unknown } | undefined)?.options;
+  if (!Array.isArray(options)) return [];
+  return options
+    .filter((option): option is OpenCodeModelOption => typeof option === 'object' && option !== null && typeof (option as OpenCodeModelOption).value === 'string')
+    .slice(0, 2000);
+}
+
+/**
+ * Sprint 141 R10: the `opencode` live rows, from OpenCode's own list, narrowed by
+ * the Google and OpenAI lists this probe already read for the person's keys.
+ */
+function withOpenCodeLive(discovery: DiscoveryResults): DiscoveryResults {
+  if (!_context || _openCodeOptions.length === 0 || !isEnabled('opencode-integration')) return discovery;
+  const curated = resolveStaticModels('opencode', _remote, getCachedCatalog(_context.globalState), BUNDLED_CATALOG, _appVersion);
+  const idsOf = (rows: ModelEntry[] | null | undefined): ReadonlySet<string> | undefined => (rows ? new Set(rows.map((row) => row.id)) : undefined);
+  const providerIds: Partial<Record<'google' | 'openai', ReadonlySet<string>>> = {};
+  const google = idsOf(discovery.gemini);
+  const openai = idsOf(discovery.openai);
+  if (google) providerIds.google = google;
+  if (openai) providerIds.openai = openai;
+  const rows = openCodeLiveRows(_openCodeOptions, curated, providerIds);
+  return { ...discovery, opencode: rows.length > 0 ? rows : null };
+}
+
+/**
+ * Sprint 141 R10: OpenCode reported its model list (a new or resumed session). Kept
+ * for the next start; the menu follows at once when it changed.
+ */
+export function noteOpenCodeModels(options: OpenCodeModelOption[]): void {
+  if (!_context) return;
+  const next = readOpenCodeOptions({ options });
+  if (JSON.stringify(next) === JSON.stringify(_openCodeOptions)) return;
+  _openCodeOptions = next;
+  void _context.globalState.update(OPENCODE_OPTIONS_KEY, { options: next, at: new Date().toISOString() });
+  _discovery = withOpenCodeLive(_discovery);
   resolveAndEmit();
 }
 
