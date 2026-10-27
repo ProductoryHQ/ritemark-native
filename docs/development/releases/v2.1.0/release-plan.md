@@ -81,6 +81,7 @@ The shape's done list, checked on the release candidate. A failure is a first-we
 - [ ] **Synced folders (#499).**
   - The welcome opens a OneDrive, SharePoint or Google Drive synced folder as a project, on the Mac and on Windows, including online-only files.
   - Saving and the agent work there without conflicts. Sprint 137's R11 is the save half: a sync client touching a file asks nothing.
+  - **On the Mac: Gate 2 on the RC, with the File Provider consent** (Sprint 144's S20, 27 October). macOS asks each app once for the files a sync client manages under `~/Library/CloudStorage` ("… would like to access files managed by Google Drive"), and the answer belongs to that app, so a dev build's answer wouldn't carry over to the signed candidate. Jarmo answers the dialog himself when he tests the candidate, on his personal Google Drive, and on a OneDrive that isn't the work tenant's (this Mac's OneDrive is only the work tenant, `OneDrive-ProductoryServicesOÜ`, which stays out of tests). Nothing was created in either drive during the sprint.
 - [ ] **The Windows first window (#276, closed in 2.0).**
   - On a fresh profile and on an update from 2.0.1, the first window opens on the welcome and then Home with the AI in view, not on a terminal or an empty desk.
   - #501, a restored terminal before the welcome on a slow first start after an update, is checked in the same run.

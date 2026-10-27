@@ -112,6 +112,9 @@ When S1's installer updates it and the app starts the first time
 Then the time a restored terminal is in front before the welcome is recorded (2.0's retest: 6–14 s); if it is in front at all after the welcome appears, #501 is a 2.1 bug with that recording
 
 ### S20: A synced folder on the Mac (#499, with the manager's OK)
+
+*Moved to Gate 2 on the RC (the manager, 27 October): macOS's File Provider consent is per app, so it is answered on the signed candidate by Jarmo; the work tenant's OneDrive stays out. See `qa-evidence.md`.*
+
 Given a dev build here, and a new empty folder "Ritemark 2.1 sync test" inside this Mac's OneDrive folder and one inside its Google Drive folder
 When the welcome opens each as a project, a document is created, edited and saved, and the AI edits it
 Then each opens, the saves ask nothing, and the AI's write raises no conflict

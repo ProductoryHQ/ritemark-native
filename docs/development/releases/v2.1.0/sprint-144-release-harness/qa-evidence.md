@@ -20,6 +20,8 @@ What ran, where, and what it showed. "Here" is the Mac, on a dev build of the br
 
 Dev-environment noise seen in the p1 launch, not caused by this branch: GitHub Copilot Chat failed to activate (its `dist/` isn't built in a dev tree; release builds strip it), and the terminal showed Copilot CLI's hint for the same reason; "Missing 'tunnelApplicationConfig'" (OSS product.json); one "Refused to load resource /phosphor.woff2" at start, with every icon drawn.
 
+**S20, a synced folder on the Mac (#499): Gate 2 on the RC, with the File Provider consent** (the manager, 27 October). Not run here, and nothing was created in either drive. This Mac's OneDrive is only the work tenant (`OneDrive-ProductoryServicesOÜ`, and an older copy of it), which stays out of tests; its Google Drive is personal. macOS asks each app once for the files a sync client manages under `~/Library/CloudStorage`, and the answer belongs to that app: the dev build is an unsigned app the Mac hasn't seen, so it would put a consent dialog on Jarmo's screen while he is away, and its answer wouldn't carry over to the signed candidate anyway. So the Mac's half runs at Gate 2 on the RC, where Jarmo answers the dialog himself; the release plan's #499 item says so.
+
 **Still to run after the merge:** S1–S4 and S8 (the Windows build on `main`, the visibility and stars read before and after); `build-macos-x64.yml` on `main`; S11–S12's Windows half and S17–S19 by the Windows session; S15 or S16.
 
 ## Part 2: polish from the 2.1 smoke test (`sprint-144-release-harness-polish`)
