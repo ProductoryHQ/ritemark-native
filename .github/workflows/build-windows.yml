@@ -553,8 +553,13 @@ jobs:
             -SignToolPath '${{ steps.signing-tools.outputs.signtool }}'
 
       - name: Sign Windows binaries (Azure Artifact Signing)
+        # Sprint 144 (#506): no cached dependencies. With the cache on, a hit for the action's ArtifactSigning
+        # PowerShell module skips its Install-Module step; the cached copy, saved on the 8-core runner, worked there
+        # but not on windows-latest ("The term 'Invoke-ArtifactSigning' is not recognized", run 40434351179). The
+        # action then installs the module from PSGallery on every run, about a minute.
         uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2
         with:
+          cache-dependencies: false
           azure-tenant-id: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
           azure-client-secret: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
