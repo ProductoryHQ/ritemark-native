@@ -130,6 +130,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **New writing uses one plain form (R8):** new lists are `- item` and tight; a typed line break (Shift+Enter) is `line\`; a new thematic break is `---` (`***` as a document's first block). Save as Markdown (Word preview) and Copy as Markdown use the same rules.
 - **Files saved by Ritemark 2.0.1 and earlier** change once on their first save in 2.1: the spaces on blank lines and needless escapes go.
 
+### Sprint 140: the first day and the feedback door (#497, #498, #466)
+
+#### Added
+- **A first request on Home (Sprint 140, #498).** A new project's Home offers one ready request under Waiting for you: in a folder with files, "Ask <AI> what is here", sent at once in a new chat (the AI looks at the names and ends with two things it could do next; ChatGPT also reads the five newest documents, Claude and OpenCode once they pass #497's spike), with what the folder holds counted from the names alone ("37 files: 20 Word documents, 10 PDFs, 4 spreadsheets and 3 text documents."); in an empty folder, "Tell <AI> what this project is for", which puts "This project is for " in the message box, then "Then write About this project from it, and a first outline as a document.", and sends nothing until you do; in the sample, "Ask <AI> to draft Module 4", which gives the board's task to the AI. Ask with chooses the AI, with Sign in or Set up for one that is not ready. The card goes once answered, once you start a chat of your own there, or with ×.
+- **Starting points in an empty chat (Sprint 140, #498).** "What shall we work on?" and up to three starting points chosen by what is in front: the project, an empty project, the sample, a short or long text, a table. A click puts the words in the message box, ready for Send; nothing is sent. They step aside while you type. These replace 2.0's three examples, which sent at once.
+- **Send feedback (Sprint 140, #466).** In the status bar, in Help, in AI information (as Report an AI issue) and in All commands, one sheet over the window. With neither box ticked, Send sends your words straight from Ritemark, even with usage data off, and says thank you only when the service accepted them; if it didn't go, your message stays with Try again and Open in e-mail. Ticking "This is about something the AI said or did" or "I'd like an answer" goes through your own e-mail app to info@productory.eu; in a chat, the AI's last answer can be added as a quote you see first. Replaces Report AI issue's window and Send Feedback's four reactions.
+- **A line on Home in your first week (Sprint 140, #466).** On the third day you save a document in this release, Home asks "What did you make with Ritemark this week?" once; Send or Not now ends it.
+- **Empty places say what they are for (Sprint 140, #498).** The task board with no tasks, the conversations panel with no chats, and Transcribe with no recordings.
+
+#### Changed
+- **Every AI says which files it could not open (Sprint 140, #497).** Claude, ChatGPT and OpenCode are told to name a file they could not open (a scanned PDF, a protected document) rather than leave it out.
+- **ChatGPT's file citations are links (Sprint 140).** They were drawn as raw markup.
+- **Every AI knows what About this project is (Sprint 140).** Asked to write About this project, Claude, ChatGPT and OpenCode write the project's `AGENTS.md`, which Home shows as About this project.
+
 ---
 
 ## [2.0.1] — 2026-10-24
