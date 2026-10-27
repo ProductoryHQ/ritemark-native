@@ -126,9 +126,9 @@ These were added after the shape, mostly from 2.0's release candidate and its fi
 | 142, merge 2 (patches 002, 018, 019) | `sprint-142-polish-shell` | [#565](https://github.com/ProductoryHQ/ritemark-native/pull/565) | #557 (File changes), #503 (the desk's edge), #508 | Merged 27 Oct (beac93b2) | No blockers at 8830ea17, 27 Oct; the Experience lead signed off (9aaef19); the follow-up (a restored tab that is no longer a card, S63) rebased onto 5019e42b | Drafted with merge 1's, in the same file |
 | Plan: 143 | `plan/sprint-143-fixes` | — | — | Rebased into `sprint-143-fixes` | n/a | n/a |
 | 143 | `sprint-143-fixes` | [#564](https://github.com/ProductoryHQ/ritemark-native/pull/564) | #556, #551, #544, #514, #513, #511, #507, #509, #510 | Merged 27 Oct (5019e42b) | Passed (technical), 27 Oct; Windows (A4) and Gate 2 rows open | `CHANGELOG.md` entry; notes at closeout |
-| Plan: 144 | `plan/sprint-144-release-harness` | Draft, docs only | #506, #515, #569 | — | n/a | n/a |
-| 144, Part 1 (shell) | `sprint-144-release-harness` | — | #506, #515 | — | — | `CHANGELOG.md` line for the Electron; notes at closeout |
-| 144, Part 2 (extension) | `sprint-144-release-harness-polish` | — | #569; the smoke test's P1–P4 | — | — | `CHANGELOG.md` entry; notes at closeout |
+| Plan: 144 | `plan/sprint-144-release-harness` | [#570](https://github.com/ProductoryHQ/ritemark-native/pull/570) | #506, #515, #569 | Merged 27 Oct (1a63b8cb) | n/a | n/a |
+| 144, Part 1 (shell) | `sprint-144-release-harness` | [#572](https://github.com/ProductoryHQ/ritemark-native/pull/572); the signing step's follow-up [#575](https://github.com/ProductoryHQ/ritemark-native/pull/575) | #506, #515 | #572 merged 27 Oct (9a9ea48a); #575 open | Passed (technical), 27 Oct; the first signed Windows run on `windows-latest` is S1 | `CHANGELOG.md` line for the Electron; notes at closeout |
+| 144, Part 2 (extension; the themes' status bar fills ship with the shell) | `sprint-144-release-harness-polish` | [#574](https://github.com/ProductoryHQ/ritemark-native/pull/574) | #569; the smoke test's P1–P4 | Open | QA's one blocker (the reveals took focus) and its small fixes in; the Experience lead's answer (no dot, the fills) in | `CHANGELOG.md` entry; notes at closeout |
 | Release | a `create-release-worktree.sh` worktree, then the version bump | — | #499, the Store | — | — | — |
 
 ## Feature-Complete Checklist

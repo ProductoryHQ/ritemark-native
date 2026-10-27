@@ -331,7 +331,7 @@ function DependencyRow({
       </div>
       <div>
         {installed ? (
-          <span className="text-xs text-[var(--vscode-testing-iconPassed)]">Ready</span>
+          <span className="text-xs text-[var(--r-ink-muted)]">Ready</span>
         ) : isInstalling ? (
           <span className="text-xs opacity-60">Installing...</span>
         ) : isFailed ? (
@@ -347,7 +347,9 @@ function DependencyRow({
             </Button>
           </Tooltip>
         ) : disabled ? (
-          <span className="text-xs opacity-40" title={disabledHint}>{disabledHint}</span>
+          <Tooltip label={disabledHint}>
+            <span className="text-xs opacity-40">{disabledHint}</span>
+          </Tooltip>
         ) : (
           <Tooltip label={`Install ${label}`}>
             <Button type="button" variant="link" size="sm" className="h-auto gap-1 p-0 text-xs" onClick={onInstall}>
@@ -382,7 +384,7 @@ function CompactRow({
     <div className="flex items-center justify-between py-0.5">
       <div className="flex items-center gap-2">
         {installed ? (
-          <Icon name="check" size={14} className="text-[var(--vscode-testing-iconPassed)]" />
+          <Icon name="check" size={14} className="text-[var(--r-ink-body)]" />
         ) : optional ? (
           <Icon name="minus" size={14} className="opacity-30" />
         ) : (
@@ -392,7 +394,7 @@ function CompactRow({
       </div>
       <div className="flex items-center gap-2">
         {suffix && (
-          <span className={`text-xs ${installed ? 'text-[var(--vscode-testing-iconPassed)]' : 'opacity-40'}`}>
+          <span className={`text-xs ${installed ? 'text-[var(--r-ink-muted)]' : 'opacity-40'}`}>
             {suffix}
           </span>
         )}
@@ -425,7 +427,7 @@ function StatusIcon({
     return <Icon name="circle-notch" size={14} className="animate-spin text-[var(--r-accent)]" />;
   }
   if (installed) {
-    return <Icon name="check" size={14} className="text-[var(--vscode-testing-iconPassed)]" />;
+    return <Icon name="check" size={14} className="text-[var(--r-ink-body)]" />;
   }
   if (failed) {
     return <Icon name="x" size={14} className="text-[var(--vscode-testing-iconFailed)]" />;

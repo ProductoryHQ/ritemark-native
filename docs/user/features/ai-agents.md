@@ -343,7 +343,7 @@ For the longer data-flow explanation and current provider links, open **AI infor
 
 If an agent gives you output that is wrong, unsafe or not what you asked for, you can report it to the Ritemark team. There are four ways in, and all open the same sheet over the window:
 
-- **Send feedback** in the status bar at the bottom of the window, beside the **AI Ready** indicator. It is always there.
+- **Send feedback** in the status bar at the bottom of the window, beside the AI item, which names the AI your next message goes to (for example **Claude ready**) or says **No AI yet** or **Offline**. It is always there.
 - **Help ▸ Send feedback** in the menu bar.
 - **AI information** (the ⓘ button beside the message box) has a **Report an AI issue** link. It opens the sheet titled **Report an AI issue**, with **This is about something the AI said or did** already ticked.
 - **Send feedback** in All commands.

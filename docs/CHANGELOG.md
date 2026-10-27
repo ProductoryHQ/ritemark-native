@@ -12,14 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Sprint 144, part 2: polish from the 2.1 smoke test (#569)
 
 #### Changed
-- **The status bar says which AI you are talking to.** Instead of "AI Ready" whenever the internet answered, it names the AI your next message goes to: "Claude ready" with a green dot, "Claude: sign in" or "sign in again", "No AI yet" when no AI is signed in, and "Offline" with a grey dot when there is no internet. It follows sign-ins and switching between chats, for Claude, ChatGPT and OpenCode.
+- **The status bar says which AI you are talking to.** Instead of "AI Ready" whenever the internet answered, it names the AI your next message goes to: "Claude ready", "Claude: sign in" or "sign in again", "No AI yet" when no AI is signed in, and "Offline" when there is no internet. It says "ready" only once the internet has answered, and follows sign-ins and switching between chats, for Claude, ChatGPT and OpenCode. A click opens the AI's sheet.
+- **The status bar's items light up on hover and when pressed** in Ritemark's own colours, in Light and Dark (Send feedback too). Before, Light's pressed fill was paler than the bar.
 - **No "Experimental" badges on Claude and ChatGPT** in Settings: they are Ritemark's main AIs.
-- **The AI sheet's sign-in buttons** match the rest of Ritemark: their icons take the colour of their words, and each says what it does on hover.
+- **The AI sheet's sign-in buttons** match the rest of Ritemark: their icons take the colour of their words, and each says what it does on hover. "Installed" and "Ready" are in muted ink rather than pale green.
 
 #### Fixed
-- **A Flow step's model picker is usable at once.** It stayed greyed with "Loading models..." for 5 seconds every time a step was selected, because Ritemark answered the request with the wrong kind of list; an Image step now gets the image models.
+- **A Flow step's model picker is usable at once.** It stayed greyed with "Loading models..." for 5 seconds every time a step was selected, because Ritemark answered the request with the wrong kind of list. An Image step now gets the image models: opening one asks OpenAI or Google for its list with your key, as an LLM step's list already did through the model catalog. Without a key it keeps the built-in list and says so under Model ("OpenAI API key not configured"); a saved model the list no longer has shows as "Unavailable: <model>" until you choose another. Both lines were there before but never reached an Image step.
 - **A Flow step's Delete row no longer cuts through Temperature and Max Tokens** in a short window: it scrolls with the fields.
-- **After switching projects, the AI column is there with the window** instead of arriving 3–4 seconds after Home, and Home comes forward sooner (#569).
+- **After switching projects, the AI column comes back when Ritemark starts in the window**, before Home in 9 of 10 measured switches, instead of 3–4 seconds after Home, and it no longer takes the keyboard from the document you were in. What remains (the document in front for under a second before Home, while the window loads) happens before Ritemark runs; it is #569's check on the release candidate.
 
 ### Sprint 144, part 1: the release harness (#506, #515)
 

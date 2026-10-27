@@ -7,7 +7,8 @@
  * Renders the wizard's three steps to markup and checks:
  * - every <button> carries the shared Button's `data-slot="button"`;
  * - every button sits inside a tooltip trigger (the Tooltip wraps it in a span);
- * - clicking each button by its words runs the action it ran before, once.
+ * - clicking each button by its words runs the action it ran before, once;
+ * - "Installed" and "Ready" are muted ink with their checks in ink, never green.
  *
  * Run: npx tsx webview/src/components/ai-sidebar/OnboardingWizard.test.ts
  */
@@ -111,6 +112,7 @@ function click(recorded: Clickable[], words: string, where: string) {
     { 'claude-cli': 'failed' },
   )
   assertSharedButtons(root, where)
+  assert.ok(!root.toString().includes('testing-iconPassed'), `${where}: Ready and its check are ink, not green`)
   calls.length = 0
   click(recorded, 'Re-check', where)
   click(recorded, 'Retry', where)
@@ -136,6 +138,11 @@ function click(recorded: Clickable[], words: string, where: string) {
   assert.deepEqual(calls, ['startLogin', 'openApiKeySettings', 'startCodexLogin', 'recheckDependencies'], `${where}: actions`)
   const secondary = root.querySelectorAll('button').find((b) => b.text.trim() === 'Use API key')
   assert.ok(secondary?.getAttribute('class')?.includes('bg-secondary'), `${where}: Use API key is the secondary Button`)
+  // "Installed" in muted ink, its check in ink: green is not used for words (the Experience lead, 3c0a2ae).
+  const installed = root.querySelectorAll('span').filter((el) => el.text.trim() === 'Installed')
+  assert.equal(installed.length, 2, `${where}: Claude and ChatGPT both read Installed`)
+  for (const el of installed) assert.ok(el.getAttribute('class')?.includes('--r-ink-muted'), `${where}: Installed is muted ink`)
+  assert.ok(!root.toString().includes('testing-iconPassed'), `${where}: no green on the sign-in card`)
 }
 
 // Step 3: an AI is ready.

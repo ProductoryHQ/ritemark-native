@@ -4,18 +4,23 @@
  * and draws them.
  *
  * Where the inputs come from, all on the host, so the item is right before the AI's sheet has ever been opened:
- * - the internet: `connectivity.ts` (`isOnline`, `connectivityChanged`); Offline is decided before any probe;
+ * - the internet: `connectivity.ts` (`isOnline`, `connectivityChanged`, `hasInternetAnswered`); Offline is decided
+ *   before any probe, and "ready" waits for the internet's first answer;
  * - which AI: the open chat's, as the sheet reports it (`conversation/active`), else `ritemark.ai.selectedAgent`;
  * - its state: `UnifiedViewProvider.runtimeAvailability`, the one availability rule (Sprint 117, D12), re-read when
  *   Claude's or ChatGPT's status changes, when an OpenCode key changes, and when the open chat or the default AI does;
  * - a sign-in that ended: the open chat's last turn on that AI failed on sign-in, as the sheet reports it.
  *
- * Probing costs something (ChatGPT's probe starts its app server), so only the AI in question is probed, results are
- * reused for 15 s, and the other two are probed only to tell "No AI yet" from "Claude: sign in".
+ * Probing costs something (ChatGPT's probe starts its app server), so only the AI in question is probed, and results
+ * are reused for 15 s. Only when that AI can't take a turn are the others probed, because "No AI yet" and
+ * "Claude: sign in" differ by whether another AI can; the cheapest first (OpenCode reads its keys, Claude its CLI's
+ * status, ChatGPT asks its app server), stopping at the first that can. The AI's sheet reads Claude's and ChatGPT's
+ * status itself when it starts (`UnifiedViewProvider`'s hydration), and in a project window it starts with the window
+ * (P5), so ChatGPT's app server runs either way.
  *
- * The dot is its own item just left of the words, because VS Code colours an item's text all at once and the words
- * stay in body ink. It takes no command (no hover, not clickable, not a tab stop) and is hidden from screen readers, so
- * the words carry the one name, the one hover and the one click (the Experience lead's condition, b058692).
+ * In 2.1 the item is its words only, in body ink, with one name, one hover and one click (the Experience lead,
+ * experience 13, 3c0a2ae). A separate dot item sat 16 px from the words (VS Code's item padding), so it was dropped;
+ * a dot may return in 2.2 only when one item can draw it 6 px from its words with one hover.
  */
 
 import * as vscode from 'vscode';
@@ -23,10 +28,12 @@ import type { AgentId } from '../agent/types';
 import { onClaudeStatusInvalidated } from '../agent/claudeStatusEvents';
 import { onCodexStatusInvalidated } from '../codex/codexStatusEvents';
 import { RUNTIME_LABELS, type RuntimeAvailability } from '../runtime/availability';
-import { connectivityChanged, isOnline, whenFirstConnectivityRound } from './connectivity';
-import { describeAiStatus, type AiStatusDot, type AiStatusView } from './aiStatusPolicy';
+import { connectivityChanged, hasInternetAnswered, internetAnswered, isOnline, whenFirstConnectivityRound } from './connectivity';
+import { describeAiStatus, type AiStatusView } from './aiStatusPolicy';
 
 const AGENT_IDS: readonly AgentId[] = ['claude-code', 'codex', 'opencode'];
+/** The order the other AIs are probed in, cheapest first (ChatGPT's probe starts its app server). */
+const BY_PROBE_COST: readonly AgentId[] = ['opencode', 'claude-code', 'codex'];
 const REUSE_MS = 15_000;
 const DEBOUNCE_MS = 300;
 
@@ -43,12 +50,29 @@ export interface AiStatusSources {
   onDidChangeOpenChat(listener: () => void): vscode.Disposable;
   /** The model catalog changed (`modelCatalog.onUpdate`): OpenCode's readiness follows its model list. */
   onDidUpdateModels(listener: () => void): vscode.Disposable;
+  /** The internet, `connectivity.ts` by default; a test passes its own. */
+  internet?: InternetSource;
 }
 
-const DOT_COLORS: Record<AiStatusDot, string> = {
-  green: 'testing.iconPassed',
-  grey: 'descriptionForeground',
-  amber: 'editorWarning.foreground',
+export interface InternetSource {
+  isOnline(): boolean;
+  /** A probe round has succeeded at least once; before that, `isOnline()` is the starting guess. */
+  hasAnswered(): boolean;
+  /** The online verdict changed, or the internet answered for the first time. */
+  onDidChange(listener: () => void): vscode.Disposable;
+  /** The first probe round has ended, whatever it found. */
+  whenFirstRound(): Promise<void>;
+}
+
+const CONNECTIVITY: InternetSource = {
+  isOnline,
+  hasAnswered: hasInternetAnswered,
+  onDidChange: (listener) => {
+    const changed = connectivityChanged.event(() => listener());
+    const answered = internetAnswered.event(() => listener());
+    return { dispose: () => { changed.dispose(); answered.dispose(); } };
+  },
+  whenFirstRound: whenFirstConnectivityRound,
 };
 
 function asAgentId(value: unknown): AgentId {
@@ -60,14 +84,11 @@ function defaultAgent(): AgentId {
 }
 
 export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiStatusSources): void {
-  const dot = vscode.window.createStatusBarItem('ritemark.aiStatus.dot', vscode.StatusBarAlignment.Right, 101);
-  dot.name = 'Ritemark AI status (dot)';
-  dot.text = '$(circle-filled)';
-  dot.accessibilityInformation = { label: '', role: 'presentation' };
+  const internet = sources.internet ?? CONNECTIVITY;
   const words = vscode.window.createStatusBarItem('ritemark.aiStatus', vscode.StatusBarAlignment.Right, 100);
   words.name = 'Ritemark AI status';
   words.command = 'ritemark.aiStatus.open';
-  context.subscriptions.push(dot, words);
+  context.subscriptions.push(words);
 
   const cache = new Map<AgentId, { at: number; value: RuntimeAvailability }>();
   // One probe at a time per AI, and a probe that an invalidation overtook is not kept (its epoch moved on)
@@ -94,16 +115,14 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
   }
 
   function draw(view: AiStatusView): void {
+    if (view.state === 'waiting') {
+      words.hide(); // a signed-in AI before the internet has answered: claim nothing yet
+      return;
+    }
     words.text = view.text;
     words.tooltip = view.tooltip;
     words.accessibilityInformation = { label: view.text };
     words.show();
-    if (view.dot) {
-      dot.color = new vscode.ThemeColor(DOT_COLORS[view.dot]);
-      dot.show();
-    } else {
-      dot.hide();
-    }
   }
 
   async function derive(): Promise<void> {
@@ -113,8 +132,8 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
     const label = RUNTIME_LABELS[target];
     const base = { label, signInEnded: chat?.signInEnded === true, planRefused: false };
     let view: AiStatusView;
-    if (!isOnline()) {
-      view = describeAiStatus({ ...base, online: false, usable: false, anyUsable: false });
+    if (!internet.isOnline()) {
+      view = describeAiStatus({ ...base, online: false, internetAnswered: internet.hasAnswered(), usable: false, anyUsable: false });
     } else {
       let usable = false;
       try {
@@ -124,7 +143,7 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
       }
       let anyUsable = usable;
       if (!usable) {
-        for (const other of AGENT_IDS.filter((id) => id !== target)) {
+        for (const other of BY_PROBE_COST.filter((id) => id !== target)) {
           try {
             if ((await availability(other)).usable) { anyUsable = true; break; }
           } catch {
@@ -132,7 +151,7 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
           }
         }
       }
-      view = describeAiStatus({ ...base, online: true, usable, anyUsable });
+      view = describeAiStatus({ ...base, online: true, internetAnswered: internet.hasAnswered(), usable, anyUsable });
     }
     if (mine !== generation) return; // a newer request has started; its answer wins
     draw(view);
@@ -155,11 +174,14 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
   const onClaude = onClaudeStatusInvalidated((event) => {
     if (event.reason !== 'login-started' && event.reason !== 'install-started') schedule(['claude-code']);
   });
-  const onCodex = onCodexStatusInvalidated(() => schedule(['codex']));
+  // A sign-in or a repair that has only started changes nothing yet; its end (or a sign-out) does.
+  const onCodex = onCodexStatusInvalidated((event) => {
+    if (event.reason !== 'login-started' && event.reason !== 'repair-started') schedule(['codex']);
+  });
   context.subscriptions.push(
     { dispose: onClaude },
     { dispose: onCodex },
-    connectivityChanged.event(() => schedule()),
+    internet.onDidChange(() => schedule()),
     context.secrets.onDidChange(() => schedule(['opencode'])),
     // OpenCode's readiness also follows its model list, as the welcome's does
     sources.onDidUpdateModels(() => schedule(['opencode'])),
@@ -174,7 +196,7 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
   );
 
   // The first answer waits for the first connectivity round, so the item never starts on a guess.
-  void whenFirstConnectivityRound().then(() => {
+  void internet.whenFirstRound().then(() => {
     started = true;
     void derive();
   });

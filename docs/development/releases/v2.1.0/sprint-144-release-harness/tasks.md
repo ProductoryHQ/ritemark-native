@@ -92,5 +92,20 @@ Nothing below is ticked until its change is on its branch (or, for a run, its ru
 
 - [x] Webview bundle rebuilt; the pre-commit validator by hand; `qa-validator`
 - [ ] The smoke test on a dev launch; PR, extension tier; the manager's merge
-- [ ] `docs/CHANGELOG.md`: one entry for Parts 1 and 2; release notes at the release's closeout
+- [x] `docs/CHANGELOG.md`: an entry for each part; release notes at the release's closeout
 - [x] The autosave on step selection: raised with the manager (P4's note), filed as #571 for 2.2
+
+## Phase 11: The review round on #574 (27 October)
+
+The Experience lead's answer (`3c0a2ae`) and QA's findings on `415a9be9`, in one push:
+- [x] No dot: the dot's item and colours removed; the words and tooltips kept; spec, scenarios, technical plan, tests
+- [x] The themes' `statusBarItem.hoverBackground` and `statusBarItem.activeBackground`, Light and Dark; real pressed shots of the AI item and Send feedback
+- [x] "Installed" (and step 1's "Ready") in muted ink, checks in ink
+- [x] The Copilot toast's source confirmed in `qa-evidence.md`
+- [x] QA's blocker: both start-up reveals with `{ preserveFocus: true }`; the live keyboard check, with a before
+- [x] "Ready" waits for the internet's first answer (`hasInternetAnswered`)
+- [x] ChatGPT's `login-started` and `repair-started` filtered; the others probed cheapest first, written into the spec
+- [x] `aiStatusItem.test.ts` on mocked time
+- [x] `OnboardingWizard.tsx`'s native `title` and the delete confirm's buttons: `Tooltip`
+- [x] User docs (`ai-agents.md`, `troubleshooting.md`), `release-plan.md` rows, CHANGELOG
+- [x] Filed for v2.2.0: the two tooltip looks in Light; the hand-rolled `<button>`s in `RitemarkSettings.tsx` and `NodeConfigPanel.tsx`

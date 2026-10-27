@@ -150,23 +150,27 @@ export function NodeConfigPanel() {
                   Delete "{nodeLabel}"? This cannot be undone.
                 </p>
                 <div className="flex gap-2">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleDeleteConfirm}
-                    className="flex-1 bg-[var(--r-error)] text-white hover:opacity-90"
-                  >
-                    <Icon name="trash" size={14} className="mr-1" />
-                    Delete
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleDeleteCancel}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
+                  <Tooltip label="Remove this step from the flow for good" className="flex-1">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleDeleteConfirm}
+                      className="w-full bg-[var(--r-error)] text-white hover:opacity-90"
+                    >
+                      <Icon name="trash" size={14} className="mr-1" />
+                      Delete
+                    </Button>
+                  </Tooltip>
+                  <Tooltip label="Keep this step" className="flex-1">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleDeleteCancel}
+                      className="w-full"
+                    >
+                      Cancel
+                    </Button>
+                  </Tooltip>
                 </div>
               </div>
             ) : (

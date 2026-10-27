@@ -148,13 +148,13 @@ And every feature that worked before still works (no flag changed)
 ### S25: A fresh profile that chose Skip
 Given a fresh profile, online, whose welcome ended with Skip
 When the first window settles
-Then the item reads "No AI yet", with no dot, tooltip "Sign in to an AI to work with it here"
+Then the item reads "No AI yet", tooltip "Sign in to an AI to work with it here"
 And a click opens the AI's sheet on its sign-in card
 
 ### S26: Signing in names the AI
 Given S25's window
 When the person signs in to ChatGPT on the sheet
-Then within two seconds the item reads "ChatGPT ready" with a green dot, tooltip "Signed in to ChatGPT"
+Then within two seconds the item reads "ChatGPT ready", tooltip "Signed in to ChatGPT"
 
 ### S27: Two AIs, two chats
 Given Claude and ChatGPT both signed in, a chat with Claude and a chat with ChatGPT open
@@ -169,7 +169,7 @@ Then the item reads "OpenCode ready", and then "No AI yet"
 ### S29: Offline comes first
 Given "Claude ready"
 When the internet goes and the probe fails twice
-Then the item reads "Offline" with a grey dot, in body ink, no warning background, tooltip "No internet. Your documents work as usual and save on this computer."
+Then the item reads "Offline", in body ink, no warning background, tooltip "No internet. Your documents work as usual and save on this computer."
 And when the internet comes back, "Claude ready" again
 
 ### S30: A sign-in that ended

@@ -373,11 +373,12 @@ export function activate(context: vscode.ExtensionContext) {
     }
   })();
 
-  // Focus AI panel after extension views register (terminal init finishes first and grabs focus).
-  // Not while the welcome is open: it is alone in the window (Sprint 133, R1).
+  // Show the AI panel after extension views register (terminal init finishes first and grabs focus).
+  // Not while the welcome is open: it is alone in the window (Sprint 133, R1). It shows the column without taking the
+  // keyboard from what has it, a document or a terminal (Sprint 144, P5).
   setTimeout(() => {
     if (welcomeHost?.isOpen()) return;
-    vscode.commands.executeCommand('ritemark.unifiedView.focus');
+    vscode.commands.executeCommand('ritemark.unifiedView.focus', { preserveFocus: true });
   }, 4000);
 
   // Initialize API key manager (must be first)
@@ -797,8 +798,9 @@ export function activate(context: vscode.ExtensionContext) {
   // 3.2-4.6 s after Home on every switch). The later focus still runs, for the terminal's sake. Never beside the welcome,
   // which is alone in a window with no folder and in the update welcome (Sprint 133, R1): it opens after an await, so
   // ask whether it may open, not whether it is open.
+  // It shows the column and leaves the keyboard where it is, as the task board's handoff does (UnifiedViewProvider).
   if (vscode.workspace.workspaceFolders?.length && !welcomeHost?.mayOpenAtStart()) {
-    void vscode.commands.executeCommand('ritemark.unifiedView.focus');
+    void vscode.commands.executeCommand('ritemark.unifiedView.focus', { preserveFocus: true });
   }
 
   // Register chat history command (toggles history panel in webview)

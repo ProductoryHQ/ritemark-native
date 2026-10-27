@@ -57,14 +57,16 @@ Ritemark auto-saves after 1 second. If changes aren't saving:
 > spawn errors), see [AI Agents](features/ai-agents.md). For OpenAI-key issues in Flows, see
 > [Set Up AI → OpenAI API Key for Flows](setup-ai.md#openai-api-key-for-flows).
 
-### "AI Offline" badge in the sidebar
+### "Offline" in the status bar or the AI's sheet
 
-If Ritemark can't reach the AI provider, the sidebar shows an **AI Offline** badge.
+> Changed in v2.1: the status bar's item used to read **AI Ready** whenever the internet answered, even with no AI signed in.
+
+When Ritemark can't reach the internet, the AI item in the status bar reads **Offline** (its tooltip: "No internet. Your documents work as usual and save on this computer.") and the AI's sheet shows **Offline — AI features require internet connection**.
 
 1. Check your internet connection.
-2. Click **Check again** on the badge to re-test connectivity on demand — you'll see a brief "Checking…" state. (Added in v1.8.5; before that you had to wait out the ~30-second poll or restart.)
-3. Once connectivity is back, **Check again** brings the sidebar online without a restart.
-4. If it stays offline with a working connection, verify your API key / sign-in on the affected agent (see [AI Agents](features/ai-agents.md)).
+2. Click **Check again** on the sheet's banner to re-test at once; you'll see a brief "Checking…" state. (Added in v1.8.5; before that you had to wait out the ~30-second poll or restart.)
+3. Once the internet is back, the status bar names your AI again, for example **Claude ready**, without a restart.
+4. If the status bar reads **Claude: sign in**, **Claude: sign in again** or **No AI yet**, the internet is fine: that AI, or every AI, needs you to sign in (see [AI Agents](features/ai-agents.md)). Click the item to open the AI's sheet.
 
 ### New helpers do not appear in Agents
 
