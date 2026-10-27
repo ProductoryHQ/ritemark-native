@@ -93,6 +93,7 @@ After the qa-validator review of #562 at `a73bf362`:
 - **`scripts/run-flow-test.ts` and `.js`:** the developer script sent the Gemini key as `?key=` in the URL. It now sends it in the `x-goog-api-key` header, and S50's scan in `geminiRequest.test.ts` now covers `scripts/` too.
 - **`webview/src/config/modelConfig.test.ts`** is now in `npm test`.
 - **Checks on this branch's head:** see *Checks, QA pass* below.
+- **The final rebase**, onto `origin/main` at `beac93b2` (#564 as `5019e42b`, then #565): `src/flows/FlowEditorProvider.ts` keeps Sprint 143's `pickerFolder` import and its two dialogs' `defaultUri` beside this sprint's `listGeminiModels` and `flowModelDefaults` imports; `package.json`'s test line keeps main's new tests (`dialogDefaults`, `codexRetry`, `HomePanel` and the rest) plus this sprint's; `media/webview.js` was rebuilt (+16 bytes over main's, `office-preview.js` byte for byte); the CHANGELOG, `architecture.md` and `release-plan.md` keep every sprint's rows. The release plan's 142 merge 2 and 143 rows now say merged. See *Checks, final rebase* below.
 
 ### Checks, QA pass
 
@@ -101,4 +102,13 @@ Run on the rebased branch with this pass's changes, before the commit that recor
 - `npm test` (the full chain, now with `webview/src/config/modelConfig.test.ts`): exit 0.
 - The webview's `tsc --noEmit`: clean.
 - `./scripts/validate-qa.sh`: exit 0 ("Codex QA validation passed").
+- The pre-commit validator, run by hand with `CLAUDE_PROJECT_DIR` set to the worktree: pass.
+
+### Checks, final rebase
+
+Run on the branch rebased onto `beac93b2` at `71a3a1cc`, before the commit that records them. A fresh webview build matched the committed bundle byte for byte.
+- `npm run compile`: exit 0.
+- `npm test` (main's chain with Sprint 143's and 142's tests plus this sprint's; `runtimeErrorPresentation` passes its Sprint 127, 139, 141 and 143 cases): exit 0.
+- The webview's `tsc --noEmit`: clean.
+- `./scripts/validate-qa.sh`: exit 0.
 - The pre-commit validator, run by hand with `CLAUDE_PROJECT_DIR` set to the worktree: pass.
