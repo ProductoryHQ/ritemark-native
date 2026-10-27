@@ -67,6 +67,7 @@ RITEMARK_BUILD_CHANNEL=test open -n -g -a /Applications/Ritemark.app --args \
 
 - [ ] **Install over 2.0.1.** Quit 2.0.1 with ⌘Q, mount the DMG and drag Ritemark to Applications, replacing it. It isn't notarized, so if Gatekeeper warns: right-click ▸ **Open**, or System Settings ▸ Privacy & Security ▸ **Open Anyway**. Passes when it starts from `/Applications`
 - [ ] **About** (144-S9). Help ▸ About. Passes when it reads 2.1.0, names the candidate's source commit, and reads "Electron: 43.8.3" and "Node.js: 24.22.0" (24.22.1 if patch 020 moved)
+- [ ] **The `.claude` folder in Documents** (RC4; Jarmo, 27 October). In a project with a `.claude` folder, look at Documents, then search for a word that is only inside a skill. Passes when `.claude` shows as an ordinary folder (not faded), its skills open, Search finds the word, and `.ritemark` stays hidden
 - [ ] **No Copilot error toast** (Sprint 144's QA evidence). Watch the first minute after start. Passes when no "Activating extension 'GitHub.copilot-chat' failed" toast shows, as dev builds show it
 - [ ] **#557: no Chat Debug** (142-S45). Open More (⋯), and take a screenshot of it. In Terminal, `ls /Applications/Ritemark.app/Contents/Resources/app/extensions | grep copilot`. Passes when More lists no "Chat Debug" and the command prints nothing; #557 then closes with the screenshot
 

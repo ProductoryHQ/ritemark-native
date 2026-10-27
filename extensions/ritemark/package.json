@@ -988,8 +988,7 @@
       "workbench.editor.tabSizingFixedMaxWidth": 200,
       "workbench.editor.pinnedTabSizing": "compact",
       "files.exclude": {
-        "**/.ritemark": true,
-        "**/.claude": true
+        "**/.ritemark": true
       },
       "extensions.ignoreRecommendations": true,
       "workbench.tips.enabled": false,
