@@ -131,9 +131,10 @@ test('the 2.0 defaults', () => {
   assert.equal(configurationDefaults['workbench.editor.tabSizingFixedMinWidth'], 38); // no floor: tabs are as wide as their names (the stylesheet)
   assert.equal(configurationDefaults['workbench.editor.tabSizingFixedMaxWidth'], 200);
   assert.equal(configurationDefaults['workbench.editor.pinnedTabSizing'], 'compact');
-  // Documents hides only .ritemark. .claude shows: people keep and change their own skills, agents and commands
-  // there (Jarmo, 27 October, for 2.1; 2.0 hid it, the Experience lead, 19 October)
-  assert.deepEqual(configurationDefaults['files.exclude'], { '**/.ritemark': true });
+  // Documents hides .ritemark and Claude Code's working copies (.claude/worktrees). The rest of .claude shows: people
+  // keep and change their own skills, agents and commands there (Jarmo, 27 October, for 2.1; 2.0 hid it all, the
+  // Experience lead, 19 October)
+  assert.deepEqual(configurationDefaults['files.exclude'], { '**/.ritemark': true, '**/.claude/worktrees': true });
   assert.equal(configurationDefaults['terminal.integrated.defaultLocation'], 'editor');
   assert.equal(configurationDefaults['terminal.integrated.hideOnStartup'], 'always');
   // ⌘T reaches the tab row from a terminal tab too (Sprint 134, R21)

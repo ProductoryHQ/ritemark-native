@@ -105,7 +105,7 @@ Ritemark 2.1 makes what your AI writes ready to send. Formulas from ChatGPT and 
 
 ## Fixes
 
-- **The `.claude` folder shows in Documents again,** with the skills, agents and commands you keep in it, so you can open and change them there. Search and Quick Open find what is in it too. Ritemark 2.0 hid it.
+- **The `.claude` folder shows in Documents again,** with the skills, agents and commands you keep in it, so you can open and change them there. Search and Quick Open find what is in it too. Ritemark 2.0 hid it. Claude Code's own working copies in `.claude/worktrees` stay hidden.
 - **Editing a link's address works.** The link dialog changed nothing when you edited an existing link. It now changes the address, from anywhere in the link.
 - **No false "Retry document update"** after an AI edit to a document in a window behind other windows.
 - **Deleting text no longer freezes the editor.**
