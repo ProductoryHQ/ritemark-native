@@ -162,6 +162,19 @@ export function isConversationEmpty(conversation: ConversationState): boolean {
   );
 }
 
+/**
+ * Sprint 144 (P3): what the status bar's AI item needs from the open chat: its AI, and whether that AI's last finished
+ * turn in it failed on sign-in ("Claude: sign in again" until a message goes through). Sent with `conversation/active`.
+ */
+export function openChatAiReport(conversation: ConversationState): { agentId: AgentId; signInEnded: boolean } {
+  const agentId = conversation.selectedAgent;
+  const finished = agentId === 'claude-code'
+    ? conversation.agentConversation.filter((turn) => !turn.isRunning)
+    : conversation.codexConversation.filter((turn) => !turn.isRunning && (turn.runtime ?? 'codex') === agentId);
+  const last = finished[finished.length - 1];
+  return { agentId, signInEnded: last?.result?.errorKind === 'sign-in' };
+}
+
 /** R9: a non-empty cross-runtime change is an immediate, draft-safe handoff. */
 export function isRuntimeHandoff(
   conversation: ConversationState,

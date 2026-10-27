@@ -88,6 +88,11 @@ export interface PermanentTabsDependencies {
   boardEnabled: () => boolean;
   /** True once, in a window a switch in place opened: it lands on Home, not on the tab it was left with (R9). */
   landOnHome?: () => boolean;
+  /**
+   * Sprint 144 (P5, #569): this window was opened by a switch in place and lands on Home, so the first check runs at
+   * once: the restored document it was left with is otherwise in front, its editor still loading, for the 800 ms wait.
+   */
+  landingPending?: boolean;
 }
 
 /** Make sure Home (first) and Tasks (second) are pinned in the first group. */
@@ -150,7 +155,8 @@ export function registerPermanentTabs(deps: PermanentTabsDependencies): vscode.D
       }
     }, delay);
   };
-  check(800);
+  // The window's tabs are restored before the extension activates; the wait covers a slow restore in an ordinary start
+  check(deps.landingPending ? 50 : 800);
   const listener = vscode.window.tabGroups.onDidChangeTabs((event) => {
     if (busy) return;
     const ours = (tab: vscode.Tab) => kindOf(tab) !== 'other';

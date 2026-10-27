@@ -448,12 +448,10 @@ export function RitemarkSettings() {
         <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm mb-6">
           <div className="flex items-center justify-between mb-2">
             <div>
+              {/* Sprint 144 P2: no "Experimental" badge; Claude is one of Ritemark's main AIs (experience 15) */}
               <label className="text-sm font-medium text-ink-strong">
                 Claude Account
               </label>
-              <span className="ml-2 text-xs px-2 py-0.5 rounded bg-accent-soft text-accent-deep">
-                Experimental
-              </span>
             </div>
             {(settings.componentStatus.claudeCode.state === 'ready'
               || settings.componentStatus.claudeCode.authMethod === 'api-key') && (
@@ -628,16 +626,13 @@ export function RitemarkSettings() {
           </p>
         </div>
 
-        {/* Codex ChatGPT Auth (experimental) */}
+        {/* Codex ChatGPT Auth. Sprint 144 P2: no "Experimental" badge (experience 15) */}
         <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm mb-6">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <label className="text-sm font-medium text-ink-strong">
                   ChatGPT Account
                 </label>
-                <span className="ml-2 text-xs px-2 py-0.5 rounded bg-accent-soft text-accent-deep">
-                  Experimental
-                </span>
               </div>
               {settings.codexIntegration && codexAuth.authenticated && (
                 <span className="flex items-center gap-1 text-xs text-ritemark-success">

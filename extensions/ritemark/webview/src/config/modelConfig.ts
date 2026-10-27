@@ -111,6 +111,14 @@ export function modelOptionsWithPersistedSelection(
 }
 
 /**
+ * Sprint 144 P4: whether a Flow step's model picker waits for the host's list. It waits (greyed, "Loading models...")
+ * only while it has no list at all; a known list, and the step's saved model, stay usable while the host refreshes it.
+ */
+export function modelListWaiting(isLoading: boolean, knownModels: number): boolean {
+  return isLoading && knownModels === 0;
+}
+
+/**
  * Get default assistant model
  */
 export function getDefaultAssistantModel(): string {

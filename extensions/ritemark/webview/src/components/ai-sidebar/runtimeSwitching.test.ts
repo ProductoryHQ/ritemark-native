@@ -596,8 +596,9 @@ function testClaudePickAfterCodexSurvivesTheHostsLateEcho() {
     posted.length = 0;
 
     useAISidebarStore.getState().selectRuntimeModel('claude-code', 'opus[1m]');
+    // Sprint 144 (P3): the chat's new AI also reaches the status bar through `conversation/active`.
     assert.deepEqual(
-      posted.map((message) => (message as { type: string }).type),
+      posted.map((message) => (message as { type: string }).type).filter((type) => type !== 'conversation/active'),
       ['ai-select-agent', 'ai-select-model'],
     );
     // The host answers `ai-select-agent` before `ai-select-model` is saved.

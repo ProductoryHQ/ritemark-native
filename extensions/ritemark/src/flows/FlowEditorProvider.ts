@@ -25,7 +25,7 @@ import {
 import * as modelCatalog from '../ai/modelCatalog';
 import { pickerFolder } from '../utils/dialogDefaults';
 import { listGeminiModels } from '../ai/geminiRequest';
-import { flowModelDefaults } from './flowModelDefaults';
+import { flowModelDefaults, flowModelRequestType } from './flowModelDefaults';
 
 /**
  * Sanitize a string for use in a filename
@@ -161,7 +161,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'flow:getModels':
             // Fetch available models from API
-            this.fetchModels(message.provider, message.type || 'llm', webview);
+            // Sprint 144 P4: the list the picker asked for (`modelType`), not the message's own `type`
+            this.fetchModels(message.provider, flowModelRequestType(message), webview);
             return;
 
           case 'flow:pickFile':
