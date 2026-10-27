@@ -4,7 +4,7 @@ Track: SDD (auto-detected: two shell-tier harness changes resting on measurement
 Override with: "use plain full track"
 Branches, made from `origin/main` at Phase 3, after approval: `sprint-144-release-harness` (Part 1, shell tier) and `sprint-144-release-harness-polish` (Part 2, extension tier), one PR each. This plan was written on `plan/sprint-144-release-harness`.
 Release tier: **Part 1 shell** (`.github/workflows/build-windows.yml`, `patches/vscode/`); **Part 2 extension** (`extensions/ritemark/` only). 2.1 is a shell release already.
-Status: **Proposed (Phase 2), 27 October 2026,** for the Development manager's review under Jarmo's delegation. No implementation code is written before approval. The planning measurement ran on a scratch branch (`scratch/sprint-144-free-runner-probe`), which changes nothing on `main`; P4's reproduction is a harness under `research/repro/`, outside the product.
+Status: **Approved and started (Phase 2 → 3), 27 October 2026,** by the Development manager under Jarmo's delegation (*Approval* below). Code starts on the two sprint branches after this plan merges. The planning measurement ran on a scratch branch (`scratch/sprint-144-free-runner-probe`), which changes nothing on `main`; P4's reproduction is a harness under `research/repro/`, outside the product.
 
 ## SDD Artifacts
 
@@ -102,10 +102,7 @@ The release is 2.1.0 ([release-plan.md](../release-plan.md)). This is the last s
 5. **The autosave on step selection** (noticed while reproducing P4: selecting a Flow step saves the flow about 100 ms later). I recommend filing it for 2.2 and not touching it in 144: it writes nothing wrong, and changing when flows save is not polish.
 6. **The probe branch.** I recommend deleting `scratch/sprint-144-free-runner-probe` once you have read A1. It holds only the probe's workflow, which must never merge.
 
-**For the Experience lead, through you (P3's words not yet given):**
-- When the AI the next message goes to was never signed in but another AI is, "Claude: sign in again" says "again" to someone who never did. Proposed: "Claude: sign in".
-- The tooltips of the two needing-the-person states. Proposed: "Your Claude sign-in has ended" and "Your Claude plan doesn't include working in Ritemark".
-- The dot is its own status bar item just left of the words, since VS Code colours an item's text all at once and the words stay in body ink. The screenshots will show it.
+**For the Experience lead, through you (P3's words):** answered on 27 October (ritemark-dev `b058692`, experience 13), yes to all three: "Claude: sign in" for an AI never signed in, the two tooltips as proposed, and the dot as its own item as long as it reads as one item. Word for word in [spec.md](spec.md#p3-the-status-bars-ai-item-says-only-what-ritemark-knows).
 
 ## Feature Flag Check
 
@@ -159,4 +156,18 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Approval
 
-- [ ] Approved by the Development manager under Jarmo's delegation.
+- [x] **Approved and started on 27 October 2026** by the Development manager, under Jarmo's delegation of 26 October: "ei sprindiplaanid kinnitad sina. midagi ei tohi minu taga oodata kuni Gate 1 RCini" (ritemark-dev `decisions/log.md`). Release approval (Gate 1, Gate 2, publish) stays Jarmo's.
+
+**The plan's decisions, decided:**
+1. **#506:** the free `windows-latest` runner, with the 30 GB free-disk guard. The fallbacks stay in the order given; the org runner-group setting is Jarmo's and is raised only if the first signed run fails.
+2. **#515:** patch 020 with Electron 43.8.3 now, moved to the first 43.x carrying Node 24.22.1 if Electron publishes one before the version bump. Patch 020's row goes into `CLAUDE.md`'s *Current patches* table, the count from 18 to 19; `scripts/check-native-modules.sh` (or its equivalent) runs after the bump (memory: the native-module arch check).
+3. **If no Node 24.22.1 by the version bump:** 2.1 ships on 43.8.3 with A2 as the written risk and #515 open. Gate 1 is Jarmo's; the Development manager puts this risk in front of him there in plain words, so he can hold if he wants.
+4. **#499 on the Mac (S20):** yes, within limits: one folder "Ritemark 2.1 sync test" at the top level of this Mac's own OneDrive and Google Drive folders, never inside a shared folder; fictional content only (the leadership sample or invented files); nothing else in those drives opened, moved or edited; after S20 both folders go to the Trash (not emptied), recorded in `qa-evidence.md`. Before creating anything, the OneDrive folder's name is checked: if it is a work or tenant OneDrive ("OneDrive - <organisation>"), the folder goes into a personal one if there is one; if there is only the work one, stop and tell the Development manager.
+5. **The Flow autosave on step selection:** filed for 2.2 (milestone v2.2.0) with the reproduction; not touched here.
+6. **The probe branch:** `scratch/sprint-144-free-runner-probe` deleted now; A1 records it.
+
+**Branches and order:** after this plan merges (#570, docs only), `sprint-144-release-harness` (Part 1, shell) and `sprint-144-release-harness-polish` (Part 2, extension) are cut from the new `origin/main`, each checked with `git branch --show-current` before its first code edit; one PR each. Part 2 merges first if it is ready first; Part 1's Windows run happens on `main` after its merge.
+
+**P3's open words:** answered by the Experience lead the same day (ritemark-dev `b058692`): yes to all three, with conditions on the dot (one hover and pressed fill across both items, one tab stop, one screen-reader name, the dot hidden from the screen reader, 6 between dot and words; if VS Code can't give one hover fill, the dot takes no hover and isn't clickable). In spec P3.
+
+**Rules:** hidden, isolated launches, one per check; never `~/.codex` or `~/.claude`, never HOME; no production build here; Windows checks go through the Development manager to the Windows session; screenshots of P1–P4 to the Experience lead through the Development manager before Part 2 merges.

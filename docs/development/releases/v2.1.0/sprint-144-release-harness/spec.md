@@ -115,12 +115,25 @@ The Experience lead's words (ritemark-dev `55bf49c`, experience 13, *The status 
 - **Click:** opens the AI's sheet, on the open chat, or on its sign-in card when there is no AI yet.
 - The words never say "AI", "service" or "connected", except "No AI yet" itself.
 
+The Experience lead's answers to this plan's three questions (ritemark-dev `b058692`, experience 13), word for word:
+1. **Never signed in:** "Claude: sign in", tooltip "Sign in to Claude to work with it here". "Again" is only for a sign-in that ended. If no AI is signed in at all, the item still says "No AI yet".
+2. **Tooltips:**
+   - "Your Claude sign-in has ended" goes with "Claude: sign in again".
+   - "Your Claude plan doesn't include working in Ritemark" goes with "Claude needs a paid plan", matching the refusal card's words.
+3. **The dot as its own status bar item:** yes, as long as it still reads as one item:
+   - 6 between the dot and the words;
+   - one hover fill and one pressed fill across both;
+   - one tab stop, and one screen-reader name ("Claude ready"), with the dot hidden from the screen reader;
+   - in a state with no dot, the dot's item is hidden.
+
+   If VS Code can't give one hover fill across two items, the dot's item takes no hover and isn't clickable, so only the words light up. The screenshots must show the hover and pressed states.
+
 Done when:
 - The item follows the person live, for Claude, ChatGPT and OpenCode alike: a sign-in, a sign-out, a key added or removed (OpenCode), a switch between open chats on different AIs, a new chat, a change of the default AI, and the internet going and coming back each change it within two seconds, without a reload.
 - It is right before the AI's sheet has ever been opened (the source is the host's, not the sheet's).
 - "Claude ready" and its siblings name the AI by its label (Claude, ChatGPT, OpenCode).
-- "<AI>: sign in again" shows when that AI's availability is `needs-auth`, or when the open chat's last turn on it failed with `errorKind: 'sign-in'`, until a message goes through.
-- "<AI> needs a paid plan" shows only from a plan-refusal signal. None exists on the host today (`src/runtime/turnFailureCopy.ts:21–24`: "There is no plan refusal kind yet"); the state is built and tested, and wired when Sprint 139's #496 classifier gains that kind after a Claude Free reproduction. Until then it can't appear, and the plan says so.
+- "<AI>: sign in again" (tooltip "Your <AI> sign-in has ended") shows when the open chat's last turn on that AI failed with `errorKind: 'sign-in'`, until a message goes through. "<AI>: sign in" (tooltip "Sign in to <AI> to work with it here") shows when that AI's availability is `needs-auth` without such a failure, and another AI is signed in; with no AI signed in at all, "No AI yet".
+- "<AI> needs a paid plan" (tooltip "Your <AI> plan doesn't include working in Ritemark") shows only from a plan-refusal signal. None exists on the host today (`src/runtime/turnFailureCopy.ts:21–24`: "There is no plan refusal kind yet"); the state is built and tested, and wired when Sprint 139's #496 classifier gains that kind after a Claude Free reproduction. Until then it can't appear, and the plan says so.
 - Probing adds no new cost at window start: only the AI in question is probed (ChatGPT's probe starts its app server), and results are reused for a short time the way Home's guidance does (`GuidanceHost.ts:444–456`).
 - A unit test covers every state, Offline first, each AI's name, the dot's colour, the tooltips, and that no text says "AI", "service" or "connected" except "No AI yet".
 - Screenshots of each reachable state in Light and Dark.
@@ -186,6 +199,5 @@ Done when:
 
 - Does Electron publish a 43.x with Node 24.22.1 before 2.1's version bump? (Measured on 27 October: merged on `43-x-y` on 22 October, unreleased.)
 - Where does each packaged target name its Electron version for R3's check (A3)?
-- **P3, for the Experience lead:** the AI the next message goes to was never signed in on this computer while another AI is (say the default is Claude and only ChatGPT is signed in). "Claude: sign in again" says "again" to someone who never did. Proposed: "Claude: sign in", same tooltip pattern ("Sign in to Claude to work with it here").
-- **P3, for the Experience lead:** the tooltips of the two needing-the-person states aren't given. Proposed: "Your Claude sign-in has ended" and "Your Claude plan doesn't include working in Ritemark".
+- ~~P3's three questions for the Experience lead~~: answered 27 October (ritemark-dev `b058692`), in P3 above.
 - **P5:** is the cause the workbench's restore (patch tier) or Ritemark's two timers (extension tier)? The first step of P5 measures it.
