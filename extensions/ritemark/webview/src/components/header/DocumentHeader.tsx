@@ -57,7 +57,7 @@ export function DocumentHeader({
 
   return (
     <header className="sticky top-0 left-0 right-0 h-10 bg-surface z-[60]" /* Ritemark 2.0: no line under the document's own bar */>
-      <div className="flex items-center h-full px-1" /* Ritemark 2.0: buttons inset 4 on every side; 10 (the desk's corner) − 4 = 6, their radius, so the corners nest */>
+      <div className="flex items-center h-full pl-1 pr-3" /* Ritemark 2.0: the left buttons inset 4 (10, the desk's corner, − 4 = 6, their radius, so the corners nest), their icons 12 in. Share 12 in from the desk's right edge, mirroring the ⓘ and as the PDF and Word bars end (the 2.1.0 join pass) */>
         {/* Left: toggle cluster (the kit's docbar: 4 between buttons) */}
         <div className="flex items-center gap-1">
           {onContentsClick && (
