@@ -100,6 +100,15 @@ clip it, so it has no shadow and draws its hairline inside its own box with ::af
 (.ritemark-desk-webview); the welcome alone draws none. ritemark.sheetShadow stays for what floats (menus, dialogs,
 quick input, toasts), not the desk or the AI's sheet.
 
+Sprint 144 (2.1.0's Gate 1, #503's follow-up): the chosen tab joins the desk again with no line beneath it, as in 2.0
+(framework §1, "joined to it like a browser tab"; Jarmo's Gate 1 finding on the release candidate). Sprint 142's
+hairline lies inside the desk's box, where the tab row (clipped at the desk's top, and under the hairline's layer) can't
+cover it. So the desk lays its own colour over its top edge under the chosen tab and its two fillets, 9 each side and
+1.5 high (.editor-container::before): fixed, and placed by the chosen tab with CSS anchor positioning (anchor-name on
+.tab.active, anchor-scope on each editor group, so each desk follows its own tab), at z-index 11, over the hairline (10)
+and a desk webview's layer. The other edges, the top edge beside the tab, the corners, no shadow and the welcome alone
+stay as Sprint 142 drew them.
+
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
 platform/window/common/window.ts; platform/windows/electron-main/windowImpl.ts; workbench/browser/{layout,style}.ts;
@@ -818,10 +827,10 @@ index 75f9238fd75..68ad7c003b7 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..eee03ea02ff
+index 00000000000..bbb69641289
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1815 @@
+@@ -0,0 +1,1843 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1030,6 +1039,33 @@ index 00000000000..eee03ea02ff
 +	box-shadow: inset 0 0 0 1px var(--rm-hairline);
 +	pointer-events: none;
 +	z-index: 10;
++}
++
++/* Sprint 144 (Gate 1, #503's follow-up): the chosen tab joins the desk with no line beneath it, as in 2.0 (framework §1:
++   "joined to it like a browser tab"). The hairline above lies inside the desk's box, where the tab row (clipped at the
++   desk's top, and under the hairline's layer) can't cover it. So the desk lays its own colour over its top edge under
++   the chosen tab and its two fillets (9 each side), and nowhere else: the other edges, and the top edge beside the tab,
++   stay whole. The chosen tab places it (anchor positioning, as VS Code places webviews; fixed, so a tab outside the
++   desk's box can be its anchor), each desk by its own tab (anchor-scope), over the hairline (10) and a webview's layer */
++.monaco-workbench .part.editor .editor-group-container {
++	anchor-scope: --ritemark-chosen-tab;
++}
++
++.monaco-workbench .part.editor .editor-group-container > .title .tabs-container > .tab.active {
++	anchor-name: --ritemark-chosen-tab;
++}
++
++.monaco-workbench .part.editor .editor-group-container:not(.empty) > .editor-container::before {
++	content: '';
++	position: fixed;
++	position-anchor: --ritemark-chosen-tab;
++	top: anchor(bottom);
++	left: calc(anchor(left) - 9px / var(--ritemark-zoom-factor, 1)); /* the tab row keeps its size through zoom (R3), and so do its fillets */
++	right: calc(anchor(right) - 9px / var(--ritemark-zoom-factor, 1));
++	height: 1.5px; /* the 1px hairline takes part of a second device pixel at a zoom or display scale that isn't whole */
++	background-color: var(--rm-desk);
++	pointer-events: none;
++	z-index: 11;
 +}
 +
 +/* A webview on the desk (the Markdown editor, CSV, PDF, Word) is a layer of its own: round it too (overlayWebview.ts) */
@@ -2515,6 +2551,7 @@ index 00000000000..eee03ea02ff
 +}
 +
 +.monaco-workbench.ritemark-welcome-alone .part.editor .editor-group-container > .editor-container::after,
++.monaco-workbench.ritemark-welcome-alone .part.editor .editor-group-container > .editor-container::before,
 +.monaco-workbench.ritemark-welcome-alone .ritemark-desk-webview::after {
 +	display: none; /* the welcome alone lies on the ground, with no desk's edge (Sprint 142) */
 +}
