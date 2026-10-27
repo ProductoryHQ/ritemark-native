@@ -103,7 +103,11 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
    so the ellipsis touches the next character; the start gives way first, then the parent folder, never the
    project's own folder. Nothing here cuts it, and nothing hides what the measure kept. */
 .rh-place .rh-place-text { flex: 0 1 auto; min-width: 0; white-space: nowrap; }
-.rh-place-caret { display: inline-block; margin-left: 6px; vertical-align: -1px; }
+/* The › sits in the middle of its 24 line, on whole pixels, centred on the lowercase letters as 2.0's flex item did:
+   4 under the line's top, (24 − the 16 box the button gives its icons) / 2 (2.1.0's join pass, the Experience lead's
+   ruling at 0d0c1b8). Sprint 142 put it inside the text, so a wrapping name keeps it after its last word, and on the
+   baseline (vertical-align: -1px), which lifted it 3 to 4 and split it over two rows */
+.rh-place-caret { display: inline-block; margin-left: 6px; margin-top: 4px; vertical-align: top; }
 /* The folder's name would only repeat the project's title above it: the line keeps its icon and › (Sprint 142) */
 .rh-place-iconly .rh-place-caret { margin-left: 0; }
 /* A folder name wider than the line on its own wraps at its spaces, or anywhere if it has none, with the › after

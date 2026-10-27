@@ -114,18 +114,20 @@ kit's single outline and 2.0 draw it. Its default anchor is the title row, which
 default, a scrolled tab row in a very narrow desk shifted the bound too); anchor-scope keeps each desk to its own. The
 other edges, the top edge beside the tab, no shadow and the welcome alone stay as Sprint 142 drew them.
 
-2.1.0's Gate 1 join pass (RC3; the Experience lead's rulings at 04eba74: framework §§1 and 4, the kit, experience 3):
-the desk's edge is drawn once, and opaque. The hairline lies over a line of the desk's own colour (--rm-desk-edge), so
-it reads one tone over a webview's page, a terminal or the browser's page: #302d56 in Ritemark Dark, where the
-#FFFFFF14 hairline over #1E1B4B was drawn twice under a webview and read #403d63. Where a webview lies on the desk
-(.editor-container:has() the webview editor's element), its layer draws the edge and the desk's own line under it goes.
-The chosen tab's outline (--rm-tab-edge) and its fillets lie over the same desk-coloured line, so the desk and its tab
-are one tone; the AI's sheet keeps its own (#2b294d). What floats keeps 4 clear of any line it runs beside or lies
-across: the + menu (and the folded tabs' menu) opens 4 below the desk's top line (its edge at 49 for the line at 44),
-its right edge on its button's, the +'s 18 in from the desk's edge, its width a whole pixel (calc-size) so it is crisp.
-The left column's slider stops a hairline short of the desk's left hairline (2 device pixels of ground on the Mac).
-And the left column lays its content out again when the head's rows change after its first draw (a window that opens
-on Documents drew its head before the extension's New and Search existed, and the tree ran 64 past the column's foot,
+2.1.0's Gate 1 join pass (RC3; the Experience lead's rulings at 04eba74 and 0d0c1b8: framework §§1 and 4, the kit,
+experience 3): the desk's edge is drawn once, and opaque. The hairline lies over a line of the desk's own colour
+(--rm-desk-edge), so it reads one tone over a webview's page, a terminal or the browser's page: #302d56 in Ritemark
+Dark, where the #FFFFFF14 hairline over #1E1B4B was drawn twice under a webview and read #403d63. Where a webview lies
+on the desk (.editor-container:has() the webview editor's element), its layer draws the edge and the desk's own line
+under it goes. The chosen tab's outline (--rm-tab-edge) and its fillets lie over the same desk-coloured line, so the
+desk and its tab are one tone; the AI's sheet keeps its own (#2b294d). What floats keeps 4 clear of any line it runs
+beside or lies across, and a menu that lands on a control covers it whole, corners included, or keeps 4 clear of it:
+the + menu and the folded tabs' menu open 4 below the desk's top line (their edge at 49 for the line at 44) and end 8
+in from the desk's right edge (019 places them from the desk), so they cover the document bar's Share whole; their width
+is a whole pixel (calc-size), so the edge is crisp. You's menu ends 4 past You's right edge, covering the AI rail's +
+and history whole. The left column's slider stops 2 CSS pixels short of the desk's left hairline at every scale. And
+the left column lays its content out again when the head's rows change after its first draw (a window that opens on
+Documents drew its head before the extension's New and Search existed, and the tree ran 64 past the column's foot,
 under the status bar): ritemarkProjectHead.ts fires onDidChangeRows, sidebarPart.ts lays out again.
 
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
@@ -846,10 +848,10 @@ index 75f9238fd75..68ad7c003b7 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..e559947a65a
+index 00000000000..4bb0fe7848a
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1890 @@
+@@ -0,0 +1,1895 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1394,11 +1396,11 @@ index 00000000000..e559947a65a
 +	outline: none !important; /* !important: as above */
 +}
 +
-+/* The left column's slider stops a hairline's width short of the desk (2.1.0's join pass, the Experience lead's
-+   rulings at 04eba74): the column ends where the desk's left hairline starts, so a slider the column's full width lay
-+   against that line. The ground shows between them, 2 device pixels on the Mac */
++/* The left column's slider stops 2 short of the desk (2.1.0's join pass, the Experience lead's rulings at 04eba74 and
++   0d0c1b8): the column ends where the desk's left hairline starts, so a slider the column's full width lay against that
++   line. The ground shows between them, 2 CSS pixels at every scale: 4 device pixels on the Mac, 2 at 100% */
 +.monaco-workbench .part.sidebar .monaco-scrollable-element > .scrollbar.vertical > .slider {
-+	width: calc(100% - var(--rm-hairline-width)) !important; /* !important: the scrollbar sets the slider's width inline (abstractScrollbar.ts) */
++	width: calc(100% - 2px) !important; /* !important: the scrollbar sets the slider's width inline (abstractScrollbar.ts) */
 +}
 +
 +
@@ -1719,13 +1721,15 @@ index 00000000000..e559947a65a
 +}
 +
 +/* Their menus, in the kit's menu (kit/ritemark.css: .menu, .menu.kinds): the menus' sheet (menu.ts), a small heading,
-+   then the rows (R12). What floats keeps 4 clear of any line it runs beside or lies across (2.1.0's join pass, the
-+   Experience lead's rulings at 04eba74): the menu's top edge (its 1 hairline) lies 4 below the desk's top line, on the
-+   desk (the line at 44, the menu's edge at 49), and its right edge is its button's, the +'s 18 in from the desk's edge,
-+   so its corner never nests in the desk's. Its width is a whole pixel, so the menu placed from its right edge is crisp */
++   then the rows (R12). What floats keeps 4 clear of any line it runs beside or lies across, and a menu that lands on a
++   control covers it whole, corners included, or keeps 4 clear of it (2.1.0's join pass, the Experience lead's rulings
++   at 04eba74 and 0d0c1b8): the menu's top edge (its 1 hairline) lies 4 below the desk's top line, on the desk (the line
++   at 44, the menu's edge at 49), and its right edge is 8 in from the desk's (ritemarkNewTab.ts places it from the desk),
++   so it covers the document bar's Share whole and its corner keeps 4 rows and 7 columns clear of the desk's. Its width
++   is a whole pixel, so the menu placed from its right edge is crisp */
 +.monaco-workbench .ritemark-new-tab-menu {
 +	position: relative;
-+	left: -1px; /* the hairline (1, outside the box) ends on the button's right edge */
++	left: -1px; /* the hairline (1, outside the box) ends where the menu is placed, 8 in from the desk's edge */
 +	min-width: 248px;
 +	width: calc-size(max-content, round(up, size, 1px));
 +	margin-top: 10px; /* from the button's foot (40): the desk's top line at 44, 4 clear (45 to 48), the menu's edge at 49 */
@@ -2041,9 +2045,12 @@ index 00000000000..e559947a65a
 +	color: var(--rm-ground);
 +}
 +
-+/* You's menu (experiences/settings frame 1): 228 wide, 2 under You, its right edge 16 from the window's */
++/* You's menu (experiences/settings frame 1): 228 wide, 2 under You. It covers the AI rail's + whole, so no sliver of
++   the + shows beside it: its edge (the hairline, outside the box) ends 4 past You's right edge, which is the +'s, 4 in
++   from the window's edge on the Mac (2.1.0's join pass, the Experience lead's rulings at 0d0c1b8). Its top stays 2 above
++   the AI sheet's top line for 2.1 */
 +.monaco-workbench .ritemark-menu.ritemark-you-menu {
-+	left: -8px;
++	left: 3px;
 +	width: 228px;
 +	margin-top: 2px;
 +}
