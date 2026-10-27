@@ -113,7 +113,7 @@ scripts/codesign-windows.sh
 
 This list is the single source of truth — `scripts/release-extension-preflight.sh`'s denylist array must stay copy-paste identical to it (edit both in the same commit, never one without the other).
 
-**Shell-tier** = a full app rebuild + release (Gate 1 technical + Gate 2 Jarmo-tested, notarization, 60-min hardening — see `release-manager` agent). **Extension-tier** = `./scripts/release-extension.sh <version>` (per-file manifest, no app rebuild) — a light gate: Jarmo tests via the in-app "Relaunch to update" flow or a local dev path, then gives the approval phrase. No notarization, no hardening wait, no Windows CI, no repo-visibility toggle for an extension-only release. See `docs/development/RELEASING.md` for the plain-language version of this decision.
+**Shell-tier** = a full app rebuild + release (Gate 1 technical + Gate 2 Jarmo-tested, notarization, 60-min hardening — see `release-manager` agent). **Extension-tier** = `./scripts/release-extension.sh <version>` (per-file manifest, no app rebuild) — a light gate: Jarmo tests via the in-app "Relaunch to update" flow or a local dev path, then gives the approval phrase. No notarization, no hardening wait, no Windows CI for an extension-only release. See `docs/development/RELEASING.md` for the plain-language version of this decision.
 
 **Extension-tier by path does not mean an extension release delivers it.** An extension release ships only `out/**/*.js`, `media/webview.js`, `media/office-preview.js` (+ NOTICES) and `package.json`, laid over the app's bundled copy. Every other file under `extensions/ritemark/` (icons, fonts, themes, starter pack, draw.io/PDF assets) and every esbuild external in `node_modules` (e.g. the Claude Agent SDK) changes for users only with a shell release. `release-extension-preflight.sh` lists such changes and stops; `--allow-unshipped` releases without them, only with Jarmo's OK.
 
@@ -173,7 +173,7 @@ Customizations to VS Code go through patch files in `patches/vscode/`, NEVER dir
 
 After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bump: run `./scripts/update-vscode.sh --check`.
 
-### Current patches (18)
+### Current patches (19)
 
 | Patch | Purpose |
 | --- | --- |
@@ -195,6 +195,7 @@ After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bum
 | `016-ritemark-store-acquisition-policy.patch` | Removes external software-acquisition promotion: the Git download button in Source Control (Microsoft Store policy 10.1.5) |
 | `018-ritemark-surfaces.patch` | Ritemark 2.0's frame and surfaces (Sprint 132): no title row on the Mac and Windows, 44 strips with every control on the line at 26, the desks and the AI's sheet, zoom, Ritemark's menus and dialogs, the left column's head, You, the window sizes (`ritemarkWindowSizes.ts`), the theme pass on the palette and notifications (toasts wrap to 3 lines), the tabs' sizes and close button on the right, and the tree's chosen folder for new documents (`_ritemark.files.chosenFolder`); the welcome alone on the ground, an empty desk's tiles drawn, a file's extension in muted ink, a fresh profile's first window at 1440 × 900 (Sprint 133); the head's rows on Home, Tasks, Browser and Transcribe, the project menu's Switch project flyout, File ▸ New tab, Switch project and Share (`ritemark/fileMenu`), About this project as the root AGENTS.md's name and the pointer-only CLAUDE.md hidden in Documents, a switch that reloads asks while chats work (`ritemarkSwitchGuard.ts`), and the splash saving the ground (Sprint 134); the feedback sheet over the window (`ritemarkFeedbackSheet.ts`, `_ritemark.feedbackSheet`) and the thank-you toast that closes by itself (`_ritemark.briefToast`) (Sprint 140); File changes as the SCM container's name, in More and at its panel's head (`scm.contribution.ts`), and the desk's edge whole: an inset hairline over its webviews too, no shadow, `ritemark.sheetShadow` kept for what floats (Sprint 142, #557, #503) |
 | `019-ritemark-tab-row.patch` | Ritemark 2.0's tab row (Sprint 132): folded tabs ("N ⌄"), the +, permanent Home and Task board tabs (and the move commands that leave no empty desk), terminals as tabs with their bar and a tab menu of the usual items plus Rename; an empty desk's Text, Table and Web page tiles (Sprint 133); the Tasks tab's count and ⌘T for the desk's + (`ritemark.newTab`, Sprint 134); a restored task card's tab keeps its title from the first paint (`customEditorInputFactory.ts`, Sprint 142, #508) |
+| `020-ritemark-electron-43.patch` | Electron 43.8.3, the newest of the pinned VS Code's Electron line (Sprint 144, #515): `.npmrc`'s target, Electron's own `SHASUMS256.txt` in `build/checksums/electron.txt`, the notices in `cgmanifest.json`; moves to the first 43.x with Node 24.22.1; deleted, not rebased, at the next VS Code update that carries it |
 
 Patch rules and unused-imports gotcha: `.claude/skills/vscode-development/PATCH-RULES.md`.
 
