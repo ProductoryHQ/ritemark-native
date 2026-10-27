@@ -151,8 +151,9 @@ function click(recorded: Clickable[], words: string, where: string) {
   const { root, recorded } = render({ ...base, claudeCliInstalled: true, claudeCliAuthenticated: true, anyAgentReady: true })
   assertSharedButtons(root, where)
   assert.ok(!root.toString().includes('testing-iconPassed'), `${where}: "You're all set!"'s check is ink, not green`)
+  assert.ok(root.toString().includes('text-[var(--r-ink-strong)]'), `${where}: "You're all set!"'s check is the heading's ink, not muted`)
   calls.length = 0
-  click(recorded, 'Get Started', where)
+  click(recorded, 'Get started', where)
   assert.deepEqual(calls, ['dismissOnboarding'], `${where}: actions`)
 }
 
