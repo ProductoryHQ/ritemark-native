@@ -2,24 +2,24 @@ name: Windows CI Canary
 
 # Lightweight weekly early-warning for Windows runner-image toolchain breakage.
 #
-# WHY: the real build (build-windows.yml) runs on the `windows-8core` LARGER
-# runner, which is NOT available on public repos — so it only runs behind a
-# private-repo toggle, right before a release, where a broken runner image
-# (e.g. the 2026-07 Visual Studio 2026 bump that broke node-gyp VS detection)
-# is discovered at the worst possible moment. This canary runs the cheap,
-# failure-prone part — the node-gyp Visual Studio detection + a native-module
-# compile — every week on the FREE `windows-latest` standard runner, so a
-# toolchain regression surfaces on a Monday, not mid-release.
+# WHY: the real build (build-windows.yml) runs only when a release is dispatched,
+# so a broken runner image (e.g. the 2026-07 Visual Studio 2026 bump that broke
+# node-gyp VS detection) would otherwise be discovered at the worst possible
+# moment. This canary runs the cheap, failure-prone part — the node-gyp Visual
+# Studio detection + a native-module compile — every week on the same FREE
+# `windows-latest` standard runner the release build uses (Sprint 144, #506: no
+# larger runner and no private-repo toggle any more), so a toolchain regression
+# surfaces on a Monday, not mid-release.
 #
 # SCOPE: the scheduled path is an EARLY WARNING, not a gate. It does NOT
 # clone/build VS Code or produce an installer. The manual replay path can also
 # download and verify an already preserved signed installer without rebuilding
-# or re-signing it. `windows-latest` (standard) and `windows-8core`
-# (larger) can run slightly different image versions, so a green canary does
-# not GUARANTEE the 8-core build is green — but a RED canary reliably means the
-# shared Windows toolchain (Node + node-gyp + MSVC/VS detection) has shifted and
-# the release build needs attention before the next release. See
-# docs/development/architecture.md + the VS2026 CI-break memory.
+# or re-signing it. `windows-latest` moves to a new image version every week or
+# so, and the canary and a release build may land on different ones, so a green
+# canary does not GUARANTEE the release build is green — but a RED canary
+# reliably means the shared Windows toolchain (Node + node-gyp + MSVC/VS
+# detection) has shifted and the release build needs attention before the next
+# release. See docs/development/architecture.md + the VS2026 CI-break memory.
 
 on:
   schedule:

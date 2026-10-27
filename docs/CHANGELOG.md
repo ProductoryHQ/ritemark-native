@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — 2.1.0
 
+### Sprint 144, part 1: the release harness (#506, #515)
+
+#### Security
+- **Electron 43.8.3 (Node 24.22.0) (#515).** The app moves from Electron 43.7.7 to the newest release of its line: three weeks of Chromium security fixes for the built-in browser, and the compromised eMudhra intermediate certificate no longer trusted. Patch 020 moves again to the first 43.x with Node 24.22.1 (the 21 October Node security releases) if Electron publishes it before 2.1's candidate.
+
+#### Changed (release process)
+- **Windows builds no longer make the repository private (#506).** The Windows release build runs on GitHub's free standard runner, so each release no longer erases the repository's stars and watchers. The release instructions lose every visibility command, and a build that would run out of disk stops at once.
+- **A build carries the Electron it names.** `validate-build-output.sh` fails a build whose packaged Electron isn't `vscode/.npmrc`'s target.
+
 ### Sprint 143: 2.1 fixes (#556, #551, #544, #514, #513, #511, #509, #510)
 
 #### Added

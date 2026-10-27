@@ -622,6 +622,54 @@ fi
 echo ""
 
 # -----------------------------------------------------------------------------
+# Check 5f: the packaged Electron is the one vscode/.npmrc names
+#
+# Sprint 144 (R3, #515): patch 020 moves the pinned VS Code's Electron inside
+# its line for security fixes. The build downloads the version in
+# vscode/.npmrc's `target` and verifies it against build/checksums/electron.txt;
+# this proves the app that comes out is that version, so a stale or skipped
+# patch can't ship the old Electron silently. The macOS bundle names it in the
+# Electron framework's Info.plist (CFBundleVersion). On Windows the Electron
+# zip's `version` file is looked for at the app's root and one level down; a
+# target where the app names no version says so, and About is read at Gate 2.
+# -----------------------------------------------------------------------------
+echo -n "Checking the packaged Electron... "
+EXPECTED_ELECTRON=$(sed -n 's/^target="\(.*\)"$/\1/p' vscode/.npmrc 2>/dev/null | head -1)
+PACKAGED_ELECTRON=""
+ELECTRON_SOURCE=""
+case "$TARGET" in
+  darwin-arm64|darwin-x64)
+    ELECTRON_PLIST="$APP_PATH/Contents/Frameworks/Electron Framework.framework/Versions/A/Resources/Info.plist"
+    if [[ -f "$ELECTRON_PLIST" ]]; then
+      PACKAGED_ELECTRON=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$ELECTRON_PLIST" 2>/dev/null || true)
+      ELECTRON_SOURCE="Electron Framework's Info.plist"
+    fi
+    ;;
+  win32-x64)
+    for candidate in "$APP_PATH/version" "$APP_PATH"/*/version; do
+      if [[ -f "$candidate" ]]; then
+        PACKAGED_ELECTRON=$(tr -d '\r\n' < "$candidate")
+        ELECTRON_SOURCE="${candidate#"$APP_PATH"/}"
+        break
+      fi
+    done
+    ;;
+esac
+PACKAGED_ELECTRON="${PACKAGED_ELECTRON#v}"
+if [[ -z "$EXPECTED_ELECTRON" ]]; then
+  echo -e "${YELLOW}WARN${NC} (vscode/.npmrc names no Electron target; not checked)"
+  WARNINGS=$((WARNINGS + 1))
+elif [[ -z "$PACKAGED_ELECTRON" ]]; then
+  echo -e "${YELLOW}SKIPPED${NC} (the packaged app names no Electron version for $TARGET; read About at Gate 2: Electron $EXPECTED_ELECTRON)"
+elif [[ "$PACKAGED_ELECTRON" != "$EXPECTED_ELECTRON" ]]; then
+  echo -e "${RED}FAIL${NC} (the app carries Electron $PACKAGED_ELECTRON, from $ELECTRON_SOURCE; vscode/.npmrc names $EXPECTED_ELECTRON)"
+  ERRORS=$((ERRORS + 1))
+else
+  echo -e "${GREEN}OK${NC} (Electron $PACKAGED_ELECTRON, from $ELECTRON_SOURCE)"
+fi
+echo ""
+
+# -----------------------------------------------------------------------------
 # Check 6: App Launches (optional manual verification)
 # -----------------------------------------------------------------------------
 echo ""
