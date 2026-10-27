@@ -110,5 +110,5 @@ The Experience lead's answer (`3c0a2ae`) and QA's findings on `415a9be9`, in one
 - [x] User docs (`ai-agents.md`, `troubleshooting.md`), `release-plan.md` rows, CHANGELOG
 - [x] Filed for v2.2.0: the two tooltip looks in Light (#576); the hand-rolled `<button>`s in `RitemarkSettings.tsx` and `NodeConfigPanel.tsx` (#577)
 - [x] The Image step's card names the model a run uses, as its panel does (`imageStepModel`, `ImageNode.test.ts`)
-- [ ] The no-key line's words: waiting for the Experience lead
+- [x] The no-key line in the Experience lead's words, its Settings link, and a run's error in the same sentence; "You're all set!" in ink
 - [x] S20: Gate 2 on the RC, with the File Provider consent (the manager, 27 Oct); nothing created in either drive

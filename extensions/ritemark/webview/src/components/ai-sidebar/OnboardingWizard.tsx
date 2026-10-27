@@ -286,8 +286,9 @@ function ReadyStep({
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-5 text-center py-8">
-      <div className="w-10 h-10 rounded-full bg-[var(--vscode-testing-iconPassed)]/20 flex items-center justify-center mb-3">
-        <Icon name="check" size={20} className="text-[var(--vscode-testing-iconPassed)]" />
+      {/* Sprint 144: ink, not green; green is only ever the small ready dot (the Experience lead) */}
+      <div className="w-10 h-10 rounded-full bg-[var(--r-surface-muted)] flex items-center justify-center mb-3">
+        <Icon name="check" size={20} className="text-[var(--r-ink-muted)]" />
       </div>
       <h3 className="text-sm font-semibold mb-1.5">You're all set!</h3>
       <p className="text-xs text-[var(--r-ink-muted)] mb-4">

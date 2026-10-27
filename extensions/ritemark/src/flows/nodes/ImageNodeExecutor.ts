@@ -18,6 +18,7 @@ import { DEFAULT_MODELS, OPENAI_IMAGE_MODEL_IDS } from '../../ai/modelConfig';
 import { geminiHeaders, geminiUrl } from '../../ai/geminiRequest';
 import { ensureProjectSubfolder } from '../../projects/projectFolderGuard';
 import type { FlowNode, ExecutionContext } from '../types';
+import { StepNeedsKeyError } from '../flowModelDefaults';
 
 /**
  * Write a file via VS Code's filesystem API so the explorer model is
@@ -359,9 +360,9 @@ async function generateWithGemini(
   const apiKey = await extensionContext.secrets.get('google-ai-key');
 
   if (!apiKey) {
-    throw new Error(
-      'Google AI API key not configured. Go to Ritemark Settings to add your API key.'
-    );
+    // Sprint 144: the step panel's sentence, as plain text ("This step needs a Google AI API key to run. Add it in
+    // Settings")
+    throw new StepNeedsKeyError();
   }
 
   const model = options.model || DEFAULT_MODELS.flowImageGemini;

@@ -30,3 +30,22 @@ export function flowModelDefaults(getDefault: FlowLlmDefault): FlowModelDefaults
 export function flowModelRequestType(message: { modelType?: unknown }): 'llm' | 'image' {
   return message.modelType === 'image' ? 'image' : 'llm';
 }
+
+/**
+ * A Google image step with no Google AI key can't run at all (Sprint 144, the Experience lead's words, experience
+ * 13). The step panel shows `text` and `action`, the action a link to Settings at that key (`settingsSection`, see
+ * `RitemarkSettingsProvider`); a run that fails for the same reason says the same sentence, as plain text.
+ */
+export const GOOGLE_IMAGE_KEY_NEEDED = {
+  text: 'This step needs a Google AI API key to run.',
+  action: 'Add it in Settings',
+  settingsSection: 'google-ai-key',
+} as const;
+
+/** Thrown where a step needs a key it doesn't have; its message is the plain sentence a run shows. */
+export class StepNeedsKeyError extends Error {
+  constructor(readonly copy: typeof GOOGLE_IMAGE_KEY_NEEDED = GOOGLE_IMAGE_KEY_NEEDED) {
+    super(`${copy.text} ${copy.action}`);
+    this.name = 'StepNeedsKeyError';
+  }
+}

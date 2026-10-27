@@ -197,7 +197,7 @@ export function NodeConfigPanel() {
 interface FieldProps {
   label: string;
   children: React.ReactNode;
-  description?: string;
+  description?: React.ReactNode;
 }
 
 function Field({ label, children, description }: FieldProps) {
@@ -669,6 +669,8 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
   );
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // Sprint 144: what fixes the error, when the host names it (a Google image step with no key: Settings at that key)
+  const [errorAction, setErrorAction] = React.useState<{ label: string; settingsSection: string } | null>(null);
   const modelOptions = modelOptionsWithPersistedSelection(models, data.model);
   const waiting = modelListWaiting(loading, models.length); // Sprint 144 P4, as on the LLM step
 
@@ -678,6 +680,7 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
     setModels(offeredImageModels(provider));
     setLoading(true);
     setError(null);
+    setErrorAction(null);
 
     // Request image models from extension
     vscode.postMessage({ type: 'flow:getModels', provider, modelType: 'image' });
@@ -689,6 +692,7 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
         setLoading(false);
         if (message.error) {
           setError(message.error);
+          setErrorAction(message.errorAction ?? null);
           // Keep fallback models (already set)
         } else if (message.models && message.models.length > 0) {
           setModels(message.models);
@@ -750,7 +754,26 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
           ? 'Loading models...'
           : modelOptions.unavailable
             ? 'Saved model is no longer available. Choose a replacement.'
-            : error ? `⚠️ ${error}` : undefined}
+            : error && errorAction
+              ? (
+                // Sprint 144, the Experience lead's words: the step can't run without the key, so say so, no warning
+                // sign, with the fix as a link ("This step needs a Google AI API key to run. Add it in Settings")
+                <>
+                  {error}{' '}
+                  <Tooltip label="Open Settings at the Google AI API key">
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0 text-xs"
+                      onClick={() => vscode.postMessage({ type: 'flow:openSettings', section: errorAction.settingsSection })}
+                    >
+                      {errorAction.label}
+                    </Button>
+                  </Tooltip>
+                </>
+              )
+              : error ? `⚠️ ${error}` : undefined}
       >
         <Select
           // Sprint 141 R4: an unset step shows the model it runs on, as the run's default.

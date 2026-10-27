@@ -25,7 +25,7 @@ import {
 import * as modelCatalog from '../ai/modelCatalog';
 import { pickerFolder } from '../utils/dialogDefaults';
 import { listGeminiModels } from '../ai/geminiRequest';
-import { flowModelDefaults, flowModelRequestType } from './flowModelDefaults';
+import { flowModelDefaults, flowModelRequestType, StepNeedsKeyError } from './flowModelDefaults';
 
 /**
  * Sanitize a string for use in a filename
@@ -177,6 +177,11 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'flow:getScheduleStatus':
             void this.sendScheduleStatus(document, webview);
+            return;
+
+          case 'flow:openSettings':
+            // Sprint 144: a step panel's "Add it in Settings" opens Settings at that key (the section is checked there)
+            void vscode.commands.executeCommand('ritemark.aiSettings', message.section);
             return;
 
           case 'codex:getModels':
@@ -762,6 +767,18 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
 
       webview.postMessage({ type: 'flow:models', provider, modelType, models });
     } catch (err) {
+      if (err instanceof StepNeedsKeyError) {
+        // Sprint 144: the panel shows the sentence with its action as a link to Settings at that key
+        webview.postMessage({
+          type: 'flow:models',
+          provider,
+          modelType,
+          models: [],
+          error: err.copy.text,
+          errorAction: { label: err.copy.action, settingsSection: err.copy.settingsSection },
+        });
+        return;
+      }
       console.error(`[FlowEditorProvider] Failed to fetch ${provider} ${modelType} models:`, err);
       webview.postMessage({
         type: 'flow:models',
@@ -887,7 +904,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     const apiKey = await this.context.secrets.get('google-ai-key');
 
     if (!apiKey) {
-      throw new Error('Google AI API key not configured');
+      throw new StepNeedsKeyError();
     }
 
     // Use v1beta to include preview models. Sprint 141: the key in a header (R12,

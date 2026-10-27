@@ -922,8 +922,8 @@ export function RitemarkSettings() {
           </p>
         </div>
 
-        {/* Google AI */}
-        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+        {/* Google AI; a Google image step's "Add it in Settings" opens the page here (Sprint 144) */}
+        <div id="settings-section-google-ai-key" className="scroll-mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-ink-strong">
               Google AI API Key
