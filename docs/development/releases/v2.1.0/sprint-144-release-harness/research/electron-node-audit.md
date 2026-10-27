@@ -70,6 +70,13 @@ An Electron patch release inside 43 is a small change in the VS Code tree, carri
 - **Native modules stay compatible:** every 43.x has ABI 148. `build-prod.sh` applies patches before `npm ci` in `vscode/`, so the Mac's native modules build against the new headers. Both CI workflows run `npm ci` before their patch step, so CI's native modules build against 43.7.7's headers and run on the new 43.x: the same ABI, so they load (inferred from the ABI, to be proven on the built app, see the technical plan).
 - **About already shows the Node version** (patch 001: `Node.js: ${process.versions['node']}`), so #515's "About shows that Node version" needs no code.
 
+## A3: where a packaged app names its Electron (27 October, during the sprint)
+
+- **macOS, measured:** `Ritemark.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Resources/Info.plist`, `CFBundleVersion`: `43.7.7` in the installed 2.0.1, `43.8.3` in this branch's dev Electron (`vscode/.build/electron`).
+- **The Electron zip's own `version` file**, measured in the dev download: `43.8.3`, at the root next to `Ritemark.app` and `LICENSE`. On Windows, `@vscode/gulp-electron` keeps the zip's root files and moves them into the app's versioned folder (`win32.js`, "Move other files to version subfolder"), so the check looks at the app's root and one level down. Inferred from the packager's code; the first Windows run on `main` prints what it found ("OK … from <path>/version" or "SKIPPED").
+- **The Windows executable's file version is no help:** the packager stamps `file-version` and `product-version` with the product's version (`win32.js`).
+- **darwin-x64:** the same plist as arm64, but `build-macos-x64.yml` validates inline and doesn't run `validate-build-output.sh`; its Electron is read in About at Gate 2 (Rosetta), and in the plist when the x64 artifact is signed (Step 6).
+
 ## Options
 
 1. **Update VS Code past 1.142.** Doesn't bring Node 24.22.1 today (no VS Code has it), and it is the biggest shell change there is: Sprint 135 was one, rebasing 18 patches. Not for the last sprint before a candidate.

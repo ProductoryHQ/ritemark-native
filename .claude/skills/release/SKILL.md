@@ -15,7 +15,7 @@ Companion skill to `release-manager` agent. The agent owns workflow + gate enfor
 - A release-manager run reaches a step that needs exact bash commands.
 - The user is doing release steps without invoking the agent.
 - Notarization, signing, or GitHub Release commands need to be looked up.
-- GitHub Actions Windows build needs the public/private repo toggle.
+- The Windows and macOS x64 CI builds need dispatching (Step 5). Neither ever changes the repository's visibility.
 - A published release's worktree is still on disk holding build output (Step 10, closeout).
 
 ## Release Types
@@ -265,11 +265,7 @@ command's, not the script's.
 
 > **Changed in v1.8.2:** CI no longer auto-triggers on tag push. `build-windows.yml` and `build-macos-x64.yml` are `workflow_dispatch`-only. Dispatch them explicitly against the release ref. The build version is read from `branding/product.json`, **not** the git ref, so any ref (branch, tag, or commit) works — you do NOT need to create the tag to build. Create the tag later, at publish time (Step 8).
 
-**Toggle repo to private first** — public repos cannot use larger Windows runners:
-
-```bash
-gh repo edit ProductoryHQ/ritemark-native --visibility private --accept-visibility-change-consequences
-```
+**The repository stays public. Never change its visibility** (Sprint 144, #506): every public → private change erases its GitHub stars and watchers for good. Both builds run on free standard runners (`windows-latest`, `macos-15-intel`) that a public repository may use, so there is nothing to toggle.
 
 Dispatch both builds against **`main`** — not a SHA (`--ref` takes a branch or
 tag; a raw commit gives `HTTP 422: No ref found`) and not a release branch (the
@@ -292,11 +288,10 @@ against a single `RITEMARK_RELEASE_COMMIT`.
 Both workflows independently initialize the recorded VS Code gitlink, use
 frozen installs, run the clean-source gate, and embed provenance.
 
-After the Windows build completes (Step 6), toggle back:
-
-```bash
-gh repo edit ProductoryHQ/ritemark-native --visibility public --accept-visibility-change-consequences
-```
+The Windows build takes about 45–50 minutes on the free runner and costs
+nothing from the Actions budget. A step at its start (right after Git's
+configuration) stops it, with a clear message, if the runner's work drive has
+under 30 GB free.
 
 ### Step 6 — Download + sign macOS x64 (NO notarization yet)
 
@@ -672,7 +667,7 @@ For changes confined to `extensions/ritemark/` — i.e. extension-tier per `CLAU
    If the preflight lists changes an extension release cannot deliver (a file outside the shipped set, or a package that loads from the app's `node_modules`), tell Jarmo in plain words that they arrive with the next full release and ask whether to ship without them. Only after his yes, re-run with `--allow-unshipped`, and name those changes in the release report.
 3. Review `release-staging/upload/` — the script prints (does not auto-run) the exact `gh release create` command to publish.
    Also run `(cd extensions/ritemark && npm run check:anthropic-models)`. An extension release cannot change the bundled Claude Code, so an `ALERT` here does not block this release, but it goes to Jarmo in the release report. A Claude Code that has fallen behind needs a full release.
-4. **Light gate, not the full Gate 1/Gate 2 process below:** Jarmo tests via the in-app "Relaunch to update" flow (or a local dev install pointed at the staged files) on the changed surfaces only, then gives the approval phrase. No notarization, no 60-min hardening wait, no Windows CI dispatch, no repo-visibility toggle — none of those apply to an extension-only release.
+4. **Light gate, not the full Gate 1/Gate 2 process below:** Jarmo tests via the in-app "Relaunch to update" flow (or a local dev install pointed at the staged files) on the changed surfaces only, then gives the approval phrase. No notarization, no 60-min hardening wait, no Windows CI dispatch — none of those apply to an extension-only release.
 5. Only after Jarmo's approval: run the `gh release create` command the script printed, uploading the individual files from `release-staging/upload/` (never a `.vsix`).
 6. No closeout step: an extension release is built in the main checkout and leaves no release worktree or multi-GB output behind.
 
@@ -758,9 +753,13 @@ v1.12.0 gate: the check passes on the release source, and the build bundles Clau
 
 `./scripts/notarize-dmg.sh` is the canonical script. `notarize-app.sh` is **deprecated** — using it bypasses Gatekeeper for DMG installs.
 
-### Windows builds — public/private repo toggle
+### Windows builds run on the free runner — never change the repository's visibility
 
-GitHub does NOT allow larger runners (windows-8core) on public repos. Before dispatching `build-windows.yml` (Step 5, `gh workflow run`), switch repo to private. After the Windows build completes, switch back to public. Without the toggle, the Windows build fails with a billing/permissions error. (A separate `windows-canary.yml` runs weekly on the FREE `windows-latest` standard runner — no toggle needed — to catch runner-image toolchain breakage early; see W4.)
+Until Sprint 144 (#506), `build-windows.yml` ran on the paid `windows-8core` larger runner, which a public repository can't use by default, so every release made ProductoryHQ/ritemark-native private for the build and public again. Each public → private change erased the repository's stars and watchers for good (3 → 0 by 21 October 2026). Since Sprint 144 the build runs on the free standard `windows-latest` runner: measured on 27 October 2026, the release workflow without signing took 37.5 minutes there (about 45–50 with it, estimated), on a 150 GB work drive with 132 GB still free (`docs/development/releases/v2.1.0/sprint-144-release-harness/research/windows-ci-audit.md`).
+
+- **Never run `gh repo edit … --visibility`** for a build, or for anything else in a release.
+- **If a Windows build fails for a runner reason** (disk, time, signing on the runner), don't go back to the 8-core runner by toggling. The fallbacks, in order: let the public repository use the 8-core runner's group (an organization setting, Jarmo's to change), then a private build repository. Both are in the audit above.
+- `windows-canary.yml` runs the toolchain checks weekly on the same free runner; a red canary means the release build needs attention before the next release.
 
 ### Node version + architecture
 

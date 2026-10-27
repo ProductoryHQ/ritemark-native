@@ -7,7 +7,7 @@ Nothing below is ticked until its change is on its branch (or, for a run, its ru
 - [x] A1: the free-runner probe, run 40425970110 on `scratch/sprint-144-free-runner-probe`, unsigned, no secrets: `research/windows-ci-audit.md`
 - [x] A2: Electron and Node for 2.1, the cost of a move, the outside-URL paths: `research/electron-node-audit.md`
 - [x] A4: P4 reproduced in a headless harness: `research/repro/flow-step-panel/`, `qa/p4-*.png`
-- [ ] Delete `scratch/sprint-144-free-runner-probe` once the manager has read A1 (Decision 6)
+- [x] Delete `scratch/sprint-144-free-runner-probe` once the manager has read A1 (Decision 6)
 
 ---
 
@@ -15,36 +15,36 @@ Nothing below is ticked until its change is on its branch (or, for a run, its ru
 
 ## Phase 1: Before W3's check
 
-- [ ] A3: where the packaged Electron names its version on win32-x64 and in the darwin-x64 tarball (the Mac's is measured); recorded in `research/electron-node-audit.md`
+- [x] A3: where the packaged Electron names its version on win32-x64 and in the darwin-x64 tarball (the Mac's is measured); recorded in `research/electron-node-audit.md`
 
 ## Phase 2: The Windows build on the free runner (R1, W1)
 
-- [ ] `.github/workflows/build-windows.yml`: `runs-on: windows-latest`
-- [ ] `.github/workflows/build-windows.yml`: the disk guard (≥ 30 GB free on the work drive) as the first step after Git's config
-- [ ] `.github/workflows/build-windows.yml`: the two comments that name the 8-core runner
-- [ ] YAML parse and the `release` skill's pre-push audit (the whole file and `build-macos-x64.yml` read)
+- [x] `.github/workflows/build-windows.yml`: `runs-on: windows-latest`
+- [x] `.github/workflows/build-windows.yml`: the disk guard (≥ 30 GB free on the work drive) as the first step after Git's config
+- [x] `.github/workflows/build-windows.yml`: the two comments that name the 8-core runner
+- [x] YAML parse and the `release` skill's pre-push audit (the whole file and `build-macos-x64.yml` read)
 
 ## Phase 3: The release path without the toggle (R2, W2)
 
-- [ ] `.claude/skills/release/SKILL.md`: *When to use*, Step 5, the Windows gotcha
-- [ ] `.claude/agents/release-manager.md`: *Windows Build Notes*, *Target Repository*
-- [ ] `.github/workflows/windows-canary.yml`: the header comment only
-- [ ] `grep -rn "visibility private" .claude .github docs/development/release-process` returns nothing
+- [x] `.claude/skills/release/SKILL.md`: *When to use*, Step 5, the Windows gotcha
+- [x] `.claude/agents/release-manager.md`: *Windows Build Notes*, *Target Repository*
+- [x] `.github/workflows/windows-canary.yml`: the header comment only
+- [x] `grep -rn "visibility private" .claude .github docs/development/release-process` returns nothing
 
 ## Phase 4: Electron 43.8.x (R3, R4, W3)
 
-- [ ] `patches/vscode/020-ritemark-electron-43.patch` (`.npmrc`, `build/checksums/electron.txt`, `cgmanifest.json`), made with `./scripts/create-patch.sh` on a pristine pin with 001–019 applied
-- [ ] The new `SHASUMS256.txt` cross-checked against GitHub's asset digests for darwin-arm64, darwin-x64 and win32-x64
-- [ ] `CLAUDE.md`: *Current patches (19)*, patch 020's row
-- [ ] `scripts/validate-build-output.sh`: the packaged Electron equals `vscode/.npmrc`'s target (A3's locations), with a message naming both
-- [ ] `scripts/update-vscode.sh --check` against a newer upstream: say in `qa-evidence.md` what it reports for patch 020
-- [ ] Release plan: the #515 risk row (R4) with the Electron the branch ships
+- [x] `patches/vscode/020-ritemark-electron-43.patch` (`.npmrc`, `build/checksums/electron.txt`, `cgmanifest.json`), made with `./scripts/create-patch.sh` on a pristine pin with 001–019 applied
+- [x] The new `SHASUMS256.txt` cross-checked against GitHub's asset digests for darwin-arm64, darwin-x64 and win32-x64
+- [ ] `CLAUDE.md`: *Current patches (19)*, patch 020's row. **Not done by the agent:** CLAUDE.md is the agents' own instructions, which no agent's message can authorise changing; the row is in the PR's description for a person to add
+- [x] `scripts/validate-build-output.sh`: the packaged Electron equals `vscode/.npmrc`'s target (A3's locations), with a message naming both
+- [ ] `scripts/update-vscode.sh --check` against a newer upstream: say in `qa-evidence.md` what it reports for patch 020. Not run: it needs a newer tag fetched into the shallow submodule; patch 020's header says to delete it at the next update
+- [x] Release plan: the #515 risk row (R4) with the Electron the branch ships
 
 ## Phase 5: Part 1's QA
 
-- [ ] S13: `./scripts/apply-patches.sh --dry-run`, then apply; the pre-commit validator by hand (`CLAUDE_PROJECT_DIR="$PWD"`)
-- [ ] S10, S14 on scratch copies (never committed)
-- [ ] S9, S11, S12 on a dev launch here (hidden window, `--use-mock-keychain`, one launch reused)
+- [x] S13: `./scripts/apply-patches.sh --dry-run`, then apply; the pre-commit validator by hand (`CLAUDE_PROJECT_DIR="$PWD"`)
+- [x] S10, S14 on scratch copies (never committed)
+- [x] S9, S11, S12 on a dev launch here (hidden window, `--use-mock-keychain`, one launch reused): the AI turns not run (`qa-evidence.md`)
 - [ ] `qa-validator` review; PR, shell tier; the manager's merge
 - [ ] After the merge: S1–S4, S8 on `main` (`build-windows.yml`), and `build-macos-x64.yml` on `main`
 - [ ] After the merge: S11, S12 (Windows half) and S17–S19 by the Windows session; S20 here if Decision 4 is yes

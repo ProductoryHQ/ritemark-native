@@ -282,7 +282,7 @@ For an **extension-tier** release (per `CLAUDE.md`'s "Release Tiers" section —
 3. Manual smoke test of ONLY the changed surfaces (e.g. if the sprint touched the update platform, test the update flow — not an unrelated full app QA pass).
 4. Jarmo tests via the in-app "Relaunch to update" flow or a local dev install pointed at the staged files, then gives the approval phrase.
 
-No notarization, no hardening window, no Windows CI, no repo-visibility toggle — see `release-manager`'s "Extension-only release" workflow table for the full gate detail.
+No notarization, no hardening window, no Windows CI — see `release-manager`'s "Extension-only release" workflow table for the full gate detail.
 
 ## Integration with Sprint Workflow
 

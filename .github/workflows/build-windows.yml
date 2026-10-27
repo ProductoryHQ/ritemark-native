@@ -7,8 +7,8 @@ on:
         description: 'Exact approved 40-character commit to build (must equal canonical origin/main)'
         required: true
         type: string
-    # This paid larger-runner workflow stays manual and always produces a
-    # fully signed installer. Missing credentials or any unsigned PE fails it.
+    # This workflow stays manual and always produces a fully signed installer.
+    # Missing credentials or any unsigned PE fails it.
 
 permissions:
   contents: read
@@ -24,7 +24,12 @@ env:
 
 jobs:
   build:
-    runs-on: windows-8core
+    # Sprint 144 (#506): the free standard runner, so the public repository is
+    # never made private for a build (every public -> private change erases its
+    # stars and watchers). Measured on 27 Oct 2026: unsigned, the build took
+    # 37.5 minutes with 132 GB of its 150 GB work drive still free
+    # (docs/development/releases/v2.1.0/sprint-144-release-harness/research/windows-ci-audit.md).
+    runs-on: windows-latest
     timeout-minutes: 120
 
     steps:
@@ -33,6 +38,20 @@ jobs:
         run: |
           git config --global core.longpaths true
           git config --global core.autocrlf false
+
+      - name: Require free disk on the work drive
+        # GitHub documents only 14 GB of SSD for the standard Windows runner and
+        # the build's tree alone is about 14 GB; today's runner has far more.
+        # Stop in seconds with a clear message instead of filling the disk midway.
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $drive = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).PSDrive
+          $freeGb = [math]::Floor($drive.Free / 1GB)
+          Write-Host "Work drive $($drive.Name): has $freeGb GB free."
+          if ($freeGb -lt 30) {
+            throw "The runner's work drive has $freeGb GB free; the Windows build needs at least 30 GB."
+          }
 
       - name: Checkout RiteMark
         uses: actions/checkout@v4
@@ -140,7 +159,7 @@ jobs:
         # you change the node-gyp floor or the Visual Studio check here, change
         # windows-canary.yml in the same commit.
         #
-        # windows-8core ships Visual Studio 2026 (internal major version 18).
+        # windows-latest (windows-2025-vs2026) ships Visual Studio 2026 (internal major version 18).
         # node-gyp maps 18 -> 2026 from 12.1.0 on. Node 24.18.0's npm 11.16.0
         # bundles node-gyp 12.3.0, so npm's own copy finds it, and the swap to
         # 12.4.0 that Node 22.22.1's node-gyp 11.2.0 needed is gone (Sprint 135,

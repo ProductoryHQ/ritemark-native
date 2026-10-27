@@ -128,7 +128,7 @@ No `.vsix`/`vsce` packaging — this codebase ships a per-file manifest + canoni
 | **2** | **Jarmo tests via the in-app "Relaunch to update" flow (or a local dev install), on the changed surfaces only** | **Jarmo** | **Light gate — one step, not two** |
 | 3 | `gh release create` with the individual files from `release-staging/upload/` + the regenerated feed | Agent | **REQUIRES step 2 cleared** |
 
-**Explicitly do NOT apply to this path:** notarization, the ≥60-minute hardening window, Windows CI dispatch, the public/private repo-visibility toggle. Those exist because a full release replaces the signed app bundle; an extension release never touches it. If a sprint's release-tier guard (`CLAUDE.md`'s "Release Tiers") finds shell-tier paths changed, it blocks this path entirely — that sprint must go through the full-release table instead.
+**Explicitly do NOT apply to this path:** notarization, the ≥60-minute hardening window, Windows CI dispatch. Those exist because a full release replaces the signed app bundle; an extension release never touches it. If a sprint's release-tier guard (`CLAUDE.md`'s "Release Tiers") finds shell-tier paths changed, it blocks this path entirely — that sprint must go through the full-release table instead.
 
 For exact commands, invoke the `release` skill.
 
@@ -341,26 +341,9 @@ verdict to work around. Commands: `release` skill, Step 10.
 
 ## Windows Build Notes
 
-The Windows installer is built from a GitHub Actions artifact and processed on a Windows machine.
+`build-windows.yml` builds, signs (Azure Artifact Signing) and tests the Windows installer in CI, on the free `windows-latest` runner, dispatched by hand against `main` with the exact source commit (`release` skill, Step 5). Its artifact `ritemark-windows-installer` holds `Ritemark-Setup.exe`, its identity record (`source_commit`, `workflow_commit`, SHA-256) and the standard-user round-trip evidence; Gate 2 stages it (`release` skill, Gate 2).
 
-**Public/private repo toggle (CRITICAL):** GitHub does NOT allow larger runners (`windows-8core`) on public repos. Before pushing the release tag (which triggers `build-windows.yml`):
-
-```bash
-gh repo edit ProductoryHQ/ritemark-native --visibility private --accept-visibility-change-consequences
-```
-
-After the Windows build finishes, switch back:
-
-```bash
-gh repo edit ProductoryHQ/ritemark-native --visibility public --accept-visibility-change-consequences
-```
-
-**Per-build steps on Windows host:**
-
-1. Download artifact: `gh run download <run-id> --name ritemark-windows-x64 --dir VSCode-win32-x64`
-2. Patch icon with `rcedit` (default Electron icon otherwise): `rcedit.exe Ritemark.exe --set-icon branding/icons/icon.ico`
-3. Build installer with Inno Setup 6 (`ISCC.exe`) using **absolute** SourcePath / IconPath — Inno Setup mishandles relative paths.
-4. Verify installer: ~100MB, has icon, installs cleanly, app launches with TipTap editor visible.
+**Never change the repository's visibility (CRITICAL, Sprint 144, #506).** Every public → private change erases ProductoryHQ/ritemark-native's stars and watchers for good. The release no longer needs it: no step of a release runs `gh repo edit … --visibility`. If a Windows build fails for a runner reason, the fallbacks are in the `release` skill's *Windows builds run on the free runner*, not a toggle.
 
 **Native dependency check:** before any release, audit new extension deps for Windows compatibility:
 
@@ -393,7 +376,7 @@ Fix: [what must change before release can proceed]
 
 ## Target Repository
 
-Public release repo: `jarmo-productory/ritemark-public`. Private development repo: `ProductoryHQ/ritemark-native`. The public/private toggle for Windows builds operates on the development repo.
+Release repo (binaries, update feed, model feed): `jarmo-productory/ritemark-public`. Development repo: `ProductoryHQ/ritemark-native`, public, and kept public: its visibility is never changed (Sprint 144, #506).
 
 ## Lessons Learned
 
