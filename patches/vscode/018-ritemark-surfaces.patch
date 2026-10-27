@@ -114,6 +114,24 @@ kit's single outline and 2.0 draw it. Its default anchor is the title row, which
 default, a scrolled tab row in a very narrow desk shifted the bound too); anchor-scope keeps each desk to its own. The
 other edges, the top edge beside the tab, no shadow and the welcome alone stay as Sprint 142 drew them.
 
+2.1.0's Gate 1 join pass (RC3; the Experience lead's rulings at 04eba74 and 0d0c1b8: framework §§1 and 4, the kit,
+experience 3): the desk's edge is drawn once, and opaque. The hairline lies over a line of the desk's own colour
+(--rm-desk-edge), so it reads one tone over a webview's page, a terminal or the browser's page: #302d56 in Ritemark
+Dark, where the #FFFFFF14 hairline over #1E1B4B was drawn twice under a webview and read #403d63. Where a webview lies
+on the desk (.editor-container:has() the webview editor's element), its layer draws the edge and the desk's own line
+under it goes. The chosen tab's outline (--rm-tab-edge) and its fillets lie over the same desk-coloured line, so the
+desk and its tab are one tone; the AI's sheet keeps its own (#2b294d). What floats keeps 4 clear of any line it runs
+beside or lies across, and a menu that lands on a control covers it whole, corners included, or keeps 4 clear of it:
+the + menu and the folded tabs' menu open 4 below the desk's top line (their edge at 49 for the line at 44) and end 8
+in from the desk's right edge (019 places them from the desk), so they cover the document bar's Share whole; their width
+is a whole pixel (calc-size), so the edge is crisp. The folded tabs' button ("N ⌄") is a whole pixel wide the same way,
+so its left edge and its hover and open fill land on whole device pixels. You's menu ends 4 past You's right edge,
+covering the AI rail's + and history whole. The left column's slider stops 2 CSS pixels short of the desk's left
+hairline at every scale. And the left column lays its content out again when the head's rows change after its first
+draw (a window that opens on Documents drew its head before the extension's New and Search existed, and the tree ran
+64 past the column's foot, under the status bar): ritemarkProjectHead.ts fires onDidChangeRows, sidebarPart.ts lays
+out again.
+
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
 platform/window/common/window.ts; platform/windows/electron-main/windowImpl.ts; workbench/browser/{layout,style}.ts;
@@ -832,10 +850,10 @@ index 75f9238fd75..68ad7c003b7 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..a52f9c52d5f
+index 00000000000..380c2122910
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1861 @@
+@@ -0,0 +1,1896 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -874,6 +892,13 @@ index 00000000000..a52f9c52d5f
 +	--rm-hairline-width: 1px; /* the desk's and the chosen tab's edge */
 +	--rm-fillet: 8px; /* the radius where the chosen tab meets the desk */
 +	--rm-fillet-box: calc(var(--rm-fillet) + var(--rm-hairline-width)); /* a fillet with its hairline */
++	/* The desk's edge and the chosen tab's (2.1.0's Gate 1 join pass, the Experience lead's rulings at 04eba74): the
++	   hairline laid over a line of the desk's own colour, so the edge is opaque and one tone wherever it lies (over a
++	   webview's page, a terminal, the browser's page or the ground beside the chosen tab), and the desk and its tab are
++	   one sheet. Ritemark Dark's #FFFFFF14 over #1E1B4B reads #302d56; Ritemark Light's hairline is opaque already. The
++	   AI's sheet lays the same hairline over its own colour (the AI webview), so it reads its own tone, #2b294d */
++	--rm-desk-edge: inset 0 0 0 var(--rm-hairline-width) var(--rm-hairline), inset 0 0 0 var(--rm-hairline-width) var(--rm-desk);
++	--rm-tab-edge: 0 0 0 var(--rm-hairline-width) var(--rm-hairline), 0 0 0 var(--rm-hairline-width) var(--rm-desk);
 +	/* the room the window controls take at the left (the Mac's traffic lights) and the right (Windows' buttons) */
 +	--rm-lights: 0px;
 +	--rm-buttons: 0px;
@@ -1044,9 +1069,16 @@ index 00000000000..a52f9c52d5f
 +	position: absolute;
 +	inset: 0;
 +	border-radius: inherit;
-+	box-shadow: inset 0 0 0 var(--rm-hairline-width) var(--rm-hairline);
++	box-shadow: var(--rm-desk-edge);
 +	pointer-events: none;
 +	z-index: 10;
++}
++
++/* The edge is drawn once (the join pass): where a webview lies on the desk (the Markdown editor, Settings, Home, the
++   Task board), the webview's layer draws it over its page, and the desk's own line under that layer goes. Twice, the
++   Dark hairline doubled where the page let it through (#403d63 against #302d56 over a terminal) */
++.monaco-workbench .part.editor .editor-group-container > .editor-container:has([id^="webview-editor-element-"])::after {
++	display: none;
 +}
 +
 +/* Sprint 144 (Gate 1, #503's follow-up): the chosen tab joins the desk with no line beneath it, as in 2.0 (framework §1:
@@ -1366,6 +1398,13 @@ index 00000000000..a52f9c52d5f
 +	outline: none !important; /* !important: as above */
 +}
 +
++/* The left column's slider stops 2 short of the desk (2.1.0's join pass, the Experience lead's rulings at 04eba74 and
++   0d0c1b8): the column ends where the desk's left hairline starts, so a slider the column's full width lay against that
++   line. The ground shows between them, 2 CSS pixels at every scale: 4 device pixels on the Mac, 2 at 100% */
++.monaco-workbench .part.sidebar .monaco-scrollable-element > .scrollbar.vertical > .slider {
++	width: calc(100% - 2px) !important; /* !important: the scrollbar sets the slider's width inline (abstractScrollbar.ts) */
++}
++
 +
 +/* Tabs (R7): the chosen tab is the desk's colour and joined to it; the others are plain labels on the ground */
 +
@@ -1382,7 +1421,7 @@ index 00000000000..a52f9c52d5f
 +.monaco-workbench .part.editor .tabs-container > .tab.active {
 +	background-color: var(--rm-desk) !important; /* !important: as the tabs' rule above */
 +	border-radius: 8px 8px 0 0;
-+	box-shadow: 0 0 0 var(--rm-hairline-width) var(--rm-hairline) !important; /* !important: multieditortabscontrol.css's chosen and hovered tab shadows are more specific. not VS Code's inset shade, which greys the tab's top against the desk */
++	box-shadow: var(--rm-tab-edge) !important; /* !important: multieditortabscontrol.css's chosen and hovered tab shadows are more specific. not VS Code's inset shade, which greys the tab's top against the desk; the desk's edge, opaque (--rm-tab-edge), not the hairline over the ground */
 +	z-index: 2;
 +}
 +
@@ -1418,7 +1457,8 @@ index 00000000000..a52f9c52d5f
 +	pointer-events: none;
 +}
 +
-+/* the fillet carries the hairline round its curve, from the tab's side into the desk's top edge */
++/* the fillet carries the hairline round its curve, from the tab's side into the desk's top edge; under it a layer of the
++   desk's colour from the same curve, so the hairline reads the desk's edge (--rm-desk-edge), not the hairline over the ground */
 +.monaco-workbench .part.editor .tabs-container > .tab.active > .tab-border-bottom-container::before,
 +.monaco-workbench .part.editor .tabs-container > .tab.active > .tab-border-bottom-container::after {
 +	content: '';
@@ -1430,12 +1470,16 @@ index 00000000000..a52f9c52d5f
 +
 +.monaco-workbench .part.editor .tabs-container > .tab.active > .tab-border-bottom-container::before {
 +	left: calc(-1 * var(--rm-fillet-box));
-+	background: radial-gradient(circle at 0 0, transparent var(--rm-fillet), var(--rm-hairline) calc(var(--rm-fillet) + var(--rm-hairline-width) / 4), var(--rm-hairline) calc(var(--rm-fillet) + var(--rm-hairline-width) * 3 / 4), var(--rm-desk) var(--rm-fillet-box));
++	background:
++		radial-gradient(circle at 0 0, transparent var(--rm-fillet), var(--rm-hairline) calc(var(--rm-fillet) + var(--rm-hairline-width) / 4), var(--rm-hairline) calc(var(--rm-fillet) + var(--rm-hairline-width) * 3 / 4), var(--rm-desk) var(--rm-fillet-box)),
++		radial-gradient(circle at 0 0, transparent var(--rm-fillet), var(--rm-desk) calc(var(--rm-fillet) + var(--rm-hairline-width) / 4));
 +}
 +
 +.monaco-workbench .part.editor .tabs-container > .tab.active > .tab-border-bottom-container::after {
 +	right: calc(-1 * var(--rm-fillet-box));
-+	background: radial-gradient(circle at 100% 0, transparent var(--rm-fillet), var(--rm-hairline) calc(var(--rm-fillet) + var(--rm-hairline-width) / 4), var(--rm-hairline) calc(var(--rm-fillet) + var(--rm-hairline-width) * 3 / 4), var(--rm-desk) var(--rm-fillet-box));
++	background:
++		radial-gradient(circle at 100% 0, transparent var(--rm-fillet), var(--rm-hairline) calc(var(--rm-fillet) + var(--rm-hairline-width) / 4), var(--rm-hairline) calc(var(--rm-fillet) + var(--rm-hairline-width) * 3 / 4), var(--rm-desk) var(--rm-fillet-box)),
++		radial-gradient(circle at 100% 0, transparent var(--rm-fillet), var(--rm-desk) calc(var(--rm-fillet) + var(--rm-hairline-width) / 4));
 +}
 +
 +/* No fade over the label's end (it takes the hover colour and reads as a shadow beside the close button); a long
@@ -1645,6 +1689,7 @@ index 00000000000..a52f9c52d5f
 +}
 +
 +.monaco-workbench .part.editor .editor-group-container > .title .ritemark-more-tabs {
++	width: calc-size(max-content, round(up, size, 1px)); /* a whole pixel: placed from the + at the row's end, its left edge (and its hover and open fill) then lands on whole device pixels at 1× and 2× (2.1.0's join pass) */
 +	padding: 0 6px 0 8px;
 +	gap: 2px;
 +	font-size: 12px;
@@ -1679,13 +1724,18 @@ index 00000000000..a52f9c52d5f
 +}
 +
 +/* Their menus, in the kit's menu (kit/ritemark.css: .menu, .menu.kinds): the menus' sheet (menu.ts), a small heading,
-+   then the rows (R12) */
++   then the rows (R12). What floats keeps 4 clear of any line it runs beside or lies across, and a menu that lands on a
++   control covers it whole, corners included, or keeps 4 clear of it (2.1.0's join pass, the Experience lead's rulings
++   at 04eba74 and 0d0c1b8): the menu's top edge (its 1 hairline) lies 4 below the desk's top line, on the desk (the line
++   at 44, the menu's edge at 49), and its right edge is 8 in from the desk's (ritemarkNewTab.ts places it from the desk),
++   so it covers the document bar's Share whole and its corner keeps 4 rows and 7 columns clear of the desk's. Its width
++   is a whole pixel, so the menu placed from its right edge is crisp */
 +.monaco-workbench .ritemark-new-tab-menu {
 +	position: relative;
-+	left: 6px; /* the drawn menu reaches 6 past its button's right edge (comparison/after-newtab.png) */
++	left: -1px; /* the hairline (1, outside the box) ends where the menu is placed, 8 in from the desk's edge */
 +	min-width: 248px;
-+	width: max-content;
-+	margin-top: 6px;
++	width: calc-size(max-content, round(up, size, 1px));
++	margin-top: 10px; /* from the button's foot (40): the desk's top line at 44, 4 clear (45 to 48), the menu's edge at 49 */
 +	padding: 6px;
 +	box-sizing: border-box;
 +	border-radius: 10px;
@@ -1998,9 +2048,12 @@ index 00000000000..a52f9c52d5f
 +	color: var(--rm-ground);
 +}
 +
-+/* You's menu (experiences/settings frame 1): 228 wide, 2 under You, its right edge 16 from the window's */
++/* You's menu (experiences/settings frame 1): 228 wide, 2 under You. It covers the AI rail's + whole, so no sliver of
++   the + shows beside it: its edge (the hairline, outside the box) ends 4 past You's right edge, which is the +'s, 4 in
++   from the window's edge on the Mac (2.1.0's join pass, the Experience lead's rulings at 0d0c1b8). Its top stays 2 above
++   the AI sheet's top line for 2.1 */
 +.monaco-workbench .ritemark-menu.ritemark-you-menu {
-+	left: -8px;
++	left: 3px;
 +	width: 228px;
 +	margin-top: 2px;
 +}
@@ -4654,10 +4707,10 @@ index 00000000000..c6764e91723
 +registerWorkbenchContribution2(RitemarkWindowSizes.ID, RitemarkWindowSizes, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644
-index 00000000000..5f751447e51
+index 00000000000..760766e62b1
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,328 @@
+@@ -0,0 +1,341 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4684,6 +4737,7 @@ index 00000000000..5f751447e51
 +import { renderIcon } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
 +import { Codicon } from '../../../../base/common/codicons.js';
 +import { KeyCode } from '../../../../base/common/keyCodes.js';
++import { Emitter } from '../../../../base/common/event.js';
 +import { Disposable, DisposableStore } from '../../../../base/common/lifecycle.js';
 +import { ThemeIcon } from '../../../../base/common/themables.js';
 +import { localize } from '../../../../nls.js';
@@ -4777,6 +4831,10 @@ index 00000000000..5f751447e51
 +	private titleHeight = 40;
 +	private readonly titleArea: HTMLElement;
 +
++	private readonly _onDidChangeRows = this._register(new Emitter<void>());
++	/** The rows changed outside update(): the column lays its content out again (rowsHeight) */
++	readonly onDidChangeRows = this._onDidChangeRows.event;
++
 +	private get active(): boolean {
 +		return !!this.place;
 +	}
@@ -4824,10 +4882,18 @@ index 00000000000..5f751447e51
 +		this._register({ dispose: () => this.rows.remove() });
 +		this.rowList = append(this.rows, $('.ritemark-project-row-list'));
 +		this.group = append(this.rows, $('.ritemark-project-group', { role: 'heading', 'aria-level': '2' }));
-+		// The extension's commands may register after the first draw: draw the rows again when they do.
++		// The extension's commands may register after the first draw: draw the rows again when they do. When that
++		// changes how many rows there are (a window that opens on Documents draws its head before the extension's
++		// New and Search exist), the column lays its content out again: else the tree ran the rows' height (64 on
++		// Documents) past the column's foot, under the status bar, where its last rows and its slider's foot could not be
++		// reached (2.1.0's join pass)
 +		this._register(MenuRegistry.onDidChangeMenu(() => {
 +			if (this.place) {
++				const before = this.rowList.childElementCount;
 +				this.renderRows(this.place);
++				if (this.rowList.childElementCount !== before) {
++					this._onDidChangeRows.fire();
++				}
 +			}
 +		}));
 +	}
@@ -4987,7 +5053,7 @@ index 00000000000..5f751447e51
 +	}
 +}
 diff --git a/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts b/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
-index cd93a447d1c..5a1176efe49 100644
+index cd93a447d1c..ccf760af283 100644
 --- a/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
 +++ b/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
 @@ -5,7 +5,7 @@
@@ -5011,7 +5077,7 @@ index cd93a447d1c..5a1176efe49 100644
  
  const PRIMARY_SIDE_BAR_SASH_CLASS = 'primary-sidebar-sash';
  
-@@ -183,12 +188,53 @@ export class SidebarPart extends AbstractPaneCompositePart {
+@@ -183,12 +188,58 @@ export class SidebarPart extends AbstractPaneCompositePart {
  		container.style.outlineColor = this.getColor(SIDE_BAR_DRAG_AND_DROP_BACKGROUND) ?? '';
  	}
  
@@ -5032,6 +5098,11 @@ index cd93a447d1c..5a1176efe49 100644
 +			};
 +			update(this.getActivePaneComposite()?.getId());
 +			this._register(this.onDidPaneCompositeOpen(composite => update(composite.getId())));
++			this._register(head.onDidChangeRows(() => {
++				if (this.ritemarkLastLayout) {
++					this.layout(...this.ritemarkLastLayout);
++				}
++			}));
 +		}
 +
 +		// Ritemark 2.0: the left column carries the title row's strip: the traffic lights (or the menu button) and its toggle
@@ -5066,7 +5137,7 @@ index cd93a447d1c..5a1176efe49 100644
  	}
  
  	override setBoundarySashes(sashes: IBoundarySashes): void {
-@@ -230,7 +276,7 @@ export class SidebarPart extends AbstractPaneCompositePart {
+@@ -230,7 +281,7 @@ export class SidebarPart extends AbstractPaneCompositePart {
  			},
  			compositeSize: 0,
  			iconSize: 16,

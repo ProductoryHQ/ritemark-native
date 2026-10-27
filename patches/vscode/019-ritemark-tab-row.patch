@@ -40,6 +40,13 @@ file's own name stays unset, so a file renamed while the window was closed shows
 (contrib/customEditor/browser/customEditorInputFactory.ts).
 Built from the Experience lead's proof of concept (branch poc/2.0-surfaces), with the DOM walks replaced.
 
+2.1.0's Gate 1 join pass (RC3; the Experience lead's rulings at 0d0c1b8): the +'s menu and the folded tabs' menu open
+in one place on every desk, ending 8 in from the desk's right edge, placed from the desk rather than from their buttons
+(ritemarkNewTab.ts: ritemarkShowMenuUnder, RITEMARK_MENU_DESK_INSET), so they cover the document bar's Share whole.
+Each tab's measured width (its name and half a pixel) is rounded to whole device pixels at a whole scale (1, 2, 3), and
+the open tab takes its measured width too, so every tab, and the chosen tab's outline and fillets, lands on whole device
+pixels; at 125% and 150% Chromium's own rounding stands (multiEditorTabsControl.ts, ritemarkFoldTabs).
+
 Files: workbench/browser/parts/editor/{editor,editorCommands,editorGroupView,editorGroupWatermark,editorTabsControl,
 multiEditorTabsControl,ritemarkEmptyDesk,ritemarkFoldedTabs,ritemarkNewTab,singleEditorTabsControl}.ts; workbench/contrib/terminal/browser/{ritemarkTerminalBar,ritemarkTerminalTabs,
 terminalEditor,terminalEditorInput,terminalInstance,terminalMenus}.ts; workbench/contrib/customEditor/browser/
@@ -361,7 +368,7 @@ index 1c06de9c41f..f95abbd7234 100644
  			return {
  				markdown: new MarkdownString('', { supportThemeIcons: true, isTrusted: true }).
 diff --git a/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts b/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
-index 2ab980e4786..672248b6170 100644
+index 2ab980e4786..3281dc1b7ff 100644
 --- a/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
 +++ b/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
 @@ -45,7 +45,7 @@ import { IPathService } from '../../../services/path/common/pathService.js';
@@ -455,7 +462,7 @@ index 2ab980e4786..672248b6170 100644
  			}
  		);
  
-@@ -2005,12 +2033,78 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -2005,12 +2033,91 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  		) {
  			height = this.tabsAndActionsContainer.offsetHeight;
  		} else {
@@ -482,11 +489,19 @@ index 2ab980e4786..672248b6170 100644
 +			tab.style.removeProperty('min-width');
 +		}
 +
-+		// Each tab's own width, its whole name (up to the stylesheet's maximum), measured unflexed. Not
-+		// rounded: a rounded-down width cuts the name's last letter, a rounded-up one makes the gaps
-+		// between names differ by a pixel; the same half pixel on every tab keeps them equal and whole.
++		// Each tab's own width, its whole name (up to the stylesheet's maximum), measured unflexed, and half a
++		// pixel more, so the name's last letter is never cut and the gaps between names stay equal. Where the
++		// screen's pixels are whole CSS pixels or halves of them (a scale of 1, 2 or 3), the width is rounded
++		// to whole device pixels, so every tab, and the chosen one's outline and fillets, lands on them (2.1.0's
++		// join pass, the Experience lead's rulings at 0d0c1b8): at 2 and up the half pixel is whole device pixels,
++		// at 100% it rounds away. At 125% and 150% Chromium's own rounding stands.
 +		tabsContainer.classList.add('ritemark-measuring');
-+		const natural = tabs.map(tab => tab.getBoundingClientRect().width + 0.5);
++		const ratio = getWindow(tabsContainer).devicePixelRatio;
++		const grid = Number.isInteger(ratio) ? ratio : 0;
++		const natural = tabs.map(tab => {
++			const width = tab.getBoundingClientRect().width + 0.5;
++			return grid ? Math.round(width * grid) / grid : width;
++		});
 +		tabsContainer.classList.remove('ritemark-measuring');
 +
 +		const editors = this.tabsModel.getEditors(EditorsOrder.SEQUENTIAL);
@@ -520,6 +535,11 @@ index 2ab980e4786..672248b6170 100644
 +			folded.update(candidates.length - shown.size); // shown, so it can be measured
 +			shown = fit(rowWidth - folded.outerWidth);
 +		}
++		// The open tab takes its measured width too, so the tabs after it start on whole device pixels as well
++		const activeIndex = active ? editors.indexOf(active) : -1;
++		if (activeIndex >= 0 && !this.tabsModel.isSticky(activeIndex)) {
++			tabs[activeIndex]?.style.setProperty('min-width', `${widthOf(activeIndex)}px`, 'important');
++		}
 +		const foldedEditors: EditorInput[] = [];
 +		for (const index of candidates) {
 +			if (shown.has(index)) {
@@ -535,7 +555,7 @@ index 2ab980e4786..672248b6170 100644
  	layout(dimensions: IEditorTitleControlDimensions, options?: IMultiEditorTabsControlLayoutOptions): Dimension {
  
  		// Remember dimensions that we get
-@@ -2335,6 +2429,8 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -2335,6 +2442,8 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  	private doLayoutTabsNonWrapping(options?: IMultiEditorTabsControlLayoutOptions): void {
  		const [tabsContainer, tabsScrollbar] = assertReturnsAllDefined(this.tabsContainer, this.tabsScrollbar);
  
@@ -544,7 +564,7 @@ index 2ab980e4786..672248b6170 100644
  		//
  		// Synopsis
  		// - allTabsWidth:   			sum of all tab widths
-@@ -2370,6 +2466,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -2370,6 +2479,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  				}
  				stickyTabsWidth += this.connectedTabLabels && stickyTabWidth > 0 && tab ? tab.offsetWidth : stickyTabWidth;
  			}
@@ -552,7 +572,7 @@ index 2ab980e4786..672248b6170 100644
  		}
  
  		const activeTabAndIndex = this.tabsModel.activeEditor ? this.getTabAndIndex(this.tabsModel.activeEditor) : undefined;
-@@ -2565,7 +2662,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -2565,7 +2675,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  	}
  
  	private get visible(): boolean {
@@ -879,10 +899,10 @@ index 00000000000..ec6ccab036c
 +}
 diff --git a/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts b/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts
 new file mode 100644
-index 00000000000..1a8c5074d84
+index 00000000000..60fd89edea9
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/editor/ritemarkNewTab.ts
-@@ -0,0 +1,186 @@
+@@ -0,0 +1,201 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -897,7 +917,7 @@ index 00000000000..1a8c5074d84
 +
 +import { $, addDisposableListener, append, EventType, getActiveWindow, getWindow } from '../../../../base/browser/dom.js';
 +import { StandardKeyboardEvent } from '../../../../base/browser/keyboardEvent.js';
-+import { AnchorAlignment } from '../../../../base/browser/ui/contextview/contextview.js';
++import { AnchorAlignment, getAnchorRect, IAnchor } from '../../../../base/browser/ui/contextview/contextview.js';
 +import { renderIcon } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
 +import { Codicon } from '../../../../base/common/codicons.js';
 +import { KeyCode } from '../../../../base/common/keyCodes.js';
@@ -928,14 +948,29 @@ index 00000000000..1a8c5074d84
 +/** Ritemark 2.0: the +'s kinds, which an empty desk offers as tiles (ritemarkEmptyDesk.ts, Sprint 133). */
 +export const RITEMARK_NEW_TAB_KINDS = KINDS;
 +
++/** How far in from its desk's right edge a tab row menu ends (2.1.0's join pass, the Experience lead's rulings at 0d0c1b8) */
++const RITEMARK_MENU_DESK_INSET = 8;
++
 +/**
 + * Show a Ritemark menu under a button at the right end of the tab row: it opens leftward, over the
-+ * desk. Anchored to the button itself, so the context view corrects for the window's zoom.
++ * desk. It ends 8 in from its desk's right edge, placed from the desk, not from its button, so the +'s
++ * menu and the folded tabs' menu open in one place on every desk and cover the document bar's Share
++ * whole, corners included (a menu that lands on a control covers it whole or keeps 4 clear of it). Its
++ * top comes from the button, and both rectangles from the context view's own measure, which corrects for
++ * the window's zoom.
 + */
 +export function ritemarkShowMenuUnder(contextViewService: IContextViewService, button: HTMLElement, render: (container: HTMLElement) => IDisposable, onHide: () => void): void {
 +	const leave = ritemarkCloseOnLeave(button, () => contextViewService.hideContextView());
 +	contextViewService.showContextView({
-+		getAnchor: () => button,
++		getAnchor: (): HTMLElement | IAnchor => {
++			const desk = button.closest<HTMLElement>('.editor-group-container');
++			if (!desk) {
++				return button;
++			}
++			const below = getAnchorRect(button);
++			const deskRect = getAnchorRect(desk);
++			return { x: deskRect.left + deskRect.width - RITEMARK_MENU_DESK_INSET - 1, y: below.top, width: 1, height: below.height };
++		},
 +		anchorAlignment: AnchorAlignment.RIGHT,
 +		render,
 +		onHide: () => {

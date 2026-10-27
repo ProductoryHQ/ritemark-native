@@ -319,6 +319,22 @@ html.rm-ground[data-scrolling],
 html.rm-ground :hover,
 html.rm-ground [data-scrolling] { scrollbar-color: var(--vscode-scrollbarSlider-background) transparent; }
 
+/* 2.1.0's join pass (the Experience lead's ruling 7): Ritemark Settings scrolls in #root on the desk. It keeps 2.0's
+   gutter, 16 wide and reserved whether or not the page overflows (scrollbar-gutter: stable), so its content sits where
+   2.0's did; the slider (8, in the middle of the gutter) shows as #504's does, while the pointer is on the page or it
+   scrolls (scrollingMark.ts marks both: a drawn scrollbar does not restyle on :hover). It is drawn here rather than left
+   to the system, because a trackpad's overlay scrollbars take no room and show only while scrolling, and a mouse's
+   take the room and show always: one look for both */
+#root[data-editor-type="settings"] { scrollbar-color: auto; scrollbar-width: auto; scrollbar-gutter: stable; }
+#root[data-editor-type="settings"]::-webkit-scrollbar { width: 16px; height: 16px; }
+#root[data-editor-type="settings"]::-webkit-scrollbar-track,
+#root[data-editor-type="settings"]::-webkit-scrollbar-corner { background-color: transparent; }
+#root[data-editor-type="settings"]::-webkit-scrollbar-thumb { background-color: transparent; border: 4px solid transparent; border-radius: 8px; background-clip: padding-box; min-height: 40px; }
+#root[data-editor-type="settings"][data-pointer]::-webkit-scrollbar-thumb,
+#root[data-editor-type="settings"][data-scrolling]::-webkit-scrollbar-thumb { background-color: var(--vscode-scrollbarSlider-background); }
+#root[data-editor-type="settings"]::-webkit-scrollbar-thumb:hover { background-color: var(--vscode-scrollbarSlider-hoverBackground); }
+#root[data-editor-type="settings"]::-webkit-scrollbar-thumb:active { background-color: var(--vscode-scrollbarSlider-activeBackground); }
+
 /* Ritemark 2.0: a table without Add row closes on its area's border, with no line after its last row (DataTable.tsx) */
 .rm-grid-closed > tbody > tr:last-child > td {
   border-bottom-width: 0;
