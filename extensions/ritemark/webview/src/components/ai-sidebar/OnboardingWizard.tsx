@@ -286,9 +286,9 @@ function ReadyStep({
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-5 text-center py-8">
-      {/* Sprint 144: ink, not green; green is only ever the small ready dot (the Experience lead) */}
+      {/* Sprint 144: a done check in ink, not green or muted; green is only ever the small ready dot (the Experience lead, 22ffe7b) */}
       <div className="w-10 h-10 rounded-full bg-[var(--r-surface-muted)] flex items-center justify-center mb-3">
-        <Icon name="check" size={20} className="text-[var(--r-ink-muted)]" />
+        <Icon name="check" size={20} className="text-[var(--r-ink-strong)]" />
       </div>
       <h3 className="text-sm font-semibold mb-1.5">You're all set!</h3>
       <p className="text-xs text-[var(--r-ink-muted)] mb-4">
@@ -297,7 +297,7 @@ function ReadyStep({
       <Tooltip label={`Start your first chat with ${agentName}`}>
         <Button type="button" size="sm" className="text-xs" onClick={onGetStarted}>
           <Icon name="rocket" size={14} />
-          Get Started
+          Get started
         </Button>
       </Tooltip>
     </div>
