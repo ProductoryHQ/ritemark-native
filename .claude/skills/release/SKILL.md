@@ -480,7 +480,7 @@ If the feed is stale or missing, the release is BLOCKED — even if the binaries
 
 ### Step 9 — Post-release
 
-1. Surface to user: "Recommend invoking `product-marketer` for changelog, release notes, landing-page copy."
+1. Surface to user: "Recommend invoking `product-marketer` for changelog, release notes, landing-page copy." The notes and every copy follow the `release-notes` skill's wording and checks before anyone else reads them.
 2. **Issue sweep.** `gh issue list --repo ProductoryHQ/ritemark-native --state open`; map every open issue against the shipped scope; verify that each `Fixes #NNN` auto-close actually happened; close what the release genuinely resolved with a comment naming the version. Do not close partial or reputation-dependent issues (Windows Smart App Control, #130, is the standing example) — surface those to Jarmo.
 3. Run the release closeout (Step 10). A release whose worktree is still `BLOCKED` for build output is not finished.
 4. **Model catalog feed.** Refresh the feed only if it was edited by hand since the last release; see **Claude Code and model currency** below.

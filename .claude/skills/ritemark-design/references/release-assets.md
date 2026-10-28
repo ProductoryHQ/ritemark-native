@@ -15,7 +15,7 @@ Things Ritemark publishes when a version ships: release notes, GitHub release ba
 
 ## Release notes — voice
 
-The release notes file in `docs/releases/` is the canonical narrative. Rules:
+The release notes file in `docs/releases/` is the canonical narrative. **Its wording follows the `release-notes` skill** (`.claude/skills/release-notes/SKILL.md`): every line says what a person can now do, in plain words, with no mechanism. That skill wins over the format notes and the template below. Rules:
 
 - **Plain markdown, no emoji, no h1** (the version number is an h2 because the file is usually embedded in a larger release-notes index).
 - **Three-tier structure:** Highlights → What's new (categorized) → Under the hood.
