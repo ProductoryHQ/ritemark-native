@@ -184,6 +184,8 @@ Cannot write content files without approval:
 
 ### release-notes.md
 
+**Wording: follow `.claude/skills/release-notes/SKILL.md`** (the one rule, the headline, the checks). Every copy made from the notes (blog, social, Store) keeps that wording.
+
 ```markdown
 # Ritemark vX.X.X
 

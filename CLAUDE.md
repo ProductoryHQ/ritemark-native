@@ -139,6 +139,7 @@ Skills (knowledge injection, not agents):
 | --- | --- |
 | `vscode-development` | Production build commands, Node versions, patch rules, build gotchas |
 | `release` | Release procedural commands (sign, DMG, notarize, GH release, update feed) |
+| `release-notes` | Writing release notes and every public text copied from them (blog, social, Store): what people can now do, in plain words |
 | `feature-flags` | Adding flag-gated features |
 | `flow-testing` | Testing Ritemark Flows |
 | `ritemark-flows` | Building / editing flow JSON |
