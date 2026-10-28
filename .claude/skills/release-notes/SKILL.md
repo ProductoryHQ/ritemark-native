@@ -19,9 +19,19 @@ The release notes are where every public text about a release starts. The GitHub
 
 How it works, what changed in the code and how we measured it stay out. If the reader needs a detail to use the feature, it goes in the second sentence, after the value.
 
+## Jarmo's five rules
+
+From his own rewrite of the 2.1 post (28 October 2026): "You can now add math formulas to your documents. Write them yourself or with AI. They look right in Ritemark, in PDF and in Word."
+
+1. **Start with "You can now …".**
+2. **Use everyday words:** "math formulas", "documents".
+3. **Say that the method doesn't matter:** "yourself or with AI". Don't make it sound like it's only for the AI.
+4. **Say where it works:** "in Ritemark, in PDF and in Word".
+5. **Leave out the mechanism and the numbers.** A short qualifier the facts need can stand as its own sentence: "Almost always."
+
 ## The headline
 
-- **One sentence: the simplest true thing a person can now do.** "Now you can add formulas to your text." It is not a slogan ("What your AI writes is ready to send"), not a theme, and not three facts in one line.
+- **One sentence: the simplest true thing a person can now do.** "You can now add math formulas to your documents." It is not a slogan ("What your AI writes is ready to send"), not a theme, and not three facts in one line.
 - **If no single thing leads, say so plainly.** "Ritemark 2.1 adds formulas and fixes how files are saved." Never invent a theme to cover a set of changes.
 - **The headline and the first picture show the same thing.**
 
@@ -84,10 +94,10 @@ Do every check before anyone else reads the notes: Jarmo, the Experience lead, t
 
 | What we wrote | What a person can read |
 | --- | --- |
-| Ritemark 2.1 makes what your AI writes ready to send. | Now you can add formulas to your text. |
-| Formulas from ChatGPT and Claude show as typeset equations. | Formulas from ChatGPT and Claude now look right, in your document and in the PDF or Word file you send. |
-| Saving changes only what you changed. Over the team's own documents, 3 in 100 came back unchanged after one save in 2.0. In 2.1, 89 in 100 do. | Change one word and save, and almost always only that word changes in your file. |
-| When the AI changes a document while you're editing it, Ritemark asks once, with **Review changes**. | If the AI edits a document while you are typing in it, Ritemark usually asks you what to keep. |
+| Ritemark 2.1 makes what your AI writes ready to send. | You can now add math formulas to your documents. |
+| Formulas from ChatGPT and Claude show as typeset equations. | Write them yourself or with AI. They look right in Ritemark, in PDF and in Word. |
+| Saving changes only what you changed. Over the team's own documents, 3 in 100 came back unchanged after one save in 2.0. In 2.1, 89 in 100 do. | Saving now changes only what you changed. Almost always. |
+| When the AI changes a document while you're editing it, Ritemark asks once, with **Review changes**. | Does the AI edit a file while you type? Ritemark asks what to keep. |
 | Send feedback, in the status bar and in Help, reaches the people who make Ritemark. | Something not working? Tell us with **Send feedback**, at the bottom of the window. |
 
 ## Related
