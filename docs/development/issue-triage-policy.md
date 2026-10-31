@@ -40,9 +40,9 @@ For each `triage:agent-fix` issue (respecting the WIP cap below):
 1. Create branch `claude/issue-NN-<short-slug>` from latest `main`.
 2. Implement following ALL rules in `CLAUDE.md` (hard rules on never stubbing/removing features, feature flags, model config, UI components).
 3. Validate: `.claude/hooks/pre-commit-validator.sh` must pass; extension TypeScript must compile; if webview changed, rebuild the bundle; run any tests covering the touched area.
-4. Push and open a PR titled `fix: <summary> (#NN)` with `Closes #NN` in the body, a short test plan, and a note on how Jarmo can verify locally.
+4. Push and open a PR titled `fix: <summary> (#NN)` with `Closes #NN` in the body, a short test plan, and a note on how Jarmo can verify locally. The body also fills the PR template's **Risk** (the review tier from `REVIEW.md` and the paths that set it) and **How to revert** (`.github/PULL_REQUEST_TEMPLATE.md`).
 5. Label the issue `agent-pr-open` and comment with the PR link.
-6. Never merge. Never release. Jarmo reviews, merges, and ships via the extension-tier release flow.
+6. Never merge. Never release. Jarmo reviews, merges, and ships via the extension-tier release flow. Before the merge the PR gets `REVIEW.md`'s review, run by the merging session.
 
 **WIP cap: max 3 open `agent-pr-open` issues at any time.** If the cap is reached, still triage (apply labels) but do not implement; the next run picks up the queue.
 

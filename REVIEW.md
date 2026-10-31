@@ -58,5 +58,6 @@ section names the tier and the paths that set it. Paths below are under `extensi
 - At most three rounds. Round one reads the whole PR; rounds two and three read only the new commits, and report
   nothing already reported. After round three, stop and rethink the approach with Jarmo or the Experience lead.
   Don't re-tag `@codex review`.
-- The merging session's last comment on the PR gives the rounds and each finding's outcome: fixed, rejected,
-  intentional or didn't matter.
+- The record: a comment by the merging session that starts with **Review record**, posted after the last round. It
+  names the reviewed head commit (SHA), the rounds and each finding's outcome (fixed, rejected, intentional, didn't
+  matter), and the security review's outcome for High tier. The merge uses that SHA in `--match-head-commit`.

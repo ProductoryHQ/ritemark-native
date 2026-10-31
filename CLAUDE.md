@@ -67,7 +67,7 @@ Layout invariants (Ritemark 2.0's frame: placement, the strips and sheets, the t
 
 These gates cannot be bypassed. If blocked, wait for approval or fix the underlying issue.
 
-Every PR gets `REVIEW.md`'s review before it merges, run by the merging session at the tier its paths set, with every finding answered and a record on the PR; `pr-reviewer` and `qa-validator` refuse a merge without it. `REVIEW.md` also says what counts as a failure in Ritemark, what not to report and how to write a finding.
+Every PR gets `REVIEW.md`'s review before it merges, run by the merging session at the tier its paths set, with every finding answered and a **Review record** comment on the PR naming the reviewed commit; `pr-reviewer` refuses any merge without it, and `qa-validator` checks it before a sprint-end merge. `REVIEW.md` also says what counts as a failure in Ritemark, what not to report and how to write a finding.
 
 ### Sprint branch rule (HARD)
 
