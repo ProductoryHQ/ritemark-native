@@ -101,13 +101,13 @@ Concrete commands live in the `release` skill. This is the gate-enforcement view
 | 3 | Sign + DMG arm64 — **NO notarization yet** (record build time) | Agent | — |
 | **4** | **Jarmo tests the UN-notarized signed arm64 DMG locally** | **Jarmo** | **Gate 1 — BLOCKS step 5** |
 | 4b | Hardening period (**≥60 min since DMG build, no new bugs**) → notarize + staple arm64 | Agent | **REQUIRES Gate 1 cleared + 60-min window** |
-| 5 | Switch repo private → tag → push (triggers x64 + Windows CI) | Agent | **REQUIRES Gate 1 cleared** |
+| 5 | Tag → push (triggers x64 + Windows CI); the repo stays public | Agent | **REQUIRES Gate 1 cleared** |
 | 6 | Download x64 from CI, sign, DMG — **NO notarization yet** | Agent | — |
 | **7** | **Jarmo tests the UN-notarized x64 DMG + Windows installer** | **Jarmo** | **Gate 2** |
 | 7b | Hardening period (**≥60 min since x64 DMG build, no new bugs**) → notarize + staple x64 | Agent | **REQUIRES Gate 2 cleared + 60-min window** |
 | 8 | Generate the canonical update feed → GitHub Release as a **draft** → upload binaries + feed → GitHub digests match `dist/` → publish (`--draft=false`) | Agent | **Digest check BLOCKS publish** |
-| 9 | Switch repo public; recommend `product-marketer` for changelog/notes | Agent | — |
-| 9b | Post-release issue sweep — close what the release resolved, citing the version; partial or reputation-dependent issues go to Jarmo | Agent | — |
+| 9 | Recommend `product-marketer` for changelog/notes | Agent | — |
+| 9b | Post-release issue sweep — close what the release resolved, citing the version; label each issue the release caused `regression` and add its row to `docs/development/review/incidents.md` (causing commit, fix, the layer that should have caught it); partial or reputation-dependent issues go to Jarmo | Agent | — |
 | 10 | Release closeout — verify every published asset against local `dist/` (size + SHA-256 vs GitHub digests and the canonical feed) → archive the local-only evidence to `docs/releases/vX.Y.Z/evidence/` → clear `dist/` + `VSCode-<target>/` → `worktree-hygiene.mjs --check` reports `REVIEW` | Agent | **Closeout gate — clear only after verification passes and the evidence is pushed** |
 | 11 | `node ./scripts/worktree-hygiene.mjs --clean` on the reviewed list | **Jarmo** | **Human-authorized — never run by the agent** |
 
