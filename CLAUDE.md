@@ -67,7 +67,7 @@ Layout invariants (Ritemark 2.0's frame: placement, the strips and sheets, the t
 
 These gates cannot be bypassed. If blocked, wait for approval or fix the underlying issue.
 
-Every PR is reviewed against `REVIEW.md` before it merges: what counts as a failure in Ritemark, what not to report, how to write a finding, and the review tier a PR's paths set.
+`REVIEW.md` holds the review rules for every PR: what counts as a failure in Ritemark, what not to report, how to write a finding, and the review tier a PR's paths set.
 
 ### Sprint branch rule (HARD)
 

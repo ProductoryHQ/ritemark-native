@@ -23,8 +23,9 @@
  *
  * The joins pass (2.2's review process, Step 3) runs on every capture, with or without --compare: under each desk's
  * chosen tab the desk's top line must be the tab's own fill, and the ground must show just outside each desk's top
- * corners. It prints a JOINS line per scene and writes <out>/joins.html, each join's device-pixel crop at 4×. A broken
- * join fails the run however small its share of the scene.
+ * corners. It prints a JOINS line per scene and writes joins.html, each join's device-pixel crop at 4×: in <out> with
+ * --compare, and in a temporary folder when taking a baseline, so nothing lands in the baseline's folder. A broken join,
+ * or a desk that can't be checked, fails the run however small its share of the scene.
  *
  * With --release (Sprint 136, R3), a scene that has an image in <release-images-dir> is compared with that image
  * instead: a production build differs from the dev baseline by design in a few scenes (More has no Copilot Chat).
@@ -38,7 +39,8 @@
  * project window now opens on Home, so the run first chooses Documents, where the base scene's document is opened.
  */
 
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 
@@ -231,134 +233,156 @@ async function capture(name) {
  * The joins pass (2.2's review process, Step 3). 2.1.0's RC1 drew the desk's hairline under the chosen tab; the
  * comparison flagged it as about 2.1% of each scene, and people explained it away (27 October 2026). So a broken join
  * fails the run by itself, whatever share of the scene changed. For each desk with a chosen tab:
- *   - under the tab, from half a fillet before it to half a fillet after it and within the tab row's box, the desk's top
- *     line is the tab's own fill (within JOIN_TOLERANCE in every channel): tab and desk read as one sheet;
+ *   - under the tab and its two fillets, within the tab row's box, the desk's top line (the hairline and the device row
+ *     it can spill into) is the tab's own fill, within JOIN_TOLERANCE in every channel: tab and desk read as one sheet;
  *   - just outside each top corner, the ground shows, never the desk's colour: nothing lands on the ground.
- * It reads device pixels from small crops of each join, saved in <out>/joins/ and shown at 4× in <out>/joins.html. A
- * point that a menu, the palette or a dialog covers is not a join and is skipped.
+ * It reads device pixels from small crops of each join and shows them at 4× in joins.html. A point that a menu, the
+ * palette or a dialog covers is not a join and is skipped. A desk that can't be checked fails the scene: it never
+ * reads as ok.
  */
 const JOIN_TOLERANCE = 8;
-const HALF_FILLET = 4; // CSS px: the inner half of the 8 px fillet, clear of where its curve meets the desk's top line
+const FILLET_REACH = 8; // CSS px: the fillet and its hairline (9), less one px, clear of where the desk's cover ends
 const JOIN_GEOMETRY = `(() => {
 	const scene = { dpr: devicePixelRatio, vw: innerWidth, vh: innerHeight, desks: [] };
 	if (document.querySelector('.monaco-workbench').classList.contains('ritemark-welcome-alone')) { return scene; }
 	const rect = element => { if (!element) { return null; } const r = element.getBoundingClientRect(); return r.width && r.height ? { left: r.left, right: r.right, top: r.top, bottom: r.bottom } : null; };
 	// On top at a point: the desk (or a desk webview's layer), or something floating over it
 	const open = (x, y) => { const top = document.elementFromPoint(x, y); return !!top && !!(top.closest('.part.editor') || top.closest('.ritemark-desk-webview')); };
+	const step = 1 / devicePixelRatio;
 	for (const group of document.querySelectorAll('.part.editor .editor-group-container:not(.empty)')) {
 		const desk = rect(group.querySelector(':scope > .editor-container'));
 		const tab = rect(group.querySelector(':scope > .title .tabs-container > .tab.active'));
 		const row = rect(group.querySelector(':scope > .title > .tabs-and-actions-container > .monaco-scrollable-element'));
 		if (!group.offsetParent || !desk || !tab || !row) { continue; }
-		const covered = [];
-		for (let x = Math.floor(Math.max(tab.left - ${HALF_FILLET}, row.left)); x < Math.min(tab.right + ${HALF_FILLET}, row.right); x++) {
-			if (!open(x + 0.5, desk.top + 0.5)) { covered.push(x); }
+		// Device-pixel centres: the tab's fill on a row 3 px above its foot (below its name), and the desk's top line
+		// (1.5 px, as the desk's own cover: the hairline can take part of a second device pixel at 125% or 150%)
+		const fill = [], line = [], corners = [];
+		for (let x = Math.max(tab.left, row.left) + 4 + step / 2; x < Math.min(tab.right, row.right) - 4; x += step) {
+			fill.push([x, desk.top - 3 + step / 2]);
 		}
-		const corners = [];
+		for (let y = desk.top + step / 2; y < desk.top + 1.5; y += step) {
+			for (let x = Math.max(tab.left - ${FILLET_REACH}, row.left) + step / 2; x < Math.min(tab.right + ${FILLET_REACH}, row.right); x += step) {
+				if (open(x, y)) { line.push([x, y]); }
+			}
+		}
 		for (const [side, edge, inward] of [['top-left', desk.left, 1], ['top-right', desk.right, -1]]) {
 			for (const [dx, dy] of [[0.5, 0.5], [1.5, 0.5], [2.5, 0.5], [0.5, 1.5], [0.5, 2.5]]) {
 				const x = edge + inward * dx, y = desk.top + dy;
 				if (x >= 0 && x < innerWidth && open(x, y)) { corners.push({ side, x, y }); }
 			}
 		}
-		scene.desks.push({ desk, tab, row, covered, corners });
+		scene.desks.push({ desk, tab, fill, line, corners });
 	}
 	return scene;
 })()`;
 let joinFailures = 0;
 const joinRows = [];
+// A run that takes a baseline (no --compare) still checks its joins, but keeps the crops out of the baseline's folder
+const joinsRoot = baseline ? out : mkdtempSync(join(tmpdir(), 'frame-joins-'));
 
 const median = pixels => [0, 1, 2].map(channel => pixels.map(pixel => pixel[channel]).sort((a, b) => a - b)[Math.floor(pixels.length / 2)]);
 const far = (a, b) => Math.max(...[0, 1, 2].map(channel => Math.abs(a[channel] - b[channel])));
 const hex = rgb => `#${rgb.map(value => value.toString(16).padStart(2, '0')).join('')}`;
 
-/** Captures a clip (CSS px) at device pixels into <out>/joins/<file>; returns the PNG as base64. */
+/** Captures a clip (CSS px) at device pixels into the joins folder; returns the PNG as base64. */
 async function crop(file, x0, y0, x1, y1) {
+	if (x1 - x0 < 1 || y1 - y0 < 1) {
+		throw new Error(`the crop for ${file} is outside the window`);
+	}
 	const { data } = await send('Page.captureScreenshot', { format: 'png', clip: { x: x0, y: y0, width: x1 - x0, height: y1 - y0, scale: 1 } });
-	writeFileSync(join(out, 'joins', file), Buffer.from(data, 'base64'));
+	writeFileSync(join(joinsRoot, 'joins', file), Buffer.from(data, 'base64'));
 	return data;
 }
 
-/** The RGB of each point (CSS px in the page) in a crop taken at x0, y0 and cssWidth wide; null off the crop. */
-async function pixelsAt(png, x0, y0, cssWidth, points) {
+/** Decodes a crop taken at x0, y0 and cssWidth wide once, and returns the RGB of each point (CSS px) in each set; null off the crop. */
+async function pixelsAt(png, x0, y0, cssWidth, ...pointSets) {
 	return evaluate(`(async () => {
 		const binary = atob(${JSON.stringify(png)}); const bytes = new Uint8Array(binary.length); for (let i = 0; i < binary.length; i++) { bytes[i] = binary.charCodeAt(i); }
 		const image = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
 		const canvas = new OffscreenCanvas(image.width, image.height); const context = canvas.getContext('2d'); context.drawImage(image, 0, 0);
 		const { data, width, height } = context.getImageData(0, 0, image.width, image.height);
 		const scale = width / ${cssWidth};
-		return ${JSON.stringify(points)}.map(([x, y]) => { const i = Math.floor((x - ${x0}) * scale), j = Math.floor((y - ${y0}) * scale); if (i < 0 || j < 0 || i >= width || j >= height) { return null; } const k = (j * width + i) * 4; return [data[k], data[k + 1], data[k + 2]]; });
+		return ${JSON.stringify(pointSets)}.map(points => points.map(([x, y]) => { const i = Math.floor((x - ${x0}) * scale), j = Math.floor((y - ${y0}) * scale); if (i < 0 || j < 0 || i >= width || j >= height) { return null; } const k = (j * width + i) * 4; return [data[k], data[k + 1], data[k + 2]]; }));
 	})()`);
 }
 
-async function checkJoins(name) {
-	const { dpr, vw, vh, desks } = await evaluate(JOIN_GEOMETRY);
-	const step = 1 / dpr;
+/** One desk's notes (empty when its joins hold); throws when it can't be checked. */
+async function checkDesk(prefix, label, { desk, tab, fill: fillPoints, line, corners }, { vw, vh }, images, margins) {
 	const notes = [];
-	const images = [];
-	for (const [index, { desk, tab, row, covered, corners }] of desks.entries()) {
-		const label = desks.length > 1 ? `desk ${index + 1}: ` : '';
-		const prefix = `${name}-desk${index + 1}`;
-		const [x0, x1] = [Math.max(0, Math.floor(tab.left) - 24), Math.min(vw, Math.ceil(tab.right) + 24)];
-		const [y0, y1] = [Math.max(0, Math.floor(desk.top) - 12), Math.min(vh, Math.ceil(desk.top) + 8)];
-		const png = await crop(`${prefix}-tab.png`, x0, y0, x1, y1);
-		images.push(`${prefix}-tab.png`);
-		// The tab's fill, on a row 3 px above its foot (below its name): the colour tab and desk share
-		const fillPoints = [];
-		for (let x = Math.max(tab.left, row.left) + 4 + step / 2; x < Math.min(tab.right, row.right) - 4; x += step) {
-			fillPoints.push([x, desk.top - 3 + step / 2]);
+	const [x0, x1] = [Math.max(0, Math.floor(tab.left) - 24), Math.min(vw, Math.ceil(tab.right) + 24)];
+	const [y0, y1] = [Math.max(0, Math.floor(desk.top) - 12), Math.min(vh, Math.ceil(desk.top) + 8)];
+	const png = await crop(`${prefix}-tab.png`, x0, y0, x1, y1);
+	images.push(`${prefix}-tab.png`);
+	const [fillPixels, linePixels] = await pixelsAt(png, x0, y0, x1 - x0, fillPoints, line);
+	const known = fillPixels.filter(Boolean);
+	if (!known.length || !line.length) {
+		throw new Error('no part of the chosen tab or of the desk\'s top line under it is in view');
+	}
+	const fill = median(known);
+	let bad = 0, worst = 0, first = null, last = null;
+	linePixels.forEach((pixel, k) => {
+		const difference = pixel ? far(pixel, fill) : 0;
+		if (difference > JOIN_TOLERANCE) {
+			bad++;
+			worst = Math.max(worst, difference);
+			first ??= line[k][0];
+			last = line[k][0];
 		}
-		const fillPixels = (await pixelsAt(png, x0, y0, x1 - x0, fillPoints)).filter(Boolean);
-		if (!fillPixels.length) {
-			continue;
+	});
+	if (bad) {
+		notes.push(`${label}${bad} device pixels of the desk's top line under the chosen tab differ from the tab's fill (${hex(fill)}) by up to ${worst} levels, from x ${Math.floor(first)} to ${Math.ceil(last)}`);
+	}
+	for (const side of ['top-left', 'top-right']) {
+		const points = corners.filter(corner => corner.side === side).map(corner => [corner.x, corner.y]);
+		if (!points.length) {
+			continue; // something floats over this corner
 		}
-		const fill = median(fillPixels);
-		const linePoints = [];
-		for (let y = desk.top + step / 2; y < desk.top + 1; y += step) {
-			for (let x = Math.max(tab.left - HALF_FILLET, row.left) + step / 2; x < Math.min(tab.right + HALF_FILLET, row.right); x += step) {
-				if (!covered.includes(Math.floor(x))) {
-					linePoints.push([x, y]);
-				}
-			}
-		}
-		let bad = 0, worst = 0, first = null, last = null;
-		(await pixelsAt(png, x0, y0, x1 - x0, linePoints)).forEach((pixel, k) => {
-			const difference = pixel ? far(pixel, fill) : 0;
-			if (difference > JOIN_TOLERANCE) {
-				bad++;
-				worst = Math.max(worst, difference);
-				first ??= linePoints[k][0];
-				last = linePoints[k][0];
-			}
-		});
-		if (bad) {
-			notes.push(`${label}${bad} device pixels of the desk's top line under the chosen tab differ from the tab's fill (${hex(fill)}) by up to ${worst} levels, from x ${Math.floor(first)} to ${Math.ceil(last)}`);
-		}
-		for (const side of ['top-left', 'top-right']) {
-			const points = corners.filter(corner => corner.side === side).map(corner => [corner.x, corner.y]);
-			if (!points.length) {
-				continue; // something floats over this corner
-			}
-			const edge = side === 'top-left' ? desk.left : desk.right;
-			const [cx0, cx1] = [Math.max(0, Math.floor(edge) - 12), Math.min(vw, Math.ceil(edge) + 12)];
-			const [cy0, cy1] = [Math.max(0, Math.floor(desk.top) - 12), Math.min(vh, Math.ceil(desk.top) + 12)];
-			const cornerPng = await crop(`${prefix}-${side}.png`, cx0, cy0, cx1, cy1);
-			images.push(`${prefix}-${side}.png`);
-			const deskColoured = (await pixelsAt(cornerPng, cx0, cy0, cx1 - cx0, points)).filter(pixel => pixel && far(pixel, fill) <= JOIN_TOLERANCE).length;
-			if (deskColoured) {
-				notes.push(`${label}${deskColoured} of ${points.length} ground pixels just outside the ${side} corner are the desk's colour (${hex(fill)})`);
-			}
+		const edge = side === 'top-left' ? desk.left : desk.right;
+		const [cx0, cx1] = [Math.max(0, Math.floor(edge) - 12), Math.min(vw, Math.ceil(edge) + 12)];
+		const [cy0, cy1] = [Math.max(0, Math.floor(desk.top) - 12), Math.min(vh, Math.ceil(desk.top) + 12)];
+		const cornerPng = await crop(`${prefix}-${side}.png`, cx0, cy0, cx1, cy1);
+		images.push(`${prefix}-${side}.png`);
+		const [pixels] = await pixelsAt(cornerPng, cx0, cy0, cx1 - cx0, points);
+		const distances = pixels.filter(Boolean).map(pixel => far(pixel, fill));
+		margins.push(...distances);
+		const deskColoured = distances.filter(distance => distance <= JOIN_TOLERANCE).length;
+		if (deskColoured) {
+			notes.push(`${label}${deskColoured} of ${points.length} ground pixels just outside the ${side} corner are the desk's colour (${hex(fill)})`);
 		}
 	}
-	if (!images.length) {
+	return notes;
+}
+
+async function checkJoins(name) {
+	const notes = [];
+	const images = [];
+	const margins = []; // how far the ground at the corners is from the desk's colour: the corner check's margin
+	let dpr = 1;
+	let desks = [];
+	try {
+		const scene = await evaluate(JOIN_GEOMETRY);
+		({ dpr, desks } = scene);
+		for (const [index, desk] of desks.entries()) {
+			const label = desks.length > 1 ? `desk ${index + 1}: ` : '';
+			try {
+				notes.push(...await checkDesk(`${name}-desk${index + 1}`, label, desk, scene, images, margins));
+			} catch (error) {
+				notes.push(`${label}not checked: ${error.message}`);
+			}
+		}
+	} catch (error) {
+		notes.push(`not checked: ${error.message}`);
+	}
+	if (!desks.length && !notes.length) {
 		console.log(`JOINS    ${name}: no desk with a chosen tab, nothing to check`);
 	} else if (notes.length) {
 		joinFailures++;
 		console.log(`JOINS    ${name}: FAIL\n${notes.map(note => `           ${note}`).join('\n')}`);
 	} else {
-		console.log(`JOINS    ${name}: ok (${desks.length} desk${desks.length === 1 ? '' : 's'})`);
+		const margin = margins.length ? `; the ground at the corners is ${Math.min(...margins)} levels from the desk's colour` : '';
+		console.log(`JOINS    ${name}: ok (${desks.length} desk${desks.length === 1 ? '' : 's'}${margin})`);
 	}
-	joinRows.push({ name, notes, images, dpr });
+	joinRows.push({ name, notes, images, dpr, checked: desks.length > 0 || notes.length > 0 });
 }
 
 /**
@@ -553,7 +577,8 @@ const SCENES = [
 	}],
 ];
 
-mkdirSync(join(out, 'joins'), { recursive: true });
+mkdirSync(out, { recursive: true });
+mkdirSync(join(joinsRoot, 'joins'), { recursive: true });
 await command('Notifications: Clear All Notifications'); // a fresh profile's notices would cover the corner
 await openDocument(documents[0]);
 for (const themeName of ['Ritemark Light', 'Ritemark Dark']) {
@@ -635,11 +660,11 @@ ${rows.map(row => `<h2>${row.name} <span>${row.missing ? 'not in the baseline' :
 }
 
 const escapeHtml = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-writeFileSync(join(out, 'joins.html'), `<!doctype html><meta charset="utf-8"><title>Frame joins at 4×</title>
+writeFileSync(join(joinsRoot, 'joins.html'), `<!doctype html><meta charset="utf-8"><title>Frame joins at 4×</title>
 <style>body{font:14px/1.4 -apple-system,'Segoe UI',sans-serif;margin:24px;background:#F1F5F9;color:#1E1B4B}h2{font-size:15px;margin:24px 0 8px}.fail{color:#B91C1C}.ok{color:#617187}div{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}figure{margin:0}img{image-rendering:pixelated;border:1px solid #E2E8F0}figcaption{color:#617187;font-size:12px}</style>
 <h1>Frame joins at 4×</h1>
-${joinRows.map(row => `<h2>${row.name} <span class="${row.notes.length ? 'fail' : 'ok'}">${row.images.length ? (row.notes.length ? 'FAIL' : 'ok') : 'nothing to check'}</span></h2>${row.notes.map(note => `<p class="fail">${escapeHtml(note)}</p>`).join('')}<div>${row.images.map(file => `<figure><img src="joins/${file}" onload="this.style.width = this.naturalWidth * 4 / ${row.dpr} + 'px'"><figcaption>${file}</figcaption></figure>`).join('')}</div>`).join('\n')}`);
-console.log(`${joinFailures} of ${joinRows.length} scenes have a broken join; written ${join(out, 'joins.html')}`);
+${joinRows.map(row => `<h2>${row.name} <span class="${row.notes.length ? 'fail' : 'ok'}">${row.notes.length ? 'FAIL' : row.checked ? 'ok' : 'nothing to check'}</span></h2>${row.notes.map(note => `<p class="fail">${escapeHtml(note)}</p>`).join('')}<div>${row.images.map(file => `<figure><img src="joins/${file}" onload="this.style.width = this.naturalWidth * 4 / ${row.dpr} + 'px'"><figcaption>${file}</figcaption></figure>`).join('')}</div>`).join('\n')}`);
+console.log(`${joinFailures} of ${joinRows.length} scenes have a broken join or could not be checked; written ${join(joinsRoot, 'joins.html')}`);
 
 socket.close();
 process.exit(differing + joinFailures);
