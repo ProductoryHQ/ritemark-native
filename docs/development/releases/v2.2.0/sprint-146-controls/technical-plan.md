@@ -196,7 +196,7 @@ Five PRs, listed with their tiers in the sprint plan. How each gets there:
 | The outline's class is wider than File changes | A6 lists every place; the rule is scoped to the left column, and the keyboard keeps the outline |
 | The tab menu's filter hides a useful item | It names what goes, with the lead's list; the commands stay in All commands; S48 |
 | Git's words drift on a VS Code update | Patch 016's hunks fail loudly when upstream moves the lines; `update-vscode.sh --check` |
-| The dialog and the card page disagree | Both draw from the board's snapshot; the dialog writes nothing (decision 2) |
+| The dialog and the card page disagree | Both draw from the board's snapshot; the dialog has no write path of its own and uses the board's existing messages; the notes are read there, edited in the tab (decision 2) |
 | A card's text draws over the board | No raw HTML; S58; `/security-review` on PR 5 |
 | #598 meets Sprint 145's board work | PR 5 starts after 145's board PR; #598 is the first item cut |
 | A drawing arrives late | The cut order; PR 1 needs none, PR 2 waits only for the images' approval |

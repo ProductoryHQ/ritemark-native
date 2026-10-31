@@ -155,7 +155,7 @@ Each requirement's check fails on `main` at the commit the branch starts from an
 
 ### E2: Records and older versions
 
-No card file, flow, document, conversation or setting changes shape. The dialog writes nothing. No host message changes; the catalogue adds one webview type (`control-catalogue`) that only its own panel uses.
+No card file, flow, document, conversation or setting changes shape. The dialog has no write path of its own: its changes (stage, state, title, Files) go through the board's existing messages, as the card page's strip and head do (experience 42). No host message changes; the catalogue adds one webview type (`control-catalogue`) that only its own panel uses.
 
 ### E3: Tier
 
