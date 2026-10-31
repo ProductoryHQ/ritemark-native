@@ -55,6 +55,8 @@ The provider rows and cards show what the capturing computer is signed in to (he
 
 To take a new baseline, run the same command without `--compare`, with `--out docs/development/frame-baseline`.
 
+**The joins pass** (2.2's review process, Step 3). Every run also checks each desk's joins in every scene, with or without `--compare`: under the chosen tab the desk's top line must be the tab's own fill (within 8 levels), and just outside each top corner the ground must show, not the desk's colour. It prints a `JOINS` line per scene, writes `joins.html` with each join's device-pixel crop at 4× (in `<folder>` with `--compare`; in a temporary folder when taking a baseline, so nothing lands here), and adds each failing scene to the exit code. A desk it can't check fails the scene too. It exists because 2.1.0's RC1 drew the hairline under the chosen tab at only about 2.1% of each scene, and the share was explained away. A JOINS failure is fixed; it is never approved as a new baseline. How to judge a scene that differs: the `ritemark-automation` skill, "Judging a frame scene that differs".
+
 ## Comparing a release candidate
 
 Every shell release's test checklist carries this check, from Sprint 136 (its R3; the `release` skill, Step 2):
@@ -68,7 +70,7 @@ Every shell release's test checklist carries this check, from Sprint 136 (its R3
    node scripts/qa/frame-geometry.mjs --port <cdp-port>
    ```
 
-3. A scene over 0.5% is fixed, or Jarmo approves it, before Gate 1 passes.
+3. Every scene's JOINS line is ok, and a scene over 0.5% is fixed, or Jarmo approves it, before Gate 1 passes (below, "The joins pass").
 
 **The release images.** A production build differs from this dev baseline by design in More, which has no Copilot Chat (Sprint 135's E5: 1.05% and 1.02%). `release/` holds a production build's image for each such scene, and `--release` compares that scene with it; every other scene compares with the baseline above. They change only with Jarmo's approval, as the baseline does. The first two, `light-more-menu.png` and `dark-more-menu.png`, come from 2.0.0's RC1 (`c04eabf2`), captured on 21 October 2026 in the release session's Gate 1 prep. Against the dev baseline they differed by 1.07% and 1.04%, and the other 32 scenes matched. **Jarmo approved them on 21 October 2026** ("release pildid OK", through the Development manager; Sprint 136, D2).
 

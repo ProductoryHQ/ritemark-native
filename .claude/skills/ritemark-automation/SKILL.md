@@ -269,6 +269,12 @@ npx --no-install --prefix "$REPO_ROOT/vscode" agent-browser \
   ```
 - Hide PII before screenshotting — the title bar shows the workspace path. Either screenshot before opening files, or set `window.titleBarStyle` to something that omits the path.
 
+**Judging a frame scene that differs** (2.2's review process, Step 3; the RC1 seam of 27 October 2026). A JOINS FAIL from `frame-screenshots.mjs` stops the check whatever the scene's share: a line under the chosen tab, or the desk's colour on the ground past a corner. For every scene over 0.5%, before anyone is asked to approve it:
+
+- Open `<out>/joins.html`: each desk's joins (tab and desk, both top corners) at device pixels, shown at 4×.
+- Look at the scene's other joins at 4× too: the sheet's edges, the status bar's ends, menu edges, the two desks' gap. Cut the same box from the 2.0 baseline, the last candidate and this run (`sips --cropOffset <y> <x> -c <h> <w>`) and view them side by side with no smoothing.
+- Match each changed region to a source: an Experience lead drawing or a changelog line. A change with no source is a finding, not a new baseline.
+
 **macOS Screen Recording permission:** if `screenshot` returns "Permission denied," your terminal needs **System Settings → Privacy & Security → Screen Recording** access. Fallback: use the verification snippet in `launch` SKILL.md to confirm UI state without a real screen capture.
 
 ## Demo recordings

@@ -50,6 +50,8 @@ For every PR, check the following:
 ### 4. Documentation and DLC
 
 - [ ] PR template lifecycle fields identify release, sprint, issues, release-note need, and architecture-doc need
+- [ ] PR template's **Risk** names the review tier and the paths that set it, and the tier matches `REVIEW.md`'s table (the highest path wins; the author never lowers it)
+- [ ] PR template's **How to revert** picks one way back with a line of detail (a revert only before a release; users can't be moved to an older version)
 - [ ] Release-bound work updates `docs/development/releases/vX.Y.Z/release-plan.md` tracker
 - [ ] Linked GitHub Issues are moved toward `Done` or explicitly deferred
 - [ ] User-facing changes have corresponding doc updates in `docs/user/`

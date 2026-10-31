@@ -172,6 +172,7 @@ The user can override with one sentence. Do NOT silently switch tracks mid-sprin
 ### Phase 6: DEPLOY
 - Final commit
 - Push to GitHub
+- The PR fills the template's **Risk** (the review tier from `REVIEW.md` and the paths that set it; what could break, for whom) and **How to revert**
 - Tag release if applicable
 - Surface to the user: "Recommend invoking `qa-validator` for prod-build sign-off."
 

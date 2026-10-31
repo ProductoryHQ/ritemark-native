@@ -67,6 +67,8 @@ Layout invariants (Ritemark 2.0's frame: placement, the strips and sheets, the t
 
 These gates cannot be bypassed. If blocked, wait for approval or fix the underlying issue.
 
+`REVIEW.md` holds the review rules for every PR: what counts as a failure in Ritemark, what not to report, how to write a finding, and the review tier a PR's paths set.
+
 ### Sprint branch rule (HARD)
 
 After Jarmo approves a sprint plan, the IMMEDIATE next action — before any code edit — is creating the sprint branch:
@@ -174,29 +176,7 @@ Customizations to VS Code go through patch files in `patches/vscode/`, NEVER dir
 
 After fresh clone: run `./scripts/apply-patches.sh`. Before VS Code upstream bump: run `./scripts/update-vscode.sh --check`.
 
-### Current patches (19)
-
-| Patch | Purpose |
-| --- | --- |
-| `001-ritemark-branding.patch` | Theme, fonts, icons, about dialog, breadcrumbs; every way into VS Code's Getting Started page (Help: Welcome, walkthroughs) opens Ritemark's welcome instead (Sprint 133); the splash's auto-detect defaults are the two grounds (Sprint 134) |
-| `002-ritemark-ui-layout.patch` | Placement (2.0): the places row on top in Ritemark's order, Copilot Chat behind More, the AI column, Documents always a place; Refresh Explorer takes `{ reveal: false }` to refresh Documents without opening it, so an AI turn's end never moves the left column (Sprint 136, #487); View ▸ Advanced's Source Control entry reads File changes (Sprint 142, #557) |
-| `003-ritemark-menu-cleanup.patch` | Hide VS Code dev features (chat, debug, go menu); All commands offers no developer commands (`commandsQuickAccess.ts`, Sprint 134); no Agents window: VS Code 1.142's second workbench never opens (`constants.ts`, `windowsMainService.ts`, Sprint 135); no agent host prewarm at window start (`agentHostService.ts`, Sprint 135 E5) |
-| `004-ritemark-build-system.patch` | jschardet, microphone permission, integrity check skip; packaging skips the built-in Copilot's SDK shim when a build from source has stripped the SDK, and product.json names Ritemark's source commit (`RITEMARK_SOURCE_COMMIT`; the commit reader also follows a gitdir file) (Sprint 135) |
-| `005-ritemark-windows-and-oss-fixes.patch` | Windows builds, OSS compatibility, account service |
-| `006-ritemark-dev-launch-fallback.patch` | Dev mode scripts, product.json dev launch fallback |
-| `007-ritemark-vscode-1117-compat.patch` | Copilot Chat compatibility, from VS Code 1.117 (rebased onto 1.142 in Sprint 135, its registrations now in `chat.shared.contribution.ts`): the narrow setup actions instead of `ChatSetupContribution`, the onboarding module's fallback, a custom editor opened with no options (1.142's navigation, upstream's later fix taken early in `webviewEditor.ts`, Sprint 135); and Copilot Chat's place in 2.0 (Sprint 132): a launcher in More while Copilot Chat is installed and not disabled, opening it as a tab on the desk; the View menu's Copilot Chat and Ctrl+Alt+I (⌃⌘I) open the same tab, and the shortcut does nothing without it |
-| `008-ritemark-windows-binary-strip.patch` | Strip the bundled Claude Agent SDK's non-Windows native binaries so Windows packaging (`rcedit`) does not fail (upstream strips Copilot's itself since VS Code 1.142) |
-| `009-ritemark-browser-context-bridge.patch` | Exposes the active browser tab's context to the extension host for AI chat, and pushes each navigation to the extension for Browser Recent (`ritemark.browser.didNavigate`, Sprint 131); the share question waits on the AI's sheet, not in a dialog (`ensureActiveBrowserShared` takes the sheet's answer, `shareWithAgentAnswered`, Sprint 134) |
-| `010-ritemark-browser-action-bridge.patch` | Enables AI agent actions (click, navigate, fill) in the integrated browser; the browser bar as the Experience lead set it (Sprint 135): no Add Element to Chat, Developer tools in ⋯ |
-| `011-ritemark-cloud-file-error.patch` | Maps Windows OneDrive/SharePoint cloud-file read errors to an actionable message |
-| `012-ritemark-shell-watchdog.patch` | Quarantines a broken user-dir copy of `ritemark.ritemark` on activation failure and falls back to the bundled built-in |
-| `013-ritemark-configuration-defaults.patch` | product.json `configurationDefaults` apply on desktop (trust off, `*.md` → Ritemark editor, theme/tree/preview defaults) |
-| `014-ritemark-save-receipts.patch` | Text-file save receipts through the extension-host document protocol, so a save is acknowledged against the exact written snapshot; a save refused as newer, for a document Ritemark's editor holds, goes to Ritemark first (`textFileSaveErrorHandler.ts` → `_ritemark.editorSync.answerSaveConflict`): one question, Ritemark's Review changes, or none when only the file's date or line endings moved; VS Code's notification where Ritemark can't answer (Sprint 137, #454) |
-| `015-ritemark-help-menu-policy.patch` | Keeps the Help menu focused on Ritemark, dropping upstream VS Code help and developer entries; Getting started beside Support, where 1.x's first page linked (Sprint 133); Send feedback after Support, opening the feedback sheet (`ritemark.help.sendFeedback`, Sprint 140) |
-| `016-ritemark-store-acquisition-policy.patch` | Removes external software-acquisition promotion: the Git download button in Source Control (Microsoft Store policy 10.1.5) |
-| `018-ritemark-surfaces.patch` | Ritemark 2.0's frame and surfaces (Sprint 132): no title row on the Mac and Windows, 44 strips with every control on the line at 26, the desks and the AI's sheet, zoom, Ritemark's menus and dialogs, the left column's head, You, the window sizes (`ritemarkWindowSizes.ts`), the theme pass on the palette and notifications (toasts wrap to 3 lines), the tabs' sizes and close button on the right, and the tree's chosen folder for new documents (`_ritemark.files.chosenFolder`); the welcome alone on the ground, an empty desk's tiles drawn, a file's extension in muted ink, a fresh profile's first window at 1440 × 900 (Sprint 133); the head's rows on Home, Tasks, Browser and Transcribe, the project menu's Switch project flyout, File ▸ New tab, Switch project and Share (`ritemark/fileMenu`), About this project as the root AGENTS.md's name and the pointer-only CLAUDE.md hidden in Documents, a switch that reloads asks while chats work (`ritemarkSwitchGuard.ts`), and the splash saving the ground (Sprint 134); the feedback sheet over the window (`ritemarkFeedbackSheet.ts`, `_ritemark.feedbackSheet`) and the thank-you toast that closes by itself (`_ritemark.briefToast`) (Sprint 140); File changes as the SCM container's name, in More and at its panel's head (`scm.contribution.ts`), and the desk's edge whole: an inset hairline over its webviews too, no shadow, `ritemark.sheetShadow` kept for what floats (Sprint 142, #557, #503) |
-| `019-ritemark-tab-row.patch` | Ritemark 2.0's tab row (Sprint 132): folded tabs ("N ⌄"), the +, permanent Home and Task board tabs (and the move commands that leave no empty desk), terminals as tabs with their bar and a tab menu of the usual items plus Rename; an empty desk's Text, Table and Web page tiles (Sprint 133); the Tasks tab's count and ⌘T for the desk's + (`ritemark.newTab`, Sprint 134); a restored task card's tab keeps its title from the first paint (`customEditorInputFactory.ts`, Sprint 142, #508) |
-| `020-ritemark-electron-43.patch` | Electron 43.8.3, the newest of the pinned VS Code's Electron line (Sprint 144, #515): `.npmrc`'s target, Electron's own `SHASUMS256.txt` in `build/checksums/electron.txt`, the notices in `cgmanifest.json`; moves to the first 43.x with Node 24.22.1; deleted, not rebased, at the next VS Code update that carries it |
+The current patches, one row each with what it does: `docs/development/vscode-patches.md`. A sprint that adds or changes a patch updates its row there.
 
 Patch rules and unused-imports gotcha: `.claude/skills/vscode-development/PATCH-RULES.md`.
 
@@ -229,7 +209,7 @@ ritemark-native/
 │   ├── webview/                 # React webview (TipTap editor + AI sidebar)
 │   ├── media/                   # webview.js bundle (~7.6 MB IIFE — see GH #107)
 │   └── binaries/agents/         # Bundled agent binaries (gitignored) + manifest.json
-├── patches/vscode/              # Numbered patch files (listed under "Current patches" above)
+├── patches/vscode/              # Numbered patch files (listed in docs/development/vscode-patches.md)
 ├── branding/                    # Icons, logos, product.json overrides
 ├── scripts/                     # Development and release scripts
 ├── VSCode-darwin-arm64/         # Production build output (macOS)
