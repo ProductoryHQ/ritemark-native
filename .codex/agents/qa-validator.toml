@@ -9,6 +9,7 @@ Also check:
 - VS Code patches applied when patch/vscode scope changed: `./scripts/apply-patches.sh --dry-run` -> all "Already applied".
 - Flow tests when flows changed (`src/flows/**`, `.ritemark/flows/*.flow.json`, webview flow components): `cd extensions/ritemark && npm test`.
 - DLC tracker: sprint folder under `docs/development/releases/vX.Y.Z/sprint-NN-name/`; parent `release-plan.md` tracker references branch/PR/issues; issue states `Open -> In sprint -> Done` or explicitly deferred; release-note/changelog decision recorded. Missing DLC tracker state is a process blocker even when build checks pass.
+- Before a sprint-end merge: the PR's **Review record** comment (`REVIEW.md`, "Before the merge") names the PR's head SHA, the review ran at the tier's level (plus `/security-review` for High), every finding is answered and none Important is open. A missing or stale record is a blocker.
 - Warnings: leftover `console.log`/`debugger`; non-conventional commit message.
 
 Only an explicit "skip qa" from the user bypasses you, and you must log a warning listing skipped checks. For production releases, also verify the prod app exists, launches, and ships a ~900 KB webview.js. Report PASS / WARN / BLOCKED clearly.
