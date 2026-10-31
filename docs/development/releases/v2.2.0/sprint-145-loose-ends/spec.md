@@ -196,13 +196,16 @@ Shell, by `patches/vscode/020-ritemark-electron-43.patch` and the expected chang
 - A new element for #588 that the Experience lead hasn't drawn.
 - The new Settings, the tooltip and focus-ring work, the card dialog over the board (Sprints 146–147).
 
-## Open Questions
+## Decisions
 
-Each with a recommendation; the sprint plan carries the same list.
+Jarmo answered all five on 31 October 2026 ("agreed with all", in the Development manager session), each as recommended:
 
-1. **#588: a question where there is silence today.** Recommendation: yes. The guard asks (Review changes) when words saved in the last few seconds vanish from the file; the alternative is silent loss. It can also ask when an AI deliberately rewrites the sentence just typed.
+1. **#588: a question where there is silence today.** Yes. The guard asks (Review changes) when words saved in the last few seconds vanish from the file; the alternative is silent loss. It can also ask when an AI deliberately rewrites the sentence just typed.
 2. **#588: the review level.** Decided by the Development manager (31 October): `/code-review` at high for this PR, though its paths set Standard.
-3. **#501: the direction,** once Windows shows the cause. Recommendation: restored terminals wait behind until a document is in front (patch 019), not a welcome that shows sooner than the extension.
-4. **#515: no fixed Electron by the candidate.** Recommendation: ship on 43.8.3 with the risk recorded; no guard on the Save File fetch.
-5. **#507: no reproduction on Windows either.** Recommendation: close with the evidence.
-6. **For the Experience lead:** the rows and question for #596, the quiet sign for #597, the done card's background for #578, the words (or a lighter button) for #588.
+3. **#501: the direction,** once Windows shows the cause. Restored terminals wait behind until a document is in front (patch 019), not a welcome that shows sooner than the extension.
+4. **#515: no fixed Electron by the candidate.** Ship on 43.8.3 with the risk recorded; no guard on the Save File fetch.
+5. **#507: no reproduction on Windows either.** Close with the evidence.
+
+Still open:
+
+- **For the Experience lead:** the rows and question for #596, the quiet sign for #597, the done card's background for #578, the words (or a lighter button) for #588.

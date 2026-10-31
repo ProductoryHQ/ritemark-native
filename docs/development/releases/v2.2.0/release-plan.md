@@ -1,6 +1,6 @@
 # Release Plan — v2.2.0
 
-**Status:** **Proposed** (31 October 2026), waiting on two things from Jarmo: the appetite (below) and Sprint 145's plan approval. The shape's scope is chosen (29 October), and so is the sprint order (31 October: "sprintide järjekord üldiselt sobib"). The review process (Steps 1–7) is on `main` or in review, so 2.2's PRs are reviewed by it from the first one.<br>
+**Status:** **Approved** (31 October 2026). Jarmo agreed to the appetite (below) and approved Sprint 145's plan in one message: "agreed with all". The shape's scope is chosen (29 October), and so is the sprint order (31 October: "sprintide järjekord üldiselt sobib"). The review process (Steps 1–7) is on `main` or in review, so 2.2's PRs are reviewed by it from the first one.<br>
 **Target:** v2.2.0<br>
 **GitHub milestone:** v2.2.0<br>
 **Release type:** **Shell-tier.** A full app release for the Mac and Windows:
@@ -43,7 +43,7 @@ The five items, in the shape's order:
 
 | Sprint | Shape item | Scope | Issues | Depends on | Status |
 |---|---|---|---|---|---|
-| [145 — 2.1's loose ends](sprint-145-loose-ends/sprint-plan.md) | 4 | Behaviour, files and platform faults from 2.1's gates and first days, each reproduced first: a stale write over an auto-save; the AI column's late return after a project switch; Windows' first start and ⌘⇧P on Home; the Electron with Node 24.22.1; the release logs' two errors; Settings' version suffix; Flow steps' missing-key errors; a failed turn's green check; selecting a Flow step saves the flow; the Task board's unreadable cards and its slow drop | #588, #569, #501, #507, #515, #582, #595, #580, #578, #571, #596, #597 | — | **Proposed** 2026-10-31 |
+| [145 — 2.1's loose ends](sprint-145-loose-ends/sprint-plan.md) | 4 | Behaviour, files and platform faults from 2.1's gates and first days, each reproduced first: a stale write over an auto-save; the AI column's late return after a project switch; Windows' first start and ⌘⇧P on Home; the Electron with Node 24.22.1; the release logs' two errors; Settings' version suffix; Flow steps' missing-key errors; a failed turn's green check; selecting a Flow step saves the flow; the Task board's unreadable cards and its slow drop | #588, #569, #501, #507, #515, #582, #595, #580, #578, #571, #596, #597 | — | **Approved** 2026-10-31 |
 | 146 — Every control's states, and the frame's polish | 4 | The review process's Step 8: #585 (no focus ring after a mouse pick) first, then the catalogue page of every `components/ui/` control in every state, one input-mode tracker deciding the ring, and `scripts/qa/control-states.mjs`; then the polish that belongs to the controls and the frame: one tooltip look, narrow buttons as icons, File changes with no Git, a tab's menu, the left column's hover row, and a task card in a dialog over the board | #585, #576, #566, #567, #568, #594, #598 | The Experience lead approves the catalogue's images and #598's dialog | To plan after 145 |
 | 147 — The new Settings | 5 | Experience 15's seven sections, today's settings only, in plain words; skills, connectors and plugins per agent; a redraw when a sign-in changes elsewhere; the shared Button; 13 s on Windows | #592, #415, #460, #577, #593 | 146's controls | To plan |
 | 148 — Search: the words layer | 2 | Ritemark's own search under New over documents (Markdown, Word, PDF, CSV), chats and tasks, grouped by kind, as you type, with no AI | #591 (part) | — | To plan |
@@ -68,7 +68,7 @@ The five items, in the shape's order:
 
 ## The appetite
 
-**For Jarmo to decide.** The shape leaves it open "once the spikes are in". A suggestion to decide from, not a decision:
+**Decided 31 October 2026** (Jarmo: "agreed with all"). The shape left it open "once the spikes are in"; this is the suggestion he agreed to:
 
 - **The core:** items 1 (publish), 2's words layer, 4 (loose ends) and 5 (Settings).
 - **Cut first, in this order:** 151 (AI on your own computer) moves to 2.3; then 150 (the meaning layer); then #598 (the card dialog) inside 146.
@@ -79,9 +79,9 @@ The five items, in the shape's order:
 | Sprint | Planned branch | PR | Issues | Merge status | QA status | Release-note status |
 |---|---|---|---|---|---|---|
 | Review process, Steps 1–3 | `harness/review-process-steps-1-3` | [#599](https://github.com/ProductoryHQ/ritemark-native/pull/599) | — | Merged 31 Oct (6fa90921) | Two review rounds; the joins pass live on 2.1.0 | n/a |
-| Review process, Steps 4, 5, 7 | `harness/review-process-steps-4-5-7` | [#600](https://github.com/ProductoryHQ/ritemark-native/pull/600) | — | In review | Two review rounds | n/a |
-| Review process, Step 6 | `harness/review-process-step-6` | — | — | In progress | — | n/a |
-| Plan: this release plan and 145 | `plan/v2.2.0-release-plan` | — | — | — | n/a | n/a |
+| Review process, Steps 4, 5, 7 | `harness/review-process-steps-4-5-7` | [#600](https://github.com/ProductoryHQ/ritemark-native/pull/600) | — | Merge agreed 31 Oct | Two review rounds | n/a |
+| Review process, Step 6 | `harness/review-process-step-6` | [#602](https://github.com/ProductoryHQ/ritemark-native/pull/602) | — | Merges after #600, rebased and reviewed again | Two review rounds | n/a |
+| Plan: this release plan and 145 | `plan/v2.2.0-release-plan` | [#601](https://github.com/ProductoryHQ/ritemark-native/pull/601) | — | In review (Light) | n/a | n/a |
 | 145 | `sprint-145-loose-ends` | — | #588, #569, #501, #507, #515, #582, #595, #580, #578, #571, #596, #597 | — | — | — |
 
 ## Risks and Blockers
@@ -106,3 +106,4 @@ The five items, in the shape's order:
 | 2026-10-30 | 2.1's milestone closes; #496, #473, #497 move to 2.2's loose ends | Jarmo |
 | 2026-10-31 | The review process starts now; the sprint order: loose ends and Settings, search's words, publishing, search's meaning, local AI | Jarmo |
 | 2026-10-31 | The milestone's other issues go into item 4; #598 is the first to move to 2.3 if the appetite is tight | The Development manager ("otsusta ise") |
+| 2026-10-31 | The appetite: the core is items 1, 2's words layer, 4 and 5; cut 151, then 150, then #598. Sprint 145's plan approved, with its decisions as recommended (#588 asks; #501 keeps terminals behind; #515 ships on 43.8.3 with the risk recorded if no fixed Electron; #507 closes with the evidence) | Jarmo ("agreed with all") |

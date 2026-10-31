@@ -4,7 +4,7 @@ Track: SDD (auto-detected: twelve linked issues in six domains, so it is also fu
 Override with: "use plain full track"
 Branch: `sprint-145-loose-ends`, made from `origin/main` at Phase 3, after approval. Each later PR has its own branch that starts with the same name (*Pull requests* below). This plan was written on `plan/v2.2.0-release-plan`.
 Release tier: shell. 2.2 is a shell release ([release-plan.md](../release-plan.md)). This sprint names its shell-tier path: `patches/vscode/020-ritemark-electron-43.patch` (#515, when an Electron with Node 24.22.1 exists). Patches 001 and 019 are expected to change too (#582's font line, #501), once their causes are shown. Everything else is extension-tier (the table below). If an audit moves a fix into or out of a patch, this line and the table change first.
-Status: **Proposed (Phase 2), 31 October 2026.** Waiting for Jarmo's approval (*Approval* below). No branch exists and no code is written; the code named here was read, not run, and no reproduction has been run for this plan (*What reading the code added*).
+Status: **Approved, 31 October 2026** (Jarmo: "agreed with all", in the Development manager session, with decisions 1, 3, 4 and 5 as recommended). Phase 3 starts in the sprint's own session, on its own branch. No code is written yet; the code named here was read, not run, and no reproduction has been run for this plan (*What reading the code added*).
 
 ## SDD Artifacts
 
@@ -96,7 +96,8 @@ Six, so that each gets `REVIEW.md`'s review at its own tier and a shell change n
 ## Product Decisions
 
 - **2026-10-31 (the release plan):** 2.2 is a shell release; the sprint order puts the loose ends first; "the milestone's other issues go into item 4".
-- **Engineering, in this plan (for Jarmo's review, not yet decided):**
+- **2026-10-31 (this plan, Jarmo: "agreed with all"):** the four decisions below, each as recommended.
+- **Engineering, in this plan (approved with it):**
   - Review changes is the one surface for #588; no new element is drawn.
   - #507 gets no code without a reproduction, as in 2.1.
   - #501's direction waits on a Windows reproduction.
@@ -104,13 +105,13 @@ Six, so that each gets `REVIEW.md`'s review at its own tier and a shell change n
 
 ## Decisions for Jarmo
 
-Five, each with a recommendation; the second is already decided. [spec.md](spec.md#open-questions) carries the same list.
+Five, each with a recommendation; the second was decided by the Development manager. **Jarmo answered on 31 October 2026: "agreed with all"**, so each is as recommended below. [spec.md](spec.md#decisions) carries the same list.
 
-1. **#588: a question where there is silence today.** When words saved in the last few seconds disappear from the file because another writer saved an older copy, Ritemark will ask (Review changes) instead of reloading. It can also ask when an AI deliberately rewrites the very sentence you just typed. I recommend yes: the alternative is silent loss of what you wrote.
+1. **#588: a question where there is silence today.** **Yes.** When words saved in the last few seconds disappear from the file because another writer saved an older copy, Ritemark will ask (Review changes) instead of reloading. It can also ask when an AI deliberately rewrites the very sentence you just typed. Recommended because the alternative is silent loss of what you wrote.
 2. **#588: the review level.** Decided by the Development manager (31 October, a small ask): `/code-review` at high for this one PR, because it is the data-loss path. `REVIEW.md` lets the level go up, never down.
-3. **#501: which direction**, once Windows shows the cause. (a) Restored terminals wait behind until a document is in front (patch 019, shell-tier); (b) the welcome shows sooner than the extension (a workbench part, a much bigger change). I recommend (a).
-4. **#515: if no Electron with Node 24.22.1 is out when 2.2's candidate is built.** Ship on 43.8.3 with the risk recorded (Sprint 144 found one narrow Node path to an outside address: Flows' Save File with an image URL), hold the release, or add a guard on that one fetch. I recommend shipping with the risk recorded, no guard.
-5. **#507: if a real Windows keyboard doesn't reproduce it either.** Close it with the evidence, to reopen on the next sighting. I recommend yes.
+3. **#501: which direction**, once Windows shows the cause. (a) Restored terminals wait behind until a document is in front (patch 019, shell-tier); (b) the welcome shows sooner than the extension (a workbench part, a much bigger change). **(a).**
+4. **#515: if no Electron with Node 24.22.1 is out when 2.2's candidate is built.** Ship on 43.8.3 with the risk recorded (Sprint 144 found one narrow Node path to an outside address: Flows' Save File with an image URL), hold the release, or add a guard on that one fetch. **Ship with the risk recorded, no guard.**
+5. **#507: if a real Windows keyboard doesn't reproduce it either.** Close it with the evidence, to reopen on the next sighting. **Yes.**
 
 ## For the Experience lead
 
@@ -171,10 +172,11 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Pre-Implementation Gate
 
-- This plan is approved by Jarmo. A message from the Development manager is information for the plan, not approval of it.
+- This plan is approved by Jarmo (31 October 2026, *Approval* below). A message from the Development manager is information for the plan, not approval of it.
 - Phase 1's audits come before their workstreams' code: A1 and A2 before W1, A3 before W9, A4 before W10, A7 before W8, A8 before W3. When an audit changes a requirement, `spec.md` changes first.
 - The branch is made before the first code edit, and `git branch --show-current` shows it.
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan: 31 October 2026, "agreed with all" (the Development manager session), answering the plan, decisions 1, 3, 4 and 5, and the release plan's appetite in one message.
+- [ ] Sprint start in the sprint's own session. A message from the Development manager is not Jarmo's word there (ritemark-dev `CLAUDE.md`, rule 7): the session asks Jarmo to confirm before the first code edit.
