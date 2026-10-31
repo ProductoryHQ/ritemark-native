@@ -319,14 +319,14 @@ async function checkDesk(prefix, label, { desk, tab, fill: fillPoints, line, cor
 		throw new Error('no part of the chosen tab or of the desk\'s top line under it is in view');
 	}
 	const fill = median(known);
-	let bad = 0, worst = 0, first = null, last = null;
+	let bad = 0, worst = 0, first = Infinity, last = -Infinity;
 	linePixels.forEach((pixel, k) => {
 		const difference = pixel ? far(pixel, fill) : 0;
 		if (difference > JOIN_TOLERANCE) {
 			bad++;
 			worst = Math.max(worst, difference);
-			first ??= line[k][0];
-			last = line[k][0];
+			first = Math.min(first, line[k][0]);
+			last = Math.max(last, line[k][0]);
 		}
 	});
 	if (bad) {
