@@ -483,9 +483,10 @@ If the feed is stale or missing, the release is BLOCKED — even if the binaries
 
 1. Surface to user: "Recommend invoking `product-marketer` for changelog, release notes, landing-page copy." The notes and every copy follow the `release-notes` skill's wording and checks before anyone else reads them.
 2. **Issue sweep.** `gh issue list --repo ProductoryHQ/ritemark-native --state open`; map every open issue against the shipped scope; verify that each `Fixes #NNN` auto-close actually happened; close what the release genuinely resolved with a comment naming the version. Do not close partial or reputation-dependent issues (Windows Smart App Control, #130, is the standing example) — surface those to Jarmo.
-3. Run the release closeout (Step 10). A release whose worktree is still `BLOCKED` for build output is not finished.
-4. **Model catalog feed.** Refresh the feed only if it was edited by hand since the last release; see **Claude Code and model currency** below.
-5. **The release's numbers** (2.2's review process, Step 7), in the release plan's tracker, written at closeout and again seven days after publishing. At closeout, write the day-7 date in the tracker as an open item, so the second sweep (labelling that week's `regression` issues) is on someone's list:
+3. **Incident rows.** For each regression the issue sweep finds, now or at the day-7 sweep (item 6), add a row to `docs/development/review/incidents.md`: the causing commit (found in `git log`, or "not found" with what was searched), the fix, and the layer that should have caught it. Score its causing diff as that file's method says.
+4. Run the release closeout (Step 10). A release whose worktree is still `BLOCKED` for build output is not finished.
+5. **Model catalog feed.** Refresh the feed only if it was edited by hand since the last release; see **Claude Code and model currency** below.
+6. **The release's numbers** (2.2's review process, Step 7), in the release plan's tracker, written at closeout and again seven days after publishing. At closeout, write the day-7 date in the tracker as an open item, so the second sweep (labelling that week's `regression` issues and adding their incident rows, item 3) is on someone's list:
    - PRs merged; reverts;
    - first-week regressions: issues opened within seven days of publishing that a change in this release caused, labelled `regression` by the issue sweep;
    - review rounds per PR (median and most) and the findings by outcome (fixed, rejected, intentional, didn't matter), from each PR's review record.
