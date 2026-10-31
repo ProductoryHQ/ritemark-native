@@ -4,7 +4,7 @@
 **Target:** v2.2.0<br>
 **GitHub milestone:** v2.2.0<br>
 **Release type:** **Shell-tier.** A full app release for the Mac and Windows:
-- #568 (a tab's menu) and #594 (the left column's hover row) change patches 019 and 018;
+- #568 (a tab's menu) and #594 (the left column's hover row) change patches 019 and 018, and #567 (File changes with no Git) changes 016 and 018 (Sprint 146's plan);
 - #515 moves Electron to one carrying Node 24.22.1 (patch 020);
 - the Store gets a normal update.
 
@@ -44,7 +44,7 @@ The five items, in the shape's order:
 | Sprint | Shape item | Scope | Issues | Depends on | Status |
 |---|---|---|---|---|---|
 | [145 — 2.1's loose ends](sprint-145-loose-ends/sprint-plan.md) | 4 | Behaviour, files and platform faults from 2.1's gates and first days, each reproduced first: a stale write over an auto-save; the AI column's late return after a project switch; Windows' first start and ⌘⇧P on Home; the Electron with Node 24.22.1; the release logs' two errors; Settings' version suffix; Flow steps' missing-key errors; a failed turn's green check; selecting a Flow step saves the flow; the Task board's unreadable cards and its slow drop | #588, #569, #501, #507, #515, #582, #595, #580, #578, #571, #596, #597 | — | **Approved** 2026-10-31 |
-| 146 — Every control's states, and the frame's polish | 4 | The review process's Step 8: #585 (no focus ring after a mouse pick) first, then the catalogue page of every `components/ui/` control in every state, one input-mode tracker deciding the ring, and `scripts/qa/control-states.mjs`; then the polish that belongs to the controls and the frame: one tooltip look, narrow buttons as icons, File changes with no Git, a tab's menu, the left column's hover row, and a task card in a dialog over the board | #585, #576, #566, #567, #568, #594, #598 | The Experience lead approves the catalogue's images and #598's dialog | To plan after 145 |
+| [146 — Every control's states, and the frame's polish](sprint-146-controls/sprint-plan.md) | 4 | The review process's Step 8: #585 (no focus ring after a mouse pick) first, then the catalogue page of every `components/ui/` control in every state, one input-mode tracker deciding the ring, and `scripts/qa/control-states.mjs`; then the polish that belongs to the controls and the frame: one tooltip look, narrow buttons as icons, File changes with no Git, a tab's menu, the left column's hover row, and a task card in a dialog over the board | #585, #576, #566, #567, #568, #594, #598 | The Experience lead approves the catalogue's images and #598's dialog | **Proposed** 2026-10-31 |
 | 147 — The new Settings | 5 | Experience 15's seven sections, today's settings only, in plain words; skills, connectors and plugins per agent; a redraw when a sign-in changes elsewhere; the shared Button; 13 s on Windows | #592, #415, #460, #577, #593 | 146's controls | To plan |
 | 148 — Search: the words layer | 2 | Ritemark's own search under New over documents (Markdown, Word, PDF, CSV), chats and tasks, grouped by kind, as you type, with no AI | #591 (part) | — | To plan |
 | 149 — Publish a web page | 1 | An .html file on the desk as the page in Ritemark's own browser; Connect Cloudflare (OAuth with PKCE, a token link as the fallback); Publish, Copy link, Update the page, Unpublish; noindex | #590 | The Cloudflare test account (Jarmo, 1 November) and its 14 live measurements | To plan |
@@ -83,6 +83,7 @@ The five items, in the shape's order:
 | Review process, Step 6 | `harness/review-process-step-6` | [#602](https://github.com/ProductoryHQ/ritemark-native/pull/602) | — | Merges after #600, rebased and reviewed again | Two review rounds | n/a |
 | Plan: this release plan and 145 | `plan/v2.2.0-release-plan` | [#601](https://github.com/ProductoryHQ/ritemark-native/pull/601) | — | In review (Light) | n/a | n/a |
 | 145 | `sprint-145-loose-ends` | — | #588, #569, #501, #507, #515, #582, #595, #580, #578, #571, #596, #597 | — | — | — |
+| 146 | `sprint-146-controls` (plan on `plan/v2.2.0-sprint-146`) | Plan: draft | #585, #576, #566, #567, #568, #594, #598 | Plan proposed, waiting for Jarmo | — | — |
 
 ## Risks and Blockers
 
