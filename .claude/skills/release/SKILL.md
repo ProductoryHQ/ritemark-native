@@ -189,7 +189,8 @@ Every checklist carries the section **"The base window against the baseline"** (
 
 - Launch the installed candidate in the background with its own short `--user-data-dir`, `--extensions-dir` and `--shared-data-dir`, `RITEMARK_BUILD_CHANNEL=test` in the environment and a debugging port (the `ritemark-automation` skill, "Launching an installed build"), on a fresh profile with the baseline's sample project.
 - Run `node scripts/qa/frame-screenshots.mjs --port <port> --out <dir> --compare docs/development/frame-baseline --release docs/development/frame-baseline/release` and `node scripts/qa/frame-geometry.mjs --port <port>`, on the Mac and, where the Windows session can run them, on Windows.
-- A scene over 0.5% is fixed, or Jarmo approves it, before Gate 1 passes. The release images (`frame-baseline/release/`) change only with his approval.
+- Every scene's JOINS line is ok: the script's joins pass (under each chosen tab, and just outside each desk's top corners) fails the run by itself, however small the scene's share.
+- A scene over 0.5% is fixed, or Jarmo approves it, before Gate 1 passes. Before asking, look at its joins at 4× (`<out>/joins.html`) and match each changed region to a drawing or a changelog line: the `ritemark-automation` skill, "Judging a frame scene that differs". The release images (`frame-baseline/release/`) change only with his approval.
 - Every other scripted test launch of a candidate uses the same launch rule, so test folders stay out of the installed app's recent list (#475) and test runs never count as people (#480).
 
 How to read the results: `docs/development/frame-baseline/README.md`, "Comparing a release candidate".

@@ -356,9 +356,7 @@ If `apply-patches.sh` fails after a VS Code update:
 
 ### Current Patches
 
-| Patch | Purpose | Risk |
-|-------|---------|------|
-| `001-terminal-default-to-right-sidebar` | Terminal opens in Secondary Sidebar by default | Low (cosmetic) |
+The list, one row per patch with what it does: `docs/development/vscode-patches.md`.
 
 ### Pre-Build Patch Check
 
