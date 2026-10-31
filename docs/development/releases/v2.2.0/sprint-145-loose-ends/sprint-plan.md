@@ -76,7 +76,7 @@ Six, so that each gets `REVIEW.md`'s review at its own tier and a shell change n
 
 | PR | Branch | Holds | Release tier | Review tier |
 |---|---|---|---|---|
-| 1 | `sprint-145-loose-ends` | R1 (#588), with this plan's documents | extension | Standard by paths (`src/editorSync/`); see decision 2 |
+| 1 | `sprint-145-loose-ends` | R1 (#588), and this sprint's document updates (the plan itself lands first, in #601) | extension | Standard by paths (`src/editorSync/`); see decision 2 |
 | 2 | `sprint-145-loose-ends-ext` | R6 (#578), R7 (#595), R8's DEP0169 half if the caller is ours, R10's extension half, R9's extension half if the measurement puts it there | extension | Standard; #578 also goes to the Experience lead with screenshots |
 | 3 | `sprint-145-loose-ends-flows` | R4 (#571), R5 (#580) | extension | Standard. R5 adds one section name in `RitemarkSettingsProvider.ts`, a file in `src/settings/` that also holds key handling; the PR says so and takes High if the review reads it so |
 | 4 | `sprint-145-loose-ends-board` | R2 (#596), R3 (#597) | extension | Standard, with the Experience lead's screenshots |
