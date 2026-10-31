@@ -83,7 +83,7 @@ The five items, in the shape's order:
 | Review process, Step 6 | `harness/review-process-step-6` | [#602](https://github.com/ProductoryHQ/ritemark-native/pull/602) | — | Merges after #600, rebased and reviewed again | Two review rounds | n/a |
 | Plan: this release plan and 145 | `plan/v2.2.0-release-plan` | [#601](https://github.com/ProductoryHQ/ritemark-native/pull/601) | — | In review (Light) | n/a | n/a |
 | 145 | `sprint-145-loose-ends` | — | #588, #569, #501, #507, #515, #582, #595, #580, #578, #571, #596, #597 | — | — | — |
-| 146 | `sprint-146-controls` (plan on `plan/v2.2.0-sprint-146`) | Plan: draft | #585, #576, #566, #567, #568, #594, #598 | Plan proposed, waiting for Jarmo | — | — |
+| 146 | `sprint-146-controls` (plan on `plan/v2.2.0-sprint-146`) | Plan: [#603](https://github.com/ProductoryHQ/ritemark-native/pull/603) (draft) | #585, #576, #566, #567, #568, #594, #598 | Plan proposed, waiting for Jarmo | — | — |
 
 ## Risks and Blockers
 
