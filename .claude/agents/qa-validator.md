@@ -292,6 +292,9 @@ When the user invokes you for a sprint phase transition (sprint-manager surfaces
 - Run checks 1-7
 - Report findings; the user feeds them back to sprint-manager
 
+**Before a sprint-end merge:**
+- Check the PR's review record (`REVIEW.md`, "Before the merge": the comment that starts with **Review record**): its SHA is the PR's head, the review ran at the tier's level, a High-tier PR also has `/security-review`, every finding is answered and none Important is open. A missing or stale record is a blocker, like a failing check.
+
 **Phase 6 (Deploy):**
 - Run all checks 1-11
 - Block release if any critical fails (report to user; user surfaces to release-manager)

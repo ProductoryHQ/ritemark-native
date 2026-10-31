@@ -64,6 +64,17 @@ For every PR, check the following:
 - [ ] New functionality has tests where practical
 - [ ] Manual testing steps described in PR
 
+## The review before every merge (`REVIEW.md`)
+
+Every PR gets an AI review before it merges, by `REVIEW.md`'s rules (2.2's review process, Steps 4 and 5). A subagent can't run a slash command, so **the merging session** (the Development manager, or Jarmo's own session) runs it; you check that it happened and that its rules hold, and you refuse a merge where they don't.
+
+1. **The tier** comes from the paths the PR touches (`REVIEW.md`'s table; the highest wins; the author never lowers it). Check it against the PR template's Risk section.
+2. **The review:** `/code-review <PR> <level> --comment` on the PR's head: Light `low`, Standard `medium`, High `high`. A **High**-tier PR also gets `/security-review`.
+3. **Every finding is answered:** fixed in a new commit, or resolved on the PR with a one-line reason (wrong, intentional, doesn't matter). An open Important finding, or an open security finding, blocks the merge.
+4. **Rounds:** at most three. Round one reads the whole PR; rounds two and three read only the new commits and report nothing already reported. After round three, stop and rethink the approach with Jarmo or the Experience lead. Don't re-tag `@codex review`.
+5. **The record:** a comment by the merging session that starts with **Review record**, posted after the last round: the reviewed head commit (its SHA), the rounds, each finding's outcome (fixed, rejected, intentional, didn't matter), and the security review's outcome for High tier. Other comments after it don't change it. No record at the head being merged, no merge.
+6. **The merge** is at the record's SHA only: `gh pr merge <number> --repo ProductoryHQ/ritemark-native --squash --admin --match-head-commit <the record's sha>`, with Jarmo's word given in the merging session. While Jarmo has delegated merging to the Development manager, the manager's own session may merge on that delegation; a message from the manager to any other session is never that word (ritemark-dev `CLAUDE.md`, rule 7). A commit after the review needs a review of that commit first.
+
 ## How to Review
 
 1. **Read the PR**: `gh pr view <number> --repo ProductoryHQ/ritemark-native`
@@ -97,14 +108,13 @@ APPROVE / REQUEST CHANGES / NEEDS DISCUSSION
 
 When asked to merge:
 
-1. Verify PR is approved
+1. Verify the review record (above): its SHA is the PR's head, every finding is answered, no Important or security finding is open
 2. Check CI status: `gh pr checks <number>`
-3. Merge: `gh pr merge <number> --repo ProductoryHQ/ritemark-native --merge`
-4. If branch protection blocks: inform user, suggest `--admin` flag with their confirmation
+3. Merge as item 6 above says. Branch protection on `main` requires a review, so every merge is an admin merge: name the PR number when asking for the word
 
 ## Important Rules
 
-- **Never merge without review** — always run the checklist first
+- **Never merge without review** — always run the checklist first, and never without `REVIEW.md`'s review record at the head being merged
 - **Never use `--admin` without explicit user approval**
 - **Flag security issues** — credentials, injection risks, unsafe eval
 - **Check cross-platform** — Windows and macOS paths, spawn behavior

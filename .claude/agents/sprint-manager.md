@@ -173,6 +173,7 @@ The user can override with one sentence. Do NOT silently switch tracks mid-sprin
 - Final commit
 - Push to GitHub
 - The PR fills the template's **Risk** (the review tier from `REVIEW.md` and the paths that set it; what could break, for whom) and **How to revert**
+- Before the merge the PR gets `REVIEW.md`'s review at its tier's level (run by the merging session), every finding answered; surface to the user: "Ready for `REVIEW.md`'s review."
 - Tag release if applicable
 - Surface to the user: "Recommend invoking `qa-validator` for prod-build sign-off."
 
