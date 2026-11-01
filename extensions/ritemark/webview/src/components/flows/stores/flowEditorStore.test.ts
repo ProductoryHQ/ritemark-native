@@ -18,7 +18,7 @@ Object.assign(globalThis, {
   acquireVsCodeApi: () => ({ postMessage: () => {}, getState: () => undefined, setState: () => {} }),
 })
 
-const { useFlowEditorStore } = await import('./flowEditorStore')
+const { useFlowEditorStore, createSaveTracker } = await import('./flowEditorStore')
 type Store = ReturnType<typeof useFlowEditorStore.getState>
 type Flow = Parameters<Store['setFlow']>[0]
 
@@ -152,9 +152,39 @@ assert.equal(store().executionOrder.has('llm-1'), true, 'undo gives it back its 
 store().redo()
 assert.equal(store().executionOrder.has('llm-1'), false, 'redo takes it away again')
 load()
-const orderBefore = store().executionOrder
+store().addNode('saveFileNode', { x: 0, y: 400 })
+assert.equal(store().executionOrder.get('llm-1'), 3, 'after the trigger and the unconnected new step')
 store().deleteEdge('edge-1')
-assert.notEqual(store().executionOrder, orderBefore, 'an edge removed from its menu recomputes the run order')
+assert.equal(store().executionOrder.get('llm-1'), 2, 'an edge removed from its menu renumbers the steps')
+
+// ── Which write the editor waits on (review rounds 1 and 2) ──────────────────
+
+{
+  // The usual case: one write, answered, nothing changed since
+  const tracker = createSaveTracker()
+  const seq = tracker.sent('A')
+  assert.equal(tracker.answered(seq, 'A'), 'clean')
+}
+{
+  // An edit made while the host writes: written again
+  const tracker = createSaveTracker()
+  const seq = tracker.sent('A')
+  assert.equal(tracker.answered(seq, 'AB'), 'write-again')
+}
+{
+  // Two requests in flight (an autosave, then Cmd+S): the first answer waits for the second's
+  const tracker = createSaveTracker()
+  const first = tracker.sent('A')
+  const second = tracker.sent('AB')
+  assert.equal(tracker.answered(first, 'AB'), 'wait', "the autosave's answer can't mark Cmd+S's copy saved")
+  assert.equal(tracker.answered(second, 'AB'), 'clean')
+}
+{
+  // Cmd+S on a clean flow sends no copy but records the flow it saves: an edit made during that save is written
+  const tracker = createSaveTracker()
+  const seq = tracker.sent('A')
+  assert.equal(tracker.answered(seq, 'AC'), 'write-again')
+}
 
 // Editing a step's fields still marks it dirty (the panel's path, not a React Flow change).
 load()

@@ -159,6 +159,37 @@ function changesFlowFile(changes: ReadonlyArray<{ type: string }>): boolean {
 }
 
 /**
+ * Which write a Flow editor waits on (Sprint 145 R4, review rounds 1 and 2). Each write request (the autosave's
+ * `flow:save`, Cmd+S's `flow:requestSave`, the schedule's save) gets a number the host echoes in its `flow:saved`, and
+ * the copy of the flow it stands for. An answer marks the flow clean only when it answers the newest request and the
+ * flow hasn't changed since; an older request's answer waits for the newest's, and an edit made during the write is
+ * written again. A look used to cover these cases by marking the flow dirty again; it no longer does.
+ */
+export interface SaveTracker {
+  /** Records a request for `flow` (as JSON) and returns its number. */
+  sent(flow: string): number;
+  /** What an answer means, given the flow (as JSON) now. */
+  answered(seq: unknown, current: string): 'clean' | 'write-again' | 'wait';
+}
+
+export function createSaveTracker(): SaveTracker {
+  let last = 0;
+  let lastFlow: string | null = null;
+  return {
+    sent(flow) {
+      last += 1;
+      lastFlow = flow;
+      return last;
+    },
+    answered(seq, current) {
+      if (typeof seq === 'number' && seq !== last) return 'wait';
+      if (lastFlow !== null && current !== lastFlow) return 'write-again';
+      return 'clean';
+    },
+  };
+}
+
+/**
  * Calculate execution order using topological sort (Kahn's algorithm)
  * Returns Map of nodeId -> execution step (1-indexed)
  */

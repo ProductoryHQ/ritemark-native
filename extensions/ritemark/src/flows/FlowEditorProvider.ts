@@ -91,17 +91,26 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     webviewPanel.webview.html = this.getHtml(webviewPanel.webview, scriptUri);
 
     let isDisposed = false;
-    // Sprint 145 R4: the flow's writes run one after another. A write that came while another ran used to be dropped
-    // (with no `flow:saved`), and the webview then took the earlier write's answer as its own.
-    let writes: Promise<void> = Promise.resolve();
-    const writeFlow = (flow: Flow): Promise<void> => {
-      const write = writes.then(() => this.updateDocument(document, flow, webview));
-      writes = write.catch(() => undefined);
-      return write;
-    };
 
     const webview = webviewPanel.webview;
     FlowEditorProvider.activeWebviews.add(webview);
+
+    // Sprint 145 R4: the flow's writes and saves run one after another, and each answer names the request it answers
+    // (`seq`). A write that came while another ran used to be dropped, with no answer, and the webview then took the
+    // earlier write's answer as its own.
+    let writes: Promise<unknown> = Promise.resolve();
+    const inTurn = <T>(job: () => Promise<T>): Promise<T> => {
+      const run = writes.then(job);
+      writes = run.catch(() => undefined);
+      return run;
+    };
+    const afterWrite = (flow: Flow) => {
+      // Re-validate and send updated warnings
+      webview.postMessage({ type: 'flow:validation', warnings: this.validateFlow(flow) });
+      void this.sendScheduleStatus(document, webview);
+      // Refresh flows list in sidebar
+      vscode.commands.executeCommand('ritemark.flows.refresh');
+    };
 
     // Handle messages from webview
     webview.onDidReceiveMessage(
@@ -116,27 +125,25 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
             this.sendFlowData(document, webview, workspacePath);
             return;
 
-          case 'flow:save': {
+          case 'flow:save':
             // Save flow changes (autosave)
-            await writeFlow(message.flow);
+            await inTurn(() => this.updateDocument(document, message.flow, webview));
             // Signal save complete so webview marks clean
-            webview.postMessage({ type: 'flow:saved' });
-            // Re-validate and send updated warnings
-            const saveWarnings = this.validateFlow(message.flow);
-            webview.postMessage({ type: 'flow:validation', warnings: saveWarnings });
-            void this.sendScheduleStatus(document, webview);
-            // Refresh flows list in sidebar
-            vscode.commands.executeCommand('ritemark.flows.refresh');
+            webview.postMessage({ type: 'flow:saved', seq: message.seq });
+            afterWrite(message.flow);
             return;
-          }
 
           case 'flow:requestSave':
             // User explicitly requested save (Cmd+S). Sprint 145 R4: the webview sends the edits its autosave hasn't
             // written yet, so the save holds them; it used to save the document without them and then mark them clean.
-            if (message.flow) await writeFlow(message.flow);
-            else await writes;
-            await document.save();
-            webview.postMessage({ type: 'flow:saved' });
+            await inTurn(async () => {
+              const written = message.flow ? await this.updateDocument(document, message.flow, webview) : document.uri;
+              // A new name renames the file, which closes this document: save the renamed one
+              const target = document.isClosed ? await vscode.workspace.openTextDocument(written) : document;
+              await target.save();
+            });
+            webview.postMessage({ type: 'flow:saved', seq: message.seq });
+            if (message.flow) afterWrite(message.flow);
             return;
 
           case 'flow:validate':
@@ -152,7 +159,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
             return;
 
           case 'flow:run':
-            // Execute the flow with step-by-step progress
+            // Execute the flow with step-by-step progress (Sprint 145: after the writes already sent)
+            await writes;
             this.executeFlowWithProgress(
               message.id,
               message.inputs || {},
@@ -216,9 +224,9 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     // Sprint 145 R5 (#580): a key added or removed in Settings (often through a step's "Add it in Settings") changes
     // what the step panels say, so an open panel asks again. Only the key's name is read here, never its value.
     const keyChanges = this.context.secrets.onDidChange((event) => {
-      if (!isDisposed && (event.key === STEP_KEY_SECRETS.openai || event.key === STEP_KEY_SECRETS.gemini)) {
-        webview.postMessage({ type: 'flow:keysChanged' });
-      }
+      if (isDisposed) return;
+      const provider = event.key === STEP_KEY_SECRETS.openai ? 'openai' : event.key === STEP_KEY_SECRETS.gemini ? 'gemini' : null;
+      if (provider) webview.postMessage({ type: 'flow:keysChanged', provider });
     });
 
     webviewPanel.onDidDispose(() => {
@@ -312,11 +320,12 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
    * Update document with new flow content
    * If flow name changed, rename the file to match
    */
+  /** Writes the flow into its document; returns where the flow now is (a new name renames the file). */
   private async updateDocument(
     document: vscode.TextDocument,
     flow: Flow,
     webview?: vscode.Webview
-  ): Promise<void> {
+  ): Promise<vscode.Uri> {
     const scheduleState = new FlowScheduleState(this.context.workspaceState);
 
     // Update modified timestamp
@@ -363,6 +372,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
       if (webview) {
         webview.postMessage({ type: 'flow:renamed', newId: flow.id });
       }
+      return newUri;
     } else {
       // No rename needed - just update content
       const content = JSON.stringify(flow, null, 2);
@@ -377,6 +387,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
       if (!flow.schedule) {
         await scheduleState.clear(document.uri.fsPath);
       }
+      return document.uri;
     }
   }
 

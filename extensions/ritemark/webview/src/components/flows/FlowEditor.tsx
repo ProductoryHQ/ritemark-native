@@ -13,7 +13,7 @@ import { FlowCanvas, useFlowAutoArrange } from './FlowCanvas';
 import { NodeConfigPanel } from './NodeConfigPanel';
 import { ExecutionPanel } from './ExecutionPanel';
 import { FlowSettingsPanel } from './FlowSettingsPanel';
-import { useFlowEditorStore } from './stores/flowEditorStore';
+import { createSaveTracker, useFlowEditorStore } from './stores/flowEditorStore';
 import type { Flow } from './stores/flowEditorStore';
 import { Button } from '../ui/button';
 import { Tooltip } from '../ui/tooltip';
@@ -119,9 +119,15 @@ export function FlowEditor() {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const savedNotificationTimerRef = useRef<number | null>(null);
-  // Sprint 145 R4: the flow last sent to be written. A `flow:saved` while the flow differs from it (an edit came during
-  // the write) keeps the flow dirty and writes again; the next look no longer does that by accident.
-  const sentFlowRef = useRef<string | null>(null);
+  // Sprint 145 R4: which write the editor waits on (`createSaveTracker`): each request carries a number the host's
+  // `flow:saved` echoes, so an older write's answer, or an edit made during a write, never marks the flow clean.
+  const saveTrackerRef = useRef(createSaveTracker());
+  // The name and description being typed reach the store 1.5 s after the last key; Cmd+S takes them at once
+  const pendingTitleRef = useRef<{ name?: string; description?: string }>({});
+  pendingTitleRef.current = {
+    name: isNameFocused && localName !== flowName ? localName : undefined,
+    description: isDescFocused && localDescription !== flowDescription ? localDescription : undefined,
+  };
 
   // Ref to track isRunning for message handler (avoids stale closure)
   const isRunningRef = useRef(isRunning);
@@ -146,19 +152,20 @@ export function FlowEditor() {
           break;
 
         case 'flow:saved': {
-          const current = useFlowEditorStore.getState().toFlow();
-          if (sentFlowRef.current !== null && JSON.stringify(current) !== sentFlowRef.current) {
-            // Sprint 145 R4: the host wrote an older copy; write the newer one after the usual pause
+          const answer = saveTrackerRef.current.answered(message.seq, JSON.stringify(useFlowEditorStore.getState().toFlow()));
+          // Sprint 145 R4: an older request's answer: the newest one's is still to come
+          if (answer === 'wait') break;
+          if (answer === 'write-again') {
+            // The flow changed while the host wrote it: write the newer copy after the usual pause
             if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
             saveTimerRef.current = window.setTimeout(() => {
               saveTimerRef.current = null;
               const flow = useFlowEditorStore.getState().toFlow();
-              sentFlowRef.current = JSON.stringify(flow);
-              vscodeApi.postMessage({ type: 'flow:save', flow });
+              const seq = saveTrackerRef.current.sent(JSON.stringify(flow));
+              vscodeApi.postMessage({ type: 'flow:save', flow, seq });
             }, 500);
             break;
           }
-          sentFlowRef.current = null;
           markClean();
           setSaveState('saved');
           setLastSavedAt(new Date());
@@ -225,9 +232,9 @@ export function FlowEditor() {
     saveTimerRef.current = window.setTimeout(() => {
       const vscodeApi = vscode;
       const flow = toFlow();
-      sentFlowRef.current = JSON.stringify(flow);
+      const seq = saveTrackerRef.current.sent(JSON.stringify(flow));
       setSaveState('saving');
-      vscodeApi.postMessage({ type: 'flow:save', flow });
+      vscodeApi.postMessage({ type: 'flow:save', flow, seq });
     }, 500);
 
     return () => {
@@ -245,18 +252,23 @@ export function FlowEditor() {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
         const vscodeApi = vscode;
-        // Sprint 145 R4: an edit the autosave hasn't sent yet goes with the save, so the save holds it
+        // Sprint 145 R4: an edit the autosave hasn't sent yet goes with the save, so the save holds it; so do the name
+        // and description being typed
+        const pending = pendingTitleRef.current;
+        if (pending.name !== undefined) useFlowEditorStore.getState().setFlowName(pending.name);
+        if (pending.description !== undefined) useFlowEditorStore.getState().setFlowDescription(pending.description);
         const store = useFlowEditorStore.getState();
+        const current = store.toFlow();
         let flow: Flow | undefined;
         if (store.isDirty) {
           if (saveTimerRef.current) {
             window.clearTimeout(saveTimerRef.current);
             saveTimerRef.current = null;
           }
-          flow = store.toFlow();
-          sentFlowRef.current = JSON.stringify(flow);
+          flow = current;
         }
-        vscodeApi.postMessage({ type: 'flow:requestSave', flow });
+        const seq = saveTrackerRef.current.sent(JSON.stringify(current));
+        vscodeApi.postMessage({ type: 'flow:requestSave', flow, seq });
       }
 
       // Cmd/Ctrl + Z to undo
@@ -315,8 +327,8 @@ export function FlowEditor() {
     }
     setSaveState('saving');
     const flow = toFlow();
-    sentFlowRef.current = JSON.stringify(flow);
-    vscode.postMessage({ type: 'flow:save', flow });
+    const seq = saveTrackerRef.current.sent(JSON.stringify(flow));
+    vscode.postMessage({ type: 'flow:save', flow, seq });
   }, [toFlow]);
 
   const nextScheduledRun = getNextScheduledRun(flowSchedule);

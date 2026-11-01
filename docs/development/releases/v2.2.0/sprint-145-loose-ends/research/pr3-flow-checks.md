@@ -30,6 +30,15 @@ A look used to mark the flow dirty, so the next click or measurement wrote whate
 
 `src/flows/flowSaves.test.ts` (the host's writes) fails on round 1's head and `main` in 3 of 4 cases; `flowEditorStore.test.ts` adds the store's own edits.
 
+### Review round 2: each answer names its request, and the rest a click used to write
+
+- **Each write request carries a number the host echoes in `flow:saved`** (`createSaveTracker` in `flowEditorStore.ts`). An answer marks the flow clean only when it answers the newest request and the flow hasn't changed since: an autosave's answer can't mark a later Cmd+S's copy saved, and an edit made during a Cmd+S on a clean flow is written. The host runs Cmd+S's write and save as one turn, after any write before it.
+- **Auto-arrange's layout was never written once a click stopped writing.** It sets the steps' positions from outside React Flow, which marked nothing dirty; on `main` the next click wrote it. Auto-arrange now marks the flow dirty and adds the layout to undo. In the dev instance, Auto-arrange wrote the file within 3 s.
+- **Cmd+S with a new flow name** renamed the file, which closes the document the editor opened, then saved that closed document. The renamed file is saved now. Cmd+S also takes a name or description still being typed (they reached the store 1.5 s after the last key), and sends the flow's warnings, its schedule and the Flows list's refresh, as an autosave does. In the dev instance: a label typed and saved with Cmd+S at once, and a flow name typed and saved with Cmd+S at once, are in the file 1 s later.
+- **R5:** the missing key's sentence comes before "Saved model is no longer available" in both panels (round 1 had put it after, as Sprint 144's image panel did): without a key the list is the bundled one, so a saved model can look missing, and R5 says a step without its key always says so. A key change names its provider, and only that provider's panels ask again. A run waits for the writes already sent.
+
+`flowSaves.test.ts` adds the answers' numbers and the renamed file's save; `flowEditorStore.test.ts` adds the tracker's cases (one write, an edit during it, two in flight, Cmd+S on a clean flow).
+
 ## R5: one sentence and a link for every step without its key
 
 **The four places** and what they said on `main` (from `src/flows/stepNeedsKey.test.ts` run against `main`'s source):

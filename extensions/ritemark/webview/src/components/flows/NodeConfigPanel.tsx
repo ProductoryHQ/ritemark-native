@@ -222,7 +222,10 @@ function Field({ label, children, description }: FieldProps) {
 function useModelsAgainOnKeyChange(provider: string, modelType: 'llm' | 'image'): void {
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'flow:keysChanged') vscode.postMessage({ type: 'flow:getModels', provider, modelType });
+      // Only this step's provider's key matters to it
+      if (event.data?.type === 'flow:keysChanged' && event.data.provider === provider) {
+        vscode.postMessage({ type: 'flow:getModels', provider, modelType });
+      }
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
@@ -230,8 +233,9 @@ function useModelsAgainOnKeyChange(provider: string, modelType: 'llm' | 'image')
 }
 
 /**
- * The line under a step's model picker, the same for the AI step and the image step (Sprint 144's order): the list
- * loading, a saved model the list no longer has, the step's missing key with its link, then any other error.
+ * The line under a step's model picker, the same for the AI step and the image step: the list loading, the step's
+ * missing key with its link (R5: a step without its key always says so; without the key the list is the bundled one,
+ * so a saved model can look missing from it), a saved model the list no longer has, then any other error.
  */
 function modelFieldNote(note: {
   waiting: boolean;
@@ -240,8 +244,8 @@ function modelFieldNote(note: {
   errorAction: StepKeyAction | null;
 }): React.ReactNode {
   if (note.waiting) return 'Loading models...';
-  if (note.unavailable) return 'Saved model is no longer available. Choose a replacement.';
   if (note.error && note.errorAction) return <StepKeyNotice text={note.error} action={note.errorAction} />;
+  if (note.unavailable) return 'Saved model is no longer available. Choose a replacement.';
   if (note.error) return `⚠️ ${note.error}`;
   return undefined;
 }

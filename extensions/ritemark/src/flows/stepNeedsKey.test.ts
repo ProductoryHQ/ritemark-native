@@ -271,7 +271,8 @@ async function main(): Promise<void> {
     fire('openai-api-key');
     fire('google-ai-key');
     fire('anthropic-api-key');
-    assert.deepEqual(posted.map((m) => m.type), ['flow:keysChanged', 'flow:keysChanged'], "only the two Flow keys, and only the key's name");
+    assert.deepEqual(posted.map((m) => m.type), ['flow:keysChanged', 'flow:keysChanged'], 'only the two Flow keys');
+    assert.deepEqual(posted.map((m) => m.provider), ['openai', 'gemini'], "each names its provider, never the key's value");
     disposed?.();
     assert.equal(secretListeners.size, 0, 'a closed editor stops listening');
   });
