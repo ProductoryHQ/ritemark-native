@@ -605,6 +605,58 @@ async function main(): Promise<void> {
     env.dispose();
   });
 
+  await scenario('Round 2: an edit made outside Ritemark\'s view and saved at once is not held', async () => {
+    const env = await open('text-editor-edit.md', md('Stale write'));
+    const before = env.document.getText();
+    await env.type(addToEnd(before, A));
+    await env.autoSave();
+    // A text editor of the same file deletes the sentence and saves straight away.
+    env.document.edit(before);
+    await env.autoSave();
+    assert.equal(env.conflicts().length, 0, 'no question');
+    assert.ok(!env.document.getText().includes(A.trim()) && !env.disk().includes(A.trim()), 'the deletion stays');
+    env.dispose();
+  });
+
+  await scenario('Round 2: many saves inside the window keep the first one\'s words guarded', async () => {
+    const env = await open('many-saves.md', md('Stale write'));
+    const read = env.disk();
+    await env.type(addToEnd(env.document.getText(), ' Alpha words typed first and then trimmed a little more each time.'));
+    await env.autoSave();
+    for (const word of [' more each time', ' a little', ' then trimmed', ' and', ' first', ' typed']) {
+      await env.type(env.document.getText().replace(word, ''));
+      await env.autoSave();
+    }
+    fs.writeFileSync(env.document.file, editTitle(read));
+    await env.fileChanged('reload-first');
+    assert.equal(env.conflicts().pop()?.reason, 'held-import');
+    assert.ok(env.document.getText().includes('Alpha words'));
+    env.dispose();
+  });
+
+  await scenario('Round 2: the views get the text put back as a new revision', async () => {
+    const { env } = await s1('broadcast.md', md('Stale write'), editTitle, 'reload-first');
+    const conflict = env.conflicts().pop()!;
+    const update = env.messages.filter(message => message.type === 'document:update').pop()!;
+    assert.ok(String((update.payload as { content: string }).content).includes(B.trim()));
+    assert.equal(update.revision, conflict.revision, 'the update and the question share the new revision');
+    env.dispose();
+  });
+
+  await scenario('Round 2: Use disk version writes back a writer\'s copy that is not UTF-8, byte for byte', async () => {
+    const env = await open('latin1.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    await env.autoSave();
+    const writer = Buffer.concat([Buffer.from('# Stale write, edited by the writer caf', 'latin1'), Buffer.from([0xe9]), Buffer.from('\n\nThe second line.\n\nThe third line.\n', 'latin1')]);
+    fs.writeFileSync(env.document.file, writer);
+    await env.fileChanged('reload-first');
+    assert.equal(env.conflicts().pop()?.reason, 'held-import');
+    await env.autoSave();
+    await env.answer('use-disk');
+    assert.ok(fs.readFileSync(env.document.file).equals(writer), 'the file is the writer\'s bytes');
+    env.dispose();
+  });
+
   await scenario('S8: a stale write more than 30 s after the save still wins, as in 2.1', async () => {
     const realNow = Date.now;
     try {

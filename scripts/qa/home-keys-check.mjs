@@ -124,11 +124,14 @@ let workspace = option('workspace');
 let launched = false;
 if (!ATTACH) {
   workspace = path.join(PROFILE, 'ws');
+  // Nothing may still run on this port or this profile before the profile is deleted.
+  if (portBusy()) throw new Error(`port ${PORT} is in use`);
+  const live = spawnSync('ps', ['-axo', 'command='], { encoding: 'utf8' }).stdout.split('\n').some((line) => line.includes(`--user-data-dir=${path.join(PROFILE, 'ud')}`));
+  if (live) throw new Error(`an instance still runs on ${PROFILE}: quit it first`);
   fs.rmSync(PROFILE, { recursive: true, force: true });
   for (const dir of ['ud/User', 'ext', 'shared', 'ws', 'ai/codex', 'ai/claude', 'ai/xdg/config', 'ai/xdg/data', 'ai/xdg/state', 'ai/xdg/cache']) fs.mkdirSync(path.join(PROFILE, dir), { recursive: true });
   fs.writeFileSync(path.join(workspace, 'README.md'), '# Home keys check\n\nA scratch project.\n');
   fs.writeFileSync(path.join(PROFILE, 'ud/User/settings.json'), JSON.stringify({ 'window.confirmBeforeClose': 'never', 'ritemark.updates.enabled': false, 'ritemark.features.analytics': false }, null, 2));
-  if (portBusy()) throw new Error(`port ${PORT} is in use`);
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
   const ai = (p) => path.join(PROFILE, 'ai', p);
   const appArgs = APP ? [] : [VSCODE];

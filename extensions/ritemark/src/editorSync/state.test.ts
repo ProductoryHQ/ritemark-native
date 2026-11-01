@@ -198,7 +198,8 @@ const lost = (diskText: string, saves = recentSaves, now = NOW) =>
   droppedRecentSave({ saves, diskText, now, windowMs: STALE_WRITE_WINDOW_MS });
 
 test('#588 S1: a writer that read before the second save drops its words', () => {
-  assert.equal(lost(SAVE_A.replace('# Title', '# Title, edited by the writer')), 4);
+  // The two saves typed one run (Alpha … second.); the file lacks it, so its 8 words count.
+  assert.equal(lost(SAVE_A.replace('# Title', '# Title, edited by the writer')), 8);
 });
 
 test('#588 S2: a writer that read the latest save drops nothing', () => {
@@ -207,7 +208,7 @@ test('#588 S2: a writer that read the latest save drops nothing', () => {
 });
 
 test('#588 S4: a writer that rewrites the sentence just typed drops it (decision 1)', () => {
-  assert.equal(lost(SAVE_B.replace('Bravo words typed second.', 'Something else entirely.')), 4);
+  assert.equal(lost(SAVE_B.replace('Bravo words typed second.', 'Something else entirely.')), 8);
 });
 
 test('#588 S5: line endings and a byte order mark are not a loss', () => {
@@ -219,7 +220,7 @@ test('#588 S5: line endings and a byte order mark are not a loss', () => {
     previousText: save.previousText.replace(/\n/g, '\r\n'),
   }));
   assert.equal(lost(SAVE_B, crlfSaves), 0);
-  assert.equal(lost(SAVE_A, crlfSaves), 4);
+  assert.equal(lost(SAVE_A, crlfSaves), 8);
 });
 
 test('#588: a rewrap, a moved paragraph or a changed neighbour keeps the words', () => {
@@ -266,6 +267,26 @@ test('#588 review round 1: a short insert made of words found elsewhere is still
   const saves = [{ text: saved, previousText: before, savedAt: NOW - 500 }];
   assert.equal(lost(before, saves), 1, '"not" is gone from the second line');
   assert.equal(lost(saved.replace('It is not long.', 'It is short.'), saves), 0, 'the writer changed only the last line');
+});
+
+test('#588 review round 2: a later fix inside the run just typed does not hide it', () => {
+  const before = '# Plan\n\nThe intro.\n';
+  const typed = '# Plan\n\nThe intro. The budget is approved for nest year\n';
+  const fixed = '# Plan\n\nThe intro. The budget is approved for next year.\n';
+  const saves = [
+    { text: typed, previousText: before, savedAt: NOW - 4_000 },
+    { text: fixed, previousText: typed, savedAt: NOW - 1_000 },
+  ];
+  assert.ok(lost('# Plan\n\nThe intro. Costs rise next year.\n', saves) > 0, 'a writer\'s own sentence ending in "year." does not cover it');
+  assert.equal(lost(fixed.replace('# Plan', '# Plan, edited'), saves), 0);
+});
+
+test('#588 review round 2: a writer that only reformatted the person\'s words has not lost them', () => {
+  const before = '# List\n\n* Milk\n';
+  const saved = '# List\n\n* Milk\n* Buy eggs today\n\nSee _this_ note.\n';
+  const saves = [{ text: saved, previousText: before, savedAt: NOW - 500 }];
+  assert.equal(lost('# List\n\n- Milk\n- Buy eggs today\n\nSee *this* note.\n', saves), 0);
+  assert.ok(lost('# List\n\n- Milk\n', saves) > 0, 'the items are gone');
 });
 
 test('#588 S7: a CSV cell next to the person\'s cell, and a dropped row', () => {

@@ -184,10 +184,18 @@ export const STALE_WRITE_WINDOW_MS = 30_000;
 /**
  * Words, for the guard: runs of characters between white space and the
  * separators of a table or CSV row, so a rewrap, a changed line ending or a
- * cell edit next to the person's words doesn't count as a loss.
+ * cell edit next to the person's words doesn't count as a loss. Markup at a
+ * word's edges (emphasis, code, quotes) is dropped, and so are list markers
+ * and headings' hashes on their own, so a writer that only reformatted the
+ * person's words hasn't lost them.
  */
 function guardWords(text: string): string[] {
-  return normalizeLogicalText(text).match(/[^\s,;|]+/g) ?? [];
+  const words: string[] = [];
+  for (const raw of normalizeLogicalText(text).match(/[^\s,;|]+/g) ?? []) {
+    const word = raw.replace(/^[*_~`"'>#]+/, '').replace(/[*_~`"']+$/, '');
+    if (word && !/^(?:[-+]|\d+[.)])$/.test(word)) words.push(word);
+  }
+  return words;
 }
 
 /** Words joined for a contiguous search; built once per text. */
@@ -273,9 +281,11 @@ function addedRuns(previous: readonly string[], next: readonly string[]): AddedR
  * Ritemark's own recent saves added? Returns how many such words are missing,
  * 0 when none are (or when nothing recent is remembered).
  *
- * For each save within `windowMs` of `now`, the words it added are the runs a
- * word alignment with the text before it finds. A run counts as lost when the
- * person's newest save still has it, the disk text has it fewer times, and not
+ * The words the saves within `windowMs` of `now` added are the runs one word
+ * alignment finds, from the text before the oldest of them to the newest save,
+ * so every run is in the person's newest text and a later fix inside an earlier
+ * run (a typo, a full stop) doesn't hide it. A run counts as lost when the disk
+ * text has it fewer times than the newest save, and not
  * with the word on each side of it where the person put it; so a short insert
  * made of words found elsewhere in the file isn't missed, and a writer that
  * removed another copy of the person's word isn't a loss. Word runs, not lines
@@ -289,22 +299,21 @@ export function droppedRecentSave(input: {
   now: number;
   windowMs: number;
 }): number {
-  const recent = input.saves.filter(save => input.now - save.savedAt <= input.windowMs);
+  const oldest = input.saves.find(save => input.now - save.savedAt <= input.windowMs);
   const newest = input.saves[input.saves.length - 1];
-  if (!newest || recent.length === 0) return 0;
-  const newestText = searchable(guardWords(newest.text));
+  if (!newest || !oldest) return 0;
+  const newestWords = guardWords(newest.text);
+  const runs = addedRuns(guardWords(oldest.previousText), newestWords);
+  if (runs.length === 0) return 0;
+  const newestText = searchable(newestWords);
   const diskText = searchable(guardWords(input.diskText));
   let lost = 0;
-  for (const save of recent) {
-    for (const run of addedRuns(guardWords(save.previousText), guardWords(save.text))) {
-      const inNewest = countRun(newestText, run.words);
-      if (inNewest === 0) continue;
-      // Kept when the file has the run as often as the person's newest save does, or has it where the
-      // person put it (the word on each side; for a short run, where a count can be met by chance).
-      if (countRun(diskText, run.words) >= inNewest) continue;
-      if (containsRun(diskText, run.withNeighbours)) continue;
-      lost += run.words.length;
-    }
+  for (const run of runs) {
+    // Kept when the file has the run as often as the person's newest save does, or has it where the
+    // person put it (the word on each side; for a short run, where a count can be met by chance).
+    if (countRun(diskText, run.words) >= countRun(newestText, run.words)) continue;
+    if (containsRun(diskText, run.withNeighbours)) continue;
+    lost += run.words.length;
   }
   return lost;
 }
