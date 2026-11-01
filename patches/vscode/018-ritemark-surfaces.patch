@@ -820,7 +820,7 @@ index d81722d63af..8a11889fd80 100644
  		this._onDidRender.fire();
  
 diff --git a/src/vs/workbench/browser/layout.ts b/src/vs/workbench/browser/layout.ts
-index 93d1f653e88..1c003cc8692 100644
+index 79add6fa2a9..ed88fcd86de 100644
 --- a/src/vs/workbench/browser/layout.ts
 +++ b/src/vs/workbench/browser/layout.ts
 @@ -151,6 +151,12 @@ export const TITLE_BAR_SETTINGS = [
@@ -836,7 +836,7 @@ index 93d1f653e88..1c003cc8692 100644
  const DEFAULT_WORKSPACE_WINDOW_DIMENSIONS = new Dimension(DEFAULT_WORKSPACE_WINDOW_SIZE.width, DEFAULT_WORKSPACE_WINDOW_SIZE.height);
  
  export abstract class Layout extends Disposable implements IWorkbenchLayoutService {
-@@ -3038,9 +3044,9 @@ class LayoutStateModel extends Disposable {
+@@ -3039,9 +3045,9 @@ class LayoutStateModel extends Disposable {
  		const auxiliaryBarForceMaximized = this.configurationService.getValue(WorkbenchLayoutSettings.AUXILIARYBAR_FORCE_MAXIMIZED);
  		const workbenchState = this.contextService.getWorkbenchState();
  		const mainContainerDimension = configuration.mainContainerDimension;
@@ -848,7 +848,7 @@ index 93d1f653e88..1c003cc8692 100644
  		LayoutStateKeys.AUXILIARYBAR_HIDDEN.defaultValue = (() => {
  			if (isWeb && !this.environmentService.remoteAuthority) {
  				return true; // not required in web if unsupported
-@@ -3140,8 +3146,8 @@ class LayoutStateModel extends Disposable {
+@@ -3141,8 +3147,8 @@ class LayoutStateModel extends Disposable {
  
  		// Restrict auxiliary bar size in case of small window dimensions
  		if (this.isNew[StorageScope.WORKSPACE] && configuration.mainContainerDimension.width <= DEFAULT_WORKSPACE_WINDOW_DIMENSIONS.width) {
@@ -3069,7 +3069,7 @@ index ae595e8ab3e..d2a137e7255 100644
  				renderBody,
  				icon: customOptions?.icon,
 diff --git a/src/vs/workbench/browser/parts/editor/editorPart.ts b/src/vs/workbench/browser/parts/editor/editorPart.ts
-index afa6942390e..4096214aa80 100644
+index afa6942390e..9d283019916 100644
 --- a/src/vs/workbench/browser/parts/editor/editorPart.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorPart.ts
 @@ -36,6 +36,9 @@ import { IContextKeyService } from '../../../../platform/contextkey/common/conte
@@ -3113,9 +3113,9 @@ index afa6942390e..4096214aa80 100644
  	private doCreateGridControl(): void {
  
 +		// Ritemark 2.0 (Sprint 145, #569): a window a switch in place opened lands on Home from its first frame. The
-+		// switch's note is taken here by the first main window that makes its desks, restoring them or not, so it never
-+		// lands a later one
-+		const ritemarkLanding = this.windowId === mainWindow.vscodeWindowId && this.instantiationService.invokeFunction(ritemarkTakeSwitchLanding);
++		// switch's note is taken here by the first main editor part that makes its desks, restoring them or not, so it
++		// never lands a later one (a modal or floating editor part never takes it)
++		const ritemarkLanding = this.editorPartsView.mainPart === this && this.instantiationService.invokeFunction(ritemarkTakeSwitchLanding);
 +
  		// Grid Widget (with previous UI state)
  		let restoreError = false;
@@ -4393,10 +4393,10 @@ index 00000000000..c515a8eb74f
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts b/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts
 new file mode 100644
-index 00000000000..55a650c6653
+index 00000000000..d11f6cea69c
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts
-@@ -0,0 +1,206 @@
+@@ -0,0 +1,214 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4576,26 +4576,34 @@ index 00000000000..55a650c6653
 +		super();
 +
 +		// Sprint 145 (#569): the note for the next window, held until the reload really goes on. Another participant can
-+		// still veto after Ritemark's answer (unsaved files, a running terminal), and then nothing is written.
-+		let landing: IRitemarkSwitchLanding | undefined;
++		// still veto after Ritemark's answer (unsaved files, a running terminal), and then nothing is written. Each
++		// shutdown attempt has its own number, so a late answer to one that was already vetoed sets nothing.
++		let landing: Omit<IRitemarkSwitchLanding, 'at'> | undefined;
++		let attempt = 0;
 +
 +		this._register(lifecycleService.onBeforeShutdown(e => {
++			const thisAttempt = ++attempt;
 +			landing = undefined;
 +			const target = takeSwitchTarget();
 +			if (e.reason === ShutdownReason.LOAD) {
 +				e.veto(askRitemarkBeforeReload(commandService, dialogService, target).then(veto => {
-+					if (!veto) {
-+						landing = { from: projectFolder(contextService) ?? null, target: target?.toString() ?? null, at: Date.now() };
++					if (!veto && thisAttempt === attempt) {
++						landing = { from: projectFolder(contextService) ?? null, target: target?.toString() ?? null };
 +					}
 +					return veto;
 +				}), RitemarkSwitchGuard.ID);
 +			}
 +		}));
-+		this._register(lifecycleService.onShutdownVeto(() => landing = undefined));
-+		// The storage's last save of a shutdown that goes on: the one moment clients can still store (storageService.ts)
++		this._register(lifecycleService.onShutdownVeto(() => {
++			attempt++;
++			landing = undefined;
++		}));
++		// The storage's last save of a shutdown that goes on: the one moment clients can still store (storageService.ts).
++		// Its time is the switch's, not the answer's: other questions (unsaved files) may wait long after Ritemark answered.
 +		this._register(storageService.onWillSaveState(e => {
 +			if (e.reason === WillSaveStateReason.SHUTDOWN && landing) {
-+				storageService.store(LANDING_KEY, JSON.stringify(landing), StorageScope.APPLICATION, StorageTarget.MACHINE);
++				const note: IRitemarkSwitchLanding = { ...landing, at: Date.now() };
++				storageService.store(LANDING_KEY, JSON.stringify(note), StorageScope.APPLICATION, StorageTarget.MACHINE);
 +				landing = undefined;
 +			}
 +		}));
@@ -6127,10 +6135,10 @@ index 00000000000..7924086e116
 +});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts b/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts
 new file mode 100644
-index 00000000000..7668ba13877
+index 00000000000..9530e100551
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts
-@@ -0,0 +1,142 @@
+@@ -0,0 +1,162 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -6271,6 +6279,26 @@ index 00000000000..7668ba13877
 +			target: null,
 +			dated: true,
 +		});
++	});
++
++	test('#569: Ritemark\'s answer that comes after another participant vetoed the switch sets no note', async () => {
++		const beforeShutdown = store.add(new Emitter<BeforeShutdownEvent>());
++		const shutdownVeto = store.add(new Emitter<void>());
++		const dialogs = store.add(new Emitter<void>());
++		const storage = store.add(new TestStorageService());
++		const lifecycle = { onBeforeShutdown: beforeShutdown.event, onShutdownVeto: shutdownVeto.event } as unknown as ILifecycleService;
++		const workspace = { getWorkbenchState: () => WorkbenchState.FOLDER, getWorkspace: () => ({ folders: [{ uri: URI.file('/p/lead') }] }) } as unknown as IWorkspaceContextService;
++		let answer!: (veto: boolean) => void;
++		store.add(new RitemarkSwitchGuard(lifecycle, commands(() => new Promise<boolean>(resolve => answer = resolve)), { onWillShowDialog: dialogs.event } as unknown as IDialogService, storage, workspace));
++		const vetos: Promise<boolean>[] = [];
++
++		beforeShutdown.fire({ reason: ShutdownReason.LOAD, veto: value => vetos.push(Promise.resolve(value)) });
++		shutdownVeto.fire(); // another participant's veto ended the switch before Ritemark answered
++		answer(false);
++		await Promise.all(vetos);
++		storage.testEmitWillSaveState(WillSaveStateReason.SHUTDOWN); // a later quit
++
++		assert.strictEqual(storage.get('ritemark.switch.landOnHome', StorageScope.APPLICATION), undefined);
 +	});
 +});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts b/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts
