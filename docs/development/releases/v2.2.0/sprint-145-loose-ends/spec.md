@@ -53,6 +53,7 @@ Acceptance criteria:
 - **No answer in time (S64)** isn't the fallback: VS Code reloads, and Ritemark merges from its own sighting a moment later (the views get the merge, never the writer's copy alone). The question comes only without a base.
 - **Typing while a merge lands:** a keystroke from a view that hasn't shown the merge yet is merged on top of it (the view's last text as the base), never refused.
 - **The notification** behind a hidden tab is an information notification, not a warning: the person's text is kept.
+- **No warning icon on the fallback question either** (the Experience lead, ritemark-dev `8408035`): its header is the title alone, as the paragraph dialog's.
 
 #### R1 as approved on 31 October 2026 (superseded on 1 November)
 

@@ -1,5 +1,4 @@
 import type { DocumentConflictReason, DocumentParagraphConflict } from '../../../../src/editorSync/protocol'
-import { Icon } from '../ui/Icon'
 import {
   Dialog,
   DialogBody,
@@ -41,12 +40,7 @@ export function DocumentConflictDialog({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent className="max-w-[520px]">
-        <DialogHeader
-          icon={<Icon name="warning" size={20} className="text-[var(--r-warning)]" />}
-          onClose={onClose}
-        >
-          <DialogTitle>Document changed in two places</DialogTitle>
-        </DialogHeader>
+        <DocumentConflictHeader onClose={onClose} />
 
         <DialogBody>
           <DialogDescription asChild>
@@ -88,6 +82,18 @@ export function DocumentConflictDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * The fallback question's header (the Experience lead, ritemark-dev `8408035`): the title alone, with no warning
+ * icon, as the paragraph dialog's. A conflict is a question, not an alarm.
+ */
+export function DocumentConflictHeader({ onClose }: { onClose: () => void }) {
+  return (
+    <DialogHeader onClose={onClose}>
+      <DialogTitle>Document changed in two places</DialogTitle>
+    </DialogHeader>
   )
 }
 

@@ -15,7 +15,8 @@ const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
 const { paragraphReviewWords } = await import('./paragraphReviewWords')
 const { SyncActionButton } = await import('../header/DocumentHeader')
-const { ParagraphQuote } = await import('./DocumentConflictDialog')
+const { DocumentConflictHeader, ParagraphQuote } = await import('./DocumentConflictDialog')
+const { Dialog } = await import('../ui/dialog')
 
 // The words: the AI by name only when Ritemark knows it; otherwise another app. One paragraph, or several.
 const claude = paragraphReviewWords(1, 'Claude')
@@ -71,4 +72,13 @@ for (const token of ['font-editor', 'text-[14px]', 'leading-[22px]', 'text-[var(
 assert.ok(!/max-h-|overflow-auto/.test(paragraphClass), 'its full length, no scroll box')
 assert.ok(!/<input|<textarea|<blockquote|contenteditable/i.test(quoteMarkup), 'never editable, and no blockquote (VS Code\'s webview stylesheet fills those)')
 
-console.log('ok - paragraph review words, the conflict button and the quoted paragraphs')
+// The fallback question's header (ritemark-dev 8408035): its title alone, no warning icon, as the paragraph dialog.
+const headerMarkup = renderToStaticMarkup(React.createElement(Dialog, { open: true }, React.createElement(DocumentConflictHeader, { onClose: () => {} })))
+const titleRow = parse(headerMarkup).querySelector('div > div')
+assert.ok(titleRow, 'the title row')
+assert.equal(titleRow.textContent.trim(), 'Document changed in two places')
+assert.equal(titleRow.querySelectorAll('svg').length, 0, 'no icon beside the title')
+assert.ok(!headerMarkup.includes('--r-warning'), 'no warning colour')
+assert.ok(headerMarkup.includes('aria-label="Close dialog"'), 'the close button stays')
+
+console.log('ok - paragraph review words, the conflict button, the quoted paragraphs and the fallback header')

@@ -61,7 +61,7 @@ Was (31 October): Review changes appears for each.
 
 ### S8 (revised 1 November): No base: the fallback question, and its limit
 Given S1's steps, but the writer writes a copy whose blocks differ from every remembered save almost everywhere (a whole-file rewrite that also reformatted the text)
-Then within 30 s of the person's last save, the whole-document question asks, held as #605 does, with the Experience lead's three changes (the second paragraph's words, Use disk version `secondary` and alone at the footer's far left, Keep my version primary and the default, Tab in screen order)
+Then within 30 s of the person's last save, the whole-document question asks, held as #605 does, with the Experience lead's three changes (the second paragraph's words, Use disk version `secondary` and alone at the footer's far left, Keep my version primary and the default, Tab in screen order), and no warning icon beside its title (ritemark-dev `8408035`: a conflict is a question, not an alarm)
 And the same for a copy that is exactly an earlier version (a Discard of an AI's change, a checkout): it has no edit of its own to merge
 And after 30 s, a copy with no base still replaces the words, as in 2.1; the issue and the release notes' known limits say so in plain words.
 
