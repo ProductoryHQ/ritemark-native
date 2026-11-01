@@ -4,15 +4,15 @@ Nothing here starts before the plan is approved by Jarmo. Tick a box only when t
 
 ## Phase 0: Branch and starting tree
 
-- [ ] Jarmo's approval is on the sprint plan, with his answers to the decisions
-- [ ] `git checkout -b sprint-146-controls` from `origin/main`; `git branch --show-current` shows it before any edit. Later PRs: `sprint-146-controls-catalogue`, `-polish`, `-shell`, `-card-dialog`, each from `origin/main` the same way
-- [ ] `media/webview.js` size recorded in `notes/bundle.md` (E4)
-- [ ] `node ./scripts/worktree-hygiene.mjs --report` read, and the free disk recorded; nothing removed without Jarmo's word
+- [x] Jarmo's approval is on the sprint plan, with his answers to the decisions
+- [x] `git checkout -b sprint-146-controls` from `origin/main`; `git branch --show-current` shows it before any edit. Later PRs: `sprint-146-controls-catalogue`, `-polish`, `-shell`, `-card-dialog`, each from `origin/main` the same way
+- [x] `media/webview.js` size recorded in `notes/bundle.md` (E4)
+- [x] `node ./scripts/worktree-hygiene.mjs --report` read, and the free disk recorded; nothing removed without Jarmo's word (1 November: 10 GiB free; five worktrees reported removable, about 21 GiB, none removed)
 - [ ] Asked: the Experience lead for the drawings, words and choices (sprint plan, *For the Experience lead*); the "Ritemark on Windows" session for the overlay checks and Gate 2's rows
 
 ## Phase 1: Audits (each in `research/`, before its code)
 
-- [ ] A1 `research/menu-focus-audit.md` (R1, S1–S8): #585's commit cherry-picked; its audit table run live, mouse and keyboard, Light and Dark; the rows behind an AI run or marked not run
+- [x] A1 `research/menu-focus-audit.md` (R1, S1–S8): #585's commit cherry-picked; its audit table run live, mouse and keyboard, Light and Dark; the rows behind an AI run or marked not run
 - [ ] A2 `research/focus-rings.md` (R3): every ring sorted by kind; the Tailwind 3.3 variant check and the mechanism chosen
 - [ ] A3 `research/catalogue-capture.md` (R2, R4, S22–S26): focus emulation, hover and press into a webview, a cell at device pixels five times, the theme switch
 - [ ] A4 `research/tooltip-looks.md` (R5, S28–S31): both looks measured with crops; other users of `editorHoverWidget.*`; the native `title` list
@@ -25,9 +25,9 @@ Nothing here starts before the plan is approved by Jarmo. Tick a box only when t
 
 ## Phase 2: PR 1, no ring after a mouse pick (W1, R1)
 
-- [ ] `f370bb66` cherry-picked onto `sprint-146-controls`; bundles rebuilt; its two crops moved into this sprint's `qa/`
-- [ ] `npm test` (with `closeFocus.test.ts`) and the webview's `tsc --noEmit` pass; the test fails on `main`'s `components/ui` (E1)
-- [ ] A1's table filled; a fault in the shared rule fixed here
+- [x] `f370bb66` cherry-picked onto `sprint-146-controls`; bundles rebuilt; its two crops moved into this sprint's `qa/`
+- [x] `npm test` (with `closeFocus.test.ts`) and the webview's `tsc --noEmit` pass; the test fails on `main`'s `components/ui` (E1)
+- [x] A1's table filled; a fault in the shared rule fixed here (none found)
 - [ ] The Experience lead has seen the screenshots (S1–S4, Light and Dark)
 - [ ] PR 1 opened: Risk with its tier, #585's evidence quoted; #585 closed with a link; `/code-review` at medium; every finding answered; merged at the reviewed head
 
