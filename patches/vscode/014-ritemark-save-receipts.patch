@@ -12,7 +12,7 @@
 # Created: 2026-08-31
 # Updated: 2026-10-19 (Sprint 135: carried onto VS Code 1.142.0 unchanged)
 # Updated: 2026-10-26 (Sprint 137, #454: the save-error handler hands a refused save to Ritemark, with VS Code's notification when no answer comes within 3 s: textFileSaveErrorHandler.ts and its test)
-# Updated: 2026-11-01 (Sprint 145, #588: the reload participant: `ritemarkReloadParticipant` on the model manager, asked in `resolveFromFile` before a clean model takes a changed file's text; the save-error handler's contribution answers with `_ritemark.editorSync.answerReload` within 3 s, else VS Code reloads as before)
+# Updated: 2026-11-01 (Sprint 145, #588: the reload participant: `ritemarkReloadParticipant` on the model manager, asked in `resolveFromFile` before a clean model takes a changed file's text, the file's text made only when Ritemark's editor holds the model; an undo of Ritemark's answer never makes the model clean; the save-error handler's contribution answers with `_ritemark.editorSync.answerReload` within 3 s, else VS Code reloads as before)
 #
 diff --git a/src/vs/workbench/api/browser/mainThreadDocuments.ts b/src/vs/workbench/api/browser/mainThreadDocuments.ts
 index 9827a1a573f..5affedfb204 100644
@@ -114,7 +114,7 @@ index 517568ceb6d..c6b34ed5d93 100644
  
  	public $acceptDirtyStateChanged(uriComponents: UriComponents, isDirty: boolean): void {
 diff --git a/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts b/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts
-index ce11123d046..223386da89a 100644
+index ce11123d046..269097351bb 100644
 --- a/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts
 +++ b/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts
 @@ -9,9 +9,9 @@ import { basename, isEqual } from '../../../../../base/common/resources.js';
@@ -255,13 +255,13 @@ index ce11123d046..223386da89a 100644
 +	 * or the person's text while its fallback question asks), or `undefined` for the usual reload: also when
 +	 * Ritemark is not running or doesn't answer within `RITEMARK_ANSWER_TIMEOUT_MS`.
 +	 */
-+	private async askRitemarkBeforeReload(model: ITextFileEditorModel, diskText: string): Promise<string | undefined> {
++	private async askRitemarkBeforeReload(model: ITextFileEditorModel, diskText: () => string): Promise<string | undefined> {
 +		const editorIds = this.editorService.findEditors(model.resource).map(({ editor }) => editor.editorId);
 +		if (!shouldAskRitemarkBeforeReload(editorIds)) {
 +			return undefined;
 +		}
 +		try {
-+			const answer = await raceTimeout(this.commandService.executeCommand<unknown>(RITEMARK_ANSWER_RELOAD_COMMAND, model.resource, diskText), RITEMARK_ANSWER_TIMEOUT_MS);
++			const answer = await raceTimeout(this.commandService.executeCommand<unknown>(RITEMARK_ANSWER_RELOAD_COMMAND, model.resource, diskText()), RITEMARK_ANSWER_TIMEOUT_MS);
 +			return typeof answer === 'string' ? answer : undefined;
 +		} catch {
 +			return undefined; // the command is not registered: Ritemark is not running
@@ -314,7 +314,7 @@ index 00000000000..72c08773800
 +	});
 +});
 diff --git a/src/vs/workbench/services/textfile/common/textFileEditorModel.ts b/src/vs/workbench/services/textfile/common/textFileEditorModel.ts
-index d7058ab3947..3e243da9c75 100644
+index d7058ab3947..901e0f773d4 100644
 --- a/src/vs/workbench/services/textfile/common/textFileEditorModel.ts
 +++ b/src/vs/workbench/services/textfile/common/textFileEditorModel.ts
 @@ -16,16 +16,16 @@ import { IFileService, FileOperationError, FileOperationResult, FileChangesEvent
@@ -368,7 +368,7 @@ index d7058ab3947..3e243da9c75 100644
  /**
   * The text file editor model listens to changes to its underlying code editor model and saves these changes through the file service back to the disk.
   */
-@@ -468,6 +492,18 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+@@ -468,6 +492,21 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
  				return;
  			}
  
@@ -381,13 +381,16 @@ index d7058ab3947..3e243da9c75 100644
 +				return;
 +			}
 +			if (ritemarkText !== undefined) {
-+				return this.resolveFromContent({ ...content, value: createTextBufferFactory(ritemarkText) }, true /* dirty (Ritemark's merge) */, options);
++				this.resolveFromContent({ ...content, value: createTextBufferFactory(ritemarkText) }, true /* dirty (Ritemark's merge) */, options);
++				// The file holds the writer's copy, which no version of this model has: no undo makes the model clean.
++				this.bufferSavedVersionId = -1;
++				return;
 +			}
 +
  			return this.resolveFromContent(content, false /* not dirty (resolved from file) */, options);
  		} catch (error) {
  			const result = error.fileOperationResult;
-@@ -499,6 +535,25 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+@@ -499,6 +538,26 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
  		}
  	}
  
@@ -401,9 +404,10 @@ index d7058ab3947..3e243da9c75 100644
 +			return undefined;
 +		}
 +		try {
-+			const diskText = ritemarkTextOf(content.value);
-+			const answer = await participant.participate(this, diskText);
-+			return typeof answer === 'string' && answer !== diskText ? answer : undefined;
++			let diskText: string | undefined;
++			const readDiskText = () => diskText ??= ritemarkTextOf(content.value);
++			const answer = await participant.participate(this, readDiskText);
++			return typeof answer === 'string' && answer !== readDiskText() ? answer : undefined;
 +		} catch (error) {
 +			this.logService.warn(`[text file model] Ritemark did not answer before reload: ${error}`, this.resource.toString());
 +			return undefined;
@@ -413,7 +417,7 @@ index d7058ab3947..3e243da9c75 100644
  	private resolveFromContent(content: ITextFileStreamContent, dirty: boolean, options?: ITextFileResolveOptions): void {
  		this.trace('resolveFromContent() - enter');
  
-@@ -933,8 +988,19 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+@@ -933,8 +992,19 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
  			const lastResolvedFileStat = assertReturnsDefined(this.lastResolvedFileStat);
  			const resolvedTextFileEditorModel = this;
  			return this.saveSequentializer.run(versionId, (async () => {
@@ -434,7 +438,7 @@ index d7058ab3947..3e243da9c75 100644
  						mtime: lastResolvedFileStat.mtime,
  						encoding: this.getEncoding(),
  						etag: (options.ignoreModifiedSince || !this.filesConfigurationService.preventSaveConflicts(lastResolvedFileStat.resource, resolvedTextFileEditorModel.getLanguageId())) ? ETAG_DISABLED : lastResolvedFileStat.etag,
-@@ -942,7 +1008,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+@@ -942,7 +1012,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
  						writeElevated: options.writeElevated
  					});
  
@@ -443,7 +447,7 @@ index d7058ab3947..3e243da9c75 100644
  				} catch (error) {
  					this.handleSaveError(error, versionId, options);
  				}
-@@ -950,7 +1016,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+@@ -950,7 +1020,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
  		})(), () => saveCancellation.cancel());
  	}
  
@@ -452,7 +456,7 @@ index d7058ab3947..3e243da9c75 100644
  
  		// Updated resolved stat with updated stat
  		this.updateLastResolvedFileStat(stat);
-@@ -967,7 +1033,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+@@ -967,7 +1037,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
  		this.setOrphaned(false);
  
  		// Emit Save Event
@@ -485,26 +489,27 @@ index 6c1300e0006..110cc4f565e 100644
  		return [...this.mapResourceToModel.values()];
  	}
 diff --git a/src/vs/workbench/services/textfile/common/textfiles.ts b/src/vs/workbench/services/textfile/common/textfiles.ts
-index 84c90a5581b..a6dc22a9a4d 100644
+index 84c90a5581b..eb58545d634 100644
 --- a/src/vs/workbench/services/textfile/common/textfiles.ts
 +++ b/src/vs/workbench/services/textfile/common/textfiles.ts
-@@ -224,6 +224,15 @@ export interface ISaveErrorHandler {
+@@ -224,6 +224,16 @@ export interface ISaveErrorHandler {
  	onSaveError(error: Error, model: ITextFileEditorModel, options: ITextFileSaveAsOptions): void;
  }
  
 +/**
 + * Ritemark (patch 014, Sprint 145 #588): asked before a clean model takes the text of a file that changed on disk.
 + * The answer is the text the model takes instead, and the model is then dirty (Ritemark's merge of the person's
-+ * text and the file's, saved over the file as any edit is); `undefined` reloads as usual.
++ * text and the file's, saved over the file as any edit is); `undefined` reloads as usual. `diskText` makes the
++ * file's text only when called, so a model Ritemark doesn't hold pays nothing.
 + */
 +export interface IRitemarkReloadParticipant {
-+	participate(model: ITextFileEditorModel, diskText: string): Promise<string | undefined>;
++	participate(model: ITextFileEditorModel, diskText: () => string): Promise<string | undefined>;
 +}
 +
  /**
   * States the text file editor model can be in.
   */
-@@ -398,6 +407,11 @@ export interface ITextFileEditorModelManager {
+@@ -398,6 +408,11 @@ export interface ITextFileEditorModelManager {
  	 */
  	saveErrorHandler: ISaveErrorHandler;
  
@@ -516,7 +521,7 @@ index 84c90a5581b..a6dc22a9a4d 100644
  	/**
  	 * Returns the text file editor model for the provided resource
  	 * or undefined if none.
-@@ -536,6 +550,13 @@ export interface ITextFileEditorModelSaveEvent extends IWorkingCopySaveEvent {
+@@ -536,6 +551,13 @@ export interface ITextFileEditorModelSaveEvent extends IWorkingCopySaveEvent {
  	 * The resolved stat from the save operation.
  	 */
  	readonly stat: IFileStatWithMetadata;
@@ -531,7 +536,7 @@ index 84c90a5581b..a6dc22a9a4d 100644
  
  export interface ITextFileEditorModel extends ITextEditorModel, IEncodingSupport, ILanguageSupport, IWorkingCopy {
 diff --git a/src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts b/src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
-index 5bdb6860d65..a225b9a9c71 100644
+index 5bdb6860d65..15b416aab29 100644
 --- a/src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
 +++ b/src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
 @@ -91,7 +91,7 @@ suite('Files - TextFileEditorModel', () => {
@@ -551,7 +556,7 @@ index 5bdb6860d65..a225b9a9c71 100644
  		assert.ok(workingCopyEvent);
  
  		assert.strictEqual(accessor.workingCopyService.dirtyCount, 0);
-@@ -528,6 +529,87 @@ suite('Files - TextFileEditorModel', () => {
+@@ -528,6 +529,92 @@ suite('Files - TextFileEditorModel', () => {
  		assert.strictEqual(accessor.workingCopyService.isDirty(model.resource, model.typeId), true);
  	});
  
@@ -561,7 +566,7 @@ index 5bdb6860d65..a225b9a9c71 100644
 +		await model.resolve();
 +		const asked: string[] = [];
 +		accessor.textFileService.files.ritemarkReloadParticipant = {
-+			participate: async (_model, diskText) => { asked.push(diskText); return 'Merged text'; }
++			participate: async (_model, diskText) => { asked.push(diskText()); return 'Merged text'; }
 +		};
 +		try {
 +			accessor.fileService.setContent('Hello Change');
@@ -569,6 +574,11 @@ index 5bdb6860d65..a225b9a9c71 100644
 +
 +			assert.deepStrictEqual(asked, ['Hello Change']);
 +			assert.strictEqual(model.textEditorModel?.getValue(), 'Merged text');
++			assert.ok(model.isDirty());
++
++			// Undoing the merge doesn't make the model clean: the file holds the writer's copy, not the old text.
++			await model.textEditorModel?.undo();
++			assert.notStrictEqual(model.textEditorModel?.getValue(), 'Merged text');
 +			assert.ok(model.isDirty());
 +		} finally {
 +			accessor.textFileService.files.ritemarkReloadParticipant = undefined;

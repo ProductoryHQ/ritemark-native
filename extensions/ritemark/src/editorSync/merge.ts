@@ -43,8 +43,9 @@ export function splitBlocks(text: string, kind: BlockKind): Blocks {
   // whitespace-only lines) is the first block's separator, exactly as written, so the blocks rebuild the text.
   const ranges: Array<[number, number]> = [];
   let index = 0;
-  // Front matter: '---' on the first line, closed by the next '---' or '...'.
-  if (lines[0] === '---') {
+  // Front matter: '---' on the first line with YAML right under it, closed by the next '---' or '...'. A '---'
+  // followed by a blank line is a thematic break.
+  if (lines[0] === '---' && lines.length > 1 && lines[1].trim() !== '') {
     const close = lines.findIndex((line, at) => at > 0 && (line === '---' || line === '...'));
     if (close > 0) {
       ranges.push([0, close]);
@@ -190,6 +191,9 @@ export function findBase(candidates: readonly string[], theirs: string, kind: Bl
   let bestLikeness = MIN_BASE_LIKENESS;
   candidates.forEach((candidate, index) => {
     const blocks = splitBlocks(candidate, kind).blocks;
+    // An upper bound first: a candidate whose block count alone can't reach the best is not aligned at all.
+    const longer = Math.max(blocks.length, theirBlocks.length);
+    if (longer > 0 && Math.min(blocks.length, theirBlocks.length) / longer < bestLikeness) return;
     const value = likeness(blocks, theirBlocks);
     if (value <= 0 || value < bestLikeness) return;
     if (best >= 0 && value === bestLikeness && !readTheNewer(bestBlocks, blocks, theirBlocks)) return;
@@ -212,15 +216,25 @@ export function alignBlocks(before: readonly string[], after: readonly string[])
   return alignment(before, after);
 }
 
+/** Where a tracked run is now, and the stretch between the blocks kept on each side of it (`gap`). */
+export interface TrackedRange {
+  at: number;
+  length: number;
+  gapAt: number;
+  gapLength: number;
+}
+
 /**
  * Where a run of blocks went when the text changed (`match` from `alignBlocks(before, after)`): the same blocks if
- * they are all still there in a row; otherwise what now lies between the blocks kept on each side, less the
- * neighbours that were there before and changed too (for an empty run, a block the person removed, that is what
- * was typed into its place since); when the count can't tell, the run most like the old one.
+ * they are all still there in a row. Otherwise, between the blocks kept on each side (the gap): all of it when
+ * nothing else there changed and it didn't grow (the person rewrote or joined the run); the run's own share when
+ * the counts match one for one; otherwise the run of as many blocks there that is most like the old one, so
+ * neither a changed neighbour nor a block added beside it is ever taken in. An empty run (a block the person
+ * removed) stays empty, at its place: what was typed there since is in the gap.
  */
-export function trackRange(before: readonly string[], after: readonly string[], at: number, length: number, match: readonly number[] = alignment(before, after)): { at: number; length: number } {
+export function trackRange(before: readonly string[], after: readonly string[], at: number, length: number, match: readonly number[] = alignment(before, after)): TrackedRange {
   const own = match.slice(at, at + length);
-  if (length > 0 && own.every((index, offset) => index >= 0 && index === own[0] + offset)) return { at: own[0], length };
+  if (length > 0 && own.every((index, offset) => index >= 0 && index === own[0] + offset)) return { at: own[0], length, gapAt: own[0], gapLength: length };
   let previousOld = -1;
   for (let index = Math.min(at, before.length) - 1; index >= 0; index -= 1) {
     if (match[index] >= 0) { previousOld = index; break; }
@@ -232,14 +246,12 @@ export function trackRange(before: readonly string[], after: readonly string[], 
   const first = previousOld >= 0 ? match[previousOld] + 1 : 0;
   const last = nextOld < before.length ? match[nextOld] : after.length;
   const region = Math.max(0, last - first);
-  // The changed neighbours on each side, one for one where the counts allow.
   const left = at - (previousOld + 1);
   const right = nextOld - (at + length);
-  if (region >= left + right) {
-    const placeAt = first + left;
-    return { at: placeAt, length: region - left - right };
-  }
-  if (length === 0) return { at: Math.min(first + left, last), length: 0 };
+  const gap = { gapAt: first, gapLength: region };
+  if (length === 0) return { at: Math.min(first + left, last), length: 0, ...gap };
+  if (left === 0 && right === 0 && region <= length) return { at: first, length: region, ...gap };
+  if (region === left + length + right) return { at: first + left, length, ...gap };
   const wanted = new Map<string, number>();
   for (const word of wordsOf(before.slice(at, at + length))) wanted.set(word, (wanted.get(word) ?? 0) + 1);
   const size = Math.min(length, region);
@@ -254,7 +266,7 @@ export function trackRange(before: readonly string[], after: readonly string[], 
     }
     if (score > bestScore) { best = start; bestScore = score; }
   }
-  return { at: best, length: size };
+  return { at: best, length: size, ...gap };
 }
 
 /** The text with blocks [at, at + length) replaced by `replacement`'s blocks ('' removes them). */
@@ -366,6 +378,14 @@ export function mergeBlocks(base: string, mine: string, theirs: string, kind: Bl
         if (other === undefined) insertedAt.set(group.position, index);
         else if (groups[other].side !== group.side) parent[find(index)] = find(other);
       }
+    });
+    // An insertion between two base blocks one place removed or rewrote is part of that place, so the person's
+    // blocks there come out in the person's order.
+    groups.forEach((group, index) => {
+      if (group.removed.length !== 0) return;
+      const before = owner.get(Math.floor(group.position));
+      const after = owner.get(Math.ceil(group.position));
+      if (before !== undefined && after !== undefined && find(before) === find(after)) parent[find(index)] = find(before);
     });
     const components = new Map<number, Group[]>();
     groups.forEach((group, index) => {

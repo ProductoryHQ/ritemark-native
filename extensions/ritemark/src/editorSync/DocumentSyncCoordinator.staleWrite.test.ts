@@ -86,8 +86,12 @@ class FakeDocument {
     const normalized = logical(next);
     this.text = this.eol === EndOfLine.CRLF ? normalized.replace(/\n/g, '\r\n') : normalized;
     this.version += 1;
-    this.isDirty = true;
+    // As VS Code does: the extension host hears of the edit before the document is marked dirty, and then gets a
+    // change event with no content change for the dirty state (review round 3, #605).
+    const wasDirty = this.isDirty;
     for (const listener of listeners.change) listener({ document: this, contentChanges: [{}] });
+    this.isDirty = true;
+    if (!wasDirty) for (const listener of listeners.change) listener({ document: this, contentChanges: [] });
   }
 
   private bytes(): string { return `${this.hasBom ? '﻿' : ''}${this.text}`; }
@@ -805,6 +809,46 @@ async function main(): Promise<void> {
     const { env } = await s1('r2-crlf.md', crlf, read => editTitle(read).replace(/\r\n/g, '\n'), 'reload-first');
     assert.ok(has(merged(env), 'edited by the writer', A, B));
     assert.ok(merged(env).includes('\r\n') && !/[^\r]\n/.test(merged(env)), 'CRLF throughout');
+    env.dispose();
+  });
+
+  // ── Review round 3 (#605) ───────────────────────────────────────────────
+
+  await scenario('Round 3, finding 1: a writer\'s next copy, made from its own last one, keeps the paragraph the person added between', async () => {
+    const env = await open('r3-own-copy.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    await env.autoSave();
+    // The AI writes T1 (taken in), the person adds a paragraph and it saves, the AI writes again from its T1.
+    const t1 = env.disk().replace('The second line.', 'The second line, by the AI.');
+    fs.writeFileSync(env.document.file, t1);
+    await env.fileChanged('reload-first');
+    assert.ok(merged(env).includes('by the AI'));
+    await env.type(`${env.document.getText()}\nA paragraph the person added.\n`);
+    await env.autoSave();
+    fs.writeFileSync(env.document.file, t1.replace('# Stale write', '# Stale write, the AI again'));
+    await env.fileChanged('reload-first');
+    assert.equal(env.conflicts().length, 0);
+    assert.ok(has(merged(env), 'the AI again', 'by the AI', A, 'A paragraph the person added.'), 'the person\'s paragraph stays');
+    env.dispose();
+  });
+
+  await scenario('Round 3, finding 7: a newer copy behind a pending merge doesn\'t list the same place twice', async () => {
+    const env = await open('r3-pending.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    await env.autoSave();
+    const read = env.disk();
+    await env.type(addToEnd(env.document.getText(), B));
+    await env.autoSave();
+    const t1 = read.replace('The third line. Alpha words typed first.', 'The third line, tightened by the writer.');
+    fs.writeFileSync(env.document.file, t1);
+    await env.document.reload();
+    // The writer saves again (from its T1) before the sync looks.
+    fs.writeFileSync(env.document.file, t1.replace('# Stale write', '# Stale write, again'));
+    await env.settle();
+    watchers[0]?.change?.();
+    await env.settle();
+    assert.equal(paragraphs(env).length, 1, 'one place, listed once');
+    assert.ok(has(merged(env), 'again', B));
     env.dispose();
   });
 

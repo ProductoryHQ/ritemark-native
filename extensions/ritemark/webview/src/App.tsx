@@ -556,6 +556,22 @@ function App() {
     if (left <= 0) setShowParagraphDialog(false)
   }, [documentSync, documentViewSync.paragraphs])
 
+  // One paragraph review for both layouts: "1 of 2" counts from the places listed when it opened.
+  const paragraphItems = documentViewSync.paragraphs?.items ?? []
+  const paragraphCount = Math.max(paragraphTotal, paragraphItems.length)
+  const paragraphDialog = (
+    <ParagraphConflictDialog
+      isOpen={showParagraphDialog && paragraphItems.length > 0}
+      items={paragraphItems}
+      total={paragraphCount}
+      position={paragraphCount - paragraphItems.length + 1}
+      writer={documentViewSync.paragraphs?.writer}
+      onClose={() => setShowParagraphDialog(false)}
+      onKeepMine={(id) => sendParagraphAction(id, 'keep-mine')}
+      onUseTheirs={(id) => sendParagraphAction(id, 'use-theirs')}
+    />
+  )
+
   const sendConflictAction = useCallback((action: 'compare' | 'keep-local' | 'use-disk') => {
     if (!documentSync || !documentViewSync.conflict) return
     sendDocumentMessage({
@@ -814,16 +830,7 @@ function App() {
           onKeepLocal={() => sendConflictAction('keep-local')}
           onUseDisk={() => sendConflictAction('use-disk')}
         />
-        <ParagraphConflictDialog
-          isOpen={showParagraphDialog && !!documentViewSync.paragraphs?.items.length}
-          items={documentViewSync.paragraphs?.items ?? []}
-          total={Math.max(paragraphTotal, documentViewSync.paragraphs?.items.length ?? 0)}
-          position={Math.max(paragraphTotal, documentViewSync.paragraphs?.items.length ?? 0) - (documentViewSync.paragraphs?.items.length ?? 0) + 1}
-          writer={documentViewSync.paragraphs?.writer}
-          onClose={() => setShowParagraphDialog(false)}
-          onKeepMine={(id) => sendParagraphAction(id, 'keep-mine')}
-          onUseTheirs={(id) => sendParagraphAction(id, 'use-theirs')}
-        />
+        {paragraphDialog}
       </>
     )
   }
@@ -970,16 +977,7 @@ function App() {
         onUseDisk={() => sendConflictAction('use-disk')}
       />
 
-      <ParagraphConflictDialog
-        isOpen={showParagraphDialog && !!documentViewSync.paragraphs?.items.length}
-        items={documentViewSync.paragraphs?.items ?? []}
-        total={Math.max(paragraphTotal, documentViewSync.paragraphs?.items.length ?? 0)}
-        position={Math.max(paragraphTotal, documentViewSync.paragraphs?.items.length ?? 0) - (documentViewSync.paragraphs?.items.length ?? 0) + 1}
-        writer={documentViewSync.paragraphs?.writer}
-        onClose={() => setShowParagraphDialog(false)}
-        onKeepMine={(id) => sendParagraphAction(id, 'keep-mine')}
-        onUseTheirs={(id) => sendParagraphAction(id, 'use-theirs')}
-      />
+      {paragraphDialog}
 
     </div>
   )

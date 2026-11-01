@@ -144,13 +144,17 @@ test('the same blocks with other blank lines or no final newline are the same te
 
 test('a place both changed is followed through later edits, and replaced by block', () => {
   const before = ['# T', 'Mine.', 'Other.'];
-  assert.deepEqual(trackRange(before, ['# T', 'Mine.', 'Other!'], 1, 1), { at: 1, length: 1 }, 'an edit elsewhere');
-  assert.deepEqual(trackRange(before, ['New.', '# T', 'Mine.', 'Other.'], 1, 1), { at: 2, length: 1 }, 'a block added above');
-  assert.deepEqual(trackRange(before, ['# T', 'Mine, typed on.', 'Other.'], 1, 1), { at: 1, length: 1 }, 'the person kept typing in it');
-  assert.deepEqual(trackRange(before, ['# T', 'Other.'], 1, 1), { at: 1, length: 0 }, 'the person removed it');
-  assert.deepEqual(trackRange(['# T', 'Other.'], ['# T', 'Other.'], 1, 0), { at: 1, length: 0 }, 'a removed place stays where it was');
-  assert.deepEqual(trackRange(['# T', 'Second.'], ['# T', 'Second, typed on.'], 2, 0), { at: 2, length: 0 }, 'a removed place after a block the person changed stays after it');
-  assert.deepEqual(trackRange(['# T', 'Mine.', 'Next.'], ['# T', 'Mine, typed on.', 'Next, changed.'], 1, 1), { at: 1, length: 1 }, 'a neighbour changed too: the place keeps its own block');
+  const place = (range: { at: number; length: number }) => ({ at: range.at, length: range.length });
+  assert.deepEqual(place(trackRange(before, ['# T', 'Mine.', 'Other!'], 1, 1)), { at: 1, length: 1 }, 'an edit elsewhere');
+  assert.deepEqual(place(trackRange(before, ['New.', '# T', 'Mine.', 'Other.'], 1, 1)), { at: 2, length: 1 }, 'a block added above');
+  assert.deepEqual(place(trackRange(before, ['# T', 'Mine, typed on.', 'Other.'], 1, 1)), { at: 1, length: 1 }, 'the person kept typing in it');
+  assert.deepEqual(place(trackRange(before, ['# T', 'Other.'], 1, 1)), { at: 1, length: 0 }, 'the person removed it');
+  assert.deepEqual(place(trackRange(['# T', 'Other.'], ['# T', 'Other.'], 1, 0)), { at: 1, length: 0 }, 'a removed place stays where it was');
+  assert.deepEqual(place(trackRange(['# T', 'Second.'], ['# T', 'Second, typed on.'], 2, 0)), { at: 2, length: 0 }, 'a removed place after a block the person changed stays after it');
+  assert.deepEqual(place(trackRange(['# T', 'Mine.', 'Next.'], ['# T', 'Mine, typed on.', 'Next, changed.'], 1, 1)), { at: 1, length: 1 }, 'a neighbour changed too: the place keeps its own block');
+  // Review round 3 (#605): a neighbour changed and a block added in one change; a block added after the last one.
+  assert.deepEqual(place(trackRange(['A', 'B1', 'C'], ['A', 'B1 more words', 'C edited', 'D new at the end'], 1, 1)), { at: 1, length: 1 });
+  assert.deepEqual(place(trackRange(['A', 'P'], ['A', 'P, typed on', 'Q, a new paragraph'], 1, 1)), { at: 1, length: 1 });
 
   const text = '# T\n\n```\na\n\n\nb\n```\n\nMine.\n\nLast.\n';
   assert.equal(replaceBlocks(text, 'markdown', 2, 1, 'Theirs.'), '# T\n\n```\na\n\n\nb\n```\n\nTheirs.\n\nLast.\n');
@@ -169,8 +173,20 @@ test('CSV: the final newline ends the last row, and a merge keeps the person\'s'
   assert.equal(mergeBlocks('h\n1\n', 'h\n1\n2\n', 'h\n1x', 'csv').text, 'h\n1x\n2\n');
 });
 
-test('a removed place takes the blocks typed into it since, so typing the writer\'s version settles it', () => {
-  assert.deepEqual(trackRange(['# T', 'A', 'C'], ['# T', 'A', 'B2', 'C'], 2, 0), { at: 2, length: 1 });
-  assert.deepEqual(trackRange(['# T', 'A', 'C'], ['# T', 'A', 'C'], 2, 0), { at: 2, length: 0 });
-  assert.deepEqual(trackRange(['# T', 'Second.'], ['# T', 'Second, typed on.'], 2, 0), { at: 2, length: 0 }, 'a changed neighbour is not typed into the place');
+test('a removed place stays empty, and what was typed into it since is its gap', () => {
+  assert.deepEqual(trackRange(['# T', 'A', 'C'], ['# T', 'A', 'B2', 'C'], 2, 0), { at: 2, length: 0, gapAt: 2, gapLength: 1 }, 'what was typed there is in the gap; the place stays empty');
+  assert.deepEqual(trackRange(['# T', 'A', 'C'], ['# T', 'A', 'C'], 2, 0), { at: 2, length: 0, gapAt: 2, gapLength: 0 });
+});
+
+// Review round 3 (#605).
+test('a rule followed by a blank line is a thematic break, not front matter', () => {
+  assert.deepEqual(splitBlocks('---\n\n# T\n\nA\n\n---\n\nB', 'markdown').blocks, ['---', '# T', 'A', '---', 'B']);
+  assert.equal(splitBlocks('---\ntitle: X\n---\n\nA\n', 'markdown').blocks[0], '---\ntitle: X\n---');
+});
+
+test('an insertion inside a place both changed stays in the person\'s order', () => {
+  const result = mergeBlocks('S\n\na\n\nb\n\nc\n\nE\n', 'S\n\na2\n\nb\n\nN\n\nc\n\nE\n', 'S\n\nZ\n\nE\n', 'markdown');
+  assert.equal(result.text, 'S\n\na2\n\nb\n\nN\n\nc\n\nE\n');
+  assert.equal(result.conflicts.length, 1);
+  assert.deepEqual({ at: result.conflicts[0].at, length: result.conflicts[0].length }, { at: 1, length: 4 });
 });
