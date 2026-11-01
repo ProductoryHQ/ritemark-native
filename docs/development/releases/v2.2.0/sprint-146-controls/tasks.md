@@ -41,8 +41,8 @@ Nothing here starts before the plan is approved by Jarmo. Tick a box only when t
 - [x] `focusOpensTooltip` reads the mode; its test
 - [x] The close rule by decision 1; `ExportMenu.tsx`'s own copy gone (S6, S19)
 - [ ] S13–S20 on a dev instance
-- [ ] The Experience lead approves every image, Light and Dark; `docs/development/control-baseline/` and its README
-- [ ] The revert run exits non-zero; the branch run exits 0 (S22); the background run equals the front run (S25)
+- [ ] The Experience lead approves every image, Light and Dark; `docs/development/control-baseline/` and its README (the set and the README are in; the approval waits)
+- [ ] The revert run exits non-zero; the branch run exits 0 (S22); the background run equals the front run (S25). S22 done (`research/control-states-runs.md`, runs 8 and 9); S25 not run: a front run takes the screen
 - [x] Wiring: the PR template's Risk line; `REVIEW.md` and `reviewer-brief.md` leave out `control-baseline/`; the `release` skill and `release-manager.md` run it at Gate 1; `incidents.md` row 10 (S27); the Codex harness through the harness-equalizer (its next run)
 - [ ] Windows through the overlay (S21)
 - [ ] PR 2 opened and reviewed at Standard; screenshots and `sheet.html` to the Experience lead
