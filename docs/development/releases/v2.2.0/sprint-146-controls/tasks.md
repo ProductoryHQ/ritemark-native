@@ -64,7 +64,7 @@ Nothing here starts before the plan is approved by Jarmo. Tick a box only when t
 - [x] Patch 019: the tab menu's filter and `ritemarkTabMenu.test.ts` (S44–S48)
 - [x] `./scripts/test.sh --grep Ritemark`; `frame-screenshots.mjs --compare` with JOINS ok and `frame-geometry.mjs` (62 passing; 0 of 34 scenes differ from `main`'s capture, JOINS ok 34 of 34, geometry 34 PASS)
 - [x] `CLAUDE.md`'s patch table (016, 018, 019) and `layout-invariants.md` (a document tab's menu, the left column's rows) (the table lives in `docs/development/vscode-patches.md` now; `PATCH-RULES.md`'s rows too)
-- [ ] PR 4 opened: High, `/code-review` at high and `/security-review`; every finding answered; merged at the reviewed head with the drift check
+- [ ] PR 4 opened: High, `/code-review` at high and `/security-review`; every finding answered; merged at the reviewed head with the drift check (opened as a draft: [#630](https://github.com/ProductoryHQ/ritemark-native/pull/630))
 - [ ] Windows proof on 2.2's candidate at Gate 2 (S43, S47)
 
 ## Phase 6: PR 5, the card dialog (W10, R10)
