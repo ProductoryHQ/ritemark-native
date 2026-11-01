@@ -25,6 +25,14 @@ Sprint 135: rebased onto VS Code 1.142.0. The places row and the 40-high header,
   by the Cmd+B binding this patch removes.
 Sprint 142 (2.1 polish, #557, Q4): View ▸ Advanced's Source Control entry reads File changes, its name everywhere (018
   names the view container).
+Sprint 145 (#569): the AI column comes back with the layout in a project window (layout.ts). Ritemark AI is the column's
+  default (paneCompositePart.ts), so VS Code never stores its id, and the layout read it before the extension's container
+  was registered: the column started hidden and the extension opened it about half a second after Home, which then laid
+  out twice. Now a project window restores Ritemark AI there, and VS Code's "the column was empty before" rule (which only
+  recorded that race) no longer hides a new project's column. When nothing could be opened there once the extensions
+  are read (Ritemark AI never registered), a project window's column closes again; and the empty-desk rule that gives the AI column the
+  keyboard applies only to a window with no folder (the extension puts a new project's keyboard on Home). A window with
+  no folder keeps upstream's rules.
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 index 833787070f3..164ba274dfd 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
@@ -238,6 +246,62 @@ index f7b82f298f7..e8bbceb8706 100644
  		}
  	}
  ]);
+diff --git a/src/vs/workbench/browser/layout.ts b/src/vs/workbench/browser/layout.ts
+index 75f9238fd75..79add6fa2a9 100644
+--- a/src/vs/workbench/browser/layout.ts
++++ b/src/vs/workbench/browser/layout.ts
+@@ -839,7 +839,13 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
+ 
+ 		// Auxiliary View to restore
+ 		if (this.isVisible(Parts.AUXILIARYBAR_PART)) {
+-			const viewContainerToRestore = this.storageService.get(AuxiliaryBarPart.activeViewSettingsKey, StorageScope.WORKSPACE, this.viewDescriptorService.getDefaultViewContainer(ViewContainerLocation.AuxiliaryBar)?.id);
++			// Ritemark 2.0 (Sprint 145, #569): in a project window the AI column comes back with the layout, as Ritemark AI.
++			// It is the column's default (paneCompositePart.ts), so its id is never stored, and here, before the
++			// extensions are read, it is not registered yet: without it the column started hidden and the extension
++			// opened it half a second later, so Home was laid out twice after a switch. The welcome's window, with
++			// no folder, keeps upstream's rule.
++			const ritemarkAiColumn = this.contextService.getWorkbenchState() === WorkbenchState.EMPTY ? undefined : 'workbench.view.extension.ritemark-ai';
++			const viewContainerToRestore = this.storageService.get(AuxiliaryBarPart.activeViewSettingsKey, StorageScope.WORKSPACE, this.viewDescriptorService.getDefaultViewContainer(ViewContainerLocation.AuxiliaryBar)?.id ?? ritemarkAiColumn);
+ 			if (viewContainerToRestore) {
+ 				this.state.initialization.views.containerToRestore.auxiliaryBar = viewContainerToRestore;
+ 			} else {
+@@ -1192,6 +1198,13 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
+ 
+ 			await this.openViewContainer(ViewContainerLocation.AuxiliaryBar, this.state.initialization.views.containerToRestore.auxiliaryBar);
+ 
++			// Ritemark 2.0 (Sprint 145, #569): in a project window, nothing to show once the extensions are read (Ritemark
++			// AI never registered): the column closes, as it stayed closed before it came back with the layout. The
++			// extension opens it again at its next start, and the start after that restores it with the layout again
++			if (this.contextService.getWorkbenchState() !== WorkbenchState.EMPTY && !this.paneCompositeService.getActivePaneComposite(ViewContainerLocation.AuxiliaryBar)) {
++				this.setPartHidden(true, Parts.AUXILIARYBAR_PART);
++			}
++
+ 			mark('code/didRestoreAuxiliaryBar');
+ 		})());
+ 
+@@ -1225,6 +1238,9 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
+ 			Promises.settled(layoutRestoredPromises).finally(() => {
+ 				if (
+ 					this.editorService.editors.length === 0 && 			// no editors opened or restored
++					// Ritemark 2.0 (Sprint 145, #569): not in a project window, where the AI column now comes back with the
++					// layout: the extension gives a new project's window the keyboard on Home
++					this.contextService.getWorkbenchState() === WorkbenchState.EMPTY &&
+ 					this.isVisible(Parts.AUXILIARYBAR_PART) && 			// auxiliary bar is visible
+ 					!this.hasFocus(Parts.AUXILIARYBAR_PART) && 			// auxiliary bar does not have focus yet
+ 					!this.environmentService.enableSmokeTestDriver 		// not in smoke test mode (where focus is sensitive)
+@@ -3037,8 +3053,11 @@ class LayoutStateModel extends Disposable {
+ 
+ 			// Unless auxiliary bar visibility is explicitly configured, make
+ 			// sure to not force open it in case we know it was empty before.
++			// Ritemark 2.0 (Sprint 145, #569): not in a project window. Ritemark AI is always there; "empty" only records
++			// a part that opened at start before the extension's container was registered, and it hid a new project's
++			// AI column until the extension opened it.
+ 			const configuration = this.configurationService.inspect(WorkbenchLayoutSettings.AUXILIARYBAR_DEFAULT_VISIBILITY);
+-			if (configuration.defaultValue !== 'hidden' && !isConfigured(configuration) && this.stateCache.get(LayoutStateKeys.AUXILIARYBAR_EMPTY.name)) {
++			if (workbenchState === WorkbenchState.EMPTY && configuration.defaultValue !== 'hidden' && !isConfigured(configuration) && this.stateCache.get(LayoutStateKeys.AUXILIARYBAR_EMPTY.name)) {
+ 				return true;
+ 			}
+ 
 diff --git a/src/vs/workbench/browser/media/part.css b/src/vs/workbench/browser/media/part.css
 index a9cd407de3c..bcdbe6bdc34 100644
 --- a/src/vs/workbench/browser/media/part.css

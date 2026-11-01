@@ -47,6 +47,13 @@ Each tab's measured width (its name and half a pixel) is rounded to whole device
 the open tab takes its measured width too, so every tab, and the chosen tab's outline and fillets, lands on whole device
 pixels; at 125% and 150% Chromium's own rounding stands (multiEditorTabsControl.ts, ritemarkFoldTabs).
 
+Sprint 145 (#501): terminals that come back at start onto an empty desk wait in the panel for the desk's first editor
+that is not a terminal, and then open behind it (ritemarkTerminalTabs.ts). VS Code makes the first editor in an empty
+group the active one, inactive or not (editorGroupView.ts: active is count === 0 || !inactive), so on Windows' slow first
+start after an update a restored terminal was in front for 10 s until the extension opened the welcome. With no such
+editor within a minute (VS Code's own limit for the extension host to start) they open anyway, so a terminal is never
+lost; one closed meanwhile is not opened. The sweep still opens a terminal made later in front, as asked.
+
 Files: workbench/browser/parts/editor/{editor,editorCommands,editorGroupView,editorGroupWatermark,editorTabsControl,
 multiEditorTabsControl,ritemarkEmptyDesk,ritemarkFoldedTabs,ritemarkNewTab,singleEditorTabsControl}.ts; workbench/contrib/terminal/browser/{ritemarkTerminalBar,ritemarkTerminalTabs,
 terminalEditor,terminalEditorInput,terminalInstance,terminalMenus}.ts; workbench/contrib/customEditor/browser/
@@ -1284,10 +1291,10 @@ index 00000000000..1699503e2b0
 +}
 diff --git a/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalTabs.ts b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalTabs.ts
 new file mode 100644
-index 00000000000..9816138c2ac
+index 00000000000..58f426a7c1b
 --- /dev/null
 +++ b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalTabs.ts
-@@ -0,0 +1,132 @@
+@@ -0,0 +1,178 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1299,6 +1306,10 @@ index 00000000000..9816138c2ac
 + * - A terminal that appears in the panel (an extension asked for it, or an older profile's saved terminals
 + *   came back there) moves onto the desk as a tab, behind the open document. It never stays in the panel,
 + *   and never reaches the AI column.
++ * - Sprint 145 (#501): terminals that come back at start onto an empty desk wait for its first document. VS Code
++ *   makes the first editor in an empty group the active one, `inactive` or not, so on a slow first start (Windows
++ *   after an update) a restored terminal was in front for 10 s until the extension opened the welcome. They open
++ *   behind the first editor that is not a terminal, or after a minute with none, so a terminal is never lost.
 + * - A new terminal with no name of its own is named "Terminal", then "Terminal 2" and so on. Ritemark's own
 + *   terminals (Install Codex, Codex Repair, ...) keep their names.
 + * - Whether a terminal runs a command now, from its shell integration (`CommandDetection`): the terminal's
@@ -1307,14 +1318,22 @@ index 00000000000..9816138c2ac
 + */
 +
 +import { Emitter, Event } from '../../../../base/common/event.js';
-+import { Disposable } from '../../../../base/common/lifecycle.js';
-+import { RunOnceScheduler } from '../../../../base/common/async.js';
++import { Disposable, DisposableStore, MutableDisposable } from '../../../../base/common/lifecycle.js';
++import { disposableTimeout, RunOnceScheduler } from '../../../../base/common/async.js';
++import { Schemas } from '../../../../base/common/network.js';
 +import { TerminalCapability } from '../../../../platform/terminal/common/capabilities/capabilities.js';
 +import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 +import { IEditorService } from '../../../services/editor/common/editorService.js';
 +import { ITerminalGroupService, ITerminalInstance, ITerminalService } from './terminal.js';
 +
 +const RITEMARK_TERMINAL_NAME = 'Terminal';
++
++/**
++ * Sprint 145 (#501): how long terminals restored onto an empty desk wait for a document before they open anyway. A
++ * minute is also how long VS Code waits for the extension host to start before it gives up, after which no document
++ * from the extension comes.
++ */
++export const RITEMARK_RESTORED_TERMINALS_WAIT_MS = 60_000;
 +
 +const running = new Set<number>();
 +const onDidChangeRunning = new Emitter<ITerminalInstance>();
@@ -1370,6 +1389,9 @@ index 00000000000..9816138c2ac
 +
 +	private restored = false;
 +	private readonly sweep = this._register(new RunOnceScheduler(() => this.moveToDesk(false), 0));
++	/** Terminals restored onto an empty desk, waiting in the panel for its first document (#501). */
++	private readonly waiting = new Set<ITerminalInstance>();
++	private readonly waitForDocument = this._register(new MutableDisposable<DisposableStore>());
 +
 +	constructor(
 +		@ITerminalService terminalService: ITerminalService,
@@ -1407,15 +1429,46 @@ index 00000000000..9816138c2ac
 +
 +	/**
 +	 * Open every terminal in the panel as a tab on the desk, keeping the keyboard where it is. Terminals that
-+	 * come back at start stay behind the open document; one made later comes to the front, as asked.
++	 * come back at start stay behind the open document; one made later comes to the front, as asked. With no
++	 * document on the desk yet, the ones that came back wait for it (#501).
 +	 */
 +	private moveToDesk(behind: boolean): void {
-+		for (const instance of this.terminalGroupService.instances) {
-+			if (instance.shellLaunchConfig.hideFromUser) {
-+				continue;
++		const instances = this.terminalGroupService.instances.filter(instance => !instance.shellLaunchConfig.hideFromUser && !this.waiting.has(instance));
++		if (behind && instances.length && !this.editorService.activeEditor) {
++			for (const instance of instances) {
++				this.waiting.add(instance);
 +			}
-+			this.editorService.openEditor({ resource: instance.resource, options: { pinned: true, inactive: behind, preserveFocus: true } });
++			this.openWhenDocumentShows();
++			return;
 +		}
++		for (const instance of instances) {
++			this.openOnDesk(instance, behind);
++		}
++	}
++
++	private openOnDesk(instance: ITerminalInstance, behind: boolean): void {
++		this.editorService.openEditor({ resource: instance.resource, options: { pinned: true, inactive: behind, preserveFocus: true } });
++	}
++
++	/** The waiting terminals open behind the desk's first editor that is not a terminal, or after the wait with none. */
++	private openWhenDocumentShows(): void {
++		const store = new DisposableStore();
++		const release = () => {
++			this.waitForDocument.clear();
++			const waiting = [...this.waiting].filter(instance => this.terminalGroupService.instances.includes(instance));
++			this.waiting.clear();
++			for (const instance of waiting) {
++				this.openOnDesk(instance, true);
++			}
++		};
++		store.add(this.editorService.onDidActiveEditorChange(() => {
++			const active = this.editorService.activeEditor;
++			if (active && active.resource?.scheme !== Schemas.vscodeTerminal) {
++				release();
++			}
++		}));
++		store.add(disposableTimeout(release, RITEMARK_RESTORED_TERMINALS_WAIT_MS));
++		this.waitForDocument.value = store;
 +	}
 +}
 +
@@ -1607,10 +1660,10 @@ index 576424a1298..be57eb737ff 100644
  			command: {
 diff --git a/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts b/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts
 new file mode 100644
-index 00000000000..5627ecf829b
+index 00000000000..a1729227f9d
 --- /dev/null
 +++ b/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,171 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1623,17 +1676,20 @@ index 00000000000..5627ecf829b
 +import { URI } from '../../../../../base/common/uri.js';
 +import { upcastPartial } from '../../../../../base/test/common/mock.js';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
++import { runWithFakedTimers } from '../../../../../base/test/common/virtualScheduling/runWithFakedTimers.js';
 +import { IShellLaunchConfig } from '../../../../../platform/terminal/common/terminal.js';
++import { EditorInput } from '../../../../common/editor/editorInput.js';
 +import { IEditorService } from '../../../../services/editor/common/editorService.js';
 +import { ITerminalGroupService, ITerminalInstance, ITerminalService } from '../../browser/terminal.js';
-+import { ritemarkNextTerminalName, RitemarkTerminalTabs } from '../../browser/ritemarkTerminalTabs.js';
++import { RITEMARK_RESTORED_TERMINALS_WAIT_MS, ritemarkNextTerminalName, RitemarkTerminalTabs } from '../../browser/ritemarkTerminalTabs.js';
 +
 +interface IOpened { resource: string; inactive: boolean; preserveFocus: boolean }
 +
 +/**
 + * Ritemark 2.0 (Sprint 132, R8): a terminal is a tab. Terminals that land in the panel move onto the desk, behind
 + * the open document at start and in front later; hidden ones stay where they are. Plain new terminals are named
-+ * "Terminal", "Terminal 2", ...; a terminal with a name of its own keeps it.
++ * "Terminal", "Terminal 2", ...; a terminal with a name of its own keeps it. Sprint 145 (#501): terminals that come
++ * back onto an empty desk wait for its first document, or a minute, and then open behind it.
 + */
 +suite('Ritemark terminal tabs', () => {
 +
@@ -1651,8 +1707,15 @@ index 00000000000..5627ecf829b
 +		return instance;
 +	}
 +
-+	function setUp(panel: ITerminalInstance[]) {
++	/** An editor in front on the desk: a document, or a terminal tab. */
++	function editor(resource: URI): EditorInput {
++		return upcastPartial<EditorInput>({ resource });
++	}
++
++	function setUp(panel: ITerminalInstance[], { deskEmpty = false } = {}) {
 +		const onDidCreateInstance = disposables.add(new Emitter<ITerminalInstance>());
++		const onDidActiveEditorChange = disposables.add(new Emitter<void>());
++		let active: EditorInput | undefined = deskEmpty ? undefined : editor(URI.file('/project/Plan.md'));
 +		const onDidChangeInstances = disposables.add(new Emitter<void>());
 +		let connect!: () => void;
 +		const whenConnected = new Promise<void>(resolve => connect = resolve);
@@ -1670,6 +1733,8 @@ index 00000000000..5627ecf829b
 +			onDidChangeInstances: onDidChangeInstances.event,
 +		});
 +		const editorService = upcastPartial<IEditorService>({
++			get activeEditor() { return active; },
++			onDidActiveEditorChange: onDidActiveEditorChange.event,
 +			openEditor: (async (input: { resource: URI; options: { inactive: boolean; preserveFocus: boolean } }) => {
 +				opened.push({ resource: input.resource.path, inactive: input.options.inactive, preserveFocus: input.options.preserveFocus });
 +				return undefined;
@@ -1680,7 +1745,11 @@ index 00000000000..5627ecf829b
 +			all.push(instance);
 +			onDidCreateInstance.fire(instance);
 +		};
-+		return { connect, opened, panel, create, changed: () => onDidChangeInstances.fire() };
++		const show = (next: EditorInput) => {
++			active = next;
++			onDidActiveEditorChange.fire();
++		};
++		return { connect, opened, panel, create, show, changed: () => onDidChangeInstances.fire() };
 +	}
 +
 +	test('panel terminals move onto the desk: behind the document at start, in front later; hidden ones stay', async () => {
@@ -1698,6 +1767,49 @@ index 00000000000..5627ecf829b
 +			later: [{ resource: '/3', inactive: false, preserveFocus: true }],
 +		});
 +	});
++
++	test('#501: onto an empty desk, restored terminals wait for its first document, past a terminal tab and the sweep, then open behind it', async () => {
++		const restored = terminal(1);
++		const { connect, opened, panel, show, changed } = setUp([restored], { deskEmpty: true });
++
++		connect();
++		await timeout(0);
++		const atStart = opened.splice(0);
++		panel.push(terminal(2)); // one an extension asks for meanwhile comes to the front, as asked
++		changed();
++		await timeout(10);
++		const meanwhile = opened.splice(0);
++		show(editor(URI.from({ scheme: 'vscode-terminal', path: '/2' }))); // a terminal tab is not a document
++		await timeout(0);
++		const afterTerminalTab = opened.splice(0);
++		panel.splice(0, panel.length, restored);
++		show(editor(URI.file('/project/Welcome')));
++		await timeout(0);
++
++		assert.deepStrictEqual({ atStart, meanwhile, afterTerminalTab, afterDocument: opened }, {
++			atStart: [],
++			meanwhile: [{ resource: '/2', inactive: false, preserveFocus: true }],
++			afterTerminalTab: [],
++			afterDocument: [{ resource: '/1', inactive: true, preserveFocus: true }],
++		});
++	});
++
++	test('#501: with no document within the wait, restored terminals open anyway; one closed meanwhile does not', () => runWithFakedTimers({}, async () => {
++		const kept = terminal(1);
++		const { connect, opened, panel } = setUp([kept, terminal(2)], { deskEmpty: true });
++
++		connect();
++		await timeout(0);
++		panel.splice(1, 1);
++		await timeout(RITEMARK_RESTORED_TERMINALS_WAIT_MS - 1);
++		const beforeTheMinute = opened.splice(0);
++		await timeout(2);
++
++		assert.deepStrictEqual({ beforeTheMinute, after: opened }, {
++			beforeTheMinute: [],
++			after: [{ resource: '/1', inactive: true, preserveFocus: true }],
++		});
++	}));
 +
 +	test('plain terminals are named Terminal, Terminal 2; named, task and revived ones keep their names', () => {
 +		const { create } = setUp([]);

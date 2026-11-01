@@ -10,8 +10,8 @@ Patches live in `patches/vscode/` and are applied to the `vscode/` submodule. Th
 
 | Patch | Purpose |
 |-------|---------|
-| `001-ritemark-branding.patch` | Theme, fonts, icons, about dialog, breadcrumbs; Help: Welcome and walkthroughs open Ritemark's welcome (Sprint 133) |
-| `002-ritemark-ui-layout.patch` | Placement (2.0): the places row on top in Ritemark's order, Copilot Chat behind More, the AI column, Documents always a place |
+| `001-ritemark-branding.patch` | Theme, fonts, icons, about dialog, breadcrumbs; Help: Welcome and walkthroughs open Ritemark's welcome (Sprint 133); no Phosphor font request at the app's root (Sprint 145) |
+| `002-ritemark-ui-layout.patch` | Placement (2.0): the places row on top in Ritemark's order, Copilot Chat behind More, the AI column, Documents always a place; the AI column restored with the layout (Sprint 145) |
 | `003-ritemark-menu-cleanup.patch` | Hide VS Code developer features (chat, debug, go menu); no Agents window and no agent host prewarm |
 | `004-ritemark-build-system.patch` | jschardet, microphone permission, integrity check skip; packaging skips the built-in Copilot's SDK shim when a build from source has stripped the SDK, and product.json names Ritemark's source commit (`RITEMARK_SOURCE_COMMIT`; the commit reader also follows a gitdir file) (Sprint 135) |
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows packaging and OSS compatibility fixes |
@@ -26,8 +26,8 @@ Patches live in `patches/vscode/` and are applied to the `vscode/` submodule. Th
 | `014-ritemark-save-receipts.patch` | Exact successful-save identity for editor–disk synchronization; a save refused as newer goes to Ritemark first when its editor holds the document, with VS Code's notification if Ritemark can't answer within 3 s (Sprint 137, #454); a clean document Ritemark's editor holds asks Ritemark before it reloads a changed file, and takes Ritemark's merge (Sprint 145, #588) |
 | `015-ritemark-help-menu-policy.patch` | Ritemark-only fail-closed Help-menu policy shared by native and custom menubars; Getting started beside Support (Sprint 133) |
 | `016-ritemark-store-acquisition-policy.patch` | No external software-acquisition promotion: no Git download button in Source Control (Microsoft Store policy 10.1.5) |
-| `018-ritemark-surfaces.patch` | Ritemark 2.0's frame: no title row, the strips and sheets, zoom, Ritemark's menus, the left column's head; the welcome alone, an empty desk's tiles drawn, a file's extension muted |
-| `019-ritemark-tab-row.patch` | Ritemark 2.0's tab row: tab sizes, the +, folded tabs, permanent Home and Task board tabs, terminals as tabs, an empty desk's tiles |
+| `018-ritemark-surfaces.patch` | Ritemark 2.0's frame: no title row, the strips and sheets, zoom, Ritemark's menus, the left column's head; the welcome alone, an empty desk's tiles drawn, a file's extension muted; a switch lands on Home from its first frame, no "Drag a view here" while a column loads (Sprint 145) |
+| `019-ritemark-tab-row.patch` | Ritemark 2.0's tab row: tab sizes, the +, folded tabs, permanent Home and Task board tabs, terminals as tabs, an empty desk's tiles; restored terminals wait behind the desk's first document (Sprint 145) |
 
 ## Commands
 

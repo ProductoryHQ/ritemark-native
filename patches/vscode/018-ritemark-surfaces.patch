@@ -132,6 +132,27 @@ draw (a window that opens on Documents drew its head before the extension's New 
 64 past the column's foot, under the status bar): ritemarkProjectHead.ts fires onDidChangeRows, sidebarPart.ts lays
 out again.
 
+Sprint 145 (#569): a window that a switch in place opened lands on Home from its first frame. When the switch guard lets a
+LOAD go on and no other participant vetoes it, it writes a note into application storage with the storage's last save
+(onWillSaveState, SHUTDOWN): the folder left, the folder opened when the window knew it, the time. The main editor part
+of the window it is for takes it as it makes its desks, before the grid is made (a window on another folder or with no
+folder leaves it, and an unusable or two-minute-old note goes), and puts Home's tab first in its desk's order of use and
+that desk in front, so Home is the tab in front and the document the project was left on stays behind it
+(ritemarkSwitchGuard.ts: ritemarkLandsOnHome, the extension's own rule; ritemarkHomeInFront; editorPart.ts). Until now
+the restored document was in front for about half a second, until the extension started and brought Home forward.
+While a column waits for its place or the AI at start, it shows the ground, not VS Code's "Drag a view here to
+display." (ritemarkSurfaces.css), which flashed in the left column at every start and, with 002's AI column restored
+with the layout, would have in the AI column too. The held start, as the Experience lead set it: the AI column shows no
+progress bar (an indigo line, which framework §3 rules out), nothing for its first second, and then, while its view still
+waits for the extension, the kit's turning mark (ink on the strong hairline, 16) at its centre, alone, labelled "The AI is
+starting" for screen readers (announced as it appears); it goes when the view is resolved or its resolving fails
+(contrib/webviewView/browser/webviewViewPane.ts, only for a
+view in the AI column; ritemarkSurfaces.css). And the left column lays out once: until the extensions are read, a head
+row whose command is not registered yet keeps its room, empty (`.ritemark-project-row-waiting`), so New and Search fill
+rows already drawn and the tree under them never moves (on main a window landing on Documents drew the tree, then pushed
+it down 64 when New and Search arrived); once the extensions are read, a row whose command is still missing goes
+(ritemarkProjectHead.ts).
+
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
 platform/window/common/window.ts; platform/windows/electron-main/windowImpl.ts; workbench/browser/{layout,style}.ts;
@@ -141,7 +162,7 @@ parts/editor/editorPart.ts; parts/notifications/{notificationsCenter,notificatio
 parts/sidebar/{ritemarkProjectHead,sidebarPart}.ts; parts/statusbar/statusbarPart.ts + media/statusbarpart.css;
 parts/ritemarkFeedbackSheet.ts + parts/media/ritemarkFeedbackSheet.css (Sprint 140);
 parts/titlebar/titlebarPart.ts; contrib/files/browser/views/explorerViewer.ts; contrib/scm/browser/scm.contribution.ts (Sprint 142);
-contrib/webview/browser/overlayWebview.ts;
+contrib/webview/browser/overlayWebview.ts; contrib/webviewView/browser/webviewViewPane.ts (Sprint 145);
 electron-browser/desktop.contribution.ts; electron-browser/parts/titlebar/titlebarPart.ts;
 services/actions/common/menusExtensionPoint.ts; services/layout/browser/layoutService.ts.
 Tests: workbench/test/browser/parts/ritemarkWindowSizes.test.ts (R14), base/test/browser/iconLabel.test.ts (Sprint 133,
@@ -809,7 +830,7 @@ index d81722d63af..8a11889fd80 100644
  		this._onDidRender.fire();
  
 diff --git a/src/vs/workbench/browser/layout.ts b/src/vs/workbench/browser/layout.ts
-index 75f9238fd75..68ad7c003b7 100644
+index 79add6fa2a9..ed88fcd86de 100644
 --- a/src/vs/workbench/browser/layout.ts
 +++ b/src/vs/workbench/browser/layout.ts
 @@ -151,6 +151,12 @@ export const TITLE_BAR_SETTINGS = [
@@ -825,7 +846,7 @@ index 75f9238fd75..68ad7c003b7 100644
  const DEFAULT_WORKSPACE_WINDOW_DIMENSIONS = new Dimension(DEFAULT_WORKSPACE_WINDOW_SIZE.width, DEFAULT_WORKSPACE_WINDOW_SIZE.height);
  
  export abstract class Layout extends Disposable implements IWorkbenchLayoutService {
-@@ -3023,9 +3029,9 @@ class LayoutStateModel extends Disposable {
+@@ -3039,9 +3045,9 @@ class LayoutStateModel extends Disposable {
  		const auxiliaryBarForceMaximized = this.configurationService.getValue(WorkbenchLayoutSettings.AUXILIARYBAR_FORCE_MAXIMIZED);
  		const workbenchState = this.contextService.getWorkbenchState();
  		const mainContainerDimension = configuration.mainContainerDimension;
@@ -837,7 +858,7 @@ index 75f9238fd75..68ad7c003b7 100644
  		LayoutStateKeys.AUXILIARYBAR_HIDDEN.defaultValue = (() => {
  			if (isWeb && !this.environmentService.remoteAuthority) {
  				return true; // not required in web if unsupported
-@@ -3122,8 +3128,8 @@ class LayoutStateModel extends Disposable {
+@@ -3141,8 +3147,8 @@ class LayoutStateModel extends Disposable {
  
  		// Restrict auxiliary bar size in case of small window dimensions
  		if (this.isNew[StorageScope.WORKSPACE] && configuration.mainContainerDimension.width <= DEFAULT_WORKSPACE_WINDOW_DIMENSIONS.width) {
@@ -850,10 +871,10 @@ index 75f9238fd75..68ad7c003b7 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..380c2122910
+index 00000000000..90d67e8aa7f
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1896 @@
+@@ -0,0 +1,1943 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1159,6 +1180,47 @@ index 00000000000..380c2122910
 +
 +.monaco-workbench .part.auxiliarybar > .content {
 +	margin-left: 8px; /* auxiliaryBarPart.ts RITEMARK_SHEET_GAP */
++}
++
++/* Sprint 145 (#569): at start a column waits a moment for its place or the AI, which the extension brings (since this
++   sprint the AI column comes back with the layout). It shows the ground meanwhile, not VS Code's "Drag a view here to
++   display.", which flashed for about half a second in both columns */
++.monaco-workbench .part.sidebar.empty .empty-pane-message-area,
++.monaco-workbench .part.auxiliarybar.empty .empty-pane-message-area {
++	display: none;
++}
++
++/* Sprint 145 (#569; the Experience lead, 1 November): no indigo line in the AI column (framework §3: indigo is a fill or
++   an icon's colour, never a line), so VS Code's progress bar there is hidden. While the AI starts, the column stays bare
++   ground; after a second the kit's turning mark (.spin: ink on the strong hairline, 16) turns at its centre, alone, until
++   the AI's view draws (webviewViewPane.ts) */
++.monaco-workbench .part.auxiliarybar .monaco-progress-container {
++	display: none !important; /* !important: the progress bar shows itself with an inline style */
++}
++
++.monaco-workbench .part.auxiliarybar .ritemark-ai-starting {
++	position: absolute;
++	top: 50%;
++	left: 50%;
++	box-sizing: border-box;
++	width: 16px;
++	height: 16px;
++	margin: -8px 0 0 -8px;
++	border-radius: 50%;
++	border: 1.5px solid var(--vscode-input-border);
++	border-top-color: var(--vscode-foreground);
++	animation: ritemark-ai-starting 1s linear infinite;
++	pointer-events: none;
++}
++
++@keyframes ritemark-ai-starting {
++	to {
++		transform: rotate(360deg);
++	}
++}
++
++.monaco-workbench.monaco-reduce-motion .part.auxiliarybar .ritemark-ai-starting {
++	animation: none;
 +}
 +
 +
@@ -2188,6 +2250,12 @@ index 00000000000..380c2122910
 +	background-color: var(--rm-hover);
 +}
 +
++/* Sprint 145 (#569): a row whose command the extension has not registered yet keeps its room, empty, so the content
++   under the head never moves when New and Search arrive (ritemarkProjectHead.ts) */
++.monaco-workbench .part.sidebar .ritemark-project-row.ritemark-project-row-waiting {
++	visibility: hidden;
++}
++
 +.monaco-workbench .part.sidebar .ritemark-project-row .codicon {
 +	width: 14px;
 +	font-size: 14px !important; /* !important: the codicon rule sets 16 */
@@ -3050,19 +3118,20 @@ index ae595e8ab3e..d2a137e7255 100644
  				renderBody,
  				icon: customOptions?.icon,
 diff --git a/src/vs/workbench/browser/parts/editor/editorPart.ts b/src/vs/workbench/browser/parts/editor/editorPart.ts
-index afa6942390e..06e7b97bf55 100644
+index afa6942390e..9d283019916 100644
 --- a/src/vs/workbench/browser/parts/editor/editorPart.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorPart.ts
-@@ -36,6 +36,8 @@ import { IContextKeyService } from '../../../../platform/contextkey/common/conte
+@@ -36,6 +36,9 @@ import { IContextKeyService } from '../../../../platform/contextkey/common/conte
  import { ServiceCollection } from '../../../../platform/instantiation/common/serviceCollection.js';
  import { EditorAreaFocusContext, EditorPartMaximizedEditorGroupContext, EditorPartMultipleEditorGroupsContext, EditorTabsVisibleContext, IsTopRightEditorGroupContext } from '../../../common/contextkeys.js';
  import { mainWindow } from '../../../../base/browser/window.js';
 +import { RITEMARK_FRAME_WITHOUT_TITLE_ROW } from '../../../../platform/window/common/window.js';
 +import { createRitemarkFrameStrip, trackRitemarkZoom } from '../ritemarkFrameStrip.js';
++import { ritemarkHomeInFront, ritemarkTakeSwitchLanding } from '../ritemarkSwitchGuard.js';
  
  /**
   * The width (in pixels) of the editor card border drawn on every side when the
-@@ -97,6 +99,9 @@ class GridWidgetView<T extends IView> implements IView {
+@@ -97,6 +100,9 @@ class GridWidgetView<T extends IView> implements IView {
  	}
  }
  
@@ -3072,7 +3141,7 @@ index afa6942390e..06e7b97bf55 100644
  export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart, IEditorGroupsView {
  
  	private static readonly EDITOR_PART_UI_STATE_STORAGE_KEY = 'editorpart.state';
-@@ -1080,6 +1085,15 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1080,6 +1086,15 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
  		// Drag & Drop support
  		this.setupDragAndDropSupport(parent, this.container);
  
@@ -3088,7 +3157,45 @@ index afa6942390e..06e7b97bf55 100644
  		// Context keys
  		this.handleContextKeys();
  
-@@ -1466,7 +1480,8 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1285,10 +1300,15 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+ 
+ 	private doCreateGridControl(): void {
+ 
++		// Ritemark 2.0 (Sprint 145, #569): a window a switch in place opened lands on Home from its first frame. The
++		// switch's note is taken here by the first main editor part that makes its desks, restoring them or not, so it
++		// never lands a later one (a modal or floating editor part never takes it)
++		const ritemarkLanding = this.editorPartsView.mainPart === this && this.instantiationService.invokeFunction(ritemarkTakeSwitchLanding);
++
+ 		// Grid Widget (with previous UI state)
+ 		let restoreError = false;
+ 		if (this._willRestoreState) {
+-			restoreError = !this.doCreateGridControlWithPreviousState();
++			restoreError = !this.doCreateGridControlWithPreviousState(ritemarkLanding);
+ 		}
+ 
+ 		// Grid Widget (no previous UI state or failed to restore)
+@@ -1307,7 +1327,7 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+ 		this.notifyGroupIndexChange();
+ 	}
+ 
+-	private doCreateGridControlWithPreviousState(): boolean {
++	private doCreateGridControlWithPreviousState(ritemarkLanding = false): boolean {
+ 		const state: IEditorPartUIState | undefined = this.loadState();
+ 		if (state?.serializedGrid) {
+ 			try {
+@@ -1315,8 +1335,9 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+ 				// MRU
+ 				this.mostRecentActiveGroups = state.mostRecentActiveGroups;
+ 
+-				// Grid Widget
+-				this.doCreateGridControlWithState(state.serializedGrid, state.activeGroup);
++				// Grid Widget (Ritemark 2.0: landing on Home, its tab and its desk come back in front)
++				const landed = ritemarkLanding ? ritemarkHomeInFront(state.serializedGrid) : undefined;
++				this.doCreateGridControlWithState(landed?.grid ?? state.serializedGrid, landed?.homeGroup ?? state.activeGroup);
+ 			} catch (error) {
+ 
+ 				// Log error
+@@ -1466,7 +1487,8 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
  		}
  
  		// Layout contents
@@ -4335,10 +4442,10 @@ index 00000000000..c515a8eb74f
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts b/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts
 new file mode 100644
-index 00000000000..2b78c3bd68c
+index 00000000000..79a3f867a70
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,238 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4352,13 +4459,26 @@ index 00000000000..2b78c3bd68c
 + * service notes it here: Open Recent). The command answers true to stop the reload. Reload Window and quitting never
 + * ask. The window is never stuck: with no such command, or no answer and no question shown within 10 seconds, the
 + * reload goes on as before.
++ *
++ * Sprint 145 (#569): the window a switch opens lands on Home from its first frame. Once the reload really goes on (no
++ * participant vetoed it), the guard leaves a note for the next window as the storage saves for the last time: the folder
++ * it leaves, the folder it opens when known, the time. The next window's editor part takes it once and brings Home's
++ * tab to the front of its desk, and that desk to the front (editorPart.ts), where the extension brought it forward only
++ * after it had started, with the document the project was left on in front until then. The rule is the extension's own
++ * (`ProjectSwitcher.takeLanding`): within two minutes, in the folder the switch opened, or in any other folder when
++ * the window did not know it.
 + */
 +
 +import { Disposable, toDisposable } from '../../../base/common/lifecycle.js';
 +import { URI } from '../../../base/common/uri.js';
++import { ISerializedGrid, ISerializedNode } from '../../../base/browser/ui/grid/grid.js';
 +import { ICommandService } from '../../../platform/commands/common/commands.js';
 +import { IDialogService } from '../../../platform/dialogs/common/dialogs.js';
++import { ServicesAccessor } from '../../../platform/instantiation/common/instantiation.js';
++import { IStorageService, StorageScope, StorageTarget, WillSaveStateReason } from '../../../platform/storage/common/storage.js';
++import { IWorkspaceContextService, WorkbenchState } from '../../../platform/workspace/common/workspace.js';
 +import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../common/contributions.js';
++import { isSerializedEditorGroupModel, ISerializedEditorGroupModel } from '../../common/editor/editorGroupModel.js';
 +import { ILifecycleService, ShutdownReason } from '../../services/lifecycle/common/lifecycle.js';
 +
 +const BEFORE_RELOAD_COMMAND = '_ritemark.projects.beforeReload';
@@ -4396,7 +4516,126 @@ index 00000000000..2b78c3bd68c
 +	});
 +}
 +
-+class RitemarkSwitchGuard extends Disposable implements IWorkbenchContribution {
++/** Sprint 145 (#569): the note a switch leaves for the window it opens. */
++const LANDING_KEY = 'ritemark.switch.landOnHome';
++
++/** As the extension's `SWITCHED_NOTE_MS`: a note older than this is from a switch that did not happen. */
++const LANDING_FRESH_MS = 2 * 60 * 1000;
++
++const HOME_VIEW_TYPE = 'mainThreadWebview-ritemark.home';
++/** `WebviewInput.typeId`, the serializer id a saved webview tab carries. */
++const WEBVIEW_EDITOR_TYPE_ID = 'workbench.editors.webviewInput';
++
++interface IRitemarkSwitchLanding {
++	/** The folder the switch left. */
++	readonly from: string | null;
++	/** The folder it opens, when the window knew it (Open Recent, Ritemark's own ways). */
++	readonly target: string | null;
++	readonly at: number;
++}
++
++function sameFolder(a: string, b: string): boolean {
++	return a.replace(/\/+$/, '') === b.replace(/\/+$/, '');
++}
++
++/** Whether a window on `here` lands on Home after this note (the extension's rule, `ProjectSwitcher.takeLanding`). */
++export function ritemarkLandsOnHome(landing: unknown, here: string | undefined, now: number): boolean {
++	const note = landing as Partial<IRitemarkSwitchLanding> | undefined;
++	if (!here || !note || typeof note.at !== 'number' || now - note.at > LANDING_FRESH_MS || now < note.at) {
++		return false;
++	}
++	if (typeof note.target === 'string') {
++		return sameFolder(note.target, here);
++	}
++	return typeof note.from !== 'string' || !sameFolder(note.from, here);
++}
++
++/** The project's folder as the extension reads it (`workspaceFolders[0]`), in any window that has one. */
++function projectFolder(contextService: IWorkspaceContextService): string | undefined {
++	return contextService.getWorkbenchState() === WorkbenchState.EMPTY ? undefined : contextService.getWorkspace().folders[0]?.uri.toString();
++}
++
++/**
++ * What a window on `here` does with the saved note: lands on Home and takes it; keeps it for the window it is for (a note
++ * naming another folder, or a window with no folder); or drops it when it is unusable (not a note, no time, older than
++ * two minutes, or from the future). Pure.
++ *
++ * A note with no target (Open Folder…, a folder dropped on the Dock icon: only the main process knows the folder) can't
++ * be told apart from inside a window, so it keeps the extension's rule: the first window on a folder other than the one
++ * left takes it.
++ */
++export function ritemarkReadLanding(raw: string, here: string | undefined, now: number): 'land' | 'keep' | 'drop' {
++	let note: Partial<IRitemarkSwitchLanding> | undefined;
++	try {
++		note = JSON.parse(raw);
++	} catch {
++		return 'drop';
++	}
++	if (!note || typeof note !== 'object' || typeof note.at !== 'number' || now - note.at > LANDING_FRESH_MS || now < note.at) {
++		return 'drop';
++	}
++	return ritemarkLandsOnHome(note, here, now) ? 'land' : 'keep';
++}
++
++/**
++ * Sprint 145 (#569): as its editor part makes its desks, the window takes the note when it is for this window (true: it
++ * lands on Home), leaves a note meant for another window to that window (it expires by itself), and removes one that
++ * is unusable. Codex's review: a window on another folder starting within the two minutes must not take the note away
++ * from the window the switch opened.
++ */
++export function ritemarkTakeSwitchLanding(accessor: ServicesAccessor): boolean {
++	const storageService = accessor.get(IStorageService);
++	const raw = storageService.get(LANDING_KEY, StorageScope.APPLICATION);
++	if (raw === undefined) {
++		return false;
++	}
++	const verdict = ritemarkReadLanding(raw, projectFolder(accessor.get(IWorkspaceContextService)), Date.now());
++	if (verdict !== 'keep') {
++		storageService.remove(LANDING_KEY, StorageScope.APPLICATION);
++	}
++	return verdict === 'land';
++}
++
++function isHomeEditor(editor: { id: string; value: string }): boolean {
++	if (editor.id !== WEBVIEW_EDITOR_TYPE_ID) {
++		return false;
++	}
++	try {
++		return (JSON.parse(editor.value) as { viewType?: unknown })?.viewType === HOME_VIEW_TYPE;
++	} catch {
++		return false;
++	}
++}
++
++/**
++ * The saved tabs with Home's tab first in its desk's order of use, so it is the tab in front when they come back, and
++ * that desk's id, to make it the desk in front (undefined when no desk holds Home). Pure.
++ */
++export function ritemarkHomeInFront(grid: ISerializedGrid): { grid: ISerializedGrid; homeGroup: number | undefined } {
++	let homeGroup: number | undefined;
++	const land = (node: ISerializedNode): ISerializedNode => {
++		if (node.type === 'branch') {
++			return { ...node, data: node.data.map(land) };
++		}
++		if (!isSerializedEditorGroupModel(node.data)) {
++			return node;
++		}
++		const group: ISerializedEditorGroupModel = node.data;
++		const home = group.editors.findIndex(isHomeEditor);
++		if (home < 0) {
++			return node;
++		}
++		homeGroup ??= group.id;
++		if (group.mru[0] === home) {
++			return node;
++		}
++		return { ...node, data: { ...group, mru: [home, ...group.mru.filter(index => index !== home)] } };
++	};
++	const landed = { ...grid, root: land(grid.root) };
++	return { grid: landed, homeGroup };
++}
++
++export class RitemarkSwitchGuard extends Disposable implements IWorkbenchContribution {
 +
 +	static readonly ID = 'workbench.contrib.ritemarkSwitchGuard';
 +
@@ -4404,13 +4643,41 @@ index 00000000000..2b78c3bd68c
 +		@ILifecycleService lifecycleService: ILifecycleService,
 +		@ICommandService commandService: ICommandService,
 +		@IDialogService dialogService: IDialogService,
++		@IStorageService storageService: IStorageService,
++		@IWorkspaceContextService contextService: IWorkspaceContextService,
 +	) {
 +		super();
 +
++		// Sprint 145 (#569): the note for the next window, held until the reload really goes on. Another participant can
++		// still veto after Ritemark's answer (unsaved files, a running terminal), and then nothing is written. Each
++		// shutdown attempt has its own number, so a late answer to one that was already vetoed sets nothing.
++		let landing: Omit<IRitemarkSwitchLanding, 'at'> | undefined;
++		let attempt = 0;
++
 +		this._register(lifecycleService.onBeforeShutdown(e => {
++			const thisAttempt = ++attempt;
++			landing = undefined;
 +			const target = takeSwitchTarget();
 +			if (e.reason === ShutdownReason.LOAD) {
-+				e.veto(askRitemarkBeforeReload(commandService, dialogService, target), RitemarkSwitchGuard.ID);
++				e.veto(askRitemarkBeforeReload(commandService, dialogService, target).then(veto => {
++					if (!veto && thisAttempt === attempt) {
++						landing = { from: projectFolder(contextService) ?? null, target: target?.toString() ?? null };
++					}
++					return veto;
++				}), RitemarkSwitchGuard.ID);
++			}
++		}));
++		this._register(lifecycleService.onShutdownVeto(() => {
++			attempt++;
++			landing = undefined;
++		}));
++		// The storage's last save of a shutdown that goes on: the one moment clients can still store (storageService.ts).
++		// Its time is the switch's, not the answer's: other questions (unsaved files) may wait long after Ritemark answered.
++		this._register(storageService.onWillSaveState(e => {
++			if (e.reason === WillSaveStateReason.SHUTDOWN && landing) {
++				const note: IRitemarkSwitchLanding = { ...landing, at: Date.now() };
++				storageService.store(LANDING_KEY, JSON.stringify(note), StorageScope.APPLICATION, StorageTarget.MACHINE);
++				landing = undefined;
 +			}
 +		}));
 +	}
@@ -4707,10 +4974,10 @@ index 00000000000..c6764e91723
 +registerWorkbenchContribution2(RitemarkWindowSizes.ID, RitemarkWindowSizes, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644
-index 00000000000..760766e62b1
+index 00000000000..a19755eb243
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,341 @@
+@@ -0,0 +1,361 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4746,6 +5013,7 @@ index 00000000000..760766e62b1
 +import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
 +import { IContextViewService } from '../../../../platform/contextview/browser/contextView.js';
 +import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
++import { IExtensionService } from '../../../services/extensions/common/extensions.js';
 +import { RITEMARK_MENU_SEPARATOR, RitemarkMenuEntry, showRitemarkMenu } from '../ritemarkMenu.js';
 +
 +const PROJECT_MENU = MenuId.for('ritemark/projectHead');
@@ -4831,6 +5099,12 @@ index 00000000000..760766e62b1
 +	private titleHeight = 40;
 +	private readonly titleArea: HTMLElement;
 +
++	/**
++	 * Sprint 145 (#569): until the extensions are read, a row whose command is not registered yet keeps its room, so
++	 * New and Search fill rows already drawn and the content under them never moves.
++	 */
++	private extensionsRead = false;
++
 +	private readonly _onDidChangeRows = this._register(new Emitter<void>());
 +	/** The rows changed outside update(): the column lays its content out again (rowsHeight) */
 +	readonly onDidChangeRows = this._onDidChangeRows.event;
@@ -4847,6 +5121,7 @@ index 00000000000..760766e62b1
 +		@IContextKeyService private readonly contextKeyService: IContextKeyService,
 +		@IMenuService private readonly menuService: IMenuService,
 +		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
++		@IExtensionService extensionService: IExtensionService,
 +	) {
 +		super();
 +		this.titleArea = titleArea;
@@ -4887,7 +5162,7 @@ index 00000000000..760766e62b1
 +		// New and Search exist), the column lays its content out again: else the tree ran the rows' height (64 on
 +		// Documents) past the column's foot, under the status bar, where its last rows and its slider's foot could not be
 +		// reached (2.1.0's join pass)
-+		this._register(MenuRegistry.onDidChangeMenu(() => {
++		const drawRowsAgain = () => {
 +			if (this.place) {
 +				const before = this.rowList.childElementCount;
 +				this.renderRows(this.place);
@@ -4895,7 +5170,15 @@ index 00000000000..760766e62b1
 +					this._onDidChangeRows.fire();
 +				}
 +			}
-+		}));
++		};
++		this._register(MenuRegistry.onDidChangeMenu(drawRowsAgain));
++		// Sprint 145 (#569): once the extensions are read, a row whose command is still missing goes (an older extension)
++		extensionService.whenInstalledExtensionsRegistered().then(() => {
++			if (!this._store.isDisposed) {
++				this.extensionsRead = true;
++				drawRowsAgain();
++			}
++		});
 +	}
 +
 +	/**
@@ -4961,6 +5244,10 @@ index 00000000000..760766e62b1
 +		for (const spec of place.rows) {
 +			const command = MenuRegistry.getCommand(spec.command);
 +			if (!command) {
++				if (!this.extensionsRead) {
++					// Sprint 145 (#569): the extension's command comes once the extensions are read; its row keeps its room
++					append(this.rowList, $('.ritemark-project-row.ritemark-project-row-waiting', { 'aria-hidden': 'true' }));
++				}
 +				continue; // an older extension: no row rather than a row that does nothing
 +			}
 +			const text = typeof command.title === 'string' ? command.title : command.title.value;
@@ -5422,6 +5709,114 @@ index 86d357e665c..9b9f66fd54b 100644
  		const part = anchorElement.closest('.part');
  		this._syncOuterEdgeClasses(part);
  
+diff --git a/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts b/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
+index e0e445671e1..c84769ab83b 100644
+--- a/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
++++ b/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
+@@ -3,7 +3,9 @@
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
+  *--------------------------------------------------------------------------------------------*/
+ 
+-import { addDisposableListener, EventType, findParentWithClass, getWindow } from '../../../../base/browser/dom.js';
++import { $, addDisposableListener, EventType, findParentWithClass, getWindow } from '../../../../base/browser/dom.js';
++import { status } from '../../../../base/browser/ui/aria/aria.js';
++import { disposableTimeout } from '../../../../base/common/async.js';
+ import { CancellationTokenSource } from '../../../../base/common/cancellation.js';
+ import { Emitter } from '../../../../base/common/event.js';
+ import { DisposableStore, IDisposable, MutableDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
+@@ -18,10 +20,11 @@ import { IOpenerService } from '../../../../platform/opener/common/opener.js';
+ import { IProgressService } from '../../../../platform/progress/common/progress.js';
+ import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
+ import { IThemeService } from '../../../../platform/theme/common/themeService.js';
++import { localize } from '../../../../nls.js';
+ import { ViewPane, ViewPaneShowActions } from '../../../browser/parts/views/viewPane.js';
+ import { IViewletViewOptions } from '../../../browser/parts/views/viewsViewlet.js';
+ import { Memento } from '../../../common/memento.js';
+-import { IViewBadge, IViewDescriptorService } from '../../../common/views.js';
++import { IViewBadge, IViewDescriptorService, ViewContainerLocation } from '../../../common/views.js';
+ import { IViewsService } from '../../../services/views/common/viewsService.js';
+ import { ExtensionKeyedWebviewOriginStore, IOverlayWebview, IWebviewService, WebviewContentPurpose } from '../../webview/browser/webview.js';
+ import { WebviewWindowDragMonitor } from '../../webview/browser/webviewWindowDragMonitor.js';
+@@ -38,6 +41,25 @@ interface WebviewViewState {
+ 	[storageKeys.webviewState]?: string | undefined;
+ }
+ 
++/** Ritemark 2.0 (Sprint 145, #569): how long the AI column stays bare ground before its turning mark shows. */
++const RITEMARK_STARTING_MARK_AFTER_MS = 1000;
++
++/**
++ * Ritemark 2.0 (Sprint 145, #569; the Experience lead, 1 November): while the AI column's view waits for its extension,
++ * nothing for a second (a sign that flashes and goes is noise), then the kit's turning mark (ink, 16) at the column's
++ * centre, alone, with no words but the screen reader's (drawn by ritemarkSurfaces.css). Disposing removes it.
++ */
++function ritemarkStartingMark(container: HTMLElement): IDisposable {
++	const store = new DisposableStore();
++	store.add(disposableTimeout(() => {
++		const words = localize('ritemark.aiStarting', "The AI is starting");
++		const mark = container.appendChild($('.ritemark-ai-starting', { role: 'status', 'aria-label': words }));
++		store.add(toDisposable(() => mark.remove()));
++		status(words); // a live region announces a change, not its own insertion; the label stays for anyone who reaches the mark
++	}, RITEMARK_STARTING_MARK_AFTER_MS));
++	return store;
++}
++
+ export class WebviewViewPane extends ViewPane {
+ 
+ 	private static _originStore?: ExtensionKeyedWebviewOriginStore;
+@@ -50,6 +72,8 @@ export class WebviewViewPane extends ViewPane {
+ 	private readonly _webview = this._register(new MutableDisposable<IOverlayWebview>());
+ 	private readonly _webviewDisposables = this._register(new DisposableStore());
+ 	private _activated = false;
++	/** Ritemark 2.0 (Sprint 145, #569): the AI column's turning mark while its view waits for its extension. */
++	private readonly ritemarkStarting = this._register(new MutableDisposable());
+ 
+ 	private _container?: HTMLElement;
+ 	private _rootContainer?: HTMLElement;
+@@ -170,6 +194,12 @@ export class WebviewViewPane extends ViewPane {
+ 
+ 		this._activated = true;
+ 
++		// Ritemark 2.0 (Sprint 145, #569): the AI column's view shows the turning mark after a second, until it is resolved
++		if (this.viewDescriptorService.getViewLocationById(this.id) === ViewContainerLocation.AuxiliaryBar) {
++			this.ritemarkStarting.value = ritemarkStartingMark(this.element);
++			this._webviewDisposables.add(toDisposable(() => this.ritemarkStarting.clear()));
++		}
++
+ 		const origin = this.extensionId ? WebviewViewPane.getOriginStore(this.storageService).getOrigin(this.id, this.extensionId) : undefined;
+ 		const webview = this.webviewService.createWebviewOverlay({
+ 			origin,
+@@ -209,7 +239,7 @@ export class WebviewViewPane extends ViewPane {
+ 		// so the webview view service drops any pending `_awaitingRevival` entry for this view.
+ 		this._webviewDisposables.add(toDisposable(() => source.cancel()));
+ 
+-		this.withProgress(async () => {
++		this.withProgress(this.ritemarkUntilResolved(async () => {
+ 			await this.extensionService.activateByEvent(`onView:${this.id}`);
+ 
+ 			const self = this;
+@@ -240,7 +270,21 @@ export class WebviewViewPane extends ViewPane {
+ 			};
+ 
+ 			await this.webviewViewService.resolve(this.id, webviewView, source.token);
+-		});
++		}));
++	}
++
++	/**
++	 * Ritemark 2.0 (Sprint 145, #569): the AI column's turning mark goes when the view is resolved, and also when the
++	 * extension's activation or its resolver fails, so it never says the AI is starting when it has stopped.
++	 */
++	private ritemarkUntilResolved(task: () => Promise<void>): () => Promise<void> {
++		return async () => {
++			try {
++				await task();
++			} finally {
++				this.ritemarkStarting.clear();
++			}
++		};
+ 	}
+ 
+ 	protected override updateTitle(value: string | undefined) {
 diff --git a/src/vs/workbench/electron-browser/desktop.contribution.ts b/src/vs/workbench/electron-browser/desktop.contribution.ts
 index 41250d7b714..c6fc8a12257 100644
 --- a/src/vs/workbench/electron-browser/desktop.contribution.ts
@@ -5941,10 +6336,10 @@ index 00000000000..7924086e116
 +});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts b/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts
 new file mode 100644
-index 00000000000..c737d2c8ed5
+index 00000000000..b8d451ffc33
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,195 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -5956,11 +6351,19 @@ index 00000000000..c737d2c8ed5
 +import { URI } from '../../../../base/common/uri.js';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
 +import { ICommandService } from '../../../../platform/commands/common/commands.js';
-+import { askRitemarkBeforeReload } from '../../../browser/parts/ritemarkSwitchGuard.js';
++import { Orientation } from '../../../../base/browser/ui/grid/grid.js';
++import { IDialogService } from '../../../../platform/dialogs/common/dialogs.js';
++import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
++import { IStorageService, StorageScope, StorageTarget, WillSaveStateReason } from '../../../../platform/storage/common/storage.js';
++import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
++import { askRitemarkBeforeReload, ritemarkHomeInFront, ritemarkLandsOnHome, RitemarkSwitchGuard, ritemarkTakeSwitchLanding } from '../../../browser/parts/ritemarkSwitchGuard.js';
++import { BeforeShutdownEvent, ILifecycleService, ShutdownReason } from '../../../services/lifecycle/common/lifecycle.js';
++import { TestStorageService } from '../../common/workbenchTestServices.js';
 +
 +/**
 + * Ritemark 2.0 (Sprint 134, R9): an unload that opens another folder here waits for the extension's answer; anything
 + * but a clear true lets it go on, and a guard that neither answers nor asks within the ceiling never keeps the window.
++ * Sprint 145 (#569): the window the switch opens lands on Home from its first frame, by the extension's rule.
 + */
 +suite('Ritemark switch guard', () => {
 +
@@ -5999,6 +6402,137 @@ index 00000000000..c737d2c8ed5
 +			return true;
 +		}), { onWillShowDialog: dialogs.event }, undefined, 5);
 +		assert.strictEqual(await answer, true);
++	});
++
++	test('#569: the window a switch opens lands on Home: within two minutes, in the folder it opened, or any other one', () => {
++		const sales = 'file:///p/sales';
++		const lead = 'file:///p/lead';
++		const now = 1_000_000;
++		const cases = {
++			'Open Recent to sales, in sales': ritemarkLandsOnHome({ from: lead, target: sales, at: now - 3000 }, sales, now),
++			'its trailing slash': ritemarkLandsOnHome({ from: lead, target: `${sales}/`, at: now - 3000 }, sales, now),
++			'Open Recent to sales, in another folder': ritemarkLandsOnHome({ from: lead, target: sales, at: now - 3000 }, 'file:///p/other', now),
++			'Open Folder (no target), in another folder': ritemarkLandsOnHome({ from: lead, target: null, at: now - 3000 }, sales, now),
++			'Open Folder (no target), back in the same one': ritemarkLandsOnHome({ from: lead, target: null, at: now - 3000 }, lead, now),
++			'after two minutes': ritemarkLandsOnHome({ from: lead, target: sales, at: now - 2 * 60 * 1000 - 1 }, sales, now),
++			'a window with no folder': ritemarkLandsOnHome({ from: lead, target: null, at: now - 3000 }, undefined, now),
++			'no note, or a broken one': ritemarkLandsOnHome(undefined, sales, now) || ritemarkLandsOnHome({ target: sales }, sales, now),
++		};
++		assert.deepStrictEqual(cases, {
++			'Open Recent to sales, in sales': true,
++			'its trailing slash': true,
++			'Open Recent to sales, in another folder': false,
++			'Open Folder (no target), in another folder': true,
++			'Open Folder (no target), back in the same one': false,
++			'after two minutes': false,
++			'a window with no folder': false,
++			'no note, or a broken one': false,
++		});
++	});
++
++	test('#569: Home\'s tab goes first in its desk\'s order of use, the tabs\' order and the other desk unchanged', () => {
++		const home = { id: 'workbench.editors.webviewInput', value: JSON.stringify({ viewType: 'mainThreadWebview-ritemark.home' }) };
++		const board = { id: 'workbench.editors.webviewInput', value: JSON.stringify({ viewType: 'mainThreadWebview-ritemark.taskBoard' }) };
++		const plan = { id: 'workbench.editors.file', value: '{"resourceJSON":{"path":"/p/sales/Plan.md"}}' };
++		const first = { id: 1, editors: [home, board, plan], mru: [2, 1, 0], sticky: 1 };
++		const second = { id: 2, editors: [plan], mru: [0] };
++		const grid = { orientation: Orientation.HORIZONTAL, width: 800, height: 600, root: { type: 'branch' as const, size: 600, data: [{ type: 'leaf' as const, size: 400, data: first }, { type: 'leaf' as const, size: 400, data: second }] } };
++		const landed = ritemarkHomeInFront(grid);
++		const noHome = ritemarkHomeInFront({ ...grid, root: { type: 'leaf' as const, size: 400, data: second } });
++		assert.deepStrictEqual({ landed, noHome: noHome.homeGroup, savedUnchanged: first.mru }, {
++			landed: { grid: { ...grid, root: { ...grid.root, data: [{ type: 'leaf', size: 400, data: { ...first, mru: [0, 2, 1] } }, { type: 'leaf', size: 400, data: second }] } }, homeGroup: 1 },
++			noHome: undefined,
++			savedUnchanged: [2, 1, 0],
++		});
++	});
++
++	test('#569: the note is written with the last save of a switch that goes on, never after a veto or for a reload', async () => {
++		const beforeShutdown = store.add(new Emitter<BeforeShutdownEvent>());
++		const shutdownVeto = store.add(new Emitter<void>());
++		const dialogs = store.add(new Emitter<void>());
++		const storage = store.add(new TestStorageService());
++		const lifecycle = { onBeforeShutdown: beforeShutdown.event, onShutdownVeto: shutdownVeto.event } as unknown as ILifecycleService;
++		const workspace = { getWorkbenchState: () => WorkbenchState.FOLDER, getWorkspace: () => ({ folders: [{ uri: URI.file('/p/lead') }] }) } as unknown as IWorkspaceContextService;
++		store.add(new RitemarkSwitchGuard(lifecycle, commands(async () => false), { onWillShowDialog: dialogs.event } as unknown as IDialogService, storage, workspace));
++		const unload = async (reason: ShutdownReason) => {
++			const vetos: Promise<boolean>[] = [];
++			beforeShutdown.fire({ reason, veto: value => vetos.push(Promise.resolve(value)) });
++			await Promise.all(vetos);
++		};
++		const note = () => storage.get('ritemark.switch.landOnHome', StorageScope.APPLICATION);
++
++		await unload(ShutdownReason.LOAD); // Ritemark lets it go on, then another participant vetoes it (unsaved files)
++		shutdownVeto.fire();
++		storage.testEmitWillSaveState(WillSaveStateReason.SHUTDOWN); // a later quit
++		const afterVeto = note();
++		await unload(ShutdownReason.RELOAD);
++		storage.testEmitWillSaveState(WillSaveStateReason.SHUTDOWN);
++		const afterReload = note();
++		await unload(ShutdownReason.LOAD);
++		const beforeTheLastSave = note();
++		storage.testEmitWillSaveState(WillSaveStateReason.SHUTDOWN);
++		const written = JSON.parse(note() ?? '{}');
++
++		assert.deepStrictEqual({ afterVeto, afterReload, beforeTheLastSave, from: written.from, target: written.target, dated: typeof written.at === 'number' }, {
++			afterVeto: undefined,
++			afterReload: undefined,
++			beforeTheLastSave: undefined,
++			from: URI.file('/p/lead').toString(),
++			target: null,
++			dated: true,
++		});
++	});
++
++	test('#569 (Codex): only the window the note is for takes it; another folder\'s window and a window with no folder leave it; an unusable note goes', () => {
++		const storage = store.add(new TestStorageService());
++		const take = (folder: string | undefined) => ritemarkTakeSwitchLanding({
++			get: (id: unknown) => id === IStorageService ? storage : { getWorkbenchState: () => folder ? WorkbenchState.FOLDER : WorkbenchState.EMPTY, getWorkspace: () => ({ folders: folder ? [{ uri: URI.parse(folder) }] : [] }) },
++		} as unknown as ServicesAccessor);
++		const write = (note: unknown) => storage.store('ritemark.switch.landOnHome', typeof note === 'string' ? note : JSON.stringify(note), StorageScope.APPLICATION, StorageTarget.MACHINE);
++		const left = () => storage.get('ritemark.switch.landOnHome', StorageScope.APPLICATION) !== undefined;
++		const now = Date.now();
++
++		write({ from: 'file:///p/lead', target: 'file:///p/sales', at: now - 1000 });
++		const other = { landed: take('file:///p/other'), kept: left() };
++		const noFolder = { landed: take(undefined), kept: left() };
++		const target = { landed: take('file:///p/sales'), kept: left() };
++		write({ from: 'file:///p/lead', target: null, at: now - 1000 });
++		const backInTheOneLeft = { landed: take('file:///p/lead'), kept: left() };
++		const openFolder = { landed: take('file:///p/other'), kept: left() };
++		write({ from: 'file:///p/lead', target: 'file:///p/sales', at: now - 3 * 60 * 1000 });
++		const stale = { landed: take('file:///p/other'), kept: left() };
++		write('not a note');
++		const broken = { landed: take('file:///p/sales'), kept: left() };
++
++		assert.deepStrictEqual({ other, noFolder, target, backInTheOneLeft, openFolder, stale, broken }, {
++			other: { landed: false, kept: true },
++			noFolder: { landed: false, kept: true },
++			target: { landed: true, kept: false },
++			backInTheOneLeft: { landed: false, kept: true },
++			openFolder: { landed: true, kept: false },
++			stale: { landed: false, kept: false },
++			broken: { landed: false, kept: false },
++		});
++	});
++
++	test('#569: Ritemark\'s answer that comes after another participant vetoed the switch sets no note', async () => {
++		const beforeShutdown = store.add(new Emitter<BeforeShutdownEvent>());
++		const shutdownVeto = store.add(new Emitter<void>());
++		const dialogs = store.add(new Emitter<void>());
++		const storage = store.add(new TestStorageService());
++		const lifecycle = { onBeforeShutdown: beforeShutdown.event, onShutdownVeto: shutdownVeto.event } as unknown as ILifecycleService;
++		const workspace = { getWorkbenchState: () => WorkbenchState.FOLDER, getWorkspace: () => ({ folders: [{ uri: URI.file('/p/lead') }] }) } as unknown as IWorkspaceContextService;
++		let answer!: (veto: boolean) => void;
++		store.add(new RitemarkSwitchGuard(lifecycle, commands(() => new Promise<boolean>(resolve => answer = resolve)), { onWillShowDialog: dialogs.event } as unknown as IDialogService, storage, workspace));
++		const vetos: Promise<boolean>[] = [];
++
++		beforeShutdown.fire({ reason: ShutdownReason.LOAD, veto: value => vetos.push(Promise.resolve(value)) });
++		shutdownVeto.fire(); // another participant's veto ended the switch before Ritemark answered
++		answer(false);
++		await Promise.all(vetos);
++		storage.testEmitWillSaveState(WillSaveStateReason.SHUTDOWN); // a later quit
++
++		assert.strictEqual(storage.get('ritemark.switch.landOnHome', StorageScope.APPLICATION), undefined);
 +	});
 +});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts b/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts

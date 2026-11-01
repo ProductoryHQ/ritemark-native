@@ -12,6 +12,12 @@ Drafts for 2.2's release notes, one per user-visible change, written for the `re
 - **Known limit:** If the other copy is a rewrite of almost the whole file, Ritemark can't tell what changed. Within 30 seconds of your last save it asks which version to keep; after that the copy replaces your words, as before.
 - **Good to know:** If you discard your changes to a file (or switch branches) within 30 seconds of typing in it, Ritemark asks first; choose Use disk version to finish.
 
+## PR 5 (#569, #501, #582)
+
+- **Fixed:** When you switch projects, the next project opens straight on its Home, with the AI beside it. Before, the document you last had open showed for a moment, then Home appeared and the page shifted as the AI came back.
+- **Fixed:** On Windows, the first start after updating from Ritemark 1 shows the welcome, not a terminal you had open in Ritemark 1. That terminal is still there, as a tab behind the welcome.
+- (No line for #582: nothing changed on screen, only a line in the logs.)
+
 ## PR 6 (#515)
 
 *R12: Electron 43.8.6, on Node.js 24.22.1.*

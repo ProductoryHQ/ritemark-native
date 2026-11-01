@@ -10,8 +10,8 @@ Eighteen patches, numbered 001 through 019 (017 retired with the Getting Started
 
 | Patch | Domain | Summary |
 |-------|--------|---------|
-| `001-ritemark-branding.patch` | Branding | Theme, fonts, icons, about dialog, breadcrumbs; Help: Welcome opens Ritemark's welcome |
-| `002-ritemark-ui-layout.patch` | UI Layout | Sidebar, titlebar, tabs, explorer, panels, Cmd+B removal |
+| `001-ritemark-branding.patch` | Branding | Theme, fonts, icons, about dialog, breadcrumbs; Help: Welcome opens Ritemark's welcome; the Phosphor font declared once, in codicon.css (Sprint 145) |
+| `002-ritemark-ui-layout.patch` | UI Layout | Sidebar, titlebar, tabs, explorer, panels, Cmd+B removal; the AI column restored with the layout (Sprint 145) |
 | `003-ritemark-menu-cleanup.patch` | Menu Cleanup + OSS Fixes | 26 files -- Selection/Go/Terminal/Run menus hidden, Edit menu cleaned, Chat/Debug hidden, the palette's developer commands left out, the Agents window closed, no agent host prewarm, defaultChatAgent null-safety |
 | `004-ritemark-build-system.patch` | Build System | jschardet, microphone permission, integrity check skip; packaging skips the built-in Copilot's SDK shim when a build from source has stripped the SDK, and product.json names Ritemark's source commit (`RITEMARK_SOURCE_COMMIT`; the commit reader also follows a gitdir file) (Sprint 135) |
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows + OSS | Windows-specific and OSS compatibility fixes |
@@ -26,8 +26,8 @@ Eighteen patches, numbered 001 through 019 (017 retired with the Getting Started
 | `014-ritemark-save-receipts.patch` | Saving | Text-file save receipts; a save refused as newer goes to Ritemark first when its editor holds the document (Sprint 137, #454); a reload of such a clean document asks Ritemark first and takes its merge (Sprint 145, #588) |
 | `015-ritemark-help-menu-policy.patch` | Menus | The Help menu focused on Ritemark, with Getting started, Support and Send feedback |
 | `016-ritemark-store-acquisition-policy.patch` | Store policy | No external software-acquisition promotion (Source Control's Git download button) |
-| `018-ritemark-surfaces.patch` | The 2.0 frame | No title row, strips, sheets and gaps, zoom, Ritemark's menus, the left column's head, the welcome alone, a file's extension muted, File changes as Source Control's name, the desk's whole edge (sizes, drawing and names) |
-| `019-ritemark-tab-row.patch` | The 2.0 tab row | Tab sizes, the +, folded tabs, permanent tabs, terminals as tabs, an empty desk's tiles, a restored task tab's title |
+| `018-ritemark-surfaces.patch` | The 2.0 frame | No title row, strips, sheets and gaps, zoom, Ritemark's menus, the left column's head, the welcome alone, a file's extension muted, File changes as Source Control's name, the desk's whole edge (sizes, drawing and names); a switch lands on Home, a loading column shows the ground (Sprint 145) |
+| `019-ritemark-tab-row.patch` | The 2.0 tab row | Tab sizes, the +, folded tabs, permanent tabs, terminals as tabs, an empty desk's tiles, a restored task tab's title; restored terminals wait for a document (Sprint 145) |
 
 **Rule:** Patches must not overlap in domain. Two patches may touch one file (002 and 018 share `titlebarPart.ts`,
 `auxiliaryBarPart.ts` and `paneCompositePart.ts`: placement and drawing), but no hunk may build on another patch's

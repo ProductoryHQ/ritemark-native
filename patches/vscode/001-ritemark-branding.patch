@@ -19,6 +19,10 @@ Sprint 135: rebased onto VS Code 1.142.0
     (build/next/index.ts, which keeps the .woff2 loader) and writes the fonts the CSS references to media/, and the
     packaging takes the whole bundle output, so the font includes are upstream's now and optimize.ts is gone
   - The About box keeps its 1.117 lines: upstream's new Copilot SDK version lines stay out (dialog.ts)
+Sprint 145 (#582): the icon registry names the Phosphor family and asks for no file: its URI.parse('phosphor.woff2') became
+  vscode-file://vscode-app/phosphor.woff2, a request at the app's root that the protocol refused once at every start
+  (main.log). codicon.css declares the font where the build puts it (out/media/ in a release); iconsStyleSheet.ts writes
+  no @font-face for a font without a source (10 → 12 files). Test: platform/theme/test/browser/ritemarkPhosphorFont.test.ts.
 ---
 diff --git a/build/next/index.ts b/build/next/index.ts
 index c439d777fd5..a94f901d2e0 100644
@@ -159,11 +163,26 @@ index 71d2a8a906a..ce5bad99ad8 100644
  		details: details,
  		detailsToCopy: detailsToCopy
  	};
+diff --git a/src/vs/platform/theme/browser/iconsStyleSheet.ts b/src/vs/platform/theme/browser/iconsStyleSheet.ts
+index 7215f066d45..0e618119492 100644
+--- a/src/vs/platform/theme/browser/iconsStyleSheet.ts
++++ b/src/vs/platform/theme/browser/iconsStyleSheet.ts
+@@ -58,6 +58,10 @@ export function getIconsStyleSheet(themeService: IThemeService | undefined): IIc
+ 
+ 			for (const id in usedFontIds) {
+ 				const definition = usedFontIds[id];
++				// Ritemark (Sprint 145, #582): a font declared by a style sheet of its own (Phosphor, codicon.css) has no source here
++				if (!definition.src.length) {
++					continue;
++				}
+ 				const fontWeight = definition.weight ? css.inline`font-weight: ${css.identValue(definition.weight)};` : css.inline``;
+ 				const fontStyle = definition.style ? css.inline`font-style: ${css.identValue(definition.style)};` : css.inline``;
+ 
 diff --git a/src/vs/platform/theme/common/iconRegistry.ts b/src/vs/platform/theme/common/iconRegistry.ts
-index 9feac0c4ca4..08e22351a02 100644
+index 9feac0c4ca4..b016d81ea6b 100644
 --- a/src/vs/platform/theme/common/iconRegistry.ts
 +++ b/src/vs/platform/theme/common/iconRegistry.ts
-@@ -319,6 +319,45 @@ function initialize() {
+@@ -319,6 +319,49 @@ function initialize() {
  }
  initialize();
  
@@ -175,9 +194,13 @@ index 9feac0c4ca4..08e22351a02 100644
 +	terminal: 0xe47e, triangleAlert: 0xe4e0, clock: 0xe19a, list: 0xe2f0,
 +} as const;
 +
++// The font itself is declared once, in codicon.css (`url("./phosphor.woff2")`), where the build puts it beside the
++// style sheet (out/media/ in a release). No source here: a bare name became vscode-file://vscode-app/phosphor.woff2,
++// a request at the app's root that the protocol refused at every start (Sprint 145, #582). iconsStyleSheet.ts
++// writes no @font-face for a font without a source.
 +const phosphorFontDefinition: IconFontDefinition = {
 +	weight: '400',
-+	src: [{ location: URI.parse('phosphor.woff2'), format: 'woff2' }]
++	src: []
 +};
 +iconRegistry.registerIconFont('phosphor', phosphorFontDefinition);
 +
@@ -228,6 +251,41 @@ index 0009eb39c87..056d82e0dc5 100644
  		}
  	}
  
+diff --git a/src/vs/platform/theme/test/browser/ritemarkPhosphorFont.test.ts b/src/vs/platform/theme/test/browser/ritemarkPhosphorFont.test.ts
+new file mode 100644
+index 00000000000..0ab2cad0d20
+--- /dev/null
++++ b/src/vs/platform/theme/test/browser/ritemarkPhosphorFont.test.ts
+@@ -0,0 +1,29 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
++import { getIconsStyleSheet } from '../../browser/iconsStyleSheet.js';
++
++/**
++ * Ritemark (Sprint 145, #582): the Phosphor icon font is declared once, in codicon.css, at the place the build puts it.
++ * The icon registry's style sheet names the family for Phosphor's icons and asks for no file of its own: its bare
++ * `phosphor.woff2` was a request at the app's root that the protocol refused at every start.
++ */
++suite('Ritemark Phosphor icon font', () => {
++
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	test('the icons\' style sheet names the family and loads no Phosphor file of its own', () => {
++		const styleSheet = getIconsStyleSheet(undefined);
++		const css = styleSheet.getCSS().toString();
++		styleSheet.dispose();
++		assert.deepStrictEqual({
++			familyNamed: /\.codicon-phosphor-settings:before \{[^}]*font-family: 'phosphor'/.test(css),
++			phosphorFile: /phosphor\\?\.woff2/.test(css), // CSS.escape writes the dot as \.
++			phosphorFontFace: /@font-face \{[^}]*font-family: 'phosphor'/.test(css),
++		}, { familyNamed: true, phosphorFile: false, phosphorFontFace: false });
++	});
++});
 diff --git a/src/vs/workbench/browser/media/style.css b/src/vs/workbench/browser/media/style.css
 index c6bd172ac07..9ac63c8a9cf 100644
 --- a/src/vs/workbench/browser/media/style.css

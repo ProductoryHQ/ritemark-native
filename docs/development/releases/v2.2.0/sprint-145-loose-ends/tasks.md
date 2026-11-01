@@ -14,11 +14,11 @@ Nothing here starts before the plan is approved by Jarmo. Tick a box only when t
 - [x] A1 `research/stale-write-repro.md` (R1, S1–S8): the coordinator-level test and its failure on `main`; `scripts/qa/stale-write-check.mjs`, ten runs on the Mac; whether ⌘Z brings the words back (no); the false-positive set; the window and threshold chosen from the numbers
   - [ ] The Windows run (the "Ritemark on Windows" session: waiting)
 - [ ] A2 `research/ai-edit-tools.md` (R1, S9): each signed-in runtime's stale edit; the 27 October write's tool. **Not run** (scratch AI homes have no sign-in; the real homes may not be used); the file says why
-- [ ] A3 `research/switch-timing.md` (R9, S42–S44): `project-check.mjs --measure 10` on `main` and the shipped 2.1.0, with the AI column's markers; the first-switch outlier. **Not run in the first pass** (the profile had no second project); the file says why
-- [ ] A4 `research/first-start-terminal.md` (R10, S45–S47): the Windows reproduction; the Mac with a held extension host; VS Code 1.142's rule for an `inactive` editor in an empty group. **Waiting** for the Windows session
+- [x] A3 `research/switch-timing.md` (R9, S42–S44): `project-check.mjs --measure 10` on `main` with the AI column's markers (PR 2, then again in PR 5, before and after); the first-switch outlier (S44: the AI column waiting for the extension). The shipped 2.1.0 half was not run (the installed app is not touched); Sprint 144's RC record stands for it
+- [x] A4 `research/first-start-terminal.md` (R10, S45–S47): the Windows reproduction (the Windows session, 1 November, on #501); the Mac with a held extension host and VS Code 1.142's rule for an `inactive` editor in an empty group (PR 5)
 - [x] A5 `research/home-keys-windows.md` (R11): `scripts/qa/home-keys-check.mjs` written; the Windows run waits for a person (Phase 8)
 - [x] A6 `research/electron-availability.md` (R12, S50): the newest 43.x and its Node, dated; the Node network calls re-read (43.8.4–43.8.6 on Node 24.22.1; run again before the candidate)
-- [ ] A7 `research/log-lines.md` (R8, S39–S40): the request for `/phosphor.woff2` (found: patch 001's registration); DEP0169's stack (not reproduced in the dev build; not Ritemark's bundle; waits for PR 5's tree)
+- [ ] A7 `research/log-lines.md` (R8, S39–S40): the request for `/phosphor.woff2` (found: patch 001's registration; fixed in PR 5); DEP0169's stack (not reproduced in the dev build, PR 5's tree included: its built-in extensions don't start; not Ritemark's bundle; waits for the candidate, S41)
 - [ ] A8 `research/board-timing.md` (R3, S18): the table; the slow-file test for the tail (the store's share and the tail measured; the controller's steps in a dev instance not yet)
 - [x] A9 the flow harness run on `main` (R4, S27): the `flow:save` and its delay (`research/flow-save-timing.md`)
 - [x] Where an audit changes a requirement or a tier, `spec.md` and the sprint plan's tier line change first (R1, R4, R8, R12 addenda; no tier moved)
@@ -84,9 +84,9 @@ Approved on 1 November (`819c63f`); Codex reviews once (marked ready once, after
 
 ## Phase 6: PR 5, the shell patches (W8, W9, W10, W11; R8–R11)
 
-- [ ] Only what A3, A4, A5 and A7 show needs a patch: patch 001 (the icon font's place), patch 019 (restored terminals), patch 002 or 018 (the AI column), a keyboard hunk if R11 reproduces
-- [ ] Built on a CoW-cloned, patched `vscode/` through `create-patch.sh`; `./scripts/apply-patches.sh --dry-run` passes; the frame check if 018 changed
-- [ ] The tier line already names the patches
+- [x] Only what A3, A4, A5 and A7 show needs a patch: patch 001 (the icon font: no source in the registry, no `@font-face` without one), patch 019 (restored terminals wait for a document), patches 002 and 018 (the AI column restored with the layout; a switch lands on Home; no empty-part message); no keyboard hunk (R11 not reproduced)
+- [x] Built on a CoW-cloned, patched `vscode/` at the pin; the four patches' sections regenerated from the tree (`create-patch.sh` only makes a new numbered patch; patch 002's `layout.ts` hunks against the pristine file, 018's on top of them); `./scripts/apply-patches.sh --dry-run` 19 of 19, a real apply from pristine and a re-run, `check-patch-stacking.mjs` OK; `npm run typecheck-client`; the Ritemark suites (54 passing; the new tests fail on `main`'s stack); the frame check (`main`'s build and PR 5's give the same pixels, joins ok in 34 scenes)
+- [x] The tier line names the patches (001, 002 and 018, 019; sprint plan, 1 November)
 - [ ] PR 5 opened: High, `/code-review` at high and `/security-review`; every finding answered; merged at the reviewed head
 - [ ] The Windows proof is on 2.2's candidate at Gate 2 (S46)
 
