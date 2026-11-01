@@ -36,6 +36,10 @@ async function main() {
   assert.ok(globToRegExp('report-[0-9].md').test('report-7.md'));
   assert.ok(!globToRegExp('Drafts').test('drafts'), 'case counts on the Mac, as VS Code\'s glob');
   assert.ok(globToRegExp('Drafts', true).test('drafts'), 'not on Windows');
+  // A glob a regular expression can't take (a backwards range) is matched as written, never thrown.
+  assert.doesNotThrow(() => globToRegExp('**/[z-a]*'));
+  assert.ok(globToRegExp('**/[z-a]*').test('**/[z-a]*'));
+  assert.ok(!globToRegExp('**/[z-a]*').test('notes.md'));
 
   // ── The cloud-file rule ─────────────────────────────────────────────────────
   assert.equal(cloudState('/u/iCloud/a.pdf', { size: 5000, blocks: 0 }, 'darwin', []), 'online-only', 'dataless: a size, no blocks');

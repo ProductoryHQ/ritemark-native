@@ -32,7 +32,7 @@ Nothing here starts before the plan is approved (the Development manager, on Jar
 - [x] New tests in `npm test`; `tsc --noEmit` passes (the worker's own `tsconfig.search-worker.json` too)
 - [x] `scripts/qa/search-fixture.mjs`; M1 and M3 on the Mac in `research/measurements.md`; a missed target goes to the Development manager (the warm start past the plan's folder, and the query past 20,000 documents)
 - [ ] Windows through the overlay: the worker, paths, the watcher, M1 with Defender, A4's OneDrive case
-- [ ] PR 1 opened: Standard; `/code-review` at medium; every finding answered; merged at the reviewed head
+- [ ] PR 1 opened: Standard; `/code-review` at medium; every finding answered; merged at the reviewed head (#631 opened as a draft; one round, 15 findings, all fixed; the merge waits)
 
 ## Phase 3: PR 2, the results view (W5, W6; R6, R7's extension side, R8, E3)
 

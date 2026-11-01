@@ -88,6 +88,9 @@ async function main() {
     const joined = all.join(' ');
     for (const hidden of ['secret', 'hidden-target', 'hidden-path', 'class', 'c1']) assert.ok(!joined.includes(hidden), hidden);
     assert.equal(outcome.ok && outcome.passages[0].at.block, 0);
+    // A comment's words are marked as a comment's, so R9 doesn't count them in the document's text.
+    const comments = outcome.ok ? outcome.passages.filter((p) => p.at.comment).map((p) => p.text) : [];
+    assert.deepEqual(comments, ['@claude: check the figures', 'verify with finance']);
     // The budget per document.
     const capped = readMarkdown('word '.repeat(1000), 100);
     assert.ok(capped.ok && capped.truncated && capped.passages[0].text.length <= 100);
@@ -132,6 +135,11 @@ async function main() {
       '<w:r><w:pict><w:txbxContent><w:p><w:r><w:t>in a box</w:t></w:r></w:p></w:txbxContent></w:pict></w:r></w:p></w:body></w:document>';
     const parsed = documentXmlPassages(xml, BUDGET);
     assert.deepEqual(texts(parsed), ['in a box', 'kept & more']);
+    // A text box carries its paragraphs twice, the second time for older readers (mc:Fallback): read once.
+    const twice =
+      '<w:p><w:r><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing><w:txbxContent><w:p><w:r><w:t>boxed</w:t></w:r></w:p></w:txbxContent></w:drawing></mc:Choice>' +
+      '<mc:Fallback><w:pict><v:textbox><w:txbxContent><w:p><w:r><w:t>boxed</w:t></w:r></w:p></w:txbxContent></v:textbox></w:pict></mc:Fallback></mc:AlternateContent></w:r><w:r><w:t>after</w:t></w:r></w:p>';
+    assert.deepEqual(texts(documentXmlPassages(twice, BUDGET)), ['boxed', 'after']);
 
     // The corpus's refusals: found by name.
     const corpus = path.resolve(__dirname, '../../../../../docs/development/releases/v1.12.0/sprint-124-word-preview-fidelity/research/corpus/fixtures');

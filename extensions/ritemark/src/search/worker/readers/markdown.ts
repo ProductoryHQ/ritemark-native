@@ -102,14 +102,14 @@ export function readMarkdown(source: string, budget: number): ReadOutcome {
         case 'html': {
           const raw = token.raw ?? token.text ?? '';
           const comment = STANDALONE_COMMENT.exec(raw);
-          if (comment) sink.add(decodeEntities(comment[1].replace(COMMENT_ID, '')), at);
+          if (comment) sink.add(decodeEntities(comment[1].replace(COMMENT_ID, '')), { ...at, comment: true });
           else sink.add(decodeEntities(stripTags(raw, notes)), at);
           break;
         }
         default:
           break; // space, hr, def
       }
-      for (const note of notes) sink.add(note, at);
+      for (const note of notes) sink.add(note, { ...at, comment: true });
     }
   };
   let next = 0;

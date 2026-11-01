@@ -169,4 +169,38 @@ assert.equal(matchWord(queryWord('žürii', false), 'zurii', false, false), null
   assert.deepEqual(map.map((m) => [m.relativePath, m.name, m.firstLine]), [['Budget.md', 'Budget', 'The budget for 2027.'], ['a/Ships.md', 'Ships', 'Harbour fees and the budget.']], 'documents only, by path');
 }
 
+// ── Review round 1 (#631) ────────────────────────────────────────────────────
+{
+  // Hangul: a syllable decomposes into letters, not marks, so a typed syllable finds only words that start with it.
+  const index = new WordIndex();
+  index.add(doc('d:1', 'Note', ['한국 사람']));
+  index.add(doc('d:2', 'Other', ['하늘']));
+  assert.deepEqual(names(index, '한구'), [], '"한구" is not the start of "한국", though its jamo are');
+  assert.deepEqual(names(index, '하늘'), ['Other']);
+  assert.deepEqual(names(index, '한국'), ['Note']);
+  const [result] = index.query('한국', { options: ANY, perKind: 5 }).groups[0].results;
+  assert.ok(result.passage, 'every result with a hit in the text shows its passage');
+}
+{
+  // R9: a comment's words are found, but the find bar's occurrence counts only the document's own text.
+  const index = new WordIndex();
+  index.add({
+    key: 'd:c',
+    kind: 'document',
+    name: 'Plan',
+    where: null,
+    changedAt: 0,
+    passages: [
+      { text: 'Intro paragraph.', at: { block: 0 } },
+      { text: 'check the budget', at: { block: 0, comment: true } },
+      { text: 'The budget for next year.', at: { block: 1 } },
+    ],
+  });
+  const [inText] = index.query('budget next', { options: ANY, perKind: 5 }).groups[0].results;
+  assert.deepEqual(inText.match, { text: 'budget', occurrence: 0 }, 'the note\'s "budget" isn\'t counted');
+  const [inComment] = index.query('check', { options: ANY, perKind: 5 }).groups[0].results;
+  assert.equal(inComment.passage?.text, 'check the budget');
+  assert.equal(inComment.match, null, 'a hit in a comment has nothing to land on');
+}
+
 console.log('wordIndex.test.ts: all passed');

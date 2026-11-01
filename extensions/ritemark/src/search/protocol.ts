@@ -26,6 +26,8 @@ export interface PassageLocation {
   /** A chat's message: who said it, `you` or the AI's runtime id (`claude-code`, `codex`, `opencode`). */
   speaker?: string;
   field?: 'doneWhen' | 'description';
+  /** A Markdown comment's words: found, but not in the text a document's find bar searches (R9). */
+  comment?: true;
 }
 
 /** Why a document is searched by its name only, not inside. */

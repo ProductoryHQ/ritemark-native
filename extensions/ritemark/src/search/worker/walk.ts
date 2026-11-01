@@ -137,7 +137,13 @@ export function globToRegExp(glob: string, ignoreCase = false): RegExp {
     i++;
   }
   while (braces-- > 0) source += ')';
-  return new RegExp(`^${source}$`, ignoreCase ? 'i' : '');
+  try {
+    return new RegExp(`^${source}$`, ignoreCase ? 'i' : '');
+  } catch {
+    // A pattern VS Code's glob reads but a regular expression can't (a range like [z-a]): matched as written.
+    const literal = pattern.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&');
+    return new RegExp('^' + literal + '$', ignoreCase ? 'i' : '');
+  }
 }
 
 // ── The rules for one project ───────────────────────────────────────────────

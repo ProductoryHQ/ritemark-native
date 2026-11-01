@@ -60,7 +60,11 @@ function loadPdfjs(): Promise<PdfJs> {
     // pdf.js's parser, in this thread: getDocument finds it here instead of starting a worker of its own.
     scope.pdfjsWorker ??= await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
     return (await import('pdfjs-dist/legacy/build/pdf.mjs')) as unknown as PdfJs;
-  })();
+  })().catch((error: unknown) => {
+    // Not kept: the next PDF tries to load it again. The reader's caller treats the throw as a failed read, not a verdict.
+    pdfjs = null;
+    throw error;
+  });
   return pdfjs;
 }
 

@@ -20,7 +20,8 @@ import type { NameOnlyReason } from '../protocol';
 import { READER_VERSION, type Passage } from './readers';
 
 export type CachedText =
-  | { kind: 'text'; passages: Passage[]; truncated: boolean }
+  /** `budget`: the characters it was read under. A copy cut short is used only under a budget no larger. */
+  | { kind: 'text'; passages: Passage[]; truncated: boolean; budget: number }
   | { kind: 'name-only'; reason: NameOnlyReason };
 
 interface IndexRow {
@@ -95,7 +96,48 @@ export class TextCache {
     return this.dir !== null;
   }
 
-  async open(): Promise<void> {
+  // Every read and write of the folder runs one at a time, in order: a flush never writes `index.json.tmp`
+  // while another does, and a copy is never written twice at once.
+  private tail: Promise<unknown> = Promise.resolve();
+
+  private serial<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.tail.then(work, work);
+    this.tail = run.catch(() => undefined);
+    return run;
+  }
+
+  open(): Promise<void> {
+    return this.serial(() => this.openNow());
+  }
+
+  get(filePath: string, size: number, mtimeMs: number): Promise<CachedText | null> {
+    return this.serial(() => this.getNow(filePath, size, mtimeMs));
+  }
+
+  put(filePath: string, size: number, mtimeMs: number, value: CachedText): Promise<void> {
+    return this.serial(() => this.putNow(filePath, size, mtimeMs, value));
+  }
+
+  /** The document went (deleted, or renamed away): its copy goes at once. */
+  delete(filePath: string): Promise<void> {
+    return this.serial(() => this.deleteNow(filePath));
+  }
+
+  /** A folder went: the copies of every document inside it go. */
+  deleteUnder(folderPath: string): Promise<void> {
+    return this.serial(() => this.deleteUnderNow(folderPath));
+  }
+
+  /** At index start: drops the copies whose documents are gone (deleted while Ritemark was closed). */
+  sweep(livePaths: ReadonlySet<string>): Promise<number> {
+    return this.serial(() => this.sweepNow(livePaths));
+  }
+
+  flush(): Promise<void> {
+    return this.serial(() => this.flushNow());
+  }
+
+  private async openNow(): Promise<void> {
     if (this.opened || !this.dir) return;
     this.opened = true;
     let index: IndexFile | null = null;
@@ -118,7 +160,7 @@ export class TextCache {
     }
   }
 
-  async get(filePath: string, size: number, mtimeMs: number): Promise<CachedText | null> {
+  private async getNow(filePath: string, size: number, mtimeMs: number): Promise<CachedText | null> {
     if (!this.dir) return null;
     const hash = hashOf(filePath);
     const row = this.rows.get(hash);
@@ -140,7 +182,7 @@ export class TextCache {
     return null;
   }
 
-  async put(filePath: string, size: number, mtimeMs: number, value: CachedText): Promise<void> {
+  private async putNow(filePath: string, size: number, mtimeMs: number, value: CachedText): Promise<void> {
     if (!this.dir) return;
     const hash = hashOf(filePath);
     const data = JSON.stringify(value);
@@ -162,22 +204,19 @@ export class TextCache {
     await this.evict();
   }
 
-  /** The document went (deleted, or renamed away): its copy goes at once. */
-  async delete(filePath: string): Promise<void> {
+  private async deleteNow(filePath: string): Promise<void> {
     const hash = hashOf(filePath);
     if (this.rows.has(hash)) await this.drop(hash);
   }
 
-  /** A folder went: the copies of every document inside it go. */
-  async deleteUnder(folderPath: string): Promise<void> {
+  private async deleteUnderNow(folderPath: string): Promise<void> {
     const prefix = folderPath.endsWith(nodePath.sep) ? folderPath : folderPath + nodePath.sep;
     for (const [hash, row] of [...this.rows]) {
       if (row.path.startsWith(prefix)) await this.drop(hash);
     }
   }
 
-  /** At index start: drops the copies whose documents are gone (deleted while Ritemark was closed). */
-  async sweep(livePaths: ReadonlySet<string>): Promise<number> {
+  private async sweepNow(livePaths: ReadonlySet<string>): Promise<number> {
     let dropped = 0;
     for (const [hash, row] of [...this.rows]) {
       if (!livePaths.has(row.path)) {
@@ -203,17 +242,17 @@ export class TextCache {
     }
   }
 
-  async flush(): Promise<void> {
+  private async flushNow(): Promise<void> {
     if (!this.dir || !this.dirty) return;
     const index: IndexFile = { schema: 1, readerVersion: this.readerVersion, entries: Object.fromEntries(this.rows) };
     const target = nodePath.join(this.dir, INDEX);
+    this.dirty = false;
     try {
       await this.fs.mkdir(this.dir);
       await this.fs.writeFile(`${target}.tmp`, JSON.stringify(index));
       await this.fs.rename(`${target}.tmp`, target);
-      this.dirty = false;
     } catch {
-      // kept dirty: the next flush tries again
+      this.dirty = true; // the next flush tries again
     }
   }
 

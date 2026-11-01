@@ -109,6 +109,7 @@ const ROOT = '/p';
 
 function makeIndexer(fs: MemoryFs, clock: Clock, options: { limits?: Partial<SearchLimits>; cacheDir?: string | null; chatFs?: ChatFs; read?: ConstructorParameters<typeof Indexer>[0]['read'] } = {}) {
   const statuses: IndexStatus[] = [];
+  const logs: string[] = [];
   const indexer = new Indexer({
     fs,
     cache: new TextCache(options.cacheDir ?? null, 10 * 1024 * 1024),
@@ -116,7 +117,7 @@ function makeIndexer(fs: MemoryFs, clock: Clock, options: { limits?: Partial<Sea
     timers: clock,
     pause: () => Promise.resolve(),
     onStatus: (status) => statuses.push(status),
-    log: () => undefined,
+    log: (event) => logs.push(event),
     read: options.read,
   });
   const config: WorkerConfig = {
@@ -129,7 +130,7 @@ function makeIndexer(fs: MemoryFs, clock: Clock, options: { limits?: Partial<Sea
     chats: options.chatFs ? { dir: '/store', scopeId: 'ps1-scope' } : null,
     limits: { ...DEFAULT_SEARCH_LIMITS, ...options.limits },
   };
-  return { indexer, statuses, config };
+  return { indexer, statuses, config, logs };
 }
 
 function found(indexer: Indexer, text: string, kind = 'document'): string[] {
@@ -312,6 +313,166 @@ async function main() {
     assert.deepEqual(found(indexer, 'paint', 'task'), ['Paint the lighthouse']);
     indexer.setTasks([]);
     assert.deepEqual(found(indexer, 'paint', 'task'), [], 'a snapshot replaces the set');
+  }
+
+  // ── Review round 1 (#631): the fixes, each with its case ───────────────────
+
+  // Reading from the first moment: a query before the walk ends is "still reading", not a final nothing.
+  {
+    const fs = new MemoryFs();
+    fs.write(`${ROOT}/Notes.md`, 'words');
+    const { indexer, config } = makeIndexer(fs, new Clock());
+    const started = indexer.start(config);
+    assert.equal(indexer.status().state, 'reading');
+    assert.ok(indexer.query(1, 'words', DEFAULT_SEARCH_OPTIONS, 5).reading, 'the answer says it is still reading');
+    await started;
+    assert.equal(indexer.query(1, 'words', DEFAULT_SEARCH_OPTIONS, 5).reading, null);
+  }
+
+  // Events while a walk lists the folders wait for it: its listing never overwrites them, and none is dropped.
+  {
+    class GatedFs extends MemoryFs {
+      gate: Promise<void> | null = null;
+      override async stat(target: string) {
+        if (this.gate && target.endsWith('/Z.md')) await this.gate;
+        return super.stat(target);
+      }
+    }
+    const fs = new GatedFs();
+    fs.write(`${ROOT}/A.md`, 'alpha words');
+    fs.write(`${ROOT}/Z.md`, 'zulu words');
+    let open!: () => void;
+    fs.gate = new Promise<void>((resolve) => (open = resolve));
+    const clock = new Clock();
+    const { indexer, config } = makeIndexer(fs, clock);
+    const started = indexer.start(config);
+    await settle(); // the walk has listed the folder and waits on Z.md's stat
+    fs.write(`${ROOT}/B.md`, 'bravo words');
+    fs.remove(`${ROOT}/A.md`);
+    indexer.onEvents([{ kind: 'created', path: `${ROOT}/B.md` }, { kind: 'deleted', path: `${ROOT}/A.md` }]);
+    fs.gate = null;
+    open();
+    await started;
+    await clock.advance(FIRST_LOOK_MS + SETTLE_MS);
+    assert.deepEqual(found(indexer, 'words').sort(), ['B', 'Z'], 'the walk listed A and missed B; the events set it right');
+  }
+
+  // A read that failed (a locked file, too many open files) is no verdict: not kept, read again next time.
+  {
+    const cacheDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'search-fail-'));
+    try {
+      const fs = new MemoryFs();
+      fs.write(`${ROOT}/Locked.pdf`, '%PDF');
+      let fail = true;
+      const read = async () => {
+        if (fail) throw Object.assign(new Error('EBUSY'), { code: 'EBUSY' });
+        return { ok: true, passages: [{ text: 'quarterly figures', at: { page: 1 } }], truncated: false } as const;
+      };
+      const first = makeIndexer(fs, new Clock(), { cacheDir, read });
+      await first.indexer.start(first.config);
+      assert.equal(first.indexer.status().failed, 1);
+      assert.deepEqual(found(first.indexer, 'quarterly'), []);
+      fail = false;
+      const second = makeIndexer(fs, new Clock(), { cacheDir, read });
+      await second.indexer.start(second.config);
+      assert.deepEqual(found(second.indexer, 'quarterly'), ['Locked'], 'read again, not taken from a copy of the failure');
+      assert.equal(second.indexer.status().failed, 0);
+    } finally {
+      await fsp.rm(cacheDir, { recursive: true, force: true });
+    }
+  }
+
+  // A copy cut short by the project's budget isn't kept: a later start with room reads the whole file.
+  {
+    const cacheDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'search-budget-'));
+    try {
+      const fs = new MemoryFs();
+      fs.write(`${ROOT}/Long.pdf`, '%PDF');
+      let reads = 0;
+      const read = async (_format: string, _bytes: Uint8Array, budget: number) => {
+        reads++;
+        const text = 'early words '.repeat(5) + 'late words';
+        return { ok: true, passages: [{ text: text.slice(0, budget), at: { page: 1 } }], truncated: text.length > budget } as const;
+      };
+      const starved = makeIndexer(fs, new Clock(), { cacheDir, read, limits: { textBudget: 20 } });
+      await starved.indexer.start(starved.config);
+      assert.deepEqual(found(starved.indexer, 'late'), []);
+      const roomy = makeIndexer(fs, new Clock(), { cacheDir, read });
+      await roomy.indexer.start(roomy.config);
+      assert.equal(reads, 2, 'not taken from the short copy');
+      assert.deepEqual(found(roomy.indexer, 'late'), ['Long']);
+      const third = makeIndexer(fs, new Clock(), { cacheDir, read });
+      await third.indexer.start(third.config);
+      assert.equal(reads, 2, 'the whole copy is kept');
+    } finally {
+      await fsp.rm(cacheDir, { recursive: true, force: true });
+    }
+  }
+
+  // Chats share the text budget, at most a quarter of it, the newest messages first.
+  {
+    const files = new Map<string, string>();
+    const chatFs: ChatFs = { readFile: async (target) => files.get(target) ?? Promise.reject(new Error('ENOENT')), exists: async (target) => files.has(target) };
+    const id = '22222222-2222-4333-8444-555555555555';
+    files.set('/store/index.json', JSON.stringify({ entries: [{ conversationId: id, scopeId: 'ps1-scope', revision: 1 }] }));
+    files.set(`/store/records/${id}.json`, JSON.stringify({ conversationId: id, title: 'Long chat', events: [
+      { kind: 'user-message', eventId: 'old', text: 'oldest words here' },
+      { kind: 'assistant-message', eventId: 'new', content: 'newest' },
+    ] }));
+    const fs = new MemoryFs();
+    fs.write(`${ROOT}/Doc.md`, 'document words');
+    const { indexer, config } = makeIndexer(fs, new Clock(), { chatFs, limits: { textBudget: 40 } });
+    await indexer.start(config);
+    assert.deepEqual(found(indexer, 'newest', 'chat'), ['Long chat'], 'the newest message fits the quarter (10 characters)');
+    assert.deepEqual(found(indexer, 'oldest', 'chat'), [], 'the older one doesn\'t');
+    assert.deepEqual(found(indexer, 'document'), ['Doc'], 'the documents keep the rest');
+  }
+
+  // A folder moved in is listed by itself; a .gitignore in a folder search leaves out walks nothing again.
+  {
+    const fs = new MemoryFs();
+    fs.write(`${ROOT}/Notes.md`, 'words');
+    const clock = new Clock();
+    const { indexer, config, logs } = makeIndexer(fs, clock);
+    await indexer.start(config);
+    const walks = () => logs.filter((event) => event === 'walk').length;
+    fs.write(`${ROOT}/moved/In.md`, 'moved words');
+    fs.write(`${ROOT}/moved/deeper/Too.md`, 'deeper words');
+    fs.write(`${ROOT}/moved/node_modules/x/Skip.md`, 'skipped words');
+    indexer.onEvents([{ kind: 'created', path: `${ROOT}/moved` }]);
+    await clock.advance(FIRST_LOOK_MS);
+    await clock.advance(FIRST_LOOK_MS + SETTLE_MS);
+    assert.deepEqual(found(indexer, 'moved').concat(found(indexer, 'deeper')).sort(), ['In', 'Too']);
+    assert.deepEqual(found(indexer, 'skipped'), []);
+    assert.equal(walks(), 1, 'no walk of the whole project');
+    fs.write(`${ROOT}/node_modules/pkg/.gitignore`, 'x');
+    fs.write(`${ROOT}/.venv/.gitignore`, '*');
+    indexer.onEvents([{ kind: 'created', path: `${ROOT}/node_modules/pkg/.gitignore` }, { kind: 'created', path: `${ROOT}/.venv/.gitignore` }]);
+    await clock.advance(1000);
+    assert.equal(walks(), 1);
+    fs.write(`${ROOT}/moved/.gitignore`, 'deeper/');
+    indexer.onEvents([{ kind: 'created', path: `${ROOT}/moved/.gitignore` }]);
+    await clock.advance(1000);
+    assert.equal(walks(), 2, 'a .gitignore in a folder search covers does');
+    assert.deepEqual(found(indexer, 'deeper'), []);
+  }
+
+  // The counts follow the documents: a file that failed and then read is no longer counted as failed.
+  {
+    const fs = new MemoryFs();
+    fs.write(`${ROOT}/Half.docx`, 'PK');
+    let ok = false;
+    const read = async () => (ok ? ({ ok: true, passages: [{ text: 'whole now', at: {} }], truncated: false } as const) : ({ ok: false, reason: 'unreadable' } as const));
+    const clock = new Clock();
+    const { indexer, config } = makeIndexer(fs, clock, { read });
+    await indexer.start(config);
+    assert.equal(indexer.status().failed, 1);
+    ok = true;
+    fs.write(`${ROOT}/Half.docx`, 'PK-whole');
+    indexer.onEvents([{ kind: 'changed', path: `${ROOT}/Half.docx` }]);
+    await clock.advance(FIRST_LOOK_MS + SETTLE_MS);
+    assert.equal(indexer.status().failed, 0);
+    assert.deepEqual(found(indexer, 'whole'), ['Half']);
   }
 
   console.log('freshness.test.ts: all passed');

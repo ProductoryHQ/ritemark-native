@@ -9,7 +9,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { TextCache, type CachedText } from './textCache';
 
-const text = (words: string): CachedText => ({ kind: 'text', passages: [{ text: words, at: { page: 1 } }], truncated: false });
+const text = (words: string): CachedText => ({ kind: 'text', passages: [{ text: words, at: { page: 1 } }], truncated: false, budget: 2 * 1024 * 1024 });
 
 async function main() {
   const base = await fsp.mkdtemp(path.join(os.tmpdir(), 'search-cache-'));
@@ -79,6 +79,25 @@ async function main() {
     await newer.open();
     assert.equal(newer.entries, 0);
     assert.deepEqual((await fsp.readdir(dir)).sort(), ['not-ours.txt']);
+
+    // Writes and flushes that overlap (the walk's and a saved file's) run one after another: nothing is lost or mixed.
+    const busy = path.join(base, 'busy');
+    const together = new TextCache(busy, 10_000);
+    await together.open();
+    await Promise.all([
+      together.put('/p/a.pdf', 1, 1, text('a')),
+      together.flush(),
+      together.put('/p/b.pdf', 1, 1, text('b')),
+      together.put('/p/b.pdf', 1, 1, text('b again')),
+      together.flush(),
+      together.put('/p/c.pdf', 1, 1, text('c')),
+      together.flush(),
+    ]);
+    const reopened = new TextCache(busy, 10_000);
+    await reopened.open();
+    assert.equal(reopened.entries, 3, 'every row reached index.json');
+    assert.deepEqual(await reopened.get('/p/b.pdf', 1, 1), text('b again'));
+    assert.deepEqual((await fsp.readdir(busy)).filter((name) => name.endsWith('.tmp')), []);
 
     // Without a project storage folder there is no cache, and nothing fails.
     const none = new TextCache(null, 10_000);

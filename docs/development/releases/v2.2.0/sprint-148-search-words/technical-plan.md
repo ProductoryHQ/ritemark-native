@@ -89,7 +89,7 @@ After A2 and A3. Each reader is pure over bytes and returns `{ passages: { text,
 
 - **Markdown:** `marked.lexer`, walked for text tokens; headings, paragraphs, list items, table rows, quotes as passages; front matter, link targets, image paths and HTML left out; a comment's words kept (its mark is HTML-like in the file, so the reader keeps its body text).
 - **CSV:** `papaparse` with quotes; each row a passage, its cells joined with " · ".
-- **Word:** `readZipDirectory` and the capped inflate, exported from `officePackageCheck.ts` as they are (no behaviour change for the preview); `checkOfficePackage` first, with the preview's limits; `word/document.xml` scanned for `w:p`, `w:t`, `w:tab`, `w:br`, `w:tc`.
+- **Word:** `readZipDirectory` as it is, and `readZipEntry` beside it (one entry, inflated capped at its declared size), in `officePackageCheck.ts` with no behaviour change for the preview; `checkOfficePackage` first, with the preview's limits but without inflating every part (`verifyParts: false`; the preview keeps the default); `word/document.xml` scanned for `w:p`, `w:t`, `w:tab`, `w:br`, `w:tc`, skipping `mc:Fallback`'s second copy of a text box.
 - **PDF:** `pdfjs-dist` by A2's route; `buildPdfSearchIndex` imported from the webview's module (it is pure and DOM-free) so the passages are the preview's chunks; a passage per run of chunks within a block, with its page; scanned PDFs name only.
 - **Tests:** `readers.test.ts` on the fixtures, one case per kind and per refusal.
 

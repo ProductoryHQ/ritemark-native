@@ -5,7 +5,8 @@
  * table cell; a text box's paragraphs are passages of their own.
  *
  * Kept: runs (`w:t`), tabs and line breaks as spaces, inserted text. Left out:
- * deleted text (`w:delText`), field codes (`w:instrText`), and the parts outside
+ * deleted text (`w:delText`), field codes (`w:instrText`), the second copy a
+ * text box carries for older readers (`mc:Fallback`), and the parts outside
  * the body (headers, footers, footnotes, comments: not in Sprint 148).
  * A password-protected, damaged or legacy file is refused, and found by name.
  */
@@ -34,13 +35,21 @@ export function documentXmlPassages(xml: string, budget: number): ReadOutcome {
       }
     }
   };
+  // Inside mc:Fallback: the same content once more, for older readers (a text box's VML copy). Read once.
+  let fallback = 0;
   TAG.lastIndex = 0;
   for (let match = TAG.exec(xml); match && !sink.full; match = TAG.exec(xml)) {
-    if (inText && match.index > last) append(decodeEntities(xml.slice(last, match.index)));
+    if (inText && fallback === 0 && match.index > last) append(decodeEntities(xml.slice(last, match.index)));
     last = TAG.lastIndex;
     const closing = match[1] === '/';
     const name = match[3];
     const selfClosing = match[5] === '/';
+    if (match[2] === 'mc:' && name === 'Fallback' && !selfClosing) {
+      fallback += closing ? -1 : 1;
+      inText = false;
+      continue;
+    }
+    if (fallback > 0) continue;
     switch (name) {
       case 't':
         inText = !closing && !selfClosing;
@@ -80,7 +89,8 @@ export function documentXmlPassages(xml: string, budget: number): ReadOutcome {
 }
 
 export async function readDocx(bytes: Uint8Array, budget: number): Promise<ReadOutcome> {
-  const verdict = await checkOfficePackage(bytes, 'word/', OFFICE_PREVIEW_LIMITS);
+  // The preview's checks, but not its inflating of every part: only document.xml is read, capped at its size.
+  const verdict = await checkOfficePackage(bytes, 'word/', OFFICE_PREVIEW_LIMITS, { verifyParts: false });
   if (!verdict.ok) {
     if (verdict.reason === 'password-protected') return { ok: false, reason: 'protected' };
     if (verdict.reason === 'too-large') return { ok: false, reason: 'too-large' };

@@ -8,7 +8,7 @@ Read on 1 November 2026 from `main` at `b2ac230e`. PR 1 needs the words and the 
 - **Read only, in the worker:** `index.json` lists the chats with their `scopeId`, `revision` and `integrity`; each chat is `records/<id>.json`. The worker reads them directly, never through `ConversationStore`, whose reads can repair and rewrite the index. A chat is read again only when its revision moves; a chat gone from the index, marked `corrupt`, or with a tombstone (`tombstones/<id>.json`) never shows.
 - **The scope:** the host gives the worker the same `resolveProjectScope(...)` id the AI sidebar's controller uses, so the list is this project's chats.
 - **Following them:** the host watches `index.json` as Home does (`projectsHost.ts`) and tells the worker after 300 ms.
-- **The largest record:** not measured on a test profile here. The reader keeps at most 1 MB of message text per chat, the newest messages first, so a long chat costs at most that.
+- **The largest record:** not measured on a test profile here. The reader keeps at most 1 MB of message text per chat, the newest messages first, and all chats together at most a quarter of R1's text budget (20 MB of 80), so many long chats can't take the worker past its heap cap (the review round of #631); past it, a chat is found by its title.
 - **Who said it:** each passage carries `speaker`, `you` or the AI's runtime id, for the row's "You: …" or "Claude: …" (the Experience lead, question 4).
 
 ## Tasks

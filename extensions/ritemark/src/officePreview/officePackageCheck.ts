@@ -214,11 +214,16 @@ export async function verifyDeclaredSizes(bytes: Uint8Array, entries: readonly Z
 /**
  * Is this a package the preview may open? `partPrefix` is the folder the
  * format keeps its parts in: `word/` for .docx, `ppt/` for .pptx.
+ *
+ * `verifyParts: false` (Sprint 148, search) skips the last step, inflating every
+ * part: search reads one part, through `readZipEntry`, which is capped at that
+ * part's declared size itself, so the pictures needn't be inflated to be checked.
  */
 export async function checkOfficePackage(
   bytes: Uint8Array,
   partPrefix: string,
   limits: typeof OFFICE_PREVIEW_LIMITS = OFFICE_PREVIEW_LIMITS,
+  { verifyParts = true }: { verifyParts?: boolean } = {},
 ): Promise<PackageVerdict> {
   if (bytes.length > limits.maxFileBytes) return { ok: false, reason: 'too-large', bytes: bytes.length };
   if (startsWith(bytes, CFB_SIGNATURE)) {
@@ -245,7 +250,7 @@ export async function checkOfficePackage(
   if (!names.includes('[Content_Types].xml')) return { ok: false, reason: 'not-an-office-file' };
   if (!names.some((n) => n.startsWith(partPrefix))) return { ok: false, reason: 'wrong-kind' };
   // Last, and only now that the declared sizes are within the limits: are they true?
-  if (!(await verifyDeclaredSizes(bytes, entries))) return { ok: false, reason: 'damaged' };
+  if (verifyParts && !(await verifyDeclaredSizes(bytes, entries))) return { ok: false, reason: 'damaged' };
   return { ok: true };
 }
 

@@ -4,9 +4,9 @@ Run on 1 November 2026 on the Mac, on `sprint-148-search-words`. Cases in `src/s
 
 ## How it reads
 
-1. `checkOfficePackage(bytes, 'word/')`, the preview's own check with its limits (`OFFICE_PREVIEW_LIMITS`: 50 MB, 10,000 entries, 400 MB unpacked, the bomb ratio, every part inflated to its declared size).
-2. `readZipDirectory` finds `word/document.xml`; `readZipEntry`, new in `officePackageCheck.ts`, inflates that one entry capped at its declared size. It shares the local-header arithmetic with `verifyDeclaredSizes` (`entryDataRange`), which is otherwise unchanged; the file's own tests still pass.
-3. The XML is scanned tag by tag: `w:t` text kept; `w:tab`, `w:br`, `w:cr` as spaces; one passage per paragraph (`w:p`) and per table cell (`w:tc`, its paragraphs joined); a text box's paragraphs (`w:txbxContent`) are passages of their own.
+1. `checkOfficePackage(bytes, 'word/', limits, { verifyParts: false })`: the preview's own check with its limits (`OFFICE_PREVIEW_LIMITS`: 50 MB, 10,000 entries, 400 MB unpacked, the bomb ratio, the password and legacy cases), without its last step, inflating every part. The preview still takes that step (the option's default); search reads one part, capped at that part's size, so the pictures needn't be inflated to be checked (the review round of #631: inflating them filled the thread pool the extension host shares).
+2. `readZipDirectory` finds `word/document.xml`; `readZipEntry`, new in `officePackageCheck.ts`, inflates that one entry capped at its declared size, and refuses it if it holds more or less. It shares the local-header arithmetic with `verifyDeclaredSizes` (`entryDataRange`), which is otherwise unchanged; the file's own tests still pass.
+3. The XML is scanned tag by tag: `w:t` text kept; `w:tab`, `w:br`, `w:cr` as spaces; one passage per paragraph (`w:p`) and per table cell (`w:tc`, its paragraphs joined); a text box's paragraphs (`w:txbxContent`) are passages of their own, read once (the copy a text box carries for older readers, inside `mc:Fallback`, is skipped).
 
 ## The cases
 

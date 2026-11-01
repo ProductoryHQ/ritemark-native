@@ -18,7 +18,8 @@ A fixture tree written to a temp folder by the test:
 | `~$Report.docx` (Office's lock file) | Left out |
 | Root `CLAUDE.md` whose whole text is `@AGENTS.md`, with `AGENTS.md` beside it | Left out, as Documents hides it; with the person's own words it stays |
 | Root `AGENTS.md` | Named "About this project", as patch 018 names it |
-| The watcher's events | Judged by the same rules (`classifyPath`); a changed `.gitignore` or `.git/info/exclude` walks again |
+| The watcher's events | Judged by the same rules (`classifyPath`). A changed `.gitignore` or `.git/info/exclude` walks again, unless the `.gitignore` is in a folder search leaves out (`node_modules`, a dot folder, an ignored folder). A folder moved in is listed by itself, not the whole project. Events that come while a walk lists the folders wait for it (`freshness.test.ts`) |
+| A `files.exclude` glob a regular expression can't take (`**/[z-a]*`) | Matched as written; it never throws (the review round) |
 
 Windows paths: the rules work on root-relative paths with `/`, so they don't depend on the separator; a Windows run belongs to the overlay session.
 

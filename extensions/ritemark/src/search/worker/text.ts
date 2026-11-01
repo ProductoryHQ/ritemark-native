@@ -25,9 +25,13 @@ export function normalizeText(text: string): string {
   return text.normalize('NFC');
 }
 
-/** The base of a (folded) word: its marks removed. */
+/**
+ * The base of a (folded) word: its marks removed, and composed again, so a
+ * letter that decomposes into letters rather than marks (a Hangul syllable into
+ * its jamo) stays one letter and a base's prefix is a prefix of letters.
+ */
 export function baseOf(word: string): string {
-  return word.normalize('NFD').replace(MARKS, '');
+  return word.normalize('NFD').replace(MARKS, '').normalize('NFC');
 }
 
 const WORD_CHAR = /^[\p{L}\p{N}\p{M}]$/u;

@@ -15,46 +15,48 @@ Times are from the worker's start. "Searchable" means the words inside, not only
 
 ### The plan's folder (10,821 documents, 37.4 MB of text, 146,220 terms)
 
+The final runs are on the PR's head after its review round (2 November), whose fixes read two files ahead instead of eight and check a Word file without inflating its pictures.
+
 | | Target (E1) | Cold | Warm (copies) | |
 |---|---|---|---|---|
-| Every name searchable | — | 0.63 s | 0.22 s | |
-| Markdown and CSV searchable | cold ≤ 15 s | **3.6 s** | 3.1 s | met |
-| Word and PDF read (620) | reported | 5.9 s | 3.4 s (620 copies used) | |
-| Warm start searchable | ≤ 3 s | — | names 0.22 s; Markdown and CSV **3.1 s** (2.9 s on the run before) | **at the edge** |
-| The worker's query, after reading | p95 ≤ 15 ms | p50 5.1, **p95 10.2**, max 11.7 ms | p50 4.3, p95 9.0 ms | met |
-| A query while it reads (round trip) | — | p50 8.3, p95 23.9, max 136 ms | p50 8.4, p95 19.7, max 109 ms | reported |
-| The worker's heap at its peak | cap 512 MB | 328 MB | 332 MB | |
-| The host's delay while it reads (M3) | p95 ≤ 20 ms | p50 2.0, **p95 2.1**, max 22.7 ms | p95 2.0 ms | met; idle p95 2.1 ms |
+| Every name searchable | — | 0.36 s | 0.20 s | |
+| Markdown and CSV searchable | cold ≤ 15 s | **3.5 s** | 3.1 s | met |
+| Word and PDF read (620) | reported | 5.2 s | 3.4 s (620 copies used) | |
+| Warm start searchable | ≤ 3 s | — | names 0.20 s; Markdown and CSV **3.06 s** (2.9–3.1 s over five runs) | **at the edge** |
+| The worker's query, after reading | p95 ≤ 15 ms | p50 4.4, **p95 9.0**, max 10.4 ms | p50 3.8, p95 8.1 ms | met |
+| A query while it reads (round trip) | — | p50 7.9, p95 20.5, max 97 ms | p50 8.2, p95 50, max 141 ms | reported |
+| The worker's heap at its peak | cap 512 MB | 293 MB | 259 MB | |
+| The host's delay while it reads (M3) | p95 ≤ 20 ms | p50 1.4, **p95 2.1**, max 7.0 ms | p95 2.0 ms | met; idle p95 2.1 ms |
 | Decision 3's copies | ≤ 200 MB | 620 written, 4.3 MB | 620 used | |
 
-In the Electron utility process: ready in 4.7 s, Markdown and CSV at 2.6 s, heap 210 MB at the end, the utility thread's delay p95 5.1 ms (no idle baseline there).
+In the Electron utility process (before the review round's fixes): ready in 4.7 s, Markdown and CSV at 2.6 s, heap 210 MB at the end, the utility thread's delay p95 5.1 ms (no idle baseline there).
 
 ### Twice the size (21,641 documents, 19,960 read inside, 71.8 MB of text)
 
 | | Target | Cold | Warm |
 |---|---|---|---|
-| Every name searchable | — | 0.81 s | 0.38 s |
-| Markdown and CSV searchable | ≤ 15 s | 6.3 s | 5.4 s |
-| Word and PDF read (1,240) | reported | 11.5 s | 6.1 s |
-| Warm start searchable | ≤ 3 s | — | names 0.38 s; text **5.4 s: missed** |
-| The worker's query, after reading | p95 ≤ 15 ms | p95 **16.6 ms: missed** (max 24.2) | p95 13.7 ms |
-| Heap at its peak | 512 MB | 440 MB | 402 MB |
-| The host's delay (M3) | p95 ≤ 20 ms | p95 2.1 ms | p95 2.0 ms |
+| Every name searchable | — | 0.67 s | 0.39 s |
+| Markdown and CSV searchable | ≤ 15 s | 5.9 s | 5.5 s |
+| Word and PDF read (1,240) | reported | 10.1 s | 6.4 s |
+| Warm start searchable | ≤ 3 s | — | names 0.39 s; text **5.5 s: missed** |
+| The worker's query, after reading | p95 ≤ 15 ms | p95 **15.2 ms: missed** (max 16.7) | p95 14.0 ms |
+| Heap at its peak | 512 MB | 438 MB | 406 MB |
+| The host's delay (M3) | p95 ≤ 20 ms | p95 2.0 ms | p95 2.0 ms |
 
 ## What M1 changed
 
-- **The text kept in all: 80 MB, not 200 MB** (spec R1 changed first). The heap grows about 3.2 MB for each MB of text above a base of ~175 MB (328 MB at 37 MB, 440 MB at 72 MB), so 200 MB of text would need about 815 MB against the 512 MB cap. At 80 MB the peak is about 430–460 MB. A worker that still stops at the cap starts once more with half the limits (R4).
+- **The text kept in all: 80 MB, not 200 MB** (spec R1 changed first). The heap grows about 3.2 MB for each MB of text above a base of ~175 MB (293–328 MB at 37 MB, 438–440 MB at 72 MB), so 200 MB of text would need about 815 MB against the 512 MB cap. At 80 MB the peak is about 430–460 MB. Chats' words share the 80 MB, at most a quarter of it (the review round: a project with many long chats would otherwise pass the cap). A worker that still stops at the cap starts once more with half the limits (R4).
 - **The documents limit goes to the newest of every kind.** The first run at twice the size showed every Word file and PDF searched by name only: Markdown and CSV are read first, and spent the 20,000 before the Office files had their turn. The walk now shares the 20,000 out newest first across the four kinds before anything is read (`freshness.test.ts`).
-- **Speed** (the first runs missed the query target: p95 42 ms): the passages' words are looked up in a byte per term rather than a `Set`; the order's keys are worked out once per result; a character loop replaced the Unicode regular expression for words (the same words, checked against it on 2,000 random strings: 304 → 71 ms for 2.5 million words); Markdown and CSV are read eight files ahead. That took the warm start from 5.0 to 2.9–3.1 s.
+- **Speed** (the first runs missed the query target: p95 42 ms): the passages' words are looked up in a byte per term rather than a `Set`; the order's keys are worked out once per result; a character loop replaced the Unicode regular expression for words (the same words, checked against it on 2,000 random strings: 304 → 71 ms for 2.5 million words); Markdown and CSV are read ahead of the file being parsed. That took the warm start from 5.0 to 2.9–3.1 s. The review round cut the read-ahead from eight files to two, since file reads run on the thread pool the extension host shares, and the warm start stayed at 3.06 s.
 
 ## For the Development manager
 
 Two targets are missed past the plan's folder, and one is at its edge on it:
 
-1. **A warm start in 3 s.** Met at the edge on the plan's folder (2.9–3.1 s), missed at twice the size (5.4 s). The cause is decision 3 as approved: only Word and PDF text is kept between starts, and Markdown and CSV are read again, which is 10,200 files on the plan's folder. Names are searchable within 0.4 s in every case, and the words inside follow as they are read. Choices: accept it (names at once, words in seconds); keep copies of Markdown and CSV text too, which changes decision 3 (their copies would cost about 40 MB on disk for the plan's folder); or later, an index kept on disk.
-2. **The query's 95th percentile past 20,000 documents:** 16.6 ms cold, 13.7 ms warm, against 15 ms. Within the target on the plan's folder (10.2 ms). The widest queries are two- and three-word starts of the commonest words, which match nearly every document; the slowest part left is ordering a few thousand candidates.
+1. **A warm start in 3 s.** Met at the edge on the plan's folder (2.9–3.1 s), missed at twice the size (5.5 s). The cause is decision 3 as approved: only Word and PDF text is kept between starts, and Markdown and CSV are read again, which is 10,200 files on the plan's folder. Names are searchable within 0.4 s in every case, and the words inside follow as they are read. Choices: accept it (names at once, words in seconds); keep copies of Markdown and CSV text too, which changes decision 3 (their copies would cost about 40 MB on disk for the plan's folder); or later, an index kept on disk.
+2. **The query's 95th percentile past 20,000 documents:** 15.2 ms cold (16.6 ms on the run before), 14.0 ms warm, against 15 ms. Within the target on the plan's folder (9.0 ms). The widest queries are two- and three-word starts of the commonest words, which match nearly every document; the slowest part left is ordering a few thousand candidates.
 
-A query while the index is still reading waits for the file in hand: p95 20–60 ms, at worst 0.1–0.3 s (a large CSV, a garbage collection). E1's targets are for the index once read; PR 2's M2 measures the key-to-paint time.
+A query while the index is still reading waits for the file in hand: p95 20–50 ms, at worst 0.1–0.3 s (a large CSV, a garbage collection). E1's targets are for the index once read; PR 2's M2 measures the key-to-paint time.
 
 ## Not measured here
 

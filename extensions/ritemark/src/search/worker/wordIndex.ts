@@ -474,7 +474,8 @@ export class WordIndex {
     if (!first) return result;
     const hit: { word: string; start: number } = first;
     result.passage = cutPassage(passage.text, marks, passage.at);
-    result.match = { text: hit.word, occurrence: occurrenceOf(source.passages, best, hit.start, hit.word) };
+    // A comment's words aren't in the text a find bar searches: no match to land on (R9).
+    result.match = passage.at.comment ? null : { text: hit.word, occurrence: occurrenceOf(source.passages, best, hit.start, hit.word) };
     return result;
   }
 
@@ -596,8 +597,11 @@ export function cutPassage(text: string, rawMarks: [number, number][], at: Passa
   return { text: `${lead}${source.slice(start, end)}${tail}`, marks: kept, at };
 }
 
-/** Which case-insensitive occurrence of `word` the hit at `offset` of passage `index` is, as a find bar counts them. */
-function occurrenceOf(passages: readonly { text: string }[], index: number, offset: number, word: string): number {
+/**
+ * Which case-insensitive occurrence of `word` the hit at `offset` of passage `index` is, as a find bar counts
+ * them: in the document's own text, so a comment's words don't count.
+ */
+function occurrenceOf(passages: readonly { text: string; at: PassageLocation }[], index: number, offset: number, word: string): number {
   const needle = foldCase(word);
   if (!needle) return 0;
   let count = 0;
@@ -610,7 +614,7 @@ function occurrenceOf(passages: readonly { text: string }[], index: number, offs
       from = at + needle.length;
     }
   };
-  for (let p = 0; p < index; p++) countIn(passages[p].text, Infinity);
+  for (let p = 0; p < index; p++) if (!passages[p].at.comment) countIn(passages[p].text, Infinity);
   countIn(passages[index].text, offset);
   return count;
 }

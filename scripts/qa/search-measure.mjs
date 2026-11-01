@@ -14,9 +14,11 @@
  *   with a query every 100 ms during the read, as someone typing would send.
  * - The worker's own query time once the index is read (E1: at most 15 ms at the 95th percentile), and the round trip.
  *
- * Prints counts and timings only. The copies go to --cache (default: a folder under /private/tmp, removed after).
+ * Prints counts and timings only. The copies go to --cache (default: a folder under /private/tmp, removed after);
+ * it is emptied first, so it must be under /private/tmp or the system temp folder.
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
 import { Worker } from 'node:worker_threads';
@@ -32,6 +34,12 @@ function arg(name, fallback) {
 
 const fixture = path.resolve(arg('fixture', '/private/tmp/ritemark-search-fixture'));
 const cacheDir = path.resolve(arg('cache', '/private/tmp/ritemark-search-measure-cache'));
+// The copies' folder is emptied before the cold run: only ever one under /private/tmp or the system temp folder.
+const tmp = fs.realpathSync(os.tmpdir());
+if (!cacheDir.startsWith('/private/tmp/') && !cacheDir.startsWith(`${tmp}${path.sep}`)) {
+  console.error(`--cache must be under /private/tmp or ${tmp}: it is emptied first`);
+  process.exit(2);
+}
 const queryCount = Number(arg('queries', '200'));
 const jsonOut = arg('json', null);
 
@@ -45,6 +53,7 @@ const LIMITS = {
   pdfBytes: 50 * 1024 * 1024,
   textPerDocument: 2 * 1024 * 1024,
   textBudget: 80 * 1024 * 1024,
+  // (chats, not in this folder, may take a quarter of the text budget: CHAT_SHARE in indexer.ts)
   textPerChat: 1024 * 1024,
 };
 const HEAP_MB = 512;

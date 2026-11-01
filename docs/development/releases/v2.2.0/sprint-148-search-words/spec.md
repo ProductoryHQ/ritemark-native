@@ -45,7 +45,7 @@ Acceptance criteria:
 As someone whose decisions often live in a chat or on a card, I want those found too.
 
 Acceptance criteria:
-- **Chats:** this project's chats from the conversation store (filtered by the project's scope), by their titles and the words of the person's and the AI's messages; tool activity, approvals and receipts are left out. A passage is one message. A deleted chat never shows. At most 1 MB of message text per chat (proposed).
+- **Chats:** this project's chats from the conversation store (filtered by the project's scope), by their titles and the words of the person's and the AI's messages; tool activity, approvals and receipts are left out. A passage is one message. A deleted chat never shows. At most 1 MB of message text per chat, the newest messages first, and all chats together at most a quarter of R1's text budget; past it, a chat is found by its title.
 - **Tasks:** this project's cards from the Task board's snapshots, by their title, Done when and description; archived cards too, with their state. The card files in `.ritemark/tasks/` are not read as documents.
 - **Comment tasks are not a source of their own:** a comment's words are found in its document, and an agent's run on it in its chat.
 
