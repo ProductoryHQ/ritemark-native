@@ -68,9 +68,10 @@ As someone looking for something, I want each key to narrow what I see.
 Acceptance criteria:
 - **From two characters.** With one, nothing shows yet and no line says nothing was found.
 - **Each word of the box starts a word** in the document's name or text, in any order: "report" finds "reports" and "reporting", not "unreported". All words must be found.
-- **Capitals don't matter,** unless Match capital letters is on. Letters with marks stay themselves: "kasi" doesn't find "käsi" (the Experience lead confirms, question 7).
+- **Capitals don't matter,** unless Match capital letters is on.
+- **A letter typed without its mark finds it with one; a mark typed finds only itself** (the Experience lead, question 7, 1 November): "kasi" finds "kasi" and "käsi", and "käsi" finds only "käsi". Š, ž and the marks of other languages follow the same rule ("Muller" finds "Müller", "Jose" finds "José"). No option is added for it; More keeps its two.
 - **Whole words only:** each word must be a whole word.
-- **Order within a kind:** a hit in the name first; then the words together as typed; then more hits; then the most recently changed.
+- **Order within a kind:** a hit in the name first; then a hit with the exact letters typed before one found without its marks ("kasi" puts "kasi" before "käsi"); then the words together as typed; then more hits; then the most recently changed.
 - **A result** shows its name, one muted word for where it lives (the folder's name, nothing at the project's root; a task's state; a chat's age), and its first matching passage, about two lines, with each matching part marked. A hit in the name alone shows no passage.
 - **A newer query replaces an older one;** results for an older query are never drawn over newer ones.
 
@@ -187,4 +188,4 @@ Three, for the Development manager, each with a recommendation. The sprint plan 
 2. **Replace waits** for its own sprint, High; More holds the options and the kinds. Recommended: yes. The other answer: Replace in Markdown only, as a fifth PR, High, cut first.
 3. **Word and PDF text is kept on this computer,** in Ritemark's storage for the project, at most 200 MB. Recommended: yes. The other answer: read again at every start.
 
-Still open, for the Experience lead: the sprint plan's seven questions (nothing found; still reading and too big; the box at rest and focused; a chat's and a task's row; a long list; Enter before the meaning layer; letters with marks).
+The Experience lead answered the sprint plan's seven questions on 1 November (ritemark-dev `releases/v2.2.0/analysis/2026-11-01-sprint-148-experience-answers.md`). Question 7 changed R5 above: letters typed without their marks find marked ones, a typed mark finds only itself, and the exact letters rank first. The other six concern the panel (PR 2) and change no requirement of the index.
