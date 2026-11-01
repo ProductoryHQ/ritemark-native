@@ -45,8 +45,8 @@ import path from 'node:path';
 import type * as vscode from 'vscode';
 import {
   GOOGLE_AI_KEY_NEEDED,
-  GOOGLE_IMAGE_KEY_NEEDED,
   OPENAI_KEY_NEEDED,
+  STEP_KEY_SECRETS,
   StepNeedsKeyError,
   stepKeyAnswer,
   stepKeyCopy,
@@ -56,7 +56,7 @@ import type { FlowNode, ExecutionContext } from './types';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { isSettingsSection } = require('../settings/RitemarkSettingsProvider') as typeof import('../settings/RitemarkSettingsProvider');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { initAPIKeyManager } = require('../ai/apiKeyManager') as typeof import('../ai/apiKeyManager');
+const { initAPIKeyManager, getAPIKeyManager } = require('../ai/apiKeyManager') as typeof import('../ai/apiKeyManager');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { executeLLMNode, setExtensionContext } = require('./nodes/LLMNodeExecutor') as typeof import('./nodes/LLMNodeExecutor');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -147,7 +147,6 @@ async function main(): Promise<void> {
     assert.equal(`${GOOGLE_AI_KEY_NEEDED.text} ${GOOGLE_AI_KEY_NEEDED.action}`, GOOGLE_SENTENCE);
     assert.equal(GOOGLE_AI_KEY_NEEDED.tooltip, 'Open Settings at the Google AI API key');
     assert.equal(GOOGLE_AI_KEY_NEEDED.settingsSection, 'google-ai-key');
-    assert.equal(GOOGLE_IMAGE_KEY_NEEDED, GOOGLE_AI_KEY_NEEDED, "the Google image step's words are the Google AI key's");
     for (const copy of [OPENAI_KEY_NEEDED, GOOGLE_AI_KEY_NEEDED]) {
       assert.ok(!/⚠|not configured|Command Palette/.test(`${copy.text} ${copy.action}`), 'no warning sign, no old words');
     }
@@ -163,6 +162,16 @@ async function main(): Promise<void> {
     assert.equal(isSettingsSection('openai-api-key'), true, "ritemark.aiSettings accepts the OpenAI key's section");
     assert.equal(isSettingsSection('google-ai-key'), true);
     assert.equal(isSettingsSection('anthropic-api-key'), false, 'only the sections the page has');
+  });
+
+  await test("the keys' secret names are the ones Settings and the key manager store", async () => {
+    stored.set(STEP_KEY_SECRETS.openai, PLACEHOLDER);
+    try {
+      assert.equal(await getAPIKeyManager().hasAPIKey(), true, "the OpenAI name is apiKeyManager's");
+    } finally {
+      stored.clear();
+    }
+    assert.equal(STEP_KEY_SECRETS.gemini, 'google-ai-key', "Settings' Google AI key");
   });
 
   await test('the error a run shows is the plain sentence', () => {

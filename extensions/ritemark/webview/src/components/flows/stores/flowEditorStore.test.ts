@@ -136,6 +136,26 @@ assert.equal(
   'adding an edge marks the flow dirty',
 )
 
+// The run order follows the store's own edits. React Flow's measurement of a new or restored step used to recompute
+// it for them; a measurement is a look now, so each edit recomputes it itself (review round 1).
+load()
+store().addNode('saveFileNode', { x: 0, y: 400 })
+const paletteStep = store().selectedNodeId as string
+assert.equal(store().isDirty, true, 'a step added from the palette marks the flow dirty')
+assert.equal(store().executionOrder.has(paletteStep), true, 'a step added from the palette has its number at once')
+store().onNodesChange([{ type: 'dimensions', id: paletteStep, dimensions: { width: 240, height: 88 } }])
+assert.equal(store().executionOrder.has(paletteStep), true, 'and keeps it when React Flow measures it')
+store().deleteNode('llm-1')
+assert.equal(store().executionOrder.has('llm-1'), false, 'a step deleted from its panel loses its number')
+store().undo()
+assert.equal(store().executionOrder.has('llm-1'), true, 'undo gives it back its number')
+store().redo()
+assert.equal(store().executionOrder.has('llm-1'), false, 'redo takes it away again')
+load()
+const orderBefore = store().executionOrder
+store().deleteEdge('edge-1')
+assert.notEqual(store().executionOrder, orderBefore, 'an edge removed from its menu recomputes the run order')
+
 // Editing a step's fields still marks it dirty (the panel's path, not a React Flow change).
 load()
 store().updateNodeData('llm-1', { userPrompt: 'Hello again' })

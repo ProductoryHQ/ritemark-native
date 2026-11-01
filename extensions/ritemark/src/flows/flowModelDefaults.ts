@@ -60,12 +60,19 @@ export const GOOGLE_AI_KEY_NEEDED: StepKeyCopy = {
   settingsSection: 'google-ai-key',
 };
 
-/** The Google image step's words (Sprint 144) are the Google AI key's. */
-export const GOOGLE_IMAGE_KEY_NEEDED = GOOGLE_AI_KEY_NEEDED;
-
-/** The words for a provider's missing key: OpenAI's, or Google AI's for Gemini. */
+/** The words for a provider's missing key: OpenAI's, or Google AI's for Gemini (the Google image step's too). */
 export function stepKeyCopy(provider: 'openai' | 'gemini'): StepKeyCopy {
   return provider === 'gemini' ? GOOGLE_AI_KEY_NEEDED : OPENAI_KEY_NEEDED;
+}
+
+/**
+ * Where each provider's key is kept in the secret store: OpenAI's is `apiKeyManager`'s (its `API_KEY_ID`), Google
+ * AI's is Settings' `google-ai-key`. The Flow steps, their model lists and the key watch read these names.
+ */
+export const STEP_KEY_SECRETS = { openai: 'openai-api-key', gemini: 'google-ai-key' } as const;
+
+export function stepKeySecret(provider: 'openai' | 'gemini'): string {
+  return provider === 'gemini' ? STEP_KEY_SECRETS.gemini : STEP_KEY_SECRETS.openai;
 }
 
 /**

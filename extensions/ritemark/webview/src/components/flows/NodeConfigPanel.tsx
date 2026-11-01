@@ -215,19 +215,35 @@ function Field({ label, children, description }: FieldProps) {
 }
 
 /**
- * A count that moves when a key is added or removed in Settings (the host's `flow:keysChanged`, Sprint 145 R5), so a
- * step panel's model list asks the host again: back from "Add it in Settings", the sentence goes.
+ * When a key is added or removed in Settings (the host's `flow:keysChanged`, Sprint 145 R5), a step panel asks for its
+ * model list again: back from "Add it in Settings", the sentence goes. The panel's own listener takes the answer; the
+ * list it shows stays until then.
  */
-function useKeysChanged(): number {
-  const [changes, setChanges] = useState(0);
+function useModelsAgainOnKeyChange(provider: string, modelType: 'llm' | 'image'): void {
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'flow:keysChanged') setChanges((count) => count + 1);
+      if (event.data?.type === 'flow:keysChanged') vscode.postMessage({ type: 'flow:getModels', provider, modelType });
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, []);
-  return changes;
+  }, [provider, modelType]);
+}
+
+/**
+ * The line under a step's model picker, the same for the AI step and the image step (Sprint 144's order): the list
+ * loading, a saved model the list no longer has, the step's missing key with its link, then any other error.
+ */
+function modelFieldNote(note: {
+  waiting: boolean;
+  unavailable: boolean;
+  error: string | null;
+  errorAction: StepKeyAction | null;
+}): React.ReactNode {
+  if (note.waiting) return 'Loading models...';
+  if (note.unavailable) return 'Saved model is no longer available. Choose a replacement.';
+  if (note.error && note.errorAction) return <StepKeyNotice text={note.error} action={note.errorAction} />;
+  if (note.error) return `⚠️ ${note.error}`;
+  return undefined;
 }
 
 /** What fixes a step's missing key, as the host names it (`flow:models`' `errorAction`): Settings at that key. */
@@ -446,7 +462,7 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
   const [error, setError] = useState<string | null>(null);
   // Sprint 145 R5 (#580): what fixes the error, when the host names it (no key for the provider: Settings at that key)
   const [errorAction, setErrorAction] = useState<StepKeyAction | null>(null);
-  const keysChanged = useKeysChanged();
+  useModelsAgainOnKeyChange(provider, 'llm');
   // Sprint 144 P4: the known list and the saved model stay usable while the host refreshes the list; the picker waits
   // only when it has no list at all. A saved model missing from the list stays visible, as on the Image step.
   const modelOptions = modelOptionsWithPersistedSelection(models, data.model);
@@ -493,7 +509,7 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
       window.removeEventListener('message', handleMessage);
       clearTimeout(timeout);
     };
-  }, [provider, keysChanged]);
+  }, [provider]);
 
   // Handle provider change - reset model to first available
   const handleProviderChange = (newProvider: 'openai' | 'gemini') => {
@@ -530,15 +546,7 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
 
       <Field
         label="Model"
-        description={error && errorAction
-          ? <StepKeyNotice text={error} action={errorAction} />
-          : error
-          ? `⚠️ ${error}`
-          : waiting
-            ? 'Loading models...'
-            : modelOptions.unavailable
-              ? 'Saved model is no longer available. Choose a replacement.'
-              : undefined}
+        description={modelFieldNote({ waiting, unavailable: modelOptions.unavailable, error, errorAction })}
       >
         <Select
           // Sprint 141 R4: an unset step shows the model it runs on (the catalog's default), as its card does.
@@ -724,7 +732,7 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
   const [error, setError] = React.useState<string | null>(null);
   // Sprint 144: what fixes the error, when the host names it (an image step with no key: Settings at that key)
   const [errorAction, setErrorAction] = React.useState<StepKeyAction | null>(null);
-  const keysChanged = useKeysChanged();
+  useModelsAgainOnKeyChange(provider, 'image');
   const modelOptions = modelOptionsWithPersistedSelection(models, data.model);
   const waiting = modelListWaiting(loading, models.length); // Sprint 144 P4, as on the LLM step
 
@@ -744,9 +752,10 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
       const message = event.data;
       if (message.type === 'flow:models' && message.provider === provider && message.modelType === 'image') {
         setLoading(false);
+        // A later answer (a key added in Settings) clears what an earlier one said
+        setError(message.error ?? null);
+        setErrorAction(message.errorAction ?? null);
         if (message.error) {
-          setError(message.error);
-          setErrorAction(message.errorAction ?? null);
           // Keep fallback models (already set)
         } else if (message.models && message.models.length > 0) {
           setModels(message.models);
@@ -767,7 +776,7 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
       window.removeEventListener('message', handleMessage);
       clearTimeout(timeout);
     };
-  }, [provider, keysChanged]);
+  }, [provider]);
 
   // Handle provider change - reset model to first available
   const handleProviderChange = (newProvider: 'openai' | 'gemini') => {
@@ -804,13 +813,7 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
 
       <Field
         label="Model"
-        description={waiting
-          ? 'Loading models...'
-          : modelOptions.unavailable
-            ? 'Saved model is no longer available. Choose a replacement.'
-            : error && errorAction
-              ? <StepKeyNotice text={error} action={errorAction} />
-              : error ? `⚠️ ${error}` : undefined}
+        description={modelFieldNote({ waiting, unavailable: modelOptions.unavailable, error, errorAction })}
       >
         <Select
           // Sprint 141 R4: an unset step shows the model it runs on, as the run's default.

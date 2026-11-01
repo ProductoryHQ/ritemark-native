@@ -14,7 +14,7 @@ import { usesResponsesAPI, getReasoningEffort } from '../../ai/modelConfig';
 import * as modelCatalog from '../../ai/modelCatalog';
 import { geminiHeaders, geminiUrl } from '../../ai/geminiRequest';
 import { FlowStepError, geminiAnswerText, geminiStepFailure } from './geminiStep';
-import { GOOGLE_AI_KEY_NEEDED, OPENAI_KEY_NEEDED, StepNeedsKeyError } from '../flowModelDefaults';
+import { GOOGLE_AI_KEY_NEEDED, OPENAI_KEY_NEEDED, STEP_KEY_SECRETS, StepNeedsKeyError } from '../flowModelDefaults';
 import type { FlowNode, ExecutionContext } from '../types';
 
 /**
@@ -265,7 +265,7 @@ async function executeWithGemini(
     throw new Error('Extension context not initialized');
   }
 
-  const apiKey = await extensionContext.secrets.get('google-ai-key');
+  const apiKey = await extensionContext.secrets.get(STEP_KEY_SECRETS.gemini);
 
   if (!apiKey) {
     // Sprint 145 R5 (#580): the step panel's sentence, as plain text

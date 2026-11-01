@@ -149,10 +149,6 @@ function escapeRegex(str: string): string {
 }
 
 /**
- * Calculate execution order using topological sort (Kahn's algorithm)
- * Returns Map of nodeId -> execution step (1-indexed)
- */
-/**
  * Whether React Flow's changes alter what the flow's file holds (Sprint 145 R4, #571). React Flow reports a
  * selection (`select`) and a measurement (`dimensions`) as node and edge changes too; `toFlow` saves neither (a
  * step's id, type, position and data, an edge's id and ends), so they don't mark the flow dirty: opening a flow and
@@ -162,6 +158,10 @@ function changesFlowFile(changes: ReadonlyArray<{ type: string }>): boolean {
   return changes.some((change) => change.type !== 'select' && change.type !== 'dimensions');
 }
 
+/**
+ * Calculate execution order using topological sort (Kahn's algorithm)
+ * Returns Map of nodeId -> execution step (1-indexed)
+ */
 function calculateExecutionOrder(
   nodes: Array<{ id: string }>,
   edges: Array<{ source: string; target: string }>
@@ -396,12 +396,11 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
   onNodesChange: (changes) => {
     set((state) => {
       const newNodes = applyNodeChanges(changes, state.nodes);
-      const edit = changesFlowFile(changes);
       return {
         nodes: newNodes,
         // Sprint 145 R4 (#571): a selection or a measurement is a look, not an edit
-        isDirty: state.isDirty || edit,
-        executionOrder: edit ? calculateExecutionOrder(newNodes, state.edges) : state.executionOrder,
+        isDirty: state.isDirty || changesFlowFile(changes),
+        executionOrder: calculateExecutionOrder(newNodes, state.edges),
       };
     });
   },
@@ -409,11 +408,10 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
   onEdgesChange: (changes) => {
     set((state) => {
       const newEdges = applyEdgeChanges(changes, state.edges);
-      const edit = changesFlowFile(changes);
       return {
         edges: newEdges,
-        isDirty: state.isDirty || edit,
-        executionOrder: edit ? calculateExecutionOrder(state.nodes, newEdges) : state.executionOrder,
+        isDirty: state.isDirty || changesFlowFile(changes),
+        executionOrder: calculateExecutionOrder(state.nodes, newEdges),
       };
     });
   },
@@ -472,6 +470,8 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
         flowInputs,
         selectedNodeId: id,
         isDirty: true,
+        // Sprint 145: the run order is the store's own, not left to React Flow's next measurement
+        executionOrder: calculateExecutionOrder(newNodes, state.edges),
       };
     });
 
@@ -624,16 +624,17 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
         selectedNodeId:
           state.selectedNodeId === nodeId ? null : state.selectedNodeId,
         isDirty: true,
+        executionOrder: calculateExecutionOrder(nodes, edges),
       };
     });
     get().saveToHistory();
   },
 
   deleteEdge: (edgeId) => {
-    set((state) => ({
-      edges: state.edges.filter((e) => e.id !== edgeId),
-      isDirty: true,
-    }));
+    set((state) => {
+      const edges = state.edges.filter((e) => e.id !== edgeId);
+      return { edges, isDirty: true, executionOrder: calculateExecutionOrder(state.nodes, edges) };
+    });
     get().saveToHistory();
   },
 
@@ -669,7 +670,7 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
       if (state.historyIndex > 0) {
         const newIndex = state.historyIndex - 1;
         const { nodes, edges } = state.history[newIndex];
-        return { nodes, edges, historyIndex: newIndex, isDirty: true };
+        return { nodes, edges, historyIndex: newIndex, isDirty: true, executionOrder: calculateExecutionOrder(nodes, edges) };
       }
       return state;
     });
@@ -680,7 +681,7 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
       if (state.historyIndex < state.history.length - 1) {
         const newIndex = state.historyIndex + 1;
         const { nodes, edges } = state.history[newIndex];
-        return { nodes, edges, historyIndex: newIndex, isDirty: true };
+        return { nodes, edges, historyIndex: newIndex, isDirty: true, executionOrder: calculateExecutionOrder(nodes, edges) };
       }
       return state;
     });

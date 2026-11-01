@@ -13,14 +13,15 @@
  * after the VS Code folder), and CDP on a port checked to be free (see .claude/skills/ritemark-automation: `open -n
  * -g -j`, scratch homes for the AIs, never Jarmo's profile). The check attaches over CDP and:
  *
- * - S29 (R4): the file's modified time is unchanged 3 s after the flow is drawn, and after each step is selected.
+ * - S29 (R4): the file's modified time is unchanged 3 s after the flow is drawn, and after each step is selected with
+ *   a real mouse press and release (CDP input, so React Flow's pointer path runs).
  * - S30-S32 (R5): each step's panel reads its key's sentence, with "Add it in Settings" as a link whose tooltip names
  *   the key (hovered); the AI steps say it too (they had no key check before Sprint 145). The OpenAI image step's
  *   model list no longer says "OpenAI API key not configured".
  * - S30, S32: the link opens Settings with that key's card at the top of the page.
  * - S33: the Google image step's sentence is Sprint 144's.
- * - S28 (with --edits, last, because it changes the flow): a step's label typed in its panel writes the file, and a
- *   step deleted from its panel writes it again.
+ * - S28 (with --edits, last, because it changes the flow): a step's label typed in its panel, a step dragged on the
+ *   canvas and a step deleted from its panel each write the file.
  *
  * Screenshots go to --shots (the window with each panel, the tooltip, and Settings at each key). Every check prints
  * PASS or FAIL with what it saw; the exit code is the number of failures. The window is left open: quit it yourself.
@@ -174,6 +175,31 @@ const opened = mtime();
 await sleep(3000);
 check(mtime() === opened, 'S29: opening the flow writes nothing (3 s after it is drawn)', `modified ${new Date(mtime()).toISOString()}`);
 
+/**
+ * Clicks a step the way a person does: a mouse press and release, with no travel, at the step's header, through the
+ * window (CDP input on the workbench page reaches the webview under the point). React Flow's pointer path runs, so a
+ * click that started a drag would show here as a write.
+ */
+async function clickStep(id, travel = [0, 0]) {
+	const at = await flow.evaluate(inFrame(`(() => { const el = d.querySelector('.react-flow__node[data-id="${id}"]'); if (!el) return null; const r = el.getBoundingClientRect(); return [r.x + r.width / 2, r.y + 12]; })()`));
+	if (!at) return false;
+	const host = new URL(flow.url).host;
+	const offset = await workbench.evaluate(`(() => { const frame = [...document.querySelectorAll('iframe')].find(f => (f.getAttribute('src') || '').includes(${JSON.stringify(host)})); if (!frame) return null; const r = frame.getBoundingClientRect(); return [r.x, r.y]; })()`);
+	if (!offset) return false;
+	const x = offset[0] + at[0];
+	const y = offset[1] + at[1];
+	await workbench.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+	await workbench.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
+	// With travel, a drag: the pointer moves in ten steps before it is released
+	for (let i = 1; i <= 10 && (travel[0] || travel[1]); i++) {
+		await workbench.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x + (travel[0] * i) / 10, y: y + (travel[1] * i) / 10, button: 'left', buttons: 1 });
+		await sleep(30);
+	}
+	await sleep(60);
+	await workbench.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x + travel[0], y: y + travel[1], button: 'left', buttons: 0, clickCount: 1 });
+	return true;
+}
+
 const MODEL_NOTE = inFrame(`(() => {
 	const panel = d.querySelector('.rm-flow-props');
 	const label = panel && [...panel.querySelectorAll('label')].find(l => l.textContent.trim() === 'Model');
@@ -185,7 +211,7 @@ const MODEL_NOTE = inFrame(`(() => {
 
 for (const step of STEPS) {
 	const selectedAt = mtime();
-	const clicked = await flow.evaluate(inFrame(`(() => { const el = d.querySelector('.react-flow__node[data-id="${step.id}"]'); if (!el) return false; el.click(); return true; })()`));
+	const clicked = await clickStep(step.id);
 	if (!clicked) {
 		check(false, `${step.what}: the step is on the canvas`, step.id);
 		continue;
@@ -220,7 +246,7 @@ for (const step of STEPS) {
 
 for (const step of [STEPS[0], STEPS[1]]) {
 	await frontFlowTab();
-	await flow.evaluate(inFrame(`(() => { const el = d.querySelector('.react-flow__node[data-id="${step.id}"]'); if (el) el.click(); return true; })()`));
+	await clickStep(step.id);
 	for (let i = 0; i < 40 && (await flow.evaluate(MODEL_NOTE))?.link !== 'Add it in Settings'; i++) await sleep(250);
 	await flow.evaluate(inFrame(`(() => { const panel = d.querySelector('.rm-flow-props'); const link = [...panel.querySelectorAll('p button')].find(b => b.textContent.trim() === 'Add it in Settings'); if (link) link.click(); return !!link; })()`));
 	let settings = null;
@@ -245,7 +271,7 @@ for (const step of [STEPS[0], STEPS[1]]) {
 
 if (flag('edits')) {
 	await frontFlowTab();
-	await flow.evaluate(inFrame(`(() => { const el = d.querySelector('.react-flow__node[data-id="llm-openai"]'); if (el) el.click(); return true; })()`));
+	await clickStep('llm-openai');
 	await sleep(800);
 	const beforeLabel = mtime();
 	const typed = await flow.evaluate(inFrame(`(() => {
@@ -263,6 +289,15 @@ if (flag('edits')) {
 	check(typed && mtime() !== beforeLabel && saved.nodes.find(n => n.id === 'llm-openai')?.data.label === 'Write (openai), renamed', "S28: a step's label typed in its panel is written", `typed=${typed}`);
 
 	await sleep(1500);
+	const beforeDrag = mtime();
+	const dragged = await clickStep('image-gemini', [80, 30]);
+	for (let i = 0; i < 20 && mtime() === beforeDrag; i++) await sleep(250);
+	const moved = JSON.parse(fs.readFileSync(flowFile, 'utf8')).nodes.find(n => n.id === 'image-gemini')?.position;
+	check(dragged && mtime() !== beforeDrag && moved && (moved.x !== 120 || moved.y !== 640), 'S28: a step dragged on the canvas is written', moved ?? 'no step');
+
+	await sleep(1500);
+	await clickStep('llm-openai'); // the drag selected the dragged step
+	await sleep(800);
 	const beforeDelete = mtime();
 	const asked = await flow.evaluate(inFrame(`(() => { const panel = d.querySelector('.rm-flow-props'); const button = panel && [...panel.querySelectorAll('button')].find(b => /^Delete/.test(b.textContent.trim())); if (button) button.click(); return button ? button.textContent.trim() : null; })()`));
 	await sleep(400);

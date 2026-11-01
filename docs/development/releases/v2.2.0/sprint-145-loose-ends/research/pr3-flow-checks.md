@@ -18,7 +18,17 @@ Run on 1 November 2026 on the Mac, branch `sprint-145-loose-ends-flows` from `ma
 
 **Unit test** `webview/src/components/flows/stores/flowEditorStore.test.ts` (S26): `dimensions` and `select` on steps, `select` on an edge, and a look after an edit (stays dirty); `position`, `remove`, `add`, `replace`, a mixed batch, an edge removed or added, and a field edit all mark the flow dirty. It fails on `main` at its first assertion ("measuring the steps does not mark the flow dirty").
 
-**Dev instance** (`scripts/qa/flow-step-check.mjs`, below): the flow file's modified time is unchanged 3 s after the flow is drawn and after each of four steps is selected (S29). A step's label typed in its panel, a step deleted from its panel, and a step dragged on the canvas (CDP mouse events) each wrote the file (S28). Adding a step from the palette (an HTML drag and drop) was not driven; the unit test covers `add`.
+**Dev instance** (`scripts/qa/flow-step-check.mjs`, below): the flow file's modified time is unchanged 3 s after the flow is drawn and after each of four steps is selected with a real mouse press and release (CDP input, so React Flow's pointer path runs) (S29). A step's label typed in its panel, a step dragged on the canvas and a step deleted from its panel each wrote the file (S28). Adding a step from the palette (an HTML drag and drop) was not driven; the unit test covers the store's `addNode`.
+
+### Review round 1: what R4 had been hiding
+
+A look used to mark the flow dirty, so the next click or measurement wrote whatever an earlier write had missed. R4 took that away, and the review found what it had covered:
+
+- **An edit made while the host wrote the flow was marked saved and never written.** `flow:saved` cleared the dirty flag whatever had changed since the copy was sent, and the host dropped a `flow:save` that came during another write (`isUpdating`), answering nothing. Now the webview remembers the copy it sent; a `flow:saved` while the flow differs from it writes again after the usual 500 ms, and the host runs its writes one after another. `research/repro/pr3-save-race.mjs` (the harness, a host that answers 600 ms late, the label typed again during the wait), three runs each: `main` and round 1's head write "First" only; this branch writes "First", then "Second". So this was `main`'s too, whenever no look came after the write.
+- **Cmd+S saved the document without the edit the autosave hadn't sent, then marked it clean.** Cmd+S now sends the pending flow with `flow:requestSave`; the host writes it, then saves (after any write in progress). In the dev instance a label typed and saved with Cmd+S at once is in the file.
+- **A step added from the palette, or brought back by undo, had no step number** until something else changed: it took its number from React Flow's measurement, which R4 had stopped recomputing the run order for. The run order is recomputed on every change again, and `addNode`, `deleteNode`, `deleteEdge`, `undo` and `redo` compute it themselves.
+
+`src/flows/flowSaves.test.ts` (the host's writes) fails on round 1's head and `main` in 3 of 4 cases; `flowEditorStore.test.ts` adds the store's own edits.
 
 ## R5: one sentence and a link for every step without its key
 
@@ -43,6 +53,8 @@ The "LLM error:" prefix was the AI step's wrapper for any error; a missing key's
 Screenshots (Ritemark Light, 1440 × 900 at 2×): [the AI step on OpenAI](../qa/r5-llm-openai-panel.png), [the AI step on Gemini](../qa/r5-llm-gemini-panel.png), [the OpenAI image step](../qa/r5-image-openai-panel.png), [the Google image step](../qa/r5-image-gemini-panel.png) (each with its tooltip shown), [Settings at the OpenAI key](../qa/r5-settings-openai-api-key.png).
 
 **A key set** (S34): covered by `stepNeedsKey.test.ts` with a placeholder in a stand-in secret store (no sentence for either provider). No key was typed into the dev instance.
+
+**Review round 1:** the host checks the key before any network call (the missing-key answer no longer waits on the catalog's refresh), in one place for both step kinds; the secret names are in one map (`STEP_KEY_SECRETS`); both panels draw the line under the model picker with one function, in Sprint 144's order (loading, a saved model the list lacks, the missing key, any other error); a key change asks for the list again without first dropping the list the panel shows; `GOOGLE_IMAGE_KEY_NEEDED` is gone (the Google image step uses `GOOGLE_AI_KEY_NEEDED`, the same words).
 
 ## What was found beside them
 
