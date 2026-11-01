@@ -1168,9 +1168,10 @@ export function Editor({
           cursor: not-allowed !important;
         }
 
-        /* Copied state - green feedback (icon swaps to check, color goes success) */
+        /* Copied state: the icon swaps to a check in the button's own ink at full opacity; green is only the
+           ready dot (Sprint 145, #578) */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn.copied {
-          color: var(--r-success) !important;
+          color: var(--r-ink-strong) !important;
           opacity: 1 !important;
         }
 
@@ -1385,8 +1386,9 @@ export function Editor({
           color: var(--r-accent-deep, var(--r-accent)) !important;
         }
 
+        /* Copied: the check in the button's own ink (Sprint 145, #578) */
         .mermaid-expand-overlay .mermaid-expand-btn.copied {
-          color: var(--r-success) !important;
+          color: var(--r-ink-strong) !important;
         }
 
         .mermaid-expand-overlay .mermaid-expand-btn:disabled {

@@ -622,8 +622,9 @@ body {
 .rm-bubble-del { background: transparent; border: none; color: var(--ritemark-ink-faint, #94a3b8); cursor: pointer; padding: 3px; border-radius: 5px; display: inline-flex; }
 .rm-bubble-del:hover { color: #ef4444; background: rgba(239,68,68,0.09); }
 /* Mark as done: the same action as Delete, but on a finished task it is a
-   completion, not a discard — so it hovers green rather than red. */
-.rm-bubble-done:hover { color: #15803d; background: rgba(21,128,61,0.10); }
+   completion, not a discard — so it hovers in ink rather than red (green is
+   only the small ready dot, Sprint 145, #578). */
+.rm-bubble-done:hover { color: var(--r-ink-strong); background: var(--r-surface-soft); }
 .rm-bubble-text { font-family: var(--ritemark-editor-font-family); font-size: 13px; color: var(--ritemark-ink-body, #475569); line-height: 1.5; word-wrap: break-word; }
 
 /* compose bubble (create flow)
@@ -710,7 +711,7 @@ body {
 .rm-task-dot--idle      { background: transparent; box-shadow: inset 0 0 0 1.5px var(--r-ink-faint, #94a3b8); }
 .rm-task-dot--progress  { background: var(--r-accent); animation: rm-task-pulse 1.4s ease-in-out infinite; }
 .rm-task-dot--attention { background: var(--r-warning); }
-.rm-task-dot--success   { background: var(--r-success); }
+.rm-task-dot--success   { background: var(--r-ink-strong); } /* done is ink: green is only the ready dot (Sprint 145, #578) */
 .rm-task-dot--error     { background: var(--r-error); }
 @keyframes rm-task-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .rm-task-dot--progress { animation: none; } }
@@ -729,7 +730,7 @@ body {
 .rm-task-status--idle      { color: var(--r-ink-muted, #617187); }
 .rm-task-status--progress  { color: var(--r-accent); }
 .rm-task-status--attention { color: var(--r-warning); }
-.rm-task-status--success   { color: var(--r-success); }
+.rm-task-status--success   { color: var(--r-ink-strong); }
 .rm-task-status--error     { color: var(--r-error); }
 
 /* which conversation the task went to / will go to */

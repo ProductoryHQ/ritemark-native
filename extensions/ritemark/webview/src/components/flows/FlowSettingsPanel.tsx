@@ -380,9 +380,10 @@ export function FlowSettingsPanel({
             Saving schedule...
           </div>
         )}
+        {/* Sprint 145 (#578): saved is ink; green is only the ready dot */}
         {saveState === 'saved' && (
-          <div className="flex items-center gap-2 text-xs text-[var(--vscode-testing-iconPassed)]">
-            <Icon name="check-circle" size={14} />
+          <div className="flex items-center gap-2 text-xs text-[var(--r-ink-strong)]">
+            <Icon name="check-circle" size={14} tone="inherit" />
             {lastSavedAt
               ? `Schedule saved at ${lastSavedAt.toLocaleTimeString([], {
                   hour: '2-digit',

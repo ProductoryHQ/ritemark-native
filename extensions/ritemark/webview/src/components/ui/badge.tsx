@@ -10,7 +10,8 @@ const badgeVariants = cva(
       variant: {
         default: 'border-hairline bg-surface-soft text-ink-body',
         accent: 'border-transparent bg-accent-soft text-accent-deep',
-        success: 'border-transparent bg-ritemark-success-soft text-ritemark-success',
+        // Sprint 145 (#578): done is ink; green is only the small ready dot
+        success: 'border-transparent bg-surface-muted text-ink-strong',
         warning: 'border-transparent bg-ritemark-warning-soft text-ritemark-warning',
         error: 'border-transparent bg-ritemark-error-soft text-ritemark-error',
         outline: 'border-hairline-strong bg-surface text-ink-muted',

@@ -202,14 +202,14 @@ function ShareMenuRow({
       className={cn(
         'gap-2.5 rounded-md px-2.5 py-0 leading-4 focus:bg-accent-soft data-[disabled]:text-ink-muted data-[disabled]:opacity-100',
         twoLines ? 'h-11' : 'h-8',
-        copied && 'text-[var(--r-success)] focus:text-[var(--r-success)]',
       )}
     >
+      {/* Sprint 145 (#578): Copied keeps the item's own ink and the check is the sign; green is only the ready dot */}
       <Icon
         name={copied ? 'check' : item.icon}
         size={14}
         tone="inherit"
-        className={cn(copied ? 'text-[var(--r-success)]' : 'text-ink-muted', item.busy && 'animate-spin')}
+        className={cn(copied ? 'text-ink-strong' : 'text-ink-muted', item.busy && 'animate-spin')}
       />
       {twoLines ? (
         <span className="grid min-w-0">
