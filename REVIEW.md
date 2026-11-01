@@ -43,9 +43,9 @@ The review ends with a summary that gives the count, or says "No issues found."
 The paths a PR touches set its tier. The highest wins, and the author never lowers it. The PR template's Risk
 section names the tier and the paths that set it. Paths below are under `extensions/ritemark/` unless they start at the root.
 
-The effort follows what a mistake costs (Jarmo, 1 November 2026). The full process is for the shell, the start, a
-person's documents and the release, where a mistake is expensive to undo. Extension UI and small fixes get one round
-and one picture.
+The effort follows what a mistake costs (Jarmo, 1 November 2026). The full process is for the shell (which draws the
+start), a person's documents and the release, where a mistake is expensive to undo. Extension UI and small fixes get
+one round and one piece of proof.
 
 | Tier | Paths | Review |
 | --- | --- | --- |
@@ -58,7 +58,8 @@ and one picture.
 - The merging session runs the review at the tier's level on the PR's head and puts its findings on the PR (`--comment`).
 - Every finding is answered: fixed in a new commit, or resolved on the PR with a one-line reason (wrong, intentional, doesn't matter).
 - Merge only when no Important finding is open, and only at the reviewed head (`gh pr merge --match-head-commit`).
-  A commit after the review needs a review of that commit.
+  A commit after the review needs a review of that commit. After the last round, on every tier, a commit is checked
+  against the findings it answers, and anything in it beyond those fixes gets a round of its own.
 - Rounds follow the tier. **High:** at most three. Round one reads the whole PR, round two reads only the new
   commits, and round three runs only when round two found something Important. No round reports what an earlier one
   already reported. **Standard and Light:** one round. The commits that fix its findings, or answer Codex, are

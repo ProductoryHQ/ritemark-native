@@ -54,4 +54,4 @@ Users can't be moved back to an older version: the update feed only offers newer
 
 ## Screenshots
 
-If this changes the UI, include before/after screenshots.
+If this changes the UI, include one screenshot that shows the change (a before/after pair in one image is fine). High tier shows the fault first and then fixed, on each platform it touches (`REVIEW.md`).
