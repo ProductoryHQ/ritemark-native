@@ -153,7 +153,7 @@ A target missed goes into `research/measurements.md` with its cause, and the Dev
 
 ### E3: The kill switch, and older shells
 
-- `ritemark.features.project-search`, on by default, as `powerpoint-preview`: off, the Search row opens VS Code's search and the index never starts.
+- `ritemark.features.project-search`, on by default, as `powerpoint-preview`: off, the Search row opens VS Code's search and the index never starts. On a shell with the box, the extension's context key `ritemark.projectSearch.enabled` tells the shell: with it false, the shell draws the plain row, a click, typed text and ⌘⇧F all reach VS Code's search, and the tree never hides. Tested with PR 3 applied.
 - The extension works on a shell without the box: the Search row's command called with no words opens VS Code's search, and the results view's `when` is never true there.
 
 ### E4: Dependencies, the bundle and the tier

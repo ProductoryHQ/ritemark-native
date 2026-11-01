@@ -99,8 +99,8 @@ After A2 and A3. Each reader is pure over bytes and returns `{ passages: { text,
 - **A query:** its words, each looked up by prefix (or exactly, with Whole words only); the documents that have every word; Match capital letters checks the hits in the passage's own text. Ranking as R5. The first passage with a hit, cut to about 160 characters around it, with the marks.
 - **Names** are passages too, with a `name` flag and the highest rank.
 - **150's two questions:** `passages(words, limit = 20)` returns the best passages for a list of words; `map()` returns each document's path, name and first line. Both covered by tests; no screen.
-- **The text cache** (decision 3, `textCache.ts`): one file per Word or PDF document under `context.storageUri/search/v1/`, named by a hash of its path, holding its size, change time, reader version and passages; read when all three match; the oldest dropped past 200 MB; the folder dropped when the reader version changes.
-- **Tests:** `wordIndex.test.ts` (prefix, all words, whole words, capitals, marks, ranking, the passage cut, a newer query, `passages`, `map`), `textCache.test.ts`.
+- **The text cache** (decision 3, `textCache.ts`): one file per Word or PDF document under `context.storageUri/search/v1/`, named by a hash of its path, holding its size, change time, reader version and passages; read when all three match; an entry dropped at once when the watcher reports its document deleted, or renamed away (a rename writes the new path's entry when it's read again); the oldest dropped past 200 MB; the folder dropped when the reader version changes. A sweep at index start drops entries whose document is gone, for deletions made while Ritemark was closed. (Codex's review of #628: decision 3 promises the copy goes with the file.)
+- **Tests:** `wordIndex.test.ts` (prefix, all words, whole words, capitals, marks, ranking, the passage cut, a newer query, `passages`, `map`), `textCache.test.ts` (including: a deleted document's entry goes; a renamed one's old entry goes; the start sweep drops an orphan).
 
 ## Workstream 4: chats and tasks (R3, PR 1)
 
@@ -143,7 +143,8 @@ interface SearchResult {
 
 - **The row's command** (`projectHeadCommands.ts`): `ritemark.projectHead.search` takes an optional argument from the shell's field: `{ text }` runs a query (an empty text clears), `{ key: 'down' }` sends `search/focus-first`, `{ key: 'enter' }` opens the top result. Called with no argument (an older shell, a key binding): with the kill switch on and a shell that has the field, it focuses the box (`_ritemark.projectHead.focusSearch`); otherwise it runs `workbench.view.search`, as today.
 - **⌘⇧F** (Ctrl+Shift+F on Windows): a key binding to `ritemark.projectHead.search` while the kill switch is on (decision 1); VS Code's own stays registered and reachable from More's Search place.
-- **The kill switch:** the `project-search` flag and its setting, as `powerpoint-preview`; off, the index isn't started and the command runs VS Code's search.
+- **The kill switch:** the `project-search` flag and its setting, as `powerpoint-preview`; off, the index isn't started and the command runs VS Code's search, whatever its argument (a click, `{ text }`, a key).
+- **The kill switch and the shell's field (with PR 3):** the extension sets a context key, `ritemark.projectSearch.enabled`, from the flag at start and on change. The shell draws the field only while it is true; while it is false, the Search row is the plain row it is today and opens VS Code's search, and the shell never sets `ritemark.searchOpen` or hides the tree. A test with PR 3 applied covers the flag off: a click, typed text and ⌘⇧F all reach VS Code's search, and the tree stays. (Codex's review of #628.)
 - **Tests:** `projectHeadCommands.test.ts` grows the argument cases and the fallback.
 
 ## Workstream 7: the box and the swap (R7, PR 3)
@@ -161,7 +162,8 @@ After A1, on a CoW-cloned, patched `vscode/`.
 
 ## Workstream 8: at the passage (R9, PR 4)
 
-- **Markdown:** one host-to-page message, `find:open { words, matchIndex }`, posted by `ritemarkEditor.ts` to the document's page after `vscode.open` resolves; `App.tsx` opens its find bar with the words and steps to the match, as ⌘F and Enter do. No document state is read or sent.
+- **What is passed:** not the person's words. The word index's prefix-and-AND match can't be found again by a find bar that looks for one literal run of text (`SearchExtension`, `findDocumentMatches`). So the result carries the concrete match from the index: the first hit's exact text as it stands in the document (the matched word, at its full length) and which occurrence of that text it is. The message carries those, and the find bar searches that literal and steps to that occurrence. A test for `rep ann` matching "Annual report" lands on the shown passage. (Codex's review of #628.)
+- **Markdown:** one host-to-page message, `find:open { text, occurrence }`, posted by `ritemarkEditor.ts` to the document's page after `vscode.open` resolves; `App.tsx` opens its find bar with that text and steps to that occurrence, as ⌘F and Enter do. No document state is read or sent.
 - **Word and PDF:** the same message through `officePreviewProvider.ts` and `pdfEditorProvider.ts` to `FindBarShell` in `DOCXViewer.tsx` and `PDFViewer.tsx`; a PDF match carries its page.
 - **Tests:** a unit test of each page's handler (opens, steps, no edit); a dev instance on the fixtures; Windows through the overlay.
 
