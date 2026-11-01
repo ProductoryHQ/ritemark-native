@@ -551,6 +551,30 @@ body {
 }
 .rm-bubble button { cursor: pointer; }
 
+/* The marker and the bubble are white in both themes (--ritemark-surface), so inside them the theme's tokens take
+   their light values: a task's status, its dot, the destination line and the focus ring stay readable on white in
+   Dark, where the theme's inks are near white and its accents pale (Sprint 145, #578, review round 2). In Light these
+   equal the :root values, so nothing changes there. --r-surface stays the theme's (the desk's colour). */
+.rm-marker,
+.rm-bubble {
+  --r-surface-muted: var(--ritemark-surface-muted);
+  --r-surface-soft: var(--ritemark-surface-soft);
+  --r-hairline: var(--ritemark-hairline);
+  --r-hairline-strong: var(--ritemark-hairline-strong);
+  --r-ink-strong: var(--ritemark-ink-strong);
+  --r-ink-body: var(--ritemark-ink-body);
+  --r-ink-muted: var(--ritemark-ink-muted);
+  --r-ink-faint: var(--ritemark-ink-faint);
+  --r-ink-disabled: var(--ritemark-ink-disabled);
+  --r-accent: var(--ritemark-indigo);
+  --r-accent-deep: var(--ritemark-indigo-deep);
+  --r-accent-soft: var(--ritemark-indigo-soft);
+  --r-warning: var(--ritemark-warning);
+  --r-warning-soft: var(--ritemark-warning-soft);
+  --r-error: var(--ritemark-error);
+  --r-error-soft: var(--ritemark-error-soft);
+}
+
 /* A pinned comment (clicked, not merely hovered) reads as held open: a firmer
    accent border and a deeper shadow. Without this, "why will this not go
    away" is the next question — a latch the user cannot see is a stuck UI. */
@@ -623,9 +647,9 @@ body {
 .rm-bubble-del:hover { color: #ef4444; background: rgba(239,68,68,0.09); }
 /* Mark as done: the same action as Delete, but on a finished task it is a
    completion, not a discard — so it hovers in ink rather than red (green is
-   only the small ready dot, Sprint 145, #578). The bubble is white in both
-   themes, so the ink is the fixed light one, as its words are. */
-.rm-bubble-done:hover { color: var(--ritemark-ink-strong, #1e1b4b); background: var(--ritemark-surface-soft, #f1f5f9); }
+   only the small ready dot, Sprint 145, #578). Inside the bubble the tokens
+   are the light ones (the block after .rm-bubble). */
+.rm-bubble-done:hover { color: var(--r-ink-strong); background: var(--r-surface-soft); }
 .rm-bubble-text { font-family: var(--ritemark-editor-font-family); font-size: 13px; color: var(--ritemark-ink-body, #475569); line-height: 1.5; word-wrap: break-word; }
 
 /* compose bubble (create flow)
@@ -712,9 +736,9 @@ body {
 .rm-task-dot--idle      { background: transparent; box-shadow: inset 0 0 0 1.5px var(--r-ink-faint, #94a3b8); }
 .rm-task-dot--progress  { background: var(--r-accent); animation: rm-task-pulse 1.4s ease-in-out infinite; }
 .rm-task-dot--attention { background: var(--r-warning); }
-/* Done is ink: green is only the ready dot (Sprint 145, #578). The marker and the bubble are white in both themes,
-   so done takes the fixed light ink, as their words do (the theme's ink would vanish on white in Dark). */
-.rm-task-dot--success   { background: var(--ritemark-ink-strong, #1e1b4b); }
+/* Done is ink: green is only the ready dot (Sprint 145, #578). The dot sits in the marker and the line in the bubble,
+   whose tokens are the light ones in both themes (the block after .rm-bubble). */
+.rm-task-dot--success   { background: var(--r-ink-strong); }
 .rm-task-dot--error     { background: var(--r-error); }
 @keyframes rm-task-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .rm-task-dot--progress { animation: none; } }
@@ -733,7 +757,7 @@ body {
 .rm-task-status--idle      { color: var(--r-ink-muted, #617187); }
 .rm-task-status--progress  { color: var(--r-accent); }
 .rm-task-status--attention { color: var(--r-warning); }
-.rm-task-status--success   { color: var(--ritemark-ink-strong, #1e1b4b); }
+.rm-task-status--success   { color: var(--r-ink-strong); }
 .rm-task-status--error     { color: var(--r-error); }
 
 /* which conversation the task went to / will go to */

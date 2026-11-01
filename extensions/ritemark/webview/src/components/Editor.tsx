@@ -1168,9 +1168,10 @@ export function Editor({
           cursor: not-allowed !important;
         }
 
-        /* Copied state: the icon swaps to a check, in the button's own ink at full opacity; the check is the
-           sign. It named green before, which the icon never showed (an Icon's tone sets its fill); green is only
-           the ready dot (Sprint 145, #578) */
+        /* Copied state: the icon swaps to a check, which is the sign, and the button stays shown while it says
+           so (a diagram's toolbar still hides with the pointer). The check is drawn in the Icon's own muted tone,
+           as the copy icon was: a colour here named green, which never showed, because an Icon's tone sets its
+           fill. Green is only the ready dot (Sprint 145, #578) */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn.copied {
           opacity: 1 !important;
         }

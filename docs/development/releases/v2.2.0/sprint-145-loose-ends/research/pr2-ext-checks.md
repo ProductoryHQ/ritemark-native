@@ -13,10 +13,10 @@
 | `RuntimeNotice.tsx`, the success tone (a failed turn's done card; Claude's "You're signed in" note) | `check-circle`, `--r-success` on `--r-success-soft` | a plain `check` in `--r-ink-strong` on `--r-surface-muted`, the chip's shape kept |
 | `CommentsMenuButton.tsx` (a send's result line) | `--r-success` | `--r-ink-strong` |
 | `ExportMenu.tsx` (Copied) | the item and its check in `--r-success` | the item's own ink; the check in `ink-strong` |
-| `Editor.tsx` (a code block's and a diagram's copy button, copied) | a `--r-success` rule, which the icon never showed (below) | the colour rule goes: Copied keeps the button's own ink at full opacity, the check is the sign |
+| `Editor.tsx` (a code block's and a diagram's copy button, copied) | a `--r-success` rule, which the icon never showed (below) | the colour rule goes: Copied keeps the copy icon's look (the Icon's own muted tone), and the check is the sign |
 | `tasks/LogView.tsx` (Marked done's rail dot) | `--r-success` | `--r-ink-strong` |
 | `PlanReviewCard.tsx` (the enforcement line's check) | `--r-success` | `--r-ink-muted`, as its words |
-| `index.css` (a comment task's done dot and line) | `--r-success` | the fixed light ink `--ritemark-ink-strong`: the marker and the bubble are white in both themes, so the theme's ink would vanish there in Dark (review round 1) |
+| `index.css` (a comment task's done dot and line) | `--r-success` | `--r-ink-strong`. The marker and the bubble are white in both themes, so inside them the theme's tokens now take their light values: every task tone, the destination line and the focus ring stay readable on white in Dark (review rounds 1 and 2; before, a working or waiting status there was pale indigo or amber on white) |
 | `RitemarkSettings.tsx` (the runtime's ready dot) | Tailwind `bg-emerald-500` | `bg-ritemark-success`: the one green, in the token |
 | `SubagentCard`, `ActivePlanBanner`, `CodexSetupView`, `ActivityCard`, `FlowSettingsPanel`, `ExecutionPanel` (201, 212), `DictationSettingsModal`, `ui/pill` and `ui/badge` (success variants) | VS Code's or Tailwind's green | ink: `--r-ink-strong`, or the ink of the words a mark sits beside (framework §4) |
 
@@ -25,7 +25,9 @@
 **Found beyond the lead's list** (the same rule, by a search for the success token's Tailwind name `ritemark-success`, which her search for greens didn't cover), changed to ink here and to be confirmed by the lead:
 - Settings: "Connected" (Claude, ChatGPT, Google account), "Configured" (five keys) and the key test's "API key is valid" row: 13 places in `RitemarkSettings.tsx` and 1 in `GoogleDocsSettingsCard.tsx`;
 - `ExecutionPanel.tsx:351`, a Claude step's live "done" line (the same file and mark as 201);
-- `index.css`, Mark as done's hover on a comment bubble (`#15803d`), now the bubble's fixed light ink.
+- `index.css`, Mark as done's hover on a comment bubble (`#15803d`), now the bubble's light ink.
+
+**For the lead:** a comment task's done dot (`#1e1b4b`) and its working dot (`#4338ca`) are both dark indigo, 7 px, about 2:1 apart, and with reduced motion the working dot doesn't pulse. At the rail's medium and compact widths the dot is the marker's only sign of the state (review round 2). Keep, or give done another shape?
 
 **Greens that stay**, each with its reason in `theme/greenIsTheReadyDot.test.ts`:
 - the token itself;
@@ -103,4 +105,4 @@ Not run here; the "Ritemark on Windows" session was offline:
 
 ## Bundle (E4)
 
-`media/webview.js` 8,727,898 → 8,727,344 bytes; `media/office-preview.js` 2,614,295 → 2,613,806 bytes (it carries `index.css`'s task and bubble colours). The dev-instance warnings in the screenshots' session: activation failures of `vscode.git-base`, `vscode.emmet` and `vscode.github-authentication` (this tree's built-in extensions have no `out/`, as A7 found), the GitHub authentication time-outs that follow from them, and the known refused `phosphor.woff2` (A7, PR 5). None comes from this PR.
+`media/webview.js` 8,727,898 → 8,728,121 bytes; `media/office-preview.js` 2,614,295 → 2,614,448 bytes (it carries `index.css`'s task and bubble colours). The dev-instance warnings in the screenshots' session: activation failures of `vscode.git-base`, `vscode.emmet` and `vscode.github-authentication` (this tree's built-in extensions have no `out/`, as A7 found), the GitHub authentication time-outs that follow from them, and the known refused `phosphor.woff2` (A7, PR 5). None comes from this PR.

@@ -2,9 +2,11 @@
  * Sprint 145 (#578, R6, S36): green appears only as the small "ready" dot (the Experience lead's framework, §3:
  * "One accent, no other hues"). A done mark, a saved line, a copied check or a valid key is drawn in ink.
  *
- * Scans the webview's source, in any letter case, for the ways green is written: the success token, Tailwind's green
- * and emerald classes (any prefix), VS Code's green colours, and Tailwind's green and emerald hex values. It fails on
- * any use outside the list below, each with its reason. Not scanned: rgb()/rgba() values and other hex values.
+ * Scans the webview's source, in any letter case, for the ways green is written here: the success token; Tailwind's
+ * green and emerald classes, with any prefix or `!`; VS Code's success and "added" colours; Tailwind's green and
+ * emerald hex values, with or without alpha; and a CSS colour property set to a named green. It fails on any use
+ * outside the list below, each with its reason. Not scanned: rgb()/rgba()/hsl() values, and hex values outside
+ * Tailwind's green and emerald scales.
  *
  * Run: npx tsx webview/src/theme/greenIsTheReadyDot.test.ts
  */
@@ -20,8 +22,10 @@ const GREEN_HEX = 'f0fdf4|dcfce7|bbf7d0|86efac|4ade80|22c55e|16a34a|15803d|16653
 const GREEN = new RegExp([
   String.raw`--r-success|--ritemark(?:-dark)?-success|ritemark-success`,
   String.raw`testing-iconPassed|charts-green|ansi(?:bright)?green|gitDecoration-addedResourceForeground`,
-  String.raw`(?:^|[\s"'\x60:])[a-z-]*-(?:green|emerald)-\d`,
-  String.raw`#(?:${GREEN_HEX})\b`,
+  String.raw`(?:editorGutter|minimapGutter|editorOverviewRuler)-added|diffEditor-inserted|notebookStatusSuccessIcon|debugIcon-startForeground|statusSuccess|successForeground`,
+  String.raw`(?:^|[\s"'\x60:!])[a-z-]*-(?:green|emerald)-\d`,
+  String.raw`#(?:${GREEN_HEX})(?:[0-9a-f]{2})?\b`,
+  String.raw`(?:color|background|fill|stroke|border|outline)[a-z-]*['"]?\s*:\s*['"]?[a-z]*green\b`,
 ].join('|'), 'i')
 
 /** Where green stays, by file and by what the line holds. */
@@ -61,17 +65,29 @@ assert.deepEqual(found, [], `green outside the ready dot:\n${found.join('\n')}`)
 // Every allowance still matches something, so the list can't hide a stale entry.
 ALLOWED.forEach((entry, index) => assert.ok(used.has(index), `the allowance for ${entry.file} (${entry.why}) matches nothing`))
 
-// A comment's marker and bubble are white in both themes, so their done marks take the fixed light ink, as their
-// words do: the theme's ink-strong is near white in Dark and would vanish there (review round 1).
+// A comment's marker and bubble are white in both themes, so inside them the theme's tokens take their light values:
+// a task's done, working, waiting and failed tones, its destination line and the focus ring stay readable on white in
+// Dark, where the theme's inks are near white (review rounds 1 and 2).
 const css = readFileSync(join(root, 'index.css'), 'utf-8')
-const ruleBody = (selector: string) => css.match(new RegExp(`^${selector.replace(/[.:-]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm'))?.[1] ?? ''
+const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match) => ({ selectors: match[1].split(',').map((s) => s.trim()), body: match[2] }))
+const targets = (selector: string, surface: string) => new RegExp(`(?:^|\\s)${surface.replace('.', '\\.')}(?::[a-z-]+)*$`).test(selector)
 for (const surface of ['.rm-marker', '.rm-bubble']) {
-  assert.match(ruleBody(surface), /background: var\(--ritemark-surface, #fff\)/, `${surface} is white in both themes (if it follows the theme, revisit the inks below)`)
+  // Every rule that paints the surface itself, a dark-scoped one included, keeps it white
+  const painting = rules.filter((rule) => rule.selectors.some((selector) => targets(selector, surface)) && /(?:^|;|\s)background(?:-color)?\s*:/.test(rule.body))
+  assert.ok(painting.length >= 1, `${surface} has its background rule`)
+  for (const rule of painting) {
+    assert.match(rule.body, /background(?:-color)?\s*:\s*var\(--ritemark-surface, #fff\)/, `${rule.selectors.join(', ')} keeps ${surface} white in both themes (if it follows the theme, the light tokens below must go)`)
+  }
+}
+const scope = rules.find((rule) => rule.selectors.includes('.rm-marker') && rule.selectors.includes('.rm-bubble') && /--r-ink-strong:/.test(rule.body))
+assert.ok(scope, 'the marker and the bubble give the theme tokens their light values')
+for (const [token, light] of [['--r-ink-strong', '--ritemark-ink-strong'], ['--r-ink-muted', '--ritemark-ink-muted'], ['--r-ink-faint', '--ritemark-ink-faint'], ['--r-accent', '--ritemark-indigo'], ['--r-warning', '--ritemark-warning'], ['--r-error', '--ritemark-error'], ['--r-surface-soft', '--ritemark-surface-soft']]) {
+  assert.match(scope!.body, new RegExp(`${token}:\\s*var\\(${light}\\);`), `inside a comment, ${token} is ${light}`)
 }
 for (const selector of ['.rm-task-dot--success', '.rm-task-status--success', '.rm-bubble-done:hover']) {
-  const body = ruleBody(selector)
-  assert.match(body, /var\(--ritemark-ink-strong, #1e1b4b\)/, `${selector} is the fixed light ink`)
-  assert.doesNotMatch(body, /var\(--r-/, `${selector} uses no theme token on its white surface`)
+  const done = rules.filter((rule) => rule.selectors.includes(selector))
+  assert.ok(done.length >= 1, `${selector} is styled`)
+  for (const rule of done) assert.match(rule.body, /var\(--r-ink-strong\)/, `${selector} is ink`)
 }
 
-console.log(`greenIsTheReadyDot: green only as the ready dot (${ALLOWED.length} allowances, each with its reason); comment surfaces keep their light ink`)
+console.log(`greenIsTheReadyDot: green only as the ready dot (${ALLOWED.length} allowances, each with its reason); comments keep their light tokens`)
