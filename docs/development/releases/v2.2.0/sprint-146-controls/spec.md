@@ -27,7 +27,7 @@ Acceptance criteria:
 - **The live audit is run** on a hidden dev instance: every trigger in #585's table, with the mouse and with the keyboard, in Ritemark Light and Ritemark Dark. A row that needs a ready AI is run with one, or marked not run.
 - After a mouse pick, a click outside or a press-drag-release, no ring and no tooltip show on the trigger.
 - After Enter, Space or Escape, the trigger has the focus again, with its ring.
-- A consumer that passes its own `onCloseAutoFocus` keeps it (Share's menu, the chat's link menu, the welcome's dialog).
+- A consumer that passes its own `onCloseAutoFocus` keeps it (Share's menu, the chat's link menu, the welcome's dialog). The two that focus something else read the same rule: Share's menu for the Share button, the link menu for its link (PR 1's review, #618).
 - `closeFocus.test.ts` fails on `main`'s `components/ui` and passes on the branch.
 
 ### R2: A catalogue of every shared control in every state
@@ -47,7 +47,7 @@ Acceptance criteria:
 As someone who works with the mouse, the keyboard, or both, I want a ring only when I'm using the keyboard, on every control, and I want to carry on with the keyboard from where I was.
 
 Acceptance criteria:
-- **One tracker per webview** marks the page as keyboard or pointer, in the capture phase, before any control handles the input: pointer after a press of a mouse, pen or finger; keyboard after a key that is not a modifier alone or a shortcut (⌘, Ctrl or Alt held). Before any input the page is in keyboard mode, so a page reached from the workbench by keyboard shows where the focus is. #585's `close-focus.ts` grows into it; it is not a second tracker.
+- **One tracker per webview** marks the page as keyboard or pointer, in the capture phase, before any control handles the input: pointer after a press of a mouse, pen or finger; keyboard after a key that is not a modifier alone or a shortcut (⌘, Ctrl or Alt held), where the keys that move or act on a menu (Enter, Space, Escape, Tab, the arrows, Home, End, Page Up, Page Down) count whatever is held and AltGr's characters count as typing; keyboard too after a click no press made (assistive technology's activation, such as VoiceOver's VO-Space), but not the click a press has just made (PR 1's review, #618). Before any input the page is in keyboard mode, so a page reached from the workbench by keyboard shows where the focus is. #585's `close-focus.ts` grows into it; it is not a second tracker.
 - **The ring shows only in keyboard mode,** whatever Chromium's `:focus-visible` guess, on every non-field control: Button, split button parts, Select's trigger, Switch, Tabs, FilterChip, Slider's thumb, the menus' triggers, Dialog's close, and every screen's own ring (the hand-written `:focus-visible` rules).
 - **A field keeps its focused look in both modes:** Input, Textarea, the composer and the editor show where the typing goes after a click too.
 - **A tooltip opens on focus only in keyboard mode** (`focusOpensTooltip`); hover still opens it, and leaving still closes it. Sprint 142's R9 case (a button that replaces itself) stays fixed.

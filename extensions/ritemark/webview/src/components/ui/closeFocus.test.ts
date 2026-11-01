@@ -22,7 +22,25 @@ for (const key of ['Shift', 'Control', 'Alt', 'Meta']) {
   assert.equal(inputKindOf({ type: 'keydown', key }), null, `${key} alone says nothing`)
 }
 assert.equal(inputKindOf({ type: 'keydown', key: 'c', metaKey: true }), null, 'a shortcut says nothing')
-assert.equal(inputKindOf({ type: 'keydown', key: 'Enter', ctrlKey: true }), null, 'a shortcut says nothing')
+assert.equal(inputKindOf({ type: 'keydown', key: 'v', ctrlKey: true }), null, 'a shortcut says nothing')
+assert.equal(inputKindOf({ type: 'keydown', key: 'AltGraph' }), null, 'AltGr alone says nothing')
+// Radix picks, closes and moves on these keys whatever is held: a close by Ctrl+Enter or ⌘-Escape is the keyboard's
+for (const key of ['Enter', ' ', 'Escape', 'Tab', 'ArrowDown', 'Home']) {
+  assert.equal(inputKindOf({ type: 'keydown', key, ctrlKey: true }), 'keyboard', `Ctrl+${JSON.stringify(key)} is the keyboard`)
+  assert.equal(inputKindOf({ type: 'keydown', key, metaKey: true, altKey: true }), 'keyboard', `⌘⌥${JSON.stringify(key)} is the keyboard`)
+}
+// Windows reports AltGr as Ctrl and Alt held: its characters are typing, not a shortcut
+const altGr = (key: string) => ({ type: 'keydown', key, ctrlKey: true, altKey: true, getModifierState: (k: string) => k === 'AltGraph' })
+assert.equal(inputKindOf(altGr('€')), 'keyboard', "AltGr's character is typing")
+assert.equal(
+  inputKindOf({ type: 'keydown', key: 'e', ctrlKey: true, altKey: true, getModifierState: () => false }),
+  null,
+  'Ctrl+Alt with no AltGr is a shortcut',
+)
+// A click no press made is assistive technology's (or a keyboard's) activation; a script's click() says nothing
+assert.equal(inputKindOf({ type: 'click', detail: 0, isTrusted: true }), 'keyboard', "assistive technology's activation")
+assert.equal(inputKindOf({ type: 'click', detail: 0, isTrusted: false }), null, "a script's own click() says nothing")
+assert.equal(inputKindOf({ type: 'click', detail: 1, isTrusted: true }), null, 'a press made this click: the press said it')
 assert.equal(inputKindOf({ type: 'keyup', key: 'Enter' }), null, 'only the press counts')
 assert.equal(inputKindOf({ type: 'pointermove' }), null, 'moving over a menu is not a pick')
 
@@ -37,7 +55,7 @@ const page = {
 }
 watchInput(page)
 watchInput(page)
-assert.deepEqual([...listeners.keys()].sort(), ['keydown', 'pointerdown'])
+assert.deepEqual([...listeners.keys()].sort(), ['click', 'keydown', 'pointerdown'])
 const press = (event: Record<string, unknown>) => listeners.get(String(event.type))!(event as unknown as Event)
 
 /** A close event as Radix's FocusScope gives it; `prevented` says whether the trigger keeps the focus off. */
@@ -71,6 +89,17 @@ assert.equal(closesWithFocusBack(), false, 'opened by the keyboard, picked with 
 
 press({ type: 'keydown', key: 'Shift' })
 assert.equal(closesWithFocusBack(), false, 'a modifier pressed after the mouse pick changes nothing')
+
+// A click no press made counts, but not the click a press has just made (a label passing its click on to its field)
+press({ type: 'pointerdown', timeStamp: 10_000 })
+press({ type: 'click', detail: 0, isTrusted: true, timeStamp: 10_050 })
+assert.equal(lastInputKind(), 'pointer', "a press's own click, passed on by a label, is not a second input")
+press({ type: 'click', detail: 0, isTrusted: true, timeStamp: 20_000 })
+assert.equal(lastInputKind(), 'keyboard', "VoiceOver's VO-Space on an item, long after the last press")
+assert.equal(closesWithFocusBack(), true, 'a screen reader user gets the focus back on the trigger')
+press({ type: 'pointerdown', timeStamp: 30_000 })
+press({ type: 'keydown', key: 'Enter', metaKey: true, timeStamp: 30_500 })
+assert.equal(closesWithFocusBack(), true, 'opened with the mouse, picked with ⌘-Enter: focus back')
 
 // ── The shared menu and list contents take the rule; a consumer's own handler stays its own ──
 type Rendered = { props: { children: { props: { onCloseAutoFocus?: unknown } } } }

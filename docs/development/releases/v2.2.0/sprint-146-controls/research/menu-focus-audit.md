@@ -55,7 +55,12 @@ Crops (device pixels, 2×) in [`../qa/`](../qa/):
 4. **Share's menu behaves as on `main` (S6):** a click outside leaves Share alone, Escape and Tab return to Share with its ring.
 5. **The keyboard always gets its ring back:** every keyboard close in every row ended on its trigger with `:focus-visible`, in both themes.
 
-Nothing in the shared rule needed a fix.
+The audit found nothing in the shared rule to fix. PR 1's first review round (#618) did, and the rule changed after the audit above:
+- **Keys that act on a menu count whatever is held.** Radix picks on Enter or Space and closes on Escape with ⌘, Ctrl or Alt held, so a close by ⌘-Enter was read as a pointer close. Enter, Space, Escape, Tab, the arrows, Home, End, Page Up and Page Down now count as the keyboard with any modifier; other keys with ⌘, Ctrl or Alt held are still shortcuts. AltGr's characters count as typing (Windows reports AltGr as Ctrl and Alt).
+- **Assistive technology's activation counts as the keyboard.** VoiceOver's VO-Space (and Voice Control) sends a click and no press or key. A trusted click with no click count now counts as the keyboard, unless a press made it within a second (a label passing its click on to its field). A script's own `click()` says nothing.
+- **The AI sheet's link menu takes the rule** (`ChatLinkMenu.tsx`): it focused its link by script after every close, a mouse pick too, which is RC3's mechanism. It now focuses the link only after the keyboard. Not run live: the link menu needs a ready AI.
+
+After those changes, four rows ran again in Light on the rebuilt bundle (the zoom menu, Doing limit, Share and the agent Select): every step met the rule.
 
 ## Not run, and why
 

@@ -43,7 +43,8 @@ const SelectTrigger = React.forwardRef<
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
 // Radix focuses the trigger after every close, a mouse pick too, and the trigger's `focus:` styles then show. The
-// trigger gets the focus back only when the keyboard closed the list (2.2, close-focus.ts), as in dropdown-menu.tsx.
+// trigger gets the focus back only after the keyboard (2.2, the page's last input, close-focus.ts), as in
+// dropdown-menu.tsx.
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>

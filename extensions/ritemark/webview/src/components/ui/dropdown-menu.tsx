@@ -4,7 +4,7 @@
  * Radix: Enter/Space/↓ open it, arrows move, Escape closes and returns focus
  * to the trigger.
  *
- * Focus goes back to the trigger only when the keyboard closed the menu (2.2,
+ * Focus goes back to the trigger only after the keyboard (2.2, the page's last input,
  * `close-focus.ts`): after a mouse pick or a click outside, nothing is focused
  * and no focus ring shows. A content given its own `onCloseAutoFocus` keeps it.
  *
