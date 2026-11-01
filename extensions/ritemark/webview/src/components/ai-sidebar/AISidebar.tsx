@@ -34,7 +34,8 @@ import { RuntimeAvailabilityNotice } from './RuntimeAvailabilityNotice';
 import { ShareQuestionCard } from './ShareQuestionCard';
 import { RUNTIME_LABEL } from './threadStatus';
 import { deriveRuntimeAvailabilities, listReadyAlternatives, RUNTIME_LABELS } from './runtimeAvailability';
-import { START_EXTRAS_GRACE_MS, startLook } from './startLook';
+import { START_EXTRAS_GRACE_MS, START_SLOW_AFTER_MS, startLook } from './startLook';
+import { RuntimeNotice } from './RuntimeNotice';
 import { StartFailure, StartingLook } from './StartingLook';
 import { AI_STARTING_MARK_ID } from '../../../../src/views/aiStartingMark';
 
@@ -78,7 +79,7 @@ export function AISidebar() {
         });
       }
       if (typeof savedState.currentConversationId === 'string' && /^[0-9a-f]{8}-/i.test(savedState.currentConversationId)) {
-        useAISidebarStore.setState({ startConversationPending: true });
+        useAISidebarStore.setState((state) => ({ startConversationsPending: state.startConversationsPending + 1 }));
         sendConversationRequest({ type: 'conversation/get', requestId: `restore-${Date.now()}`, conversationId: savedState.currentConversationId });
       }
     }
@@ -153,7 +154,7 @@ export function AISidebar() {
   const browserShareQuestion = useAISidebarStore((s) => s.browserShareQuestion);
   const answerBrowserShareQuestion = useAISidebarStore((s) => s.answerBrowserShareQuestion);
   const conversationRolloutMode = useAISidebarStore((s) => s.conversationRolloutMode);
-  const startConversationPending = useAISidebarStore((s) => s.startConversationPending);
+  const startConversationsPending = useAISidebarStore((s) => s.startConversationsPending);
   const isClaudeCode = selectedAgent === 'claude-code';
   const isCodex = selectedAgent === 'codex';
   const isOpenCode = selectedAgent === 'opencode';
@@ -202,13 +203,11 @@ export function AISidebar() {
   const start = startLook({
     ...sidebarFacts,
     bootstrapError,
-    conversationOnItsWay: conversationRolloutMode === 'unknown' || startConversationPending,
+    conversationOnItsWay: conversationRolloutMode === 'unknown' || startConversationsPending > 0,
     extrasWaitOver,
   });
-  const look: 'starting' | 'failed' | 'settled' = !ready
-    ? (bootstrapError ? 'failed' : 'starting')
-    : settledOnce ? 'settled' : start.look;
-  const waitingForExtras = start.look === 'starting' && (start.waitingFor === 'conversation' || start.waitingFor === 'onboarding');
+  const look = ready && settledOnce ? 'settled' : start.look;
+  const waitingForExtras = start.look === 'starting' && start.waitingFor !== 'bootstrap' && start.waitingFor !== 'ai';
   useEffect(() => {
     if (!waitingForExtras || extrasWaitOver) return;
     const timeout = window.setTimeout(() => setExtrasWaitOver(true), START_EXTRAS_GRACE_MS);
@@ -219,6 +218,28 @@ export function AISidebar() {
     // The page's own mark (aiStartingMark.ts) goes in the same frame as the look that replaces it
     if (look !== 'starting') document.getElementById(AI_STARTING_MARK_ID)?.remove();
   }, [look, settledOnce]);
+  // The AI the view is waiting for: the chosen one while it is checked, else the first other still checked
+  const checkingAis = (Object.keys(runtimeAvailabilities) as AgentId[]).filter((id) => runtimeAvailabilities[id].state === 'checking');
+  const awaitedAi = checkingAis.includes(selectedAgent) ? selectedAgent : (checkingAis[0] ?? selectedAgent);
+  const recheck = () => {
+    for (const runtimeId of checkingAis.length > 0 ? checkingAis : [selectedAgent]) {
+      vscode.postMessage({ type: 'agent:status/recheck', runtimeId });
+    }
+  };
+  // A chat that is the settled look at once (a conversation was open) while its AI's check hangs: the same words after
+  // the same 10 s of the view's check, with Try again, on the notice every runtime problem uses (Sprint 152: the 15 s
+  // card's job, so a hung check is never left without a way to check again)
+  const [chatCheckSlow, setChatCheckSlow] = useState(false);
+  const [chatCheckStartedAt, setChatCheckStartedAt] = useState(() => Date.now());
+  const chatWaitsOnItsAi = look === 'settled' && selectedRuntimeAvailability.state === 'checking';
+  useEffect(() => {
+    if (!chatWaitsOnItsAi) {
+      setChatCheckSlow(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => setChatCheckSlow(true), Math.max(0, chatCheckStartedAt + START_SLOW_AFTER_MS - Date.now()));
+    return () => window.clearTimeout(timeout);
+  }, [chatWaitsOnItsAi, chatCheckStartedAt]);
   const currentApprovedPlan = isClaudeCode
     ? getActiveApprovedPlanForClaude(agentConversation)
     : (isCodex || isOpenCode)
@@ -248,20 +269,36 @@ export function AISidebar() {
       {/* Offline banner */}
       {!isOnline && <OfflineBanner />}
 
+      {chatCheckSlow && (
+        <div className="p-3">
+          <RuntimeNotice
+            tone="warning"
+            title={`Still checking whether ${RUNTIME_LABELS[selectedAgent]} is ready.`}
+            message="Try again to start the check over."
+            primaryAction={{
+              label: 'Try again',
+              icon: 'arrows-clockwise',
+              tooltip: `Check again whether ${RUNTIME_LABELS[selectedAgent]} is ready`,
+              onAction: () => {
+                setChatCheckSlow(false);
+                setChatCheckStartedAt(Date.now());
+                recheck();
+              },
+            }}
+          />
+        </div>
+      )}
+
       {/* Sprint 152 (R5, #624): the turning mark until the look is certain, then that look, once */}
       {look === 'starting' ? (
         <StartingLook
-          aiName={ready ? RUNTIME_LABELS[selectedAgent] : null}
+          aiName={ready ? RUNTIME_LABELS[awaitedAi] : null}
           onTryAgain={() => {
             if (!ready) {
               vscode.postMessage({ type: 'agent:bootstrap/request' });
               return;
             }
-            // The AIs still being checked, or the chosen one when every AI has answered
-            const checking = (Object.keys(runtimeAvailabilities) as AgentId[]).filter((id) => runtimeAvailabilities[id].state === 'checking');
-            for (const runtimeId of checking.length > 0 ? checking : [selectedAgent]) {
-              vscode.postMessage({ type: 'agent:status/recheck', runtimeId });
-            }
+            recheck();
           }}
         />
       ) : look === 'failed' ? (

@@ -7,6 +7,6 @@
 
 ## After PR 1 (R5)
 
-- `media/webview.js`: 8,752,573 bytes, 2,597 more: the start look's decision (`startLook.ts`), its line and failure
+- `media/webview.js`: 8,753,245 bytes, 3,269 more (after the review round's fixes): the start look's decision (`startLook.ts`), its line and failure
   (`StartingLook.tsx`), and the gate's derivation moved into `sidebarGate.ts`. The turning mark itself is plain HTML and
   CSS in the view's page (`src/views/aiStartingMark.ts`), not in the bundle.

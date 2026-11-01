@@ -59,7 +59,6 @@ import { readFileSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
 
 const args = process.argv.slice(2);
 const option = (name, fallback) => {
@@ -315,8 +314,15 @@ const FRAME_SAMPLE = `(() => {
 /** The workbench's own marks around the first frame (`vs/base/common/performance`), on the page's clock. */
 const FIRST_FRAME_MARKS = ['code/didStartWorkbench', 'code/willRestoreEditors', 'code/didRestoreEditors', 'code/didRemovePartsSplash', 'code/willRestoreAuxiliaryBar', 'code/didRestoreAuxiliaryBar', 'code/willLoadExtensions', 'code/didLoadExtensions'];
 
-/** Whether the process listening on `listenPort` is, or descends from, the instance launched with this --user-data-dir. */
+/**
+ * Whether the process listening on `listenPort` is, or descends from, the instance launched with this --user-data-dir:
+ * its command line names the folder as a whole argument (`--user-data-dir=<dir>` or `--user-data-dir <dir>`), so
+ * another instance on a longer path that starts the same way never counts. It reads `lsof` and `ps`, so the first
+ * frame runs on the Mac (Windows' starts are measured at Gate 2, the plan's *Windows*).
+ */
 function ownedByInstance(listenPort) {
+	const escaped = userDataDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const namesTheProfile = new RegExp(`--user-data-dir[= ]${escaped}/?(\\s|$)`);
 	let current;
 	try {
 		current = execFileSync('lsof', ['-nP', `-tiTCP:${listenPort}`, '-sTCP:LISTEN'], { encoding: 'utf8' }).trim().split('\n')[0];
@@ -331,7 +337,7 @@ function ownedByInstance(listenPort) {
 			return false;
 		}
 		const [, ppid, command] = line.match(/^(\d+)\s+(.*)$/) ?? [];
-		if (command?.includes(userDataDir)) {
+		if (command && namesTheProfile.test(command)) {
 			return true;
 		}
 		current = ppid;
@@ -363,6 +369,10 @@ async function firstFrame(start) {
 	if (shots) {
 		mkdirSync(shots, { recursive: true });
 	}
+	if (process.platform === 'win32') {
+		console.error('stopped: --first-frame reads lsof and ps to make sure it measures (and lets go) this instance only, so it runs on the Mac');
+		return 2;
+	}
 	// A new profile's start can be run before the launch: it waits up to a minute for the instance's CDP port
 	for (let waited = 0; start === 'new-profile' && waited < 60000 && !ownedByInstance(port); waited += 50) {
 		await sleep(50);
@@ -386,7 +396,9 @@ async function firstFrame(start) {
 		}
 		return found;
 	};
-	const before = extPort ? new Set((await inspectors()).map(target => target.id)) : new Set();
+	// The extension hosts already there belong to the window before this start; a new profile's window is the
+	// instance's first, so any host it finds is this start's own, even one already listening
+	const before = extPort && start !== 'new-profile' ? new Set((await inspectors()).map(target => target.id)) : new Set();
 	let oldOrigin = null;
 
 	// What starts it
@@ -534,8 +546,9 @@ async function firstFrame(start) {
 				}
 			}
 			const sinceRelease = releasedAt === null ? (extPort ? -1 : value.t - first.t) : value.t - releasedAt;
-			// Settled: Ritemark started at least 5 s ago (the last move its start makes is the AI column's second call, 4 s
-			// after activation, extension.ts), and nothing has changed for 2 s
+			// Settled: Ritemark started at least 5 s ago, so its start's late moves are inside the run (the AI column's
+			// second call, 4 s after activation, in builds before Sprint 152's R6 removed it: a build under test can be
+			// older than this script), and nothing has changed for 2 s
 			if (value.started && startedAt === null) {
 				startedAt = value.t;
 			}
