@@ -36,7 +36,7 @@ As the Experience lead, I want one page that shows each control in `webview/src/
 
 Acceptance criteria:
 - **One hidden webview page.** It opens only when Ritemark is started with the catalogue's launch setting (an environment variable only test scripts set), in a dev instance and in a release build alike. No command, menu or palette entry shows it otherwise (decision 5).
-- **Every control in `components/ui/` has a row.** A unit test lists the folder and fails when a control has no row.
+- **Every control in `components/ui/` has a row.** A unit test lists every component each file exports (a file such as `dropdown-menu.tsx` exports several) and fails when an exported control has no row, or is named on a list of parts that need none (Codex on #603).
 - **Each row is one control (and its variants), each column one state:** at rest; hovered; pressed; with the keyboard's focus; after a mouse click (focus with no ring); menu open; after a mouse pick (menu closed); after Escape; after a keyboard pick; disabled; busy; on (where the control has it); with a long label (cut or wrapped, and at a narrow width for #566). A state the control does not have is an empty cell.
 - **Each cell holds its own copy of the control,** so a state reached in one cell never shows in another.
 - **Both themes.** The page is drawn in Ritemark Light and Ritemark Dark (the script switches the theme).
@@ -62,7 +62,7 @@ As the person who merges a PR or passes Gate 1, I want a script that says which 
 Acceptance criteria:
 - **Real input only.** It reaches each state with `Input.dispatchMouseEvent` and `Input.dispatchKeyEvent` on the window, never `element.click()` or `element.focus()` in the page. A unit test of the script's source fails if one appears in an evaluated expression.
 - **Device pixels.** Each state's cell is captured at device pixels, in both themes, and compared with its approved image inside the running instance, as `frame-screenshots.mjs` compares (no image library).
-- **The exit code is the number of states that differ** from their approved image, or have none. `compare.html` shows each differing state's reference, capture and difference; `sheet.html` lays the captures out as the catalogue's grid, for the Experience lead.
+- **The exit code is 1 when any state differs** from its approved image or has none, and 0 otherwise. The script prints how many states differ (an exit status holds only 0–255, so a count of 256 would read as a pass; Codex on #603). `compare.html` shows each differing state's reference, capture and difference; `sheet.html` lays the captures out as the catalogue's grid, for the Experience lead.
 - **A background window draws as a front one:** the script turns on the debugging protocol's focus emulation, and one run compares a front and a background capture.
 - **The approved images** live in `docs/development/control-baseline/`, with a README saying how to run the script, how to take a new set, and that the Experience lead approves each image once.
 - **It fails first:** run against the approved set on a branch with R1's shared rule reverted, it exits non-zero and names the mouse-pick states; on the sprint branch it exits 0.

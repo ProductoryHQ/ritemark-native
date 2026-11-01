@@ -58,7 +58,7 @@ And given the same started with the setting, the catalogue opens as a tab on the
 ### S10: Every control, every state
 Given the catalogue open
 Then each file in `components/ui/` has a row, each with its variants, and each state it has a cell; a state it doesn't have is empty
-And the coverage test fails when a new file is added to `components/ui/` without a row.
+And the coverage test fails when a new file is added to `components/ui/` without a row, or a new control is exported from a file that already has rows.
 
 ### S11: Both themes
 Given the catalogue open
