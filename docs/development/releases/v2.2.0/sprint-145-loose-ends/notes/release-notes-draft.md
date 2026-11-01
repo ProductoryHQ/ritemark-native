@@ -16,4 +16,4 @@ Drafts for 2.2's release notes, one per user-visible change, written for the `re
 
 *R12: Electron 43.8.6, on Node.js 24.22.1.*
 
-- **Security:** Ritemark now runs on Electron 43.8.6, which includes the Node.js security fixes of 21 October and the newest Chromium security fixes for the built-in browser.
+- **Security:** Ritemark now runs on Electron 43.8.6, which includes the Node.js security fixes of 21 October and the newest Chromium security fixes for everything Ritemark shows, the built-in browser included.

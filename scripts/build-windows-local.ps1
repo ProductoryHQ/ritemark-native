@@ -36,6 +36,9 @@ $BrandDir  = Join-Path $RootDir "branding"
 
 # The VS Code release at the committed vscode pin, and the Electron it builds native modules for (target= in
 # vscode/.npmrc). update-vscode.sh's checklist names both; they were 1.117.0 and 30.5.1 until Sprint 135.
+# This is the pin's own target, before patch 020 moves the Electron the build downloads (43.8.6 since Sprint 145).
+# CI does the same: build-windows.yml runs npm ci before the patches. Every 43.x has native-module ABI 148, so
+# modules built against 43.7.7's headers load on 43.8.x; a patch 020 that left the 43 line would change this.
 $VSCodeVersion = "1.142.0"
 $ElectronTarget = "43.7.7"
 
