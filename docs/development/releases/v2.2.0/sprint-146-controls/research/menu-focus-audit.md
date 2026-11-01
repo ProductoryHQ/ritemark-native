@@ -72,6 +72,10 @@ The second round changed four more things, and the same four rows ran again in L
 
 **In PR 2** (`sprint-146-controls-catalogue`), decision 1's change landed: `close-focus.ts` grew into the input-mode tracker (`ui/input-mode.ts`), the menus and Select give the focus back to their trigger after every close, and the mode decides the ring and the tooltip. That ends the assistive-technology regression, and PR 2 also takes PR 1's round-3 items (its Review record lists each). The two PRs merge together.
 
+## Again on PR 2's tracker
+
+On PR 2's head (`sprint-146-controls-catalogue`: the input-mode tracker and decision 1), the rows that could run in that window ran again in Light and Dark: Home's caret, the board's Doing limit, the PDF zoom menu, Share and dictation. Every step met the rule. After a mouse pick from the zoom menu the trigger now has the focus again, Chromium even matches `:focus-visible` on it, and nothing is drawn and no tooltip opens: the page is in pointer mode (`r2-pdf-zoom-mouse-pick-{light,dark}.png`). Every keyboard close still ends on the trigger with its ring. The agent configurator's Select didn't run (its file wasn't open in that window); the catalogue's Select row covers the same trigger (`research/control-states-runs.md`). From this run on, the driver judges a ring by what the trigger draws, not by `:focus-visible`, which the tracker no longer follows.
+
 ## Not run, and why
 
 - **Rows behind a ready AI:** the composer's model, permission, runtime and More menus, its thinking effort popover, the conversation header's and rows' More actions, the link menu (`ChatLinkMenu`, S7), and the board's Give to, Send to, Retry with and Review with carets (`AgentSplitButton`, disabled with no usable agent). The scratch homes have no AI signed in, and this run signs in nothing.
