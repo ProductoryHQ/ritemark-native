@@ -136,6 +136,7 @@ async function clickIn(kind, expr) {
 async function openFromHome(name) {
   await clickTab('Home');
   const f = await frame('home');
+  if (!f) throw new Error('no home webview');
   const r = await rectOf(f, `[...d.querySelectorAll('button, a, [role=button], li')].find((e) => e.innerText && e.innerText.trim().startsWith(${JSON.stringify(name)}))`);
   f.close();
   if (!r) throw new Error(`no ${name} on Home`);

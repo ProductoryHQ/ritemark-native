@@ -1,0 +1,120 @@
+/* The control catalogue (Sprint 146, R2). Its own page: these rules never reach another surface. */
+
+/* Stable captures: nothing moves and no caret blinks. No state's end look depends on motion. */
+body.rm-catalogue-page *,
+body.rm-catalogue-page *::before,
+body.rm-catalogue-page *::after {
+  animation: none !important;
+  transition: none !important;
+  caret-color: transparent !important;
+}
+
+body.rm-catalogue-page {
+  background: var(--r-surface);
+}
+
+.rm-catalogue {
+  padding: 24px 24px 480px;
+  color: var(--r-ink-strong);
+  font-family: var(--ritemark-ui-font-family);
+  font-size: 13px;
+}
+
+.rm-cat-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.rm-cat-head h1 {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.rm-cat-head p {
+  margin-top: 4px;
+  color: var(--r-ink-muted);
+  line-height: 18px;
+}
+
+.rm-cat-row {
+  margin-top: 32px;
+}
+
+.rm-cat-row > h2 {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.rm-cat-variant {
+  margin-top: 12px;
+}
+
+.rm-cat-variant > h3 {
+  color: var(--r-ink-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.rm-cat-cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 6px;
+}
+
+.rm-cat-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rm-cat-caption {
+  height: 14px;
+  color: var(--r-ink-faint);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+/* The captured box: its own copy of the control, room below it, and nothing drawn round it */
+.rm-cat-box {
+  position: relative;
+  box-sizing: border-box;
+}
+
+.rm-cat-start {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  outline: none;
+}
+
+.rm-cat-stage {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+}
+
+/* A narrow width round the control: it cuts, wraps or overflows as it does in a narrow desk (#566) */
+.rm-cat-narrow {
+  min-width: 0;
+}
+
+.rm-cat-context {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 160px;
+  height: 40px;
+  border: 1px dashed var(--r-hairline-strong);
+  border-radius: 6px;
+  color: var(--r-ink-muted);
+  font-size: 12px;
+}

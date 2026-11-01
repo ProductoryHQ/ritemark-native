@@ -17,7 +17,6 @@
 import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import { cn } from '../../lib/utils'
-import { lastInputKind } from '../ui/close-focus'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { Icon } from '../ui/Icon'
 import type { GoogleDocsAction, GoogleDocsProjection } from './googleDocsMenu'
@@ -130,10 +129,11 @@ export function ShareMenu({
           leftOutsideRef.current = true
         }}
         onCloseAutoFocus={(event) => {
-          // The menu's trigger is the stand-in, so Share itself gets the focus back, and only after a keyboard close
-          // (ui/close-focus.ts): after a click on an item it does not, or Share's tooltip would show over the bar.
+          // The menu's trigger is the stand-in, so Share itself gets the focus back after every close but a click
+          // outside (2.2, decision 1). After a mouse pick it shows no ring and opens no tooltip: the page's input mode
+          // decides (ui/input-mode.ts).
           event.preventDefault()
-          if (!leftOutsideRef.current && lastInputKind() === 'keyboard') anchorRef.current?.focus()
+          if (!leftOutsideRef.current) anchorRef.current?.focus()
           leftOutsideRef.current = false
         }}
         onKeyDown={(event) => {

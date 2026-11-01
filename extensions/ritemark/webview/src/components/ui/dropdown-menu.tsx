@@ -4,10 +4,10 @@
  * Radix: Enter/Space/↓ open it, arrows move, Escape closes and returns focus
  * to the trigger.
  *
- * Focus goes back to the trigger only after the keyboard (2.2, the page's last
- * input, `close-focus.ts`): after a mouse pick or a click outside, nothing is
- * focused and no focus ring shows. A content's own `onCloseAutoFocus` runs
- * first; the rule follows unless that handler prevented the focus.
+ * After every close the trigger has the focus again, as Radix gives it, and
+ * the next Tab carries on from it. Whether a ring shows is the page's input
+ * mode's (2.2, `input-mode.ts`): after a mouse pick none, after the keyboard
+ * the ring (decision 1).
  *
  *   <DropdownMenu>
  *     <DropdownMenuTrigger asChild><Button …/></DropdownMenuTrigger>
@@ -20,7 +20,6 @@ import * as React from 'react'
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import { cn } from '../../lib/utils'
 import { Button } from './button'
-import { closeFocusHandler } from './close-focus'
 import { Icon } from './Icon'
 import { Tooltip } from './tooltip'
 
@@ -31,12 +30,11 @@ const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 4, onCloseAutoFocus, ...props }, ref) => (
+>(({ className, sideOffset = 4, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
     <DropdownMenuPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
-      onCloseAutoFocus={closeFocusHandler(onCloseAutoFocus)}
       collisionPadding={8}
       className={cn(
         // Above the 56 px thread rail (z-60), below dialogs (z-80) and tooltips (z-100).
