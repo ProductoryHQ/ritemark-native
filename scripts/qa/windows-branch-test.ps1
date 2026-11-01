@@ -19,7 +19,9 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)][string]$Overlay,
-  [string]$RitemarkExe
+  [string]$RitemarkExe,
+  # Use this PC's own Claude, Codex and OpenCode sign-ins (for a check that needs a signed-in AI); off by default
+  [switch]$RealAiHomes
 )
 
 $ErrorActionPreference = 'Stop'
@@ -86,4 +88,18 @@ Write-Host ''
 Write-Host "Starting Ritemark ($RitemarkExe) with the branch extension $($pkg.version) (installed: $installedVersion)."
 Write-Host "Profile: $userData (fresh; your normal settings are not used)."
 Write-Host 'Walk the scenarios marked B in the sprint''s scenarios.md, then close the window.'
+if (-not $RealAiHomes) {
+  # Throwaway AI homes, so the test window never sees or changes this PC's own sign-ins (only this script's process
+  # and the Ritemark it starts get them)
+  $ai = Join-Path $root 'ai'
+  if (Test-Path -LiteralPath $ai) { Remove-Item -LiteralPath $ai -Recurse -Force }
+  $env:CLAUDE_CONFIG_DIR = Join-Path $ai 'claude'
+  $env:CODEX_HOME = Join-Path $ai 'codex'
+  $env:XDG_CONFIG_HOME = Join-Path $ai 'config'
+  $env:XDG_DATA_HOME = Join-Path $ai 'data'
+  $env:XDG_STATE_HOME = Join-Path $ai 'state'
+  $env:XDG_CACHE_HOME = Join-Path $ai 'cache'
+  New-Item -ItemType Directory -Path $env:CLAUDE_CONFIG_DIR, $env:CODEX_HOME, $env:XDG_CONFIG_HOME, $env:XDG_DATA_HOME, $env:XDG_STATE_HOME, $env:XDG_CACHE_HOME -Force | Out-Null
+  Write-Host "AI homes: $ai (throwaway; pass -RealAiHomes to use this PC's sign-ins)."
+}
 & $RitemarkExe --extensions-dir $ext --user-data-dir $userData --shared-data-dir $sharedData $workspace
