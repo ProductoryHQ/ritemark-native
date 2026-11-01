@@ -83,7 +83,7 @@ The five items, in the shape's order:
 | Review process, Step 6 | `harness/review-process-step-6` | [#602](https://github.com/ProductoryHQ/ritemark-native/pull/602) | — | Merges after #600, rebased and reviewed again | Two review rounds | n/a |
 | Plan: this release plan and 145 | `plan/v2.2.0-release-plan` | [#601](https://github.com/ProductoryHQ/ritemark-native/pull/601) | — | In review (Light) | n/a | n/a |
 | 145 | `sprint-145-loose-ends` | — | #588, #569, #501, #507, #515, #582, #595, #580, #578, #571, #596, #597 | — | — | — |
-| 145, PR 1 | `sprint-145-loose-ends` | [#605](https://github.com/ProductoryHQ/ritemark-native/pull/605) | #588, and Phase 1's Mac audits | Draft, in review (Standard by paths, `/code-review` at high by decision 2) | Unit and coordinator tests fail on `main` and pass; the Mac check 10 of 10; Windows run waiting | Drafted (`notes/release-notes-draft.md`) |
+| 145, PR 1 | `sprint-145-loose-ends` | [#605](https://github.com/ProductoryHQ/ritemark-native/pull/605) | #588, and Phase 1's Mac audits | Draft. R1 revised on 1 November (both changes stay, merged by paragraph, in the shell next to patch 014): shell-tier, High; waits for Jarmo's approval of the revision, then a new review | #605's first approach: three review rounds, round 3 open; the merge's tests not written yet; Windows at Gate 2 | Drafted for the first approach; rewritten with the merge |
 
 ## Risks and Blockers
 

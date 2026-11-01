@@ -6,14 +6,19 @@ Unless a scenario says otherwise it runs on the Mac, on a dev instance of the sp
 
 ## Feature: Words a person typed and saved stay (R1)
 
+**Revised on 1 November 2026** with R1 (both changes stay, merged by block; experience 44, *Editing alongside the AI*, ritemark-dev `ec25356`; pending Jarmo's approval). S1, S4 and S8 are revised below (their 31 October text follows each as "Was"); S2, S3, S5–S7 and S9 stand; S56–S64 are new.
+
 The setup of S1–S8 is a three-line Markdown file in a scratch project, open in Ritemark's editor. "Typing" is key events over CDP at the end of line 3; "auto-save" is waiting for Ritemark's own save.
 
-### S1: The stale write (the reproducer)
+### S1 (revised 1 November): The stale write is merged
 Given the file, and the document clean
 When the person types a sentence and it auto-saves, the writer reads the file, the person types a second sentence and it auto-saves, and the writer then writes the copy it read with line 1 changed
-Then on `main` the second sentence is gone from the editor and from the file, with no question and no log line (the record says whether Ctrl+Z brings it back)
-And on the branch Review changes appears, the editor still shows both sentences and the writer's line 1 is on disk, and choosing Keep my version puts both sentences back on disk, Use disk takes the writer's copy, and Compare shows both
-And the same on Windows, through the test overlay, ten times.
+Then on `main` the second sentence is gone from the editor and from the file, with no question and no log line (⌘Z doesn't bring it back: A1)
+And on the branch, with no question and no highlight, the document and, after the auto-save, the file hold the writer's line 1 and both sentences; the document bar says Saved; the caret, the selection and the view are where they were; the sync log names the merge (one block from the writer, none held)
+And one ⌘Z in the editor undoes the merge as one step (line 1 goes back), and the auto-save then writes that
+And the same on Windows on 2.2's candidate at Gate 2 (the merge needs the shell), ten times.
+
+Was (31 October): on the branch Review changes appears, the editor still shows both sentences and the writer's line 1 is on disk; Keep my version, Use disk and Compare; on Windows through the test overlay.
 
 ### S2: A writer that read the latest save
 Given the file, a sentence typed and auto-saved, the document clean
@@ -24,10 +29,12 @@ Then the editor takes the change silently, as today, and no question appears.
 Given the same, and the person is typing when the writer writes
 Then Review changes appears, as it does on `main`.
 
-### S4: A writer rewrites the sentence just typed
+### S4 (revised 1 November): A writer rewrites the sentence just typed, after reading it
 Given the person typed a sentence and it auto-saved
 When a writer that read the file after that save replaces that very sentence with other words
-Then Review changes appears (the words the save wrote are gone), and the person decides. This is the cost named in decision 1.
+Then the writer's words land as written, with no question: the base is the save it read, and only the writer changed that block since.
+
+Was (31 October): Review changes appears (the cost named in decision 1).
 
 ### S5: Line endings and the byte order mark
 Given a file with LF endings, and another with CRLF and a byte order mark
@@ -44,15 +51,65 @@ Given a CSV file, a Markdown file with front matter and a Markdown file with CRL
 When S1's steps run on each
 Then Review changes appears for each, and S2's steps stay silent for each.
 
-### S8: The limit
-Given S1's steps, but the writer writes long after the person's last save (the window's length is the audit's number)
-Then the record says what happens, and the issue and the release notes' known limits say it in plain words: a writer that read long ago and writes much later can still win.
+### S8 (revised 1 November): No base: the fallback question, and its limit
+Given S1's steps, but the writer writes a copy whose blocks differ from every remembered save almost everywhere (a whole-file rewrite that also reformatted the text)
+Then within 30 s of the person's last save, the whole-document question asks, held as #605 does, with the Experience lead's three changes (the second paragraph's words, Use disk version `secondary` and alone at the footer's far left, Keep my version primary and the default, Tab in screen order)
+And after 30 s, a copy with no base still replaces the words, as in 2.1; the issue and the release notes' known limits say so in plain words.
+
+Was (31 October): a writer that writes long after the person's last save; the record says what happens, and the known limits say it.
 
 ### S9: What each AI's tool does
 Given a scratch project, a file, and each AI that is signed in on the test Mac (ChatGPT through Jarmo's own sign-in; Claude and OpenCode if signed in)
 When the AI reads the file, the file is changed by the writer, and the AI is asked to edit one line
 Then the record says, for each, whether its tool refuses a write when the file changed since the read, and what the 27 October sighting's ChatGPT write used (from its session record, if it is still on disk)
 And an AI that isn't signed in is listed as not run.
+
+### S56: Both changed one block: the person's text stays, Review changes waits (experience 44, frame 2)
+Given the file, the person typing in its opening paragraph, and Claude, in a turn working on this document, saving a copy made from the last save that tightens the opening and shortens a later paragraph
+Then the later paragraph takes Claude's text and the opening keeps the person's, with no highlight anywhere and the person still typing (nothing takes the focus)
+And the document bar's Review changes takes Saved's place, in ink with a hairline and the `arrows-split` icon, with the tooltip "Claude also changed the paragraph you were writing in. Yours is kept. Review changes shows both."
+And the file holds the merged text after the auto-save.
+
+### S57: Review changes for one block (experience 44, frame 3)
+Given S56
+When the person opens Review changes
+Then the document scrolls to the opening and `DocumentConflictDialog` opens in its paragraph mode: "A paragraph changed in two places", the first line "Claude changed a paragraph you were writing in. Ritemark kept yours in the document.", the two paragraphs in full under "Yours, in the document" and "Claude's", [Use Claude's] at the far left and [Keep mine] primary and the default, no warning icon
+And Keep mine closes it and the button goes; in a second run, Use Claude's puts Claude's paragraph in the document (one undo step), and the auto-save writes it.
+
+### S58: Two blocks, one at a time
+Given both changed two blocks
+Then the tooltip reads "Claude also changed 2 paragraphs you were writing in. Yours are kept. Review changes shows both versions."
+And the dialog shows "1 of 2", then "2 of 2", and the last choice closes it and the button.
+
+### S59: Another app, and the tab behind
+Given S56's write made by an app that isn't an AI working on this document, and the document's tab behind another
+Then the notification reads "Another app saved a copy of "Module 3.md" that changes a paragraph you were writing in. Yours is kept." [Review changes], its Review changes brings the tab forward with the dialog open, and the dialog's words say "The other copy" and "Use the other copy"
+And with ChatGPT or OpenCode as the writer in a turn on this document, their names replace "Claude".
+
+### S60: The button goes by itself
+Given S56's button
+When the person types Claude's version of the opening (or Claude writes the person's)
+Then the button goes, with no question
+And in another run, when the person closes the document with the button still there, the file holds the person's text.
+
+### S61: Nothing moves under the person
+Given a long file scrolled to its middle, the caret in a paragraph there and a word selected
+When a writer's copy (from the last save) adds three paragraphs above the view and removes one
+Then the caret's paragraph stays at the same place on screen, the caret and the selection are unchanged, and the document bar says Saved.
+
+### S62: One undo step
+Given S1 on the branch
+When the person presses ⌘Z once in the editor
+Then all of the writer's merged changes go back together, the person's own words stay, and nothing else is undone.
+
+### S63: The base is found when it is older
+Given the person saves five times within two minutes (each auto-save adding a sentence) and a writer that read the second save writes its copy with line 1 changed
+Then the base is the second save, and the merge keeps all five sentences and takes line 1.
+
+### S64: The shell doesn't answer in time
+Given Ritemark's extension host held for longer than the reload participant's budget
+When S1's writer writes
+Then VS Code reloads as it does today, and the fallback (S8's question, within its window) holds the person's words.
 
 ## Feature: A card the board can't read (R2)
 

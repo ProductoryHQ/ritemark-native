@@ -4,6 +4,8 @@ Drafts for 2.2's release notes, one per user-visible change, written for the `re
 
 ## PR 1 (#588)
 
+*For #605's first approach (the question). R1 was revised on 1 November (both changes stay, merged by paragraph): these lines are rewritten with that code.*
+
 - **Fixed:** If another app or an AI saves an older copy of your document just after Ritemark saved what you typed, Ritemark now keeps your words and asks which version to keep, instead of quietly replacing them.
 - **Known limit:** A copy saved more than 30 seconds after Ritemark last saved your words still replaces them, as before.
 - **Good to know:** If you discard your changes to a file (or switch branches) within 30 seconds of typing in it, Ritemark asks first; choose Use disk version to finish.

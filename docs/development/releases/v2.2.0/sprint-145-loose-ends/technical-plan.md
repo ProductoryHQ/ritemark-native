@@ -36,7 +36,7 @@ Twelve changes in existing modules, no new subsystem. Two request types (try aga
 
 | Layer | Requirement | Where |
 |---|---|---|
-| The editor sync | R1 | `src/editorSync/state.ts` (the pure decision), `DocumentSyncCoordinator.ts` (the memory of recent saves and the branch) |
+| The editor sync | R1 | `src/editorSync/state.ts` (the pure decision), `DocumentSyncCoordinator.ts` (the memory of recent saves and the branch). Since 1 November: patch 014 (the reload participant), `state.ts` (blocks, base, merge), the coordinator's `answerReload`, `webview/components/dialogs/DocumentConflictDialog.tsx` and the document bar's `SyncActionButton` |
 | The Task board's store, host and rows | R2 | `src/taskBoard/BoardStore.ts`, `BoardController.ts`, `boardSurface.ts`, `protocol.ts`; `webview/components/tasks/UnreadableCards.tsx`, `DeleteConfirm.tsx`, `boardUi.ts` |
 | The Task board's moves | R3 | `webview/components/tasks/boardClient.ts`, `boardUi.ts`; maybe `BoardController.ts`, `BoardStore.ts` by A8 |
 | Flows | R4, R5 | `webview/components/flows/stores/flowEditorStore.ts`; `src/flows/`, `webview/components/flows/NodeConfigPanel.tsx`, `src/settings/RitemarkSettingsProvider.ts`, `webview/components/settings/RitemarkSettings.tsx` |
@@ -48,7 +48,7 @@ Twelve changes in existing modules, no new subsystem. Two request types (try aga
 | Home's keys | R11 | by A5; `scripts/qa/home-keys-check.mjs` |
 | The Electron | R12 | patch 020 |
 
-**Release tier: shell** (`patches/vscode/020-ritemark-electron-43.patch` for certain; 001 and 019 expected). The per-item tiers and the six PRs are in the sprint plan.
+**Release tier: shell** (`patches/vscode/020-ritemark-electron-43.patch` for certain; 001 and 019 expected; since 1 November 014 for R1's reload participant, pending approval). The per-item tiers and the six PRs are in the sprint plan.
 
 ## Phase 1: reproductions and audits
 
@@ -66,8 +66,59 @@ Nothing here is code. Each audit is one file in `research/` and comes before the
 7. **A7, `research/log-lines.md` (R8: S39–S41).** A fresh hidden launch with the network over CDP (`Network.requestWillBeSent` for fonts) names the request for `/phosphor.woff2`. The stack of DEP0169: the dev instance launched with Node's deprecation trace on (`NODE_OPTIONS=--trace-deprecation`, if the extension host passes it on; if it doesn't, the bundle's imports are loaded one by one in a plain Node with the same flag). Neither is assumed from patch 001 or from any dependency.
 8. **A8, `research/board-timing.md` (R3: S18; R2's hang question).** The controller's steps timed around a drop: read, rank, write, snapshot, file checks, and the wait on the store's tail; on the real disk, on a file system with delays, and in a cloud-synced folder if the Mac has one. A unit test of one slow file: does a `mutate` on another card wait for it?
 9. **A9, the flow harness (R4: S27).** Sprint 144's `flow-step-panel/shoot.mjs` run on `main`: the `flow:save` and its delay. If it is 100 ms and not 500, a second path writes.
+10. **The merge checks, `research/merge-checks.md` (R1 revised, 1 November).** The base (the writer's copy against the remembered saves, block by block: done, 5 of 5) and the hook (where VS Code reloads a clean model, and whether a patch can ask Ritemark there: done, by reading the pinned source).
+11. **A10, `research/who-wrote-it.md` (R1 revised: S56, S59).** Can the host tell that a write to this file came from an AI's turn, and which AI: Claude's tool events through the Agent SDK, Codex's file changes, OpenCode's tool calls through ACP. Without it, the words say "another app".
+12. **A11, `research/editor-undo-and-anchor.md` (R1 revised: S61, S62).** In a dev instance: what one host update added to the editor's history does to ⌘Z (and to VS Code's own undo of the same document, the custom editor's double undo), and whether the view keeps its place by the caret's block when text above it changes.
 
-## Workstream 1: the stale write (R1)
+## Workstream 1 (revised 2026-11-01): both changes stay (R1)
+
+For R1 as revised on 1 November ([spec.md](spec.md), experience 44; [research/merge-checks.md](research/merge-checks.md)). **Pending Jarmo's approval; no code before it.** The 31 October workstream follows as history.
+
+**Shape.** The decision is made before the document holds the writer's copy, in the shell, and the merge is Ritemark's:
+
+```text
+file changes ─ VS Code: clean model? ─ TextFileEditorModel.resolveFromFile reads the file
+             ─ reload participant (patch 014): Ritemark's editor holds it? ─ _ritemark.editorSync.answerReload(uri, diskText)  (≤ 3 s)
+             ─ coordinator: own save? no change? → "reload"   base found? → merged text   no base? → fallback (held text)
+             ─ shell: answer differs from the file → resolveFromContent({ ...read, value: answer }, dirty) ; else VS Code's own reload
+             ─ VS Code's auto-save writes the merged text with the read's etag (a newer write in between → patch 014's save-conflict route)
+```
+
+**The shell (patch 014, shell-tier).** Through `create-patch.sh` onto patch 014, on a copy-on-write, patched `vscode/`:
+- `ITextFileEditorModelManager` gets a second slot beside `saveErrorHandler`: a reload participant, `(model, diskText) => Promise<string | undefined>`.
+- `TextFileEditorModel.resolveFromFile`, after `readStream` and the version check, when the model is already resolved and the read isn't forced (Revert forces it, so Keep my version and Use disk version are untouched): decode the content, ask the participant; a returned text that differs from the file's is resolved dirty with the read's stat (`resolveFromContent(…, true)`, an existing path), anything else continues as today.
+- `textFileSaveErrorHandler.ts`'s contribution registers the participant: only for a resource `editorService.findEditors` says `ritemark.editor` holds; `executeCommand('_ritemark.editorSync.answerReload', resource, diskText)` under `raceTimeout(…, RITEMARK_ANSWER_TIMEOUT_MS)`; no answer, an error or a non-string means VS Code's own reload.
+- Tests beside patch 014's own (`ritemarkSaveConflict.test.ts`, `textFileEditorModel.test.ts`): a merged answer resolves dirty with the read's etag; no participant, a timeout or `undefined` reload as today; a forced read never asks.
+
+**The extension (`src/editorSync/`).**
+- **Memory for the base** (reused from #605): `recentTexts`, `rememberSave` by the receipt's hash, `convergedBeforeReceipt`, `lastKnownDiskText`. Kept longer than #605's 30 s, since a merge asks nothing: the saves of the last 10 minutes, up to 40 and about 8,000,000 characters, merged rather than dropped beyond that (#605's round-2 rule).
+- **Blocks** (new, `state.ts`, pure): Markdown's top-level blocks from `marked`'s lexer (the host already ships it), the front matter one block; CSV rows; compared as logical text.
+- **Finding the base** (new, pure): among the remembered saves and the last read or imported text, the one with which the writer's copy differs in the fewest blocks; none when the copy differs from every candidate in most of its blocks (the threshold fixed from the false-positive set, as #605's window was), or when the best two tie at a different text.
+- **The merge** (new, pure): a three-way merge of block sequences, base against the writer and base against the person, aligned with a longest common subsequence (the alignment code from #605's `addedRuns`, on blocks instead of words). Writer-only changes taken, person-only kept, both-changed blocks keep the person's text and are listed with the writer's version. Inserts and deletes from either side kept; a block one side moved and the other edited counts as both changed.
+- **`answerReload`** (new command, registered like `answerSaveConflict`): on the record's queue, read nothing new (the shell passes the text it read). Own save (a receipt or a remembered hash) or the same text → `undefined`. Base found → the merged text, a pending-merge note `{ diskHash, mergedHash, held blocks }` so the change event that follows is taken as Ritemark's own (local-only until the auto-save echoes), and the held blocks become the document's paragraph conflicts. No base → the fallback: within the 30 s window, the held text (the views' text) and #605's held import; outside it, `undefined`.
+- **The coordinator's own sightings** (`external-only` from its poll or watcher, when VS Code hasn't reloaded yet) use the same function and apply the merged text with `applyText`.
+- **Paragraph conflicts** (new): a list of `{ blockIndex, mine, theirs, writer }` per record; resolved by Keep mine, Use the writer's (one `applyText`), the two texts becoming equal, or the document closing (the person's text was saved). A new optional field on `document:conflict` (`kind: 'paragraphs'`, the count, the writer's name) and one view message to answer one block; a build that doesn't know them ignores them (E2).
+- **The writer's name** (A10): the AI whose turn in this project wrote this file, when the host knows it from its own runtime events; otherwise "another app".
+- **Goes** (#605's code that raced VS Code's reload): `holdStaleWrite`'s put-back over a reloaded model, `keepHeldWords`, `wasLocalEdit`, `knownText` as a put-back source, the `converged` branch guard and its `revert` broadcast. The held import itself stays for the fallback, its answers too (Use disk version writes `diskBytes`).
+- **Stays from #605:** `droppedRecentSave` decides the fallback's question within the window; the protocol's `reason`; `scripts/qa/stale-write-check.mjs` (its expectations change); the coordinator test harness, whose fake document gains the reload participant.
+
+**The webview.**
+- `SyncActionButton`, conflict kind, for every conflict: ink, `--r-hairline-strong`, the `arrows-split` icon; the failed-sync kind unchanged. Tooltip words from experience 44 (singular, plural, Claude or the AI by name, another app).
+- `DocumentConflictDialog`: a paragraph mode (title, first line, the two blocks in full with their labels, [Use Claude's] left, [Keep mine] primary and the default, "1 of 2", no warning icon); the whole-document mode gets the Experience lead's three changes from #605 (words, `secondary` Use disk version at the far left, Tab in screen order).
+- **One undo step:** the host's merge update enters the editor's history as one step (today host updates are `addToHistory: false`, `Editor.tsx:610–626`); every other host update stays out of it. A11 checks it before the code.
+- **Nothing moves:** the merge update keeps the caret and the selection (as host updates do today) and the view's place by the caret's block; A11 checks it with a change above the view.
+
+**Tests:** the pure functions (blocks, base, merge: S1, S2, S4, S7, S56, S58, S63, a move against an edit, a split, a table, a list, front matter, CRLF, a reformat with no base); the coordinator with the shell participant faked (S1–S8, S56–S64, both save orders); the shell's tests above; webview render tests of the paragraph mode and the button; `stale-write-check.mjs` extended to S56–S62 in the app.
+
+**Which PR, and its tier (my judgment, as asked).** #605 becomes the #588 PR, shell-tier by `patches/vscode/014-ritemark-save-receipts.patch`, High review (`/code-review` at high plus `/security-review`), named so in its title and Risk section; not split with the hook in PR 5:
+- the extension half alone is #605's guard, which races VS Code's reload (round 3's findings 1, 2, 4, 6, 7, 8); shipping it first would ship a race the hook removes;
+- the hook alone does nothing without the coordinator's answer, and its tests need the answer's shape;
+- one PR reviews the decision where it is made, once, at the tier its paths set;
+- the cost: it is built and checked on a copy-on-write, patched `vscode/` (`./scripts/apply-patches.sh --dry-run`, the drift check at merge), and its Windows proof moves from the test overlay to 2.2's candidate at Gate 2, like PR 5's. PR 5 keeps R8's font, R10 and R9's patch half.
+
+## Workstream 1 as planned on 31 October (superseded on 1 November)
+
+### The stale write (R1), 31 October
 
 The most careful change in the sprint. It is one PR, `src/editorSync/` and tests only, with the false-positive set as its largest part.
 
@@ -166,7 +217,7 @@ By A6. If a 43.x with Node 24.22.1 or later is published: patch 020 gets the new
 Six PRs, listed with their tiers in the sprint plan. How each gets there:
 - Each branch is made from `origin/main` after approval; `git branch --show-current` shows it before any edit. The documents in this folder are updated in the PR that does the work.
 - Each PR's Risk section names its tier and the paths that set it. `REVIEW.md`'s review runs at that tier on the PR's head; every finding is answered; the merge is at the reviewed head. At most three rounds.
-- **PR 5 and PR 6** are built on a CoW-cloned, patched `vscode/` in the worktree, through `create-patch.sh` onto the existing patches, with the drift check at merge, and a frame check (`scripts/qa/frame-screenshots.mjs`) if a hunk touches patch 018.
+- **PR 5 and PR 6** are built on a CoW-cloned, patched `vscode/` in the worktree, through `create-patch.sh` onto the existing patches, with the drift check at merge, and a frame check (`scripts/qa/frame-screenshots.mjs`) if a hunk touches patch 018. **PR 1 too, since 1 November** (patch 014's reload participant): shell-tier, High.
 - **Gate 2 on Windows** carries the proof for what the overlay can't test (PR 5 and PR 6).
 - Everything merges before 2.2's first release candidate; main is frozen from that build.
 
@@ -190,6 +241,9 @@ Six PRs, listed with their tiers in the sprint plan. How each gets there:
 | The optimistic move disagrees with the host | The host stays the authority; a refusal puts the card back; S20–S23 |
 | A Try again on a hung file holds the board | A8 measures it; the read moves out of the lock if it does |
 | #569's cause is in the workbench | PR 5 and the tier line; Windows proof at Gate 2 |
+| (1 Nov) The writer's copy has no base (a whole-file rewrite or a reformat) | The fallback question within 30 s; the false-positive set fixes the base threshold; A2's tools when someone can sign one in |
+| (1 Nov) The merge's undo step in the editor fights VS Code's own undo of the same document | A11 before the code; the custom editor's double-undo rule (`editorUndoKeybindings`) is the place |
+| (1 Nov) The AI isn't known as the writer | A10; the words say "another app" |
 | #501's guess about empty groups is wrong | A4 reads the source and runs the reproduction before any patch |
 | The OpenAI section id collides with Sprint 147's new Settings | The id is the key's own name, the same as the Google one; 147 carries it over |
 | No fixed Electron by the candidate | Decision 4 and the release plan's Risks |

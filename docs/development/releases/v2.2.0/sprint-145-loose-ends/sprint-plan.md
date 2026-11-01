@@ -3,8 +3,8 @@
 Track: SDD (auto-detected: twelve linked issues in six domains, so it is also full track, not lightweight; the stale-write fault and the Task board's unreadable cards are edge-case-heavy, and the document-to-disk-to-reload flow crosses the webview, the extension host and the file system; scope may grow when an audit shows a cause)
 Override with: "use plain full track"
 Branch: `sprint-145-loose-ends`, made from `origin/main` at Phase 3, after approval. Each later PR has its own branch that starts with the same name (*Pull requests* below). This plan was written on `plan/v2.2.0-release-plan`.
-Release tier: shell. 2.2 is a shell release ([release-plan.md](../release-plan.md)). This sprint names its shell-tier path: `patches/vscode/020-ritemark-electron-43.patch` (#515, when an Electron with Node 24.22.1 exists). Patches 001 and 019 are expected to change too (#582's font line, #501), once their causes are shown. Everything else is extension-tier (the table below). If an audit moves a fix into or out of a patch, this line and the table change first. **31 October, after Phase 1's Mac audits:** no tier moves. A6 found a 43.x on Node 24.22.1 (43.8.4–43.8.6), so patch 020 changes for certain (PR 6); A7 showed the refused font is patch 001's own registration, so patch 001 changes (PR 5); A7 found no DEP0169 caller in Ritemark's bundle, so that half has no extension change for now.
-Status: **Approved, 31 October 2026** (Jarmo: "agreed with all", in the Development manager session, with decisions 1, 3, 4 and 5 as recommended). **Phase 3 under way** on `sprint-145-loose-ends` (31 October): Phase 1's Mac audits are in `research/`, and PR 1 (#588) is open as [#605](https://github.com/ProductoryHQ/ritemark-native/pull/605). The code named under *What reading the code added* was read for the plan; the audits have since run what they could on the Mac (`research/`).
+Release tier: shell. 2.2 is a shell release ([release-plan.md](../release-plan.md)). This sprint names its shell-tier path: `patches/vscode/020-ritemark-electron-43.patch` (#515, when an Electron with Node 24.22.1 exists). Patches 001 and 019 are expected to change too (#582's font line, #501), once their causes are shown. Everything else is extension-tier (the table below). If an audit moves a fix into or out of a patch, this line and the table change first. **31 October, after Phase 1's Mac audits:** no tier moves. A6 found a 43.x on Node 24.22.1 (43.8.4–43.8.6), so patch 020 changes for certain (PR 6); A7 showed the refused font is patch 001's own registration, so patch 001 changes (PR 5); A7 found no DEP0169 caller in Ritemark's bundle, so that half has no extension change for now. **1 November, R1 revised (pending approval):** #588 moves to shell-tier: `patches/vscode/014-ritemark-save-receipts.patch` gains a reload participant (VS Code asks Ritemark before it reloads a clean document Ritemark's editor holds), so PR 1 (#605) is shell-tier with High review.
+Status: **Approved, 31 October 2026** (Jarmo: "agreed with all", in the Development manager session, with decisions 1, 3, 4 and 5 as recommended). **R1 revised on 1 November** by Jarmo's decision (both changes stay, merged by paragraph; experience 44); **the revision waits for Jarmo's approval** (*Approval*), and no R1 code is written before it. **Phase 3 under way** on `sprint-145-loose-ends` (31 October): Phase 1's Mac audits are in `research/`, and PR 1 (#588) is open as [#605](https://github.com/ProductoryHQ/ritemark-native/pull/605). The code named under *What reading the code added* was read for the plan; the audits have since run what they could on the Mac (`research/`).
 
 ## SDD Artifacts
 
@@ -23,7 +23,7 @@ What 2.1's gates and first days found goes: text a person typed and saved is nev
 
 | Issue | What | Req | Reproduced so far | Release tier |
 |---|---|---|---|---|
-| [#588](https://github.com/ProductoryHQ/ritemark-native/issues/588) | A stale write over an auto-save is taken as the new truth, silently | R1 | Yes, on Windows (the issue's own run, without the AI). Not yet on this Mac | extension |
+| [#588](https://github.com/ProductoryHQ/ritemark-native/issues/588) | A stale write over an auto-save is taken as the new truth, silently | R1 | Yes, on Windows (the issue's own run, without the AI), and on this Mac 10 of 10 (A1) | ~~extension~~ shell since 1 November (patch 014's reload participant) |
 | [#596](https://github.com/ProductoryHQ/ritemark-native/issues/596) | Task board: an unreadable card can only be opened | R2 | Seen by Jarmo (three cards, a timeout). In code: the row only opens the file, the message says "Couldn't read" twice. The timeout's cause is not shown | extension |
 | [#597](https://github.com/ProductoryHQ/ritemark-native/issues/597) | Task board: a dropped card waits about a second | R3 | Seen on 2.1 (Mac). Where the second goes is not measured | extension |
 | [#571](https://github.com/ProductoryHQ/ritemark-native/issues/571) | Selecting a Flow step saves the flow | R4 | Yes, Sprint 144's headless harness | extension |
@@ -36,13 +36,13 @@ What 2.1's gates and first days found goes: text a person typed and saved is nev
 | [#507](https://github.com/ProductoryHQ/ritemark-native/issues/507) | ⌘⇧P sometimes does nothing on Home | R11 | No. Synthetic presses never failed (Sprint 143); Jarmo's own ten per case on the Mac never failed; Windows never run by hand | none unless it reproduces |
 | [#515](https://github.com/ProductoryHQ/ritemark-native/issues/515) | Ship on an Electron carrying Node 24.22.1 | R12 | Advisory. On 27 October no such Electron existed | shell (patch 020) |
 
-**Which items need a shell release by their paths:** #515 (patch 020) for certain; #501's first wait (patch 019), #582's font line (patch 001) and #569 (patch 002 or 018) only if their audits put the fix there. #588, #596, #597, #571, #580, #578, #595 and the extension halves of #501, #569 and #582 are extension-tier: alone they would ship as an extension release. #507 has no code unless it reproduces. They all ship in 2.2's shell release, so none of them adds a release step.
+**Which items need a shell release by their paths:** #515 (patch 020) for certain; #588 since 1 November (patch 014, R1 revised); #501's first wait (patch 019), #582's font line (patch 001) and #569 (patch 002 or 018) only if their audits put the fix there. #596, #597, #571, #580, #578, #595 and the extension halves of #501, #569 and #582 are extension-tier: alone they would ship as an extension release. #507 has no code unless it reproduces. They all ship in 2.2's shell release, so none of them adds a release step.
 
 ## What reading the code added
 
 Read for this plan; nothing was run.
 
-- **#588's receipt can't tell what was lost.** Patch 014's save receipt is a hash of the text saved, not the text. The sync coordinator takes a clean document's changed file as the truth in one branch (`DocumentSyncCoordinator.ts:682–709`, `classifyThreeWay` says `external-only`). The guard needs to remember the texts of the last few saves itself. Review changes is already there for a dirty document (#454): the same surface can ask here, so nothing new is drawn.
+- **#588's receipt can't tell what was lost.** Patch 014's save receipt is a hash of the text saved, not the text. The sync coordinator takes a clean document's changed file as the truth in one branch (`DocumentSyncCoordinator.ts:682–709`, `classifyThreeWay` says `external-only`). The guard needs to remember the texts of the last few saves itself. Review changes is already there for a dirty document (#454): the same surface can ask here, so nothing new is drawn. **Corrected on 1 November:** "patch 014 unchanged" no longer holds. A1 showed VS Code reloads a clean document itself, before the extension can decide, and R1's revision answers that in the shell: patch 014 gains a reload participant beside its save-conflict route ([research/merge-checks.md](research/merge-checks.md)); the save receipt and the save-conflict route stay as they are. The surface is still Review changes, in experience 44's paragraph mode.
 - **#580 has a fourth place.** The OpenAI image step's model list throws a plain "OpenAI API key not configured" (`FlowEditorProvider.ts:870`), where the Google image step already uses `StepNeedsKeyError` (`:907`). An AI step's panel has no key check at all today, so showing the link there needs the host to say so.
 - **#595's fix belongs where the label is drawn.** The version is shown in the webview (`RitemarkSettings.tsx:1390`), and the `-0` floor is a build detail that only the screen should hide, so the helper lives there. The update code (`src/update/`) needs the floored version for its comparison and stays as it is. (Where a fix goes follows the fault; a review tier never moves it.)
 - **#501 has an extension half.** The welcome sends a restored terminal behind itself once, then stops (`welcomeHost.ts:447–458` sets `keepInFrontUntil = 0` after the first reveal), which fits the issue's second flash 0.2 s after the welcome. The first wait of 6–14 s happens before the welcome exists; its place is patch 019's `moveToDesk`. A guess to check, not a finding: VS Code activates an editor opened `inactive` when its group is empty.
@@ -54,7 +54,7 @@ Read for this plan; nothing was run.
 
 | Area | Requirement | Proven by |
 |---|---|---|
-| A clean document doesn't take a file that drops the person's just-saved words; Review changes asks | R1 | A coordinator-level test and a scripted run that fail on `main`; the Windows run |
+| ~~A clean document doesn't take a file that drops the person's just-saved words; Review changes asks~~ (31 October) Both changes stay: a writer's copy from an older save is merged by block; a block both changed keeps the person's text and Review changes waits for it (1 November, pending approval) | R1 | Pure tests of the base and the merge; the coordinator with the shell participant faked; patch 014's tests; `stale-write-check.mjs` in the app; each failing on `main` first; Windows at Gate 2 |
 | Unreadable cards: Try again, Remove (to the Trash, after one question), one plain message | R2 | Store and handler tests; a render test; the Experience lead's screenshots |
 | A dropped card moves at once; a refusal puts it back with the notice | R3 | A measurement first; unit tests of the overlay; a CDP run |
 | Selection and measurement don't mark a flow dirty | R4 | A unit test of `onNodesChange`; Sprint 144's harness |
@@ -76,7 +76,7 @@ Six, so that each gets `REVIEW.md`'s review at its own tier and a shell change n
 
 | PR | Branch | Holds | Release tier | Review tier |
 |---|---|---|---|---|
-| 1 | `sprint-145-loose-ends` | R1 (#588), and this sprint's document updates (the plan itself lands first, in #601) | extension | Standard by paths (`src/editorSync/`); see decision 2 |
+| 1 | `sprint-145-loose-ends` ([#605](https://github.com/ProductoryHQ/ritemark-native/pull/605)) | R1 (#588), and this sprint's document updates (the plan itself lands first, in #601) | ~~extension~~ **shell** (patch 014's reload participant; 1 November) | ~~Standard by paths; see decision 2~~ **High** by paths: `/code-review` at high and `/security-review`, a new review from round 1 on the new head. Built on a copy-on-write, patched `vscode/`; Windows proof at Gate 2 |
 | 2 | `sprint-145-loose-ends-ext` | R6 (#578), R7 (#595), R8's DEP0169 half if the caller is ours, R10's extension half, R9's extension half if the measurement puts it there | extension | Standard; #578 also goes to the Experience lead with screenshots |
 | 3 | `sprint-145-loose-ends-flows` | R4 (#571), R5 (#580) | extension | Standard. R5 adds one section name in `RitemarkSettingsProvider.ts`, a file in `src/settings/` that also holds key handling; the PR says so and takes High if the review reads it so |
 | 4 | `sprint-145-loose-ends-board` | R2 (#596), R3 (#597) | extension | Standard, with the Experience lead's screenshots |
@@ -89,17 +89,18 @@ Six, so that each gets `REVIEW.md`'s review at its own tier and a shell change n
 
 ## Windows
 
-- **Extension-tier items** (R1, R2–R7, R10's extension half) run on Windows through the test overlay (`scripts/qa/make-windows-test-overlay.sh`, `windows-branch-test.ps1`), by the "Ritemark on Windows" session, before the merge.
-- **Shell-tier items** (R8's font, R10's patch, R9's patch half, R12) can't: Windows CI builds only the exact `main` commit. Their Windows proof is 2.2's candidate at Gate 2. That is why R10 is reproduced first on the shipped 2.1.0 installer, and fixed only when that run shows the cause.
+- **Extension-tier items** (R2–R7, R10's extension half; R1 until 1 November) run on Windows through the test overlay (`scripts/qa/make-windows-test-overlay.sh`, `windows-branch-test.ps1`), by the "Ritemark on Windows" session, before the merge.
+- **Shell-tier items** (R1 since 1 November, R8's font, R10's patch, R9's patch half, R12) can't: Windows CI builds only the exact `main` commit. Their Windows proof is 2.2's candidate at Gate 2. That is why R10 is reproduced first on the shipped 2.1.0 installer, and fixed only when that run shows the cause.
 - **R11 is a Windows person's job:** a real keyboard, not a script.
 
 ## Product Decisions
 
 - **2026-10-31 (the release plan):** 2.2 is a shell release; the sprint order puts the loose ends first; "the milestone's other issues go into item 4".
 - **2026-10-31 (this plan, Jarmo: "agreed with all"):** the four decisions below, each as recommended.
+- **2026-11-01 (Jarmo, on #605's approach question; decision log `735b186`):** "mina kasutajana tahan streamlined kogemust, seega mina ei läheks "soovituste" teed alguses. Soovituste tee võiks minna sisse nii, et kasutaja saab selle ka välja lülitada (straight streaming) 2. Nõus sinu ettepanekuga poolitada." (As a user I want a streamlined experience, so I wouldn't start with suggestions; a suggestions mode could come later with a switch back to straight streaming. 2. Agreed with the proposal to split.) Hence R1's revision: both changes stay, merged by paragraph in the shell next to patch 014; the AI's edits stream straight in; no suggestions mode in 2.2 (#609); the whole-document question only as the fallback. The Experience lead drew it as experience 44 (ritemark-dev `ec25356`). This supersedes decision 1, and decision 2's level becomes High by paths.
 - **2026-10-31 (Phase 1, engineering, from the audits):** #588's guard also covers the `converged` path and puts the person's words back before asking, because VS Code reloads a clean document itself (A1; `spec.md` R1 addendum). R4 has no second write path (A9). R12 takes its first branch: Electron 43.8.4–43.8.6 carry Node 24.22.1 (A6). R8's font is patch 001's own registration; DEP0169 is not Ritemark's code and waits for PR 5's tree (A7). No tier moves.
 - **Engineering, in this plan (approved with it):**
-  - Review changes is the one surface for #588; no new element is drawn.
+  - Review changes is the one surface for #588; no new element is drawn. (1 November: still true; the dialog gains experience 44's paragraph mode, and the document bar's button its one restyle.)
   - #507 gets no code without a reproduction, as in 2.1.
   - #501's direction waits on a Windows reproduction.
   - Each fix's check goes into `scripts/qa/` beside the existing ones, so the next sighting has a reproducer.
@@ -108,8 +109,8 @@ Six, so that each gets `REVIEW.md`'s review at its own tier and a shell change n
 
 Five, each with a recommendation; the second was decided by the Development manager. **Jarmo answered on 31 October 2026: "agreed with all"**, so each is as recommended below. [spec.md](spec.md#decisions) carries the same list.
 
-1. **#588: a question where there is silence today.** **Yes.** When words saved in the last few seconds disappear from the file because another writer saved an older copy, Ritemark will ask (Review changes) instead of reloading. It can also ask when an AI deliberately rewrites the very sentence you just typed. Recommended because the alternative is silent loss of what you wrote.
-2. **#588: the review level.** Decided by the Development manager (31 October, a small ask): `/code-review` at high for this one PR, because it is the data-loss path. `REVIEW.md` lets the level go up, never down.
+1. **#588: a question where there is silence today.** *(Superseded on 1 November by Jarmo's decision: both changes stay, merged by paragraph; the question is only the fallback.)* **Yes.** When words saved in the last few seconds disappear from the file because another writer saved an older copy, Ritemark will ask (Review changes) instead of reloading. It can also ask when an AI deliberately rewrites the very sentence you just typed. Recommended because the alternative is silent loss of what you wrote.
+2. **#588: the review level.** *(1 November: High by paths, since PR 1 changes patch 014.)* Decided by the Development manager (31 October, a small ask): `/code-review` at high for this one PR, because it is the data-loss path. `REVIEW.md` lets the level go up, never down.
 3. **#501: which direction**, once Windows shows the cause. (a) Restored terminals wait behind until a document is in front (patch 019, shell-tier); (b) the welcome shows sooner than the extension (a workbench part, a much bigger change). **(a).**
 4. **#515: if no Electron with Node 24.22.1 is out when 2.2's candidate is built.** Ship on 43.8.3 with the risk recorded (Sprint 144 found one narrow Node path to an outside address: Flows' Save File with an image URL), hold the release, or add a guard on that one fetch. **Ship with the risk recorded, no guard.**
 5. **#507: if a real Windows keyboard doesn't reproduce it either.** Close it with the evidence, to reopen on the next sighting. **Yes.**
@@ -121,7 +122,7 @@ Drawings and words first, before the build of what they touch:
 - **#596:** the unreadable rows (Try again, Remove, Open to fix it where it applies), the one question before Remove, the moment while a retry reads, and the plain words (the issue's example: "Ritemark couldn't open this file in time. If this folder syncs from the cloud, the file may still be downloading.").
 - **#597:** the quiet sign on a card while its move is being saved, shown only when saving takes long.
 - **#578:** does the soft green fill go with the check? The same family: the other uses of the success colour (listed in [technical-plan.md](technical-plan.md), W6): which are the allowed ready dot and which are not.
-- **#588:** whether Review changes' words fit this case, or a lighter "Restore what you wrote" is wanted. A button that is not there today is a new element, so it needs the lead's word.
+- **#588:** *(Done: the words on #588, 31 October; the three changes on #605, 1 November; experience 44 for the merge, 1 November.)* Whether Review changes' words fit this case, or a lighter "Restore what you wrote" is wanted. A button that is not there today is a new element, so it needs the lead's word.
 - **Screenshots before each UI merge:** #578, #596, #597, and #580's panel (its words are already set).
 
 ## Feature Flag Check
@@ -136,7 +137,7 @@ No feature flag. Each change fixes what 2.0 and 2.1 already do, on for everyone.
 
 ## Success Criteria
 
-- [ ] A writer's older copy over a clean document's just-saved words raises Review changes, with the person's text kept in the editor; a writer who read the latest save is still imported silently (R1).
+- [ ] ~~A writer's older copy over a clean document's just-saved words raises Review changes, with the person's text kept in the editor; a writer who read the latest save is still imported silently (R1).~~ (1 November) A writer's copy made from an older save is merged by block with no question; a block both changed keeps the person's text and the document bar's Review changes waits for it; nothing moves under the person; the merge is one undo step; the whole-document question only when no base is found (R1 revised).
 - [ ] An unreadable card can be retried and removed (to the Trash, after one question), and says once, in plain words, what happened (R2).
 - [ ] A dropped card is in its new place in the same frame, and goes back with the host's notice if refused (R3); the second is measured and named first.
 - [ ] Selecting or measuring a Flow step writes nothing; moving, adding, removing or editing one still saves (R4).
@@ -180,4 +181,5 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 ## Approval
 
 - [x] Jarmo approved this sprint plan: 31 October 2026, "agreed with all" (the Development manager session), answering the plan, decisions 1, 3, 4 and 5, and the release plan's appetite in one message.
+- [ ] **R1's revision (1 November): spec R1, scenarios S1, S4, S8 and S56–S64, technical plan W1, tasks Phase 2, and PR 1's shell tier.** Jarmo's approval in his own words, and his answer to R1's open question (S3), before any R1 code.
 - [x] Sprint start: Jarmo typed it himself in the Development manager session on 31 October 2026 ("admin merge 601 602 and start sprint 145 … I want you to start building 2.2 according to approved sprints"). A separate sprint session can't be started while he works over Remote Control, so the work runs as that session's own subagent, on `sprint-145-loose-ends`, made from `origin/main` before the first edit.
