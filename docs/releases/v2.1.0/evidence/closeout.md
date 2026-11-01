@@ -14,3 +14,4 @@
 - **Not archived:**
   - `darwin-arm64-extension-pre-sign.sha256`, because `VSCode-darwin-arm64/` was no longer in the worktree on 1 November. The arm64 DMG's published digest above is the record.
   - The DMGs and the installer: the GitHub Release holds the same bytes.
+- **10.3, on 1 November 2026:** cleared on Jarmo's word ("jah luban"). The evidence was pushed first (`f75003c1`). Then `dist/` and `VSCode-darwin-x64/` were deleted by name; there was no `VSCode-darwin-arm64/`. The re-audit (`worktree-hygiene.mjs --check --no-sizes`) reads `REVIEW … release-7852c9f38fa1 — verified disposable release worktree`. Removing the worktree itself, its physical `vscode/` included, is Jarmo's step.
