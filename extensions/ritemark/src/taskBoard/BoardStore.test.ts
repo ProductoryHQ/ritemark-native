@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { BoardStore, BoardStoreError, nodeBoardStoreFileSystem, readFailureWords, type BoardEntry, type BoardStoreFileSystem, type CardDocuments } from './BoardStore';
+import { BoardStore, BoardStoreError, nodeBoardStoreFileSystem, readFailureWords, saveFailedWords, type BoardEntry, type BoardStoreFileSystem, type CardDocuments } from './BoardStore';
 import { parseCardFile, serializeCard, splitCardText, type Card } from './cardFile';
 
 const trashed: string[] = [];
@@ -619,6 +619,40 @@ async function main(): Promise<void> {
     assert.ok(most <= 3, `at most two re-reads at once beside the tail's own read (${most})`);
     assert.equal(freshReads, 1, 'two presses of Try again share one read');
     assert.ok(Date.now() - started < 2000);
+  }
+
+  // ── A change that couldn't be saved says why in plain words, naming the card (#610) ─
+  {
+    const folder = tempFolder();
+    writeCard(folder, 'draft-module-6.md', { id: 'dr4ft6', title: 'Draft Module 6' });
+    let failWith: string | null = null;
+    const store = newStore(folder, {
+      async writeFile(file, contents) {
+        if (failWith) throw Object.assign(new Error(`${failWith}: refused, open '${file}'`), { code: failWith });
+        return nodeBoardStoreFileSystem.writeFile(file, contents);
+      },
+    });
+    await store.list();
+    const words: Record<string, string> = {
+      EACCES: 'Couldn’t save “Draft Module 6”: this computer doesn’t let Ritemark change files in this folder.',
+      EPERM: 'Couldn’t save “Draft Module 6”: this computer doesn’t let Ritemark change files in this folder.',
+      EROFS: 'Couldn’t save “Draft Module 6”: this computer doesn’t let Ritemark change files in this folder.',
+      ETIMEDOUT: 'Couldn’t save “Draft Module 6” in time. If this folder syncs from the cloud, try again in a moment.',
+      EBUSY: 'Couldn’t save “Draft Module 6” in time. If this folder syncs from the cloud, try again in a moment.',
+      EAGAIN: 'Couldn’t save “Draft Module 6” in time. If this folder syncs from the cloud, try again in a moment.',
+      EIO: 'Couldn’t save “Draft Module 6”. Try again in a moment.',
+    };
+    for (const [code, expected] of Object.entries(words)) {
+      failWith = code;
+      await assert.rejects(
+        () => store.mutate('dr4ft6', { by: 'you', what: 'Moved to Doing' }, (card) => ({ ...card, stage: 'doing' })),
+        (error: BoardStoreError) => error instanceof BoardStoreError && error.code === 'write-failed' && error.message === expected,
+        `${code}: the card's title, in plain words; no code, no path`,
+      );
+    }
+    failWith = null;
+    assert.equal(saveFailedWords('notes.md', new Error('?')), 'Couldn’t save “notes.md”. Try again in a moment.', 'a file name when there is no title');
+    assert.equal(cardsOf(await store.list())[0].stage, 'todo', 'and nothing was changed');
   }
 
   // ── A folder named like a card file is no card, so Remove can never trash a folder ─

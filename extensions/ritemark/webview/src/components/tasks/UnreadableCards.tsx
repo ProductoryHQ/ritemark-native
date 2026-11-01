@@ -64,12 +64,17 @@ function UnreadableRow({ file, variant }: { file: UnreadableFile; variant: 'boar
     <div className={cn('pointer-events-auto relative z-10 flex items-center', board ? 'shrink-0 gap-1' : '-ml-2 mt-1 flex-wrap gap-0.5')}>
       {reason === 'read' ? (
         <Tooltip label={busy === 'retrying' ? words.tryingTip : words.tryAgainTip}>
+          {/* Trying… is busy, not unavailable (experience 41, checked in #610): its mark and words keep the button's
+              ink, it says so with aria-busy, and a click does nothing until the read is over. Only Remove greys. */}
           <Button
             type="button"
             variant={board ? 'outline' : 'ghost'}
-            className={cn(button, !board && 'text-ink-body')}
-            disabled={Boolean(busy)}
-            onClick={() => void retryFile(file.fileName)}
+            className={cn(button, !board && 'text-ink-body', busy === 'retrying' && 'cursor-default')}
+            disabled={busy === 'removing'}
+            aria-busy={busy === 'retrying' || undefined}
+            onClick={() => {
+              if (!busy) void retryFile(file.fileName)
+            }}
           >
             {busy === 'retrying' ? <Icon name="circle-notch" size={12} tone="inherit" className="tb-spin size-3" /> : null}
             {busy === 'retrying' ? 'Trying…' : 'Try again'}

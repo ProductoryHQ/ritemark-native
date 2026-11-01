@@ -107,13 +107,22 @@ assert.match(boardMarkup, /rounded-lg bg-surface/, 'each row a quiet card on the
   posted.length = 0
   handlers.find((item) => item.label === 'Try again')!.onClick({})
   assert.deepEqual({ ...posted[0], requestId: undefined }, { type: 'board/retry-file', fileName: 'book-the-venue.md', requestId: undefined }, 'Try again asks the host to read it again')
-  // S12: while it reads, that row's button says Trying… and both its buttons wait; the other rows don't.
-  const trying = render('board').rows
-  assert.deepEqual(trying[0].buttons, ['Trying…', 'Remove'])
-  assert.ok(render('board').clicks.filter((item) => item.disabled).length === 2, 'Trying… and Remove wait')
-  assert.deepEqual(trying[1].buttons, ['Try again', 'Remove'], 'the other rows are untouched')
-  assert.equal(trying[0].text.includes(CLOUD), true, 'the sentence stays as it was')
-  for (const listener of hostListeners) listener({ data: { type: 'board/result', requestId: posted[0].requestId, answer: { ok: true } } })
+  // S12: while it reads, that row's button says Trying… and its Remove waits; the other rows don't.
+  const trying = render('board')
+  assert.deepEqual(trying.rows[0].buttons, ['Trying…', 'Remove'])
+  // #610 (the Experience lead): Trying… is busy, not unavailable. It keeps its ink and says so; only Remove greys.
+  const tryingButton = trying.root.querySelectorAll('button').find((button) => button.text.trim() === 'Trying…')!
+  assert.equal(tryingButton.getAttribute('aria-busy'), 'true', 'Trying… says it is busy')
+  assert.equal(tryingButton.hasAttribute('disabled'), false, 'and is not greyed out')
+  const disabled = trying.clicks.filter((item) => item.disabled).map((item) => item.label)
+  assert.deepEqual(disabled, ['Remove'], 'only Remove waits')
+  const firstRetry = posted[0]
+  posted.length = 0
+  trying.clicks.find((item) => item.label === 'Trying…')!.onClick({})
+  assert.equal(posted.length, 0, 'a click on Trying… sends nothing while the read runs')
+  assert.deepEqual(trying.rows[1].buttons, ['Try again', 'Remove'], 'the other rows are untouched')
+  assert.equal(trying.rows[0].text.includes(CLOUD), true, 'the sentence stays as it was')
+  for (const listener of hostListeners) listener({ data: { type: 'board/result', requestId: firstRetry.requestId, answer: { ok: true } } })
   await new Promise((resolve) => setTimeout(resolve, 0))
   assert.deepEqual(render('board').rows[0].buttons, ['Try again', 'Remove'], 'the answer gives the buttons back')
 
@@ -172,6 +181,35 @@ assert.equal(unreadableFileWords('a.md', true).questionBody, 'It goes to the Rec
   assert.equal(useBoardUi.getState().notice, 'Ritemark did not answer. Try again.')
   assert.match(render('board').rows[3].text, /have a mistake/)
   useBoardUi.getState().showNotice(null)
+}
+
+// #610: the Trash only after a deliberate yes. Every way to the Trash goes through the question's answer.
+{
+  const { questionKeyAction } = await import('./DeleteConfirm')
+  const { removeFile } = await import('./boardUi')
+  const content = { closest: () => null }
+  const button = { closest: (selector: string) => (selector === 'button' ? {} : null) }
+  assert.equal(questionKeyAction({ key: 'Enter', target: content }), 'confirm', 'Enter in the question answers Remove')
+  assert.equal(questionKeyAction({ key: 'Enter', repeat: true, target: content }), null, 'an Enter still held from the key that opened it is no answer')
+  assert.equal(questionKeyAction({ key: 'Enter', target: button }), null, 'a focused button answers Enter itself (Cancel cancels)')
+  assert.equal(questionKeyAction({ key: ' ', target: content }), null)
+  assert.equal(questionKeyAction({ key: 'Escape', target: content }), null, 'Escape is the dialog’s own cancel')
+
+  // One question at a time: an answer can't land on a question left behind.
+  useBoardUi.getState().askRemoveFile('book-the-venue.md')
+  useBoardUi.getState().askDelete('todo01')
+  assert.deepEqual([useBoardUi.getState().confirmDeleteId, useBoardUi.getState().confirmRemoveFile], ['todo01', null])
+  useBoardUi.getState().askRemoveFile('book-the-venue.md')
+  assert.deepEqual([useBoardUi.getState().confirmDeleteId, useBoardUi.getState().confirmRemoveFile], [null, 'book-the-venue.md'])
+  useBoardUi.getState().askRemoveFile(null)
+
+  // A second yes while the first is on its way sends nothing more (a double click on Remove in the question).
+  posted.length = 0
+  const first = removeFile('speakers.md', CLOUD)
+  void removeFile('speakers.md', CLOUD)
+  assert.equal(posted.filter((message) => message.type === 'board/remove-file').length, 1, 'one request to remove, not two')
+  for (const listener of hostListeners) listener({ data: { type: 'board/result', requestId: posted[0].requestId, answer: { ok: true } } })
+  await first
 }
 
 // A row from a build that sends no reason keeps today's behaviour: open it to fix it.

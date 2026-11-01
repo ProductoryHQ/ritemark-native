@@ -62,8 +62,10 @@ export const useBoardUi = create<BoardUiState>((set) => ({
   openNote: (cardId, where, kind) => set({ note: { cardId, where, kind } }),
   closeNote: () => set({ note: null }),
   clearPrompt: () => set({ prompt: null }),
-  askDelete: (cardId) => set({ confirmDeleteId: cardId }),
-  askRemoveFile: (fileName) => set({ confirmRemoveFile: fileName }),
+  // The board asks one question at a time: opening one closes the other, so an answer never lands on a question
+  // left behind.
+  askDelete: (cardId) => set(cardId ? { confirmDeleteId: cardId, confirmRemoveFile: null } : { confirmDeleteId: null }),
+  askRemoveFile: (fileName) => set(fileName ? { confirmRemoveFile: fileName, confirmDeleteId: null } : { confirmRemoveFile: null }),
   showNotice: (text) => {
     if (noticeTimer) clearTimeout(noticeTimer)
     set({ notice: text })
@@ -136,6 +138,8 @@ export async function markCardDone(cardId: string): Promise<void> {
  * no longer one the board couldn't read) needs no notice: the next snapshot shows how things are.
  */
 export async function retryFile(fileName: string): Promise<void> {
+  // A row that is already reading or removing takes no second request (a double click, a key repeat).
+  if (useBoardUi.getState().files[fileName]?.busy) return
   setFileState(fileName, { busy: 'retrying' })
   try {
     await request({ type: 'board/retry-file', fileName })
@@ -150,6 +154,7 @@ export async function retryFile(fileName: string): Promise<void> {
  * other refusal is the board's usual notice.
  */
 export async function removeFile(fileName: string, sentence: string): Promise<void> {
+  if (useBoardUi.getState().files[fileName]?.busy) return
   setFileState(fileName, { busy: 'removing' })
   const answer = await request({ type: 'board/remove-file', fileName })
   if (!answer.ok && answer.code === 'trash-refused') {

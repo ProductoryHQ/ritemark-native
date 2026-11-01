@@ -859,6 +859,42 @@ async function main(): Promise<void> {
     controller.dispose();
   }
 
+  // ── A move that couldn't be saved: the notice names the card in plain words (#610) ─
+  {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-save-'));
+    const tasks = path.join(folder, '.ritemark', 'tasks');
+    fs.mkdirSync(tasks, { recursive: true });
+    fs.writeFileSync(path.join(tasks, 'draft-module-6.md'), '---\nritemark: task/1\nid: dr4ft6\ntitle: Draft Module 6\nstage: todo\n---\n');
+    const store = new BoardStore(folder, {
+      fileSystem: {
+        ...nodeBoardStoreFileSystem,
+        async writeFile(file) {
+          throw Object.assign(new Error(`EACCES: permission denied, open '${file}'`), { code: 'EACCES' });
+        },
+        async trash() {},
+      },
+      now,
+    });
+    const controller = new BoardController({
+      store,
+      ledger: new FakeLedger(),
+      folderName: 'files',
+      settings: { get: () => undefined, update: async () => undefined },
+      runtimes: () => ({ 'claude-code': READY, codex: READY, opencode: READY }),
+      enabled: () => true,
+      fileExists: async () => true,
+      now,
+    });
+    const answer = await controller.move('dr4ft6', 'doing');
+    assert.deepEqual(answer, {
+      ok: false,
+      code: 'write-failed',
+      message: 'Couldn’t save “Draft Module 6”: this computer doesn’t let Ritemark change files in this folder.',
+    });
+    assert.equal((await controller.snapshot()).cards[0].stage, 'todo', 'the card stays where it was');
+    controller.dispose();
+  }
+
   // ── Remove refuses a file the board hasn't listed, without blaming the trash ─
   {
     const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-files-'));

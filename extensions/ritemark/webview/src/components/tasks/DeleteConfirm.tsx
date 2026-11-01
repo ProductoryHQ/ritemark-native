@@ -58,6 +58,18 @@ export function DeleteConfirm({ snapshot }: { snapshot: BoardSnapshot }) {
   return null
 }
 
+/**
+ * What a key pressed in the question answers. Enter answers the question's action. A focused button answers Enter
+ * itself (Cancel cancels), and an Enter still held down from the key that opened the question (a key repeat) is
+ * no answer, so only a deliberate press confirms (Sprint 145, #610).
+ */
+export function questionKeyAction(event: { key: string; repeat?: boolean; target: unknown }): 'confirm' | null {
+  if (event.key !== 'Enter' || event.repeat) return null
+  const target = event.target as { closest?: (selector: string) => unknown } | null
+  if (target?.closest?.('button')) return null
+  return 'confirm'
+}
+
 function Question({ title, body, confirmLabel, onCancel, onConfirm }: { title: string; body: string; confirmLabel: string; onCancel: () => void; onConfirm: () => void }) {
   return (
     <Dialog open onOpenChange={(open) => !open && onCancel()}>
@@ -65,8 +77,7 @@ function Question({ title, body, confirmLabel, onCancel, onConfirm }: { title: s
         className="max-w-[400px]"
         role="alertdialog"
         onKeyDown={(event) => {
-          // A focused button answers Enter itself (Cancel cancels).
-          if (event.key !== 'Enter' || (event.target as HTMLElement).closest('button')) return
+          if (questionKeyAction(event) !== 'confirm') return
           event.preventDefault()
           onConfirm()
         }}

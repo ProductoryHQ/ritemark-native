@@ -180,13 +180,37 @@ function isMissing(error: unknown): boolean {
  * `UNKNOWN` (patch 011 maps the same case), so it gets the cloud sentence too.
  */
 export function readFailureWords(error: unknown): string {
-  const { code, syscall } = (error ?? {}) as NodeJS.ErrnoException;
-  // EDEADLK: macOS refusing to read an iCloud Drive file that isn't on the Mac yet.
-  if (code === 'ETIMEDOUT' || code === 'EBUSY' || code === 'EAGAIN' || code === 'EDEADLK' || (code === 'UNKNOWN' && (syscall === 'read' || syscall === 'open'))) {
+  const { code } = (error ?? {}) as NodeJS.ErrnoException;
+  if (isSlowFileError(error)) {
     return 'Ritemark couldn’t open this file in time. If this folder syncs from the cloud, the file may still be downloading.';
   }
   if (code === 'EACCES' || code === 'EPERM') return 'This computer doesn’t let Ritemark open this file.';
   return 'Ritemark couldn’t open this file.';
+}
+
+/** A file that didn't answer in time or was busy: what a cloud drive still fetching it gives. */
+function isSlowFileError(error: unknown): boolean {
+  const { code, syscall } = (error ?? {}) as NodeJS.ErrnoException;
+  // EDEADLK: macOS refusing to read an iCloud Drive file that isn't on the Mac yet.
+  return code === 'ETIMEDOUT' || code === 'EBUSY' || code === 'EAGAIN' || code === 'EDEADLK' || (code === 'UNKNOWN' && (syscall === 'read' || syscall === 'open'));
+}
+
+/**
+ * What a card change that couldn't be saved says, naming the card (experience 41, checked in #610). The error code
+ * and the path go to the log, not the notice.
+ */
+export function saveFailedWords(name: string, error: unknown): string {
+  const { code } = (error ?? {}) as NodeJS.ErrnoException;
+  if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') {
+    return `Couldn’t save “${name}”: this computer doesn’t let Ritemark change files in this folder.`;
+  }
+  if (isSlowFileError(error)) return `Couldn’t save “${name}” in time. If this folder syncs from the cloud, try again in a moment.`;
+  return `Couldn’t save “${name}”. Try again in a moment.`;
+}
+
+function saveFailed(name: string, fileName: string, error: unknown): BoardStoreError {
+  console.warn(`[taskBoard] couldn't save ${fileName}: ${messageOf(error)}`);
+  return new BoardStoreError('write-failed', saveFailedWords(name, error), error);
 }
 
 /** The sentence a card file whose front matter the board can't use shows (experience 41). */
@@ -350,7 +374,7 @@ export class BoardStore {
         }
         throw error;
       }
-      await this.write(fileName, text);
+      await this.write(fileName, text, card.title);
       this.setEntry({ fileName, hash: hashOf(text), parsed: { kind: 'card', card } });
       this.resolveIds();
       this.emit();
@@ -682,7 +706,10 @@ export class BoardStore {
     try {
       text = open ?? (await this.fs.readFile(file));
     } catch (error) {
-      if (!isMissing(error)) throw new BoardStoreError('write-failed', `Couldn't read ${fileName}: ${messageOf(error)}`, error);
+      if (!isMissing(error)) {
+        const cached = this.entries.get(fileName)?.parsed;
+        throw saveFailed(cached?.kind === 'card' ? cached.card.title : fileName, fileName, error);
+      }
       this.dropEntry(fileName);
       this.resolveIds();
       throw new BoardStoreError('not-found', 'That card is no longer on the board.');
@@ -709,8 +736,8 @@ export class BoardStore {
     if (history) changed = withHistory(changed, { at, ...history });
     const out = serializeCard(changed, parsed.source);
     const written =
-      open !== undefined && (await this.writeOpen(file, out, changed.description !== parsed.card.description));
-    if (!written) await this.write(fileName, out);
+      open !== undefined && (await this.writeOpen(file, out, changed.description !== parsed.card.description, changed.title));
+    if (!written) await this.write(fileName, out, changed.title);
     this.provisionalIds.delete(fileName);
     this.setEntry({ fileName, hash: hashOf(out), parsed: { kind: 'card', card: changed } });
     this.resolveIds();
@@ -840,17 +867,18 @@ export class BoardStore {
   }
 
   /** Write through the card's open document; false when it is not open. */
-  private async writeOpen(file: string, contents: string, bodyChanged: boolean): Promise<boolean> {
+  private async writeOpen(file: string, contents: string, bodyChanged: boolean, title: string): Promise<boolean> {
     const split = splitCardText(contents);
     if (!this.documents || !split) return false;
     try {
       return await this.documents.write(file, bodyChanged ? split : { head: split.head });
     } catch (error) {
-      throw new BoardStoreError('write-failed', `Couldn't save ${path.basename(file)}: ${messageOf(error)}`, error);
+      throw saveFailed(title, path.basename(file), error);
     }
   }
 
-  private async write(fileName: string, contents: string): Promise<void> {
+  /** Write a card file atomically; `title` names the card if it fails. */
+  private async write(fileName: string, contents: string, title: string): Promise<void> {
     const target = path.join(this.tasksDir, fileName);
     const temp = `${target}.tmp-${this.tempId()}`;
     try {
@@ -862,7 +890,7 @@ export class BoardStore {
       } catch {
         // A leftover temp file is ignored by every reader (it does not end in .md).
       }
-      throw new BoardStoreError('write-failed', `Couldn't save ${fileName}: ${messageOf(error)}`, error);
+      throw saveFailed(title, fileName, error);
     }
   }
 
