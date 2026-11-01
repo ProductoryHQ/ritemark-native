@@ -35,9 +35,6 @@ assert.match(
 assert.equal(page.match(/extensionVersionLabel\(/g)?.length, 1, 'the label is used once, for the installed extension')
 assert.match(page, /Extension \{settings\.updateCenter\.pendingRestartVersion\} is installed/, 'a pending update shows its own version')
 assert.match(page, /\{settings\.updateCenter\.availableUpdate\.version\}/, 'the update on offer shows its own version')
-
-// The update code still compares the floored version: Settings' host reads it unchanged.
-const updateService = readFileSync(fileURLToPath(new URL('../../../../src/update/updateService.ts', import.meta.url)), 'utf-8')
-assert.match(updateService, /currentExtensionVersion: getCurrentVersion\(\),/, 'the host sends the floored version as it is')
+// The update code is not touched: it keeps the floored value, and its own tests (S38) pass unchanged.
 
 console.log('versionLabel: all passed')

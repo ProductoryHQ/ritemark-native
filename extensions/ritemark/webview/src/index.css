@@ -623,8 +623,9 @@ body {
 .rm-bubble-del:hover { color: #ef4444; background: rgba(239,68,68,0.09); }
 /* Mark as done: the same action as Delete, but on a finished task it is a
    completion, not a discard — so it hovers in ink rather than red (green is
-   only the small ready dot, Sprint 145, #578). */
-.rm-bubble-done:hover { color: var(--r-ink-strong); background: var(--r-surface-soft); }
+   only the small ready dot, Sprint 145, #578). The bubble is white in both
+   themes, so the ink is the fixed light one, as its words are. */
+.rm-bubble-done:hover { color: var(--ritemark-ink-strong, #1e1b4b); background: var(--ritemark-surface-soft, #f1f5f9); }
 .rm-bubble-text { font-family: var(--ritemark-editor-font-family); font-size: 13px; color: var(--ritemark-ink-body, #475569); line-height: 1.5; word-wrap: break-word; }
 
 /* compose bubble (create flow)
@@ -711,7 +712,9 @@ body {
 .rm-task-dot--idle      { background: transparent; box-shadow: inset 0 0 0 1.5px var(--r-ink-faint, #94a3b8); }
 .rm-task-dot--progress  { background: var(--r-accent); animation: rm-task-pulse 1.4s ease-in-out infinite; }
 .rm-task-dot--attention { background: var(--r-warning); }
-.rm-task-dot--success   { background: var(--r-ink-strong); } /* done is ink: green is only the ready dot (Sprint 145, #578) */
+/* Done is ink: green is only the ready dot (Sprint 145, #578). The marker and the bubble are white in both themes,
+   so done takes the fixed light ink, as their words do (the theme's ink would vanish on white in Dark). */
+.rm-task-dot--success   { background: var(--ritemark-ink-strong, #1e1b4b); }
 .rm-task-dot--error     { background: var(--r-error); }
 @keyframes rm-task-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .rm-task-dot--progress { animation: none; } }
@@ -730,7 +733,7 @@ body {
 .rm-task-status--idle      { color: var(--r-ink-muted, #617187); }
 .rm-task-status--progress  { color: var(--r-accent); }
 .rm-task-status--attention { color: var(--r-warning); }
-.rm-task-status--success   { color: var(--r-ink-strong); }
+.rm-task-status--success   { color: var(--ritemark-ink-strong, #1e1b4b); }
 .rm-task-status--error     { color: var(--r-error); }
 
 /* which conversation the task went to / will go to */
