@@ -270,7 +270,7 @@ function Tile({
   const mark = p.call === 'needs-you' ? 'tb-blocked' : p.call ? 'tb-you' : ''
   return (
     <div
-      className={cn('tb-tile', mark, dragging && 'dragging')}
+      className={cn('tb-tile', mark, dragging && 'dragging', saving && 'saving')}
       data-card={card.id}
       // A working card can be dragged; the host refuses a move out of Doing
       // and the notice says why (S7a).
@@ -323,15 +323,15 @@ function Tile({
           ) : null}
         </div>
       </div>
+      {/* The menu stays mounted while the sign shows, so a keyboard focus on it is never dropped (tasks.css). */}
+      <span className="mt">
+        <CardMenu card={card} p={p} snapshot={snapshot} className="relative z-10" />
+      </span>
       {saving ? (
         <span className="tb-saving" role="status" aria-label={`Saving the move to ${STAGE_NAMES[saving]}`}>
           <Icon name="circle-notch" size={12} tone="inherit" className="tb-spin size-3" />
         </span>
-      ) : (
-        <span className="mt">
-          <CardMenu card={card} p={p} snapshot={snapshot} className="relative z-10" />
-        </span>
-      )}
+      ) : null}
     </div>
   )
 }

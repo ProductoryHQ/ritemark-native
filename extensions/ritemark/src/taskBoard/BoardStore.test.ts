@@ -482,7 +482,7 @@ async function main(): Promise<void> {
     hang = 0;
   }
 
-  // ── A re-read the store has overtaken is dropped ──────────────────────────
+  // ── A re-read the store has overtaken doesn't apply: the file is read again ─
   {
     const folder = tempFolder();
     writeCard(folder, 'race.md', { id: 'r4c3r1', title: 'Races a move' });
@@ -505,8 +505,18 @@ async function main(): Promise<void> {
     assert.equal(await stale, false, 'the read from before the move does not apply');
     assert.equal(cardsOf(await store.list())[0].stage, 'done', 'the move stays: no flicker back to the old column');
 
-    // Two re-reads of one file run one after the other, and the later one's text is what stays.
+    // An edit from outside that lands after the store's write, while the overtaken read was out: the read again sees it.
     const file = path.join(tasksDir(folder), 'race.md');
+    slowNext = true;
+    const late = store.invalidate('race.md');
+    await store.mutate('r4c3r1', { by: 'you', what: 'Moved to Doing' }, (card) => ({ ...card, stage: 'doing' }));
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('title: Races a move', 'title: Edited after the move'));
+    assert.equal(await late, true, 'the overtaken read is made again, and finds the edit');
+    assert.deepEqual([cardsOf(await store.list())[0].title, cardsOf(await store.list())[0].stage], ['Edited after the move', 'doing']);
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('title: Edited after the move', 'title: Races a move'));
+    await store.invalidate('race.md');
+
+    // Two re-reads of one file run one after the other, and the later one's text is what stays.
     slowNext = true;
     const older = store.invalidate('race.md'); // reads "done", answers late
     fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('title: Races a move', 'title: Renamed outside'));
@@ -535,8 +545,20 @@ async function main(): Promise<void> {
     });
     await store.list();
     reads = 0;
-    await Promise.all([store.invalidate('busy.md'), store.invalidate('busy.md'), store.invalidate('busy.md')]);
-    assert.deepEqual({ reads, most }, { reads: 3, most: 1 }, 'three watcher events read the file three times, one at a time');
+    await Promise.all([store.invalidate('busy.md'), store.invalidate('busy.md'), store.invalidate('busy.md'), store.invalidate('busy.md')]);
+    assert.deepEqual({ reads, most }, { reads: 2, most: 1 }, 'four watcher events while it answers: the read running and one after it, shared');
+  }
+
+  // ── A folder named like a card file is no card, so Remove can never trash a folder ─
+  {
+    const folder = tempFolder();
+    writeCard(folder, 'real.md', { id: 're4l01', title: 'A real card' });
+    fs.mkdirSync(path.join(tasksDir(folder), 'archive.md'));
+    const store = newStore(folder);
+    const entries = await store.list();
+    assert.deepEqual(entries.map((entry) => entry.fileName), ['real.md'], 'the folder is not listed, not even as unreadable');
+    await assert.rejects(() => store.removeFile('archive.md'), BoardStoreError);
+    assert.ok(fs.existsSync(path.join(tasksDir(folder), 'archive.md')), 'and stays where it is');
   }
 
   // ── Sprint 145 (#596): Remove takes only this board's unreadable files ────

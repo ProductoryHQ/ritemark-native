@@ -137,9 +137,10 @@ assert.equal(unreadableFileWords('a.md', true).questionBody, 'It goes to the Rec
 
 // S16: the trash refused: the row stays and says why, in place of its own sentence.
 {
-  const { removeFile } = await import('./boardUi')
+  const { removeFile, forgetFileStates } = await import('./boardUi')
+  const MISTAKE = snapshot.unreadable[3].message
   posted.length = 0
-  const removing = removeFile('draft-module-7.md')
+  const removing = removeFile('draft-module-7.md', MISTAKE)
   assert.deepEqual(render('board').rows[3].buttons, ['Open to fix it', 'Remove'])
   assert.equal(render('board').clicks.filter((item) => item.disabled).length >= 2, true, 'its buttons wait while the trash works')
   for (const listener of hostListeners) {
@@ -150,6 +151,27 @@ assert.equal(unreadableFileWords('a.md', true).questionBody, 'It goes to the Rec
   assert.match(row.text, /Ritemark couldn’t move it to the Trash, so it is still in the folder\./)
   assert.doesNotMatch(row.text, /have a mistake/, 'said once: the refusal takes the sentence’s place')
   assert.deepEqual(row.buttons, ['Open to fix it', 'Remove'], 'Open to fix it stays beside Remove')
+
+  // The refusal lasts only while the row's own sentence is the one it replaced, and goes with the row.
+  const changed: BoardSnapshot = {
+    ...snapshot,
+    unreadable: snapshot.unreadable.map((file) => (file.fileName === 'draft-module-7.md' ? { ...file, message: CLOUD, reason: 'read' as const } : file)),
+  }
+  assert.match(render('board', changed).rows[3].text, /may still be downloading/, 'a new sentence for the row brings its own words back')
+  forgetFileStates(new Set(snapshot.unreadable.filter((file) => file.fileName !== 'draft-module-7.md').map((file) => file.fileName)))
+  assert.equal(useBoardUi.getState().files['draft-module-7.md'], undefined, 'a row that went takes its refusal with it')
+  assert.match(render('board').rows[3].text, /have a mistake/, 'so it doesn’t come back if the file is listed again')
+
+  // Any other refusal is the board's notice, and the row keeps its sentence.
+  posted.length = 0
+  const unanswered = removeFile('draft-module-7.md', MISTAKE)
+  for (const listener of hostListeners) {
+    listener({ data: { type: 'board/result', requestId: posted[0].requestId, answer: { ok: false, code: 'sidebar-unreachable', message: 'Ritemark did not answer. Try again.' } } })
+  }
+  await unanswered
+  assert.equal(useBoardUi.getState().notice, 'Ritemark did not answer. Try again.')
+  assert.match(render('board').rows[3].text, /have a mistake/)
+  useBoardUi.getState().showNotice(null)
 }
 
 // A row from a build that sends no reason keeps today's behaviour: open it to fix it.

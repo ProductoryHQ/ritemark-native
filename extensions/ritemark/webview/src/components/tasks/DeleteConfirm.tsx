@@ -10,7 +10,7 @@
 import { useEffect } from 'react'
 import type { BoardSnapshot } from '../../../../src/taskBoard/protocol'
 import { isWindows } from '../../hooks/usePlatform'
-import { Dialog, DialogButton, DialogContent, DialogFooter, DialogTitle } from '../ui/dialog'
+import { Dialog, DialogBody, DialogButton, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
 import { act, removeFile, useBoardUi } from './boardUi'
 import { unreadableFileWords } from './taskCopy'
 
@@ -50,7 +50,7 @@ export function DeleteConfirm({ snapshot }: { snapshot: BoardSnapshot }) {
         onCancel={() => askRemoveFile(null)}
         onConfirm={() => {
           askRemoveFile(null)
-          void removeFile(file.fileName)
+          void removeFile(file.fileName, file.message)
         }}
       />
     )
@@ -63,7 +63,6 @@ function Question({ title, body, confirmLabel, onCancel, onConfirm }: { title: s
     <Dialog open onOpenChange={(open) => !open && onCancel()}>
       <DialogContent
         className="max-w-[400px]"
-        aria-describedby={undefined}
         role="alertdialog"
         onKeyDown={(event) => {
           // A focused button answers Enter itself (Cancel cancels).
@@ -72,12 +71,12 @@ function Question({ title, body, confirmLabel, onCancel, onConfirm }: { title: s
           onConfirm()
         }}
       >
-        <div className="flex items-center justify-between border-b border-hairline px-5 py-4">
+        <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-        </div>
-        <div className="flex-1 overflow-y-auto p-5">
-          <p className="text-sm text-ink-muted">{body}</p>
-        </div>
+        </DialogHeader>
+        <DialogBody>
+          <DialogDescription>{body}</DialogDescription>
+        </DialogBody>
         <DialogFooter>
           <DialogButton variant="secondary" onClick={onCancel}>
             Cancel

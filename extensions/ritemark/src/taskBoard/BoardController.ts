@@ -28,7 +28,7 @@ import {
   type RuntimeAvailabilities,
   type RuntimeAvailability,
 } from '../runtime/availability';
-import { BoardStoreError, type BoardEntry, type BoardStore } from './BoardStore';
+import { BoardStoreError, TrashRefusedError, type BoardEntry, type BoardStore } from './BoardStore';
 import { REVIEW_FAILED, type IdeaReviewInput, type ReviewFields } from './ideaReview';
 import {
   CARD_LIMITS,
@@ -551,19 +551,22 @@ export class BoardController {
 
   /**
    * Try again: read the file once more. The read runs outside the store's tail, so a file that hangs holds no
-   * other change (#597). The answer comes after at most `retryAnswerMs`; a read still running then goes on, and
-   * its card appears by itself if it reads. The fresh snapshot is sent before the answer, so the row goes (or
-   * comes back to Try again) in one step.
+   * other change (#597). The answer comes after at most `retryAnswerMs`, whatever holds the read or the snapshot;
+   * a read still running then goes on, and its card appears by itself if it reads. When it is quick, the fresh
+   * snapshot is sent before the answer, so the row goes (or comes back to Try again) in one step.
    */
   async retryFile(fileName: string): Promise<BoardAnswer> {
-    if (!(await this.isUnreadableFile(fileName))) return answerError('not-found', 'That file is not one the board couldn’t read.');
+    if (!this.store.isUnreadable(fileName)) return answerError('not-found', 'That file is not one the board couldn’t read.');
     let timer: ReturnType<typeof setTimeout> | undefined;
     const waited = new Promise<void>((resolve) => {
       timer = setTimeout(resolve, this.deps.retryAnswerMs ?? RETRY_ANSWER_MS);
     });
-    await Promise.race([this.store.invalidate(fileName).catch(() => false), waited]);
+    const work = (async () => {
+      await this.store.invalidate(fileName).catch(() => false);
+      await this.refreshNow();
+    })().catch((error) => console.warn('[taskBoard] try again failed', error));
+    await Promise.race([work, waited]);
     clearTimeout(timer);
-    await this.refresh();
     return { ok: true };
   }
 
@@ -572,18 +575,23 @@ export class BoardController {
     try {
       await this.store.removeFile(fileName);
     } catch (error) {
-      if (error instanceof BoardStoreError && error.code === 'write-failed') {
+      if (error instanceof TrashRefusedError) {
         console.warn(`[taskBoard] ${error.message}`);
         return answerError('write-failed', trashRefusedWords(this.deps.platform ?? process.platform));
       }
       return fromStoreError(error);
     }
-    await this.refresh();
+    await this.refreshNow();
     return { ok: true };
   }
 
-  private async isUnreadableFile(fileName: string): Promise<boolean> {
-    return (await this.store.list()).some((entry) => entry.kind === 'unreadable' && entry.fileName === fileName);
+  /** The snapshot now, in place of the one the store's change scheduled: one push, not two. */
+  private refreshNow(): Promise<BoardSnapshot> {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+    return this.refresh();
   }
 
   // ── Archive (D15) ────────────────────────────────────────────────────────

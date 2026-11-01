@@ -219,7 +219,13 @@ export function parseCardFile(text: string): ParsedCardFile {
   if (!isRecord(data) || data.ritemark === undefined) return { kind: 'not-a-card' };
   if (data.ritemark !== CARD_FORMAT) {
     if (typeof data.ritemark === 'string' && data.ritemark.startsWith('task/')) {
-      return { kind: 'error', message: `This card was written in a newer format (${data.ritemark}).`, problem: 'newer' };
+      // Only a higher version number is a newer Ritemark's card; anything else (task/l, task/1.0) is a mistake
+      // to fix in the file (Sprint 145, #596: the newer card's row offers only Remove).
+      const version = /^task\/(\d+)$/.exec(data.ritemark);
+      if (version && Number(version[1]) > Number(CARD_FORMAT.slice('task/'.length))) {
+        return { kind: 'error', message: `This card was written in a newer format (${data.ritemark}).`, problem: 'newer' };
+      }
+      return { kind: 'error', message: `ritemark must be ${CARD_FORMAT}.`, problem: 'field' };
     }
     return { kind: 'not-a-card' };
   }

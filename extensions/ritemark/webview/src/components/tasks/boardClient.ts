@@ -75,12 +75,21 @@ export function placeCard(source: BoardSnapshot, move: Pick<PendingMove, 'cardId
     // question left open, and nobody's move. A blocked agent's card can't be moved, so its call never gets here.
     placed = { ...placed, updated: nowIso, ask: null, call: null, move: null, nextUp: false, history: [...card.history, { at: nowIso, by: 'you', what: 'Marked done' }] }
     calls = calls.filter((call) => call.cardId !== card.id)
+  } else if (card.call === 'review' && card.stage === 'doing' && move.stage !== 'doing') {
+    // A result waits for review only in Doing (deriveWho): out of Doing, the card no longer waits on you.
+    placed = { ...placed, call: null, move: null }
+    calls = calls.filter((call) => call.cardId !== card.id)
   }
   let index: number
   const before = move.beforeCardId ? others.findIndex((item) => item.id === move.beforeCardId && item.stage === move.stage) : -1
   if (before >= 0) index = before
   else index = edgeOfStage(others, move.stage, move.beforeCardId || move.atEnd ? 'end' : 'top')
-  const cards = [...others.slice(0, index), placed, ...others.slice(index)]
+  let cards = [...others.slice(0, index), placed, ...others.slice(index)]
+  if (card.stage === 'todo' || move.stage === 'todo') {
+    // Next up is the top To do card that nothing is working on or waiting for (the host's nextUpId).
+    const nextUp = cards.find((item) => item.stage === 'todo' && item.archived === null && item.move !== 'agent' && item.call === null)?.id ?? null
+    cards = cards.map((item) => (item.nextUp === (item.id === nextUp) ? item : { ...item, nextUp: item.id === nextUp }))
+  }
   const doing = cards.filter((item) => item.stage === 'doing' && item.archived === null).length
   return {
     ...source,
@@ -121,10 +130,13 @@ let view: BoardSnapshot | null = null
 const pendingMoves = new Map<string, PendingMove>()
 let moveTokens = 0
 const listeners = new Set<() => void>()
+/** The cards' quiet signs listen apart: a sign appearing redraws its card, not the board. */
+const savingListeners = new Set<() => void>()
 
 function publish(): void {
   view = snapshot && pendingMoves.size ? applyPendingMoves(snapshot, pendingMoves.values(), new Date().toISOString()) : snapshot
   for (const listener of listeners) listener()
+  for (const listener of savingListeners) listener()
 }
 
 /** A snapshot came: the moves it shows are done; a move the host said yes to long ago gives way to it. */
@@ -148,7 +160,8 @@ export function beginMove(cardId: string, stage: CardStage, position: { beforeCa
   pendingMoves.set(cardId, { token, cardId, stage, ...position, since: Date.now(), answeredAt: null })
   // The quiet sign appears if the move is still pending after a second.
   setTimeout(() => {
-    if (pendingMoves.get(cardId)?.token === token) publish()
+    if (pendingMoves.get(cardId)?.token !== token) return
+    for (const listener of savingListeners) listener()
   }, SAVING_SIGN_AFTER_MS)
   publish()
   return token
@@ -178,8 +191,13 @@ export function savingStage(cardId: string): CardStage | null {
   return move && Date.now() - move.since >= SAVING_SIGN_AFTER_MS ? move.stage : null
 }
 
+function subscribeSaving(listener: () => void): () => void {
+  savingListeners.add(listener)
+  return () => savingListeners.delete(listener)
+}
+
 export function useSavingStage(cardId: string): CardStage | null {
-  return useSyncExternalStore(subscribe, () => savingStage(cardId), () => savingStage(cardId))
+  return useSyncExternalStore(subscribeSaving, () => savingStage(cardId), () => savingStage(cardId))
 }
 const pending = new Map<string, (answer: BoardAnswer) => void>()
 const focusListeners = new Set<(target: { tab?: BoardTab }) => void>()

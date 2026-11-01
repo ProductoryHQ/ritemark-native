@@ -679,6 +679,7 @@ async function main(): Promise<void> {
     fs.writeFileSync(path.join(folder, 'elsewhere.md'), 'not a card\n');
     let cloudReady = false;
     let stuckMs = 0;
+    let slowMs = 0;
     const trashed: string[] = [];
     const store = new BoardStore(folder, {
       fileSystem: {
@@ -686,6 +687,7 @@ async function main(): Promise<void> {
         async readFile(file) {
           const name = path.basename(file);
           if (name === 'cloud.md' && !cloudReady) throw Object.assign(new Error('ETIMEDOUT: connection timed out, read'), { code: 'ETIMEDOUT' });
+          if (name === 'slow.md' && slowMs) await new Promise((resolve) => setTimeout(resolve, slowMs));
           if (name === 'stuck.md' && stuckMs) {
             await new Promise((resolve) => setTimeout(resolve, stuckMs));
             throw Object.assign(new Error('ETIMEDOUT: connection timed out, read'), { code: 'ETIMEDOUT' });
@@ -765,6 +767,46 @@ async function main(): Promise<void> {
     windows.dispose();
     assert.equal(onWindows.ok ? null : onWindows.message, 'Ritemark couldn’t move it to the Recycle Bin, so it is still in the folder.');
     assert.ok((await controller.snapshot()).unreadable.some((file) => file.fileName === 'locked.md'), 'the refused file keeps its row');
+
+    // Try again answers in time even while a change to another card holds the store (its own file hangs).
+    fs.writeFileSync(path.join(tasks, 'slow.md'), cardText('sl0w01', 'Slow to read'));
+    await store.invalidate('slow.md');
+    slowMs = 400;
+    const held = controller.move('sl0w01', 'doing');
+    const started = Date.now();
+    assert.deepEqual(await controller.retryFile('locked.md'), { ok: true });
+    assert.ok(Date.now() - started < 350, `the answer comes at the cap, not after the held store (${Date.now() - started} ms)`);
+    await held;
+    slowMs = 0;
+    controller.dispose();
+  }
+
+  // ── Remove says the trash refused only when the trash refused ─────────────
+  {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-files-'));
+    const store = new BoardStore(folder, {
+      fileSystem: {
+        ...nodeBoardStoreFileSystem,
+        async readDir() {
+          throw Object.assign(new Error('EIO: i/o error, scandir'), { code: 'EIO' });
+        },
+        async trash() {},
+      },
+      now,
+    });
+    const controller = new BoardController({
+      store,
+      ledger: new FakeLedger(),
+      folderName: 'files',
+      settings: { get: () => undefined, update: async () => undefined },
+      runtimes: () => ({ 'claude-code': READY, codex: READY, opencode: READY }),
+      enabled: () => true,
+      fileExists: async () => true,
+      now,
+    });
+    const answer = await controller.removeFile('broken.md');
+    assert.equal(answer.ok, false);
+    assert.doesNotMatch(answer.ok ? '' : answer.message, /Trash|Recycle Bin/, 'a folder that can’t be listed is not the trash refusing');
     controller.dispose();
   }
 

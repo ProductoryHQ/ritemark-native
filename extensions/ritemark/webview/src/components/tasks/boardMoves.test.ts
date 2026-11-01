@@ -128,6 +128,14 @@ assert.equal(doneCard.call, null, 'a done card waits on nobody')
 assert.deepEqual([done.calls.length, done.attention.count, done.doing.count], [0, 0, 0], 'and the counts move with it')
 assert.deepEqual(base.cards.find((item) => item.id === 'doing1')!.history, [], 'the host’s snapshot is not changed')
 
+// A result waits for review only in Doing; Next up follows To do's new top (the host's rules, for the moment it takes).
+const reviewed = placeCard(base, { cardId: 'doing1', stage: 'todo' }, NOW)
+const reviewedCard = reviewed.cards.find((item) => item.id === 'doing1')!
+assert.deepEqual([reviewedCard.call, reviewedCard.move, reviewed.calls.length, reviewed.attention.count], [null, null, 0, 0], 'out of Doing, a result no longer waits on you')
+assert.deepEqual(reviewed.cards.filter((item) => item.nextUp).map((item) => item.id), ['doing1'], 'and the card on top of To do is Next up')
+const nextUp = placeCard({ ...base, cards: base.cards.map((item) => ({ ...item, nextUp: item.id === 'todo01' })) }, { cardId: 'todo01', stage: 'doing', atEnd: true }, NOW)
+assert.deepEqual(nextUp.cards.filter((item) => item.nextUp).map((item) => item.id), ['todo02'], 'Next up moves on when its card leaves To do')
+
 assert.equal(confirmsMove(placeCard(base, { cardId: 'todo01', stage: 'doing', atEnd: true }, NOW), { cardId: 'todo01', stage: 'doing', atEnd: true }), true)
 assert.equal(confirmsMove(base, { cardId: 'todo01', stage: 'doing', atEnd: true }), false, 'the card still in To do')
 assert.equal(confirmsMove(base, { cardId: 'todo03', stage: 'todo', beforeCardId: 'todo01' }), false, 'a reorder the snapshot doesn’t show yet')

@@ -143,6 +143,21 @@ interface CachedEntry {
 /** One file read: its text, gone, or the error that stopped the read. */
 type FileRead = { kind: 'text'; text: string } | { kind: 'missing' } | { kind: 'failed'; error: unknown };
 
+/** A re-read made outside the tail, with what it is checked against when it is applied. */
+interface QueuedRead {
+  epoch: number;
+  version: number;
+  read: FileRead;
+}
+
+/** The system trash refused a file the board couldn't read (Remove on its row, Sprint 145, #596). */
+export class TrashRefusedError extends BoardStoreError {
+  constructor(message: string, cause?: unknown) {
+    super('write-failed', message, cause);
+    this.name = 'TrashRefusedError';
+  }
+}
+
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -203,16 +218,14 @@ export class BoardStore {
   private loaded = false;
   /**
    * Re-reads happen outside the tail (Sprint 145, #597): a file that hangs (a cloud drive still fetching it) used
-   * to hold every move, add and edit until its read gave up. A read made outside the tail is applied only while
-   * it is still the latest word on its file: `fileVersions` counts the store's own changes to a file's entry
-   * (writes, loads, removals) and `epoch` whole reloads; `appliedReads` keeps the start of the last read applied,
-   * so an older read that finishes late never replaces a newer one.
+   * to hold every move, add and edit until its read gave up. Per file they run one at a time, so they finish in the
+   * order they started. A read is applied only while the store hasn't changed that file's entry since it started:
+   * `fileVersions` counts the store's own changes to an entry (writes, loads, removals), `epoch` whole reloads.
+   * One entry per file name the store has seen.
    */
   private readonly fileVersions = new Map<string, number>();
-  private readonly appliedReads = new Map<string, number>();
-  /** fileName → the re-read now running for it (`queueRead`). */
-  private readonly fileReads = new Map<string, Promise<unknown>>();
-  private readTicket = 0;
+  /** fileName → the re-read running for it, and the one queued after it that every later caller shares. */
+  private readonly fileReads = new Map<string, { running: Promise<QueuedRead>; next: Promise<QueuedRead> | null }>();
   private epoch = 0;
 
   constructor(readonly folderPath: string, dependencies: BoardStoreDependencies = {}) {
@@ -410,12 +423,17 @@ export class BoardStore {
       try {
         await this.fs.trash(file);
       } catch (error) {
-        if (!isMissing(error)) throw new BoardStoreError('write-failed', `Couldn't move ${fileName} to the trash: ${messageOf(error)}`, error);
+        if (!isMissing(error)) throw new TrashRefusedError(`Couldn't move ${fileName} to the trash: ${messageOf(error)}`, error);
       }
       this.dropEntry(fileName);
       this.resolveIds();
       this.emit();
     });
+  }
+
+  /** A file of this board listed as one it couldn't read. From the cache: it waits on nothing. */
+  isUnreadable(fileName: string): boolean {
+    return this.entries.get(fileName)?.parsed.kind === 'unreadable';
   }
 
   /**
@@ -435,18 +453,16 @@ export class BoardStore {
    * the board changed: the echo of the store's own write (same content), the same failure again and changes to
    * files that are not cards return false.
    *
-   * The file is read outside the tail and the result applied under it (Sprint 145, #597): a read that hangs
-   * holds no move, add or edit of another card. A read the store has since overtaken (it wrote, loaded or
-   * removed that file, or a later read was applied) is dropped.
+   * The file is read outside the tail and the result applied under it (Sprint 145, #597): a re-read that hangs
+   * holds no move, add or edit of another card. When the store changed that file while it was being read (it
+   * wrote, loaded or removed it), what was read may be older than the disk, so the file is read again.
    */
   async invalidate(fileName: string): Promise<boolean> {
     if (!isCardFileName(fileName)) return false;
-    const { ticket, epoch, version, read } = await this.queueRead(fileName);
-    return this.serialized(async () => {
+    const { epoch, version, read } = await this.queueRead(fileName);
+    const outcome = await this.serialized(async () => {
       await this.ensureLoaded();
-      if (epoch !== this.epoch || version !== (this.fileVersions.get(fileName) ?? 0)) return false;
-      if ((this.appliedReads.get(fileName) ?? 0) > ticket) return false;
-      this.appliedReads.set(fileName, ticket);
+      if (epoch !== this.epoch || version !== (this.fileVersions.get(fileName) ?? 0)) return 'overtaken' as const;
       const changed = this.applyRead(fileName, read);
       if (changed) {
         this.resolveIds();
@@ -454,6 +470,7 @@ export class BoardStore {
       }
       return changed;
     });
+    return outcome === 'overtaken' ? this.invalidate(fileName) : outcome;
   }
 
   /** Read the whole folder again (a branch switch, a sync that moved many files). */
@@ -494,7 +511,9 @@ export class BoardStore {
     try {
       return { kind: 'text', text: unsaved ?? (await this.fs.readFile(file)) };
     } catch (error) {
-      return isMissing(error) ? { kind: 'missing' } : { kind: 'failed', error };
+      // A folder whose name ends in .md is no card file: not listed, so Remove never sends a folder to the trash.
+      const notAFile = (error as NodeJS.ErrnoException)?.code === 'EISDIR';
+      return isMissing(error) || notAFile ? { kind: 'missing' } : { kind: 'failed', error };
     }
   }
 
@@ -537,25 +556,36 @@ export class BoardStore {
   }
 
   /**
-   * A re-read outside the tail, one at a time per file: a file that hangs is not asked again while it is still
-   * answering (a sync client can touch it many times). Each read notes, as it starts, what it will be checked
-   * against when it is applied.
+   * A re-read outside the tail. Per file, one runs at a time and at most one waits after it, shared by every
+   * caller that comes meanwhile: a file that hangs is not asked again and again while it is still answering (a
+   * sync client can touch it many times), and the read after it still sees what changed since. Each read notes,
+   * as it starts, what it is checked against when it is applied.
    */
-  private queueRead(fileName: string): Promise<{ ticket: number; epoch: number; version: number; read: FileRead }> {
-    const run = async () => {
-      const ticket = ++this.readTicket;
+  private queueRead(fileName: string): Promise<QueuedRead> {
+    const run = async (): Promise<QueuedRead> => {
       const epoch = this.epoch;
       const version = this.fileVersions.get(fileName) ?? 0;
-      return { ticket, epoch, version, read: await this.readFile(fileName) };
+      return { epoch, version, read: await this.readFile(fileName) };
     };
-    const prior = this.fileReads.get(fileName);
-    const next = prior ? prior.then(run, run) : run();
-    this.fileReads.set(fileName, next);
-    const forget = () => {
-      if (this.fileReads.get(fileName) === next) this.fileReads.delete(fileName);
+    const slot = this.fileReads.get(fileName);
+    if (slot) {
+      slot.next ??= slot.running.then(run, run);
+      return slot.next;
+    }
+    const entry = { running: run(), next: null as Promise<QueuedRead> | null };
+    const settled = () => {
+      if (this.fileReads.get(fileName) !== entry) return;
+      if (entry.next) {
+        entry.running = entry.next;
+        entry.next = null;
+        entry.running.then(settled, settled);
+      } else {
+        this.fileReads.delete(fileName);
+      }
     };
-    next.then(forget, forget);
-    return next;
+    this.fileReads.set(fileName, entry);
+    entry.running.then(settled, settled);
+    return entry.running;
   }
 
   /** The store's own change to a file's entry: a read made outside the tail before it no longer applies. */

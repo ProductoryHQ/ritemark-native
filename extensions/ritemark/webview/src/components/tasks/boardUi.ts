@@ -16,7 +16,10 @@ import { beginMove, notify, request, settleMove, type BoardCall } from './boardC
 export type NoteKind = 'changes' | 'answer'
 
 /** A file the board couldn't read, while Try again or Remove runs, or after the trash refused it (#596). */
-export type FileRowState = { busy: 'retrying' | 'removing'; note?: undefined } | { note: string; busy?: undefined }
+export type FileRowState =
+  | { busy: 'retrying' | 'removing'; note?: undefined; sentence?: undefined }
+  /** The trash refused: `note` replaces the row's own sentence while that is still `sentence`. */
+  | { note: string; sentence: string; busy?: undefined }
 
 export type GivePrompt =
   | { cardId: string; runtimeId: AgentId; kind: 'conflict'; withCardId: string; withTitle: string; file: string }
@@ -141,11 +144,27 @@ export async function retryFile(fileName: string): Promise<void> {
   }
 }
 
-/** Remove, after the board's question: the file goes to the system trash. If the trash refuses, the row says so. */
-export async function removeFile(fileName: string): Promise<void> {
+/**
+ * Remove, after the board's question: the file goes to the system trash. If the trash refuses, the row says so in
+ * place of its own sentence (`sentence`), until the person acts on the row again or its own sentence changes. Any
+ * other refusal is the board's usual notice.
+ */
+export async function removeFile(fileName: string, sentence: string): Promise<void> {
   setFileState(fileName, { busy: 'removing' })
   const answer = await request({ type: 'board/remove-file', fileName })
-  setFileState(fileName, answer.ok ? null : { note: answer.message })
+  if (!answer.ok && answer.code === 'write-failed') {
+    setFileState(fileName, { note: answer.message, sentence })
+    return
+  }
+  setFileState(fileName, null)
+  if (!answer.ok && answer.code !== 'not-found') useBoardUi.getState().showNotice(answer.message)
+}
+
+/** Forget what the rows of files no longer listed carried (a refusal's sentence, a finished wait). */
+export function forgetFileStates(listed: ReadonlySet<string>): void {
+  const files = useBoardUi.getState().files
+  if (Object.keys(files).every((name) => listed.has(name))) return
+  useBoardUi.setState({ files: Object.fromEntries(Object.entries(files).filter(([name]) => listed.has(name))) })
 }
 
 function setFileState(fileName: string, state: FileRowState | null): void {

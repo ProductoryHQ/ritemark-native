@@ -33,7 +33,7 @@ Run on 1 November 2026 on the Mac, `main` at `39b4e37f`, for PR 4 (#597). This f
 ## What the fix does, by where the time goes
 
 - **The card no longer waits for any of it.** The surface that moves a card draws the move at once and lets the host's answer confirm or undo it (spec R3). The write and the snapshot still take what they take on a slow folder; nobody watches them.
-- **Re-reads leave the store's tail.** The watcher's re-read and Try again read the file outside the tail and apply the result under it, only while no newer write, load or read has overtaken it.
+- **Re-reads leave the store's tail.** The watcher's re-read and Try again read the file outside the tail, one at a time per file, and apply the result under it only if the store hasn't changed that file meanwhile (otherwise they read it again). What stays on the tail: a move or edit of a card whose own file hangs still reads that file there, so it and the changes after it wait (the architecture doc's TO BE: a lock per file).
 - **The snapshot is not made cheaper.** Its file checks are about 1 ms on the Mac's disk and a third of the wait on a slow folder; with the move drawn at once, they only delay the other surfaces (the side bar's list), which by design show a move once it is saved. Caching them would weaken "a named file's presence is live" for no visible gain. If the side bar's lag matters on cloud folders, that is its own change.
 
 ## After (this branch, same instance and project)

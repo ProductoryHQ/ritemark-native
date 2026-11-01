@@ -13,6 +13,7 @@
  * bar draws the same rows narrower, the buttons under the sentence.
  */
 
+import { useEffect } from 'react'
 import type { BoardSnapshot } from '../../../../src/taskBoard/protocol'
 import { isWindows } from '../../hooks/usePlatform'
 import { cn } from '../../lib/utils'
@@ -20,13 +21,18 @@ import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { notify } from './boardClient'
-import { retryFile, useBoardUi } from './boardUi'
+import { forgetFileStates, retryFile, useBoardUi } from './boardUi'
 import { SECTION } from './CardParts'
 import { unreadableFileWords } from './taskCopy'
 
 type UnreadableFile = BoardSnapshot['unreadable'][number]
 
 export function UnreadableCards({ snapshot, variant = 'list' }: { snapshot: BoardSnapshot; variant?: 'board' | 'list' }) {
+  // A row that went (read, fixed, removed elsewhere) takes what it carried with it.
+  const listed = snapshot.unreadable.map((file) => file.fileName).join('\n')
+  useEffect(() => {
+    forgetFileStates(new Set(listed ? listed.split('\n') : []))
+  }, [listed])
   if (!snapshot.unreadable.length) return null
   return (
     <div className="mb-1">
@@ -90,7 +96,9 @@ function UnreadableRow({ file, variant }: { file: UnreadableFile; variant: 'boar
     </div>
   )
 
-  const sentence = state?.note ?? file.message
+  // The trash's refusal stands in for the row's own sentence until that sentence changes.
+  const note = state?.note !== undefined && state.sentence === file.message ? state.note : null
+  const sentence = note ?? file.message
   return (
     <div
       className={cn(
@@ -118,7 +126,7 @@ function UnreadableRow({ file, variant }: { file: UnreadableFile; variant: 'boar
         <div
           className={cn(
             'mt-0.5 [text-wrap:pretty]',
-            state?.note ? 'text-ink-strong' : 'text-ink-body',
+            note ? 'text-ink-strong' : 'text-ink-body',
             board ? 'text-[12px] leading-[17px]' : 'line-clamp-2 text-[11.5px] leading-4',
           )}
         >
