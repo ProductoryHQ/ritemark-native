@@ -97,6 +97,7 @@ The five items, in the shape's order:
 | 146 | `sprint-146-controls` (plan on `plan/v2.2.0-sprint-146`) | Plan: [#603](https://github.com/ProductoryHQ/ritemark-native/pull/603) | #585, #576, #566, #567, #568, #594, #598 | Plan approved 1 Nov; PR 1 (#585 carried over) and PR 2 under way | — | — |
 | 146, PR 4 | `sprint-146-controls-shell` | [#630](https://github.com/ProductoryHQ/ritemark-native/pull/630) | #567, #568, #594 | Draft. Shell-tier, High: in review | Mac: before and after on dev instances of `main`'s patches and this branch's (A6, A7, A8), the frame check (0 of 34 scenes differ from `main`'s capture, JOINS ok 34 of 34, geometry 34 PASS); Windows at Gate 2 (S43, S47, the hovered row at 100/125/150%) | At the sprint's closeout |
 | Plan: 152 and the startup contract's proposal | `plan/sprint-152-startup-contract` | [#626](https://github.com/ProductoryHQ/ritemark-native/pull/626) | #624 | Light; the plan is Approved (the manager, on Jarmo's 2.2 delegation) | n/a | n/a |
+| 152, PR 1 | `sprint-152-startup-contract` | [#632](https://github.com/ProductoryHQ/ritemark-native/pull/632) | #624 (R5), R6 (decision 2), R8, audits A1–A4 | Draft. Extension-tier, Standard: one round | Mac: the first-frame check on `main` (five runs of each start) and the branch; the AI column traced on both; screenshots Light and Dark, not signed in (signed in: not run); Windows through the overlay (the "Ritemark on Windows" session) | Changelog lines in; the release-notes line at Phase 4 |
 
 ## Risks and Blockers
 
