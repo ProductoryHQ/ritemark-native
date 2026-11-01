@@ -92,8 +92,12 @@ Approved on 1 November (`819c63f`); Codex reviews once (marked ready once, after
 
 ## Phase 7: PR 6, the Electron (W12; R12)
 
-- [ ] A6 run again before the candidate; if a 43.x on Node 24.22.1 or later exists: patch 020 moved, checks of S51; PR 6 reviewed at High
-- [ ] If none exists: the risk in the release plan and on #515; Jarmo's answer to decision 4 recorded
+- [x] A6 run again for PR 6; a 43.x on Node 24.22.1 or later exists, so patch 020 moved (1 November: 43.8.6 on Node 24.22.1; [research/pr6-electron-checks.md](research/pr6-electron-checks.md))
+- [x] S51 without a window: the dry run, Electron's own checksums, the checksum-checked download reporting Node 24.22.1, the native-module check
+- [x] S51 in the app: one isolated dev launch, where the extension host starts, the built-in browser opens a page and About shows Electron 43.8.6 and Node 24.22.1 (1 November, `qa/r12-about.png`)
+- [ ] PR 6 reviewed at High: the Review record on #620
+- [ ] A6 once more when 2.2's candidate is built (S50); a newer 43.x by then moves patch 020 again
+- [x] ~~If none exists: the risk in the release plan and on #515; Jarmo's answer to decision 4 recorded~~ Not applicable: 43.8.6 exists. Decision 4 applies only if PR 6 fails its checks
 
 ## Phase 8: The real keyboard (R11)
 

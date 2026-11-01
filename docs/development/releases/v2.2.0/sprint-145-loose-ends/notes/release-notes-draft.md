@@ -11,3 +11,9 @@ Drafts for 2.2's release notes, one per user-visible change, written for the `re
 - **Good to know:** One Undo takes back the other app's changes, if you don't want them.
 - **Known limit:** If the other copy is a rewrite of almost the whole file, Ritemark can't tell what changed. Within 30 seconds of your last save it asks which version to keep; after that the copy replaces your words, as before.
 - **Good to know:** If you discard your changes to a file (or switch branches) within 30 seconds of typing in it, Ritemark asks first; choose Use disk version to finish.
+
+## PR 6 (#515)
+
+*R12: Electron 43.8.6, on Node.js 24.22.1.*
+
+- **Security:** Ritemark now runs on Electron 43.8.6, which includes the Node.js security fixes of 21 October and the newest Chromium security fixes for everything Ritemark shows, the built-in browser included.

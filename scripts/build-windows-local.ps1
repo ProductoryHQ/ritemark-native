@@ -34,8 +34,12 @@ $ExtDir    = Join-Path $RootDir "extensions\ritemark"
 $BuildOut  = Join-Path $RootDir "VSCode-win32-x64"
 $BrandDir  = Join-Path $RootDir "branding"
 
-# The VS Code release at the committed vscode pin, and the Electron it builds native modules for (target= in
-# vscode/.npmrc). update-vscode.sh's checklist names both; they were 1.117.0 and 30.5.1 until Sprint 135.
+# The VS Code release at the committed vscode pin, and the Electron it builds native modules for: target= in the
+# pin's own vscode/.npmrc, before any patch. update-vscode.sh's checklist names both; they were 1.117.0 and 30.5.1
+# until Sprint 135. Step 4's patches set vscode/.npmrc's target to the Electron the build downloads (patch 020:
+# 43.8.6 since Sprint 145), and Step 6's npm_config_target overrides it, so the modules are built against 43.7.7's
+# headers, as Windows CI builds them (build-windows.yml runs npm ci before the patches). That works because every
+# 43.x has native-module ABI 148; a patch 020 that leaves the 43 line has to change this value and CI's order too.
 $VSCodeVersion = "1.142.0"
 $ElectronTarget = "43.7.7"
 
