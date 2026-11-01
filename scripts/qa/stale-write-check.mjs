@@ -30,13 +30,16 @@
  *   s6      type A, auto-save; only the file's modified time changes. Silent.
  *   s7fm    s1 on a file with front matter.      s7fm2  s2 on it.
  *   s7crlf  s1 on a file with CRLF endings.      s7crlf2 s2 on it.
+ *   s8      type A, auto-save; the writer rewrites the whole file (no block in common) at once: no base, so the
+ *           fallback: the whole-document question within 30 s, the words kept.
  * After a run that lost words, Cmd+Z (Ctrl+Z on Windows) is pressed once in the editor, and the record says whether
  * the lost words came back. With --answer keep-local|use-disk|compare (the whole-document question) or
  * keep-mine|use-theirs (a paragraph both changed), a run that asked opens Review changes from the document's bar,
  * records the button's tooltip and the dialog's words (and screenshots with --screenshot <path>), chooses the
  * answer and records the file and the editor 3 s later. With --undo, a run that merged (s1, s3, s7fm, s7crlf)
  * presses Cmd+Z (Ctrl+Z) once in the editor and records whether the writer's change went and the person's words
- * stayed, and whether the file followed (S62).
+ * stayed, and whether the file followed (S62). --theme light|dark fixes the colour theme of the instance it starts;
+ * --keep-open leaves that instance running for later --attach runs (quit it yourself).
  *
  * Every run prints one line and the report (JSON) holds what was seen: the disk and editor text, whether Review
  * changes showed, the delay between the last save and the write, and the [EditorSync] log lines in that time. The
@@ -67,6 +70,8 @@ const OUT = option('out', `${PROFILE}-report.json`);
 const ANSWER = option('answer'); // keep-local | use-disk | compare | keep-mine | use-theirs: open Review changes and choose it
 const SHOT = option('screenshot'); // with --answer: a screenshot of the review, <path>-<run>.png
 const UNDO = flag('undo'); // after a merge: one Cmd+Z, and what it undid
+const THEME = option('theme'); // light | dark: the instance's colour theme, not the system's
+const KEEP_OPEN = flag('keep-open'); // leave the started instance running
 const MOD = process.platform === 'darwin' ? 4 : 2; // meta on the Mac, ctrl elsewhere
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 if (!ATTACH && (path.dirname(PROFILE) === PROFILE || !PROFILE.startsWith(`${TEMP_ROOT}${path.sep}`) || path.relative(TEMP_ROOT, PROFILE).split(path.sep).length < 2)) {
@@ -247,6 +252,12 @@ async function run(kind, n, workspace, log) {
     const text = logical(read);
     fs.writeFileSync(file, kind === 's5crlf' ? text.replace(/\n/g, '\r\n') : `﻿${text}`);
     expectQuestion = false; expectKept = [A.trim()];
+  } else if (kind === 's8') {
+    await sleep(DELAY);
+    log.mark();
+    writeAt = Date.now();
+    fs.writeFileSync(file, `# Rewritten ${n}\n\nNothing here is what it was.\n\nNot one paragraph in common.\n`);
+    expectQuestion = true; expectKept = [A.trim()];
   } else if (kind === 's6') {
     await sleep(DELAY);
     log.mark();
@@ -302,6 +313,7 @@ async function run(kind, n, workspace, log) {
     const label = { 'keep-local': 'Keep my version', 'use-disk': 'Use disk version', compare: 'Compare changes', 'keep-mine': 'Keep mine', 'use-theirs': 'Use the other copy' }[ANSWER];
     const choice = await rectIn(probe, `[...d.querySelectorAll('[role=dialog] button')].find(b => b.innerText.trim() === ${JSON.stringify(label)})`);
     if (choice) await mouse(choice.x + choice.w / 2, choice.y + choice.h / 2);
+    else await press('Escape', 'Escape', 27); // the other dialog: close it unanswered
     await sleep(3000);
     const diskAfter = fs.readFileSync(file, 'utf8');
     const editorAfter = (await editorText(probe)) ?? '';
@@ -333,7 +345,8 @@ if (!ATTACH) {
   fs.rmSync(PROFILE, { recursive: true, force: true });
   for (const dir of ['ud/User', 'ext', 'shared', 'ws', 'ai/codex', 'ai/claude', 'ai/xdg/config', 'ai/xdg/data', 'ai/xdg/state', 'ai/xdg/cache']) fs.mkdirSync(path.join(PROFILE, dir), { recursive: true });
   fs.writeFileSync(path.join(PROFILE, 'ws/README.md'), '# Stale write check\n');
-  fs.writeFileSync(path.join(PROFILE, 'ud/User/settings.json'), JSON.stringify({ 'window.confirmBeforeClose': 'never', 'ritemark.updates.enabled': false, 'ritemark.features.analytics': false }, null, 2));
+  const theme = THEME ? { 'window.autoDetectColorScheme': false, 'workbench.colorTheme': THEME === 'dark' ? 'ritemark-dark' : 'ritemark-light' } : {};
+  fs.writeFileSync(path.join(PROFILE, 'ud/User/settings.json'), JSON.stringify({ 'window.confirmBeforeClose': 'never', 'ritemark.updates.enabled': false, 'ritemark.features.analytics': false, ...theme }, null, 2));
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
   const ai = (p) => path.join(PROFILE, 'ai', p);
   execFileSync('open', ['-n', '-g', '-j', '-a', path.join(VSCODE, '.build/electron/Ritemark.app'),
@@ -342,7 +355,10 @@ if (!ATTACH) {
     '--env', `XDG_CONFIG_HOME=${ai('xdg/config')}`, '--env', `XDG_DATA_HOME=${ai('xdg/data')}`, '--env', `XDG_STATE_HOME=${ai('xdg/state')}`, '--env', `XDG_CACHE_HOME=${ai('xdg/cache')}`,
     '--stdout', path.join(PROFILE, 'launch.log'), '--stderr', path.join(PROFILE, 'launch.log'),
     '--args', VSCODE, workspace,
-    '--disable-extension=vscode.vscode-api-tests', `--remote-debugging-port=${PORT}`,
+    // The dev tree doesn't build these two built-ins (their `out/` is missing: activation fails with "Cannot find
+    // module" and puts two error toasts over the screenshots); the check uses neither.
+    '--disable-extension=vscode.vscode-api-tests', '--disable-extension=vscode.markdown-language-features', '--disable-extension=vscode.extension-editing',
+    `--remote-debugging-port=${PORT}`,
     `--user-data-dir=${path.join(PROFILE, 'ud')}`, `--extensions-dir=${path.join(PROFILE, 'ext')}`, `--shared-data-dir=${path.join(PROFILE, 'shared')}`,
     '--use-mock-keychain', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--disable-background-timer-throttling'], { env });
   launched = true;
@@ -386,7 +402,8 @@ try {
 } finally {
   consoleConnection.close();
   fs.writeFileSync(OUT, JSON.stringify(report, null, 1));
-  if (launched) {
+  if (launched && KEEP_OPEN) console.log(`kept open: port ${PORT}, workspace ${workspace}`);
+  if (launched && !KEEP_OPEN) {
     try { await press('q', 'KeyQ', 81, MOD); } catch { /* gone */ }
     const mine = () => spawnSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' }).stdout.split('\n')
       .filter((line) => line.includes(`--user-data-dir=${path.join(PROFILE, 'ud')}`))

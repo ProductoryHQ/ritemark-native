@@ -15,6 +15,7 @@ const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
 const { paragraphReviewWords } = await import('./paragraphReviewWords')
 const { SyncActionButton } = await import('../header/DocumentHeader')
+const { ParagraphQuote } = await import('./DocumentConflictDialog')
 
 // The words: the AI by name only when Ritemark knows it; otherwise another app. One paragraph, or several.
 const claude = paragraphReviewWords(1, 'Claude')
@@ -49,4 +50,25 @@ const failed = parse(renderToStaticMarkup(React.createElement(SyncActionButton, 
 }))).querySelector('button')
 assert.ok((failed?.getAttribute('class') ?? '').includes('text-[var(--r-error)]'), 'the failed sync keeps its look')
 
-console.log('ok - paragraph review words and the conflict button')
+// The dialog's two paragraphs (experience 44's frame 3, redrawn in ritemark-dev 5336968): plain quoted blocks, not
+// fields. A soft fill, no border, radius 8, padding 10 x 12; the label inside at the top, 11/14 semibold uppercase
+// with 0.5 px letter-spacing in muted ink; the paragraph in the editor's font at 14/22 in strong ink, at its full
+// length; selectable, never editable.
+const quoteMarkup = renderToStaticMarkup(React.createElement(ParagraphQuote, { label: claude.mineLabel, text: 'Line one.\nLine two of a long paragraph.' }))
+const quote = parse(quoteMarkup).querySelector('figure')
+assert.ok(quote, 'a figure')
+const quoteClass = quote.getAttribute('class') ?? ''
+for (const token of ['bg-[var(--r-surface-soft)]', 'rounded-[8px]', 'px-3', 'py-[10px]', 'select-text']) assert.ok(quoteClass.includes(token), token)
+assert.ok(!/\bborder\b|border-/.test(quoteClass), 'no border')
+const label = quote.querySelector('figcaption')
+assert.equal(label?.textContent.trim(), 'Yours, in the document', 'the words; CSS makes them uppercase')
+const labelClass = label?.getAttribute('class') ?? ''
+for (const token of ['text-[11px]', 'leading-[14px]', 'font-semibold', 'uppercase', 'tracking-[0.5px]', 'text-[var(--r-ink-muted)]']) assert.ok(labelClass.includes(token), token)
+const paragraph = quote.querySelector('p')
+assert.equal(paragraph?.textContent.trim(), 'Line one.\nLine two of a long paragraph.')
+const paragraphClass = paragraph?.getAttribute('class') ?? ''
+for (const token of ['font-editor', 'text-[14px]', 'leading-[22px]', 'text-[var(--r-ink-strong)]', 'whitespace-pre-wrap']) assert.ok(paragraphClass.includes(token), token)
+assert.ok(!/max-h-|overflow-auto/.test(paragraphClass), 'its full length, no scroll box')
+assert.ok(!/<input|<textarea|<blockquote|contenteditable/i.test(quoteMarkup), 'never editable, and no blockquote (VS Code\'s webview stylesheet fills those)')
+
+console.log('ok - paragraph review words, the conflict button and the quoted paragraphs')

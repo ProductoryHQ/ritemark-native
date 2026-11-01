@@ -105,6 +105,25 @@ interface ParagraphConflictDialogProps {
 }
 
 /**
+ * Sprint 145 R1 (#588, experience 44's frame 3 as redrawn, ritemark-dev `5336968`): one of the two paragraphs, a plain
+ * quoted block, not a field: a soft fill, no border, its label inside at the top, the paragraph in the editor's own
+ * font at its full length. It can be selected and copied, never edited.
+ */
+export function ParagraphQuote({ label, text }: { label: string; text: string }) {
+  return (
+    <figure className="m-0 select-text rounded-[8px] bg-[var(--r-surface-soft)] px-3 py-[10px]">
+      <figcaption className="m-0 mb-1 font-ui text-[11px] font-semibold uppercase leading-[14px] tracking-[0.5px] text-[var(--r-ink-muted)]">
+        {label}
+      </figcaption>
+      {/* A plain paragraph, not a <blockquote>: VS Code's webview stylesheet gives blockquotes a fill of their own. */}
+      <p className="m-0 select-text whitespace-pre-wrap break-words font-editor text-[14px] leading-[22px] text-[var(--r-ink-strong)]">
+        {text}
+      </p>
+    </figure>
+  )
+}
+
+/**
  * Sprint 145 R1 (revised 1 November, #588): Review changes for one paragraph both the person and a writer changed,
  * experience 44's frame 3. The person's paragraph is in the document; the writer's waits here. No warning icon:
  * it is a question, not an alarm.
@@ -123,16 +142,10 @@ export function ParagraphConflictDialog({ isOpen, items, position, total, writer
         </DialogHeader>
         <DialogBody>
           <DialogDescription asChild>
-            <div className="space-y-4 text-sm leading-relaxed text-ink-muted">
+            <div className="space-y-3 text-sm leading-relaxed text-ink-muted">
               <p className="m-0">{words.line}</p>
-              <section className="space-y-1">
-                <h3 className="m-0 font-ui text-[12px] font-medium text-ink-muted">{words.mineLabel}</h3>
-                <p className="m-0 max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-[var(--r-hairline-strong)] px-3 py-2 text-ink-strong">{item?.mine || ' '}</p>
-              </section>
-              <section className="space-y-1">
-                <h3 className="m-0 font-ui text-[12px] font-medium text-ink-muted">{words.theirsLabel}</h3>
-                <p className="m-0 max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-[var(--r-hairline-strong)] px-3 py-2 text-ink-strong">{item?.theirs || ' '}</p>
-              </section>
+              <ParagraphQuote label={words.mineLabel} text={item?.mine ?? ''} />
+              <ParagraphQuote label={words.theirsLabel} text={item?.theirs ?? ''} />
             </div>
           </DialogDescription>
         </DialogBody>
