@@ -1,11 +1,13 @@
 import type { DocumentHostMessage, DocumentSyncState } from '../../src/editorSync/protocol'
-import type { DocumentConflictState } from './types/documentSync'
+import type { DocumentConflictState, DocumentParagraphsState } from './types/documentSync'
 
 export interface DocumentViewSyncState {
   revision: number
   state: DocumentSyncState
   message?: string
   conflict?: DocumentConflictState
+  /** Sprint 145 R1 (#588): places both the person and a writer changed, waiting for Review changes. */
+  paragraphs?: DocumentParagraphsState
 }
 
 export const initialDocumentViewSyncState: DocumentViewSyncState = {
@@ -19,6 +21,13 @@ export function reduceDocumentViewSync(
 ): DocumentViewSyncState {
   if (message.revision < current.revision) return current
 
+  if (message.type === 'document:paragraphs') {
+    return {
+      ...current,
+      revision: message.revision,
+      paragraphs: message.items.length ? { items: message.items, ...(message.writer ? { writer: message.writer } : {}) } : undefined,
+    }
+  }
   if (message.type === 'document:update') {
     return { ...current, revision: message.revision }
   }
@@ -44,6 +53,7 @@ export function reduceDocumentViewSync(
         filename: message.filename,
         ...(message.reason ? { reason: message.reason } : {}),
       },
+      ...(current.paragraphs ? { paragraphs: current.paragraphs } : {}),
     }
   }
 
@@ -57,11 +67,13 @@ export function reduceDocumentViewSync(
     state: message.state,
     message: message.message,
     conflict,
+    ...(current.paragraphs ? { paragraphs: current.paragraphs } : {}),
   }
 }
 
-export function selectDocumentSyncAction(state: DocumentViewSyncState): 'conflict' | 'retry' | undefined {
+export function selectDocumentSyncAction(state: DocumentViewSyncState): 'conflict' | 'retry' | 'paragraphs' | undefined {
   if (state.state === 'conflict' || state.conflict) return 'conflict'
   if (state.state === 'apply-error' || state.state === 'failed') return 'retry'
+  if (state.paragraphs?.items.length) return 'paragraphs'
   return undefined
 }

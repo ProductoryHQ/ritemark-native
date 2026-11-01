@@ -121,3 +121,24 @@ test('an applying retry keeps current conflict evidence when the host still name
   }
   assert.equal(reduceDocumentViewSync(conflicted, applying).conflict?.filename, 'example.md')
 })
+
+// Sprint 145 R1 (revised 1 November, #588): Review changes for the places both the person and a writer changed.
+test('paragraphs to review show Review changes, survive state changes, and clear when answered', () => {
+  const paragraphs: DocumentHostMessage = {
+    type: 'document:paragraphs', ...identity, revision: 3, items: [{ id: 1, mine: 'Mine.', theirs: 'Theirs.' }], writer: 'Claude',
+  }
+  const withParagraphs = reduceDocumentViewSync({ revision: 2, state: 'local-only' }, paragraphs)
+  assert.deepEqual(withParagraphs.paragraphs, { items: [{ id: 1, mine: 'Mine.', theirs: 'Theirs.' }], writer: 'Claude' })
+  assert.equal(selectDocumentSyncAction(withParagraphs), 'paragraphs')
+
+  const synced = reduceDocumentViewSync(withParagraphs, { type: 'document:sync-state', ...identity, revision: 4, acknowledgedRevision: 4, state: 'synced' })
+  assert.equal(selectDocumentSyncAction(synced), 'paragraphs', 'a save does not answer them')
+
+  const conflict = reduceDocumentViewSync(synced, { type: 'document:conflict', ...identity, revision: 5, conflictRevision: 1, diskHash: sha, filename: 'example.md' })
+  assert.equal(selectDocumentSyncAction(conflict), 'conflict', 'the whole-document question comes first')
+  assert.ok(conflict.paragraphs)
+
+  const answered = reduceDocumentViewSync(synced, { type: 'document:paragraphs', ...identity, revision: 6, items: [] })
+  assert.equal(answered.paragraphs, undefined)
+  assert.equal(selectDocumentSyncAction(answered), undefined)
+})

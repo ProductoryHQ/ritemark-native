@@ -8,8 +8,10 @@
  * - a save is refused as newer when the file changed since the document last read it, and the refusal goes to
  *   `_ritemark.editorSync.answerSaveConflict` (patch 014); after a refusal Ritemark answered, auto-save stops.
  *
- * S1 runs in both orders the Mac run saw: VS Code's reload before Ritemark looks (`converged`, 8 of 10), and
- * Ritemark's watcher before the reload (`external-only`, 2 of 10).
+ * Revised for R1 as revised on 1 November: a writer's copy with a base is merged by block (both changes stay), a
+ * place both changed keeps the person's text and waits for Review changes, and the whole-document question is only
+ * the fallback (no base). S1 runs with the shell's reload participant (patch 014) and without it, each in both
+ * orders the Mac run saw: VS Code's reload before Ritemark looks, and Ritemark's watcher before the reload.
  *
  * Run: npx tsx src/editorSync/DocumentSyncCoordinator.staleWrite.test.ts
  */
@@ -29,9 +31,13 @@ const listeners = {
 const commands = new Map<string, (...args: unknown[]) => unknown>();
 const executed: Array<{ id: string; args: unknown[] }> = [];
 const warnings: string[] = [];
+/** Ritemark's information notifications (a paragraph both changed, behind a hidden tab). */
+const notes: string[] = [];
 const watchers: Array<{ change?: () => void }> = [];
 let activeDocument: FakeDocument | undefined;
 let saveOrder: 'receipt-first' | 'reconcile-first' = 'receipt-first';
+/** Patch 014's reload participant: VS Code asks Ritemark before it reloads a clean document its editor holds. */
+let shellAsks = true;
 
 class Uri {
   constructor(readonly fsPath: string, readonly scheme = 'file') {}
@@ -109,11 +115,31 @@ class FakeDocument {
     return 'saved';
   }
 
-  /** VS Code's own reload of a clean document whose file changed. */
-  reload(): boolean {
+  /**
+   * VS Code's own reload of a clean document whose file changed. With the shell's participant, Ritemark is asked
+   * first with the text read; a different answer is resolved dirty with the read's stat (patch 014).
+   */
+  async reload(): Promise<boolean> {
     if (this.isDirty) return false;
     const raw = fs.readFileSync(this.file, 'utf8');
     if (raw === this.resolved) return false;
+    const answerReload = commands.get('_ritemark.editorSync.answerReload');
+    if (shellAsks && answerReload) {
+      const version = this.version;
+      const diskText = raw.replace(/^\uFEFF/, '');
+      const answer = await answerReload(this.uri, diskText);
+      if (this.version !== version || this.isDirty) return false; // the document changed while Ritemark answered
+      if (typeof answer === 'string' && answer !== diskText) {
+        const changed = logical(answer) !== logical(this.text);
+        this.resolved = raw;
+        this.hasBom = raw.startsWith('\uFEFF');
+        this.text = answer;
+        this.version += 1;
+        this.isDirty = true;
+        for (const listener of listeners.change) listener({ document: this, contentChanges: changed ? [{}] : [] });
+        return true;
+      }
+    }
     this.load(raw);
     return true;
   }
@@ -177,6 +203,7 @@ const vscodeStub = {
   },
   window: {
     showWarningMessage: async (text: string) => { warnings.push(text); return undefined; },
+    showInformationMessage: async (text: string) => { notes.push(text); return undefined; },
   },
 };
 const load = (Module as unknown as { _load: (request: string, ...rest: unknown[]) => unknown })._load;
@@ -200,8 +227,10 @@ async function main(): Promise<void> {
     listeners.change.length = 0;
     watchers.length = 0;
     warnings.length = 0;
+    notes.length = 0;
     executed.length = 0;
     const messages: Message[] = [];
+    let holdAcks = false;
     const coordinator = new DocumentSyncCoordinator({ subscriptions: [] } as never, {
       buildPayload: (doc: FakeDocument) => ({
         fileType: 'markdown',
@@ -218,7 +247,7 @@ async function main(): Promise<void> {
       postMessage: async (message: Message) => {
         messages.push(message);
         // The view applies every update and says so, as Ritemark's editor does.
-        if (message.type === 'document:update') {
+        if (message.type === 'document:update' && !holdAcks) {
           setTimeout(() => coordinator.handle(document as never, webview as never, {
             type: 'document:applied', uri: message.uri, documentSessionId: message.documentSessionId,
             viewEpoch: message.viewEpoch, revision: message.revision, payloadHash: message.payloadHash,
@@ -262,16 +291,22 @@ async function main(): Promise<void> {
         await settle();
         return result;
       },
-      /** The file changed; `order` says who sees it first. */
-      async fileChanged(order: 'reload-first' | 'watcher-first'): Promise<void> {
+      /**
+       * The file changed; `order` says who sees it first. `together`: VS Code reads the file and asks Ritemark while
+       * Ritemark's watcher is already merging it (the in-app S1 of 1 November): the question waits behind the merge.
+       */
+      async fileChanged(order: 'reload-first' | 'watcher-first' | 'together'): Promise<void> {
         if (order === 'reload-first') {
-          document.reload();
+          await document.reload();
           await settle();
           watchers[0]?.change?.();
+        } else if (order === 'together') {
+          watchers[0]?.change?.();
+          await document.reload();
         } else {
           watchers[0]?.change?.();
           await settle();
-          document.reload();
+          await document.reload();
         }
         await settle();
       },
@@ -281,6 +316,20 @@ async function main(): Promise<void> {
         coordinator.handle(document as never, webview as never, {
           type: 'document:conflict-action', ...identity, conflictRevision: last.conflictRevision, diskHash: last.diskHash, action,
         });
+        await settle();
+      },
+      /** The view is busy typing: it doesn't apply (or acknowledge) the host's updates, as Ritemark's editor doesn't. */
+      holdAcks(value: boolean): void { holdAcks = value; },
+      /** An edit the view sends based on an older revision (what it last showed). */
+      async typeAt(revision: number, next: string): Promise<void> {
+        coordinator.handle(document as never, webview as never, {
+          type: 'document:edit', ...identity, basedOnRevision: revision, clientSequence: ++clientSequence,
+          payload: { fileType: 'markdown', content: next, properties: {} },
+        });
+        await settle();
+      },
+      async paragraph(id: number, action: 'keep-mine' | 'use-theirs'): Promise<void> {
+        coordinator.handle(document as never, webview as never, { type: 'document:paragraph-action', ...identity, id, action });
         await settle();
       },
       disk: () => fs.readFileSync(document.file, 'utf8'),
@@ -296,7 +345,7 @@ async function main(): Promise<void> {
   const addToEnd = (text: string, words: string) => text.replace(/\n$/, `${words}\n`);
 
   /** S1's steps up to the stale write: type A, auto-save, the writer reads, type B, auto-save. */
-  async function s1(name: string, content: string, writerEdit: (read: string) => string, order: 'reload-first' | 'watcher-first', options: { visible?: boolean } = {}) {
+  async function s1(name: string, content: string, writerEdit: (read: string) => string, order: 'reload-first' | 'watcher-first' | 'together', options: { visible?: boolean } = {}) {
     const env = await open(name, content, options);
     await env.type(addToEnd(env.document.getText(), A));
     assert.equal(await env.autoSave(), 'saved');
@@ -327,104 +376,45 @@ async function main(): Promise<void> {
     saveOrder = 'receipt-first';
   }
 
-  for (const order of ['reload-first', 'watcher-first'] as const) {
-    await scenario(`S1 (${order}): the writer's older copy is held, the person's words stay, Review changes asks`, async () => {
-      const { env, updatesBefore } = await s1('s1.md', md('Stale write'), editTitle, order);
-      const conflict = env.conflicts().pop();
-      assert.ok(conflict, 'Review changes was sent to the view');
-      assert.equal(conflict.reason, 'held-import');
-      assert.ok(env.document.getText().includes(B.trim()), 'the document holds the second sentence');
-      assert.ok(env.document.getText().includes(A.trim()), 'the document holds the first sentence');
-      assert.ok(!env.document.getText().includes('edited by the writer'), 'the writer\'s copy is not in the document');
-      const updates = env.messages.filter(message => message.type === 'document:update').slice(updatesBefore);
-      assert.ok(updates.every(update => String((update.payload as { content: string }).content).includes(B.trim())), 'the view never received the writer\'s copy');
-      assert.equal(env.record()!.conflict?.reason, 'held-import');
-      assert.equal(warnings.length, 0, 'no notification while the view is visible');
-      // VS Code saves the document a second later: after its own reload it writes the person's words back;
-      // when Ritemark saw the file first, the save is refused as newer and the writer's copy stays (#454).
-      const saved = await env.autoSave();
-      assert.equal(saved, order === 'reload-first' ? 'saved' : 'refused');
-      assert.equal(env.disk().includes(B.trim()), order === 'reload-first');
-      assert.ok(env.record()!.conflict, 'the question still waits');
-      env.dispose();
-    });
+  const merged = (env: { document: FakeDocument }) => env.document.getText();
+  const has = (text: string, ...parts: string[]) => parts.every(part => text.includes(part.trim()));
+  const paragraphs = (env: { messages: Message[] }) => (env.messages.filter(message => message.type === 'document:paragraphs').pop()?.items ?? []) as Array<{ id: number; mine: string; theirs: string }>;
+  /** A copy that shares no block with anything remembered: no base, so the fallback decides. */
+  const rewriteAll = () => '# Something else entirely\n\nRewritten from scratch.\n\nNothing in common.\n';
 
-    await scenario(`S1 (${order}): Keep my version puts both sentences on disk`, async () => {
-      const { env } = await s1('s1-keep.md', md('Stale write'), editTitle, order);
-      await env.autoSave();
-      await env.answer('keep-local');
-      assert.ok(env.disk().includes(A.trim()) && env.disk().includes(B.trim()), 'both sentences on disk');
-      assert.equal(logical(env.disk()), logical(env.document.getText()));
-      assert.equal(env.document.isDirty, false);
-      assert.equal(env.record()!.conflict, undefined, 'the question is answered');
-      env.dispose();
-    });
-
-    await scenario(`S1 (${order}): Use disk version puts the writer's copy on disk and in the editor`, async () => {
-      const { env, read } = await s1('s1-disk.md', md('Stale write'), editTitle, order);
-      await env.autoSave();
-      await env.answer('use-disk');
-      assert.equal(env.disk(), editTitle(read), 'the file is the writer\'s copy, byte for byte');
-      assert.equal(logical(env.document.getText()), logical(editTitle(read)));
-      assert.equal(env.document.isDirty, false);
-      assert.equal(env.record()!.conflict, undefined, 'the question is answered');
-      // The person chose the writer's copy: a later write without their sentence is not held again.
-      fs.writeFileSync(env.document.file, editTitle(read).replace('second line', 'second line, again'));
-      await env.fileChanged('reload-first');
-      assert.equal(env.conflicts().filter(message => message.reason === 'held-import').length, 1);
-      env.dispose();
-    });
+  for (const shell of [true, false]) {
+    for (const order of ['reload-first', 'watcher-first', 'together'] as const) {
+      const how = `${shell ? 'the shell asks' : 'no shell answer'}, ${order}`;
+      await scenario(`S1 (${how}): the stale copy is merged: the writer's line 1 and both sentences, no question`, async () => {
+        shellAsks = shell;
+        const { env, updatesBefore } = await s1('s1.md', md('Stale write'), editTitle, order);
+        assert.equal(env.conflicts().length, 0, 'no question');
+        assert.ok(has(merged(env), 'edited by the writer', A, B), 'the document holds both changes');
+        assert.deepEqual(paragraphs(env), [], 'nothing both changed');
+        const updates = env.messages.filter(message => message.type === 'document:update').slice(updatesBefore);
+        assert.ok(updates.every(update => has(String((update.payload as { content: string }).content), B)), 'the view never received the writer\'s copy alone');
+        assert.equal(updates.pop()?.reason, 'merge', 'the merge reaches the view as one undo step');
+        await env.autoSave();
+        assert.ok(has(env.disk(), 'edited by the writer', A, B), 'and the file, after the save');
+        env.dispose();
+      });
+    }
   }
+  shellAsks = true;
 
-  await scenario('S1: Compare shows the person\'s words and the writer\'s copy', async () => {
-    const { env, read } = await s1('s1-compare.md', md('Stale write'), editTitle, 'reload-first');
-    await env.answer('compare');
-    const diff = executed.find(entry => entry.id === 'vscode.diff');
-    assert.ok(diff, 'the diff opened');
-    const virtual = (env.coordinator as unknown as { virtualDocuments: Map<string, string> }).virtualDocuments;
-    const [local, disk] = [...virtual.values()];
-    assert.ok(local.includes(B.trim()), 'my version has the second sentence');
-    assert.equal(disk, editTitle(read), 'the disk version is the writer\'s copy');
-    env.dispose();
-  });
-
-  await scenario('S1: with no view visible, one notification in the Experience lead\'s words', async () => {
-    const { env } = await s1('Module 3.md', md('Stale write'), editTitle, 'reload-first', { visible: false });
-    assert.equal(env.record()!.conflict?.reason, 'held-import');
-    assert.equal(warnings.length, 1);
-    assert.match(warnings[0], /^Something else saved ".*Module 3\.md" just after you did, without words you had just written\.$/);
-    env.dispose();
-  });
-
-  await scenario('S1: a second stale write while the question waits is held too', async () => {
-    const { env, read } = await s1('s1-twice.md', md('Stale write'), editTitle, 'reload-first');
-    assert.equal(await env.autoSave(), 'saved');
-    const second = read.replace('second line', 'second line, from another writer');
-    fs.writeFileSync(env.document.file, second);
+  await scenario('S2: a writer that read the latest save is taken as written', async () => {
+    const env = await open('s2.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    await env.autoSave();
+    fs.writeFileSync(env.document.file, editTitle(env.disk()));
     await env.fileChanged('reload-first');
-    assert.ok(env.document.getText().includes(B.trim()), 'the person\'s words are put back again');
-    const last = env.conflicts().pop()!;
-    assert.equal(last.reason, 'held-import');
-    await env.answer('use-disk');
-    assert.equal(env.disk(), second, 'Use disk version takes the newest writer\'s copy');
+    assert.equal(env.conflicts().length, 0);
+    assert.equal(merged(env), env.disk());
+    assert.equal(env.document.isDirty, false, 'VS Code\'s own reload');
     env.dispose();
   });
 
-  for (const order of ['reload-first', 'watcher-first'] as const) {
-    await scenario(`S2 (${order}): a writer that read the latest save is imported silently`, async () => {
-      const env = await open('s2.md', md('Stale write'));
-      await env.type(addToEnd(env.document.getText(), A));
-      await env.autoSave();
-      fs.writeFileSync(env.document.file, editTitle(env.disk()));
-      await env.fileChanged(order);
-      assert.equal(env.conflicts().length, 0, 'no question');
-      assert.ok(env.document.getText().includes('edited by the writer') && env.document.getText().includes(A.trim()));
-      assert.equal(env.record()!.conflict, undefined);
-      env.dispose();
-    });
-  }
-
-  await scenario('S3: a writer that writes while the document is dirty gets the usual question (#454)', async () => {
+  await scenario('S3: a writer that writes while the document has unsaved text is merged, and the merge is saved', async () => {
     const env = await open('s3.md', md('Stale write'));
     await env.type(addToEnd(env.document.getText(), A));
     await env.autoSave();
@@ -432,21 +422,42 @@ async function main(): Promise<void> {
     await env.type(addToEnd(env.document.getText(), B));
     fs.writeFileSync(env.document.file, editTitle(read));
     await env.fileChanged('reload-first');
-    const conflict = env.conflicts().pop();
-    assert.ok(conflict, 'Review changes');
-    assert.equal(conflict.reason, undefined, 'the usual words');
-    assert.ok(env.document.getText().includes(B.trim()));
+    assert.equal(env.conflicts().length, 0, 'no question');
+    assert.ok(has(merged(env), 'edited by the writer', A, B));
+    assert.equal(await env.autoSave(), 'saved', 'the refused save goes through: the disk is the copy Ritemark merged');
+    assert.ok(has(env.disk(), 'edited by the writer', A, B));
     env.dispose();
   });
 
-  await scenario('S4: a writer that rewrites the sentence just typed is asked about (decision 1)', async () => {
+  await scenario('Typing while the merge lands: the keystrokes go on top of the merge, nothing is rejected or lost', async () => {
+    const env = await open('typing.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    await env.autoSave();
+    const read = env.disk();
+    const withB = addToEnd(env.document.getText(), B);
+    await env.type(withB);
+    const before = env.record()!.revision;
+    env.holdAcks(true);
+    fs.writeFileSync(env.document.file, editTitle(read));
+    await env.fileChanged('reload-first');
+    await env.typeAt(before, addToEnd(withB, ' Charlie typed meanwhile.'));
+    const results = env.messages.filter(message => message.type === 'document:edit-result');
+    assert.equal(results.pop()?.status, 'accepted', 'not rejected');
+    assert.ok(has(merged(env), 'edited by the writer', A, B, 'Charlie typed meanwhile.'), 'both changes and the keystrokes');
+    env.holdAcks(false);
+    env.dispose();
+  });
+
+  await scenario('S4: a writer rewrote the sentence just typed: Ritemark can\'t tell whether it saw it, so the person\'s stays and the writer\'s waits', async () => {
     const env = await open('s4.md', md('Stale write'));
     await env.type(addToEnd(env.document.getText(), A));
     await env.autoSave();
     fs.writeFileSync(env.document.file, env.disk().replace(A.trim(), 'The writer\'s own words.'));
     await env.fileChanged('reload-first');
-    assert.equal(env.conflicts().pop()?.reason, 'held-import');
-    assert.ok(env.document.getText().includes(A.trim()));
+    assert.equal(env.conflicts().length, 0, 'no whole-document question');
+    assert.ok(merged(env).includes(A.trim()), 'the person\'s sentence stays');
+    assert.equal(paragraphs(env).length, 1);
+    assert.ok(paragraphs(env)[0].theirs.includes('The writer\'s own words.'), 'the writer\'s version waits for Review changes');
     env.dispose();
   });
 
@@ -454,19 +465,19 @@ async function main(): Promise<void> {
     ['CRLF endings', (text: string) => logical(text).replace(/\n/g, '\r\n')],
     ['a byte order mark', (text: string) => `﻿${logical(text)}`],
   ] as const) {
-    await scenario(`S5: the same words with ${label} are not a question`, async () => {
+    await scenario(`S5: the same words with ${label} change nothing`, async () => {
       const env = await open('s5.md', md('Stale write'));
       await env.type(addToEnd(env.document.getText(), A));
       await env.autoSave();
       fs.writeFileSync(env.document.file, rewrite(env.disk()));
       await env.fileChanged('reload-first');
       assert.equal(env.conflicts().length, 0);
-      assert.ok(env.document.getText().includes(A.trim()));
+      assert.ok(merged(env).includes(A.trim()));
       env.dispose();
     });
   }
 
-  await scenario('S6: a touched file is not a question', async () => {
+  await scenario('S6: a touched file changes nothing', async () => {
     const env = await open('s6.md', md('Stale write'));
     await env.type(addToEnd(env.document.getText(), A));
     await env.autoSave();
@@ -483,7 +494,7 @@ async function main(): Promise<void> {
     ['s7-crlf.md', md('Stale write').replace(/\n/g, '\r\n'), editTitle],
   ];
   for (const [name, content, writerEdit] of s7Files) {
-    await scenario(`S7 ${name}: S1 is held, S2 is silent`, async () => {
+    await scenario(`S7 ${name}: S1 is merged, S2 is taken as written`, async () => {
       const csv = name.endsWith('.csv');
       const first = csv ? 'Cake,5' : A.trim();
       const second = csv ? 'Bread,6' : B.trim();
@@ -497,8 +508,8 @@ async function main(): Promise<void> {
         await env.autoSave();
         fs.writeFileSync(env.document.file, writerEdit(read));
         await env.fileChanged('reload-first');
-        assert.equal(env.conflicts().pop()?.reason, 'held-import', 'S1 held');
-        assert.ok(env.document.getText().includes(second), 'the second words stay');
+        assert.equal(env.conflicts().length, 0, 'S1 no question');
+        assert.ok(has(logical(merged(env)), first, second, csv ? 'Coffee,9' : 'edited by the writer'), 'S1 merged');
         env.dispose();
       }
       {
@@ -507,147 +518,149 @@ async function main(): Promise<void> {
         await env.autoSave();
         fs.writeFileSync(env.document.file, writerEdit(env.disk()));
         await env.fileChanged('reload-first');
-        assert.equal(env.conflicts().length, 0, 'S2 silent');
+        assert.equal(env.conflicts().length, 0, 'S2 no question');
         env.dispose();
       }
     });
   }
 
-  await scenario('Round 1: fixing a typo in the sentence just saved is not a question', async () => {
-    const env = await open('own-typo.md', md('Stale write'));
-    await env.type(addToEnd(env.document.getText(), ' Alpha wrods typed first.'));
-    await env.autoSave();
-    await env.type(env.document.getText().replace('wrods', 'words'));
-    await env.autoSave();
-    assert.equal(env.conflicts().length, 0, 'no question');
-    assert.ok(env.document.getText().includes('Alpha words typed first.'), 'the fix stays');
-    assert.ok(env.disk().includes('Alpha words typed first.'));
+  await scenario('S56/S57: both changed one paragraph: the person\'s stays, Review changes waits; Use the writer\'s is one step', async () => {
+    const { env } = await s1('s56.md', md('Stale write'), (read: string) => read
+      .replace('The second line.', 'The second line, shorter.')
+      .replace('The third line. Alpha words typed first.', 'The third line, tightened by the writer.'), 'reload-first');
+    assert.equal(env.conflicts().length, 0, 'no whole-document question');
+    assert.ok(has(merged(env), 'The second line, shorter.', A, B), 'the writer\'s other paragraph lands; the person\'s stays');
+    const items = paragraphs(env);
+    assert.equal(items.length, 1);
+    assert.ok(items[0].mine.includes(B.trim()) && items[0].theirs === 'The third line, tightened by the writer.');
+    await env.paragraph(items[0].id, 'use-theirs');
+    assert.ok(merged(env).includes('The third line, tightened by the writer.') && !merged(env).includes(B.trim()));
+    assert.equal(env.messages.filter(message => message.type === 'document:update').pop()?.reason, 'merge');
+    assert.deepEqual(paragraphs(env), [], 'the button goes');
     env.dispose();
   });
 
-  await scenario('Round 1: undoing the sentence just saved is not a question', async () => {
-    const env = await open('own-undo.md', md('Stale write'));
-    const before = env.document.getText();
-    await env.type(addToEnd(before, A));
-    await env.autoSave();
-    await env.type(before);
-    await env.autoSave();
-    assert.equal(env.conflicts().length, 0, 'no question');
-    assert.ok(!env.document.getText().includes(A.trim()) && !env.disk().includes(A.trim()));
+  await scenario('S57: Keep mine closes the place; S60: typing the writer\'s version closes it too', async () => {
+    const edit = (read: string) => read.replace('The third line. Alpha words typed first.', 'The third line, tightened by the writer.');
+    {
+      const { env } = await s1('s57.md', md('Stale write'), edit, 'reload-first');
+      const [item] = paragraphs(env);
+      await env.paragraph(item.id, 'keep-mine');
+      assert.deepEqual(paragraphs(env), []);
+      assert.ok(merged(env).includes(B.trim()));
+      env.dispose();
+    }
+    {
+      const { env } = await s1('s60.md', md('Stale write'), edit, 'reload-first');
+      assert.equal(paragraphs(env).length, 1);
+      await env.type(merged(env).replace(/The third line\. Alpha words typed first\. Bravo words typed second\./, 'The third line, tightened by the writer.'));
+      assert.deepEqual(paragraphs(env), [], 'the two versions are the same');
+      env.dispose();
+    }
+  });
+
+  await scenario('S59: behind a hidden tab, one notification in experience 44\'s words', async () => {
+    const { env } = await s1('Module 3.md', md('Stale write'), (read: string) => read.replace('The third line. Alpha words typed first.', 'The third line, by the writer.'), 'reload-first', { visible: false });
+    assert.equal(notes.length, 1);
+    assert.equal(warnings.length, 0, 'not a warning');
+    assert.match(notes[0], /^Another app saved a copy of ".*Module 3\.md" that changes a paragraph you were writing in\. Yours is kept\.$/);
     env.dispose();
   });
 
-  await scenario('Round 1: a save that changed two places, then a writer that read it and changed a third', async () => {
-    const env = await open('two-places.md', md('Stale write'));
-    await env.type(addToEnd(env.document.getText().replace('# Stale write', '# Stale write X'), ' Y words here.'));
-    await env.autoSave();
-    fs.writeFileSync(env.document.file, env.disk().replace('The second line.', 'The second line, rewritten by the writer.'));
-    await env.fileChanged('reload-first');
-    assert.equal(env.conflicts().length, 0, 'imported silently');
-    assert.ok(env.document.getText().includes('rewritten by the writer'));
-    env.dispose();
+  await scenario('S8: no base: the fallback question within 30 s; Keep my version, Use disk version (byte for byte) and Compare', async () => {
+    for (const action of ['keep-local', 'use-disk', 'compare'] as const) {
+      const { env } = await s1('s8.md', md('Stale write'), rewriteAll, 'reload-first');
+      assert.equal(env.conflicts().pop()?.reason, 'held-import', 'the fallback question');
+      assert.ok(has(merged(env), A, B), 'the person\'s words stay');
+      await env.autoSave();
+      await env.answer(action);
+      if (action === 'keep-local') assert.ok(has(env.disk(), A, B) && env.record()!.conflict === undefined);
+      if (action === 'use-disk') assert.ok(env.disk() === rewriteAll() && env.record()!.conflict === undefined);
+      if (action === 'compare') assert.ok(executed.some(entry => entry.id === 'vscode.diff'));
+      env.dispose();
+    }
   });
 
-  await scenario('Round 1: Use disk version on the usual question disarms the person\'s earlier saves', async () => {
-    const env = await open('usual-use-disk.md', md('Stale write'));
-    await env.type(addToEnd(env.document.getText(), A));
-    await env.autoSave();
-    const read = md('Stale write');
-    await env.type(addToEnd(env.document.getText(), B));
-    fs.writeFileSync(env.document.file, editTitle(read));
-    await env.fileChanged('reload-first');
-    assert.equal(env.conflicts().pop()?.reason, undefined, 'the usual question');
-    await env.answer('use-disk');
-    assert.equal(env.record()!.conflict, undefined);
-    fs.writeFileSync(env.document.file, editTitle(read).replace('second line', 'second line, again'));
-    await env.fileChanged('reload-first');
-    assert.equal(env.conflicts().filter(message => message.reason === 'held-import').length, 0, 'not held');
-    assert.ok(env.document.getText().includes('second line, again'));
-    env.dispose();
-  });
-
-  await scenario('Round 1: a hold keeps what an earlier writer brought in after the save', async () => {
-    const env = await open('earlier-import.md', md('Stale write'));
-    await env.type(addToEnd(env.document.getText(), A));
-    await env.autoSave();
-    const stale = env.disk().replace(A.trim(), '');
-    fs.writeFileSync(env.document.file, env.disk().replace('The second line.', 'The second line, from the first writer.'));
-    await env.fileChanged('reload-first');
-    assert.equal(env.conflicts().length, 0, 'the first writer read the save: silent');
-    fs.writeFileSync(env.document.file, stale);
-    await env.fileChanged('reload-first');
+  await scenario('S8: a copy that is exactly an earlier save (a Discard) asks within 30 s, and a second one keeps the words', async () => {
+    const { env, read } = await s1('discard.md', md('Stale write'), (text: string) => text, 'reload-first');
     assert.equal(env.conflicts().pop()?.reason, 'held-import');
-    const text = env.document.getText();
-    assert.ok(text.includes(A.trim()) && text.includes('from the first writer'), 'both the person\'s words and the first writer\'s change');
-    const lastUpdate = env.messages.filter(message => message.type === 'document:update').pop()!;
-    assert.equal(logical(String((lastUpdate.payload as { content: string }).content)), logical(text), 'the views show what the document holds');
-    env.dispose();
-  });
-
-  await scenario('Round 1: a writer that writes back an older save\'s text twice gets the words put back twice', async () => {
-    const { env, read } = await s1('older-save.md', md('Stale write'), (text: string) => text, 'reload-first');
-    assert.equal(env.record()!.conflict?.reason, 'held-import');
     assert.equal(await env.autoSave(), 'saved');
     fs.writeFileSync(env.document.file, read);
     await env.fileChanged('reload-first');
-    assert.ok(env.document.getText().includes(B.trim()), 'the second sentence is back in the document');
-    assert.equal(env.document.isDirty, true, 'and VS Code will save it');
+    assert.ok(merged(env).includes(B.trim()), 'the person\'s words are kept while the question waits');
+    await env.answer('use-disk');
+    assert.equal(env.disk(), read, 'Use disk version finishes the Discard');
     env.dispose();
   });
 
-  await scenario('Round 1: a newer writer\'s copy behind a hidden tab gets its own notification', async () => {
-    const { env, read } = await s1('Module 4.md', md('Stale write'), editTitle, 'reload-first', { visible: false });
-    assert.equal(warnings.length, 1);
-    assert.equal(await env.autoSave(), 'saved');
-    fs.writeFileSync(env.document.file, read.replace('second line', 'second line, from another writer'));
-    await env.fileChanged('reload-first');
-    assert.equal(warnings.length, 2, 'a notification for the newer copy');
-    env.dispose();
-  });
-
-  await scenario('Round 2: an edit made outside Ritemark\'s view and saved at once is not held', async () => {
-    const env = await open('text-editor-edit.md', md('Stale write'));
-    const before = env.document.getText();
-    await env.type(addToEnd(before, A));
-    await env.autoSave();
-    // A text editor of the same file deletes the sentence and saves straight away.
-    env.document.edit(before);
-    await env.autoSave();
-    assert.equal(env.conflicts().length, 0, 'no question');
-    assert.ok(!env.document.getText().includes(A.trim()) && !env.disk().includes(A.trim()), 'the deletion stays');
-    env.dispose();
-  });
-
-  await scenario('Round 2: many saves inside the window keep the first one\'s words guarded', async () => {
-    const env = await open('many-saves.md', md('Stale write'));
-    const read = env.disk();
-    await env.type(addToEnd(env.document.getText(), ' Alpha words typed first and then trimmed a little more each time.'));
-    await env.autoSave();
-    for (const word of [' more each time', ' a little', ' then trimmed', ' and', ' first', ' typed']) {
-      await env.type(env.document.getText().replace(word, ''));
+  await scenario('S8: after 30 s, a copy with no base still replaces the words, as in 2.1', async () => {
+    const realNow = Date.now;
+    try {
+      const env = await open('s8-late.md', md('Stale write'));
+      await env.type(addToEnd(env.document.getText(), A));
       await env.autoSave();
+      Date.now = () => realNow() + 31_000;
+      fs.writeFileSync(env.document.file, rewriteAll());
+      await env.fileChanged('reload-first');
+      assert.equal(env.conflicts().length, 0, 'no question');
+      assert.equal(merged(env), rewriteAll());
+      env.dispose();
+    } finally {
+      Date.now = realNow;
     }
-    fs.writeFileSync(env.document.file, editTitle(read));
+  });
+
+  await scenario('S63: a base older than the newest save is found; every sentence stays', async () => {
+    const env = await open('s63.md', '# Title\n');
+    let second = '';
+    for (let n = 1; n <= 5; n += 1) {
+      await env.type(`${logical(env.document.getText()).replace(/\n$/, '')}\n\nSentence ${n}.\n`);
+      await env.autoSave();
+      if (n === 2) second = env.disk();
+    }
+    fs.writeFileSync(env.document.file, second.replace('# Title', '# Title, edited'));
     await env.fileChanged('reload-first');
-    assert.equal(env.conflicts().pop()?.reason, 'held-import');
-    assert.ok(env.document.getText().includes('Alpha words'));
+    assert.equal(env.conflicts().length, 0);
+    assert.ok(has(merged(env), '# Title, edited', 'Sentence 1.', 'Sentence 5.'));
     env.dispose();
   });
 
-  await scenario('Round 2: the views get the text put back as a new revision', async () => {
-    const { env } = await s1('broadcast.md', md('Stale write'), editTitle, 'reload-first');
-    const conflict = env.conflicts().pop()!;
-    const update = env.messages.filter(message => message.type === 'document:update').pop()!;
-    assert.ok(String((update.payload as { content: string }).content).includes(B.trim()));
-    assert.equal(update.revision, conflict.revision, 'the update and the question share the new revision');
+  await scenario('Own edits are never a writer: a typo fix, an undo, an edit outside Ritemark\'s view saved at once', async () => {
+    const env = await open('own.md', md('Stale write'));
+    const before = env.document.getText();
+    await env.type(addToEnd(before, ' Alpha wrods typed first.'));
+    await env.autoSave();
+    await env.type(env.document.getText().replace('wrods', 'words'));
+    await env.autoSave();
+    await env.type(before);
+    await env.autoSave();
+    env.document.edit(addToEnd(before, ' From a text editor.'));
+    await env.autoSave();
+    assert.equal(env.conflicts().length, 0);
+    assert.deepEqual(paragraphs(env), []);
+    assert.ok(merged(env).includes('From a text editor.') && env.disk().includes('From a text editor.'));
     env.dispose();
   });
 
-  await scenario('Round 2: Use disk version writes back a writer\'s copy that is not UTF-8, byte for byte', async () => {
+  await scenario('A merge keeps what an earlier writer brought in, and the person\'s words', async () => {
+    const env = await open('earlier.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    await env.autoSave();
+    const stale = env.disk().replace(` ${A.trim()}`, '').replace('The third line.', 'The third line, from a stale writer.');
+    fs.writeFileSync(env.document.file, env.disk().replace('The second line.', 'The second line, from the first writer.'));
+    await env.fileChanged('reload-first');
+    fs.writeFileSync(env.document.file, stale);
+    await env.fileChanged('reload-first');
+    assert.equal(env.conflicts().length, 0);
+    assert.ok(has(merged(env), 'from the first writer', A), 'nothing either brought in is lost');
+    env.dispose();
+  });
+
+  await scenario('Use disk version writes back a writer\'s copy that is not UTF-8, byte for byte (the fallback)', async () => {
     const env = await open('latin1.md', md('Stale write'));
     await env.type(addToEnd(env.document.getText(), A));
     await env.autoSave();
-    const writer = Buffer.concat([Buffer.from('# Stale write, edited by the writer caf', 'latin1'), Buffer.from([0xe9]), Buffer.from('\n\nThe second line.\n\nThe third line.\n', 'latin1')]);
+    const writer = Buffer.concat([Buffer.from('# Caf', 'latin1'), Buffer.from([0xe9]), Buffer.from('\n\nAll new.\n\nNothing shared.\n', 'latin1')]);
     fs.writeFileSync(env.document.file, writer);
     await env.fileChanged('reload-first');
     assert.equal(env.conflicts().pop()?.reason, 'held-import');
@@ -655,26 +668,6 @@ async function main(): Promise<void> {
     await env.answer('use-disk');
     assert.ok(fs.readFileSync(env.document.file).equals(writer), 'the file is the writer\'s bytes');
     env.dispose();
-  });
-
-  await scenario('S8: a stale write more than 30 s after the save still wins, as in 2.1', async () => {
-    const realNow = Date.now;
-    try {
-      const env = await open('s8.md', md('Stale write'));
-      await env.type(addToEnd(env.document.getText(), A));
-      await env.autoSave();
-      const read = env.disk();
-      await env.type(addToEnd(env.document.getText(), B));
-      await env.autoSave();
-      Date.now = () => realNow() + 31_000;
-      fs.writeFileSync(env.document.file, editTitle(read));
-      await env.fileChanged('reload-first');
-      assert.equal(env.conflicts().length, 0, 'no question');
-      assert.ok(!env.document.getText().includes(B.trim()), 'the writer\'s copy is taken');
-      env.dispose();
-    } finally {
-      Date.now = realNow;
-    }
   });
 
   fs.rmSync(ROOT, { recursive: true, force: true });

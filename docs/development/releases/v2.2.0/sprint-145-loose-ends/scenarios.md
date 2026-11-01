@@ -32,10 +32,13 @@ And on the branch, with no question, the document holds the writer's line 1 and 
 
 Was (31 October): Review changes appears, as it does on `main`.
 
-### S4 (revised 1 November): A writer rewrites the sentence just typed, after reading it
+### S4 (revised 1 November; as built, for Jarmo to confirm): A writer rewrites the sentence just typed, after reading it
 Given the person typed a sentence and it auto-saved
 When a writer that read the file after that save replaces that very sentence with other words
-Then the writer's words land as written, with no question: the base is the save it read, and only the writer changed that block since.
+Then the person's paragraph stays and the document bar's Review changes waits for it, with no question: the writer's copy shares every other block with the save before the sentence and with the save after it, so Ritemark can't tell which it read and takes the older (the person's sentence is never taken as deleted by the writer)
+And Use the other copy puts the writer's words in as one undo step, and the auto-save writes them; Keep mine closes it.
+
+As approved on 1 November: the writer's words land as written, with no question (the base is the save it read). That holds only when the copy can be told from one made before the sentence; see spec.md, *As built*.
 
 Was (31 October): Review changes appears (the cost named in decision 1).
 
@@ -49,14 +52,17 @@ Given the file
 When only its modified time changes (and, separately, its bytes are rewritten with the same words)
 Then no question appears (#454's R11).
 
-### S7: CSV, front matter, CRLF
+### S7 (revised 1 November): CSV, front matter, CRLF
 Given a CSV file, a Markdown file with front matter and a Markdown file with CRLF endings
 When S1's steps run on each
-Then Review changes appears for each, and S2's steps stay silent for each.
+Then each is merged as S1 is (the writer's change and both sentences, no question; the front matter and the line endings as they were), and S2's steps stay silent for each.
+
+Was (31 October): Review changes appears for each.
 
 ### S8 (revised 1 November): No base: the fallback question, and its limit
 Given S1's steps, but the writer writes a copy whose blocks differ from every remembered save almost everywhere (a whole-file rewrite that also reformatted the text)
 Then within 30 s of the person's last save, the whole-document question asks, held as #605 does, with the Experience lead's three changes (the second paragraph's words, Use disk version `secondary` and alone at the footer's far left, Keep my version primary and the default, Tab in screen order)
+And the same for a copy that is exactly an earlier version (a Discard of an AI's change, a checkout): it has no edit of its own to merge
 And after 30 s, a copy with no base still replaces the words, as in 2.1; the issue and the release notes' known limits say so in plain words.
 
 Was (31 October): a writer that writes long after the person's last save; the record says what happens, and the known limits say it.
@@ -109,10 +115,12 @@ Then all of the writer's merged changes go back together, the person's own words
 Given the person saves five times within two minutes (each auto-save adding a sentence) and a writer that read the second save writes its copy with line 1 changed
 Then the base is the second save, and the merge keeps all five sentences and takes line 1.
 
-### S64: The shell doesn't answer in time
+### S64 (as built): The shell doesn't answer in time
 Given Ritemark's extension host held for longer than the reload participant's budget
 When S1's writer writes
-Then VS Code reloads as it does today, and the fallback (S8's question, within its window) holds the person's words.
+Then VS Code reloads as it does today, and Ritemark merges from its own sighting a moment later: the same result as S1, the views never showing the writer's copy alone; S8's question only when there is no base.
+
+As approved: the fallback (S8's question, within its window) holds the person's words.
 
 ## Feature: A card the board can't read (R2)
 

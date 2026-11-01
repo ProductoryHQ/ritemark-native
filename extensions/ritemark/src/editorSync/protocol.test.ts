@@ -239,3 +239,27 @@ test('rejects malformed optional feature fields instead of silently dropping the
     },
   }), DocumentProtocolError);
 });
+
+// Sprint 145 R1 (revised 1 November, #588): a merge, Review changes for the places both changed, and the person's answer.
+test('a merge is an update reason, and Review changes\' paragraphs and answers are exact messages', () => {
+  const update = parseDocumentHostMessage({
+    type: 'document:update', ...identity, revision: 3, baseDiskHash: sha, modelHash: sha, payloadHash: sha,
+    reason: 'merge', attempt: 1,
+    payload: { fileType: 'markdown', filename: 'example.md', content: '# Example', properties: {}, hasProperties: false, imageMappings: {}, features: { voiceDictation: false, markdownExport: true } },
+  });
+  assert.equal(update.type === 'document:update' && update.reason, 'merge');
+
+  const paragraphs = parseDocumentHostMessage({
+    type: 'document:paragraphs', ...identity, revision: 3,
+    items: [{ id: 1, mine: 'Mine.', theirs: '' }], writer: 'Claude', openReview: true,
+  });
+  assert.deepEqual(paragraphs.type === 'document:paragraphs' && paragraphs.items, [{ id: 1, mine: 'Mine.', theirs: '' }], 'a paragraph the writer deleted is empty');
+  assert.equal(parseDocumentHostMessage({ type: 'document:paragraphs', ...identity, revision: 4, items: [] }).type, 'document:paragraphs', 'no places left');
+  assert.throws(() => parseDocumentHostMessage({ type: 'document:paragraphs', ...identity, revision: 4, items: [{ id: 1, mine: 'a', theirs: 'b', extra: 1 }] }), DocumentProtocolError);
+  assert.throws(() => parseDocumentHostMessage({ type: 'document:paragraphs', ...identity, revision: 4, items: [], openReview: false }), DocumentProtocolError);
+
+  const action = parseDocumentViewMessage({ type: 'document:paragraph-action', ...identity, id: 1, action: 'use-theirs' });
+  assert.equal(action.type === 'document:paragraph-action' && action.action, 'use-theirs');
+  assert.throws(() => parseDocumentViewMessage({ type: 'document:paragraph-action', ...identity, id: 1, action: 'merge' }), DocumentProtocolError);
+  assert.throws(() => parseDocumentViewMessage({ type: 'document:paragraph-action', ...identity, id: 1, action: 'keep-mine', extra: true }), DocumentProtocolError);
+});

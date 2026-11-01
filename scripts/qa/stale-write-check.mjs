@@ -16,22 +16,27 @@
  * files.autoSaveDelay). "The writer" is this script: it reads the file with fs.readFileSync and writes with
  * fs.writeFileSync. No AI is involved.
  *
- * Cases (scenarios.md):
+ * Cases (scenarios.md; "fixed" is R1 as revised on 1 November: both changes stay, merged by paragraph):
  *   s1      type A, auto-save; the writer reads; type B, auto-save; wait --delay; the writer writes its read with
- *           line 1 changed. main: B is gone from the editor and the file, no question. Fixed: Review changes, the
- *           editor keeps A and B, the writer's line 1 is on disk.
+ *           line 1 changed. main: B is gone from the editor and the file, no question. Fixed: no question, the
+ *           editor and the file hold A, B and the writer's line 1.
  *   s2      type A, auto-save; the writer reads; 5 s later it writes its read with line 1 changed. Silent import.
- *   s3      type A, auto-save; the writer reads; type B and write at once, before the auto-save (#454). Review changes.
- *   s4      type A, auto-save; the writer reads and replaces sentence A with other words. Fixed: Review changes.
+ *   s3      type A, auto-save; the writer reads; type B and write at once, before the auto-save (#454). main: the
+ *           whole-document question. Fixed: no question, the editor and the file hold A, B and the writer's line 1.
+ *   s4      type A, auto-save; the writer reads and replaces sentence A with other words. Ritemark can't tell
+ *           whether the writer saw A: fixed keeps the person's paragraph and shows Review changes for it.
  *   s5crlf  type A, auto-save; the writer rewrites the same words with CRLF endings. Silent, words kept.
  *   s5bom   the same with a UTF-8 byte order mark. Silent, words kept.
  *   s6      type A, auto-save; only the file's modified time changes. Silent.
  *   s7fm    s1 on a file with front matter.      s7fm2  s2 on it.
  *   s7crlf  s1 on a file with CRLF endings.      s7crlf2 s2 on it.
  * After a run that lost words, Cmd+Z (Ctrl+Z on Windows) is pressed once in the editor, and the record says whether
- * the lost words came back. With --answer keep-local|use-disk|compare, a run that asked opens Review changes from
- * the document's bar, records the dialog's words (and a screenshot with --screenshot <path>), chooses the answer
- * and records the file and the editor 3 s later.
+ * the lost words came back. With --answer keep-local|use-disk|compare (the whole-document question) or
+ * keep-mine|use-theirs (a paragraph both changed), a run that asked opens Review changes from the document's bar,
+ * records the button's tooltip and the dialog's words (and screenshots with --screenshot <path>), chooses the
+ * answer and records the file and the editor 3 s later. With --undo, a run that merged (s1, s3, s7fm, s7crlf)
+ * presses Cmd+Z (Ctrl+Z) once in the editor and records whether the writer's change went and the person's words
+ * stayed, and whether the file followed (S62).
  *
  * Every run prints one line and the report (JSON) holds what was seen: the disk and editor text, whether Review
  * changes showed, the delay between the last save and the write, and the [EditorSync] log lines in that time. The
@@ -59,8 +64,9 @@ const RUNS = Number(option('runs', '1'));
 const DELAY = Number(option('delay', '1000'));
 const EXPECT = option('expect');
 const OUT = option('out', `${PROFILE}-report.json`);
-const ANSWER = option('answer'); // keep-local | use-disk | compare: open Review changes and choose it
+const ANSWER = option('answer'); // keep-local | use-disk | compare | keep-mine | use-theirs: open Review changes and choose it
 const SHOT = option('screenshot'); // with --answer: a screenshot of the review, <path>-<run>.png
+const UNDO = flag('undo'); // after a merge: one Cmd+Z, and what it undid
 const MOD = process.platform === 'darwin' ? 4 : 2; // meta on the Mac, ctrl elsewhere
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 if (!ATTACH && (path.dirname(PROFILE) === PROFILE || !PROFILE.startsWith(`${TEMP_ROOT}${path.sep}`) || path.relative(TEMP_ROOT, PROFILE).split(path.sep).length < 2)) {
@@ -200,6 +206,8 @@ async function run(kind, n, workspace, log) {
   await sleep(300);
   const read = fs.readFileSync(file, 'utf8');
   let writeAt; let lastSaveAt = savedA; let expectQuestion = false; let expectKept = [];
+  // R1 as revised (1 November): what the writer changed must reach the editor too, and the merge the file.
+  let expectWriter = false; let expectOnDisk = [];
   const changeTitle = (text) => text.replace(doc.title, `${doc.title}, edited by the writer`);
 
   if (s1Like) {
@@ -211,19 +219,21 @@ async function run(kind, n, workspace, log) {
     log.mark();
     writeAt = Date.now();
     fs.writeFileSync(file, changeTitle(read));
-    expectQuestion = true; expectKept = [A.trim(), B.trim()];
+    expectQuestion = false; expectKept = [A.trim(), B.trim()]; expectWriter = true;
+    expectOnDisk = [A.trim(), B.trim(), 'edited by the writer'];
   } else if (s2Like) {
     await sleep(5000);
     log.mark();
     writeAt = Date.now();
     fs.writeFileSync(file, changeTitle(read));
-    expectQuestion = false; expectKept = [A.trim()];
+    expectQuestion = false; expectKept = [A.trim()]; expectWriter = true;
   } else if (kind === 's3') {
     await typeAt(probe, B);
     log.mark();
     writeAt = Date.now();
     fs.writeFileSync(file, changeTitle(read));
-    expectQuestion = true; expectKept = [A.trim(), B.trim()];
+    expectQuestion = false; expectKept = [A.trim(), B.trim()]; expectWriter = true;
+    expectOnDisk = [A.trim(), B.trim(), 'edited by the writer'];
   } else if (kind === 's4') {
     await sleep(DELAY);
     log.mark();
@@ -265,14 +275,31 @@ async function run(kind, n, workspace, log) {
     const afterUndo = (await editorText(probe)) ?? '';
     record.undoBrings = record.lost.map((s) => [s, afterUndo.includes(s)]);
   }
+  if (UNDO && expectOnDisk.length && record.editorHas['edited by the writer'] && !record.review) {
+    // S62: one Cmd+Z undoes the merge (the writer's change) and nothing of the person's.
+    await focusEnd(probe);
+    await press('z', 'KeyZ', 90, MOD);
+    await sleep(1500);
+    const afterUndo = (await editorText(probe)) ?? '';
+    record.undoMerge = { writerGone: !afterUndo.includes('edited by the writer'), kept: expectKept.map((s) => [s, afterUndo.includes(s)]) };
+    await sleep(2500);
+    const diskAfterUndo = fs.readFileSync(file, 'utf8');
+    record.undoMerge.diskWriterGone = !diskAfterUndo.includes('edited by the writer');
+    record.undoMerge.diskKept = expectKept.map((s) => [s, diskAfterUndo.includes(s)]);
+  }
   if (record.review && ANSWER) {
     // Open Review changes from the document's bar and answer it.
     const button = await rectIn(probe, `[...d.querySelectorAll('button')].find(b => b.offsetParent && /Review changes/.test(b.innerText))`);
+    // The tooltip first: hover the button and read what shows (experience 44, frame 2).
+    await withPage((c) => c.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x + button.w / 2, y: button.y + button.h / 2, button: 'none' }));
+    await sleep(1200);
+    record.tooltip = await inFrame(probe, `return [...d.querySelectorAll('[role=tooltip]')].map(t => t.innerText).join(' | ') || null;`);
+    if (SHOT) await screenshot(SHOT.replace(/(\.png)?$/, `-${n}-tooltip.png`));
     await mouse(button.x + button.w / 2, button.y + button.h / 2);
     const dialog = await waitFor(probe, `return !!d.querySelector('[role=dialog]');`, 5);
     record.dialog = await inFrame(probe, `return d.querySelector('[role=dialog]')?.innerText ?? null;`);
     if (SHOT && dialog) await screenshot(SHOT.replace(/(\.png)?$/, `-${n}.png`));
-    const label = { 'keep-local': 'Keep my version', 'use-disk': 'Use disk version', compare: 'Compare changes' }[ANSWER];
+    const label = { 'keep-local': 'Keep my version', 'use-disk': 'Use disk version', compare: 'Compare changes', 'keep-mine': 'Keep mine', 'use-theirs': 'Use the other copy' }[ANSWER];
     const choice = await rectIn(probe, `[...d.querySelectorAll('[role=dialog] button')].find(b => b.innerText.trim() === ${JSON.stringify(label)})`);
     if (choice) await mouse(choice.x + choice.w / 2, choice.y + choice.h / 2);
     await sleep(3000);
@@ -280,15 +307,17 @@ async function run(kind, n, workspace, log) {
     const editorAfter = (await editorText(probe)) ?? '';
     record.answer = {
       choice: label,
-      diskHas: Object.fromEntries([A.trim(), B.trim(), 'edited by the writer'].map((s) => [s, diskAfter.includes(s)])),
-      editorHas: Object.fromEntries([A.trim(), B.trim(), 'edited by the writer'].map((s) => [s, editorAfter.includes(s)])),
+      diskHas: Object.fromEntries([A.trim(), B.trim(), 'edited by the writer', `The writer's own words ${n}.`].map((s) => [s, diskAfter.includes(s)])),
+      editorHas: Object.fromEntries([A.trim(), B.trim(), 'edited by the writer', `The writer's own words ${n}.`].map((s) => [s, editorAfter.includes(s)])),
       diskIsTheWritersCopy: diskAfter === changeTitle(read),
       reviewStillShown: await reviewShown(probe),
       diffOpen: await workbench(`[...document.querySelectorAll('.tab')].some(t => /My version/.test(t.getAttribute('aria-label') || ''))`),
     };
   }
-  record.result = record.review ? 'question' : record.lost.length ? 'lost' : 'silent';
-  record.matchesFixed = expectQuestion ? record.review && record.lost.length === 0 : !record.review && record.lost.length === 0;
+  record.result = record.review ? 'question' : record.lost.length ? 'lost' : record.editorHas['edited by the writer'] && expectWriter ? 'merged' : 'silent';
+  const writerOk = !expectWriter || record.editorHas['edited by the writer'];
+  const diskOk = expectOnDisk.every((s) => record.diskHas[s]);
+  record.matchesFixed = (expectQuestion ? record.review : !record.review) && record.lost.length === 0 && writerOk && diskOk;
   return record;
 }
 
@@ -345,8 +374,8 @@ try {
         const record = await run(kind, `${stamp}c${caseIndex}r${n}`, workspace, log);
         report.runs.push(record);
         if (EXPECT === 'fixed' && !record.matchesFixed) mismatches++;
-        if (EXPECT === 'main' && record.matchesFixed && ['s1', 's7fm', 's7crlf', 's4'].includes(kind)) mismatches++;
-        console.log(`${record.result.padEnd(8)} ${kind} #${n}: review=${record.review} lost=${JSON.stringify(record.lost)} delay=${record.delayAfterLastSaveMs}ms${record.undoBrings ? ` undo=${JSON.stringify(record.undoBrings)}` : ''} log=${JSON.stringify(record.syncLog.map((l) => l.replace(/ file=\S+ session=\S+/, '')))}`);
+        if (EXPECT === 'main' && record.matchesFixed && ['s1', 's7fm', 's7crlf', 's3', 's4'].includes(kind)) mismatches++;
+        console.log(`${record.result.padEnd(8)} ${kind} #${n}: review=${record.review} lost=${JSON.stringify(record.lost)} delay=${record.delayAfterLastSaveMs}ms${record.undoBrings ? ` undo=${JSON.stringify(record.undoBrings)}` : ''}${record.undoMerge ? ` undoMerge=${JSON.stringify(record.undoMerge)}` : ''}${record.answer ? ` answer=${JSON.stringify(record.answer)}` : ''} log=${JSON.stringify(record.syncLog.map((l) => l.replace(/ file=\S+ session=\S+/, '')))}`);
       } catch (error) {
         mismatches++;
         report.runs.push({ case: kind, run: n, error: String(error?.message ?? error) });

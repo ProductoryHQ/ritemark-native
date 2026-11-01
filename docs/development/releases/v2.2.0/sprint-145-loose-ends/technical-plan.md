@@ -117,6 +117,18 @@ file changes ─ VS Code: clean model? ─ TextFileEditorModel.resolveFromFile r
 - one PR reviews the decision where it is made, once, at the tier its paths set;
 - the cost: it is built and checked on a copy-on-write, patched `vscode/` (`./scripts/apply-patches.sh --dry-run`, the drift check at merge), and its Windows proof moves from the test overlay to 2.2's candidate at Gate 2, like PR 5's. PR 5 keeps R8's font, R10 and R9's patch half.
 
+### As built (1 November, #605)
+
+Where the code differs from the plan above:
+- **Patch 014** was regenerated from `git diff` of its files in the patched `vscode/` (only patch 014 touches them), not through `create-patch.sh`, which only makes a new numbered patch. 10 files: `textFileEditorModelManager.ts` joins. The model's hook asks only on a reload of a resolved model of a type Ritemark edits (`.md`, `.markdown`, `.mdown`, `.mkd`, `.csv`, no extension: the save receipt's list), never on a first resolve or a revert, and drops the answer when the document changed while Ritemark answered.
+- **Blocks, the base and the merge** are in `src/editorSync/merge.ts` (pure, `merge.test.ts`), not `state.ts`; blocks by blank lines (fences and front matter whole, CSV lines), not `marked`'s lexer. The base needs a third of the copy's blocks in common; a tie takes the older candidate; a copy exactly equal to a candidate takes the fallback (spec.md, *As built*). Alignment is bounded (above 4,000,000 cells the middle counts as changed on both sides, so the person's text stays).
+- **Paragraph conflicts** travel in their own message, `document:paragraphs` (`items`, optional `writer`, `openReview`), answered by `document:paragraph-action` (`keep-mine` | `use-theirs`), not as fields on `document:conflict`. An old build doesn't know either; the extension and its webview ship together, so no older view receives them.
+- **The pending-merge note** holds the merge's held blocks, which join Review changes only when the change event brings the merged text (VS Code drops the answer when the person typed while it asked).
+- **A copy Ritemark already took in** (its watcher merged it while VS Code's question waited on the queue; seen in the app's first S1 run) is answered with the document's text, not decided again.
+- **Typing while a merge lands:** each view remembers the last text it sent or acknowledged (`ownText`); an edit from a view behind the document is merged on top (its last text as the base) instead of being refused as stale.
+- **The undo step:** the merge update is `addToHistory: true` with `closeHistory` on it and an empty `closeHistory` transaction after it, so it joins neither the typing before it nor after it.
+- **The writer's name** is not wired (A10): "another app" everywhere.
+
 ## Workstream 1 as planned on 31 October (superseded on 1 November)
 
 ### The stale write (R1), 31 October

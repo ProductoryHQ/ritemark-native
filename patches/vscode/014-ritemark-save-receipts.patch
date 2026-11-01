@@ -5,11 +5,14 @@
 # Why: Reading the file path from onDidSave can race with an external writer and suppress a real two-writer conflict.
 #      A save VS Code refuses as newer, for a document Ritemark's editor holds, goes to Ritemark's document sync first, so the person
 #      gets one question (Ritemark's Review changes) or none (only the file's date or line endings moved), never two (#454).
+#      A file that changed under a clean document Ritemark's editor holds goes to Ritemark before VS Code reloads it, so
+#      Ritemark merges the writer's copy with the person's text instead of the file's text replacing it (#588).
 #
-# File(s): src/vs/workbench/api/browser/mainThreadDocuments.ts, src/vs/workbench/api/common/extHost.protocol.ts, src/vs/workbench/api/common/extHostDocumentData.ts, src/vs/workbench/api/common/extHostDocuments.ts, src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts, src/vs/workbench/contrib/files/test/browser/ritemarkSaveConflict.test.ts, src/vs/workbench/services/textfile/common/textFileEditorModel.ts, src/vs/workbench/services/textfile/common/textfiles.ts, src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
+# File(s): src/vs/workbench/api/browser/mainThreadDocuments.ts, src/vs/workbench/api/common/extHost.protocol.ts, src/vs/workbench/api/common/extHostDocumentData.ts, src/vs/workbench/api/common/extHostDocuments.ts, src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts, src/vs/workbench/contrib/files/test/browser/ritemarkSaveConflict.test.ts, src/vs/workbench/services/textfile/common/textFileEditorModel.ts, src/vs/workbench/services/textfile/common/textFileEditorModelManager.ts, src/vs/workbench/services/textfile/common/textfiles.ts, src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
 # Created: 2026-08-31
 # Updated: 2026-10-19 (Sprint 135: carried onto VS Code 1.142.0 unchanged)
 # Updated: 2026-10-26 (Sprint 137, #454: the save-error handler hands a refused save to Ritemark, with VS Code's notification when no answer comes within 3 s: textFileSaveErrorHandler.ts and its test)
+# Updated: 2026-11-01 (Sprint 145, #588: the reload participant: `ritemarkReloadParticipant` on the model manager, asked in `resolveFromFile` before a clean model takes a changed file's text; the save-error handler's contribution answers with `_ritemark.editorSync.answerReload` within 3 s, else VS Code reloads as before)
 #
 diff --git a/src/vs/workbench/api/browser/mainThreadDocuments.ts b/src/vs/workbench/api/browser/mainThreadDocuments.ts
 index 9827a1a573f..5affedfb204 100644
@@ -111,9 +114,21 @@ index 517568ceb6d..c6b34ed5d93 100644
  
  	public $acceptDirtyStateChanged(uriComponents: UriComponents, isDirty: boolean): void {
 diff --git a/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts b/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts
-index ce11123d046..61077f7f893 100644
+index ce11123d046..223386da89a 100644
 --- a/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts
 +++ b/src/vs/workbench/contrib/files/browser/editors/textFileSaveErrorHandler.ts
+@@ -9,9 +9,9 @@ import { basename, isEqual } from '../../../../../base/common/resources.js';
+ import { Action } from '../../../../../base/common/actions.js';
+ import { URI } from '../../../../../base/common/uri.js';
+ import { FileOperationError, FileOperationResult, IWriteFileOptions } from '../../../../../platform/files/common/files.js';
+-import { ITextFileService, ISaveErrorHandler, ITextFileEditorModel, ITextFileSaveAsOptions, ITextFileSaveOptions } from '../../../../services/textfile/common/textfiles.js';
++import { ITextFileService, ISaveErrorHandler, ITextFileEditorModel, ITextFileSaveAsOptions, ITextFileSaveOptions, IRitemarkReloadParticipant } from '../../../../services/textfile/common/textfiles.js';
+ import { ServicesAccessor, IInstantiationService } from '../../../../../platform/instantiation/common/instantiation.js';
+-import { IDisposable, dispose, Disposable } from '../../../../../base/common/lifecycle.js';
++import { IDisposable, dispose, Disposable, toDisposable } from '../../../../../base/common/lifecycle.js';
+ import { IWorkbenchContribution } from '../../../../common/contributions.js';
+ import { ITextModelService } from '../../../../../editor/common/services/resolverService.js';
+ import { ResourceMap } from '../../../../../base/common/map.js';
 @@ -31,6 +31,8 @@ import { Schemas } from '../../../../../base/common/network.js';
  import { IPreferencesService } from '../../../../services/preferences/common/preferences.js';
  import { IEditorIdentifier, SaveReason, SideBySideEditor } from '../../../../common/editor.js';
@@ -123,7 +138,7 @@ index ce11123d046..61077f7f893 100644
  
  export const CONFLICT_RESOLUTION_CONTEXT = 'saveConflictResolutionContext';
  export const CONFLICT_RESOLUTION_SCHEME = 'conflictResolution';
-@@ -39,6 +41,21 @@ const LEARN_MORE_DIRTY_WRITE_IGNORE_KEY = 'learnMoreDirtyWriteError';
+@@ -39,6 +41,31 @@ const LEARN_MORE_DIRTY_WRITE_IGNORE_KEY = 'learnMoreDirtyWriteError';
  
  const conflictEditorHelp = localize('userGuide', "Use the actions in the editor tool bar to either undo your changes or overwrite the content of the file with your changes.");
  
@@ -132,6 +147,16 @@ index ce11123d046..61077f7f893 100644
 +export const RITEMARK_ANSWER_SAVE_CONFLICT_COMMAND = '_ritemark.editorSync.answerSaveConflict';
 +/** Ritemark (patch 014): how long Ritemark may take to answer before this handler's notification shows. */
 +export const RITEMARK_ANSWER_TIMEOUT_MS = 3000;
++/** Ritemark (patch 014, Sprint 145 #588): asked before a clean document Ritemark's editor holds reloads a changed file. */
++export const RITEMARK_ANSWER_RELOAD_COMMAND = '_ritemark.editorSync.answerReload';
++
++/**
++ * Ritemark (patch 014, Sprint 145 #588): a file that changed under a clean document Ritemark's editor holds goes to
++ * Ritemark first, which merges the writer's copy with the person's text. Any other document reloads as before.
++ */
++export function shouldAskRitemarkBeforeReload(editorIds: readonly (string | undefined)[]): boolean {
++	return editorIds.includes(RITEMARK_EDITOR_ID);
++}
 +
 +/**
 + * Ritemark (patch 014, #454): hand a save refused as "newer" to Ritemark, so the person gets one question in
@@ -145,7 +170,7 @@ index ce11123d046..61077f7f893 100644
  // A handler for text file save error happening with conflict resolution actions
  export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHandler, IWorkbenchContribution {
  
-@@ -55,7 +72,8 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
+@@ -55,7 +82,8 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
  		@IEditorService private readonly editorService: IEditorService,
  		@ITextModelService textModelService: ITextModelService,
  		@IInstantiationService private readonly instantiationService: IInstantiationService,
@@ -155,7 +180,23 @@ index ce11123d046..61077f7f893 100644
  	) {
  		super();
  
-@@ -101,7 +119,10 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
+@@ -67,6 +95,15 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
+ 		// Set as save error handler to service for text files
+ 		this.textFileService.files.saveErrorHandler = this;
+ 
++		// Ritemark (patch 014, Sprint 145 #588): Ritemark answers a reload of a document its editor holds.
++		const reloadParticipant: IRitemarkReloadParticipant = { participate: (model, diskText) => this.askRitemarkBeforeReload(model, diskText) };
++		this.textFileService.files.ritemarkReloadParticipant = reloadParticipant;
++		this._register(toDisposable(() => {
++			if (this.textFileService.files.ritemarkReloadParticipant === reloadParticipant) {
++				this.textFileService.files.ritemarkReloadParticipant = undefined;
++			}
++		}));
++
+ 		this.registerListeners();
+ 	}
+ 
+@@ -101,7 +138,10 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
  		}
  	}
  
@@ -167,7 +208,7 @@ index ce11123d046..61077f7f893 100644
  		const fileOperationError = error as FileOperationError;
  		const resource = model.resource;
  
-@@ -189,6 +210,44 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
+@@ -189,6 +229,62 @@ export class TextFileSaveErrorHandler extends Disposable implements ISaveErrorHa
  		this.messages.set(model.resource, handle);
  	}
  
@@ -209,15 +250,33 @@ index ce11123d046..61077f7f893 100644
 +		}
 +	}
 +
++	/**
++	 * Ritemark (patch 014, Sprint 145 #588): the text the document takes instead of `diskText` (Ritemark's merge,
++	 * or the person's text while its fallback question asks), or `undefined` for the usual reload: also when
++	 * Ritemark is not running or doesn't answer within `RITEMARK_ANSWER_TIMEOUT_MS`.
++	 */
++	private async askRitemarkBeforeReload(model: ITextFileEditorModel, diskText: string): Promise<string | undefined> {
++		const editorIds = this.editorService.findEditors(model.resource).map(({ editor }) => editor.editorId);
++		if (!shouldAskRitemarkBeforeReload(editorIds)) {
++			return undefined;
++		}
++		try {
++			const answer = await raceTimeout(this.commandService.executeCommand<unknown>(RITEMARK_ANSWER_RELOAD_COMMAND, model.resource, diskText), RITEMARK_ANSWER_TIMEOUT_MS);
++			return typeof answer === 'string' ? answer : undefined;
++		} catch {
++			return undefined; // the command is not registered: Ritemark is not running
++		}
++	}
++
  	override dispose(): void {
  		super.dispose();
  
 diff --git a/src/vs/workbench/contrib/files/test/browser/ritemarkSaveConflict.test.ts b/src/vs/workbench/contrib/files/test/browser/ritemarkSaveConflict.test.ts
 new file mode 100644
-index 00000000000..48aea09287d
+index 00000000000..72c08773800
 --- /dev/null
 +++ b/src/vs/workbench/contrib/files/test/browser/ritemarkSaveConflict.test.ts
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,36 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -227,7 +286,7 @@ index 00000000000..48aea09287d
 +
 +import assert from 'assert';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
-+import { RITEMARK_EDITOR_ID, shouldHandSaveConflictToRitemark } from '../../browser/editors/textFileSaveErrorHandler.js';
++import { RITEMARK_EDITOR_ID, shouldAskRitemarkBeforeReload, shouldHandSaveConflictToRitemark } from '../../browser/editors/textFileSaveErrorHandler.js';
 +
 +suite('Ritemark save conflict hand-over', () => {
 +	ensureNoDisposablesAreLeakedInTestSuite();
@@ -244,21 +303,41 @@ index 00000000000..48aea09287d
 +		assert.strictEqual(shouldHandSaveConflictToRitemark(false, [RITEMARK_EDITOR_ID], false), false, 'another save error (read-only, permissions)');
 +		assert.strictEqual(shouldHandSaveConflictToRitemark(true, [RITEMARK_EDITOR_ID], true), false, 'a save from VS Code\'s own conflict editor');
 +	});
++
++	// Sprint 145 R1 (#588): a reload of a clean document goes to Ritemark only when Ritemark's editor holds it.
++	test('a reload asks Ritemark only for a document Ritemark\'s editor holds', () => {
++		assert.strictEqual(shouldAskRitemarkBeforeReload([RITEMARK_EDITOR_ID]), true);
++		assert.strictEqual(shouldAskRitemarkBeforeReload(['workbench.editors.files.textFileEditor', RITEMARK_EDITOR_ID]), true, 'also with a text editor of the same file open');
++		assert.strictEqual(shouldAskRitemarkBeforeReload(['workbench.editors.files.textFileEditor']), false, 'only a text editor holds it');
++		assert.strictEqual(shouldAskRitemarkBeforeReload([]), false, 'no editor holds it');
++		assert.strictEqual(shouldAskRitemarkBeforeReload([undefined]), false, 'an editor without an id');
++	});
 +});
 diff --git a/src/vs/workbench/services/textfile/common/textFileEditorModel.ts b/src/vs/workbench/services/textfile/common/textFileEditorModel.ts
-index d7058ab3947..14046806d1f 100644
+index d7058ab3947..3e243da9c75 100644
 --- a/src/vs/workbench/services/textfile/common/textFileEditorModel.ts
 +++ b/src/vs/workbench/services/textfile/common/textFileEditorModel.ts
-@@ -18,7 +18,7 @@ import { IModelService } from '../../../../editor/common/services/model.js';
+@@ -16,16 +16,16 @@ import { IFileService, FileOperationError, FileOperationResult, FileChangesEvent
+ import { ILanguageService } from '../../../../editor/common/languages/language.js';
+ import { IModelService } from '../../../../editor/common/services/model.js';
  import { timeout, TaskSequentializer } from '../../../../base/common/async.js';
- import { ITextBufferFactory, ITextModel } from '../../../../editor/common/model.js';
+-import { ITextBufferFactory, ITextModel } from '../../../../editor/common/model.js';
++import { DefaultEndOfLine, EndOfLinePreference, ITextBufferFactory, ITextModel } from '../../../../editor/common/model.js';
  import { ILogService } from '../../../../platform/log/common/log.js';
 -import { basename } from '../../../../base/common/path.js';
 +import { basename, extname } from '../../../../base/common/path.js';
  import { IWorkingCopyService } from '../../workingCopy/common/workingCopyService.js';
  import { IWorkingCopyBackup, WorkingCopyCapabilities, NO_TYPE_ID, IWorkingCopyBackupMeta } from '../../workingCopy/common/workingCopy.js';
  import { IFilesConfigurationService } from '../../filesConfiguration/common/filesConfigurationService.js';
-@@ -45,6 +45,20 @@ interface IBackupMetaData extends IWorkingCopyBackupMeta {
+ import { ILabelService } from '../../../../platform/label/common/label.js';
+ import { CancellationToken, CancellationTokenSource } from '../../../../base/common/cancellation.js';
+ import { UTF16be, UTF16le, UTF8, UTF8_with_bom } from './encoding.js';
+-import { createTextBufferFactoryFromStream } from '../../../../editor/common/model/textModel.js';
++import { createTextBufferFactory, createTextBufferFactoryFromStream } from '../../../../editor/common/model/textModel.js';
+ import { ILanguageDetectionService } from '../../languageDetection/common/languageDetectionWorkerService.js';
+ import { IPathService } from '../../path/common/pathService.js';
+ import { extUri } from '../../../../base/common/resources.js';
+@@ -45,6 +45,30 @@ interface IBackupMetaData extends IWorkingCopyBackupMeta {
  	orphaned: boolean;
  }
  
@@ -267,6 +346,16 @@ index d7058ab3947..14046806d1f 100644
 +function needsRitemarkSaveReceipt(resource: URI): boolean {
 +	const extension = extname(resource.path).toLowerCase();
 +	return extension === '' || RITEMARK_EDITABLE_EXTENSIONS.has(extension);
++}
++
++/** Ritemark (patch 014, Sprint 145 #588): the text a buffer factory holds, as the model would show it. */
++function ritemarkTextOf(value: ITextBufferFactory): string {
++	const { textBuffer, disposable } = value.create(DefaultEndOfLine.LF);
++	try {
++		return textBuffer.getValueInRange(textBuffer.getRangeAt(0, textBuffer.getLength()), EndOfLinePreference.TextDefined);
++	} finally {
++		disposable.dispose();
++	}
 +}
 +
 +async function computeRitemarkLogicalHash(content: string): Promise<string> {
@@ -279,7 +368,52 @@ index d7058ab3947..14046806d1f 100644
  /**
   * The text file editor model listens to changes to its underlying code editor model and saves these changes through the file service back to the disk.
   */
-@@ -933,8 +947,19 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+@@ -468,6 +492,18 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+ 				return;
+ 			}
+ 
++			// Ritemark (patch 014, Sprint 145 #588): a changed file under a clean model Ritemark's editor holds is
++			// merged with the person's text by Ritemark, not swapped for the file's text.
++			const ritemarkText = await this.askRitemarkBeforeReload(content, forceReadFromFile);
++			if (currentVersionId !== this.versionId) {
++				this.trace('resolveFromFile() - exit - without resolving because model content changed while Ritemark answered');
++
++				return;
++			}
++			if (ritemarkText !== undefined) {
++				return this.resolveFromContent({ ...content, value: createTextBufferFactory(ritemarkText) }, true /* dirty (Ritemark's merge) */, options);
++			}
++
+ 			return this.resolveFromContent(content, false /* not dirty (resolved from file) */, options);
+ 		} catch (error) {
+ 			const result = error.fileOperationResult;
+@@ -499,6 +535,25 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+ 		}
+ 	}
+ 
++	/**
++	 * Ritemark (patch 014, Sprint 145 #588): only for a reload of a resolved model (never a first resolve or a
++	 * revert) of a document type Ritemark edits, and only when a participant is set. Any failure reloads as usual.
++	 */
++	private async askRitemarkBeforeReload(content: ITextFileStreamContent, forceReadFromFile: boolean | undefined): Promise<string | undefined> {
++		const participant = this.textFileService.files.ritemarkReloadParticipant;
++		if (!participant || forceReadFromFile || !this.isResolved() || !needsRitemarkSaveReceipt(this.resource)) {
++			return undefined;
++		}
++		try {
++			const diskText = ritemarkTextOf(content.value);
++			const answer = await participant.participate(this, diskText);
++			return typeof answer === 'string' && answer !== diskText ? answer : undefined;
++		} catch (error) {
++			this.logService.warn(`[text file model] Ritemark did not answer before reload: ${error}`, this.resource.toString());
++			return undefined;
++		}
++	}
++
+ 	private resolveFromContent(content: ITextFileStreamContent, dirty: boolean, options?: ITextFileResolveOptions): void {
+ 		this.trace('resolveFromContent() - enter');
+ 
+@@ -933,8 +988,19 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
  			const lastResolvedFileStat = assertReturnsDefined(this.lastResolvedFileStat);
  			const resolvedTextFileEditorModel = this;
  			return this.saveSequentializer.run(versionId, (async () => {
@@ -300,7 +434,7 @@ index d7058ab3947..14046806d1f 100644
  						mtime: lastResolvedFileStat.mtime,
  						encoding: this.getEncoding(),
  						etag: (options.ignoreModifiedSince || !this.filesConfigurationService.preventSaveConflicts(lastResolvedFileStat.resource, resolvedTextFileEditorModel.getLanguageId())) ? ETAG_DISABLED : lastResolvedFileStat.etag,
-@@ -942,7 +967,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+@@ -942,7 +1008,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
  						writeElevated: options.writeElevated
  					});
  
@@ -309,7 +443,7 @@ index d7058ab3947..14046806d1f 100644
  				} catch (error) {
  					this.handleSaveError(error, versionId, options);
  				}
-@@ -950,7 +975,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+@@ -950,7 +1016,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
  		})(), () => saveCancellation.cancel());
  	}
  
@@ -318,7 +452,7 @@ index d7058ab3947..14046806d1f 100644
  
  		// Updated resolved stat with updated stat
  		this.updateLastResolvedFileStat(stat);
-@@ -967,7 +992,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
+@@ -967,7 +1033,7 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
  		this.setOrphaned(false);
  
  		// Emit Save Event
@@ -327,11 +461,62 @@ index d7058ab3947..14046806d1f 100644
  	}
  
  	private handleSaveError(error: Error, versionId: number, options: ITextFileSaveAsOptions): void {
+diff --git a/src/vs/workbench/services/textfile/common/textFileEditorModelManager.ts b/src/vs/workbench/services/textfile/common/textFileEditorModelManager.ts
+index 6c1300e0006..110cc4f565e 100644
+--- a/src/vs/workbench/services/textfile/common/textFileEditorModelManager.ts
++++ b/src/vs/workbench/services/textfile/common/textFileEditorModelManager.ts
+@@ -9,7 +9,7 @@ import { Event, Emitter } from '../../../../base/common/event.js';
+ import { URI } from '../../../../base/common/uri.js';
+ import { TextFileEditorModel } from './textFileEditorModel.js';
+ import { dispose, IDisposable, Disposable, DisposableStore } from '../../../../base/common/lifecycle.js';
+-import { ITextFileEditorModel, ITextFileEditorModelManager, ITextFileEditorModelResolveOrCreateOptions, ITextFileResolveEvent, ITextFileSaveEvent, ITextFileSaveParticipant } from './textfiles.js';
++import { ITextFileEditorModel, ITextFileEditorModelManager, ITextFileEditorModelResolveOrCreateOptions, ITextFileResolveEvent, ITextFileSaveEvent, ITextFileSaveParticipant, IRitemarkReloadParticipant } from './textfiles.js';
+ import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+ import { ResourceMap } from '../../../../base/common/map.js';
+ import { IFileService, FileChangesEvent, FileOperation, FileChangeType, IFileSystemProviderRegistrationEvent, IFileSystemProviderCapabilitiesChangeEvent } from '../../../../platform/files/common/files.js';
+@@ -86,6 +86,9 @@ export class TextFileEditorModelManager extends Disposable implements ITextFileE
+ 		};
+ 	})();
+ 
++	// Ritemark (patch 014, Sprint 145 #588): set by the save error handler's contribution.
++	ritemarkReloadParticipant: IRitemarkReloadParticipant | undefined = undefined;
++
+ 	get models(): TextFileEditorModel[] {
+ 		return [...this.mapResourceToModel.values()];
+ 	}
 diff --git a/src/vs/workbench/services/textfile/common/textfiles.ts b/src/vs/workbench/services/textfile/common/textfiles.ts
-index 84c90a5581b..a48b0d557db 100644
+index 84c90a5581b..a6dc22a9a4d 100644
 --- a/src/vs/workbench/services/textfile/common/textfiles.ts
 +++ b/src/vs/workbench/services/textfile/common/textfiles.ts
-@@ -536,6 +536,13 @@ export interface ITextFileEditorModelSaveEvent extends IWorkingCopySaveEvent {
+@@ -224,6 +224,15 @@ export interface ISaveErrorHandler {
+ 	onSaveError(error: Error, model: ITextFileEditorModel, options: ITextFileSaveAsOptions): void;
+ }
+ 
++/**
++ * Ritemark (patch 014, Sprint 145 #588): asked before a clean model takes the text of a file that changed on disk.
++ * The answer is the text the model takes instead, and the model is then dirty (Ritemark's merge of the person's
++ * text and the file's, saved over the file as any edit is); `undefined` reloads as usual.
++ */
++export interface IRitemarkReloadParticipant {
++	participate(model: ITextFileEditorModel, diskText: string): Promise<string | undefined>;
++}
++
+ /**
+  * States the text file editor model can be in.
+  */
+@@ -398,6 +407,11 @@ export interface ITextFileEditorModelManager {
+ 	 */
+ 	saveErrorHandler: ISaveErrorHandler;
+ 
++	/**
++	 * Ritemark (patch 014, Sprint 145 #588): asked before a clean model reloads a changed file, when set.
++	 */
++	ritemarkReloadParticipant: IRitemarkReloadParticipant | undefined;
++
+ 	/**
+ 	 * Returns the text file editor model for the provided resource
+ 	 * or undefined if none.
+@@ -536,6 +550,13 @@ export interface ITextFileEditorModelSaveEvent extends IWorkingCopySaveEvent {
  	 * The resolved stat from the save operation.
  	 */
  	readonly stat: IFileStatWithMetadata;
@@ -346,7 +531,7 @@ index 84c90a5581b..a48b0d557db 100644
  
  export interface ITextFileEditorModel extends ITextEditorModel, IEncodingSupport, ILanguageSupport, IWorkingCopy {
 diff --git a/src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts b/src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
-index 5bdb6860d65..9d078167ced 100644
+index 5bdb6860d65..a225b9a9c71 100644
 --- a/src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
 +++ b/src/vs/workbench/services/textfile/test/browser/textFileEditorModel.test.ts
 @@ -91,7 +91,7 @@ suite('Files - TextFileEditorModel', () => {
@@ -366,3 +551,91 @@ index 5bdb6860d65..9d078167ced 100644
  		assert.ok(workingCopyEvent);
  
  		assert.strictEqual(accessor.workingCopyService.dirtyCount, 0);
+@@ -528,6 +529,87 @@ suite('Files - TextFileEditorModel', () => {
+ 		assert.strictEqual(accessor.workingCopyService.isDirty(model.resource, model.typeId), true);
+ 	});
+ 
++	// Ritemark (patch 014, Sprint 145 #588): a reload of a clean model asks Ritemark's participant first.
++	test('Ritemark reload participant: its answer becomes the dirty model text', async function () {
++		const model: TextFileEditorModel = disposables.add(instantiationService.createInstance(TextFileEditorModel, toResource.call(this, '/path/index_async.md'), 'utf8', undefined));
++		await model.resolve();
++		const asked: string[] = [];
++		accessor.textFileService.files.ritemarkReloadParticipant = {
++			participate: async (_model, diskText) => { asked.push(diskText); return 'Merged text'; }
++		};
++		try {
++			accessor.fileService.setContent('Hello Change');
++			await model.resolve();
++
++			assert.deepStrictEqual(asked, ['Hello Change']);
++			assert.strictEqual(model.textEditorModel?.getValue(), 'Merged text');
++			assert.ok(model.isDirty());
++		} finally {
++			accessor.textFileService.files.ritemarkReloadParticipant = undefined;
++		}
++	});
++
++	test('Ritemark reload participant: no answer, or the file\'s own text, reloads as usual', async function () {
++		const model: TextFileEditorModel = disposables.add(instantiationService.createInstance(TextFileEditorModel, toResource.call(this, '/path/index_async.md'), 'utf8', undefined));
++		await model.resolve();
++		const answers: (string | undefined)[] = [undefined, 'Second change'];
++		accessor.textFileService.files.ritemarkReloadParticipant = { participate: async () => answers.shift() };
++		try {
++			accessor.fileService.setContent('First change');
++			await model.resolve();
++			assert.strictEqual(model.textEditorModel?.getValue(), 'First change');
++			assert.ok(!model.isDirty());
++
++			accessor.fileService.setContent('Second change');
++			await model.resolve();
++			assert.strictEqual(model.textEditorModel?.getValue(), 'Second change');
++			assert.ok(!model.isDirty());
++		} finally {
++			accessor.textFileService.files.ritemarkReloadParticipant = undefined;
++		}
++	});
++
++	test('Ritemark reload participant: not asked on a first resolve, a revert, or a file type Ritemark does not edit', async function () {
++		let asked = 0;
++		accessor.textFileService.files.ritemarkReloadParticipant = { participate: async () => { asked++; return 'Merged text'; } };
++		try {
++			// Through the model manager, as a revert reads the file through it.
++			const markdown = await accessor.textFileService.files.resolve(toResource.call(this, '/path/index_async.md')) as TextFileEditorModel;
++			markdown.updateTextEditorModel(createTextBufferFactory('Typed'));
++			await markdown.revert();
++			assert.strictEqual(markdown.textEditorModel?.getValue(), accessor.fileService.getContent());
++
++			const text: TextFileEditorModel = disposables.add(instantiationService.createInstance(TextFileEditorModel, toResource.call(this, '/path/index_async.txt'), 'utf8', undefined));
++			await text.resolve();
++			accessor.fileService.setContent('Hello Change');
++			await text.resolve();
++			assert.strictEqual(text.textEditorModel?.getValue(), 'Hello Change');
++
++			assert.strictEqual(asked, 0);
++		} finally {
++			accessor.textFileService.files.ritemarkReloadParticipant = undefined;
++		}
++	});
++
++	test('Ritemark reload participant: an edit while Ritemark answers wins over the answer', async function () {
++		const model: TextFileEditorModel = disposables.add(instantiationService.createInstance(TextFileEditorModel, toResource.call(this, '/path/index_async.md'), 'utf8', undefined));
++		await model.resolve();
++		const asked = new DeferredPromise<void>();
++		const answered = new DeferredPromise<string>();
++		accessor.textFileService.files.ritemarkReloadParticipant = { participate: () => { asked.complete(); return answered.p; } };
++		try {
++			accessor.fileService.setContent('Hello Change');
++			const reload = model.resolve();
++			await asked.p;
++			model.updateTextEditorModel(createTextBufferFactory('Typed meanwhile'));
++			answered.complete('Merged text');
++			await reload;
++			assert.strictEqual(model.textEditorModel?.getValue(), 'Typed meanwhile');
++		} finally {
++			accessor.textFileService.files.ritemarkReloadParticipant = undefined;
++		}
++	});
++
+ 	test('Update Dirty', async function () {
+ 		let eventCounter = 0;
+ 
