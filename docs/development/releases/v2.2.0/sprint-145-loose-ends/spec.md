@@ -7,15 +7,58 @@ Twelve faults that 2.1's gates and first days found, or that the milestone carri
 ## Principles
 
 - **Reproduce first.** Each requirement names how its fault is shown ([technical-plan.md](technical-plan.md#phase-1-reproductions-and-audits)). Where a cause isn't shown, the fix is called hardening, not the cause, and its issue closes only when its own check passes (no unproven diagnoses).
-- **#588 gets the most care.** It is the only one that loses what a person wrote. It has the longest reproduction, a false-positive set, its own PR and a higher review level than its paths set (decision 2).
+- **#588 gets the most care.** It is the only one that loses what a person wrote. It has the longest reproduction, a false-positive set, its own PR and a higher review level than its paths set (decision 2). Since 1 November its PR is shell-tier (the reload participant in patch 014), so High by paths.
 - **No code without a reproduction** for #507, #501 and #569's patch half, as in 2.1.
-- **The smallest change in the existing pattern.** Review changes for #588; `StepNeedsKeyError` for #580; the board's own delete question and Trash for #596; the shared Button and Tooltip for every new control; no new subsystem.
-- **The person's files are theirs.** Remove sends a card's file to the Trash and never deletes it; a guard that can't tell what was lost asks, never discards.
+- **The smallest change in the existing pattern.** For #588 (revised 1 November), a merge that asks only about a block both changed, through the document bar's existing Review changes and `DocumentConflictDialog`, and a shell hook in patch 014's own pattern; `StepNeedsKeyError` for #580; the board's own delete question and Trash for #596; the shared Button and Tooltip for every new control; no new subsystem.
+- **The person's files are theirs.** Remove sends a card's file to the Trash and never deletes it; a guard that can't tell what was lost asks, never discards. For #588 (1 November): both changes stay; where both changed a block, the person's text stays in the document.
 - **Records are untouched.** No card, flow, conversation or document format changes (E2).
 
 ## Requirements
 
-### R1: Words a person typed and saved are never silently replaced by an older copy (#588)
+### R1 (revised 2026-11-01): Both changes stay; no word is ever lost (#588)
+
+**Revised by Jarmo's decision of 1 November 2026** (ritemark-dev decision log `735b186`; [#588's comment](https://github.com/ProductoryHQ/ritemark-native/issues/588#issuecomment-6556475375)), drawn by the Experience lead as **experience 44, *Editing alongside the AI*** (ritemark-dev `product/design/experience/experiences/alongside/README.md`, `ec25356`). The question is no longer whose version wins: both changes stay, as when two people edit in Google Docs or Word. The 31 October version is kept below as history. **Approved by Jarmo on 1 November** (decision log `819c63f`), with unsaved text merged too.
+
+As someone typing in a document while an AI or another app writes the same file, I want both my words and the other writer's changes to stay, and to be asked only about a paragraph we both changed.
+
+What is known: on `main`, a writer that saves a copy made from an older version replaces the person's newer words silently: 10 of 10 on the Mac, whether it writes 0.3 or 15 s after the last auto-save; ⌘Z doesn't bring them back ([research/stale-write-repro.md](research/stale-write-repro.md)). In those runs the writer's copy differs from the save it read only in the writer's own paragraph ([research/merge-checks.md](research/merge-checks.md), check 1). VS Code reloads a clean document from disk by itself, often before Ritemark's sync looks; the place to ask Ritemark first is `TextFileEditorModel.resolveFromFile`, reached through patch 014's own pattern (check 2).
+
+Acceptance criteria:
+- **Reproduced first** (done, A1; the Windows run waits): the stale write loses the later words on `main`.
+- **The base.** When a clean document's file changes and the new text isn't Ritemark's own save, Ritemark finds the saved version the copy started from: the remembered save (or the text Ritemark last read or imported) from which the copy differs in the fewest blocks. Line endings, a byte order mark and a date-only touch are not differences.
+- **The merge, by block** (a Markdown block: a paragraph, a heading, a whole list, a table, a code block, the front matter; a CSV row), three ways against the base:
+  - a block only the writer changed takes the writer's text;
+  - a block only the person changed keeps the person's;
+  - blocks the writer or the person added or removed are added or removed;
+  - a block both changed keeps **the person's** text, and the writer's version waits for Review changes.
+- **Where it runs: the shell asks first.** VS Code asks Ritemark before it reloads a clean document Ritemark's editor holds, and uses the text Ritemark returns: the document never holds the writer's copy, so there is no race with VS Code's reload. When the merged text differs from the file, the document is dirty with it and VS Code's auto-save writes it. No answer within the budget (3 s, as patch 014's) means VS Code's own reload, then the fallback below. Ritemark's own poll or watcher, when it sees the change first, uses the same merge.
+- **Nothing moves under the person** (experience 44): no highlight where the writer's change lands (experience 1, Jarmo 15 October: "NEVER MARK THOSE!"); the caret, the selection and the part of the page in view stay where they are, also when text above the view grows or shrinks (the page keeps its place by the caret's block). The document bar keeps saying Saved when nothing waits.
+- **Both changed a block: the document bar's Review changes.** The existing button takes Saved's place, never takes the focus, never blocks typing. Its tooltip, and the notification when the tab isn't in front, are experience 44's words (the AI by name, ChatGPT, OpenCode or Claude, only when Ritemark knows that AI made the write in that turn; otherwise "another app"; a plural form for two or more blocks). Opening it scrolls to the block and opens `DocumentConflictDialog` in its paragraph mode: the title "A paragraph changed in two places", a first line saying what happened, the two blocks in full ("Yours, in the document" and the writer's), [Use Claude's] at the far left and [Keep mine] primary and the default; for two or more, "1 of 2" and one at a time. No warning icon. The button goes when every held block is chosen or both versions of each become the same; if the document closes first, the person's text is what was saved.
+- **The button's one restyle, for every conflict:** ink with a hairline (`--r-hairline-strong`) and the `arrows-split` icon instead of the amber warning. The failed-sync kind keeps its look.
+- **The merge is one undo step** in the editor the person uses: one ⌘Z undoes the whole merge (the writer's changes it brought in), not part of it. (Today Ritemark's editor takes host updates out of its history; that changes for the merge.)
+- **The fallback, only when no base is found** (a whole-file rewrite that changed blocks everywhere, a reformat, a base older than the memory, or no answer from Ritemark in time): #605's whole-document question stays, with its window of 30 s from the person's last save of the words, its held import, its words, and the Experience lead's three changes (#605's comment of 1 November): the second paragraph "…Compare the changes, keep your version, or use the disk version." (and "Ritemark has preserved both versions. Compare the changes, keep your version, or use the disk version." for the dirty-document case); Use disk version `secondary`, not red; Use disk version alone at the footer's far left, then Compare changes and Keep my version, Keep my version primary and the default, Tab in screen order. A copy outside the window with no base still replaces the words, as in 2.1 (S8).
+- **No question where nothing conflicts:** a writer that read the latest save (S2), or that rewrote the sentence just typed after reading it (S4), lands as written; line endings, a byte order mark and a date-only touch change nothing (S5, S6); Ritemark's own saves, a typo fix or undo of words just saved, and an edit from a text editor of the same file are never merged as a writer.
+- **It is logged:** the sync log names the merge (blocks taken from the writer, blocks held, never the words) and the fallback.
+- **The AIs' own tools are audited, not changed** (A2); the AI's edits stream straight into the document; no suggestions mode in 2.2 (#609).
+- Markdown, CSV and files with front matter or CRLF endings behave the same.
+- **Patch 014 changes** (corrected from the 31 October version): it gains the reload participant beside its save-conflict route. The save receipt and the save-conflict route are unchanged.
+
+**Unsaved text is merged too** (Jarmo, 1 November, decision log `819c63f`: "salvestamata tekst samuti kokkupanekusse"). A writer that saves while the document has unsaved typing (S3, #454's path) is merged the same way, with the last save as the base and the document's text as the person's side; the merged text is saved over the writer's file (the refused save goes through, since the disk holds the copy Ritemark merged). #454's whole-document question stays only as the fallback when no base is found.
+
+**As built (1 November), where it differs from the criteria above** (#605; each one is in [scenarios.md](scenarios.md)):
+- **S4 asks, for Jarmo to confirm.** A writer that read the sentence just typed and rewrote it, and a writer that rewrote the same paragraph from the version before the sentence, write the same kind of copy: it shares every other block with both saves, so the two bases tie. Unless the copy carries more than half of the words the newer save added (then the writer read it: it rewrote a paragraph the person had just added, which lands as written), Ritemark takes the older one, so the person's sentence counts as the person's change, never as something the writer deleted: the person's paragraph stays and Review changes waits for it (Use the other copy puts the writer's in, one undo step). Taking the newer base would land S4 as the criterion says, and would silently drop the person's sentence in the second case, which is S1's loss. The criterion "or that rewrote the sentence just typed after reading it (S4), lands as written" doesn't hold; that is the cost of never losing words.
+- **A copy that is exactly an earlier version** (a Discard of an AI's change, a checkout, a rewind) has no edit of its own to merge: merging it would keep the person's text and drop the writer's whole intent without a word. It takes the fallback: within 30 s of the save it leaves out, the whole-document question; after that, it replaces the words, as in 2.1.
+- **The base** needs a third of the copy's blocks in common, in order (`MIN_BASE_LIKENESS`); below that, no base (the fallback). Unsaved text with no base gets #454's question, never the copy. Blocks are cut by blank lines, a fenced code block and the front matter each one block, a CSV record one block, a quoted field's newlines inside it (`src/editorSync/merge.ts`, not `marked`'s lexer: a list or a table has no blank line inside, so it is one block either way).
+- **The writer is always "another app" in 2.2.** The host can tell which AI wrote a file through its own file tools, but no runtime event reaches the sync yet ([research/who-wrote-it.md](research/who-wrote-it.md), A10); the words take the AI's name when that is wired (a follow-up). S56–S58's "Claude" reads "another app" / "The other copy" until then.
+- **No answer in time (S64)** isn't the fallback: VS Code reloads, and Ritemark merges from its own sighting a moment later (the views get the merge, never the writer's copy alone). The question comes only without a base.
+- **Typing while a merge lands:** a keystroke from a view that hasn't shown the merge yet is merged on top of it (the view's last text as the base), never refused.
+- **The notification** behind a hidden tab is an information notification, not a warning: the person's text is kept.
+- **A kill switch** (Codex's review of #605): the flag `editor-sync-merge`, `stable` (on). Set to `disabled` in an extension release, Ritemark answers the shell nothing and the sync is 2.1's, with #454's question for a dirty document.
+- **No warning icon on the fallback question either** (the Experience lead, ritemark-dev `8408035`): its header is the title alone, as the paragraph dialog's.
+
+#### R1 as approved on 31 October 2026 (superseded on 1 November)
+
+R1's title then: *Words a person typed and saved are never silently replaced by an older copy.*
 
 As someone typing in a document while an AI or another app writes the same file, I want the words I typed and saved to stay unless I choose otherwise.
 
@@ -31,6 +74,13 @@ Acceptance criteria:
 - **The AIs' own tools are audited, not changed.** For Claude Code, Codex and OpenCode, the record says what each does when the file changed since it read it, and what the 27 October sighting's write used. Findings go on the issue.
 - Markdown, CSV and files with front matter or CRLF endings behave the same.
 - **Patch 014 and the save receipt are unchanged.**
+
+**R1 (revised 2026-10-31, after A1, [research/stale-write-repro.md](research/stale-write-repro.md)), also superseded on 1 November.** The original criteria stay; A1 adds what they assumed:
+- **VS Code reloads a clean document from disk by itself.** On `main`, 8 of 10 S1 runs reached Ritemark's sync after VS Code had already put the writer's copy into the document (`converged`), 2 through Ritemark's own read (`external-only`). So the guard checks both, and "the editor keeps the person's text" means **the person's newest saved words are put back into the document** before Review changes asks.
+- **Where the file sits while the question waits depends on who saw the change first.** When Ritemark sees it first (all 10 S1 runs on the branch), putting the words back makes the document dirty before VS Code reloads it; VS Code's auto-save is then refused as newer and the writer's copy stays on disk, as in #454. When VS Code reloaded first, the document is dirty against the writer's file and VS Code's auto-save writes the person's words back about a second later; the writer's copy is then kept in the question. Either way **Use disk version** ends with the writer's copy in the file and the editor, byte for byte, **Keep my version** with the person's words, and **Compare** shows both.
+- **A second stale write while the question waits** is held the same way; the newest writer's copy becomes the question's disk side.
+- **"Recent" is 30 s** from each of Ritemark's own saves, and "words the save wrote" are the runs of words a word alignment of the save with the text before it finds; one missing run asks (A1, *The window and the threshold*). Ritemark's own saves, including a typo fix or an undo of words just saved, and an edit made in a text editor of the same file are never held; a writer that only reformatted the words (a list marker, emphasis) isn't a loss (review rounds 1 and 2). A Discard of the file's changes, a checkout or an AI's checkpoint rewind within 30 s of typing in it is a writer too: it asks, and Use disk version completes it (the cost decision 1 names). S8's limit: a writer that saves its copy more than 30 s after Ritemark last saved the words still wins, as in 2.1.
+- **The words** are the Experience lead's (issue #588, 31 October): the dialog's two sentences and the notification's one, for this case only. Review changes and its three buttons are unchanged.
 
 ### R2: A card the board can't read can be tried again or removed (#596)
 
@@ -75,6 +125,8 @@ Acceptance criteria:
 - A unit test of `onNodesChange` covers both.
 - If the harness's save comes about 100 ms after the click, as the issue says, and the code's debounce is 500 ms, the second write path is found and closed too.
 
+**R4 (revised 2026-10-31, after A9, [research/flow-save-timing.md](research/flow-save-timing.md)).** There is no second write path: the "about 100 ms after the click" is the save that opening the flow starts (500 ms after `flow:load`, with the harness clicking at 400 ms). Opening a flow with no click writes it once on `main`, and a click after that save is acknowledged writes it again 520 ms later. Both are the same cause and the same fix; "opening a flow writes nothing" is a check that fails on `main`.
+
 ### R5: A Flow step without its key says so in one sentence, with a link (#580)
 
 As someone who builds a Flow, I want the same sentence and link on every step that needs a key, as the Google image step has.
@@ -117,6 +169,8 @@ Acceptance criteria:
 - The font is asked for at its real place only; icons still draw (a screenshot). If the fix is in patch 001, it is a shell-tier change.
 - DEP0169: if the caller is Ritemark's own bundle or a dependency we can move off it, it moves to `new URL()`, or the dependency is updated. If the caller is VS Code's own, the record says so, the log level question is answered, and nothing in VS Code changes without a reason.
 - `main.log` and `exthost.log` of a fresh launch carry neither line, or the record says what stays and why.
+
+**R8 (revised 2026-10-31, after A7, [research/log-lines.md](research/log-lines.md)).** The font request is Ritemark's own: patch 001's `iconRegistry.ts` registers `phosphor` with `URI.parse('phosphor.woff2')`, which VS Code writes into its icon style sheet as `vscode-file://vscode-app/phosphor.woff2`. The fix is in patch 001 (PR 5). DEP0169 did not reproduce in the dev build, whose built-in extensions don't start; Ritemark's bundle doesn't import Node's `url` module, so the caller is VS Code's or a built-in extension's, and finding it waits for PR 5's tree or the candidate. PR 2 has no DEP0169 item.
 
 ### R9: A project switch lays Home out once (#569)
 
@@ -166,6 +220,8 @@ Acceptance criteria:
 - **If none exists,** the risk is recorded in the release plan and on the issue, with Sprint 144's finding (one Node path to an outside address: Flows' Save File with an image URL), and decision 4 is Jarmo's.
 - The extension host is checked again for any Node request to a URL a person or an agent supplies, because code has been added since 27 October.
 
+**R12 (revised 2026-10-31, after A6, [research/electron-availability.md](research/electron-availability.md)).** A fixed Electron exists: 43.8.4 (27 October, 18:05 UTC, after Sprint 144 looked), 43.8.5 and 43.8.6 (30 October) are on Node 24.22.1. R12 takes its first branch: PR 6 moves patch 020 to the newest 43.x when it is made (43.8.6 today). Decision 4 applies only if PR 6 fails its checks. The extension host's Node network calls are unchanged since Sprint 144's list.
+
 ## Engineering requirements
 
 ### E1: Each fix has its check
@@ -178,7 +234,7 @@ No conversation record, card file, flow, document or setting changes shape. R2 a
 
 ### E3: Tier
 
-Shell, by `patches/vscode/020-ritemark-electron-43.patch` and the expected changes to 001 and 019. The per-item tiers are in the sprint plan; the tier line changes first when an audit moves a fix.
+Shell, by `patches/vscode/020-ritemark-electron-43.patch` and the expected changes to 001 and 019. The per-item tiers are in the sprint plan; the tier line changes first when an audit moves a fix. Since 1 November also `patches/vscode/014-ritemark-save-receipts.patch`: R1's reload participant (revised R1, approved).
 
 ### E4: Bundle
 
@@ -198,6 +254,8 @@ Shell, by `patches/vscode/020-ritemark-electron-43.patch` and the expected chang
 
 ## Decisions
 
+**1 November 2026, Jarmo (decision log `735b186`):** #588's direction changes: both changes stay, merged by paragraph (R1, revised); the whole-document question is only the fallback; the AI's edits stream straight in, no suggestions in 2.2 (#609); the merge runs in the shell, next to patch 014. This supersedes decision 1 below, and decision 2's level is now High by paths. Approved on 1 November (`819c63f`), with unsaved text merged too.
+
 Jarmo answered all five on 31 October 2026 ("agreed with all", in the Development manager session), each as recommended:
 
 1. **#588: a question where there is silence today.** Yes. The guard asks (Review changes) when words saved in the last few seconds vanish from the file; the alternative is silent loss. It can also ask when an AI deliberately rewrites the sentence just typed.
@@ -208,4 +266,5 @@ Jarmo answered all five on 31 October 2026 ("agreed with all", in the Developmen
 
 Still open:
 
-- **For the Experience lead:** the rows and question for #596, the quiet sign for #597, the done card's background for #578, the words (or a lighter button) for #588.
+- **For the Experience lead:** the rows and question for #596, the quiet sign for #597, the done card's background for #578. #588's words and look are drawn (experience 44, 1 November).
+- ~~**For Jarmo:** whether a dirty document's writer (S3, #454) is merged too~~: yes (1 November, `819c63f`).

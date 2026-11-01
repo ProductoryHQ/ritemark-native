@@ -34,7 +34,8 @@ import { marked } from 'marked'
 import type { EditorSelection } from './types/editor'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import type { DocumentProperties } from './components/properties'
-import { DocumentConflictDialog } from './components/dialogs/DocumentConflictDialog'
+import { DocumentConflictDialog, ParagraphConflictDialog } from './components/dialogs/DocumentConflictDialog'
+import { paragraphReviewWords } from './components/dialogs/paragraphReviewWords'
 import type { DocumentSyncAction } from './components/header/DocumentSyncAction'
 import type { DocumentApplyTarget } from './types/documentSync'
 import {
@@ -161,6 +162,9 @@ function App() {
     initialDocumentViewSyncState,
   )
   const [showConflictDialog, setShowConflictDialog] = useState(false)
+  // Sprint 145 R1 (#588): Review changes for the places both the person and a writer changed, one at a time.
+  const [showParagraphDialog, setShowParagraphDialog] = useState(false)
+  const [paragraphTotal, setParagraphTotal] = useState(0)
 
   const postDocumentEdit = useCallback((payload: DocumentEditPayload) => {
     if (!documentSync) return
@@ -226,7 +230,7 @@ function App() {
           // actually owns. A preceding sync-state message proves host state,
           // not visible application.
           currentRevisionRef.current = message.revision
-          const target = { revision: message.revision, payloadHash: message.payloadHash }
+          const target = { revision: message.revision, payloadHash: message.payloadHash, ...(message.reason === 'merge' ? { undoable: true } : {}) }
           syncTargetRef.current = target
           setSyncTarget(target)
           applyRenderPayload(message.payload)
@@ -260,6 +264,12 @@ function App() {
           dispatchDocumentViewSync(message)
           // #454: the person chose Review changes in Ritemark's notification.
           if (message.type === 'document:conflict' && message.openReview) setShowConflictDialog(true)
+          // The person chose Review changes in Ritemark's notification for a merged paragraph.
+          if (message.type === 'document:paragraphs' && message.openReview && message.items.length) {
+            setParagraphTotal(message.items.length)
+            setShowParagraphDialog(true)
+            scrollToParagraph(message.items[0].mine)
+          }
         }
         return
       }
@@ -538,6 +548,30 @@ function App() {
     setSyncTarget(undefined)
   }, [documentSync])
 
+  // Sprint 145 R1 (#588): the person's answer for one place both changed; the dialog moves to the next or closes.
+  const sendParagraphAction = useCallback((id: number, action: 'keep-mine' | 'use-theirs') => {
+    if (!documentSync) return
+    sendDocumentMessage({ type: 'document:paragraph-action', ...documentSync, id, action })
+    const left = (documentViewSync.paragraphs?.items.length ?? 1) - 1
+    if (left <= 0) setShowParagraphDialog(false)
+  }, [documentSync, documentViewSync.paragraphs])
+
+  // One paragraph review for both layouts: "1 of 2" counts from the places listed when it opened.
+  const paragraphItems = documentViewSync.paragraphs?.items ?? []
+  const paragraphCount = Math.max(paragraphTotal, paragraphItems.length)
+  const paragraphDialog = (
+    <ParagraphConflictDialog
+      isOpen={showParagraphDialog && paragraphItems.length > 0}
+      items={paragraphItems}
+      total={paragraphCount}
+      position={paragraphCount - paragraphItems.length + 1}
+      writer={documentViewSync.paragraphs?.writer}
+      onClose={() => setShowParagraphDialog(false)}
+      onKeepMine={(id) => sendParagraphAction(id, 'keep-mine')}
+      onUseTheirs={(id) => sendParagraphAction(id, 'use-theirs')}
+    />
+  )
+
   const sendConflictAction = useCallback((action: 'compare' | 'keep-local' | 'use-disk') => {
     if (!documentSync || !documentViewSync.conflict) return
     sendDocumentMessage({
@@ -565,7 +599,19 @@ function App() {
           title: documentViewSync.message,
           onClick: retryDocumentApply,
         }
-      : undefined
+      : selectedSyncAction === 'paragraphs' && documentViewSync.paragraphs
+        ? {
+            kind: 'conflict',
+            label: 'Review changes',
+            title: paragraphReviewWords(documentViewSync.paragraphs.items.length, documentViewSync.paragraphs.writer).tooltip,
+            onClick: () => {
+              const items = documentViewSync.paragraphs?.items ?? []
+              setParagraphTotal(items.length)
+              setShowParagraphDialog(items.length > 0)
+              if (items[0]) scrollToParagraph(items[0].mine)
+            },
+          }
+        : undefined
 
   // Side panel toggle helper — TOC / Properties / Agent share one slot, mutually exclusive.
   // 'agent' is intentionally not restored from localStorage on init (it's auto-pinned on
@@ -778,11 +824,13 @@ function App() {
         <DocumentConflictDialog
           isOpen={showConflictDialog && !!documentViewSync.conflict}
           filename={documentViewSync.conflict?.filename || filename}
+          reason={documentViewSync.conflict?.reason}
           onClose={() => setShowConflictDialog(false)}
           onCompare={() => sendConflictAction('compare')}
           onKeepLocal={() => sendConflictAction('keep-local')}
           onUseDisk={() => sendConflictAction('use-disk')}
         />
+        {paragraphDialog}
       </>
     )
   }
@@ -922,14 +970,29 @@ function App() {
       <DocumentConflictDialog
         isOpen={showConflictDialog && !!documentViewSync.conflict}
         filename={documentViewSync.conflict?.filename || filename}
+        reason={documentViewSync.conflict?.reason}
         onClose={() => setShowConflictDialog(false)}
         onCompare={() => sendConflictAction('compare')}
         onKeepLocal={() => sendConflictAction('keep-local')}
         onUseDisk={() => sendConflictAction('use-disk')}
       />
 
+      {paragraphDialog}
+
     </div>
   )
+}
+
+/**
+ * Sprint 145 R1 (#588): Review changes scrolls the document to the paragraph it asks about. The paragraph is found
+ * by its text (the Markdown's words, without the marks at its start), best effort; nothing moves when it isn't.
+ */
+function scrollToParagraph(markdown: string) {
+  const words = markdown.replace(/^[\s#>*+\-\d.]+/, '').replace(/[*_`~[\]]/g, '').trim().slice(0, 40)
+  if (!words) return
+  const blocks = [...document.querySelectorAll<HTMLElement>('.ProseMirror > *')]
+  const block = blocks.find(element => (element.textContent ?? '').includes(words))
+  block?.scrollIntoView({ block: 'center' })
 }
 
 export default App

@@ -665,6 +665,339 @@ async function main(): Promise<void> {
     assert.ok((await controller.unwait(second)).ok);
   }
 
+  // ── Sprint 145 (#596): Try again and Remove on a file the board couldn't read ──
+  {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-files-'));
+    const tasks = path.join(folder, '.ritemark', 'tasks');
+    fs.mkdirSync(tasks, { recursive: true });
+    const cardText = (id: string, title: string) => `---\nritemark: task/1\nid: ${id}\ntitle: ${title}\nstage: todo\n---\n`;
+    fs.writeFileSync(path.join(tasks, 'cloud.md'), cardText('c10ud1', 'In the cloud'));
+    fs.writeFileSync(path.join(tasks, 'stuck.md'), cardText('st0ck1', 'Stuck'));
+    fs.writeFileSync(path.join(tasks, 'broken.md'), '---\nritemark: task/1\nid: br0k3n\ntitle: [unclosed\n---\n');
+    fs.writeFileSync(path.join(tasks, 'locked.md'), '---\nritemark: task/1\nid: l0ck3d\ntitle: [unclosed\n---\n');
+    fs.writeFileSync(path.join(tasks, 'fine.md'), cardText('f1n3c4', 'Reads fine'));
+    fs.writeFileSync(path.join(folder, 'elsewhere.md'), 'not a card\n');
+    let cloudReady = false;
+    let stuckMs = 0;
+    let slowMs = 0;
+    const trashed: string[] = [];
+    const store = new BoardStore(folder, {
+      fileSystem: {
+        ...nodeBoardStoreFileSystem,
+        async readFile(file) {
+          const name = path.basename(file);
+          if (name === 'cloud.md' && !cloudReady) throw Object.assign(new Error('ETIMEDOUT: connection timed out, read'), { code: 'ETIMEDOUT' });
+          if (name === 'slow.md' && slowMs) await new Promise((resolve) => setTimeout(resolve, slowMs));
+          if (name === 'stuck.md' && stuckMs) {
+            await new Promise((resolve) => setTimeout(resolve, stuckMs));
+            throw Object.assign(new Error('ETIMEDOUT: connection timed out, read'), { code: 'ETIMEDOUT' });
+          }
+          return nodeBoardStoreFileSystem.readFile(file);
+        },
+        async trash(file) {
+          if (path.basename(file) === 'locked.md') throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' });
+          trashed.push(file);
+          fs.rmSync(file);
+        },
+      },
+      now,
+    });
+    const ledger = new FakeLedger();
+    const pushed: string[][] = [];
+    const make = (platform: NodeJS.Platform) =>
+      new BoardController({
+        store,
+        ledger,
+        folderName: 'files',
+        settings: { get: () => undefined, update: async () => undefined },
+        runtimes: () => ({ 'claude-code': READY, codex: READY, opencode: READY }),
+        enabled: () => true,
+        fileExists: async () => true,
+        now,
+        platform,
+        retryAnswerMs: 150,
+      });
+    const controller = make('darwin');
+    controller.subscribe((snapshot) => pushed.push(snapshot.unreadable.map((file) => `${file.fileName}:${file.reason}`)));
+    // A card the hand-off ledger knows, whose file can't be read now.
+    ledger.set('c10ud1', { state: 'completed', runtimeId: 'claude-code', since: at(1), canOpen: true });
+    stuckMs = 0;
+    await store.list();
+    const first = await controller.snapshot();
+    assert.deepEqual(first.unreadable.map((file) => [file.fileName, file.reason]), [['broken.md', 'format'], ['cloud.md', 'read'], ['locked.md', 'format']]);
+    assert.ok(!first.cards.some((card) => card.id === 'c10ud1') && !first.calls.length, 'a ledger record brings no card back for a file the board can’t read');
+
+    // S11: Try again, and it reads. The snapshot goes out before the answer, so the row goes in one step.
+    cloudReady = true;
+    pushed.length = 0;
+    assert.deepEqual(await controller.retryFile('cloud.md'), { ok: true });
+    assert.ok(pushed.length >= 1 && !pushed[pushed.length - 1].some((row) => row.startsWith('cloud.md')), 'the last snapshot before the answer is fresh, without the row');
+    assert.ok((await controller.snapshot()).cards.some((card) => card.id === 'c10ud1'), 'the card is back in its column');
+
+    // S12: Try again on a file that still fails: the answer comes in time, the row stays as it was.
+    stuckMs = 400;
+    await store.invalidate('stuck.md').catch(() => undefined);
+    const before = Date.now();
+    assert.deepEqual(await controller.retryFile('stuck.md'), { ok: true });
+    assert.ok(Date.now() - before < 350, 'a read that hangs gets an answer after the cap, not after the read');
+    const moved = await controller.move('f1n3c4', 'doing');
+    assert.ok(moved.ok && Date.now() - before < 350, 'and a move made meanwhile doesn’t wait for it (#597)');
+    stuckMs = 0;
+
+    // S17: only this board's unreadable files.
+    for (const name of ['../elsewhere.md', 'fine.md', 'not-there.md', 'nested/broken.md']) {
+      assert.equal((await controller.removeFile(name)).ok, false, `${name} is refused`);
+      assert.equal((await controller.retryFile(name)).ok, false, `${name} can’t be retried`);
+    }
+    assert.deepEqual(trashed, [], 'nothing trashed');
+
+    // S13: Remove moves the file to the trash; the row goes.
+    assert.deepEqual(await controller.removeFile('broken.md'), { ok: true });
+    assert.deepEqual(trashed.map((file) => path.basename(file)), ['broken.md']);
+    assert.ok(!(await controller.snapshot()).unreadable.some((file) => file.fileName === 'broken.md'));
+
+    // S16: the trash refuses: the row stays, and the answer says so in the board's words, per system.
+    assert.deepEqual(await controller.removeFile('locked.md'), {
+      ok: false,
+      code: 'trash-refused',
+      message: 'Ritemark couldn’t move it to the Trash, so it is still in the folder.',
+    });
+    const windows = make('win32');
+    const onWindows = await windows.removeFile('locked.md');
+    windows.dispose();
+    assert.equal(onWindows.ok ? null : onWindows.message, 'Ritemark couldn’t move it to the Recycle Bin, so it is still in the folder.');
+    assert.ok((await controller.snapshot()).unreadable.some((file) => file.fileName === 'locked.md'), 'the refused file keeps its row');
+
+    // Try again answers in time even while a change to another card holds the store (its own file hangs).
+    fs.writeFileSync(path.join(tasks, 'slow.md'), cardText('sl0w01', 'Slow to read'));
+    await store.invalidate('slow.md');
+    slowMs = 400;
+    const held = controller.move('sl0w01', 'doing');
+    const started = Date.now();
+    assert.deepEqual(await controller.retryFile('locked.md'), { ok: true });
+    assert.ok(Date.now() - started < 350, `the answer comes at the cap, not after the held store (${Date.now() - started} ms)`);
+    await held;
+    slowMs = 0;
+    controller.dispose();
+  }
+
+  // ── Remove's last look, and a move's revision ─────────────────────────────
+  {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-files-'));
+    const tasks = path.join(folder, '.ritemark', 'tasks');
+    fs.mkdirSync(tasks, { recursive: true });
+    const cardText = (id: string, title: string) => `---\nritemark: task/1\nid: ${id}\ntitle: ${title}\nstage: todo\n---\n`;
+    fs.writeFileSync(path.join(tasks, 'arrived.md'), cardText('arr1v3', 'Arrived'));
+    fs.writeFileSync(path.join(tasks, 'hanging.md'), cardText('h4ng1n', 'Hanging'));
+    fs.writeFileSync(path.join(tasks, 'plain.md'), cardText('pl41n1', 'Plain'));
+    let arrived = false;
+    let hanging = false;
+    const trashed: string[] = [];
+    const store = new BoardStore(folder, {
+      fileSystem: {
+        ...nodeBoardStoreFileSystem,
+        async readFile(file) {
+          const name = path.basename(file);
+          if (name === 'arrived.md' && !arrived) throw Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' });
+          if (name === 'hanging.md' && hanging) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            throw Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' });
+          }
+          return nodeBoardStoreFileSystem.readFile(file);
+        },
+        async trash(file) {
+          trashed.push(path.basename(file));
+          fs.rmSync(file);
+        },
+      },
+      now,
+    });
+    const controller = new BoardController({
+      store,
+      ledger: new FakeLedger(),
+      folderName: 'files',
+      settings: { get: () => undefined, update: async () => undefined },
+      runtimes: () => ({ 'claude-code': READY, codex: READY, opencode: READY }),
+      enabled: () => true,
+      fileExists: async () => true,
+      now,
+      removeLookMs: 150,
+    });
+    hanging = true;
+    await store.list();
+    assert.ok(store.isUnreadable('arrived.md') && store.isUnreadable('hanging.md'));
+
+    // The file arrived since its row was drawn: Remove looks once more and leaves it, and its card shows.
+    arrived = true;
+    const kept = await controller.removeFile('arrived.md');
+    assert.equal(kept.ok ? 'ok' : kept.code, 'not-found');
+    assert.deepEqual(trashed, [], 'a file that reads now is not trashed');
+    assert.ok((await controller.snapshot()).cards.some((card) => card.title === 'Arrived'), 'its card is on the board');
+
+    // A file that went during the look (a sync deleted it) counts as removed, and nothing is trashed.
+    fs.writeFileSync(path.join(tasks, 'going.md'), '---\nritemark: task/1\nid: g01ng1\ntitle: [unclosed\n---\n');
+    await store.invalidate('going.md');
+    assert.ok(store.isUnreadable('going.md'));
+    fs.rmSync(path.join(tasks, 'going.md'));
+    assert.deepEqual(await controller.removeFile('going.md'), { ok: true });
+    assert.deepEqual(trashed, [], 'a file already gone is not trashed');
+
+    // A file that still hangs goes to the trash after the short look.
+    const started = Date.now();
+    assert.deepEqual(await controller.removeFile('hanging.md'), { ok: true });
+    assert.ok(Date.now() - started < 600, 'Remove doesn’t wait for the hanging read');
+    assert.deepEqual(trashed, ['hanging.md']);
+
+    // A move's answer carries the store's revision; the next snapshot is at or after it and shows the move.
+    const moved = await controller.move('pl41n1', 'doing');
+    assert.ok(moved.ok && typeof moved.revision === 'number');
+    const after = await controller.snapshot();
+    assert.ok(after.revision !== undefined && moved.ok && moved.revision !== undefined && after.revision >= moved.revision, 'the snapshot is at or after the move');
+    assert.equal(after.cards.find((card) => card.id === 'pl41n1')?.stage, 'doing');
+    assert.equal(after.boardId, store.id, 'and names the store that counted it');
+    await new Promise((resolve) => setTimeout(resolve, 1100)); // let the hanging read finish
+    controller.dispose();
+  }
+
+  // ── Remove's last look makes a read of its own, even when hung reads hold every slot (#610, Codex) ─
+  {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-look-'));
+    const tasks = path.join(folder, '.ritemark', 'tasks');
+    fs.mkdirSync(tasks, { recursive: true });
+    const cardText = (id: string, title: string) => `---\nritemark: task/1\nid: ${id}\ntitle: ${title}\nstage: todo\n---\n`;
+    fs.writeFileSync(path.join(tasks, 'arrived.md'), cardText('arr1v4', 'Arrived late'));
+    fs.writeFileSync(path.join(tasks, 'stuck-a.md'), cardText('stk00a', 'Stuck A'));
+    fs.writeFileSync(path.join(tasks, 'stuck-b.md'), cardText('stk00b', 'Stuck B'));
+    let arrived = false;
+    let stuck = false;
+    let arrivedHangsOnce = false;
+    const trashed: string[] = [];
+    const hang = () => new Promise((resolve) => setTimeout(resolve, 1200));
+    const store = new BoardStore(folder, {
+      fileSystem: {
+        ...nodeBoardStoreFileSystem,
+        async readFile(file) {
+          const name = path.basename(file);
+          if (stuck && (name === 'stuck-a.md' || name === 'stuck-b.md')) {
+            await hang();
+            throw Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' });
+          }
+          if (name === 'arrived.md') {
+            if (arrivedHangsOnce) {
+              arrivedHangsOnce = false;
+              await hang();
+              throw Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' });
+            }
+            if (!arrived) throw Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' });
+          }
+          return nodeBoardStoreFileSystem.readFile(file);
+        },
+        async trash(file) {
+          trashed.push(path.basename(file));
+          fs.rmSync(file);
+        },
+      },
+      now,
+    });
+    const controller = new BoardController({
+      store,
+      ledger: new FakeLedger(),
+      folderName: 'files',
+      settings: { get: () => undefined, update: async () => undefined },
+      runtimes: () => ({ 'claude-code': READY, codex: READY, opencode: READY }),
+      enabled: () => true,
+      fileExists: async () => true,
+      now,
+      removeLookMs: 300,
+      retryAnswerMs: 100,
+    });
+    await store.list();
+    assert.ok(store.isUnreadable('arrived.md'));
+    // An earlier Try again of this file hangs and holds one read slot; a watcher read of another file hangs in the
+    // other, and a third waits for a slot.
+    stuck = true;
+    arrivedHangsOnce = true;
+    const retry = controller.retryFile('arrived.md');
+    const held = [store.invalidate('stuck-a.md'), store.invalidate('stuck-b.md')];
+    await retry;
+    // Meanwhile the cloud file arrives: it reads now as a card.
+    arrived = true;
+    const answer = await controller.removeFile('arrived.md');
+    assert.deepEqual(trashed, [], 'the file that reads now is not trashed, though every slot was taken');
+    assert.equal(answer.ok ? 'ok' : answer.code, 'not-found');
+    assert.ok((await controller.snapshot()).cards.some((card) => card.title === 'Arrived late'), 'its card is on the board');
+    await Promise.all(held);
+    await new Promise((resolve) => setTimeout(resolve, 1300)); // the hung Try again ends, and changes nothing
+    assert.ok((await controller.snapshot()).cards.some((card) => card.title === 'Arrived late'), 'still on the board');
+    controller.dispose();
+  }
+
+  // ── A move that couldn't be saved: the notice names the card in plain words (#610) ─
+  {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-save-'));
+    const tasks = path.join(folder, '.ritemark', 'tasks');
+    fs.mkdirSync(tasks, { recursive: true });
+    fs.writeFileSync(path.join(tasks, 'draft-module-6.md'), '---\nritemark: task/1\nid: dr4ft6\ntitle: Draft Module 6\nstage: todo\n---\n');
+    const store = new BoardStore(folder, {
+      fileSystem: {
+        ...nodeBoardStoreFileSystem,
+        async writeFile(file) {
+          throw Object.assign(new Error(`EACCES: permission denied, open '${file}'`), { code: 'EACCES' });
+        },
+        async trash() {},
+      },
+      now,
+    });
+    const controller = new BoardController({
+      store,
+      ledger: new FakeLedger(),
+      folderName: 'files',
+      settings: { get: () => undefined, update: async () => undefined },
+      runtimes: () => ({ 'claude-code': READY, codex: READY, opencode: READY }),
+      enabled: () => true,
+      fileExists: async () => true,
+      now,
+    });
+    const answer = await controller.move('dr4ft6', 'doing');
+    assert.deepEqual(answer, {
+      ok: false,
+      code: 'write-failed',
+      message: 'Couldn’t save “Draft Module 6”: this computer doesn’t let Ritemark change files in this folder.',
+    });
+    assert.equal((await controller.snapshot()).cards[0].stage, 'todo', 'the card stays where it was');
+    controller.dispose();
+  }
+
+  // ── Remove refuses a file the board hasn't listed, without blaming the trash ─
+  {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-files-'));
+    const store = new BoardStore(folder, {
+      fileSystem: {
+        ...nodeBoardStoreFileSystem,
+        async readDir() {
+          throw Object.assign(new Error('EIO: i/o error, scandir'), { code: 'EIO' });
+        },
+        async trash() {},
+      },
+      now,
+    });
+    const controller = new BoardController({
+      store,
+      ledger: new FakeLedger(),
+      folderName: 'files',
+      settings: { get: () => undefined, update: async () => undefined },
+      runtimes: () => ({ 'claude-code': READY, codex: READY, opencode: READY }),
+      enabled: () => true,
+      fileExists: async () => true,
+      now,
+    });
+    const answer = await controller.removeFile('broken.md');
+    assert.equal(answer.ok, false);
+    assert.equal(answer.ok ? '' : answer.code, 'not-found', 'a board that couldn’t list its folder lists no file to remove');
+    assert.doesNotMatch(answer.ok ? '' : answer.message, /Trash|Recycle Bin/, 'and the answer doesn’t blame the trash');
+    controller.dispose();
+  }
+
   assert.deepEqual(countCheckboxes('- [ ] a\n- [x] b\n  * [X] c\nnot - [ ] d\n'), { done: 2, total: 3 });
   assert.equal(WIP_LIMIT_KEY, 'ritemark.taskBoard.wipLimit');
 

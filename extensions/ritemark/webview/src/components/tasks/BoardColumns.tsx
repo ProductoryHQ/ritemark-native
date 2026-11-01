@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { act, moveCard, useBoardUi } from './boardUi'
+import { useSavingStage } from './boardClient'
 import type { BoardTab } from '../../../../src/taskBoard/protocol'
 import { CardMenu } from './CardMenu'
 import { CardGlyph, GivePromptPanel, HeaderIconButton, StateGlyph, TitleField, toneClass, useNow, usePresenter } from './CardParts'
@@ -172,7 +173,7 @@ export function BoardColumns({ snapshot, onShowTab }: { snapshot: BoardSnapshot;
         })}
       </div>
       <div className="px-2">
-        <UnreadableCards snapshot={snapshot} />
+        <UnreadableCards snapshot={snapshot} variant="board" />
       </div>
       <div className="tb-foot">Tasks are saved in this folder, so they travel with it.</div>
     </>
@@ -263,10 +264,13 @@ function Tile({
 }) {
   const openCard = useBoardUi((state) => state.openCard)
   const prompt = useBoardUi((state) => state.prompt)
+  // Sprint 145 (#597; experience 41): a move still being saved after a second shows a quiet turning mark in the
+  // ⋯ menu's place, even under the pointer that dropped it; the menu comes back when the move is saved.
+  const saving = useSavingStage(card.id)
   const mark = p.call === 'needs-you' ? 'tb-blocked' : p.call ? 'tb-you' : ''
   return (
     <div
-      className={cn('tb-tile', mark, dragging && 'dragging')}
+      className={cn('tb-tile', mark, dragging && 'dragging', saving && 'saving')}
       data-card={card.id}
       // A working card can be dragged; the host refuses a move out of Doing
       // and the notice says why (S7a).
@@ -319,9 +323,15 @@ function Tile({
           ) : null}
         </div>
       </div>
+      {/* The menu stays mounted while the sign shows, so a keyboard focus on it is never dropped (tasks.css). */}
       <span className="mt">
         <CardMenu card={card} p={p} snapshot={snapshot} className="relative z-10" />
       </span>
+      {saving ? (
+        <span className="tb-saving" role="status" aria-label={`Saving the move to ${STAGE_NAMES[saving]}`}>
+          <Icon name="circle-notch" size={12} tone="inherit" className="tb-spin size-3" />
+        </span>
+      ) : null}
     </div>
   )
 }

@@ -152,7 +152,11 @@ export function DocumentHeader({
   )
 }
 
-/** A save problem's button (conflict or failed sync); also on a task card's strip. */
+/**
+ * A save problem's button (conflict or failed sync); also on a task card's strip. Sprint 145 (#588, experience
+ * 44): a conflict is a question, not an alarm: ink with a hairline and two arrows parting, for every conflict. It
+ * never takes the focus by itself.
+ */
 export function SyncActionButton({ action }: { action: DocumentSyncAction }) {
   return (
     <Tooltip label={action.title ?? action.label}>
@@ -162,10 +166,10 @@ export function SyncActionButton({ action }: { action: DocumentSyncAction }) {
         onClick={action.onClick}
         aria-label={action.label}
         className={action.kind === 'conflict'
-          ? 'text-[var(--r-warning)] border-[var(--r-warning)]'
+          ? 'text-ink-strong border-[var(--r-hairline-strong)]'
           : 'text-[var(--r-error)] border-[var(--r-error-soft)]'}
       >
-        <Icon name={action.kind === 'conflict' ? 'warning' : 'arrows-clockwise'} size={14} tone="active" />
+        <Icon name={action.kind === 'conflict' ? 'arrows-split' : 'arrows-clockwise'} size={14} tone="active" />
         <span>{action.label}</span>
       </Button>
     </Tooltip>

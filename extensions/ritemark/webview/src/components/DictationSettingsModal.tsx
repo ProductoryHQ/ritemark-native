@@ -165,7 +165,8 @@ export function DictationSettingsModal({ isOpen, onClose, mode = 'live' }: Dicta
                   {modelStatus === null ? (
                     'Checking...'
                   ) : modelStatus.downloaded ? (
-                    <span className="text-[var(--vscode-charts-green,#4ade80)]">{formatSize(modelStatus.sizeBytes)}</span>
+                    // Sprint 145 (#578): the downloaded model's size in ink; green is only the ready dot
+                    <span className="text-[var(--r-ink-strong)]">{formatSize(modelStatus.sizeBytes)}</span>
                   ) : (
                     <span className="text-[var(--vscode-charts-yellow,#facc15)]">Not downloaded</span>
                   )}

@@ -11,7 +11,8 @@ const pillVariants = cva(
         default: 'bg-surface-soft text-ink-body',
         accent: 'bg-accent-soft text-accent-deep',
         info: 'bg-accent-soft text-accent-deep',
-        success: 'bg-ritemark-success-soft text-ritemark-success',
+        // Sprint 145 (#578): done is ink; green is only the small ready dot
+        success: 'bg-surface-muted text-ink-strong',
         warning: 'bg-ritemark-warning-soft text-ritemark-warning',
         error: 'bg-ritemark-error-soft text-ritemark-error',
       },

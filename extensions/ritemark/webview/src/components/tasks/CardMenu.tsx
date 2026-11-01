@@ -12,7 +12,7 @@ import { CARD_STAGES } from '../../../../src/taskBoard/cardTypes'
 import { cn } from '../../lib/utils'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, MoreActionsTrigger } from '../ui/dropdown-menu'
 import { Icon, type PhosphorIconName } from '../ui/Icon'
-import { act, giveCard, moveCard, useBoardUi } from './boardUi'
+import { act, giveCard, markCardDone, moveCard, useBoardUi } from './boardUi'
 import { STAGE_NAMES, agentName, type CardPresentation } from './taskCopy'
 
 const FULL_NAMES: Record<AgentId, string> = { 'claude-code': 'Claude Code', codex: 'ChatGPT', opencode: 'OpenCode' }
@@ -82,7 +82,7 @@ export function CardMenu({
     )
   } else if (p.call === 'decision' || p.call === 'review') {
     if (canOpen) items.push(conversation)
-    items.push({ label: 'Mark done', icon: 'check', run: () => void act({ type: 'board/mark-done', cardId: card.id }) }, move)
+    items.push({ label: 'Mark done', icon: 'check', run: () => void markCardDone(card.id) }, move)
   } else if (p.call === 'failed') {
     items.push({ label: 'Retry with…', icon: 'arrow-counter-clockwise', sub: 'retry' })
     if (canOpen) items.push(conversation)

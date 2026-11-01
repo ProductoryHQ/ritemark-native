@@ -66,7 +66,8 @@ export function CodexSetupView() {
 
             {codexStatus.email && (
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                <Icon name="check-circle" size={14} className="text-[var(--vscode-testing-iconPassed)]" />
+                {/* Sprint 145 (#578): the signed-in e-mail's check takes the e-mail's ink; green is only the ready dot */}
+                <Icon name="check-circle" size={14} tone="inherit" />
                 <span className="font-medium">{codexStatus.email}</span>
                 {codexStatus.plan && <span className="opacity-70">({codexStatus.plan})</span>}
               </div>

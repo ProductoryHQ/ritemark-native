@@ -304,7 +304,7 @@ export interface TurnFailureCardCopy {
   title: string;
   message: string;
   action?: TurnFailureAction;
-  /** The card says the way on was taken (the model switch), with the green check. */
+  /** The card says the way on was taken (the model switch), with a check in ink (Sprint 145, #578: green is only the ready dot). */
   done?: true;
 }
 
