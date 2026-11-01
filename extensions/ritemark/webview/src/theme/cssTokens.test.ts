@@ -8,6 +8,10 @@
  *     Tailwind 3 cannot apply an alpha to a variable and emits no rule at all, so
  *     the element has no background. Use
  *     `bg-[color:color-mix(in_srgb,var(--x)_60%,transparent)]` instead.
+ *  3. A shadow token behind a Tailwind `shadow-*` utility set to `none` in a theme.
+ *     Tailwind lists the shadow after a ring's (`box-shadow: <ring>, <shadow>`), and
+ *     `none` in that list voids the whole declaration: Ritemark Dark's primary button
+ *     drew no keyboard ring (Sprint 146). A transparent `0 0 #0000` draws nothing.
  *
  * Run: npx tsx webview/src/theme/cssTokens.test.ts
  */
@@ -50,5 +54,18 @@ const undefinedTokens = [...used].filter(([name]) => !defined.has(name)).map(([n
 assert.deepEqual(undefinedTokens, [], `colour tokens used but never defined:\n  ${undefinedTokens.join('\n  ')}`);
 assert.deepEqual(opacityOnVariables, [], `Tailwind emits nothing for an opacity modifier on a variable:\n  ${opacityOnVariables.join('\n  ')}`);
 assert.ok(used.size > 20 && defined.size > 20, 'the scan found the webview sources');
+
+const tailwindConfig = fs.readFileSync(path.join(root, '..', 'tailwind.config.ts'), 'utf8');
+const boxShadowBlock = /boxShadow:\s*\{([^}]*)\}/.exec(tailwindConfig)?.[1] ?? '';
+const shadowTokens = [...boxShadowBlock.matchAll(/var\((--[a-z0-9-]+)\)/g)].map((m) => m[1]);
+assert.ok(shadowTokens.length > 0, "the scan found the shadow tokens behind Tailwind's shadow-* utilities");
+const voidingShadows: string[] = [];
+for (const file of sources(root)) {
+  const text = fs.readFileSync(file, 'utf8');
+  for (const token of shadowTokens) {
+    for (const m of text.matchAll(new RegExp(`${token}\\s*:\\s*none\\b`, 'g'))) voidingShadows.push(`${path.relative(root, file)}: ${m[0]}`);
+  }
+}
+assert.deepEqual(voidingShadows, [], `a shadow-* token set to none voids any ring drawn with it (use 0 0 #0000):\n  ${voidingShadows.join('\n  ')}`);
 
 console.log(`cssTokens.test.ts: all passed (${used.size} tokens used, all defined)`);

@@ -1463,7 +1463,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
         <div className="flex items-center gap-1.5 px-2 py-1.5 border-t border-transparent max-[531px]:gap-1 max-[531px]:px-1 max-[238px]:flex-wrap">
           <Select value={runtimeSelectValue} onValueChange={handleRuntimeChange}>
             <SelectTrigger
-              className="h-6 w-36 max-w-[42vw] min-w-0 shrink gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 max-[531px]:w-auto max-[531px]:max-w-none max-[531px]:px-1 max-[531px]:[&>svg]:hidden max-[238px]:basis-0 max-[238px]:grow max-[238px]:max-w-max"
+              className="h-6 w-36 max-w-[42vw] min-w-0 shrink gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] focus-visible:ring-0 focus-visible:border-[var(--r-hairline)] [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 max-[531px]:w-auto max-[531px]:max-w-none max-[531px]:px-1 max-[531px]:[&>svg]:hidden max-[238px]:basis-0 max-[238px]:grow max-[238px]:max-w-max"
               title={runtimeFooterLabel}
             >
               <div className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
@@ -1611,7 +1611,7 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
             }}
           >
             <SelectTrigger
-              className="h-6 w-auto shrink-0 gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus:ring-0 focus:border-[var(--r-hairline)] [&>svg]:h-3 [&>svg]:w-3 [&>svg]:shrink-0 max-[531px]:w-6 max-[531px]:justify-center max-[531px]:gap-0 max-[531px]:px-1 max-[531px]:[&>svg]:hidden"
+              className="h-6 w-auto shrink-0 gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus-visible:ring-0 focus-visible:border-[var(--r-hairline)] [&>svg]:h-3 [&>svg]:w-3 [&>svg]:shrink-0 max-[531px]:w-6 max-[531px]:justify-center max-[531px]:gap-0 max-[531px]:px-1 max-[531px]:[&>svg]:hidden"
               aria-label={`Permission mode: ${composerPolicy.planFirst && planCapable ? 'Plan only' : composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}`}
               title={composerPolicy.planFirst && planCapable
                 ? 'Plan only — the agent plans and waits for your approval. Turns off when a plan is approved.'

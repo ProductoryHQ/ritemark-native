@@ -39,7 +39,7 @@
   z-index: 2; /* above the page, which overlaps the cover's foot for the mark (S2) */
 }
 /* One focus ring on Home, tiles and rows alike (S17): the theme's focus colour, clear of the control */
-.rh-desk :is(button, [role="button"], a):focus-visible { outline: 2px solid var(--vscode-focusBorder, var(--r-accent)); outline-offset: 2px; box-shadow: none; }
+:where(:root:not([data-input-mode="pointer"])) .rh-desk :is(button, [role="button"], a):focus-visible { outline: 2px solid var(--vscode-focusBorder, var(--r-accent)); outline-offset: 2px; box-shadow: none; }
 .rh-missing-notice { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 12px; padding: 8px 10px; border-radius: 8px; background: var(--r-surface-soft); color: var(--r-ink-body); font: 400 13px/18px var(--ritemark-ui-font-family); }
 
 .rh-chip-button {
@@ -236,7 +236,7 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
 .rh-desk .rh-file { padding: 0; }
 .rh-desk .rh-row .rh-ic svg, .rh-desk .rh-file > svg { width: 14px; height: 14px; }
 .rh-desk .rh-file > svg { color: var(--r-ink-muted); }
-.rh-desk .rh-row:focus-visible, .rh-desk .rh-file:focus-visible { border-color: var(--r-hairline); }
+:where(:root:not([data-input-mode="pointer"])) .rh-desk .rh-row:focus-visible, :where(:root:not([data-input-mode="pointer"])) .rh-desk .rh-file:focus-visible { border-color: var(--r-hairline); }
 /* A row keeps its time whole (#525): the name takes the ellipsis first, down to a few letters; then
    "in …" gives way. A tag on a Waiting row does the same. The shrinks as for the path above. */
 .rh-file .rh-file-name { flex: 0 1000000 auto; min-width: 5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -452,7 +452,7 @@ body.vscode-dark .rh-toast .rh-toast-action:hover, body[data-vscode-theme-kind='
 .rp-column .rp-row { justify-content: flex-start; white-space: normal; transition: none; }
 .rp-column .rp-row:active { transform: none; }
 .rp-column .rp-row .rp-missing svg { width: 12px; height: 12px; }
-.rp-column .rp-row:focus-visible { outline: 2px solid var(--vscode-focusBorder, var(--r-accent)); outline-offset: -2px; box-shadow: none; }
+:where(:root:not([data-input-mode="pointer"])) .rp-column .rp-row:focus-visible { outline: 2px solid var(--vscode-focusBorder, var(--r-accent)); outline-offset: -2px; box-shadow: none; }
 .rp-row.open { background: var(--r-surface); }
 .rp-row .rp-mini {
   width: 18px;

@@ -13,8 +13,8 @@ Nothing here starts before the plan is approved by Jarmo. Tick a box only when t
 ## Phase 1: Audits (each in `research/`, before its code)
 
 - [x] A1 `research/menu-focus-audit.md` (R1, S1–S8): #585's commit cherry-picked; its audit table run live, mouse and keyboard, Light and Dark; the rows behind an AI run or marked not run
-- [ ] A2 `research/focus-rings.md` (R3): every ring sorted by kind; the Tailwind 3.3 variant check and the mechanism chosen
-- [ ] A3 `research/catalogue-capture.md` (R2, R4, S22–S26): focus emulation, hover and press into a webview, a cell at device pixels five times, the theme switch
+- [x] A2 `research/focus-rings.md` (R3): every ring sorted by kind; the Tailwind 3.3 variant check and the mechanism chosen
+- [x] A3 `research/catalogue-capture.md` (R2, R4, S22–S26): focus emulation, hover and press into a webview, a cell at device pixels five times, the theme switch
 - [ ] A4 `research/tooltip-looks.md` (R5, S28–S31): both looks measured with crops; other users of `editorHoverWidget.*`; the native `title` list
 - [ ] A5 `research/narrow-buttons.md` (R6, S32–S35): every cut label; the CSS rule tried, the measured one only if needed
 - [ ] A6 `research/file-changes-audit.md` (R7, S37–S43): every Git and GitHub welcome string, its `when`, its owner patch; the focused element on a mouse open, for File changes and each place
@@ -27,23 +27,23 @@ Nothing here starts before the plan is approved by Jarmo. Tick a box only when t
 
 - [x] `f370bb66` cherry-picked onto `sprint-146-controls`; bundles rebuilt; its two crops moved into this sprint's `qa/`
 - [x] `npm test` (with `closeFocus.test.ts`) and the webview's `tsc --noEmit` pass; the test fails on `main`'s `components/ui` (E1)
-- [x] A1's table filled; a fault in the shared rule fixed here (none found)
+- [x] A1's table filled; a fault in the shared rule fixed here (the live audit found none; PR 1's review rounds found and fixed several, listed in `research/menu-focus-audit.md`)
 - [ ] The Experience lead has seen the screenshots (S1–S4, Light and Dark)
 - [ ] PR 1 opened: Risk with its tier, #585's evidence quoted; #585 closed with a link; `/code-review` at medium; every finding answered; merged at the reviewed head
 
 ## Phase 3: PR 2, the catalogue, the tracker and the state test (W2, W3, W4; R2–R4)
 
-- [ ] `ControlCatalogue.tsx` and its `main.tsx` route; `catalogueCoverage.test.ts` in `npm test` (S10)
-- [ ] `ControlCataloguePanel.ts` and the launch setting in `extension.ts`; the gate's unit test (S9)
-- [ ] `scripts/qa/control-states.mjs`, its source test (S23); a first capture of `main`'s controls kept as the failing set
-- [ ] `ui/input-mode.ts` from `close-focus.ts`; `inputMode.test.ts`; started in `main.tsx`
-- [ ] The rings behind keyboard mode by A2's mechanism: the Tailwind variant or the fallback, the four stylesheets, Select's trigger
-- [ ] `focusOpensTooltip` reads the mode; its test
-- [ ] The close rule by decision 1; `ExportMenu.tsx`'s own copy gone (S6, S19)
+- [x] `ControlCatalogue.tsx` and its `main.tsx` route; `catalogueCoverage.test.ts` in `npm test` (S10)
+- [x] `ControlCataloguePanel.ts` and the launch setting in `extension.ts`; the gate's unit test (S9)
+- [x] `scripts/qa/control-states.mjs`, its source test (S23); a first capture of the controls before the tracker kept as the failing set (`research/control-states-runs.md`)
+- [x] `ui/input-mode.ts` from `close-focus.ts`; `inputMode.test.ts`; started in `main.tsx` (and `office/main.tsx`)
+- [x] The rings behind keyboard mode by A2's mechanism: the Tailwind variant, the stylesheets, Select's and the composer's triggers
+- [x] `focusOpensTooltip` reads the mode; its test
+- [x] The close rule by decision 1; `ExportMenu.tsx`'s own copy gone (S6, S19)
 - [ ] S13–S20 on a dev instance
-- [ ] The Experience lead approves every image, Light and Dark; `docs/development/control-baseline/` and its README
-- [ ] The revert run exits non-zero; the branch run exits 0 (S22); the background run equals the front run (S25)
-- [ ] Wiring: the PR template's Risk line; `REVIEW.md` and `reviewer-brief.md` leave out `control-baseline/`; the `release` skill and `release-manager.md` run it at Gate 1; `incidents.md` row 10 (S27); the Codex harness through the harness-equalizer
+- [ ] The Experience lead approves every image, Light and Dark; `docs/development/control-baseline/` and its README (the set and the README are in; the approval waits)
+- [ ] The revert run exits non-zero; the branch run exits 0 (S22); the background run equals the front run (S25). S22 done (`research/control-states-runs.md`, runs 8 and 9); S25 not run: a front run takes the screen
+- [x] Wiring: the PR template's Risk line; `REVIEW.md` and `reviewer-brief.md` leave out `control-baseline/`; the `release` skill and `release-manager.md` run it at Gate 1; `incidents.md` row 10 (S27); the Codex harness through the harness-equalizer (its next run)
 - [ ] Windows through the overlay (S21)
 - [ ] PR 2 opened and reviewed at Standard; screenshots and `sheet.html` to the Experience lead
 

@@ -206,9 +206,9 @@ export function FileChangeNotification({
         }
 
         /* Focus styles for accessibility */
-        .btn-refresh:focus-visible,
-        .btn-review:focus-visible,
-        .btn-dismiss:focus-visible {
+        :where(:root:not([data-input-mode="pointer"])) .btn-refresh:focus-visible,
+        :where(:root:not([data-input-mode="pointer"])) .btn-review:focus-visible,
+        :where(:root:not([data-input-mode="pointer"])) .btn-dismiss:focus-visible {
           outline: 2px solid var(--vscode-focusBorder);
           outline-offset: 2px;
         }

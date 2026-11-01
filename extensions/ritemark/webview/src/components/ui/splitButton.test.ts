@@ -67,5 +67,8 @@ assert.equal(focusOpensTooltip({ matches: (selector) => selector === ':focus-vis
 assert.equal(focusOpensTooltip({ matches: () => false }), false, 'a focus after a mouse press')
 assert.equal(focusOpensTooltip({ matches: () => { throw new Error('unsupported') } }), true, 'no :focus-visible: as before')
 assert.equal(focusOpensTooltip(null), false)
+// Sprint 146 (R3): the page's input mode decides first; in pointer mode no focus opens one, :focus-visible or not
+assert.equal(focusOpensTooltip({ matches: (selector) => selector === ':focus-visible' }, 'pointer'), false, 'a menu gives the focus back after a mouse pick')
+assert.equal(focusOpensTooltip({ matches: (selector) => selector === ':focus-visible' }, 'keyboard'), true, 'Escape gives it back: keyboard')
 
 console.log('splitButton: all assertions passed')

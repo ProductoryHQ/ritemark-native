@@ -6,7 +6,6 @@
 
 import React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
-import { closeFocusHandler } from './close-focus';
 import { Icon } from './Icon';
 import { cn } from '../../lib/utils';
 
@@ -27,32 +26,34 @@ const SelectTrigger = React.forwardRef<
       'bg-surface-muted',
       'text-ink-strong',
       'border border-hairline-strong',
-      'focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]',
+      // Not a field: its frame is the keyboard's, as every other control's ring (2.2, input-mode.ts)
+      'focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--vscode-focusBorder)]',
       'disabled:cursor-not-allowed disabled:opacity-50',
-      '[&>span]:line-clamp-1',
+      // A long value is cut where the room ends, with an ellipsis 8 before the chevron (a line clamp cut at a word and
+      // a button centres what is left), and starts at the left
+      'text-left [&>span]:truncate',
       className
     )}
     {...props}
   >
     {children}
+    {/* The chevron keeps its size beside a long value */}
     <SelectPrimitive.Icon asChild>
-      <Icon name="caret-down" size={16} className="opacity-50" />
+      <Icon name="caret-down" size={16} className="ml-2 shrink-0 opacity-50" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
-// Radix focuses the trigger after every close, a mouse pick too, and the trigger's `focus:` styles then show. The
-// trigger gets the focus back only after the keyboard (2.2, the page's last input, close-focus.ts), as in
-// dropdown-menu.tsx.
+// Radix gives the trigger the focus after every close, a mouse pick too; the page's input mode decides whether its
+// frame shows (2.2, input-mode.ts): the trigger's frame is `focus-visible:`, so after a mouse pick none.
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = 'popper', onCloseAutoFocus, ...props }, ref) => (
+>(({ className, children, position = 'popper', ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
-      onCloseAutoFocus={closeFocusHandler(onCloseAutoFocus)}
       className={cn(
         // Issue #272: without a cap, popper-positioned content sizes to its
         // widest child (option descriptions) and can exceed the webview's

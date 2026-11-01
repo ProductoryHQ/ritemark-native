@@ -62,6 +62,7 @@ import { BrowserNavigationRecorder, DID_NAVIGATE_COMMAND } from './browser/brows
 import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
 import { findReplacedTextTab, findStuckMarkdownTabs } from './utils/stickyTabHealer';
+import { openControlCatalogueIfAsked } from './views/ControlCataloguePanel';
 import { registerProjectHeadCommands } from './views/projectHeadCommands';
 import { prepareWelcome, registerWelcome, type WelcomeHost } from './welcome/welcomeHost';
 import { newDocumentFolder, nextUntitledPath } from './newDocumentLocation';
@@ -1086,6 +1087,14 @@ export function activate(context: vscode.ExtensionContext) {
       await browserHistoryStore.clear();
     })
   );
+
+  // Sprint 146 (R2, decision 5): the control catalogue, only when a test script started Ritemark with its setting. A
+  // test page never stands between activation and its confirmation below
+  try {
+    openControlCatalogueIfAsked(context);
+  } catch (error) {
+    console.warn('Ritemark: the control catalogue did not open', error);
+  }
 
   // Sprint 93 R9: activate() reached its end with no synchronous throw —
   // confirm this version and trim old installs down to N-1 (current +
