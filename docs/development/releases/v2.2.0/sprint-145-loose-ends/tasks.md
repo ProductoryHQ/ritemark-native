@@ -32,7 +32,7 @@ Nothing here starts before the plan is approved by Jarmo. Tick a box only when t
   - [ ] The Windows run on the branch (S1): waiting for the Windows session
 - [ ] The Experience lead has seen Review changes for this case (screenshot)
 - [x] The false-positive set stays silent; S8's limit written in the issue and the release notes' known limits (`notes/release-notes-draft.md`)
-- [ ] PR 1 opened: Risk section with its tier; `/code-review` at the level Jarmo chose (decision 2); every finding answered; merged at the reviewed head
+- [ ] PR 1 opened: Risk section with its tier; `/code-review` at the level Jarmo chose (decision 2); every finding answered; merged at the reviewed head (opened as #605, a draft)
 
 ## Phase 3: PR 2, the small extension fixes (W6, W7, W8, W9, W10; R6–R10)
 
