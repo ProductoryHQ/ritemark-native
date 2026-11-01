@@ -511,10 +511,14 @@ export class BoardStore {
    * holds no move, add or edit of another card. When the store changed that file while it was being read (it
    * wrote, loaded or removed it), what was read may be older than the disk, so the file is read again.
    */
-  async invalidate(fileName: string, options: { fresh?: boolean } = {}, attempt = 1): Promise<boolean> {
+  async invalidate(fileName: string, options: { fresh?: boolean; own?: boolean } = {}, attempt = 1): Promise<boolean> {
     if (!isCardFileName(fileName)) return false;
-    // `fresh` (Try again, Remove's last look): read now, not after a read of the same file that may be stuck.
-    const { ticket, epoch, version, read } = await (options.fresh ? this.freshRead(fileName) : this.queueRead(fileName));
+    // `fresh` (Try again): read now, not after a watcher read of the same file that may be stuck.
+    // `own` (Remove's last look): a read of its own that starts at once, without waiting for a free read or sharing
+    // an earlier one, so the look's moment always covers a read made for it. One per Remove a person confirms, so
+    // it can't take the I/O threads.
+    const pending = options.own ? this.startRead(fileName, { waitForSlot: false }) : options.fresh ? this.freshRead(fileName) : this.queueRead(fileName);
+    const { ticket, epoch, version, read } = await pending;
     const outcome = await this.serialized(async () => {
       await this.ensureLoaded();
       if (epoch !== this.epoch || version !== (this.fileVersions.get(fileName) ?? 0)) return 'overtaken' as const;
@@ -644,16 +648,19 @@ export class BoardStore {
   }
 
   /** One re-read, started now, noting what it is checked against when it is applied. */
-  private async startRead(fileName: string): Promise<QueuedRead> {
-    await this.readSlot();
+  private async startRead(fileName: string, options: { waitForSlot?: boolean } = {}): Promise<QueuedRead> {
+    const counted = options.waitForSlot !== false;
+    if (counted) await this.readSlot();
     try {
       const ticket = ++this.readTicket;
       const epoch = this.epoch;
       const version = this.fileVersions.get(fileName) ?? 0;
       return { ticket, epoch, version, read: await this.readFile(fileName) };
     } finally {
-      this.outsideReads -= 1;
-      this.readWaiters.shift()?.();
+      if (counted) {
+        this.outsideReads -= 1;
+        this.readWaiters.shift()?.();
+      }
     }
   }
 

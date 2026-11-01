@@ -859,6 +859,79 @@ async function main(): Promise<void> {
     controller.dispose();
   }
 
+  // ── Remove's last look makes a read of its own, even when hung reads hold every slot (#610, Codex) ─
+  {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-look-'));
+    const tasks = path.join(folder, '.ritemark', 'tasks');
+    fs.mkdirSync(tasks, { recursive: true });
+    const cardText = (id: string, title: string) => `---\nritemark: task/1\nid: ${id}\ntitle: ${title}\nstage: todo\n---\n`;
+    fs.writeFileSync(path.join(tasks, 'arrived.md'), cardText('arr1v4', 'Arrived late'));
+    fs.writeFileSync(path.join(tasks, 'stuck-a.md'), cardText('stk00a', 'Stuck A'));
+    fs.writeFileSync(path.join(tasks, 'stuck-b.md'), cardText('stk00b', 'Stuck B'));
+    let arrived = false;
+    let stuck = false;
+    let arrivedHangsOnce = false;
+    const trashed: string[] = [];
+    const hang = () => new Promise((resolve) => setTimeout(resolve, 1200));
+    const store = new BoardStore(folder, {
+      fileSystem: {
+        ...nodeBoardStoreFileSystem,
+        async readFile(file) {
+          const name = path.basename(file);
+          if (stuck && (name === 'stuck-a.md' || name === 'stuck-b.md')) {
+            await hang();
+            throw Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' });
+          }
+          if (name === 'arrived.md') {
+            if (arrivedHangsOnce) {
+              arrivedHangsOnce = false;
+              await hang();
+              throw Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' });
+            }
+            if (!arrived) throw Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' });
+          }
+          return nodeBoardStoreFileSystem.readFile(file);
+        },
+        async trash(file) {
+          trashed.push(path.basename(file));
+          fs.rmSync(file);
+        },
+      },
+      now,
+    });
+    const controller = new BoardController({
+      store,
+      ledger: new FakeLedger(),
+      folderName: 'files',
+      settings: { get: () => undefined, update: async () => undefined },
+      runtimes: () => ({ 'claude-code': READY, codex: READY, opencode: READY }),
+      enabled: () => true,
+      fileExists: async () => true,
+      now,
+      removeLookMs: 300,
+      retryAnswerMs: 100,
+    });
+    await store.list();
+    assert.ok(store.isUnreadable('arrived.md'));
+    // An earlier Try again of this file hangs and holds one read slot; a watcher read of another file hangs in the
+    // other, and a third waits for a slot.
+    stuck = true;
+    arrivedHangsOnce = true;
+    const retry = controller.retryFile('arrived.md');
+    const held = [store.invalidate('stuck-a.md'), store.invalidate('stuck-b.md')];
+    await retry;
+    // Meanwhile the cloud file arrives: it reads now as a card.
+    arrived = true;
+    const answer = await controller.removeFile('arrived.md');
+    assert.deepEqual(trashed, [], 'the file that reads now is not trashed, though every slot was taken');
+    assert.equal(answer.ok ? 'ok' : answer.code, 'not-found');
+    assert.ok((await controller.snapshot()).cards.some((card) => card.title === 'Arrived late'), 'its card is on the board');
+    await Promise.all(held);
+    await new Promise((resolve) => setTimeout(resolve, 1300)); // the hung Try again ends, and changes nothing
+    assert.ok((await controller.snapshot()).cards.some((card) => card.title === 'Arrived late'), 'still on the board');
+    controller.dispose();
+  }
+
   // ── A move that couldn't be saved: the notice names the card in plain words (#610) ─
   {
     const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-save-'));

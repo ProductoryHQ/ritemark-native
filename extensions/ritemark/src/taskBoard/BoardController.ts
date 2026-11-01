@@ -583,16 +583,17 @@ export class BoardController {
   }
 
   /**
-   * Remove: the file goes to the system trash (the board asked first). A last fresh look at the file comes first,
-   * for a moment: one that reads as a card within it (a cloud file that has arrived) is not trashed, and its card
-   * shows. A file that still hangs is trashed after that moment, even if its read would have come back a little
-   * later. A refusal keeps the row, with its words.
+   * Remove: the file goes to the system trash (the board asked first). A last look at the file comes first, for a
+   * moment, with a read made for this Remove that starts at once (it waits for no other read, hung ones included):
+   * one that reads as a card within the moment (a cloud file that has arrived) is not trashed, and its card shows.
+   * A file that still hangs is trashed after that moment, even if its read would have come back a little later. A
+   * refusal keeps the row, with its words.
    */
   async removeFile(fileName: string): Promise<BoardAnswer> {
     if (!this.store.isUnreadable(fileName)) return answerError('not-found', 'That file is not one the board couldn’t read.');
     let timer: ReturnType<typeof setTimeout> | undefined;
     await Promise.race([
-      this.store.invalidate(fileName, { fresh: true }).catch(() => false),
+      this.store.invalidate(fileName, { own: true }).catch(() => false),
       new Promise<void>((resolve) => {
         timer = setTimeout(resolve, this.deps.removeLookMs ?? REMOVE_LOOK_MS);
       }),
