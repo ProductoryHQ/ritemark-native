@@ -61,14 +61,15 @@ customEditorInputFactory.ts (Sprint 142); and the two tests above.
 
 Sprint 146 (R8, #568; the Experience lead's answers, section 6): a tab's menu holds the usual tab items, not VS Code's.
 One filter where the tab row builds the menu (editorTabsControl.ts → ritemarkTabMenu.ts) leaves out Add File to Chat,
-Open Preview, Reopen Editor With… and Find File References, whatever registered them (the workbench, chat, the built-in
-Markdown and TypeScript extensions), and names Reveal in Explorer View "Show in Documents"; the commands stay, so All
-commands runs them (decision 4). It names what goes: an item no one has named still shows. Every kind of tab passes
-through it; a terminal tab's menu has none of the five and stays as it was (its extras went at their source above).
+Add File to Copilot CLI (the lead's section 10), Open Preview, Reopen Editor With… and Find File References, whatever
+registered them (the workbench, chat, the built-in Copilot, Markdown and TypeScript extensions), and names Reveal in
+Explorer View "Show in Documents"; the commands stay, so All commands runs them (decision 4). It names what goes: an item
+no one has named still shows. Every kind of tab passes through it; a terminal tab's menu has none of them and stays as
+it was (its extras went at their source above).
 Test: test/browser/parts/editor/ritemarkTabMenu.test.ts (with ./scripts/test.sh --grep Ritemark). On a VS Code update,
-check that these five command IDs, from four other components, still exist: the four left out (chat's, the Markdown
-extension's two, the TypeScript extension's) and revealInExplorer (contrib/files), which Show in Documents renames.
-Reopen Editor With… is named by the imported REOPEN_WITH_COMMAND_ID.
+check that these six command IDs, from five other components, still exist: the five left out (chat's, the Copilot
+extension's, the Markdown extension's two, the TypeScript extension's) and revealInExplorer (contrib/files), which Show
+in Documents renames. Reopen Editor With… is named by the imported REOPEN_WITH_COMMAND_ID.
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index ac63294495c..8717025e650 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.ts
@@ -1157,10 +1158,10 @@ index 00000000000..60fd89edea9
 +});
 diff --git a/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts b/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts
 new file mode 100644
-index 00000000000..2af103728e6
+index 00000000000..7bd6397dbcc
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,59 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1181,6 +1182,7 @@ index 00000000000..2af103728e6
 +/** What a tab's menu leaves out, by command ID, with the reason the Experience lead gave. */
 +export const RITEMARK_TAB_MENU_LEAVES_OUT: ReadonlyMap<string, string> = new Map([
 +	['workbench.action.chat.attachFile', 'Add File to Chat adds the file to Copilot Chat, not to Ritemark\'s AI; the composer\'s + is Ritemark\'s way'],
++	['github.copilot.chat.copilotCLI.addFileReference', 'Add File to Copilot CLI hands the file to Copilot too, not to Ritemark\'s AI (the built-in Copilot, while a Copilot CLI session runs)'],
 +	['markdown.showPreview', 'Open Preview: Ritemark\'s editor already shows the document as it reads'],
 +	[REOPEN_WITH_COMMAND_ID, 'Reopen Editor With… lists editors by their developer names; View: Reopen Editor With… stays in All commands'],
 +	['markdown.findAllFileReferences', 'Find File References is a code tool'],
@@ -2168,10 +2170,10 @@ index 00000000000..79d6463bf76
 +});
 diff --git a/src/vs/workbench/test/browser/parts/editor/ritemarkTabMenu.test.ts b/src/vs/workbench/test/browser/parts/editor/ritemarkTabMenu.test.ts
 new file mode 100644
-index 00000000000..dbf544393dd
+index 00000000000..b6b35e9f1d6
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/editor/ritemarkTabMenu.test.ts
-@@ -0,0 +1,64 @@
+@@ -0,0 +1,69 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2220,7 +2222,12 @@ index 00000000000..dbf544393dd
 +	test('the filter names what goes: an item no one named still shows', () => {
 +		const actions = menu([['workbench.action.closeActiveEditor', 'Close'], '---', ['someExtension.newThing', 'A New Thing'], ['typescript.findAllFileReferences', 'Find File References']]);
 +		assert.deepStrictEqual(shown(ritemarkTabMenuActions(actions)), ['Close', '---', 'A New Thing']);
-+		assert.deepStrictEqual([...RITEMARK_TAB_MENU_LEAVES_OUT.keys()], ['workbench.action.chat.attachFile', 'markdown.showPreview', REOPEN_WITH_COMMAND_ID, 'markdown.findAllFileReferences', 'typescript.findAllFileReferences']);
++		assert.deepStrictEqual([...RITEMARK_TAB_MENU_LEAVES_OUT.keys()], ['workbench.action.chat.attachFile', 'github.copilot.chat.copilotCLI.addFileReference', 'markdown.showPreview', REOPEN_WITH_COMMAND_ID, 'markdown.findAllFileReferences', 'typescript.findAllFileReferences']);
++	});
++
++	test('a file\'s tab during a Copilot CLI session loses Add File to Copilot CLI, as it loses Add File to Chat', () => {
++		const copilot = menu([...CLOSE, '---', ['workbench.action.chat.attachFile', 'Add File to Chat'], '---', ['github.copilot.chat.copilotCLI.addFileReference', 'Add File to Copilot CLI'], '---', ['revealInExplorer', 'Reveal in Explorer View']]);
++		assert.deepStrictEqual(shown(ritemarkTabMenuActions(copilot)), ['Close', 'Close Others', 'Close to the Right', 'Close Saved', 'Close All', '---', 'Show in Documents']);
 +	});
 +
 +	test('Show in Documents runs Reveal in Explorer View with the menu\'s arguments', async () => {
