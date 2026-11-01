@@ -6,6 +6,7 @@
 
 import React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
+import { focusTriggerOnlyAfterKeyboard } from './close-focus';
 import { Icon } from './Icon';
 import { cn } from '../../lib/utils';
 
@@ -41,13 +42,16 @@ const SelectTrigger = React.forwardRef<
 ));
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
+// Radix focuses the trigger after every close, a mouse pick too, and the trigger's `focus:` styles then show. The
+// trigger gets the focus back only when the keyboard closed the list (2.2, close-focus.ts), as in dropdown-menu.tsx.
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = 'popper', ...props }, ref) => (
+>(({ className, children, position = 'popper', onCloseAutoFocus = focusTriggerOnlyAfterKeyboard, ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
+      onCloseAutoFocus={onCloseAutoFocus}
       className={cn(
         // Issue #272: without a cap, popper-positioned content sizes to its
         // widest child (option descriptions) and can exceed the webview's
