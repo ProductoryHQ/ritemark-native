@@ -147,8 +147,8 @@ function buttonCells(variant: ButtonVariant): CatalogueCell[] {
   if (variant === 'toolbar') cells.splice(6, 0, t('on', () => b({ on: true })))
   return cells
 }
-function sizeCells(size: 'sm' | 'lg' | 'icon' | 'icon-sm'): CatalogueCell[] {
-  const iconOnly = size === 'icon' || size === 'icon-sm'
+function sizeCells(size: 'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'): CatalogueCell[] {
+  const iconOnly = size === 'icon' || size === 'icon-sm' || size === 'icon-lg'
   const b = () => (
     <Button data-target variant="outline" size={size} aria-label={iconOnly ? 'Ask Claude' : undefined}>
       <Icon name="chat-circle" size={14} tone="inherit" />{iconOnly ? null : 'Ask Claude'}
@@ -285,7 +285,8 @@ function select(props: { disabled?: boolean; long?: boolean } = {}): ReactNode {
     </Select>
   )
 }
-const NEXT_OPTION = '[role="option"]:not([data-disabled]):not([aria-selected="true"])'
+// The option that isn't the value: Radix marks the chosen one `data-state="checked"` (its aria-selected follows the focus)
+const NEXT_OPTION = '[role="option"]:not([data-disabled]):not([data-state="checked"])'
 
 // ── Dialog ───────────────────────────────────────────────────────────────────
 function dialog(): ReactNode {
@@ -316,7 +317,7 @@ export const CATALOGUE: CatalogueRow[] = [
     covers: ['Button'],
     variants: [
       ...BUTTON_VARIANTS.map((variant) => ({ id: variant, label: variant, cells: buttonCells(variant) })),
-      ...(['sm', 'lg', 'icon', 'icon-sm'] as const).map((size) => ({ id: `size-${size}`, label: `size ${size}`, cells: sizeCells(size) })),
+      ...(['default', 'sm', 'lg', 'icon', 'icon-sm', 'icon-lg'] as const).map((size) => ({ id: `size-${size}`, label: `size ${size}`, cells: sizeCells(size) })),
     ],
   },
   {
@@ -401,7 +402,7 @@ export const CATALOGUE: CatalogueRow[] = [
         t('hover', () => select()),
         t('focus', () => select()),
         t('click', () => select(), { closeOutside: true }),
-        t('open', () => select(), { width: 300, height: MENU_ROOM }),
+        t('open', () => select(), { width: 300, height: 270 }),
         t('mouse-pick', () => select(), { item: NEXT_OPTION }),
         t('escape', () => select()),
         t('key-pick', () => select()),

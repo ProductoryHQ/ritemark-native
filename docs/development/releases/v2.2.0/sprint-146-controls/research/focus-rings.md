@@ -11,7 +11,7 @@ Tailwind is `^3.3.5` in `package.json`; the installed one is 3.4.19. A plugin's 
 | Core | `.focus-visible\:ring-\[4px\]:focus-visible` | `.focus-visible\:outline-none:focus-visible` |
 | With the plugin | `:where(:root:not([data-input-mode="pointer"])) .focus-visible\:ring-\[4px\]:focus-visible` | `:where(:root:not([data-input-mode="pointer"])) .focus-visible\:outline-none:focus-visible` |
 
-So every `focus-visible:` utility moves behind the mode in one place (`tailwind.config.ts`), and the fallback the plan held in reserve isn't needed. The prefix is "not pointer" rather than "keyboard", so a page whose tracker hasn't started yet draws its rings as before.
+So every `focus-visible:` utility moves behind the mode in one place (`tailwind.config.ts`), and the fallback the plan held in reserve isn't needed. The same plugin redefines `group-focus-visible:` and its named groups (the composer's resize handle, the thread rail's pin), and the code block's copy button, whose ring is CSS in `Editor.tsx`, carries the prefix too (PR 2's first review). The prefix is "not pointer" rather than "keyboard", so a page whose tracker hasn't started yet draws its rings as before.
 
 **The prefix sits in `:where()`, so it adds no specificity.** The first build put it bare, and the capture after the tracker caught it: the split button's keyboard focus lost its 1 px divider and gained the shared Button's 4 px ring, because the prefixed ring now outranked `.rm-split[data-tone] .rm-split-more`'s inset shadow and `.rm-split .rm-split-part { box-shadow: none }`. With `:where()` every rule keeps the rank it had, and keyboard focus draws as before.
 
