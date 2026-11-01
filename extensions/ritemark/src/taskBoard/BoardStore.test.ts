@@ -433,6 +433,7 @@ async function main(): Promise<void> {
       'Ritemark couldn’t open this file in time. If this folder syncs from the cloud, the file may still be downloading.',
       'a Windows cloud file not on the computer yet (patch 011’s case) gets the cloud sentence',
     );
+    assert.equal(readFailureWords(Object.assign(new Error('EDEADLK'), { code: 'EDEADLK' })), readFailureWords(Object.assign(new Error('x'), { code: 'ETIMEDOUT' })), 'an iCloud file not on the Mac yet reads as a timeout');
     assert.equal(readFailureWords(Object.assign(new Error('EACCES'), { code: 'EACCES' })), 'This computer doesn’t let Ritemark open this file.');
     assert.equal(readFailureWords(Object.assign(new Error('EPERM'), { code: 'EPERM' })), 'This computer doesn’t let Ritemark open this file.');
     assert.equal(readFailureWords(Object.assign(new Error('EIO'), { code: 'EIO' })), 'Ritemark couldn’t open this file.');
@@ -501,6 +502,7 @@ async function main(): Promise<void> {
     await store.list();
     slowNext = true;
     const stale = store.invalidate('race.md');
+    await new Promise((resolve) => setTimeout(resolve, 20)); // it has read, and answers late
     await store.mutate('r4c3r1', { by: 'you', what: 'Moved to Done' }, (card) => ({ ...card, stage: 'done' }));
     assert.equal(await stale, false, 'the read from before the move does not apply');
     assert.equal(cardsOf(await store.list())[0].stage, 'done', 'the move stays: no flicker back to the old column');
@@ -509,6 +511,7 @@ async function main(): Promise<void> {
     const file = path.join(tasksDir(folder), 'race.md');
     slowNext = true;
     const late = store.invalidate('race.md');
+    await new Promise((resolve) => setTimeout(resolve, 20)); // it has read, and answers late
     await store.mutate('r4c3r1', { by: 'you', what: 'Moved to Doing' }, (card) => ({ ...card, stage: 'doing' }));
     fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('title: Races a move', 'title: Edited after the move'));
     assert.equal(await late, true, 'the overtaken read is made again, and finds the edit');
@@ -519,6 +522,7 @@ async function main(): Promise<void> {
     // Two re-reads of one file run one after the other, and the later one's text is what stays.
     slowNext = true;
     const older = store.invalidate('race.md'); // reads "done", answers late
+    await new Promise((resolve) => setTimeout(resolve, 20)); // it has read
     fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('title: Races a move', 'title: Renamed outside'));
     assert.equal(await store.invalidate('race.md'), true, 'the later read applies');
     assert.equal(await older, false, 'the earlier read changed nothing');
@@ -571,6 +575,7 @@ async function main(): Promise<void> {
     assert.ok(store.isUnreadable('cloud.md'));
     mode = 'stuck-then-fail';
     const stuck = store.invalidate('cloud.md'); // the watcher's read, stuck for a while, and then failing
+    await new Promise((resolve) => setTimeout(resolve, 20)); // it is reading
     mode = 'ok';
     const started = Date.now();
     assert.equal(await store.invalidate('cloud.md', { fresh: true }), true, 'a fresh read doesn’t wait behind it');
@@ -578,6 +583,42 @@ async function main(): Promise<void> {
     assert.equal(await stuck, false, 'the stuck read, failing late, doesn’t undo the card');
     assert.deepEqual(cardsOf(await store.list()).map((card) => card.title), ['In the cloud']);
     assert.ok(store.revision > 0, 'every change counts');
+  }
+
+  // ── Hung re-reads can't take every I/O thread, and Try again pressed again starts no second read ─
+  {
+    const folder = tempFolder();
+    for (const name of ['one', 'two', 'three', 'four']) writeCard(folder, `${name}.md`, { id: `${name.slice(0, 3)}001`, title: name });
+    let hang = false;
+    let reading = 0;
+    let most = 0;
+    let freshReads = 0;
+    const store = newStore(folder, {
+      async readFile(file) {
+        if (!hang) return nodeBoardStoreFileSystem.readFile(file);
+        if (path.basename(file) === 'one.md') freshReads += 1;
+        reading += 1;
+        most = Math.max(most, reading);
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        reading -= 1;
+        return nodeBoardStoreFileSystem.readFile(file);
+      },
+    });
+    await store.list();
+    hang = true;
+    const started = Date.now();
+    const move = store.mutate('two001', { by: 'you', what: 'Moved' }, (card) => ({ ...card, stage: 'done' }));
+    await Promise.all([
+      store.invalidate('one.md', { fresh: true }),
+      store.invalidate('one.md', { fresh: true }),
+      store.invalidate('two.md'),
+      store.invalidate('three.md'),
+      store.invalidate('four.md'),
+    ]);
+    await move;
+    assert.ok(most <= 3, `at most two re-reads at once beside the tail's own read (${most})`);
+    assert.equal(freshReads, 1, 'two presses of Try again share one read');
+    assert.ok(Date.now() - started < 2000);
   }
 
   // ── A folder named like a card file is no card, so Remove can never trash a folder ─

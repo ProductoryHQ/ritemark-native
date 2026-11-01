@@ -834,6 +834,14 @@ async function main(): Promise<void> {
     assert.deepEqual(trashed, [], 'a file that reads now is not trashed');
     assert.ok((await controller.snapshot()).cards.some((card) => card.title === 'Arrived'), 'its card is on the board');
 
+    // A file that went during the look (a sync deleted it) counts as removed, and nothing is trashed.
+    fs.writeFileSync(path.join(tasks, 'going.md'), '---\nritemark: task/1\nid: g01ng1\ntitle: [unclosed\n---\n');
+    await store.invalidate('going.md');
+    assert.ok(store.isUnreadable('going.md'));
+    fs.rmSync(path.join(tasks, 'going.md'));
+    assert.deepEqual(await controller.removeFile('going.md'), { ok: true });
+    assert.deepEqual(trashed, [], 'a file already gone is not trashed');
+
     // A file that still hangs goes to the trash after the short look.
     const started = Date.now();
     assert.deepEqual(await controller.removeFile('hanging.md'), { ok: true });
@@ -851,7 +859,7 @@ async function main(): Promise<void> {
     controller.dispose();
   }
 
-  // ── Remove says the trash refused only when the trash refused ─────────────
+  // ── Remove refuses a file the board hasn't listed, without blaming the trash ─
   {
     const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-files-'));
     const store = new BoardStore(folder, {
@@ -876,7 +884,8 @@ async function main(): Promise<void> {
     });
     const answer = await controller.removeFile('broken.md');
     assert.equal(answer.ok, false);
-    assert.doesNotMatch(answer.ok ? '' : answer.message, /Trash|Recycle Bin/, 'a folder that can’t be listed is not the trash refusing');
+    assert.equal(answer.ok ? '' : answer.code, 'not-found', 'a board that couldn’t list its folder lists no file to remove');
+    assert.doesNotMatch(answer.ok ? '' : answer.message, /Trash|Recycle Bin/, 'and the answer doesn’t blame the trash');
     controller.dispose();
   }
 

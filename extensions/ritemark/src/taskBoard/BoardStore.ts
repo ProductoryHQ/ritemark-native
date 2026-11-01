@@ -163,6 +163,11 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** Re-reads out of the tail at once, across files (libuv has 4 threads by default; the tail and saves keep the rest). */
+const MAX_OUTSIDE_READS = 2;
+/** How often a re-read the store overtook is made again before the next watcher event is left to do it. */
+const MAX_REREADS = 3;
+
 function isMissing(error: unknown): boolean {
   // `FileNotFound` is what `workspace.fs` (the host's trash) says for a file that is already gone.
   const code = error ? (error as NodeJS.ErrnoException).code : undefined;
@@ -176,7 +181,8 @@ function isMissing(error: unknown): boolean {
  */
 export function readFailureWords(error: unknown): string {
   const { code, syscall } = (error ?? {}) as NodeJS.ErrnoException;
-  if (code === 'ETIMEDOUT' || code === 'EBUSY' || code === 'EAGAIN' || (code === 'UNKNOWN' && (syscall === 'read' || syscall === 'open'))) {
+  // EDEADLK: macOS refusing to read an iCloud Drive file that isn't on the Mac yet.
+  if (code === 'ETIMEDOUT' || code === 'EBUSY' || code === 'EAGAIN' || code === 'EDEADLK' || (code === 'UNKNOWN' && (syscall === 'read' || syscall === 'open'))) {
     return 'Ritemark couldn’t open this file in time. If this folder syncs from the cloud, the file may still be downloading.';
   }
   if (code === 'EACCES' || code === 'EPERM') return 'This computer doesn’t let Ritemark open this file.';
@@ -233,6 +239,11 @@ export class BoardStore {
   /** fileName → the ticket of the last re-read applied. */
   private readonly appliedReads = new Map<string, number>();
   private readTicket = 0;
+  /** fileName → a fresh read (Try again, Remove's look) still running: another fresh read of it joins this one. */
+  private readonly freshReads = new Map<string, Promise<QueuedRead>>();
+  /** Re-reads out of the tail at once, across files: a few hung cloud files can't take every I/O thread. */
+  private outsideReads = 0;
+  private readonly readWaiters: Array<() => void> = [];
   private epoch = 0;
   /** Counts the store's changes (every `emit`); a snapshot and an answer carry it, so a surface can tell their order. */
   private changes = 0;
@@ -476,10 +487,10 @@ export class BoardStore {
    * holds no move, add or edit of another card. When the store changed that file while it was being read (it
    * wrote, loaded or removed it), what was read may be older than the disk, so the file is read again.
    */
-  async invalidate(fileName: string, options: { fresh?: boolean } = {}): Promise<boolean> {
+  async invalidate(fileName: string, options: { fresh?: boolean } = {}, attempt = 1): Promise<boolean> {
     if (!isCardFileName(fileName)) return false;
     // `fresh` (Try again, Remove's last look): read now, not after a read of the same file that may be stuck.
-    const { ticket, epoch, version, read } = await (options.fresh ? this.startRead(fileName) : this.queueRead(fileName));
+    const { ticket, epoch, version, read } = await (options.fresh ? this.freshRead(fileName) : this.queueRead(fileName));
     const outcome = await this.serialized(async () => {
       await this.ensureLoaded();
       if (epoch !== this.epoch || version !== (this.fileVersions.get(fileName) ?? 0)) return 'overtaken' as const;
@@ -492,7 +503,9 @@ export class BoardStore {
       }
       return changed;
     });
-    return outcome === 'overtaken' ? this.invalidate(fileName, options) : outcome;
+    // Overtaken: read again, a few times at most (a card the store keeps rewriting gives its own watcher events).
+    if (outcome === 'overtaken') return attempt < MAX_REREADS ? this.invalidate(fileName, options, attempt + 1) : false;
+    return outcome;
   }
 
   /** Read the whole folder again (a branch switch, a sync that moved many files). */
@@ -608,10 +621,34 @@ export class BoardStore {
 
   /** One re-read, started now, noting what it is checked against when it is applied. */
   private async startRead(fileName: string): Promise<QueuedRead> {
-    const ticket = ++this.readTicket;
-    const epoch = this.epoch;
-    const version = this.fileVersions.get(fileName) ?? 0;
-    return { ticket, epoch, version, read: await this.readFile(fileName) };
+    await this.readSlot();
+    try {
+      const ticket = ++this.readTicket;
+      const epoch = this.epoch;
+      const version = this.fileVersions.get(fileName) ?? 0;
+      return { ticket, epoch, version, read: await this.readFile(fileName) };
+    } finally {
+      this.outsideReads -= 1;
+      this.readWaiters.shift()?.();
+    }
+  }
+
+  /** A fresh read; one already running for the file is shared, so pressing Try again again starts no second one. */
+  private freshRead(fileName: string): Promise<QueuedRead> {
+    const running = this.freshReads.get(fileName);
+    if (running) return running;
+    const read = this.startRead(fileName);
+    this.freshReads.set(fileName, read);
+    const forget = () => {
+      if (this.freshReads.get(fileName) === read) this.freshReads.delete(fileName);
+    };
+    read.then(forget, forget);
+    return read;
+  }
+
+  private async readSlot(): Promise<void> {
+    while (this.outsideReads >= MAX_OUTSIDE_READS) await new Promise<void>((resolve) => this.readWaiters.push(resolve));
+    this.outsideReads += 1;
   }
 
   /** The store's own change to a file's entry: a read made outside the tail before it no longer applies. */

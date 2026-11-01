@@ -249,6 +249,24 @@ assert.equal(shown(), 'idea:todo02 todo:todo01 doing:doing1', 'an older snapshot
 host({ type: 'board/state', snapshot: { ...board([card('todo01', 'todo')]), revision: 1, boardId: 'b2' } })
 assert.equal(shown(), 'todo:todo01', 'a new store’s first snapshot is taken')
 
+// Away and back before either answer: the snapshot the moves were drawn on doesn't end the second one.
+const r20 = { ...board([card('todoA1', 'todo'), card('todoB1', 'todo')]), revision: 20, boardId: 'b2' }
+host({ type: 'board/state', snapshot: r20 })
+const away = moveCard('todoA1', 'doing', { atEnd: true })
+const awayRequest = lastRequest()
+const back = moveCard('todoA1', 'todo')
+const backRequest = lastRequest()
+host({ type: 'board/state', snapshot: r20 })
+assert.equal(shown(), 'todo:todoA1 todo:todoB1')
+host({ type: 'board/state', snapshot: { ...board([card('todoB1', 'todo'), card('todoA1', 'doing')]), revision: 21, boardId: 'b2' } })
+assert.equal(shown(), 'todo:todoA1 todo:todoB1', 'the snapshot after the first write doesn’t flash the card to Doing')
+answer(awayRequest.requestId, { ok: true, cardId: 'todoA1', revision: 21 })
+answer(backRequest.requestId, { ok: true, cardId: 'todoA1', revision: 22 })
+await Promise.all([away, back])
+host({ type: 'board/state', snapshot: { ...board([card('todoA1', 'todo'), card('todoB1', 'todo')]), revision: 22, boardId: 'b2' } })
+assert.equal(shown(), 'todo:todoA1 todo:todoB1')
+assert.equal(savingStage('todoA1'), null, 'and the snapshot at the second write ends it')
+
 // A request that gets no answer resolves as a refusal after 30 s (boardClient.request): not waited for here.
 console.log('tasks/boardMoves: all assertions passed')
 process.exit(0)

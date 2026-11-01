@@ -571,7 +571,11 @@ export class BoardController {
     const work = (async () => {
       // A fresh read, not one queued behind a read of the same file that may be stuck. Nothing changed: the
       // answer alone gives the row its buttons back.
-      if (await this.store.invalidate(fileName, { fresh: true }).catch(() => false)) await this.refreshNow();
+      const changed = await this.store.invalidate(fileName, { fresh: true }).catch((error) => {
+        console.warn(`[taskBoard] try again on ${fileName} failed`, error);
+        return false;
+      });
+      if (changed) await this.refreshNow();
     })().catch((error) => console.warn('[taskBoard] try again failed', error));
     await Promise.race([work, waited]);
     clearTimeout(timer);
@@ -580,8 +584,9 @@ export class BoardController {
 
   /**
    * Remove: the file goes to the system trash (the board asked first). A last fresh look at the file comes first,
-   * for a moment: one that reads now as a card (a cloud file that has arrived) is not trashed, and its card shows.
-   * A file that still hangs is trashed after that moment. A refusal keeps the row, with its words.
+   * for a moment: one that reads as a card within it (a cloud file that has arrived) is not trashed, and its card
+   * shows. A file that still hangs is trashed after that moment, even if its read would have come back a little
+   * later. A refusal keeps the row, with its words.
    */
   async removeFile(fileName: string): Promise<BoardAnswer> {
     if (!this.store.isUnreadable(fileName)) return answerError('not-found', 'That file is not one the board couldn’t read.');
@@ -593,6 +598,13 @@ export class BoardController {
       }),
     ]);
     clearTimeout(timer);
+    if (!this.store.isUnreadable(fileName)) {
+      // The look changed it: it reads now as a card, or it is gone (both: nothing to trash).
+      await this.refreshNow();
+      return this.store.cardIdOfFile(fileName)
+        ? answerError('not-found', 'That file reads now: its card is on the board.')
+        : { ok: true };
+    }
     try {
       await this.store.removeFile(fileName);
     } catch (error) {
@@ -602,11 +614,9 @@ export class BoardController {
       }
       if (error instanceof BoardStoreError) {
         console.warn(`[taskBoard] couldn't remove ${fileName}: ${error.message}`);
-        if (error.code === 'not-found') {
-          await this.refreshNow();
-          return answerError('not-found', 'That file reads now: its card is on the board.');
-        }
-        return answerError(error.code, 'Ritemark couldn’t remove the file. Try again.');
+        await this.refreshNow();
+        if (error.code !== 'not-found') return answerError(error.code, 'Ritemark couldn’t remove the file. Try again.');
+        return this.store.cardIdOfFile(fileName) ? answerError('not-found', 'That file reads now: its card is on the board.') : { ok: true };
       }
       throw error;
     }

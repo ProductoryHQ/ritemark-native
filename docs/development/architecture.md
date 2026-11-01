@@ -444,7 +444,7 @@ Each project folder has one task board. Its cards are Markdown files in the fold
 |---|---|
 | `taskBoard/cardTypes.ts` | The card model and limits, with no imports, so the webview can share it |
 | `taskBoard/cardFile.ts` | Parse and serialize (`ritemark: task/1` front matter + the Markdown body byte for byte), unknown keys kept, `rankBetween`, ids, `cardFileName(title)`, `splitCardText` / `spliceCardBody` |
-| `taskBoard/BoardStore.ts` | The folder: injected file system, cache, one serialized mutation tail, atomic write, exclusive create, trash, echo suppression. Reads and writes a card that is open as a page through its `TextDocument` (`CardDocuments`). A re-read (the watcher, Try again) reads outside the tail, one at a time per file, and is applied under it only if the store hasn't changed that file meanwhile; otherwise the file is read again (Sprint 145, #597) |
+| `taskBoard/BoardStore.ts` | The folder: injected file system, cache, one serialized mutation tail, atomic write, exclusive create, trash, echo suppression. Reads and writes a card that is open as a page through its `TextDocument` (`CardDocuments`). A re-read (the watcher, Try again) reads outside the tail, one at a time per file and at most two at once across files, and is applied under it only if the store hasn't changed that file meanwhile; otherwise the file is read again (Sprint 145, #597) |
 | `taskBoard/BoardController.ts` | The rules, with no `vscode` import: who moves next (derived, never stored), Your calls, the badge, the Doing limit, the conflict guard, waits that start by themselves, archive and the Done window, idea review, and the operations behind the agents' board tools. Agents cannot mark a card done or delete it |
 | `taskBoard/CardTaskStore.ts` + `CardHandoffLedger.ts` | Give to agent: one record per card under `<globalStorage>/task-board/v1/<project key>/`, the turn's lifecycle from the AI sidebar's task events, the result written back onto the card |
 | `taskBoard/boardPrompt.ts` | The one card prompt: `displayText` (the user's request) and `prompt` (adds the card line when the runtime has the board tools) |
@@ -495,7 +495,7 @@ board/give ───────────────────→     shar
 | A card's conversation runs with `approvalMode: 'auto'` | As for comment tasks (G7): the per-conversation Ask/Auto toggle is webview state the host cannot read |
 | One user per board | A shared folder shows everyone as "You" |
 | Idea review state is in memory | "Reviewing · {Agent}" and a failed review do not survive a reload; the stored review does |
-| One tail for every change (Sprint 145, #597) | A move, edit or Mark done of a card whose own file hangs (a cloud placeholder) waits on that read, and every change after it waits too; re-reads already run outside the tail. A lock per file would free the rest |
+| One tail for every change (Sprint 145, #597) | A move, edit or Mark done of a card whose own file hangs (a cloud placeholder) waits on that read, and every change after it waits too; so does the first read of the folder (as since v1.14.0). Re-reads already run outside the tail. A lock per file, and a first read that lists a slow file as unreadable and goes on, would free the rest |
 
 ### The 2.0 frame (Sprint 132)
 
