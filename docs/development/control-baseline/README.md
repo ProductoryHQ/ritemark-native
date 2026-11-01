@@ -4,7 +4,7 @@ The approved image of every state of every shared control (`extensions/ritemark/
 
 **The Experience lead approves each image once.** A PR that changes a control's look (`components/ui/`, `index.css`, a control's own classes) takes a new set of that control's images in the same PR, and the lead approves them again before the merge. A look the lead wants changed becomes its own issue; the baseline records the looks as they are.
 
-**Status:** the set taken in Sprint 146's PR 2 (456 images: 228 states in each theme) waits for the Experience lead's approval. Until the lead approves it, a run against it says whether anything moved since it was taken, not whether the look is right.
+**Status:** the set taken in Sprint 146's PR 2 (456 images: 228 states in each theme). The Experience lead approved it on 1 November 2026 (ritemark-dev `releases/v2.2.0/analysis/2026-10-31-sprint-146-experience-answers.md`, section 9), except four faults in shared controls. Those were fixed in PR 2 and their 21 images retaken (the Dark primary's ring, the dialog's close, the long Select, the Slider, the disabled tab, and the Dark split button's focus that the primary's fix also moved); those 21 wait for the lead's look.
 
 ## Run it
 
@@ -33,7 +33,6 @@ Run the script without `--compare` into an empty folder, open `<dir>/sheet.html`
 ## What the images depend on
 
 - **The Mac's display:** device pixels at 2×; a 1× screen draws other images.
-- **The Mac's accent colour:** in keyboard mode the dialog's close draws Chromium's own focus outline, which takes the system's accent colour (`dialog-dialog-close-focus`). Take and compare on a Mac with the same accent setting.
 - **Focus emulation:** the script turns it on, so a hidden window draws its focus as a front one. A run with the window in front and one behind it should give the same images (S25; not run yet: a front run takes the screen).
 
 ## Where it runs
