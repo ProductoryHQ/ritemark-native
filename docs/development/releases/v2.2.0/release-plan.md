@@ -96,6 +96,7 @@ The five items, in the shape's order:
 | Fixes: Windows quit and the switch notes | `fix/619-623-quit-and-switch` | [#629](https://github.com/ProductoryHQ/ritemark-native/pull/629) | #619, #623 (the chat stop on a late answer stays open for a shell follow-up) | Draft. Standard: one round | Unit tests (Windows simulated: the `taskkill` calls); Windows not run | A line in the PR body |
 | 146 | `sprint-146-controls` (plan on `plan/v2.2.0-sprint-146`) | Plan: [#603](https://github.com/ProductoryHQ/ritemark-native/pull/603) | #585, #576, #566, #567, #568, #594, #598 | Plan approved 1 Nov; PR 1 (#585 carried over) and PR 2 under way | — | — |
 | Plan: 152 and the startup contract's proposal | `plan/sprint-152-startup-contract` | [#626](https://github.com/ProductoryHQ/ritemark-native/pull/626) | #624 | Light; the plan is Approved (the manager, on Jarmo's 2.2 delegation) | n/a | n/a |
+| 152, PR 1 | `sprint-152-startup-contract` | [#632](https://github.com/ProductoryHQ/ritemark-native/pull/632) | #624 (R5), R6 (decision 2), R8, audits A1–A4 | Draft. Extension-tier, Standard: one round | Mac: the first-frame check on `main` (five runs of each start) and the branch; the AI column traced on both; screenshots Light and Dark, not signed in (signed in: not run); Windows through the overlay (the "Ritemark on Windows" session) | Changelog lines in; the release-notes line at Phase 4 |
 
 ## Risks and Blockers
 
