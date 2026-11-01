@@ -25,16 +25,16 @@ Nothing here starts before the plan is approved by Jarmo. Tick a box only when t
 
 ## Phase 2 (revised 2026-11-01): PR 1, both changes stay (W1 revised, R1 revised; #605, shell-tier, High)
 
-Nothing here starts before Jarmo approves R1's revision (sprint plan, *Approval*). #605's code stays on the branch until then; what it keeps and drops is in [technical-plan.md](technical-plan.md), *Workstream 1 (revised 2026-11-01)*.
+Approved on 1 November (`819c63f`); Codex reviews once (marked ready once, after this PR's own review), answered in one commit. #605's code stays on the branch until then; what it keeps and drops is in [technical-plan.md](technical-plan.md), *Workstream 1 (revised 2026-11-01)*.
 
 - [x] `research/merge-checks.md`: the base (5 of 5 S1/S7 runs: the writer's copy differs from the save it read only in its own block) and the hook (`TextFileEditorModel.resolveFromFile`, patch 014's pattern)
-- [ ] Jarmo approves R1's revision; Jarmo answers the open question (S3: merge a dirty document's writer too, or keep #454's question)
+- [x] Jarmo approves R1's revision (1 November, `819c63f`); the open question answered: unsaved text is merged too (S3)
 - [ ] A10 `research/who-wrote-it.md`: can the host name the AI that wrote the file
 - [ ] A11 `research/editor-undo-and-anchor.md`: one host update in the editor's history; the view's place by the caret's block
 - [ ] A copy-on-write, patched `vscode/` for the PR (pristine reset and apply, `npm run transpile-client`, `compile-check-ts-native`)
 - [ ] Patch 014 (through `create-patch.sh`): the manager's reload-participant slot; `TextFileEditorModel.resolveFromFile` asks it and resolves dirty with the read's stat; the contribution registers it for `ritemark.editor` documents with `raceTimeout`; its tests; `./scripts/apply-patches.sh --dry-run` OK; `CLAUDE.md`'s patch table row
 - [ ] `state.ts`: blocks (Markdown via `marked`'s lexer, front matter, CSV rows), the base, the three-way block merge (on #605's alignment); tests (S1, S2, S4, S7, S56, S58, S63, a move against an edit, a split, a list, a table, a reformat with no base)
-- [ ] `DocumentSyncCoordinator.ts`: `_ritemark.editorSync.answerReload`; the longer save memory (10 minutes, bounded); the pending-merge note; paragraph conflicts and their answers; the coordinator's own `external-only` sightings through the same merge; the fallback (#605's held import, within 30 s) only with no base; #605's racing put-back (`keepHeldWords`, `wasLocalEdit`, the `converged` guard, the `revert` broadcast) removed; the log line without words
+- [ ] `DocumentSyncCoordinator.ts`: the dirty path (S3) merged with the last save as the base, and its refused save answered `overwrite`; `_ritemark.editorSync.answerReload`; the longer save memory (10 minutes, bounded); the pending-merge note; paragraph conflicts and their answers; the coordinator's own `external-only` sightings through the same merge; the fallback (#605's held import, within 30 s) only with no base; #605's racing put-back (`keepHeldWords`, `wasLocalEdit`, the `converged` guard, the `revert` broadcast) removed; the log line without words
 - [ ] `protocol.ts`: `document:conflict`'s paragraph fields and the one-block answer; old builds ignore them (E2)
 - [ ] Webview: `SyncActionButton`'s conflict look for every conflict; experience 44's tooltips and notification words; `DocumentConflictDialog`'s paragraph mode; the whole-document mode's three changes from #605; the merge as one step in the editor's history; the view's place kept
 - [ ] Tests: the coordinator with the shell participant faked (S1–S8, S56–S64, both save orders); the shell's tests; render tests of the paragraph mode and the button; `stale-write-check.mjs` for S56–S62 in the app; each fails on `main` first

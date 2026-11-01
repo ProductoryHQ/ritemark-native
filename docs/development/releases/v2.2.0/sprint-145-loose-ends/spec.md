@@ -17,7 +17,7 @@ Twelve faults that 2.1's gates and first days found, or that the milestone carri
 
 ### R1 (revised 2026-11-01): Both changes stay; no word is ever lost (#588)
 
-**Revised by Jarmo's decision of 1 November 2026** (ritemark-dev decision log `735b186`; [#588's comment](https://github.com/ProductoryHQ/ritemark-native/issues/588#issuecomment-6556475375)), drawn by the Experience lead as **experience 44, *Editing alongside the AI*** (ritemark-dev `product/design/experience/experiences/alongside/README.md`, `ec25356`). The question is no longer whose version wins: both changes stay, as when two people edit in Google Docs or Word. The 31 October version is kept below as history. **Not approved yet** (sprint plan, *Approval*); no code is written for it before Jarmo approves.
+**Revised by Jarmo's decision of 1 November 2026** (ritemark-dev decision log `735b186`; [#588's comment](https://github.com/ProductoryHQ/ritemark-native/issues/588#issuecomment-6556475375)), drawn by the Experience lead as **experience 44, *Editing alongside the AI*** (ritemark-dev `product/design/experience/experiences/alongside/README.md`, `ec25356`). The question is no longer whose version wins: both changes stay, as when two people edit in Google Docs or Word. The 31 October version is kept below as history. **Approved by Jarmo on 1 November** (decision log `819c63f`), with unsaved text merged too.
 
 As someone typing in a document while an AI or another app writes the same file, I want both my words and the other writer's changes to stay, and to be asked only about a paragraph we both changed.
 
@@ -43,7 +43,7 @@ Acceptance criteria:
 - Markdown, CSV and files with front matter or CRLF endings behave the same.
 - **Patch 014 changes** (corrected from the 31 October version): it gains the reload participant beside its save-conflict route. The save receipt and the save-conflict route are unchanged.
 
-**Open question for Jarmo:** a writer that writes while the document is *dirty* (S3, #454) still gets #454's whole-document question in this revision. The same merge could answer it (the base is the last save). Recommended: keep #454's question in 2.2 and merge it later, so this PR changes one path.
+**Unsaved text is merged too** (Jarmo, 1 November, decision log `819c63f`: "salvestamata tekst samuti kokkupanekusse"). A writer that saves while the document has unsaved typing (S3, #454's path) is merged the same way, with the last save as the base and the document's text as the person's side; the merged text is saved over the writer's file (the refused save goes through, since the disk holds the copy Ritemark merged). #454's whole-document question stays only as the fallback when no base is found.
 
 #### R1 as approved on 31 October 2026 (superseded on 1 November)
 
@@ -223,7 +223,7 @@ No conversation record, card file, flow, document or setting changes shape. R2 a
 
 ### E3: Tier
 
-Shell, by `patches/vscode/020-ritemark-electron-43.patch` and the expected changes to 001 and 019. The per-item tiers are in the sprint plan; the tier line changes first when an audit moves a fix. Since 1 November also `patches/vscode/014-ritemark-save-receipts.patch`: R1's reload participant (revised R1, pending approval).
+Shell, by `patches/vscode/020-ritemark-electron-43.patch` and the expected changes to 001 and 019. The per-item tiers are in the sprint plan; the tier line changes first when an audit moves a fix. Since 1 November also `patches/vscode/014-ritemark-save-receipts.patch`: R1's reload participant (revised R1, approved).
 
 ### E4: Bundle
 
@@ -243,7 +243,7 @@ Shell, by `patches/vscode/020-ritemark-electron-43.patch` and the expected chang
 
 ## Decisions
 
-**1 November 2026, Jarmo (decision log `735b186`):** #588's direction changes: both changes stay, merged by paragraph (R1, revised); the whole-document question is only the fallback; the AI's edits stream straight in, no suggestions in 2.2 (#609); the merge runs in the shell, next to patch 014. This supersedes decision 1 below, and decision 2's level is now High by paths. Pending: Jarmo's approval of the revised R1 (sprint plan, *Approval*).
+**1 November 2026, Jarmo (decision log `735b186`):** #588's direction changes: both changes stay, merged by paragraph (R1, revised); the whole-document question is only the fallback; the AI's edits stream straight in, no suggestions in 2.2 (#609); the merge runs in the shell, next to patch 014. This supersedes decision 1 below, and decision 2's level is now High by paths. Approved on 1 November (`819c63f`), with unsaved text merged too.
 
 Jarmo answered all five on 31 October 2026 ("agreed with all", in the Development manager session), each as recommended:
 
@@ -256,4 +256,4 @@ Jarmo answered all five on 31 October 2026 ("agreed with all", in the Developmen
 Still open:
 
 - **For the Experience lead:** the rows and question for #596, the quiet sign for #597, the done card's background for #578. #588's words and look are drawn (experience 44, 1 November).
-- **For Jarmo:** whether a dirty document's writer (S3, #454) is merged too, or keeps its question in 2.2 (R1, *Open question*).
+- ~~**For Jarmo:** whether a dirty document's writer (S3, #454) is merged too~~: yes (1 November, `819c63f`).

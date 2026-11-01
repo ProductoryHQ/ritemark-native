@@ -6,7 +6,7 @@ Unless a scenario says otherwise it runs on the Mac, on a dev instance of the sp
 
 ## Feature: Words a person typed and saved stay (R1)
 
-**Revised on 1 November 2026** with R1 (both changes stay, merged by block; experience 44, *Editing alongside the AI*, ritemark-dev `ec25356`; pending Jarmo's approval). S1, S4 and S8 are revised below (their 31 October text follows each as "Was"); S2, S3, S5–S7 and S9 stand; S56–S64 are new.
+**Revised on 1 November 2026** with R1 (both changes stay, merged by block; experience 44, *Editing alongside the AI*, ritemark-dev `ec25356`). S1, S3, S4 and S8 are revised below (their 31 October text follows each as "Was"); S2, S5–S7 and S9 stand; S56–S64 are new. Approved on 1 November (`819c63f`).
 
 The setup of S1–S8 is a three-line Markdown file in a scratch project, open in Ritemark's editor. "Typing" is key events over CDP at the end of line 3; "auto-save" is waiting for Ritemark's own save.
 
@@ -25,9 +25,12 @@ Given the file, a sentence typed and auto-saved, the document clean
 When the writer reads the file, and writes it back five seconds later with line 1 changed
 Then the editor takes the change silently, as today, and no question appears.
 
-### S3: A writer that writes while the document is dirty (#454)
-Given the same, and the person is typing when the writer writes
-Then Review changes appears, as it does on `main`.
+### S3 (revised 1 November): A writer that writes while the document is dirty is merged
+Given the same, and the person is typing (unsaved) when the writer writes its copy of the last save with line 1 changed
+Then on `main` Review changes appears (#454)
+And on the branch, with no question, the document holds the writer's line 1 and every word the person typed, saved or not, and the file holds the same after the save (Jarmo, 1 November: "salvestamata tekst samuti kokkupanekusse").
+
+Was (31 October): Review changes appears, as it does on `main`.
 
 ### S4 (revised 1 November): A writer rewrites the sentence just typed, after reading it
 Given the person typed a sentence and it auto-saved
