@@ -39,6 +39,14 @@ A look used to mark the flow dirty, so the next click or measurement wrote whate
 
 `flowSaves.test.ts` adds the answers' numbers and the renamed file's save; `flowEditorStore.test.ts` adds the tracker's cases (one write, an edit during it, two in flight, Cmd+S on a clean flow).
 
+### Review round 3 (the last)
+
+- **Cmd+S after a rename** saves the renamed file whenever the write moved the flow (the URIs differ), not when VS Code has closed the old document, which it does a moment after moving the editor.
+- **Auto-arrange** is no longer an undo step: round 2's step let Cmd+Z go back past edits that have no undo step of their own (drags, field edits, as on `main`). `setNodes` marks the flow dirty only when a step moved, so an arranged flow arranged again writes nothing, and the positions go onto the steps as they are when the layout returns, so an edit made meanwhile is kept. In the dev instance: the first Auto-arrange wrote the file, the second didn't.
+- The save tracker is made once per editor; `updateDocument` has one doc comment; `flowSaves.test.ts` covers the rename before VS Code closes the old document and a run that waits for the write sent before it.
+
+This commit came after the third round, so `/code-review` has not read it (`REVIEW.md` allows three rounds).
+
 ## R5: one sentence and a link for every step without its key
 
 **The four places** and what they said on `main` (from `src/flows/stepNeedsKey.test.ts` run against `main`'s source):

@@ -66,8 +66,6 @@ export function useFlowAutoArrange() {
   const nodes = useFlowEditorStore((state) => state.nodes);
   const edges = useFlowEditorStore((state) => state.edges);
   const setNodes = useFlowEditorStore((state) => state.setNodes);
-  const markDirty = useFlowEditorStore((state) => state.markDirty);
-  const saveToHistory = useFlowEditorStore((state) => state.saveToHistory);
 
   return useCallback(async () => {
     if (nodes.length === 0) return;
@@ -91,7 +89,10 @@ export function useFlowAutoArrange() {
       const layoutedGraph = await elk.layout(graph);
 
       if (layoutedGraph.children) {
-        const layoutedNodes = nodes.map((node) => {
+        // Sprint 145 R4 (review rounds 2 and 3): the positions go onto the steps as they are now, so an edit made while
+        // the layout ran is kept, and `setNodes` marks the flow dirty when a step moved (a click used to write the
+        // layout by accident; a click is a look now)
+        const layoutedNodes = useFlowEditorStore.getState().nodes.map((node) => {
           const layoutedNode = layoutedGraph.children?.find(
             (n) => n.id === node.id
           );
@@ -108,10 +109,6 @@ export function useFlowAutoArrange() {
         });
 
         setNodes(layoutedNodes);
-        // Sprint 145 R4 (review round 2): the new layout is an edit, so it is saved, and undo brings the old one back.
-        // A click on a step used to write it by accident; a click is a look now.
-        markDirty();
-        saveToHistory();
 
         // Fit view after layout with a small delay
         setTimeout(() => {
@@ -121,7 +118,7 @@ export function useFlowAutoArrange() {
     } catch (error) {
       console.error('Auto-layout failed:', error);
     }
-  }, [nodes, edges, setNodes, markDirty, saveToHistory, fitFlow]);
+  }, [nodes, edges, setNodes, fitFlow]);
 }
 
 

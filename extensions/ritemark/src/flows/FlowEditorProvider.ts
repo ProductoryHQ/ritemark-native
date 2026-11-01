@@ -138,8 +138,9 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
             // written yet, so the save holds them; it used to save the document without them and then mark them clean.
             await inTurn(async () => {
               const written = message.flow ? await this.updateDocument(document, message.flow, webview) : document.uri;
-              // A new name renames the file, which closes this document: save the renamed one
-              const target = document.isClosed ? await vscode.workspace.openTextDocument(written) : document;
+              // A new name renames the file, and VS Code closes this document after it moves the editor (not always by
+              // now): save the renamed file
+              const target = written.toString() === document.uri.toString() ? document : await vscode.workspace.openTextDocument(written);
               await target.save();
             });
             webview.postMessage({ type: 'flow:saved', seq: message.seq });
@@ -317,10 +318,9 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   /**
-   * Update document with new flow content
-   * If flow name changed, rename the file to match
+   * Update document with new flow content. If flow name changed, rename the file to match.
+   * Returns where the flow now is (Sprint 145: Cmd+S saves the renamed file).
    */
-  /** Writes the flow into its document; returns where the flow now is (a new name renames the file). */
   private async updateDocument(
     document: vscode.TextDocument,
     flow: Flow,

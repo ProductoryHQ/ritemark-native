@@ -20,6 +20,8 @@ const Module = require('module') as {
 };
 const log: string[] = [];
 let applyDelayMs = 40;
+let closeOnRename = true;
+const fileUri = (fsPath: string) => ({ fsPath, toString: () => `file://${fsPath}` });
 let openDocument: { isClosed: boolean } | undefined;
 class WorkspaceEdit {
   content = '';
@@ -35,8 +37,8 @@ const vscodeMod = {
     applyEdit: async (edit: WorkspaceEdit) => {
       await new Promise((resolve) => setTimeout(resolve, applyDelayMs));
       if (edit.renamedTo) {
-        // VS Code closes the renamed file's old document and opens the new one
-        if (openDocument) openDocument.isClosed = true;
+        // VS Code closes the renamed file's old document after it moves the editor: by now, or a moment later
+        if (openDocument && closeOnRename) openDocument.isClosed = true;
         log.push(`rename ${edit.renamedTo.fsPath}`);
       } else {
         log.push(`apply ${(JSON.parse(edit.content) as { name: string }).name}`);
@@ -46,7 +48,7 @@ const vscodeMod = {
   },
   window: { showErrorMessage: () => undefined },
   commands: { executeCommand: async () => undefined },
-  Uri: { parse: (s: string) => s, file: (s: string) => ({ fsPath: s }), joinPath: (...parts: unknown[]) => parts.join('/') },
+  Uri: { parse: (s: string) => s, file: (s: string) => fileUri(s), joinPath: (...parts: unknown[]) => parts.join('/') },
   Range: class { constructor(..._args: unknown[]) {} },
   WorkspaceEdit,
   EventEmitter: class { event = () => ({ dispose() {} }); fire() {} dispose() {} },
@@ -78,7 +80,7 @@ type Handler = (message: Record<string, unknown>) => Promise<void>;
 type Posted = { type: string; seq?: unknown };
 
 /** An open flow editor: its message handler, what it posted, and its document's saves in `log`. */
-async function openEditor(fsPath = '/tmp/flows/weekly.flow.json'): Promise<{ send: Handler; posted: Posted[] }> {
+async function openEditor(fsPath = '/tmp/flows/weekly.flow.json'): Promise<{ send: Handler; posted: Posted[]; host: { executeFlowWithProgress: (...args: unknown[]) => void } }> {
   let handler: Handler | undefined;
   const posted: Posted[] = [];
   const panel = {
@@ -93,20 +95,21 @@ async function openEditor(fsPath = '/tmp/flows/weekly.flow.json'): Promise<{ sen
     onDidDispose: () => ({ dispose() {} }),
   };
   const document = {
-    uri: { fsPath },
+    uri: fileUri(fsPath),
     lineCount: 1,
     isClosed: false,
     getText: () => '',
     save: async () => { log.push(document.isClosed ? 'save on a closed document' : 'save'); return !document.isClosed; },
   };
   openDocument = document;
-  await new FlowEditorProvider(extensionContext).resolveCustomTextEditor(
+  const host = new FlowEditorProvider(extensionContext);
+  await host.resolveCustomTextEditor(
     document as unknown as vscode.TextDocument,
     panel as unknown as vscode.WebviewPanel,
     {} as vscode.CancellationToken,
   );
   assert.ok(handler, 'the editor listens to its webview');
-  return { send: handler, posted };
+  return { send: handler, posted, host: host as unknown as { executeFlowWithProgress: (...args: unknown[]) => void } };
 }
 
 const flow = (name: string) => ({ id: 'weekly', name, description: '', version: 1, created: '', modified: '', inputs: [], nodes: [], edges: [] });
@@ -116,6 +119,7 @@ let failures = 0;
 async function test(name: string, fn: () => Promise<void>): Promise<void> {
   log.length = 0;
   applyDelayMs = 40; // every case writes slowly enough to overlap, unless it says otherwise
+  closeOnRename = true;
   try {
     await fn();
     console.log(`  ok   ${name}`);
@@ -174,6 +178,21 @@ async function main(): Promise<void> {
     assert.deepEqual(log, ['apply Monthly', 'rename /tmp/flows/monthly-ab12.flow.json', 'save /tmp/flows/monthly-ab12.flow.json'],
       'written, renamed, and the renamed file saved, not the closed document');
     assert.deepEqual(saved(editor.posted).map((m) => m.seq), [3]);
+  });
+
+  await test('Cmd+S with a new name saves the renamed file even before VS Code closes the old document', async () => {
+    closeOnRename = false;
+    const editor = await openEditor('/tmp/flows/weekly-ab12.flow.json');
+    await editor.send({ type: 'flow:requestSave', flow: { ...flow('Monthly'), id: 'weekly-ab12' }, seq: 4 });
+    assert.deepEqual(log, ['apply Monthly', 'rename /tmp/flows/monthly-ab12.flow.json', 'save /tmp/flows/monthly-ab12.flow.json']);
+  });
+
+  await test('a run waits for the writes already sent', async () => {
+    const editor = await openEditor();
+    const runs: string[] = [];
+    editor.host.executeFlowWithProgress = () => { runs.push(log.join(',')); };
+    await Promise.all([editor.send({ type: 'flow:save', flow: flow('G'), seq: 1 }), editor.send({ type: 'flow:run', id: 'weekly', inputs: {} })]);
+    assert.deepEqual(runs, ['apply G'], "the run starts after the write it was sent behind");
   });
 
   if (failures > 0) {

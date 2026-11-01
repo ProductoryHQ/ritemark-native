@@ -121,7 +121,7 @@ export function FlowEditor() {
   const savedNotificationTimerRef = useRef<number | null>(null);
   // Sprint 145 R4: which write the editor waits on (`createSaveTracker`): each request carries a number the host's
   // `flow:saved` echoes, so an older write's answer, or an edit made during a write, never marks the flow clean.
-  const saveTrackerRef = useRef(createSaveTracker());
+  const [saveTracker] = useState(createSaveTracker);
   // The name and description being typed reach the store 1.5 s after the last key; Cmd+S takes them at once
   const pendingTitleRef = useRef<{ name?: string; description?: string }>({});
   pendingTitleRef.current = {
@@ -152,7 +152,7 @@ export function FlowEditor() {
           break;
 
         case 'flow:saved': {
-          const answer = saveTrackerRef.current.answered(message.seq, JSON.stringify(useFlowEditorStore.getState().toFlow()));
+          const answer = saveTracker.answered(message.seq, JSON.stringify(useFlowEditorStore.getState().toFlow()));
           // Sprint 145 R4: an older request's answer: the newest one's is still to come
           if (answer === 'wait') break;
           if (answer === 'write-again') {
@@ -161,7 +161,7 @@ export function FlowEditor() {
             saveTimerRef.current = window.setTimeout(() => {
               saveTimerRef.current = null;
               const flow = useFlowEditorStore.getState().toFlow();
-              const seq = saveTrackerRef.current.sent(JSON.stringify(flow));
+              const seq = saveTracker.sent(JSON.stringify(flow));
               vscodeApi.postMessage({ type: 'flow:save', flow, seq });
             }, 500);
             break;
@@ -232,7 +232,7 @@ export function FlowEditor() {
     saveTimerRef.current = window.setTimeout(() => {
       const vscodeApi = vscode;
       const flow = toFlow();
-      const seq = saveTrackerRef.current.sent(JSON.stringify(flow));
+      const seq = saveTracker.sent(JSON.stringify(flow));
       setSaveState('saving');
       vscodeApi.postMessage({ type: 'flow:save', flow, seq });
     }, 500);
@@ -267,7 +267,7 @@ export function FlowEditor() {
           }
           flow = current;
         }
-        const seq = saveTrackerRef.current.sent(JSON.stringify(current));
+        const seq = saveTracker.sent(JSON.stringify(current));
         vscodeApi.postMessage({ type: 'flow:requestSave', flow, seq });
       }
 
@@ -327,7 +327,7 @@ export function FlowEditor() {
     }
     setSaveState('saving');
     const flow = toFlow();
-    const seq = saveTrackerRef.current.sent(JSON.stringify(flow));
+    const seq = saveTracker.sent(JSON.stringify(flow));
     vscode.postMessage({ type: 'flow:save', flow, seq });
   }, [toFlow]);
 

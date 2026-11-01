@@ -158,6 +158,16 @@ function changesFlowFile(changes: ReadonlyArray<{ type: string }>): boolean {
   return changes.some((change) => change.type !== 'select' && change.type !== 'dimensions');
 }
 
+/** Whether `after` moves, adds or drops a step compared with `before` (Sprint 145 R4: what `setNodes` writes). */
+function movesAStep(before: Array<{ id: string; position: { x: number; y: number } }>, after: Array<{ id: string; position: { x: number; y: number } }>): boolean {
+  if (before.length !== after.length) return true;
+  const was = new Map(before.map((node) => [node.id, node.position]));
+  return after.some((node) => {
+    const position = was.get(node.id);
+    return !position || position.x !== node.position.x || position.y !== node.position.y;
+  });
+}
+
 /**
  * Which write a Flow editor waits on (Sprint 145 R4, review rounds 1 and 2). Each write request (the autosave's
  * `flow:save`, Cmd+S's `flow:requestSave`, the schedule's save) gets a number the host echoes in its `flow:saved`, and
@@ -417,6 +427,8 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
 
   setNodes: (nodes) => set((state) => ({
     nodes,
+    // Sprint 145 R4: a layout that moves a step is an edit (Auto-arrange); one that moves nothing writes nothing
+    isDirty: state.isDirty || movesAStep(state.nodes, nodes),
     executionOrder: calculateExecutionOrder(nodes, state.edges),
   })),
   setEdges: (edges) => set((state) => ({

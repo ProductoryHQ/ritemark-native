@@ -157,6 +157,14 @@ assert.equal(store().executionOrder.get('llm-1'), 3, 'after the trigger and the 
 store().deleteEdge('edge-1')
 assert.equal(store().executionOrder.get('llm-1'), 2, 'an edge removed from its menu renumbers the steps')
 
+// Auto-arrange sets the steps' positions with `setNodes` (review rounds 2 and 3): a layout that moves a step is an
+// edit; one that moves nothing (an arranged flow arranged again) writes nothing.
+load()
+store().setNodes(store().nodes.map((node) => ({ ...node, position: { ...node.position } })))
+assert.equal(store().isDirty, false, 'the same layout again is not an edit')
+store().setNodes(store().nodes.map((node) => (node.id === 'llm-1' ? { ...node, position: { x: 300, y: 200 } } : node)))
+assert.equal(store().isDirty, true, 'a layout that moves a step is')
+
 // ── Which write the editor waits on (review rounds 1 and 2) ──────────────────
 
 {
