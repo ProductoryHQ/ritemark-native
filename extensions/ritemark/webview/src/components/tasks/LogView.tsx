@@ -17,9 +17,9 @@ interface Event {
   title: string
 }
 
-/** The rail dot's colour: done is success, results and answers accent, the rest faint. */
+/** The rail dot's colour: done is ink (green is only the ready dot, Sprint 145, #578), results and answers accent, the rest faint. */
 function kindColour(what: string): string {
-  if (what === 'Marked done') return 'var(--r-success)'
+  if (what === 'Marked done') return 'var(--r-ink-strong)'
   if (/^(Finished|You chose|Reviewed)/.test(what)) return 'var(--r-accent)'
   if (/^(Gave it to|Started|Retried|Asked for changes)/.test(what)) return 'var(--r-accent-fainter)'
   return 'var(--r-ink-faint)'

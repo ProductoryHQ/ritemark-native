@@ -20,7 +20,9 @@
  * - Timing the switch (with --switch-to and --measure <n>, Sprint 144 P5, #569): n more switches back and forth, each
  *   followed every 50 ms from the new window's first moment: when Home comes to the front, how long a document is in
  *   front before it (its editor says "Loading..." until the extension answers), and when the AI column shows. PASS
- *   when the AI column follows Home within 300 ms and no document is in front first, every time.
+ *   when the AI column follows Home within 300 ms and no document is in front first, every time. Each switch also
+ *   prints the workbench's own timing marks on the same clock (Sprint 145, A3): when it restored the editors and the AI
+ *   column, and when the extensions loaded, so the record says who shows the AI column.
  * - The share question (with --share-question): a page served by this script, opened from Browser's New page, asks on
  *   the AI's sheet, and while it waits the tab row works: Home comes forward and the + opens its menu (R20, S55, #455).
  *   On a profile that shares pages without asking, the question does not come and the check is SKIPPED.
@@ -309,6 +311,9 @@ if (switchTo) {
 // first moment: every 50 ms, which tab is in front, whether that is a document (its editor says "Loading..." until the
 // extension answers), and whether the AI column is shown. Times are from the new page's own time origin.
 const measureRuns = Number(option('measure', '0'));
+/** The workbench's marks (`vs/base/common/performance`) printed with each switch: its restore of editors and of the AI column, and the extensions' start. */
+const localClock = ms => { const date = new Date(ms); return `${date.toTimeString().slice(0, 8)}.${String(date.getMilliseconds()).padStart(3, '0')}`; };
+const WORKBENCH_MARKS = ['code/didStartWorkbench', 'code/willRestoreEditors', 'code/didRestoreEditors', 'code/willLoadExtensions', 'code/didLoadExtensions', 'code/willRestoreAuxiliaryBar', 'code/didRestoreAuxiliaryBar'];
 if (switchTo && measureRuns > 0) {
 	const here = (await evaluate('document.title')).split(' — ').pop();
 	const timings = [];
@@ -361,6 +366,14 @@ if (switchTo && measureRuns > 0) {
 			}
 			await sleep(40);
 		}
+		// Sprint 145 (A3, #569): the workbench's own marks in the new page, on the same clock, so the record says who
+		// shows the AI column: the workbench restoring it (the AuxiliaryBar marks) or later work in the extension
+		const marks = probe?.readyState === WebSocket.OPEN ? await new Promise(resolve => {
+			const id = ++probeId;
+			probeWaiting.set(id, resolve);
+			probe.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { returnByValue: true, expression: `(() => { const keep = ${JSON.stringify(WORKBENCH_MARKS)}; return { origin: performance.timeOrigin, marks: Object.fromEntries(performance.getEntriesByType('mark').filter(mark => keep.includes(mark.name)).map(mark => [mark.name.slice('code/'.length), Math.round(mark.startTime)])) }; })()` } }));
+			setTimeout(() => resolve(null), 1000);
+		}).catch(() => null) : null;
 		probe?.close();
 		if (!timeline.length) {
 			check(`switch ${run + 1} to ${target} timed`, false, 'no sample from the new window within 20 s');
@@ -371,8 +384,10 @@ if (switchTo && measureRuns > 0) {
 		const auxAt = timeline.find(entry => entry.aux)?.t ?? null;
 		const documentInFront = timeline.filter(entry => entry.front && !entry.front.startsWith('Home') && !entry.front.startsWith('Task board'));
 		const documentMs = documentInFront.length ? documentInFront[documentInFront.length - 1].t - documentInFront[0].t + 50 : 0;
-		timings.push({ run: run + 1, target, firstTabAt: firstFront?.t ?? null, firstTab: firstFront?.front ?? null, homeAt, auxAt, documentMs, auxAfterHome: homeAt !== null && auxAt !== null ? auxAt - homeAt : null });
+		const workbench = marks && marks.origin !== oldOrigin ? marks.marks : null;
+		timings.push({ run: run + 1, target, firstTabAt: firstFront?.t ?? null, firstTab: firstFront?.front ?? null, homeAt, auxAt, documentMs, auxAfterHome: homeAt !== null && auxAt !== null ? auxAt - homeAt : null, workbench, pageStart: Math.round(timeline[0].origin) });
 		console.log(`…  switch ${run + 1} → ${target}: first tab "${firstFront?.front ?? '(none)'}" at ${firstFront?.t ?? '?'} ms; Home in front at ${homeAt ?? 'never'} ms; a document in front for ${documentMs} ms; AI column at ${auxAt ?? 'never'} ms (${homeAt !== null && auxAt !== null ? `${auxAt - homeAt} ms after Home` : 'n/a'})`);
+		console.log(`   the workbench's marks (ms): ${workbench ? Object.entries(workbench).map(([name, at]) => `${name} ${at}`).join(', ') : 'not read'}; the page started at ${localClock(timeline[0].origin)} (local time, as exthost.log writes it)`);
 		await connect(target);
 	}
 	if (timings.length) {

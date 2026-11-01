@@ -13,6 +13,7 @@ import { vscode } from '../../lib/vscode';
 import { Slider } from '../ui/slider';
 import { AI_INFORMATION_URL } from '../ai-sidebar/aiDisclosure';
 import { GoogleDocsSettingsCard, type GoogleDocsSettingsProjection } from './GoogleDocsSettingsCard';
+import { extensionVersionLabel } from './versionLabel';
 import { PLAN_LINES } from '../welcome/welcomeCopy';
 
 interface SettingsData {
@@ -453,10 +454,11 @@ export function RitemarkSettings() {
                 Claude Account
               </label>
             </div>
+            {/* Sprint 145 (#578): Connected, Configured and a valid key are ink, here and below; green is only the ready dot */}
             {(settings.componentStatus.claudeCode.state === 'ready'
               || settings.componentStatus.claudeCode.authMethod === 'api-key') && (
-              <span className="flex items-center gap-1 text-xs text-ritemark-success">
-                <Icon name="check" size={12} />
+              <span className="flex items-center gap-1 text-xs text-ink-strong">
+                <Icon name="check" size={12} tone="inherit" />
                 Connected
               </span>
             )}
@@ -635,8 +637,8 @@ export function RitemarkSettings() {
                 </label>
               </div>
               {settings.codexIntegration && codexAuth.authenticated && (
-                <span className="flex items-center gap-1 text-xs text-ritemark-success">
-                  <Icon name="check" size={12} />
+                <span className="flex items-center gap-1 text-xs text-ink-strong">
+                  <Icon name="check" size={12} tone="inherit" />
                   Connected
                 </span>
               )}
@@ -852,8 +854,8 @@ export function RitemarkSettings() {
               OpenAI API Key
             </label>
             {settings.openaiKeyConfigured && (
-              <span className="flex items-center gap-1 text-xs text-ritemark-success">
-                <Icon name="check" size={12} />
+              <span className="flex items-center gap-1 text-xs text-ink-strong">
+                <Icon name="check" size={12} tone="inherit" />
                 Configured
               </span>
             )}
@@ -895,13 +897,13 @@ export function RitemarkSettings() {
             <div
               className={`text-xs p-2 rounded ${
                 testResults.openai.success
-                  ? 'bg-ritemark-success-soft text-ritemark-success'
+                  ? 'bg-surface-muted text-ink-strong'
                   : 'bg-ritemark-error-soft text-ritemark-error'
               }`}
             >
               {testResults.openai.success ? (
                 <span className="flex items-center gap-1">
-                  <Icon name="check" size={12} /> API key is valid
+                  <Icon name="check" size={12} tone="inherit" /> API key is valid
                 </span>
               ) : (
                 <span className="flex items-center gap-1">
@@ -931,8 +933,8 @@ export function RitemarkSettings() {
               <span className="ml-2 text-xs text-ink-muted">(optional)</span>
             </label>
             {settings.googleKeyConfigured && (
-              <span className="flex items-center gap-1 text-xs text-ritemark-success">
-                <Icon name="check" size={12} />
+              <span className="flex items-center gap-1 text-xs text-ink-strong">
+                <Icon name="check" size={12} tone="inherit" />
                 Configured
               </span>
             )}
@@ -974,13 +976,13 @@ export function RitemarkSettings() {
             <div
               className={`text-xs p-2 rounded ${
                 testResults.google.success
-                  ? 'bg-ritemark-success-soft text-ritemark-success'
+                  ? 'bg-surface-muted text-ink-strong'
                   : 'bg-ritemark-error-soft text-ritemark-error'
               }`}
             >
               {testResults.google.success ? (
                 <span className="flex items-center gap-1">
-                  <Icon name="check" size={12} /> {testResults.google.message || 'API key is valid'}
+                  <Icon name="check" size={12} tone="inherit" /> {testResults.google.message || 'API key is valid'}
                 </span>
               ) : (
                 <span className="flex items-center gap-1">
@@ -1008,8 +1010,8 @@ export function RitemarkSettings() {
               <span className="ml-2 text-xs text-ink-muted">(optional)</span>
             </label>
             {settings.anthropicKeyConfigured && (
-              <span className="flex items-center gap-1 text-xs text-ritemark-success">
-                <Icon name="check" size={12} />
+              <span className="flex items-center gap-1 text-xs text-ink-strong">
+                <Icon name="check" size={12} tone="inherit" />
                 Configured
               </span>
             )}
@@ -1051,13 +1053,13 @@ export function RitemarkSettings() {
             <div
               className={`text-xs p-2 rounded ${
                 testResults.anthropic.success
-                  ? 'bg-ritemark-success-soft text-ritemark-success'
+                  ? 'bg-surface-muted text-ink-strong'
                   : 'bg-ritemark-error-soft text-ritemark-error'
               }`}
             >
               {testResults.anthropic.success ? (
                 <span className="flex items-center gap-1">
-                  <Icon name="check" size={12} /> {testResults.anthropic.message || 'API key is valid'}
+                  <Icon name="check" size={12} tone="inherit" /> {testResults.anthropic.message || 'API key is valid'}
                 </span>
               ) : (
                 <span className="flex items-center gap-1">
@@ -1087,8 +1089,8 @@ export function RitemarkSettings() {
                 <span className="ml-2 text-xs text-ink-muted">(optional)</span>
               </label>
               {settings.openrouterKeyConfigured && (
-                <span className="flex items-center gap-1 text-xs text-ritemark-success">
-                  <Icon name="check" size={12} />
+                <span className="flex items-center gap-1 text-xs text-ink-strong">
+                  <Icon name="check" size={12} tone="inherit" />
                   Configured
                 </span>
               )}
@@ -1130,13 +1132,13 @@ export function RitemarkSettings() {
               <div
                 className={`text-xs p-2 rounded ${
                   testResults.openrouter.success
-                    ? 'bg-ritemark-success-soft text-ritemark-success'
+                    ? 'bg-surface-muted text-ink-strong'
                     : 'bg-ritemark-error-soft text-ritemark-error'
                 }`}
               >
                 {testResults.openrouter.success ? (
                   <span className="flex items-center gap-1">
-                    <Icon name="check" size={12} /> {testResults.openrouter.message || 'API key is valid'}
+                    <Icon name="check" size={12} tone="inherit" /> {testResults.openrouter.message || 'API key is valid'}
                   </span>
                 ) : (
                   <span className="flex items-center gap-1">
@@ -1169,8 +1171,8 @@ export function RitemarkSettings() {
                 <span className="ml-2 text-xs text-ink-muted">(optional)</span>
               </label>
               {settings.elevenlabsKeyConfigured && (
-                <span className="flex items-center gap-1 text-xs text-ritemark-success">
-                  <Icon name="check" size={12} />
+                <span className="flex items-center gap-1 text-xs text-ink-strong">
+                  <Icon name="check" size={12} tone="inherit" />
                   Configured
                 </span>
               )}
@@ -1212,13 +1214,13 @@ export function RitemarkSettings() {
               <div
                 className={`text-xs p-2 rounded ${
                   testResults.elevenlabs.success
-                    ? 'bg-ritemark-success-soft text-ritemark-success'
+                    ? 'bg-surface-muted text-ink-strong'
                     : 'bg-ritemark-error-soft text-ritemark-error'
                 }`}
               >
                 {testResults.elevenlabs.success ? (
                   <span className="flex items-center gap-1">
-                    <Icon name="check" size={12} /> {testResults.elevenlabs.message || 'API key is valid'}
+                    <Icon name="check" size={12} tone="inherit" /> {testResults.elevenlabs.message || 'API key is valid'}
                   </span>
                 ) : (
                   <span className="flex items-center gap-1">
@@ -1388,7 +1390,8 @@ export function RitemarkSettings() {
                 <StatusBadge state={settings.updateCenter.state} />
               </div>
               <div className="text-xs text-ink-muted mt-1">
-                App {settings.updateCenter.currentAppVersion} · Extension {settings.updateCenter.currentExtensionVersion}
+                {/* Sprint 145 (#595): "2.2.0", not the bundled copy's floored "2.2.0-0"; an update's "-ext.N" shows as it is */}
+                App {settings.updateCenter.currentAppVersion} · Extension {extensionVersionLabel(settings.updateCenter.currentExtensionVersion)}
               </div>
             </div>
 
@@ -1804,7 +1807,8 @@ function getRuntimeStatusCopy(model: RuntimeStatusModel): { label: string; sub: 
 
 function getRuntimeDotClass(model: RuntimeStatusModel): { bg: string; pulse: boolean; ariaLabel: string } {
   if (model.runtime === 'installed' && model.auth === 'ready') {
-    return { bg: 'bg-emerald-500', pulse: false, ariaLabel: 'Status: ready' };
+    // Sprint 145 (#578): the one green is the ready dot, in the success token, so it is one colour everywhere
+    return { bg: 'bg-ritemark-success', pulse: false, ariaLabel: 'Status: ready' };
   }
   if (model.runtime === 'installed' && model.auth === 'sign_in_required') {
     return { bg: 'bg-amber-500', pulse: true, ariaLabel: 'Status: attention required' };
