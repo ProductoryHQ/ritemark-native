@@ -16,7 +16,13 @@
  * (`close-focus.ts`, #585); this module grew out of it.
  *
  * Before any input the page is in keyboard mode, so a page reached from the workbench by the keyboard shows where the
- * focus is.
+ * focus is. Focus coming back into the page from outside it turns the mode to keyboard too (Codex on #621): the editor,
+ * Home and the previews keep their page while hidden, and a person who left one in pointer mode and comes back with a
+ * workbench key (a shortcut, Tab, ⌃Tab) pressed it where this page can't hear it. A press inside the page brings the
+ * focus in its own press, so a click into the page stays the pointer's. A mouse click on the workbench (its tab, say)
+ * can't be told from a key there, and reads as the keyboard: it shows a ring that needn't be there, rather than hiding
+ * one a keyboard user needs. A focus move inside the page, such as a menu giving its trigger the focus back after a
+ * mouse pick, is not the window's own focus and changes nothing.
  */
 
 import { isMac } from '../../hooks/usePlatform'
@@ -33,6 +39,8 @@ interface InputEventLike {
   detail?: number
   /** False for an event a script made (`dispatchEvent`, `click()`): it says nothing about the person. */
   isTrusted?: boolean
+  /** A focus event's target: the window itself when the focus comes into the page from outside it. */
+  target?: unknown
   getModifierState?(key: string): boolean
 }
 
@@ -112,10 +120,15 @@ export function watchInputMode(doc: InputDocument | undefined = typeof document 
       return
     }
     if (input.type === 'click' && pressing) return
+    if (input.type === 'focus') {
+      // The window's own focus, not a control's inside the page, and no press of the page's own brought it
+      if (input.target === view && !pressing) set('keyboard')
+      return
+    }
     const kind = inputKindOf(input)
     if (!kind) return
     pressing = kind === 'pointer' ? ++pressNumber : 0
     set(kind)
   }
-  for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'keydown', 'click']) view.addEventListener(type, note, true)
+  for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'keydown', 'click', 'focus']) view.addEventListener(type, note, true)
 }

@@ -1,6 +1,7 @@
 /**
- * Sprint 146 (R2, S9, decision 5): the control catalogue opens only when the launch sets RITEMARK_CONTROL_CATALOGUE=1,
- * and then as one webview tab drawn by the shared bundle; with no setting nothing is created.
+ * Sprint 146 (R2, S9, decision 5): the control catalogue opens only when the launch sets RITEMARK_CONTROL_CATALOGUE=1
+ * and its flag is on, and then as one webview tab drawn by the shared bundle; with no setting, or the flag killed,
+ * nothing is created. The flag is in the registry, ON (Codex on #621).
  *
  * Run: npx tsx src/views/ControlCataloguePanel.test.ts
  */
@@ -30,6 +31,12 @@ const load = (Module as unknown as { _load: (request: string, ...rest: unknown[]
 
 async function main(): Promise<void> {
   const { controlCatalogueAsked, openControlCatalogueIfAsked, CONTROL_CATALOGUE_VIEW_TYPE } = await import('./ControlCataloguePanel');
+  const { FLAGS, isEnabled } = await import('../features');
+
+  // The flag: in the registry, ON on every platform (HARD RULE #2); the launch setting is what opens the page
+  assert.equal(FLAGS['control-catalogue'].status, 'stable', 'ON: a code-level kill switch, not a Settings toggle');
+  assert.deepEqual(FLAGS['control-catalogue'].platforms, ['darwin', 'win32', 'linux']);
+  assert.equal(isEnabled('control-catalogue'), true);
 
   // The gate: exactly "1"
   assert.equal(controlCatalogueAsked({}), false, 'no setting: no catalogue');
@@ -44,7 +51,12 @@ async function main(): Promise<void> {
   assert.equal(created.length, 0, 'no setting: no panel, no tab');
   assert.equal(context.subscriptions.length, 0);
 
-  // With it, one tab of the shared bundle as the catalogue
+  // The setting with the flag killed ('disabled'): still nothing
+  openControlCatalogueIfAsked(context as never, { RITEMARK_CONTROL_CATALOGUE: '1' }, () => false);
+  assert.equal(created.length, 0, 'the flag killed: no panel, whatever the launch asks');
+  assert.equal(context.subscriptions.length, 0);
+
+  // With it and the flag on (the registry's own answer), one tab of the shared bundle as the catalogue
   openControlCatalogueIfAsked(context as never, { RITEMARK_CONTROL_CATALOGUE: '1' });
   assert.equal(created.length, 1, 'the setting: one panel');
   assert.equal(created[0].viewType, CONTROL_CATALOGUE_VIEW_TYPE);
