@@ -114,7 +114,7 @@ Three, each with a recommendation. [spec.md](spec.md#decisions) carries the same
 
 ## Feature Flag Check
 
-No new flag. The new page replaces the old one, and every setting moves with it (R1); a fault is fixed or reverted by an extension release. The existing flags gate the same rows as today: `codex-integration`, `opencode-integration`, `transcription-workbench`, `google-docs-publishing` (spec R1). HARD RULE #1 holds: nothing is removed, the chat's exact size moves to All settings as the drawing says, and reading a saved key back goes only with Jarmo's answer to decision 2.
+One new flag, `settings-ai-capabilities`, for R12 alone (#415, PR 4): what each AI can use starts an AI session and adds host and page behaviour, so it can be turned off without touching the runtimes' flags or the rest of the page. It is ON by default (HARD RULE #2), registered in `src/features/flags.ts`, and gates both the host's request handler and the Details sheets' section; with it off, the sheets draw as they would without R12. The rest needs no new flag: the new page replaces the old one, and every setting moves with it (R1); a fault is fixed or reverted by an extension release. (Codex's review of #627.) The existing flags gate the same rows as today: `codex-integration`, `opencode-integration`, `transcription-workbench`, `google-docs-publishing` (spec R1). HARD RULE #1 holds: nothing is removed, the chat's exact size moves to All settings as the drawing says, and reading a saved key back goes only with Jarmo's answer to decision 2.
 
 ## Testing
 

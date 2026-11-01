@@ -202,6 +202,7 @@ Acceptance criteria:
 - **Only when asked:** read when the person opens the list, never on Settings' open (R10), kept for the window, with Check again.
 - **No browsing or installing,** no marketplace, nothing promoted (Ritemark is free).
 - **Where it lives is the lead's** (question 1); recommended: a folded "What Claude can use" in each AI's Details sheet.
+- **Its own flag:** `settings-ai-capabilities` in `src/features/flags.ts`, ON by default, gates the host's request handler and the sheets' section; with it off, the sheets draw as without R12 and no AI session starts for it. A test covers both states.
 
 ## Engineering requirements
 

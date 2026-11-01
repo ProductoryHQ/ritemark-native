@@ -35,7 +35,7 @@ The plan is approved on Jarmo's 2.2 delegation (sprint-plan.md, *Approval*). The
 
 - [ ] The three rows, with every state; render tests from recorded payloads
 - [ ] `AiDetailsSheet.tsx` for Claude and ChatGPT (and OpenCode's if drawn)
-- [ ] `ApiKeysSheet.tsx`: Add, Test, Change, Remove, Get a key; Change opens an empty field
+- [ ] `ApiKeysSheet.tsx`: Add, Test, Change, Remove, Get a key. Until Jarmo answers decision 2, Change opens the field filled with the saved key and keeps today's eye; the empty field comes only with his yes, together with PR 3's key change
 - [ ] AI information at the foot
 - [ ] The key round trip (K) for all five keys, on the Mac and on Windows through the overlay; sign-in rows start and cancel
 - [ ] The inventory test passes; the rows I7–I38 and I59 checked
@@ -59,6 +59,7 @@ The plan is approved on Jarmo's 2.2 delegation (sprint-plan.md, *Approval*). The
 - [ ] The lead's answer on where it lives
 - [ ] `capabilityReport.ts` and a reader per AI by A3; parsing tests from recorded reports
 - [ ] `capabilities/request` and its answer; cached for the window; Check again
+- [ ] The `settings-ai-capabilities` flag (ON by default) gates the handler and the section; a test with it on and off (`.claude/skills/feature-flags/SKILL.md`)
 - [ ] The list in place, read-only, with "can't use it now, because…" where it applies; Light and Dark; Windows through the overlay
 - [ ] PR 4 opened: Standard, `/code-review` at medium
 
