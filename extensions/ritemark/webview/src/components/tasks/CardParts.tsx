@@ -14,7 +14,7 @@ import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { AgentSplitButton } from './AgentSplitButton'
 import { notify } from './boardClient'
-import { act, giveCard, sendNote, useBoardUi, type GivePrompt } from './boardUi'
+import { act, giveCard, markCardDone, sendNote, useBoardUi, type GivePrompt } from './boardUi'
 import { agentName, cardAgent, presentCard, type CardPresentation, type Tone } from './taskCopy'
 
 export const INPUT =
@@ -189,7 +189,7 @@ export function CardGlyph({ card, p }: { card: BoardCardView; p: CardPresentatio
           aria-label={`Mark ${card.title} done`}
           onClick={(event) => {
             event.stopPropagation()
-            void act({ type: 'board/mark-done', cardId: card.id })
+            void markCardDone(card.id)
           }}
         >
           <Icon name="circle" size={16} tone="inherit" className="off size-4" />
@@ -347,7 +347,7 @@ export function OpenConversationButton({ card, variant = 'outline' }: { card: Bo
 export function MarkDoneButton({ card }: { card: BoardCardView }) {
   return (
     <Tooltip label="Move this task to Done">
-      <Button type="button" size="sm" onClick={() => void act({ type: 'board/mark-done', cardId: card.id })}>
+      <Button type="button" size="sm" onClick={() => void markCardDone(card.id)}>
         Mark done
       </Button>
     </Tooltip>

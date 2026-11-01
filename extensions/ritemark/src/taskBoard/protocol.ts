@@ -139,7 +139,10 @@ export interface BoardSnapshot {
   /** Archived cards, the most recently archived first (D15): listed at the
    *  bottom of the Tasks side bar, off the board. */
   archived: BoardCardView[];
-  unreadable: Array<{ fileName: string; message: string }>;
+  /** Files in the task folder the board can't use. `message` is one plain sentence (Sprint 145, #596); `reason`
+   *  picks the row's buttons (Try again for `read`, Open to fix it for `format`, Remove for all). A build that
+   *  doesn't send `reason` gets today's row. */
+  unreadable: Array<{ fileName: string; message: string; reason?: UnreadableReason }>;
   calls: BoardCall[];
   attention: { count: number; oldestSince: string | null; blocked: number };
   doing: { count: number; limit: number | null };
@@ -147,6 +150,12 @@ export interface BoardSnapshot {
   /** The agent the board's buttons name; the user's last choice. */
   defaultRuntime: AgentId;
 }
+
+/**
+ * Why the board can't use a file (Sprint 145, #596): it couldn't be read (`read`: a timeout, a permission, a cloud
+ * drive still fetching it), its front matter is broken (`format`), or a newer Ritemark wrote it (`newer`).
+ */
+export type UnreadableReason = 'read' | 'format' | 'newer';
 
 export const WIP_LIMIT_DEFAULT = 3;
 export const WIP_LIMIT_MAX = 6;
@@ -237,6 +246,10 @@ export type BoardRequest =
   /** Open a card's page; `fileName` names a card file that won't read, which opens as a plain document.
    *  `focus`: opened from the keyboard, so the page takes the focus (W16). */
   | { type: 'board/open-card'; cardId?: string; fileName?: string; focus?: boolean }
+  /** A file the board couldn't read (Sprint 145, #596): read it again (Try again), or move it to the system trash
+   *  (Remove, after the board's question). `fileName` must be an unreadable file of this board. */
+  | { type: 'board/retry-file'; requestId: string; fileName: string }
+  | { type: 'board/remove-file'; requestId: string; fileName: string }
   | { type: 'board/recover'; action: BoardRecoverAction };
 
 export type BoardRecoverAction = 'sign-in-claude' | 'sign-in-codex' | 'settings' | 'open-folder';
@@ -300,6 +313,8 @@ const FIELDS: Record<BoardRequestType, { required: Record<string, FieldRule>; op
   'board/add-files': { required: { cardId: 'cardId' } },
   'board/open-file': { required: { path: 'path' } },
   'board/open-card': { required: {}, optional: { cardId: 'cardId', fileName: 'fileName', focus: 'bool' } },
+  'board/retry-file': { required: { requestId: 'requestId', fileName: 'fileName' } },
+  'board/remove-file': { required: { requestId: 'requestId', fileName: 'fileName' } },
   'board/recover': { required: { action: 'recover' } },
 };
 

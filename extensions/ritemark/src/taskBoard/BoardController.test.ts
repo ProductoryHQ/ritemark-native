@@ -665,6 +665,109 @@ async function main(): Promise<void> {
     assert.ok((await controller.unwait(second)).ok);
   }
 
+  // ── Sprint 145 (#596): Try again and Remove on a file the board couldn't read ──
+  {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-files-'));
+    const tasks = path.join(folder, '.ritemark', 'tasks');
+    fs.mkdirSync(tasks, { recursive: true });
+    const cardText = (id: string, title: string) => `---\nritemark: task/1\nid: ${id}\ntitle: ${title}\nstage: todo\n---\n`;
+    fs.writeFileSync(path.join(tasks, 'cloud.md'), cardText('c10ud1', 'In the cloud'));
+    fs.writeFileSync(path.join(tasks, 'stuck.md'), cardText('st0ck1', 'Stuck'));
+    fs.writeFileSync(path.join(tasks, 'broken.md'), '---\nritemark: task/1\nid: br0k3n\ntitle: [unclosed\n---\n');
+    fs.writeFileSync(path.join(tasks, 'locked.md'), '---\nritemark: task/1\nid: l0ck3d\ntitle: [unclosed\n---\n');
+    fs.writeFileSync(path.join(tasks, 'fine.md'), cardText('f1n3c4', 'Reads fine'));
+    fs.writeFileSync(path.join(folder, 'elsewhere.md'), 'not a card\n');
+    let cloudReady = false;
+    let stuckMs = 0;
+    const trashed: string[] = [];
+    const store = new BoardStore(folder, {
+      fileSystem: {
+        ...nodeBoardStoreFileSystem,
+        async readFile(file) {
+          const name = path.basename(file);
+          if (name === 'cloud.md' && !cloudReady) throw Object.assign(new Error('ETIMEDOUT: connection timed out, read'), { code: 'ETIMEDOUT' });
+          if (name === 'stuck.md' && stuckMs) {
+            await new Promise((resolve) => setTimeout(resolve, stuckMs));
+            throw Object.assign(new Error('ETIMEDOUT: connection timed out, read'), { code: 'ETIMEDOUT' });
+          }
+          return nodeBoardStoreFileSystem.readFile(file);
+        },
+        async trash(file) {
+          if (path.basename(file) === 'locked.md') throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' });
+          trashed.push(file);
+          fs.rmSync(file);
+        },
+      },
+      now,
+    });
+    const ledger = new FakeLedger();
+    const pushed: string[][] = [];
+    const make = (platform: NodeJS.Platform) =>
+      new BoardController({
+        store,
+        ledger,
+        folderName: 'files',
+        settings: { get: () => undefined, update: async () => undefined },
+        runtimes: () => ({ 'claude-code': READY, codex: READY, opencode: READY }),
+        enabled: () => true,
+        fileExists: async () => true,
+        now,
+        platform,
+        retryAnswerMs: 150,
+      });
+    const controller = make('darwin');
+    controller.subscribe((snapshot) => pushed.push(snapshot.unreadable.map((file) => `${file.fileName}:${file.reason}`)));
+    // A card the hand-off ledger knows, whose file can't be read now.
+    ledger.set('c10ud1', { state: 'completed', runtimeId: 'claude-code', since: at(1), canOpen: true });
+    stuckMs = 0;
+    await store.list();
+    const first = await controller.snapshot();
+    assert.deepEqual(first.unreadable.map((file) => [file.fileName, file.reason]), [['broken.md', 'format'], ['cloud.md', 'read'], ['locked.md', 'format']]);
+    assert.ok(!first.cards.some((card) => card.id === 'c10ud1') && !first.calls.length, 'a ledger record brings no card back for a file the board can’t read');
+
+    // S11: Try again, and it reads. The snapshot goes out before the answer, so the row goes in one step.
+    cloudReady = true;
+    pushed.length = 0;
+    assert.deepEqual(await controller.retryFile('cloud.md'), { ok: true });
+    assert.ok(pushed.length >= 1 && !pushed[0].some((row) => row.startsWith('cloud.md')), 'a fresh snapshot without the row went out before the answer');
+    assert.ok((await controller.snapshot()).cards.some((card) => card.id === 'c10ud1'), 'the card is back in its column');
+
+    // S12: Try again on a file that still fails: the answer comes in time, the row stays as it was.
+    stuckMs = 400;
+    await store.invalidate('stuck.md').catch(() => undefined);
+    const before = Date.now();
+    assert.deepEqual(await controller.retryFile('stuck.md'), { ok: true });
+    assert.ok(Date.now() - before < 350, 'a read that hangs gets an answer after the cap, not after the read');
+    const moved = await controller.move('f1n3c4', 'doing');
+    assert.ok(moved.ok && Date.now() - before < 350, 'and a move made meanwhile doesn’t wait for it (#597)');
+    stuckMs = 0;
+
+    // S17: only this board's unreadable files.
+    for (const name of ['../elsewhere.md', 'fine.md', 'not-there.md', 'nested/broken.md']) {
+      assert.equal((await controller.removeFile(name)).ok, false, `${name} is refused`);
+      assert.equal((await controller.retryFile(name)).ok, false, `${name} can’t be retried`);
+    }
+    assert.deepEqual(trashed, [], 'nothing trashed');
+
+    // S13: Remove moves the file to the trash; the row goes.
+    assert.deepEqual(await controller.removeFile('broken.md'), { ok: true });
+    assert.deepEqual(trashed.map((file) => path.basename(file)), ['broken.md']);
+    assert.ok(!(await controller.snapshot()).unreadable.some((file) => file.fileName === 'broken.md'));
+
+    // S16: the trash refuses: the row stays, and the answer says so in the board's words, per system.
+    assert.deepEqual(await controller.removeFile('locked.md'), {
+      ok: false,
+      code: 'write-failed',
+      message: 'Ritemark couldn’t move it to the Trash, so it is still in the folder.',
+    });
+    const windows = make('win32');
+    const onWindows = await windows.removeFile('locked.md');
+    windows.dispose();
+    assert.equal(onWindows.ok ? null : onWindows.message, 'Ritemark couldn’t move it to the Recycle Bin, so it is still in the folder.');
+    assert.ok((await controller.snapshot()).unreadable.some((file) => file.fileName === 'locked.md'), 'the refused file keeps its row');
+    controller.dispose();
+  }
+
   assert.deepEqual(countCheckboxes('- [ ] a\n- [x] b\n  * [X] c\nnot - [ ] d\n'), { done: 2, total: 3 });
   assert.equal(WIP_LIMIT_KEY, 'ritemark.taskBoard.wipLimit');
 

@@ -46,6 +46,25 @@ export const VERDICTS = {
 
 export const STAGE_NAMES = { idea: 'Ideas', todo: 'To do', doing: 'Doing', done: 'Done' } as const
 
+/**
+ * Sprint 145 (#596; experience 41): the words around a file the board couldn't read. The row's own sentence
+ * comes from the host; these are the buttons' tooltips and the one question before Remove. The system trash is
+ * the Recycle Bin on Windows.
+ */
+export function unreadableFileWords(fileName: string, windows: boolean) {
+  const bin = windows ? 'Recycle Bin' : 'Trash'
+  return {
+    tryAgainTip: `Read ${fileName} again`,
+    tryingTip: `Reading ${fileName} again…`,
+    openTip: `Open ${fileName} to fix it`,
+    removeTip: `Move ${fileName} to the ${bin}`,
+    removingTip: `Moving ${fileName} to the ${bin}…`,
+    waitTip: 'Remove waits until the read is over',
+    question: `Remove ${fileName}?`,
+    questionBody: `It goes to the ${bin}, and the board stops listing it. You can put it back from the ${bin}.`,
+  }
+}
+
 export function agentName(id: AgentId): string {
   return RUNTIME_LABELS[id]
 }
