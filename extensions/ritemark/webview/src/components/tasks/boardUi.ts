@@ -120,14 +120,14 @@ export async function giveCard(cardId: string, runtimeId: AgentId, options: { fo
 export async function moveCard(cardId: string, stage: CardStage, position: { beforeCardId?: string; atEnd?: boolean } = {}): Promise<void> {
   const token = beginMove(cardId, stage, position)
   const answer = await act({ type: 'board/move', cardId, stage, ...position })
-  settleMove(token, answer.ok)
+  settleMove(token, answer.ok, answer.ok ? answer.revision : undefined)
 }
 
 /** Mark done: the card goes to the top of Done at once, as the host puts it there (#597). */
 export async function markCardDone(cardId: string): Promise<void> {
   const token = beginMove(cardId, 'done')
   const answer = await act({ type: 'board/mark-done', cardId })
-  settleMove(token, answer.ok)
+  settleMove(token, answer.ok, answer.ok ? answer.revision : undefined)
 }
 
 /**
@@ -152,7 +152,7 @@ export async function retryFile(fileName: string): Promise<void> {
 export async function removeFile(fileName: string, sentence: string): Promise<void> {
   setFileState(fileName, { busy: 'removing' })
   const answer = await request({ type: 'board/remove-file', fileName })
-  if (!answer.ok && answer.code === 'write-failed') {
+  if (!answer.ok && answer.code === 'trash-refused') {
     setFileState(fileName, { note: answer.message, sentence })
     return
   }

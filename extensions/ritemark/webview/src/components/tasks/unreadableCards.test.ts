@@ -144,7 +144,7 @@ assert.equal(unreadableFileWords('a.md', true).questionBody, 'It goes to the Rec
   assert.deepEqual(render('board').rows[3].buttons, ['Open to fix it', 'Remove'])
   assert.equal(render('board').clicks.filter((item) => item.disabled).length >= 2, true, 'its buttons wait while the trash works')
   for (const listener of hostListeners) {
-    listener({ data: { type: 'board/result', requestId: posted[0].requestId, answer: { ok: false, code: 'write-failed', message: 'Ritemark couldn’t move it to the Trash, so it is still in the folder.' } } })
+    listener({ data: { type: 'board/result', requestId: posted[0].requestId, answer: { ok: false, code: 'trash-refused', message: 'Ritemark couldn’t move it to the Trash, so it is still in the folder.' } } })
   }
   await removing
   const row = render('board').rows[3]

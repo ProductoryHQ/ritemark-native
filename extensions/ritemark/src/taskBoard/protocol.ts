@@ -149,6 +149,11 @@ export interface BoardSnapshot {
   runtimes: BoardRuntimeView[];
   /** The agent the board's buttons name; the user's last choice. */
   defaultRuntime: AgentId;
+  /** The count of the store's changes this snapshot includes (Sprint 145, #597): a surface ignores a snapshot older
+   *  than one it has, and a move it drew early ends at the first snapshot at or after the move's own revision. */
+  revision?: number;
+  /** Which store counted it: a store started again (the extension host restarted) counts from 0. */
+  boardId?: string;
 }
 
 /**
@@ -175,10 +180,13 @@ export type BoardErrorCode =
   | 'runtime-unavailable'
   | 'no-conversation'
   | 'sidebar-unreachable'
-  | 'write-failed';
+  | 'write-failed'
+  /** Remove: the system trash refused the file (Sprint 145, #596); the row says so. */
+  | 'trash-refused';
 
 export type BoardAnswer =
-  | { ok: true; cardId?: string; waiting?: WaitReason; count?: number }
+  /** `revision` (a move): a snapshot with this revision or later shows it. */
+  | { ok: true; cardId?: string; waiting?: WaitReason; count?: number; revision?: number }
   | { ok: false; code: BoardErrorCode; message: string; recovery?: RuntimeAvailabilityRecovery }
   /** Give to would start a second agent on a file another card's agent is changing. */
   | { ok: false; code: 'conflict'; message: string; withCardId: string; withTitle: string; file: string }

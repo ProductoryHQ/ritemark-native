@@ -38,11 +38,13 @@ export interface PendingMove {
   since: number
   /** When the host said yes (ms); the move then waits for a snapshot that shows it. */
   answeredAt: number | null
+  /** The host's yes came with the store's revision: the first snapshot at or after it ends the move. */
+  confirmAt?: number
 }
 
 /** The quiet sign on a moving card shows only after this long (experience 41: below a second a move feels immediate). */
 export const SAVING_SIGN_AFTER_MS = 1000
-/** After the host's yes, how long a move waits for a snapshot that shows it before the snapshot is believed. */
+/** A yes without a revision (an older host): how long the move waits for a snapshot that shows it. */
 export const CONFIRM_WAIT_MS = 2000
 
 function stageIndex(stage: CardStage): number {
@@ -128,6 +130,8 @@ let snapshot: BoardSnapshot | null = null
 /** What the components read: the host's snapshot with this surface's pending moves applied. */
 let view: BoardSnapshot | null = null
 const pendingMoves = new Map<string, PendingMove>()
+/** Cards whose move has been pending a second: they show the quiet sign. */
+const savingCards = new Set<string>()
 let moveTokens = 0
 const listeners = new Set<() => void>()
 /** The cards' quiet signs listen apart: a sign appearing redraws its card, not the board. */
@@ -139,13 +143,32 @@ function publish(): void {
   for (const listener of savingListeners) listener()
 }
 
-/** A snapshot came: the moves it shows are done; a move the host said yes to long ago gives way to it. */
-function settleBySnapshot(): void {
-  if (!snapshot) return
+function endMove(cardId: string): void {
+  pendingMoves.delete(cardId)
+  savingCards.delete(cardId)
+}
+
+/**
+ * A snapshot came. One built before a snapshot this surface already has is dropped (refreshes can finish out of
+ * order); a new store (the extension host started again) starts the count over. Then the moves it shows are done:
+ * it shows the card where the move put it, or it is at or after the move's own revision.
+ */
+function takeSnapshot(next: BoardSnapshot): boolean {
+  if (snapshot && next.boardId === snapshot.boardId && next.revision !== undefined && snapshot.revision !== undefined && next.revision < snapshot.revision) {
+    return false
+  }
+  if (snapshot && next.boardId !== snapshot.boardId) {
+    pendingMoves.clear()
+    savingCards.clear()
+  }
+  snapshot = next
   const now = Date.now()
   for (const [cardId, move] of pendingMoves) {
-    if (confirmsMove(snapshot, move) || (move.answeredAt !== null && now - move.answeredAt >= CONFIRM_WAIT_MS)) pendingMoves.delete(cardId)
+    const reached = move.confirmAt !== undefined && next.revision !== undefined && next.revision >= move.confirmAt
+    const waitedOut = move.confirmAt === undefined && move.answeredAt !== null && now - move.answeredAt >= CONFIRM_WAIT_MS
+    if (confirmsMove(next, move) || reached || waitedOut) endMove(cardId)
   }
+  return true
 }
 
 /**
@@ -158,37 +181,47 @@ export function beginMove(cardId: string, stage: CardStage, position: { beforeCa
   moveTokens += 1
   const token = moveTokens
   pendingMoves.set(cardId, { token, cardId, stage, ...position, since: Date.now(), answeredAt: null })
+  savingCards.delete(cardId)
   // The quiet sign appears if the move is still pending after a second.
   setTimeout(() => {
     if (pendingMoves.get(cardId)?.token !== token) return
+    savingCards.add(cardId)
     for (const listener of savingListeners) listener()
   }, SAVING_SIGN_AFTER_MS)
   publish()
   return token
 }
 
-/** The host answered a move: a refusal puts the card back; a yes waits for a snapshot that shows it, briefly. */
-export function settleMove(token: number | null, ok: boolean): void {
+/**
+ * The host answered a move. A refusal puts the card back. A yes keeps it where it was drawn until a snapshot shows
+ * it: one at or after the answer's revision (however long the host's next snapshot takes), or, from an older host
+ * that sends none, one that shows the card there or a short wait.
+ */
+export function settleMove(token: number | null, ok: boolean, revision?: number): void {
   if (token === null) return
   const entry = [...pendingMoves.values()].find((move) => move.token === token)
   if (!entry) return
-  if (!ok || (snapshot && confirmsMove(snapshot, entry))) {
-    pendingMoves.delete(entry.cardId)
+  const reached = revision !== undefined && snapshot?.revision !== undefined && snapshot.revision >= revision
+  if (!ok || reached || (snapshot && confirmsMove(snapshot, entry))) {
+    endMove(entry.cardId)
     publish()
     return
   }
   entry.answeredAt = Date.now()
+  if (revision !== undefined) {
+    entry.confirmAt = revision
+    return
+  }
   setTimeout(() => {
     if (pendingMoves.get(entry.cardId)?.token !== token) return
-    pendingMoves.delete(entry.cardId)
+    endMove(entry.cardId)
     publish()
   }, CONFIRM_WAIT_MS)
 }
 
 /** The stage a card is being moved to, while that move has been pending a second or longer; else null. */
 export function savingStage(cardId: string): CardStage | null {
-  const move = pendingMoves.get(cardId)
-  return move && Date.now() - move.since >= SAVING_SIGN_AFTER_MS ? move.stage : null
+  return savingCards.has(cardId) ? (pendingMoves.get(cardId)?.stage ?? null) : null
 }
 
 function subscribeSaving(listener: () => void): () => void {
@@ -218,9 +251,7 @@ function install(): void {
     const message = event.data as BoardHostMessage | undefined
     if (!message || typeof message !== 'object') return
     if (message.type === 'board/state') {
-      snapshot = message.snapshot
-      settleBySnapshot()
-      publish()
+      if (takeSnapshot(message.snapshot)) publish()
     } else if (message.type === 'board/result') {
       const resolve = pending.get(message.requestId)
       if (resolve) {

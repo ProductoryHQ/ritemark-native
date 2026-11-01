@@ -29,9 +29,9 @@ type UnreadableFile = BoardSnapshot['unreadable'][number]
 
 export function UnreadableCards({ snapshot, variant = 'list' }: { snapshot: BoardSnapshot; variant?: 'board' | 'list' }) {
   // A row that went (read, fixed, removed elsewhere) takes what it carried with it.
-  const listed = snapshot.unreadable.map((file) => file.fileName).join('\n')
+  const listed = JSON.stringify(snapshot.unreadable.map((file) => file.fileName))
   useEffect(() => {
-    forgetFileStates(new Set(listed ? listed.split('\n') : []))
+    forgetFileStates(new Set(JSON.parse(listed) as string[]))
   }, [listed])
   if (!snapshot.unreadable.length) return null
   return (

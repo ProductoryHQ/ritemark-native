@@ -225,6 +225,30 @@ await sleep(CONFIRM_WAIT_MS + 50)
 assert.equal(savingStage('doing1'), null, 'after the wait the move lets go')
 assert.equal(shown(), 'todo:todo02 doing:doing1 doing:lock01 doing:todo01', 'and the host’s last snapshot is shown')
 
+// ── With revisions (this host): order and confirmation by the store's change count ──
+const r10 = { ...board([card('todo01', 'todo'), card('todo02', 'todo'), card('doing1', 'doing')]), revision: 10, boardId: 'b1' }
+host({ type: 'board/state', snapshot: r10 })
+assert.equal(shown(), 'todo:todo01 todo:todo02 doing:doing1')
+const held = moveCard('todo02', 'done')
+answer(lastRequest().requestId, { ok: true, cardId: 'todo02', revision: 11 })
+await held
+// The host's next snapshot is slow (the store is held): the move stays drawn, however long that takes.
+await sleep(CONFIRM_WAIT_MS + 50)
+assert.equal(shown(), 'todo:todo01 doing:doing1 done:todo02', 'a yes with a revision keeps the move until a snapshot at or after it')
+// A snapshot built before the write, arriving now, doesn't end it.
+host({ type: 'board/state', snapshot: r10 })
+assert.equal(shown(), 'todo:todo01 doing:doing1 done:todo02')
+// The snapshot at the move's revision ends it, wherever it puts the card (here another surface moved it on).
+const r12 = { ...board([card('todo02', 'idea'), card('todo01', 'todo'), card('doing1', 'doing')]), revision: 12, boardId: 'b1' }
+host({ type: 'board/state', snapshot: r12 })
+assert.equal(shown(), 'idea:todo02 todo:todo01 doing:doing1', 'the host’s newer snapshot is the truth')
+// A snapshot older than one already shown is ignored (refreshes can finish out of order).
+host({ type: 'board/state', snapshot: { ...r10, revision: 11 } })
+assert.equal(shown(), 'idea:todo02 todo:todo01 doing:doing1', 'an older snapshot arriving late changes nothing')
+// A store started again (the extension host restarted) counts from 0: its snapshots are taken.
+host({ type: 'board/state', snapshot: { ...board([card('todo01', 'todo')]), revision: 1, boardId: 'b2' } })
+assert.equal(shown(), 'todo:todo01', 'a new store’s first snapshot is taken')
+
 // A request that gets no answer resolves as a refusal after 30 s (boardClient.request): not waited for here.
 console.log('tasks/boardMoves: all assertions passed')
 process.exit(0)

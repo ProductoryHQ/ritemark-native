@@ -731,7 +731,7 @@ async function main(): Promise<void> {
     cloudReady = true;
     pushed.length = 0;
     assert.deepEqual(await controller.retryFile('cloud.md'), { ok: true });
-    assert.ok(pushed.length >= 1 && !pushed[0].some((row) => row.startsWith('cloud.md')), 'a fresh snapshot without the row went out before the answer');
+    assert.ok(pushed.length >= 1 && !pushed[pushed.length - 1].some((row) => row.startsWith('cloud.md')), 'the last snapshot before the answer is fresh, without the row');
     assert.ok((await controller.snapshot()).cards.some((card) => card.id === 'c10ud1'), 'the card is back in its column');
 
     // S12: Try again on a file that still fails: the answer comes in time, the row stays as it was.
@@ -759,7 +759,7 @@ async function main(): Promise<void> {
     // S16: the trash refuses: the row stays, and the answer says so in the board's words, per system.
     assert.deepEqual(await controller.removeFile('locked.md'), {
       ok: false,
-      code: 'write-failed',
+      code: 'trash-refused',
       message: 'Ritemark couldn’t move it to the Trash, so it is still in the folder.',
     });
     const windows = make('win32');
@@ -778,6 +778,76 @@ async function main(): Promise<void> {
     assert.ok(Date.now() - started < 350, `the answer comes at the cap, not after the held store (${Date.now() - started} ms)`);
     await held;
     slowMs = 0;
+    controller.dispose();
+  }
+
+  // ── Remove's last look, and a move's revision ─────────────────────────────
+  {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-files-'));
+    const tasks = path.join(folder, '.ritemark', 'tasks');
+    fs.mkdirSync(tasks, { recursive: true });
+    const cardText = (id: string, title: string) => `---\nritemark: task/1\nid: ${id}\ntitle: ${title}\nstage: todo\n---\n`;
+    fs.writeFileSync(path.join(tasks, 'arrived.md'), cardText('arr1v3', 'Arrived'));
+    fs.writeFileSync(path.join(tasks, 'hanging.md'), cardText('h4ng1n', 'Hanging'));
+    fs.writeFileSync(path.join(tasks, 'plain.md'), cardText('pl41n1', 'Plain'));
+    let arrived = false;
+    let hanging = false;
+    const trashed: string[] = [];
+    const store = new BoardStore(folder, {
+      fileSystem: {
+        ...nodeBoardStoreFileSystem,
+        async readFile(file) {
+          const name = path.basename(file);
+          if (name === 'arrived.md' && !arrived) throw Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' });
+          if (name === 'hanging.md' && hanging) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            throw Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' });
+          }
+          return nodeBoardStoreFileSystem.readFile(file);
+        },
+        async trash(file) {
+          trashed.push(path.basename(file));
+          fs.rmSync(file);
+        },
+      },
+      now,
+    });
+    const controller = new BoardController({
+      store,
+      ledger: new FakeLedger(),
+      folderName: 'files',
+      settings: { get: () => undefined, update: async () => undefined },
+      runtimes: () => ({ 'claude-code': READY, codex: READY, opencode: READY }),
+      enabled: () => true,
+      fileExists: async () => true,
+      now,
+      removeLookMs: 150,
+    });
+    hanging = true;
+    await store.list();
+    assert.ok(store.isUnreadable('arrived.md') && store.isUnreadable('hanging.md'));
+
+    // The file arrived since its row was drawn: Remove looks once more and leaves it, and its card shows.
+    arrived = true;
+    const kept = await controller.removeFile('arrived.md');
+    assert.equal(kept.ok ? 'ok' : kept.code, 'not-found');
+    assert.deepEqual(trashed, [], 'a file that reads now is not trashed');
+    assert.ok((await controller.snapshot()).cards.some((card) => card.title === 'Arrived'), 'its card is on the board');
+
+    // A file that still hangs goes to the trash after the short look.
+    const started = Date.now();
+    assert.deepEqual(await controller.removeFile('hanging.md'), { ok: true });
+    assert.ok(Date.now() - started < 600, 'Remove doesn’t wait for the hanging read');
+    assert.deepEqual(trashed, ['hanging.md']);
+
+    // A move's answer carries the store's revision; the next snapshot is at or after it and shows the move.
+    const moved = await controller.move('pl41n1', 'doing');
+    assert.ok(moved.ok && typeof moved.revision === 'number');
+    const after = await controller.snapshot();
+    assert.ok(after.revision !== undefined && moved.ok && moved.revision !== undefined && after.revision >= moved.revision, 'the snapshot is at or after the move');
+    assert.equal(after.cards.find((card) => card.id === 'pl41n1')?.stage, 'doing');
+    assert.equal(after.boardId, store.id, 'and names the store that counted it');
+    await new Promise((resolve) => setTimeout(resolve, 1100)); // let the hanging read finish
     controller.dispose();
   }
 

@@ -130,9 +130,12 @@ export interface BoardControllerDependencies {
   platform?: NodeJS.Platform;
   /** How long Try again waits for a read before it answers (tests); a stuck read goes on after the answer. */
   retryAnswerMs?: number;
+  /** How long Remove's last look at the file may take (tests). */
+  removeLookMs?: number;
 }
 
 const RETRY_ANSWER_MS = 15_000;
+const REMOVE_LOOK_MS = 2_000;
 
 /** What a file's row says when the system trash refused it (experience 41). */
 export function trashRefusedWords(platform: NodeJS.Platform): string {
@@ -277,7 +280,7 @@ export class BoardController {
   // ── Snapshot ──────────────────────────────────────────────────────────────
 
   async snapshot(): Promise<BoardSnapshot> {
-    const entries = await this.store.list();
+    const { entries, revision } = await this.store.listWithRevision();
     const handoffs = this.ledger.list();
     const cards = entries.flatMap((entry) => (entry.kind === 'card' ? [entry] : []));
     const unreadable = entries.flatMap((entry) =>
@@ -349,6 +352,8 @@ export class BoardController {
         };
       }),
       defaultRuntime: this.defaultRuntime(),
+      revision,
+      boardId: this.store.id,
     };
   }
 
@@ -520,11 +525,13 @@ export class BoardController {
         if (stage === 'done') delete next.ask;
         return next;
       });
+      // A snapshot with this revision or later shows the move (Sprint 145, #597: the surface that drew it early).
+      const revision = this.store.revision;
       // A card put away no longer waits to start.
       if ((stage === 'done' || stage === 'idea') && this.ledger.list().get(cardId)?.state === 'waiting') {
         await this.ledger.unwait(cardId);
       }
-      return { ok: true, cardId };
+      return { ok: true, cardId, revision };
     } catch (error) {
       return fromStoreError(error);
     }
@@ -562,24 +569,46 @@ export class BoardController {
       timer = setTimeout(resolve, this.deps.retryAnswerMs ?? RETRY_ANSWER_MS);
     });
     const work = (async () => {
-      await this.store.invalidate(fileName).catch(() => false);
-      await this.refreshNow();
+      // A fresh read, not one queued behind a read of the same file that may be stuck. Nothing changed: the
+      // answer alone gives the row its buttons back.
+      if (await this.store.invalidate(fileName, { fresh: true }).catch(() => false)) await this.refreshNow();
     })().catch((error) => console.warn('[taskBoard] try again failed', error));
     await Promise.race([work, waited]);
     clearTimeout(timer);
     return { ok: true };
   }
 
-  /** Remove: the file goes to the system trash (the board asked first). A refusal keeps the row, with its words. */
+  /**
+   * Remove: the file goes to the system trash (the board asked first). A last fresh look at the file comes first,
+   * for a moment: one that reads now as a card (a cloud file that has arrived) is not trashed, and its card shows.
+   * A file that still hangs is trashed after that moment. A refusal keeps the row, with its words.
+   */
   async removeFile(fileName: string): Promise<BoardAnswer> {
+    if (!this.store.isUnreadable(fileName)) return answerError('not-found', 'That file is not one the board couldn’t read.');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      this.store.invalidate(fileName, { fresh: true }).catch(() => false),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, this.deps.removeLookMs ?? REMOVE_LOOK_MS);
+      }),
+    ]);
+    clearTimeout(timer);
     try {
       await this.store.removeFile(fileName);
     } catch (error) {
       if (error instanceof TrashRefusedError) {
         console.warn(`[taskBoard] ${error.message}`);
-        return answerError('write-failed', trashRefusedWords(this.deps.platform ?? process.platform));
+        return answerError('trash-refused', trashRefusedWords(this.deps.platform ?? process.platform));
       }
-      return fromStoreError(error);
+      if (error instanceof BoardStoreError) {
+        console.warn(`[taskBoard] couldn't remove ${fileName}: ${error.message}`);
+        if (error.code === 'not-found') {
+          await this.refreshNow();
+          return answerError('not-found', 'That file reads now: its card is on the board.');
+        }
+        return answerError(error.code, 'Ritemark couldn’t remove the file. Try again.');
+      }
+      throw error;
     }
     await this.refreshNow();
     return { ok: true };

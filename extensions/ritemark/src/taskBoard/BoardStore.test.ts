@@ -549,6 +549,37 @@ async function main(): Promise<void> {
     assert.deepEqual({ reads, most }, { reads: 2, most: 1 }, 'four watcher events while it answers: the read running and one after it, shared');
   }
 
+  // ── Try again reads at once, beside a read of the same file that is stuck ──
+  {
+    const folder = tempFolder();
+    writeCard(folder, 'cloud.md', { id: 'c10ud2', title: 'In the cloud' });
+    let mode: 'fail' | 'stuck-then-fail' | 'ok' = 'ok';
+    const store = newStore(folder, {
+      async readFile(file) {
+        if (path.basename(file) !== 'cloud.md') return nodeBoardStoreFileSystem.readFile(file);
+        const now = mode;
+        if (now === 'stuck-then-fail') {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+        if (now !== 'ok') throw Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' });
+        return nodeBoardStoreFileSystem.readFile(file);
+      },
+    });
+    await store.list();
+    mode = 'fail';
+    await store.invalidate('cloud.md');
+    assert.ok(store.isUnreadable('cloud.md'));
+    mode = 'stuck-then-fail';
+    const stuck = store.invalidate('cloud.md'); // the watcher's read, stuck for a while, and then failing
+    mode = 'ok';
+    const started = Date.now();
+    assert.equal(await store.invalidate('cloud.md', { fresh: true }), true, 'a fresh read doesn’t wait behind it');
+    assert.ok(Date.now() - started < 200, 'and comes back at once');
+    assert.equal(await stuck, false, 'the stuck read, failing late, doesn’t undo the card');
+    assert.deepEqual(cardsOf(await store.list()).map((card) => card.title), ['In the cloud']);
+    assert.ok(store.revision > 0, 'every change counts');
+  }
+
   // ── A folder named like a card file is no card, so Remove can never trash a folder ─
   {
     const folder = tempFolder();

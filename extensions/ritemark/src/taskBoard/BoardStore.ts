@@ -145,6 +145,7 @@ type FileRead = { kind: 'text'; text: string } | { kind: 'missing' } | { kind: '
 
 /** A re-read made outside the tail, with what it is checked against when it is applied. */
 interface QueuedRead {
+  ticket: number;
   epoch: number;
   version: number;
   read: FileRead;
@@ -203,6 +204,8 @@ function isCardFileName(name: string): boolean {
 
 export class BoardStore {
   readonly tasksDir: string;
+  /** This store's own id: its change count (`revision`) means something only with it. */
+  readonly id = randomUUID();
   private readonly fs: BoardStoreFileSystem;
   private readonly now: () => Date;
   private readonly random: (max: number) => number;
@@ -221,12 +224,18 @@ export class BoardStore {
    * to hold every move, add and edit until its read gave up. Per file they run one at a time, so they finish in the
    * order they started. A read is applied only while the store hasn't changed that file's entry since it started:
    * `fileVersions` counts the store's own changes to an entry (writes, loads, removals), `epoch` whole reloads.
-   * One entry per file name the store has seen.
+   * One entry per file name the store has seen. Try again reads at once, beside a read still running, so reads
+   * also carry a ticket: one that finishes after a later one was applied changes nothing.
    */
   private readonly fileVersions = new Map<string, number>();
   /** fileName → the re-read running for it, and the one queued after it that every later caller shares. */
   private readonly fileReads = new Map<string, { running: Promise<QueuedRead>; next: Promise<QueuedRead> | null }>();
+  /** fileName → the ticket of the last re-read applied. */
+  private readonly appliedReads = new Map<string, number>();
+  private readTicket = 0;
   private epoch = 0;
+  /** Counts the store's changes (every `emit`); a snapshot and an answer carry it, so a surface can tell their order. */
+  private changes = 0;
 
   constructor(readonly folderPath: string, dependencies: BoardStoreDependencies = {}) {
     this.tasksDir = path.join(folderPath, ...CARD_FOLDER.split('/'));
@@ -249,6 +258,19 @@ export class BoardStore {
       await this.ensureLoaded();
       return this.snapshot();
     });
+  }
+
+  /** `list()`, with the count of the store's changes it includes (Sprint 145, #597: the order of snapshots). */
+  listWithRevision(): Promise<{ entries: BoardEntry[]; revision: number }> {
+    return this.serialized(async () => {
+      await this.ensureLoaded();
+      return { entries: this.snapshot(), revision: this.changes };
+    });
+  }
+
+  /** The count of the store's changes so far: a snapshot with this revision or later includes them. */
+  get revision(): number {
+    return this.changes;
   }
 
   get(cardId: string): Promise<Card | null> {
@@ -417,9 +439,6 @@ export class BoardStore {
         throw new BoardStoreError('not-found', 'That file is not one the board couldn’t read.');
       }
       const file = path.join(this.tasksDir, fileName);
-      if (path.dirname(path.resolve(file)) !== path.resolve(this.tasksDir)) {
-        throw new BoardStoreError('invalid', 'That file is not in the task folder.');
-      }
       try {
         await this.fs.trash(file);
       } catch (error) {
@@ -457,12 +476,15 @@ export class BoardStore {
    * holds no move, add or edit of another card. When the store changed that file while it was being read (it
    * wrote, loaded or removed it), what was read may be older than the disk, so the file is read again.
    */
-  async invalidate(fileName: string): Promise<boolean> {
+  async invalidate(fileName: string, options: { fresh?: boolean } = {}): Promise<boolean> {
     if (!isCardFileName(fileName)) return false;
-    const { epoch, version, read } = await this.queueRead(fileName);
+    // `fresh` (Try again, Remove's last look): read now, not after a read of the same file that may be stuck.
+    const { ticket, epoch, version, read } = await (options.fresh ? this.startRead(fileName) : this.queueRead(fileName));
     const outcome = await this.serialized(async () => {
       await this.ensureLoaded();
       if (epoch !== this.epoch || version !== (this.fileVersions.get(fileName) ?? 0)) return 'overtaken' as const;
+      if ((this.appliedReads.get(fileName) ?? 0) > ticket) return false;
+      this.appliedReads.set(fileName, ticket);
       const changed = this.applyRead(fileName, read);
       if (changed) {
         this.resolveIds();
@@ -470,7 +492,7 @@ export class BoardStore {
       }
       return changed;
     });
-    return outcome === 'overtaken' ? this.invalidate(fileName) : outcome;
+    return outcome === 'overtaken' ? this.invalidate(fileName, options) : outcome;
   }
 
   /** Read the whole folder again (a branch switch, a sync that moved many files). */
@@ -562,11 +584,7 @@ export class BoardStore {
    * as it starts, what it is checked against when it is applied.
    */
   private queueRead(fileName: string): Promise<QueuedRead> {
-    const run = async (): Promise<QueuedRead> => {
-      const epoch = this.epoch;
-      const version = this.fileVersions.get(fileName) ?? 0;
-      return { epoch, version, read: await this.readFile(fileName) };
-    };
+    const run = () => this.startRead(fileName);
     const slot = this.fileReads.get(fileName);
     if (slot) {
       slot.next ??= slot.running.then(run, run);
@@ -586,6 +604,14 @@ export class BoardStore {
     this.fileReads.set(fileName, entry);
     entry.running.then(settled, settled);
     return entry.running;
+  }
+
+  /** One re-read, started now, noting what it is checked against when it is applied. */
+  private async startRead(fileName: string): Promise<QueuedRead> {
+    const ticket = ++this.readTicket;
+    const epoch = this.epoch;
+    const version = this.fileVersions.get(fileName) ?? 0;
+    return { ticket, epoch, version, read: await this.readFile(fileName) };
   }
 
   /** The store's own change to a file's entry: a read made outside the tail before it no longer applies. */
@@ -804,6 +830,7 @@ export class BoardStore {
   }
 
   private emit(): void {
+    this.changes += 1;
     for (const listener of this.listeners) {
       try {
         listener();
