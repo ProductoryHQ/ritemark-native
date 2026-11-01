@@ -144,7 +144,8 @@ display." (ritemarkSurfaces.css), which flashed in the left column at every star
 with the layout, would have in the AI column too. The held start, as the Experience lead set it: the AI column shows no
 progress bar (an indigo line, which framework §3 rules out), nothing for its first second, and then, while its view still
 waits for the extension, the kit's turning mark (ink on the strong hairline, 16) at its centre, alone, labelled "The AI is
-starting" for screen readers; it goes when the view is resolved (contrib/webviewView/browser/webviewViewPane.ts, only for a
+starting" for screen readers (announced as it appears); it goes when the view is resolved or its resolving fails
+(contrib/webviewView/browser/webviewViewPane.ts, only for a
 view in the AI column; ritemarkSurfaces.css). And the left column lays out once: until the extensions are read, a head
 row whose command is not registered yet keeps its room, empty (`.ritemark-project-row-waiting`), so New and Search fill
 rows already drawn and the tree under them never moves (on main a window landing on Documents drew the tree, then pushed
@@ -5684,20 +5685,21 @@ index 86d357e665c..9b9f66fd54b 100644
  		this._syncOuterEdgeClasses(part);
  
 diff --git a/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts b/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
-index e0e445671e1..a61917823ea 100644
+index e0e445671e1..c84769ab83b 100644
 --- a/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
 +++ b/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
-@@ -3,7 +3,8 @@
+@@ -3,7 +3,9 @@
   *  Licensed under the MIT License. See License.txt in the project root for license information.
   *--------------------------------------------------------------------------------------------*/
  
 -import { addDisposableListener, EventType, findParentWithClass, getWindow } from '../../../../base/browser/dom.js';
 +import { $, addDisposableListener, EventType, findParentWithClass, getWindow } from '../../../../base/browser/dom.js';
++import { status } from '../../../../base/browser/ui/aria/aria.js';
 +import { disposableTimeout } from '../../../../base/common/async.js';
  import { CancellationTokenSource } from '../../../../base/common/cancellation.js';
  import { Emitter } from '../../../../base/common/event.js';
  import { DisposableStore, IDisposable, MutableDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
-@@ -18,10 +19,11 @@ import { IOpenerService } from '../../../../platform/opener/common/opener.js';
+@@ -18,10 +20,11 @@ import { IOpenerService } from '../../../../platform/opener/common/opener.js';
  import { IProgressService } from '../../../../platform/progress/common/progress.js';
  import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
  import { IThemeService } from '../../../../platform/theme/common/themeService.js';
@@ -5710,7 +5712,7 @@ index e0e445671e1..a61917823ea 100644
  import { IViewsService } from '../../../services/views/common/viewsService.js';
  import { ExtensionKeyedWebviewOriginStore, IOverlayWebview, IWebviewService, WebviewContentPurpose } from '../../webview/browser/webview.js';
  import { WebviewWindowDragMonitor } from '../../webview/browser/webviewWindowDragMonitor.js';
-@@ -38,6 +40,23 @@ interface WebviewViewState {
+@@ -38,6 +41,25 @@ interface WebviewViewState {
  	[storageKeys.webviewState]?: string | undefined;
  }
  
@@ -5725,8 +5727,10 @@ index e0e445671e1..a61917823ea 100644
 +function ritemarkStartingMark(container: HTMLElement): IDisposable {
 +	const store = new DisposableStore();
 +	store.add(disposableTimeout(() => {
-+		const mark = container.appendChild($('.ritemark-ai-starting', { role: 'status', 'aria-label': localize('ritemark.aiStarting', "The AI is starting") }));
++		const words = localize('ritemark.aiStarting', "The AI is starting");
++		const mark = container.appendChild($('.ritemark-ai-starting', { role: 'status', 'aria-label': words }));
 +		store.add(toDisposable(() => mark.remove()));
++		status(words); // a live region announces a change, not its own insertion; the label stays for anyone who reaches the mark
 +	}, RITEMARK_STARTING_MARK_AFTER_MS));
 +	return store;
 +}
@@ -5734,7 +5738,7 @@ index e0e445671e1..a61917823ea 100644
  export class WebviewViewPane extends ViewPane {
  
  	private static _originStore?: ExtensionKeyedWebviewOriginStore;
-@@ -50,6 +69,8 @@ export class WebviewViewPane extends ViewPane {
+@@ -50,6 +72,8 @@ export class WebviewViewPane extends ViewPane {
  	private readonly _webview = this._register(new MutableDisposable<IOverlayWebview>());
  	private readonly _webviewDisposables = this._register(new DisposableStore());
  	private _activated = false;
@@ -5743,7 +5747,7 @@ index e0e445671e1..a61917823ea 100644
  
  	private _container?: HTMLElement;
  	private _rootContainer?: HTMLElement;
-@@ -170,6 +191,12 @@ export class WebviewViewPane extends ViewPane {
+@@ -170,6 +194,12 @@ export class WebviewViewPane extends ViewPane {
  
  		this._activated = true;
  
@@ -5756,14 +5760,38 @@ index e0e445671e1..a61917823ea 100644
  		const origin = this.extensionId ? WebviewViewPane.getOriginStore(this.storageService).getOrigin(this.id, this.extensionId) : undefined;
  		const webview = this.webviewService.createWebviewOverlay({
  			origin,
-@@ -240,6 +267,7 @@ export class WebviewViewPane extends ViewPane {
+@@ -209,7 +239,7 @@ export class WebviewViewPane extends ViewPane {
+ 		// so the webview view service drops any pending `_awaitingRevival` entry for this view.
+ 		this._webviewDisposables.add(toDisposable(() => source.cancel()));
+ 
+-		this.withProgress(async () => {
++		this.withProgress(this.ritemarkUntilResolved(async () => {
+ 			await this.extensionService.activateByEvent(`onView:${this.id}`);
+ 
+ 			const self = this;
+@@ -240,7 +270,21 @@ export class WebviewViewPane extends ViewPane {
  			};
  
  			await this.webviewViewService.resolve(this.id, webviewView, source.token);
-+			this.ritemarkStarting.clear(); // Ritemark 2.0: the view draws
- 		});
+-		});
++		}));
++	}
++
++	/**
++	 * Ritemark 2.0 (Sprint 145, #569): the AI column's turning mark goes when the view is resolved, and also when the
++	 * extension's activation or its resolver fails, so it never says the AI is starting when it has stopped.
++	 */
++	private ritemarkUntilResolved(task: () => Promise<void>): () => Promise<void> {
++		return async () => {
++			try {
++				await task();
++			} finally {
++				this.ritemarkStarting.clear();
++			}
++		};
  	}
  
+ 	protected override updateTitle(value: string | undefined) {
 diff --git a/src/vs/workbench/electron-browser/desktop.contribution.ts b/src/vs/workbench/electron-browser/desktop.contribution.ts
 index 41250d7b714..c6fc8a12257 100644
 --- a/src/vs/workbench/electron-browser/desktop.contribution.ts
