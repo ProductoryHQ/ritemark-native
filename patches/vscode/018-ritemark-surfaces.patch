@@ -133,9 +133,10 @@ draw (a window that opens on Documents drew its head before the extension's New 
 out again.
 
 Sprint 145 (#569): a window that a switch in place opened lands on Home from its first frame. When the switch guard lets a
-LOAD go on, it leaves a note in application storage (the folder left, the folder opened when the window knew it, the
-time); the main editor part takes it once as it restores, before the grid is made, and puts Home's tab first in its
-desk's order of use, so Home is the tab in front and the document the project was left on stays behind it
+LOAD go on and no other participant vetoes it, it writes a note into application storage with the storage's last save
+(onWillSaveState, SHUTDOWN): the folder left, the folder opened when the window knew it, the time. The next main editor
+part takes it once as it makes its desks, before the grid is made, and puts Home's tab first in its desk's order of
+use and that desk in front, so Home is the tab in front and the document the project was left on stays behind it
 (ritemarkSwitchGuard.ts: ritemarkLandsOnHome, the extension's own rule; ritemarkHomeInFront; editorPart.ts). Until now
 the restored document was in front for about half a second, until the extension started and brought Home forward.
 While a column waits for its place or the AI at start, it shows the ground, not VS Code's "Drag a view here to
@@ -819,7 +820,7 @@ index d81722d63af..8a11889fd80 100644
  		this._onDidRender.fire();
  
 diff --git a/src/vs/workbench/browser/layout.ts b/src/vs/workbench/browser/layout.ts
-index eb7de803333..8adb9b60084 100644
+index 93d1f653e88..1c003cc8692 100644
 --- a/src/vs/workbench/browser/layout.ts
 +++ b/src/vs/workbench/browser/layout.ts
 @@ -151,6 +151,12 @@ export const TITLE_BAR_SETTINGS = [
@@ -835,7 +836,7 @@ index eb7de803333..8adb9b60084 100644
  const DEFAULT_WORKSPACE_WINDOW_DIMENSIONS = new Dimension(DEFAULT_WORKSPACE_WINDOW_SIZE.width, DEFAULT_WORKSPACE_WINDOW_SIZE.height);
  
  export abstract class Layout extends Disposable implements IWorkbenchLayoutService {
-@@ -3029,9 +3035,9 @@ class LayoutStateModel extends Disposable {
+@@ -3038,9 +3044,9 @@ class LayoutStateModel extends Disposable {
  		const auxiliaryBarForceMaximized = this.configurationService.getValue(WorkbenchLayoutSettings.AUXILIARYBAR_FORCE_MAXIMIZED);
  		const workbenchState = this.contextService.getWorkbenchState();
  		const mainContainerDimension = configuration.mainContainerDimension;
@@ -847,7 +848,7 @@ index eb7de803333..8adb9b60084 100644
  		LayoutStateKeys.AUXILIARYBAR_HIDDEN.defaultValue = (() => {
  			if (isWeb && !this.environmentService.remoteAuthority) {
  				return true; // not required in web if unsupported
-@@ -3131,8 +3137,8 @@ class LayoutStateModel extends Disposable {
+@@ -3140,8 +3146,8 @@ class LayoutStateModel extends Disposable {
  
  		// Restrict auxiliary bar size in case of small window dimensions
  		if (this.isNew[StorageScope.WORKSPACE] && configuration.mainContainerDimension.width <= DEFAULT_WORKSPACE_WINDOW_DIMENSIONS.width) {
@@ -3068,7 +3069,7 @@ index ae595e8ab3e..d2a137e7255 100644
  				renderBody,
  				icon: customOptions?.icon,
 diff --git a/src/vs/workbench/browser/parts/editor/editorPart.ts b/src/vs/workbench/browser/parts/editor/editorPart.ts
-index afa6942390e..50ec6c1d38a 100644
+index afa6942390e..4096214aa80 100644
 --- a/src/vs/workbench/browser/parts/editor/editorPart.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorPart.ts
 @@ -36,6 +36,9 @@ import { IContextKeyService } from '../../../../platform/contextkey/common/conte
@@ -3107,26 +3108,45 @@ index afa6942390e..50ec6c1d38a 100644
  		// Context keys
  		this.handleContextKeys();
  
-@@ -1309,6 +1324,9 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1285,10 +1300,15 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
  
- 	private doCreateGridControlWithPreviousState(): boolean {
- 		const state: IEditorPartUIState | undefined = this.loadState();
+ 	private doCreateGridControl(): void {
+ 
 +		// Ritemark 2.0 (Sprint 145, #569): a window a switch in place opened lands on Home from its first frame. The
-+		// switch's note is taken here by the first window that restores, with tabs or without, so it never lands a later one
++		// switch's note is taken here by the first main window that makes its desks, restoring them or not, so it never
++		// lands a later one
 +		const ritemarkLanding = this.windowId === mainWindow.vscodeWindowId && this.instantiationService.invokeFunction(ritemarkTakeSwitchLanding);
++
+ 		// Grid Widget (with previous UI state)
+ 		let restoreError = false;
+ 		if (this._willRestoreState) {
+-			restoreError = !this.doCreateGridControlWithPreviousState();
++			restoreError = !this.doCreateGridControlWithPreviousState(ritemarkLanding);
+ 		}
+ 
+ 		// Grid Widget (no previous UI state or failed to restore)
+@@ -1307,7 +1327,7 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+ 		this.notifyGroupIndexChange();
+ 	}
+ 
+-	private doCreateGridControlWithPreviousState(): boolean {
++	private doCreateGridControlWithPreviousState(ritemarkLanding = false): boolean {
+ 		const state: IEditorPartUIState | undefined = this.loadState();
  		if (state?.serializedGrid) {
  			try {
- 
-@@ -1316,7 +1334,7 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1315,8 +1335,9 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+ 				// MRU
  				this.mostRecentActiveGroups = state.mostRecentActiveGroups;
  
- 				// Grid Widget
+-				// Grid Widget
 -				this.doCreateGridControlWithState(state.serializedGrid, state.activeGroup);
-+				this.doCreateGridControlWithState(ritemarkLanding ? ritemarkHomeInFront(state.serializedGrid) : state.serializedGrid, state.activeGroup);
++				// Grid Widget (Ritemark 2.0: landing on Home, its tab and its desk come back in front)
++				const landed = ritemarkLanding ? ritemarkHomeInFront(state.serializedGrid) : undefined;
++				this.doCreateGridControlWithState(landed?.grid ?? state.serializedGrid, landed?.homeGroup ?? state.activeGroup);
  			} catch (error) {
  
  				// Log error
-@@ -1466,7 +1484,8 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1466,7 +1487,8 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
  		}
  
  		// Layout contents
@@ -4373,10 +4393,10 @@ index 00000000000..c515a8eb74f
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts b/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts
 new file mode 100644
-index 00000000000..3f89aba713f
+index 00000000000..55a650c6653
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts
-@@ -0,0 +1,178 @@
+@@ -0,0 +1,206 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4391,12 +4411,13 @@ index 00000000000..3f89aba713f
 + * ask. The window is never stuck: with no such command, or no answer and no question shown within 10 seconds, the
 + * reload goes on as before.
 + *
-+ * Sprint 145 (#569): the window a switch opens lands on Home from its first frame. When the reload goes on, the guard
-+ * leaves a note for the next window (the folder it leaves, the folder it opens when known, the time); the editor part
-+ * takes it once as it restores the tabs and brings Home's tab to the front of its desk (editorPart.ts), where the
-+ * extension brought it forward only after it had started, with the document the project was left on in front until then.
-+ * The rule is the extension's own (`ProjectSwitcher.takeLanding`): within two minutes, in the folder the switch opened,
-+ * or in any other folder when the window did not know it.
++ * Sprint 145 (#569): the window a switch opens lands on Home from its first frame. Once the reload really goes on (no
++ * participant vetoed it), the guard leaves a note for the next window as the storage saves for the last time: the folder
++ * it leaves, the folder it opens when known, the time. The next window's editor part takes it once and brings Home's
++ * tab to the front of its desk, and that desk to the front (editorPart.ts), where the extension brought it forward only
++ * after it had started, with the document the project was left on in front until then. The rule is the extension's own
++ * (`ProjectSwitcher.takeLanding`): within two minutes, in the folder the switch opened, or in any other folder when
++ * the window did not know it.
 + */
 +
 +import { Disposable, toDisposable } from '../../../base/common/lifecycle.js';
@@ -4405,7 +4426,7 @@ index 00000000000..3f89aba713f
 +import { ICommandService } from '../../../platform/commands/common/commands.js';
 +import { IDialogService } from '../../../platform/dialogs/common/dialogs.js';
 +import { ServicesAccessor } from '../../../platform/instantiation/common/instantiation.js';
-+import { IStorageService, StorageScope, StorageTarget } from '../../../platform/storage/common/storage.js';
++import { IStorageService, StorageScope, StorageTarget, WillSaveStateReason } from '../../../platform/storage/common/storage.js';
 +import { IWorkspaceContextService, WorkbenchState } from '../../../platform/workspace/common/workspace.js';
 +import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../common/contributions.js';
 +import { isSerializedEditorGroupModel, ISerializedEditorGroupModel } from '../../common/editor/editorGroupModel.js';
@@ -4453,6 +4474,8 @@ index 00000000000..3f89aba713f
 +const LANDING_FRESH_MS = 2 * 60 * 1000;
 +
 +const HOME_VIEW_TYPE = 'mainThreadWebview-ritemark.home';
++/** `WebviewInput.typeId`, the serializer id a saved webview tab carries. */
++const WEBVIEW_EDITOR_TYPE_ID = 'workbench.editors.webviewInput';
 +
 +interface IRitemarkSwitchLanding {
 +	/** The folder the switch left. */
@@ -4478,8 +4501,9 @@ index 00000000000..3f89aba713f
 +	return typeof note.from !== 'string' || !sameFolder(note.from, here);
 +}
 +
++/** The project's folder as the extension reads it (`workspaceFolders[0]`), in any window that has one. */
 +function projectFolder(contextService: IWorkspaceContextService): string | undefined {
-+	return contextService.getWorkbenchState() === WorkbenchState.FOLDER ? contextService.getWorkspace().folders[0]?.uri.toString() : undefined;
++	return contextService.getWorkbenchState() === WorkbenchState.EMPTY ? undefined : contextService.getWorkspace().folders[0]?.uri.toString();
 +}
 +
 +/** Sprint 145 (#569): the window takes the note once, as its editor part restores the tabs. True when it lands on Home. */
@@ -4500,6 +4524,9 @@ index 00000000000..3f89aba713f
 +}
 +
 +function isHomeEditor(editor: { id: string; value: string }): boolean {
++	if (editor.id !== WEBVIEW_EDITOR_TYPE_ID) {
++		return false;
++	}
 +	try {
 +		return (JSON.parse(editor.value) as { viewType?: unknown })?.viewType === HOME_VIEW_TYPE;
 +	} catch {
@@ -4507,8 +4534,12 @@ index 00000000000..3f89aba713f
 +	}
 +}
 +
-+/** The saved tabs with Home's tab first in its desk's order of use, so it is the tab in front when they come back. Pure. */
-+export function ritemarkHomeInFront(grid: ISerializedGrid): ISerializedGrid {
++/**
++ * The saved tabs with Home's tab first in its desk's order of use, so it is the tab in front when they come back, and
++ * that desk's id, to make it the desk in front (undefined when no desk holds Home). Pure.
++ */
++export function ritemarkHomeInFront(grid: ISerializedGrid): { grid: ISerializedGrid; homeGroup: number | undefined } {
++	let homeGroup: number | undefined;
 +	const land = (node: ISerializedNode): ISerializedNode => {
 +		if (node.type === 'branch') {
 +			return { ...node, data: node.data.map(land) };
@@ -4518,15 +4549,20 @@ index 00000000000..3f89aba713f
 +		}
 +		const group: ISerializedEditorGroupModel = node.data;
 +		const home = group.editors.findIndex(isHomeEditor);
-+		if (home < 0 || group.mru[0] === home) {
++		if (home < 0) {
++			return node;
++		}
++		homeGroup ??= group.id;
++		if (group.mru[0] === home) {
 +			return node;
 +		}
 +		return { ...node, data: { ...group, mru: [home, ...group.mru.filter(index => index !== home)] } };
 +	};
-+	return { ...grid, root: land(grid.root) };
++	const landed = { ...grid, root: land(grid.root) };
++	return { grid: landed, homeGroup };
 +}
 +
-+class RitemarkSwitchGuard extends Disposable implements IWorkbenchContribution {
++export class RitemarkSwitchGuard extends Disposable implements IWorkbenchContribution {
 +
 +	static readonly ID = 'workbench.contrib.ritemarkSwitchGuard';
 +
@@ -4539,16 +4575,28 @@ index 00000000000..3f89aba713f
 +	) {
 +		super();
 +
++		// Sprint 145 (#569): the note for the next window, held until the reload really goes on. Another participant can
++		// still veto after Ritemark's answer (unsaved files, a running terminal), and then nothing is written.
++		let landing: IRitemarkSwitchLanding | undefined;
++
 +		this._register(lifecycleService.onBeforeShutdown(e => {
++			landing = undefined;
 +			const target = takeSwitchTarget();
 +			if (e.reason === ShutdownReason.LOAD) {
 +				e.veto(askRitemarkBeforeReload(commandService, dialogService, target).then(veto => {
 +					if (!veto) {
-+						const landing: IRitemarkSwitchLanding = { from: projectFolder(contextService) ?? null, target: target?.toString() ?? null, at: Date.now() };
-+						storageService.store(LANDING_KEY, JSON.stringify(landing), StorageScope.APPLICATION, StorageTarget.MACHINE);
++						landing = { from: projectFolder(contextService) ?? null, target: target?.toString() ?? null, at: Date.now() };
 +					}
 +					return veto;
 +				}), RitemarkSwitchGuard.ID);
++			}
++		}));
++		this._register(lifecycleService.onShutdownVeto(() => landing = undefined));
++		// The storage's last save of a shutdown that goes on: the one moment clients can still store (storageService.ts)
++		this._register(storageService.onWillSaveState(e => {
++			if (e.reason === WillSaveStateReason.SHUTDOWN && landing) {
++				storageService.store(LANDING_KEY, JSON.stringify(landing), StorageScope.APPLICATION, StorageTarget.MACHINE);
++				landing = undefined;
 +			}
 +		}));
 +	}
@@ -6079,10 +6127,10 @@ index 00000000000..7924086e116
 +});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts b/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts
 new file mode 100644
-index 00000000000..919bd02e625
+index 00000000000..7668ba13877
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts
-@@ -0,0 +1,95 @@
+@@ -0,0 +1,142 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -6095,7 +6143,12 @@ index 00000000000..919bd02e625
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
 +import { ICommandService } from '../../../../platform/commands/common/commands.js';
 +import { Orientation } from '../../../../base/browser/ui/grid/grid.js';
-+import { askRitemarkBeforeReload, ritemarkHomeInFront, ritemarkLandsOnHome } from '../../../browser/parts/ritemarkSwitchGuard.js';
++import { IDialogService } from '../../../../platform/dialogs/common/dialogs.js';
++import { StorageScope, WillSaveStateReason } from '../../../../platform/storage/common/storage.js';
++import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
++import { askRitemarkBeforeReload, ritemarkHomeInFront, ritemarkLandsOnHome, RitemarkSwitchGuard } from '../../../browser/parts/ritemarkSwitchGuard.js';
++import { BeforeShutdownEvent, ILifecycleService, ShutdownReason } from '../../../services/lifecycle/common/lifecycle.js';
++import { TestStorageService } from '../../common/workbenchTestServices.js';
 +
 +/**
 + * Ritemark 2.0 (Sprint 134, R9): an unload that opens another folder here waits for the extension's answer; anything
@@ -6174,8 +6227,50 @@ index 00000000000..919bd02e625
 +		const first = { id: 1, editors: [home, board, plan], mru: [2, 1, 0], sticky: 1 };
 +		const second = { id: 2, editors: [plan], mru: [0] };
 +		const grid = { orientation: Orientation.HORIZONTAL, width: 800, height: 600, root: { type: 'branch' as const, size: 600, data: [{ type: 'leaf' as const, size: 400, data: first }, { type: 'leaf' as const, size: 400, data: second }] } };
-+		assert.deepStrictEqual(ritemarkHomeInFront(grid), { ...grid, root: { ...grid.root, data: [{ type: 'leaf', size: 400, data: { ...first, mru: [0, 2, 1] } }, { type: 'leaf', size: 400, data: second }] } });
-+		assert.deepStrictEqual(first.mru, [2, 1, 0]); // the saved state itself is not changed
++		const landed = ritemarkHomeInFront(grid);
++		const noHome = ritemarkHomeInFront({ ...grid, root: { type: 'leaf' as const, size: 400, data: second } });
++		assert.deepStrictEqual({ landed, noHome: noHome.homeGroup, savedUnchanged: first.mru }, {
++			landed: { grid: { ...grid, root: { ...grid.root, data: [{ type: 'leaf', size: 400, data: { ...first, mru: [0, 2, 1] } }, { type: 'leaf', size: 400, data: second }] } }, homeGroup: 1 },
++			noHome: undefined,
++			savedUnchanged: [2, 1, 0],
++		});
++	});
++
++	test('#569: the note is written with the last save of a switch that goes on, never after a veto or for a reload', async () => {
++		const beforeShutdown = store.add(new Emitter<BeforeShutdownEvent>());
++		const shutdownVeto = store.add(new Emitter<void>());
++		const dialogs = store.add(new Emitter<void>());
++		const storage = store.add(new TestStorageService());
++		const lifecycle = { onBeforeShutdown: beforeShutdown.event, onShutdownVeto: shutdownVeto.event } as unknown as ILifecycleService;
++		const workspace = { getWorkbenchState: () => WorkbenchState.FOLDER, getWorkspace: () => ({ folders: [{ uri: URI.file('/p/lead') }] }) } as unknown as IWorkspaceContextService;
++		store.add(new RitemarkSwitchGuard(lifecycle, commands(async () => false), { onWillShowDialog: dialogs.event } as unknown as IDialogService, storage, workspace));
++		const unload = async (reason: ShutdownReason) => {
++			const vetos: Promise<boolean>[] = [];
++			beforeShutdown.fire({ reason, veto: value => vetos.push(Promise.resolve(value)) });
++			await Promise.all(vetos);
++		};
++		const note = () => storage.get('ritemark.switch.landOnHome', StorageScope.APPLICATION);
++
++		await unload(ShutdownReason.LOAD); // Ritemark lets it go on, then another participant vetoes it (unsaved files)
++		shutdownVeto.fire();
++		storage.testEmitWillSaveState(WillSaveStateReason.SHUTDOWN); // a later quit
++		const afterVeto = note();
++		await unload(ShutdownReason.RELOAD);
++		storage.testEmitWillSaveState(WillSaveStateReason.SHUTDOWN);
++		const afterReload = note();
++		await unload(ShutdownReason.LOAD);
++		const beforeTheLastSave = note();
++		storage.testEmitWillSaveState(WillSaveStateReason.SHUTDOWN);
++		const written = JSON.parse(note() ?? '{}');
++
++		assert.deepStrictEqual({ afterVeto, afterReload, beforeTheLastSave, from: written.from, target: written.target, dated: typeof written.at === 'number' }, {
++			afterVeto: undefined,
++			afterReload: undefined,
++			beforeTheLastSave: undefined,
++			from: URI.file('/p/lead').toString(),
++			target: null,
++			dated: true,
++		});
 +	});
 +});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts b/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts
