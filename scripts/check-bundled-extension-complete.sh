@@ -63,7 +63,8 @@ fi
 # -----------------------------------------------------------------------------
 # Check 1: compiled host entry points exist
 # -----------------------------------------------------------------------------
-for entry in "out/extension.js" "out/browser/browserMcpAdapter.js"; do
+# Sprint 148: the search index's worker thread is an entry of its own.
+for entry in "out/extension.js" "out/browser/browserMcpAdapter.js" "out/search/searchWorker.js"; do
   if [[ -s "$EXT_DIR/$entry" ]]; then
     ok "$entry present"
   else

@@ -110,5 +110,8 @@ const featureProperties = extensionManifest.contributes.configuration[2].propert
 assert.strictEqual(featureProperties['ritemark.features.durableAgentConversations']?.default, true);
 assert.strictEqual(FLAGS['composer-thinking-effort'].status, 'experimental');
 assert.strictEqual(featureProperties['ritemark.features.composer-thinking-effort']?.default, true);
+// Sprint 148 (#591): the search index's kill switch, on by default (HARD RULE #2).
+assert.strictEqual(FLAGS['project-search'].status, 'experimental');
+assert.strictEqual(featureProperties['ritemark.features.project-search']?.default, true);
 
 console.log('All feature gate tests passed.');

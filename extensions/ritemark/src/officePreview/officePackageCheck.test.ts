@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import JSZip from 'jszip';
-import { OFFICE_PREVIEW_LIMITS, checkOfficePackage, describeProblem, readZipDirectory, verifyDeclaredSizes } from './officePackageCheck';
+import { OFFICE_PREVIEW_LIMITS, checkOfficePackage, describeProblem, readZipDirectory, readZipEntry, verifyDeclaredSizes } from './officePackageCheck';
 
 const releases = path.resolve(__dirname, '../../../../docs/development/releases/v1.12.0');
 const wordCorpus = path.join(releases, 'sprint-124-word-preview-fidelity/research/corpus');
@@ -56,6 +56,20 @@ async function main() {
     const started = Date.now();
     assert.deepEqual(await checkOfficePackage(bytes, prefix), { ok: false, reason: 'damaged' }, part);
     assert.ok(Date.now() - started < 1000, `${part}: refused without inflating 512 MiB (${Date.now() - started} ms)`);
+  }
+
+  // Sprint 148 (search): without inflating every part, the package passes, and the one part search reads is
+  // refused by readZipEntry, capped at its declared size: still fast, still nothing inflated past 4 KiB + 1.
+  {
+    const bomb = deck('f6-docx-bomb-lying-size.docx');
+    assert.deepEqual(await checkOfficePackage(bomb, 'word/', OFFICE_PREVIEW_LIMITS, { verifyParts: false }), { ok: true });
+    const started = Date.now();
+    assert.equal(await readZipEntry(bomb, readZipDirectory(bomb)!.find((e) => e.name === 'word/document.xml')!), null);
+    assert.ok(Date.now() - started < 1000);
+    const honestDocument = readZipDirectory(word('01-headings-styles.docx'))!.find((e) => e.name === 'word/document.xml')!;
+    const xml = await readZipEntry(word('01-headings-styles.docx'), honestDocument);
+    assert.equal(xml?.length, honestDocument.uncompressedSize);
+    assert.ok(new TextDecoder().decode(xml!).includes('<w:body>'));
   }
 
   // A part that declares more than it holds is refused too, and so are encrypted entries and

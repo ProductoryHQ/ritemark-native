@@ -24,7 +24,7 @@ Acceptance criteria:
 - **It covers each folder of the window's project.**
 - **Documents** are `.md`, `.markdown`, `.docx`, `.pdf` and `.csv` files, found by their names and their text (R2). A document's name is its file name without the extension, as the tree shows it; the root `AGENTS.md` is About this project, as patch 018 names it.
 - **It leaves out:** every file and folder whose name starts with a dot (`.ritemark`, `.claude`, `.git`, `.github` and the rest); `node_modules`; what the project's `.gitignore` files and `.git/info/exclude` ignore, whether or not Git is installed; the person's `files.exclude` (which already holds `**/.ritemark` and `**/.claude/worktrees`); folders reached through a symbolic link; Office's lock files (`~$name.docx`); and the root `CLAUDE.md` while it is only Ritemark's pointer line, as Documents hides it.
-- **Limits** (proposed; M1 confirms or changes them, and this file changes first): at most 20,000 documents, the most recently changed first; Markdown and CSV read up to 10 MB, Word up to the preview's 50 MB and its package checks (`OFFICE_PREVIEW_LIMITS`), PDF up to 50 MB; at most 2 MB of text kept per document and 200 MB in all. A file past a limit is found by its name, and the line of R6 says the project is past them.
+- **Limits** (M1 confirmed them and changed one, 1 November; `research/measurements.md`): at most 20,000 documents read inside, the most recently changed first whatever their kind; Markdown and CSV read up to 10 MB, Word up to the preview's 50 MB and its package checks (`OFFICE_PREVIEW_LIMITS`), PDF up to 50 MB; at most 2 MB of text kept per document and 80 MB in all (proposed 200 MB: the worker's heap grows about 3.2 MB for each MB of text above ~175 MB, and its cap is 512 MB). A file past a limit is found by its name, and the line of R6 says the project is past them.
 - **A file kept only online is never downloaded.** On the Mac, a file with a size and no blocks on disk (iCloud Drive's and OneDrive's dataless files) is found by its name. On Windows, OneDrive's online-only files are found by their names by the mechanism A4 proves; until A4 has one, the index reads no file under a OneDrive folder on Windows and finds them by name.
 - **Nothing is written into the project's folder.**
 
@@ -45,7 +45,7 @@ Acceptance criteria:
 As someone whose decisions often live in a chat or on a card, I want those found too.
 
 Acceptance criteria:
-- **Chats:** this project's chats from the conversation store (filtered by the project's scope), by their titles and the words of the person's and the AI's messages; tool activity, approvals and receipts are left out. A passage is one message. A deleted chat never shows. At most 1 MB of message text per chat (proposed).
+- **Chats:** this project's chats from the conversation store (filtered by the project's scope), by their titles and the words of the person's and the AI's messages; tool activity, approvals and receipts are left out. A passage is one message. A deleted chat never shows. At most 1 MB of message text per chat, the newest messages first, and all chats together at most a quarter of R1's text budget; past it, a chat is found by its title.
 - **Tasks:** this project's cards from the Task board's snapshots, by their title, Done when and description; archived cards too, with their state. The card files in `.ritemark/tasks/` are not read as documents.
 - **Comment tasks are not a source of their own:** a comment's words are found in its document, and an agent's run on it in its chat.
 
@@ -68,9 +68,10 @@ As someone looking for something, I want each key to narrow what I see.
 Acceptance criteria:
 - **From two characters.** With one, nothing shows yet and no line says nothing was found.
 - **Each word of the box starts a word** in the document's name or text, in any order: "report" finds "reports" and "reporting", not "unreported". All words must be found.
-- **Capitals don't matter,** unless Match capital letters is on. Letters with marks stay themselves: "kasi" doesn't find "käsi" (the Experience lead confirms, question 7).
+- **Capitals don't matter,** unless Match capital letters is on.
+- **A letter typed without its mark finds it with one; a mark typed finds only itself** (the Experience lead, question 7, 1 November): "kasi" finds "kasi" and "käsi", and "käsi" finds only "käsi". Š, ž and the marks of other languages follow the same rule ("Muller" finds "Müller", "Jose" finds "José"). No option is added for it; More keeps its two.
 - **Whole words only:** each word must be a whole word.
-- **Order within a kind:** a hit in the name first; then the words together as typed; then more hits; then the most recently changed.
+- **Order within a kind:** a hit in the name first; then a hit with the exact letters typed before one found without its marks ("kasi" puts "kasi" before "käsi"); then the words together as typed; then more hits; then the most recently changed.
 - **A result** shows its name, one muted word for where it lives (the folder's name, nothing at the project's root; a task's state; a chat's age), and its first matching passage, about two lines, with each matching part marked. A hit in the name alone shows no passage.
 - **A newer query replaces an older one;** results for an older query are never drawn over newer ones.
 
@@ -187,4 +188,4 @@ Three, for the Development manager, each with a recommendation. The sprint plan 
 2. **Replace waits** for its own sprint, High; More holds the options and the kinds. Recommended: yes. The other answer: Replace in Markdown only, as a fifth PR, High, cut first.
 3. **Word and PDF text is kept on this computer,** in Ritemark's storage for the project, at most 200 MB. Recommended: yes. The other answer: read again at every start.
 
-Still open, for the Experience lead: the sprint plan's seven questions (nothing found; still reading and too big; the box at rest and focused; a chat's and a task's row; a long list; Enter before the meaning layer; letters with marks).
+The Experience lead answered the sprint plan's seven questions on 1 November (ritemark-dev `releases/v2.2.0/analysis/2026-11-01-sprint-148-experience-answers.md`). Question 7 changed R5 above: letters typed without their marks find marked ones, a typed mark finds only itself, and the exact letters rank first. The other six concern the panel (PR 2) and change no requirement of the index.

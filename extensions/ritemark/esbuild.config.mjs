@@ -69,6 +69,11 @@ const options = {
     // RitemarkToolsInjector (its own bundle, never
     // inlined — a child process can't require() code loaded in the host process).
     'browser/browserMcpAdapter': 'src/browser/browserMcpAdapter.ts',
+    // Sprint 148 (#591): the search index's worker thread, started by SearchHost through
+    // `context.extensionPath` (a worker can't share the host's loaded modules). pdf.js,
+    // `ignore`, marked and papaparse are inlined, so an extension release carries them
+    // (audit A2: pdf.js's legacy build bundles into CJS and runs with no canvas package).
+    'search/searchWorker': 'src/search/worker/searchWorker.ts',
   },
   outdir: 'out',
   bundle: true,

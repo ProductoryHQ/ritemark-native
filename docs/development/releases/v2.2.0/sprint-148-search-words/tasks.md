@@ -5,34 +5,34 @@ Nothing here starts before the plan is approved (the Development manager, on Jar
 ## Phase 0: Branch and starting tree
 
 - [x] The approval is on the sprint plan, with the answers to decisions 1–3
-- [ ] `git checkout -b sprint-148-search-words` from `origin/main`; `git branch --show-current` shows it before any edit. Later PRs: `sprint-148-search-words-panel`, `-shell`, `-passage`, each from `origin/main` the same way
-- [ ] `media/webview.js` size recorded in `notes/bundle.md` (E4)
-- [ ] `node ./scripts/worktree-hygiene.mjs --report` read, and the free disk recorded; nothing removed without Jarmo's word
-- [ ] Asked: the Experience lead the sprint plan's seven questions; the "Ritemark on Windows" session for the overlay checks and Gate 2's rows
+- [x] `git checkout -b sprint-148-search-words` from `origin/main`; `git branch --show-current` shows it before any edit. Later PRs: `sprint-148-search-words-panel`, `-shell`, `-passage`, each from `origin/main` the same way
+- [x] `media/webview.js` size recorded in `notes/bundle.md` (E4)
+- [x] `node ./scripts/worktree-hygiene.mjs --report` read, and the free disk recorded (24 GiB, 2 November); nothing removed without Jarmo's word
+- [ ] Asked: the Experience lead the sprint plan's seven questions (answered 1 November); the "Ritemark on Windows" session for the overlay checks and Gate 2's rows (not yet)
 
 ## Phase 1: Audits (each in `research/`, before its code)
 
 - [ ] A1 `research/head-swap.md` (R7): the Folders view hidden and shown keeps its state, or the other mechanism; a lone view merged in Documents; where VS Code's search is reached; the field's room
-- [ ] A2 `research/pdf-in-worker.md` (R2): `pdfjs-dist` inlined into a CJS worker or not; text with no canvas package; the fixtures; the size
-- [ ] A3 `research/word-text.md` (R2): `word/document.xml` through the zip reader on the fixtures; the refusals
-- [ ] A4 `research/walk-and-cloud.md` (R1): `ignore` on the fixture; links; `files.exclude`; cloud files on the Mac and, through the overlay, on Windows
-- [ ] A5 `research/chats-and-tasks.md` (R3, R8): the words' fields; the largest record; the scope id; a chat at a message; archived cards
-- [ ] Where an audit changes a requirement or a tier, `spec.md` and the sprint plan's tier line change first
+- [x] A2 `research/pdf-in-worker.md` (R2): `pdfjs-dist` inlined into a CJS worker or not; text with no canvas package; the fixtures; the size
+- [x] A3 `research/word-text.md` (R2): `word/document.xml` through the zip reader on the fixtures; the refusals
+- [ ] A4 `research/walk-and-cloud.md` (R1): `ignore` on the fixture; links; `files.exclude`; cloud files on the Mac and, through the overlay, on Windows (the Mac half done; Windows waits for the overlay, and until then nothing under OneDrive is read there)
+- [ ] A5 `research/chats-and-tasks.md` (R3, R8): the words' fields; the largest record; the scope id; a chat at a message; archived cards (PR 1's part done; a chat at its message is PR 2's; the largest record not measured)
+- [x] Where an audit changes a requirement or a tier, `spec.md` and the sprint plan's tier line change first (the lead's question 7: R5; M1: R1's text budget, 80 MB; no tier changed)
 
 ## Phase 2: PR 1, the index (W1–W4; R1–R5, R10, E2, E4)
 
-- [ ] `pdfjs-dist` (the webview's version) and `ignore` added to `package.json`; the `search/searchWorker` entry in `esbuild.config.mjs`; `external` only if A2 says so, with `check-bundled-extension-complete.sh`
-- [ ] The walker, the cloud-file test, the limits; `walk.test.ts` (W1)
-- [ ] The four readers; the zip reader's two functions exported unchanged; `readers.test.ts` (W2)
-- [ ] The word index, the query, `passages`, `map`; `wordIndex.test.ts` (W3)
-- [ ] The text cache; `textCache.test.ts` (W3, decision 3)
-- [ ] `SearchHost` and the worker client: start, events, restart, the not-available state; `freshness.test.ts` (W1)
-- [ ] Chats and tasks fed in; `sources.test.ts` (W4)
-- [ ] `src/search/protocol.ts` with R10's room
-- [ ] New tests in `npm test`; `tsc --noEmit` passes
-- [ ] `scripts/qa/search-fixture.mjs`; M1 and M3 on the Mac in `research/measurements.md`; a missed target goes to the Development manager
+- [x] `pdfjs-dist` (the webview's version) and `ignore` added to `package.json`; the `search/searchWorker` entry in `esbuild.config.mjs`; `external` only if A2 says so, with `check-bundled-extension-complete.sh` (inlined, no external; the check now looks for the worker's entry)
+- [x] The walker, the cloud-file test, the limits; `walk.test.ts` (W1)
+- [x] The four readers; the zip reader as it was, with `readZipEntry` beside it; `readers.test.ts` (W2)
+- [x] The word index, the query, `passages`, `map`; `wordIndex.test.ts` (W3)
+- [x] The text cache; `textCache.test.ts` (W3, decision 3)
+- [x] `SearchHost` and the worker client: start, events, restart, the not-available state; `freshness.test.ts`, `searchWorkerClient.test.ts` (W1)
+- [x] Chats and tasks fed in; `sources.test.ts` (W4)
+- [x] `src/search/protocol.ts` with R10's room
+- [x] New tests in `npm test`; `tsc --noEmit` passes (the worker's own `tsconfig.search-worker.json` too)
+- [x] `scripts/qa/search-fixture.mjs`; M1 and M3 on the Mac in `research/measurements.md`; a missed target goes to the Development manager (the warm start past the plan's folder, and the query past 20,000 documents)
 - [ ] Windows through the overlay: the worker, paths, the watcher, M1 with Defender, A4's OneDrive case
-- [ ] PR 1 opened: Standard; `/code-review` at medium; every finding answered; merged at the reviewed head
+- [ ] PR 1 opened: Standard; `/code-review` at medium; every finding answered; merged at the reviewed head (#631 opened as a draft; one round, 15 findings, all fixed; the merge waits)
 
 ## Phase 3: PR 2, the results view (W5, W6; R6, R7's extension side, R8, E3)
 
