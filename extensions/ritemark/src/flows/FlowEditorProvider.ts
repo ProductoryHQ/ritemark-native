@@ -25,7 +25,7 @@ import {
 import * as modelCatalog from '../ai/modelCatalog';
 import { pickerFolder } from '../utils/dialogDefaults';
 import { listGeminiModels } from '../ai/geminiRequest';
-import { flowModelDefaults, flowModelRequestType, StepNeedsKeyError } from './flowModelDefaults';
+import { flowModelDefaults, flowModelRequestType, GOOGLE_IMAGE_KEY_NEEDED, OPENAI_KEY_NEEDED, stepKeyAnswer, stepKeyCopy, StepNeedsKeyError } from './flowModelDefaults';
 
 /**
  * Sanitize a string for use in a filename
@@ -210,9 +210,18 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
       if (!isDisposed) this.sendModelConfig(webview);
     });
 
+    // Sprint 145 R5 (#580): a key added or removed in Settings (often through a step's "Add it in Settings") changes
+    // what the step panels say, so an open panel asks again. Only the key's name is read here, never its value.
+    const keyChanges = this.context.secrets.onDidChange((event) => {
+      if (!isDisposed && (event.key === 'openai-api-key' || event.key === 'google-ai-key')) {
+        webview.postMessage({ type: 'flow:keysChanged' });
+      }
+    });
+
     webviewPanel.onDidDispose(() => {
       isDisposed = true;
       catalogUpdates.dispose();
+      keyChanges.dispose();
       FlowEditorProvider.activeWebviews.delete(webview);
     });
   }
@@ -763,20 +772,19 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         // → bundled), replacing the standalone REST fetchers (Sprint 89 #109).
         await modelCatalog.refresh();
         models = modelCatalog.getModels(provider).map(m => ({ id: m.id, name: m.label }));
+        // Sprint 145 R5 (#580): an AI step can't run without its provider's key, so its panel says so beside the
+        // list, as an image step's does. Only whether a key exists is checked here.
+        if (!(await this.hasProviderKey(provider))) {
+          webview.postMessage({ type: 'flow:models', provider, modelType, models, ...stepKeyAnswer(stepKeyCopy(provider)) });
+          return;
+        }
       }
 
       webview.postMessage({ type: 'flow:models', provider, modelType, models });
     } catch (err) {
       if (err instanceof StepNeedsKeyError) {
         // Sprint 144: the panel shows the sentence with its action as a link to Settings at that key
-        webview.postMessage({
-          type: 'flow:models',
-          provider,
-          modelType,
-          models: [],
-          error: err.copy.text,
-          errorAction: { label: err.copy.action, settingsSection: err.copy.settingsSection },
-        });
+        webview.postMessage({ type: 'flow:models', provider, modelType, models: [], ...stepKeyAnswer(err.copy) });
         return;
       }
       console.error(`[FlowEditorProvider] Failed to fetch ${provider} ${modelType} models:`, err);
@@ -856,6 +864,12 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     }
   }
 
+  /** Whether the provider's key is stored (Sprint 145 R5): OpenAI's through the key manager, Google AI's as a secret. */
+  private async hasProviderKey(provider: 'openai' | 'gemini'): Promise<boolean> {
+    if (provider === 'gemini') return Boolean(await this.context.secrets.get('google-ai-key'));
+    return getAPIKeyManager().hasAPIKey();
+  }
+
   // fetchOpenAIModels() removed in Sprint 89 (GH #109) — OpenAI LLM lists now
   // resolve through modelCatalog (providerDiscovery.discoverOpenAI).
 
@@ -867,7 +881,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     const apiKey = await apiKeyManager.getAPIKey();
 
     if (!apiKey) {
-      throw new Error('OpenAI API key not configured');
+      // Sprint 145 R5 (#580): the panel's sentence and link, as the Google image step's
+      throw new StepNeedsKeyError(OPENAI_KEY_NEEDED);
     }
 
     const openai = new OpenAI({ apiKey });
@@ -904,7 +919,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     const apiKey = await this.context.secrets.get('google-ai-key');
 
     if (!apiKey) {
-      throw new StepNeedsKeyError();
+      throw new StepNeedsKeyError(GOOGLE_IMAGE_KEY_NEEDED);
     }
 
     // Use v1beta to include preview models. Sprint 141: the key in a header (R12,

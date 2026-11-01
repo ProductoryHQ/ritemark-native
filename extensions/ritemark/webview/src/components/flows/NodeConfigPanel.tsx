@@ -214,6 +214,53 @@ function Field({ label, children, description }: FieldProps) {
   );
 }
 
+/**
+ * A count that moves when a key is added or removed in Settings (the host's `flow:keysChanged`, Sprint 145 R5), so a
+ * step panel's model list asks the host again: back from "Add it in Settings", the sentence goes.
+ */
+function useKeysChanged(): number {
+  const [changes, setChanges] = useState(0);
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'flow:keysChanged') setChanges((count) => count + 1);
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+  return changes;
+}
+
+/** What fixes a step's missing key, as the host names it (`flow:models`' `errorAction`): Settings at that key. */
+interface StepKeyAction {
+  label: string;
+  tooltip?: string;
+  settingsSection: string;
+}
+
+/**
+ * A step that can't run without its key says so in one sentence, with the fix as a link (the Experience lead's
+ * words, experiences 13 and 31: "This step needs an OpenAI API key to run. Add it in Settings"). No warning sign. The
+ * AI step and the image step show it the same way (Sprint 144 for the Google image step; Sprint 145 R5, #580).
+ */
+export function StepKeyNotice({ text, action }: { text: string; action: StepKeyAction }) {
+  return (
+    <>
+      {text}{' '}
+      <Tooltip label={action.tooltip ?? action.label}>
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto p-0 text-xs"
+          onClick={() => vscode.postMessage({ type: 'flow:openSettings', section: action.settingsSection })}
+        >
+          {action.label}
+        </Button>
+      </Tooltip>
+    </>
+  );
+}
+
 // Textarea with VS Code styling
 interface TextAreaProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -397,6 +444,9 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
   const [models, setModels] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Sprint 145 R5 (#580): what fixes the error, when the host names it (no key for the provider: Settings at that key)
+  const [errorAction, setErrorAction] = useState<StepKeyAction | null>(null);
+  const keysChanged = useKeysChanged();
   // Sprint 144 P4: the known list and the saved model stay usable while the host refreshes the list; the picker waits
   // only when it has no list at all. A saved model missing from the list stays visible, as on the Image step.
   const modelOptions = modelOptionsWithPersistedSelection(models, data.model);
@@ -408,6 +458,7 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
     setModels(getLLMModels(provider));
     setIsLoading(true);
     setError(null);
+    setErrorAction(null);
 
     // Request models from extension
     vscode.postMessage({
@@ -421,10 +472,10 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
       const message = event.data;
       if (message.type === 'flow:models' && message.provider === provider && message.modelType === 'llm') {
         setIsLoading(false);
-        if (message.error) {
-          setError(message.error);
-          // Keep fallback models (already set)
-        } else if (message.models && message.models.length > 0) {
+        // A missing key comes with the list (Sprint 145 R5): the picker keeps working, and the panel says what's missing
+        setError(message.error ?? null);
+        setErrorAction(message.errorAction ?? null);
+        if (message.models && message.models.length > 0) {
           setModels(message.models);
         }
         // If empty, keep fallback models
@@ -442,7 +493,7 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
       window.removeEventListener('message', handleMessage);
       clearTimeout(timeout);
     };
-  }, [provider]);
+  }, [provider, keysChanged]);
 
   // Handle provider change - reset model to first available
   const handleProviderChange = (newProvider: 'openai' | 'gemini') => {
@@ -479,7 +530,9 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
 
       <Field
         label="Model"
-        description={error
+        description={error && errorAction
+          ? <StepKeyNotice text={error} action={errorAction} />
+          : error
           ? `⚠️ ${error}`
           : waiting
             ? 'Loading models...'
@@ -669,8 +722,9 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
   );
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  // Sprint 144: what fixes the error, when the host names it (a Google image step with no key: Settings at that key)
-  const [errorAction, setErrorAction] = React.useState<{ label: string; settingsSection: string } | null>(null);
+  // Sprint 144: what fixes the error, when the host names it (an image step with no key: Settings at that key)
+  const [errorAction, setErrorAction] = React.useState<StepKeyAction | null>(null);
+  const keysChanged = useKeysChanged();
   const modelOptions = modelOptionsWithPersistedSelection(models, data.model);
   const waiting = modelListWaiting(loading, models.length); // Sprint 144 P4, as on the LLM step
 
@@ -713,7 +767,7 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
       window.removeEventListener('message', handleMessage);
       clearTimeout(timeout);
     };
-  }, [provider]);
+  }, [provider, keysChanged]);
 
   // Handle provider change - reset model to first available
   const handleProviderChange = (newProvider: 'openai' | 'gemini') => {
@@ -755,24 +809,7 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
           : modelOptions.unavailable
             ? 'Saved model is no longer available. Choose a replacement.'
             : error && errorAction
-              ? (
-                // Sprint 144, the Experience lead's words: the step can't run without the key, so say so, no warning
-                // sign, with the fix as a link ("This step needs a Google AI API key to run. Add it in Settings")
-                <>
-                  {error}{' '}
-                  <Tooltip label="Open Settings at the Google AI API key">
-                    <Button
-                      type="button"
-                      variant="link"
-                      size="sm"
-                      className="h-auto p-0 text-xs"
-                      onClick={() => vscode.postMessage({ type: 'flow:openSettings', section: errorAction.settingsSection })}
-                    >
-                      {errorAction.label}
-                    </Button>
-                  </Tooltip>
-                </>
-              )
+              ? <StepKeyNotice text={error} action={errorAction} />
               : error ? `⚠️ ${error}` : undefined}
       >
         <Select

@@ -18,7 +18,7 @@ import { DEFAULT_MODELS, OPENAI_IMAGE_MODEL_IDS } from '../../ai/modelConfig';
 import { geminiHeaders, geminiUrl } from '../../ai/geminiRequest';
 import { ensureProjectSubfolder } from '../../projects/projectFolderGuard';
 import type { FlowNode, ExecutionContext } from '../types';
-import { StepNeedsKeyError } from '../flowModelDefaults';
+import { GOOGLE_IMAGE_KEY_NEEDED, OPENAI_KEY_NEEDED, StepNeedsKeyError } from '../flowModelDefaults';
 
 /**
  * Write a file via VS Code's filesystem API so the explorer model is
@@ -220,9 +220,9 @@ async function generateWithOpenAI(
   const apiKey = await apiKeyManager.getAPIKey();
 
   if (!apiKey) {
-    throw new Error(
-      'OpenAI API key not configured. Use Command Palette → "Ritemark: Configure OpenAI API Key"'
-    );
+    // Sprint 145 R5 (#580): the step panel's sentence, as plain text ("This step needs an OpenAI API key to run. Add
+    // it in Settings"); the old line named a Command Palette route Ritemark 2.0 doesn't have
+    throw new StepNeedsKeyError(OPENAI_KEY_NEEDED);
   }
 
   const openai = new OpenAI({ apiKey });
@@ -362,7 +362,7 @@ async function generateWithGemini(
   if (!apiKey) {
     // Sprint 144: the step panel's sentence, as plain text ("This step needs a Google AI API key to run. Add it in
     // Settings")
-    throw new StepNeedsKeyError();
+    throw new StepNeedsKeyError(GOOGLE_IMAGE_KEY_NEEDED);
   }
 
   const model = options.model || DEFAULT_MODELS.flowImageGemini;

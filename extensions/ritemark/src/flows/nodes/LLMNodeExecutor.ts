@@ -14,6 +14,7 @@ import { usesResponsesAPI, getReasoningEffort } from '../../ai/modelConfig';
 import * as modelCatalog from '../../ai/modelCatalog';
 import { geminiHeaders, geminiUrl } from '../../ai/geminiRequest';
 import { FlowStepError, geminiAnswerText, geminiStepFailure } from './geminiStep';
+import { GOOGLE_AI_KEY_NEEDED, OPENAI_KEY_NEEDED, StepNeedsKeyError } from '../flowModelDefaults';
 import type { FlowNode, ExecutionContext } from '../types';
 
 /**
@@ -193,9 +194,8 @@ async function executeWithOpenAI(
   const apiKey = await apiKeyManager.getAPIKey();
 
   if (!apiKey) {
-    throw new Error(
-      'OpenAI API key not configured. Go to Ritemark Settings to add your API key.'
-    );
+    // Sprint 145 R5 (#580): the step panel's sentence, as plain text
+    throw new StepNeedsKeyError(OPENAI_KEY_NEEDED);
   }
 
   const openai = new OpenAI({ apiKey });
@@ -268,9 +268,8 @@ async function executeWithGemini(
   const apiKey = await extensionContext.secrets.get('google-ai-key');
 
   if (!apiKey) {
-    throw new Error(
-      'Google AI API key not configured. Go to Ritemark Settings to add your API key.'
-    );
+    // Sprint 145 R5 (#580): the step panel's sentence, as plain text
+    throw new StepNeedsKeyError(GOOGLE_AI_KEY_NEEDED);
   }
 
   // Build the prompt - Gemini uses a different format
@@ -347,8 +346,8 @@ export async function executeLLMNode(
 
     return response;
   } catch (err) {
-    // Sprint 141 R5: a sentence written for the person passes through unchanged.
-    if (err instanceof FlowStepError) throw err;
+    // Sprint 141 R5: a sentence written for the person passes through unchanged (Sprint 145 R5: a missing key's too).
+    if (err instanceof FlowStepError || err instanceof StepNeedsKeyError) throw err;
     if (err instanceof Error) {
       // Handle specific errors
       if (err.message.includes('rate_limit')) {

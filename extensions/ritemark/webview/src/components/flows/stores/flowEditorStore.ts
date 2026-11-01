@@ -152,6 +152,16 @@ function escapeRegex(str: string): string {
  * Calculate execution order using topological sort (Kahn's algorithm)
  * Returns Map of nodeId -> execution step (1-indexed)
  */
+/**
+ * Whether React Flow's changes alter what the flow's file holds (Sprint 145 R4, #571). React Flow reports a
+ * selection (`select`) and a measurement (`dimensions`) as node and edge changes too; `toFlow` saves neither (a
+ * step's id, type, position and data, an edge's id and ends), so they don't mark the flow dirty: opening a flow and
+ * clicking a step write nothing. Every other change (`position`, `add`, `remove`, `replace`) is an edit.
+ */
+function changesFlowFile(changes: ReadonlyArray<{ type: string }>): boolean {
+  return changes.some((change) => change.type !== 'select' && change.type !== 'dimensions');
+}
+
 function calculateExecutionOrder(
   nodes: Array<{ id: string }>,
   edges: Array<{ source: string; target: string }>
@@ -386,10 +396,12 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
   onNodesChange: (changes) => {
     set((state) => {
       const newNodes = applyNodeChanges(changes, state.nodes);
+      const edit = changesFlowFile(changes);
       return {
         nodes: newNodes,
-        isDirty: true,
-        executionOrder: calculateExecutionOrder(newNodes, state.edges),
+        // Sprint 145 R4 (#571): a selection or a measurement is a look, not an edit
+        isDirty: state.isDirty || edit,
+        executionOrder: edit ? calculateExecutionOrder(newNodes, state.edges) : state.executionOrder,
       };
     });
   },
@@ -397,10 +409,11 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
   onEdgesChange: (changes) => {
     set((state) => {
       const newEdges = applyEdgeChanges(changes, state.edges);
+      const edit = changesFlowFile(changes);
       return {
         edges: newEdges,
-        isDirty: true,
-        executionOrder: calculateExecutionOrder(state.nodes, newEdges),
+        isDirty: state.isDirty || edit,
+        executionOrder: edit ? calculateExecutionOrder(state.nodes, newEdges) : state.executionOrder,
       };
     });
   },
