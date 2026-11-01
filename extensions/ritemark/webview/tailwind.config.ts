@@ -98,11 +98,16 @@ const config: Config = {
     // control sets one property under both, and the catalogue's states came out the same.)
     plugin(({ addVariant, matchVariant }) => {
       const keyboard = ':where(:root:not([data-input-mode="pointer"]))'
-      addVariant('focus-visible', `${keyboard} &:focus-visible`)
-      // `group-focus-visible:` and its named groups (`group-focus-visible/pin:`), the same rule for a focused parent
+      // A field keeps its focused look in both modes: it shows where the typing goes after a click too (index.css
+      // names fields the same way)
+      const field = ':where(input, textarea, select, [contenteditable]:not([contenteditable="false"]))'
+      addVariant('focus-visible', [`${keyboard} &:focus-visible`, `&${field}:focus-visible`])
+      // `group-focus-visible:` and its named groups (`group-focus-visible/pin:`), the same rule for a focused parent;
+      // a group's name escaped as Tailwind's own `group-*` variants escape it
+      const escape = (name: string) => name.replace(/[^a-zA-Z0-9_-]/g, (character) => `\\${character}`)
       matchVariant(
         'group-focus-visible',
-        (_value, { modifier }) => `${keyboard} :merge(.group${modifier ? `\\/${modifier}` : ''}):focus-visible &`,
+        (_value, { modifier }) => `${keyboard} :merge(.group${modifier ? `\\/${escape(modifier)}` : ''}):focus-visible &`,
         { values: { DEFAULT: '' } },
       )
     }),

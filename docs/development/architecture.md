@@ -344,7 +344,8 @@ Below 640px a dialog goes full bleed: no inset, no rounded corners, no border. T
 - Tailwind's `focus-visible:` variant matches only outside pointer mode (a plugin in `tailwind.config.ts`), so every `focus-visible:` utility is the keyboard's;
 - the hand-written `:focus-visible` rings (`index.css`, `home.css`, `welcome.css`) carry the same `:where(:root:not([data-input-mode="pointer"]))` prefix (`:where()`, so no rule's rank changes);
 - in pointer mode no element but a field draws even Chromium's own outline (`index.css`);
-- a field (Input, Textarea, the composer, the editor, Settings' fields) keeps its `focus:` look in both modes;
+- a field (Input, Textarea, the composer, the editor, Settings' fields) keeps its focus look in both modes, whether written with `focus:` or `focus-visible:` (the variant matches fields in both);
+- `inputMode.test.ts` fails on any hand-written `:focus-visible` rule without the prefix;
 - a tooltip opens on focus only in keyboard mode (`ui/tooltip.tsx`, `focusOpensTooltip`).
 
 So menus and Select give the focus back to their trigger after every close, as Radix does (decision 1): after a mouse pick the trigger has the focus with no ring and no tooltip, and Tab carries on from it. 2.1 RC3's ring after a mouse pick came from Chromium's `:focus-visible` guess on that script focus. Sprint 146's PR 1 (#585) withheld the focus instead (`close-focus.ts`); PR 2 grew it into the tracker. A screen gets no focus logic of its own: Share's menu only points the focus at the real Share button (`header/ExportMenu.tsx`).

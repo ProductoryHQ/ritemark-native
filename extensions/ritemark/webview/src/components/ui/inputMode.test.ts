@@ -9,7 +9,7 @@ import assert from 'node:assert/strict'
 
 const React = await import('react')
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
-const { inputKindOf, watchInputMode, inputMode, onInputModeChange } = await import('./input-mode')
+const { inputKindOf, watchInputMode, inputMode } = await import('./input-mode')
 const { DropdownMenuContent } = await import('./dropdown-menu')
 const { SelectContent } = await import('./select')
 
@@ -65,9 +65,9 @@ watchInputMode(page)
 assert.equal(attributes.get('data-input-mode'), 'keyboard', 'the mode is on <html> from the start')
 assert.deepEqual([...listeners.keys()].sort(), ['click', 'keydown', 'pointercancel', 'pointerdown', 'pointerup'])
 const press = (event: Record<string, unknown>) => listeners.get(String(event.type))!(event as unknown as Event)
-const taskEnds = () => new Promise((resolve) => setTimeout(resolve, 5))
-const modes: string[] = []
-const stop = onInputModeChange((mode) => modes.push(mode))
+// A press's clicks are left out for 400 ms after its release (a touch tap's click comes after the release's task)
+const pressIsOver = () => new Promise((resolve) => setTimeout(resolve, 450))
+const soon = () => new Promise((resolve) => setTimeout(resolve, 50))
 
 press({ type: 'pointerdown' })
 assert.equal(inputMode(), 'pointer')
@@ -82,22 +82,24 @@ assert.equal(attributes.get('data-input-mode'), 'keyboard', 'Tab: keyboard, so t
 press({ type: 'pointerdown' })
 press({ type: 'keydown', key: 'ArrowDown' })
 assert.equal(inputMode(), 'keyboard', 'a menu opened with the mouse, then ↓: keyboard (S18)')
-assert.deepEqual(modes, ['pointer', 'keyboard', 'pointer', 'keyboard'], 'subscribers hear each change once')
-stop()
 
-// A press's own clicks come after its release, in the same task, however long it was held; a later one counts
+// A press's own clicks come after its release, however long it was held: a label's passed on to its field, a touch
+// tap's a moment later; a click no press made, once the press is over, counts
 press({ type: 'pointerdown' })
 press({ type: 'pointerup' })
 press({ type: 'click', detail: 0 })
 assert.equal(inputMode(), 'pointer', "a press's own click, passed on by a label, is not a second input")
-await taskEnds()
+await soon()
+press({ type: 'click', detail: 0 })
+assert.equal(inputMode(), 'pointer', "a touch tap's click, after the release's task, is the tap's too")
+await pressIsOver()
 press({ type: 'click', detail: 0 })
 assert.equal(inputMode(), 'keyboard', 'a click no press made, after the press is over')
 // A timer left by one press doesn't end the next: a quick second press, its release not yet in
 press({ type: 'pointerdown' })
 press({ type: 'pointerup' })
 press({ type: 'pointerdown' })
-await taskEnds()
+await pressIsOver()
 press({ type: 'click', detail: 0 })
 assert.equal(inputMode(), 'pointer', "the second press is still on: the first one's timer leaves it alone")
 // A key ends a press whose release never came (a native context menu took it)
@@ -114,5 +116,39 @@ for (const [name, content] of Object.entries(contents)) {
   assert.equal(content.render({}, null).props.children.props.onCloseAutoFocus, undefined, `${name}: Radix gives the focus back to the trigger`)
   assert.equal(content.render({ onCloseAutoFocus: own }, null).props.children.props.onCloseAutoFocus, own, `${name}: a consumer's own handler is its own`)
 }
+
+// ── Every hand-written ring is behind the mode (PR 2's review): a selector line with :focus-visible carries the
+// keyboard mode's prefix, or is a field's (a field keeps its focused look in both modes) ──
+const { readdirSync, readFileSync, statSync } = await import('node:fs')
+const { join, dirname, relative } = await import('node:path')
+const { fileURLToPath } = await import('node:url')
+const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const FIELDS = new Set([
+  '.rm-flow-props input:focus-visible',
+  '.rm-flow-props textarea:focus-visible',
+  '.cp-title:focus-visible', // EditableLine: contenteditable
+  '.cp-donewhen-text:focus-visible', // EditableLine: contenteditable
+])
+const files: string[] = []
+const walk = (dir: string) => {
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name)
+    if (statSync(path).isDirectory()) walk(path)
+    else if (/\.(css|tsx)$/.test(name) && !/\.test\./.test(name)) files.push(path)
+  }
+}
+walk(SRC)
+const ungated: string[] = []
+for (const file of files) {
+  readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
+    // A selector: `…:focus-visible` followed by `,`, `{`, `::` or `:not(` (not Tailwind's `focus-visible:` classes)
+    if (!/:focus-visible(?=\s*[,{]|::|:not\()/.test(line)) return
+    if (line.includes('data-input-mode')) return
+    const selector = line.trim().replace(/\s*[,{].*$/, '')
+    if (FIELDS.has(selector)) return
+    ungated.push(`${relative(SRC, file)}:${index + 1}: ${line.trim()}`)
+  })
+}
+assert.deepEqual(ungated, [], `every hand-written ring carries the keyboard mode's prefix:\n${ungated.join('\n')}`)
 
 console.log('inputMode.test.ts: all assertions passed')

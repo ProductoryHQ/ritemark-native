@@ -15,7 +15,11 @@ So every `focus-visible:` utility moves behind the mode in one place (`tailwind.
 
 **The prefix sits in `:where()`, so it adds no specificity.** The first build put it bare, and the capture after the tracker caught it: the split button's keyboard focus lost its 1 px divider and gained the shared Button's 4 px ring, because the prefixed ring now outranked `.rm-split[data-tone] .rm-split-more`'s inset shadow and `.rm-split .rm-split-part { box-shadow: none }`. With `:where()` every rule keeps the rank it had, and keyboard focus draws as before.
 
-One consequence: `focus-visible:outline-none` also applies only outside pointer mode. A control that relies on it alone (Tabs' triggers, `DialogButton`) would show Chromium's own outline after a script focus in pointer mode. One rule in `index.css` covers that: in pointer mode no element but a field draws an outline on `:focus-visible`.
+One consequence: `focus-visible:outline-none` also applies only outside pointer mode. A control that relies on it alone (Tabs' triggers, `DialogButton`) would show Chromium's own outline after a script focus in pointer mode. One rule in `index.css` covers that: in pointer mode no button, link, `[role]` or `[tabindex]` element (and no field) draws an outline on `:focus-visible`. Its subject names those kinds, so a change of mode restyles them, not the whole page (PR 2's second review).
+
+**A field matches the variant in both modes.** The variant has a second selector, `&:where(input, textarea, select, [contenteditable]:not([contenteditable="false"])):focus-visible`, so a field written with `focus-visible:` (the AI sheet's report text area) keeps its focused look after a click, as the fields written with `focus:` do (PR 2's second review).
+
+**A test holds every hand-written ring to the mode:** `ui/inputMode.test.ts` reads every stylesheet and component under `webview/src/` and fails on a `:focus-visible` selector line without the prefix, but for four named fields. It found two more on its first run, the inline table of contents' items and the file-change notice's buttons; both carry the prefix now.
 
 ## The rings, by kind
 

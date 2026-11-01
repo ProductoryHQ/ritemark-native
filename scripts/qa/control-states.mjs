@@ -28,7 +28,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 const args = process.argv.slice(2);
 const option = (name, fallback) => {
@@ -43,6 +43,10 @@ const themes = option('themes', 'light,dark').split(',');
 const [width, height] = option('size', '1440x900').split('x').map(Number);
 if (!port || !out) {
 	console.error('usage: node scripts/qa/control-states.mjs --port <cdp-port> --out <dir> [--compare <approved-dir>] [--only <row>] [--themes light,dark] [--size 1440x900]');
+	process.exit(2);
+}
+if (baseline && resolve(out) === resolve(baseline)) {
+	console.error('--out must not be the --compare folder: each capture would replace its approved image and match itself');
 	process.exit(2);
 }
 mkdirSync(out, { recursive: true });
@@ -430,9 +434,8 @@ async function capture(cell, file) {
 	if (!r) {
 		throw new Error(`${cell.name}: nothing to capture`);
 	}
-	// The dialog's own box: round it, the blurred page under the scrim changes with whatever the page shows behind it
-	const pad = 0;
-	const { data } = await page.send('Page.captureScreenshot', { format: 'png', clip: { x: r.x - pad, y: r.y - pad, width: r.w + pad * 2, height: r.h + pad * 2, scale: 1 } });
+	// A dialog is captured as its own box: round it, the blurred page under the scrim changes with what the page shows
+	const { data } = await page.send('Page.captureScreenshot', { format: 'png', clip: { x: r.x, y: r.y, width: r.w, height: r.h, scale: 1 } });
 	writeFileSync(join(out, file), Buffer.from(data, 'base64'));
 }
 

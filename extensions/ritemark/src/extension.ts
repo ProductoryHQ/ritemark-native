@@ -1088,8 +1088,13 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Sprint 146 (R2, decision 5): the control catalogue, only when a test script started Ritemark with its setting
-  openControlCatalogueIfAsked(context);
+  // Sprint 146 (R2, decision 5): the control catalogue, only when a test script started Ritemark with its setting. A
+  // test page never stands between activation and its confirmation below
+  try {
+    openControlCatalogueIfAsked(context);
+  } catch (error) {
+    console.warn('Ritemark: the control catalogue did not open', error);
+  }
 
   // Sprint 93 R9: activate() reached its end with no synchronous throw —
   // confirm this version and trim old installs down to N-1 (current +
