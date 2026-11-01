@@ -54,7 +54,7 @@ So the plan's branch alone (technical plan, W1: "in `reconcile`'s `external-only
 ## The window and the threshold (chosen from these numbers)
 
 - **The loss doesn't depend on the delay** (0.3–15 s all lose), so the window can't come from a failure boundary. It is a trade-off between a stale write that lands later (S8) and a question when a writer deliberately rewrites words the person saved earlier (decision 1). The Windows run and this one wrote within 0.3–15 s of the last save; the 27 October sighting's AI write landed in a pause between two typed sentences. **30 seconds** from each of Ritemark's own saves (`STALE_WRITE_WINDOW_MS`).
-- **Threshold: one missing word run.** The words a save added are the run between what it shares with the text before it; a run counts as lost when the person's newest save still has it and the new file doesn't. Runs, not single words, so a common word elsewhere in the file doesn't hide a lost sentence, and a writer that removed a different occurrence of one of the person's words isn't a loss.
+- **Threshold: one missing word run.** The words a save added are the runs a word alignment with the text before it finds (two edits in one save are two runs); a run counts as lost when the person's newest save still has it, the new file has it fewer times, and not with the word on each side where the person put it. So a short insert made of words found elsewhere isn't missed, and a writer that removed a different occurrence of one of the person's words isn't a loss (review round 1, #605).
 - **S8, the limit, in plain words:** if another app or an AI read the document earlier and saves its copy more than 30 seconds after Ritemark last saved your words, its copy still replaces them, as in 2.1.
 
 ## A second race: the save's receipt after the sync's reconcile (measured, found while fixing)
@@ -83,3 +83,4 @@ VS Code tells the extension host a saved document is clean (a change event with 
 
 - **On `main`** (its `src/editorSync/` copied beside the test): 26 of 40 fail: every S1 run, S4 and S7's S1 half, in both orders. S2, S3, S5, S6 and S8 pass, as they should.
 - **On the branch:** 40 of 40 pass, inside `npm run test:editor-sync`.
+- **Review round 1 (#605)** added seven scenarios (a typo fix and an undo of words just saved, a save that changed two places, Use disk version on the usual question, an import after the save kept by a hold, a writer that writes back an older save's text twice, a second notification behind a hidden tab). They fail on the first reviewed head (`3e8463a6`) and pass after the fixes: 54 of 54, in about 10 s.

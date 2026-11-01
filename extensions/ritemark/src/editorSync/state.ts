@@ -190,12 +190,38 @@ function guardWords(text: string): string[] {
   return normalizeLogicalText(text).match(/[^\s,;|]+/g) ?? [];
 }
 
-function containsRun(haystack: readonly string[], run: readonly string[]): boolean {
-  return ` ${haystack.join(' ')} `.includes(` ${run.join(' ')} `);
+/** Words joined for a contiguous search; built once per text. */
+function searchable(words: readonly string[]): string {
+  return ` ${words.join(' ')} `;
 }
 
-/** The words `next` has between the words it shares with `previous` at its start and at its end. */
-function insertedRun(previous: readonly string[], next: readonly string[]): string[] {
+function containsRun(haystack: string, run: readonly string[]): boolean {
+  return haystack.includes(` ${run.join(' ')} `);
+}
+
+/** How many times the run appears in the text; occurrences may share their separating space. */
+function countRun(haystack: string, run: readonly string[]): number {
+  const needle = ` ${run.join(' ')} `;
+  let count = 0;
+  for (let at = haystack.indexOf(needle); at >= 0; at = haystack.indexOf(needle, at + needle.length - 1)) count += 1;
+  return count;
+}
+
+/** Above this many cells the word alignment isn't computed and the changed span counts as one run. */
+const MAX_ALIGNMENT_CELLS = 4_000_000;
+
+interface AddedRun {
+  words: string[];
+  /** The run with the word on each side of it in the save, where there is one. */
+  withNeighbours: string[];
+}
+
+/**
+ * The runs of words `next` added to `previous`: a word alignment (longest
+ * common subsequence) of the part between their common start and end, so a
+ * save that changed two places gives two runs, not the span between them.
+ */
+function addedRuns(previous: readonly string[], next: readonly string[]): AddedRun[] {
   let start = 0;
   while (start < previous.length && start < next.length && previous[start] === next[start]) start += 1;
   let end = 0;
@@ -204,7 +230,42 @@ function insertedRun(previous: readonly string[], next: readonly string[]): stri
     && end < next.length - start
     && previous[previous.length - 1 - end] === next[next.length - 1 - end]
   ) end += 1;
-  return next.slice(start, next.length - end);
+  const a = previous.slice(start, previous.length - end);
+  const b = next.slice(start, next.length - end);
+  const run = (from: number, to: number): AddedRun => ({
+    words: next.slice(from, to),
+    withNeighbours: next.slice(Math.max(0, from - 1), Math.min(next.length, to + 1)),
+  });
+  if (b.length === 0) return [];
+  if (a.length === 0 || a.length * b.length > MAX_ALIGNMENT_CELLS) return [run(start, start + b.length)];
+  const width = b.length + 1;
+  const common = new Uint32Array((a.length + 1) * width);
+  for (let i = a.length - 1; i >= 0; i -= 1) {
+    for (let j = b.length - 1; j >= 0; j -= 1) {
+      common[i * width + j] = a[i] === b[j]
+        ? common[(i + 1) * width + j + 1] + 1
+        : Math.max(common[(i + 1) * width + j], common[i * width + j + 1]);
+    }
+  }
+  const runs: AddedRun[] = [];
+  let runStart = -1;
+  let i = 0;
+  let j = 0;
+  while (j < b.length) {
+    if (i < a.length && a[i] === b[j]) {
+      if (runStart >= 0) runs.push(run(start + runStart, start + j));
+      runStart = -1;
+      i += 1;
+      j += 1;
+    } else if (i < a.length && common[(i + 1) * width + j] >= common[i * width + j + 1]) {
+      i += 1;
+    } else {
+      if (runStart < 0) runStart = j;
+      j += 1;
+    }
+  }
+  if (runStart >= 0) runs.push(run(start + runStart, start + b.length));
+  return runs;
 }
 
 /**
@@ -212,12 +273,15 @@ function insertedRun(previous: readonly string[], next: readonly string[]): stri
  * Ritemark's own recent saves added? Returns how many such words are missing,
  * 0 when none are (or when nothing recent is remembered).
  *
- * For each save within `windowMs` of `now`, the words it added are the run
- * between what it shares with the text before it. A run counts as lost when
- * the person's newest save still has it and the disk text doesn't. Word runs,
- * not lines or bytes, so line endings, a byte order mark, a rewrap or a writer
- * that changed another line are not a loss; a writer that kept the person's
- * words wherever it put them is not either.
+ * For each save within `windowMs` of `now`, the words it added are the runs a
+ * word alignment with the text before it finds. A run counts as lost when the
+ * person's newest save still has it, the disk text has it fewer times, and not
+ * with the word on each side of it where the person put it; so a short insert
+ * made of words found elsewhere in the file isn't missed, and a writer that
+ * removed another copy of the person's word isn't a loss. Word runs, not lines
+ * or bytes, so line endings, a byte order mark, a rewrap or a writer that
+ * changed another line are not a loss; a writer that kept the person's words
+ * wherever it put them is not either.
  */
 export function droppedRecentSave(input: {
   saves: readonly RecentSave[];
@@ -225,18 +289,22 @@ export function droppedRecentSave(input: {
   now: number;
   windowMs: number;
 }): number {
+  const recent = input.saves.filter(save => input.now - save.savedAt <= input.windowMs);
   const newest = input.saves[input.saves.length - 1];
-  if (!newest) return 0;
-  const newestWords = guardWords(newest.text);
-  const diskWords = guardWords(input.diskText);
+  if (!newest || recent.length === 0) return 0;
+  const newestText = searchable(guardWords(newest.text));
+  const diskText = searchable(guardWords(input.diskText));
   let lost = 0;
-  for (const save of input.saves) {
-    if (input.now - save.savedAt > input.windowMs) continue;
-    const run = insertedRun(guardWords(save.previousText), guardWords(save.text));
-    if (run.length === 0) continue;
-    if (!containsRun(newestWords, run)) continue;
-    if (containsRun(diskWords, run)) continue;
-    lost += run.length;
+  for (const save of recent) {
+    for (const run of addedRuns(guardWords(save.previousText), guardWords(save.text))) {
+      const inNewest = countRun(newestText, run.words);
+      if (inNewest === 0) continue;
+      // Kept when the file has the run as often as the person's newest save does, or has it where the
+      // person put it (the word on each side; for a short run, where a count can be met by chance).
+      if (countRun(diskText, run.words) >= inNewest) continue;
+      if (containsRun(diskText, run.withNeighbours)) continue;
+      lost += run.words.length;
+    }
   }
   return lost;
 }

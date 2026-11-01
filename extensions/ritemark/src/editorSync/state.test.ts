@@ -236,6 +236,9 @@ test('#588: a common word elsewhere does not hide a lost sentence', () => {
 test('#588: a writer that removes another copy of a word the person typed is not a loss', () => {
   const saves = [{ text: 'Notes on text\n\nMore text here.\n', previousText: 'Notes on text\n', savedAt: NOW - 500 }];
   assert.equal(lost('Notes\n\nMore text here.\n', saves), 0);
+  const oneWord = [{ text: 'Notes on text\n\nMore text here.\n', previousText: 'Notes on text\n\nMore here.\n', savedAt: NOW - 500 }];
+  assert.equal(lost('Notes\n\nMore text here.\n', oneWord), 0, 'a one-word run kept where the person put it');
+  assert.equal(lost('Notes on text\n\nMore here.\n', oneWord), 1, 'a one-word run gone from where the person put it');
 });
 
 test('#588: saves outside the window, no saves, and words the person removed do not count', () => {
@@ -247,6 +250,22 @@ test('#588: saves outside the window, no saves, and words the person removed do 
     { text: BASE, previousText: SAVE_A, savedAt: NOW - 1_000 },
   ];
   assert.equal(lost(BASE, removed), 0, 'the person deleted their own sentence again');
+});
+
+test('#588 review round 1: a save that changed two places adds two runs, not the span between them', () => {
+  const before = '# Title\n\nThe second line.\n\nThe third line.\n';
+  const saved = '# Title X\n\nThe second line.\n\nThe third line. Y words.\n';
+  const saves = [{ text: saved, previousText: before, savedAt: NOW - 500 }];
+  assert.equal(lost(saved.replace('The second line.', 'The second line, rewritten.'), saves), 0, 'a writer that read the save changed the middle');
+  assert.equal(lost(before.replace('The second line.', 'The second line, rewritten.'), saves), 3, 'a stale writer drops both runs (X; Y words.)');
+});
+
+test('#588 review round 1: a short insert made of words found elsewhere is still missed when it goes', () => {
+  const before = '# Title\n\nThe second line is safe.\n\nIt is not long.\n';
+  const saved = '# Title\n\nThe second line is not safe.\n\nIt is not long.\n';
+  const saves = [{ text: saved, previousText: before, savedAt: NOW - 500 }];
+  assert.equal(lost(before, saves), 1, '"not" is gone from the second line');
+  assert.equal(lost(saved.replace('It is not long.', 'It is short.'), saves), 0, 'the writer changed only the last line');
 });
 
 test('#588 S7: a CSV cell next to the person\'s cell, and a dropped row', () => {

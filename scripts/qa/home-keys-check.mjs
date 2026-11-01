@@ -25,6 +25,7 @@
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -34,7 +35,10 @@ const REPO = option('repo', path.resolve(path.dirname(fileURLToPath(import.meta.
 const VSCODE = option('vscode', path.join(REPO, 'vscode'));
 const APP = option('app');
 const PORT = Number(option('port', '9355'));
-const PROFILE = option('profile', '/private/tmp/claude-501/rm-home-keys');
+// The profile is deleted and made again at start, so it must be a folder of its own under the temp folder.
+// On the Mac that is /private/tmp (a short path: the IPC socket lives in it); elsewhere the system's.
+const TEMP_ROOT = process.platform === 'darwin' ? '/private/tmp' : fs.realpathSync(os.tmpdir());
+const PROFILE = path.resolve(option('profile', process.platform === 'darwin' ? '/private/tmp/claude-501/rm-home-keys' : path.join(TEMP_ROOT, 'rm-home-keys')));
 const ATTACH = argv.includes('--attach');
 const ROUNDS = Number(option('rounds', '10'));
 const OUT = option('out', `${PROFILE}-report.json`);
@@ -42,7 +46,10 @@ const MAC = process.platform === 'darwin';
 const MOD = MAC ? 4 : 2;
 const SHIFT = 8;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-if (!ATTACH && (!PROFILE.startsWith('/private/tmp/') || PROFILE.split('/').length < 4)) throw new Error('--profile must be under /private/tmp');
+if (!ATTACH && (path.dirname(PROFILE) === PROFILE || !PROFILE.startsWith(`${TEMP_ROOT}${path.sep}`) || path.relative(TEMP_ROOT, PROFILE).split(path.sep).length < 2)) {
+  throw new Error(`--profile must be a folder at least two levels inside ${TEMP_ROOT} (it is deleted and made again)`);
+}
+if (!ATTACH && process.platform !== 'darwin') throw new Error('Starting an instance is Mac-only (open -n -g -j): start Ritemark yourself with --remote-debugging-port and use --attach --workspace <folder>');
 
 // ── raw CDP ────────────────────────────────────────────────────────────────
 const targets = async () => (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();

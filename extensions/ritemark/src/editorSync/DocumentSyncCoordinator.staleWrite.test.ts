@@ -24,7 +24,7 @@ import path from 'node:path';
 type Listener<T> = (event: T) => void;
 const listeners = {
   save: [] as Listener<FakeDocument>[],
-  change: [] as Listener<{ document: FakeDocument }>[],
+  change: [] as Listener<{ document: FakeDocument; contentChanges: unknown[] }>[],
 };
 const commands = new Map<string, (...args: unknown[]) => unknown>();
 const executed: Array<{ id: string; args: unknown[] }> = [];
@@ -81,7 +81,7 @@ class FakeDocument {
     this.text = this.eol === EndOfLine.CRLF ? normalized.replace(/\n/g, '\r\n') : normalized;
     this.version += 1;
     this.isDirty = true;
-    for (const listener of listeners.change) listener({ document: this });
+    for (const listener of listeners.change) listener({ document: this, contentChanges: [{}] });
   }
 
   private bytes(): string { return `${this.hasBom ? '﻿' : ''}${this.text}`; }
@@ -102,8 +102,8 @@ class FakeDocument {
     // VS Code tells the extension host the document is clean (a change event with no content change) before
     // it fires the save with its receipt. On the Mac run the sync's reconcile of the first often finished
     // before the second arrived (`model-change:converged` after a save); `saveOrder` plays both.
-    for (const listener of listeners.change) listener({ document: this });
-    if (saveOrder === 'reconcile-first') await sleep(80);
+    for (const listener of listeners.change) listener({ document: this, contentChanges: [] });
+    if (saveOrder === 'reconcile-first') await sleep(50);
     this.receipt = logicalHash(this.text);
     for (const listener of listeners.save) listener(this);
     return 'saved';
@@ -131,7 +131,7 @@ class FakeDocument {
     this.text = raw.replace(/^﻿/, '');
     this.eol = this.text.includes('\r\n') ? EndOfLine.CRLF : EndOfLine.LF;
     this.version += 1;
-    for (const listener of listeners.change) listener({ document: this });
+    for (const listener of listeners.change) listener({ document: this, contentChanges: [{}] });
   }
 }
 
@@ -146,7 +146,7 @@ const vscodeStub = {
   },
   workspace: {
     onDidSaveTextDocument: (listener: Listener<FakeDocument>) => { listeners.save.push(listener); return disposable; },
-    onDidChangeTextDocument: (listener: Listener<{ document: FakeDocument }>) => { listeners.change.push(listener); return disposable; },
+    onDidChangeTextDocument: (listener: Listener<{ document: FakeDocument; contentChanges: unknown[] }>) => { listeners.change.push(listener); return disposable; },
     registerTextDocumentContentProvider: () => disposable,
     createFileSystemWatcher: () => {
       const watcher: { change?: () => void } = {};
@@ -232,11 +232,14 @@ async function main(): Promise<void> {
     const identity = { uri: bootstrap.uri, documentSessionId: bootstrap.documentSessionId, viewEpoch: 'view-1' };
     coordinator.handle(document as never, webview as never, { type: 'document:ready', ...identity });
     const record = () => (coordinator as unknown as { records: Map<string, { queue: Promise<void>; revision: number; conflict?: { reason?: string } }> }).records.get(bootstrap.uri);
+    /** Until the record's queue has been idle twice in a row (its tasks hold their own timers). */
     async function settle(): Promise<void> {
-      for (let round = 0; round < 6; round += 1) {
-        const current = record();
-        if (current) await current.queue;
-        await sleep(40);
+      let idle = 0;
+      for (let round = 0; round < 60 && idle < 2; round += 1) {
+        const queue = record()?.queue;
+        if (queue) await queue;
+        await sleep(5);
+        idle = record()?.queue === queue ? idle + 1 : 0;
       }
     }
     let clientSequence = 0;
@@ -509,6 +512,98 @@ async function main(): Promise<void> {
       }
     });
   }
+
+  await scenario('Round 1: fixing a typo in the sentence just saved is not a question', async () => {
+    const env = await open('own-typo.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), ' Alpha wrods typed first.'));
+    await env.autoSave();
+    await env.type(env.document.getText().replace('wrods', 'words'));
+    await env.autoSave();
+    assert.equal(env.conflicts().length, 0, 'no question');
+    assert.ok(env.document.getText().includes('Alpha words typed first.'), 'the fix stays');
+    assert.ok(env.disk().includes('Alpha words typed first.'));
+    env.dispose();
+  });
+
+  await scenario('Round 1: undoing the sentence just saved is not a question', async () => {
+    const env = await open('own-undo.md', md('Stale write'));
+    const before = env.document.getText();
+    await env.type(addToEnd(before, A));
+    await env.autoSave();
+    await env.type(before);
+    await env.autoSave();
+    assert.equal(env.conflicts().length, 0, 'no question');
+    assert.ok(!env.document.getText().includes(A.trim()) && !env.disk().includes(A.trim()));
+    env.dispose();
+  });
+
+  await scenario('Round 1: a save that changed two places, then a writer that read it and changed a third', async () => {
+    const env = await open('two-places.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText().replace('# Stale write', '# Stale write X'), ' Y words here.'));
+    await env.autoSave();
+    fs.writeFileSync(env.document.file, env.disk().replace('The second line.', 'The second line, rewritten by the writer.'));
+    await env.fileChanged('reload-first');
+    assert.equal(env.conflicts().length, 0, 'imported silently');
+    assert.ok(env.document.getText().includes('rewritten by the writer'));
+    env.dispose();
+  });
+
+  await scenario('Round 1: Use disk version on the usual question disarms the person\'s earlier saves', async () => {
+    const env = await open('usual-use-disk.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    await env.autoSave();
+    const read = md('Stale write');
+    await env.type(addToEnd(env.document.getText(), B));
+    fs.writeFileSync(env.document.file, editTitle(read));
+    await env.fileChanged('reload-first');
+    assert.equal(env.conflicts().pop()?.reason, undefined, 'the usual question');
+    await env.answer('use-disk');
+    assert.equal(env.record()!.conflict, undefined);
+    fs.writeFileSync(env.document.file, editTitle(read).replace('second line', 'second line, again'));
+    await env.fileChanged('reload-first');
+    assert.equal(env.conflicts().filter(message => message.reason === 'held-import').length, 0, 'not held');
+    assert.ok(env.document.getText().includes('second line, again'));
+    env.dispose();
+  });
+
+  await scenario('Round 1: a hold keeps what an earlier writer brought in after the save', async () => {
+    const env = await open('earlier-import.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    await env.autoSave();
+    const stale = env.disk().replace(A.trim(), '');
+    fs.writeFileSync(env.document.file, env.disk().replace('The second line.', 'The second line, from the first writer.'));
+    await env.fileChanged('reload-first');
+    assert.equal(env.conflicts().length, 0, 'the first writer read the save: silent');
+    fs.writeFileSync(env.document.file, stale);
+    await env.fileChanged('reload-first');
+    assert.equal(env.conflicts().pop()?.reason, 'held-import');
+    const text = env.document.getText();
+    assert.ok(text.includes(A.trim()) && text.includes('from the first writer'), 'both the person\'s words and the first writer\'s change');
+    const lastUpdate = env.messages.filter(message => message.type === 'document:update').pop()!;
+    assert.equal(logical(String((lastUpdate.payload as { content: string }).content)), logical(text), 'the views show what the document holds');
+    env.dispose();
+  });
+
+  await scenario('Round 1: a writer that writes back an older save\'s text twice gets the words put back twice', async () => {
+    const { env, read } = await s1('older-save.md', md('Stale write'), (text: string) => text, 'reload-first');
+    assert.equal(env.record()!.conflict?.reason, 'held-import');
+    assert.equal(await env.autoSave(), 'saved');
+    fs.writeFileSync(env.document.file, read);
+    await env.fileChanged('reload-first');
+    assert.ok(env.document.getText().includes(B.trim()), 'the second sentence is back in the document');
+    assert.equal(env.document.isDirty, true, 'and VS Code will save it');
+    env.dispose();
+  });
+
+  await scenario('Round 1: a newer writer\'s copy behind a hidden tab gets its own notification', async () => {
+    const { env, read } = await s1('Module 4.md', md('Stale write'), editTitle, 'reload-first', { visible: false });
+    assert.equal(warnings.length, 1);
+    assert.equal(await env.autoSave(), 'saved');
+    fs.writeFileSync(env.document.file, read.replace('second line', 'second line, from another writer'));
+    await env.fileChanged('reload-first');
+    assert.equal(warnings.length, 2, 'a notification for the newer copy');
+    env.dispose();
+  });
 
   await scenario('S8: a stale write more than 30 s after the save still wins, as in 2.1', async () => {
     const realNow = Date.now;

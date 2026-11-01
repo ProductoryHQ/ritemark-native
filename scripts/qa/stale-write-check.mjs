@@ -39,6 +39,7 @@
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -48,7 +49,10 @@ const flag = (name) => argv.includes(`--${name}`);
 const REPO = option('repo', path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'));
 const VSCODE = option('vscode', path.join(REPO, 'vscode'));
 const PORT = Number(option('port', '9351'));
-const PROFILE = option('profile', '/private/tmp/claude-501/rm-stale');
+// The profile is deleted and made again at start, so it must be a folder of its own under the temp folder.
+// On the Mac that is /private/tmp (a short path: the IPC socket lives in it); elsewhere the system's.
+const TEMP_ROOT = process.platform === 'darwin' ? '/private/tmp' : fs.realpathSync(os.tmpdir());
+const PROFILE = path.resolve(option('profile', process.platform === 'darwin' ? '/private/tmp/claude-501/rm-stale' : path.join(TEMP_ROOT, 'rm-stale')));
 const ATTACH = flag('attach');
 const CASES = option('cases', 's1').split(',').map((c) => c.trim()).filter(Boolean);
 const RUNS = Number(option('runs', '1'));
@@ -59,7 +63,10 @@ const ANSWER = option('answer'); // keep-local | use-disk | compare: open Review
 const SHOT = option('screenshot'); // with --answer: a screenshot of the review, <path>-<run>.png
 const MOD = process.platform === 'darwin' ? 4 : 2; // meta on the Mac, ctrl elsewhere
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-if (!ATTACH && (!PROFILE.startsWith('/private/tmp/') || PROFILE.split('/').length < 4)) throw new Error('--profile must be under /private/tmp');
+if (!ATTACH && (path.dirname(PROFILE) === PROFILE || !PROFILE.startsWith(`${TEMP_ROOT}${path.sep}`) || path.relative(TEMP_ROOT, PROFILE).split(path.sep).length < 2)) {
+  throw new Error(`--profile must be a folder at least two levels inside ${TEMP_ROOT} (it is deleted and made again)`);
+}
+if (!ATTACH && process.platform !== 'darwin') throw new Error('Starting an instance is Mac-only (open -n -g -j): start Ritemark yourself with --remote-debugging-port and use --attach --workspace <folder>');
 
 // ── raw CDP ────────────────────────────────────────────────────────────────
 const targets = async () => (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();

@@ -1,3 +1,4 @@
+import type { DocumentConflictReason } from '../../../../src/editorSync/protocol'
 import { Icon } from '../ui/Icon'
 import {
   Dialog,
@@ -14,7 +15,7 @@ interface DocumentConflictDialogProps {
   isOpen: boolean
   filename: string
   /** Sprint 145 R1 (#588): `held-import`, a writer's copy that left out words Ritemark had just saved. */
-  reason?: 'held-import'
+  reason?: DocumentConflictReason
   onClose: () => void
   onCompare: () => void
   onKeepLocal: () => void
