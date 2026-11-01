@@ -36,52 +36,55 @@ export function splitBlocks(text: string, kind: BlockKind): Blocks {
     return { blocks, separators };
   }
   const lines = source.split('\n');
+  // Each block is a run of lines; what lies between two blocks (the newline after a block and the blank or
+  // whitespace-only lines) is the first block's separator, exactly as written, so the blocks rebuild the text.
+  const ranges: Array<[number, number]> = [];
   let index = 0;
-  let current: string[] = [];
-  const flush = (separator: string) => {
-    blocks.push(current.join('\n'));
-    separators.push(separator);
-    current = [];
-  };
   // Front matter: '---' on the first line, closed by the next '---' or '...'.
   if (lines[0] === '---') {
     const close = lines.findIndex((line, at) => at > 0 && (line === '---' || line === '...'));
     if (close > 0) {
-      current = lines.slice(0, close + 1);
+      ranges.push([0, close]);
       index = close + 1;
     }
   }
+  let start = -1;
   let fence: string | null = null;
   for (; index < lines.length; index += 1) {
     const line = lines[index];
     const opener = /^ {0,3}(`{3,}|~{3,})/.exec(line);
     if (fence) {
-      current.push(line);
       if (opener && opener[1][0] === fence[0] && opener[1].length >= fence.length && line.trim() === opener[1]) fence = null;
       continue;
     }
-    if (opener) fence = opener[1];
-    if (line.trim() === '' && !fence) {
-      if (current.length === 0) {
-        // Blank lines before the first block, or several in a row: part of the previous separator.
-        if (separators.length > 0) separators[separators.length - 1] += '\n';
-        else { blocks.push(''); separators.push('\n'); }
-        continue;
-      }
-      flush('\n\n');
+    if (opener) {
+      if (start < 0) start = index;
+      fence = opener[1];
       continue;
     }
-    current.push(line);
-  }
-  if (current.length > 0) flush('');
-  // The last separator is what follows the last block in the text (a trailing newline, or nothing).
-  if (separators.length > 0) {
-    const rebuilt = blocks.map((block, at) => block + separators[at]).join('');
-    if (rebuilt !== source) {
-      // Exactness first: the final separator absorbs whatever the split left over at the end.
-      const lastStart = rebuilt.length - separators[separators.length - 1].length;
-      separators[separators.length - 1] = source.slice(lastStart);
+    if (line.trim() === '') {
+      if (start >= 0) {
+        ranges.push([start, index - 1]);
+        start = -1;
+      }
+      continue;
     }
+    if (start < 0) start = index;
+  }
+  if (start >= 0) ranges.push([start, lines.length - 1]);
+  if (ranges.length === 0) return { blocks: [''], separators: [source] };
+  ranges.forEach(([first, last], at) => {
+    blocks.push(lines.slice(first, last + 1).join('\n'));
+    const next = at + 1 < ranges.length ? ranges[at + 1][0] : lines.length;
+    const between = lines.slice(last + 1, next);
+    separators.push(at + 1 < ranges.length
+      ? `\n${between.map(line => `${line}\n`).join('')}`
+      : between.length ? `\n${between.join('\n')}` : '');
+  });
+  // Blank lines before the first block: an empty block whose separator is them.
+  if (ranges[0][0] > 0) {
+    blocks.unshift('');
+    separators.unshift(lines.slice(0, ranges[0][0]).map(line => `${line}\n`).join(''));
   }
   return { blocks, separators };
 }
@@ -124,6 +127,44 @@ function likeness(a: readonly string[], b: readonly string[]): number {
   return alignment(a, b).filter(index => index >= 0).length / longer;
 }
 
+/** Words, for comparing: letters and digits only, in lower case. */
+function wordsOf(blocks: readonly string[]): string[] {
+  return blocks.join(' ').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+/**
+ * For a tie between an older and a newer candidate: does the writer's copy carry the words the newer one added (more
+ * than half of them, in the blocks it doesn't share with the newer one)? Then the writer read the newer save: it
+ * rewrote a paragraph the person had just added. A copy that rewrote the person's new words away (S4) carries few
+ * of them, and the older base stays.
+ */
+function readTheNewer(older: readonly string[], newer: readonly string[], theirs: readonly string[]): boolean {
+  const unmatched = (blocks: readonly string[], other: readonly string[]) => {
+    const match = alignment(blocks, other);
+    return blocks.filter((_, index) => match[index] < 0);
+  };
+  const remaining = new Map<string, number>();
+  for (const word of wordsOf(unmatched(older, theirs))) remaining.set(word, (remaining.get(word) ?? 0) + 1);
+  const added: string[] = [];
+  for (const word of wordsOf(unmatched(newer, theirs))) {
+    const count = remaining.get(word) ?? 0;
+    if (count > 0) remaining.set(word, count - 1);
+    else added.push(word);
+  }
+  if (added.length === 0) return false;
+  const theirWords = new Map<string, number>();
+  for (const word of wordsOf(unmatched(theirs, newer))) theirWords.set(word, (theirWords.get(word) ?? 0) + 1);
+  let carried = 0;
+  for (const word of added) {
+    const count = theirWords.get(word) ?? 0;
+    if (count > 0) {
+      theirWords.set(word, count - 1);
+      carried += 1;
+    }
+  }
+  return carried * 2 > added.length;
+}
+
 /**
  * Below this likeness to every candidate, a copy has no base and the merge doesn't run (the fallback decides). A
  * third: in a three-paragraph note a writer that rewrote two paragraphs still shares one in place with the save it
@@ -132,31 +173,104 @@ function likeness(a: readonly string[], b: readonly string[]): number {
 export const MIN_BASE_LIKENESS = 1 / 3;
 
 /**
- * The base: the candidate the writer's copy shares the most blocks with, at least `MIN_BASE_LIKENESS`. On a tie
- * the oldest wins: a base older than the true one only makes more blocks look changed by the writer or by both,
- * which keeps the person's words (a block both changed waits for Review changes); a newer one would make the
- * person's later words look deleted by the writer. So when Ritemark can't tell whether the writer saw the person's
- * latest words in a block it rewrote, the person's words stay and the writer's version waits.
- * `candidates` are oldest first. Returns the candidate's index, or -1.
+ * The base: the candidate the writer's copy shares the most blocks with, at least `MIN_BASE_LIKENESS`. On a tie,
+ * the older, unless the copy carries most of the words the newer one added (`readTheNewer`): a base older than the
+ * true one only makes more blocks look changed by the writer or by both, which keeps the person's words (a block
+ * both changed waits for Review changes); a newer one would make the person's later words look deleted by the
+ * writer. So when Ritemark can't tell whether the writer saw the person's latest words in a block it rewrote, the
+ * person's words stay and the writer's version waits. `candidates` are oldest first. Returns the index, or -1.
  */
 export function findBase(candidates: readonly string[], theirs: string, kind: BlockKind): number {
   const theirBlocks = splitBlocks(theirs, kind).blocks;
   let best = -1;
+  let bestBlocks: string[] = [];
   let bestLikeness = MIN_BASE_LIKENESS;
   candidates.forEach((candidate, index) => {
-    const value = likeness(splitBlocks(candidate, kind).blocks, theirBlocks);
-    if (value > 0 && (value > bestLikeness || (best < 0 && value >= bestLikeness))) {
-      best = index;
-      bestLikeness = value;
-    }
+    const blocks = splitBlocks(candidate, kind).blocks;
+    const value = likeness(blocks, theirBlocks);
+    if (value <= 0 || value < bestLikeness) return;
+    if (best >= 0 && value === bestLikeness && !readTheNewer(bestBlocks, blocks, theirBlocks)) return;
+    best = index;
+    bestBlocks = blocks;
+    bestLikeness = value;
   });
   return best;
+}
+
+/** Whether two texts have the same blocks (the space between them aside). */
+export function sameBlocks(a: string, b: string, kind: BlockKind): boolean {
+  const left = splitBlocks(a, kind).blocks.filter(block => block.trim() !== '');
+  const right = splitBlocks(b, kind).blocks.filter(block => block.trim() !== '');
+  return left.length === right.length && left.every((block, index) => block === right[index]);
+}
+
+/**
+ * Where a run of blocks went when the text changed: the same blocks if they are all still there in a row; for an
+ * empty run (a block the person removed), the place beside a neighbour that is still there; otherwise what now lies
+ * between the blocks kept on each side (the person rewrote it), or, when a neighbour changed too, the run of as
+ * many blocks there that is most like the old one.
+ */
+export function trackRange(before: readonly string[], after: readonly string[], at: number, length: number): { at: number; length: number } {
+  const match = alignment(before, after);
+  const nextKept = (from: number) => {
+    for (let index = from; index < before.length; index += 1) if (match[index] >= 0) return match[index];
+    return after.length;
+  };
+  if (length === 0) {
+    if (at > 0 && match[at - 1] >= 0) return { at: match[at - 1] + 1, length: 0 };
+    return { at: nextKept(at), length: 0 };
+  }
+  const own = match.slice(at, at + length);
+  if (own.every((index, offset) => index >= 0 && index === own[0] + offset)) return { at: own[0], length };
+  let previous = -1;
+  for (let index = Math.min(at, before.length) - 1; index >= 0; index -= 1) {
+    if (match[index] >= 0) { previous = match[index]; break; }
+  }
+  const first = previous + 1;
+  const region = Math.max(0, nextKept(at + length) - first);
+  if (region <= length) return { at: first, length: region };
+  const wanted = new Map<string, number>();
+  for (const word of wordsOf(before.slice(at, at + length))) wanted.set(word, (wanted.get(word) ?? 0) + 1);
+  let best = first;
+  let bestScore = -1;
+  for (let start = first; start + length <= first + region; start += 1) {
+    const left = new Map(wanted);
+    let score = 0;
+    for (const word of wordsOf(after.slice(start, start + length))) {
+      const count = left.get(word) ?? 0;
+      if (count > 0) { left.set(word, count - 1); score += 1; }
+    }
+    if (score > bestScore) { best = start; bestScore = score; }
+  }
+  return { at: best, length };
+}
+
+/** The text with blocks [at, at + length) replaced by `replacement`'s blocks ('' removes them). */
+export function replaceBlocks(text: string, kind: BlockKind, at: number, length: number, replacement: string): string {
+  const source = splitBlocks(text, kind);
+  const joiner = kind === 'csv' ? '\n' : '\n\n';
+  const added = replacement === '' ? [] : splitBlocks(replacement, kind).blocks;
+  const last = source.blocks.length - 1;
+  const parts = [
+    ...source.blocks.slice(0, at).map((block, index) => ({ block, separator: index === last ? joiner : source.separators[index] || joiner })),
+    ...added.map(block => ({ block, separator: joiner })),
+    ...source.blocks.slice(at + length).map((block, offset) => {
+      const index = at + length + offset;
+      return { block, separator: index === last ? joiner : source.separators[index] || joiner };
+    }),
+  ];
+  if (parts.length === 0) return '';
+  parts[parts.length - 1].separator = source.separators[last] ?? '';
+  return parts.map(part => part.block + part.separator).join('');
 }
 
 /** A place where both changed: the person's blocks (kept in the merge) and the writer's. */
 export interface BlockConflict {
   mine: string;
   theirs: string;
+  /** Where the person's blocks are in the merged text's blocks, and how many (0: the person removed them). */
+  at: number;
+  length: number;
 }
 
 export interface MergeResult {
@@ -255,6 +369,7 @@ export function mergeBlocks(base: string, mine: string, theirs: string, kind: Bl
       ])].sort((left, right) => left - right);
       const mineBlocks = view('mine', toMine, m0, m1);
       const theirBlocks = view('theirs', toTheirs, t0, t1);
+      const at = out.length;
       if (hasMine) mineBlocks.forEach(index => push(m, index));
       else theirBlocks.forEach(index => push(t, index));
       if (!hasMine) {
@@ -262,7 +377,7 @@ export function mergeBlocks(base: string, mine: string, theirs: string, kind: Bl
       } else if (hasTheirs) {
         const mineText = mineBlocks.map(index => m.blocks[index]).join(joiner);
         const theirText = theirBlocks.map(index => t.blocks[index]).join(joiner);
-        if (mineText !== theirText) conflicts.push({ mine: mineText, theirs: theirText });
+        if (mineText !== theirText) conflicts.push({ mine: mineText, theirs: theirText, at, length: mineBlocks.length });
       }
     }
   };

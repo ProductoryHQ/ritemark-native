@@ -670,6 +670,120 @@ async function main(): Promise<void> {
     env.dispose();
   });
 
+  // ── Review round 1 (#605) ───────────────────────────────────────────────
+
+  await scenario('Round 1, finding 1: unsaved text and a copy with no base ask (#454), never replace the words', async () => {
+    const env = await open('r1-unsaved.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    assert.ok(env.document.isDirty, 'typed, never saved');
+    fs.writeFileSync(env.document.file, rewriteAll());
+    await env.fileChanged('watcher-first');
+    assert.ok(merged(env).includes(A.trim()), 'the typed words stay');
+    assert.equal(env.conflicts().length, 1, '#454\'s question');
+    env.dispose();
+  });
+
+  await scenario('Round 1, finding 2: a writer that rewrote the paragraph the person just added replaces it once', async () => {
+    const env = await open('r1-added.md', md('Stale write'));
+    await env.type(`${env.document.getText()}\nA brand new paragraph.\n`);
+    await env.autoSave();
+    fs.writeFileSync(env.document.file, env.disk().replace('A brand new paragraph.', 'A brand-new paragraph, tightened.'));
+    await env.fileChanged('reload-first');
+    assert.equal(env.conflicts().length, 0);
+    assert.ok(merged(env).includes('A brand-new paragraph, tightened.'));
+    assert.ok(!merged(env).includes('A brand new paragraph.'), 'no second copy');
+    assert.deepEqual(paragraphs(env), []);
+    env.dispose();
+  });
+
+  await scenario('Round 1, finding 4: a view\'s edit to a block the document changed meanwhile shows Review changes', async () => {
+    const env = await open('r1-rebase.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    await env.autoSave();
+    const before = env.record()!.revision;
+    const viewText = env.document.getText();
+    env.holdAcks(true);
+    fs.writeFileSync(env.document.file, env.disk().replace('The third line.', 'The third line, by the writer.'));
+    await env.fileChanged('reload-first');
+    await env.typeAt(before, viewText.replace('The third line.', 'The third line, by the person.'));
+    env.holdAcks(false);
+    assert.ok(merged(env).includes('by the person'), 'the view\'s block stays');
+    const items = paragraphs(env);
+    assert.equal(items.length, 1, 'and the other version waits for Review changes');
+    assert.ok(items[0].theirs.includes('by the writer'));
+    env.dispose();
+  });
+
+  await scenario('Round 1, findings 5 and 6: a place stays until it is answered; Use the other copy puts back a block the person removed', async () => {
+    const env = await open('r1-places.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    await env.autoSave();
+    const read = env.disk();
+    // The person removes the third paragraph; the writer, from the save it read, trims it.
+    await env.type(env.document.getText().replace(/\n\nThe third line\. Alpha words typed first\./, ''));
+    await env.autoSave();
+    fs.writeFileSync(env.document.file, read.replace('The third line. Alpha words typed first.', 'The third'));
+    await env.fileChanged('reload-first');
+    let items = paragraphs(env);
+    assert.equal(items.length, 1);
+    assert.equal(items[0].mine, '');
+    // Typing elsewhere doesn't settle it, though the writer's text is part of other words in the document.
+    await env.type(env.document.getText().replace('The second line.', 'The second line. The third'));
+    items = paragraphs(env);
+    assert.equal(items.length, 1, 'still waiting');
+    await env.paragraph(items[0].id, 'use-theirs');
+    assert.match(merged(env), /The second line\. The third\n\nThe third\n/, `the writer's paragraph is back, after the second: ${JSON.stringify(merged(env))}`);
+    assert.deepEqual(paragraphs(env), []);
+    env.dispose();
+  });
+
+  await scenario('Round 1, finding 8: a writer that read the latest save and dropped the final newline is taken as written', async () => {
+    const env = await open('r1-newline.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    await env.autoSave();
+    const copy = env.disk().replace('# Stale write', '# Stale write, edited').replace(/\n$/, '');
+    fs.writeFileSync(env.document.file, copy);
+    await env.fileChanged('watcher-first');
+    assert.equal(env.document.getText(), copy, 'the writer\'s copy, as written: not a merge with the person\'s final newline');
+    env.dispose();
+  });
+
+  await scenario('Round 1, finding 9: an edit from a text editor of the same file, saved at once, is never a writer', async () => {
+    const env = await open('r1-texteditor.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    await env.autoSave();
+    await env.type(addToEnd(env.document.getText(), B));
+    // A text editor of the same file changes the same paragraph, and its save lands before the sync looks.
+    env.document.edit(env.document.getText().replace('The third line.', 'The third line (from the text editor).'));
+    await env.document.save();
+    await env.settle();
+    assert.ok(merged(env).includes('(from the text editor)'), 'the text editor\'s edit stays');
+    assert.ok(merged(env).includes(B.trim()));
+    assert.deepEqual(paragraphs(env), [], 'no Review changes for the person\'s own edit');
+    assert.equal(env.conflicts().length, 0);
+    env.dispose();
+  });
+
+  await scenario('Round 1, finding 11: the merge saved before the sync looks keeps its places both changed', async () => {
+    const env = await open('r1-saved-merge.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    await env.autoSave();
+    const read = env.disk();
+    await env.type(addToEnd(env.document.getText(), B));
+    await env.autoSave();
+    fs.writeFileSync(env.document.file, read.replace('The third line. Alpha words typed first.', 'The third line, tightened by the writer.'));
+    await env.document.reload();
+    // The auto-save writes the merge before the queued reconcile reads the disk.
+    await env.document.save();
+    await env.settle();
+    watchers[0]?.change?.();
+    await env.settle();
+    const items = paragraphs(env);
+    assert.equal(items.length, 1, 'the place both changed still waits');
+    assert.ok(merged(env).includes(B.trim()));
+    env.dispose();
+  });
+
   fs.rmSync(ROOT, { recursive: true, force: true });
   console.log(failures ? `\n${failures} scenario(s) failed` : '\nall scenarios passed');
   process.exit(failures ? 1 : 0);

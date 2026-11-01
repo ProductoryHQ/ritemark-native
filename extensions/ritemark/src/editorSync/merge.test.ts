@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { findBase, mergeBlocks, splitBlocks } from './merge';
+import { findBase, mergeBlocks, replaceBlocks, sameBlocks, splitBlocks, trackRange } from './merge';
 
 const join = (text: string, kind: 'markdown' | 'csv' = 'markdown') => {
   const { blocks, separators } = splitBlocks(text, kind);
@@ -46,7 +46,7 @@ test('S56: both changed one block: the person\'s stays and it is a conflict; the
   const theirs = '# Title\n\nThe second line, shorter.\n\nThe third line, tightened by the writer.\n';
   const result = mergeBlocks(BASE, MINE, theirs, 'markdown');
   assert.equal(result.text, '# Title\n\nThe second line, shorter.\n\nThe third line. Alpha. Bravo.\n');
-  assert.deepEqual(result.conflicts, [{ mine: 'The third line. Alpha. Bravo.', theirs: 'The third line, tightened by the writer.' }]);
+  assert.deepEqual(result.conflicts, [{ mine: 'The third line. Alpha. Bravo.', theirs: 'The third line, tightened by the writer.', at: 2, length: 1 }]);
 });
 
 test('adjacent changes: the person rewrote a block, the writer added one right after it', () => {
@@ -78,7 +78,7 @@ test('the same change on both sides is taken once; a block the person changed an
   assert.deepEqual(same.conflicts, []);
   const deleted = mergeBlocks(BASE, MINE, '# Title\n\nThe second line.\n', 'markdown');
   assert.equal(deleted.text, MINE);
-  assert.deepEqual(deleted.conflicts, [{ mine: 'The third line. Alpha. Bravo.', theirs: '' }]);
+  assert.deepEqual(deleted.conflicts, [{ mine: 'The third line. Alpha. Bravo.', theirs: '', at: 2, length: 1 }]);
 });
 
 test('S7: CSV rows, front matter and CRLF line endings', () => {
@@ -103,4 +103,52 @@ test('the base: the save the copy shares most blocks with, the oldest on a tie, 
   assert.equal(findBase(saves, copyOfSecond, 'markdown'), 1);
   const merged = mergeBlocks(saves[1], saves[4], copyOfSecond, 'markdown');
   assert.equal(merged.text, saves[4].replace('# Title', '# Title, edited'));
+});
+
+// Review round 1 (#605): what the first review found.
+test('blocks: whitespace-only lines between blocks stay as written, and a merge keeps the text whole', () => {
+  for (const text of ['A\n  \nB\n', 'A\n\t\n\nB', '\n \nA\n\nB\n  \n', '  \n']) {
+    assert.equal(join(text), text, JSON.stringify(text));
+  }
+  assert.deepEqual(splitBlocks('A\n  \nB\n', 'markdown'), { blocks: ['A', 'B'], separators: ['\n  \n', '\n'] });
+  const base = '# Title\n\nOne.\n  \nTwo.\n';
+  const result = mergeBlocks(base, '# Title\n\nOne.\n  \nTwo. Added.\n', '# Title, by the writer\n\nOne.\n  \nTwo.\n', 'markdown');
+  assert.equal(result.text, '# Title, by the writer\n\nOne.\n  \nTwo. Added.\n');
+});
+
+test('the base: a writer that rewrote the paragraph the person had just added read the save that added it', () => {
+  const before = '# Title\n\nThe second line.\n\nThe third line.\n';
+  const added = `${before}\nA brand new paragraph.\n`;
+  const theirs = `${before}\nA brand-new paragraph, tightened.\n`;
+  assert.equal(findBase([before, added], theirs, 'markdown'), 1, 'its words show it read the newer save');
+  const result = mergeBlocks(added, added, theirs, 'markdown');
+  assert.equal(result.text, theirs, 'taken as written: no second copy of the paragraph');
+  // When the copy carries no word of the newer save's block, the older base stays (S4: the person's words stay).
+  const s4 = '# Title\n\nThe second line.\n\nThe third line. The writer\'s own words.\n';
+  assert.equal(findBase([before, before.replace('The third line.', 'The third line. Alpha words.')], s4, 'markdown'), 0);
+});
+
+test('the same blocks with other blank lines or no final newline are the same text for the import', () => {
+  assert.ok(sameBlocks('A\n\nB2\n', 'A\n\n\nB2', 'markdown'));
+  assert.ok(sameBlocks('A\n\nB2\n', 'A\n\nB2\n\n', 'markdown'));
+  assert.ok(!sameBlocks('A\n\nB2\n', 'A\n\nB3\n', 'markdown'));
+});
+
+test('a place both changed is followed through later edits, and replaced by block', () => {
+  const before = ['# T', 'Mine.', 'Other.'];
+  assert.deepEqual(trackRange(before, ['# T', 'Mine.', 'Other!'], 1, 1), { at: 1, length: 1 }, 'an edit elsewhere');
+  assert.deepEqual(trackRange(before, ['New.', '# T', 'Mine.', 'Other.'], 1, 1), { at: 2, length: 1 }, 'a block added above');
+  assert.deepEqual(trackRange(before, ['# T', 'Mine, typed on.', 'Other.'], 1, 1), { at: 1, length: 1 }, 'the person kept typing in it');
+  assert.deepEqual(trackRange(before, ['# T', 'Other.'], 1, 1), { at: 1, length: 0 }, 'the person removed it');
+  assert.deepEqual(trackRange(['# T', 'Other.'], ['# T', 'Other.'], 1, 0), { at: 1, length: 0 }, 'a removed place stays where it was');
+  assert.deepEqual(trackRange(['# T', 'Second.'], ['# T', 'Second, typed on.'], 2, 0), { at: 2, length: 0 }, 'a removed place after a block the person changed stays after it');
+  assert.deepEqual(trackRange(['# T', 'Mine.', 'Next.'], ['# T', 'Mine, typed on.', 'Next, changed.'], 1, 1), { at: 1, length: 1 }, 'a neighbour changed too: the place keeps its own block');
+
+  const text = '# T\n\n```\na\n\n\nb\n```\n\nMine.\n\nLast.\n';
+  assert.equal(replaceBlocks(text, 'markdown', 2, 1, 'Theirs.'), '# T\n\n```\na\n\n\nb\n```\n\nTheirs.\n\nLast.\n');
+  assert.equal(replaceBlocks(text, 'markdown', 2, 1, ''), '# T\n\n```\na\n\n\nb\n```\n\nLast.\n', 'removed: the code block keeps its blank lines');
+  assert.equal(replaceBlocks(text, 'markdown', 3, 1, ''), '# T\n\n```\na\n\n\nb\n```\n\nMine.\n', 'the last block removed');
+  assert.equal(replaceBlocks(text, 'markdown', 4, 0, 'Theirs.'), '# T\n\n```\na\n\n\nb\n```\n\nMine.\n\nLast.\n\nTheirs.\n', 'added at the end');
+  assert.equal(replaceBlocks(text, 'markdown', 2, 0, 'Theirs.'), '# T\n\n```\na\n\n\nb\n```\n\nTheirs.\n\nMine.\n\nLast.\n', 'put back where the person removed it');
+  assert.equal(replaceBlocks('a,b\n1,2\n3,4', 'csv', 1, 1, '1,9'), 'a,b\n1,9\n3,4');
 });
