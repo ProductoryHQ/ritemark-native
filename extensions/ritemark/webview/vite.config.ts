@@ -22,13 +22,15 @@ const LICENSE_FILE = /^(licen[cs]e|copying|notice|third[-_]party[-_]notices)(\.|
 
 /** The package folder a bundled module belongs to: the last `node_modules/<name>` in its path. */
 function packageDirOf(id: string): string | null {
-  const file = id.split('?')[0]
-  const marker = `${path.sep}node_modules${path.sep}`
+  // Rollup's module ids use forward slashes on Windows too, so match on '/' (path.sep there is '\\', and a
+  // Windows build found no KaTeX at all, Sprint 145)
+  const file = id.split('?')[0].replace(/\\/g, '/')
+  const marker = '/node_modules/'
   const at = file.lastIndexOf(marker)
   if (at < 0) return null
-  const rest = file.slice(at + marker.length).split(path.sep)
+  const rest = file.slice(at + marker.length).split('/')
   const nameParts = rest[0].startsWith('@') ? rest.slice(0, 2) : rest.slice(0, 1)
-  return file.slice(0, at + marker.length) + nameParts.join(path.sep)
+  return file.slice(0, at + marker.length) + nameParts.join('/')
 }
 
 /**

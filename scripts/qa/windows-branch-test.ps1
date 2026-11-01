@@ -19,7 +19,9 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)][string]$Overlay,
-  [string]$RitemarkExe
+  [string]$RitemarkExe,
+  # Use this PC's own Claude, Codex and OpenCode sign-ins (for a check that needs a signed-in AI); off by default
+  [switch]$RealAiHomes
 )
 
 $ErrorActionPreference = 'Stop'
@@ -38,12 +40,29 @@ if (-not $RitemarkExe -or -not (Test-Path -LiteralPath $RitemarkExe)) {
 $installed = Join-Path (Split-Path -Parent $RitemarkExe) 'resources\app\extensions\ritemark'
 if (-not (Test-Path -LiteralPath (Join-Path $installed 'package.json'))) { throw "No bundled extension at $installed." }
 
+# VS Code keeps the built-in copy, without a word, when the branch's version isn't higher (Sprint 145: a 1.99.x
+# overlay under 2.1.0 tested 2.1.0). Checked before the copy, so a wrong overlay stops at once.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $Overlay).Path)
+try {
+  $entry = $zip.Entries | Where-Object { $_.FullName -eq 'package.json' } | Select-Object -First 1
+  if (-not $entry) { throw 'The overlay has no package.json at its top.' }
+  $reader = New-Object IO.StreamReader($entry.Open())
+  try { $overlayVersion = ($reader.ReadToEnd() | ConvertFrom-Json).version } finally { $reader.Dispose() }
+} finally { $zip.Dispose() }
+$installedVersion = (Get-Content -LiteralPath (Join-Path $installed 'package.json') -Raw | ConvertFrom-Json).version
+if ([version](($overlayVersion -split '-')[0]) -le [version](($installedVersion -split '-')[0])) {
+  throw "The overlay's version $overlayVersion is not higher than the installed $installedVersion, so Ritemark would run the installed extension. Rebuild the overlay with make-windows-test-overlay.sh."
+}
+
 $root = Join-Path $env:TEMP 'rm-s129'
 $ext = Join-Path $root 'ext'
 $userData = Join-Path $root 'ud'
+# Its own shared-data folder too: without it, the test shares ~\.ritemark-shared (Open Recent) with the person's Ritemark
+$sharedData = Join-Path $root 'shared'
 $workspace = Join-Path $root 'dictation-test'
 if (Test-Path -LiteralPath $ext) { Remove-Item -LiteralPath $ext -Recurse -Force }
-New-Item -ItemType Directory -Path $ext, $userData, $workspace -Force | Out-Null
+New-Item -ItemType Directory -Path $ext, $userData, $sharedData, $workspace -Force | Out-Null
 
 Write-Host "Copying the installed extension ($installed)..."
 Copy-Item -LiteralPath $installed -Destination (Join-Path $ext 'ritemark') -Recurse
@@ -65,9 +84,22 @@ if (-not (Test-Path -LiteralPath $note)) {
   )
 }
 
-$installedVersion = (Get-Content -LiteralPath (Join-Path $installed 'package.json') -Raw | ConvertFrom-Json).version
 Write-Host ''
 Write-Host "Starting Ritemark ($RitemarkExe) with the branch extension $($pkg.version) (installed: $installedVersion)."
 Write-Host "Profile: $userData (fresh; your normal settings are not used)."
 Write-Host 'Walk the scenarios marked B in the sprint''s scenarios.md, then close the window.'
-& $RitemarkExe --extensions-dir $ext --user-data-dir $userData $workspace
+if (-not $RealAiHomes) {
+  # Throwaway AI homes, so the test window never sees or changes this PC's own sign-ins (only this script's process
+  # and the Ritemark it starts get them)
+  $ai = Join-Path $root 'ai'
+  if (Test-Path -LiteralPath $ai) { Remove-Item -LiteralPath $ai -Recurse -Force }
+  $env:CLAUDE_CONFIG_DIR = Join-Path $ai 'claude'
+  $env:CODEX_HOME = Join-Path $ai 'codex'
+  $env:XDG_CONFIG_HOME = Join-Path $ai 'config'
+  $env:XDG_DATA_HOME = Join-Path $ai 'data'
+  $env:XDG_STATE_HOME = Join-Path $ai 'state'
+  $env:XDG_CACHE_HOME = Join-Path $ai 'cache'
+  New-Item -ItemType Directory -Path $env:CLAUDE_CONFIG_DIR, $env:CODEX_HOME, $env:XDG_CONFIG_HOME, $env:XDG_DATA_HOME, $env:XDG_STATE_HOME, $env:XDG_CACHE_HOME -Force | Out-Null
+  Write-Host "AI homes: $ai (throwaway; pass -RealAiHomes to use this PC's sign-ins)."
+}
+& $RitemarkExe --extensions-dir $ext --user-data-dir $userData --shared-data-dir $sharedData $workspace
