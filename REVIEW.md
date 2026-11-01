@@ -57,7 +57,10 @@ section names the tier and the paths that set it. Paths below are under `extensi
   A commit after the review needs a review of that commit.
 - At most three rounds. Round one reads the whole PR; rounds two and three read only the new commits, and report
   nothing already reported. After round three, stop and rethink the approach with Jarmo or the Experience lead.
-  Don't re-tag `@codex review`.
+- Codex reviews a PR by itself once, when it opens ready or goes from draft to ready. That review is its one loop:
+  answer it once, in one commit, and stop. Never tag `@codex review`, and never toggle draft and ready to get
+  another: each pass finds something new and the loop never ends (Jarmo, 1 November 2026). Open a PR as a draft
+  and mark it ready once, after the `/code-review` rounds.
 - The record: a comment by the merging session that starts with **Review record**, posted after the last round. It
   names the reviewed head commit (SHA), the rounds and each finding's outcome (fixed, rejected, intentional, didn't
   matter), and the security review's outcome for High tier. The merge uses that SHA in `--match-head-commit`.
