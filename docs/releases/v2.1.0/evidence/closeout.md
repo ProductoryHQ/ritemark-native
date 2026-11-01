@@ -1,0 +1,18 @@
+# v2.1.0 release closeout
+
+- **Release worktree:** `.worktrees/release-7852c9f38fa1`, detached at source commit `7852c9f38fa1e14d8aa5ba7686d1c219fe37b941` (2.1.0 RC4).
+- **Release:** https://github.com/jarmo-productory/ritemark-public/releases/tag/v2.1.0, published 27 October 2026, 22:04 UTC. It is still `latest` on 1 November.
+- **CI runs:**
+  - `build-windows.yml` run 40568939149, success. Its Windows round-trip evidence is in `win32-roundtrip/`; the runner's user folder (`rmci-<run id>`) is the only path in it.
+  - `build-macos-x64.yml` run 40568932326, success.
+- **10.1, on 1 November 2026:** every blocking check came back empty.
+  - Local `dist/` matches GitHub's published digests and sizes for `Ritemark-arm64.dmg`, `Ritemark-x64.dmg`, `Ritemark-Setup.exe` and `update-feed.json`.
+  - The versioned feed's 2.1.0 entry matches local.
+  - `dist/update-feed.json` is byte-identical to the published feed.
+  - The staged installer is the CI artifact (`cmp`).
+  - `published-assets.txt` is the authoritative published record.
+- **The `*.dmg.sha256` sidecars** are archived as `dist/` held them. In 2.1 they carry the stapled, published hashes (the same as `published-assets.txt`), so they were written after notarization, not before it as the standard flow does. Codex flagged this on #616. The hashes of the un-notarized DMGs that passed Gates 1 and 2 aren't on this disk, and `TEST-CHECKLIST.md` left them blank, so they can't be recovered. The next release records each un-notarized hash in its checklist at its gate.
+- **Not archived:**
+  - `darwin-arm64-extension-pre-sign.sha256`, because `VSCode-darwin-arm64/` was no longer in the worktree on 1 November. The arm64 DMG's published digest above is the record.
+  - The DMGs and the installer: the GitHub Release holds the same bytes.
+- **10.3, on 1 November 2026:** cleared on Jarmo's word ("jah luban"). The evidence was pushed first (`f75003c1`). Then `dist/` and `VSCode-darwin-x64/` were deleted by name; there was no `VSCode-darwin-arm64/`. The re-audit (`worktree-hygiene.mjs --check --no-sizes`) reads `REVIEW … release-7852c9f38fa1 — verified disposable release worktree`. Removing the worktree itself, its physical `vscode/` included, is Jarmo's step.
