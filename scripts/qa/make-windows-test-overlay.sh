@@ -50,11 +50,12 @@ cp -R "$EXT/producticons" "$STAGE/producticons"
 cp -R "$EXT/sample-project" "$STAGE/sample-project"
 cp -R "$EXT/binaries/win32-x64" "$STAGE/binaries/win32-x64"
 cp "$EXT/binaries/whisper-manifest.json" "$STAGE/binaries/"
-# 1.99.x sorts above every release, so VS Code picks this copy over the built-in one.
+# 99.0.x sorts above every release (1.99.x stopped doing so at 2.0, and VS Code then kept the built-in copy
+# without a word, Sprint 145), so VS Code picks this copy over the built-in one.
 node -e '
 const fs = require("fs");
 const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-pkg.version = "1.99." + Math.floor(Date.now() / 1000);
+pkg.version = "99.0." + Math.floor(Date.now() / 1000);
 fs.writeFileSync(process.argv[2], JSON.stringify(pkg, null, 2) + "\n");
 console.log("Test version " + pkg.version);
 ' "$EXT/package.json" "$STAGE/package.json"
