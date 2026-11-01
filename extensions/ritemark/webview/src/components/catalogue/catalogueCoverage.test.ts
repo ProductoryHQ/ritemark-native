@@ -24,16 +24,20 @@ export function exportedComponents(source: string): string[] {
   for (const match of source.matchAll(/^export\s+(?:default\s+)?(?:async\s+)?(?:function|const|let|class)\s+([A-Za-z_$][\w$]*)/gm)) names.add(match[1])
   for (const match of source.matchAll(/^export\s*\{([^}]*)\}/gm)) {
     for (const part of match[1].split(',')) {
-      const name = part.trim().split(/\s+as\s+/).pop()?.trim()
-      if (name && !name.startsWith('type ')) names.add(name)
+      const spec = part.trim()
+      if (!spec || spec.startsWith('type ')) continue
+      const name = spec.split(/\s+as\s+/).pop()?.trim()
+      if (name) names.add(name)
     }
   }
-  return [...names].filter((name) => /^[A-Z]/.test(name)).sort()
+  // A component's name starts with a capital and isn't a constant's ALL_CAPS
+  return [...names].filter((name) => /^[A-Z]/.test(name) && !/^[A-Z0-9_]+$/.test(name)).sort()
 }
 
 assert.deepEqual(exportedComponents('export function Icon() {}\nexport type IconSize = 12\nexport interface IconProps {}'), ['Icon'])
-assert.deepEqual(exportedComponents('const A = 1\nconst b = 2\nexport { A, b, A as C }'), ['A', 'C'])
+assert.deepEqual(exportedComponents('const Alpha = 1\nconst beta = 2\nexport { Alpha, beta, Alpha as Gamma }'), ['Alpha', 'Gamma'])
 assert.deepEqual(exportedComponents('export const Input = forwardRef()\nexport function splitButtonState() {}'), ['Input'])
+assert.deepEqual(exportedComponents('export const MENU_ROOM = 200\nexport { type ButtonProps as Props, Button }'), ['Button'], 'a constant and a type are not controls')
 
 // Every control file of the folder (tests and the input rule's helpers left out)
 const files = readdirSync(UI).filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))

@@ -75,36 +75,32 @@ export function inputKindOf(event: InputEventLike, mac = isMac): InputMode | nul
 }
 
 let mode: InputMode = 'keyboard'
-const listeners = new Set<(mode: InputMode) => void>()
-const watched = new WeakSet<object>()
+let watching = false
+
+// A press's clicks come after its release: a mouse's in the same task, a touch tap's a little later (Windows sends it
+// as a gesture after the release), a label's passed on to its field with them
+const PRESS_CLICKS_MS = 400
 
 /** The page's input mode now. */
 export function inputMode(): InputMode {
   return mode
 }
 
-/** Runs `listener` whenever the mode changes; returns the unsubscribe. */
-export function onInputModeChange(listener: (mode: InputMode) => void): () => void {
-  listeners.add(listener)
-  return () => listeners.delete(listener)
-}
-
-/** Start deciding the page's input mode (once per document; the page's own by default). */
+/** Start deciding the page's input mode (once: one page, one mode; the page's own document by default). */
 export function watchInputMode(doc: InputDocument | undefined = typeof document === 'undefined' ? undefined : document): void {
   const view = doc?.defaultView
-  if (!doc || !view || watched.has(doc)) return
-  watched.add(doc)
+  if (!doc || !view || watching) return
+  watching = true
   const root = doc.documentElement
   root.setAttribute('data-input-mode', mode)
   const set = (next: InputMode) => {
     if (next === mode) return
     mode = next
     root.setAttribute('data-input-mode', next)
-    for (const listener of listeners) listener(next)
   }
-  // A press's own clicks (and a label's, passed on to its field) come after its release, in the same task: they are
-  // left out until that task ends, however long the press was held. Each press has its number, so a timer left by an
-  // earlier press can't end a later one; a key ends any press whose release never came (a native context menu's).
+  // A press's own clicks are left out from its release for PRESS_CLICKS_MS, however long the press was held. Each press
+  // has its number, so a timer left by an earlier press can't end a later one; a key ends any press whose release never
+  // came (a native context menu's).
   let pressNumber = 0
   let pressing = 0
   const note = (event: Event) => {
@@ -112,7 +108,7 @@ export function watchInputMode(doc: InputDocument | undefined = typeof document 
     if (input.isTrusted === false) return
     if (input.type === 'pointerup' || input.type === 'pointercancel') {
       const released = pressing
-      setTimeout(() => { if (pressing === released) pressing = 0 }, 0)
+      setTimeout(() => { if (pressing === released) pressing = 0 }, PRESS_CLICKS_MS)
       return
     }
     if (input.type === 'click' && pressing) return

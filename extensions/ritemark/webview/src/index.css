@@ -6,7 +6,7 @@
    the focus a menu gives back to its trigger (components/ui/input-mode.ts). A field keeps its focused look: it shows
    where the typing goes after a click too. Every ring of Ritemark's own is `focus-visible:` or carries the keyboard
    mode's prefix, so this only catches what no rule draws, such as Radix's dialog close. */
-:where(:root[data-input-mode="pointer"]) :focus-visible:not(input, textarea, select, [contenteditable]:not([contenteditable="false"])) {
+:where(:root[data-input-mode="pointer"]) :is(button, a, summary, [role], [tabindex]):focus-visible:not(input, textarea, select, [contenteditable]:not([contenteditable="false"])) {
   outline: none;
 }
 
