@@ -43,8 +43,9 @@ assert.notEqual(flowModelRequestType(request), request.type, "the message's own 
 
 // A Google image step with no key (Sprint 144, the Experience lead's words): the panel's line and a run's error say
 // the same sentence; the panel's action opens Settings at that key.
-const { GOOGLE_IMAGE_KEY_NEEDED, StepNeedsKeyError } = await import('../../../src/flows/flowModelDefaults');
-const keyNeeded = new StepNeedsKeyError();
+// The Google image step's words are the Google AI key's (Sprint 145 gave each key its copy object)
+const { GOOGLE_AI_KEY_NEEDED: GOOGLE_IMAGE_KEY_NEEDED, StepNeedsKeyError } = await import('../../../src/flows/flowModelDefaults');
+const keyNeeded = new StepNeedsKeyError(GOOGLE_IMAGE_KEY_NEEDED);
 assert.equal(keyNeeded.message, 'This step needs a Google AI API key to run. Add it in Settings', "a run's error, word for word");
 assert.equal(`${GOOGLE_IMAGE_KEY_NEEDED.text} ${GOOGLE_IMAGE_KEY_NEEDED.action}`, keyNeeded.message, "the panel's line is the same sentence");
 assert.equal(GOOGLE_IMAGE_KEY_NEEDED.settingsSection, 'google-ai-key');
