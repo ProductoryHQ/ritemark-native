@@ -1,7 +1,7 @@
 /**
  * Sprint 145 (#578, R6, S35): a failed turn's done card has no green. Green is only the small "ready" dot (the
  * Experience lead's framework, §3); the done card draws as "You're all set!" does: a plain check in the heading's ink
- * on a muted chip, in RuntimeNotice's shape. The success tone is shared, so Claude's "You're signed in" note (the
+ * on a quiet chip (soft in Light, muted in Dark), in RuntimeNotice's shape. The success tone is shared, so Claude's "You're signed in" note (the
  * same RuntimeNotice) changes with it.
  *
  * Renders, to markup:
@@ -12,6 +12,8 @@
  * Run: npx tsx webview/src/components/ai-sidebar/RuntimeNotice.test.ts
  */
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 Object.assign(globalThis, {
   window: { addEventListener: () => {}, removeEventListener: () => {}, innerWidth: 400 },
@@ -42,13 +44,21 @@ function chipOf(markup: string) {
 function assertDone(markup: string, where: string) {
   const chip = chipOf(markup)
   const style = chip.getAttribute('style') ?? ''
-  assert.match(style, /background:var\(--r-surface-muted\)/, `${where}: the chip is the muted surface`)
+  assert.match(style, /background:var\(--r-done-chip\)/, `${where}: the chip is the done chip's surface`)
   assert.match(style, /color:var\(--r-ink-strong\)/, `${where}: the check is the heading's ink`)
   assert.equal(chip.querySelector('svg')!.innerHTML, drawing('check'), `${where}: a plain check`)
   assert.notEqual(chip.querySelector('svg')!.innerHTML, drawing('check-circle'), `${where}: not a check in a circle`)
   assert.ok(!markup.includes('--r-success'), `${where}: no success colour (green) anywhere`)
   assert.ok(chip.getAttribute('class')?.includes('h-6 w-6') && chip.getAttribute('class')?.includes('rounded-md'), `${where}: RuntimeNotice's chip shape (24, rounded)`)
   assert.equal(parse(markup).querySelector('[role]')?.getAttribute('role'), 'status', `${where}: still a status, not an alert`)
+}
+
+// The done chip's surface: soft in Light, where the muted fill vanishes on the white card; muted in Dark, as before
+// (the Experience lead, ritemark-dev 486c2da).
+{
+  const css = readFileSync(fileURLToPath(new URL('../../index.css', import.meta.url)), 'utf-8')
+  const chip = [...css.matchAll(/--r-done-chip:\s*var\((--[\w-]+)\);/g)].map((match) => match[1])
+  assert.deepEqual(chip, ['--ritemark-surface-soft', '--ritemark-dark-surface-muted'], 'the done chip is soft in Light and muted in Dark')
 }
 
 // RuntimeNotice's success tone itself (the signed-in note uses it too).
@@ -90,4 +100,4 @@ const warningChip = chipOf(waiting)
 assert.match(warningChip.getAttribute('style') ?? '', /background:var\(--r-warning-soft\);color:var\(--r-warning\)/, 'the warning card is unchanged')
 assert.equal(warningChip.querySelector('svg')!.innerHTML, drawing('warning'), 'the warning card keeps its warning icon')
 
-console.log("RuntimeNotice: a failed turn's done card is a check in ink on a muted chip, with no green")
+console.log("RuntimeNotice: a failed turn's done card is a check in ink on a quiet chip, with no green")

@@ -32,9 +32,10 @@ export function RuntimeNotice({
   const visual = {
     warning: { icon: 'warning' as const, background: 'var(--r-warning-soft)', color: 'var(--r-warning)' },
     progress: { icon: 'circle-notch' as const, background: 'var(--r-accent-soft)', color: 'var(--r-accent)' },
-    // Sprint 145 (#578): done, in ink on a muted chip, as "You're all set!" is; green is only the small ready dot.
+    // Sprint 145 (#578): done, in ink on a quiet chip, as "You're all set!" is; green is only the small ready dot.
     // A plain check, not check-circle, so the mark doesn't sit in two outlines (the Experience lead, 31 October).
-    success: { icon: 'check' as const, background: 'var(--r-surface-muted)', color: 'var(--r-ink-strong)' },
+    // The chip is --r-done-chip: the soft surface in Light (the muted one vanishes on the white card), muted in Dark.
+    success: { icon: 'check' as const, background: 'var(--r-done-chip)', color: 'var(--r-ink-strong)' },
     error: { icon: 'warning-circle' as const, background: 'var(--r-error-soft)', color: 'var(--r-error)' },
   }[tone];
   const hasActions = Boolean(primaryAction || secondaryAction);

@@ -10,13 +10,13 @@
 
 | Where | Was | Now |
 |---|---|---|
-| `RuntimeNotice.tsx`, the success tone (a failed turn's done card; Claude's "You're signed in" note) | `check-circle`, `--r-success` on `--r-success-soft` | a plain `check` in `--r-ink-strong` on `--r-surface-muted`, the chip's shape kept |
+| `RuntimeNotice.tsx`, the success tone (a failed turn's done card; Claude's "You're signed in" note) | `check-circle`, `--r-success` on `--r-success-soft` | a plain `check` in `--r-ink-strong` on `--r-done-chip`, the chip's shape kept. `--r-done-chip` is the soft surface in Light (the muted one vanishes on the white card) and the muted surface in Dark (the lead, ritemark-dev `486c2da`) |
 | `CommentsMenuButton.tsx` (a send's result line) | `--r-success` | `--r-ink-strong` |
 | `ExportMenu.tsx` (Copied) | the item and its check in `--r-success` | the item's own ink; the check in `ink-strong` |
 | `Editor.tsx` (a code block's and a diagram's copy button, copied) | a `--r-success` rule, which the icon never showed (below) | the colour rule goes: Copied keeps the copy icon's look (the Icon's own muted tone), and the check is the sign |
 | `tasks/LogView.tsx` (Marked done's rail dot) | `--r-success` | `--r-ink-strong` |
 | `PlanReviewCard.tsx` (the enforcement line's check) | `--r-success` | `--r-ink-muted`, as its words |
-| `index.css` (a comment task's done dot and line) | `--r-success` | `--r-ink-strong`. The marker and the bubble are white in both themes, so inside them the theme's tokens now take their light values: every task tone, the destination line and the focus ring stay readable on white in Dark (review rounds 1 and 2; before, a working or waiting status there was pale indigo or amber on white) |
+| `index.css` (a comment task's done dot and line) | `--r-success` | the line in ink-strong; the dot in muted ink, filled (the lead, `486c2da`: at 7 px ink-strong is too close to the working dot's indigo, which doesn't pulse with Reduce motion). The marker and the bubble are white in both themes, so both take the fixed light inks (`--ritemark-ink-strong`, `--ritemark-ink-muted`), as their words do (below) |
 | `RitemarkSettings.tsx` (the runtime's ready dot) | Tailwind `bg-emerald-500` | `bg-ritemark-success`: the one green, in the token |
 | `SubagentCard`, `ActivePlanBanner`, `CodexSetupView`, `ActivityCard`, `FlowSettingsPanel`, `ExecutionPanel` (201, 212), `DictationSettingsModal`, `ui/pill` and `ui/badge` (success variants) | VS Code's or Tailwind's green | ink: `--r-ink-strong`, or the ink of the words a mark sits beside (framework §4) |
 
@@ -25,19 +25,41 @@
 **Found beyond the lead's list** (the same rule, by a search for the success token's Tailwind name `ritemark-success`, which her search for greens didn't cover), changed to ink here and to be confirmed by the lead:
 - Settings: "Connected" (Claude, ChatGPT, Google account), "Configured" (five keys) and the key test's "API key is valid" row: 13 places in `RitemarkSettings.tsx` and 1 in `GoogleDocsSettingsCard.tsx`;
 - `ExecutionPanel.tsx:351`, a Claude step's live "done" line (the same file and mark as 201);
-- `index.css`, Mark as done's hover on a comment bubble (`#15803d`), now the bubble's light ink.
+- `index.css`, Mark as done's hover on a comment bubble (`#15803d`), now the bubble's fixed light ink.
 
-**For the lead:** a comment task's done dot (`#1e1b4b`) and its working dot (`#4338ca`) are both dark indigo, 7 px, about 2:1 apart, and with reduced motion the working dot doesn't pulse. At the rail's medium and compact widths the dot is the marker's only sign of the state (review round 2). Keep, or give done another shape?
+The Experience lead confirmed these on 1 November (ritemark-dev `486c2da`).
+
+**The comment card in Dark (review rounds 1–3).** The marker and the bubble are white in both themes (`--ritemark-surface`):
+- Round 1's fix gave the three done rules the fixed light inks.
+- Round 2 replaced that with a block that gave every theme token its light value inside the two surfaces.
+- Round 3 found that the block moved the marker's focus ring, which is drawn on the desk, to a dark indigo on Dark's dark desk, and faded the idle dot's ring.
+
+The block is reverted, and round 1's fixed inks are back. The comment card's other contrast in Dark (the waiting and failed tones, the @mention chip, the bubble's buttons) is pre-existing and goes to the Experience lead as its own issue. WCAG contrast:
+
+| What | Before the block (`main`, round 1, now) | With the block (`cc2ef002`) |
+|---|---|---|
+| Dark: the marker's focus ring on the desk (`#818cf8` / `#4338ca` on `#1E1B4B`) | 5.36:1 | 2.02:1 |
+| Dark: the idle dot's ring on the white marker (`#7C86A2` / `#94a3b8` on `#fff`) | 3.63:1 | 2.56:1 |
+
+The done marks now (both themes, on white): the done line `#1e1b4b` is 15.99:1, and the done dot `#617187` is 4.98:1. The done dot and the working dot now differ in hue: slate grey against indigo, not two dark indigos. Their lightness contrast is 1.59:1 in Light and 1.67:1 in Dark (ink-strong's was 2.02:1 in Light). The done chip in Light is `#f1f5f9` on the white card, 1.10:1, against muted's 1.05:1; the check on it is 14.59:1.
 
 **Greens that stay**, each with its reason in `theme/greenIsTheReadyDot.test.ts`:
 - the token itself;
 - Settings' runtime ready dot, and a Transcribe engine's ready dot (`TranscribePanel.tsx`);
 - ChatGPT's provenance badge, the conversation colours and Transcribe's speakers (they say who);
 - a Flow step's kind chip (experience 31: each kind keeps one colour, in both themes);
-- the window's traffic lights in Settings' theme pictures;
-- `properties/StatusSelect.tsx`'s Published (a chosen front-matter status with an amber Draft beside it: a "chosen" control, not a done mark, left for the lead).
+- the window's traffic lights in Settings' theme pictures.
 
-The scan covers, in any letter case, the success token, Tailwind's green and emerald classes with any prefix, VS Code's green colours, and Tailwind's green and emerald hex values; not rgb()/rgba() values.
+`properties/StatusSelect.tsx` changed too (the lead, `486c2da`): Published's emerald and Draft's amber go. The chosen option takes the chosen-segment look (`bg-surface-soft text-ink-strong border-hairline-strong`), the other keeps its inactive look, and the word says which is chosen.
+
+The scan covers, in any letter case:
+- the success token;
+- Tailwind's green and emerald classes, with any prefix or `!`;
+- VS Code's success and "added" colours (`--vscode-…` only);
+- Tailwind's green and emerald hex values, with or without alpha;
+- a colour property or attribute set to a named green.
+
+It doesn't cover rgb()/rgba()/hsl() values. It also pins the comment's done rules to the fixed light inks, and checks that no rule moves the theme's tokens on the marker or the bubble. That check covers a dark-scoped, compound, attribute, `:is()` or pseudo-element rule, and the fixed inks are declared only in `:root`. A scratch run injected each of those seven faults into a copy of the source, and the test failed on every one.
 
 **A defect found on the way: an icon's colour class doesn't colour it.** `Icon` passes its tone to Phosphor as `fill` (`ui/Icon.tsx:317`; the default tone is muted), and a CSS `color` from a class doesn't change an SVG's `fill` attribute. Proved in the live sheet: an `svg` with `fill="var(--r-ink-muted)"` and `class="text-[var(--r-error)]"` computes `color` red and `fill` `rgb(97, 113, 135)`, the muted ink. So most of the "green" done checks above were already drawn muted, and so was "You're all set!"'s check, which Sprint 144 meant in `--r-ink-strong` and whose look the done card copies. Fixed where this PR touches a mark: `tone="inherit"` wherever a mark is meant in a non-muted ink (the done card, You're all set!, Installed, the subagent and Flow step checks, Settings' checks), with fill assertions in `OnboardingWizard.test.ts`. In the live sheet the Installed checks now compute `#475569` (`--r-ink-body`), where `main` draws `#617187`.
 **Not fixed here (Pre-existing):** about 70 other `<Icon>`s with a colour class and no `inherit` tone draw muted, among them error icons meant red, accent spinners and Onboarding's failed-install cross (`--vscode-testing-iconFailed`). Making them follow their class changes how many screens look, and some classes name VS Code colours the framework doesn't use, so each needs the lead's word. It belongs with Sprint 146's controls work or its own issue (the shared `Icon` is one of 146's controls).
@@ -105,4 +127,4 @@ Not run here; the "Ritemark on Windows" session was offline:
 
 ## Bundle (E4)
 
-`media/webview.js` 8,727,898 → 8,728,121 bytes; `media/office-preview.js` 2,614,295 → 2,614,448 bytes (it carries `index.css`'s task and bubble colours). The dev-instance warnings in the screenshots' session: activation failures of `vscode.git-base`, `vscode.emmet` and `vscode.github-authentication` (this tree's built-in extensions have no `out/`, as A7 found), the GitHub authentication time-outs that follow from them, and the known refused `phosphor.woff2` (A7, PR 5). None comes from this PR.
+`media/webview.js` 8,727,898 → 8,727,200 bytes; `media/office-preview.js` 2,614,295 → 2,613,621 bytes (it carries `index.css`'s task and bubble colours). The dev-instance warnings in the screenshots' session: activation failures of `vscode.git-base`, `vscode.emmet` and `vscode.github-authentication` (this tree's built-in extensions have no `out/`, as A7 found), the GitHub authentication time-outs that follow from them, and the known refused `phosphor.woff2` (A7, PR 5). None comes from this PR.
