@@ -160,6 +160,164 @@ export function classifyRefusedSave(snapshot: RefusedSaveSnapshot): RefusedSaveD
   return 'conflict';
 }
 
+/**
+ * Sprint 145 R1 (#588): one of Ritemark's own saves of a document, as the
+ * guard remembers it. `previousText` is the text on disk before this save as
+ * far as Ritemark knows (the save before it, or the text it last read or
+ * imported), so the words this save added can be told apart from words that
+ * were already there.
+ */
+export interface RecentSave {
+  text: string;
+  previousText: string;
+  savedAt: number;
+}
+
+/**
+ * How long after one of Ritemark's own saves a disk change that leaves out the
+ * words that save added is held as a conflict instead of imported (#588,
+ * `research/stale-write-repro.md`). A writer that writes later than this still
+ * wins (S8).
+ */
+export const STALE_WRITE_WINDOW_MS = 30_000;
+
+/**
+ * Words, for the guard: runs of characters between white space and the
+ * separators of a table or CSV row, so a rewrap, a changed line ending or a
+ * cell edit next to the person's words doesn't count as a loss. Markup at a
+ * word's edges (emphasis, code, quotes) is dropped, and so are list markers
+ * and headings' hashes on their own, so a writer that only reformatted the
+ * person's words hasn't lost them.
+ */
+function guardWords(text: string): string[] {
+  const words: string[] = [];
+  for (const raw of normalizeLogicalText(text).match(/[^\s,;|]+/g) ?? []) {
+    const word = raw.replace(/^[*_~`"'>#]+/, '').replace(/[*_~`"']+$/, '');
+    if (word && !/^(?:[-+]|\d+[.)])$/.test(word)) words.push(word);
+  }
+  return words;
+}
+
+/** Words joined for a contiguous search; built once per text. */
+function searchable(words: readonly string[]): string {
+  return ` ${words.join(' ')} `;
+}
+
+function containsRun(haystack: string, run: readonly string[]): boolean {
+  return haystack.includes(` ${run.join(' ')} `);
+}
+
+/** How many times the run appears in the text; occurrences may share their separating space. */
+function countRun(haystack: string, run: readonly string[]): number {
+  const needle = ` ${run.join(' ')} `;
+  let count = 0;
+  for (let at = haystack.indexOf(needle); at >= 0; at = haystack.indexOf(needle, at + needle.length - 1)) count += 1;
+  return count;
+}
+
+/** Above this many cells the word alignment isn't computed and the changed span counts as one run. */
+const MAX_ALIGNMENT_CELLS = 4_000_000;
+
+interface AddedRun {
+  words: string[];
+  /** The run with the word on each side of it in the save, where there is one. */
+  withNeighbours: string[];
+}
+
+/**
+ * The runs of words `next` added to `previous`: a word alignment (longest
+ * common subsequence) of the part between their common start and end, so a
+ * save that changed two places gives two runs, not the span between them.
+ */
+function addedRuns(previous: readonly string[], next: readonly string[]): AddedRun[] {
+  let start = 0;
+  while (start < previous.length && start < next.length && previous[start] === next[start]) start += 1;
+  let end = 0;
+  while (
+    end < previous.length - start
+    && end < next.length - start
+    && previous[previous.length - 1 - end] === next[next.length - 1 - end]
+  ) end += 1;
+  const a = previous.slice(start, previous.length - end);
+  const b = next.slice(start, next.length - end);
+  const run = (from: number, to: number): AddedRun => ({
+    words: next.slice(from, to),
+    withNeighbours: next.slice(Math.max(0, from - 1), Math.min(next.length, to + 1)),
+  });
+  if (b.length === 0) return [];
+  if (a.length === 0 || a.length * b.length > MAX_ALIGNMENT_CELLS) return [run(start, start + b.length)];
+  const width = b.length + 1;
+  const common = new Uint32Array((a.length + 1) * width);
+  for (let i = a.length - 1; i >= 0; i -= 1) {
+    for (let j = b.length - 1; j >= 0; j -= 1) {
+      common[i * width + j] = a[i] === b[j]
+        ? common[(i + 1) * width + j + 1] + 1
+        : Math.max(common[(i + 1) * width + j], common[i * width + j + 1]);
+    }
+  }
+  const runs: AddedRun[] = [];
+  let runStart = -1;
+  let i = 0;
+  let j = 0;
+  while (j < b.length) {
+    if (i < a.length && a[i] === b[j]) {
+      if (runStart >= 0) runs.push(run(start + runStart, start + j));
+      runStart = -1;
+      i += 1;
+      j += 1;
+    } else if (i < a.length && common[(i + 1) * width + j] >= common[i * width + j + 1]) {
+      i += 1;
+    } else {
+      if (runStart < 0) runStart = j;
+      j += 1;
+    }
+  }
+  if (runStart >= 0) runs.push(run(start + runStart, start + b.length));
+  return runs;
+}
+
+/**
+ * Sprint 145 R1 (#588): does the text now on disk leave out words that
+ * Ritemark's own recent saves added? Returns how many such words are missing,
+ * 0 when none are (or when nothing recent is remembered).
+ *
+ * The words the saves within `windowMs` of `now` added are the runs one word
+ * alignment finds, from the text before the oldest of them to the newest save,
+ * so every run is in the person's newest text and a later fix inside an earlier
+ * run (a typo, a full stop) doesn't hide it. A run counts as lost when the disk
+ * text has it fewer times than the newest save, and not
+ * with the word on each side of it where the person put it; so a short insert
+ * made of words found elsewhere in the file isn't missed, and a writer that
+ * removed another copy of the person's word isn't a loss. Word runs, not lines
+ * or bytes, so line endings, a byte order mark, a rewrap or a writer that
+ * changed another line are not a loss; a writer that kept the person's words
+ * wherever it put them is not either.
+ */
+export function droppedRecentSave(input: {
+  saves: readonly RecentSave[];
+  diskText: string;
+  now: number;
+  windowMs: number;
+}): number {
+  const oldest = input.saves.find(save => input.now - save.savedAt <= input.windowMs);
+  const newest = input.saves[input.saves.length - 1];
+  if (!newest || !oldest) return 0;
+  const newestWords = guardWords(newest.text);
+  const runs = addedRuns(guardWords(oldest.previousText), newestWords);
+  if (runs.length === 0) return 0;
+  const newestText = searchable(newestWords);
+  const diskText = searchable(guardWords(input.diskText));
+  let lost = 0;
+  for (const run of runs) {
+    // Kept when the file has the run as often as the person's newest save does, or has it where the
+    // person put it (the word on each side; for a short run, where a count can be met by chance).
+    if (countRun(diskText, run.words) >= countRun(newestText, run.words)) continue;
+    if (containsRun(diskText, run.withNeighbours)) continue;
+    lost += run.words.length;
+  }
+  return lost;
+}
+
 export function classifyThreeWay(snapshot: ThreeWaySnapshot): ThreeWaySyncState {
   const diskChanged = snapshot.diskHash !== snapshot.baseDiskHash;
   const modelChanged = snapshot.modelHash !== snapshot.baseModelHash;

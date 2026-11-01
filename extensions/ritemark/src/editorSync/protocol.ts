@@ -44,7 +44,9 @@ export type DocumentUpdateReason =
   | 'peer-edit'
   | 'undo-redo'
   | 'revert'
-  | 'resolution';
+  | 'resolution'
+  /** Sprint 145 R1 (#588): a writer's copy merged by block; the editor takes it as one undo step. */
+  | 'merge';
 
 export type DocumentSyncState =
   | 'synced'
@@ -89,9 +91,37 @@ export type DocumentHostMessage =
       revision: number;
       diskHash: string;
       filename: string;
+      /**
+       * Why the review is asked, when it isn't the usual two changes: `held-import` is a writer's copy that left
+       * out words Ritemark had just saved, held instead of imported (Sprint 145 R1, #588).
+       */
+      reason?: DocumentConflictReason;
       /** Open the review at once: the person chose Review changes in Ritemark's notification (#454). */
       openReview?: boolean;
+    })
+  | (DocumentIdentity & {
+      /** Sprint 145 R1 (#588): the places both changed, after a merge; an empty list when none wait. */
+      type: 'document:paragraphs';
+      revision: number;
+      items: DocumentParagraphConflict[];
+      /** The AI that wrote the copy, when Ritemark knows it; otherwise "another app". */
+      writer?: string;
+      openReview?: boolean;
     });
+
+export type DocumentConflictReason = 'held-import';
+
+/**
+ * Sprint 145 R1 (#588): a place both the person and a writer changed. The person's blocks (`mine`) are in the
+ * document; the writer's (`theirs`) wait for Review changes.
+ */
+export interface DocumentParagraphConflict {
+  id: number;
+  mine: string;
+  theirs: string;
+}
+
+export type DocumentParagraphAction = 'keep-mine' | 'use-theirs';
 
 export type DocumentEditPayload =
   | { fileType: 'markdown'; content: string; properties: Record<string, unknown> }
@@ -113,6 +143,12 @@ export type DocumentViewMessage =
   | (DocumentIdentity & {
       type: 'document:conflict-action';
       action: 'retry-apply';
+    })
+  | (DocumentIdentity & {
+      /** Sprint 145 R1 (#588): the person's answer for one place both changed. */
+      type: 'document:paragraph-action';
+      id: number;
+      action: DocumentParagraphAction;
     })
   | (DocumentIdentity & {
       type: 'document:conflict-action';
@@ -139,6 +175,7 @@ const VIEW_TYPES = new Set<DocumentViewMessage['type']>([
   'document:applied',
   'document:edit',
   'document:conflict-action',
+  'document:paragraph-action',
 ]);
 
 const HOST_TYPES = new Set<DocumentHostMessage['type']>([
@@ -146,10 +183,11 @@ const HOST_TYPES = new Set<DocumentHostMessage['type']>([
   'document:sync-state',
   'document:edit-result',
   'document:conflict',
+  'document:paragraphs',
 ]);
 
 const UPDATE_REASONS = new Set<DocumentUpdateReason>([
-  'open', 'external', 'peer-edit', 'undo-redo', 'revert', 'resolution',
+  'open', 'external', 'peer-edit', 'undo-redo', 'revert', 'resolution', 'merge',
 ]);
 
 const SYNC_STATES = new Set<DocumentSyncState>([
@@ -197,6 +235,13 @@ export function parseDocumentViewMessage(value: unknown): DocumentViewMessage {
       clientSequence: integer(input, 'clientSequence'),
       payload: parseEditPayload(input.payload),
     };
+  }
+
+  if (type === 'document:paragraph-action') {
+    exactKeys(input, ['type', 'uri', 'documentSessionId', 'viewEpoch', 'id', 'action']);
+    const action = requiredString(input, 'action', 32);
+    if (action !== 'keep-mine' && action !== 'use-theirs') throw new DocumentProtocolError('Unknown paragraph action');
+    return { type, ...identity, id: integer(input, 'id'), action };
   }
 
   const action = requiredString(input, 'action', 32);
@@ -268,8 +313,27 @@ export function parseDocumentHostMessage(value: unknown): DocumentHostMessage {
     };
   }
 
-  exactKeys(input, ['type', 'uri', 'documentSessionId', 'viewEpoch', 'conflictRevision', 'revision', 'diskHash', 'filename', 'openReview']);
+  if (type === 'document:paragraphs') {
+    exactKeys(input, ['type', 'uri', 'documentSessionId', 'viewEpoch', 'revision', 'items', 'writer', 'openReview']);
+    if (input.openReview !== undefined && input.openReview !== true) throw new DocumentProtocolError('openReview must be true when present');
+    const items = array(input.items, 'items').map(item => {
+      const entry = object(item);
+      exactKeys(entry, ['id', 'mine', 'theirs']);
+      return { id: integer(entry, 'id'), mine: requiredString(entry, 'mine', MAX_CONTENT_LENGTH, true), theirs: requiredString(entry, 'theirs', MAX_CONTENT_LENGTH, true) };
+    });
+    return {
+      type,
+      ...identity,
+      revision: integer(input, 'revision'),
+      items,
+      ...(input.writer === undefined ? {} : { writer: requiredString(input, 'writer', 64) }),
+      ...(input.openReview === true ? { openReview: true } : {}),
+    };
+  }
+
+  exactKeys(input, ['type', 'uri', 'documentSessionId', 'viewEpoch', 'conflictRevision', 'revision', 'diskHash', 'filename', 'reason', 'openReview']);
   if (input.openReview !== undefined && input.openReview !== true) throw new DocumentProtocolError('openReview must be true when present');
+  if (input.reason !== undefined && input.reason !== 'held-import') throw new DocumentProtocolError('Unknown conflict reason');
   return {
     type,
     ...identity,
@@ -277,6 +341,7 @@ export function parseDocumentHostMessage(value: unknown): DocumentHostMessage {
     revision: integer(input, 'revision'),
     diskHash: hash(input, 'diskHash'),
     filename: requiredString(input, 'filename', 512),
+    ...(input.reason === 'held-import' ? { reason: 'held-import' as const } : {}),
     ...(input.openReview === true ? { openReview: true } : {}),
   };
 }

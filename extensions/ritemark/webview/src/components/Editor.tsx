@@ -4,6 +4,7 @@ import { useEditor, EditorContent, useEditorState, type Editor as TipTapEditor }
 import { DOMSerializer } from '@tiptap/pm/model'
 import { Fragment } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
+import { closeHistory } from '@tiptap/pm/history'
 import { createNodeFromContent } from '@tiptap/core'
 import { sendToExtension, onMessage } from '../bridge'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -589,6 +590,20 @@ export function Editor({
       const wasFocused = editor.isFocused
       const { anchor, head } = editor.state.selection
       const scrollTop = scrollContainer?.scrollTop
+      // Sprint 145 R1 (#588, experience 44): nothing moves under the person. When the caret is in view, the page
+      // keeps its place by the caret's paragraph, so a change above the view doesn't push it; otherwise the
+      // scroll position is kept as before. A merge of a writer's copy is one undo step; other host updates stay
+      // out of the history.
+      const undoable = syncTarget?.undoable === true
+      let anchorAfter = anchor
+      let caretTopBefore: number | undefined
+      try {
+        const view = scrollContainer?.getBoundingClientRect()
+        const caret = editor.view.coordsAtPos(anchor)
+        if (view && caret.top >= view.top && caret.bottom <= view.bottom) caretTopBefore = caret.top
+      } catch {
+        caretTopBefore = undefined
+      }
       try {
         const parsed = createNodeFromContent(processedContent, editor.schema, {
           slice: false,
@@ -605,27 +620,33 @@ export function Editor({
           let transaction = editor.state.tr.replace(replacement.from, replacement.to, replacement.slice)
           const mappedAnchor = Math.max(0, Math.min(transaction.doc.content.size, transaction.mapping.map(anchor)))
           const mappedHead = Math.max(0, Math.min(transaction.doc.content.size, transaction.mapping.map(head)))
+          anchorAfter = mappedAnchor
           transaction = transaction
             .setSelection(TextSelection.between(transaction.doc.resolve(mappedAnchor), transaction.doc.resolve(mappedHead)))
-            .setMeta('addToHistory', false)
+            .setMeta('addToHistory', undoable)
             .setMeta('preventUpdate', true)
             .setMeta('ritemarkDocumentRevision', syncTarget?.revision)
           if (!transaction.doc.eq(nextDoc)) throw new Error('Structural update did not reproduce the host document.')
-          editor.view.dispatch(transaction)
+          // A merge is its own undo step: not joined to the person's typing before it.
+          editor.view.dispatch(undoable ? closeHistory(transaction) : transaction)
         }
       } catch {
         console.warn('[EditorSync] structural apply fell back to full replacement')
         editor.chain()
+          .command(({ tr }) => { if (undoable) closeHistory(tr); return true })
           .setContent(processedContent, false)
-          .setMeta('addToHistory', false)
+          .setMeta('addToHistory', undoable)
           .setMeta('ritemarkDocumentRevision', syncTarget?.revision)
           .run()
         const position = Math.max(0, Math.min(editor.state.doc.content.size, anchor))
+        anchorAfter = position
         editor.view.dispatch(editor.state.tr
           .setSelection(TextSelection.near(editor.state.doc.resolve(position)))
           .setMeta('addToHistory', false)
           .setMeta('preventUpdate', true))
       }
+      // ...nor the typing after it: the next keystroke starts a new undo step.
+      if (undoable) editor.view.dispatch(closeHistory(editor.state.tr).setMeta('addToHistory', false).setMeta('preventUpdate', true))
 
       // Structural application and the fallback both suppress onUpdate. Keep
       // the outgoing baseline aligned with the actual parsed TipTap document,
@@ -634,7 +655,16 @@ export function Editor({
 
       lastExternalValue.current = value
       requestAnimationFrame(() => {
-        if (scrollContainer && scrollTop !== undefined) scrollContainer.scrollTop = scrollTop
+        if (scrollContainer && scrollTop !== undefined) {
+          scrollContainer.scrollTop = scrollTop
+          if (caretTopBefore !== undefined) {
+            try {
+              scrollContainer.scrollTop += editor.view.coordsAtPos(anchorAfter).top - caretTopBefore
+            } catch {
+              // The caret's place is gone (its paragraph was replaced): keep the scroll position.
+            }
+          }
+        }
         if (wasFocused) editor.view.focus()
       })
       // #512: the acknowledgement does not wait for a frame. The document is
