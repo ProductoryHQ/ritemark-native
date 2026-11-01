@@ -29,11 +29,37 @@
  *
  * Every check prints PASS, FAIL or SKIP with what it saw; the exit code is the number of failures. Each step that
  * changes the window says so; the window is left on the first project, with Home in front.
+ *
+ * The first frame (with --first-frame <start>, Sprint 152, R8; the startup contract): one start of the window, followed
+ * every 50 ms from its first moment, as --measure does. Each sample records the boxes of the left column, the desk, the
+ * AI column, the status bar, VS Code's side places bar, the places row's items, the head's rows and the tab row's first
+ * tabs, and what is in front (the desk's tab, the left column's place). PASS when every box in the first laid-out sample
+ * (the parts splash removed, the desk laid out) equals its box once the window has settled (Ritemark started at least
+ * 5 s before, then 2 s with no change), and what is in front never changed. A box is the room an element takes, so a
+ * row waiting for its words keeps its box; content inside a box may change. It prints each box that moved, by how much
+ * and when, on the page's clock and from the first frame, with the workbench's marks. The starts:
+ *
+ *   new-profile   the window an instance launched on a fresh --user-data-dir opens with no folder (start it just before
+ *                 the launch: it waits for the instance's CDP port, so it sees the window's first moment)
+ *   new-project   File ▸ Open Recent into --to <folder name>, a folder this profile has never opened
+ *   switch        File ▸ Open Recent into --to <folder name>, a project opened before, leaving a document in front
+ *   relaunch      Developer: Reload Window with a document in front (--doc, README.md unless given, opened if none
+ *                 is) and a terminal on the desk (made if none is); with --ai-closed, the AI column closed first by its
+ *                 toggle (decision 2: it stays closed)
+ *
+ * With --ext-port <port>, the instance was launched with --inspect-brk-extensions=<port>, so its extension host waits
+ * at every start (Sprint 145's S47 method, the Mac's stand-in for a slow start): the check lets it go over its inspector
+ * --hold <seconds> (10 unless given) after the first frame, once it has checked that the inspector's process and the
+ * CDP port's both belong to the instance launched with this --user-data-dir (needed with --first-frame). With --shots
+ * <dir> it also captures the window at the first frame, while held and settled (<dir>/<start>-first.png, …).
+ * Each start is its own run; the exit code is 1 when the frame moved, as for any failure.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createServer } from 'node:http';
+import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 const args = process.argv.slice(2);
 const option = (name, fallback) => {
@@ -45,8 +71,13 @@ const port = option('port');
 const userDataDir = option('user-data-dir');
 const switchTo = option('switch-to');
 const boardOff = flag('board-off');
-if (!port) {
+const firstFrameStart = option('first-frame');
+const FIRST_FRAME_STARTS = ['new-profile', 'new-project', 'switch', 'relaunch'];
+if (!port
+	|| (firstFrameStart !== undefined && (!FIRST_FRAME_STARTS.includes(firstFrameStart) || !userDataDir))
+	|| ((firstFrameStart === 'new-project' || firstFrameStart === 'switch') && !option('to'))) {
 	console.error('usage: node scripts/qa/project-check.mjs --port <cdp-port> [--user-data-dir <dir>] [--close-all] [--switch-to <folder name>] [--share-question] [--board-off]');
+	console.error('       node scripts/qa/project-check.mjs --port <cdp-port> --user-data-dir <dir> --first-frame new-profile|new-project|switch|relaunch [--to <folder name>] [--doc <file name>] [--ai-closed] [--ext-port <port> [--hold <seconds>]] [--shots <dir>]');
 	process.exit(2);
 }
 
@@ -230,6 +261,346 @@ async function checkPermanent(when) {
 	return row;
 }
 
+/** A page's clock as local time, as exthost.log writes it. */
+function localClock(ms) {
+	const date = new Date(ms);
+	return `${date.toTimeString().slice(0, 8)}.${String(date.getMilliseconds()).padStart(3, '0')}`;
+}
+
+// ── The first frame (Sprint 152, R8) ──
+
+/**
+ * One sample of the frame: the boxes (x, y, width, height in CSS px, or null when not shown) of the parts and of the
+ * items in the places row, the head and the tab row, and what is in front. A box is keyed by what it is, so an item
+ * that comes or goes shows as its own key. Before the workbench has laid out (the parts splash still up), `laidOut` is
+ * false and nothing else is read.
+ */
+const FRAME_SAMPLE = `(() => {
+	// A box is the room an element takes: one hidden but keeping its room (visibility: hidden, a head row waiting for
+	// its command) is still there; one with no room (display: none, no size) is not
+	const box = element => {
+		if (!element || !element.isConnected) { return null; }
+		const r = element.getBoundingClientRect();
+		if (!r.width || !r.height || getComputedStyle(element).display === 'none') { return null; }
+		return [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)];
+	};
+	const name = element => (element?.getAttribute('aria-label') || element?.textContent || '').split(/, | \\(/)[0].trim();
+	const workbench = document.querySelector('.monaco-workbench');
+	const sample = { origin: performance.timeOrigin, t: Math.round(performance.now()), title: document.title, laidOut: !!workbench && performance.getEntriesByName('code/didRemovePartsSplash').length > 0 && !!box(document.querySelector('.monaco-workbench .part.editor')) };
+	if (!sample.laidOut) { return sample; }
+	const boxes = {};
+	boxes['the left column'] = box(document.querySelector('.part.sidebar'));
+	boxes['the desk'] = box(document.querySelector('.part.editor'));
+	boxes['the AI column'] = box(document.querySelector('.part.auxiliarybar'));
+	boxes['the status bar'] = box(document.querySelector('.part.statusbar'));
+	boxes['the side places bar'] = box(document.querySelector('.part.activitybar')); // VS Code's own place for the places row, before Ritemark's setting puts it on top
+	const places = [...document.querySelectorAll('.part.sidebar > .header-or-footer .composite-bar .action-item')].filter(item => box(item));
+	places.forEach((item, index) => { boxes['place ' + (index + 1) + ' (' + name(item.querySelector('.action-label')) + ')'] = box(item); });
+	boxes['the project head'] = box(document.querySelector('.part.sidebar .ritemark-project-head'));
+	[...document.querySelectorAll('.part.sidebar .ritemark-project-row-list > .ritemark-project-row')].forEach((row, index) => { boxes['head row ' + (index + 1)] = box(row); });
+	boxes['the head\\'s label'] = box(document.querySelector('.part.sidebar .ritemark-project-group'));
+	const group = [...document.querySelectorAll('.part.editor .editor-group-container')].find(element => box(element));
+	[...(group?.querySelectorAll('.tabs-container > .tab') ?? [])].slice(0, 3).forEach((tab, index) => { boxes['tab ' + (index + 1) + ' (' + name(tab) + ')'] = box(tab); });
+	for (const key of Object.keys(boxes)) { if (boxes[key] === null && !/^the (left column|desk|AI column|status bar|side places bar)$/.test(key)) { delete boxes[key]; } }
+	sample.boxes = boxes;
+	const alone = workbench.classList.contains('ritemark-welcome-alone');
+	const tab = document.querySelector('.part.editor .editor-group-container.active .tabs-container > .tab.active') ?? group?.querySelector('.tabs-container > .tab.active');
+	const place = places.find(item => item.classList.contains('checked'));
+	sample.front = { desk: alone ? 'the welcome alone' : (tab ? name(tab) : '(none)'), place: boxes['the left column'] ? (place ? name(place.querySelector('.action-label')) : '(none)') : '(closed)' };
+	// Ritemark has started: its activation shows the status bar's Send feedback (in the DOM even where the welcome alone hides the bar)
+	sample.started = !!document.querySelector('.part.statusbar [id$="ritemark.feedback"]');
+	return sample;
+})()`;
+
+/** The workbench's own marks around the first frame (`vs/base/common/performance`), on the page's clock. */
+const FIRST_FRAME_MARKS = ['code/didStartWorkbench', 'code/willRestoreEditors', 'code/didRestoreEditors', 'code/didRemovePartsSplash', 'code/willRestoreAuxiliaryBar', 'code/didRestoreAuxiliaryBar', 'code/willLoadExtensions', 'code/didLoadExtensions'];
+
+/** Whether the process listening on `listenPort` is, or descends from, the instance launched with this --user-data-dir. */
+function ownedByInstance(listenPort) {
+	let current;
+	try {
+		current = execFileSync('lsof', ['-nP', `-tiTCP:${listenPort}`, '-sTCP:LISTEN'], { encoding: 'utf8' }).trim().split('\n')[0];
+	} catch {
+		return false;
+	}
+	for (let depth = 0; depth < 10 && current && current !== '0' && current !== '1'; depth++) {
+		let line;
+		try {
+			line = execFileSync('ps', ['-o', 'ppid=,command=', '-p', current], { encoding: 'utf8' }).trim();
+		} catch {
+			return false;
+		}
+		const [, ppid, command] = line.match(/^(\d+)\s+(.*)$/) ?? [];
+		if (command?.includes(userDataDir)) {
+			return true;
+		}
+		current = ppid;
+	}
+	return false;
+}
+
+/** The folders this profile has opened, from its workspace storage (`workspace.json`'s folder URI). */
+function openedFolders() {
+	try {
+		const root = join(userDataDir, 'User', 'workspaceStorage');
+		return readdirSync(root).flatMap(entry => {
+			try {
+				return [decodeURIComponent(JSON.parse(readFileSync(join(root, entry, 'workspace.json'), 'utf8')).folder ?? '')];
+			} catch {
+				return [];
+			}
+		});
+	} catch {
+		return [];
+	}
+}
+
+async function firstFrame(start) {
+	const extPort = option('ext-port');
+	const holdMs = Number(option('hold', '10')) * 1000;
+	const shots = option('shots');
+	const to = option('to');
+	if (shots) {
+		mkdirSync(shots, { recursive: true });
+	}
+	// A new profile's start can be run before the launch: it waits up to a minute for the instance's CDP port
+	for (let waited = 0; start === 'new-profile' && waited < 60000 && !ownedByInstance(port); waited += 50) {
+		await sleep(50);
+	}
+	if (!ownedByInstance(port)) {
+		console.error(`stopped: the CDP port ${port} does not belong to the instance launched with ${userDataDir}`);
+		return 2;
+	}
+	// The extension host's inspector is on --ext-port, or, when that port is still taken (the last start's host not yet
+	// gone), on one of the next nine VS Code tries, 2048 apart (`localProcessExtensionHost.ts`, `_tryFindDebugPort`)
+	const inspectors = async () => {
+		const found = [];
+		for (let attempt = 0; attempt < 10; attempt++) {
+			const inspectorPort = Number(extPort) + attempt * 2048;
+			try {
+				const targets = await (await fetch(`http://127.0.0.1:${inspectorPort}/json/list`, { signal: AbortSignal.timeout(300) })).json();
+				found.push(...targets.filter(target => target.type === 'node').map(target => ({ ...target, inspectorPort })));
+			} catch {
+				// nothing there
+			}
+		}
+		return found;
+	};
+	const before = extPort ? new Set((await inspectors()).map(target => target.id)) : new Set();
+	let oldOrigin = null;
+
+	// What starts it
+	if (start !== 'new-profile') {
+		await connect();
+		MOD = await evaluate(`document.querySelector('.monaco-workbench').classList.contains('mac')`) ? 4 : 2;
+		await key('Escape', 0, 'Escape');
+		oldOrigin = await evaluate('performance.timeOrigin');
+		const opened = openedFolders();
+		const toOpened = to ? opened.some(folder => folder.replace(/\/$/, '').endsWith(`/${to}`)) : false;
+		if (start === 'new-project' && toOpened) {
+			console.error(`stopped: this profile has opened ${to} before, so it is no new project`);
+			return 2;
+		}
+		if (start === 'switch' && !toOpened) {
+			console.error(`stopped: this profile has never opened ${to}, so it is a new project, not a switch`);
+			return 2;
+		}
+		const documentTab = `[...${TABS}].find(tab => { const label = tab.getAttribute('aria-label') || ''; return !label.startsWith('Home') && !label.startsWith('Task board') && !label.startsWith('Welcome') && !/^(Terminal|zsh|bash)/.test(label); })`;
+		if (start === 'relaunch') {
+			if (!(await evaluate(`!!document.querySelector('.part.editor .tabs-container > .tab .codicon-terminal, .part.editor .tabs-container > .tab.terminal-tab')`)) && !(await evaluate(`[...document.querySelectorAll('.part.editor .tabs-container > .tab')].some(tab => /^(Terminal|zsh|bash)/.test(tab.getAttribute('aria-label') || ''))`))) {
+				console.log('…  Terminal: Create New Terminal (a terminal on the desk)');
+				await command('Terminal: Create New Terminal');
+				await sleep(1500);
+			}
+		}
+		if (start === 'switch' || start === 'relaunch') {
+			// Leave with a document in front, as a person working in it does (--doc, README.md unless given, when none is open)
+			if (!(await evaluate(`!!(${documentTab})`))) {
+				const doc = option('doc', 'README.md');
+				console.log(`…  Go to File → ${doc}`);
+				await command('Go to File...');
+				await typeInto('quick-input', doc, true);
+				await sleep(2500);
+			}
+			await click('a document\'s tab', documentTab).catch(() => console.log('…  (no document open to leave in front)'));
+			await sleep(800);
+		}
+		const aiShown = `(() => { const r = document.querySelector('.part.auxiliarybar')?.getBoundingClientRect(); return !!r && r.width > 0; })()`;
+		if (start === 'relaunch' && flag('ai-closed') && await evaluate(aiShown)) {
+			// Decision 2 (R6): the AI column the person closed with its own toggle, as the strip's button does
+			console.log('…  View: Toggle Secondary Side Bar Visibility (the AI column closed, as its toggle does)');
+			await command('View: Toggle Secondary Side Bar Visibility');
+			await sleep(1000);
+			if (await evaluate(aiShown)) {
+				console.error('stopped: the AI column did not close');
+				return 2;
+			}
+		}
+		if (start === 'relaunch') {
+			console.log('…  Developer: Reload Window');
+			await command('Developer: Reload Window');
+		} else {
+			console.log(`…  File ▸ Open Recent → ${to}`);
+			await command('File: Open Recent...');
+			await typeInto('quick-input', to, true);
+		}
+	}
+
+	// Follow the window from its first moment, reconnecting as a reload drops the session
+	let probe = null;
+	let probeId = 0;
+	const probeWaiting = new Map();
+	const openProbe = async () => {
+		const page = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(candidate => candidate.type === 'page' && candidate.url.includes('workbench'));
+		if (!page) {
+			return null;
+		}
+		const socketToPage = new WebSocket(page.webSocketDebuggerUrl);
+		await new Promise((resolve, reject) => { socketToPage.addEventListener('open', resolve, { once: true }); socketToPage.addEventListener('error', reject, { once: true }); });
+		socketToPage.addEventListener('message', event => { const message = JSON.parse(event.data); probeWaiting.get(message.id)?.(message.result ?? null); probeWaiting.delete(message.id); });
+		return socketToPage;
+	};
+	const call = (method, params, timeout = 500) => new Promise(resolve => {
+		const id = ++probeId;
+		probeWaiting.set(id, resolve);
+		probe.send(JSON.stringify({ id, method, params }));
+		setTimeout(() => resolve(null), timeout);
+	});
+	const sample = async () => (await call('Runtime.evaluate', { returnByValue: true, expression: FRAME_SAMPLE }))?.result?.value ?? null;
+	const shoot = async name => {
+		if (!shots) {
+			return;
+		}
+		const size = (await call('Runtime.evaluate', { returnByValue: true, expression: '({ w: innerWidth, h: innerHeight, ratio: devicePixelRatio })' }))?.result?.value;
+		const shot = size ? await call('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: size.w, height: size.h, scale: 1 / size.ratio } }, 3000) : null;
+		if (shot?.data) {
+			writeFileSync(join(shots, `${start}${to ? `-${to}` : ''}-${name}.png`), Buffer.from(shot.data, 'base64'));
+		}
+	};
+
+	const timeline = [];
+	let first = null;
+	let releasedAt = null;
+	let releaseNote = extPort ? 'not let go' : 'not held';
+	let heldShot = false;
+	let lastChange = null;
+	let startedAt = null;
+	let settled = null;
+	const deadline = Date.now() + 120000;
+	while (Date.now() < deadline) {
+		if (!probe || probe.readyState !== WebSocket.OPEN) {
+			probe = await openProbe().catch(() => null);
+			if (!probe) {
+				await sleep(25);
+				continue;
+			}
+		}
+		const value = await sample().catch(() => null);
+		if (value && value.origin !== oldOrigin) {
+			if (!value.laidOut) {
+				await sleep(25);
+				continue;
+			}
+			const frame = JSON.stringify([value.boxes, value.front]);
+			if (!first) {
+				first = value;
+				lastChange = value.t;
+				await shoot('first');
+			} else if (frame !== JSON.stringify([timeline[timeline.length - 1].boxes, timeline[timeline.length - 1].front])) {
+				lastChange = value.t;
+			}
+			timeline.push(value);
+			// Let the held extension host go, once it is this instance's
+			if (extPort && releasedAt === null && value.t - first.t >= holdMs) {
+				const target = (await inspectors()).find(candidate => !before.has(candidate.id));
+				if (target) {
+					if (!ownedByInstance(target.inspectorPort)) {
+						console.error(`stopped: the inspector on ${target.inspectorPort} does not belong to the instance launched with ${userDataDir}`);
+						return 2;
+					}
+					if (!heldShot) {
+						await shoot('held');
+						heldShot = true;
+					}
+					const host = new WebSocket(target.webSocketDebuggerUrl);
+					await new Promise((resolve, reject) => { host.addEventListener('open', resolve, { once: true }); host.addEventListener('error', reject, { once: true }); });
+					await new Promise(resolve => { host.addEventListener('message', resolve, { once: true }); host.send(JSON.stringify({ id: 1, method: 'Runtime.runIfWaitingForDebugger' })); setTimeout(resolve, 1000); });
+					host.close();
+					releasedAt = value.t;
+					releaseNote = `let go at ${releasedAt} ms (its inspector on ${target.inspectorPort})`;
+				} else if (value.t - first.t >= holdMs + 30000) {
+					releaseNote = 'no held extension host came within 40 s';
+					releasedAt = value.t;
+				}
+			}
+			const sinceRelease = releasedAt === null ? (extPort ? -1 : value.t - first.t) : value.t - releasedAt;
+			// Settled: Ritemark started at least 5 s ago (the last move its start makes is the AI column's second call, 4 s
+			// after activation, extension.ts), and nothing has changed for 2 s
+			if (value.started && startedAt === null) {
+				startedAt = value.t;
+			}
+			if (sinceRelease >= 0 && startedAt !== null && value.t - startedAt >= 5000 && value.t - lastChange >= 2000) {
+				settled = value;
+				break;
+			}
+			if (sinceRelease >= 40000) {
+				settled = value;
+				settled.unsettled = true;
+				break;
+			}
+		}
+		await sleep(40);
+	}
+	const marks = probe?.readyState === WebSocket.OPEN ? (await call('Runtime.evaluate', { returnByValue: true, expression: `(() => { const keep = ${JSON.stringify(FIRST_FRAME_MARKS)}; return Object.fromEntries(performance.getEntriesByType('mark').filter(mark => keep.includes(mark.name)).map(mark => [mark.name.slice('code/'.length), Math.round(mark.startTime)])); })()` }, 1000))?.result?.value : null;
+	if (settled) {
+		await shoot('settled');
+	}
+	probe?.close();
+	socket?.close();
+	if (!first || !settled) {
+		check(`the first frame holds (${start})`, false, first ? 'the window never settled within 2 minutes' : 'no laid-out sample from the window');
+		return 1;
+	}
+
+	// What moved: every box of the first laid-out sample against the settled one, and when it first changed
+	const fromFirst = ms => `${ms >= first.t ? '+' : ''}${((ms - first.t) / 1000).toFixed(2)} s`;
+	const show = value => value ? `[${value.join(', ')}]` : 'not shown';
+	const moved = [];
+	for (const name of new Set([...Object.keys(first.boxes), ...Object.keys(settled.boxes)])) {
+		const a = first.boxes[name] ?? null;
+		const b = settled.boxes[name] ?? null;
+		if (JSON.stringify(a) === JSON.stringify(b)) {
+			continue;
+		}
+		const changedAt = timeline.find(entry => JSON.stringify(entry.boxes[name] ?? null) !== JSON.stringify(a))?.t ?? settled.t;
+		const delta = a && b ? ` (${['x', 'y', 'w', 'h'].map((axis, index) => b[index] - a[index] ? `${axis} ${b[index] - a[index] > 0 ? '+' : ''}${b[index] - a[index]}` : null).filter(Boolean).join(', ')})` : '';
+		moved.push(`${name}: ${a ? show(a) : 'came'} → ${b ? show(b) : 'went'}${delta} at ${changedAt} ms (${fromFirst(changedAt)})`);
+	}
+	const fronts = [];
+	for (const entry of timeline) {
+		const value = `${entry.front.desk} | ${entry.front.place}`;
+		if (fronts[fronts.length - 1]?.value !== value) {
+			fronts.push({ value, t: entry.t });
+		}
+	}
+	console.log(`…  ${start}${to ? ` → ${to}` : ''}: the first frame at ${first.t} ms on the page's clock (in front: ${fronts[0].value}); the extension host ${releaseNote}; Ritemark started by ${startedAt ?? '?'} ms; settled at ${settled.t} ms${settled.unsettled ? ' (still changing after 40 s)' : ''}; ${timeline.length} samples`);
+	console.log(`   the workbench's marks (ms): ${marks ? Object.entries(marks).map(([name, at]) => `${name} ${at}`).join(', ') : 'not read'}; the page started at ${localClock(first.origin)}`);
+	for (const line of moved) {
+		console.log(`   moved: ${line}`);
+	}
+	if (fronts.length > 1) {
+		console.log(`   in front (desk | left column): ${fronts.map(entry => `${entry.value} at ${entry.t} ms (${fromFirst(entry.t)})`).join(' → ')}`);
+	}
+	const ok = moved.length === 0 && fronts.length === 1;
+	check(`the first frame holds (${start})`, ok, ok ? `${Object.keys(first.boxes).length} boxes kept their place, and ${fronts[0].value} stayed in front` : `${moved.length} box${moved.length === 1 ? '' : 'es'} moved${fronts.length > 1 ? `; what is in front changed ${fronts.length - 1} time${fronts.length === 2 ? '' : 's'}` : ''}`);
+	console.log(JSON.stringify({ start, to: to ?? null, firstAt: first.t, releasedAt, settledAt: settled.t, marks, first: first.boxes, settled: settled.boxes, fronts, moved }));
+	return ok ? 0 : 1;
+}
+
+if (firstFrameStart !== undefined) {
+	process.exit(await firstFrame(firstFrameStart));
+}
+
 // ── The run ──
 
 await connect();
@@ -312,7 +683,6 @@ if (switchTo) {
 // extension answers), and whether the AI column is shown. Times are from the new page's own time origin.
 const measureRuns = Number(option('measure', '0'));
 /** The workbench's marks (`vs/base/common/performance`) printed with each switch: its restore of editors and of the AI column, and the extensions' start. */
-const localClock = ms => { const date = new Date(ms); return `${date.toTimeString().slice(0, 8)}.${String(date.getMilliseconds()).padStart(3, '0')}`; };
 const WORKBENCH_MARKS = ['code/didStartWorkbench', 'code/willRestoreEditors', 'code/didRestoreEditors', 'code/willLoadExtensions', 'code/didLoadExtensions', 'code/willRestoreAuxiliaryBar', 'code/didRestoreAuxiliaryBar'];
 if (switchTo && measureRuns > 0) {
 	const here = (await evaluate('document.title')).split(' — ').pop();
