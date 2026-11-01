@@ -328,7 +328,8 @@ function verdict(step, row, s) {
   if (s.open) return 'menu still open';
   // What is drawn, not Chromium's guess: with the input-mode tracker (PR 2) the trigger can match :focus-visible after a
   // mouse pick and draw nothing. Without it, a ring always changes the trigger's outline, shadow or border.
-  const drawn = s.onTrigger && row.restLook !== null && s.look !== row.restLook;
+  // With no look read at rest (the trigger wasn't there yet), Chromium's :focus-visible is the fallback.
+  const drawn = s.onTrigger && (row.restLook === null ? s.focusVisible : s.look !== row.restLook);
   // Escape after a mouse open is a keyboard close: the trigger has the focus, with its ring (S3)
   if (step.startsWith('mouse')) {
     if (drawn) return 'ring on the trigger';

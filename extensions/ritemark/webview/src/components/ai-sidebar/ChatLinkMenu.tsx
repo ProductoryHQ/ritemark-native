@@ -77,6 +77,7 @@ export function ChatLinkMenu({ request, onClose }: { request: ChatLinkMenuReques
         : null
       : chatLinkMenu({ kind: target.kind }, PLATFORM);
 
+  const leftOutsideRef = useRef(false);
   const close = () => {
     if (closedRef.current) return;
     closedRef.current = true;
@@ -92,11 +93,13 @@ export function ChatLinkMenu({ request, onClose }: { request: ChatLinkMenuReques
         align="start"
         sideOffset={2}
         aria-label="Link actions"
+        onInteractOutside={() => { leftOutsideRef.current = true; }}
         onCloseAutoFocus={(event) => {
-          // The link gets the focus back after every close; after a mouse pick it shows no ring, as the page's input
-          // mode decides (2.2, ui/input-mode.ts)
+          // The link gets the focus back after every close but a click outside, which has put the focus where the
+          // person wanted it (Radix's own rule, kept when the focus goes to the link); after a mouse pick it shows no
+          // ring, as the page's input mode decides (2.2, ui/input-mode.ts)
           event.preventDefault();
-          request.anchor.focus({ preventScroll: true });
+          if (!leftOutsideRef.current) request.anchor.focus({ preventScroll: true });
         }}
       >
         {items === null ? (

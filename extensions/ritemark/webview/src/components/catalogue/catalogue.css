@@ -9,6 +9,13 @@ body.rm-catalogue-page *::after {
   caret-color: transparent !important;
 }
 
+/* No scrollbars: a field's comes and goes with the pointer and the system's timing, and took a long Textarea's width
+   in one run and not the next. The page still scrolls. */
+body.rm-catalogue-page,
+body.rm-catalogue-page * {
+  scrollbar-width: none !important;
+}
+
 body.rm-catalogue-page {
   background: var(--r-surface);
 }

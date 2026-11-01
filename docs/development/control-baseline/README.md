@@ -4,7 +4,7 @@ The approved image of every state of every shared control (`extensions/ritemark/
 
 **The Experience lead approves each image once.** A PR that changes a control's look (`components/ui/`, `index.css`, a control's own classes) takes a new set of that control's images in the same PR, and the lead approves them again before the merge. A look the lead wants changed becomes its own issue; the baseline records the looks as they are.
 
-**Status:** the set taken in Sprint 146's PR 2 waits for the Experience lead's approval. Until the lead approves it, a run against it says whether anything moved since it was taken, not whether the look is right.
+**Status:** the set taken in Sprint 146's PR 2 (456 images: 228 states in each theme) waits for the Experience lead's approval. Until the lead approves it, a run against it says whether anything moved since it was taken, not whether the look is right.
 
 ## Run it
 
@@ -24,7 +24,7 @@ The approved image of every state of every shared control (`extensions/ritemark/
    node scripts/qa/control-states.mjs --port <port> --out <dir> --compare docs/development/control-baseline
    ```
    It switches the theme through the palette, draws every cell afresh, reaches each state with real input (`Input.dispatchMouseEvent`, `Input.dispatchKeyEvent`), captures it, and leaves the window in Ritemark Light. About ten minutes for both themes. `--only <row>` takes one control's row (`button`, `split-button`, `select`, …).
-3. Read the result: the exit code is 1 when any state differs from its image or has none, and 0 otherwise; the count is printed. `<dir>/compare.html` shows each differing state's approved image, capture and difference; `<dir>/sheet.html` lays all the captures out as the catalogue's grid.
+3. Read the result: the exit code is 1 when any state differs from its image or has none, and 0 otherwise; the count is printed. A state differs when more than 0.03% of its pixels move by more than 24 in their three channels (`--share`): enough for text's anti-aliasing when a row is added above, never enough to hide a ring or a radio's dot. `<dir>/compare.html` shows each differing state's approved image, capture and difference; `<dir>/sheet.html` lays all the captures out as the catalogue's grid.
 
 ## Take a new set
 

@@ -14,9 +14,10 @@ Run on 1 November 2026 on one hidden dev instance of `sprint-146-controls-catalo
 
 ## What the runs set
 
-- **The tolerance:** a pixel differs when its three channels move by more than 24 in all (as `frame-screenshots.mjs`); a state differs when more than 0.1% of its pixels do (`--share`, default `0.001`). Five runs moved no pixel at all, so 0.1% only absorbs a stray anti-aliased edge; a ring, a fill or a tooltip is far above it.
+- **The tolerance:** a pixel differs when its three channels move by more than 24 in all (as `frame-screenshots.mjs`), and a state differs when more than 0.03% of its pixels do (`--share`, default `0.0003`). Five runs of one build moved no pixel; a run with every row moved 37 px down moved up to 0.02% of a cell (text's anti-aliasing at another place on the screen), in 20 of 112 cells. The first build allowed 0.1%, and PR 2's first review showed why that was too loose: the context menu's radio dot, once fixed, is 0.06% of its cell and passed unseen. A 1 px ring is over 1%.
+- **The placement:** each cell is scrolled to 48 px below the page's top on whole pixels, clear of the desk's hairline over the webview's first row (a cell scrolled to the very top took that line in); a dialog is captured as its own box, since the blurred page round it changes with what the page shows behind.
 - **The waits:** 650 ms after the input before a capture (a tooltip's 300 ms delay and its first paint, a menu's mount). With motion and the caret off on the page, nothing moves after that.
-- **A cell's room:** a cell is its control plus the room its menu or tooltip needs, so the capture holds the whole state. Menus need up to 280 × 200, the context menu 340 × 330 (500 wide with its submenu), tooltips 112 high, with the control set in far enough for a tooltip centred on it.
+- **A cell's room:** a cell is its control plus the room its menu or tooltip needs, so the capture holds the whole state. Menus need up to 300 × 270 (the Select's whole list), the context menu 340 × 330 (500 wide with its submenu), tooltips 112 high, with the control set in far enough for a tooltip centred on it.
 
 ## What the images depend on (written into the baseline's README)
 

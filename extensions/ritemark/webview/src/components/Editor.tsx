@@ -1188,7 +1188,7 @@ export function Editor({
           background: rgba(255, 255, 255, 0.24) !important;
         }
 
-        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:focus-visible {
+        :where(:root:not([data-input-mode="pointer"])) .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:focus-visible {
           outline: none !important;
           box-shadow: 0 0 0 4px var(--r-ring-color, rgba(67, 56, 202, 0.1)) !important;
         }
@@ -1231,7 +1231,7 @@ export function Editor({
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:hover::after,
-        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:focus-visible::after {
+        :where(:root:not([data-input-mode="pointer"])) .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:focus-visible::after {
           opacity: 1 !important;
           transform: translateX(-50%) translateY(0) !important;
         }

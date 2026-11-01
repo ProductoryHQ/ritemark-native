@@ -4,7 +4,7 @@
  * (Sprint 146, R4; the review process's Step 8).
  *
  * Usage: node scripts/qa/control-states.mjs --port <cdp-port> --out <dir> [--compare docs/development/control-baseline]
- *          [--only <row>[,<row>…]] [--themes light,dark] [--size 1440x900] [--share 0.001]
+ *          [--only <row>[,<row>…]] [--themes light,dark] [--size 1440x900] [--share 0.0003]
  *
  * Connects over the Chrome DevTools Protocol to a Ritemark dev instance or an installed build (a release candidate)
  * started with RITEMARK_CONTROL_CATALOGUE=1 and --remote-debugging-port (launch it hidden: `open -n -g -j`, its own
@@ -50,9 +50,14 @@ mkdirSync(out, { recursive: true });
 // A pixel differs when its channels move by more than this in all; a state differs when more than this share of its
 // pixels do (A3: five runs of the same cells on one instance, research/catalogue-capture.md)
 const PIXEL_DELTA = 24;
-const STATE_SHARE = Number(option('share', '0.001')); // --share 0 lists every state with any pixel changed (A3's runs)
+const STATE_SHARE = Number(option('share', '0.0003')); // 0.03%: a 37 px shift of the page moved up to 0.02% (anti-aliasing), a radio's dot is 0.06%
+if (!Number.isFinite(STATE_SHARE) || STATE_SHARE < 0 || STATE_SHARE >= 1) {
+	console.error('--share takes a share of a state\'s pixels, from 0 up to 1 (0.0003 by default)');
+	process.exit(2);
+}
 const SETTLE_MS = 650; // a tooltip's 300 ms delay and its first paint, a menu's mount
 const THEME_LABEL = { light: 'Ritemark Light', dark: 'Ritemark Dark' };
+const THEME_ID = { light: 'ritemark-light', dark: 'ritemark-dark' };
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // ── CDP plumbing ──────────────────────────────────────────────────────────────
@@ -168,9 +173,12 @@ async function command(label) {
 	await pickRow(label);
 	await sleep(1200);
 }
+/** The theme the catalogue's page is drawn in now: VS Code marks a webview's body with its theme's id. */
+async function themeNow() {
+	return frame.read(`return d.body.dataset.vscodeThemeId || null;`);
+}
 async function theme(name) {
-	const dark = await page.evaluate(`document.querySelector('.monaco-workbench').classList.contains('vs-dark')`);
-	if (dark === (name === 'dark')) {
+	if ((await themeNow()) === THEME_ID[name]) {
 		return;
 	}
 	for (let attempt = 1; ; attempt++) {
@@ -180,6 +188,9 @@ async function theme(name) {
 		try {
 			await pickRow(THEME_LABEL[name]);
 			await sleep(2000);
+			if ((await themeNow()) !== THEME_ID[name]) {
+				throw new Error(`the catalogue is not in ${THEME_LABEL[name]}`);
+			}
 			return;
 		} catch (error) {
 			if (attempt === 2) {
@@ -295,8 +306,10 @@ async function reset(cell) {
 	await key('Escape');
 	await sleep(120);
 	await ensureShown();
-	// The page shows the cell (scrolling is no state: nothing in the cell is touched)
-	await frame.read(`d.querySelector('[data-cell=${JSON.stringify(cell.name)}]').scrollIntoView({ block: 'center' }); return true;`);
+	// The page shows the cell (scrolling is no state: nothing in the cell is touched). Its top 48 px below the page's top,
+	// clear of the desk's hairline over the webview's first row: the catalogue lays out in whole pixels, so every cell
+	// lands on whole device pixels wherever the rows above it end, and a row added above moves no cell's anti-aliasing
+	await frame.read(`const box = d.querySelector('[data-cell=${JSON.stringify(cell.name)}]'); const view = d.defaultView; view.scrollTo(0, Math.max(0, Math.round(box.getBoundingClientRect().top + view.scrollY) - 48)); return true;`);
 	await sleep(150);
 	const origin = await frameOrigin();
 	const box = await rectOf(cell, 'box');
@@ -417,7 +430,8 @@ async function capture(cell, file) {
 	if (!r) {
 		throw new Error(`${cell.name}: nothing to capture`);
 	}
-	const pad = cell.capture === 'dialog' ? 16 : 0;
+	// The dialog's own box: round it, the blurred page under the scrim changes with whatever the page shows behind it
+	const pad = 0;
 	const { data } = await page.send('Page.captureScreenshot', { format: 'png', clip: { x: r.x - pad, y: r.y - pad, width: r.w + pad * 2, height: r.h + pad * 2, scale: 1 } });
 	writeFileSync(join(out, file), Buffer.from(data, 'base64'));
 }
@@ -436,17 +450,20 @@ for (const name of themes) {
 	for (const cell of cells) {
 		const file = `${name}-${cell.name}.png`;
 		rmSync(join(out, file), { force: true }); // a capture left by an earlier run never stands in for this one
+		let after = null;
 		try {
 			await reset(cell);
-			const after = await reach(cell);
+			after = await reach(cell);
 			await sleep(SETTLE_MS);
 			await capture(cell, file);
-			if (after) {
-				await after();
-			}
 		} catch (error) {
 			failures.push(`${file}: ${error.message}`);
 			console.log(`FAILED   ${file}: ${error.message}`);
+		} finally {
+			// A held press is released whatever happened, so it never carries into the next cell
+			if (after) {
+				await after().catch(() => {});
+			}
 		}
 	}
 	console.log(`captured ${cells.length} cells in ${THEME_LABEL[name]}`);
