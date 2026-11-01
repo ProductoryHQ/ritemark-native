@@ -94,6 +94,7 @@ The five items, in the shape's order:
 | 145, PR 5 | `sprint-145-loose-ends-shell` | [#622](https://github.com/ProductoryHQ/ritemark-native/pull/622) | #569, #501, #582 | Draft. Shell-tier, High: in review | Mac: `project-check.mjs --measure 10` before and after, the S47 traces with the extension host held, fresh launches' `main.log`, the frame check; Windows at Gate 2 | In the draft |
 | 145, PR 6 | `sprint-145-loose-ends-electron` | [#620](https://github.com/ProductoryHQ/ritemark-native/pull/620) | #515 | Merged 1 Nov (d97799e3). Shell-tier, High: 3 rounds; `/security-review` clean; Codex no findings | Mac: a dev-instance launch, About, the browser; the signed candidate's launch, built-in extensions in exthost.log, and Windows at Gate 1/Gate 2 | In the draft |
 | 146 | `sprint-146-controls` (plan on `plan/v2.2.0-sprint-146`) | Plan: [#603](https://github.com/ProductoryHQ/ritemark-native/pull/603) | #585, #576, #566, #567, #568, #594, #598 | Plan approved 1 Nov; PR 1 (#585 carried over) and PR 2 under way | — | — |
+| Plan: 152 and the startup contract's proposal | `plan/sprint-152-startup-contract` | [#626](https://github.com/ProductoryHQ/ritemark-native/pull/626) | #624 | Draft (Light); the plan is Proposed, waiting for Jarmo | n/a | n/a |
 
 ## Risks and Blockers
 
