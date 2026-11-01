@@ -162,8 +162,13 @@ Acceptance criteria (the Experience lead's answer 5, 1 November):
   AI's own name), tooltip "Check again whether Claude is ready"; before the view has read which AI, "The AI is taking
   longer than usual to start.", tooltip "Start the AI again". Try again takes the line away, keeps the mark and starts
   the 10 s over. This replaces the 8 s card ("Agent Chat could not start") and the 15 s card ("Still checking Claude").
-- **A start that fails** (`agent:bootstrap-error`) is a settled look of its own: "The AI couldn't start", one sentence on
-  what to do, and Try again; its words go to the lead with the screenshots.
+- **A start that fails** (`agent:bootstrap-error`) is a settled look of its own: "The AI couldn't start", "Try again. If
+  it keeps happening, restart Ritemark.", and a filled Try again, on one of the column's cards (the column's edges,
+  radius 12, no shadow; the Experience lead's check of #632).
+- **A chat opened on a conversation while its AI's check hangs** (the review round's finding 1): after the same 10 s,
+  "Still checking whether Claude is ready." and "You can write your message now and send it when Claude is ready." on
+  a notice inside the sheet directly above the box, the mark in ink on the quiet chip, with a ghost Try again. The sheet
+  and the rail don't move.
 - Extension-tier: the webview and the host only, no new message type and no new field (A4: the statuses can't ride on
   the bootstrap, which is local by rule).
 

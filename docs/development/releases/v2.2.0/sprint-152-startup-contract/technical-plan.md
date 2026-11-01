@@ -121,8 +121,12 @@ release stays: every measured start is well inside it, and it is VS Code's own l
   decides when the look is certain (the bootstrap; the chosen AI's answer; then the other AIs, a conversation on its
   way and the onboarding status, awaited 2 s at most); `sidebarGate.ts` now derives its own inputs (`sidebarGateInput`),
   so the view and the tests share them; `StartingLook.tsx` draws the 10 s line and the failure. A chat that is the
-  settled look at once (a conversation was open) while its AI's check hangs gets the same words after the same 10 s on
-  `RuntimeNotice`, with Try again: the 15 s card's job, so a hung check always has a way to check again. The AI view's lazy
+  settled look at once (a conversation was open) while its AI's check hangs gets, after the same 10 s, "Still checking
+  whether Claude is ready." and "You can write your message now and send it when Claude is ready." on `RuntimeNotice`'s
+  new `checking` tone (the kit's mark in ink on the quiet chip, `role="status"`), inside the sheet directly above the box
+  (`ChatInput`'s `notice`, under the AI disclosure), with a ghost Try again: the 15 s card's job, so a hung check always
+  has a way to check again. Only the conversation gets shorter at its foot; one kept at its end keeps its last message in
+  sight (`UnifiedConversationView`). The Experience lead's check of #632 set both cards' words and looks. The AI view's lazy
   load has no "Loading..." fallback. No message type and no field: the statuses can't ride on the bootstrap (A4).
 
 ## Workstream 3: the AI column at start (R6, PR 1)

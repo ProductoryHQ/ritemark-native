@@ -13,11 +13,14 @@ scratch profiles and AI homes, signed in to nothing.
 | R5 | The AI column traced in the running app (A4's tracer), not signed in, Claude chosen | First window: ground, the view's empty frame, "Preparing Agent Chat…", the empty chat, "Sign in with Claude.ai…", "Almost there!" at 2.5 s. Held start: the shell's mark, then 0.33 s of bare ground, then the card | First window: ground, the view's ground while its mark waits for its second, its mark at 1.13 s, "Almost there!" at 2.66 s. Reload: the same, "Almost there!" at 2.25 s. Held start: the shell's mark from 1.25 s, the view's mark at 11.15 s with the shell's still under it (no bare ground), "Almost there!" at 12.97 s |
 | R5 | The two marks' places | — | Both centred at (1244, 456) in workbench pixels: the shell's in its pane `[1048, 44, 392, 824]`, the view's at (196, 412) in its window, whose frame is that same box |
 | R5 | `aiStartingMark.test.ts`: the column's first frame, the mark's wait and turn, the ring's values | No such mark in the view | The view's mark waits the rest of the second, or shows at once turned to where the shell's is; the same ring and words as patch 018's |
+| R5 | A chat opened on a conversation while its AI's check hangs: the sheet's and rail's top edges and the conversation's foot, read in the running view before the notice and at it (10 s) | No notice: the 15 s card drew on the ground above the sheet, pushing the sheet and rail down about 120 px | Light and Dark alike: the sheet's top 0 → 0 px, the rail's top 0 → 0 px; the conversation's foot 610.8 → 477.9 px; the notice from 579.9 to 704.8 px, inside the sheet under the AI disclosure, directly above the box |
 | R6 | `project-check.mjs --first-frame relaunch --ai-closed` | 5 of 5: the AI column the person closed opens at Ritemark's start (+11.0–11.2 s), the desk 400 narrower | The AI column stays closed (no AI column move); the start still fails on the shell's moves (a stored place at +0.24 s, the terminal tab's name at +2.36 s), which PR 2 removes |
 
 Screenshots of the AI column's start on the branch, not signed in, Light and Dark: `qa/r5-light-*.png`, `qa/r5-dark-*.png`
 (the view's mark; the 10 s line before and after the view has read which AI, held there by pausing the extension host
 over its inspector; "Almost there!"; the failure, from an `agent:bootstrap-error` delivered to the view as the host
-sends it). Signed in: not run (no signed-in AI in a scratch home).
+sends it; the restored chat's notice, its conversation delivered as the host's `conversation/get` answer carries it).
+The failure card and the notice were retaken after the Experience lead's check of #632. Signed in: not run (no
+signed-in AI in a scratch home).
 
 Tests: the extension's `npm test` (with the two new files), the webview's `tsc --noEmit`, the extension's `tsc --noEmit`.
