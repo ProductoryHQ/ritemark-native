@@ -18,7 +18,7 @@ import {
 } from './protocol';
 import { DocumentDeliverySchedule } from './delivery';
 import { readRitemarkSavedLogicalHash } from './saveReceipt';
-import { findBase, mergeBlocks, replaceBlocks, sameBlocks, splitBlocks, trackRange, type BlockConflict, type BlockKind } from './merge';
+import { alignBlocks, findBase, mergeBlocks, replaceBlocks, sameBlocks, splitBlocks, trackRange, type BlockConflict, type BlockKind } from './merge';
 import {
   canCompleteViewResolution,
   canonicalJson,
@@ -95,9 +95,8 @@ type EditMessage = Extract<DocumentViewMessage, { type: 'document:edit' }>;
 type ConflictActionMessage = Extract<DocumentViewMessage, { type: 'document:conflict-action' }>;
 type ParagraphActionMessage = Extract<DocumentViewMessage, { type: 'document:paragraph-action' }>;
 
-/** What to do with a writer's copy (#588): take it, merge it with the person's text, or hold it and ask. */
 /**
- * What to do with a writer's copy. `import`: the person changed nothing the copy doesn't have (take it as written).
+ * What to do with a writer's copy (#588). `import`: the person changed nothing the copy doesn't have (take it as written).
  * `merge`: both changed. Without a base (or for a copy that is exactly an earlier version): `hold` when it leaves out
  * words saved within the window, `no-base` otherwise (a clean document takes it, as 2.1 did; unsaved text gets #454's
  * question).
@@ -171,6 +170,8 @@ interface ViewLease {
    * acknowledged. An edit from a view that hasn't caught up with the document is put on top of it, not over it.
    */
   ownText?: string;
+  /** The logical hash of `ownText`, kept with it (no hashing per keystroke). */
+  ownHash?: string;
 }
 
 interface DocumentRecord {
@@ -189,9 +190,11 @@ interface DocumentRecord {
   conflictSequence: number;
   localSaveSequence: number;
   pendingLocalSaveReceipts: LocalSaveReceipt[];
-  /** #588: the document's recent texts, newest last, taken in the change event. */
-  /** #588: the document's recent texts, each with whether the document was dirty (a local edit) when it held it. */
-  recentTexts: Array<{ text: string; dirty: boolean }>;
+  /**
+   * #588: the document's recent texts, newest last, taken in the change event, each with its version and whether
+   * the document was dirty (a local edit) when it held it.
+   */
+  recentTexts: Array<{ text: string; version: number; dirty: boolean }>;
   /** #588: Ritemark's own recent saves of the document, newest last. */
   recentSaves: RememberedSave[];
   /** #588: the text Ritemark last knew to be on disk: its last save, or what it last read or imported. */
@@ -210,6 +213,11 @@ interface DocumentRecord {
   /** The document's logical text the paragraphs' places refer to. */
   paragraphsText?: string;
   paragraphSequence: number;
+  /**
+   * #588 (revised): the revision of the latest writer's change the views were sent (a merge, an import, Use the
+   * other copy); a view's edit made before it is put on top of it.
+   */
+  lastWriterRevision?: number;
   /** The paragraph sequence Ritemark's notification last named, so one merge asks once. */
   notifiedParagraphs?: number;
   views: Map<string, ViewLease>;
@@ -413,6 +421,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     view.applyError = false;
     view.acknowledgedRevision = revision;
     view.ownText = pending.text;
+    view.ownHash = pending.message.modelHash;
     if (!this.maybeCompleteResolution(record)) this.sendState(record, view);
     this.logDelivery(record, view, 'ack', revision, undefined, elapsed);
   }
@@ -434,23 +443,24 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     // #588 (revised): the document moved on since this view last showed it (a writer's copy merged in while the
     // person typed, or another view's edit): put this view's change on top of the document instead of over it.
     // The person's blocks win where both changed. The view shows its own text until it applies the result.
+    // Only an edit the view made before a writer's change it hasn't shown yet: any other stale edit (another view,
+    // a text editor of the same file) keeps 2.1's handling below, and an open whole-document question freezes it.
     const viewText = fullContent;
     const own = source.ownText;
+    const ownHash = source.ownHash;
     let rebased = false;
     let rebaseConflicts: BlockConflict[] = [];
-    if (own !== undefined) {
+    const behindAWriter = record.lastWriterRevision !== undefined && message.basedOnRevision < record.lastWriterRevision;
+    const questionOpen = !!record.conflict && record.resolutionRevision === undefined;
+    if (own !== undefined && ownHash !== undefined && behindAWriter && !questionOpen
+      && ownHash !== record.modelHash && nextHash !== record.modelHash && ownHash !== nextHash) {
       const current = record.document.getText();
-      // Compared as strings first: typing with nothing in between costs no hashing.
-      if (own !== current && fullContent !== current && own !== fullContent) {
-        const ownHash = logicalHash(own);
-        const currentHash = logicalHash(current);
-        if (ownHash !== currentHash && nextHash !== currentHash && ownHash !== nextHash) {
-          const result = mergeBlocks(own, fullContent, current, this.blockKind(record.document), current.includes('\r\n') ? '\r\n' : '\n');
-          rebaseConflicts = result.conflicts;
-          fullContent = result.text;
-          nextHash = logicalHash(fullContent);
-          rebased = true;
-        }
+      if (logicalHash(current) === record.modelHash) {
+        const result = mergeBlocks(own, fullContent, current, this.blockKind(record.document), this.eolOf(record.document));
+        rebaseConflicts = result.conflicts;
+        fullContent = result.text;
+        nextHash = logicalHash(fullContent);
+        rebased = true;
       }
     }
     if (!rebased && message.basedOnRevision !== record.revision) {
@@ -497,6 +507,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     const payloadHash = payloadHashFor(this.adapter.buildPayload(record.document, source.webview));
     // The view's own text, once the document took its edit: a rebase of a later edit starts from it.
     source.ownText = viewText;
+    source.ownHash = rebased ? logicalHash(viewText) : nextHash;
     this.sendEditResult(record, source, message.clientSequence, 'accepted', undefined, payloadHash);
     if (record.conflict) {
       for (const target of record.views.values()) this.sendConflict(record, target);
@@ -529,6 +540,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     if (disposition === 'already-current') {
       record.modelHash = modelHash;
       source.ownText = viewText;
+      source.ownHash = nextHash;
       const payloadHash = payloadHashFor(this.adapter.buildPayload(record.document, source.webview));
       this.sendEditResult(record, source, clientSequence, 'accepted', undefined, payloadHash);
       await this.sendCurrent(record, source, 'peer-edit');
@@ -570,6 +582,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     record.modelHash = logicalHash(record.document.getText());
     record.revision += 1;
     source.ownText = viewText;
+    source.ownHash = nextHash;
     record.conflictSequence += 1;
     record.conflict = {
       revision: record.conflictSequence,
@@ -725,10 +738,9 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       : typeof uriArgument === 'string' ? uriArgument : undefined;
     const record = uri ? this.records.get(uri) : undefined;
     if (!record || record.disposed || !this.isDiskBacked(record.document)) return false;
-    let late = false;
-    const answer = this.enqueueResult(record, false, async (): Promise<SaveConflictAnswer> => {
+    return this.answerWithin<SaveConflictAnswer>(record, false, ANSWER_SAVE_CONFLICT_BUDGET_MS, async isLate => {
       const disk = await this.readDisk(record.document);
-      if (!disk || late) return false;
+      if (!disk || isLate()) return false;
       const decision = classifyRefusedSave({
         baseDiskLogicalHash: record.baseDiskLogicalHash,
         diskLogicalHash: disk.logicalHash,
@@ -744,22 +756,21 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       }
       // R10: a real conflict. Ritemark's Review changes is the one question.
       await this.reconcile(record, 'refused-save');
-      if (!record.conflict || late) return false;
+      if (isLate()) return false;
+      if (!record.conflict) {
+        // #588 (revised): the reconcile merged the writer's copy into the unsaved text (S3), and the copy is now
+        // the base: the disk still holding it, the merge may be saved over it, with no question.
+        const after = await this.readDisk(record.document);
+        if (!isLate() && after && after.logicalHash === record.baseDiskLogicalHash
+          && logicalHash(record.document.getText()) !== after.logicalHash) {
+          this.log(record, 'refused-save:merged');
+          return 'overwrite';
+        }
+        return false;
+      }
       this.notifyHiddenConflict(record);
       return 'handled';
     });
-    let budget: NodeJS.Timeout | undefined;
-    const outOfTime = new Promise<SaveConflictAnswer>(resolve => {
-      budget = setTimeout(() => {
-        late = true;
-        resolve(false);
-      }, ANSWER_SAVE_CONFLICT_BUDGET_MS);
-    });
-    try {
-      return await Promise.race([answer, outOfTime]);
-    } finally {
-      clearTimeout(budget);
-    }
   }
 
   /**
@@ -844,6 +855,9 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       record.baseDiskHash = disk.validator;
       record.baseDiskLogicalHash = disk.logicalHash;
       record.baseModelHash = disk.logicalHash;
+      // The file holds the person's save: a base for a writer's copy made from it, even when the receipt's text
+      // wasn't in the memory.
+      if (!record.guardOff) record.lastKnownDiskText = disk.content;
       record.conflict = undefined;
       record.resolutionRevision = undefined;
       record.state = localSaveObservation.state;
@@ -915,6 +929,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       }
       record.modelHash = logicalHash(record.document.getText());
       record.revision += 1;
+      record.lastWriterRevision = record.revision;
       this.setBase(record, disk, record.modelHash);
       record.conflict = undefined;
       record.resolutionRevision = undefined;
@@ -922,8 +937,10 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       await this.broadcast(record, 'external');
     } else if (classification === 'converged') {
       const changed = modelHash !== record.modelHash;
+      const fromAWriter = changed && !this.wasLocalEdit(record, modelHash);
       record.modelHash = modelHash;
       if (changed) record.revision += 1;
+      if (fromAWriter) record.lastWriterRevision = record.revision;
       // #588: VS Code says a saved document is clean before it fires the save with its receipt, so this
       // branch can see Ritemark's own save first. Keep what was on disk before, for that save's receipt.
       const before = { hash: disk.logicalHash, previousText: record.lastKnownDiskText };
@@ -1161,17 +1178,22 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
   /** #588: keep the document's text as it is now, so a later save receipt can find the text it saved. */
   private rememberModelText(record: DocumentRecord): void {
     if (record.guardOff || record.disposed) return;
+    const last = record.recentTexts[record.recentTexts.length - 1];
+    if (last && last.version === record.document.version) {
+      last.dirty ||= record.document.isDirty;
+      return;
+    }
     const text = record.document.getText();
     if (text.length > STALE_WRITE_GUARD_MAX_CHARS) {
       this.turnGuardOff(record, text.length);
       return;
     }
-    const last = record.recentTexts[record.recentTexts.length - 1];
-    if (last && last.text === text) {
+    // The same version is the same text: no compare of the whole text on every keystroke.
+    if (last && last.version === record.document.version) {
       last.dirty ||= record.document.isDirty;
       return;
     }
-    record.recentTexts.push({ text, dirty: record.document.isDirty });
+    record.recentTexts.push({ text, version: record.document.version, dirty: record.document.isDirty });
     if (record.recentTexts.length > RECENT_MODEL_TEXTS) record.recentTexts.splice(0, record.recentTexts.length - RECENT_MODEL_TEXTS);
   }
 
@@ -1251,16 +1273,6 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     return record.recentTexts.some(state => state.dirty && logicalHash(state.text) === textLogicalHash);
   }
 
-  /** #588: how many words that Ritemark's recent saves added the file now leaves out (0 when none). */
-  private wordsLostToStaleWrite(record: DocumentRecord, disk: DiskSnapshot): number {
-    if (record.guardOff || record.recentSaves.length === 0) return 0;
-    return droppedRecentSave({
-      saves: record.recentSaves,
-      diskText: disk.content,
-      now: Date.now(),
-      windowMs: STALE_WRITE_WINDOW_MS,
-    });
-  }
 
   /**
    * #588: a writer's copy left out words Ritemark had just saved. Put back the text the person's views show
@@ -1311,6 +1323,11 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     this.log(record, `${reason}:held-import words=${lost}`);
   }
 
+  /** #588 (revised): the document's line endings, which a merge keeps. */
+  private eolOf(document: vscode.TextDocument): '\n' | '\r\n' {
+    return document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
+  }
+
   /** #588 (revised): Markdown blocks, or CSV rows. */
   private blockKind(document: vscode.TextDocument): BlockKind {
     return path.extname(document.uri.fsPath).toLowerCase() === '.csv' ? 'csv' : 'markdown';
@@ -1341,14 +1358,15 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     if (record.guardOff) return { action: 'no-base' };
     const kind = this.blockKind(record.document);
     const candidates = this.baseCandidates(record);
-    const index = findBase(candidates, theirs, kind);
-    const anEarlierVersion = index >= 0 && logicalHash(candidates[index]) === logicalHash(theirs);
-    if (index >= 0 && !anEarlierVersion) {
+    const theirHash = logicalHash(theirs);
+    const anEarlierVersion = candidates.some(candidate => logicalHash(candidate) === theirHash);
+    const index = anEarlierVersion ? -1 : findBase(candidates, theirs, kind);
+    if (index >= 0) {
       const base = candidates[index];
       // The person changed nothing since the base, or nothing the copy doesn't have: the copy as written (its
       // blank lines and final newline too, so Ritemark doesn't write over the writer's file).
       if (logicalHash(mine) === logicalHash(base)) return { action: 'import' };
-      const result = mergeBlocks(base, mine, theirs, kind, theirs.includes('\r\n') ? '\r\n' : '\n');
+      const result = mergeBlocks(base, mine, theirs, kind, this.eolOf(record.document));
       if (result.conflicts.length === 0 && sameBlocks(result.text, theirs, kind)) return { action: 'import' };
       return { action: 'merge', text: result.text, conflicts: result.conflicts, taken: result.takenFromTheirs };
     }
@@ -1367,14 +1385,23 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     const record = uri ? this.records.get(uri) : undefined;
     if (!record || record.disposed || typeof diskTextArgument !== 'string' || !this.isDiskBacked(record.document)) return undefined;
     const theirs = diskTextArgument;
+    return this.answerWithin<string | undefined>(record, undefined, ANSWER_RELOAD_BUDGET_MS, isLate => this.answerReloadNow(record, theirs, isLate));
+  }
+
+  /**
+   * The shell waits a little longer than `budgetMs` for an answer, then decides by itself: `task` runs on the
+   * record's queue, and after the budget its answer is `fallback` (it can ask `isLate()` after each await).
+   */
+  private async answerWithin<T>(record: DocumentRecord, fallback: T, budgetMs: number, task: (isLate: () => boolean) => Promise<T>): Promise<T> {
     let late = false;
-    const answer = this.enqueueResult<string | undefined>(record, undefined, async () => (late ? undefined : this.answerReloadNow(record, theirs, () => late)));
+    const isLate = () => late;
+    const answer = this.enqueueResult<T>(record, fallback, async () => (late ? fallback : task(isLate)));
     let budget: NodeJS.Timeout | undefined;
-    const outOfTime = new Promise<undefined>(resolve => {
+    const outOfTime = new Promise<T>(resolve => {
       budget = setTimeout(() => {
         late = true;
-        resolve(undefined);
-      }, ANSWER_RELOAD_BUDGET_MS);
+        resolve(fallback);
+      }, budgetMs);
     });
     try {
       return await Promise.race([answer, outOfTime]);
@@ -1476,6 +1503,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     record.resolutionRevision = undefined;
     record.state = modelHash === disk.logicalHash ? 'synced' : 'local-only';
     record.revision += 1;
+    record.lastWriterRevision = record.revision;
     await this.broadcast(record, 'merge');
     this.sendAllStates(record);
     this.sendParagraphs(record);
@@ -1514,10 +1542,11 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     const joiner = kind === 'csv' ? '\n' : '\n\n';
     const now = splitBlocks(text, kind).blocks;
     const then = before === undefined ? now : splitBlocks(before, kind).blocks;
+    const match = before === undefined ? [] : alignBlocks(then, now);
     const next: ParagraphItem[] = [];
     let changed = false;
     for (const item of record.paragraphs) {
-      const place = before === undefined ? { at: item.at, length: item.length } : trackRange(then, now, item.at, item.length);
+      const place = before === undefined ? { at: item.at, length: item.length } : trackRange(then, now, item.at, item.length, match);
       const mine = now.slice(place.at, place.at + place.length).join(joiner);
       if (sameBlocks(mine, item.theirs, kind) && (mine.trim() !== '' || item.theirs.trim() === '')) {
         changed = true;
@@ -1587,7 +1616,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       const current = record.document.getText();
       // The writer's blocks in place of the person's, by block: nothing else in the document changes.
       const next = replaceBlocks(normalizeLogicalText(current), this.blockKind(record.document), item.at, item.length, item.theirs);
-      const eol = record.document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
+      const eol = this.eolOf(record.document);
       const applied = await this.applyText(record.document, eol === '\n' ? next : next.replace(/\n/g, '\r\n'), {
         version: record.document.version,
         logicalHash: logicalHash(current),
@@ -1602,6 +1631,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       this.trackParagraphs(record);
       record.modelHash = logicalHash(record.document.getText());
       record.revision += 1;
+      record.lastWriterRevision = record.revision;
       await this.broadcast(record, 'merge');
       this.sendAllStates(record);
     } else {

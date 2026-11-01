@@ -64,12 +64,20 @@ test('adjacent rewrites by different sides are both taken', () => {
   assert.deepEqual(result.conflicts, []);
 });
 
-test('inserts at one place from both sides are both kept, the person\'s first; deletions from either side land', () => {
+test('inserts at one place from both sides are one place both changed (the same insert once); deletions land', () => {
   const mine = '# Title\n\nMine inserted.\n\nThe second line.\n\nThe third line. Alpha.\n';
   const theirs = '# Title\n\nTheirs inserted.\n\nThe second line.\n';
   const result = mergeBlocks(BASE, mine, theirs, 'markdown');
-  assert.equal(result.text, '# Title\n\nMine inserted.\n\nTheirs inserted.\n\nThe second line.\n');
-  assert.deepEqual(result.conflicts, []);
+  assert.equal(result.text, '# Title\n\nMine inserted.\n\nThe second line.\n');
+  assert.deepEqual(result.conflicts, [{ mine: 'Mine inserted.', theirs: 'Theirs inserted.', at: 1, length: 1 }]);
+  // Review round 2 (#605): the same insert on both sides is taken once.
+  const same = mergeBlocks('A\n\nB\n', 'A\n\nX\n\nB\n', 'A\n\nX\n\nB\n', 'markdown');
+  assert.equal(same.text, 'A\n\nX\n\nB\n');
+  assert.deepEqual(same.conflicts, []);
+  // A paragraph the person added and the writer rewrote, merged on an older base, is one place, never two copies.
+  const rewritten = mergeBlocks('# T\n\nOne.\n', '# T\n\nOne.\n\nA new paragraph.\n', '# T\n\nOne.\n\nQuite another one.\n', 'markdown');
+  assert.equal(rewritten.text, '# T\n\nOne.\n\nA new paragraph.\n');
+  assert.deepEqual(rewritten.conflicts, [{ mine: 'A new paragraph.', theirs: 'Quite another one.', at: 2, length: 1 }]);
 });
 
 test('the same change on both sides is taken once; a block the person changed and the writer deleted is a conflict', () => {
@@ -151,4 +159,18 @@ test('a place both changed is followed through later edits, and replaced by bloc
   assert.equal(replaceBlocks(text, 'markdown', 4, 0, 'Theirs.'), '# T\n\n```\na\n\n\nb\n```\n\nMine.\n\nLast.\n\nTheirs.\n', 'added at the end');
   assert.equal(replaceBlocks(text, 'markdown', 2, 0, 'Theirs.'), '# T\n\n```\na\n\n\nb\n```\n\nTheirs.\n\nMine.\n\nLast.\n', 'put back where the person removed it');
   assert.equal(replaceBlocks('a,b\n1,2\n3,4', 'csv', 1, 1, '1,9'), 'a,b\n1,9\n3,4');
+});
+
+// Review round 2 (#605).
+test('CSV: the final newline ends the last row, and a merge keeps the person\'s', () => {
+  assert.deepEqual(splitBlocks('h\n1\n', 'csv'), { blocks: ['h', '1'], separators: ['\n', '\n'] });
+  assert.equal(join('a\n\nb\n', 'csv'), 'a\n\nb\n');
+  assert.equal(join('h\n1', 'csv'), 'h\n1');
+  assert.equal(mergeBlocks('h\n1\n', 'h\n1\n2\n', 'h\n1x', 'csv').text, 'h\n1x\n2\n');
+});
+
+test('a removed place takes the blocks typed into it since, so typing the writer\'s version settles it', () => {
+  assert.deepEqual(trackRange(['# T', 'A', 'C'], ['# T', 'A', 'B2', 'C'], 2, 0), { at: 2, length: 1 });
+  assert.deepEqual(trackRange(['# T', 'A', 'C'], ['# T', 'A', 'C'], 2, 0), { at: 2, length: 0 });
+  assert.deepEqual(trackRange(['# T', 'Second.'], ['# T', 'Second, typed on.'], 2, 0), { at: 2, length: 0 }, 'a changed neighbour is not typed into the place');
 });

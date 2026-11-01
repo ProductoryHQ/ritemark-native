@@ -29,9 +29,12 @@ export function splitBlocks(text: string, kind: BlockKind): Blocks {
   if (source.length === 0) return { blocks, separators };
   if (kind === 'csv') {
     const rows = source.split('\n');
+    // A final newline ends the last row; it is not an empty row of its own.
+    const ends = rows.length > 1 && rows[rows.length - 1] === '';
+    if (ends) rows.pop();
     rows.forEach((row, index) => {
       blocks.push(row);
-      separators.push(index < rows.length - 1 ? '\n' : '');
+      separators.push(index < rows.length - 1 || ends ? '\n' : '');
     });
     return { blocks, separators };
   }
@@ -204,45 +207,54 @@ export function sameBlocks(a: string, b: string, kind: BlockKind): boolean {
   return left.length === right.length && left.every((block, index) => block === right[index]);
 }
 
+/** The alignment of two block lists, for `trackRange` (one per change, shared by every place). */
+export function alignBlocks(before: readonly string[], after: readonly string[]): number[] {
+  return alignment(before, after);
+}
+
 /**
- * Where a run of blocks went when the text changed: the same blocks if they are all still there in a row; for an
- * empty run (a block the person removed), the place beside a neighbour that is still there; otherwise what now lies
- * between the blocks kept on each side (the person rewrote it), or, when a neighbour changed too, the run of as
- * many blocks there that is most like the old one.
+ * Where a run of blocks went when the text changed (`match` from `alignBlocks(before, after)`): the same blocks if
+ * they are all still there in a row; otherwise what now lies between the blocks kept on each side, less the
+ * neighbours that were there before and changed too (for an empty run, a block the person removed, that is what
+ * was typed into its place since); when the count can't tell, the run most like the old one.
  */
-export function trackRange(before: readonly string[], after: readonly string[], at: number, length: number): { at: number; length: number } {
-  const match = alignment(before, after);
-  const nextKept = (from: number) => {
-    for (let index = from; index < before.length; index += 1) if (match[index] >= 0) return match[index];
-    return after.length;
-  };
-  if (length === 0) {
-    if (at > 0 && match[at - 1] >= 0) return { at: match[at - 1] + 1, length: 0 };
-    return { at: nextKept(at), length: 0 };
-  }
+export function trackRange(before: readonly string[], after: readonly string[], at: number, length: number, match: readonly number[] = alignment(before, after)): { at: number; length: number } {
   const own = match.slice(at, at + length);
-  if (own.every((index, offset) => index >= 0 && index === own[0] + offset)) return { at: own[0], length };
-  let previous = -1;
+  if (length > 0 && own.every((index, offset) => index >= 0 && index === own[0] + offset)) return { at: own[0], length };
+  let previousOld = -1;
   for (let index = Math.min(at, before.length) - 1; index >= 0; index -= 1) {
-    if (match[index] >= 0) { previous = match[index]; break; }
+    if (match[index] >= 0) { previousOld = index; break; }
   }
-  const first = previous + 1;
-  const region = Math.max(0, nextKept(at + length) - first);
-  if (region <= length) return { at: first, length: region };
+  let nextOld = before.length;
+  for (let index = at + length; index < before.length; index += 1) {
+    if (match[index] >= 0) { nextOld = index; break; }
+  }
+  const first = previousOld >= 0 ? match[previousOld] + 1 : 0;
+  const last = nextOld < before.length ? match[nextOld] : after.length;
+  const region = Math.max(0, last - first);
+  // The changed neighbours on each side, one for one where the counts allow.
+  const left = at - (previousOld + 1);
+  const right = nextOld - (at + length);
+  if (region >= left + right) {
+    const placeAt = first + left;
+    return { at: placeAt, length: region - left - right };
+  }
+  if (length === 0) return { at: Math.min(first + left, last), length: 0 };
   const wanted = new Map<string, number>();
   for (const word of wordsOf(before.slice(at, at + length))) wanted.set(word, (wanted.get(word) ?? 0) + 1);
+  const size = Math.min(length, region);
   let best = first;
   let bestScore = -1;
-  for (let start = first; start + length <= first + region; start += 1) {
-    const left = new Map(wanted);
+  for (let start = first; start + size <= first + region; start += 1) {
+    const remaining = new Map(wanted);
     let score = 0;
-    for (const word of wordsOf(after.slice(start, start + length))) {
-      const count = left.get(word) ?? 0;
-      if (count > 0) { left.set(word, count - 1); score += 1; }
+    for (const word of wordsOf(after.slice(start, start + size))) {
+      const count = remaining.get(word) ?? 0;
+      if (count > 0) { remaining.set(word, count - 1); score += 1; }
     }
     if (score > bestScore) { best = start; bestScore = score; }
   }
-  return { at: best, length };
+  return { at: best, length: size };
 }
 
 /** The text with blocks [at, at + length) replaced by `replacement`'s blocks ('' removes them). */
@@ -285,8 +297,8 @@ export interface MergeResult {
  * changes are grouped: the base blocks a side removed or rewrote between two blocks it kept, with what it put there
  * (an insertion with nothing removed is a group too). A group only one side has is taken from that side. Groups of
  * both sides that touch the same base block are one place both changed: the person's blocks stay, and it is a
- * conflict (or nothing, when both wrote the same). Insertions both sides made at one place are both kept, the
- * person's first. The text keeps the person's separators (and line endings `eol`).
+ * conflict (or nothing, when both wrote the same). Insertions both sides made at one place are such a place too
+ * (the same insertion is taken once). The text keeps the person's separators (and line endings `eol`).
  */
 export function mergeBlocks(base: string, mine: string, theirs: string, kind: BlockKind, eol: '\n' | '\r\n' = '\n'): MergeResult {
   const b = splitBlocks(base, kind);
@@ -340,11 +352,19 @@ export function mergeBlocks(base: string, mine: string, theirs: string, kind: Bl
     const parent = groups.map((_, index) => index);
     const find = (index: number): number => (parent[index] === index ? index : (parent[index] = find(parent[index])));
     const owner = new Map<number, number>();
+    // Insertions both sides made at one place (nothing removed) are one place too: the same insertion is taken
+    // once, two different ones keep the person's and list the writer's.
+    const insertedAt = new Map<number, number>();
     groups.forEach((group, index) => {
       for (const removed of group.removed) {
         const other = owner.get(removed);
         if (other === undefined) owner.set(removed, index);
         else parent[find(index)] = find(other);
+      }
+      if (group.removed.length === 0) {
+        const other = insertedAt.get(group.position);
+        if (other === undefined) insertedAt.set(group.position, index);
+        else if (groups[other].side !== group.side) parent[find(index)] = find(other);
       }
     });
     const components = new Map<number, Group[]>();

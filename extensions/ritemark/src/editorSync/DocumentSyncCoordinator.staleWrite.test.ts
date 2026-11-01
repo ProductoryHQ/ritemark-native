@@ -784,6 +784,30 @@ async function main(): Promise<void> {
     env.dispose();
   });
 
+  // ── Review round 2 (#605) ───────────────────────────────────────────────
+
+  await scenario('Round 2, finding 1: the auto-save refused before the sync looks: the merge is saved, no question', async () => {
+    const env = await open('r2-refused.md', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    await env.autoSave();
+    const read = env.disk();
+    await env.type(addToEnd(env.document.getText(), B));
+    fs.writeFileSync(env.document.file, editTitle(read));
+    // VS Code's auto-save runs first and is refused as newer: patch 014 asks Ritemark.
+    assert.equal(await env.autoSave(), 'saved', 'Ritemark answers overwrite: the save goes through');
+    assert.equal(env.conflicts().length, 0, 'no question, Ritemark\'s or VS Code\'s');
+    assert.ok(has(env.disk(), 'edited by the writer', A, B), 'the file holds the merge');
+    env.dispose();
+  });
+
+  await scenario('Round 2, finding 7: a CRLF document keeps its line endings when a writer saves an LF copy', async () => {
+    const crlf = md('Stale write').replace(/\n/g, '\r\n');
+    const { env } = await s1('r2-crlf.md', crlf, read => editTitle(read).replace(/\r\n/g, '\n'), 'reload-first');
+    assert.ok(has(merged(env), 'edited by the writer', A, B));
+    assert.ok(merged(env).includes('\r\n') && !/[^\r]\n/.test(merged(env)), 'CRLF throughout');
+    env.dispose();
+  });
+
   fs.rmSync(ROOT, { recursive: true, force: true });
   console.log(failures ? `\n${failures} scenario(s) failed` : '\nall scenarios passed');
   process.exit(failures ? 1 : 0);
