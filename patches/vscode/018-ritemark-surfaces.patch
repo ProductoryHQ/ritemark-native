@@ -145,7 +145,11 @@ with the layout, would have in the AI column too. The held start, as the Experie
 progress bar (an indigo line, which framework §3 rules out), nothing for its first second, and then, while its view still
 waits for the extension, the kit's turning mark (ink on the strong hairline, 16) at its centre, alone, labelled "The AI is
 starting" for screen readers; it goes when the view is resolved (contrib/webviewView/browser/webviewViewPane.ts, only for a
-view in the AI column; ritemarkSurfaces.css).
+view in the AI column; ritemarkSurfaces.css). And the left column lays out once: until the extensions are read, a head
+row whose command is not registered yet keeps its room, empty (`.ritemark-project-row-waiting`), so New and Search fill
+rows already drawn and the tree under them never moves (on main a window landing on Documents drew the tree, then pushed
+it down 64 when New and Search arrived); once the extensions are read, a row whose command is still missing goes
+(ritemarkProjectHead.ts).
 
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
@@ -865,10 +869,10 @@ index 79add6fa2a9..ed88fcd86de 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..2a12f15ff0f
+index 00000000000..90d67e8aa7f
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1937 @@
+@@ -0,0 +1,1943 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2242,6 +2246,12 @@ index 00000000000..2a12f15ff0f
 +.monaco-workbench .part.sidebar .ritemark-project-row:hover,
 +.monaco-workbench .part.sidebar .ritemark-project-row[aria-expanded="true"] {
 +	background-color: var(--rm-hover);
++}
++
++/* Sprint 145 (#569): a row whose command the extension has not registered yet keeps its room, empty, so the content
++   under the head never moves when New and Search arrive (ritemarkProjectHead.ts) */
++.monaco-workbench .part.sidebar .ritemark-project-row.ritemark-project-row-waiting {
++	visibility: hidden;
 +}
 +
 +.monaco-workbench .part.sidebar .ritemark-project-row .codicon {
@@ -4938,10 +4948,10 @@ index 00000000000..c6764e91723
 +registerWorkbenchContribution2(RitemarkWindowSizes.ID, RitemarkWindowSizes, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644
-index 00000000000..760766e62b1
+index 00000000000..a19755eb243
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,341 @@
+@@ -0,0 +1,361 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4977,6 +4987,7 @@ index 00000000000..760766e62b1
 +import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
 +import { IContextViewService } from '../../../../platform/contextview/browser/contextView.js';
 +import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
++import { IExtensionService } from '../../../services/extensions/common/extensions.js';
 +import { RITEMARK_MENU_SEPARATOR, RitemarkMenuEntry, showRitemarkMenu } from '../ritemarkMenu.js';
 +
 +const PROJECT_MENU = MenuId.for('ritemark/projectHead');
@@ -5062,6 +5073,12 @@ index 00000000000..760766e62b1
 +	private titleHeight = 40;
 +	private readonly titleArea: HTMLElement;
 +
++	/**
++	 * Sprint 145 (#569): until the extensions are read, a row whose command is not registered yet keeps its room, so
++	 * New and Search fill rows already drawn and the content under them never moves.
++	 */
++	private extensionsRead = false;
++
 +	private readonly _onDidChangeRows = this._register(new Emitter<void>());
 +	/** The rows changed outside update(): the column lays its content out again (rowsHeight) */
 +	readonly onDidChangeRows = this._onDidChangeRows.event;
@@ -5078,6 +5095,7 @@ index 00000000000..760766e62b1
 +		@IContextKeyService private readonly contextKeyService: IContextKeyService,
 +		@IMenuService private readonly menuService: IMenuService,
 +		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
++		@IExtensionService extensionService: IExtensionService,
 +	) {
 +		super();
 +		this.titleArea = titleArea;
@@ -5118,7 +5136,7 @@ index 00000000000..760766e62b1
 +		// New and Search exist), the column lays its content out again: else the tree ran the rows' height (64 on
 +		// Documents) past the column's foot, under the status bar, where its last rows and its slider's foot could not be
 +		// reached (2.1.0's join pass)
-+		this._register(MenuRegistry.onDidChangeMenu(() => {
++		const drawRowsAgain = () => {
 +			if (this.place) {
 +				const before = this.rowList.childElementCount;
 +				this.renderRows(this.place);
@@ -5126,7 +5144,15 @@ index 00000000000..760766e62b1
 +					this._onDidChangeRows.fire();
 +				}
 +			}
-+		}));
++		};
++		this._register(MenuRegistry.onDidChangeMenu(drawRowsAgain));
++		// Sprint 145 (#569): once the extensions are read, a row whose command is still missing goes (an older extension)
++		extensionService.whenInstalledExtensionsRegistered().then(() => {
++			if (!this._store.isDisposed) {
++				this.extensionsRead = true;
++				drawRowsAgain();
++			}
++		});
 +	}
 +
 +	/**
@@ -5192,6 +5218,10 @@ index 00000000000..760766e62b1
 +		for (const spec of place.rows) {
 +			const command = MenuRegistry.getCommand(spec.command);
 +			if (!command) {
++				if (!this.extensionsRead) {
++					// Sprint 145 (#569): the extension's command comes once the extensions are read; its row keeps its room
++					append(this.rowList, $('.ritemark-project-row.ritemark-project-row-waiting', { 'aria-hidden': 'true' }));
++				}
 +				continue; // an older extension: no row rather than a row that does nothing
 +			}
 +			const text = typeof command.title === 'string' ? command.title : command.title.value;
