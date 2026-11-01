@@ -12,7 +12,9 @@
  * (`research/menu-focus-audit.md` says how), open a folder in it, then:
  *   node menu-focus-audit.mjs --port 9271 --settings <profile>/ud/User/settings.json --out <dir> [--themes light,dark] [--rows a,b] [--pad 28]
  * It writes `<dir>/audit.json` and one crop per step (`<theme>-<row>-<step>.png`, device pixels), and prints a table.
- * Exit code: 1 when any step's result isn't the rule's (R1), 0 otherwise; the count is printed.
+ * Exit code: 1 when any step's result isn't the rule's (R1); 2 when none broke it but a row's preparation, its webview's
+ * discovery or a step itself threw, so the audit is incomplete; 0 otherwise. Both counts are printed. A step that says
+ * up front why it can't run here (`notRun`: an item that opens another app, a sign-in, …) is listed and counts as neither.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -345,13 +347,14 @@ async function setTheme(theme) {
 
 const results = [];
 let failures = 0;
+let errors = 0; // a prep, a frame discovery or a step that threw: the audit didn't run what it says it ran
 for (const theme of THEMES) {
   await setTheme(theme);
   for (const row of ROWS.filter((r) => !ONLY.length || ONLY.includes(r.id))) {
-    try { await row.prep(); } catch (error) { results.push({ theme, row: row.id, name: row.name, step: '*', notRun: String(error.message) }); continue; }
+    try { await row.prep(); } catch (error) { errors += 1; results.push({ theme, row: row.id, name: row.name, step: '*', notRun: `error: ${String(error.message).slice(0, 200)}`, error: true }); continue; }
     for (const step of Object.keys(STEPS)) {
-      const f = await frame(row.frame);
-      if (!f) { results.push({ theme, row: row.id, name: row.name, step, notRun: `no ${row.frame} webview` }); continue; }
+      const f = await frame(row.frame).catch(() => null);
+      if (!f) { errors += 1; results.push({ theme, row: row.id, name: row.name, step, notRun: `error: no ${row.frame} webview`, error: true }); continue; }
       try {
         await reset(f, row);
         const done = await STEPS[step](f, row);
@@ -362,16 +365,19 @@ for (const theme of THEMES) {
         const file = await crop(path.join(OUT, `${theme}-${row.id}-${step}.png`), done.r);
         results.push({ theme, row: row.id, name: row.name, step, verdict: v, ...s, tabs: done.tabs, crop: file });
       } catch (error) {
-        results.push({ theme, row: row.id, name: row.name, step, notRun: `error: ${String(error.message).slice(0, 200)}` });
+        errors += 1;
+        results.push({ theme, row: row.id, name: row.name, step, notRun: `error: ${String(error.message).slice(0, 200)}`, error: true });
       } finally { f.close(); }
     }
   }
 }
-await key('Escape');
-fs.writeFileSync(path.join(OUT, 'audit.json'), JSON.stringify({ at: new Date().toISOString(), port: PORT, results }, null, 2));
+await key('Escape').catch(() => {}); // the counts below still get written when the window has gone
+fs.writeFileSync(path.join(OUT, 'audit.json'), JSON.stringify({ at: new Date().toISOString(), port: PORT, failures, errors, results }, null, 2));
 for (const r of results) {
   console.log([r.theme, r.row, r.step, r.notRun ? `not run: ${r.notRun}` : r.verdict, r.notRun ? '' : `active=${r.active} fv=${r.focusVisible} tooltip=${r.tooltip ?? '-'}`].join(' | '));
 }
 console.log(`steps that break the rule: ${failures}`);
+console.log(`not run because something threw (a row's preparation, its webview or a step): ${errors}`);
 wb?.close();
-process.exit(failures ? 1 : 0); // 1 when any step breaks the rule (a raw count wraps at 256)
+// 1 when any step breaks the rule, 2 when the audit is incomplete (a raw count wraps at 256)
+process.exit(failures ? 1 : errors ? 2 : 0);
