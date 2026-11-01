@@ -214,6 +214,73 @@ function Field({ label, children, description }: FieldProps) {
   );
 }
 
+/**
+ * When a key is added or removed in Settings (the host's `flow:keysChanged`, Sprint 145 R5), a step panel asks for its
+ * model list again: back from "Add it in Settings", the sentence goes. The panel's own listener takes the answer; the
+ * list it shows stays until then.
+ */
+function useModelsAgainOnKeyChange(provider: string, modelType: 'llm' | 'image'): void {
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      // Only this step's provider's key matters to it
+      if (event.data?.type === 'flow:keysChanged' && event.data.provider === provider) {
+        vscode.postMessage({ type: 'flow:getModels', provider, modelType });
+      }
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [provider, modelType]);
+}
+
+/**
+ * The line under a step's model picker, the same for the AI step and the image step: the list loading, the step's
+ * missing key with its link (R5: a step without its key always says so; without the key the list is the bundled one,
+ * so a saved model can look missing from it), a saved model the list no longer has, then any other error.
+ */
+function modelFieldNote(note: {
+  waiting: boolean;
+  unavailable: boolean;
+  error: string | null;
+  errorAction: StepKeyAction | null;
+}): React.ReactNode {
+  if (note.waiting) return 'Loading models...';
+  if (note.error && note.errorAction) return <StepKeyNotice text={note.error} action={note.errorAction} />;
+  if (note.unavailable) return 'Saved model is no longer available. Choose a replacement.';
+  if (note.error) return `⚠️ ${note.error}`;
+  return undefined;
+}
+
+/** What fixes a step's missing key, as the host names it (`flow:models`' `errorAction`): Settings at that key. */
+interface StepKeyAction {
+  label: string;
+  tooltip?: string;
+  settingsSection: string;
+}
+
+/**
+ * A step that can't run without its key says so in one sentence, with the fix as a link (the Experience lead's
+ * words, experiences 13 and 31: "This step needs an OpenAI API key to run. Add it in Settings"). No warning sign. The
+ * AI step and the image step show it the same way (Sprint 144 for the Google image step; Sprint 145 R5, #580).
+ */
+export function StepKeyNotice({ text, action }: { text: string; action: StepKeyAction }) {
+  return (
+    <>
+      {text}{' '}
+      <Tooltip label={action.tooltip ?? action.label}>
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto p-0 text-xs"
+          onClick={() => vscode.postMessage({ type: 'flow:openSettings', section: action.settingsSection })}
+        >
+          {action.label}
+        </Button>
+      </Tooltip>
+    </>
+  );
+}
+
 // Textarea with VS Code styling
 interface TextAreaProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -397,6 +464,9 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
   const [models, setModels] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Sprint 145 R5 (#580): what fixes the error, when the host names it (no key for the provider: Settings at that key)
+  const [errorAction, setErrorAction] = useState<StepKeyAction | null>(null);
+  useModelsAgainOnKeyChange(provider, 'llm');
   // Sprint 144 P4: the known list and the saved model stay usable while the host refreshes the list; the picker waits
   // only when it has no list at all. A saved model missing from the list stays visible, as on the Image step.
   const modelOptions = modelOptionsWithPersistedSelection(models, data.model);
@@ -408,6 +478,7 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
     setModels(getLLMModels(provider));
     setIsLoading(true);
     setError(null);
+    setErrorAction(null);
 
     // Request models from extension
     vscode.postMessage({
@@ -421,10 +492,10 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
       const message = event.data;
       if (message.type === 'flow:models' && message.provider === provider && message.modelType === 'llm') {
         setIsLoading(false);
-        if (message.error) {
-          setError(message.error);
-          // Keep fallback models (already set)
-        } else if (message.models && message.models.length > 0) {
+        // A missing key comes with the list (Sprint 145 R5): the picker keeps working, and the panel says what's missing
+        setError(message.error ?? null);
+        setErrorAction(message.errorAction ?? null);
+        if (message.models && message.models.length > 0) {
           setModels(message.models);
         }
         // If empty, keep fallback models
@@ -479,13 +550,7 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
 
       <Field
         label="Model"
-        description={error
-          ? `⚠️ ${error}`
-          : waiting
-            ? 'Loading models...'
-            : modelOptions.unavailable
-              ? 'Saved model is no longer available. Choose a replacement.'
-              : undefined}
+        description={modelFieldNote({ waiting, unavailable: modelOptions.unavailable, error, errorAction })}
       >
         <Select
           // Sprint 141 R4: an unset step shows the model it runs on (the catalog's default), as its card does.
@@ -669,8 +734,9 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
   );
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  // Sprint 144: what fixes the error, when the host names it (a Google image step with no key: Settings at that key)
-  const [errorAction, setErrorAction] = React.useState<{ label: string; settingsSection: string } | null>(null);
+  // Sprint 144: what fixes the error, when the host names it (an image step with no key: Settings at that key)
+  const [errorAction, setErrorAction] = React.useState<StepKeyAction | null>(null);
+  useModelsAgainOnKeyChange(provider, 'image');
   const modelOptions = modelOptionsWithPersistedSelection(models, data.model);
   const waiting = modelListWaiting(loading, models.length); // Sprint 144 P4, as on the LLM step
 
@@ -690,9 +756,10 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
       const message = event.data;
       if (message.type === 'flow:models' && message.provider === provider && message.modelType === 'image') {
         setLoading(false);
+        // A later answer (a key added in Settings) clears what an earlier one said
+        setError(message.error ?? null);
+        setErrorAction(message.errorAction ?? null);
         if (message.error) {
-          setError(message.error);
-          setErrorAction(message.errorAction ?? null);
           // Keep fallback models (already set)
         } else if (message.models && message.models.length > 0) {
           setModels(message.models);
@@ -750,30 +817,7 @@ function ImageNodeConfig({ nodeId, data, onUpdate }: ImageNodeConfigProps) {
 
       <Field
         label="Model"
-        description={waiting
-          ? 'Loading models...'
-          : modelOptions.unavailable
-            ? 'Saved model is no longer available. Choose a replacement.'
-            : error && errorAction
-              ? (
-                // Sprint 144, the Experience lead's words: the step can't run without the key, so say so, no warning
-                // sign, with the fix as a link ("This step needs a Google AI API key to run. Add it in Settings")
-                <>
-                  {error}{' '}
-                  <Tooltip label="Open Settings at the Google AI API key">
-                    <Button
-                      type="button"
-                      variant="link"
-                      size="sm"
-                      className="h-auto p-0 text-xs"
-                      onClick={() => vscode.postMessage({ type: 'flow:openSettings', section: errorAction.settingsSection })}
-                    >
-                      {errorAction.label}
-                    </Button>
-                  </Tooltip>
-                </>
-              )
-              : error ? `⚠️ ${error}` : undefined}
+        description={modelFieldNote({ waiting, unavailable: modelOptions.unavailable, error, errorAction })}
       >
         <Select
           // Sprint 141 R4: an unset step shows the model it runs on, as the run's default.

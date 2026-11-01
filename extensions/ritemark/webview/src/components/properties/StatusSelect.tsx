@@ -3,9 +3,13 @@ interface StatusSelectProps {
   onChange: (value: string) => void
 }
 
+// Sprint 145 (#578): no green and no amber. The chosen option has the chosen-segment look and the word says which;
+// the other keeps its inactive look (the Experience lead, ritemark-dev 486c2da)
+const CHOSEN = 'bg-surface-soft text-ink-strong border-hairline-strong'
+const NOT_CHOSEN = 'bg-surface text-ink-muted border-hairline hover:border-hairline-strong'
 const STATUS_OPTIONS = [
-  { value: 'draft', label: 'Draft', active: 'bg-amber-50 text-amber-700 border-amber-200', inactive: 'bg-surface text-ink-muted border-hairline hover:border-hairline-strong' },
-  { value: 'published', label: 'Published', active: 'bg-emerald-50 text-emerald-700 border-emerald-200', inactive: 'bg-surface text-ink-muted border-hairline hover:border-hairline-strong' },
+  { value: 'draft', label: 'Draft', active: CHOSEN, inactive: NOT_CHOSEN },
+  { value: 'published', label: 'Published', active: CHOSEN, inactive: NOT_CHOSEN },
 ]
 
 export function StatusSelect({ value, onChange }: StatusSelectProps) {

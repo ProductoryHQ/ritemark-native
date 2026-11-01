@@ -198,7 +198,8 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
       case 'running':
         return <Icon name="circle-notch" size={20} className="animate-spin text-[var(--vscode-progressBar-foreground)]" />;
       case 'complete':
-        return <Icon name="check-circle" size={20} className="text-[var(--vscode-testing-iconPassed)]" />;
+        // Sprint 145 (#578): done is ink; green is only the ready dot (`inherit` lets the class colour it)
+        return <Icon name="check-circle" size={20} tone="inherit" className="text-[var(--r-ink-strong)]" />;
       case 'error':
         return <Icon name="x-circle" size={20} className="text-[var(--vscode-testing-iconFailed)]" />;
     }
@@ -209,7 +210,8 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
       {/* Header (kit: .props .top) */}
       <PanelHeader title={phase === 'input' ? 'Run flow' : 'Results'} onClose={onClose}>
         {phase === 'complete' && (
-          <span className="px-2 py-0.5 text-xs font-medium leading-4 rounded-full bg-[var(--vscode-testing-iconPassed)]/20 text-[var(--vscode-testing-iconPassed)] border border-[var(--vscode-testing-iconPassed)]/30">
+          // Sprint 145 (#578): Finished is ink on the muted surface; green is only the ready dot
+          <span className="px-2 py-0.5 text-xs font-medium leading-4 rounded-full bg-[var(--r-surface-muted)] text-[var(--r-ink-strong)] border border-[var(--r-hairline)]">
             Finished
           </span>
         )}
@@ -348,7 +350,8 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
                             {p.type === 'init' && <Icon name="terminal" size={12} className="mt-0.5 text-[var(--vscode-terminal-ansiBlue)]" />}
                             {p.type === 'tool_use' && <Icon name="lightning" size={12} className="mt-0.5 text-[var(--vscode-terminal-ansiYellow)]" />}
                             {p.type === 'thinking' && <Icon name="star-four" size={12} className="mt-0.5 text-[var(--vscode-terminal-ansiMagenta)]" />}
-                            {p.type === 'done' && <Icon name="check-circle" size={12} className="mt-0.5 text-[var(--vscode-testing-iconPassed)]" />}
+                            {/* Sprint 145 (#578): done in its message's muted ink (the Icon's own tone); green is only the ready dot */}
+                            {p.type === 'done' && <Icon name="check-circle" size={12} className="mt-0.5" />}
                             <span className="text-[var(--r-ink-muted)] leading-tight">{p.message}</span>
                           </div>
                         ))}

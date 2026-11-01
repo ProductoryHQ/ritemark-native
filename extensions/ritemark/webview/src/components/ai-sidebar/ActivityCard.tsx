@@ -26,7 +26,8 @@ function getActivityIcon(activity: AgentProgress) {
   if (activity.type === 'text') return <Icon name="star-four" size={14} />;
   if (activity.type === 'subagent_start') return <Icon name="robot" size={14} className="text-[var(--vscode-progressBar-background)]" />;
   if (activity.type === 'subagent_progress') return <Icon name="robot" size={14} className="text-[var(--vscode-progressBar-background)]" />;
-  if (activity.type === 'subagent_done') return <Icon name="check-circle" size={14} className="text-green-500" />;
+  // Sprint 145 (#578): in the icons' own muted ink, as 'done' above; green is only the ready dot
+  if (activity.type === 'subagent_done') return <Icon name="check-circle" size={14} />;
   if (activity.tool && iconMap[activity.tool]) return iconMap[activity.tool];
   return <Icon name="terminal" size={14} />;
 }

@@ -281,8 +281,9 @@ export function CommentsMenuButton({ getEditor }: { getEditor: () => TipTapEdito
                     {resultAliases.map((alias) => {
                       const line = describeGroupResult(ALIAS_LABEL[alias], groupStates[alias] as GroupSendState)
                       if (!line) return null
+                      // Sprint 145 (#578): a send that went through is ink; green is only the ready dot
                       const tone =
-                        line.tone === 'success' ? 'var(--r-success)'
+                        line.tone === 'success' ? 'var(--r-ink-strong)'
                           : line.tone === 'error' ? 'var(--r-error)'
                             : 'var(--r-ink-muted)'
                       return (

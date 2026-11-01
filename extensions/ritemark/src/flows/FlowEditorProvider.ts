@@ -25,7 +25,7 @@ import {
 import * as modelCatalog from '../ai/modelCatalog';
 import { pickerFolder } from '../utils/dialogDefaults';
 import { listGeminiModels } from '../ai/geminiRequest';
-import { flowModelDefaults, flowModelRequestType, StepNeedsKeyError } from './flowModelDefaults';
+import { flowModelDefaults, flowModelRequestType, GOOGLE_AI_KEY_NEEDED, OPENAI_KEY_NEEDED, STEP_KEY_SECRETS, stepKeyAnswer, stepKeyCopy, stepKeySecret, StepNeedsKeyError } from './flowModelDefaults';
 
 /**
  * Sanitize a string for use in a filename
@@ -90,12 +90,27 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
 
     webviewPanel.webview.html = this.getHtml(webviewPanel.webview, scriptUri);
 
-    // Track if we're currently updating to prevent feedback loops
-    let isUpdating = false;
     let isDisposed = false;
 
     const webview = webviewPanel.webview;
     FlowEditorProvider.activeWebviews.add(webview);
+
+    // Sprint 145 R4: the flow's writes and saves run one after another, and each answer names the request it answers
+    // (`seq`). A write that came while another ran used to be dropped, with no answer, and the webview then took the
+    // earlier write's answer as its own.
+    let writes: Promise<unknown> = Promise.resolve();
+    const inTurn = <T>(job: () => Promise<T>): Promise<T> => {
+      const run = writes.then(job);
+      writes = run.catch(() => undefined);
+      return run;
+    };
+    const afterWrite = (flow: Flow) => {
+      // Re-validate and send updated warnings
+      webview.postMessage({ type: 'flow:validation', warnings: this.validateFlow(flow) });
+      void this.sendScheduleStatus(document, webview);
+      // Refresh flows list in sidebar
+      vscode.commands.executeCommand('ritemark.flows.refresh');
+    };
 
     // Handle messages from webview
     webview.onDidReceiveMessage(
@@ -112,28 +127,24 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'flow:save':
             // Save flow changes (autosave)
-            if (!isUpdating) {
-              isUpdating = true;
-              try {
-                await this.updateDocument(document, message.flow, webview);
-                // Signal save complete so webview marks clean
-                webview.postMessage({ type: 'flow:saved' });
-                // Re-validate and send updated warnings
-                const saveWarnings = this.validateFlow(message.flow);
-                webview.postMessage({ type: 'flow:validation', warnings: saveWarnings });
-                void this.sendScheduleStatus(document, webview);
-                // Refresh flows list in sidebar
-                vscode.commands.executeCommand('ritemark.flows.refresh');
-              } finally {
-                isUpdating = false;
-              }
-            }
+            await inTurn(() => this.updateDocument(document, message.flow, webview));
+            // Signal save complete so webview marks clean
+            webview.postMessage({ type: 'flow:saved', seq: message.seq });
+            afterWrite(message.flow);
             return;
 
           case 'flow:requestSave':
-            // User explicitly requested save (Cmd+S)
-            await document.save();
-            webview.postMessage({ type: 'flow:saved' });
+            // User explicitly requested save (Cmd+S). Sprint 145 R4: the webview sends the edits its autosave hasn't
+            // written yet, so the save holds them; it used to save the document without them and then mark them clean.
+            await inTurn(async () => {
+              const written = message.flow ? await this.updateDocument(document, message.flow, webview) : document.uri;
+              // A new name renames the file, and VS Code closes this document after it moves the editor (not always by
+              // now): save the renamed file
+              const target = written.toString() === document.uri.toString() ? document : await vscode.workspace.openTextDocument(written);
+              await target.save();
+            });
+            webview.postMessage({ type: 'flow:saved', seq: message.seq });
+            if (message.flow) afterWrite(message.flow);
             return;
 
           case 'flow:validate':
@@ -149,7 +160,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
             return;
 
           case 'flow:run':
-            // Execute the flow with step-by-step progress
+            // Execute the flow with step-by-step progress (Sprint 145: after the writes already sent)
+            await writes;
             this.executeFlowWithProgress(
               message.id,
               message.inputs || {},
@@ -210,9 +222,18 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
       if (!isDisposed) this.sendModelConfig(webview);
     });
 
+    // Sprint 145 R5 (#580): a key added or removed in Settings (often through a step's "Add it in Settings") changes
+    // what the step panels say, so an open panel asks again. Only the key's name is read here, never its value.
+    const keyChanges = this.context.secrets.onDidChange((event) => {
+      if (isDisposed) return;
+      const provider = event.key === STEP_KEY_SECRETS.openai ? 'openai' : event.key === STEP_KEY_SECRETS.gemini ? 'gemini' : null;
+      if (provider) webview.postMessage({ type: 'flow:keysChanged', provider });
+    });
+
     webviewPanel.onDidDispose(() => {
       isDisposed = true;
       catalogUpdates.dispose();
+      keyChanges.dispose();
       FlowEditorProvider.activeWebviews.delete(webview);
     });
   }
@@ -297,14 +318,14 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   /**
-   * Update document with new flow content
-   * If flow name changed, rename the file to match
+   * Update document with new flow content. If flow name changed, rename the file to match.
+   * Returns where the flow now is (Sprint 145: Cmd+S saves the renamed file).
    */
   private async updateDocument(
     document: vscode.TextDocument,
     flow: Flow,
     webview?: vscode.Webview
-  ): Promise<void> {
+  ): Promise<vscode.Uri> {
     const scheduleState = new FlowScheduleState(this.context.workspaceState);
 
     // Update modified timestamp
@@ -351,6 +372,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
       if (webview) {
         webview.postMessage({ type: 'flow:renamed', newId: flow.id });
       }
+      return newUri;
     } else {
       // No rename needed - just update content
       const content = JSON.stringify(flow, null, 2);
@@ -365,6 +387,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
       if (!flow.schedule) {
         await scheduleState.clear(document.uri.fsPath);
       }
+      return document.uri;
     }
   }
 
@@ -752,6 +775,14 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     webview: vscode.Webview
   ): Promise<void> {
     try {
+      // Sprint 145 R5 (#580): a step can't run without its provider's key, so its panel says so, with the link to that
+      // key, for the AI step and the image step alike. Only whether a key exists is read, before any network call.
+      if (!(await this.hasProviderKey(provider))) {
+        const known = modelType === 'llm' ? modelCatalog.getModels(provider).map(m => ({ id: m.id, name: m.label })) : [];
+        webview.postMessage({ type: 'flow:models', provider, modelType, models: known, ...stepKeyAnswer(stepKeyCopy(provider)) });
+        return;
+      }
+
       let models: Array<{ id: string; name: string }>;
 
       if (modelType === 'image') {
@@ -768,15 +799,9 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
       webview.postMessage({ type: 'flow:models', provider, modelType, models });
     } catch (err) {
       if (err instanceof StepNeedsKeyError) {
-        // Sprint 144: the panel shows the sentence with its action as a link to Settings at that key
-        webview.postMessage({
-          type: 'flow:models',
-          provider,
-          modelType,
-          models: [],
-          error: err.copy.text,
-          errorAction: { label: err.copy.action, settingsSection: err.copy.settingsSection },
-        });
+        // Sprint 144: the panel shows the sentence with its action as a link to Settings at that key (here, when the
+        // key went away between the check above and the list's own read of it)
+        webview.postMessage({ type: 'flow:models', provider, modelType, models: [], ...stepKeyAnswer(err.copy) });
         return;
       }
       console.error(`[FlowEditorProvider] Failed to fetch ${provider} ${modelType} models:`, err);
@@ -856,6 +881,11 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     }
   }
 
+  /** Whether the provider's key is stored (Sprint 145 R5). Its value is not kept or passed on. */
+  private async hasProviderKey(provider: 'openai' | 'gemini'): Promise<boolean> {
+    return Boolean(await this.context.secrets.get(stepKeySecret(provider)));
+  }
+
   // fetchOpenAIModels() removed in Sprint 89 (GH #109) — OpenAI LLM lists now
   // resolve through modelCatalog (providerDiscovery.discoverOpenAI).
 
@@ -867,7 +897,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     const apiKey = await apiKeyManager.getAPIKey();
 
     if (!apiKey) {
-      throw new Error('OpenAI API key not configured');
+      // Sprint 145 R5 (#580): the panel's sentence and link, as the Google image step's
+      throw new StepNeedsKeyError(OPENAI_KEY_NEEDED);
     }
 
     const openai = new OpenAI({ apiKey });
@@ -901,10 +932,10 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
    * Fetch Gemini Image models
    */
   private async fetchGeminiImageModels(): Promise<Array<{ id: string; name: string }>> {
-    const apiKey = await this.context.secrets.get('google-ai-key');
+    const apiKey = await this.context.secrets.get(STEP_KEY_SECRETS.gemini);
 
     if (!apiKey) {
-      throw new StepNeedsKeyError();
+      throw new StepNeedsKeyError(GOOGLE_AI_KEY_NEEDED);
     }
 
     // Use v1beta to include preview models. Sprint 141: the key in a header (R12,
