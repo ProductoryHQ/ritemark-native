@@ -55,8 +55,8 @@ const sameFolder = (a: string, b: string) => a.replace(/\/+$/, '') === b.replace
 export interface SwitchedFrom {
   folderUri: string;
   name: string;
-  /** The folder the switch opened; absent in a note from before #623, which keeps the old rule. */
-  target?: string;
+  /** The folder the switch opened (#623): the note is shown there only. */
+  target: string;
   at: number;
 }
 
@@ -70,31 +70,27 @@ const unusable = (note: { at?: unknown } | null | undefined, now: number): boole
  * The landing note, read before it is taken (#623, as the shell's `ritemarkReadLanding` in patch 018): a window lands on
  * Home and takes it when it is for this window; a window on another folder, or with no folder, keeps it for the window
  * it is for (it expires by itself); a note that is not one, has no time, is older than two minutes or from the future is
- * dropped. A note with no target (Open Folder…, a drop, Close Folder) keeps its rule: the first window on a folder other
- * than the one left lands. Pure.
+ * dropped. A note with no target (Open Folder…, a drop, Close Folder) can't name the window it is for, and keeps
+ * today's rule: the first window that reads it takes it, and lands when it is on a folder other than the one left. In
+ * the folder it left it is that switch's own window (Open Folder… into the same folder), with nothing to land on. Pure.
  */
 export function readLanding(note: unknown, here: string | null, now: number): NoteVerdict {
   const landing = note as Partial<Landing> | null | undefined;
   if (unusable(landing, now)) return 'drop';
-  if (!here) return 'keep';
-  if (typeof landing!.target === 'string') return sameFolder(landing!.target, here) ? 'take' : 'keep';
-  return typeof landing!.from !== 'string' || !sameFolder(landing!.from, here) ? 'take' : 'keep';
+  if (typeof landing!.target === 'string') return here && sameFolder(landing!.target, here) ? 'take' : 'keep';
+  return here && (typeof landing!.from !== 'string' || !sameFolder(landing!.from, here)) ? 'take' : 'drop';
 }
 
 /**
  * The "Switched from" note, by the same rule (#623): shown and taken in the folder the switch opened, kept for it by a
- * window on another folder, dropped when unusable or about the project itself. A note from before #623 has no target
- * and keeps its old rule: any folder but the one left. Pure.
+ * window on another folder or with none, dropped when unusable (no target among them) or about the project itself. Pure.
  */
 export function readSwitchedFrom(note: unknown, here: string | null, now: number): NoteVerdict {
   const from = note as Partial<SwitchedFrom> | null | undefined;
-  if (unusable(from, now) || typeof from!.folderUri !== 'string' || !from!.folderUri || typeof from!.name !== 'string') return 'drop';
-  if (!here) return 'keep';
-  if (typeof from!.target === 'string') {
-    if (!sameFolder(from!.target, here)) return 'keep';
-    return sameFolder(from!.folderUri, here) ? 'drop' : 'take';
-  }
-  return sameFolder(from!.folderUri, here) ? 'keep' : 'take';
+  if (unusable(from, now) || typeof from!.folderUri !== 'string' || !from!.folderUri || typeof from!.name !== 'string'
+    || typeof from!.target !== 'string') return 'drop';
+  if (!here || !sameFolder(from!.target, here)) return 'keep';
+  return sameFolder(from!.folderUri, here) ? 'drop' : 'take';
 }
 
 /** A note file's contents: `undefined` when there is none (or it can't be read), `null` when it is not JSON. */
@@ -130,11 +126,13 @@ function takeNote<T>(globalStoragePath: string, name: string, read: (note: unkno
   return verdict === 'take' ? note as T : null;
 }
 
-/** The notes of the switch this window answered, held until it goes. */
+/** The notes of the switch this window answered, held until it goes; stamped when they are written. */
 interface PendingNotes {
-  landing: Landing;
+  /** When the person let the switch go ahead. */
+  heldAt: number;
+  landing: Omit<Landing, 'at'>;
   /** The note for the next window's Home; null takes an older one away (Go back); undefined leaves it. */
-  switchedFrom?: SwitchedFrom | null;
+  switchedFrom?: Omit<SwitchedFrom, 'at'> | null;
 }
 
 export type SwitchChoice = 'cancel' | 'switch-and-stop' | 'new-window';
@@ -185,8 +183,8 @@ export interface SwitchDependencies {
 }
 
 export class ProjectSwitcher {
-  /** Ritemark asked already: the reload it starts next is let through by the veto. */
-  private askedUntil = 0;
+  /** Ritemark asked already: the reload it starts next, for that folder, is let through by the veto. */
+  private asked: { target: string; until: number } | undefined;
   /** The notes of the switch the person let go ahead, written as the window goes (#623). */
   private pending: PendingNotes | undefined;
 
@@ -212,41 +210,47 @@ export class ProjectSwitcher {
    * Nothing is written until the window goes; an answer that a newer one replaces leaves nothing.
    */
   private hold(target: string | null, from: 'remember' | 'forget' | 'leave'): void {
-    const at = Date.now();
     const here = this.deps.hereUri();
     this.pending = {
-      landing: { from: here, target, at },
+      heldAt: Date.now(),
+      landing: { from: here, target },
       switchedFrom: from === 'forget'
         ? null
-        : from === 'remember' && here && target ? { folderUri: here, name: this.deps.hereName(), target, at } : undefined,
+        : from === 'remember' && here && target ? { folderUri: here, name: this.deps.hereName(), target } : undefined,
     };
   }
 
   /**
    * Write the held notes, as the window goes (extension.ts `deactivate`, #623): only then is the reload known to have
-   * gone ahead, past every other participant's question. Synchronous, since the extension host exits soon after. An
-   * answer more than two minutes old is not the switch that ends this window (its reload was stopped; this is a
+   * gone ahead, past every other participant's question. Synchronous, since the extension host exits soon after. The
+   * notes carry this moment, the switch's, as the shell's own note does: their two minutes start when the window goes.
+   * An answer more than two minutes old is not the switch that ends this window (its reload was stopped; this is a
    * later close), and leaves nothing.
    */
   writePendingNotes(now = Date.now()): void {
     const pending = this.pending;
     this.pending = undefined;
-    if (!pending || now - pending.landing.at > SWITCHED_NOTE_MS) return;
+    if (!pending || now - pending.heldAt > SWITCHED_NOTE_MS) return;
     const globalStoragePath = this.deps.context.globalStorageUri.fsPath;
     const write = (name: string, note: object) => {
       const file = switchNoteFile(globalStoragePath, name);
       const partial = `${file}.${process.pid}.tmp`;
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(partial, JSON.stringify(note));
-      fs.renameSync(partial, file);
+      try {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(partial, JSON.stringify({ ...note, at: now }));
+        fs.renameSync(partial, file);
+      } catch (error) {
+        console.warn('[Projects] Could not leave a switch note for the next window:', error);
+        try {
+          fs.rmSync(partial, { force: true });
+        } catch {
+          // Nothing more to do as the window goes.
+        }
+      }
     };
-    try {
-      write(LANDING_FILE, pending.landing);
-      if (pending.switchedFrom) write(SWITCHED_FROM_FILE, pending.switchedFrom);
-      else if (pending.switchedFrom === null) removeNoteFile(switchNoteFile(globalStoragePath, SWITCHED_FROM_FILE));
-    } catch (error) {
-      console.warn('[Projects] Could not leave the switch notes for the next window:', error);
-    }
+    write(LANDING_FILE, pending.landing);
+    if (pending.switchedFrom) write(SWITCHED_FROM_FILE, pending.switchedFrom);
+    else if (pending.switchedFrom === null) removeNoteFile(switchNoteFile(globalStoragePath, SWITCHED_FROM_FILE));
   }
 
   /**
@@ -271,7 +275,7 @@ export class ProjectSwitcher {
     }
     if (choice === 'switch-and-stop') await this.deps.stopWorkingChats();
     this.hold(target.toString(), options.goingBack ? 'forget' : 'remember');
-    this.askedUntil = Date.now() + 10_000;
+    this.asked = { target: target.toString(), until: Date.now() + 10_000 };
     await vscode.commands.executeCommand('vscode.openFolder', target, { forceReuseWindow: true });
     return 'switched';
   }
@@ -287,8 +291,10 @@ export class ProjectSwitcher {
    * answer still stops them, until the shell tells the extension whether its answer counted (see #623).
    */
   async beforeReload(target: unknown): Promise<boolean> {
-    if (Date.now() < this.askedUntil) return false;
     const targetUri = typeof target === 'string' ? vscode.Uri.parse(target) : target instanceof vscode.Uri ? target : undefined;
+    // switchTo's own reload: the guard is passed its folder (the host service notes it). Another folder is another
+    // switch (switchTo's reload was stopped), asked about and held for itself.
+    if (this.asked && Date.now() < this.asked.until && (!targetUri || sameFolder(targetUri.toString(), this.asked.target))) return false;
     const choice = await this.ask(targetUri ? this.deps.nameOf(targetUri.toString()) : null);
     if (choice === 'cancel' || (choice === 'new-window' && targetUri)) {
       this.pending = undefined;

@@ -454,7 +454,7 @@ function testDisposeStopsTheTreeOnWindows() {
   const realSpawn = childProcess.spawn;
   const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
   const started: unknown[][] = [];
-  childProcess.spawn = (...args: unknown[]) => { started.push(args); return { on: () => undefined }; };
+  childProcess.spawn = (...args: unknown[]) => { started.push(args); const taskkill: { on: () => unknown } = { on: () => taskkill }; return taskkill; };
   Object.defineProperty(process, 'platform', { value: 'win32' });
   try {
     const manager = new CodexManager();
@@ -466,7 +466,7 @@ function testDisposeStopsTheTreeOnWindows() {
     Object.defineProperty(process, 'platform', platform);
     childProcess.spawn = realSpawn;
   }
-  assert.deepStrictEqual(started.map((call) => [call[0], call[1]]), [['taskkill', ['/pid', '5150', '/T', '/F']]]);
+  assert.deepStrictEqual(started.map((call) => [call[0], call[1]]), [['C:\\Windows\\System32\\taskkill.exe', ['/pid', '5150', '/T', '/F']]]);
   console.log(`  Windows dispose: ${started.map((call) => `${call[0]} ${(call[1] as string[]).join(' ')}`).join('; ')}`);
 }
 

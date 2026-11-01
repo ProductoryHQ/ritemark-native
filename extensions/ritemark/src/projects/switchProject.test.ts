@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import Module from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -91,6 +91,17 @@ async function main(): Promise<void> {
   assert.ok(!calls.some((call) => call[0] === 'ask'));
   switcher.writePendingNotes();
   assert.deepEqual(note(SWITCHED_FROM_FILE), { folderUri: 'file:///p/lead', name: 'Leadership programme', target: 'file:///p/sales', at: (note(SWITCHED_FROM_FILE) as { at: number }).at });
+  // #623: only switchTo's own reload is let through. Its reload was stopped and, within the ten seconds, Open Recent
+  // reloads for another folder: that one is asked about and held for itself, not written as the stopped switch's.
+  reset(); working = [];
+  const stoppedSwitch = fresh();
+  await stoppedSwitch.switchTo(sales);
+  working = [{ conversationId: 'c1', runtimeId: 'claude-code' }]; answer = 'Switch and stop';
+  assert.equal(await stoppedSwitch.beforeReload('file:///p/other'), false);
+  assert.ok(calls.some((call) => call[0] === 'ask'), 'another folder is asked about');
+  stoppedSwitch.writePendingNotes();
+  assert.equal((note(LANDING_FILE) as { target: string }).target, 'file:///p/other');
+  assert.equal((note(SWITCHED_FROM_FILE) as { target: string }).target, 'file:///p/other');
 
   // Working: Cancel changes nothing.
   reset(); working = [{ conversationId: 'c1', runtimeId: 'claude-code' }]; answer = 'Cancel';
@@ -137,6 +148,23 @@ async function main(): Promise<void> {
   await old.beforeReload('file:///p/sales');
   old.writePendingNotes(Date.now() + SWITCHED_NOTE_MS + 1);
   assert.equal(note(LANDING_FILE), undefined, 'a two-minute-old answer leaves nothing');
+  // A note that can't be written (here a folder stands where the landing goes) leaves no partial file, and the other is
+  // still written.
+  reset();
+  mkdirSync(path.join(noteFile(LANDING_FILE), 'in-the-way'), { recursive: true });
+  const blocked = fresh();
+  await blocked.beforeReload('file:///p/sales');
+  blocked.writePendingNotes();
+  assert.deepEqual(readdirSync(path.dirname(noteFile(LANDING_FILE))).filter((name) => name.endsWith('.tmp')), [], 'no partial file left');
+  assert.equal((note(SWITCHED_FROM_FILE) as { target: string }).target, 'file:///p/sales', 'the other note is still written');
+  rmSync(noteFile(LANDING_FILE), { recursive: true, force: true });
+  // The notes carry the moment the window goes, not the answer's: a reload held by a slower question keeps its two minutes.
+  const slow = fresh();
+  await slow.beforeReload('file:///p/sales');
+  const goesAt = Date.now() + 90_000;
+  slow.writePendingNotes(goesAt);
+  assert.deepEqual([(note(LANDING_FILE) as { at: number }).at, (note(SWITCHED_FROM_FILE) as { at: number }).at], [goesAt, goesAt]);
+  reset();
   // The reload goes on: the notes are written as the window goes, and the window it opened lands with its note.
   const going = fresh();
   await going.beforeReload('file:///p/sales');
@@ -174,6 +202,8 @@ async function main(): Promise<void> {
   assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/sales'), true, 'Open Recent');
   await goneTo((window) => window.beforeReload(undefined));
   assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/lead'), false, 'Open Folder… back into the same folder is no switch');
+  assert.equal(note(LANDING_FILE), undefined, '... and its window spends the note: no later window lands on it');
+  await goneTo((window) => window.beforeReload(undefined));
   assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/elsewhere'), true, 'Open Folder… into another folder');
   leave(LANDING_FILE, { from: 'file:///p/lead', target: 'file:///p/sales', at: Date.now() - 3 * 60 * 1000 });
   assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/sales'), false, 'too late');
@@ -188,22 +218,22 @@ async function main(): Promise<void> {
   assert.equal(ProjectSwitcher.takeLanding(context, null), false, 'not in a window with no folder');
   assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/sales'), true, '... the switched window still lands');
   assert.equal(ProjectSwitcher.takeSwitchedFrom(context, 'file:///p/sales')?.name, 'Leadership programme', '... and still says where it came from');
-  // A target-less note keeps its rule: the folder it left keeps it, the first other folder takes it.
+  // A target-less note keeps today's rule: the first window that reads it takes it, landing on another folder.
   leave(LANDING_FILE, { from: 'file:///p/lead', target: null, at: Date.now() });
-  assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/lead'), false);
-  assert.notEqual(note(LANDING_FILE), undefined, 'kept by the folder it left');
   assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/elsewhere'), true);
-  // A "Switched from" note written before #623 has no target and keeps the old rule.
+  assert.equal(note(LANDING_FILE), undefined);
+  // A "Switched from" note always names its target; one without is unusable.
   leave(SWITCHED_FROM_FILE, { folderUri: 'file:///p/lead', name: 'Leadership programme', at: Date.now() });
-  assert.equal(ProjectSwitcher.takeSwitchedFrom(context, 'file:///p/lead'), null);
-  assert.equal(ProjectSwitcher.takeSwitchedFrom(context, 'file:///p/elsewhere')?.name, 'Leadership programme');
+  assert.equal(ProjectSwitcher.takeSwitchedFrom(context, 'file:///p/elsewhere'), null);
+  assert.equal(note(SWITCHED_FROM_FILE), undefined, 'dropped');
   // Unusable notes are dropped: not JSON, no time, from the future.
   for (const bad of ['{not json', { from: 'file:///p/lead', target: 'file:///p/sales' }, { from: null, target: 'file:///p/sales', at: Date.now() + 60_000 }]) {
     leave(LANDING_FILE, bad);
     assert.equal(ProjectSwitcher.takeLanding(context, 'file:///p/other'), false);
     assert.equal(note(LANDING_FILE), undefined, `dropped: ${JSON.stringify(bad)}`);
   }
-  // The pure rules, as the shell's `ritemarkReadLanding` (patch 018) reads its own note.
+  // The pure rules: a note with a target as the shell's `ritemarkReadLanding` (patch 018) reads its own; one without,
+  // today's rule (the shell keeps that one in the folder it left: see #629's shell follow-up).
   const now = Date.now();
   assert.deepEqual(
     [
@@ -211,13 +241,14 @@ async function main(): Promise<void> {
       readLanding({ from: 'file:///p/lead', target: 'file:///p/sales', at: now }, 'file:///p/other', now),
       readLanding({ from: 'file:///p/lead', target: null, at: now }, 'file:///p/other', now),
       readLanding({ from: 'file:///p/lead', target: null, at: now }, 'file:///p/lead', now),
+      readLanding({ from: 'file:///p/lead', target: null, at: now }, null, now),
       readLanding({ from: 'file:///p/lead', target: 'file:///p/sales', at: now }, null, now),
       readLanding({ at: now - SWITCHED_NOTE_MS - 1 }, 'file:///p/sales', now),
       readSwitchedFrom({ folderUri: 'file:///p/lead', name: 'L', target: 'file:///p/sales', at: now }, 'file:///p/sales', now),
       readSwitchedFrom({ folderUri: 'file:///p/lead', name: 'L', target: 'file:///p/sales', at: now }, 'file:///p/other', now),
       readSwitchedFrom({ folderUri: 'file:///p/lead', at: now }, 'file:///p/sales', now),
     ],
-    ['take', 'keep', 'take', 'keep', 'keep', 'drop', 'take', 'keep', 'drop'],
+    ['take', 'keep', 'take', 'drop', 'drop', 'keep', 'drop', 'take', 'keep', 'drop'],
   );
   rmSync(storage, { recursive: true, force: true });
 
