@@ -4,7 +4,7 @@
 
 | File | Before | After | Change |
 |---|---|---|---|
-| `media/webview.js` | 8,749,976 bytes (SHA-256 `d26d4b7510a63bd3c32923370ff63f84e6b8bf77657a86267ad91b4ca10e908f`) | PR 1: 8,750,954 bytes | +978 bytes (`ui/close-focus.ts`, the two default `onCloseAutoFocus` and the link menu's use of the rule; +512 before review round 1's key and click rules) |
-| `media/office-preview.js` | 2,620,152 bytes | PR 1: 2,621,151 bytes | +999 bytes (the same rule, through the viewers' shared menus) |
+| `media/webview.js` | 8,749,976 bytes (SHA-256 `d26d4b7510a63bd3c32923370ff63f84e6b8bf77657a86267ad91b4ca10e908f`) | PR 1: 8,751,229 bytes | +1,253 bytes (`ui/close-focus.ts`, the two contents' `onCloseAutoFocus` and the link menu's use of the rule; +512 before the review's two rounds) |
+| `media/office-preview.js` | 2,620,152 bytes | PR 1: 2,621,425 bytes | +1,273 bytes (the same rule, through the viewers' shared menus) |
 
 PR 1 carries #585's commit (`f370bb66`, now `2f691d92`): `webview/src/components/ui/` and `header/ExportMenu.tsx` only. Its test (`closeFocus.test.ts`) is not in either bundle.

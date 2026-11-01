@@ -62,6 +62,14 @@ The audit found nothing in the shared rule to fix. PR 1's first review round (#6
 
 After those changes, four rows ran again in Light on the rebuilt bundle (the zoom menu, Doing limit, Share and the agent Select): every step met the rule.
 
+The second round changed four more things, and the same four rows ran again in Light and Dark on its bundle, every step meeting the rule:
+- **A script's own events say nothing.** An untrusted `keydown` or `pointerdown` (`dispatchEvent`) no longer moves the rule, as an untrusted click didn't.
+- **The Mac's Option characters are typing.** Option-2 types @ on many layouts; Option with a character and no ⌘ or Ctrl now counts as the keyboard on a Mac. On Windows, Alt with a letter is still a menu's shortcut.
+- **A press's own clicks are left out until its task ends,** from the release, however long the press was held (a label held down for a second used to slip through the time window).
+- **A consumer's own `onCloseAutoFocus` runs first, and the rule follows** unless that handler prevented the focus itself (`closeFocusHandler`). A handler that only watches the close can no longer bring back Radix's focus after every close.
+
+**Not fixed, and said plainly:** by the round's reading of Chromium's source, an assistive technology's click (VoiceOver's VO-Space) comes with a press of its own, so it reads as the pointer: after such a pick the trigger doesn't get the focus back, where `main` gave it back. Not run live. Decision 1's change in PR 2 returns the focus to the trigger after every close, with the tracker deciding the ring, which ends it; PR 1 shouldn't reach a release without PR 2.
+
 ## Not run, and why
 
 - **Rows behind a ready AI:** the composer's model, permission, runtime and More menus, its thinking effort popover, the conversation header's and rows' More actions, the link menu (`ChatLinkMenu`, S7), and the board's Give to, Send to, Retry with and Review with carets (`AgentSplitButton`, disabled with no usable agent). The scratch homes have no AI signed in, and this run signs in nothing.

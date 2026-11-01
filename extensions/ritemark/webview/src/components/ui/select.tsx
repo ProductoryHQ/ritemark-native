@@ -6,7 +6,7 @@
 
 import React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
-import { focusTriggerOnlyAfterKeyboard } from './close-focus';
+import { closeFocusHandler } from './close-focus';
 import { Icon } from './Icon';
 import { cn } from '../../lib/utils';
 
@@ -48,11 +48,11 @@ SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = 'popper', onCloseAutoFocus = focusTriggerOnlyAfterKeyboard, ...props }, ref) => (
+>(({ className, children, position = 'popper', onCloseAutoFocus, ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
-      onCloseAutoFocus={onCloseAutoFocus}
+      onCloseAutoFocus={closeFocusHandler(onCloseAutoFocus)}
       className={cn(
         // Issue #272: without a cap, popper-positioned content sizes to its
         // widest child (option descriptions) and can exceed the webview's

@@ -8,12 +8,12 @@
  * outside, no focus goes back and nothing is drawn round the trigger. After Enter, Space or Escape the trigger has the
  * focus again, with its ring, and a keyboard user carries on from it.
  *
- * The rule reads the page's last input, not the close itself: a pointer press or a key (or a click no press made:
- * assistive technology), seen in the capture phase before any menu handles it. In practice that is the input that
- * closed the menu; a menu the app closes with no input in the page follows whatever came last. The contents in
- * `dropdown-menu.tsx` and `select.tsx` take `focusTriggerOnlyAfterKeyboard` as their default `onCloseAutoFocus`; a
- * consumer that passes its own keeps it, and the two that focus something else read `lastInputKind` (Share's stand-in
- * trigger, `header/ExportMenu.tsx`; the AI sheet's link menu, `ai-sidebar/ChatLinkMenu.tsx`).
+ * The rule reads the page's last input, not the close itself: a pointer press or a key (or a click no press made),
+ * seen in the capture phase before any menu handles it. In practice that is the input that closed the menu; a menu the
+ * app closes with no input in the page follows whatever came last. The contents in `dropdown-menu.tsx` and
+ * `select.tsx` pass their `onCloseAutoFocus` through `closeFocusHandler`: a consumer's own handler runs first, and the
+ * rule follows unless that handler prevented the focus. The two that focus something else read `lastInputKind`
+ * (Share's stand-in trigger, `header/ExportMenu.tsx`; the AI sheet's link menu, `ai-sidebar/ChatLinkMenu.tsx`).
  */
 
 export type InputKind = 'pointer' | 'keyboard'
@@ -26,8 +26,8 @@ interface InputEventLike {
   altKey?: boolean
   /** A click's count of presses: 0 for a click no press made (a keyboard's or assistive technology's activation). */
   detail?: number
+  /** False for an event a script made (`dispatchEvent`, `click()`): it says nothing about the person. */
   isTrusted?: boolean
-  timeStamp?: number
   getModifierState?(key: string): boolean
 }
 
@@ -38,26 +38,31 @@ interface InputTarget {
 const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'CapsLock', 'Fn'])
 // The keys that move through a page or act on a menu: Radix picks, closes and moves on these whatever is held
 const ACTING_KEYS = new Set(['Enter', ' ', 'Escape', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'])
+const ON_A_MAC = typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent)
 
-/** What an input event says about how the person works (pure, tested); null when it says nothing. */
-export function inputKindOf(event: InputEventLike): InputKind | null {
+/**
+ * What an input event says about how the person works (pure, tested); null when it says nothing. `mac`: on a Mac,
+ * Option types characters (@ [ ] { } on many layouts), where on Windows Alt with a letter is a menu's shortcut.
+ */
+export function inputKindOf(event: InputEventLike, mac = ON_A_MAC): InputKind | null {
+  if (event.isTrusted === false) return null
   if (event.type === 'pointerdown') return 'pointer'
-  // A click no press made: assistive technology's activation (VoiceOver's VO-Space, Voice Control) sends only this.
-  // A script's own click() is untrusted and says nothing; `watchInput` leaves out the click a press just made.
+  // A click no press made: a keyboard's activation, or assistive technology that sends no press of its own. (Chromium
+  // sends a press before its own accessibility click, by PR 1's review round 2 reading its source, not run live: that
+  // click then reads as the pointer.) `watchInput` leaves out the clicks a press makes.
   if (event.type === 'click') return event.isTrusted === true && event.detail === 0 ? 'keyboard' : null
   if (event.type !== 'keydown' || !event.key) return null
   // A modifier on its own is not moving through the page
   if (MODIFIER_KEYS.has(event.key)) return null
   if (ACTING_KEYS.has(event.key)) return 'keyboard'
-  // A shortcut (⌘, Ctrl or Alt held) is not moving through the page either; AltGr's characters are typing (Windows
-  // reports AltGr as Ctrl and Alt held)
-  const altGraph = event.getModifierState?.('AltGraph') === true
-  if (!altGraph && (event.metaKey || event.ctrlKey || event.altKey)) return null
+  // A shortcut (⌘, Ctrl or Alt held) is not moving through the page either. Characters are typing: AltGr's (Windows
+  // reports AltGr as Ctrl and Alt held), and the Mac's Option ones
+  const typed =
+    event.getModifierState?.('AltGraph') === true ||
+    (mac && event.altKey === true && !event.metaKey && !event.ctrlKey && event.key.length === 1)
+  if (!typed && (event.metaKey || event.ctrlKey || event.altKey)) return null
   return 'keyboard'
 }
-
-// A click this soon after a press is that press's own (a label passing its click on to its field), not a second input
-const PRESS_CLICK_MS = 1000
 
 // Nothing seen yet keeps Radix's own behaviour: the trigger gets the focus back
 let lastInput: InputKind = 'keyboard'
@@ -67,28 +72,45 @@ const watchedTargets = new WeakSet<object>()
 export function watchInput(target: InputTarget | undefined = typeof window === 'undefined' ? undefined : window): void {
   if (!target || watchedTargets.has(target)) return
   watchedTargets.add(target)
-  let lastPressAt = -Infinity
+  // A press's own clicks (and a label's, passed on to its field) come after its release, in the same task: they are
+  // left out until that task ends, however long the press was held
+  let pressing = false
   const note = (event: Event) => {
     const input = event as unknown as InputEventLike
+    if (input.isTrusted === false) return
+    if (input.type === 'pointerup' || input.type === 'pointercancel') {
+      setTimeout(() => { pressing = false }, 0)
+      return
+    }
+    if (input.type === 'click' && pressing) return
     const kind = inputKindOf(input)
     if (!kind) return
-    const at = input.timeStamp ?? 0
-    if (input.type === 'click' && at - lastPressAt < PRESS_CLICK_MS) return
-    if (kind === 'pointer') lastPressAt = at
+    pressing = kind === 'pointer'
     lastInput = kind
   }
-  target.addEventListener('pointerdown', note, true)
-  target.addEventListener('keydown', note, true)
-  target.addEventListener('click', note, true)
+  for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'keydown', 'click']) target.addEventListener(type, note, true)
 }
 
 export function lastInputKind(): InputKind {
   return lastInput
 }
 
-/** A menu's default `onCloseAutoFocus`: the trigger gets the focus back only after a keyboard close. */
+/** A menu's default `onCloseAutoFocus`: the trigger gets the focus back only after the keyboard. */
 export function focusTriggerOnlyAfterKeyboard(event: Event): void {
   if (lastInput === 'pointer') event.preventDefault()
+}
+
+/**
+ * The `onCloseAutoFocus` a shared menu or list passes on: the consumer's own handler first, then the rule, unless that
+ * handler prevented the close's focus itself (Share's menu, the link menu). A handler that only watches the close
+ * can't bring back Radix's focus after every close.
+ */
+export function closeFocusHandler(own?: (event: Event) => void): (event: Event) => void {
+  if (!own) return focusTriggerOnlyAfterKeyboard
+  return (event) => {
+    own(event)
+    if (!event.defaultPrevented) focusTriggerOnlyAfterKeyboard(event)
+  }
 }
 
 // From the first import, so the press that opens the first menu is already known

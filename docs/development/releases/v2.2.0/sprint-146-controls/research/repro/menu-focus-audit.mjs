@@ -282,6 +282,7 @@ const STEPS = {
   async mouseOutside(f, row) {
     const r = await openByMouse(f, row);
     const blank = await rectOf(f, row.blank);
+    if (!blank) return { notRun: 'no blank spot to click beside the trigger', r };
     await click(blank.x + 4, blank.y + Math.min(6, blank.h / 2)); await sleep(700);
     await mouseMove(4, 880); await sleep(300);
     return { r };
