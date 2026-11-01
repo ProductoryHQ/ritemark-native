@@ -1,8 +1,21 @@
 # A6: Is there an Electron 43.x on Node 24.22.1? (R12, S50, #515)
 
-Run at the sprint's start, 31 October 2026, 20:35 UTC, on the Mac. To be run again before 2.2's candidate is built.
+Run at the sprint's start, 31 October 2026, 20:35 UTC, on the Mac, and again for PR 6 on 1 November 2026, 17:21 UTC (below). If a newer 43.x is out when 2.2's candidate is built, the candidate's run records it.
 
-## The newest 43.x and its Node (measured)
+## Run again for PR 6: 1 November 2026, 17:21 UTC (measured)
+
+Same sources: Electron's release list (`releases.json`, its `node` field), npm (`npm view electron time`, `dist-tags`) and the GitHub releases.
+
+- **The newest 43.x is still 43.8.6, on Node 24.22.1.** npm's `43-x-y` tag is 43.8.6; nothing on the 43 line is newer on npm, in `releases.json` or on GitHub (no draft, no prerelease). 43.8.4, 43.8.5 and 43.8.6 are on Node 24.22.1, all with Chromium 150.0.7871.250 and native-module ABI 148, the same as 43.8.3.
+- **The release:** GitHub's `v43.8.6`, published 30 October 23:35 UTC from `43-x-y`, tag commit `294458de94162d6f71ab2d740cdd5d5643d32aad`. Its notes: a `net.fetch()` speed-up for `file:` URLs and backported fixes from ANGLE, Chromium, libaom, libvpx, PDFium, Skia, V8 and WebRTC. 43.8.5's: a Linux D-Bus crash fix, a `net.fetch()` speed-up, Chromium, Dawn, Skia and V8 backports. 43.8.4's: Node 24.22.1 (electron/electron#55161), File System Access blocklist fixes, asar archive handling fixes, tzdata 2026e, `utilityProcess` exit on quit.
+- **Its `SHASUMS256.txt`:** 7610 bytes, 75 entries, no newline after the last, SHA-256 `91b08f0fe67f1b274dfff20995e9423d3a483ccc5bb4329792605aa25dd88e54`, equal to the digest GitHub shows for the asset.
+- **Node 24.22.1's tag commit** in nodejs/node: `ce7aaf1cee78b8cf0ce17364260535c418d3ed26` (for the notices).
+- **Upstream VS Code** `main` is still on 43.8.3 (`d6e20fdc`, 23 October), so no VS Code update brings the fix.
+- **The extension host's Node network calls** are unchanged since the 31 October read: of the four PRs merged to `extensions/ritemark/src` since `39b4e37f` (#605, #607, #610, #612; `main` at `d2fc595a`), no added line calls `fetch(`, `https.request(`, `http.request(`, `https.get(`, `http.get(`, `net.request`, `posthog-node` or `new OpenAI(`, and the files that do are the same list.
+
+**So PR 6 takes 43.8.6.** Measured in PR 6 ([pr6-electron-checks.md](pr6-electron-checks.md)): the downloaded 43.8.6 reports Node 24.22.1.
+
+## The newest 43.x and its Node on 31 October (measured)
 
 From Electron's own release list (`https://releases.electronjs.org/releases.json`, its `node` field), npm's publish times (`npm view electron time`) and each GitHub release's notes:
 

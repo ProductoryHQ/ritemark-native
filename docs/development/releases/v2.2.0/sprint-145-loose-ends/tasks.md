@@ -92,8 +92,8 @@ Approved on 1 November (`819c63f`); Codex reviews once (marked ready once, after
 
 ## Phase 7: PR 6, the Electron (W12; R12)
 
-- [ ] A6 run again before the candidate; if a 43.x on Node 24.22.1 or later exists: patch 020 moved, checks of S51; PR 6 reviewed at High
-- [ ] If none exists: the risk in the release plan and on #515; Jarmo's answer to decision 4 recorded
+- [x] A6 run again before the candidate; if a 43.x on Node 24.22.1 or later exists: patch 020 moved, checks of S51; PR 6 reviewed at High (1 November: 43.8.6 on Node 24.22.1; [research/pr6-electron-checks.md](research/pr6-electron-checks.md))
+- [x] If none exists: the risk in the release plan and on #515; Jarmo's answer to decision 4 recorded (not needed: 43.8.6 exists, so decision 4 doesn't apply)
 
 ## Phase 8: The real keyboard (R11)
 
