@@ -61,12 +61,25 @@ export type FlagId =
   // Sprint 125: read-only PowerPoint (.pptx) preview (#285)
   | 'powerpoint-preview'
   // Sprint 145 (#588): a writer's copy merged with the person's text by paragraph
-  | 'editor-sync-merge';
+  | 'editor-sync-merge'
+  // Sprint 148 (#591): Ritemark's own search, the words layer (its index reads the project in a worker)
+  | 'project-search';
 
 /**
  * Feature flag registry
  */
 export const FLAGS: Record<FlagId, FeatureFlag> = {
+  // Sprint 148 (#591): kill switch for Ritemark's own search, as `powerpoint-preview` is. Default ON (HARD RULE #2):
+  // the setting defaults to true. Search reads every document of the project in the background, so a way to stop it
+  // without a release is worth one setting. Off, the index never starts (and a running one stops); with PR 2, the
+  // Search row opens VS Code's search as in 2.1. VS Code's own search stays in More either way.
+  'project-search': {
+    id: 'project-search',
+    label: 'Project Search',
+    description: 'Search the words in this project\'s documents, chats and tasks, on this computer.',
+    status: 'experimental',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
   // Sprint 145 (#588): both changes stay. A writer's (an AI's or another app's) copy is merged with the person's
   // text by paragraph, with Review changes for a paragraph both changed; patch 014's reload participant asks
   // `_ritemark.editorSync.answerReload` first. ON ('stable'); a code-level kill switch an extension release can
