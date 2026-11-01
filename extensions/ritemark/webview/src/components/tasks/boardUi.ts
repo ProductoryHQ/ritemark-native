@@ -11,9 +11,15 @@
 import { create } from 'zustand'
 import type { AgentId } from '../../../../src/agent/types'
 import type { BoardAnswer, CardStage } from '../../../../src/taskBoard/protocol'
-import { notify, request, type BoardCall } from './boardClient'
+import { beginMove, notify, request, settleMove, type BoardCall } from './boardClient'
 
 export type NoteKind = 'changes' | 'answer'
+
+/** A file the board couldn't read, while Try again or Remove runs, or after the trash refused it (#596). */
+export type FileRowState =
+  | { busy: 'retrying' | 'removing'; note?: undefined; sentence?: undefined }
+  /** The trash refused: `note` replaces the row's own sentence while that is still `sentence`. */
+  | { note: string; sentence: string; busy?: undefined }
 
 export type GivePrompt =
   | { cardId: string; runtimeId: AgentId; kind: 'conflict'; withCardId: string; withTitle: string; file: string }
@@ -24,6 +30,10 @@ interface BoardUiState {
   note: { cardId: string; where: string; kind: NoteKind } | null
   prompt: GivePrompt | null
   confirmDeleteId: string | null
+  /** A file the board couldn't read, waiting for the one question before Remove (#596). */
+  confirmRemoveFile: string | null
+  /** Files the board couldn't read whose row is busy or carries the trash's refusal, by file name. */
+  files: Record<string, FileRowState>
   notice: string | null
   /** Cards with a request in flight: their agent buttons wait. */
   pending: Record<string, true>
@@ -34,6 +44,7 @@ interface BoardUiState {
   closeNote(): void
   clearPrompt(): void
   askDelete(cardId: string | null): void
+  askRemoveFile(fileName: string | null): void
   showNotice(text: string | null): void
 }
 
@@ -43,13 +54,18 @@ export const useBoardUi = create<BoardUiState>((set) => ({
   note: null,
   prompt: null,
   confirmDeleteId: null,
+  confirmRemoveFile: null,
+  files: {},
   notice: null,
   pending: {},
   openCard: (cardId, focus) => notify({ type: 'board/open-card', cardId, ...(focus ? { focus: true } : {}) }),
   openNote: (cardId, where, kind) => set({ note: { cardId, where, kind } }),
   closeNote: () => set({ note: null }),
   clearPrompt: () => set({ prompt: null }),
-  askDelete: (cardId) => set({ confirmDeleteId: cardId }),
+  // The board asks one question at a time: opening one closes the other, so an answer never lands on a question
+  // left behind.
+  askDelete: (cardId) => set(cardId ? { confirmDeleteId: cardId, confirmRemoveFile: null } : { confirmDeleteId: null }),
+  askRemoveFile: (fileName) => set(fileName ? { confirmRemoveFile: fileName, confirmDeleteId: null } : { confirmRemoveFile: null }),
   showNotice: (text) => {
     if (noticeTimer) clearTimeout(noticeTimer)
     set({ notice: text })
@@ -99,8 +115,70 @@ export async function giveCard(cardId: string, runtimeId: AgentId, options: { fo
   }
 }
 
+/**
+ * Move a card: drawn in its new place at once (Sprint 145, #597), then sent. The drop, Move to…, Reopen and the
+ * card page's stage all come here; a refusal puts the card back and the notice says why.
+ */
 export async function moveCard(cardId: string, stage: CardStage, position: { beforeCardId?: string; atEnd?: boolean } = {}): Promise<void> {
-  await act({ type: 'board/move', cardId, stage, ...position })
+  const token = beginMove(cardId, stage, position)
+  const answer = await act({ type: 'board/move', cardId, stage, ...position })
+  settleMove(token, answer.ok, answer.ok ? answer.revision : undefined)
+}
+
+/** Mark done: the card goes to the top of Done at once, as the host puts it there (#597). */
+export async function markCardDone(cardId: string): Promise<void> {
+  const token = beginMove(cardId, 'done')
+  const answer = await act({ type: 'board/mark-done', cardId })
+  settleMove(token, answer.ok, answer.ok ? answer.revision : undefined)
+}
+
+/**
+ * Try again on a file the board couldn't read (Sprint 145, #596). While it reads, the row's buttons wait; if the
+ * read works, the card is in the snapshot that comes before the answer and the row goes. A refusal (the file is
+ * no longer one the board couldn't read) needs no notice: the next snapshot shows how things are.
+ */
+export async function retryFile(fileName: string): Promise<void> {
+  // A row that is already reading or removing takes no second request (a double click, a key repeat).
+  if (useBoardUi.getState().files[fileName]?.busy) return
+  setFileState(fileName, { busy: 'retrying' })
+  try {
+    await request({ type: 'board/retry-file', fileName })
+  } finally {
+    setFileState(fileName, null)
+  }
+}
+
+/**
+ * Remove, after the board's question: the file goes to the system trash. If the trash refuses, the row says so in
+ * place of its own sentence (`sentence`), until the person acts on the row again or its own sentence changes. Any
+ * other refusal is the board's usual notice.
+ */
+export async function removeFile(fileName: string, sentence: string): Promise<void> {
+  if (useBoardUi.getState().files[fileName]?.busy) return
+  setFileState(fileName, { busy: 'removing' })
+  const answer = await request({ type: 'board/remove-file', fileName })
+  if (!answer.ok && answer.code === 'trash-refused') {
+    setFileState(fileName, { note: answer.message, sentence })
+    return
+  }
+  setFileState(fileName, null)
+  if (!answer.ok && answer.code !== 'not-found') useBoardUi.getState().showNotice(answer.message)
+}
+
+/** Forget what the rows of files no longer listed carried (a refusal's sentence, a finished wait). */
+export function forgetFileStates(listed: ReadonlySet<string>): void {
+  const files = useBoardUi.getState().files
+  if (Object.keys(files).every((name) => listed.has(name))) return
+  useBoardUi.setState({ files: Object.fromEntries(Object.entries(files).filter(([name]) => listed.has(name))) })
+}
+
+function setFileState(fileName: string, state: FileRowState | null): void {
+  useBoardUi.setState((current) => {
+    const files = { ...current.files }
+    if (state) files[fileName] = state
+    else delete files[fileName]
+    return { files }
+  })
 }
 
 export async function sendNote(cardId: string, text: string, runtimeId?: AgentId): Promise<boolean> {

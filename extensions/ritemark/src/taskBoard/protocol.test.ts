@@ -66,6 +66,15 @@ function main(): void {
   rejects({ type: 'board/open-card', cardId: 'k3f9x2', fileName: 'a.md' }, /exactly one/);
   rejects({ type: 'board/open-card', fileName: '../escape.md' }, /card file name/);
   rejects({ type: 'board/open-card', cardId: 'k3f9x2', focus: 'yes' }, /focus must be true or false/);
+  // Sprint 145 (#596): Try again and Remove on a file the board couldn't read take a bare card file name only.
+  assert.deepEqual(decodeBoardRequest({ type: 'board/retry-file', requestId: 'r1', fileName: 'stuck.md' }), { type: 'board/retry-file', requestId: 'r1', fileName: 'stuck.md' });
+  assert.deepEqual(decodeBoardRequest({ type: 'board/remove-file', requestId: 'r2', fileName: 'stuck.md' }), { type: 'board/remove-file', requestId: 'r2', fileName: 'stuck.md' });
+  for (const fileName of ['../elsewhere.md', 'nested/stuck.md', 'nested\\stuck.md', '.hidden.md', 'notes.txt', '', 42]) {
+    rejects({ type: 'board/remove-file', requestId: 'r', fileName }, /card file name/);
+    rejects({ type: 'board/retry-file', requestId: 'r', fileName }, /card file name/);
+  }
+  rejects({ type: 'board/remove-file', fileName: 'stuck.md' }, /requestId is required/);
+  rejects({ type: 'board/remove-file', requestId: 'r', fileName: 'stuck.md', cardId: 'k3f9x2' }, /cardId is not part of board\/remove-file/);
   rejects({ type: 'board/open-as-document', cardId: 'k3f9x2' }, /known board request/);
   rejects({ type: 'board/open', cardId: 'k3f9x2' }, /cardId is not part of board\/open/);
   rejects({ type: 'board/ready', surface: 'window' }, /sidebar, panel or page/);

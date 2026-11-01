@@ -183,6 +183,12 @@ function main(): void {
     const newer = parseCardFile('---\nritemark: task/2\nid: k3f9x2\ntitle: T\nstage: todo\n---\n');
     assert.equal(newer.kind, 'error');
     if (newer.kind === 'error') assert.match(newer.message, /newer format/);
+    assert.equal(newer.kind === 'error' && newer.problem, 'newer');
+    // Sprint 145 (#596): only a higher version is a newer Ritemark's card; a typo is a mistake to fix in the file.
+    for (const typo of ['task/l', 'task/1.0', 'task/0', 'task/']) {
+      const parsed = parseCardFile(`---\nritemark: ${typo}\nid: k3f9x2\ntitle: T\nstage: todo\n---\n`);
+      assert.deepEqual(parsed.kind === 'error' ? [parsed.problem, parsed.message] : parsed.kind, ['field', 'ritemark must be task/1.'], `${typo} is a mistake, not a newer card`);
+    }
 
     const lenient = parsedCard('---\nritemark: task/1\nid: k3f9x2\ntitle: 2026\nstage: todo\nrank: 5\n---\n').card;
     assert.equal(lenient.title, '2026', 'an unquoted number reads as text');

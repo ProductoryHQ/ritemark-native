@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { BoardStore, BoardStoreError, nodeBoardStoreFileSystem, type BoardEntry, type BoardStoreFileSystem, type CardDocuments } from './BoardStore';
+import { BoardStore, BoardStoreError, nodeBoardStoreFileSystem, readFailureWords, saveFailedWords, type BoardEntry, type BoardStoreFileSystem, type CardDocuments } from './BoardStore';
 import { parseCardFile, serializeCard, splitCardText, type Card } from './cardFile';
 
 const trashed: string[] = [];
@@ -146,7 +146,11 @@ async function main(): Promise<void> {
       'cards in stage order; README and the leftover temp file are not cards; the broken file is listed',
     );
     const broken = entries.find((entry) => entry.kind === 'unreadable');
-    assert.match(broken && broken.kind === 'unreadable' ? broken.message : '', /not valid YAML/);
+    // Sprint 145 (#596): one plain sentence, no parser output; the YAML error goes to the log.
+    assert.deepEqual(
+      broken && broken.kind === 'unreadable' ? { message: broken.message, reason: broken.reason } : null,
+      { message: 'The lines at the top of this file, where the board keeps the card’s title and column, have a mistake.', reason: 'format' },
+    );
   }
 
   // ── A broken card file is never written to ─────────────────────────────────
@@ -407,12 +411,299 @@ async function main(): Promise<void> {
     assert.deepEqual(cardsOf(entries).map((card) => card.title), ['Still on the board'], 'the readable card loads');
     const unreadable = entries.find((entry) => entry.kind === 'unreadable');
     assert.ok(unreadable && unreadable.kind === 'unreadable' && unreadable.fileName === 'p7q2m4-cloud.md', 'the timed-out file is listed as unreadable');
-    assert.match(unreadable.kind === 'unreadable' ? unreadable.message : '', /Couldn't read it: ETIMEDOUT/, 'with the reason');
+    // Sprint 145 (#596): what happened, once, in plain words; the error code goes to the log, not the row.
+    assert.deepEqual(
+      unreadable.kind === 'unreadable' ? { message: unreadable.message, reason: unreadable.reason } : null,
+      { message: 'Ritemark couldn’t open this file in time. If this folder syncs from the cloud, the file may still be downloading.', reason: 'read' },
+      'with the reason, in plain words',
+    );
+    assert.doesNotMatch(unreadable.kind === 'unreadable' ? unreadable.message : '', /ETIMEDOUT|Couldn/, 'no error code, no second “Couldn’t read”');
     assert.equal(await store.invalidate('p7q2m4-cloud.md'), false, 'the same failure again is no change');
 
     cloudReady = true;
     assert.equal(await store.invalidate('p7q2m4-cloud.md'), true, 'once the file can be read, it becomes a card again');
     assert.deepEqual(cardsOf(await store.list()).map((card) => card.title).sort(), ['In the cloud', 'Still on the board']);
+  }
+
+  // ── Sprint 145 (#596): each reason has its own words and its own buttons ──
+  {
+    assert.equal(readFailureWords(Object.assign(new Error('EBUSY'), { code: 'EBUSY' })), readFailureWords(Object.assign(new Error('x'), { code: 'ETIMEDOUT' })), 'busy reads as a timeout');
+    assert.equal(
+      readFailureWords(Object.assign(new Error('UNKNOWN: unknown error, read'), { code: 'UNKNOWN', syscall: 'read' })),
+      'Ritemark couldn’t open this file in time. If this folder syncs from the cloud, the file may still be downloading.',
+      'a Windows cloud file not on the computer yet (patch 011’s case) gets the cloud sentence',
+    );
+    assert.equal(readFailureWords(Object.assign(new Error('EDEADLK'), { code: 'EDEADLK' })), readFailureWords(Object.assign(new Error('x'), { code: 'ETIMEDOUT' })), 'an iCloud file not on the Mac yet reads as a timeout');
+    assert.equal(readFailureWords(Object.assign(new Error('EACCES'), { code: 'EACCES' })), 'This computer doesn’t let Ritemark open this file.');
+    assert.equal(readFailureWords(Object.assign(new Error('EPERM'), { code: 'EPERM' })), 'This computer doesn’t let Ritemark open this file.');
+    assert.equal(readFailureWords(Object.assign(new Error('EIO'), { code: 'EIO' })), 'Ritemark couldn’t open this file.');
+    assert.equal(readFailureWords('not even an error'), 'Ritemark couldn’t open this file.');
+
+    const folder = tempFolder();
+    fs.mkdirSync(tasksDir(folder), { recursive: true });
+    fs.writeFileSync(path.join(tasksDir(folder), 'newer.md'), '---\nritemark: task/9\nid: n3w3r1\ntitle: From the future\n---\n');
+    fs.writeFileSync(path.join(tasksDir(folder), 'no-title.md'), '---\nritemark: task/1\nid: n0t1t1\ntitle: ""\nstage: todo\n---\n');
+    fs.writeFileSync(path.join(tasksDir(folder), 'locked.md'), '---\nritemark: task/1\nid: l0ck3d\ntitle: Locked\nstage: todo\n---\n');
+    const store = newStore(folder, {
+      async readFile(file) {
+        if (path.basename(file) === 'locked.md') throw Object.assign(new Error(`EACCES: permission denied, open '${file}'`), { code: 'EACCES' });
+        return nodeBoardStoreFileSystem.readFile(file);
+      },
+    });
+    const rows = (await store.list()).flatMap((entry) => (entry.kind === 'unreadable' ? [{ file: entry.fileName, reason: entry.reason, message: entry.message }] : []));
+    assert.deepEqual(rows, [
+      { file: 'locked.md', reason: 'read', message: 'This computer doesn’t let Ritemark open this file.' },
+      { file: 'newer.md', reason: 'newer', message: 'A newer Ritemark made this card. Update Ritemark to see it.' },
+      { file: 'no-title.md', reason: 'format', message: 'title is empty.' },
+    ], 'a refused read, a newer card and a broken field: each its reason and sentence (a field rule keeps the parser’s own)');
+    assert.ok(rows.every((row) => !row.message.includes(folder)), 'no path on the row');
+  }
+
+  // ── Sprint 145 (#597): a re-read that hangs holds no other change ─────────
+  {
+    const folder = tempFolder();
+    writeCard(folder, 'stuck.md', { id: 'st0ck1', title: 'Stuck in the cloud' });
+    writeCard(folder, 'other.md', { id: '0th3r1', title: 'Another card' });
+    let hang = 0;
+    const store = newStore(folder, {
+      async readFile(file) {
+        if (hang && path.basename(file) === 'stuck.md') await new Promise((resolve) => setTimeout(resolve, hang));
+        return nodeBoardStoreFileSystem.readFile(file);
+      },
+    });
+    await store.list();
+    hang = 400;
+    const started = Date.now();
+    const reread = store.invalidate('stuck.md');
+    const moved = await store.mutate('0th3r1', { by: 'you', what: 'Moved to Doing' }, (card) => ({ ...card, stage: 'doing' }));
+    const moveMs = Date.now() - started;
+    assert.equal(moved.stage, 'doing');
+    assert.ok(moveMs < 200, `a move of another card doesn't wait for the stuck read (${moveMs} ms)`);
+    assert.equal(await reread, false, 'the stuck file, read at last, is unchanged');
+    hang = 0;
+  }
+
+  // ── A re-read the store has overtaken doesn't apply: the file is read again ─
+  {
+    const folder = tempFolder();
+    writeCard(folder, 'race.md', { id: 'r4c3r1', title: 'Races a move' });
+    let slowNext = false;
+    const store = newStore(folder, {
+      async readFile(file) {
+        // The text is read the moment it is asked for; a slow answer comes late (a slow drive answering an old question).
+        const text = fs.readFileSync(file, 'utf8');
+        if (slowNext && path.basename(file) === 'race.md') {
+          slowNext = false;
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        }
+        return text;
+      },
+    });
+    await store.list();
+    slowNext = true;
+    const stale = store.invalidate('race.md');
+    await new Promise((resolve) => setTimeout(resolve, 20)); // it has read, and answers late
+    await store.mutate('r4c3r1', { by: 'you', what: 'Moved to Done' }, (card) => ({ ...card, stage: 'done' }));
+    assert.equal(await stale, false, 'the read from before the move does not apply');
+    assert.equal(cardsOf(await store.list())[0].stage, 'done', 'the move stays: no flicker back to the old column');
+
+    // An edit from outside that lands after the store's write, while the overtaken read was out: the read again sees it.
+    const file = path.join(tasksDir(folder), 'race.md');
+    slowNext = true;
+    const late = store.invalidate('race.md');
+    await new Promise((resolve) => setTimeout(resolve, 20)); // it has read, and answers late
+    await store.mutate('r4c3r1', { by: 'you', what: 'Moved to Doing' }, (card) => ({ ...card, stage: 'doing' }));
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('title: Races a move', 'title: Edited after the move'));
+    assert.equal(await late, true, 'the overtaken read is made again, and finds the edit');
+    assert.deepEqual([cardsOf(await store.list())[0].title, cardsOf(await store.list())[0].stage], ['Edited after the move', 'doing']);
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('title: Edited after the move', 'title: Races a move'));
+    await store.invalidate('race.md');
+
+    // Two re-reads of one file run one after the other, and the later one's text is what stays.
+    slowNext = true;
+    const older = store.invalidate('race.md'); // reads "done", answers late
+    await new Promise((resolve) => setTimeout(resolve, 20)); // it has read
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('title: Races a move', 'title: Renamed outside'));
+    assert.equal(await store.invalidate('race.md'), true, 'the later read applies');
+    assert.equal(await older, false, 'the earlier read changed nothing');
+    assert.equal(cardsOf(await store.list())[0].title, 'Renamed outside');
+  }
+
+  // ── A file that hangs is not asked again while it is still answering ──────
+  {
+    const folder = tempFolder();
+    writeCard(folder, 'busy.md', { id: 'bu5y01', title: 'Touched by a sync client' });
+    let reading = 0;
+    let most = 0;
+    let reads = 0;
+    const store = newStore(folder, {
+      async readFile(file) {
+        if (path.basename(file) !== 'busy.md') return nodeBoardStoreFileSystem.readFile(file);
+        reads += 1;
+        reading += 1;
+        most = Math.max(most, reading);
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        reading -= 1;
+        return nodeBoardStoreFileSystem.readFile(file);
+      },
+    });
+    await store.list();
+    reads = 0;
+    await Promise.all([store.invalidate('busy.md'), store.invalidate('busy.md'), store.invalidate('busy.md'), store.invalidate('busy.md')]);
+    assert.deepEqual({ reads, most }, { reads: 2, most: 1 }, 'four watcher events while it answers: the read running and one after it, shared');
+  }
+
+  // ── Try again reads at once, beside a read of the same file that is stuck ──
+  {
+    const folder = tempFolder();
+    writeCard(folder, 'cloud.md', { id: 'c10ud2', title: 'In the cloud' });
+    let mode: 'fail' | 'stuck-then-fail' | 'ok' = 'ok';
+    const store = newStore(folder, {
+      async readFile(file) {
+        if (path.basename(file) !== 'cloud.md') return nodeBoardStoreFileSystem.readFile(file);
+        const now = mode;
+        if (now === 'stuck-then-fail') {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+        if (now !== 'ok') throw Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' });
+        return nodeBoardStoreFileSystem.readFile(file);
+      },
+    });
+    await store.list();
+    mode = 'fail';
+    await store.invalidate('cloud.md');
+    assert.ok(store.isUnreadable('cloud.md'));
+    mode = 'stuck-then-fail';
+    const stuck = store.invalidate('cloud.md'); // the watcher's read, stuck for a while, and then failing
+    await new Promise((resolve) => setTimeout(resolve, 20)); // it is reading
+    mode = 'ok';
+    const started = Date.now();
+    assert.equal(await store.invalidate('cloud.md', { fresh: true }), true, 'a fresh read doesn’t wait behind it');
+    assert.ok(Date.now() - started < 200, 'and comes back at once');
+    assert.equal(await stuck, false, 'the stuck read, failing late, doesn’t undo the card');
+    assert.deepEqual(cardsOf(await store.list()).map((card) => card.title), ['In the cloud']);
+    assert.ok(store.revision > 0, 'every change counts');
+  }
+
+  // ── Hung re-reads can't take every I/O thread, and Try again pressed again starts no second read ─
+  {
+    const folder = tempFolder();
+    for (const name of ['one', 'two', 'three', 'four']) writeCard(folder, `${name}.md`, { id: `${name.slice(0, 3)}001`, title: name });
+    let hang = false;
+    let reading = 0;
+    let most = 0;
+    let freshReads = 0;
+    const store = newStore(folder, {
+      async readFile(file) {
+        if (!hang) return nodeBoardStoreFileSystem.readFile(file);
+        if (path.basename(file) === 'one.md') freshReads += 1;
+        reading += 1;
+        most = Math.max(most, reading);
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        reading -= 1;
+        return nodeBoardStoreFileSystem.readFile(file);
+      },
+    });
+    await store.list();
+    hang = true;
+    const started = Date.now();
+    const move = store.mutate('two001', { by: 'you', what: 'Moved' }, (card) => ({ ...card, stage: 'done' }));
+    await Promise.all([
+      store.invalidate('one.md', { fresh: true }),
+      store.invalidate('one.md', { fresh: true }),
+      store.invalidate('two.md'),
+      store.invalidate('three.md'),
+      store.invalidate('four.md'),
+    ]);
+    await move;
+    assert.ok(most <= 3, `at most two re-reads at once beside the tail's own read (${most})`);
+    assert.equal(freshReads, 1, 'two presses of Try again share one read');
+    assert.ok(Date.now() - started < 2000);
+  }
+
+  // ── A change that couldn't be saved says why in plain words, naming the card (#610) ─
+  {
+    const folder = tempFolder();
+    writeCard(folder, 'draft-module-6.md', { id: 'dr4ft6', title: 'Draft Module 6' });
+    let failWith: string | null = null;
+    const store = newStore(folder, {
+      async writeFile(file, contents) {
+        if (failWith) throw Object.assign(new Error(`${failWith}: refused, open '${file}'`), { code: failWith });
+        return nodeBoardStoreFileSystem.writeFile(file, contents);
+      },
+    });
+    await store.list();
+    const words: Record<string, string> = {
+      EACCES: 'Couldn’t save “Draft Module 6”: this computer doesn’t let Ritemark change files in this folder.',
+      EPERM: 'Couldn’t save “Draft Module 6”: this computer doesn’t let Ritemark change files in this folder.',
+      EROFS: 'Couldn’t save “Draft Module 6”: this computer doesn’t let Ritemark change files in this folder.',
+      ETIMEDOUT: 'Couldn’t save “Draft Module 6” in time. If this folder syncs from the cloud, try again in a moment.',
+      EBUSY: 'Couldn’t save “Draft Module 6” in time. If this folder syncs from the cloud, try again in a moment.',
+      EAGAIN: 'Couldn’t save “Draft Module 6” in time. If this folder syncs from the cloud, try again in a moment.',
+      EIO: 'Couldn’t save “Draft Module 6”. Try again in a moment.',
+    };
+    for (const [code, expected] of Object.entries(words)) {
+      failWith = code;
+      await assert.rejects(
+        () => store.mutate('dr4ft6', { by: 'you', what: 'Moved to Doing' }, (card) => ({ ...card, stage: 'doing' })),
+        (error: BoardStoreError) => error instanceof BoardStoreError && error.code === 'write-failed' && error.message === expected,
+        `${code}: the card's title, in plain words; no code, no path`,
+      );
+    }
+    failWith = null;
+    assert.equal(saveFailedWords('notes.md', new Error('?')), 'Couldn’t save “notes.md”. Try again in a moment.', 'a file name when there is no title');
+    assert.equal(cardsOf(await store.list())[0].stage, 'todo', 'and nothing was changed');
+  }
+
+  // ── A folder named like a card file is no card, so Remove can never trash a folder ─
+  {
+    const folder = tempFolder();
+    writeCard(folder, 'real.md', { id: 're4l01', title: 'A real card' });
+    fs.mkdirSync(path.join(tasksDir(folder), 'archive.md'));
+    const store = newStore(folder);
+    const entries = await store.list();
+    assert.deepEqual(entries.map((entry) => entry.fileName), ['real.md'], 'the folder is not listed, not even as unreadable');
+    await assert.rejects(() => store.removeFile('archive.md'), BoardStoreError);
+    assert.ok(fs.existsSync(path.join(tasksDir(folder), 'archive.md')), 'and stays where it is');
+  }
+
+  // ── Sprint 145 (#596): Remove takes only this board's unreadable files ────
+  {
+    const folder = tempFolder();
+    writeCard(folder, 'fine.md', { id: 'f1n3c4', title: 'Reads fine' });
+    fs.writeFileSync(path.join(tasksDir(folder), 'broken.md'), '---\nritemark: task/1\nid: br0k3n\ntitle: [unclosed\n---\n');
+    fs.writeFileSync(path.join(tasksDir(folder), 'gone.md'), '---\nritemark: task/1\nid: g0n3x1\ntitle: [unclosed\n---\n');
+    fs.writeFileSync(path.join(tasksDir(folder), 'refused.md'), '---\nritemark: task/1\nid: r3fu5e\ntitle: [unclosed\n---\n');
+    fs.writeFileSync(path.join(folder, 'elsewhere.md'), 'not a card\n');
+    trashed.length = 0;
+    const store = newStore(folder, {
+      async trash(file) {
+        if (path.basename(file) === 'refused.md') throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' });
+        if (path.basename(file) === 'gone.md') {
+          fs.rmSync(file);
+          throw Object.assign(new Error('Unable to delete nonexistent file'), { code: 'FileNotFound' });
+        }
+        trashed.push(file);
+        fs.rmSync(file);
+      },
+    });
+    await store.list();
+    for (const name of ['../elsewhere.md', 'nested/broken.md', '..\\elsewhere.md', 'not-there.md', 'fine.md', '.hidden.md']) {
+      await assert.rejects(() => store.removeFile(name), BoardStoreError, `${name} is refused`);
+    }
+    assert.deepEqual(trashed, [], 'nothing was trashed');
+    assert.ok(fs.existsSync(path.join(folder, 'elsewhere.md')) && fs.existsSync(path.join(tasksDir(folder), 'fine.md')), 'every refused file is where it was');
+
+    await store.removeFile('broken.md');
+    assert.deepEqual(trashed.map((file) => path.basename(file)), ['broken.md'], 'the unreadable file goes to the trash');
+    await store.removeFile('gone.md');
+    await assert.rejects(
+      () => store.removeFile('refused.md'),
+      (error: BoardStoreError) => error instanceof BoardStoreError && error.code === 'write-failed',
+      'a trash that refuses is a write failure',
+    );
+    const left = (await store.list()).map((entry) => (entry.kind === 'card' ? entry.card.title : `unreadable:${entry.fileName}`));
+    assert.deepEqual(left, ['Reads fine', 'unreadable:refused.md'], 'removed rows go, a file already gone counts as removed, a refused one stays');
   }
 
   // ── A card in a project whose folder has gone: refused, nothing made (R13) ─
