@@ -446,9 +446,34 @@ async function testProbesRunAsynchronously() {
   }
 }
 
+// #619: on Windows, dispose() stops app-server's whole tree (taskkill /T /F), so its `git fetch` and `index-pack`
+// don't outlive Ritemark; kill() there ends app-server alone. Windows is simulated: the taskkill is recorded, not run.
+function testDisposeStopsTheTreeOnWindows() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const childProcess = require('child_process') as { spawn: (...args: unknown[]) => unknown };
+  const realSpawn = childProcess.spawn;
+  const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+  const started: unknown[][] = [];
+  childProcess.spawn = (...args: unknown[]) => { started.push(args); return { on: () => undefined }; };
+  Object.defineProperty(process, 'platform', { value: 'win32' });
+  try {
+    const manager = new CodexManager();
+    const appServer = { pid: 5150, exitCode: null, signalCode: null, killed: false, kill: () => assert.fail('kill() leaves the tree running') };
+    (manager as unknown as { process: unknown }).process = appServer;
+    manager.dispose();
+    assert.strictEqual((manager as unknown as { process: unknown }).process, null);
+  } finally {
+    Object.defineProperty(process, 'platform', platform);
+    childProcess.spawn = realSpawn;
+  }
+  assert.deepStrictEqual(started.map((call) => [call[0], call[1]]), [['taskkill', ['/pid', '5150', '/T', '/F']]]);
+  console.log(`  Windows dispose: ${started.map((call) => `${call[0]} ${(call[1] as string[]).join(' ')}`).join('; ')}`);
+}
+
 async function main() {
   await testRuntimeSourcePolicy();
   await testProbesRunAsynchronously();
+  testDisposeStopsTheTreeOnWindows();
 }
 
 main()

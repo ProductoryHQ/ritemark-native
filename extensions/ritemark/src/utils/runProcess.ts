@@ -29,10 +29,12 @@ export const MAX_PROCESS_OUTPUT = 1024 * 1024;
 const KILL_GRACE_MS = 1000;
 
 /**
- * Stop a child: on Windows its whole tree (a `.cmd` shell would leave its Node
- * child running), elsewhere the process itself, with SIGKILL when `force`.
+ * Stop a child: on Windows its whole tree, at once (`taskkill /T /F`), since
+ * `kill()` there ends only the process itself: a `.cmd` shell would leave its
+ * Node child running, and codex-app-server its `git fetch` (#619). Elsewhere the
+ * process itself, with SIGTERM, or SIGKILL when `force`.
  */
-function stopProcess(child: ChildProcess, force: boolean): void {
+export function stopProcessTree(child: ChildProcess, force = false): void {
   if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
   if (process.platform === 'win32') {
     try {
@@ -85,9 +87,9 @@ export function runProcess(
       const running = child;
       stopping = error;
       clearTimeout(timer);
-      stopProcess(running, false);
+      stopProcessTree(running, false);
       killTimer = setTimeout(() => {
-        stopProcess(running, true);
+        stopProcessTree(running, true);
         killTimer = setTimeout(() => settle({ status: null, stdout, stderr, error }), KILL_GRACE_MS);
       }, KILL_GRACE_MS);
     };

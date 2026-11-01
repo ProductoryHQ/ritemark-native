@@ -15,6 +15,7 @@ import assert from 'assert';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
+import type { ChildProcess } from 'child_process';
 import { AcpClient, type AcpClientHandlers } from './acpClient';
 
 // ── Scripted agent ──────────────────────────────────────────────────────────
@@ -273,6 +274,31 @@ async function run() {
     client.dispose();
     await new Promise((r) => setTimeout(r, 200));
     assert.ok(!client.isRunning(), 'dispose() must kill the process');
+  }
+
+  // ── #619: on Windows dispose() stops `opencode acp`'s whole tree ──
+  // kill() there ends the agent alone and leaves its MCP servers running. Windows is simulated: the taskkill
+  // is recorded instead of run, and the stub agent is then stopped for real.
+  {
+    const client = new AcpClient({ command: nodeBin, args: [agentScript], cwd: os.tmpdir(), handlers: noopHandlers() });
+    await client.initialize();
+    const agent = (client as unknown as { process: ChildProcess }).process;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const childProcess = require('child_process') as { spawn: (...args: unknown[]) => unknown };
+    const realSpawn = childProcess.spawn;
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+    const started: unknown[][] = [];
+    childProcess.spawn = (...args: unknown[]) => { started.push(args); return { on: () => undefined }; };
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    try {
+      client.dispose();
+    } finally {
+      Object.defineProperty(process, 'platform', platform);
+      childProcess.spawn = realSpawn;
+    }
+    agent.kill('SIGKILL');
+    assert.deepStrictEqual(started.map((call) => [call[0], call[1]]), [['taskkill', ['/pid', String(agent.pid), '/T', '/F']]]);
+    console.log(`  Windows dispose: ${started.map((call) => `${call[0]} ${(call[1] as string[]).join(' ')}`).join('; ')}`);
   }
 
 

@@ -8,7 +8,8 @@ import assert from 'assert';
 import { mkdtempSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { MAX_PROCESS_OUTPUT, runProcess } from './runProcess';
+import { spawn } from 'child_process';
+import { MAX_PROCESS_OUTPUT, runProcess, stopProcessTree } from './runProcess';
 
 async function waitFor(condition: () => boolean, message: string): Promise<void> {
   const deadline = Date.now() + 5000;
@@ -119,6 +120,32 @@ async function main() {
       env: { ...process.env, RITEMARK_RUN_PROCESS_TEST: 'expanded' },
     });
     assert.deepStrictEqual(result, { status: 0, stdout: 'expanded\n', stderr: '' });
+  }
+
+  // #619: stopProcessTree stops a whole tree on Windows (taskkill /T /F), and only the process elsewhere. Windows is
+  // simulated: the platform reads win32 and the taskkill it starts is recorded instead of run.
+  {
+    const childProcess = require('child_process') as { spawn: (...args: unknown[]) => unknown };
+    const realSpawn = childProcess.spawn;
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+    const started: unknown[][] = [];
+    childProcess.spawn = (...args: unknown[]) => { started.push(args); return { on: () => undefined }; };
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    try {
+      stopProcessTree({ pid: 4242, exitCode: null, signalCode: null, kill: () => assert.fail('kill() ends only the process on Windows') } as never);
+      stopProcessTree({ pid: 4243, exitCode: 0, signalCode: null } as never);
+    } finally {
+      Object.defineProperty(process, 'platform', platform);
+      childProcess.spawn = realSpawn;
+    }
+    assert.deepStrictEqual(started, [['taskkill', ['/pid', '4242', '/T', '/F'], { stdio: 'ignore', windowsHide: true }]], 'one taskkill, none for a child that already exited');
+    console.log(`  Windows: ${started.map((call) => `${call[0]} ${(call[1] as string[]).join(' ')}`).join('; ')}`);
+  }
+  if (process.platform !== 'win32') {
+    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+    const exited = new Promise<NodeJS.Signals | null>((resolve) => child.on('exit', (_code, signal) => resolve(signal)));
+    stopProcessTree(child);
+    assert.strictEqual(await exited, 'SIGTERM');
   }
 
   // The reason it exists: the event loop keeps turning while the child runs.
