@@ -154,7 +154,7 @@ the first frame of every project window.
 | PR | Branch | Holds | Release tier | Review tier |
 | --- | --- | --- | --- | --- |
 | 1 | `sprint-152-startup-contract` | A1–A4's research; W1 (the first-frame check), W2 (#624), W3 (R6, by decision 2); the plan's doc updates | extension | Standard (`webview/src/`, `src/`, `scripts/qa/`, `.claude/skills/`); screenshots of the AI column's start to the Experience lead |
-| 2 | `sprint-152-startup-contract-shell` | W4–W7 (R1–R4, R7, R9) and E5 | shell | High: `/code-review` at high and `/security-review`; up to three rounds, the third only when the second found something Important (`REVIEW.md` as #625 drafts it; as `REVIEW.md` stands at review time otherwise). Built on a CoW-cloned, patched `vscode/`; the first-frame check, `frame-screenshots.mjs --compare`, `frame-geometry.mjs`, `project-check.mjs --measure 10` |
+| 2 | `sprint-152-startup-contract-shell` | W4–W7 (R1–R4, R7, R9) and E5 | shell | High: `/code-review` at high and `/security-review`; up to three rounds, the third only when the second found something Important (`REVIEW.md`, since #625). Built on a CoW-cloned, patched `vscode/`; the first-frame check, `frame-screenshots.mjs --compare`, `frame-geometry.mjs`, `project-check.mjs --measure 10` |
 
 PR 1 first: its check records `main`'s failing set before PR 2's code, and #624 needs no patch. PR 2 after Sprint 146's
 shell PR merges (both change 018 and 019) and after the Experience lead answers questions 1–4, 6 and 8.

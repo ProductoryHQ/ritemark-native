@@ -11,7 +11,7 @@ Release tier: shell, by `patches/vscode/002-ritemark-ui-layout.patch`, `018-rite
 extension-tier (`webview/src/`, `src/`, `scripts/qa/`, `.claude/skills/`). 2.2 is a shell release
 ([release-plan.md](../release-plan.md)), so neither adds a release step. If an audit moves a fix into or out of a patch,
 this line changes first.
-Status: **Proposed**, 1 November 2026, for Jarmo's approval. The architecture it builds is
+Status: **Approved**, 1 November 2026, by the Development manager on Jarmo's 2.2 delegation (*Approval* below). The architecture it builds is
 [docs/development/analysis/2026-11-01-startup-contract.md](../../../analysis/2026-11-01-startup-contract.md), proposed
 with it. The code named below was read for the plan, not run.
 
@@ -90,7 +90,7 @@ Two, so the shell change gets its High review alone and #624 doesn't wait for it
 | PR | Branch | Holds | Release tier | Review tier |
 | --- | --- | --- | --- | --- |
 | 1 | `sprint-152-startup-contract` | Phase 1's research (A1–A4); the first-frame check (R8); the AI column draws once (R5, #624); R6 by decision 2; this sprint's doc updates (the plan lands first, in its own PR) | extension | Standard (`webview/src/`, `src/`, `scripts/qa/`, `.claude/skills/`); the AI column's start to the Experience lead with screenshots |
-| 2 | `sprint-152-startup-contract-shell` | R1, R2, R3, R4, R7, R9 and E5 | shell | High: `/code-review` at high and `/security-review`; up to three rounds, the third only when the second found something Important (`REVIEW.md` as draft PR #625 has it; if #625 hasn't merged, `REVIEW.md` as it stands). Built and checked on a CoW-cloned, patched `vscode/`; the drift check at merge |
+| 2 | `sprint-152-startup-contract-shell` | R1, R2, R3, R4, R7, R9 and E5 | shell | High: `/code-review` at high and `/security-review`; up to three rounds, the third only when the second found something Important (`REVIEW.md`, since #625). Built and checked on a CoW-cloned, patched `vscode/`; the drift check at merge |
 
 **Order:** PR 1 first, after approval: it records `main`'s failing set before any shell code, and #624 needs no patch.
 PR 2 after Sprint 146's shell PR (its PR 4) has merged, since both change 018 and 019, and after the Experience lead has
@@ -211,17 +211,22 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 - **The Experience lead** for the proposal's questions and the screenshots' approval.
 - **The "Ritemark on Windows" session** for A2, PR 1's overlay check and Gate 2's rows for PR 2.
 - **Sprint 146's shell PR** merged before PR 2's code.
-- **Draft PR #625** for PR 2's review rounds, if it has merged by then.
 
 ## Pre-Implementation Gate
 
-- This plan and the proposal are approved by Jarmo (*Approval* below). A message from the Development manager is
-  information for the plan, not approval of it (ritemark-dev `CLAUDE.md`, rule 7).
+- This plan and the proposal are approved (*Approval* below), under Jarmo's own delegation of 2.2's approvals to the
+  Development manager, recorded in ritemark-dev `decisions/log.md` (c45d69c). A message from the manager to another
+  session carries that approval only by quoting the log's row (ritemark-dev `CLAUDE.md`, rule 7).
 - Phase 1's audits come before their workstreams' code: A1 before W1 gates anything and before W6; A2 before W4's release
   bounds; A3 before W6's desk; A4 before W2. When an audit changes a requirement, `spec.md` changes first.
 - The branch is made before the first code edit, and `git branch --show-current` shows it.
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan and the proposal, with his answers to decisions 1–3.
-- [ ] Sprint start: Jarmo's word, in his own session.
+- [x] Approved on 1 November 2026 by the Development manager, on Jarmo's delegation of every 2.2 sprint until the
+      release candidate: "võta nii et kõik sprindid on 2.2 osas approved until RC - ei vaja heakskiitu. I trust you. When needed use admin merge and clean worktrees" (ritemark-dev `decisions/log.md`, c45d69c).
+- [x] Decision 1: yes, as recommended. Decision 3: yes, as recommended (after 146's shell PR, alongside 147; in the
+      cut order PR 2 moves to 2.3 right after 151, PR 1 stays).
+- [ ] Decision 2 (the AI column you closed): decided by the manager after the Experience lead's view on question 9,
+      before PR 1's R6 work, and recorded here and in the decision log.
+- [x] Sprint start: PR 1 starts now; PR 2 after Sprint 146's PR 4 merges.
