@@ -1,18 +1,19 @@
 # Sprint 152 Tasks
 
-Nothing here starts before Jarmo approves the plan. Tick a box only when the change is on its PR's branch. W numbers are
+The plan is approved on Jarmo's 2.2 delegation (sprint-plan.md, *Approval*). Tick a box only when the change is on its PR's branch. W numbers are
 workstreams in [technical-plan.md](technical-plan.md); R and E numbers are requirements in [spec.md](spec.md); A numbers
 are the audits.
 
 ## Phase 0: Branch and starting tree
 
-- [ ] Jarmo's approval is on the sprint plan, with his answers to the three decisions
+- [x] The plan's approval is recorded (the Development manager, on Jarmo's 2.2 delegation; decisions 1 and 3). Decision
+      2 gates only R6's work: it is recorded in the sprint plan before R6 starts
 - [ ] `git checkout -b sprint-152-startup-contract` from `origin/main`; `git branch --show-current` shows it before any
       edit. PR 2's branch, `sprint-152-startup-contract-shell`, is made the same way, from `origin/main` after Sprint
       146's shell PR has merged
 - [ ] The hunk counts recorded (`grep -c '^@@'` for 002, 018, 019) and `media/webview.js`' size in `notes/bundle.md`
-- [ ] `node ./scripts/worktree-hygiene.mjs --report` read, and the free disk recorded; nothing removed without Jarmo's
-      word
+- [ ] `node ./scripts/worktree-hygiene.mjs --report` read, and the free disk recorded; removal by `--clean` on the
+      delegation, never over BLOCKED
 - [ ] Asked: the Experience lead for the proposal's nine questions; the "Ritemark on Windows" session for A2
 
 ## Phase 1: Audits (each in `research/`, before its code)

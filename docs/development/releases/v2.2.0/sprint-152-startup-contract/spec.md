@@ -172,10 +172,15 @@ Acceptance criteria, by Jarmo's answer to decision 2:
 As the team, I want an extension-tier release to be unable to break the frame, and to hear about it before it ships.
 
 Acceptance criteria:
-- **The release check:** `release-extension-preflight.sh` gains a check that compares the extension's view containers,
-  their views, the head rows' commands and the frame-shaping defaults (R1) with the manifest in `branding/product.json`
-  at its `--ref` (the shell-release tag it already uses). A release that adds, removes or renames one is refused, with
-  the names; `--allow-unshipped` doesn't pass it. Proved on a fixture with a renamed head command.
+- **The release check:** `release-extension-preflight.sh` gains a check that compares every identifier the manifest
+  holds with the extension's own source of truth: the view containers and their views and the head rows' commands
+  (`package.json`), the head's menu IDs, the permanent tabs' and the desk front's view types (`HOME_TAB_VIEW_TYPE`,
+  `BOARD_TAB_VIEW_TYPE` in `src/views/permanentTabs.ts`), the welcome's view type (`WELCOME_VIEW_TYPE` in
+  `src/welcome/welcomePanel.ts`), and the frame-shaping defaults (R1), against the manifest in `branding/product.json`
+  at its `--ref` (the shell-release tag it already uses). The identifiers that live in code are exported from one
+  extension module that the check reads, so none is copied by hand. A release that adds, removes or renames one is
+  refused, with the names; `--allow-unshipped` doesn't pass it. Proved on fixtures with a renamed head command and a
+  renamed permanent-tab view type. (Codex's review of #626.)
 - **The defaults stay equal:** a test in the extension's `npm test` fails when one of R1's frame-shaping keys in
   `package.json` differs from `branding/product.json`'s.
 - **A build without the manifest fails:** `validate-build-output.sh` checks the built app's `product.json` for the

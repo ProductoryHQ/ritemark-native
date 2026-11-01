@@ -144,8 +144,11 @@ the first frame of every project window.
 ## Workstream 7: version skew (R7, PR 2)
 
 - `release-extension-preflight.sh`: a check after Check 6 that reads `branding/product.json` at `--ref` (`git show`) and
-  the extension's `package.json`, and refuses a release whose view containers, views, head-row commands or
-  frame-shaping defaults differ from the manifest. A fixture proves it.
+  the extension's sources of truth, and refuses a release in which any manifest-backed identifier differs from the
+  manifest: view containers, views and head-row commands (`package.json`); the head's menu IDs; the permanent tabs'
+  and the desk front's view types and the welcome's view type, which live in code today (`src/views/permanentTabs.ts`,
+  `src/welcome/welcomePanel.ts`) and move into one exported module of frame identifiers that the check reads; and the
+  frame-shaping defaults. Fixtures prove it for a renamed head command and a renamed permanent-tab view type.
 - The extension's `npm test`: the frame-shaping keys in `package.json` equal `branding/product.json`'s.
 - Docs (E5).
 
