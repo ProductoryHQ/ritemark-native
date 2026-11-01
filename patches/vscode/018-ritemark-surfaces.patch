@@ -134,9 +134,10 @@ out again.
 
 Sprint 145 (#569): a window that a switch in place opened lands on Home from its first frame. When the switch guard lets a
 LOAD go on and no other participant vetoes it, it writes a note into application storage with the storage's last save
-(onWillSaveState, SHUTDOWN): the folder left, the folder opened when the window knew it, the time. The next main editor
-part takes it once as it makes its desks, before the grid is made, and puts Home's tab first in its desk's order of
-use and that desk in front, so Home is the tab in front and the document the project was left on stays behind it
+(onWillSaveState, SHUTDOWN): the folder left, the folder opened when the window knew it, the time. The main editor part
+of the window it is for takes it as it makes its desks, before the grid is made (a window on another folder or with no
+folder leaves it, and an unusable or two-minute-old note goes), and puts Home's tab first in its desk's order of use and
+that desk in front, so Home is the tab in front and the document the project was left on stays behind it
 (ritemarkSwitchGuard.ts: ritemarkLandsOnHome, the extension's own rule; ritemarkHomeInFront; editorPart.ts). Until now
 the restored document was in front for about half a second, until the extension started and brought Home forward.
 While a column waits for its place or the AI at start, it shows the ground, not VS Code's "Drag a view here to
@@ -4441,10 +4442,10 @@ index 00000000000..c515a8eb74f
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts b/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts
 new file mode 100644
-index 00000000000..d11f6cea69c
+index 00000000000..79a3f867a70
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts
-@@ -0,0 +1,214 @@
+@@ -0,0 +1,238 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4554,21 +4555,45 @@ index 00000000000..d11f6cea69c
 +	return contextService.getWorkbenchState() === WorkbenchState.EMPTY ? undefined : contextService.getWorkspace().folders[0]?.uri.toString();
 +}
 +
-+/** Sprint 145 (#569): the window takes the note once, as its editor part restores the tabs. True when it lands on Home. */
++/**
++ * What a window on `here` does with the saved note: lands on Home and takes it; keeps it for the window it is for (a note
++ * naming another folder, or a window with no folder); or drops it when it is unusable (not a note, no time, older than
++ * two minutes, or from the future). Pure.
++ *
++ * A note with no target (Open Folder…, a folder dropped on the Dock icon: only the main process knows the folder) can't
++ * be told apart from inside a window, so it keeps the extension's rule: the first window on a folder other than the one
++ * left takes it.
++ */
++export function ritemarkReadLanding(raw: string, here: string | undefined, now: number): 'land' | 'keep' | 'drop' {
++	let note: Partial<IRitemarkSwitchLanding> | undefined;
++	try {
++		note = JSON.parse(raw);
++	} catch {
++		return 'drop';
++	}
++	if (!note || typeof note !== 'object' || typeof note.at !== 'number' || now - note.at > LANDING_FRESH_MS || now < note.at) {
++		return 'drop';
++	}
++	return ritemarkLandsOnHome(note, here, now) ? 'land' : 'keep';
++}
++
++/**
++ * Sprint 145 (#569): as its editor part makes its desks, the window takes the note when it is for this window (true: it
++ * lands on Home), leaves a note meant for another window to that window (it expires by itself), and removes one that
++ * is unusable. Codex's review: a window on another folder starting within the two minutes must not take the note away
++ * from the window the switch opened.
++ */
 +export function ritemarkTakeSwitchLanding(accessor: ServicesAccessor): boolean {
 +	const storageService = accessor.get(IStorageService);
 +	const raw = storageService.get(LANDING_KEY, StorageScope.APPLICATION);
 +	if (raw === undefined) {
 +		return false;
 +	}
-+	storageService.remove(LANDING_KEY, StorageScope.APPLICATION);
-+	let landing: unknown;
-+	try {
-+		landing = JSON.parse(raw);
-+	} catch {
-+		return false;
++	const verdict = ritemarkReadLanding(raw, projectFolder(accessor.get(IWorkspaceContextService)), Date.now());
++	if (verdict !== 'keep') {
++		storageService.remove(LANDING_KEY, StorageScope.APPLICATION);
 +	}
-+	return ritemarkLandsOnHome(landing, projectFolder(accessor.get(IWorkspaceContextService)), Date.now());
++	return verdict === 'land';
 +}
 +
 +function isHomeEditor(editor: { id: string; value: string }): boolean {
@@ -6311,10 +6336,10 @@ index 00000000000..7924086e116
 +});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts b/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts
 new file mode 100644
-index 00000000000..9530e100551
+index 00000000000..b8d451ffc33
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,195 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -6328,9 +6353,10 @@ index 00000000000..9530e100551
 +import { ICommandService } from '../../../../platform/commands/common/commands.js';
 +import { Orientation } from '../../../../base/browser/ui/grid/grid.js';
 +import { IDialogService } from '../../../../platform/dialogs/common/dialogs.js';
-+import { StorageScope, WillSaveStateReason } from '../../../../platform/storage/common/storage.js';
++import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
++import { IStorageService, StorageScope, StorageTarget, WillSaveStateReason } from '../../../../platform/storage/common/storage.js';
 +import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
-+import { askRitemarkBeforeReload, ritemarkHomeInFront, ritemarkLandsOnHome, RitemarkSwitchGuard } from '../../../browser/parts/ritemarkSwitchGuard.js';
++import { askRitemarkBeforeReload, ritemarkHomeInFront, ritemarkLandsOnHome, RitemarkSwitchGuard, ritemarkTakeSwitchLanding } from '../../../browser/parts/ritemarkSwitchGuard.js';
 +import { BeforeShutdownEvent, ILifecycleService, ShutdownReason } from '../../../services/lifecycle/common/lifecycle.js';
 +import { TestStorageService } from '../../common/workbenchTestServices.js';
 +
@@ -6454,6 +6480,38 @@ index 00000000000..9530e100551
 +			from: URI.file('/p/lead').toString(),
 +			target: null,
 +			dated: true,
++		});
++	});
++
++	test('#569 (Codex): only the window the note is for takes it; another folder\'s window and a window with no folder leave it; an unusable note goes', () => {
++		const storage = store.add(new TestStorageService());
++		const take = (folder: string | undefined) => ritemarkTakeSwitchLanding({
++			get: (id: unknown) => id === IStorageService ? storage : { getWorkbenchState: () => folder ? WorkbenchState.FOLDER : WorkbenchState.EMPTY, getWorkspace: () => ({ folders: folder ? [{ uri: URI.parse(folder) }] : [] }) },
++		} as unknown as ServicesAccessor);
++		const write = (note: unknown) => storage.store('ritemark.switch.landOnHome', typeof note === 'string' ? note : JSON.stringify(note), StorageScope.APPLICATION, StorageTarget.MACHINE);
++		const left = () => storage.get('ritemark.switch.landOnHome', StorageScope.APPLICATION) !== undefined;
++		const now = Date.now();
++
++		write({ from: 'file:///p/lead', target: 'file:///p/sales', at: now - 1000 });
++		const other = { landed: take('file:///p/other'), kept: left() };
++		const noFolder = { landed: take(undefined), kept: left() };
++		const target = { landed: take('file:///p/sales'), kept: left() };
++		write({ from: 'file:///p/lead', target: null, at: now - 1000 });
++		const backInTheOneLeft = { landed: take('file:///p/lead'), kept: left() };
++		const openFolder = { landed: take('file:///p/other'), kept: left() };
++		write({ from: 'file:///p/lead', target: 'file:///p/sales', at: now - 3 * 60 * 1000 });
++		const stale = { landed: take('file:///p/other'), kept: left() };
++		write('not a note');
++		const broken = { landed: take('file:///p/sales'), kept: left() };
++
++		assert.deepStrictEqual({ other, noFolder, target, backInTheOneLeft, openFolder, stale, broken }, {
++			other: { landed: false, kept: true },
++			noFolder: { landed: false, kept: true },
++			target: { landed: true, kept: false },
++			backInTheOneLeft: { landed: false, kept: true },
++			openFolder: { landed: true, kept: false },
++			stale: { landed: false, kept: false },
++			broken: { landed: false, kept: false },
 +		});
 +	});
 +
