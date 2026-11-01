@@ -3,7 +3,7 @@
 Track: SDD, lean (a new subsystem: an index of the project read off the extension host, three sources, a results view, and one shell change to the left column's head; edge cases in exclusions, cloud files, file kinds and the keyboard)
 Branch: `sprint-148-search-words`, made from `origin/main` at Phase 3, after approval. Each later PR has its own branch that starts with the same name (*Pull requests* below). This plan was written on `plan/sprint-148-search-words`.
 Release tier: shell, by `patches/vscode/018-ritemark-surfaces.patch` (PR 3: the box in the Documents head, and the column that becomes the results). Everything else is extension-tier. 2.2 is a shell release ([release-plan.md](../release-plan.md)), so this adds no release step.
-Status: **Plan in review.** Jarmo has delegated 2.2's plan approvals to the Development manager until the release candidate (ritemark-dev `decisions/log.md`, c45d69c). The code named under *What reading the code added* was read for this plan, not run.
+Status: **Approved**, 1 November 2026, by the Development manager. Jarmo has delegated 2.2's plan approvals to the Development manager until the release candidate (ritemark-dev `decisions/log.md`, c45d69c). The code named under *What reading the code added* was read for this plan, not run.
 
 ## SDD Artifacts
 
@@ -157,7 +157,8 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Approval
 
-- [ ] The Development manager approved this sprint plan on Jarmo's 2.2 delegation, with decisions 1–3.
+- [x] Approved on 1 November 2026 by the Development manager, on Jarmo's delegation of every 2.2 sprint until the release candidate: "võta nii et kõik sprindid on 2.2 osas approved until RC - ei vaja heakskiitu. I trust you. When needed use admin merge and clean worktrees" (ritemark-dev `decisions/log.md`, c45d69c).
+- [x] Decisions 1–3 as recommended: the Search row and ⌘⇧F open Ritemark's search, and VS Code's search stays in More (moved, not removed); Replace waits for its own High sprint; Word and PDF text is kept on this computer, outside the project, up to 200 MB.
 - [ ] Sprint start: the same delegation ("every 2.2 sprint counts as approved until the release candidate").
 
 ## For the Experience lead

@@ -4,7 +4,7 @@ Nothing here starts before the plan is approved (the Development manager, on Jar
 
 ## Phase 0: Branch and starting tree
 
-- [ ] The approval is on the sprint plan, with the answers to decisions 1–3
+- [x] The approval is on the sprint plan, with the answers to decisions 1–3
 - [ ] `git checkout -b sprint-148-search-words` from `origin/main`; `git branch --show-current` shows it before any edit. Later PRs: `sprint-148-search-words-panel`, `-shell`, `-passage`, each from `origin/main` the same way
 - [ ] `media/webview.js` size recorded in `notes/bundle.md` (E4)
 - [ ] `node ./scripts/worktree-hygiene.mjs --report` read, and the free disk recorded; nothing removed without Jarmo's word
