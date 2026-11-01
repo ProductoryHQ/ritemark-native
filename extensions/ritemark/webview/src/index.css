@@ -248,10 +248,12 @@ body[data-vscode-theme-kind='vscode-dark'],
   --primary: var(--r-accent);
   --primary-foreground: var(--r-on-accent);
   --primary-hover: #a5b4fc;
-  /* kit: text on indigo becomes the ground's ink (white on the lighter indigo is below 4.5:1), and the primary loses its glow */
+  /* kit: text on indigo becomes the ground's ink (white on the lighter indigo is below 4.5:1), and the primary loses its glow.
+     A transparent shadow, not `none`: Tailwind lists the shadow after a focus ring's (`box-shadow: <ring>, <shadow>`),
+     and `none` in that list voids the whole declaration, so Dark's primary drew no keyboard ring (Sprint 146) */
   --r-on-accent: #16132f;
-  --ritemark-shadow-indigo-sm: none;
-  --ritemark-shadow-indigo-md: none;
+  --ritemark-shadow-indigo-sm: 0 0 #0000;
+  --ritemark-shadow-indigo-md: 0 0 #0000;
   --background: var(--r-surface);
   --foreground: var(--r-ink-strong);
   --muted: var(--r-surface-soft);

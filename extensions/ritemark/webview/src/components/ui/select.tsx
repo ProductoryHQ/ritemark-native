@@ -29,14 +29,17 @@ const SelectTrigger = React.forwardRef<
       // Not a field: its frame is the keyboard's, as every other control's ring (2.2, input-mode.ts)
       'focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--vscode-focusBorder)]',
       'disabled:cursor-not-allowed disabled:opacity-50',
-      '[&>span]:line-clamp-1',
+      // A long value is cut where the room ends, with an ellipsis 8 before the chevron (a line clamp cut at a word and
+      // a button centres what is left), and starts at the left
+      'text-left [&>span]:truncate',
       className
     )}
     {...props}
   >
     {children}
+    {/* The chevron keeps its size beside a long value */}
     <SelectPrimitive.Icon asChild>
-      <Icon name="caret-down" size={16} className="opacity-50" />
+      <Icon name="caret-down" size={16} className="ml-2 shrink-0 opacity-50" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));

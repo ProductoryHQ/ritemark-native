@@ -22,10 +22,10 @@ Run on 1 November 2026 on one hidden dev instance of `sprint-146-controls-catalo
 ## What the images depend on (written into the baseline's README)
 
 - The Mac's display at 2×.
-- The Mac's accent colour, for the one control that draws Chromium's own outline in keyboard mode: the dialog's close (`dialog-dialog-close-focus`).
+- The Mac's accent colour, for the one control that drew Chromium's own outline in keyboard mode: the dialog's close (`dialog-dialog-close-focus`). No longer: the close draws Ritemark's ring since the Experience lead's check (1 November).
 - The fonts of the Mac: Windows is checked by eye.
 
 ## Seen on the way
 
-- **The dialog's close has no ring of Ritemark's.** In keyboard mode it draws the system's own focus outline, in the Mac's accent colour (orange on the test Mac). A look for the Experience lead's list, not this sprint's change.
+- **The dialog's close has no ring of Ritemark's.** In keyboard mode it draws the system's own focus outline, in the Mac's accent colour (orange on the test Mac). A look for the Experience lead's list, not this sprint's change. The lead asked for Ritemark's ring on it (1 November), and PR 2 gives it one.
 - **A narrow plain Button overflows its room** (it doesn't shrink: `shrink-0`, `whitespace-nowrap`); a split button cuts its label to "A…". That is #566, PR 3's.

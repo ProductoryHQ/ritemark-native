@@ -30,7 +30,7 @@ One consequence: `focus-visible:outline-none` also applies only outside pointer 
 | A non-field control's frame on any focus (`focus:`) | `ui/select.tsx`'s trigger (`focus:ring-1`); the composer's model and permission triggers (`ai-sidebar/ChatInput.tsx`, `focus:border-…`) | Moved to `focus-visible:`, so behind the mode |
 | A field's focused look | `ui/input.tsx`, `ui/textarea.tsx` (`focus:ring-1`); the Flow panel's inputs and text areas (`.rm-flow-props input/textarea:focus-visible`); the card page's title and Done when (`tasks/tasks.css`, contenteditable); the composer; Settings' fields; the property rows; the schedule editor's time; Transcribe's search and language field; the bubble menu's link field | Unchanged: a field shows where the typing goes after a click too |
 | A menu item's highlight | `focus:bg-…` on `DropdownMenuItem`, `ContextMenuItem`, `SelectItem` | Unchanged: it shows where the keyboard is inside an open menu, and the pointer moves it too |
-| Chromium's own outline | Any focusable element with no ring of its own: `dialog.tsx`'s header close (Radix `DialogPrimitive.Close`) is the one the catalogue shows | Hidden in pointer mode by the `index.css` rule; in keyboard mode it stays, drawn in the system's accent colour (an image of it depends on the Mac's accent setting: noted in the baseline's README) |
+| Chromium's own outline | Any focusable element with no ring of its own. The catalogue showed one, `dialog.tsx`'s header close (Radix `DialogPrimitive.Close`), in the system's accent colour; it now draws Ritemark's ring, as `DialogButton` does (the Experience lead, 1 November) | Hidden in pointer mode by the `index.css` rule; in keyboard mode it stays where an element has no ring of its own |
 
 ## Local focus rules
 
