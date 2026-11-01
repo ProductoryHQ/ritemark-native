@@ -59,7 +59,9 @@ export type FlagId =
   // Sprint 118: record from the microphone directly in Transcribe (#328)
   | 'transcribe-direct-recording'
   // Sprint 125: read-only PowerPoint (.pptx) preview (#285)
-  | 'powerpoint-preview';
+  | 'powerpoint-preview'
+  // Sprint 145 (#588): a writer's copy merged with the person's text by paragraph
+  | 'editor-sync-merge';
 
 /**
  * Feature flag registry
@@ -68,6 +70,18 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
   // Sprint 125: kill switch for the PowerPoint preview. Default ON (HARD RULE #2).
   // The .pptx editor stays registered when it is off, so a deck says the preview
   // is turned off and offers PowerPoint rather than showing VS Code's binary-file page.
+  // Sprint 145 (#588): both changes stay. A writer's (an AI's or another app's) copy is merged with the person's
+  // text by paragraph, with Review changes for a paragraph both changed; patch 014's reload participant asks
+  // `_ritemark.editorSync.answerReload` first. ON ('stable'); a code-level kill switch an extension release can
+  // flip without a shell release: 'disabled' makes the command answer nothing (VS Code reloads as before) and the
+  // sync behave as 2.1 did (a clean document takes the copy, a dirty one gets #454's question). Not in Settings.
+  'editor-sync-merge': {
+    id: 'editor-sync-merge',
+    label: 'Merge a Writer\'s Copy',
+    description: 'When an AI or another app saves a copy of the document you are writing in, keep both changes, merged by paragraph.',
+    status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
   'powerpoint-preview': {
     id: 'powerpoint-preview',
     label: 'PowerPoint Preview',

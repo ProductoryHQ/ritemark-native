@@ -190,3 +190,16 @@ test('an insertion inside a place both changed stays in the person\'s order', ()
   assert.equal(result.conflicts.length, 1);
   assert.deepEqual({ at: result.conflicts[0].at, length: result.conflicts[0].length }, { at: 1, length: 4 });
 });
+
+// Codex's review of #605 (245f160): a quoted CSV field can hold newlines.
+test('CSV: a record with a quoted multiline field is one block, and both changing it is one place both changed', () => {
+  assert.deepEqual(splitBlocks('id,text\n1,"alpha\nbeta"\n2,"say ""hi""\nthere"\n', 'csv').blocks,
+    ['id,text', '1,"alpha\nbeta"', '2,"say ""hi""\nthere"']);
+  assert.equal(join('id,text\n1,"alpha\nbeta"\n', 'csv'), 'id,text\n1,"alpha\nbeta"\n');
+  const base = 'id,text\n1,"alpha\nbeta"\n';
+  const mine = 'id,text\n1,"alpha2\nbeta"\n';
+  const theirs = 'id,text\n1,"alpha\nbeta2"\n';
+  const result = mergeBlocks(base, mine, theirs, 'csv');
+  assert.equal(result.text, mine, 'never a cell neither side wrote ("alpha2\nbeta2")');
+  assert.deepEqual(result.conflicts.map(({ mine: m, theirs: t2 }) => ({ mine: m, theirs: t2 })), [{ mine: '1,"alpha2\nbeta"', theirs: '1,"alpha\nbeta2"' }]);
+});

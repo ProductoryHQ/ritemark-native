@@ -852,6 +852,39 @@ async function main(): Promise<void> {
     env.dispose();
   });
 
+  // ── Codex's review of #605: the kill switch ─────────────────────────────
+
+  await scenario('The flag editor-sync-merge off: 2.1\'s behaviour comes back (no answer to the shell, no merge, #454\'s question)', async () => {
+    const { FLAGS } = await import('../features/flags');
+    const flag = FLAGS['editor-sync-merge'];
+    const status = flag.status;
+    flag.status = 'disabled';
+    try {
+      // The shell asks, and Ritemark doesn't answer: VS Code reloads the writer's copy, and it is taken as 2.1 took it.
+      const { env } = await s1('flag-off-s1.md', md('Stale write'), editTitle, 'reload-first');
+      const answer = await commands.get('_ritemark.editorSync.answerReload')!(env.document.uri, 'any text');
+      assert.equal(answer, undefined, 'no answer to the shell');
+      assert.ok(merged(env).includes('edited by the writer') && !merged(env).includes(B.trim()), 'the writer\'s copy, as in 2.1');
+      assert.equal(env.conflicts().length, 0);
+      assert.deepEqual(paragraphs(env), []);
+      env.dispose();
+      // Unsaved text and a writer's copy: #454's whole-document question, no merge.
+      const dirty = await open('flag-off-s3.md', md('Stale write'));
+      await dirty.type(addToEnd(dirty.document.getText(), A));
+      await dirty.autoSave();
+      const read = dirty.disk();
+      await dirty.type(addToEnd(dirty.document.getText(), B));
+      fs.writeFileSync(dirty.document.file, editTitle(read));
+      await dirty.fileChanged('watcher-first');
+      assert.equal(dirty.conflicts().length, 1, '#454\'s question');
+      assert.equal(dirty.conflicts().pop()?.reason, undefined, 'the dirty-document question, not the held import');
+      assert.ok(!merged(dirty).includes('edited by the writer'), 'not merged');
+      dirty.dispose();
+    } finally {
+      flag.status = status;
+    }
+  });
+
   fs.rmSync(ROOT, { recursive: true, force: true });
   console.log(failures ? `\n${failures} scenario(s) failed` : '\nall scenarios passed');
   process.exit(failures ? 1 : 0);

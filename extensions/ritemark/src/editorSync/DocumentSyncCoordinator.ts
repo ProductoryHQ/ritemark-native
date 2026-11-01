@@ -18,6 +18,7 @@ import {
 } from './protocol';
 import { DocumentDeliverySchedule } from './delivery';
 import { readRitemarkSavedLogicalHash } from './saveReceipt';
+import { isEnabled } from '../features';
 import { alignBlocks, findBase, mergeBlocks, replaceBlocks, sameBlocks, splitBlocks, trackRange, type BlockConflict, type BlockKind } from './merge';
 import {
   canCompleteViewResolution,
@@ -467,7 +468,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     let rebaseConflicts: BlockConflict[] = [];
     const behindAWriter = record.lastWriterRevision !== undefined && message.basedOnRevision < record.lastWriterRevision;
     const questionOpen = !!record.conflict && record.resolutionRevision === undefined;
-    if (own !== undefined && ownHash !== undefined && behindAWriter && !questionOpen && !record.guardOff
+    if (own !== undefined && ownHash !== undefined && behindAWriter && !questionOpen && !record.guardOff && this.merging()
       && ownHash !== record.modelHash && nextHash !== record.modelHash && ownHash !== nextHash) {
       const current = record.document.getText();
       if (logicalHash(current) === record.modelHash) {
@@ -927,8 +928,9 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     // `converged`, only when the document's text changed without Ritemark: VS Code reloaded it without asking (the
     // shell's participant didn't answer in time). Ritemark's own save seen before its receipt has the text
     // Ritemark already knows, and is never a writer.
-    if (classification === 'external-only'
-      || (classification === 'converged' && modelHash !== record.modelHash && !this.wasLocalEdit(record, modelHash))) {
+    // The flag `editor-sync-merge` off: 2.1's import below, no merge and no held question.
+    if (this.merging() && (classification === 'external-only'
+      || (classification === 'converged' && modelHash !== record.modelHash && !this.wasLocalEdit(record, modelHash)))) {
       const mine = classification === 'external-only' ? modelContent : (this.knownText(record) ?? modelContent);
       if (logicalHash(mine) !== disk.logicalHash) {
         const decision = this.decideForCopy(record, disk.content, mine);
@@ -1020,7 +1022,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
         && logicalHash(record.conflict.localContent) === modelHash;
       // #588 (revised, Jarmo 1 November: "salvestamata tekst samuti kokkupanekusse"): the person's unsaved text is
       // merged with the writer's copy too, the last save as the base. #454's question only when no base is found.
-      if (!sameConflict && !record.conflict) {
+      if (!sameConflict && !record.conflict && this.merging()) {
         const decision = this.decideForCopy(record, disk.content, modelContent);
         if (decision.action === 'merge' || decision.action === 'import') {
           const merge = decision.action === 'merge' ? decision : { action: 'merge' as const, text: disk.content, conflicts: [], taken: 0 };
@@ -1362,6 +1364,11 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     this.log(record, `${reason}:held-import words=${lost}`);
   }
 
+  /** #588 (revised): the merge is on (the flag `editor-sync-merge`, the kill switch); off, the sync is 2.1's. */
+  private merging(): boolean {
+    return isEnabled('editor-sync-merge');
+  }
+
   /** #588 (revised): the document's line endings, which a merge keeps. */
   private eolOf(document: vscode.TextDocument): '\n' | '\r\n' {
     return document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
@@ -1439,7 +1446,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       : typeof uriArgument === 'string' ? uriArgument : undefined;
     const record = uri ? this.records.get(uri) : undefined;
     if (!record || record.disposed || typeof diskTextArgument !== 'string' || !this.isDiskBacked(record.document)) return undefined;
-    if (record.resolving) return undefined;
+    if (record.resolving || !this.merging()) return undefined;
     const theirs = diskTextArgument;
     return this.answerWithin<string | undefined>(record, undefined, ANSWER_RELOAD_BUDGET_MS, isLate => this.answerReloadNow(record, theirs, isLate));
   }

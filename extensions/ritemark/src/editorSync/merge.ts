@@ -28,7 +28,21 @@ export function splitBlocks(text: string, kind: BlockKind): Blocks {
   const separators: string[] = [];
   if (source.length === 0) return { blocks, separators };
   if (kind === 'csv') {
-    const rows = source.split('\n');
+    // One block per record: a quoted field may hold newlines, so a record runs on until its quotes balance (an
+    // escaped quote, "", counts twice and keeps the balance).
+    const rows: string[] = [];
+    let open: string[] = [];
+    let quotes = 0;
+    for (const line of source.split('\n')) {
+      open.push(line);
+      quotes += line.split('"').length - 1;
+      if (quotes % 2 === 0) {
+        rows.push(open.join('\n'));
+        open = [];
+        quotes = 0;
+      }
+    }
+    if (open.length) rows.push(open.join('\n'));
     // A final newline ends the last row; it is not an empty row of its own.
     const ends = rows.length > 1 && rows[rows.length - 1] === '';
     if (ends) rows.pop();
