@@ -32,7 +32,9 @@ paragraphs leave the panel (extensions/github/package.json's viewsWelcome, decis
 commands still offers Publish to GitHub. The explorer's Clone Repository and learn-more entries went in 003 already;
 Git: Clone stays in All commands. The words live here because this patch owns the scm.missing lines they replace.
 This replaces Sprint 126's wording above: the four scm.missing strings (the remote window's too) now hold the lead's
-two lines, so its reload and troubleshoot links went with it. The Store rule stands as Sprint 126 set it.
+two lines, so its reload and troubleshoot links went with it. The welcome's Store rule stands as Sprint 126 set it.
+Not here: the Git extension's own "Git not found" toast with its Download Git button (extensions/git/src/main.ts,
+warnAboutMissingGit), a separate surface the sprint's research/file-changes-audit.md lists for a follow-up.
 ---
 diff --git a/extensions/git/package.nls.json b/extensions/git/package.nls.json
 index e8acff6826e..78b5aa9e4f6 100644

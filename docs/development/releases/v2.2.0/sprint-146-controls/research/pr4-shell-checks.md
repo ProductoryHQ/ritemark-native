@@ -36,7 +36,7 @@ The frame was compared with `main`'s own capture, not with `docs/development/fra
 
 ## The launches
 
-Six hidden dev launches, each quit afterwards and its profile deleted: `open -n -g -j` of the clone's dev Electron, `--use-mock-keychain`, a short profile under `/private/tmp/claude-501/`, its own extensions and shared-data folders, scratch `CLAUDE_CONFIG_DIR`, `CODEX_HOME` and `XDG_*`, no bundled agents in the worktree and no AI command-line tool on the PATH, the three backgrounding flags, CDP on 9361–9365 (each checked free first; each listener was the instance's own). Nothing was signed in. `document.hasFocus()` was false in each when first read.
+Seven hidden dev launches, each quit afterwards and its profile deleted: `open -n -g -j` of the clone's dev Electron, `--use-mock-keychain`, a short profile under `/private/tmp/claude-501/`, its own extensions and shared-data folders, scratch `CLAUDE_CONFIG_DIR`, `CODEX_HOME` and `XDG_*`, no bundled agents in the worktree and no AI command-line tool on the PATH, the three backgrounding flags, CDP on 9361–9366 (each checked free first; each listener was the instance's own). Nothing was signed in. `document.hasFocus()` was false in each when first read.
 
 1. `main`, Git on the PATH: dropped after the Git extension was found not compiled.
 2. `main`, Git on the PATH, a fresh profile: the frame capture and geometry, A6's places and File changes, A7's menus, A8's rows.
@@ -44,10 +44,15 @@ Six hidden dev launches, each quit afterwards and its profile deleted: `open -n 
 4. PR 4, Git on the PATH, a fresh profile: the frame compare and geometry, the same audits, All commands, Show in Documents, Git turned off, Set up Git here, closed and Open it again.
 5. PR 4, no Git on the PATH: File changes with no Git.
 6. PR 4 after review round 1 (the slider rule for a list's own slider only): every slider in the left column read with Documents and then File changes open on a fresh repository. The lists' sliders take the opaque tone; the commit message's editor and the split view's keep the theme's (`background-image: none`); Documents' hovered row is still one tone (rgb(218, 224, 233) over the row and past it).
+7. PR 4 after review round 2 (the panes' split view's slider back in the rule): the same reading. Every list's slider and the split view's take the opaque tone; the commit message's editor and the welcome words' scrollable keep the theme's; Documents' hovered row one tone in Dark (rgb(53, 58, 84) over the row, rgb(53, 57, 83) past it).
 
 ## After review round 1
 
 The round's fixes (the slider rule scoped to a list's own slider, `REOPEN_WITH_COMMAND_ID` imported, patch 016's header) went through the same steps: the sections regenerated through `create-patch.sh`, the dry run 19 of 19, the stacking check, a real apply from the pin equal to the edited tree, `typecheck-client`, 62 Ritemark tests passing, ESLint clean, and launch 6.
+
+## After review round 2
+
+The round's fix (the split view's slider) and its header and note changes went through the same steps: the section regenerated through `create-patch.sh`, the dry run 19 of 19, the stacking check, a real apply from the pin equal to the edited tree, and launch 7. No TypeScript changed in round 2.
 
 ## Not run here
 
