@@ -262,77 +262,93 @@ export async function walkProject(
       const exclude = await readSmallText(fs, nodePath.join(root.path, '.git', 'info', 'exclude'), rules.platform, rules.oneDriveRoots);
       if (exclude) rootRules.addGitRules('', exclude);
     }
-    const queue: string[] = [root.path];
-    let visited = 0;
-    while (queue.length > 0) {
-      const dir = queue.shift()!;
-      if (++visited % 50 === 0) await pause();
-      let entries: WalkDirent[];
-      try {
-        entries = await fs.readdir(dir);
-      } catch {
-        continue;
-      }
-      const relativeDir = dir === root.path ? '' : toRelative(root.path, dir);
-      const gitignore = entries.find((entry) => entry.name === '.gitignore' && entry.isFile());
-      if (gitignore && rootRules.readable) {
-        const text = await readSmallText(fs, nodePath.join(dir, '.gitignore'), rules.platform, rules.oneDriveRoots);
-        if (text) rootRules.addGitRules(relativeDir, text);
-      }
-      const hasAgents = relativeDir === '' && entries.some((entry) => entry.name.toLowerCase() === 'agents.md');
-      for (const entry of entries) {
-        const name = entry.name;
-        if (name.startsWith('.') || name === 'node_modules') continue;
-        const target = nodePath.join(dir, name);
-        const relative = relativeDir ? `${relativeDir}/${name}` : name;
-        let isDirectory = entry.isDirectory();
-        let isFile = entry.isFile();
-        if (entry.isSymbolicLink()) {
-          // A linked folder is left out; a linked file is a file.
-          try {
-            const stat = await fs.stat(target);
-            isDirectory = false;
-            isFile = stat.isFile();
-          } catch {
-            continue;
-          }
-        }
-        if (isDirectory) {
-          if (!rootRules.excluded(relative, true)) queue.push(target);
-          continue;
-        }
-        if (!isFile || name.startsWith('~$')) continue;
-        const format = formatOf(name);
-        if (!format || rootRules.excluded(relative, false)) continue;
-        if (hasAgents && name.toLowerCase() === 'claude.md' && (await isPointer(fs, target, rules))) continue;
-        let stat: WalkStat;
-        try {
-          stat = await fs.stat(target);
-        } catch {
-          continue;
-        }
-        const cloud = rootRules.readable ? cloudState(target, stat, rules.platform, rules.oneDriveRoots) : 'cloud-folder';
-        documents.push({
-          path: target,
-          rootPath: root.path,
-          relativePath: relative,
-          name: nameOf(name, relative),
-          where: relativeDir ? nodePath.basename(dir) : null,
-          format,
-          size: stat.size,
-          mtimeMs: stat.mtimeMs,
-          cloud,
-        });
-        if (documents.length >= maxNames) {
-          limited = true;
-          break;
-        }
-      }
-      if (limited) break;
-    }
+    limited = await walkTree(rootRules, root.path, fs, documents, maxNames, pause);
     if (limited) break;
   }
   return { documents, limited };
+}
+
+/**
+ * Walks one folder of a root and everything under it, adding the documents it finds to `documents` until that
+ * holds `maxNames`; true when it stopped there. The `.gitignore` files it meets join the root's rules, so a
+ * folder moved into the project later (the watcher's one event for it) is walked by the same code and rules as
+ * the project was. The caller checks that search doesn't leave `start` itself out.
+ */
+export async function walkTree(
+  rootRules: RootRules,
+  start: string,
+  fs: WalkFs,
+  documents: FoundDocument[],
+  maxNames: number,
+  pause: () => Promise<void>,
+): Promise<boolean> {
+  const { root, rules } = rootRules;
+  if (documents.length >= maxNames) return true;
+  const queue: string[] = [start];
+  let visited = 0;
+  while (queue.length > 0) {
+    const dir = queue.shift()!;
+    if (++visited % 50 === 0) await pause();
+    let entries: WalkDirent[];
+    try {
+      entries = await fs.readdir(dir);
+    } catch {
+      continue;
+    }
+    const relativeDir = dir === root.path ? '' : toRelative(root.path, dir);
+    const gitignore = entries.find((entry) => entry.name === '.gitignore' && entry.isFile());
+    if (gitignore && rootRules.readable) {
+      const text = await readSmallText(fs, nodePath.join(dir, '.gitignore'), rules.platform, rules.oneDriveRoots);
+      if (text) rootRules.addGitRules(relativeDir, text);
+    }
+    const hasAgents = relativeDir === '' && entries.some((entry) => entry.name.toLowerCase() === 'agents.md');
+    for (const entry of entries) {
+      const name = entry.name;
+      if (name.startsWith('.') || name === 'node_modules') continue;
+      const target = nodePath.join(dir, name);
+      const relative = relativeDir ? `${relativeDir}/${name}` : name;
+      let isDirectory = entry.isDirectory();
+      let isFile = entry.isFile();
+      if (entry.isSymbolicLink()) {
+        // A linked folder is left out; a linked file is a file.
+        try {
+          const stat = await fs.stat(target);
+          isDirectory = false;
+          isFile = stat.isFile();
+        } catch {
+          continue;
+        }
+      }
+      if (isDirectory) {
+        if (!rootRules.excluded(relative, true)) queue.push(target);
+        continue;
+      }
+      if (!isFile || name.startsWith('~$')) continue;
+      const format = formatOf(name);
+      if (!format || rootRules.excluded(relative, false)) continue;
+      if (hasAgents && name.toLowerCase() === 'claude.md' && (await isPointer(fs, target, rules))) continue;
+      let stat: WalkStat;
+      try {
+        stat = await fs.stat(target);
+      } catch {
+        continue;
+      }
+      const cloud = rootRules.readable ? cloudState(target, stat, rules.platform, rules.oneDriveRoots) : 'cloud-folder';
+      documents.push({
+        path: target,
+        rootPath: root.path,
+        relativePath: relative,
+        name: nameOf(name, relative),
+        where: relativeDir ? nodePath.basename(dir) : null,
+        format,
+        size: stat.size,
+        mtimeMs: stat.mtimeMs,
+        cloud,
+      });
+      if (documents.length >= maxNames) return true;
+    }
+  }
+  return false;
 }
 
 /** Checks one path from the watcher against its root's rules: its document, or null when search leaves it out. */

@@ -475,6 +475,80 @@ async function main() {
     assert.deepEqual(found(indexer, 'whole'), ['Half']);
   }
 
+  // ── Codex's review of #631 ──────────────────────────────────────────────────
+
+  // A folder moved in is walked by the walk's own code: the .gitignore files inside it apply.
+  {
+    const fs = new MemoryFs();
+    fs.write(`${ROOT}/Notes.md`, 'words');
+    const clock = new Clock();
+    const { indexer, config } = makeIndexer(fs, clock);
+    await indexer.start(config);
+    fs.write(`${ROOT}/moved/.gitignore`, 'private/\n');
+    fs.write(`${ROOT}/moved/Open.md`, 'open words');
+    fs.write(`${ROOT}/moved/private/Secret.md`, 'secret words');
+    indexer.onEvents([{ kind: 'created', path: `${ROOT}/moved` }]);
+    await clock.advance(FIRST_LOOK_MS);
+    await clock.advance(FIRST_LOOK_MS + SETTLE_MS);
+    assert.deepEqual(found(indexer, 'open'), ['Open']);
+    assert.deepEqual(found(indexer, 'secret'), [], 'moved/.gitignore leaves out moved/private/');
+  }
+
+  // The names limit holds in a moved-in folder: inside a flat folder, and across moves.
+  {
+    const fs = new MemoryFs();
+    fs.write(`${ROOT}/One.md`, 'words');
+    fs.write(`${ROOT}/Two.md`, 'words');
+    const clock = new Clock();
+    const { indexer, config } = makeIndexer(fs, clock, { limits: { maxNames: 5 } });
+    await indexer.start(config);
+    for (let i = 0; i < 10; i++) fs.write(`${ROOT}/flat/File ${i}.md`, 'flat words');
+    indexer.onEvents([{ kind: 'created', path: `${ROOT}/flat` }]);
+    await clock.advance(FIRST_LOOK_MS);
+    await clock.advance(FIRST_LOOK_MS + SETTLE_MS);
+    assert.equal(indexer.status().documents.total, 5, 'three of the ten fit beside the two');
+    assert.equal(indexer.status().limited, true);
+    for (let i = 0; i < 10; i++) fs.write(`${ROOT}/again/File ${i}.md`, 'again words');
+    indexer.onEvents([{ kind: 'created', path: `${ROOT}/again` }]);
+    await clock.advance(FIRST_LOOK_MS);
+    await clock.advance(FIRST_LOOK_MS + SETTLE_MS);
+    assert.equal(indexer.status().documents.total, 5, 'a second move adds nothing past the limit');
+  }
+
+  // A full project: a document a change made newer takes the place of the oldest, by the documents limit...
+  {
+    const fs = new MemoryFs();
+    fs.write(`${ROOT}/Oldest.md`, 'alpha words');
+    fs.write(`${ROOT}/Middle.md`, 'bravo words');
+    fs.write(`${ROOT}/Newest.md`, 'charlie words');
+    const clock = new Clock();
+    const { indexer, config } = makeIndexer(fs, clock, { limits: { maxDocuments: 2 } });
+    await indexer.start(config);
+    assert.deepEqual(found(indexer, 'alpha'), [], 'the oldest is searched by name only');
+    fs.write(`${ROOT}/Oldest.md`, 'alpha words, saved again');
+    indexer.onEvents([{ kind: 'changed', path: `${ROOT}/Oldest.md` }]);
+    await clock.advance(FIRST_LOOK_MS + SETTLE_MS);
+    assert.deepEqual(found(indexer, 'alpha'), ['Oldest'], 'the saved file\'s words are found');
+    assert.deepEqual(found(indexer, 'bravo'), [], 'the now oldest gave up its words');
+    assert.deepEqual(found(indexer, 'charlie'), ['Newest']);
+    assert.equal(indexer.query(1, 'middle', DEFAULT_SEARCH_OPTIONS, 5).groups[0].results[0].nameOnly, 'limited');
+  }
+  // ... and by the text budget.
+  {
+    const fs = new MemoryFs();
+    fs.write(`${ROOT}/First.md`, 'xray xray xray');
+    fs.write(`${ROOT}/Second.md`, 'yankee yankee');
+    const clock = new Clock();
+    const { indexer, config } = makeIndexer(fs, clock, { limits: { textBudget: 30 } });
+    await indexer.start(config);
+    fs.write(`${ROOT}/Third.md`, 'zulu zulu zulu');
+    indexer.onEvents([{ kind: 'created', path: `${ROOT}/Third.md` }]);
+    await clock.advance(FIRST_LOOK_MS + SETTLE_MS);
+    assert.deepEqual(found(indexer, 'zulu'), ['Third'], 'the new file\'s words are found');
+    assert.deepEqual(found(indexer, 'xray'), [], 'the oldest gave up its words for them');
+    assert.deepEqual(found(indexer, 'yankee'), ['Second']);
+  }
+
   console.log('freshness.test.ts: all passed');
 }
 

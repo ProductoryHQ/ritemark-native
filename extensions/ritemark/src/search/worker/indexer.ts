@@ -33,7 +33,7 @@ import { ChatFeed, type ChatFs } from '../sources/chats';
 import { READER_VERSION, formatOf, readDocument, type ReadOutcome } from './readers';
 import { TextCache } from './textCache';
 import { WordIndex } from './wordIndex';
-import { RootRules, classifyPath, isRuleFile, walkProject, type FoundDocument, type WalkFs } from './walk';
+import { RootRules, classifyPath, isRuleFile, walkProject, walkTree, type FoundDocument, type WalkFs } from './walk';
 
 export interface IndexerFs extends WalkFs {
   readFile(target: string): Promise<Uint8Array>;
@@ -357,8 +357,32 @@ export class Indexer {
     return this.limits.textBudget - this.textChars - this.chatTextChars;
   }
 
-  /** Reads one document's text, or settles it as name only. */
-  private async readOne(state: DocumentState, prefetched?: Promise<Uint8Array | null>): Promise<void> {
+  /**
+   * Settles the oldest documents holding text that are older than `newer` as name only, until `enough`: a
+   * document a change made newer takes the place of the oldest, so the limits stay newest first after the start.
+   */
+  private demoteOlder(newer: FoundDocument, enough: () => boolean): void {
+    while (!enough()) {
+      let oldest: DocumentState | null = null;
+      for (const other of this.documents.values()) {
+        if (other.chars > 0 && other.found.path !== newer.path && other.found.mtimeMs < newer.mtimeMs && (!oldest || other.found.mtimeMs < oldest.found.mtimeMs)) {
+          oldest = other;
+        }
+      }
+      if (!oldest) return;
+      this.dropText(oldest);
+      this.count(oldest.reason, -1);
+      oldest.reason = 'limited';
+      this.count('limited', 1);
+      this.index.add(this.nameSource(oldest.found, 'limited'));
+    }
+  }
+
+  /**
+   * Reads one document's text, or settles it as name only. `makeRoom` (a change the watcher reported): when the
+   * documents limit or the text budget is full, older documents give up their text to it (`demoteOlder`).
+   */
+  private async readOne(state: DocumentState, prefetched?: Promise<Uint8Array | null>, makeRoom = false): Promise<void> {
     const doc = state.found;
     const settle = (nameOnly: NameOnlyReason | undefined, passages: IndexSource['passages'] = [], columns?: string[]) => {
       // While this read waited, the file may have gone or changed again: a newer state wins.
@@ -379,16 +403,29 @@ export class Indexer {
     };
     const reason = this.nameOnlyOf(doc);
     if (reason) return settle(reason);
-    if (state.overLimit || this.withText >= this.limits.maxDocuments || this.budgetLeft <= 0) return settle('limited');
+    if (makeRoom && !state.overLimit) this.demoteOlder(doc, () => this.withText < this.limits.maxDocuments);
+    if (state.overLimit || this.withText >= this.limits.maxDocuments || (!makeRoom && this.budgetLeft <= 0)) return settle('limited');
     // The budget a copy may be written under: a read cut short by the project's budget is this session's only.
     const fullBudget = this.limits.textPerDocument;
-    const budget = Math.min(fullBudget, this.budgetLeft);
+    // Making room, the whole document is read and older ones give up what its text needs (`fit`, below).
+    const budget = makeRoom ? fullBudget : Math.min(fullBudget, this.budgetLeft);
+    const fit = (passages: IndexSource['passages']): IndexSource['passages'] => {
+      if (!makeRoom || this.documents.get(doc.path) !== state) return passages;
+      const need = passages.reduce((sum, passage) => sum + passage.text.length, 0);
+      this.demoteOlder(doc, () => this.budgetLeft >= need);
+      return withinBudget(passages, Math.max(0, this.budgetLeft));
+    };
+    const settleText = (passages: IndexSource['passages'], columns?: string[]) => {
+      const kept = fit(passages);
+      if (kept.length === 0 && passages.length > 0) return settle('limited');
+      settle(undefined, kept, columns);
+    };
     const office = doc.format === 'docx' || doc.format === 'pdf';
     if (office) {
       const cached = await this.deps.cache.get(doc.path, doc.size, doc.mtimeMs);
       if (cached?.kind === 'name-only') return settle(cached.reason);
       // A copy cut short under a smaller budget than this read's isn't the whole of what this read would find.
-      if (cached?.kind === 'text' && (!cached.truncated || cached.budget >= budget)) return settle(undefined, withinBudget(cached.passages, budget));
+      if (cached?.kind === 'text' && (!cached.truncated || cached.budget >= budget)) return settleText(withinBudget(cached.passages, budget));
     }
     let bytes: Uint8Array;
     let outcome: ReadOutcome;
@@ -409,7 +446,7 @@ export class Indexer {
       );
     }
     if (!outcome.ok) return settle(outcome.reason);
-    settle(undefined, outcome.passages, outcome.columns);
+    settleText(outcome.passages, outcome.columns);
   }
 
   // ── The watcher's events (R4) ─────────────────────────────────────────────
@@ -523,36 +560,22 @@ export class Indexer {
     const state: DocumentState = { found: doc, settled: false, chars: 0 };
     this.place(filePath, state);
     this.index.add(this.nameSource(doc, undefined));
-    await this.readOne(state);
+    await this.readOne(state, undefined, true);
     await this.deps.cache.flush();
     this.deps.log('fresh', { documents: 1 });
     this.emitStatus();
   }
 
-  /** A folder that came whole: each file in it is looked at as if it had an event of its own. */
+  /**
+   * A folder that came whole: walked by the walk's own code (`walkTree`), so the `.gitignore` files inside it
+   * apply and the names limit counts every name the index holds or is about to look at. Each document found
+   * is then looked at as if it had an event of its own.
+   */
   private async listFolder(folder: string, root: RootRules): Promise<void> {
-    const queue = [folder];
-    let looked = 0;
-    while (queue.length > 0 && looked < this.limits.maxNames) {
-      const dir = queue.shift()!;
-      let entries;
-      try {
-        entries = await this.deps.fs.readdir(dir);
-      } catch {
-        continue;
-      }
-      for (const entry of entries) {
-        const target = nodePath.join(dir, entry.name);
-        if (entry.isSymbolicLink()) continue;
-        if (entry.isDirectory()) {
-          if (!root.excluded(this.relative(root, target), true)) queue.push(target);
-        } else if (entry.isFile() && formatOf(entry.name)) {
-          this.look(target, -1, FIRST_LOOK_MS, 'created');
-          looked++;
-        }
-      }
-      await this.deps.pause();
-    }
+    const found: FoundDocument[] = [];
+    const room = Math.max(0, this.limits.maxNames - this.documents.size - this.pending.size);
+    if (await walkTree(root, folder, this.deps.fs, found, room, this.deps.pause)) this.walkLimited = true;
+    for (const doc of found) this.look(doc.path, -1, FIRST_LOOK_MS, 'created');
   }
 
   private scheduleRewalk(): void {
