@@ -50,7 +50,8 @@ The five items, in the shape's order:
 | 149 — Publish a web page | 1 | An .html file on the desk as the page in Ritemark's own browser; Connect Cloudflare (OAuth with PKCE, a token link as the fallback); Publish, Copy link, Update the page, Unpublish; noindex | #590 | The Cloudflare test account (Jarmo, 1 November) and its 14 live measurements | To plan |
 | 150 — Search: the meaning layer | 2 | Enter asks the AI's small model for the best places and an answer, with the word results kept when there's no AI | #591 (part) | 148 | To plan |
 | 151 — AI on your own computer | 3 | Settings' AI on this computer: check, install Ollama, download a model that fits; the picker's "On this computer"; nothing sent elsewhere when Ollama isn't running | #534 | 147 (the section lives in Settings); the spikes: silent install on Mac and Windows, `/api/pull` progress, offline through ACP | To plan |
-| The release — 2.2 as one release | — | The done list, the runtime review, version 2.2.0, notes, the Store update, the release itself | the Store | 145–151 merged, or cut | — |
+| [152 — The startup contract](sprint-152-startup-contract/sprint-plan.md) | 4 | The frame draws once: the shell draws Ritemark's frame in its final shape from the first frame and the extension only fills it in ([the proposal](../../analysis/2026-11-01-startup-contract.md)). Sprint 145's four start fixes move onto one rule with the same behaviour; a project opened for the first time and a window with no folder draw right from the first frame; the AI column draws once; an extension release can't move the frame; a first-frame check in Gate 1 | #624 (and #569, #501 kept) | 146's shell PR (both change patches 018 and 019); the Experience lead's answers | **Approved** 2026-11-01 (the manager, on Jarmo's 2.2 delegation) |
+| The release — 2.2 as one release | — | The done list, the runtime review, version 2.2.0, notes, the Store update, the release itself | the Store | 145–152 merged, or cut | — |
 
 ### Order
 
@@ -59,6 +60,7 @@ The five items, in the shape's order:
 - **148 before 150:** the meaning layer streams in under the word results.
 - **149 waits on the Cloudflare test account** (Jarmo, 1 November). Its live measurements decide the upload and the connection before its plan is approved.
 - **151 after 147:** its section lives in the new Settings.
+- **152 after 146, alongside 147** (proposed, 1 November): its shell PR starts once 146's shell PR has merged, because both rewrite hunks in patches 018 and 019, and one High review at a time on those patches keeps each rebase small. 147 is extension work that touches neither those patches nor the AI view, so the two run side by side. 152's first PR (#624 and the first-frame check) is extension-tier and can start as soon as the plan is approved.
 
 ### Not yet in a sprint
 
@@ -73,6 +75,8 @@ The five items, in the shape's order:
 - **The core:** items 1 (publish), 2's words layer, 4 (loose ends) and 5 (Settings).
 - **Cut first, in this order:** 151 (AI on your own computer) moves to 2.3; then 150 (the meaning layer); then #598 (the card dialog) inside 146.
 - **Can't be cut:** item 1 is 2.2's story.
+
+**Decided 1 November 2026: Sprint 152 adds to 2.2** ([its plan](sprint-152-startup-contract/sprint-plan.md), decision 3, approved by the manager on Jarmo's 2.2 delegation). It is new work beyond the appetite Jarmo agreed to on 31 October. The cut order: 152's shell PR moves to 2.3 right after 151 and before 150; its first PR (#624 and the first-frame check) stays. Sprint 145 already fixed the start faults people met, so the shell PR can wait if 2.2 is tight.
 
 ## Sprint / Issue / PR Tracker
 
@@ -90,6 +94,7 @@ The five items, in the shape's order:
 | 145, PR 5 | `sprint-145-loose-ends-shell` | [#622](https://github.com/ProductoryHQ/ritemark-native/pull/622) | #569, #501, #582 | Draft. Shell-tier, High: in review | Mac: `project-check.mjs --measure 10` before and after, the S47 traces with the extension host held, fresh launches' `main.log`, the frame check; Windows at Gate 2 | In the draft |
 | 145, PR 6 | `sprint-145-loose-ends-electron` | [#620](https://github.com/ProductoryHQ/ritemark-native/pull/620) | #515 | Merged 1 Nov (d97799e3). Shell-tier, High: 3 rounds; `/security-review` clean; Codex no findings | Mac: a dev-instance launch, About, the browser; the signed candidate's launch, built-in extensions in exthost.log, and Windows at Gate 1/Gate 2 | In the draft |
 | 146 | `sprint-146-controls` (plan on `plan/v2.2.0-sprint-146`) | Plan: [#603](https://github.com/ProductoryHQ/ritemark-native/pull/603) | #585, #576, #566, #567, #568, #594, #598 | Plan approved 1 Nov; PR 1 (#585 carried over) and PR 2 under way | — | — |
+| Plan: 152 and the startup contract's proposal | `plan/sprint-152-startup-contract` | [#626](https://github.com/ProductoryHQ/ritemark-native/pull/626) | #624 | Light; the plan is Approved (the manager, on Jarmo's 2.2 delegation) | n/a | n/a |
 
 ## Risks and Blockers
 
