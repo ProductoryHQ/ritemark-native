@@ -172,6 +172,8 @@ Acceptance criteria:
 
 **R8 (revised 2026-10-31, after A7, [research/log-lines.md](research/log-lines.md)).** The font request is Ritemark's own: patch 001's `iconRegistry.ts` registers `phosphor` with `URI.parse('phosphor.woff2')`, which VS Code writes into its icon style sheet as `vscode-file://vscode-app/phosphor.woff2`. The fix is in patch 001 (PR 5). DEP0169 did not reproduce in the dev build, whose built-in extensions don't start; Ritemark's bundle doesn't import Node's `url` module, so the caller is VS Code's or a built-in extension's, and finding it waits for PR 5's tree or the candidate. PR 2 has no DEP0169 item.
 
+**R8 as built (PR 5, 1 November; [research/log-lines.md](research/log-lines.md)).** The registry's Phosphor font has no source and the icons' style sheet writes no `@font-face` for it; `codicon.css` declares the font at its real place in both builds. A fresh launch of PR 5's build logs no refused font, and `main`'s still does. DEP0169 is still not reproduced in a dev build (its built-in extensions don't start) and waits for the candidate (S41).
+
 ### R9: A project switch lays Home out once (#569)
 
 As someone switching projects, I want Home to be laid out once, with the AI column already there or waiting for it.
@@ -183,6 +185,8 @@ Acceptance criteria:
 - After the fix, over 10 switches, in both directions (a project left on Home, a project left with a document): no document in front before Home, and the AI column within 300 ms of Home, either order.
 - Home lays out once: the AI column keeps its place through the switch, or Home waits for it.
 - If the cause is in the workbench (patch 002 or 018), the fix is in PR 5, the tier line stays shell, and Windows is proved at Gate 2.
+
+**R9 as built (PR 5, 1 November; [research/switch-timing.md](research/switch-timing.md)).** The cause is the workbench's restore, in both parts. The AI column: patch 002 makes Ritemark AI the column's default, so its id is never stored, and the layout read the column's container before the extension's was registered, so it started the column hidden; patch 002 now restores Ritemark AI with the layout in a project window, and VS Code's "the column was empty before" rule no longer hides a new project's column. The document in front: the switch guard (patch 018) leaves a note when a switch reloads, and the new window's editor part puts Home's tab in front before it makes the grid, by the extension's own landing rule. While a column loads it shows the ground, not "Drag a view here to display." (018). `project-check.mjs --measure 10`: FAIL on `main`'s code, PASS 10 of 10 with PR 5's (Home first at once, the AI column in the same sample), the first switch included (S44).
 
 ### R10: The welcome, not a terminal, is in front on Windows' slow first start (#501)
 
@@ -196,6 +200,8 @@ Acceptance criteria:
 - **The first wait** (before the welcome exists) is fixed only when the reproduction shows its cause. The direction is Jarmo's (decision 3); the recommended one keeps restored terminals behind until a document is in front, in patch 019.
 - A terminal the person opens themselves still opens in front, named as before.
 - Windows proof for the shell-tier half is 2.2's candidate at Gate 2.
+
+**R10 as built (PR 5, 1 November; [research/first-start-terminal.md](research/first-start-terminal.md)).** Windows showed the cause (S45): patch 019's `moveToDesk(true)` opens a restored terminal `inactive` while the desk is still empty, and VS Code makes the first editor in an empty group the active one anyway (`editorGroupView.ts`). Restored terminals now wait in the panel for the desk's first editor that is not a terminal and open behind it, or open after a minute (VS Code's own limit for the extension host to start) when none comes. The Mac shows the same with the extension host held (S47), before and after. The second flash did not reproduce on Windows, and PR 2 made no extension change for it.
 
 ### R11: ⌘⇧P / Ctrl+Shift+P opens All commands on Home, every time (#507)
 
