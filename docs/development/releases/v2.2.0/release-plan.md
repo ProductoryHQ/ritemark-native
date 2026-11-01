@@ -4,7 +4,7 @@
 **Target:** v2.2.0<br>
 **GitHub milestone:** v2.2.0<br>
 **Release type:** **Shell-tier.** A full app release for the Mac and Windows:
-- #568 (a tab's menu) and #594 (the left column's hover row) change patches 019 and 018;
+- #568 (a tab's menu) and #594 (the left column's hover row) change patches 019 and 018, and #567 (File changes with no Git) changes 016 and 018 (Sprint 146's plan);
 - #515 moves Electron to one carrying Node 24.22.1 (patch 020);
 - the Store gets a normal update.
 
@@ -44,7 +44,7 @@ The five items, in the shape's order:
 | Sprint | Shape item | Scope | Issues | Depends on | Status |
 |---|---|---|---|---|---|
 | [145 — 2.1's loose ends](sprint-145-loose-ends/sprint-plan.md) | 4 | Behaviour, files and platform faults from 2.1's gates and first days, each reproduced first: a stale write over an auto-save; the AI column's late return after a project switch; Windows' first start and ⌘⇧P on Home; the Electron with Node 24.22.1; the release logs' two errors; Settings' version suffix; Flow steps' missing-key errors; a failed turn's green check; selecting a Flow step saves the flow; the Task board's unreadable cards and its slow drop | #588, #569, #501, #507, #515, #582, #595, #580, #578, #571, #596, #597 | — | **Approved** 2026-10-31 |
-| 146 — Every control's states, and the frame's polish | 4 | The review process's Step 8: #585 (no focus ring after a mouse pick) first, then the catalogue page of every `components/ui/` control in every state, one input-mode tracker deciding the ring, and `scripts/qa/control-states.mjs`; then the polish that belongs to the controls and the frame: one tooltip look, narrow buttons as icons, File changes with no Git, a tab's menu, the left column's hover row, and a task card in a dialog over the board | #585, #576, #566, #567, #568, #594, #598 | The Experience lead approves the catalogue's images and #598's dialog | To plan after 145 |
+| [146 — Every control's states, and the frame's polish](sprint-146-controls/sprint-plan.md) | 4 | The review process's Step 8: #585 (no focus ring after a mouse pick) first, then the catalogue page of every `components/ui/` control in every state, one input-mode tracker deciding the ring, and `scripts/qa/control-states.mjs`; then the polish that belongs to the controls and the frame: one tooltip look, narrow buttons as icons, File changes with no Git, a tab's menu, the left column's hover row, and a task card in a dialog over the board | #585, #576, #566, #567, #568, #594, #598 | The Experience lead approves the catalogue's images and #598's dialog | **Approved** 2026-11-01 |
 | 147 — The new Settings | 5 | Experience 15's seven sections, today's settings only, in plain words; skills, connectors and plugins per agent; a redraw when a sign-in changes elsewhere; the shared Button; 13 s on Windows | #592, #415, #460, #577, #593 | 146's controls | To plan |
 | 148 — Search: the words layer | 2 | Ritemark's own search under New over documents (Markdown, Word, PDF, CSV), chats and tasks, grouped by kind, as you type, with no AI | #591 (part) | — | To plan |
 | 149 — Publish a web page | 1 | An .html file on the desk as the page in Ritemark's own browser; Connect Cloudflare (OAuth with PKCE, a token link as the fallback); Publish, Copy link, Update the page, Unpublish; noindex | #590 | The Cloudflare test account (Jarmo, 1 November) and its 14 live measurements | To plan |
@@ -83,7 +83,12 @@ The five items, in the shape's order:
 | Review process, Step 6 | `harness/review-process-step-6` | [#602](https://github.com/ProductoryHQ/ritemark-native/pull/602) | — | Merges after #600, rebased and reviewed again | Two review rounds | n/a |
 | Plan: this release plan and 145 | `plan/v2.2.0-release-plan` | [#601](https://github.com/ProductoryHQ/ritemark-native/pull/601) | — | In review (Light) | n/a | n/a |
 | 145 | `sprint-145-loose-ends` | — | #588, #569, #501, #507, #515, #582, #595, #580, #578, #571, #596, #597 | — | — | — |
-| 145, PR 1 | `sprint-145-loose-ends` | [#605](https://github.com/ProductoryHQ/ritemark-native/pull/605) | #588, and Phase 1's Mac audits | Draft. R1 revised on 1 November (both changes stay, merged by paragraph, in the shell next to patch 014): shell-tier, High; waits for Jarmo's approval of the revision, then a new review | #605's first approach: three review rounds, round 3 open; the merge's tests not written yet; Windows at Gate 2 | Drafted for the first approach; rewritten with the merge |
+| 145, PR 1 | `sprint-145-loose-ends` | [#605](https://github.com/ProductoryHQ/ritemark-native/pull/605) | #588, and Phase 1's Mac audits | Merged 1 Nov (5d0f8517). Shell-tier, High: 3 rounds; the manager checked the commits after round 3; `/security-review` clean; Codex's two P1s fixed (the `editor-sync-merge` kill switch, quote-aware CSV) | Mac: 18 of 18 in the app; editor-sync tests; the shell's answer path in tests only; Windows at Gate 2 | Drafted (rewritten for the merge) |
+| 145, PR 2 | `sprint-145-loose-ends-ext` | [#612](https://github.com/ProductoryHQ/ritemark-native/pull/612) | #578, #595 (#569 measured: the cause is in the shell, for PR 5; #501 and DEP0169: no extension change) | Merged 1 Nov (c7ab4013) | Mac; Windows through the overlay (sent 1 Nov) | In the PR body |
+| 145, PR 3 | `sprint-145-loose-ends-flows` | [#607](https://github.com/ProductoryHQ/ritemark-native/pull/607) | #571, #580 | Merged 1 Nov (d41b1c66) | Mac, with a dev-instance run; Windows through the overlay (sent 1 Nov) | In the PR body |
+| 145, PR 4 | `sprint-145-loose-ends-board` | [#610](https://github.com/ProductoryHQ/ritemark-native/pull/610) | #596, #597 | Merged 1 Nov (e8f256a9) | Mac; Windows through the overlay (sent 1 Nov) | In the PR body |
+| 145, PR 5–6 | `sprint-145-loose-ends-shell`, `sprint-145-loose-ends-electron` | — | #582, #501, #569; #515 | Not started | — | — |
+| 146 | `sprint-146-controls` (plan on `plan/v2.2.0-sprint-146`) | Plan: [#603](https://github.com/ProductoryHQ/ritemark-native/pull/603) | #585, #576, #566, #567, #568, #594, #598 | Plan approved 1 Nov; PR 1 (#585 carried over) and PR 2 under way | — | — |
 
 ## Risks and Blockers
 
