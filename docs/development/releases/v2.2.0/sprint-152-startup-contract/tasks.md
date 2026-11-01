@@ -36,7 +36,7 @@ are the audits.
 
 - [x] W1: `project-check.mjs --first-frame` and the four starts; five runs per start on `main`; the failing set recorded
 - [x] W2: the AI view keeps one starting state with the turning mark, then draws the chat or the sign-in once; no
-      "Preparing Agent Chat…" on a normal start; the error card in the lead's words (the words pending the lead)
+      "Preparing Agent Chat…" on a normal start; the error card in the lead's words (set in her check of #632, 2 November)
 - [x] W2's webview tests fail on `main`'s view and pass; `npm test`, the webview's `tsc --noEmit`; the bundle rebuilt and
       measured
 - [x] W3, by decision 2: the start-time focus calls, or nothing here (PR 2's `layout.ts` instead) (the two calls removed)

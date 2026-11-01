@@ -240,6 +240,24 @@ export function AISidebar() {
     const timeout = window.setTimeout(() => setChatCheckSlow(true), Math.max(0, chatCheckStartedAt + START_SLOW_AFTER_MS - Date.now()));
     return () => window.clearTimeout(timeout);
   }, [chatWaitsOnItsAi, chatCheckStartedAt]);
+  // Inside the sheet, directly above the box whose greyed Send it explains (the Experience lead's check of #632)
+  const checkingNotice = chatCheckSlow ? (
+    <RuntimeNotice
+      tone="checking"
+      title={`Still checking whether ${RUNTIME_LABELS[selectedAgent]} is ready.`}
+      message={`You can write your message now and send it when ${RUNTIME_LABELS[selectedAgent]} is ready.`}
+      primaryAction={{
+        label: 'Try again',
+        variant: 'ghost',
+        tooltip: `Check again whether ${RUNTIME_LABELS[selectedAgent]} is ready`,
+        onAction: () => {
+          setChatCheckSlow(false);
+          setChatCheckStartedAt(Date.now());
+          recheck();
+        },
+      }}
+    />
+  ) : null;
   const currentApprovedPlan = isClaudeCode
     ? getActiveApprovedPlanForClaude(agentConversation)
     : (isCodex || isOpenCode)
@@ -268,26 +286,6 @@ export function AISidebar() {
 
       {/* Offline banner */}
       {!isOnline && <OfflineBanner />}
-
-      {chatCheckSlow && (
-        <div className="p-3">
-          <RuntimeNotice
-            tone="warning"
-            title={`Still checking whether ${RUNTIME_LABELS[selectedAgent]} is ready.`}
-            message="Try again to start the check over."
-            primaryAction={{
-              label: 'Try again',
-              icon: 'arrows-clockwise',
-              tooltip: `Check again whether ${RUNTIME_LABELS[selectedAgent]} is ready`,
-              onAction: () => {
-                setChatCheckSlow(false);
-                setChatCheckStartedAt(Date.now());
-                recheck();
-              },
-            }}
-          />
-        </div>
-      )}
 
       {/* Sprint 152 (R5, #624): the turning mark until the look is certain, then that look, once */}
       {look === 'starting' ? (
@@ -378,7 +376,7 @@ export function AISidebar() {
                   onAnswer={answerBrowserShareQuestion}
                 />
               )}
-              <ChatInput onReport={reportDialog.request} menuBoundary={conversationColumn} />
+              <ChatInput onReport={reportDialog.request} menuBoundary={conversationColumn} notice={checkingNotice} />
             </div>
             <ThreadRail />
             <BackgroundSwitchDialog />

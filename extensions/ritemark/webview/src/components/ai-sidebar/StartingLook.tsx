@@ -76,19 +76,18 @@ interface StartFailureProps {
 }
 
 /**
- * The view couldn't start (`agent:bootstrap-error`): a settled look of its own, in the Experience lead's words.
- * The words below are pending the lead's review with W2's screenshots (answer 5: "Its words come to me with the
- * screenshots").
+ * The view couldn't start (`agent:bootstrap-error`): a settled look of its own, in the Experience lead's words (her check
+ * of #632). One of the column's cards: its edges at the column's 12, radius 12, no shadow, centred on the mark's height.
  */
 export function StartFailure({ onTryAgain }: StartFailureProps) {
   return (
-    <div className="flex flex-1 items-center justify-center p-5" data-ai-start="failed">
-      <div className="w-full max-w-sm rounded-[10px] border border-[var(--r-hairline)] bg-[var(--r-surface)] p-5 text-center shadow-sm">
+    <div className="flex flex-1 items-center justify-center px-3" data-ai-start="failed">
+      <div className="w-full rounded-xl border border-[var(--r-hairline)] bg-[var(--r-surface)] p-5 text-center">
         <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--r-surface-soft)] text-[var(--r-ink-muted)]">
           <Icon name="warning" size={20} />
         </div>
         <h2 className="text-sm font-semibold text-[var(--r-ink-strong)]">The AI couldn't start</h2>
-        <p className="mt-1.5 text-xs leading-relaxed text-[var(--r-ink-muted)]">Try again, and restart Ritemark if it keeps happening.</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-[var(--r-ink-muted)]">Try again. If it keeps happening, restart Ritemark.</p>
         <div className="mt-4 flex justify-center">
           <Tooltip label="Start the AI again">
             <Button type="button" size="sm" onClick={onTryAgain}>
