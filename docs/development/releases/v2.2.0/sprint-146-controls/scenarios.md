@@ -41,7 +41,8 @@ Then Share gets no focus after the mouse pick, Tab closes the menu and returns t
 ### S7: A menu with its own close rule
 Given the AI sheet's link menu (`ChatLinkMenu`) and the welcome's dialog
 When each closes
-Then each does what it did on `main`.
+Then the welcome's dialog does what it did on `main`
+And the link menu gives its link the focus back only after the keyboard: after a mouse pick nothing is focused, as with the shared menus (on `main` it focused the link after every close, RC3's mechanism; changed in PR 1's review, #618).
 
 ### S8: #585's audit
 Given every trigger in #585's audit table

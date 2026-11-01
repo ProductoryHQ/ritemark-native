@@ -9,6 +9,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { vscode } from '../../lib/vscode';
+import { lastInputKind } from '../ui/close-focus';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Icon, type PhosphorIconName } from '../ui/Icon';
 import { chatLinkMenu, type ChatLinkAction, type ChatLinkMenuItem, type ChatLocalKind } from './chatLinks';
@@ -93,8 +94,10 @@ export function ChatLinkMenu({ request, onClose }: { request: ChatLinkMenuReques
         sideOffset={2}
         aria-label="Link actions"
         onCloseAutoFocus={(event) => {
+          // The link gets the focus back only after the keyboard (ui/close-focus.ts): after a mouse pick, this script
+          // focus drew the keyboard's ring round the link, as RC3's caret had it
           event.preventDefault();
-          request.anchor.focus({ preventScroll: true });
+          if (lastInputKind() === 'keyboard') request.anchor.focus({ preventScroll: true });
         }}
       >
         {items === null ? (
