@@ -17,9 +17,9 @@ Nothing here starts before the plan is approved by Jarmo. Tick a box only when t
 - [ ] A3 `research/catalogue-capture.md` (R2, R4, S22–S26): focus emulation, hover and press into a webview, a cell at device pixels five times, the theme switch
 - [ ] A4 `research/tooltip-looks.md` (R5, S28–S31): both looks measured with crops; other users of `editorHoverWidget.*`; the native `title` list
 - [ ] A5 `research/narrow-buttons.md` (R6, S32–S35): every cut label; the CSS rule tried, the measured one only if needed
-- [ ] A6 `research/file-changes-audit.md` (R7, S37–S43): every Git and GitHub welcome string, its `when`, its owner patch; the focused element on a mouse open, for File changes and each place
-- [ ] A7 `research/tab-menu-audit.md` (R8, S44–S48): each tab kind's menu on a dev build with Copilot Chat and on 2.1.0; each item's command and All commands
-- [ ] A8 `research/hover-row-audit.md` (R9, S49): each list's row end and thumb edge at 1× and 2×, Light and Dark
+- [x] A6 `research/file-changes-audit.md` (R7, S37–S43): every Git and GitHub welcome string, its `when`, its owner patch; the focused element on a mouse open, for File changes and each place
+- [x] A7 `research/tab-menu-audit.md` (R8, S44–S48): each tab kind's menu on a dev build with Copilot Chat and on 2.1.0; each item's command and All commands (the dev build, with Copilot Chat; the shipped 2.1.0 not run: the filter drops Add File to Chat either way)
+- [x] A8 `research/hover-row-audit.md` (R9, S49): each list's row end and thumb edge at 1× and 2×, Light and Dark (2× only, Light and Dark; 1× is Gate 2's on Windows at 100%. The workbench's lists: Documents has the fault; the left column's webview lists are PR 3's half)
 - [ ] A9 `research/card-dialog.md` (R10): the card page's parts that need only the card and the snapshot; how the page treats HTML, images and links
 - [ ] Where an audit changes a requirement or a tier, `spec.md` and the sprint plan's tier line change first
 
@@ -58,13 +58,13 @@ Nothing here starts before the plan is approved by Jarmo. Tick a box only when t
 
 ## Phase 5: PR 4, the shell patches (W7, W8, W9; R7, R8, R9; R5's hover if it moves)
 
-- [ ] A CoW-cloned, patched `vscode/` in the worktree; `./scripts/apply-patches.sh --dry-run` passes before any change
-- [ ] Patch 016: Git's welcome strings and GitHub's publish entries in the lead's words, through `create-patch.sh`; its header (S37–S40)
-- [ ] Patch 018: the outline rule for File changes and the places A6 lists (S41, S42); the hovered row's rule if A8 puts it there (S50, S51); the hover's shape if R5's choice needs it
-- [ ] Patch 019: the tab menu's filter and `ritemarkTabMenu.test.ts` (S44–S48)
-- [ ] `./scripts/test.sh --grep Ritemark`; `frame-screenshots.mjs --compare` with JOINS ok and `frame-geometry.mjs`
-- [ ] `CLAUDE.md`'s patch table (016, 018, 019) and `layout-invariants.md` (a document tab's menu, the left column's rows)
-- [ ] PR 4 opened: High, `/code-review` at high and `/security-review`; every finding answered; merged at the reviewed head with the drift check
+- [x] A CoW-cloned, patched `vscode/` in the worktree; `./scripts/apply-patches.sh --dry-run` passes before any change ([research/pr4-shell-checks.md](research/pr4-shell-checks.md))
+- [x] Patch 016: Git's welcome strings and GitHub's publish entries in the lead's words, through `create-patch.sh`; its header (S37–S40)
+- [x] Patch 018: the outline rule for File changes and the places A6 lists (S41, S42); the hovered row's rule if A8 puts it there (S50, S51); the hover's shape if R5's choice needs it (the hover's shape isn't needed: the Experience lead chose the workbench's look for `ui/tooltip.tsx`, PR 3)
+- [x] Patch 019: the tab menu's filter and `ritemarkTabMenu.test.ts` (S44–S48)
+- [x] `./scripts/test.sh --grep Ritemark`; `frame-screenshots.mjs --compare` with JOINS ok and `frame-geometry.mjs` (62 passing; 0 of 34 scenes differ from `main`'s capture, JOINS ok 34 of 34, geometry 34 PASS)
+- [x] `CLAUDE.md`'s patch table (016, 018, 019) and `layout-invariants.md` (a document tab's menu, the left column's rows) (the table lives in `docs/development/vscode-patches.md` now; `PATCH-RULES.md`'s rows too)
+- [ ] PR 4 opened: High, `/code-review` at high and `/security-review`; every finding answered; merged at the reviewed head with the drift check (opened as a draft: [#630](https://github.com/ProductoryHQ/ritemark-native/pull/630))
 - [ ] Windows proof on 2.2's candidate at Gate 2 (S43, S47)
 
 ## Phase 6: PR 5, the card dialog (W10, R10)

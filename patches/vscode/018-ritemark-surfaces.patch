@@ -153,6 +153,17 @@ rows already drawn and the tree under them never moves (on main a window landing
 it down 64 when New and Search arrived); once the extensions are read, a row whose command is still missing goes
 (ritemarkProjectHead.ts).
 
+Sprint 146 (#567, #594; the sprint's research/file-changes-audit.md and hover-row-audit.md): a view's welcome words
+take the focus as the view opens (viewPane.ts), and the workbench outlines every [tabindex]:focus (style.css), so File
+changes opened from More with the mouse drew an indigo outline round the column. A view's welcome words now draw it
+only where Chromium matches :focus-visible: Tab or Shift+Tab onto them, not a mouse open (ritemarkSurfaces.css). And the
+left column's slider is one tone over a row: a row ends 8 in from the column's edge, the slider covers the scrollbar's
+width less 2, so they overlap by 2, and the theme's see-through slider showed a hovered or chosen row through those 2.
+The slider's colour is now laid over the ground's, in its rest, hover and drag tones (the Experience lead's answer:
+the fill doesn't stop at the slider, which comes and goes, so a row's end never jumps); two sliders take it, a list's own
+and the pane view's split view's (.monaco-pane-view > .monaco-split-view2, as upstream's list.css names it); any other,
+such as the commit message's box, keeps the theme's.
+
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
 platform/window/common/window.ts; platform/windows/electron-main/windowImpl.ts; workbench/browser/{layout,style}.ts;
@@ -871,10 +882,10 @@ index 79add6fa2a9..ed88fcd86de 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..90d67e8aa7f
+index 00000000000..cdf3c2c1030
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1943 @@
+@@ -0,0 +1,1972 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1465,6 +1476,35 @@ index 00000000000..90d67e8aa7f
 +   line. The ground shows between them, 2 CSS pixels at every scale: 4 device pixels on the Mac, 2 at 100% */
 +.monaco-workbench .part.sidebar .monaco-scrollable-element > .scrollbar.vertical > .slider {
 +	width: calc(100% - 2px) !important; /* !important: the scrollbar sets the slider's width inline (abstractScrollbar.ts) */
++}
++
++/* The slider is one tone over a row (Sprint 146, #594; the Experience lead's answers for the sprint, section 7). A row
++   ends 8 in from the column's edge and the slider covers the scrollbar's width less 2, so the two overlap by 2; the theme's
++   slider colours are see-through, and a hovered or chosen row showed through those 2 as a second tone. The slider's colour
++   is laid over the ground's, so it reads as it does over the ground wherever it lies. The fill doesn't stop at the slider:
++   the overlay scrollbar comes and goes, and the row's end would jump with it. Its hover and drag tones keep their steps.
++   Two sliders, both on the ground: a list's own, and the panes' split view's (when a place's sections run past the column's
++   foot; upstream's list.css names it the same way). Any other keeps the theme's: a box's lies on the box's colour (File
++   changes' commit message, Search's field), and the welcome words have no rows under theirs */
++.monaco-workbench .part.sidebar :is(.monaco-list, .monaco-pane-view > .monaco-split-view2) > .monaco-scrollable-element > .scrollbar > .slider {
++	background: linear-gradient(var(--vscode-scrollbarSlider-background), var(--vscode-scrollbarSlider-background)), var(--rm-ground);
++}
++
++.monaco-workbench .part.sidebar :is(.monaco-list, .monaco-pane-view > .monaco-split-view2) > .monaco-scrollable-element > .scrollbar > .slider:hover {
++	background: linear-gradient(var(--vscode-scrollbarSlider-hoverBackground), var(--vscode-scrollbarSlider-hoverBackground)), var(--rm-ground);
++}
++
++.monaco-workbench .part.sidebar :is(.monaco-list, .monaco-pane-view > .monaco-split-view2) > .monaco-scrollable-element > .scrollbar > .slider.active {
++	background: linear-gradient(var(--vscode-scrollbarSlider-activeBackground), var(--vscode-scrollbarSlider-activeBackground)), var(--rm-ground);
++}
++
++/* A view's welcome words take the focus as the view opens (viewPane.ts focuses .welcome-view-content, tabIndex 0), and the
++   workbench outlines every [tabindex]:focus (style.css), so File changes opened from More with the mouse drew an indigo
++   outline round the column (Sprint 146, #567; the sprint's research/file-changes-audit.md). A mouse open draws none; Tab
++   or Shift+Tab onto the words still does, where Chromium matches :focus-visible. Every view's welcome words, wherever
++   the view is */
++.monaco-workbench .welcome-view-content:focus:not(:focus-visible) {
++	outline: none;
 +}
 +
 +
