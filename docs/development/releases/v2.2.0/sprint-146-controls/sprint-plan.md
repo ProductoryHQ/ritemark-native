@@ -4,7 +4,7 @@ Track: SDD (auto-detected: seven linked issues and the four parts of the review 
 Override with: "use plain full track"
 Branch: `sprint-146-controls`, made from `origin/main` at Phase 3, after approval. Each later PR has its own branch that starts with the same name (*Pull requests* below). This plan was written on `plan/v2.2.0-sprint-146`.
 Release tier: shell. 2.2 is a shell release ([release-plan.md](../release-plan.md)). This sprint names its shell-tier paths: `patches/vscode/016-ritemark-store-acquisition-policy.patch` (#567's words), `patches/vscode/018-ritemark-surfaces.patch` (#567's outline, #594 if the workbench's lists have it) and `patches/vscode/019-ritemark-tab-row.patch` (#568). Everything else is extension-tier (the table below). If an audit moves a fix into or out of a patch, this line and the table change first.
-Status: **Proposed, 31 October 2026.** Waiting for Jarmo's approval and his answers to the five decisions below. No code is written yet; the code named here was read, not run, and nothing was launched or built for this plan (*What reading the code added*).
+Status: **Approved, 1 November 2026** (Jarmo: "Sprint 146 kinnitatud", in the Development manager session), with decisions 1–5 as recommended (*Approval*). The code named under *What reading the code added* was read for the plan, not run.
 
 ## SDD Artifacts
 
@@ -188,5 +188,5 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan, with his answers to decisions 1–5.
-- [ ] Sprint start in the sprint's own session. A message from the Development manager is not Jarmo's word there (ritemark-dev `CLAUDE.md`, rule 7): the session asks Jarmo to confirm before the first code edit.
+- [x] Jarmo approved this sprint plan on 1 November 2026: "Sprint 146 kinnitatud" (the Development manager session), taken as approval with decisions 1 and 4 as recommended. He had confirmed decisions 2 and 3 earlier that day in the Experience lead's session ("kinnitan otsused 2 ja 3 nagu soovitatud"). The Development manager answered decision 5 (yes) on #603.
+- [x] Sprint start: Jarmo's standing word in the Development manager session (31 October: "I want you to start building 2.2 according to approved sprints"), with this plan approved on 1 November. A separate sprint session can't start while he works over Remote Control, so the work runs as that session's subagents, each PR on its own branch from `origin/main`. A message from the Development manager is not Jarmo's word in any other session (ritemark-dev `CLAUDE.md`, rule 7).
