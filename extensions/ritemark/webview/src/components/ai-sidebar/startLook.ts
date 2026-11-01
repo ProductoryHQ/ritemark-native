@@ -10,24 +10,25 @@
  * - the bootstrap (`ready`); before it nothing is known;
  * - a conversation open at the start is the chat whatever the AIs answer, so a restore on its way is waited for;
  * - the chosen AI usable: the chat; still being checked: not known yet;
- * - the chosen AI not usable: the chat if another AI is (`hasReadyAlternative`), so every AI's answer is waited for;
+ * - the chosen AI not usable: the chat if another AI is (`hasReadyAlternative`), so the other AIs' answers are waited for;
  * - no AI usable: "Almost there!" needs `onboarding:status`, which the host sends once Claude's and ChatGPT's checks
  *   have both answered, and never when one of them failed.
- * The conversation and the onboarding status are waited for only so long (`extrasWaitOver`): a lost answer must not
- * leave the mark turning, so after the grace the view draws what the gate says with what is known.
+ * Once the chosen AI has answered, the others, the conversation and the onboarding status are waited for only so long
+ * (`extrasWaitOver`): a lost or hung answer must not leave the mark turning while the chosen AI's own look is known,
+ * so after the grace the view draws what the gate says with what is known.
  *
  * A failed bootstrap is a look of its own (`failed`): the view couldn't start.
  */
 
 import type { AgentId } from './types';
-import type { RuntimeAvailabilities } from './runtimeAvailability';
+import { listReadyAlternatives, type RuntimeAvailabilities } from './runtimeAvailability';
 
 export type StartLook =
-  | { look: 'starting'; waitingFor: 'bootstrap' | 'ai' | 'conversation' | 'onboarding' }
+  | { look: 'starting'; waitingFor: 'bootstrap' | 'ai' | 'other-ai' | 'conversation' | 'onboarding' }
   | { look: 'failed' }
   | { look: 'settled' };
 
-/** How long the view waits for a restored conversation or the onboarding status once every AI has answered. */
+/** How long the view waits for the other AIs, a restored conversation or the onboarding status once the chosen AI has answered. */
 export const START_EXTRAS_GRACE_MS = 2000;
 
 /** After this long in its own check the view says so, under the mark (the Experience lead's answer 5). */
@@ -45,7 +46,7 @@ export interface StartLookInput {
   conversationOnItsWay: boolean;
   onboardingStatusKnown: boolean;
   onboardingDismissed: boolean;
-  /** The grace for the conversation and the onboarding status has run out. */
+  /** The grace for the other AIs, the conversation and the onboarding status has run out. */
   extrasWaitOver: boolean;
 }
 
@@ -56,12 +57,13 @@ export function startLook(input: StartLookInput): StartLook {
   const selected = input.availabilities[input.selectedAgent];
   if (selected.usable) return { look: 'settled' };
   if (selected.state === 'checking') return { look: 'starting', waitingFor: 'ai' };
-  const others = (Object.keys(input.availabilities) as AgentId[]).filter((id) => id !== input.selectedAgent);
-  if (others.some((id) => input.availabilities[id].usable)) return { look: 'settled' };
-  if (others.some((id) => input.availabilities[id].state === 'checking')) return { look: 'starting', waitingFor: 'ai' };
+  if (listReadyAlternatives(input.availabilities, input.selectedAgent).length > 0) return { look: 'settled' };
 
-  // No AI can take a turn: the look is the sign-in, unless a conversation lands first
+  // The chosen AI can't take a turn: its sign-in, unless another AI or a conversation answers first
   if (input.extrasWaitOver) return { look: 'settled' };
+  const othersChecking = (Object.keys(input.availabilities) as AgentId[])
+    .some((id) => id !== input.selectedAgent && input.availabilities[id].state === 'checking');
+  if (othersChecking) return { look: 'starting', waitingFor: 'other-ai' };
   if (input.conversationOnItsWay) return { look: 'starting', waitingFor: 'conversation' };
   const onboardingWillCome = input.availabilities['claude-code'].state !== 'error' && input.availabilities.codex.state !== 'error';
   if (!input.onboardingStatusKnown && !input.onboardingDismissed && onboardingWillCome) return { look: 'starting', waitingFor: 'onboarding' };

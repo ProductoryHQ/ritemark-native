@@ -118,9 +118,11 @@ release stays: every measured start is well inside it, and it is VS Code's own l
   first frame; a nonce'd script in the page's head times it from the column's first frame (the host's estimate,
   `aiColumnShownSince`) and turns it in step with the shell's. `resolveWebviewView` returns a promise that ends when
   the page asks for its bootstrap (or after 3 s), so patch 018 keeps its mark until the view's covers it. `startLook.ts`
-  decides when the look is certain (the bootstrap; a conversation on its way; every AI's answer; the onboarding status,
-  awaited 2 s at most once the AIs have answered); `sidebarGate.ts` now derives its own inputs (`sidebarGateInput`),
-  so the view and the tests share them; `StartingLook.tsx` draws the 10 s line and the failure. The AI view's lazy
+  decides when the look is certain (the bootstrap; the chosen AI's answer; then the other AIs, a conversation on its
+  way and the onboarding status, awaited 2 s at most); `sidebarGate.ts` now derives its own inputs (`sidebarGateInput`),
+  so the view and the tests share them; `StartingLook.tsx` draws the 10 s line and the failure. A chat that is the
+  settled look at once (a conversation was open) while its AI's check hangs gets the same words after the same 10 s on
+  `RuntimeNotice`, with Try again: the 15 s card's job, so a hung check always has a way to check again. The AI view's lazy
   load has no "Loading..." fallback. No message type and no field: the statuses can't ride on the bootstrap (A4).
 
 ## Workstream 3: the AI column at start (R6, PR 1)
@@ -147,7 +149,10 @@ choice. `WelcomeHost`'s two queries (`isOpen`, `mayOpenAtStart`), which only tho
 
 ## Workstream 5: Sprint 145's four on the slot (R2, PR 2)
 
-- `layout.ts` (002): the AI column restored from the manifest; closing it again is its release.
+- `layout.ts` (002): the AI column restored from the manifest; closing it again is its release. The release must
+  not store the column hidden: 002's comment says the extension opens it again at its next start, and PR 1's R6 removed
+  that call, so after a start where Ritemark AI never registered (the extension not read at all) the column would
+  otherwise stay closed though the person never closed it (PR 1's review, finding 3).
 - `ritemarkSwitchGuard.ts` and `editorPart.ts` (018): the note as it is; the decision goes through the desk's front slot.
 - `ritemarkTerminalTabs.ts` (019): restored terminals wait for the front slot; the 60 s constant is the slot's release.
 - `ritemarkProjectHead.ts` (018): `HEAD_PLACES` from the manifest, the rows' room as slots.

@@ -116,6 +116,12 @@ assert.deepEqual(play(bootstrap, noConversation, { claude: 'needs-auth' }, { ope
 // Nobody signed in, with a conversation open from last time: the chat, never the sign-in first.
 assert.deepEqual(play(bootstrap, { claude: 'needs-auth' }, { codex: 'needs-auth' }, { opencode: 'needs-configuration' }, { onboardingStatusKnown: true }, { hasConversation: true, conversationOnItsWay: false }), ['mark', 'chat'])
 
+// Another AI's check hangs after the chosen one answered: the grace, then the chosen AI's sign-in, not the mark for ever.
+assert.deepEqual(startLook({ ...start, ready: true, availabilities: availabilities({ ...start, claude: 'needs-auth', opencode: 'needs-configuration' }), onboardingDismissed: false, inlineRecoveryAvailable: false }), { look: 'starting', waitingFor: 'other-ai' })
+assert.deepEqual(play(bootstrap, noConversation, { claude: 'needs-auth' }, { opencode: 'needs-configuration' }, { extrasWaitOver: true }), ['mark', 'claude-setup'])
+// The chosen AI's own check is never cut short: it is the look's own answer.
+assert.deepEqual(play(bootstrap, noConversation, { codex: 'needs-auth' }, { opencode: 'needs-configuration' }, { extrasWaitOver: true }), ['mark'])
+
 // A lost answer doesn't keep the mark turning: after the grace the gate draws what is known.
 assert.deepEqual(play(bootstrap, noConversation, { claude: 'needs-auth' }, { codex: 'needs-auth' }, { opencode: 'needs-configuration' }, { extrasWaitOver: true }), ['mark', 'claude-setup'])
 assert.deepEqual(play(bootstrap, { claude: 'needs-auth' }, { codex: 'needs-auth' }, { opencode: 'needs-configuration' }, { onboardingStatusKnown: true }, { extrasWaitOver: true }), ['mark', 'onboarding'])

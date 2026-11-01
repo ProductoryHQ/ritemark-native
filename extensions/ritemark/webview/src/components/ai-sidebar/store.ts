@@ -354,10 +354,11 @@ interface AISidebarState {
   setComposerEmpty: (empty: boolean) => void;
   conversationRolloutMode: 'unknown' | 'legacy' | 'host-canonical' | 'host-compat';
   /**
-   * Sprint 152 (R5): a conversation the sidebar opens as it starts (the one it showed before a reload, or the store's
-   * selected one) is on its way. Until it lands the view can't tell the chat from the sign-in (startLook.ts).
+   * Sprint 152 (R5): how many conversations the sidebar asked for as it started (the one it showed before a reload, the
+   * store's selected one) are still on their way; both can be at once. Until they land the view can't tell the chat
+   * from the sign-in (startLook.ts).
    */
-  startConversationPending: boolean;
+  startConversationsPending: number;
   /** Current host flag; absent on an older host means enabled. */
   durableAgentConversationsEnabled: boolean;
   hostConversations: ConversationSummaryV1[];
@@ -1078,7 +1079,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     composerFill: null,
     composerEmpty: true,
     conversationRolloutMode: 'unknown',
-    startConversationPending: false,
+    startConversationsPending: 0,
     durableAgentConversationsEnabled: true,
     hostConversations: [],
     earlierConversations: [],
@@ -2552,8 +2553,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             break
           }
           // Sprint 152 (R5): whatever a conversation's answer is, the one on its way at the start is no longer awaited
-          if (message.operation === 'conversation/get' && get().startConversationPending) {
-            set({ startConversationPending: false });
+          if (message.operation === 'conversation/get' && get().startConversationsPending > 0) {
+            set({ startConversationsPending: get().startConversationsPending - 1 });
           }
           if (!message.ok) {
             if (message.operation === 'legacy/import-batch') {
@@ -2593,7 +2594,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               else legacyInventorySent = true;
             }
             if (initialized.selectedConversationId) {
-              set({ startConversationPending: true });
+              set({ startConversationsPending: get().startConversationsPending + 1 });
               postConversationRequest({ type: 'conversation/get', conversationId: initialized.selectedConversationId });
             }
             break;
