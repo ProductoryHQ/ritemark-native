@@ -160,7 +160,8 @@ only where Chromium matches :focus-visible: Tab or Shift+Tab onto them, not a mo
 left column's slider is one tone over a row: a row ends 8 in from the column's edge, the slider covers the scrollbar's
 width less 2, so they overlap by 2, and the theme's see-through slider showed a hovered or chosen row through those 2.
 The slider's colour is now laid over the ground's, in its rest, hover and drag tones (the Experience lead's answer:
-the fill doesn't stop at the slider, which comes and goes, so a row's end never jumps).
+the fill doesn't stop at the slider, which comes and goes, so a row's end never jumps); only a list's own slider
+(.monaco-list > .monaco-scrollable-element), since a box's, such as the commit message's, lies on the box's colour.
 
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
@@ -880,10 +881,10 @@ index 79add6fa2a9..ed88fcd86de 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..ed0ed164c29
+index 00000000000..8e2a976660b
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1969 @@
+@@ -0,0 +1,1970 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1480,16 +1481,17 @@ index 00000000000..ed0ed164c29
 +   ends 8 in from the column's edge and the slider covers the scrollbar's width less 2, so the two overlap by 2; the theme's
 +   slider colours are see-through, and a hovered or chosen row showed through those 2 as a second tone. The slider's colour
 +   is laid over the ground's, so it reads as it does over the ground wherever it lies. The fill doesn't stop at the slider:
-+   the overlay scrollbar comes and goes, and the row's end would jump with it. Its hover and drag tones keep their steps */
-+.monaco-workbench .part.sidebar .monaco-scrollable-element > .scrollbar > .slider {
++   the overlay scrollbar comes and goes, and the row's end would jump with it. Its hover and drag tones keep their steps.
++   Only a list's own slider: a box's (File changes' commit message, Search's field) lies on the box's colour, not the ground */
++.monaco-workbench .part.sidebar .monaco-list > .monaco-scrollable-element > .scrollbar > .slider {
 +	background: linear-gradient(var(--vscode-scrollbarSlider-background), var(--vscode-scrollbarSlider-background)), var(--rm-ground);
 +}
 +
-+.monaco-workbench .part.sidebar .monaco-scrollable-element > .scrollbar > .slider:hover {
++.monaco-workbench .part.sidebar .monaco-list > .monaco-scrollable-element > .scrollbar > .slider:hover {
 +	background: linear-gradient(var(--vscode-scrollbarSlider-hoverBackground), var(--vscode-scrollbarSlider-hoverBackground)), var(--rm-ground);
 +}
 +
-+.monaco-workbench .part.sidebar .monaco-scrollable-element > .scrollbar > .slider.active {
++.monaco-workbench .part.sidebar .monaco-list > .monaco-scrollable-element > .scrollbar > .slider.active {
 +	background: linear-gradient(var(--vscode-scrollbarSlider-activeBackground), var(--vscode-scrollbarSlider-activeBackground)), var(--rm-ground);
 +}
 +

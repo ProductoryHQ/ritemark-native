@@ -29,11 +29,21 @@ Screenshots (`qa/`): `pr4-r7-folder-{light,dark}-main.png` and `pr4-r7-folder-{l
 
 **Windows** isn't run here: most Windows PCs have no Git, so `missing.windows` is the first thing most people there see. Gate 2 on 2.2's candidate (S43).
 
+### For the Experience lead (review round 1)
+
+The lead's words stand in PR 4; these are questions about them, from the review:
+
+- **"Once it is, File changes works in every project"**: the Git extension looks for Git once, when Ritemark starts, so after installing Git the panel keeps saying "File changes needs Git" until Ritemark is restarted, and the old reload and troubleshoot links are gone (finding 1). A line such as "Restart Ritemark once Git is installed." would say so; it's the lead's call.
+- **Git turned off** says "in Ritemark's settings", and Open the setting opens the person's own settings; `git.enabled` can also be off in the project's own settings (finding 7).
+- **Git in folders above** reads "folders above this project … that folder's files too … Show its file changes": the lead wrote "The same" for the plural (finding 8).
+
 ### Still VS Code's, beyond the lead's words (for a follow-up)
 
 Found on the way, not changed (PR 4 keeps to the lead's words):
 
 - **Open it again** runs `git.reopenClosedRepositories`, as before, which opens VS Code's own picker: "Reopen Closed Repositories", "Pick a repository to reopen" (`qa/pr4-r7-open-it-again-pick-light.png`). Allow this folder… (`git.manageUnsafeRepositories`) opens a picker of the same kind. Their words are in the Git extension's code (`l10n.t`), not in `package.nls.json`.
+- **Set up Git here in a project of several folders** runs `git.init` with no folder, as Initialize Repository did, and VS Code's picker asks "Pick workspace folder to initialize git repo in", with Choose Folder… (review round 1, finding 6).
+- **SCM's own fallback**, "No source control providers registered." (`contrib/scm/browser/scm.contribution.ts`, `when: default`), shows when no Git state matches, for one while the Git extension hasn't started (round 1, finding 9).
 - **Right after Set up Git here**, before a first commit, the Graph view at the panel's foot says "The selected source control provider does not have any source control history items." (SCM's history view), and the Repositories and Graph views keep "Source Control" in their names (patch 018's Sprint 142 note left them "for now (#567)").
 
 ## The outline

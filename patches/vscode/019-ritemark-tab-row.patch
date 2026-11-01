@@ -66,7 +66,8 @@ Markdown and TypeScript extensions), and names Reveal in Explorer View "Show in 
 commands runs them (decision 4). It names what goes: an item no one has named still shows. Every kind of tab passes
 through it; a terminal tab's menu has none of the five and stays as it was (its extras went at their source above).
 Test: test/browser/parts/editor/ritemarkTabMenu.test.ts (with ./scripts/test.sh --grep Ritemark). On a VS Code update,
-check that the five command IDs still exist (REOPEN_WITH_COMMAND_ID is asserted by the test).
+check that the four other components' command IDs still exist (Reopen Editor With… is named by the imported
+REOPEN_WITH_COMMAND_ID).
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index ac63294495c..8717025e650 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.ts
@@ -1155,10 +1156,10 @@ index 00000000000..60fd89edea9
 +});
 diff --git a/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts b/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts
 new file mode 100644
-index 00000000000..b64f6edb959
+index 00000000000..2af103728e6
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts
-@@ -0,0 +1,57 @@
+@@ -0,0 +1,58 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1174,12 +1175,13 @@ index 00000000000..b64f6edb959
 +
 +import { IAction, Separator, toAction } from '../../../../base/common/actions.js';
 +import { localize } from '../../../../nls.js';
++import { REOPEN_WITH_COMMAND_ID } from './editorCommands.js';
 +
 +/** What a tab's menu leaves out, by command ID, with the reason the Experience lead gave. */
 +export const RITEMARK_TAB_MENU_LEAVES_OUT: ReadonlyMap<string, string> = new Map([
 +	['workbench.action.chat.attachFile', 'Add File to Chat adds the file to Copilot Chat, not to Ritemark\'s AI; the composer\'s + is Ritemark\'s way'],
 +	['markdown.showPreview', 'Open Preview: Ritemark\'s editor already shows the document as it reads'],
-+	['workbench.action.reopenWithEditor', 'Reopen Editor With… lists editors by their developer names; View: Reopen Editor With… stays in All commands'],
++	[REOPEN_WITH_COMMAND_ID, 'Reopen Editor With… lists editors by their developer names; View: Reopen Editor With… stays in All commands'],
 +	['markdown.findAllFileReferences', 'Find File References is a code tool'],
 +	['typescript.findAllFileReferences', 'Find File References is a code tool (the same item on a script file\'s tab)'],
 +]);
