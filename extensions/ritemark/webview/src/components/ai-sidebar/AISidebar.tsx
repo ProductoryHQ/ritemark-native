@@ -5,12 +5,12 @@
  * and renders the correct view based on store state.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { vscode } from '../../lib/vscode';
 import { OfflineBanner } from './OfflineBanner';
 import { OnboardingWizard } from './OnboardingWizard';
-import { hasUndismissedInlineRecovery, sidebarGate } from './sidebarGate';
+import { hasUndismissedInlineRecovery, sidebarGate, sidebarGateInput } from './sidebarGate';
 import { SetupWizard } from './SetupWizard';
 import { AgentView } from './AgentView';
 import { CodexView } from './CodexView';
@@ -28,16 +28,15 @@ import { ThreadRail } from './ThreadRail';
 import { ActivePlanBanner } from './ActivePlanBanner';
 import { getActiveApprovedPlanForClaude, getActiveApprovedPlanForCodex } from './lifecycle';
 import { markdownStyles } from './RenderedMarkdown';
-import type { ExtensionMessage } from './types';
+import type { AgentId, ExtensionMessage } from './types';
 import { sendConversationRequest } from '../../bridge';
-import { Icon } from '../ui/Icon';
-import { Button } from '../ui/button';
-import { Tooltip } from '../ui/tooltip';
-import { RuntimeNotice } from './RuntimeNotice';
 import { RuntimeAvailabilityNotice } from './RuntimeAvailabilityNotice';
 import { ShareQuestionCard } from './ShareQuestionCard';
 import { RUNTIME_LABEL } from './threadStatus';
-import { deriveRuntimeAvailabilities, listReadyAlternatives } from './runtimeAvailability';
+import { deriveRuntimeAvailabilities, listReadyAlternatives, RUNTIME_LABELS } from './runtimeAvailability';
+import { START_EXTRAS_GRACE_MS, startLook } from './startLook';
+import { StartFailure, StartingLook } from './StartingLook';
+import { AI_STARTING_MARK_ID } from '../../../../src/views/aiStartingMark';
 
 export function AISidebar() {
   const handleMessage = useAISidebarStore((s) => s.handleExtensionMessage);
@@ -79,6 +78,7 @@ export function AISidebar() {
         });
       }
       if (typeof savedState.currentConversationId === 'string' && /^[0-9a-f]{8}-/i.test(savedState.currentConversationId)) {
+        useAISidebarStore.setState({ startConversationPending: true });
         sendConversationRequest({ type: 'conversation/get', requestId: `restore-${Date.now()}`, conversationId: savedState.currentConversationId });
       }
     }
@@ -152,10 +152,11 @@ export function AISidebar() {
   const opencodeEnabled = useAISidebarStore((s) => s.opencodeEnabled);
   const browserShareQuestion = useAISidebarStore((s) => s.browserShareQuestion);
   const answerBrowserShareQuestion = useAISidebarStore((s) => s.answerBrowserShareQuestion);
+  const conversationRolloutMode = useAISidebarStore((s) => s.conversationRolloutMode);
+  const startConversationPending = useAISidebarStore((s) => s.startConversationPending);
   const isClaudeCode = selectedAgent === 'claude-code';
   const isCodex = selectedAgent === 'codex';
   const isOpenCode = selectedAgent === 'opencode';
-  const selectedRuntimeHydration = runtimeHydration[selectedAgent];
   const runtimeAvailabilities = deriveRuntimeAvailabilities({
     runtimeHydration,
     setupStatus,
@@ -166,37 +167,6 @@ export function AISidebar() {
   });
   const selectedRuntimeAvailability = runtimeAvailabilities[selectedAgent];
   const readyAlternatives = listReadyAlternatives(runtimeAvailabilities, selectedAgent);
-  const [bootstrapTimedOut, setBootstrapTimedOut] = useState(false);
-  const [runtimeTimedOut, setRuntimeTimedOut] = useState(false);
-  const runtimeLabel = selectedAgent === 'claude-code' ? 'Claude' : selectedAgent === 'codex' ? 'ChatGPT' : 'OpenCode';
-  const bootstrapDisplayError = bootstrapError
-    ?? (bootstrapTimedOut ? 'Agent Chat is taking longer than expected to load its local configuration.' : null);
-
-  useEffect(() => {
-    if (ready || bootstrapError || bootstrapTimedOut) return;
-    const timeout = window.setTimeout(() => setBootstrapTimedOut(true), 8000);
-    return () => window.clearTimeout(timeout);
-  }, [ready, bootstrapError, bootstrapTimedOut]);
-
-  useEffect(() => {
-    if (!ready || selectedRuntimeHydration?.phase !== 'checking' || runtimeTimedOut) return;
-    const timeout = window.setTimeout(() => setRuntimeTimedOut(true), 15000);
-    return () => window.clearTimeout(timeout);
-  }, [ready, selectedAgent, selectedRuntimeHydration?.phase, runtimeTimedOut]);
-
-  useEffect(() => {
-    // A runtime switch dismisses a timeout that belonged to the old runtime.
-    setRuntimeTimedOut(false);
-  }, [selectedAgent]);
-
-  useEffect(() => {
-    // A terminal result dismisses the timeout for the completed revision.
-    if (selectedRuntimeHydration?.phase !== 'checking') setRuntimeTimedOut(false);
-  }, [selectedRuntimeHydration?.phase]);
-  const needsSetup = isClaudeCode
-    && selectedRuntimeAvailability.state !== 'checking'
-    && selectedRuntimeAvailability.state !== 'error'
-    && !selectedRuntimeAvailability.usable;
   const latestClaudeTurn = agentConversation[agentConversation.length - 1];
   const inlineRecoveryAvailable = isClaudeCode
     && hasUndismissedInlineRecovery(latestClaudeTurn, dismissedAuthRecoveryTurnIds);
@@ -214,31 +184,41 @@ export function AISidebar() {
     if (ready && showWelcome) dismissWelcome();
   }, [ready, showWelcome, dismissWelcome]);
 
-  const showCodexSetup = isCodex
-    && selectedRuntimeAvailability.state !== 'checking'
-    && selectedRuntimeAvailability.state !== 'error'
-    && !selectedRuntimeAvailability.usable;
-  // OpenCode zero-key: no conversation yet and all four provider booleans are false
-  const showOpenCodeSetup = isOpenCode
-    && selectedRuntimeAvailability.state !== 'checking'
-    && selectedRuntimeAvailability.state !== 'error'
-    && !selectedRuntimeAvailability.usable
-    && !hasAnyRuntimeConversation
-    && selectedRuntimeAvailability.state === 'needs-configuration';
-  const sidebarView = sidebarGate({
+  const sidebarFacts = {
     ready,
-    inlineRecoveryAvailable,
-    onboardingNeeded: Boolean(
-      onboardingStatus
-      && !Object.values(runtimeAvailabilities).some((availability) => availability.usable)
-      && !onboardingDismissed
-    ),
+    selectedAgent,
+    availabilities: runtimeAvailabilities,
+    onboardingStatusKnown: onboardingStatus !== null,
+    onboardingDismissed,
     hasConversation: hasAnyRuntimeConversation,
-    hasReadyAlternative: readyAlternatives.length > 0,
-    needsSetup,
-    showCodexSetup: Boolean(showCodexSetup),
-    showOpenCodeSetup: Boolean(showOpenCodeSetup),
+    inlineRecoveryAvailable,
+  };
+  const sidebarView = sidebarGate(sidebarGateInput(sidebarFacts));
+
+  // Sprint 152 (R5, #624): the view draws once. Until the messages make its look certain it shows the turning mark it
+  // took over from the shell; then the gate's look, which stays (a later re-check never brings the mark back).
+  const [extrasWaitOver, setExtrasWaitOver] = useState(false);
+  const [settledOnce, setSettledOnce] = useState(false);
+  const start = startLook({
+    ...sidebarFacts,
+    bootstrapError,
+    conversationOnItsWay: conversationRolloutMode === 'unknown' || startConversationPending,
+    extrasWaitOver,
   });
+  const look: 'starting' | 'failed' | 'settled' = !ready
+    ? (bootstrapError ? 'failed' : 'starting')
+    : settledOnce ? 'settled' : start.look;
+  const waitingForExtras = start.look === 'starting' && (start.waitingFor === 'conversation' || start.waitingFor === 'onboarding');
+  useEffect(() => {
+    if (!waitingForExtras || extrasWaitOver) return;
+    const timeout = window.setTimeout(() => setExtrasWaitOver(true), START_EXTRAS_GRACE_MS);
+    return () => window.clearTimeout(timeout);
+  }, [waitingForExtras, extrasWaitOver]);
+  useLayoutEffect(() => {
+    if (look === 'settled' && !settledOnce) setSettledOnce(true);
+    // The page's own mark (aiStartingMark.ts) goes in the same frame as the look that replaces it
+    if (look !== 'starting') document.getElementById(AI_STARTING_MARK_ID)?.remove();
+  }, [look, settledOnce]);
   const currentApprovedPlan = isClaudeCode
     ? getActiveApprovedPlanForClaude(agentConversation)
     : (isCodex || isOpenCode)
@@ -268,59 +248,29 @@ export function AISidebar() {
       {/* Offline banner */}
       {!isOnline && <OfflineBanner />}
 
-      {/* The same card as every other runtime notice (RuntimeNotice): the
-          check is still running, it is only slow. */}
-      {ready && runtimeTimedOut && (
-        <div className="p-3">
-          <RuntimeNotice
-            tone="warning"
-            title={`Still checking ${runtimeLabel}`}
-            message={`Finding out whether ${runtimeLabel} is ready is taking longer than usual. Try again to start the check over.`}
-            primaryAction={{
-              label: 'Try again',
-              icon: 'arrows-clockwise',
-              tooltip: `Start checking ${runtimeLabel} again.`,
-              onAction: () => {
-                setRuntimeTimedOut(false);
-                vscode.postMessage({ type: 'agent:status/recheck', runtimeId: selectedAgent });
-              },
-            }}
-          />
-        </div>
-      )}
-
-      {!ready ? (
-        <div className="flex flex-1 items-center justify-center p-5">
-          <div className="w-full max-w-sm rounded-[10px] border border-[var(--r-hairline)] bg-[var(--r-surface)] p-5 text-center shadow-sm">
-            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--r-surface-soft)] text-[var(--r-ink-muted)]">
-              <Icon name={bootstrapDisplayError ? 'warning' : 'sparkle'} size={20} />
-            </div>
-            <h2 className="text-sm font-semibold text-[var(--r-ink-strong)]">
-              {bootstrapDisplayError ? 'Agent Chat could not start' : 'Preparing Agent Chat…'}
-            </h2>
-            <p className="mt-1.5 text-xs leading-relaxed text-[var(--r-ink-muted)]">
-              {bootstrapDisplayError ?? 'Loading the local model catalog and your last selection.'}
-            </p>
-            {bootstrapDisplayError && (
-              <div className="mt-4 flex justify-center">
-                <Tooltip label="Load Agent Chat's local configuration again">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => {
-                      setBootstrapTimedOut(false);
-                      useAISidebarStore.setState({ bootstrapError: null });
-                      vscode.postMessage({ type: 'agent:bootstrap/request' });
-                    }}
-                  >
-                    <Icon name="arrows-clockwise" size={12} tone="inherit" />
-                    Try again
-                  </Button>
-                </Tooltip>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Sprint 152 (R5, #624): the turning mark until the look is certain, then that look, once */}
+      {look === 'starting' ? (
+        <StartingLook
+          aiName={ready ? RUNTIME_LABELS[selectedAgent] : null}
+          onTryAgain={() => {
+            if (!ready) {
+              vscode.postMessage({ type: 'agent:bootstrap/request' });
+              return;
+            }
+            // The AIs still being checked, or the chosen one when every AI has answered
+            const checking = (Object.keys(runtimeAvailabilities) as AgentId[]).filter((id) => runtimeAvailabilities[id].state === 'checking');
+            for (const runtimeId of checking.length > 0 ? checking : [selectedAgent]) {
+              vscode.postMessage({ type: 'agent:status/recheck', runtimeId });
+            }
+          }}
+        />
+      ) : look === 'failed' ? (
+        <StartFailure
+          onTryAgain={() => {
+            useAISidebarStore.setState({ bootstrapError: null });
+            vscode.postMessage({ type: 'agent:bootstrap/request' });
+          }}
+        />
       ) : sidebarView === 'onboarding' ? (
         <OnboardingWizard />
       ) : sidebarView === 'claude-setup' ? (
