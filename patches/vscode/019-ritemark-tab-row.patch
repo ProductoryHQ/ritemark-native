@@ -66,9 +66,9 @@ Markdown and TypeScript extensions), and names Reveal in Explorer View "Show in 
 commands runs them (decision 4). It names what goes: an item no one has named still shows. Every kind of tab passes
 through it; a terminal tab's menu has none of the five and stays as it was (its extras went at their source above).
 Test: test/browser/parts/editor/ritemarkTabMenu.test.ts (with ./scripts/test.sh --grep Ritemark). On a VS Code update,
-check that the five other components' command IDs still exist: the four left out from chat and the Markdown and
-TypeScript extensions, and revealInExplorer (contrib/files) that Show in Documents renames. Reopen Editor With… is named
-by the imported REOPEN_WITH_COMMAND_ID.
+check that these five command IDs, from four other components, still exist: the four left out (chat's, the Markdown
+extension's two, the TypeScript extension's) and revealInExplorer (contrib/files), which Show in Documents renames.
+Reopen Editor With… is named by the imported REOPEN_WITH_COMMAND_ID.
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index ac63294495c..8717025e650 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.ts

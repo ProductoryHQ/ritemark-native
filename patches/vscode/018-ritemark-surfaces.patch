@@ -160,8 +160,9 @@ only where Chromium matches :focus-visible: Tab or Shift+Tab onto them, not a mo
 left column's slider is one tone over a row: a row ends 8 in from the column's edge, the slider covers the scrollbar's
 width less 2, so they overlap by 2, and the theme's see-through slider showed a hovered or chosen row through those 2.
 The slider's colour is now laid over the ground's, in its rest, hover and drag tones (the Experience lead's answer:
-the fill doesn't stop at the slider, which comes and goes, so a row's end never jumps); only the sliders that lie on the
-ground, a list's own and the panes' split view's, since a box's, such as the commit message's, lies on the box's colour.
+the fill doesn't stop at the slider, which comes and goes, so a row's end never jumps); two sliders take it, a list's own
+and the pane view's split view's (.monaco-pane-view > .monaco-split-view2, as upstream's list.css names it); any other,
+such as the commit message's box, keeps the theme's.
 
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
@@ -881,10 +882,10 @@ index 79add6fa2a9..ed88fcd86de 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..a2f46b2ef91
+index 00000000000..cdf3c2c1030
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1974 @@
+@@ -0,0 +1,1972 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1482,20 +1483,18 @@ index 00000000000..a2f46b2ef91
 +   slider colours are see-through, and a hovered or chosen row showed through those 2 as a second tone. The slider's colour
 +   is laid over the ground's, so it reads as it does over the ground wherever it lies. The fill doesn't stop at the slider:
 +   the overlay scrollbar comes and goes, and the row's end would jump with it. Its hover and drag tones keep their steps.
-+   The sliders that lie on the ground: a list's own and the panes' (the split view's, when a place's sections run past the
-+   column's foot). A box's slider (File changes' commit message, Search's field) lies on the box's colour, so it keeps its own */
-+.monaco-workbench .part.sidebar .monaco-list > .monaco-scrollable-element > .scrollbar > .slider,
-+.monaco-workbench .part.sidebar .monaco-split-view2 > .monaco-scrollable-element > .scrollbar > .slider {
++   Two sliders, both on the ground: a list's own, and the panes' split view's (when a place's sections run past the column's
++   foot; upstream's list.css names it the same way). Any other keeps the theme's: a box's lies on the box's colour (File
++   changes' commit message, Search's field), and the welcome words have no rows under theirs */
++.monaco-workbench .part.sidebar :is(.monaco-list, .monaco-pane-view > .monaco-split-view2) > .monaco-scrollable-element > .scrollbar > .slider {
 +	background: linear-gradient(var(--vscode-scrollbarSlider-background), var(--vscode-scrollbarSlider-background)), var(--rm-ground);
 +}
 +
-+.monaco-workbench .part.sidebar .monaco-list > .monaco-scrollable-element > .scrollbar > .slider:hover,
-+.monaco-workbench .part.sidebar .monaco-split-view2 > .monaco-scrollable-element > .scrollbar > .slider:hover {
++.monaco-workbench .part.sidebar :is(.monaco-list, .monaco-pane-view > .monaco-split-view2) > .monaco-scrollable-element > .scrollbar > .slider:hover {
 +	background: linear-gradient(var(--vscode-scrollbarSlider-hoverBackground), var(--vscode-scrollbarSlider-hoverBackground)), var(--rm-ground);
 +}
 +
-+.monaco-workbench .part.sidebar .monaco-list > .monaco-scrollable-element > .scrollbar > .slider.active,
-+.monaco-workbench .part.sidebar .monaco-split-view2 > .monaco-scrollable-element > .scrollbar > .slider.active {
++.monaco-workbench .part.sidebar :is(.monaco-list, .monaco-pane-view > .monaco-split-view2) > .monaco-scrollable-element > .scrollbar > .slider.active {
 +	background: linear-gradient(var(--vscode-scrollbarSlider-activeBackground), var(--vscode-scrollbarSlider-activeBackground)), var(--rm-ground);
 +}
 +
