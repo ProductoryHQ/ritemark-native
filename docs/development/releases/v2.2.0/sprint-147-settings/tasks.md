@@ -1,10 +1,11 @@
 # Sprint 147 Tasks
 
-Nothing here starts before Jarmo approves the plan, and the build starts only after Sprint 146 has merged. Tick a box only when the change is on its PR's branch. W numbers are workstreams in [technical-plan.md](technical-plan.md); R, E and I numbers are in [spec.md](spec.md); A numbers are the audits.
+The plan is approved on Jarmo's 2.2 delegation (sprint-plan.md, *Approval*). The audits can start now; the code starts only after Sprint 146 has merged. Tick a box only when the change is on its PR's branch. W numbers are workstreams in [technical-plan.md](technical-plan.md); R, E and I numbers are in [spec.md](spec.md); A numbers are the audits.
 
 ## Phase 0: Branch and starting tree
 
-- [ ] Jarmo's approval is on the sprint plan, with his answers to the decisions; Sprint 146's PRs are merged
+- [x] The plan's approval is recorded (the manager, on Jarmo's 2.2 delegation; decisions 1 and 3). Decision 2 is Jarmo's and gates only PR 3's key change
+- [ ] Sprint 146's PRs are merged before the first code edit
 - [ ] `git checkout -b sprint-147-settings` from `origin/main`; `git branch --show-current` shows it before any edit. Later PRs: `sprint-147-settings-ai`, `-host`, `-capabilities`, each from `origin/main` the same way
 - [ ] `media/webview.js` size recorded in `notes/bundle.md` (E4)
 - [ ] Asked: the Experience lead for the answers to the plan's questions; the "Ritemark on Windows" session for A1 and the overlay checks

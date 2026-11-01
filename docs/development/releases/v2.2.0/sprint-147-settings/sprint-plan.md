@@ -4,7 +4,7 @@ Track: SDD (auto-detected: five linked issues on one page that holds every setti
 Override with: "use plain full track"
 Branch: `sprint-147-settings`, made from `origin/main` at Phase 3, after approval and after Sprint 146 has merged. Each later PR has its own branch that starts with the same name (*Pull requests* below). This plan was written on `plan/sprint-147-settings`.
 Release tier: extension. No path is on `CLAUDE.md`'s shell-tier list; it ships in 2.2's shell release ([release-plan.md](../release-plan.md)).
-Status: **Plan in review**, waiting for Jarmo's approval. The code named under *What reading the code added* was read for the plan, not run.
+Status: **Approved**, 1 November 2026, by the Development manager on Jarmo's 2.2 delegation (*Approval* below). The code named under *What reading the code added* was read for the plan, not run.
 
 ## SDD Artifacts
 
@@ -156,15 +156,18 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Pre-Implementation Gate
 
-- Jarmo approves this plan. A message from the Development manager is information for the plan, not approval of it (ritemark-dev `CLAUDE.md`, rule 7).
+- The plan is approved (*Approval* below), under Jarmo's own delegation of 2.2's approvals to the Development manager (ritemark-dev `decisions/log.md`, c45d69c). A message from the manager to another session carries it only by quoting the log's row (ritemark-dev `CLAUDE.md`, rule 7).
+- Decision 2 stays Jarmo's (HARD RULE #1: a way to do something leaves). Until he answers, the page keeps today's behaviour for a saved key, and PR 3's "keys stay in the host" change waits for his word.
 - Sprint 146 has merged.
 - Phase 1's audits come before the code they gate: A1 before W5, A2 before W5's listeners, A3 before W6, A4 before W1's list is final. When an audit changes a requirement, `spec.md` changes first.
 - The branch is made before the first code edit, and `git branch --show-current` shows it.
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan.
-- [ ] Sprint start: Jarmo's word, after Sprint 146 has merged.
+- [x] Approved on 1 November 2026 by the Development manager, on Jarmo's delegation of every 2.2 sprint until the release candidate: "võta nii et kõik sprindid on 2.2 osas approved until RC - ei vaja heakskiitu. I trust you. When needed use admin merge and clean worktrees" (ritemark-dev `decisions/log.md`, c45d69c).
+- [x] Decision 1: yes, as recommended. Decision 3: yes, as recommended.
+- [ ] Decision 2 (a saved key never back on the page): Jarmo's, since a way to do something leaves (HARD RULE #1). Today's behaviour stays until he answers.
+- [x] Sprint start: the audits now; the code after Sprint 146 has merged.
 
 ## Questions
 
