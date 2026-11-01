@@ -1099,6 +1099,8 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export async function deactivate() {
+  // First and synchronous: a project switch's notes for the next window, now that this window is really going (#623).
+  projectsHost?.switcher.writePendingNotes();
   await transcribeView?.prepareForShutdown();
   await unifiedViewProvider?.prepareForShutdown();
   await shutdownAnalytics();

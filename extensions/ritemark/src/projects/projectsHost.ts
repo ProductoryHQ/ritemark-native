@@ -127,6 +127,10 @@ export function registerProjects(deps: ProjectsHostDependencies): ProjectsHost {
     workingChats: deps.workingChats,
     stopWorkingChats: deps.stopWorkingChats,
   });
+  // #623: the switch notes are files now (switchProject.ts); global state's old two go.
+  for (const key of ['ritemark.projects.switchedFrom', 'ritemark.projects.landOnHome']) {
+    if (context.globalState.get(key) !== undefined) void context.globalState.update(key, undefined);
+  }
 
   // What waits in the open project, from the board's live calls.
   const countHere = async (): Promise<number | null> => {

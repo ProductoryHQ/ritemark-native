@@ -15,6 +15,7 @@
 
 import { spawn, ChildProcess } from 'child_process';
 import { Writable, Readable } from 'stream';
+import { stopProcessTree } from '../utils/runProcess';
 import type {
   InitializeResponse,
   NewSessionResponse,
@@ -309,10 +310,11 @@ export class AcpClient {
     });
   }
 
+  /** On Windows the whole tree (#619): `opencode acp`'s own children, its MCP servers among them, go with it. */
   private killProcess(signal: NodeJS.Signals): void {
     if (this.process && !this.process.killed) {
       try {
-        this.process.kill(signal);
+        stopProcessTree(this.process, signal === 'SIGKILL');
       } catch {
         // Process may already be gone; nothing to do.
       }

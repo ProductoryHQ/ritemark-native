@@ -8,7 +8,9 @@ import assert from 'assert';
 import { mkdtempSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { MAX_PROCESS_OUTPUT, runProcess } from './runProcess';
+import { spawn } from 'child_process';
+import { EventEmitter } from 'events';
+import { MAX_PROCESS_OUTPUT, runProcess, stopProcessTree } from './runProcess';
 
 async function waitFor(condition: () => boolean, message: string): Promise<void> {
   const deadline = Date.now() + 5000;
@@ -119,6 +121,50 @@ async function main() {
       env: { ...process.env, RITEMARK_RUN_PROCESS_TEST: 'expanded' },
     });
     assert.deepStrictEqual(result, { status: 0, stdout: 'expanded\n', stderr: '' });
+  }
+
+  // #619: stopProcessTree stops a whole tree on Windows (taskkill /T /F, by its full path), and only the process
+  // elsewhere. When taskkill can't start or fails, the process itself is still killed. Windows is simulated: the
+  // platform reads win32 and each taskkill is recorded instead of run, then made to exit, fail or not start.
+  {
+    const childProcess = require('child_process') as { spawn: (...args: unknown[]) => unknown };
+    const realSpawn = childProcess.spawn;
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+    const started: { args: unknown[]; taskkill: EventEmitter }[] = [];
+    childProcess.spawn = (...args: unknown[]) => {
+      const taskkill = new EventEmitter();
+      started.push({ args, taskkill });
+      return taskkill;
+    };
+    const killed: string[] = [];
+    const child = (pid: number, exitCode: number | null = null) => ({ pid, exitCode, signalCode: null, kill: (signal: string) => { killed.push(`${pid} ${signal}`); return true; } }) as never;
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    try {
+      stopProcessTree(child(4242));
+      stopProcessTree(child(4243, 0));
+      started[0].taskkill.emit('exit', 0);
+      assert.deepStrictEqual(killed, [], 'a tree taskkill ended is not followed by kill()');
+      stopProcessTree(child(4244), true);
+      started[1].taskkill.emit('error', Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' }));
+      stopProcessTree(child(4245));
+      started[2].taskkill.emit('exit', 1);
+    } finally {
+      Object.defineProperty(process, 'platform', platform);
+      childProcess.spawn = realSpawn;
+    }
+    assert.deepStrictEqual(
+      started.map(({ args }) => args),
+      [4242, 4244, 4245].map((pid) => ['C:\\Windows\\System32\\taskkill.exe', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }]),
+      'one taskkill each, by its full path; none for a child that already exited',
+    );
+    assert.deepStrictEqual(killed, ['4244 SIGKILL', '4245 SIGTERM'], 'kill() when taskkill did not start, or failed');
+    console.log(`  Windows: ${started.map(({ args }) => `${args[0]} ${(args[1] as string[]).join(' ')}`).join('; ')}`);
+  }
+  if (process.platform !== 'win32') {
+    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+    const exited = new Promise<NodeJS.Signals | null>((resolve) => child.on('exit', (_code, signal) => resolve(signal)));
+    stopProcessTree(child);
+    assert.strictEqual(await exited, 'SIGTERM');
   }
 
   // The reason it exists: the event loop keeps turning while the child runs.

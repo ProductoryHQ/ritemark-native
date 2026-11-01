@@ -25,7 +25,7 @@ import {
   isBundledAgentRuntimePath,
   readAgentRuntimePreference,
 } from '../utils/bundledAgentRuntime';
-import { runProcess, type ProcessResult } from '../utils/runProcess';
+import { runProcess, stopProcessTree, type ProcessResult } from '../utils/runProcess';
 import { codexAppServerEnv } from './codexRetry';
 
 /**
@@ -514,12 +514,14 @@ export class CodexManager {
   }
 
   /**
-   * Gracefully shutdown app-server
+   * Stop app-server: SIGTERM, and on Windows its whole tree, so the `git fetch`
+   * of Codex's plugins clone and its `index-pack` don't outlive Ritemark and
+   * hold CODEX_HOME open (#619).
    */
   dispose(): void {
     if (this.process && !this.process.killed) {
       this.isShuttingDown = true;
-      this.process.kill('SIGTERM');
+      stopProcessTree(this.process);
       this.process = null;
     }
   }
