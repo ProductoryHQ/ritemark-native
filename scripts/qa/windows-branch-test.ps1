@@ -66,6 +66,13 @@ if (-not (Test-Path -LiteralPath $note)) {
 }
 
 $installedVersion = (Get-Content -LiteralPath (Join-Path $installed 'package.json') -Raw | ConvertFrom-Json).version
+# VS Code keeps the built-in copy, without a word, when the branch's version isn't higher (Sprint 145: a 1.99.x
+# overlay under 2.1.0 tested 2.1.0)
+$branchCore = ($pkg.version -split '-')[0]
+$installedCore = ($installedVersion -split '-')[0]
+if ([version]$branchCore -le [version]$installedCore) {
+  throw "The overlay's version $($pkg.version) is not higher than the installed $installedVersion, so Ritemark would run the installed extension. Rebuild the overlay with make-windows-test-overlay.sh."
+}
 Write-Host ''
 Write-Host "Starting Ritemark ($RitemarkExe) with the branch extension $($pkg.version) (installed: $installedVersion)."
 Write-Host "Profile: $userData (fresh; your normal settings are not used)."
