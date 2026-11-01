@@ -1,0 +1,12 @@
+# Sprint 152: hunk counts and the webview bundle (E2, E4)
+
+## Before (`origin/main`, `f84f4513`)
+
+- Patch hunks (`grep -c '^@@'`): 002 88, 018 123, 019 55. PR 1 touches no patch.
+- `extensions/ritemark/media/webview.js`: 8,749,976 bytes (2,525,831 gzipped), rebuilt byte for byte from `main`'s source.
+
+## After PR 1 (R5)
+
+- `media/webview.js`: 8,752,573 bytes, 2,597 more: the start look's decision (`startLook.ts`), its line and failure
+  (`StartingLook.tsx`), and the gate's derivation moved into `sidebarGate.ts`. The turning mark itself is plain HTML and
+  CSS in the view's page (`src/views/aiStartingMark.ts`), not in the bundle.

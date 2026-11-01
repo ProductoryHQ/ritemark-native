@@ -63,7 +63,7 @@ import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
 import { findReplacedTextTab, findStuckMarkdownTabs } from './utils/stickyTabHealer';
 import { registerProjectHeadCommands } from './views/projectHeadCommands';
-import { prepareWelcome, registerWelcome, type WelcomeHost } from './welcome/welcomeHost';
+import { prepareWelcome, registerWelcome } from './welcome/welcomeHost';
 import { newDocumentFolder, nextUntitledPath } from './newDocumentLocation';
 // Feature flags: view visibility controlled by 'when' clauses in package.json
 
@@ -96,8 +96,6 @@ let flowScheduler: FlowScheduler | null = null;
 // Settings provider
 let settingsProvider: RitemarkSettingsProvider | null = null;
 
-// The welcome (Sprint 133)
-let welcomeHost: WelcomeHost | null = null;
 let projectsHost: ProjectsHost | null = null;
 
 // Sprint 118: Transcribe panel, so shutdown can close an in-progress recording cleanly
@@ -373,13 +371,10 @@ export function activate(context: vscode.ExtensionContext) {
     }
   })();
 
-  // Show the AI panel after extension views register (terminal init finishes first and grabs focus).
-  // Not while the welcome is open: it is alone in the window (Sprint 133, R1). It shows the column without taking the
-  // keyboard from what has it, a document or a terminal (Sprint 144, P5).
-  setTimeout(() => {
-    if (welcomeHost?.isOpen()) return;
-    vscode.commands.executeCommand('ritemark.unifiedView.focus', { preserveFocus: true });
-  }, 4000);
+  // Sprint 152 (R6, decision 2): Ritemark no longer opens the AI column by itself when it starts. The layout brings it
+  // back as the window left it (patch 002, Sprint 145): open in a project window, closed when the person closed it
+  // with its toggle, and a column the narrow window stepped aside comes back once the window is wide enough
+  // (patch 018's window sizes). What asks for the AI still opens it: the welcome's landing, a task's conversation.
 
   // Initialize API key manager (must be first)
   initAPIKeyManager(context);
@@ -781,7 +776,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // The welcome (Sprint 133): a window with no folder opens on one sheet, and the
   // landing after it reloads into a folder. Its checks and sign-ins are the AI sheet's.
-  welcomeHost = registerWelcome(context, welcomeProfileKind, {
+  registerWelcome(context, welcomeProfileKind, {
     runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
     startCodexSignIn: (onStatus) => unifiedViewProvider.startCodexSignIn(onStatus),
     stopCodexSignIn: () => unifiedViewProvider.stopCodexSignIn(),
@@ -792,16 +787,6 @@ export function activate(context: vscode.ExtensionContext) {
     entries: () => projectsHost!.projectList.entries(vscode.workspace.workspaceFolders?.[0]?.uri.toString()),
     revealHome: () => projectsHost!.revealHome(),
   } : undefined);
-
-  // Sprint 144 (P5, #569): in a project window the AI column comes back with the window. The layout starts it hidden
-  // and only the 4 s focus above brought it back, so Home laid out at full width and reflowed when it came (measured:
-  // 3.2-4.6 s after Home on every switch). The later focus still runs, for the terminal's sake. Never beside the welcome,
-  // which is alone in a window with no folder and in the update welcome (Sprint 133, R1): it opens after an await, so
-  // ask whether it may open, not whether it is open.
-  // It shows the column and leaves the keyboard where it is, as the task board's handoff does (UnifiedViewProvider).
-  if (vscode.workspace.workspaceFolders?.length && !welcomeHost?.mayOpenAtStart()) {
-    void vscode.commands.executeCommand('ritemark.unifiedView.focus', { preserveFocus: true });
-  }
 
   // Register chat history command (toggles history panel in webview)
   context.subscriptions.push(
