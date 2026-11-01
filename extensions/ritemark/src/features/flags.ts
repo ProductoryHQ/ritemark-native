@@ -67,9 +67,6 @@ export type FlagId =
  * Feature flag registry
  */
 export const FLAGS: Record<FlagId, FeatureFlag> = {
-  // Sprint 125: kill switch for the PowerPoint preview. Default ON (HARD RULE #2).
-  // The .pptx editor stays registered when it is off, so a deck says the preview
-  // is turned off and offers PowerPoint rather than showing VS Code's binary-file page.
   // Sprint 145 (#588): both changes stay. A writer's (an AI's or another app's) copy is merged with the person's
   // text by paragraph, with Review changes for a paragraph both changed; patch 014's reload participant asks
   // `_ritemark.editorSync.answerReload` first. ON ('stable'); a code-level kill switch an extension release can
@@ -82,6 +79,9 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
+  // Sprint 125: kill switch for the PowerPoint preview. Default ON (HARD RULE #2).
+  // The .pptx editor stays registered when it is off, so a deck says the preview
+  // is turned off and offers PowerPoint rather than showing VS Code's binary-file page.
   'powerpoint-preview': {
     id: 'powerpoint-preview',
     label: 'PowerPoint Preview',
