@@ -847,8 +847,8 @@ export function RitemarkSettings() {
           </div>
         )}
 
-        {/* OpenAI */}
-        <div className="mb-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+        {/* OpenAI; an OpenAI step's "Add it in Settings" opens the page here (Sprint 145, #580) */}
+        <div id="settings-section-openai-api-key" className="mb-6 scroll-mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-ink-strong">
               OpenAI API Key
@@ -914,7 +914,8 @@ export function RitemarkSettings() {
           )}
 
           <p className="text-xs text-ink-muted mt-2">
-            Used for: AI Chat, Flows (LLM), Image Generation (GPT Image 1.5){settings.opencodeEnabled ? ', OpenCode (GPT models)' : ''}
+            {/* No model's name here: the image steps' default moves with modelConfig (it named GPT Image 1.5 after the default became GPT Image 2) */}
+            Used for: AI Chat, Flows (LLM), Image Generation{settings.opencodeEnabled ? ', OpenCode (GPT models)' : ''}
             <a
               href="https://platform.openai.com/api-keys"
               className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
