@@ -11,6 +11,7 @@
   - `dist/update-feed.json` is byte-identical to the published feed.
   - The staged installer is the CI artifact (`cmp`).
   - `published-assets.txt` is the authoritative published record.
+- **The `*.dmg.sha256` sidecars** are archived as `dist/` held them. In 2.1 they carry the stapled, published hashes (the same as `published-assets.txt`), so they were written after notarization, not before it as the standard flow does. Codex flagged this on #616. The hashes of the un-notarized DMGs that passed Gates 1 and 2 aren't on this disk, and `TEST-CHECKLIST.md` left them blank, so they can't be recovered. The next release records each un-notarized hash in its checklist at its gate.
 - **Not archived:**
   - `darwin-arm64-extension-pre-sign.sha256`, because `VSCode-darwin-arm64/` was no longer in the worktree on 1 November. The arm64 DMG's published digest above is the record.
   - The DMGs and the installer: the GitHub Release holds the same bytes.
