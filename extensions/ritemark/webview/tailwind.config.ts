@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss'
+import plugin from 'tailwindcss/plugin'
 
 const config: Config = {
   // dark: follows the webview's own dark class (utils/themeClass.ts sets ritemark-dark from VS Code's theme);
@@ -88,7 +89,13 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // Sprint 146 (R3): every `focus-visible:` ring is the keyboard's. It matches only while the page isn't in pointer
+    // mode (webview/src/components/ui/input-mode.ts writes data-input-mode on <html>), whatever Chromium's
+    // :focus-visible guess after a script focus: no ring after a mouse pick (2.1 RC3). A field's `focus:` look stays.
+    // `:where()` adds no specificity, so every rule that outranked a ring before (the split button's divider) still does.
+    plugin(({ addVariant }) => addVariant('focus-visible', ':where(:root:not([data-input-mode="pointer"])) &:focus-visible')),
+  ],
 }
 
 export default config

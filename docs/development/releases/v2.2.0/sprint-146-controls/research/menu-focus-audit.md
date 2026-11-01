@@ -57,7 +57,7 @@ Crops (device pixels, 2×) in [`../qa/`](../qa/):
 
 The audit found nothing in the shared rule to fix. PR 1's first review round (#618) did, and the rule changed after the audit above:
 - **Keys that act on a menu count whatever is held.** Radix picks on Enter or Space and closes on Escape with ⌘, Ctrl or Alt held, so a close by ⌘-Enter was read as a pointer close. Enter, Space, Escape, Tab, the arrows, Home, End, Page Up and Page Down now count as the keyboard with any modifier; other keys with ⌘, Ctrl or Alt held are still shortcuts. AltGr's characters count as typing (Windows reports AltGr as Ctrl and Alt).
-- **Assistive technology's activation counts as the keyboard.** VoiceOver's VO-Space (and Voice Control) sends a click and no press or key. A trusted click with no click count now counts as the keyboard, unless a press made it within a second (a label passing its click on to its field). A script's own `click()` says nothing.
+- **A click no press made counts as the keyboard.** A trusted click with no click count is a keyboard's activation, or assistive technology's when it sends no press of its own. Round 1 left out a click a press made within a second (a label passing its click on to its field); round 2 replaced that window (below). A script's own `click()` says nothing. Round 2 also found that Chromium sends a press before its own accessibility click (VoiceOver's VO-Space), so that click reads as the pointer: see the note after round 2's list.
 - **The AI sheet's link menu takes the rule** (`ChatLinkMenu.tsx`): it focused its link by script after every close, a mouse pick too, which is RC3's mechanism. It now focuses the link only after the keyboard. Not run live: the link menu needs a ready AI.
 
 After those changes, four rows ran again in Light on the rebuilt bundle (the zoom menu, Doing limit, Share and the agent Select): every step met the rule.
@@ -69,6 +69,8 @@ The second round changed four more things, and the same four rows ran again in L
 - **A consumer's own `onCloseAutoFocus` runs first, and the rule follows** unless that handler prevented the focus itself (`closeFocusHandler`). A handler that only watches the close can no longer bring back Radix's focus after every close.
 
 **Not fixed, and said plainly:** by the round's reading of Chromium's source, an assistive technology's click (VoiceOver's VO-Space) comes with a press of its own, so it reads as the pointer: after such a pick the trigger doesn't get the focus back, where `main` gave it back. Not run live. Decision 1's change in PR 2 returns the focus to the trigger after every close, with the tracker deciding the ring, which ends it; PR 1 shouldn't reach a release without PR 2.
+
+**In PR 2** (`sprint-146-controls-catalogue`), decision 1's change landed: `close-focus.ts` grew into the input-mode tracker (`ui/input-mode.ts`), the menus and Select give the focus back to their trigger after every close, and the mode decides the ring and the tooltip. That ends the assistive-technology regression, and PR 2 also takes PR 1's round-3 items (its Review record lists each). The two PRs merge together.
 
 ## Not run, and why
 

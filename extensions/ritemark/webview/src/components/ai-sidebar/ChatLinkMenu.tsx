@@ -9,7 +9,6 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { vscode } from '../../lib/vscode';
-import { lastInputKind } from '../ui/close-focus';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Icon, type PhosphorIconName } from '../ui/Icon';
 import { chatLinkMenu, type ChatLinkAction, type ChatLinkMenuItem, type ChatLocalKind } from './chatLinks';
@@ -23,7 +22,7 @@ export interface ChatLinkMenuRequest {
   x: number;
   y: number;
   target: ChatLinkMenuTarget;
-  /** The link that was right-clicked; focus goes back to it when the menu closes. */
+  /** The link that was right-clicked; the focus goes back to it after every close (its ring is the input mode's). */
   anchor: HTMLElement;
 }
 
@@ -94,10 +93,10 @@ export function ChatLinkMenu({ request, onClose }: { request: ChatLinkMenuReques
         sideOffset={2}
         aria-label="Link actions"
         onCloseAutoFocus={(event) => {
-          // The link gets the focus back only after the keyboard (ui/close-focus.ts): after a mouse pick, this script
-          // focus drew the keyboard's ring round the link, as RC3's caret had it
+          // The link gets the focus back after every close; after a mouse pick it shows no ring, as the page's input
+          // mode decides (2.2, ui/input-mode.ts)
           event.preventDefault();
-          if (lastInputKind() === 'keyboard') request.anchor.focus({ preventScroll: true });
+          request.anchor.focus({ preventScroll: true });
         }}
       >
         {items === null ? (

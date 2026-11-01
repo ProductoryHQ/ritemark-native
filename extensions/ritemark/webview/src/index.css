@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Sprint 146 (R3): in pointer mode no control draws a ring, Chromium's own outline included, after a click or after
+   the focus a menu gives back to its trigger (components/ui/input-mode.ts). A field keeps its focused look: it shows
+   where the typing goes after a click too. Every ring of Ritemark's own is `focus-visible:` or carries the keyboard
+   mode's prefix, so this only catches what no rule draws, such as Radix's dialog close. */
+:where(:root[data-input-mode="pointer"]) :focus-visible:not(input, textarea, select, [contenteditable]:not([contenteditable="false"])) {
+  outline: none;
+}
+
 /* Everything clickable shows the pointing hand — Tailwind's preflight leaves
    buttons at `cursor: default`. `:where()` keeps this at zero specificity, so
    any class (`cursor-not-allowed` on a refused action, `cursor-text`, …) and
@@ -283,7 +291,7 @@ body[data-vscode-theme-kind='vscode-dark'],
 .rm-split .rm-split-part:disabled { opacity: 1; }
 .rm-split .rm-split-main { min-width: 0; max-width: 100%; border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .rm-split .rm-split-more { flex: none; border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 8px; padding-right: 8px; }
-.rm-split .rm-split-part:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--r-accent); outline-offset: 1px; }
+:where(:root:not([data-input-mode="pointer"])) .rm-split .rm-split-part:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--r-accent); outline-offset: 1px; }
 .rm-split:not([data-disabled]):has(.rm-split-part:active) { transform: scale(0.98); }
 .rm-split[data-disabled] { opacity: 0.5; }
 .rm-split[data-disabled] .rm-split-part { cursor: default; }
@@ -385,7 +393,7 @@ body {
   border-width: 0 0 1.5px 1.5px;
   transform: translateY(-1px) rotate(-45deg);
 }
-.rm-check:focus-visible { outline: 2px solid var(--r-ring-color); outline-offset: 2px; }
+:where(:root:not([data-input-mode="pointer"])) .rm-check:focus-visible { outline: 2px solid var(--r-ring-color); outline-offset: 2px; }
 
 /* TipTap ProseMirror styles - will be expanded in Task 2 */
 .ProseMirror {
@@ -532,7 +540,7 @@ body {
   box-shadow: 0 4px 6px -1px rgba(30,27,75,0.08), 0 2px 4px -2px rgba(30,27,75,0.06);
 }
 .rm-marker:hover { border-color: var(--ritemark-hairline-strong, #cbd5e1); }
-.rm-marker:focus-visible { outline: 2px solid var(--r-accent, #4338ca); outline-offset: 2px; }
+:where(:root:not([data-input-mode="pointer"])) .rm-marker:focus-visible { outline: 2px solid var(--r-accent, #4338ca); outline-offset: 2px; }
 .rm-marker-ico { color: #f59e0b; flex: none; display: inline-flex; }
 .rm-marker-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* No preview text below the wide breakpoint — the marker shrinks to icon +
@@ -601,11 +609,11 @@ body {
   background: var(--r-surface);
   box-shadow: 0 0 0 2px var(--r-accent), 0 2px 7px rgba(26, 24, 67, 0.2);
 }
-.thinking-effort-range:focus-visible::-webkit-slider-thumb {
+:where(:root:not([data-input-mode="pointer"])) .thinking-effort-range:focus-visible::-webkit-slider-thumb {
   outline: 2px solid var(--vscode-focusBorder);
   outline-offset: 2px;
 }
-.thinking-effort-range:focus-visible::-moz-range-thumb {
+:where(:root:not([data-input-mode="pointer"])) .thinking-effort-range:focus-visible::-moz-range-thumb {
   outline: 2px solid var(--vscode-focusBorder);
   outline-offset: 2px;
 }
@@ -820,5 +828,5 @@ body.vscode-dark .rm-step-chip.action, body.ritemark-dark .rm-step-chip.action, 
 }
 .rm-flow-props input:focus-visible,
 .rm-flow-props textarea:focus-visible,
-.rm-flow-props button[role='combobox']:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--r-accent); }
+:where(:root:not([data-input-mode="pointer"])) .rm-flow-props button[role='combobox']:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--r-accent); }
 .rm-flow-props textarea { min-height: 120px; }
