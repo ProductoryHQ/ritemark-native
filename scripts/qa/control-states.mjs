@@ -21,14 +21,16 @@
  * <out>/<theme>-<cell>.png, and <out>/sheet.html lays the captures out as the catalogue's grid, for the Experience
  * lead. With --compare, each capture is compared with the same file in the approved set inside the running instance
  * (no image library), and <out>/compare.html shows each differing state's approved image, capture and difference.
- * The exit code is 1 when any state differs from its approved image or has none, and 0 otherwise; the count is printed
- * (an exit status holds only 0-255, so a count could read as a pass).
+ * The exit code is 1 when any state differs from its approved image or has none, or when an approved image has no state
+ * in the catalogue (a state deleted or renamed; not checked on an --only run, and on a --themes run only for those
+ * themes), and 0 otherwise; the counts are printed (an exit status holds only 0-255, so a count could read as a pass).
  *
  * docs/development/control-baseline/README.md says how to take a new set and who approves it.
  */
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { unmatchedApprovedImages } from './control-states-baseline.mjs';
 
 const args = process.argv.slice(2);
 const option = (name, fallback) => {
@@ -497,6 +499,7 @@ console.log(`written ${join(out, 'sheet.html')}`);
 
 // The comparison, inside the running instance: decode both, count the pixels that differ, draw them in red
 let differing = 0;
+let unmatched = 0;
 if (baseline) {
 	const rows = [];
 	for (const name of themes) {
@@ -549,21 +552,28 @@ if (baseline) {
 			}
 		}
 	}
+	// An approved image no cell made: its state was deleted or renamed, and the check would pass without it
+	const expected = themes.flatMap(name => cells.map(cell => `${name}-${cell.name}.png`));
+	for (const file of unmatchedApprovedImages(baseline, expected, { themes, allThemes: Object.keys(THEME_LABEL), only })) {
+		unmatched++;
+		console.log(`NO STATE ${file}: an approved image with no state in the catalogue (bring the state back, or remove the image with the change)`);
+		rows.push({ file, unmatched: true, then: readFileSync(join(baseline, file)).toString('base64') });
+	}
 	const image = data => `<img src="data:image/png;base64,${data}" onload="this.style.width = this.naturalWidth / 2 + 'px'">`;
 	writeFileSync(join(out, 'compare.html'), `<!doctype html><meta charset="utf-8"><title>Control states compared</title>
 <style>body{font:14px/1.4 -apple-system,'Segoe UI',sans-serif;margin:24px;background:#F1F5F9;color:#1E1B4B}h2{font-size:15px;margin:24px 0 8px}div{display:flex;gap:12px;align-items:flex-start}img{border:1px solid #E2E8F0;background:#fff}span{color:#617187}</style>
 <h1>Control states: approved, now, difference</h1>
 ${rows.length ? '' : '<p>Every state matches its approved image.</p>'}
-${rows.map(row => `<h2>${escapeHtml(row.file)} <span>${row.missing ? 'no approved image of this size' : `${row.percent}% changed`}</span></h2><div>${row.missing ? image(row.now) : image(row.then) + image(row.now) + image(row.diff)}</div>`).join('\n')}`);
+${rows.map(row => `<h2>${escapeHtml(row.file)} <span>${row.unmatched ? 'approved, but no state in the catalogue' : row.missing ? 'no approved image of this size' : `${row.percent}% changed`}</span></h2><div>${row.unmatched ? image(row.then) : row.missing ? image(row.now) : image(row.then) + image(row.now) + image(row.diff)}</div>`).join('\n')}`);
 	console.log(`written ${join(out, 'compare.html')}`);
 }
 
 for (const failure of failures) {
 	console.log(`not captured: ${failure}`);
 }
-const bad = differing + (baseline ? 0 : failures.length);
+const bad = differing + unmatched + (baseline ? 0 : failures.length);
 console.log(baseline
-	? `${differing} of ${cells.length * themes.length} states differ from their approved image or have none`
+	? `${differing} of ${cells.length * themes.length} states differ from their approved image or have none; ${unmatched} approved images have no state`
 	: `${cells.length * themes.length - failures.length} states captured, ${failures.length} not`);
 page.close();
 frame.close();

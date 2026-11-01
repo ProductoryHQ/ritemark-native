@@ -4,12 +4,14 @@
  *
  * It opens at activation only when Ritemark was started with `RITEMARK_CONTROL_CATALOGUE=1`, an environment variable
  * only test scripts set, in a dev instance and in a release build alike, so Gate 1 runs the same check on every
- * candidate (decision 5). Otherwise nothing is registered: no command, menu or palette entry, no serializer. The page
+ * candidate (decision 5), and its flag (`control-catalogue` in `features/flags.ts`, ON: a code-level kill switch) is
+ * on. Otherwise nothing is registered: no command, menu or palette entry, no serializer. The page
  * is the shared bundle (`data-editor-type="control-catalogue"`) with the same CSP as Home; it reads nothing from the
  * host and its one message, its ready note, needs no answer.
  */
 
 import * as vscode from 'vscode';
+import { isEnabled } from '../features';
 
 export const CONTROL_CATALOGUE_VIEW_TYPE = 'ritemark.controlCatalogue';
 export const CONTROL_CATALOGUE_SETTING = 'RITEMARK_CONTROL_CATALOGUE';
@@ -19,9 +21,13 @@ export function controlCatalogueAsked(env: Record<string, string | undefined>): 
   return env[CONTROL_CATALOGUE_SETTING] === '1';
 }
 
-/** At activation: open the catalogue as a tab on the desk, only when the launch asked for it. */
-export function openControlCatalogueIfAsked(context: vscode.ExtensionContext, env: Record<string, string | undefined> = process.env): void {
-  if (!controlCatalogueAsked(env)) return;
+/** At activation: open the catalogue as a tab on the desk, only when the launch asked for it and its flag is on. */
+export function openControlCatalogueIfAsked(
+  context: vscode.ExtensionContext,
+  env: Record<string, string | undefined> = process.env,
+  flagOn: () => boolean = () => isEnabled('control-catalogue'),
+): void {
+  if (!controlCatalogueAsked(env) || !flagOn()) return;
   const media = vscode.Uri.joinPath(context.extensionUri, 'media');
   const panel = vscode.window.createWebviewPanel(
     CONTROL_CATALOGUE_VIEW_TYPE,

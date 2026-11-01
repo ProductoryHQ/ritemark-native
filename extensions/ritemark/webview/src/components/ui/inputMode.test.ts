@@ -1,6 +1,6 @@
 /**
  * Sprint 146 (R3): one tracker per webview decides whether a focus ring shows. The inputs to modes, the default, one
- * watcher per document, the press's own clicks, and that the shared menu and list contents give the focus back to
+ * watcher per document, the press's own clicks, focus coming back into the page, and that the shared menu and list contents give the focus back to
  * their trigger after every close (decision 1), the ring being the mode's.
  *
  * Run: npx tsx webview/src/components/ui/inputMode.test.ts
@@ -63,7 +63,7 @@ assert.equal(inputMode(), 'keyboard', 'before any input: keyboard, so a page rea
 watchInputMode(page)
 watchInputMode(page)
 assert.equal(attributes.get('data-input-mode'), 'keyboard', 'the mode is on <html> from the start')
-assert.deepEqual([...listeners.keys()].sort(), ['click', 'keydown', 'pointercancel', 'pointerdown', 'pointerup'])
+assert.deepEqual([...listeners.keys()].sort(), ['click', 'focus', 'keydown', 'pointercancel', 'pointerdown', 'pointerup'])
 const press = (event: Record<string, unknown>) => listeners.get(String(event.type))!(event as unknown as Event)
 // A press's clicks are left out for 400 ms after its release (a touch tap's click comes after the release's task)
 const pressIsOver = () => new Promise((resolve) => setTimeout(resolve, 450))
@@ -107,6 +107,30 @@ press({ type: 'pointerdown' })
 press({ type: 'keydown', key: 'Escape' })
 press({ type: 'click', detail: 0 })
 assert.equal(inputMode(), 'keyboard', 'after a key, a click no press made counts again')
+
+// Focus coming back into the page from outside it (Codex on #621): the page kept while hidden, left in pointer mode,
+// and come back to with a workbench key this page never heard
+const view = page.defaultView
+press({ type: 'pointerdown' })
+press({ type: 'pointerup' })
+await pressIsOver()
+assert.equal(inputMode(), 'pointer', 'left in pointer mode')
+press({ type: 'focus', target: view })
+assert.equal(attributes.get('data-input-mode'), 'keyboard', 'the focus back from the workbench with no press here: keyboard, so the restored focus shows its ring')
+// A click into the page brings the focus in its own press
+press({ type: 'pointerdown' })
+press({ type: 'focus', target: view })
+assert.equal(inputMode(), 'pointer', "a press inside the page brought the focus in: the pointer's, no ring")
+press({ type: 'pointerup' })
+press({ type: 'focus', target: view })
+assert.equal(inputMode(), 'pointer', "a focus just after the page's own release is that press's too")
+await pressIsOver()
+// A focus move inside the page is not a re-entry: a menu gives its trigger the focus back after a mouse pick
+// (decision 1), and the trigger still draws no ring
+press({ type: 'focus', target: { tagName: 'BUTTON' } })
+assert.equal(inputMode(), 'pointer', "the menu's trigger, focused after a mouse pick: still the pointer's")
+press({ type: 'focus', target: view, isTrusted: false })
+assert.equal(inputMode(), 'pointer', "a script's own focus event says nothing")
 
 // ── The shared menu and list contents give the focus back after every close (decision 1) ──
 type Rendered = { props: { children: { props: { onCloseAutoFocus?: unknown } } } }
