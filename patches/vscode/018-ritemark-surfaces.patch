@@ -141,7 +141,11 @@ use and that desk in front, so Home is the tab in front and the document the pro
 the restored document was in front for about half a second, until the extension started and brought Home forward.
 While a column waits for its place or the AI at start, it shows the ground, not VS Code's "Drag a view here to
 display." (ritemarkSurfaces.css), which flashed in the left column at every start and, with 002's AI column restored
-with the layout, would have in the AI column too.
+with the layout, would have in the AI column too. The held start, as the Experience lead set it: the AI column shows no
+progress bar (an indigo line, which framework §3 rules out), nothing for its first second, and then, while its view still
+waits for the extension, the kit's turning mark (ink on the strong hairline, 16) at its centre, alone, labelled "The AI is
+starting" for screen readers; it goes when the view is resolved (contrib/webviewView/browser/webviewViewPane.ts, only for a
+view in the AI column; ritemarkSurfaces.css).
 
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
@@ -152,7 +156,7 @@ parts/editor/editorPart.ts; parts/notifications/{notificationsCenter,notificatio
 parts/sidebar/{ritemarkProjectHead,sidebarPart}.ts; parts/statusbar/statusbarPart.ts + media/statusbarpart.css;
 parts/ritemarkFeedbackSheet.ts + parts/media/ritemarkFeedbackSheet.css (Sprint 140);
 parts/titlebar/titlebarPart.ts; contrib/files/browser/views/explorerViewer.ts; contrib/scm/browser/scm.contribution.ts (Sprint 142);
-contrib/webview/browser/overlayWebview.ts;
+contrib/webview/browser/overlayWebview.ts; contrib/webviewView/browser/webviewViewPane.ts (Sprint 145);
 electron-browser/desktop.contribution.ts; electron-browser/parts/titlebar/titlebarPart.ts;
 services/actions/common/menusExtensionPoint.ts; services/layout/browser/layoutService.ts.
 Tests: workbench/test/browser/parts/ritemarkWindowSizes.test.ts (R14), base/test/browser/iconLabel.test.ts (Sprint 133,
@@ -861,10 +865,10 @@ index 79add6fa2a9..ed88fcd86de 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..e7d6446e0cc
+index 00000000000..2a12f15ff0f
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1904 @@
+@@ -0,0 +1,1937 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1178,6 +1182,39 @@ index 00000000000..e7d6446e0cc
 +.monaco-workbench .part.sidebar.empty .empty-pane-message-area,
 +.monaco-workbench .part.auxiliarybar.empty .empty-pane-message-area {
 +	display: none;
++}
++
++/* Sprint 145 (#569; the Experience lead, 1 November): no indigo line in the AI column (framework §3: indigo is a fill or
++   an icon's colour, never a line), so VS Code's progress bar there is hidden. While the AI starts, the column stays bare
++   ground; after a second the kit's turning mark (.spin: ink on the strong hairline, 16) turns at its centre, alone, until
++   the AI's view draws (webviewViewPane.ts) */
++.monaco-workbench .part.auxiliarybar .monaco-progress-container {
++	display: none !important; /* !important: the progress bar shows itself with an inline style */
++}
++
++.monaco-workbench .part.auxiliarybar .ritemark-ai-starting {
++	position: absolute;
++	top: 50%;
++	left: 50%;
++	box-sizing: border-box;
++	width: 16px;
++	height: 16px;
++	margin: -8px 0 0 -8px;
++	border-radius: 50%;
++	border: 1.5px solid var(--vscode-input-border);
++	border-top-color: var(--vscode-foreground);
++	animation: ritemark-ai-starting 1s linear infinite;
++	pointer-events: none;
++}
++
++@keyframes ritemark-ai-starting {
++	to {
++		transform: rotate(360deg);
++	}
++}
++
++.monaco-workbench.monaco-reduce-motion .part.auxiliarybar .ritemark-ai-starting {
++	animation: none;
 +}
 +
 +
@@ -5615,6 +5652,87 @@ index 86d357e665c..9b9f66fd54b 100644
 +
  		const part = anchorElement.closest('.part');
  		this._syncOuterEdgeClasses(part);
+ 
+diff --git a/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts b/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
+index e0e445671e1..a61917823ea 100644
+--- a/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
++++ b/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
+@@ -3,7 +3,8 @@
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
+  *--------------------------------------------------------------------------------------------*/
+ 
+-import { addDisposableListener, EventType, findParentWithClass, getWindow } from '../../../../base/browser/dom.js';
++import { $, addDisposableListener, EventType, findParentWithClass, getWindow } from '../../../../base/browser/dom.js';
++import { disposableTimeout } from '../../../../base/common/async.js';
+ import { CancellationTokenSource } from '../../../../base/common/cancellation.js';
+ import { Emitter } from '../../../../base/common/event.js';
+ import { DisposableStore, IDisposable, MutableDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
+@@ -18,10 +19,11 @@ import { IOpenerService } from '../../../../platform/opener/common/opener.js';
+ import { IProgressService } from '../../../../platform/progress/common/progress.js';
+ import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
+ import { IThemeService } from '../../../../platform/theme/common/themeService.js';
++import { localize } from '../../../../nls.js';
+ import { ViewPane, ViewPaneShowActions } from '../../../browser/parts/views/viewPane.js';
+ import { IViewletViewOptions } from '../../../browser/parts/views/viewsViewlet.js';
+ import { Memento } from '../../../common/memento.js';
+-import { IViewBadge, IViewDescriptorService } from '../../../common/views.js';
++import { IViewBadge, IViewDescriptorService, ViewContainerLocation } from '../../../common/views.js';
+ import { IViewsService } from '../../../services/views/common/viewsService.js';
+ import { ExtensionKeyedWebviewOriginStore, IOverlayWebview, IWebviewService, WebviewContentPurpose } from '../../webview/browser/webview.js';
+ import { WebviewWindowDragMonitor } from '../../webview/browser/webviewWindowDragMonitor.js';
+@@ -38,6 +40,23 @@ interface WebviewViewState {
+ 	[storageKeys.webviewState]?: string | undefined;
+ }
+ 
++/** Ritemark 2.0 (Sprint 145, #569): how long the AI column stays bare ground before its turning mark shows. */
++const RITEMARK_STARTING_MARK_AFTER_MS = 1000;
++
++/**
++ * Ritemark 2.0 (Sprint 145, #569; the Experience lead, 1 November): while the AI column's view waits for its extension,
++ * nothing for a second (a sign that flashes and goes is noise), then the kit's turning mark (ink, 16) at the column's
++ * centre, alone, with no words but the screen reader's (drawn by ritemarkSurfaces.css). Disposing removes it.
++ */
++function ritemarkStartingMark(container: HTMLElement): IDisposable {
++	const store = new DisposableStore();
++	store.add(disposableTimeout(() => {
++		const mark = container.appendChild($('.ritemark-ai-starting', { role: 'status', 'aria-label': localize('ritemark.aiStarting', "The AI is starting") }));
++		store.add(toDisposable(() => mark.remove()));
++	}, RITEMARK_STARTING_MARK_AFTER_MS));
++	return store;
++}
++
+ export class WebviewViewPane extends ViewPane {
+ 
+ 	private static _originStore?: ExtensionKeyedWebviewOriginStore;
+@@ -50,6 +69,8 @@ export class WebviewViewPane extends ViewPane {
+ 	private readonly _webview = this._register(new MutableDisposable<IOverlayWebview>());
+ 	private readonly _webviewDisposables = this._register(new DisposableStore());
+ 	private _activated = false;
++	/** Ritemark 2.0 (Sprint 145, #569): the AI column's turning mark while its view waits for its extension. */
++	private readonly ritemarkStarting = this._register(new MutableDisposable());
+ 
+ 	private _container?: HTMLElement;
+ 	private _rootContainer?: HTMLElement;
+@@ -170,6 +191,12 @@ export class WebviewViewPane extends ViewPane {
+ 
+ 		this._activated = true;
+ 
++		// Ritemark 2.0 (Sprint 145, #569): the AI column's view shows the turning mark after a second, until it is resolved
++		if (this.viewDescriptorService.getViewLocationById(this.id) === ViewContainerLocation.AuxiliaryBar) {
++			this.ritemarkStarting.value = ritemarkStartingMark(this.element);
++			this._webviewDisposables.add(toDisposable(() => this.ritemarkStarting.clear()));
++		}
++
+ 		const origin = this.extensionId ? WebviewViewPane.getOriginStore(this.storageService).getOrigin(this.id, this.extensionId) : undefined;
+ 		const webview = this.webviewService.createWebviewOverlay({
+ 			origin,
+@@ -240,6 +267,7 @@ export class WebviewViewPane extends ViewPane {
+ 			};
+ 
+ 			await this.webviewViewService.resolve(this.id, webviewView, source.token);
++			this.ritemarkStarting.clear(); // Ritemark 2.0: the view draws
+ 		});
+ 	}
  
 diff --git a/src/vs/workbench/electron-browser/desktop.contribution.ts b/src/vs/workbench/electron-browser/desktop.contribution.ts
 index 41250d7b714..c6fc8a12257 100644
