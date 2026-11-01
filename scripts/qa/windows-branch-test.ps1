@@ -38,12 +38,29 @@ if (-not $RitemarkExe -or -not (Test-Path -LiteralPath $RitemarkExe)) {
 $installed = Join-Path (Split-Path -Parent $RitemarkExe) 'resources\app\extensions\ritemark'
 if (-not (Test-Path -LiteralPath (Join-Path $installed 'package.json'))) { throw "No bundled extension at $installed." }
 
+# VS Code keeps the built-in copy, without a word, when the branch's version isn't higher (Sprint 145: a 1.99.x
+# overlay under 2.1.0 tested 2.1.0). Checked before the copy, so a wrong overlay stops at once.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $Overlay).Path)
+try {
+  $entry = $zip.Entries | Where-Object { $_.FullName -eq 'package.json' } | Select-Object -First 1
+  if (-not $entry) { throw 'The overlay has no package.json at its top.' }
+  $reader = New-Object IO.StreamReader($entry.Open())
+  try { $overlayVersion = ($reader.ReadToEnd() | ConvertFrom-Json).version } finally { $reader.Dispose() }
+} finally { $zip.Dispose() }
+$installedVersion = (Get-Content -LiteralPath (Join-Path $installed 'package.json') -Raw | ConvertFrom-Json).version
+if ([version](($overlayVersion -split '-')[0]) -le [version](($installedVersion -split '-')[0])) {
+  throw "The overlay's version $overlayVersion is not higher than the installed $installedVersion, so Ritemark would run the installed extension. Rebuild the overlay with make-windows-test-overlay.sh."
+}
+
 $root = Join-Path $env:TEMP 'rm-s129'
 $ext = Join-Path $root 'ext'
 $userData = Join-Path $root 'ud'
+# Its own shared-data folder too: without it, the test shares ~\.ritemark-shared (Open Recent) with the person's Ritemark
+$sharedData = Join-Path $root 'shared'
 $workspace = Join-Path $root 'dictation-test'
 if (Test-Path -LiteralPath $ext) { Remove-Item -LiteralPath $ext -Recurse -Force }
-New-Item -ItemType Directory -Path $ext, $userData, $workspace -Force | Out-Null
+New-Item -ItemType Directory -Path $ext, $userData, $sharedData, $workspace -Force | Out-Null
 
 Write-Host "Copying the installed extension ($installed)..."
 Copy-Item -LiteralPath $installed -Destination (Join-Path $ext 'ritemark') -Recurse
@@ -65,16 +82,8 @@ if (-not (Test-Path -LiteralPath $note)) {
   )
 }
 
-$installedVersion = (Get-Content -LiteralPath (Join-Path $installed 'package.json') -Raw | ConvertFrom-Json).version
-# VS Code keeps the built-in copy, without a word, when the branch's version isn't higher (Sprint 145: a 1.99.x
-# overlay under 2.1.0 tested 2.1.0)
-$branchCore = ($pkg.version -split '-')[0]
-$installedCore = ($installedVersion -split '-')[0]
-if ([version]$branchCore -le [version]$installedCore) {
-  throw "The overlay's version $($pkg.version) is not higher than the installed $installedVersion, so Ritemark would run the installed extension. Rebuild the overlay with make-windows-test-overlay.sh."
-}
 Write-Host ''
 Write-Host "Starting Ritemark ($RitemarkExe) with the branch extension $($pkg.version) (installed: $installedVersion)."
 Write-Host "Profile: $userData (fresh; your normal settings are not used)."
 Write-Host 'Walk the scenarios marked B in the sprint''s scenarios.md, then close the window.'
-& $RitemarkExe --extensions-dir $ext --user-data-dir $userData $workspace
+& $RitemarkExe --extensions-dir $ext --user-data-dir $userData --shared-data-dir $sharedData $workspace

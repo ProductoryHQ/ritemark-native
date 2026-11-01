@@ -64,6 +64,11 @@ mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"  # zip runs inside the staging folder, so the path must be absolute
 ZIP="$OUT/ritemark-windows-test-overlay-$SHA.zip"
 rm -f "$ZIP"
-(cd "$STAGE" && zip -qr "$ZIP" .)
+if command -v zip >/dev/null 2>&1; then
+  (cd "$STAGE" && zip -qr "$ZIP" .)
+else
+  # Git Bash on Windows has no zip: PowerShell's Compress-Archive makes the same archive
+  powershell.exe -NoProfile -Command "Compress-Archive -Path '$(cygpath -w "$STAGE")\*' -DestinationPath '$(cygpath -w "$ZIP")' -Force"
+fi
 echo "Done: $ZIP ($(du -h "$ZIP" | cut -f1))"
 echo "On Windows: powershell -ExecutionPolicy Bypass -File windows-branch-test.ps1 -Overlay <that zip>"
