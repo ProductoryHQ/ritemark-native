@@ -1,47 +1,99 @@
 /**
- * DeleteConfirm — "Delete this task?" (Sprint 130). The card file goes to the
- * system trash with its history; its page, if open, closes with it. Enter
- * confirms and Escape cancels (Jarmo, 2026-10-13).
+ * DeleteConfirm — the board's one question before something leaves it
+ * (Sprint 130). "Delete this task?": the card file goes to the system trash
+ * with its history; its page, if open, closes with it. "Remove <file>?"
+ * (Sprint 145, #596; experience 41): a file the board couldn't read goes to the
+ * system trash, the Recycle Bin on Windows. Enter confirms and Escape cancels
+ * (Jarmo, 2026-10-13).
  */
 
+import { useEffect } from 'react'
 import type { BoardSnapshot } from '../../../../src/taskBoard/protocol'
-import { Dialog, DialogButton, DialogContent, DialogFooter, DialogTitle } from '../ui/dialog'
-import { act, useBoardUi } from './boardUi'
+import { isWindows } from '../../hooks/usePlatform'
+import { Dialog, DialogBody, DialogButton, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import { act, removeFile, useBoardUi } from './boardUi'
+import { unreadableFileWords } from './taskCopy'
 
 export function DeleteConfirm({ snapshot }: { snapshot: BoardSnapshot }) {
   const cardId = useBoardUi((state) => state.confirmDeleteId)
   const askDelete = useBoardUi((state) => state.askDelete)
+  const fileName = useBoardUi((state) => state.confirmRemoveFile)
+  const askRemoveFile = useBoardUi((state) => state.askRemoveFile)
   const card = snapshot.cards.find((item) => item.id === cardId) ?? snapshot.archived.find((item) => item.id === cardId)
-  if (!card) return null
-  const confirm = () => {
-    askDelete(null)
-    void act({ type: 'board/delete', cardId: card.id })
+  const file = fileName ? snapshot.unreadable.find((item) => item.fileName === fileName) : undefined
+  // A file that was read (or went) while its question was open: the question goes, and doesn't come back later
+  // if the same name can't be read again.
+  useEffect(() => {
+    if (fileName && !file) askRemoveFile(null)
+  }, [fileName, file, askRemoveFile])
+  if (card) {
+    return (
+      <Question
+        title="Delete this task?"
+        body={`“${card.title}” moves to the system trash with its history. You can restore the file from there.`}
+        confirmLabel="Delete"
+        onCancel={() => askDelete(null)}
+        onConfirm={() => {
+          askDelete(null)
+          void act({ type: 'board/delete', cardId: card.id })
+        }}
+      />
+    )
   }
+  if (file) {
+    const words = unreadableFileWords(file.fileName, isWindows)
+    return (
+      <Question
+        title={words.question}
+        body={words.questionBody}
+        confirmLabel="Remove"
+        onCancel={() => askRemoveFile(null)}
+        onConfirm={() => {
+          askRemoveFile(null)
+          void removeFile(file.fileName, file.message)
+        }}
+      />
+    )
+  }
+  return null
+}
+
+/**
+ * What a key pressed in the question answers. Enter answers the question's action. A focused button answers Enter
+ * itself (Cancel cancels), and an Enter still held down from the key that opened the question (a key repeat) is
+ * no answer, so only a deliberate press confirms (Sprint 145, #610).
+ */
+export function questionKeyAction(event: { key: string; repeat?: boolean; target: unknown }): 'confirm' | null {
+  if (event.key !== 'Enter' || event.repeat) return null
+  const target = event.target as { closest?: (selector: string) => unknown } | null
+  if (target?.closest?.('button')) return null
+  return 'confirm'
+}
+
+function Question({ title, body, confirmLabel, onCancel, onConfirm }: { title: string; body: string; confirmLabel: string; onCancel: () => void; onConfirm: () => void }) {
   return (
-    <Dialog open onOpenChange={(open) => !open && askDelete(null)}>
+    <Dialog open onOpenChange={(open) => !open && onCancel()}>
       <DialogContent
         className="max-w-[400px]"
-        aria-describedby={undefined}
         role="alertdialog"
         onKeyDown={(event) => {
-          // A focused button answers Enter itself (Cancel cancels).
-          if (event.key !== 'Enter' || (event.target as HTMLElement).closest('button')) return
+          if (questionKeyAction(event) !== 'confirm') return
           event.preventDefault()
-          confirm()
+          onConfirm()
         }}
       >
-        <div className="flex items-center justify-between border-b border-hairline px-5 py-4">
-          <DialogTitle>Delete this task?</DialogTitle>
-        </div>
-        <div className="flex-1 overflow-y-auto p-5">
-          <p className="text-sm text-ink-muted">“{card.title}” moves to the system trash with its history. You can restore the file from there.</p>
-        </div>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          <DialogDescription>{body}</DialogDescription>
+        </DialogBody>
         <DialogFooter>
-          <DialogButton variant="secondary" onClick={() => askDelete(null)}>
+          <DialogButton variant="secondary" onClick={onCancel}>
             Cancel
           </DialogButton>
-          <DialogButton variant="danger" onClick={confirm}>
-            Delete
+          <DialogButton variant="danger" onClick={onConfirm}>
+            {confirmLabel}
           </DialogButton>
         </DialogFooter>
       </DialogContent>

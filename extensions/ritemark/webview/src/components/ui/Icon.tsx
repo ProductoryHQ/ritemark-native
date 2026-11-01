@@ -59,6 +59,7 @@ import {
   EyeSlash,
   File,
   FileCode,
+  FileDashed,
   FileDoc,
   FileImage,
   FileText,
@@ -213,6 +214,8 @@ const iconMap = {
   'eye-slash': EyeSlash,
   'file': File,
   'file-code': FileCode,
+  // Sprint 145 (#596): a file the Task board couldn't read (experience 41)
+  'file-dashed': FileDashed,
   'file-doc': FileDoc,
   'file-image': FileImage,
   'file-text': FileText,

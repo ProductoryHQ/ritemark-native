@@ -51,9 +51,10 @@ export function GoogleDocsSettingsCard({ projection }: { projection: GoogleDocsS
           <div>
             <span className="text-sm font-medium text-ink-strong">Google account</span>
           </div>
+          {/* Sprint 145 (#578): connected is ink; green is only the small ready dot */}
           {state === 'connected' && (
-            <span className="flex items-center gap-1 text-xs text-ritemark-success">
-              <Icon name="check" size={12} />
+            <span className="flex items-center gap-1 text-xs text-ink-strong">
+              <Icon name="check" size={12} tone="inherit" />
               Connected
             </span>
           )}

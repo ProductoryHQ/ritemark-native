@@ -89,7 +89,10 @@ export function useFlowAutoArrange() {
       const layoutedGraph = await elk.layout(graph);
 
       if (layoutedGraph.children) {
-        const layoutedNodes = nodes.map((node) => {
+        // Sprint 145 R4 (review rounds 2 and 3): the positions go onto the steps as they are now, so an edit made while
+        // the layout ran is kept, and `setNodes` marks the flow dirty when a step moved (a click used to write the
+        // layout by accident; a click is a look now)
+        const layoutedNodes = useFlowEditorStore.getState().nodes.map((node) => {
           const layoutedNode = layoutedGraph.children?.find(
             (n) => n.id === node.id
           );

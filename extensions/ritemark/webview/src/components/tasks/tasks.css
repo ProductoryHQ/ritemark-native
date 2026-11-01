@@ -60,6 +60,18 @@
 .tb-tile.dragging { opacity: .45; }
 .tb-tile .mt { position: absolute; right: 6px; top: 6px; opacity: 0; }
 .tb-tile:hover .mt, .tb-tile .mt:has([data-state="open"]) { opacity: 1; }
+/* Sprint 145 (#597; experience 41): a move still being saved after a second. The kit's turning mark in ink, centred
+   in the ⋯ menu's slot (right 6, top 6, 24 square), so the title never moves; shown under the pointer too */
+.tb-tile .tb-saving { position: absolute; right: 12px; top: 12px; display: inline-flex; color: var(--r-ink-strong); pointer-events: none; }
+.tb-tile.saving .mt { opacity: 0; pointer-events: none; }
+/* the menu stays mounted under the sign: a keyboard focus on it keeps it, and the sign steps aside */
+.tb-tile.saving .mt:focus-within { opacity: 1; pointer-events: auto; }
+.tb-tile.saving:has(.mt:focus-within) .tb-saving { display: none; }
+.tb-rowmenu { position: relative; display: inline-flex; flex: none; }
+.tb-rowmenu .tb-saving-row { position: absolute; top: -3px; right: -6px; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--r-ink-strong); pointer-events: none; }
+.tb-rowmenu.saving > :not(.tb-saving-row) { opacity: 0; pointer-events: none; }
+.tb-rowmenu.saving > :not(.tb-saving-row):focus-within, .tb-rowmenu.saving > :not(.tb-saving-row):focus { opacity: 1; pointer-events: auto; }
+.tb-rowmenu.saving:has(:focus) .tb-saving-row { display: none; }
 .tb-dropline { height: 2px; border-radius: 2px; background: var(--r-accent); margin: -5px 2px 3px; }
 .tb-addrow { margin: 6px 0 8px; } /* clear of the column header */
 .tb-foot { padding: 4px 24px 16px; font-size: 12px; color: var(--r-ink-faint); }

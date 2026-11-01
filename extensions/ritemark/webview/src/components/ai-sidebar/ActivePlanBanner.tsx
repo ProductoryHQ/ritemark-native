@@ -80,7 +80,9 @@ export function ActivePlanBanner({
             >
               <span className="mt-[1px] shrink-0">
                 {step.status === 'completed' ? (
-                  <Icon name="check-circle" size={12} className="text-[var(--vscode-testing-iconPassed)]" />
+                  // Sprint 145 (#578): a completed step's check takes its struck-through words' ink and opacity; green is
+                  // only the ready dot
+                  <Icon name="check-circle" size={12} tone="inherit" className="opacity-60" />
                 ) : step.status === 'inProgress' ? (
                   <Icon name="dot" size={16} className="-ml-[2px] text-[var(--vscode-progressBar-background)]" />
                 ) : (

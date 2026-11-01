@@ -288,7 +288,8 @@ function ReadyStep({
     <div className="flex-1 flex flex-col items-center justify-center px-5 text-center py-8">
       {/* Sprint 144: a done check in ink, not green or muted; green is only ever the small ready dot (the Experience lead, 22ffe7b) */}
       <div className="w-10 h-10 rounded-full bg-[var(--r-surface-muted)] flex items-center justify-center mb-3">
-        <Icon name="check" size={20} className="text-[var(--r-ink-strong)]" />
+        {/* Sprint 145 (#578): `inherit`, so the class colours it; the Icon's own muted tone set the fill before */}
+        <Icon name="check" size={20} tone="inherit" className="text-[var(--r-ink-strong)]" />
       </div>
       <h3 className="text-sm font-semibold mb-1.5">You're all set!</h3>
       <p className="text-xs text-[var(--r-ink-muted)] mb-4">
@@ -385,7 +386,8 @@ function CompactRow({
     <div className="flex items-center justify-between py-0.5">
       <div className="flex items-center gap-2">
         {installed ? (
-          <Icon name="check" size={14} className="text-[var(--r-ink-body)]" />
+          // Sprint 145 (#578): `inherit`, so the check is the ink its class names, not the Icon's own muted tone
+          <Icon name="check" size={14} tone="inherit" className="text-[var(--r-ink-body)]" />
         ) : optional ? (
           <Icon name="minus" size={14} className="opacity-30" />
         ) : (
@@ -428,7 +430,8 @@ function StatusIcon({
     return <Icon name="circle-notch" size={14} className="animate-spin text-[var(--r-accent)]" />;
   }
   if (installed) {
-    return <Icon name="check" size={14} className="text-[var(--r-ink-body)]" />;
+    // Sprint 145 (#578): `inherit`, so the check is the ink its class names, not the Icon's own muted tone
+    return <Icon name="check" size={14} tone="inherit" className="text-[var(--r-ink-body)]" />;
   }
   if (failed) {
     return <Icon name="x" size={14} className="text-[var(--vscode-testing-iconFailed)]" />;

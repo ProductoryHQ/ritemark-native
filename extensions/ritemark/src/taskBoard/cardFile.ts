@@ -43,7 +43,11 @@ export interface CardSource {
 export type ParsedCardFile =
   | { kind: 'card'; card: Card; source: CardSource }
   | { kind: 'not-a-card' }
-  | { kind: 'error'; message: string };
+  /** `problem` (Sprint 145, #596): the YAML doesn't parse, a newer Ritemark wrote it, or a field breaks a rule;
+   *  the board words each differently. */
+  | { kind: 'error'; message: string; problem: CardFileProblem };
+
+export type CardFileProblem = 'yaml' | 'newer' | 'field';
 
 /** The front-matter keys this version reads and writes, in the order a new
  *  file gets them. */
@@ -207,7 +211,7 @@ export function parseCardFile(text: string): ParsedCardFile {
     if (/^\s*---[\s\S]*?\britemark\s*:\s*['"]?task\//.test(text)) {
       // The parser's first line ends with a colon before its code excerpt.
       const reason = (error instanceof Error ? error.message.split('\n')[0] : String(error)).replace(/:\s*$/, '');
-      return { kind: 'error', message: `The front matter is not valid YAML (${reason}).` };
+      return { kind: 'error', message: `The front matter is not valid YAML (${reason}).`, problem: 'yaml' };
     }
     return { kind: 'not-a-card' };
   }
@@ -215,7 +219,13 @@ export function parseCardFile(text: string): ParsedCardFile {
   if (!isRecord(data) || data.ritemark === undefined) return { kind: 'not-a-card' };
   if (data.ritemark !== CARD_FORMAT) {
     if (typeof data.ritemark === 'string' && data.ritemark.startsWith('task/')) {
-      return { kind: 'error', message: `This card was written in a newer format (${data.ritemark}).` };
+      // Only a higher version number is a newer Ritemark's card; anything else (task/l, task/1.0) is a mistake
+      // to fix in the file (Sprint 145, #596: the newer card's row offers only Remove).
+      const version = /^task\/(\d+)$/.exec(data.ritemark);
+      if (version && Number(version[1]) > Number(CARD_FORMAT.slice('task/'.length))) {
+        return { kind: 'error', message: `This card was written in a newer format (${data.ritemark}).`, problem: 'newer' };
+      }
+      return { kind: 'error', message: `ritemark must be ${CARD_FORMAT}.`, problem: 'field' };
     }
     return { kind: 'not-a-card' };
   }
@@ -254,7 +264,7 @@ export function parseCardFile(text: string): ParsedCardFile {
     }
     return { kind: 'card', card, source: { data } };
   } catch (error) {
-    if (error instanceof CardFormatError) return { kind: 'error', message: error.message };
+    if (error instanceof CardFormatError) return { kind: 'error', message: error.message, problem: 'field' };
     throw error;
   }
 }

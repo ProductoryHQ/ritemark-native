@@ -149,6 +149,57 @@ function escapeRegex(str: string): string {
 }
 
 /**
+ * Whether React Flow's changes alter what the flow's file holds (Sprint 145 R4, #571). React Flow reports a
+ * selection (`select`) and a measurement (`dimensions`) as node and edge changes too; `toFlow` saves neither (a
+ * step's id, type, position and data, an edge's id and ends), so they don't mark the flow dirty: opening a flow and
+ * clicking a step write nothing. Every other change (`position`, `add`, `remove`, `replace`) is an edit.
+ */
+function changesFlowFile(changes: ReadonlyArray<{ type: string }>): boolean {
+  return changes.some((change) => change.type !== 'select' && change.type !== 'dimensions');
+}
+
+/** Whether `after` moves, adds or drops a step compared with `before` (Sprint 145 R4: what `setNodes` writes). */
+function movesAStep(before: Array<{ id: string; position: { x: number; y: number } }>, after: Array<{ id: string; position: { x: number; y: number } }>): boolean {
+  if (before.length !== after.length) return true;
+  const was = new Map(before.map((node) => [node.id, node.position]));
+  return after.some((node) => {
+    const position = was.get(node.id);
+    return !position || position.x !== node.position.x || position.y !== node.position.y;
+  });
+}
+
+/**
+ * Which write a Flow editor waits on (Sprint 145 R4, review rounds 1 and 2). Each write request (the autosave's
+ * `flow:save`, Cmd+S's `flow:requestSave`, the schedule's save) gets a number the host echoes in its `flow:saved`, and
+ * the copy of the flow it stands for. An answer marks the flow clean only when it answers the newest request and the
+ * flow hasn't changed since; an older request's answer waits for the newest's, and an edit made during the write is
+ * written again. A look used to cover these cases by marking the flow dirty again; it no longer does.
+ */
+export interface SaveTracker {
+  /** Records a request for `flow` (as JSON) and returns its number. */
+  sent(flow: string): number;
+  /** What an answer means, given the flow (as JSON) now. */
+  answered(seq: unknown, current: string): 'clean' | 'write-again' | 'wait';
+}
+
+export function createSaveTracker(): SaveTracker {
+  let last = 0;
+  let lastFlow: string | null = null;
+  return {
+    sent(flow) {
+      last += 1;
+      lastFlow = flow;
+      return last;
+    },
+    answered(seq, current) {
+      if (typeof seq === 'number' && seq !== last) return 'wait';
+      if (lastFlow !== null && current !== lastFlow) return 'write-again';
+      return 'clean';
+    },
+  };
+}
+
+/**
  * Calculate execution order using topological sort (Kahn's algorithm)
  * Returns Map of nodeId -> execution step (1-indexed)
  */
@@ -376,6 +427,8 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
 
   setNodes: (nodes) => set((state) => ({
     nodes,
+    // Sprint 145 R4: a layout that moves a step is an edit (Auto-arrange); one that moves nothing writes nothing
+    isDirty: state.isDirty || movesAStep(state.nodes, nodes),
     executionOrder: calculateExecutionOrder(nodes, state.edges),
   })),
   setEdges: (edges) => set((state) => ({
@@ -388,7 +441,8 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
       const newNodes = applyNodeChanges(changes, state.nodes);
       return {
         nodes: newNodes,
-        isDirty: true,
+        // Sprint 145 R4 (#571): a selection or a measurement is a look, not an edit
+        isDirty: state.isDirty || changesFlowFile(changes),
         executionOrder: calculateExecutionOrder(newNodes, state.edges),
       };
     });
@@ -399,7 +453,7 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
       const newEdges = applyEdgeChanges(changes, state.edges);
       return {
         edges: newEdges,
-        isDirty: true,
+        isDirty: state.isDirty || changesFlowFile(changes),
         executionOrder: calculateExecutionOrder(state.nodes, newEdges),
       };
     });
@@ -459,6 +513,8 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
         flowInputs,
         selectedNodeId: id,
         isDirty: true,
+        // Sprint 145: the run order is the store's own, not left to React Flow's next measurement
+        executionOrder: calculateExecutionOrder(newNodes, state.edges),
       };
     });
 
@@ -611,16 +667,17 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
         selectedNodeId:
           state.selectedNodeId === nodeId ? null : state.selectedNodeId,
         isDirty: true,
+        executionOrder: calculateExecutionOrder(nodes, edges),
       };
     });
     get().saveToHistory();
   },
 
   deleteEdge: (edgeId) => {
-    set((state) => ({
-      edges: state.edges.filter((e) => e.id !== edgeId),
-      isDirty: true,
-    }));
+    set((state) => {
+      const edges = state.edges.filter((e) => e.id !== edgeId);
+      return { edges, isDirty: true, executionOrder: calculateExecutionOrder(state.nodes, edges) };
+    });
     get().saveToHistory();
   },
 
@@ -656,7 +713,7 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
       if (state.historyIndex > 0) {
         const newIndex = state.historyIndex - 1;
         const { nodes, edges } = state.history[newIndex];
-        return { nodes, edges, historyIndex: newIndex, isDirty: true };
+        return { nodes, edges, historyIndex: newIndex, isDirty: true, executionOrder: calculateExecutionOrder(nodes, edges) };
       }
       return state;
     });
@@ -667,7 +724,7 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
       if (state.historyIndex < state.history.length - 1) {
         const newIndex = state.historyIndex + 1;
         const { nodes, edges } = state.history[newIndex];
-        return { nodes, edges, historyIndex: newIndex, isDirty: true };
+        return { nodes, edges, historyIndex: newIndex, isDirty: true, executionOrder: calculateExecutionOrder(nodes, edges) };
       }
       return state;
     });

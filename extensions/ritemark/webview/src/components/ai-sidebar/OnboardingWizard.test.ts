@@ -143,6 +143,11 @@ function click(recorded: Clickable[], words: string, where: string) {
   assert.equal(installed.length, 2, `${where}: Claude and ChatGPT both read Installed`)
   for (const el of installed) assert.ok(el.getAttribute('class')?.includes('--r-ink-muted'), `${where}: Installed is muted ink`)
   assert.ok(!root.toString().includes('testing-iconPassed'), `${where}: no green on the sign-in card`)
+  // Sprint 145 (#578): the checks are drawn in the ink their class names. An Icon's own tone sets its fill, so a
+  // colour class shows only with tone="inherit" (fill="currentColor"); before, these drew in the muted tone.
+  const checks = root.querySelectorAll('svg').filter((svg) => svg.getAttribute('class')?.includes('--r-ink-body'))
+  assert.equal(checks.length, 2, `${where}: Claude's and ChatGPT's Installed checks`)
+  for (const svg of checks) assert.equal(svg.getAttribute('fill'), 'currentColor', `${where}: an Installed check takes its ink`)
 }
 
 // Step 3: an AI is ready.
@@ -152,6 +157,9 @@ function click(recorded: Clickable[], words: string, where: string) {
   assertSharedButtons(root, where)
   assert.ok(!root.toString().includes('testing-iconPassed'), `${where}: "You're all set!"'s check is ink, not green`)
   assert.ok(root.toString().includes('text-[var(--r-ink-strong)]'), `${where}: "You're all set!"'s check is the heading's ink, not muted`)
+  // Sprint 145 (#578): and it is drawn so: the class colours the check only with fill="currentColor"
+  const allSet = root.querySelectorAll('svg').find((svg) => svg.getAttribute('class')?.includes('--r-ink-strong'))
+  assert.equal(allSet?.getAttribute('fill'), 'currentColor', `${where}: "You're all set!"'s check is filled with its ink, not the muted tone`)
   calls.length = 0
   click(recorded, 'Get started', where)
   assert.deepEqual(calls, ['dismissOnboarding'], `${where}: actions`)

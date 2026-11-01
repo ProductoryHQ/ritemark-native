@@ -1198,9 +1198,11 @@ export function Editor({
           cursor: not-allowed !important;
         }
 
-        /* Copied state - green feedback (icon swaps to check, color goes success) */
+        /* Copied state: the icon swaps to a check, which is the sign, and the button stays shown while it says
+           so (a diagram's toolbar still hides with the pointer). The check is drawn in the Icon's own muted tone,
+           as the copy icon was: a colour here named green, which never showed, because an Icon's tone sets its
+           fill. Green is only the ready dot (Sprint 145, #578) */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn.copied {
-          color: var(--r-success) !important;
           opacity: 1 !important;
         }
 
@@ -1413,10 +1415,6 @@ export function Editor({
         .mermaid-expand-overlay .mermaid-expand-btn:active {
           background: var(--r-accent-soft) !important;
           color: var(--r-accent-deep, var(--r-accent)) !important;
-        }
-
-        .mermaid-expand-overlay .mermaid-expand-btn.copied {
-          color: var(--r-success) !important;
         }
 
         .mermaid-expand-overlay .mermaid-expand-btn:disabled {

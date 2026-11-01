@@ -145,12 +145,14 @@ const RITEMARK_THEMES = [
 ];
 
 /** Settings sections other features can open the page at. */
-export type SettingsSection = 'google-docs' | 'transcription' | 'usage-data' | 'google-ai-key';
+export type SettingsSection = 'google-docs' | 'transcription' | 'usage-data' | 'google-ai-key' | 'openai-api-key';
 
 export function isSettingsSection(value: unknown): value is SettingsSection {
   return value === 'google-docs' || value === 'transcription' || value === 'usage-data'
     // Sprint 144: a Google image step's "Add it in Settings"
-    || value === 'google-ai-key';
+    || value === 'google-ai-key'
+    // Sprint 145 R5 (#580): an OpenAI step's "Add it in Settings"
+    || value === 'openai-api-key';
 }
 
 export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {

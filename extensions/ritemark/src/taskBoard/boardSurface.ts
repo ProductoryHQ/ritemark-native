@@ -202,6 +202,10 @@ async function route(request: Exclude<BoardRequest, { type: 'board/ready' }>, co
       return controller.acceptReview(request.cardId);
     case 'board/set-wip':
       return controller.setWipLimit(request.limit);
+    case 'board/retry-file':
+      return controller.retryFile(request.fileName);
+    case 'board/remove-file':
+      return controller.removeFile(request.fileName);
   }
 }
 

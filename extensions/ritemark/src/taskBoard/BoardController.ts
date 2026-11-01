@@ -28,7 +28,7 @@ import {
   type RuntimeAvailabilities,
   type RuntimeAvailability,
 } from '../runtime/availability';
-import { BoardStoreError, type BoardEntry, type BoardStore } from './BoardStore';
+import { BoardStoreError, TrashRefusedError, type BoardEntry, type BoardStore } from './BoardStore';
 import { REVIEW_FAILED, type IdeaReviewInput, type ReviewFields } from './ideaReview';
 import {
   CARD_LIMITS,
@@ -126,6 +126,22 @@ export interface BoardControllerDependencies {
   /** Idea review (W6): one tool-free call to an agent; rejects with the copy to show. */
   reviewer?: { review(input: IdeaReviewInput): Promise<ReviewFields> };
   now?: () => Date;
+  /** The operating system, for the trash's name in a refusal (tests); `process.platform` when absent. */
+  platform?: NodeJS.Platform;
+  /** How long Try again waits for a read before it answers (tests); a stuck read goes on after the answer. */
+  retryAnswerMs?: number;
+  /** How long Remove's last look at the file may take (tests). */
+  removeLookMs?: number;
+}
+
+const RETRY_ANSWER_MS = 15_000;
+const REMOVE_LOOK_MS = 2_000;
+
+/** What a file's row says when the system trash refused it (experience 41). */
+export function trashRefusedWords(platform: NodeJS.Platform): string {
+  return platform === 'win32'
+    ? 'Ritemark couldn’t move it to the Recycle Bin, so it is still in the folder.'
+    : 'Ritemark couldn’t move it to the Trash, so it is still in the folder.';
 }
 
 export const WIP_LIMIT_KEY = 'ritemark.taskBoard.wipLimit';
@@ -264,11 +280,11 @@ export class BoardController {
   // ── Snapshot ──────────────────────────────────────────────────────────────
 
   async snapshot(): Promise<BoardSnapshot> {
-    const entries = await this.store.list();
+    const { entries, revision } = await this.store.listWithRevision();
     const handoffs = this.ledger.list();
     const cards = entries.flatMap((entry) => (entry.kind === 'card' ? [entry] : []));
     const unreadable = entries.flatMap((entry) =>
-      entry.kind === 'unreadable' ? [{ fileName: entry.fileName, message: entry.message }] : [],
+      entry.kind === 'unreadable' ? [{ fileName: entry.fileName, message: entry.message, reason: entry.reason }] : [],
     );
     const nextUp = this.nextUpId(cards.flatMap((entry) => (entry.card.archived === undefined ? [entry.card] : [])), handoffs);
     const exists = new Map<string, boolean>();
@@ -336,6 +352,8 @@ export class BoardController {
         };
       }),
       defaultRuntime: this.defaultRuntime(),
+      revision,
+      boardId: this.store.id,
     };
   }
 
@@ -507,11 +525,13 @@ export class BoardController {
         if (stage === 'done') delete next.ask;
         return next;
       });
+      // A snapshot with this revision or later shows the move (Sprint 145, #597: the surface that drew it early).
+      const revision = this.store.revision;
       // A card put away no longer waits to start.
       if ((stage === 'done' || stage === 'idea') && this.ledger.list().get(cardId)?.state === 'waiting') {
         await this.ledger.unwait(cardId);
       }
-      return { ok: true, cardId };
+      return { ok: true, cardId, revision };
     } catch (error) {
       return fromStoreError(error);
     }
@@ -532,6 +552,86 @@ export class BoardController {
     } catch (error) {
       return fromStoreError(error);
     }
+  }
+
+  // ── Files the board couldn't read (Sprint 145, #596) ─────────────────────
+
+  /**
+   * Try again: read the file once more. The read runs outside the store's tail, so a file that hangs holds no
+   * other change (#597). The answer comes after at most `retryAnswerMs`, whatever holds the read or the snapshot;
+   * a read still running then goes on, and its card appears by itself if it reads. When it is quick, the fresh
+   * snapshot is sent before the answer, so the row goes (or comes back to Try again) in one step.
+   */
+  async retryFile(fileName: string): Promise<BoardAnswer> {
+    if (!this.store.isUnreadable(fileName)) return answerError('not-found', 'That file is not one the board couldn’t read.');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const waited = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, this.deps.retryAnswerMs ?? RETRY_ANSWER_MS);
+    });
+    const work = (async () => {
+      // A fresh read, not one queued behind a read of the same file that may be stuck. Nothing changed: the
+      // answer alone gives the row its buttons back.
+      const changed = await this.store.invalidate(fileName, { fresh: true }).catch((error) => {
+        console.warn(`[taskBoard] try again on ${fileName} failed`, error);
+        return false;
+      });
+      if (changed) await this.refreshNow();
+    })().catch((error) => console.warn('[taskBoard] try again failed', error));
+    await Promise.race([work, waited]);
+    clearTimeout(timer);
+    return { ok: true };
+  }
+
+  /**
+   * Remove: the file goes to the system trash (the board asked first). A last look at the file comes first, for a
+   * moment, with a read made for this Remove that starts at once (it waits for no other read, hung ones included):
+   * one that reads as a card within the moment (a cloud file that has arrived) is not trashed, and its card shows.
+   * A file that still hangs is trashed after that moment, even if its read would have come back a little later. A
+   * refusal keeps the row, with its words.
+   */
+  async removeFile(fileName: string): Promise<BoardAnswer> {
+    if (!this.store.isUnreadable(fileName)) return answerError('not-found', 'That file is not one the board couldn’t read.');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      this.store.invalidate(fileName, { own: true }).catch(() => false),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, this.deps.removeLookMs ?? REMOVE_LOOK_MS);
+      }),
+    ]);
+    clearTimeout(timer);
+    if (!this.store.isUnreadable(fileName)) {
+      // The look changed it: it reads now as a card, or it is gone (both: nothing to trash).
+      await this.refreshNow();
+      return this.store.cardIdOfFile(fileName)
+        ? answerError('not-found', 'That file reads now: its card is on the board.')
+        : { ok: true };
+    }
+    try {
+      await this.store.removeFile(fileName);
+    } catch (error) {
+      if (error instanceof TrashRefusedError) {
+        console.warn(`[taskBoard] ${error.message}`);
+        return answerError('trash-refused', trashRefusedWords(this.deps.platform ?? process.platform));
+      }
+      if (error instanceof BoardStoreError) {
+        console.warn(`[taskBoard] couldn't remove ${fileName}: ${error.message}`);
+        await this.refreshNow();
+        if (error.code !== 'not-found') return answerError(error.code, 'Ritemark couldn’t remove the file. Try again.');
+        return this.store.cardIdOfFile(fileName) ? answerError('not-found', 'That file reads now: its card is on the board.') : { ok: true };
+      }
+      throw error;
+    }
+    await this.refreshNow();
+    return { ok: true };
+  }
+
+  /** The snapshot now, in place of the one the store's change scheduled: one push, not two. */
+  private refreshNow(): Promise<BoardSnapshot> {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+    return this.refresh();
   }
 
   // ── Archive (D15) ────────────────────────────────────────────────────────

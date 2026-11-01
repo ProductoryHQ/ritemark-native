@@ -45,8 +45,10 @@ import {
   spreadRanks,
   withHistory,
   type Card,
+  type CardFileProblem,
   type CardStage,
 } from './cardFile';
+import type { UnreadableReason } from './protocol';
 
 export interface BoardStoreFileSystem extends ConversationStoreFileSystem {
   /** Move a file to the system trash. */
@@ -106,7 +108,7 @@ export type BoardEntry =
        *  is shown under a fresh id, which the next write puts in the file. */
       copiedFrom?: string;
     }
-  | { kind: 'unreadable'; fileName: string; message: string };
+  | { kind: 'unreadable'; fileName: string; message: string; reason: UnreadableReason };
 
 export interface NewCard {
   title: string;
@@ -135,15 +137,91 @@ interface CachedEntry {
   hash: string;
   parsed:
     | { kind: 'card'; card: Card }
-    | { kind: 'unreadable'; message: string };
+    | { kind: 'unreadable'; message: string; reason: UnreadableReason };
+}
+
+/** One file read: its text, gone, or the error that stopped the read. */
+type FileRead = { kind: 'text'; text: string } | { kind: 'missing' } | { kind: 'failed'; error: unknown };
+
+/** A re-read made outside the tail, with what it is checked against when it is applied. */
+interface QueuedRead {
+  ticket: number;
+  epoch: number;
+  version: number;
+  read: FileRead;
+}
+
+/** The system trash refused a file the board couldn't read (Remove on its row, Sprint 145, #596). */
+export class TrashRefusedError extends BoardStoreError {
+  constructor(message: string, cause?: unknown) {
+    super('write-failed', message, cause);
+    this.name = 'TrashRefusedError';
+  }
 }
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** Re-reads out of the tail at once, across files (libuv has 4 threads by default; the tail and saves keep the rest). */
+const MAX_OUTSIDE_READS = 2;
+/** How often a re-read the store overtook is made again before the next watcher event is left to do it. */
+const MAX_REREADS = 3;
+
 function isMissing(error: unknown): boolean {
-  return Boolean(error) && (error as NodeJS.ErrnoException).code === 'ENOENT';
+  // `FileNotFound` is what `workspace.fs` (the host's trash) says for a file that is already gone.
+  const code = error ? (error as NodeJS.ErrnoException).code : undefined;
+  return code === 'ENOENT' || code === 'FileNotFound';
+}
+
+/**
+ * The sentence a file the board couldn't read shows, said once, in plain words (Sprint 145, #596; experience 41).
+ * The error itself goes to the log. A Windows cloud file that isn't on the computer yet fails its read with
+ * `UNKNOWN` (patch 011 maps the same case), so it gets the cloud sentence too.
+ */
+export function readFailureWords(error: unknown): string {
+  const { code } = (error ?? {}) as NodeJS.ErrnoException;
+  if (isSlowFileError(error)) {
+    return 'Ritemark couldn’t open this file in time. If this folder syncs from the cloud, the file may still be downloading.';
+  }
+  if (code === 'EACCES' || code === 'EPERM') return 'This computer doesn’t let Ritemark open this file.';
+  return 'Ritemark couldn’t open this file.';
+}
+
+/** A file that didn't answer in time or was busy: what a cloud drive still fetching it gives. */
+function isSlowFileError(error: unknown): boolean {
+  const { code, syscall } = (error ?? {}) as NodeJS.ErrnoException;
+  // EDEADLK: macOS refusing to read an iCloud Drive file that isn't on the Mac yet.
+  return code === 'ETIMEDOUT' || code === 'EBUSY' || code === 'EAGAIN' || code === 'EDEADLK' || (code === 'UNKNOWN' && (syscall === 'read' || syscall === 'open'));
+}
+
+/**
+ * What a card change that couldn't be saved says, naming the card (experience 41, checked in #610). The error code
+ * and the path go to the log, not the notice.
+ */
+export function saveFailedWords(name: string, error: unknown): string {
+  const { code } = (error ?? {}) as NodeJS.ErrnoException;
+  if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') {
+    return `Couldn’t save “${name}”: this computer doesn’t let Ritemark change files in this folder.`;
+  }
+  if (isSlowFileError(error)) return `Couldn’t save “${name}” in time. If this folder syncs from the cloud, try again in a moment.`;
+  return `Couldn’t save “${name}”. Try again in a moment.`;
+}
+
+function saveFailed(name: string, fileName: string, error: unknown): BoardStoreError {
+  console.warn(`[taskBoard] couldn't save ${fileName}: ${messageOf(error)}`);
+  return new BoardStoreError('write-failed', saveFailedWords(name, error), error);
+}
+
+/** The sentence a card file whose front matter the board can't use shows (experience 41). */
+export function formatProblemWords(problem: CardFileProblem, parserMessage: string): string {
+  if (problem === 'yaml') return 'The lines at the top of this file, where the board keeps the card’s title and column, have a mistake.';
+  if (problem === 'newer') return 'A newer Ritemark made this card. Update Ritemark to see it.';
+  return parserMessage;
+}
+
+function unreadableOf(parsed: { message: string; problem: CardFileProblem }): CachedEntry['parsed'] {
+  return { kind: 'unreadable', message: formatProblemWords(parsed.problem, parsed.message), reason: parsed.problem === 'newer' ? 'newer' : 'format' };
 }
 
 function hashOf(text: string): string {
@@ -156,6 +234,8 @@ function isCardFileName(name: string): boolean {
 
 export class BoardStore {
   readonly tasksDir: string;
+  /** This store's own id: its change count (`revision`) means something only with it. */
+  readonly id = randomUUID();
   private readonly fs: BoardStoreFileSystem;
   private readonly now: () => Date;
   private readonly random: (max: number) => number;
@@ -169,6 +249,28 @@ export class BoardStore {
   private readonly listeners = new Set<() => void>();
   private mutationTail: Promise<void> = Promise.resolve();
   private loaded = false;
+  /**
+   * Re-reads happen outside the tail (Sprint 145, #597): a file that hangs (a cloud drive still fetching it) used
+   * to hold every move, add and edit until its read gave up. Per file they run one at a time, so they finish in the
+   * order they started. A read is applied only while the store hasn't changed that file's entry since it started:
+   * `fileVersions` counts the store's own changes to an entry (writes, loads, removals), `epoch` whole reloads.
+   * One entry per file name the store has seen. Try again reads at once, beside a read still running, so reads
+   * also carry a ticket: one that finishes after a later one was applied changes nothing.
+   */
+  private readonly fileVersions = new Map<string, number>();
+  /** fileName → the re-read running for it, and the one queued after it that every later caller shares. */
+  private readonly fileReads = new Map<string, { running: Promise<QueuedRead>; next: Promise<QueuedRead> | null }>();
+  /** fileName → the ticket of the last re-read applied. */
+  private readonly appliedReads = new Map<string, number>();
+  private readTicket = 0;
+  /** fileName → a fresh read (Try again, Remove's look) still running: another fresh read of it joins this one. */
+  private readonly freshReads = new Map<string, Promise<QueuedRead>>();
+  /** Re-reads out of the tail at once, across files: a few hung cloud files can't take every I/O thread. */
+  private outsideReads = 0;
+  private readonly readWaiters: Array<() => void> = [];
+  private epoch = 0;
+  /** Counts the store's changes (every `emit`); a snapshot and an answer carry it, so a surface can tell their order. */
+  private changes = 0;
 
   constructor(readonly folderPath: string, dependencies: BoardStoreDependencies = {}) {
     this.tasksDir = path.join(folderPath, ...CARD_FOLDER.split('/'));
@@ -191,6 +293,19 @@ export class BoardStore {
       await this.ensureLoaded();
       return this.snapshot();
     });
+  }
+
+  /** `list()`, with the count of the store's changes it includes (Sprint 145, #597: the order of snapshots). */
+  listWithRevision(): Promise<{ entries: BoardEntry[]; revision: number }> {
+    return this.serialized(async () => {
+      await this.ensureLoaded();
+      return { entries: this.snapshot(), revision: this.changes };
+    });
+  }
+
+  /** The count of the store's changes so far: a snapshot with this revision or later includes them. */
+  get revision(): number {
+    return this.changes;
   }
 
   get(cardId: string): Promise<Card | null> {
@@ -259,8 +374,8 @@ export class BoardStore {
         }
         throw error;
       }
-      await this.write(fileName, text);
-      this.entries.set(fileName, { fileName, hash: hashOf(text), parsed: { kind: 'card', card } });
+      await this.write(fileName, text, card.title);
+      this.setEntry({ fileName, hash: hashOf(text), parsed: { kind: 'card', card } });
       this.resolveIds();
       this.emit();
       return structuredClone(card);
@@ -320,13 +435,10 @@ export class BoardStore {
         throw new BoardStoreError('write-failed', `Couldn't rename ${entry.fileName}: ${messageOf(error)}`, error);
       }
       const cached = this.entries.get(entry.fileName)!;
-      this.entries.delete(entry.fileName);
-      this.entries.set(fileName, { ...cached, fileName });
       const provisional = this.provisionalIds.get(entry.fileName);
-      if (provisional) {
-        this.provisionalIds.delete(entry.fileName);
-        this.provisionalIds.set(fileName, provisional);
-      }
+      this.dropEntry(entry.fileName);
+      this.setEntry({ ...cached, fileName });
+      if (provisional) this.provisionalIds.set(fileName, provisional);
       this.resolveIds();
       this.emit();
     });
@@ -343,11 +455,39 @@ export class BoardStore {
       } catch (error) {
         if (!isMissing(error)) throw new BoardStoreError('write-failed', `Couldn't move the card to the trash: ${messageOf(error)}`, error);
       }
-      this.entries.delete(fileName);
-      this.provisionalIds.delete(fileName);
+      this.dropEntry(fileName);
       this.resolveIds();
       this.emit();
     });
+  }
+
+  /**
+   * Move a file the board couldn't read to the system trash (Sprint 145, #596): Remove on its row. Only a bare
+   * file name that is an unreadable entry of this board's folder is accepted; anything else is refused and
+   * nothing is trashed.
+   */
+  removeFile(fileName: string): Promise<void> {
+    return this.serialized(async () => {
+      await this.ensureLoaded();
+      const entry = isCardFileName(fileName) ? this.entries.get(fileName) : undefined;
+      if (!entry || entry.parsed.kind !== 'unreadable') {
+        throw new BoardStoreError('not-found', 'That file is not one the board couldn’t read.');
+      }
+      const file = path.join(this.tasksDir, fileName);
+      try {
+        await this.fs.trash(file);
+      } catch (error) {
+        if (!isMissing(error)) throw new TrashRefusedError(`Couldn't move ${fileName} to the trash: ${messageOf(error)}`, error);
+      }
+      this.dropEntry(fileName);
+      this.resolveIds();
+      this.emit();
+    });
+  }
+
+  /** A file of this board listed as one it couldn't read. From the cache: it waits on nothing. */
+  isUnreadable(fileName: string): boolean {
+    return this.entries.get(fileName)?.parsed.kind === 'unreadable';
   }
 
   /**
@@ -363,27 +503,44 @@ export class BoardStore {
   }
 
   /**
-   * Re-read one file after the watcher saw it change. Returns whether the
-   * board changed: the echo of the store's own write (same content) and
-   * changes to files that are not cards return false.
+   * Re-read one file after the watcher saw it change, or when Try again asks (Sprint 145, #596). Returns whether
+   * the board changed: the echo of the store's own write (same content), the same failure again and changes to
+   * files that are not cards return false.
+   *
+   * The file is read outside the tail and the result applied under it (Sprint 145, #597): a re-read that hangs
+   * holds no move, add or edit of another card. When the store changed that file while it was being read (it
+   * wrote, loaded or removed it), what was read may be older than the disk, so the file is read again.
    */
-  invalidate(fileName: string): Promise<boolean> {
-    return this.serialized(async () => {
-      if (!isCardFileName(fileName)) return false;
+  async invalidate(fileName: string, options: { fresh?: boolean; own?: boolean } = {}, attempt = 1): Promise<boolean> {
+    if (!isCardFileName(fileName)) return false;
+    // `fresh` (Try again): read now, not after a watcher read of the same file that may be stuck.
+    // `own` (Remove's last look): a read of its own that starts at once, without waiting for a free read or sharing
+    // an earlier one, so the look's moment always covers a read made for it. One per Remove a person confirms, so
+    // it can't take the I/O threads.
+    const pending = options.own ? this.startRead(fileName, { waitForSlot: false }) : options.fresh ? this.freshRead(fileName) : this.queueRead(fileName);
+    const { ticket, epoch, version, read } = await pending;
+    const outcome = await this.serialized(async () => {
       await this.ensureLoaded();
-      const changed = await this.reread(fileName);
+      if (epoch !== this.epoch || version !== (this.fileVersions.get(fileName) ?? 0)) return 'overtaken' as const;
+      if ((this.appliedReads.get(fileName) ?? 0) > ticket) return false;
+      this.appliedReads.set(fileName, ticket);
+      const changed = this.applyRead(fileName, read);
       if (changed) {
         this.resolveIds();
         this.emit();
       }
       return changed;
     });
+    // Overtaken: read again, a few times at most (a card the store keeps rewriting gives its own watcher events).
+    if (outcome === 'overtaken') return attempt < MAX_REREADS ? this.invalidate(fileName, options, attempt + 1) : false;
+    return outcome;
   }
 
   /** Read the whole folder again (a branch switch, a sync that moved many files). */
   reload(): Promise<void> {
     return this.serialized(async () => {
       this.entries.clear();
+      this.epoch += 1;
       this.loaded = false;
       await this.ensureLoaded();
       this.emit();
@@ -400,51 +557,145 @@ export class BoardStore {
     } catch (error) {
       if (!isMissing(error)) throw new BoardStoreError('write-failed', `Couldn't read the task folder: ${messageOf(error)}`, error);
     }
-    for (const name of names.filter(isCardFileName).sort()) await this.reread(name);
+    for (const name of names.filter(isCardFileName).sort()) {
+      this.bump(name);
+      this.applyRead(name, await this.readFile(name));
+    }
     this.resolveIds();
     this.loaded = true;
   }
 
-  /** Read one file into the cache. True when the cache changed. */
-  private async reread(fileName: string): Promise<boolean> {
+  /** Read one card file: its text, gone, or why not. Touches no state, so it may run outside the tail. */
+  private async readFile(fileName: string): Promise<FileRead> {
     const file = path.join(this.tasksDir, fileName);
     // Unsaved typing on a card page is what the user sees, so the board shows
     // it too. A saved document is read from disk, which is never older.
     const unsaved = this.documents?.isDirty(file) ? this.documents.openText(file) : undefined;
-    let text: string;
     try {
-      text = unsaved ?? (await this.fs.readFile(file));
+      return { kind: 'text', text: unsaved ?? (await this.fs.readFile(file)) };
     } catch (error) {
-      if (isMissing(error)) {
-        const had = this.entries.delete(fileName);
-        this.provisionalIds.delete(fileName);
-        return had;
-      }
+      // A folder whose name ends in .md is no card file: not listed, so Remove never sends a folder to the trash.
+      const notAFile = (error as NodeJS.ErrnoException)?.code === 'EISDIR';
+      return isMissing(error) || notAFile ? { kind: 'missing' } : { kind: 'failed', error };
+    }
+  }
+
+  /** Put one file's read into the cache. True when the cache changed. */
+  private applyRead(fileName: string, read: FileRead): boolean {
+    if (read.kind === 'missing') {
+      const had = this.entries.delete(fileName);
+      this.provisionalIds.delete(fileName);
+      return had;
+    }
+    if (read.kind === 'failed') {
       // A file that can't be read right now (a cloud drive still fetching it, a
       // permission) is listed as unreadable, like a file that doesn't parse, and
       // the rest of the board still loads. One timed-out OneDrive file used to
-      // leave the whole board and the Tasks side bar empty (v1.14.0).
-      const message = `Couldn't read it: ${messageOf(error)}`;
+      // leave the whole board and the Tasks side bar empty (v1.14.0). The row
+      // says what happened in plain words; the error itself goes to the log.
+      const message = readFailureWords(read.error);
       const previous = this.entries.get(fileName);
-      if (previous?.parsed.kind === 'unreadable' && previous.parsed.message === message) return false;
-      this.entries.set(fileName, { fileName, hash: `unreadable:${message}`, parsed: { kind: 'unreadable', message } });
+      if (previous?.parsed.kind === 'unreadable' && previous.parsed.reason === 'read' && previous.parsed.message === message) return false;
+      console.warn(`[taskBoard] couldn't read ${fileName}: ${messageOf(read.error)}`);
+      this.entries.set(fileName, { fileName, hash: `unreadable:${message}`, parsed: { kind: 'unreadable', message, reason: 'read' } });
       this.provisionalIds.delete(fileName);
       return true;
     }
-    const hash = hashOf(text);
+    const hash = hashOf(read.text);
     if (this.entries.get(fileName)?.hash === hash) return false;
-    const parsed = parseCardFile(text);
+    const parsed = parseCardFile(read.text);
     if (parsed.kind === 'not-a-card') {
       const had = this.entries.delete(fileName);
       this.provisionalIds.delete(fileName);
       return had;
     }
+    if (parsed.kind === 'error') console.warn(`[taskBoard] ${fileName} is not a card the board can use: ${parsed.message}`);
     this.entries.set(fileName, {
       fileName,
       hash,
-      parsed: parsed.kind === 'card' ? { kind: 'card', card: parsed.card } : { kind: 'unreadable', message: parsed.message },
+      parsed: parsed.kind === 'card' ? { kind: 'card', card: parsed.card } : unreadableOf(parsed),
     });
     return true;
+  }
+
+  /**
+   * A re-read outside the tail. Per file, one runs at a time and at most one waits after it, shared by every
+   * caller that comes meanwhile: a file that hangs is not asked again and again while it is still answering (a
+   * sync client can touch it many times), and the read after it still sees what changed since. Each read notes,
+   * as it starts, what it is checked against when it is applied.
+   */
+  private queueRead(fileName: string): Promise<QueuedRead> {
+    const run = () => this.startRead(fileName);
+    const slot = this.fileReads.get(fileName);
+    if (slot) {
+      slot.next ??= slot.running.then(run, run);
+      return slot.next;
+    }
+    const entry = { running: run(), next: null as Promise<QueuedRead> | null };
+    const settled = () => {
+      if (this.fileReads.get(fileName) !== entry) return;
+      if (entry.next) {
+        entry.running = entry.next;
+        entry.next = null;
+        entry.running.then(settled, settled);
+      } else {
+        this.fileReads.delete(fileName);
+      }
+    };
+    this.fileReads.set(fileName, entry);
+    entry.running.then(settled, settled);
+    return entry.running;
+  }
+
+  /** One re-read, started now, noting what it is checked against when it is applied. */
+  private async startRead(fileName: string, options: { waitForSlot?: boolean } = {}): Promise<QueuedRead> {
+    const counted = options.waitForSlot !== false;
+    if (counted) await this.readSlot();
+    try {
+      const ticket = ++this.readTicket;
+      const epoch = this.epoch;
+      const version = this.fileVersions.get(fileName) ?? 0;
+      return { ticket, epoch, version, read: await this.readFile(fileName) };
+    } finally {
+      if (counted) {
+        this.outsideReads -= 1;
+        this.readWaiters.shift()?.();
+      }
+    }
+  }
+
+  /** A fresh read; one already running for the file is shared, so pressing Try again again starts no second one. */
+  private freshRead(fileName: string): Promise<QueuedRead> {
+    const running = this.freshReads.get(fileName);
+    if (running) return running;
+    const read = this.startRead(fileName);
+    this.freshReads.set(fileName, read);
+    const forget = () => {
+      if (this.freshReads.get(fileName) === read) this.freshReads.delete(fileName);
+    };
+    read.then(forget, forget);
+    return read;
+  }
+
+  private async readSlot(): Promise<void> {
+    while (this.outsideReads >= MAX_OUTSIDE_READS) await new Promise<void>((resolve) => this.readWaiters.push(resolve));
+    this.outsideReads += 1;
+  }
+
+  /** The store's own change to a file's entry: a read made outside the tail before it no longer applies. */
+  private bump(fileName: string): void {
+    this.fileVersions.set(fileName, (this.fileVersions.get(fileName) ?? 0) + 1);
+  }
+
+  private setEntry(entry: CachedEntry): void {
+    this.bump(entry.fileName);
+    this.entries.set(entry.fileName, entry);
+  }
+
+  private dropEntry(fileName: string): void {
+    this.bump(fileName);
+    this.entries.delete(fileName);
+    this.provisionalIds.delete(fileName);
   }
 
   private async rewrite(
@@ -462,17 +713,20 @@ export class BoardStore {
     try {
       text = open ?? (await this.fs.readFile(file));
     } catch (error) {
-      if (!isMissing(error)) throw new BoardStoreError('write-failed', `Couldn't read ${fileName}: ${messageOf(error)}`, error);
-      this.entries.delete(fileName);
+      if (!isMissing(error)) {
+        const cached = this.entries.get(fileName)?.parsed;
+        throw saveFailed(cached?.kind === 'card' ? cached.card.title : fileName, fileName, error);
+      }
+      this.dropEntry(fileName);
       this.resolveIds();
       throw new BoardStoreError('not-found', 'That card is no longer on the board.');
     }
     const parsed = parseCardFile(text);
     if (parsed.kind !== 'card') {
       if (parsed.kind === 'error') {
-        this.entries.set(fileName, { fileName, hash: hashOf(text), parsed: { kind: 'unreadable', message: parsed.message } });
+        this.setEntry({ fileName, hash: hashOf(text), parsed: unreadableOf(parsed) });
       } else {
-        this.entries.delete(fileName);
+        this.dropEntry(fileName);
       }
       this.resolveIds();
       throw parsed.kind === 'error'
@@ -489,10 +743,10 @@ export class BoardStore {
     if (history) changed = withHistory(changed, { at, ...history });
     const out = serializeCard(changed, parsed.source);
     const written =
-      open !== undefined && (await this.writeOpen(file, out, changed.description !== parsed.card.description));
-    if (!written) await this.write(fileName, out);
+      open !== undefined && (await this.writeOpen(file, out, changed.description !== parsed.card.description, changed.title));
+    if (!written) await this.write(fileName, out, changed.title);
     this.provisionalIds.delete(fileName);
-    this.entries.set(fileName, { fileName, hash: hashOf(out), parsed: { kind: 'card', card: changed } });
+    this.setEntry({ fileName, hash: hashOf(out), parsed: { kind: 'card', card: changed } });
     this.resolveIds();
     return changed;
   }
@@ -566,7 +820,7 @@ export class BoardStore {
     const unreadable: BoardEntry[] = [];
     for (const entry of this.entries.values()) {
       if (entry.parsed.kind === 'unreadable') {
-        unreadable.push({ kind: 'unreadable', fileName: entry.fileName, message: entry.parsed.message });
+        unreadable.push({ kind: 'unreadable', fileName: entry.fileName, message: entry.parsed.message, reason: entry.parsed.reason });
       }
     }
     unreadable.sort((a, b) => (a.fileName < b.fileName ? -1 : 1));
@@ -620,17 +874,18 @@ export class BoardStore {
   }
 
   /** Write through the card's open document; false when it is not open. */
-  private async writeOpen(file: string, contents: string, bodyChanged: boolean): Promise<boolean> {
+  private async writeOpen(file: string, contents: string, bodyChanged: boolean, title: string): Promise<boolean> {
     const split = splitCardText(contents);
     if (!this.documents || !split) return false;
     try {
       return await this.documents.write(file, bodyChanged ? split : { head: split.head });
     } catch (error) {
-      throw new BoardStoreError('write-failed', `Couldn't save ${path.basename(file)}: ${messageOf(error)}`, error);
+      throw saveFailed(title, path.basename(file), error);
     }
   }
 
-  private async write(fileName: string, contents: string): Promise<void> {
+  /** Write a card file atomically; `title` names the card if it fails. */
+  private async write(fileName: string, contents: string, title: string): Promise<void> {
     const target = path.join(this.tasksDir, fileName);
     const temp = `${target}.tmp-${this.tempId()}`;
     try {
@@ -642,11 +897,12 @@ export class BoardStore {
       } catch {
         // A leftover temp file is ignored by every reader (it does not end in .md).
       }
-      throw new BoardStoreError('write-failed', `Couldn't save ${fileName}: ${messageOf(error)}`, error);
+      throw saveFailed(title, fileName, error);
     }
   }
 
   private emit(): void {
+    this.changes += 1;
     for (const listener of this.listeners) {
       try {
         listener();

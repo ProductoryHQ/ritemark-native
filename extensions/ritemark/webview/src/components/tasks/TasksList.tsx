@@ -18,7 +18,7 @@ import { cn } from '../../lib/utils'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
-import { notify, onHeadRow, useActivePage } from './boardClient'
+import { notify, onHeadRow, useActivePage, useSavingStage } from './boardClient'
 import { act, useBoardUi } from './boardUi'
 import { CardMenu } from './CardMenu'
 import { DeleteConfirm } from './DeleteConfirm'
@@ -376,6 +376,7 @@ function SideRow({
   const activePage = useActivePage()
   const prompt = useBoardUi((state) => state.prompt)
   const p = present(card)
+  const saving = useSavingStage(card.id)
   const active = activePage === card.id
   const progress = card.checkboxes.total ? `${card.checkboxes.done}/${card.checkboxes.total}` : ''
   // The state's words wrap rather than cut ("Ready to revie…", QA 19 October): they say what to do
@@ -432,12 +433,21 @@ function SideRow({
           </div>
         ) : null}
       </div>
-      <CardMenu
-        card={card}
-        p={p}
-        snapshot={snapshot}
-        className="relative z-10 -mr-1.5 -mt-[3px] opacity-0 focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
-      />
+      {/* Sprint 145 (#597): a move made here and still being saved after a second shows the sign in the menu's
+          place; the menu stays mounted under it, so a keyboard focus on it is never dropped (tasks.css). */}
+      <span className={cn('tb-rowmenu', saving && 'saving')}>
+        <CardMenu
+          card={card}
+          p={p}
+          snapshot={snapshot}
+          className="relative z-10 -mr-1.5 -mt-[3px] opacity-0 focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+        />
+        {saving ? (
+          <span className="tb-saving-row" role="status" aria-label={`Saving the move to ${STAGE_NAMES[saving]}`}>
+            <Icon name="circle-notch" size={12} tone="inherit" className="tb-spin size-3" />
+          </span>
+        ) : null}
+      </span>
     </div>
   )
 }

@@ -73,10 +73,10 @@ export function PlanReviewCard({
         </div>
       )}
 
-      {/* Enforcement line — a verified claim, not decoration (R2/R5) */}
+      {/* Enforcement line — a verified claim, not decoration (R2/R5); its check is its words' ink (Sprint 145, #578) */}
       {enforcementNote && (
         <div className="flex items-center gap-1 px-2.5 pb-1.5 text-[11px] text-[var(--r-ink-muted)]">
-          <Icon name="check" size={12} className="shrink-0 text-[var(--r-success)]" />
+          <Icon name="check" size={12} className="shrink-0 text-[var(--r-ink-muted)]" />
           <span>{enforcementNote}</span>
         </div>
       )}
