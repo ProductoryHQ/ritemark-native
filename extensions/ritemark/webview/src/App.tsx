@@ -778,6 +778,7 @@ function App() {
         <DocumentConflictDialog
           isOpen={showConflictDialog && !!documentViewSync.conflict}
           filename={documentViewSync.conflict?.filename || filename}
+          reason={documentViewSync.conflict?.reason}
           onClose={() => setShowConflictDialog(false)}
           onCompare={() => sendConflictAction('compare')}
           onKeepLocal={() => sendConflictAction('keep-local')}
@@ -922,6 +923,7 @@ function App() {
       <DocumentConflictDialog
         isOpen={showConflictDialog && !!documentViewSync.conflict}
         filename={documentViewSync.conflict?.filename || filename}
+        reason={documentViewSync.conflict?.reason}
         onClose={() => setShowConflictDialog(false)}
         onCompare={() => sendConflictAction('compare')}
         onKeepLocal={() => sendConflictAction('keep-local')}

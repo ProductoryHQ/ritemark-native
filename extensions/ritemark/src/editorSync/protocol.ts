@@ -89,9 +89,16 @@ export type DocumentHostMessage =
       revision: number;
       diskHash: string;
       filename: string;
+      /**
+       * Why the review is asked, when it isn't the usual two changes: `held-import` is a writer's copy that left
+       * out words Ritemark had just saved, held instead of imported (Sprint 145 R1, #588).
+       */
+      reason?: DocumentConflictReason;
       /** Open the review at once: the person chose Review changes in Ritemark's notification (#454). */
       openReview?: boolean;
     });
+
+export type DocumentConflictReason = 'held-import';
 
 export type DocumentEditPayload =
   | { fileType: 'markdown'; content: string; properties: Record<string, unknown> }
@@ -268,8 +275,9 @@ export function parseDocumentHostMessage(value: unknown): DocumentHostMessage {
     };
   }
 
-  exactKeys(input, ['type', 'uri', 'documentSessionId', 'viewEpoch', 'conflictRevision', 'revision', 'diskHash', 'filename', 'openReview']);
+  exactKeys(input, ['type', 'uri', 'documentSessionId', 'viewEpoch', 'conflictRevision', 'revision', 'diskHash', 'filename', 'reason', 'openReview']);
   if (input.openReview !== undefined && input.openReview !== true) throw new DocumentProtocolError('openReview must be true when present');
+  if (input.reason !== undefined && input.reason !== 'held-import') throw new DocumentProtocolError('Unknown conflict reason');
   return {
     type,
     ...identity,
@@ -277,6 +285,7 @@ export function parseDocumentHostMessage(value: unknown): DocumentHostMessage {
     revision: integer(input, 'revision'),
     diskHash: hash(input, 'diskHash'),
     filename: requiredString(input, 'filename', 512),
+    ...(input.reason === 'held-import' ? { reason: 'held-import' as const } : {}),
     ...(input.openReview === true ? { openReview: true } : {}),
   };
 }

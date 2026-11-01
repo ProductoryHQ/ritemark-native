@@ -160,6 +160,87 @@ export function classifyRefusedSave(snapshot: RefusedSaveSnapshot): RefusedSaveD
   return 'conflict';
 }
 
+/**
+ * Sprint 145 R1 (#588): one of Ritemark's own saves of a document, as the
+ * guard remembers it. `previousText` is the text on disk before this save as
+ * far as Ritemark knows (the save before it, or the text it last read or
+ * imported), so the words this save added can be told apart from words that
+ * were already there.
+ */
+export interface RecentSave {
+  text: string;
+  previousText: string;
+  savedAt: number;
+}
+
+/**
+ * How long after one of Ritemark's own saves a disk change that leaves out the
+ * words that save added is held as a conflict instead of imported (#588,
+ * `research/stale-write-repro.md`). A writer that writes later than this still
+ * wins (S8).
+ */
+export const STALE_WRITE_WINDOW_MS = 30_000;
+
+/**
+ * Words, for the guard: runs of characters between white space and the
+ * separators of a table or CSV row, so a rewrap, a changed line ending or a
+ * cell edit next to the person's words doesn't count as a loss.
+ */
+function guardWords(text: string): string[] {
+  return normalizeLogicalText(text).match(/[^\s,;|]+/g) ?? [];
+}
+
+function containsRun(haystack: readonly string[], run: readonly string[]): boolean {
+  return ` ${haystack.join(' ')} `.includes(` ${run.join(' ')} `);
+}
+
+/** The words `next` has between the words it shares with `previous` at its start and at its end. */
+function insertedRun(previous: readonly string[], next: readonly string[]): string[] {
+  let start = 0;
+  while (start < previous.length && start < next.length && previous[start] === next[start]) start += 1;
+  let end = 0;
+  while (
+    end < previous.length - start
+    && end < next.length - start
+    && previous[previous.length - 1 - end] === next[next.length - 1 - end]
+  ) end += 1;
+  return next.slice(start, next.length - end);
+}
+
+/**
+ * Sprint 145 R1 (#588): does the text now on disk leave out words that
+ * Ritemark's own recent saves added? Returns how many such words are missing,
+ * 0 when none are (or when nothing recent is remembered).
+ *
+ * For each save within `windowMs` of `now`, the words it added are the run
+ * between what it shares with the text before it. A run counts as lost when
+ * the person's newest save still has it and the disk text doesn't. Word runs,
+ * not lines or bytes, so line endings, a byte order mark, a rewrap or a writer
+ * that changed another line are not a loss; a writer that kept the person's
+ * words wherever it put them is not either.
+ */
+export function droppedRecentSave(input: {
+  saves: readonly RecentSave[];
+  diskText: string;
+  now: number;
+  windowMs: number;
+}): number {
+  const newest = input.saves[input.saves.length - 1];
+  if (!newest) return 0;
+  const newestWords = guardWords(newest.text);
+  const diskWords = guardWords(input.diskText);
+  let lost = 0;
+  for (const save of input.saves) {
+    if (input.now - save.savedAt > input.windowMs) continue;
+    const run = insertedRun(guardWords(save.previousText), guardWords(save.text));
+    if (run.length === 0) continue;
+    if (!containsRun(newestWords, run)) continue;
+    if (containsRun(diskWords, run)) continue;
+    lost += run.length;
+  }
+  return lost;
+}
+
 export function classifyThreeWay(snapshot: ThreeWaySnapshot): ThreeWaySyncState {
   const diskChanged = snapshot.diskHash !== snapshot.baseDiskHash;
   const modelChanged = snapshot.modelHash !== snapshot.baseModelHash;

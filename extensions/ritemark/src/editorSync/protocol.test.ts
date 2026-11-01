@@ -197,6 +197,25 @@ test('validates every host message family', () => {
     filename: 'example.md',
     openReview: 'yes',
   }), DocumentProtocolError);
+  // Sprint 145 R1 (#588): a held import says why it asks.
+  assert.equal(parseDocumentHostMessage({
+    type: 'document:conflict',
+    ...identity,
+    conflictRevision: 2,
+    revision: 4,
+    diskHash: sha,
+    filename: 'example.md',
+    reason: 'held-import',
+  }).reason, 'held-import');
+  assert.throws(() => parseDocumentHostMessage({
+    type: 'document:conflict',
+    ...identity,
+    conflictRevision: 2,
+    revision: 4,
+    diskHash: sha,
+    filename: 'example.md',
+    reason: 'something-else',
+  }), DocumentProtocolError);
 });
 
 test('rejects malformed optional feature fields instead of silently dropping them', () => {

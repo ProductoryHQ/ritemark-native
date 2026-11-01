@@ -3,8 +3,8 @@
 Track: SDD (auto-detected: twelve linked issues in six domains, so it is also full track, not lightweight; the stale-write fault and the Task board's unreadable cards are edge-case-heavy, and the document-to-disk-to-reload flow crosses the webview, the extension host and the file system; scope may grow when an audit shows a cause)
 Override with: "use plain full track"
 Branch: `sprint-145-loose-ends`, made from `origin/main` at Phase 3, after approval. Each later PR has its own branch that starts with the same name (*Pull requests* below). This plan was written on `plan/v2.2.0-release-plan`.
-Release tier: shell. 2.2 is a shell release ([release-plan.md](../release-plan.md)). This sprint names its shell-tier path: `patches/vscode/020-ritemark-electron-43.patch` (#515, when an Electron with Node 24.22.1 exists). Patches 001 and 019 are expected to change too (#582's font line, #501), once their causes are shown. Everything else is extension-tier (the table below). If an audit moves a fix into or out of a patch, this line and the table change first.
-Status: **Approved, 31 October 2026** (Jarmo: "agreed with all", in the Development manager session, with decisions 1, 3, 4 and 5 as recommended). Phase 3 starts in the sprint's own session, on its own branch. No code is written yet; the code named here was read, not run, and no reproduction has been run for this plan (*What reading the code added*).
+Release tier: shell. 2.2 is a shell release ([release-plan.md](../release-plan.md)). This sprint names its shell-tier path: `patches/vscode/020-ritemark-electron-43.patch` (#515, when an Electron with Node 24.22.1 exists). Patches 001 and 019 are expected to change too (#582's font line, #501), once their causes are shown. Everything else is extension-tier (the table below). If an audit moves a fix into or out of a patch, this line and the table change first. **31 October, after Phase 1's Mac audits:** no tier moves. A6 found a 43.x on Node 24.22.1 (43.8.4–43.8.6), so patch 020 changes for certain (PR 6); A7 showed the refused font is patch 001's own registration, so patch 001 changes (PR 5); A7 found no DEP0169 caller in Ritemark's bundle, so that half has no extension change for now.
+Status: **Approved, 31 October 2026** (Jarmo: "agreed with all", in the Development manager session, with decisions 1, 3, 4 and 5 as recommended). **Phase 3 under way** on `sprint-145-loose-ends` (31 October): Phase 1's Mac audits are in `research/`, and PR 1 (#588) is open. The code named under *What reading the code added* was read for the plan; the audits have since run what they could on the Mac (`research/`).
 
 ## SDD Artifacts
 
@@ -13,7 +13,7 @@ Status: **Approved, 31 October 2026** (Jarmo: "agreed with all", in the Developm
 - [technical-plan.md](technical-plan.md): what exists today, the nine audits that come first, workstreams W1–W12, the pull requests, risks.
 - [tasks.md](tasks.md): the implementation checklist by phase.
 - This file: intent, decisions, status.
-- `research/` is not created yet. Phase 1 writes one file per audit there, before the code it gates.
+- `research/`: one file per audit (Phase 1), written before the code it gates. `notes/bundle.md` holds the bundle's size before and after (E4).
 
 ## Goal
 
@@ -97,6 +97,7 @@ Six, so that each gets `REVIEW.md`'s review at its own tier and a shell change n
 
 - **2026-10-31 (the release plan):** 2.2 is a shell release; the sprint order puts the loose ends first; "the milestone's other issues go into item 4".
 - **2026-10-31 (this plan, Jarmo: "agreed with all"):** the four decisions below, each as recommended.
+- **2026-10-31 (Phase 1, engineering, from the audits):** #588's guard also covers the `converged` path and puts the person's words back before asking, because VS Code reloads a clean document itself (A1; `spec.md` R1 addendum). R4 has no second write path (A9). R12 takes its first branch: Electron 43.8.4–43.8.6 carry Node 24.22.1 (A6). R8's font is patch 001's own registration; DEP0169 is not Ritemark's code and waits for PR 5's tree (A7). No tier moves.
 - **Engineering, in this plan (approved with it):**
   - Review changes is the one surface for #588; no new element is drawn.
   - #507 gets no code without a reproduction, as in 2.1.
@@ -179,4 +180,4 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 ## Approval
 
 - [x] Jarmo approved this sprint plan: 31 October 2026, "agreed with all" (the Development manager session), answering the plan, decisions 1, 3, 4 and 5, and the release plan's appetite in one message.
-- [ ] Sprint start in the sprint's own session. A message from the Development manager is not Jarmo's word there (ritemark-dev `CLAUDE.md`, rule 7): the session asks Jarmo to confirm before the first code edit.
+- [x] Sprint start: Jarmo typed it himself in the Development manager session on 31 October 2026 ("admin merge 601 602 and start sprint 145 … I want you to start building 2.2 according to approved sprints"). A separate sprint session can't be started while he works over Remote Control, so the work runs as that session's own subagent, on `sprint-145-loose-ends`, made from `origin/main` before the first edit.

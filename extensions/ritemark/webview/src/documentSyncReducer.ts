@@ -42,6 +42,7 @@ export function reduceDocumentViewSync(
         conflictRevision: message.conflictRevision,
         diskHash: message.diskHash,
         filename: message.filename,
+        ...(message.reason ? { reason: message.reason } : {}),
       },
     }
   }

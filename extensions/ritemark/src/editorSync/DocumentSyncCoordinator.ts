@@ -23,14 +23,28 @@ import {
   classifyRefusedSave,
   classifyStaleViewEdit,
   classifyThreeWay,
+  droppedRecentSave,
   encodeDocumentText,
   initializeThreeWayState,
   normalizeLogicalText,
   observeLocalSaveReceipts,
+  STALE_WRITE_WINDOW_MS,
   type LocalSaveReceipt,
+  type RecentSave,
 } from './state';
 
 const POLL_INTERVAL_MS = 3000;
+
+/**
+ * Sprint 145 R1 (#588): the stale-write guard keeps the texts of a document's
+ * last few states and saves. A document longer than this runs without the
+ * guard (as 2.1 did), and the sync log says so once.
+ */
+const STALE_WRITE_GUARD_MAX_CHARS = 2_000_000;
+/** Model states kept between saves, so a save's receipt finds its text when typing outruns the sync. */
+const RECENT_MODEL_TEXTS = 12;
+/** Saves kept for the guard; only those within `STALE_WRITE_WINDOW_MS` count. */
+const RECENT_SAVES = 6;
 
 /**
  * Sprint 137 (#454): VS Code's save-error handler hands a save it refused as
@@ -77,6 +91,20 @@ interface ConflictSnapshot {
   diskHash: string;
   diskContent: string;
   localContent: string;
+  /**
+   * `held-import` (Sprint 145 R1, #588): a writer's copy that left out words
+   * Ritemark had just saved. The person's words were put back in the document,
+   * so the file may hold them by now; `diskContent` is the writer's copy, which
+   * Use disk version writes back.
+   */
+  reason?: 'held-import';
+  /** The writer's copy had a UTF-8 byte order mark (held imports only). */
+  diskHasUtf8Bom?: boolean;
+}
+
+/** One of Ritemark's own saves, as the stale-write guard remembers it (#588). */
+interface RememberedSave extends RecentSave {
+  hash: string;
 }
 
 interface PendingDelivery {
@@ -112,6 +140,16 @@ interface DocumentRecord {
   conflictSequence: number;
   localSaveSequence: number;
   pendingLocalSaveReceipts: LocalSaveReceipt[];
+  /** #588: the document's recent texts, newest last, taken in the change event. */
+  recentTexts: string[];
+  /** #588: Ritemark's own recent saves of the document, newest last. */
+  recentSaves: RememberedSave[];
+  /** #588: the text Ritemark last knew to be on disk: its last save, or what it last read or imported. */
+  lastKnownDiskText: string;
+  /** #588: a `converged` disk that may be Ritemark's own save whose receipt hasn't arrived, and the text before it. */
+  convergedBeforeReceipt?: { hash: string; previousText: string };
+  /** #588: the document is too long for the guard; it runs as 2.1 did. */
+  guardOff?: boolean;
   views: Map<string, ViewLease>;
   panels: Map<vscode.Webview, vscode.WebviewPanel>;
   watcher?: vscode.FileSystemWatcher;
@@ -140,12 +178,18 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
         // The shell binds this hash to the exact snapshot handed to write();
         // neither the live model nor a later path read can prove that identity.
         const saveHash = readRitemarkSavedLogicalHash(document);
-        if (saveHash) this.recordLocalSaveHash(record, saveHash);
+        if (saveHash) {
+          this.rememberSave(record, saveHash);
+          this.recordLocalSaveHash(record, saveHash);
+        }
         this.enqueue(record, () => this.reconcile(record, 'save-complete'));
       }),
       vscode.workspace.onDidChangeTextDocument(event => {
         const record = this.records.get(event.document.uri.toString());
-        if (record) this.enqueue(record, () => this.reconcile(record, 'model-change'));
+        if (!record) return;
+        // Synchronously, so no state is missed when typing outruns the queue (#588).
+        this.rememberModelText(record);
+        this.enqueue(record, () => this.reconcile(record, 'model-change'));
       }),
       vscode.workspace.registerTextDocumentContentProvider('ritemark-sync', {
         provideTextDocumentContent: uri => this.virtualDocuments.get(uri.toString()) ?? '',
@@ -251,6 +295,9 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       conflictSequence: 0,
       localSaveSequence: 0,
       pendingLocalSaveReceipts: [],
+      recentTexts: [],
+      recentSaves: [],
+      lastKnownDiskText: disk.content,
       views: new Map(),
       panels: new Map(),
       queue: Promise.resolve(),
@@ -448,8 +495,15 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       return;
     }
 
+    const held = conflict.reason === 'held-import';
     const currentDisk = await this.readDisk(record.document);
-    if (!currentDisk || currentDisk.validator !== conflict.diskValidator) {
+    // #588: a held import's file may hold the person's words by now (VS Code saved them back); that is not a
+    // new change. Anything else since the question makes it stale.
+    const diskKnown = !!currentDisk && (
+      currentDisk.validator === conflict.diskValidator
+      || (held && (currentDisk.logicalHash === logicalHash(record.document.getText()) || this.isOwnSave(record, currentDisk.logicalHash)))
+    );
+    if (!currentDisk || !diskKnown) {
       await this.reconcile(record, 'stale-resolution');
       return;
     }
@@ -458,7 +512,9 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       return;
     }
     if (message.action === 'use-disk') {
-      const applied = await this.applyText(record.document, currentDisk.content, {
+      // A held import's disk side is the writer's copy, which the file may no longer hold.
+      const target = held ? { content: conflict.diskContent, logicalHash: conflict.diskHash } : currentDisk;
+      const applied = await this.applyText(record.document, target.content, {
         version: record.document.version,
         logicalHash: logicalHash(conflict.localContent),
       });
@@ -474,19 +530,32 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       // saw, so every later save failed as "newer" until Overwrite. A same-content revert refreshes that version
       // and clears the dirty marker, as Keep my version does below; it preserves the undo stack.
       try {
+        if (held && currentDisk.logicalHash !== conflict.diskHash) {
+          // Write the writer's copy back byte for byte, its line endings and byte order mark included.
+          await vscode.workspace.fs.writeFile(
+            record.document.uri,
+            Buffer.from(`${conflict.diskHasUtf8Bom ? '\uFEFF' : ''}${conflict.diskContent}`, 'utf8'),
+          );
+        }
         view.panel.reveal(view.panel.viewColumn, false);
         await vscode.commands.executeCommand('workbench.action.files.revert');
       } catch (error) {
         this.fail(record, view, error instanceof Error ? error.message : 'Could not use the disk version.');
         return;
       }
-      if (record.document.isDirty || logicalHash(record.document.getText()) !== currentDisk.logicalHash) {
+      const verifiedDisk = held ? await this.readDisk(record.document) : currentDisk;
+      if (record.document.isDirty
+        || logicalHash(record.document.getText()) !== target.logicalHash
+        || !verifiedDisk
+        || verifiedDisk.logicalHash !== target.logicalHash) {
         await this.reconcile(record, 'use-disk-verification');
         return;
       }
       record.modelHash = logicalHash(record.document.getText());
       record.revision += 1;
-      this.setBase(record, currentDisk, record.modelHash);
+      this.setBase(record, verifiedDisk, record.modelHash);
+      // The person chose the writer's copy: the words their earlier saves added no longer count as theirs.
+      if (held) record.recentSaves = [];
       record.state = 'synced';
       record.resolutionRevision = record.revision;
       await this.broadcast(record, 'resolution');
@@ -600,10 +669,11 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     if (views.length === 0 || views.some(view => view.panel.visible)) return;
     record.notifiedConflictRevision = conflict.revision;
     const name = path.basename(record.document.uri.fsPath);
-    void vscode.window.showWarningMessage(
-      `"${name}" changed on disk while you were editing it.`,
-      'Review changes',
-    ).then(choice => {
+    // Sprint 145 R1 (#588): the Experience lead's words for a held import (issue #588, 31 October).
+    const text = conflict.reason === 'held-import'
+      ? `Something else saved "${name}" just after you did, without words you had just written.`
+      : `"${name}" changed on disk while you were editing it.`;
+    void vscode.window.showWarningMessage(text, 'Review changes').then(choice => {
       if (choice !== 'Review changes' || record.disposed || record.conflict?.revision !== conflict.revision) return;
       const view = [...record.views.values()].find(candidate => !candidate.disposed);
       if (!view) return;
@@ -638,7 +708,8 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     // refreshes the immutable local/disk snapshot pair.
     const refreshConflict = reason === 'stale-resolution' || reason === 'keep-local-verification';
     if (record.conflict && record.resolutionRevision === undefined && !refreshConflict) {
-      record.modelHash = modelHash;
+      if (record.conflict.reason === 'held-import') await this.keepHeldWords(record, disk, modelHash, modelVersion);
+      else record.modelHash = modelHash;
       record.state = 'conflict';
       this.sendAllStates(record);
       return;
@@ -679,6 +750,17 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       return;
     }
 
+    // Sprint 145 R1 (#588): a writer's copy that leaves out words Ritemark just saved is not imported.
+    // VS Code reloads a clean document from disk by itself, often before this runs (`converged`), so both
+    // branches are checked, and holding means putting the person's words back, then asking.
+    if (classification === 'external-only' || classification === 'converged') {
+      const lost = this.wordsLostToStaleWrite(record, disk);
+      if (lost > 0) {
+        await this.holdStaleWrite(record, disk, reason, lost);
+        return;
+      }
+    }
+
     if (classification === 'external-only') {
       // The file-service model update and extension watcher hint can arrive in
       // adjacent turns. Give the model one short coalescing window, then honor
@@ -711,7 +793,11 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       const changed = modelHash !== record.modelHash;
       record.modelHash = modelHash;
       if (changed) record.revision += 1;
+      // #588: VS Code says a saved document is clean before it fires the save with its receipt, so this
+      // branch can see Ritemark's own save first. Keep what was on disk before, for that save's receipt.
+      const before = { hash: disk.logicalHash, previousText: record.lastKnownDiskText };
       this.setBase(record, disk, modelHash);
+      record.convergedBeforeReceipt = before;
       record.conflict = undefined;
       record.resolutionRevision = undefined;
       record.state = 'synced';
@@ -869,6 +955,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
       revision: record.revision,
       diskHash: conflict.diskValidator,
       filename: path.basename(record.document.uri.fsPath),
+      ...(conflict.reason ? { reason: conflict.reason } : {}),
       ...(openReview ? { openReview: true } : {}),
     } satisfies DocumentHostMessage);
   }
@@ -916,6 +1003,8 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
     record.baseDiskHash = disk.validator;
     record.baseDiskLogicalHash = disk.logicalHash;
     record.baseModelHash = modelHash;
+    record.lastKnownDiskText = disk.content;
+    record.convergedBeforeReceipt = undefined;
     // A new authoritative base retires every older local-save receipt. The
     // local-save-echo branch deliberately updates the base inline instead so
     // later saves that are still in flight remain pending.
@@ -925,6 +1014,157 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
   private recordLocalSaveHash(record: DocumentRecord, saveHash: string): void {
     record.localSaveSequence += 1;
     record.pendingLocalSaveReceipts.push({ sequence: record.localSaveSequence, hash: saveHash });
+  }
+
+  /** #588: keep the document's text as it is now, so a later save receipt can find the text it saved. */
+  private rememberModelText(record: DocumentRecord): void {
+    if (record.guardOff || record.disposed) return;
+    const text = record.document.getText();
+    if (text.length > STALE_WRITE_GUARD_MAX_CHARS) {
+      this.turnGuardOff(record, text.length);
+      return;
+    }
+    record.recentTexts.push(text);
+    if (record.recentTexts.length > RECENT_MODEL_TEXTS) record.recentTexts.splice(0, record.recentTexts.length - RECENT_MODEL_TEXTS);
+  }
+
+  /**
+   * #588: a save receipt names the hash of the text it wrote; find that text among the document's recent
+   * states and remember it with the time. A save whose text isn't among them (a save participant changed
+   * it, or typing outran the memory) is not guarded, which is 2.1's behaviour, never a guess.
+   */
+  private rememberSave(record: DocumentRecord, saveHash: string): void {
+    if (record.guardOff || record.disposed) return;
+    const current = record.document.getText();
+    if (current.length > STALE_WRITE_GUARD_MAX_CHARS) {
+      this.turnGuardOff(record, current.length);
+      return;
+    }
+    let text: string | undefined;
+    let index = record.recentTexts.length;
+    if (logicalHash(current) === saveHash) {
+      text = current;
+    } else {
+      while (text === undefined && index > 0) {
+        index -= 1;
+        if (logicalHash(record.recentTexts[index]) === saveHash) text = record.recentTexts[index];
+      }
+    }
+    if (text === undefined) return;
+    // When the sync saw this save's text on disk before its receipt (`converged`), the text before it is the
+    // one kept then; otherwise it is the last text Ritemark knew to be on disk.
+    const early = record.convergedBeforeReceipt;
+    record.convergedBeforeReceipt = undefined;
+    const previousText = early && early.hash === saveHash ? early.previousText : record.lastKnownDiskText;
+    record.recentSaves.push({ text, hash: saveHash, previousText, savedAt: Date.now() });
+    if (record.recentSaves.length > RECENT_SAVES) record.recentSaves.splice(0, record.recentSaves.length - RECENT_SAVES);
+    record.lastKnownDiskText = text;
+    // The states up to the saved one are not needed any more.
+    record.recentTexts.splice(0, Math.min(index + 1, record.recentTexts.length));
+  }
+
+  private turnGuardOff(record: DocumentRecord, chars: number): void {
+    record.guardOff = true;
+    record.recentTexts = [];
+    record.recentSaves = [];
+    console.info(
+      `[EditorSync] stale-write guard off file=${path.basename(record.document.uri.fsPath)} chars=${chars}`
+      + ` limit=${STALE_WRITE_GUARD_MAX_CHARS}`,
+    );
+  }
+
+  private isOwnSave(record: DocumentRecord, diskLogicalHash: string): boolean {
+    return record.recentSaves.some(save => save.hash === diskLogicalHash);
+  }
+
+  /** #588: how many words that Ritemark's recent saves added the file now leaves out (0 when none). */
+  private wordsLostToStaleWrite(record: DocumentRecord, disk: DiskSnapshot): number {
+    if (record.guardOff || record.recentSaves.length === 0) return 0;
+    return droppedRecentSave({
+      saves: record.recentSaves,
+      diskText: disk.content,
+      now: Date.now(),
+      windowMs: STALE_WRITE_WINDOW_MS,
+    });
+  }
+
+  /**
+   * #588: a writer's copy left out words Ritemark had just saved. Put the person's newest saved words back in
+   * the document and ask with Review changes, keeping the writer's copy as the question's disk side.
+   */
+  private async holdStaleWrite(record: DocumentRecord, disk: DiskSnapshot, reason: string, lost: number): Promise<void> {
+    const words = record.recentSaves[record.recentSaves.length - 1].text;
+    const modelVersion = record.document.version;
+    const modelHash = logicalHash(record.document.getText());
+    // When the document still holds the words (Ritemark read the file before VS Code reloaded it), the same
+    // text is applied anyway: the edit makes the document dirty, and VS Code doesn't reload a dirty document.
+    const applied = await this.applyText(record.document, words, { version: modelVersion, logicalHash: modelHash });
+    if (applied === 'stale') {
+      this.enqueue(record, () => this.reconcile(record, 'held-import-stale'));
+      return;
+    }
+    if (applied === 'rejected') {
+      this.failAll(record, 'VS Code rejected putting your words back.');
+      return;
+    }
+    const localContent = record.document.getText();
+    record.modelHash = logicalHash(localContent);
+    record.conflictSequence += 1;
+    record.conflict = {
+      revision: record.conflictSequence,
+      diskValidator: disk.validator,
+      diskHash: disk.logicalHash,
+      diskContent: disk.content,
+      diskHasUtf8Bom: disk.hasUtf8Bom,
+      localContent,
+      reason: 'held-import',
+    };
+    record.resolutionRevision = undefined;
+    record.state = 'conflict';
+    // The views never received the writer's copy, so they still show the person's words.
+    for (const view of record.views.values()) this.sendConflict(record, view);
+    this.sendAllStates(record);
+    this.notifyHiddenConflict(record);
+    // The count of words, never the words.
+    this.log(record, `${reason}:held-import words=${lost}`);
+  }
+
+  /**
+   * #588: while a held import waits, VS Code may reload a writer's copy into the clean document again (the
+   * person's words were saved back, then another write came). Put the person's words back again; a newer
+   * writer's copy becomes the question's disk side.
+   */
+  private async keepHeldWords(record: DocumentRecord, disk: DiskSnapshot, modelHash: string, modelVersion: number): Promise<void> {
+    const conflict = record.conflict;
+    record.modelHash = modelHash;
+    if (!conflict
+      || record.document.isDirty
+      || modelHash === logicalHash(conflict.localContent)
+      || modelHash !== disk.logicalHash
+      || this.isOwnSave(record, disk.logicalHash)) return;
+    if (disk.logicalHash !== conflict.diskHash) {
+      record.conflictSequence += 1;
+      record.conflict = {
+        ...conflict,
+        revision: record.conflictSequence,
+        diskValidator: disk.validator,
+        diskHash: disk.logicalHash,
+        diskContent: disk.content,
+        diskHasUtf8Bom: disk.hasUtf8Bom,
+      };
+    }
+    const applied = await this.applyText(record.document, conflict.localContent, { version: modelVersion, logicalHash: modelHash });
+    if (applied === 'stale') {
+      this.enqueue(record, () => this.reconcile(record, 'held-import-stale'));
+    } else if (applied === 'rejected') {
+      this.failAll(record, 'VS Code rejected putting your words back.');
+      return;
+    }
+    record.modelHash = logicalHash(record.document.getText());
+    if (record.conflict && record.conflict.revision !== conflict.revision) {
+      for (const view of record.views.values()) this.sendConflict(record, view);
+    }
+    this.log(record, 'held-import:words-put-back');
   }
 
   private async openDiff(record: DocumentRecord, conflict: ConflictSnapshot): Promise<void> {

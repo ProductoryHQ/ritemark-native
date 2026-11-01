@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — 2.2.0
+
+### Sprint 145: 2.1's loose ends
+
+#### Fixed
+- **Words you just typed are no longer replaced by an older copy (#588).** When another app or an AI that read your document a little earlier saved its copy just after Ritemark saved your newest words, Ritemark took that copy as the new truth and your words were gone, with no question. Now it keeps your words on the page and asks with Review changes, in words that say what happened: Compare shows both, Keep my version keeps yours, and Use disk version takes the other copy. A writer that kept your words, or only changed line endings or the file's date, is still taken quietly. The limit: a copy saved more than 30 seconds after Ritemark last saved your words still replaces them.
+
 ## [Unreleased] — 2.1.0
 
 ### Sprint 144, part 2: polish from the 2.1 smoke test (#569)

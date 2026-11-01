@@ -4,32 +4,34 @@ Nothing here starts before the plan is approved by Jarmo. Tick a box only when t
 
 ## Phase 0: Branch and starting tree
 
-- [ ] Jarmo's approval is on the sprint plan
-- [ ] `git checkout -b sprint-145-loose-ends` from `origin/main`; `git branch --show-current` shows it before any edit. Later PRs: `sprint-145-loose-ends-ext`, `-flows`, `-board`, `-shell`, `-electron`, each from `origin/main` the same way
-- [ ] `media/webview.js` size recorded in `notes/bundle.md` (E4)
+- [x] Jarmo's approval is on the sprint plan (31 October 2026)
+- [x] `git checkout -b sprint-145-loose-ends` from `origin/main`; `git branch --show-current` shows it before any edit. Later PRs: `sprint-145-loose-ends-ext`, `-flows`, `-board`, `-shell`, `-electron`, each from `origin/main` the same way
+- [x] `media/webview.js` size recorded in `notes/bundle.md` (E4)
 - [ ] Asked: the Experience lead for the drawings and words (sprint plan, *For the Experience lead*); the "Ritemark on Windows" session for A1's Windows half, A4, A5 and the overlay checks
 
 ## Phase 1: Reproductions and audits (each in `research/`, before its code)
 
-- [ ] A1 `research/stale-write-repro.md` (R1, S1–S8): the coordinator-level test and its failure on `main`; `scripts/qa/stale-write-check.mjs`, ten runs on the Mac; the Windows run; whether Ctrl+Z brings the words back; the false-positive set; the window and threshold chosen from the numbers
-- [ ] A2 `research/ai-edit-tools.md` (R1, S9): each signed-in runtime's stale edit; the 27 October write's tool
-- [ ] A3 `research/switch-timing.md` (R9, S42–S44): `project-check.mjs --measure 10` on `main` and the shipped 2.1.0, with the AI column's markers; the first-switch outlier
-- [ ] A4 `research/first-start-terminal.md` (R10, S45–S47): the Windows reproduction; the Mac with a held extension host; VS Code 1.142's rule for an `inactive` editor in an empty group
-- [ ] A5 `research/home-keys-windows.md` (R11): `scripts/qa/home-keys-check.mjs` written; the Windows run waits for a person (Phase 8)
-- [ ] A6 `research/electron-availability.md` (R12, S50): the newest 43.x and its Node, dated; the Node network calls re-read
-- [ ] A7 `research/log-lines.md` (R8, S39–S40): the request for `/phosphor.woff2`; DEP0169's stack
-- [ ] A8 `research/board-timing.md` (R3, S18): the table; the slow-file test for the tail
-- [ ] A9 the flow harness run on `main` (R4, S27): the `flow:save` and its delay
-- [ ] Where an audit changes a requirement or a tier, `spec.md` and the sprint plan's tier line change first
+- [x] A1 `research/stale-write-repro.md` (R1, S1–S8): the coordinator-level test and its failure on `main`; `scripts/qa/stale-write-check.mjs`, ten runs on the Mac; whether ⌘Z brings the words back (no); the false-positive set; the window and threshold chosen from the numbers
+  - [ ] The Windows run (the "Ritemark on Windows" session: waiting)
+- [ ] A2 `research/ai-edit-tools.md` (R1, S9): each signed-in runtime's stale edit; the 27 October write's tool. **Not run** (scratch AI homes have no sign-in; the real homes may not be used); the file says why
+- [ ] A3 `research/switch-timing.md` (R9, S42–S44): `project-check.mjs --measure 10` on `main` and the shipped 2.1.0, with the AI column's markers; the first-switch outlier. **Not run in the first pass** (the profile had no second project); the file says why
+- [ ] A4 `research/first-start-terminal.md` (R10, S45–S47): the Windows reproduction; the Mac with a held extension host; VS Code 1.142's rule for an `inactive` editor in an empty group. **Waiting** for the Windows session
+- [x] A5 `research/home-keys-windows.md` (R11): `scripts/qa/home-keys-check.mjs` written; the Windows run waits for a person (Phase 8)
+- [x] A6 `research/electron-availability.md` (R12, S50): the newest 43.x and its Node, dated; the Node network calls re-read (43.8.4–43.8.6 on Node 24.22.1; run again before the candidate)
+- [ ] A7 `research/log-lines.md` (R8, S39–S40): the request for `/phosphor.woff2` (found: patch 001's registration); DEP0169's stack (not reproduced in the dev build; not Ritemark's bundle; waits for PR 5's tree)
+- [ ] A8 `research/board-timing.md` (R3, S18): the table; the slow-file test for the tail (the store's share and the tail measured; the controller's steps in a dev instance not yet)
+- [x] A9 the flow harness run on `main` (R4, S27): the `flow:save` and its delay (`research/flow-save-timing.md`)
+- [x] Where an audit changes a requirement or a tier, `spec.md` and the sprint plan's tier line change first (R1, R4, R8, R12 addenda; no tier moved)
 
 ## Phase 2: PR 1, the stale write (W1, R1)
 
-- [ ] `src/editorSync/state.ts`: `droppedRecentSave`, pure; `state.test.ts` cases (S1, S2, S4–S6, empty window, no saves, a save out of the memory)
-- [ ] `src/editorSync/DocumentSyncCoordinator.ts`: the memory of recent states and saves (bounded), the `external-only` branch holding the import as a conflict, the log line without words
-- [ ] `DocumentSyncCoordinator.staleWrite.test.ts` (S1–S3, S5–S7), added to `npm test`; fails on `main` at S1
-- [ ] `scripts/qa/stale-write-check.mjs` passes on the branch (S1, S2); the Windows run on the branch (S1)
+- [x] `src/editorSync/state.ts`: `droppedRecentSave`, pure; `state.test.ts` cases (S1, S2, S4–S6, S7's CSV, outside the window, no saves, words the person removed)
+- [x] `src/editorSync/DocumentSyncCoordinator.ts`: the memory of recent states and saves (bounded), the `external-only` and `converged` branches holding the import as a conflict with the person's words put back, the log line without words
+- [x] `DocumentSyncCoordinator.staleWrite.test.ts` (S1–S8 and the answers, both save orders), added to `npm run test:editor-sync`; fails on `main` at S1 (26 of 40)
+- [x] `scripts/qa/stale-write-check.mjs` passes on the branch (S1 10 of 10, S2–S7, the three answers)
+  - [ ] The Windows run on the branch (S1): waiting for the Windows session
 - [ ] The Experience lead has seen Review changes for this case (screenshot)
-- [ ] The false-positive set stays silent; S8's limit written in the issue and the release notes' known limits
+- [x] The false-positive set stays silent; S8's limit written in the issue and the release notes' known limits (`notes/release-notes-draft.md`)
 - [ ] PR 1 opened: Risk section with its tier; `/code-review` at the level Jarmo chose (decision 2); every finding answered; merged at the reviewed head
 
 ## Phase 3: PR 2, the small extension fixes (W6, W7, W8, W9, W10; R6–R10)

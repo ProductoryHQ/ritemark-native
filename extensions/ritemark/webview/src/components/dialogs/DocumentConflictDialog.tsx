@@ -13,6 +13,8 @@ import {
 interface DocumentConflictDialogProps {
   isOpen: boolean
   filename: string
+  /** Sprint 145 R1 (#588): `held-import`, a writer's copy that left out words Ritemark had just saved. */
+  reason?: 'held-import'
   onClose: () => void
   onCompare: () => void
   onKeepLocal: () => void
@@ -23,6 +25,7 @@ interface DocumentConflictDialogProps {
 export function DocumentConflictDialog({
   isOpen,
   filename,
+  reason,
   onClose,
   onCompare,
   onKeepLocal,
@@ -41,12 +44,26 @@ export function DocumentConflictDialog({
         <DialogBody>
           <DialogDescription asChild>
             <div className="space-y-3 text-sm leading-relaxed text-ink-muted">
-              <p className="m-0">
-                Your edits and the disk version of <strong className="text-ink-strong">{filename}</strong> both changed.
-              </p>
-              <p className="m-0">
-                Ritemark has preserved both versions. Compare them first, keep your version, or replace it with the disk version.
-              </p>
+              {reason === 'held-import' ? (
+                // The Experience lead's words for this case (issue #588, 31 October 2026).
+                <>
+                  <p className="m-0">
+                    Something else saved <strong className="text-ink-strong">{filename}</strong> just after you did, and its copy leaves out words you had just written.
+                  </p>
+                  <p className="m-0">
+                    Ritemark kept your words on the page. Compare them first, keep your version, or replace it with the disk version.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="m-0">
+                    Your edits and the disk version of <strong className="text-ink-strong">{filename}</strong> both changed.
+                  </p>
+                  <p className="m-0">
+                    Ritemark has preserved both versions. Compare them first, keep your version, or replace it with the disk version.
+                  </p>
+                </>
+              )}
             </div>
           </DialogDescription>
         </DialogBody>

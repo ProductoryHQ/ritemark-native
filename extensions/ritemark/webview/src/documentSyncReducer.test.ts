@@ -74,6 +74,32 @@ test('a successful state clears conflict evidence only after host resolution', (
   assert.equal(reduceDocumentViewSync(conflicted, synced).conflict, undefined)
 })
 
+test('a held import keeps its reason for the review\'s words (Sprint 145 R1, #588)', () => {
+  const held: DocumentHostMessage = {
+    type: 'document:conflict',
+    ...identity,
+    revision: 5,
+    conflictRevision: 3,
+    diskHash: sha,
+    filename: 'Module 3.md',
+    reason: 'held-import',
+  }
+  const conflicted = reduceDocumentViewSync(initialDocumentViewSyncState, held)
+  assert.equal(conflicted.conflict?.reason, 'held-import')
+  const applying: DocumentHostMessage = {
+    type: 'document:sync-state',
+    ...identity,
+    revision: 5,
+    acknowledgedRevision: 4,
+    state: 'conflict',
+    conflictRevision: 3,
+    diskHash: sha,
+  }
+  assert.equal(reduceDocumentViewSync(conflicted, applying).conflict?.reason, 'held-import')
+  const usual = reduceDocumentViewSync(initialDocumentViewSyncState, { ...held, reason: undefined, conflictRevision: 4 })
+  assert.equal(usual.conflict?.reason, undefined)
+})
+
 test('an applying retry keeps current conflict evidence when the host still names it', () => {
   const conflict: DocumentHostMessage = {
     type: 'document:conflict',

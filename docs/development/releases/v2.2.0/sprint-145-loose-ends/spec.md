@@ -32,6 +32,13 @@ Acceptance criteria:
 - Markdown, CSV and files with front matter or CRLF endings behave the same.
 - **Patch 014 and the save receipt are unchanged.**
 
+**R1 (revised 2026-10-31, after A1, [research/stale-write-repro.md](research/stale-write-repro.md)).** The original criteria stay; A1 adds what they assumed:
+- **VS Code reloads a clean document from disk by itself.** On `main`, 8 of 10 S1 runs reached Ritemark's sync after VS Code had already put the writer's copy into the document (`converged`), 2 through Ritemark's own read (`external-only`). So the guard checks both, and "the editor keeps the person's text" means **the person's newest saved words are put back into the document** before Review changes asks.
+- **Where the file sits while the question waits depends on who saw the change first.** When Ritemark sees it first (all 10 S1 runs on the branch), putting the words back makes the document dirty before VS Code reloads it; VS Code's auto-save is then refused as newer and the writer's copy stays on disk, as in #454. When VS Code reloaded first, the document is dirty against the writer's file and VS Code's auto-save writes the person's words back about a second later; the writer's copy is then kept in the question. Either way **Use disk version** ends with the writer's copy in the file and the editor, byte for byte, **Keep my version** with the person's words, and **Compare** shows both.
+- **A second stale write while the question waits** is held the same way; the newest writer's copy becomes the question's disk side.
+- **"Recent" is 30 s** from each of Ritemark's own saves, and "words the save wrote" is the run of words between what the save shares with the text before it; one missing run asks (A1, *The window and the threshold*). S8's limit: a writer that saves its copy more than 30 s after Ritemark last saved the words still wins, as in 2.1.
+- **The words** are the Experience lead's (issue #588, 31 October): the dialog's two sentences and the notification's one, for this case only. Review changes and its three buttons are unchanged.
+
 ### R2: A card the board can't read can be tried again or removed (#596)
 
 As someone whose Task board lists a card it couldn't read, I want to try again, or remove it, and I want one plain sentence about what happened.
@@ -75,6 +82,8 @@ Acceptance criteria:
 - A unit test of `onNodesChange` covers both.
 - If the harness's save comes about 100 ms after the click, as the issue says, and the code's debounce is 500 ms, the second write path is found and closed too.
 
+**R4 (revised 2026-10-31, after A9, [research/flow-save-timing.md](research/flow-save-timing.md)).** There is no second write path: the "about 100 ms after the click" is the save that opening the flow starts (500 ms after `flow:load`, with the harness clicking at 400 ms). Opening a flow with no click writes it once on `main`, and a click after that save is acknowledged writes it again 520 ms later. Both are the same cause and the same fix; "opening a flow writes nothing" is a check that fails on `main`.
+
 ### R5: A Flow step without its key says so in one sentence, with a link (#580)
 
 As someone who builds a Flow, I want the same sentence and link on every step that needs a key, as the Google image step has.
@@ -117,6 +126,8 @@ Acceptance criteria:
 - The font is asked for at its real place only; icons still draw (a screenshot). If the fix is in patch 001, it is a shell-tier change.
 - DEP0169: if the caller is Ritemark's own bundle or a dependency we can move off it, it moves to `new URL()`, or the dependency is updated. If the caller is VS Code's own, the record says so, the log level question is answered, and nothing in VS Code changes without a reason.
 - `main.log` and `exthost.log` of a fresh launch carry neither line, or the record says what stays and why.
+
+**R8 (revised 2026-10-31, after A7, [research/log-lines.md](research/log-lines.md)).** The font request is Ritemark's own: patch 001's `iconRegistry.ts` registers `phosphor` with `URI.parse('phosphor.woff2')`, which VS Code writes into its icon style sheet as `vscode-file://vscode-app/phosphor.woff2`. The fix is in patch 001 (PR 5). DEP0169 did not reproduce in the dev build, whose built-in extensions don't start; Ritemark's bundle doesn't import Node's `url` module, so the caller is VS Code's or a built-in extension's, and finding it waits for PR 5's tree or the candidate. PR 2 has no DEP0169 item.
 
 ### R9: A project switch lays Home out once (#569)
 
@@ -165,6 +176,8 @@ Acceptance criteria:
 - **If a 43.x with Node 24.22.1 or later exists,** patch 020 moves to it, as Sprint 144 did: `.npmrc`'s target, Electron's own `SHASUMS256.txt` byte for byte in `build/checksums/electron.txt`, the notices in `cgmanifest.json`. About shows the Node version; the build's checks and the native-module check pass; the extension host and the integrated browser start.
 - **If none exists,** the risk is recorded in the release plan and on the issue, with Sprint 144's finding (one Node path to an outside address: Flows' Save File with an image URL), and decision 4 is Jarmo's.
 - The extension host is checked again for any Node request to a URL a person or an agent supplies, because code has been added since 27 October.
+
+**R12 (revised 2026-10-31, after A6, [research/electron-availability.md](research/electron-availability.md)).** A fixed Electron exists: 43.8.4 (27 October, 18:05 UTC, after Sprint 144 looked), 43.8.5 and 43.8.6 (30 October) are on Node 24.22.1. R12 takes its first branch: PR 6 moves patch 020 to the newest 43.x when it is made (43.8.6 today). Decision 4 applies only if PR 6 fails its checks. The extension host's Node network calls are unchanged since Sprint 144's list.
 
 ## Engineering requirements
 
