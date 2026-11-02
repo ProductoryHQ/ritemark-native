@@ -33,11 +33,12 @@
  * The first frame (with --first-frame <start>, Sprint 152, R8; the startup contract): one start of the window, followed
  * every 50 ms from its first moment, as --measure does. Each sample records the boxes of the left column, the desk, the
  * AI column, the status bar, VS Code's side places bar, the places row's items, the head's rows and the tab row's first
- * tabs, and what is in front (the desk's tab, the left column's place). PASS when every box in the first laid-out sample
- * (the parts splash removed, the desk laid out) equals its box once the window has settled (Ritemark started at least
- * 5 s before, then 2 s with no change), and what is in front never changed. A box is the room an element takes, so a
- * row waiting for its words keeps its box; content inside a box may change. It prints each box that moved, by how much
- * and when, on the page's clock and from the first frame, with the workbench's marks. The starts:
+ * tabs, and what is in front (the desk's tab, the left column's place). PASS when every box keeps the place it had in
+ * the first laid-out sample (the parts splash removed, the desk laid out) in every sample until the window has settled
+ * (Ritemark started at least 5 s before, then 2 s with no change), and what is in front never changed. A box is the room
+ * an element takes, so a row waiting for its words keeps its box, and one that shifts and comes back has moved
+ * (`first-frame-moves.mjs`); content inside a box may change. It prints each box that moved, each place it took and
+ * when, on the page's clock and from the first frame, with the workbench's marks. The starts:
  *
  *   new-profile   the window an instance launched on a fresh --user-data-dir opens with no folder (start it just before
  *                 the launch: it waits for the instance's CDP port, so it sees the window's first moment)
@@ -59,6 +60,7 @@ import { readFileSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
+import { frameMoves } from './first-frame-moves.mjs';
 
 const args = process.argv.slice(2);
 const option = (name, fallback) => {
@@ -575,20 +577,17 @@ async function firstFrame(start) {
 		return 1;
 	}
 
-	// What moved: every box of the first laid-out sample against the settled one, and when it first changed
+	// What moved: every box, over every sample from the first laid-out one to the settled one (first-frame-moves.mjs), so
+	// a box that shifts and comes back moved too; each place it took, and when
 	const fromFirst = ms => `${ms >= first.t ? '+' : ''}${((ms - first.t) / 1000).toFixed(2)} s`;
 	const show = value => value ? `[${value.join(', ')}]` : 'not shown';
-	const moved = [];
-	for (const name of new Set([...Object.keys(first.boxes), ...Object.keys(settled.boxes)])) {
-		const a = first.boxes[name] ?? null;
-		const b = settled.boxes[name] ?? null;
-		if (JSON.stringify(a) === JSON.stringify(b)) {
-			continue;
-		}
-		const changedAt = timeline.find(entry => JSON.stringify(entry.boxes[name] ?? null) !== JSON.stringify(a))?.t ?? settled.t;
-		const delta = a && b ? ` (${['x', 'y', 'w', 'h'].map((axis, index) => b[index] - a[index] ? `${axis} ${b[index] - a[index] > 0 ? '+' : ''}${b[index] - a[index]}` : null).filter(Boolean).join(', ')})` : '';
-		moved.push(`${name}: ${a ? show(a) : 'came'} → ${b ? show(b) : 'went'}${delta} at ${changedAt} ms (${fromFirst(changedAt)})`);
-	}
+	const moved = frameMoves(timeline).map(({ name, steps, returned }) => {
+		const a = steps[0].box;
+		const b = steps[steps.length - 1].box;
+		const delta = a && b && !returned ? ` (${['x', 'y', 'w', 'h'].map((axis, index) => b[index] - a[index] ? `${axis} ${b[index] - a[index] > 0 ? '+' : ''}${b[index] - a[index]}` : null).filter(Boolean).join(', ')})` : '';
+		const path = steps.slice(1).map(step => `${step.box ? show(step.box) : 'went'} at ${step.t} ms (${fromFirst(step.t)})`).join(' → ');
+		return `${name}: ${a ? show(a) : 'came'} → ${path}${delta}${returned ? ' (back where it started)' : ''}`;
+	});
 	const fronts = [];
 	for (const entry of timeline) {
 		const value = `${entry.front.desk} | ${entry.front.place}`;
