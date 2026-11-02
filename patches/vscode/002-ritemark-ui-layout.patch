@@ -62,6 +62,10 @@ Sprint 152, PR 3 (the Experience lead's "One loading look, for every slot"): rit
   Test: workbench/test/browser/ritemarkLoadingLook.test.ts. ritemarkFrame.ts starts loading the frame's text font
   (style.css's Sofia Sans, font-display swap) as the frame is read, while the window still starts: loaded on first use
   it came just after the first frame's layout, so 019's whole-pixel tab widths were measured in the fallback.
+Sprint 148, PR 3 (R7): a head row may be the search box (`field: true` in the manifest, ritemarkFrame.ts; 018 draws it).
+  While the box holds words (`ritemark.searchOpen`, set by 018) the Folders view is hidden, so the extension's results
+  view takes its place (explorerViewlet.ts, a `when` on its descriptor); the tree stores its view state as it goes, so it
+  comes back with the same folders open and the same scroll (explorerView.ts, dispose).
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 index 833787070f3..e4fa4a207e5 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
@@ -1414,10 +1418,10 @@ index bfc8839cc65..745739c61f4 100644
  		};
 diff --git a/src/vs/workbench/browser/ritemarkFrame.ts b/src/vs/workbench/browser/ritemarkFrame.ts
 new file mode 100644
-index 00000000000..30dde13e523
+index 00000000000..1eaf7d80f4f
 --- /dev/null
 +++ b/src/vs/workbench/browser/ritemarkFrame.ts
-@@ -0,0 +1,505 @@
+@@ -0,0 +1,507 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1472,6 +1476,8 @@ index 00000000000..30dde13e523
 +export interface IRitemarkFrameHeadRow {
 +	readonly command: string;
 +	readonly menu?: string;
++	/** Sprint 148 (R7): the row is the search box (ritemarkProjectHead.ts). */
++	readonly field?: boolean;
 +}
 +
 +/** A place in the places row, in order, with its placeholder's title and icon (the extension's media). */
@@ -1519,10 +1525,10 @@ index 00000000000..30dde13e523
 +}
 +
 +function headRow(value: unknown): IRitemarkFrameHeadRow | undefined {
-+	const row = value as { command?: unknown; menu?: unknown } | null;
++	const row = value as { command?: unknown; menu?: unknown; field?: unknown } | null;
 +	const command = text(row?.command);
 +	const menu = text(row?.menu);
-+	return command ? { command, ...(menu ? { menu } : {}) } : undefined;
++	return command ? { command, ...(menu ? { menu } : {}), ...(row?.field === true ? { field: true } : {}) } : undefined;
 +}
 +
 +function place(value: unknown): IRitemarkFramePlace | undefined {
@@ -2286,7 +2292,7 @@ index 75c746cf9eb..b434f06ca79 100644
  					localize('window.commandCenterWeb', "Show command launcher together with the window title.") :
  					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`'),
 diff --git a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
-index 565fb42cb18..6f8076410b8 100644
+index 565fb42cb18..897d664d091 100644
 --- a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 +++ b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 @@ -25,7 +25,7 @@ import { Disposable } from '../../../../base/common/lifecycle.js';
@@ -2298,7 +2304,15 @@ index 565fb42cb18..6f8076410b8 100644
  import { KeyChord, KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
  import { Registry } from '../../../../platform/registry/common/platform.js';
  import { IProgressService, ProgressLocation } from '../../../../platform/progress/common/progress.js';
-@@ -186,7 +186,9 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
+@@ -146,6 +146,7 @@ export class ExplorerViewletViewsContribution extends Disposable implements IWor
+ 			order: 1,
+ 			canMoveView: true,
+ 			canToggleVisibility: false,
++			when: ContextKeyExpr.not('ritemark.searchOpen'), // Ritemark (Sprint 148, R7): the search box's results take the tree's place while it holds words
+ 			focusCommand: {
+ 				id: 'workbench.explorer.fileView.focus'
+ 			}
+@@ -186,7 +187,9 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
  	protected override createView(viewDescriptor: IViewDescriptor, options: IViewletViewOptions): ViewPane {
  		if (viewDescriptor.id === VIEW_ID) {
  			return this.instantiationService.createInstance(ExplorerView, {
@@ -2309,7 +2323,7 @@ index 565fb42cb18..6f8076410b8 100644
  					willOpenElement: e => {
  						if (!isMouseEvent(e)) {
  							return; // only delay when user clicks
-@@ -257,28 +259,26 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
+@@ -257,28 +260,26 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
   */
  export const VIEW_CONTAINER: ViewContainer = viewContainerRegistry.registerViewContainer({
  	id: VIEWLET_ID,
@@ -2342,7 +2356,7 @@ index 565fb42cb18..6f8076410b8 100644
  const openFolderButton = `[${openFolder}](command:${OpenFolderAction.ID})`;
  const openFolderViaWorkspaceButton = `[${openFolder}](command:${OpenFolderViaWorkspaceAction.ID})`;
  const openRecentButton = `[${openRecent}](command:${OpenRecentAction.ID})`;
-@@ -326,7 +326,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
+@@ -326,7 +327,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  
  viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  	content: localize({ key: 'noFolderButEditorsHelp', comment: ['Please do not translate the word "command", it is part of our internal syntax which must not change'] },
@@ -2351,7 +2365,7 @@ index 565fb42cb18..6f8076410b8 100644
  	when: ContextKeyExpr.and(
  		// editors are opened
  		ContextKeyExpr.has('editorIsOpen'),
-@@ -343,7 +343,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
+@@ -343,7 +344,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  
  viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  	content: localize({ key: 'noFolderHelp', comment: ['Please do not translate the word "command", it is part of our internal syntax which must not change'] },
@@ -2403,7 +2417,7 @@ index c6cae5ccaef..92ed135afb6 100644
 +}
 +
 diff --git a/src/vs/workbench/contrib/files/browser/views/explorerView.ts b/src/vs/workbench/contrib/files/browser/views/explorerView.ts
-index cf95db6aa79..57e6659042d 100644
+index cf95db6aa79..a3240463f42 100644
 --- a/src/vs/workbench/contrib/files/browser/views/explorerView.ts
 +++ b/src/vs/workbench/contrib/files/browser/views/explorerView.ts
 @@ -494,7 +494,27 @@ export class ExplorerView extends ViewPane implements IExplorerView {
@@ -2435,7 +2449,15 @@ index cf95db6aa79..57e6659042d 100644
  			}
  		}
  	}
-@@ -1156,12 +1176,7 @@ registerAction2(class extends Action2 {
+@@ -1078,6 +1098,7 @@ export class ExplorerView extends ViewPane implements IExplorerView {
+ 	}
+ 
+ 	override dispose(): void {
++		this.storeTreeViewState(); // Ritemark (Sprint 148, R7): the tree goes while search results show, and comes back with its folders, scroll and selection
+ 		this.dragHandler?.dispose();
+ 		super.dispose();
+ 	}
+@@ -1156,12 +1177,7 @@ registerAction2(class extends Action2 {
  			title: nls.localize2('refreshExplorer', "Refresh Explorer"),
  			f1: true,
  			icon: Codicon.refresh,
@@ -2449,7 +2471,7 @@ index cf95db6aa79..57e6659042d 100644
  			metadata: {
  				description: nls.localize2('refreshExplorerMetadata', "Forces a refresh of the Explorer.")
  			},
-@@ -1169,10 +1184,14 @@ registerAction2(class extends Action2 {
+@@ -1169,10 +1185,14 @@ registerAction2(class extends Action2 {
  		});
  	}
  
@@ -2466,7 +2488,7 @@ index cf95db6aa79..57e6659042d 100644
  		await explorerService.refresh();
  	}
  });
-@@ -1184,12 +1203,7 @@ registerAction2(class extends Action2 {
+@@ -1184,12 +1204,7 @@ registerAction2(class extends Action2 {
  			title: nls.localize2('collapseExplorerFolders', "Collapse Folders in Explorer"),
  			f1: true,
  			icon: Codicon.collapseAll,
@@ -2537,7 +2559,7 @@ index ef3388a877f..873b2dbf292 100644
  
 diff --git a/src/vs/workbench/test/browser/ritemarkFrame.test.ts b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
 new file mode 100644
-index 00000000000..a7f4adb4968
+index 00000000000..be058b5c8b9
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
 @@ -0,0 +1,153 @@
@@ -2579,7 +2601,7 @@ index 00000000000..a7f4adb4968
 +		welcome: 'mainThreadWebview-ritemark.welcome',
 +		places: [
 +			{ id: 'workbench.view.extension.ritemark-home', title: 'Home', order: -1, icon: 'media/home-icon.svg' },
-+			{ id: 'workbench.view.explorer', title: 'Documents', head: { rows: [{ command: 'ritemark.projectHead.newRow', menu: 'ritemark/projectHead/new' }, { command: 'ritemark.projectHead.search' }], label: 'Documents' } },
++			{ id: 'workbench.view.explorer', title: 'Documents', head: { rows: [{ command: 'ritemark.projectHead.newRow', menu: 'ritemark/projectHead/new' }, { command: 'ritemark.projectHead.search', field: true }], label: 'Documents' } },
 +		],
 +	};
 +
@@ -2588,7 +2610,7 @@ index 00000000000..a7f4adb4968
 +		const read = readRitemarkFrame({
 +			...manifest,
 +			futureKey: { anything: true },
-+			places: [...manifest.places, { id: 'no-title' }, { title: 'No id' }, { id: 'p', title: 'P', order: 'first', head: { rows: [{ menu: 'no command' }, { command: 'c' }] } }],
++			places: [...manifest.places, { id: 'no-title' }, { title: 'No id' }, { id: 'p', title: 'P', order: 'first', head: { rows: [{ menu: 'no command' }, { command: 'c', field: 'yes' }] } }],
 +			permanentTabs: [...manifest.permanentTabs, { title: 'No view type' }],
 +			welcome: 7,
 +		});
