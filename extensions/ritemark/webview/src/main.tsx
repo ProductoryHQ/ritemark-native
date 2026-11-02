@@ -72,6 +72,10 @@ const ProjectsList = lazy(() =>
   import('./components/home/ProjectsList').then((m) => ({ default: m.ProjectsList }))
 )
 
+// Search's results (Sprint 148): the left column under the box while it holds words.
+const SearchPanel = lazy(() =>
+  import('./components/search/SearchPanel').then((m) => ({ default: m.SearchPanel }))
+)
 // The control catalogue (Sprint 146): opened only by a test script's launch setting (src/views/ControlCataloguePanel.ts)
 const ControlCatalogue = lazy(() =>
   import('./components/catalogue/ControlCatalogue').then((m) => ({ default: m.ControlCatalogue }))
@@ -155,6 +159,10 @@ ReactDOM.createRoot(rootElement).render(
     ) : editorType === 'projects' ? (
       <Suspense fallback={null}>
         <ProjectsList />
+      </Suspense>
+    ) : editorType === 'search' ? (
+      <Suspense fallback={null}>
+        <SearchPanel />
       </Suspense>
     ) : editorType === 'control-catalogue' ? (
       <Suspense fallback={null}>

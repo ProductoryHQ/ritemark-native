@@ -36,15 +36,15 @@ Nothing here starts before the plan is approved (the Development manager, on Jar
 
 ## Phase 3: PR 2, the results view (W5, W6; R6, R7's extension side, R8, E3)
 
-- [ ] The lead's answers to questions 1–7 are in
-- [ ] `SearchViewProvider` and `ritemark.searchResults` (in `explorer`, `when: ritemark.searchOpen`); the `search` route in `main.tsx`
-- [ ] `SearchPanel`, rows, More (no Replace, by decision 2), the states, the keyboard; render tests
-- [ ] Opening a document, a chat (at its message, by A5) and a task
-- [ ] The Search row's command with the field's arguments and its fallback; ⌘⇧F (decision 1); `projectHeadCommands.test.ts`
-- [ ] The `project-search` kill switch and its setting
-- [ ] Checked with PR 3's patch applied on a dev instance (prepared chats and cards, no AI); M2, M4, M5, M6
-- [ ] Inert without PR 3: on `main`'s shell the Search row still opens VS Code's search
-- [ ] Windows through the overlay; screenshots in Light and Dark to the Experience lead
+- [x] The lead's answers to questions 1–7 are in
+- [x] `SearchViewProvider` and `ritemark.searchResults` (in `explorer`, `when: ritemark.searchOpen`); the `search` route in `main.tsx`
+- [x] `SearchPanel`, rows, More (no Replace, by decision 2), the states, the keyboard; render tests (`search.test.ts`, `searchPanel.test.ts`)
+- [x] Opening a document, a chat (at its message, by A5: `research/chats-and-tasks.md`) and a task
+- [x] The Search row's command with the field's arguments and its fallback; ⌘⇧F (decision 1); `projectHeadCommands.test.ts`
+- [x] The `project-search` kill switch (PR 1's flag and setting) and its context key, `ritemark.projectSearch.enabled`
+- [ ] Checked with PR 3's patch applied on a dev instance (prepared chats and cards, no AI); M2, M4, M5, M6 (PR 3 isn't built: checked on a shell without the box, the box's arguments sent from the extension host and the swap stood in for by a page style for the screenshots; M2, M4–M6 in `research/measurements.md`. With PR 3: the swap, the box and the flag-off case)
+- [x] Inert without PR 3: on `main`'s shell the Search row still opens VS Code's search (the row, ⌘⇧F, and with the switch off the box's words too; checked on the dev instance)
+- [ ] Windows through the overlay; screenshots in Light and Dark to the Experience lead (screenshots in `qa/pr2-results-view/`; Windows waits for the overlay session)
 - [ ] PR 2 opened: Standard; `/code-review` at medium; every finding answered; merged at the reviewed head
 
 ## Phase 4: PR 3, the box and the swap (W7, R7)

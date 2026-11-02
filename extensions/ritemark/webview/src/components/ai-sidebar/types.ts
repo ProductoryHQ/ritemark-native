@@ -483,7 +483,8 @@ export type ExtensionMessage =
   // The sidebar drops it, so a later Give does not run the old prompt too.
   | { type: 'comment-task/drop'; taskId: string }
   // Sprint 117: "Open conversation" on a comment reveals the task's own thread.
-  | { type: 'conversation/select'; conversationId: string }
+  // Sprint 148 (R8): search passes the matching message's turn, shown in view.
+  | { type: 'conversation/select'; conversationId: string; turnId?: string }
   // Sprint 133 (R6): the welcome's landing opens a new chat with the AI the person signed in with.
   | { type: 'landing:new-chat'; runtimeId: AgentId; placeholder: string }
   // Sprint 140 (R5, R8): the host's visible chat with a request, and the empty sheet's starting place

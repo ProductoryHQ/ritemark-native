@@ -37,7 +37,8 @@ export class PassageSink {
   add(text: string, at: PassageLocation): void {
     if (this.truncated) return;
     // Control characters out, and one space for each run of white space: a passage is shown on about two lines.
-    const clean = text.replace(/[\u0000-\u001f\u007f\s]+/g, ' ').trim();
+    // U+001F stays: it is a CSV row's cell separator (readers/csv.ts)
+    const clean = text.replace(/[\u0000-\u001e\u007f\s]+/g, ' ').trim();
     if (!clean) return;
     const room = this.budget - this.chars;
     if (clean.length > room) {

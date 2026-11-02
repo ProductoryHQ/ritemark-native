@@ -52,18 +52,21 @@ export function chatSource(record: unknown, maxChars: number): IndexSource | nul
   if (!id || !CONVERSATION_ID.test(id)) return null;
   const title = str(value.title) ?? '';
   const events = Array.isArray(value.events) ? value.events : [];
-  const messages: { text: string; at: { eventId: string; speaker: string } }[] = [];
+  const messages: { text: string; at: { eventId: string; speaker: string; turnId?: string } }[] = [];
   for (const event of events) {
     if (!event || typeof event !== 'object') continue;
     const e = event as Record<string, unknown>;
     const eventId = str(e.eventId);
     if (!eventId) continue;
+    // The message's turn, so the AI's sheet can open the chat with it in view (PR 2, A5).
+    const turnId = str(e.turnId);
+    const turn = turnId ? { turnId } : {};
     if (e.kind === 'user-message' && e.origin === undefined) {
       const text = str(e.text);
-      if (text?.trim()) messages.push({ text, at: { eventId, speaker: 'you' } });
+      if (text?.trim()) messages.push({ text, at: { eventId, speaker: 'you', ...turn } });
     } else if (e.kind === 'assistant-message') {
       const text = str(e.content);
-      if (text?.trim()) messages.push({ text, at: { eventId, speaker: str(e.runtimeId) ?? 'ai' } });
+      if (text?.trim()) messages.push({ text, at: { eventId, speaker: str(e.runtimeId) ?? 'ai', ...turn } });
     }
   }
   // The newest messages first within the budget, shown in their order.
@@ -76,7 +79,10 @@ export function chatSource(record: unknown, maxChars: number): IndexSource | nul
     chars += text.length;
   }
   const changedAt = Date.parse(str(value.lastActivityAt) ?? '') || 0;
-  return { key: `chat:${id}`, kind: 'chat', name: title, where: null, changedAt, passages: kept };
+  // The chat's colour, as on the rail (the Experience lead, question 4): the store's slot, a whole number from 0.
+  const slot = value.identityColorSlot;
+  const colorSlot = typeof slot === 'number' && Number.isInteger(slot) && slot >= 0 ? { colorSlot: slot } : {};
+  return { key: `chat:${id}`, kind: 'chat', name: title, where: null, changedAt, passages: kept, ...colorSlot };
 }
 
 /** Follows the store's index; each refresh says which chats to add again and which to drop. */
