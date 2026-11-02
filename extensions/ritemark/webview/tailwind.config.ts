@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss'
+import plugin from 'tailwindcss/plugin'
 
 const config: Config = {
   // dark: follows the webview's own dark class (utils/themeClass.ts sets ritemark-dark from VS Code's theme);
@@ -88,7 +89,29 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // Sprint 146 (R3): every `focus-visible:` ring is the keyboard's. It matches only while the page isn't in pointer
+    // mode (webview/src/components/ui/input-mode.ts writes data-input-mode on <html>), whatever Chromium's
+    // :focus-visible guess after a script focus: no ring after a mouse pick (2.1 RC3). A field's `focus:` look stays.
+    // `:where()` adds no specificity, so every rule that outranked a ring before (the split button's divider) still
+    // does. (A plugin's variants come after the core ones in the CSS, after `active:`, `disabled:` and `data-*:`; no
+    // control sets one property under both, and the catalogue's states came out the same.)
+    plugin(({ addVariant, matchVariant }) => {
+      const keyboard = ':where(:root:not([data-input-mode="pointer"]))'
+      // A field keeps its focused look in both modes: it shows where the typing goes after a click too (index.css
+      // names fields the same way)
+      const field = ':where(input, textarea, select, [contenteditable]:not([contenteditable="false"]))'
+      addVariant('focus-visible', [`${keyboard} &:focus-visible`, `&${field}:focus-visible`])
+      // `group-focus-visible:` and its named groups (`group-focus-visible/pin:`), the same rule for a focused parent;
+      // a group's name escaped as Tailwind's own `group-*` variants escape it
+      const escape = (name: string) => name.replace(/[^a-zA-Z0-9_-]/g, (character) => `\\${character}`)
+      matchVariant(
+        'group-focus-visible',
+        (_value, { modifier }) => `${keyboard} :merge(.group${modifier ? `\\/${escape(modifier)}` : ''}):focus-visible &`,
+        { values: { DEFAULT: '' } },
+      )
+    }),
+  ],
 }
 
 export default config

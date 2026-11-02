@@ -43,7 +43,7 @@ set -e
 W=$(git rev-parse --show-toplevel)
 S=$1; mkdir -p "$S"
 LEFT_OUT=('extensions/ritemark/media/webview.js' 'extensions/ritemark/media/office-preview.js'
-  'extensions/ritemark/media/*.mjs' '*.map' '*.png' '*.jpg' '*package-lock.json' 'docs/development/frame-baseline/**')
+  'extensions/ritemark/media/*.mjs' '*.map' '*.png' '*.jpg' '*package-lock.json' 'docs/development/frame-baseline/**' 'docs/development/control-baseline/**')
 EXC=(); for p in "${LEFT_OUT[@]}"; do EXC+=(":(exclude)$p"); done
 while read -r id base head tier; do
   [ -z "$id" ] && continue

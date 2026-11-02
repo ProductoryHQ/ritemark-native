@@ -16,15 +16,20 @@
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import type { FocusEvent, ReactNode } from 'react';
 import { cn } from '../../lib/utils';
+import { inputMode, type InputMode } from './input-mode';
 
 /**
- * Sprint 142 R9 (#505; audit A4): whether a focus may open a tooltip. Keyboard focus may (`:focus-visible`). A focus
- * that follows a mouse or touch press may not: a button that replaces itself hands the focus to the one that took
- * its place (a task card's Give to becoming Stop), and Radix kept that tooltip open, wherever the pointer went, until
- * the focus moved on. Hover still opens it, and leaving still closes it.
+ * Sprint 142 R9 (#505; audit A4): whether a focus may open a tooltip. Keyboard focus may. A focus that follows a mouse
+ * or touch press may not: a button that replaces itself hands the focus to the one that took its place (a task card's
+ * Give to becoming Stop), and Radix kept that tooltip open, wherever the pointer went, until the focus moved on. Hover
+ * still opens it, and leaving still closes it.
+ *
+ * Sprint 146 (R3): the page's input mode decides first (`input-mode.ts`). In pointer mode no focus opens a tooltip,
+ * whatever Chromium's `:focus-visible` guess, so the focus a menu gives back to its trigger after a mouse pick opens
+ * none (2.1 RC3's tooltip). In keyboard mode, `:focus-visible` as before.
  */
-export function focusOpensTooltip(target: { matches(selector: string): boolean } | null): boolean {
-  if (!target) return false;
+export function focusOpensTooltip(target: { matches(selector: string): boolean } | null, mode: InputMode = inputMode()): boolean {
+  if (!target || mode === 'pointer') return false;
   try {
     return target.matches(':focus-visible');
   } catch {

@@ -138,6 +138,7 @@ async function clickIn(kind, expr) {
 async function openFromHome(name) {
   await clickTab('Home');
   const f = await frame('home');
+  if (!f) throw new Error('no home webview');
   const r = await rectOf(f, `[...d.querySelectorAll('button, a, [role=button], li')].find((e) => e.innerText && e.innerText.trim().startsWith(${JSON.stringify(name)}))`);
   f.close();
   if (!r) throw new Error(`no ${name} on Home`);
@@ -163,6 +164,7 @@ const STATE = (trigger) => `
     open: Boolean(d.querySelector('[role="menu"], [role="listbox"]')),
     look,
     hasFocus: d.hasFocus(),
+    mode: d.documentElement.getAttribute('data-input-mode'),
   };`;
 
 // ── The rows: #585's table, the ones a scratch profile can reach ──────────────
@@ -321,12 +323,15 @@ const STEPS = {
 };
 /**
  * The rule (R1): no ring and no tooltip after the mouse; the trigger focused with its ring after the keyboard. A ring is
- * what the trigger draws: `:focus-visible` on it, or its outline, shadow or border changed from its look at rest (a
- * Select's trigger frames any focus, `focus:`). Focus left on the trigger with nothing drawn is noted, not failed.
+ * what the trigger draws: its outline, shadow or border changed from its look at rest. Focus left on the trigger with
+ * nothing drawn is noted, not failed (PR 2's decision 1 gives the focus back after every close).
  */
 function verdict(step, row, s) {
   if (s.open) return 'menu still open';
-  const drawn = s.onTrigger && (s.focusVisible || (row.restLook !== null && s.look !== row.restLook));
+  // What is drawn, not Chromium's guess: with the input-mode tracker (PR 2) the trigger can match :focus-visible after a
+  // mouse pick and draw nothing. Without it, a ring always changes the trigger's outline, shadow or border.
+  // With no look read at rest (the trigger wasn't there yet), Chromium's :focus-visible is the fallback.
+  const drawn = s.onTrigger && (row.restLook === null ? s.focusVisible : s.look !== row.restLook);
   // Escape after a mouse open is a keyboard close: the trigger has the focus, with its ring (S3)
   if (step.startsWith('mouse')) {
     if (drawn) return 'ring on the trigger';
@@ -374,7 +379,7 @@ for (const theme of THEMES) {
 await key('Escape').catch(() => {}); // the counts below still get written when the window has gone
 fs.writeFileSync(path.join(OUT, 'audit.json'), JSON.stringify({ at: new Date().toISOString(), port: PORT, failures, errors, results }, null, 2));
 for (const r of results) {
-  console.log([r.theme, r.row, r.step, r.notRun ? `not run: ${r.notRun}` : r.verdict, r.notRun ? '' : `active=${r.active} fv=${r.focusVisible} tooltip=${r.tooltip ?? '-'}`].join(' | '));
+  console.log([r.theme, r.row, r.step, r.notRun ? `not run: ${r.notRun}` : r.verdict, r.notRun ? '' : `active=${r.active} fv=${r.focusVisible} mode=${r.mode ?? '-'} tooltip=${r.tooltip ?? '-'}`].join(' | '));
 }
 console.log(`steps that break the rule: ${failures}`);
 console.log(`not run because something threw (a row's preparation, its webview or a step): ${errors}`);

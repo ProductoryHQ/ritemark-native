@@ -61,12 +61,26 @@ export type FlagId =
   // Sprint 125: read-only PowerPoint (.pptx) preview (#285)
   | 'powerpoint-preview'
   // Sprint 145 (#588): a writer's copy merged with the person's text by paragraph
-  | 'editor-sync-merge';
+  | 'editor-sync-merge'
+  // Sprint 146 (R2): the control catalogue, a QA page that test scripts open
+  | 'control-catalogue';
 
 /**
  * Feature flag registry
  */
 export const FLAGS: Record<FlagId, FeatureFlag> = {
+  // Sprint 146 (R2, decision 5): the control catalogue, every shared control in every state, for the Experience lead
+  // and `scripts/qa/control-states.mjs` (Gate 1 runs it on every candidate). A QA tool, not a person's feature: it
+  // opens only when a test script starts Ritemark with RITEMARK_CONTROL_CATALOGUE=1, and this flag alone opens
+  // nothing. ON ('stable', HARD RULE #2), so the check runs on every build; a code-level kill switch, not in
+  // Settings: 'disabled' keeps the catalogue closed even with the launch setting.
+  'control-catalogue': {
+    id: 'control-catalogue',
+    label: 'Control Catalogue',
+    description: 'A test page of every shared control in every state, opened only when a test script starts Ritemark with RITEMARK_CONTROL_CATALOGUE=1.',
+    status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
   // Sprint 145 (#588): both changes stay. A writer's (an AI's or another app's) copy is merged with the person's
   // text by paragraph, with Review changes for a paragraph both changed; patch 014's reload participant asks
   // `_ritemark.editorSync.answerReload` first. ON ('stable'); a code-level kill switch an extension release can
