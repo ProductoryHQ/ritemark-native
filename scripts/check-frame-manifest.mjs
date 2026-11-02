@@ -7,7 +7,7 @@
 // permanent tabs, the desk's front, the welcome, and the settings that shape the frame. The extension fills those slots.
 // An extension release runs in a shell built from an older commit, so every identifier that manifest names must still
 // be the extension's: its view containers and their views, the head rows' commands and menus (package.json), the
-// permanent tabs', the desk front's and the welcome's view types and Home's place (src/frameIdentifiers.ts), and its
+// permanent tabs' (view type, title, icons, gating setting), the desk front's and the welcome's view types and Home's place (src/frameIdentifiers.ts), and its
 // defaults for the frame-shaping settings the manifest lists (`settings`). A slot the extension no longer fills is released, logged, and the frame
 // moves; a place it adds that the manifest doesn't name arrives late. release-extension-preflight.sh stops either.
 //
@@ -27,7 +27,10 @@ const WEBVIEW = 'mainThreadWebview-';
 const CONTAINER = 'workbench.view.extension.';
 
 /** What the check reads from src/frameIdentifiers.ts; one it can't read is a mismatch, never a skip. */
-export const FRAME_IDENTIFIERS = ['HOME_TAB_VIEW_TYPE', 'BOARD_TAB_VIEW_TYPE', 'WELCOME_VIEW_TYPE', 'HOME_PLACE_ID'];
+export const FRAME_IDENTIFIERS = [
+  'HOME_TAB_VIEW_TYPE', 'BOARD_TAB_VIEW_TYPE', 'WELCOME_VIEW_TYPE', 'HOME_PLACE_ID',
+  'HOME_TAB_TITLE', 'HOME_TAB_ICON_LIGHT', 'HOME_TAB_ICON_DARK', 'BOARD_TAB_TITLE', 'BOARD_TAB_ICON_LIGHT', 'BOARD_TAB_ICON_DARK', 'BOARD_TAB_SETTING',
+];
 
 /**
  * The string and string-array constants exported from src/frameIdentifiers.ts, read without compiling it: either
@@ -133,6 +136,26 @@ export function frameMismatches(product, pkg, identifiers) {
   const ours = [identifiers.HOME_TAB_VIEW_TYPE, identifiers.BOARD_TAB_VIEW_TYPE].map(viewType => `${WEBVIEW}${viewType}`);
   if (JSON.stringify(tabs) !== JSON.stringify(ours)) {
     problems.push(`the permanent tabs are ${tabs.join(', ') || 'none'} in the manifest, ${ours.join(', ')} in src/frameIdentifiers.ts`);
+  } else {
+    // Everything else the shell draws for a tab before the extension starts: its title, its icon per theme, its gating setting
+    const drawn = [
+      { name: 'Home', title: identifiers.HOME_TAB_TITLE, light: identifiers.HOME_TAB_ICON_LIGHT, dark: identifiers.HOME_TAB_ICON_DARK, setting: undefined },
+      { name: 'Task board', title: identifiers.BOARD_TAB_TITLE, light: identifiers.BOARD_TAB_ICON_LIGHT, dark: identifiers.BOARD_TAB_ICON_DARK, setting: identifiers.BOARD_TAB_SETTING },
+    ];
+    (frame.permanentTabs ?? []).forEach((tab, index) => {
+      const expected = drawn[index];
+      const fields = [
+        ['title', tab.title, expected.title],
+        ['light icon', tab.icon?.light, expected.light],
+        ['dark icon', tab.icon?.dark, expected.dark],
+        ['setting', tab.setting, expected.setting],
+      ];
+      for (const [field, shell, extensionValue] of fields) {
+        if (shell !== extensionValue) {
+          problems.push(`permanent tab ${expected.name}: its ${field} is ${JSON.stringify(shell)} in the manifest, ${JSON.stringify(extensionValue)} in src/frameIdentifiers.ts`);
+        }
+      }
+    });
   }
   if (frame.deskFront !== `${WEBVIEW}${identifiers.HOME_TAB_VIEW_TYPE}`) {
     problems.push(`the desk's front is ${frame.deskFront} in the manifest, ${WEBVIEW}${identifiers.HOME_TAB_VIEW_TYPE} in src/frameIdentifiers.ts`);

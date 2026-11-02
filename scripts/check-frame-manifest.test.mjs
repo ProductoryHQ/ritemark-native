@@ -68,6 +68,18 @@ test('a renamed permanent tab is refused, with its name', () => {
   assert.deepEqual(result, { status: 1, out: ['the permanent tabs are mainThreadWebview-ritemark.home, mainThreadWebview-ritemark.taskBoard in the manifest, mainThreadWebview-ritemark.home, mainThreadWebview-ritemark.board in src/frameIdentifiers.ts'] });
 });
 
+test('a permanent tab\'s title, icons or gating setting that differ from the manifest\'s are refused, naming the tab and the field', () => {
+  const source = (from, to) => identifiersSource.replace(from, to);
+  const check = changed => frameMismatches(product, pkg, readFrameIdentifiers(changed));
+  assert.deepEqual(check(source(`HOME_TAB_TITLE = 'Home'`, `HOME_TAB_TITLE = 'Start'`)), ['permanent tab Home: its title is "Home" in the manifest, "Start" in src/frameIdentifiers.ts']);
+  assert.deepEqual(check(source(`BOARD_TAB_ICON_DARK = 'media/tasks-tab-dark.svg'`, `BOARD_TAB_ICON_DARK = 'media/board-dark.svg'`)), ['permanent tab Task board: its dark icon is "media/tasks-tab-dark.svg" in the manifest, "media/board-dark.svg" in src/frameIdentifiers.ts']);
+  assert.deepEqual(check(source(`HOME_TAB_ICON_LIGHT = 'media/home/home-tab-light.svg'`, `HOME_TAB_ICON_LIGHT = 'media/home.svg'`)), ['permanent tab Home: its light icon is "media/home/home-tab-light.svg" in the manifest, "media/home.svg" in src/frameIdentifiers.ts']);
+  assert.deepEqual(check(source(`BOARD_TAB_SETTING = 'ritemark.features.task-board'`, `BOARD_TAB_SETTING = 'ritemark.features.board'`)), ['permanent tab Task board: its setting is "ritemark.features.task-board" in the manifest, "ritemark.features.board" in src/frameIdentifiers.ts']);
+  const result = runOnFixture(({ pkg: same, identifiers: text }) => ({ pkg: same, identifiers: text.replace(`BOARD_TAB_TITLE = 'Task board'`, `BOARD_TAB_TITLE = 'Tasks'`) }));
+  assert.deepEqual(result, { status: 1, out: ['permanent tab Task board: its title is "Task board" in the manifest, "Tasks" in src/frameIdentifiers.ts'] });
+  assert.deepEqual(frameMismatches(product, pkg, identifiers), [], 'the values that match pass');
+});
+
 test('a frame-shaping setting the shell lists is compared even when the extension no longer sets it', () => {
   const changed = clone(pkg);
   delete changed.contributes.configurationDefaults['workbench.editor.tabSizing'];
