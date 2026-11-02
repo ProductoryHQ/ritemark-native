@@ -400,7 +400,7 @@ function SideRow({
       <Tooltip label="Open this task’s page" className="absolute inset-0">
         <Button
           variant="ghost"
-          className="absolute inset-0 h-auto w-full rounded-[4px] p-0 hover:bg-transparent active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+          className="absolute inset-0 h-auto w-full rounded-[4px] p-0 hover:bg-transparent active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--r-focus-ring)]"
           aria-label={`${card.title}, ${waiting ? 'waiting for you, ' : ''}${p.row || STAGE_NAMES[card.stage]}`}
           // Enter or Space (a click with no pointer, detail 0) takes the keyboard to the page (W16).
           onClick={(event) => openCard(card.id, event.detail === 0)}

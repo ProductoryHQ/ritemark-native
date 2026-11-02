@@ -57,8 +57,7 @@ for (const className of ['min-h-0', 'flex-1', 'overflow-y-auto', 'overscroll-con
 }
 for (const className of [
   'outline-none',
-  'focus-visible:ring-[4px]',
-  'focus-visible:ring-[var(--r-ring-color)]',
+  'rm-focus-ring', // #635: the shared keyboard ring, a 2 px line with a 2 px gap
 ]) {
   assert.ok(
     WORKBENCH_LAYOUT_CLASSES.regenerate.includes(className),

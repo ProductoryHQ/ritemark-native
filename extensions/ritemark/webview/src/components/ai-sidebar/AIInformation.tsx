@@ -53,7 +53,7 @@ function ExternalLinkButton({ url, children }: ExternalLinkButtonProps) {
     <button
       type="button"
       onClick={() => openExternalUrl(url)}
-      className="inline-flex items-center gap-1 bg-transparent p-0 text-[11px] font-medium text-[var(--r-accent-deep)] hover:underline focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]"
+      className="inline-flex items-center gap-1 bg-transparent p-0 text-[11px] font-medium text-[var(--r-accent-deep)] hover:underline rm-focus-ring"
     >
       {children}
       <Icon name="arrow-square-out" size={12} tone="active" />
@@ -94,14 +94,14 @@ export function AIFirstUseDisclosure({ identity, onOpen, onDismiss }: AIFirstUse
             <button
               type="button"
               onClick={onOpen}
-              className="bg-transparent p-0 text-[10px] font-semibold text-[var(--r-accent-deep)] hover:underline focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]"
+              className="bg-transparent p-0 text-[10px] font-semibold text-[var(--r-accent-deep)] hover:underline rm-focus-ring"
             >
               What may be shared?
             </button>
             <button
               type="button"
               onClick={onDismiss}
-              className="inline-flex items-center gap-1 bg-transparent p-0 text-[10px] font-medium text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)] hover:underline focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]"
+              className="inline-flex items-center gap-1 bg-transparent p-0 text-[10px] font-medium text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)] hover:underline rm-focus-ring"
             >
               <Icon name="check-square" size={12} />
               Don’t show again

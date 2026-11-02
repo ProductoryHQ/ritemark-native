@@ -151,13 +151,13 @@ export function ReportDialog({ open, context, onOpenChange }: ReportDialogProps)
               }}
               placeholder={REPORT_COPY.bodyPlaceholder}
               rows={7}
-              className="w-full resize-y rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface)] p-2.5 text-[12px] leading-relaxed text-[var(--r-ink-strong)] focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]"
+              className="w-full resize-y rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface)] p-2.5 text-[12px] leading-relaxed text-[var(--r-ink-strong)] focus:outline-none focus:border-[var(--r-accent)] focus:shadow-[0_0_0_2px_var(--r-ring-color)]"
             />
             <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
               <button
                 type="button"
                 onClick={copy}
-                className="bg-transparent p-0 text-[10px] font-semibold text-[var(--r-accent-deep)] hover:underline focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]"
+                className="bg-transparent p-0 text-[10px] font-semibold text-[var(--r-accent-deep)] hover:underline rm-focus-ring"
               >
                 {copied ? REPORT_COPY.copiedAction : REPORT_COPY.copyAction}
               </button>

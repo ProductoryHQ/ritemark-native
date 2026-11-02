@@ -284,7 +284,7 @@ function Tile({
     >
       <button
         type="button"
-        className="absolute inset-0 rounded-lg border-0 bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+        className="absolute inset-0 rounded-lg border-0 bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--r-focus-ring)]"
         aria-label={`${card.title}, ${p.row || STAGE_NAMES[card.stage]}`}
         onClick={(event) => openCard(card.id, event.detail === 0)}
       />
