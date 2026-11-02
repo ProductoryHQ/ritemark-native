@@ -125,7 +125,7 @@ export function InlineTableOfContents({ editor, headings, activeHeadingPos }: Pr
           color: var(--r-ink-strong);
           font-weight: 600;
         }
-        .inline-toc-item:focus-visible {
+        :where(:root:not([data-input-mode="pointer"])) .inline-toc-item:focus-visible {
           outline: 2px solid var(--r-accent);
           outline-offset: -2px;
         }

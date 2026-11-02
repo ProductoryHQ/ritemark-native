@@ -26,7 +26,7 @@ about: ritemark-dev `releases/v2.2.0/analysis/2026-10-27-review-process-plan.md`
 - Style a formatter or linter owns.
 - Wording the Experience lead has set.
 - Generated files: `media/webview.js` and `media/office-preview.js` (review their source), and lockfile churn.
-- Screenshots and other evidence images (`qa/`, `qa-evidence/`, `frame-baseline/`).
+- Screenshots and other evidence images (`qa/`, `qa-evidence/`, `frame-baseline/`, `control-baseline/`).
 - An old issue presented as new. Report it as Pre-existing.
 
 ## How to write a finding
