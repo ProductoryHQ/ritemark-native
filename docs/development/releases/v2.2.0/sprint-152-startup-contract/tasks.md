@@ -80,10 +80,12 @@ are the audits.
       `progressBar.background` in ink
 - [x] The terminal tab's 0.46 px step (`multiEditorTabsControl.ts`, 019)
 - [x] E2: two new hunks in upstream files (`webviewEditor.ts`, `multiEditorTabsControl.ts`), none newly touched
-- [ ] The first-frame check on every start, held starts' captures Light and Dark (the mark at 1 s, the line at 10 s,
+- [x] The first-frame check on every start, held starts' captures Light and Dark (the mark at 1 s, the line at 10 s,
       Reduce motion, a tab opened later), the frame check against PR 2, the dry run and a real apply from the pin
-- [ ] Patches regenerated with `./scripts/create-patch.sh`; headers; docs (E5)
-- [ ] High review, up to three rounds; the PR opened only when the Development manager says so
+- [x] Patches regenerated with `./scripts/create-patch.sh`; headers; docs (E5)
+- [x] High review, three rounds (`/code-review` at high, `/security-review`): 15, 14 and 9 findings, fixed or
+      answered; no security findings
+- [ ] The PR, opened as a draft right after PR 2 when the Development manager says so
 
 ## Phase 4: QA and closeout
 
