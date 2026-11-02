@@ -44,10 +44,12 @@ Sprint 152 (the startup contract, R1–R4, R9): the shell draws Ritemark's frame
   place order (viewsExtensionPoint.ts) and the AI column's id (layout.ts, paneCompositePart.ts, auxiliaryBarPart.ts)
   read the manifest, where they were constants. layout.ts: a project window opens on its stored Ritemark place as VS
   Code's default one is restored (a built app restored no other at a new start), or on Home's place when it is opened
-  for the first time (R3; VS Code stores nothing for Documents, its default place); the welcome's window, with no folder and nothing to open, starts with both columns closed (R4); the AI
-  column's release is the slot's, and the shell's closing doesn't last: a note brings the column back with the layout
-  at the next start, and only the person's toggle closes it for good (PR 1's review, finding 3; the comment no longer
-  says the extension opens it again, which it stopped doing in Sprint 152's PR 1).
+  for the first time (R3; VS Code stores nothing for Documents, its default place, so a note says a project has been
+  opened); the welcome's window, with no folder and no document to open or restore, starts with both columns closed
+  (R4); the AI column's release is the slot's, and the shell's closing doesn't last: a note brings the column back with
+  the layout at the next start, a second release in a row waits for Ritemark AI and opens the column once it is back,
+  and only the person's toggle closes it for good (PR 1's review, finding 3; the comment no longer says the extension
+  opens it again, which it stopped doing in Sprint 152's PR 1).
   Test: workbench/test/browser/ritemarkFrame.test.ts (the reader, the release log, the places' placeholders, the first
   desk; ./scripts/test.sh --grep Ritemark).
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
@@ -1402,7 +1404,7 @@ index bfc8839cc65..745739c61f4 100644
  		};
 diff --git a/src/vs/workbench/browser/ritemarkFrame.ts b/src/vs/workbench/browser/ritemarkFrame.ts
 new file mode 100644
-index 00000000000..f7f9b4ed934
+index 00000000000..7cd666b8dc2
 --- /dev/null
 +++ b/src/vs/workbench/browser/ritemarkFrame.ts
 @@ -0,0 +1,468 @@
@@ -1744,20 +1746,20 @@ index 00000000000..f7f9b4ed934
 +	};
 +	const editors = tabs.map(entry => {
 +		const providedId = entry.viewType.startsWith(MAIN_THREAD_WEBVIEW_PREFIX) ? entry.viewType.slice(MAIN_THREAD_WEBVIEW_PREFIX.length) : entry.viewType;
-+		return ({
-+		id: WEBVIEW_EDITOR_TYPE_ID,
-+		value: JSON.stringify({
-+			origin: originOf(providedId),
-+			viewType: entry.viewType,
-+			providedId,
-+			title: entry.title,
-+			options: { retainContextWhenHidden: true, allowScripts: true, localResourceRoots: [media.toJSON()] },
-+			extensionLocation: extension.toJSON(),
-+			extensionId: frame.extension,
-+			state: undefined,
-+			iconPath: entry.icon ? { light: joinPath(extension, entry.icon.light).toJSON(), dark: joinPath(extension, entry.icon.dark).toJSON() } : undefined,
-+		}),
-+		});
++		return {
++			id: WEBVIEW_EDITOR_TYPE_ID,
++			value: JSON.stringify({
++				origin: originOf(providedId),
++				viewType: entry.viewType,
++				providedId,
++				title: entry.title,
++				options: { retainContextWhenHidden: true, allowScripts: true, localResourceRoots: [media.toJSON()] },
++				extensionLocation: extension.toJSON(),
++				extensionId: frame.extension,
++				state: undefined,
++				iconPath: entry.icon ? { light: joinPath(extension, entry.icon.light).toJSON(), dark: joinPath(extension, entry.icon.dark).toJSON() } : undefined,
++			}),
++		};
 +	});
 +	const front = Math.max(0, tabs.findIndex(entry => entry.viewType === frame.deskFront));
 +	const group: ISerializedEditorGroupModel = { id: 1, editors, mru: [front, ...editors.map((_, index) => index).filter(index => index !== front)], sticky: editors.length - 1 };
