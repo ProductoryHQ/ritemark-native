@@ -21,6 +21,7 @@ import type { ProjectSwitcher } from '../projects/switchProject';
 import type { WaitingReader } from '../projects/waiting';
 import { displayPlace } from '../welcome/recentProjects';
 import { pickerFolder } from '../utils/dialogDefaults';
+import { HOME_PLACE_ID } from '../frameIdentifiers';
 
 const FOUND_TIMEOUT_MS = 2000;
 /** A view resolved this soon after activation is the window restoring it, not a click. */
@@ -101,7 +102,7 @@ export class ProjectsViewProvider implements vscode.WebviewViewProvider, vscode.
 
   /** File ▸ Switch project: the list, with its search ready for typing. */
   async focusSearch(): Promise<void> {
-    await vscode.commands.executeCommand('workbench.view.extension.ritemark-home');
+    await vscode.commands.executeCommand(HOME_PLACE_ID);
     this.view?.show(false);
     void this.view?.webview.postMessage({ type: 'projects/focus-search' });
   }

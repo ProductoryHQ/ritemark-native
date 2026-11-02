@@ -272,7 +272,7 @@ case "$TARGET" in
 esac
 if FRAME_SUMMARY=$(node -e '
 const frame = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).ritemarkFrame;
-const missing = ["places", "homePlace", "aiColumn", "permanentTabs", "deskFront", "welcome", "extension"].filter(key => !frame || frame[key] === undefined || (Array.isArray(frame[key]) && !frame[key].length));
+const missing = ["places", "homePlace", "aiColumn", "permanentTabs", "deskFront", "welcome", "extension", "settings"].filter(key => !frame || frame[key] === undefined || (Array.isArray(frame[key]) && !frame[key].length));
 if (missing.length) { console.log(frame ? "missing " + missing.join(", ") : "no ritemarkFrame block"); process.exit(1); }
 console.log(frame.places.length + " places, " + frame.permanentTabs.length + " permanent tabs");
 ' "$PRODUCT_JSON" 2>&1); then

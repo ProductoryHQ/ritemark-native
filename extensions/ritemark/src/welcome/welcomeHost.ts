@@ -80,6 +80,7 @@ import {
   type WelcomeState,
 } from './protocol';
 import { WELCOME_VIEW_TYPE, welcomeHtml } from './welcomePanel';
+import { HOME_PLACE_ID } from '../frameIdentifiers';
 
 /** The workbench draws the welcome alone while this is true (patch 018, `ritemarkWelcomeAlone.ts`). */
 export const WELCOME_ALONE_CONTEXT_KEY = 'ritemark.welcomeAlone';
@@ -280,7 +281,7 @@ class WelcomeController implements vscode.Disposable {
   private async land(record: LandingRecord): Promise<void> {
     // Sprint 134 (R10): the project's Home first, its projects list in the left column.
     if (this.projectSource) {
-      await vscode.commands.executeCommand('workbench.view.extension.ritemark-home');
+      await vscode.commands.executeCommand(HOME_PLACE_ID);
       await this.projectSource.revealHome();
     } else {
       await vscode.commands.executeCommand('workbench.view.explorer');
