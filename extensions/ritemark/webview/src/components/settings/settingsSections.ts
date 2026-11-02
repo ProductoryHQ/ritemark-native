@@ -37,6 +37,8 @@ export interface SettingsLanding {
   section: SettingsSectionId
   /** The element id of the row, or none for the section's top. */
   anchor?: string
+  /** A key's way in: the API keys sheet opens at this key's row (Sprint 147, PR 2). */
+  keyRow?: 'google-ai-key' | 'openai-api-key'
 }
 
 /** Today's five names (`SettingsSection` in `src/settings/RitemarkSettingsProvider.ts`) and their new places (I61). */
@@ -44,8 +46,8 @@ export const LEGACY_SECTION_LANDINGS: Readonly<Record<string, SettingsLanding>> 
   'google-docs': { section: 'sharing', anchor: 'settings-section-google-docs' },
   transcription: { section: 'advanced', anchor: 'settings-section-transcription' },
   'usage-data': { section: 'usage-data' },
-  'google-ai-key': { section: 'ai-accounts', anchor: 'settings-section-google-ai-key' },
-  'openai-api-key': { section: 'ai-accounts', anchor: 'settings-section-openai-api-key' },
+  'google-ai-key': { section: 'ai-accounts', anchor: 'settings-section-google-ai-key', keyRow: 'google-ai-key' },
+  'openai-api-key': { section: 'ai-accounts', anchor: 'settings-section-openai-api-key', keyRow: 'openai-api-key' },
 }
 
 /** Whether a way in names a place: one of today's five names, or a section's id. Anything else is ignored. */
