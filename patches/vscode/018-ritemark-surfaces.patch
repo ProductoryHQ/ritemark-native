@@ -5327,7 +5327,7 @@ new file mode 100644
 index 00000000000..7b143e34532
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,604 @@
+@@ -0,0 +1,607 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -5781,6 +5781,9 @@ index 00000000000..7b143e34532
 +		store.add(addDisposableListener(clear, EventType.CLICK, () => this.setFieldText('', true)));
 +		store.add(addDisposableListener(input, EventType.INPUT, () => this.onFieldText(true)));
 +		store.add(addDisposableListener(input, EventType.KEY_DOWN, e => {
++			if (e.isComposing) {
++				return; // an IME's Enter, arrows and Escape pick its candidates (Codex on #641)
++			}
 +			const event = new StandardKeyboardEvent(e);
 +			const key = event.equals(KeyCode.DownArrow) ? 'down' : event.equals(KeyCode.Enter) ? 'enter' : event.equals(KeyCode.Escape) ? 'escape' : undefined;
 +			const action = key ? ritemarkSearchFieldKey(key, input.value) : undefined;
