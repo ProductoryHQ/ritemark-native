@@ -1414,7 +1414,7 @@ index bfc8839cc65..745739c61f4 100644
  		};
 diff --git a/src/vs/workbench/browser/ritemarkFrame.ts b/src/vs/workbench/browser/ritemarkFrame.ts
 new file mode 100644
-index 00000000000..c8e15864526
+index 00000000000..30dde13e523
 --- /dev/null
 +++ b/src/vs/workbench/browser/ritemarkFrame.ts
 @@ -0,0 +1,505 @@
@@ -1841,7 +1841,7 @@ index 00000000000..c8e15864526
 +		}
 +		const started = () => !!extensionService.getExtensionsStatus()[id]?.activationStarted;
 +		extensionService.whenInstalledExtensionsRegistered().then(() => {
-+			if (!this._store.isDisposed && !extensionService.extensions.some(extension => ExtensionIdentifier.equals(extension.identifier, id))) {
++			if (!this._store.isDisposed && !extensionService.extensions.some(extension => isRitemarkExtension(extension.identifier))) {
 +				this.release('Ritemark is not installed');
 +			}
 +		});
@@ -1925,10 +1925,10 @@ index 00000000000..c8e15864526
 +registerWorkbenchContribution2(RitemarkAiColumnRelease.ID, RitemarkAiColumnRelease, WorkbenchPhase.BlockRestore);
 diff --git a/src/vs/workbench/browser/ritemarkLoadingLook.ts b/src/vs/workbench/browser/ritemarkLoadingLook.ts
 new file mode 100644
-index 00000000000..bd9e480e36a
+index 00000000000..5f532cf8237
 --- /dev/null
 +++ b/src/vs/workbench/browser/ritemarkLoadingLook.ts
-@@ -0,0 +1,317 @@
+@@ -0,0 +1,334 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1978,7 +1978,7 @@ index 00000000000..bd9e480e36a
 +/** How long the look waits above a page of another extension that is there but hasn't spoken, before it goes anyway. */
 +export const RITEMARK_QUIET_PAGE_MS = 2000;
 +
-+/** How long the look waits above a Ritemark page for its first message, and then for it to be drawn, at most. */
++/** How long the look waits above a Ritemark page for its first message, and again from its "drawing", at most. */
 +export const RITEMARK_PAGE_LIMIT_MS = 10_000;
 +
 +/**
@@ -2002,6 +2002,8 @@ index 00000000000..bd9e480e36a
 +	readonly since?: number;
 +	/** The slot's name for `_ritemark.loadingLook.since` (W5), for a view that draws the same mark itself. */
 +	readonly id?: string;
++	/** A page has one such look: a later one waiting above the same page ends the earlier (a loading tab moved to another desk). */
++	readonly onePerPage?: boolean;
 +	/** A class the look puts on an element while the slot waits, until it ends (a tab's box, to hide VS Code's line). */
 +	readonly waiting?: { readonly element: HTMLElement; readonly className: string };
 +}
@@ -2037,15 +2039,15 @@ index 00000000000..bd9e480e36a
 + * that has gone (its frame's box can't be read), so the look just ends.
 + */
 +export function ritemarkLoadingPage(webview: IRitemarkWebviewLike, above = true): IRitemarkLoadingPage | undefined {
-+	let container: HTMLElement | undefined;
++	let container: HTMLElement;
 +	try {
-+		container = above ? webview.container : undefined;
++		container = webview.container;
 +	} catch {
 +		return undefined; // an overlay webview throws for its box once it is disposed
 +	}
 +	return {
 +		key: webview,
-+		container,
++		container: above ? container : undefined,
 +		onMessage: webview.onMessage,
 +		onDidDispose: webview.onDidDispose,
 +		ritemarks: isRitemarkExtension(webview.extension?.id),
@@ -2059,29 +2061,31 @@ index 00000000000..bd9e480e36a
 +	drawing: boolean;
 +	/** It is drawn: it posted RITEMARK_PAGE_DRAWN, or, saying nothing of drawing, any message. */
 +	drawn: boolean;
-+	/** Each time it is drawn, or speaks while not drawing. */
-+	readonly onDidDraw: Event<void>;
++	/** Each time it says it is drawing, is drawn, or speaks while not drawing. */
++	readonly onDidSpeak: Event<void>;
 +}
 +
 +const pageWatches = new WeakMap<object, IPageWatch>();
 +
++/** The page's watch, made by the first look that waits for it and kept until the page goes. */
 +function watchPage(page: IRitemarkLoadingPage): IPageWatch {
 +	const known = pageWatches.get(page.key);
 +	if (known) {
 +		return known;
 +	}
 +	const store = new DisposableStore();
-+	const onDidDraw = store.add(new Emitter<void>());
-+	const watch: IPageWatch = { drawing: false, drawn: false, onDidDraw: onDidDraw.event };
++	const onDidSpeak = store.add(new Emitter<void>());
++	const watch: IPageWatch = { drawing: false, drawn: false, onDidSpeak: onDidSpeak.event };
 +	store.add(page.onMessage(event => {
 +		const type = messageType(event);
 +		if (type === RITEMARK_PAGE_DRAWING) {
 +			watch.drawing = true;
 +			watch.drawn = false;
++			onDidSpeak.fire();
 +		} else if (!watch.drawing || type === RITEMARK_PAGE_DRAWN) {
 +			watch.drawing = false;
 +			watch.drawn = true;
-+			onDidDraw.fire();
++			onDidSpeak.fire();
 +		}
 +	}));
 +	store.add(Event.once(page.onDidDispose)(() => {
@@ -2092,19 +2096,20 @@ index 00000000000..bd9e480e36a
 +	return watch;
 +}
 +
-+/** The tab's look waiting above each page, so a page never has two (a loading tab moved to another desk). */
++/** The one-per-page look waiting above each page (a tab's), so a page never has two. */
 +const pageLooks = new WeakMap<object, RitemarkLoadingLook>();
 +
-+/** When each named slot's last wait began (epoch ms), for `_ritemark.loadingLook.since`. */
-+const waitsSince = new Map<string, number>();
++/** Each named slot's waiting look, for `_ritemark.loadingLook.since`. */
++const namedLooks = new Map<string, RitemarkLoadingLook>();
 +
 +/**
 + * W5 (the Experience lead's answer 5): a view that draws the shell's mark itself asks when its slot's wait began. The
 + * view's mark then shows from its first frame when the shell's was showing, or when the second is up when it wasn't.
 + * Undefined when the shell drew no look there (the AI's view in the left column), so the view keeps its own estimate.
 + */
-+CommandsRegistry.registerCommand('_ritemark.loadingLook.since', (_accessor, id: unknown) => typeof id === 'string' ? waitsSince.get(id) : undefined);
++CommandsRegistry.registerCommand('_ritemark.loadingLook.since', (_accessor, id: unknown) => typeof id === 'string' ? namedLooks.get(id)?.since : undefined);
 +
++/** A webview message event's `type`, if its message has one. */
 +function messageType(event: unknown): unknown {
 +	const message = (event as { message?: unknown } | undefined)?.message;
 +	return typeof message === 'object' && message !== null ? (message as { type?: unknown }).type : undefined;
@@ -2126,8 +2131,8 @@ index 00000000000..bd9e480e36a
 +		this.since = options.since ?? Date.now();
 +		const id = options.id;
 +		if (id) {
-+			waitsSince.set(id, this.since);
-+			this._register(toDisposable(() => waitsSince.get(id) === this.since && waitsSince.delete(id)));
++			namedLooks.set(id, this);
++			this._register(toDisposable(() => namedLooks.get(id) === this && namedLooks.delete(id)));
 +		}
 +		this.layer = $(`.ritemark-loading-look.${options.slot}`);
 +		this._register(toDisposable(() => {
@@ -2202,13 +2207,20 @@ index 00000000000..bd9e480e36a
 +		if (this._store.isDisposed) {
 +			return;
 +		}
-+		const watch = page && watchPage(page);
-+		if (!page || !watch || (page.retained && watch.drawn) || (!this.mark && !page.ritemarks)) {
++		if (!page) {
 +			this.dispose();
 +			return;
 +		}
-+		if (this.options.slot === TAB_SLOT) {
-+			pageLooks.get(page.key)?.dispose();
++		const watch = watchPage(page);
++		if ((page.retained && watch.drawn) || (!this.mark && !page.ritemarks)) {
++			this.dispose();
++			return;
++		}
++		if (this.options.onePerPage) {
++			const other = pageLooks.get(page.key);
++			if (other !== this) {
++				other?.dispose();
++			}
 +			pageLooks.set(page.key, this);
 +		}
 +		this.page = page;
@@ -2217,14 +2229,18 @@ index 00000000000..bd9e480e36a
 +		}
 +		const store = this.settling.value = new DisposableStore();
 +		const end = () => this.dispose();
-+		store.add(disposableTimeout(end, page.ritemarks ? RITEMARK_PAGE_LIMIT_MS : RITEMARK_QUIET_PAGE_MS));
-+		store.add(watch.onDidDraw(end));
++		const limit = store.add(new MutableDisposable());
++		limit.value = disposableTimeout(end, page.ritemarks ? RITEMARK_PAGE_LIMIT_MS : RITEMARK_QUIET_PAGE_MS);
++		store.add(watch.onDidSpeak(() => {
++			if (watch.drawn) {
++				end();
++			} else {
++				limit.value = disposableTimeout(end, RITEMARK_PAGE_LIMIT_MS); // it says it is drawing: its own limit from now
++			}
++		}));
 +		store.add(Event.once(page.onDidDispose)(end));
 +	}
 +}
-+
-+/** A desk tab's look's slot class (ritemarkSurfaces.css). */
-+const TAB_SLOT = 'ritemark-loading-desk';
 +
 +/** Each tab box's look (a webview editor's), so the box's next page ends the last one's look. */
 +const tabLooks = new WeakMap<object, RitemarkLoadingLook>();
@@ -2238,9 +2254,10 @@ index 00000000000..bd9e480e36a
 +export function ritemarkTabLoadingLook(owner: object, box: HTMLElement, name: string, atStart: boolean): RitemarkLoadingLook {
 +	tabLooks.get(owner)?.dispose();
 +	const look = new RitemarkLoadingLook(box, {
-+		slot: TAB_SLOT,
++		slot: 'ritemark-loading-desk',
 +		label: localize('ritemark.loadingLook.tabOpening', "{0} is opening", name),
 +		line: atStart,
++		onePerPage: true,
 +		waiting: { element: box, className: 'ritemark-tab-opening' },
 +	});
 +	tabLooks.set(owner, look);
@@ -2679,10 +2696,10 @@ index 00000000000..a7f4adb4968
 +});
 diff --git a/src/vs/workbench/test/browser/ritemarkLoadingLook.test.ts b/src/vs/workbench/test/browser/ritemarkLoadingLook.test.ts
 new file mode 100644
-index 00000000000..2e17d94da28
+index 00000000000..63d90046a9a
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/ritemarkLoadingLook.test.ts
-@@ -0,0 +1,245 @@
+@@ -0,0 +1,248 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2802,6 +2819,8 @@ index 00000000000..2e17d94da28
 +		readme.say(RITEMARK_PAGE_DRAWING);
 +		await timeout(RITEMARK_LINE_AFTER_MS - RITEMARK_MARK_AFTER_MS);
 +		const atTen = seen(readme.container);
++		await timeout(750);
++		const pastSettlesLimit = seen(readme.container); // "drawing" (at 1 s) gave it its own limit
 +		await timeout(RITEMARK_PAGE_LIMIT_MS);
 +		const atTheLimit = seen(readme.container);
 +
@@ -2810,10 +2829,11 @@ index 00000000000..2e17d94da28
 +		const look2 = store.add(new RitemarkLoadingLook(slot2, { slot: 'test-slot', label: 'photo.png is opening' }));
 +		look2.settle(preview.page);
 +		await timeout(RITEMARK_MARK_AFTER_MS);
-+		assert.deepStrictEqual({ atOnce, afterASecond, atTen, atTheLimit, otherExtension: seen(slot2) + ' / ' + seen(preview.container) }, {
++		assert.deepStrictEqual({ atOnce, afterASecond, atTen, pastSettlesLimit: pastSettlesLimit !== 'ground', atTheLimit, otherExtension: seen(slot2) + ' / ' + seen(preview.container) }, {
 +			atOnce: 'ground',
 +			afterASecond: 'mark (status: README.md is opening)',
 +			atTen: 'mark (status: README.md is opening), line: Ritemark is still starting. The first start after an install or an update takes longer.',
++			pastSettlesLimit: true,
 +			atTheLimit: 'ground',
 +			otherExtension: 'ground / ground',
 +		});
