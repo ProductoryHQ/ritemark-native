@@ -12,8 +12,10 @@
 
 /* #635 (Sprint 146): the keyboard focus ring. A 2 px indigo line with a 2 px gap of the surface, so it never has to
    contrast with the control's own fill: 3:1 or more against the ground, the AI's sheet and the desk in both themes
-   (WCAG 2.2, 1.4.11). Keyboard only. Every control's ring is this one class; a field keeps its border change. */
-:where(:root:not([data-input-mode="pointer"])) .rm-focus-ring:focus-visible { outline: 2px solid var(--r-focus-ring); outline-offset: 2px; }
+   (WCAG 2.2, 1.4.11). Keyboard only. Every control's ring is this one class; a field keeps its border change. The class
+   is doubled so a control's own `focus:outline-none` or `focus-visible:outline-none`, which Tailwind emits after this
+   file's rules, can't hide it (the Select's trigger did). */
+:where(:root:not([data-input-mode="pointer"])) .rm-focus-ring.rm-focus-ring:focus-visible { outline: 2px solid var(--r-focus-ring); outline-offset: 2px; }
 
 /* Everything clickable shows the pointing hand — Tailwind's preflight leaves
    buttons at `cursor: default`. `:where()` keeps this at zero specificity, so
