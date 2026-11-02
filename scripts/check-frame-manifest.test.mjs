@@ -42,16 +42,16 @@ test('this repository\'s extension fills its shell\'s frame', () => {
 
 test('the identifiers are read from the module the extension compiles, however it is written', () => {
   assert.equal(identifiers.HOME_TAB_VIEW_TYPE, 'ritemark.home');
-  assert.ok(identifiers.FRAME_SHAPING_SETTINGS.includes('workbench.activityBar.location'));
   const restyled = readFrameIdentifiers(identifiersSource
     .replace(`HOME_TAB_VIEW_TYPE = 'ritemark.home'`, `HOME_TAB_VIEW_TYPE: string = "ritemark.home"`)
-    .replace(/FRAME_SHAPING_SETTINGS = \[([^\]]*)\];/, (_all, list) => `FRAME_SHAPING_SETTINGS: readonly string[] = [${list}] as const;`));
+    .replace(`WELCOME_VIEW_TYPE = 'ritemark.welcome'`, `WELCOME_VIEW_TYPE = 'ritemark.welcome' as const`));
   assert.deepEqual(restyled, identifiers);
+  assert.deepEqual(readFrameIdentifiers(`export const LIST: readonly string[] = ['a', "b"] as const;`), { LIST: ['a', 'b'] });
 });
 
 test('an identifier the check can\'t read is a mismatch, not a skip', () => {
-  const result = runOnFixture(({ pkg: same, identifiers: source }) => ({ pkg: same, identifiers: source.replace('export const FRAME_SHAPING_SETTINGS = [', 'export const FRAME_SHAPING_SETTINGS = Object.freeze([').replace(/\];\s*$/, ']);\n') }));
-  assert.deepEqual(result, { status: 1, out: ['could not read FRAME_SHAPING_SETTINGS from src/frameIdentifiers.ts'] });
+  const result = runOnFixture(({ pkg: same, identifiers: source }) => ({ pkg: same, identifiers: source.replace(`export const HOME_PLACE_ID = 'workbench.view.extension.ritemark-home';`, `export const HOME_PLACE_ID = \`workbench.view.extension.ritemark-home\`;`) }));
+  assert.deepEqual(result, { status: 1, out: ['could not read HOME_PLACE_ID from src/frameIdentifiers.ts', 'Home\'s place is workbench.view.extension.ritemark-home in the manifest, undefined in src/frameIdentifiers.ts'] });
 });
 
 test('a renamed head command is refused, with its name', () => {
@@ -65,6 +65,12 @@ test('a renamed head command is refused, with its name', () => {
 test('a renamed permanent tab is refused, with its name', () => {
   const result = runOnFixture(({ pkg: same, identifiers: source }) => ({ pkg: same, identifiers: source.replace(`BOARD_TAB_VIEW_TYPE = 'ritemark.taskBoard'`, `BOARD_TAB_VIEW_TYPE = 'ritemark.board'`) }));
   assert.deepEqual(result, { status: 1, out: ['the permanent tabs are mainThreadWebview-ritemark.home, mainThreadWebview-ritemark.taskBoard in the manifest, mainThreadWebview-ritemark.home, mainThreadWebview-ritemark.board in src/frameIdentifiers.ts'] });
+});
+
+test('a frame-shaping setting the shell lists is compared even when the extension no longer sets it', () => {
+  const changed = clone(pkg);
+  delete changed.contributes.configurationDefaults['workbench.editor.tabSizing'];
+  assert.deepEqual(frameMismatches(product, changed, identifiers), ['setting workbench.editor.tabSizing: undefined in package.json, "fixed" in the shell\'s product.json']);
 });
 
 test('a place the manifest doesn\'t name, a place gone, and a default that differs are refused', () => {

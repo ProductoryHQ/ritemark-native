@@ -1811,10 +1811,10 @@ index 576424a1298..be57eb737ff 100644
  			command: {
 diff --git a/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts b/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts
 new file mode 100644
-index 00000000000..ce4410bd135
+index 00000000000..b08b1e20a80
 --- /dev/null
 +++ b/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts
-@@ -0,0 +1,194 @@
+@@ -0,0 +1,196 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1833,6 +1833,7 @@ index 00000000000..ce4410bd135
 +import { IEditorService } from '../../../../services/editor/common/editorService.js';
 +import { ITerminalGroupService, ITerminalInstance, ITerminalInstanceService, ITerminalService } from '../../browser/terminal.js';
 +import { RITEMARK_RESTORED_TERMINALS_WAIT_MS, ritemarkNextTerminalName, RitemarkRestoredTerminalNames, RitemarkTerminalTabs } from '../../browser/ritemarkTerminalTabs.js';
++import { resetRitemarkSlotReleasesForTesting } from '../../../../browser/ritemarkFrame.js';
 +import { ILogService, NullLogService } from '../../../../../platform/log/common/log.js';
 +
 +interface IOpened { resource: string; inactive: boolean; preserveFocus: boolean }
@@ -1948,6 +1949,7 @@ index 00000000000..ce4410bd135
 +	});
 +
 +	test('#501: with no document within the wait, restored terminals open anyway; one closed meanwhile does not', () => runWithFakedTimers({}, async () => {
++		resetRitemarkSlotReleasesForTesting();
 +		const kept = terminal(1);
 +		const logged: string[] = [];
 +		const logService = new class extends NullLogService { override warn(message: string) { logged.push(message); } }();
