@@ -25,6 +25,7 @@ import { CommentTaskStore, commentTaskStoreDir } from './commentTasks/CommentTas
 import { CommentTaskController } from './commentTasks/CommentTaskController';
 import { registerTaskBoard, type TaskBoardHost } from './taskBoard/taskBoardHost';
 import { registerProjects, type ProjectsHost } from './projects/projectsHost';
+import { registerProjectSearch } from './search/SearchHost';
 import { buildCommentTaskPrompt } from './commentTasks/commentTaskPrompt';
 import { createGoogleDocsFeature, type GoogleDocsFeature } from './googleDocs/vscodeGoogleDocs';
 import { AgentLibraryViewProvider } from './views/AgentLibraryViewProvider';
@@ -62,6 +63,7 @@ import { BrowserNavigationRecorder, DID_NAVIGATE_COMMAND } from './browser/brows
 import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
 import { findReplacedTextTab, findStuckMarkdownTabs } from './utils/stickyTabHealer';
+import { openControlCatalogueIfAsked } from './views/ControlCataloguePanel';
 import { registerProjectHeadCommands } from './views/projectHeadCommands';
 import { prepareWelcome, registerWelcome } from './welcome/welcomeHost';
 import { newDocumentFolder, nextUntitledPath } from './newDocumentLocation';
@@ -477,6 +479,11 @@ export function activate(context: vscode.ExtensionContext) {
     attachTaskListener: (listener) => unifiedViewProvider.attachTaskListener(listener),
     oneShotSettings: (runtimeId) => unifiedViewProvider.oneShotSettings(runtimeId),
   });
+
+  // ── Search, the words layer (Sprint 148, #591) ─────────────────────────────
+  // The index of this window's project, in its own worker thread. Composed here;
+  // nothing starts it until a query asks (PR 2's results view adds the warm start).
+  registerProjectSearch({ context, taskBoard, boardEnabled: () => isEnabled('task-board') });
 
   // ── Google Docs publishing (Sprint 119) ────────────────────────────────────
   // Always composed, even with the flag off: flag-off hides the surfaces but
@@ -1071,6 +1078,14 @@ export function activate(context: vscode.ExtensionContext) {
       await browserHistoryStore.clear();
     })
   );
+
+  // Sprint 146 (R2, decision 5): the control catalogue, only when a test script started Ritemark with its setting. A
+  // test page never stands between activation and its confirmation below
+  try {
+    openControlCatalogueIfAsked(context);
+  } catch (error) {
+    console.warn('Ritemark: the control catalogue did not open', error);
+  }
 
   // Sprint 93 R9: activate() reached its end with no synchronous throw —
   // confirm this version and trim old installs down to N-1 (current +

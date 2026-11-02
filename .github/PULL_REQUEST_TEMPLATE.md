@@ -28,6 +28,7 @@ Steps to verify the change works:
 
 - **Review tier:** Light / Standard / High (`REVIEW.md`; the highest path wins), set by: `path/...`
 - **What could break, and for whom:** one or two sentences.
+- **Control states** (when the PR touches `extensions/ritemark/webview/src/components/ui/`, `index.css` or a control's look): `scripts/qa/control-states.mjs --compare docs/development/control-baseline` exits 0, or the states that differ are listed here and their new images go to the Experience lead (`docs/development/control-baseline/README.md`).
 
 ## How to revert
 

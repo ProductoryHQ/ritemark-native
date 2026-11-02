@@ -1,0 +1,7 @@
+{
+  "name": "@napi-rs/canvas",
+  "version": "0.1.80",
+  "private": true,
+  "main": "index.js",
+  "types": "index.d.ts"
+}

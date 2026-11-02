@@ -174,3 +174,5 @@ Only what experience 8 doesn't settle. Words and choices before PR 2's screens.
 7. **Letters with marks.** Proposed: "kasi" doesn't find "käsi", because ä, ö, õ and ü are letters of their own in Estonian; capitals don't matter unless Match capital letters is on.
 
 If decision 2 is answered yes, More holds Match capital letters, Whole words only and the kinds, without Replace. Screenshots before PR 2's and PR 3's merges, in Light and Dark.
+
+**Answered** on 1 November (ritemark-dev `releases/v2.2.0/analysis/2026-11-01-sprint-148-experience-answers.md`). Question 7 differs from the proposal, and PR 1 follows it: a letter typed without its mark finds it with one ("kasi" finds "käsi"), a typed mark finds only itself ("käsi" finds only "käsi"), and the exact letters rank first; `spec.md` R5 and the technical plan's Terms say so.

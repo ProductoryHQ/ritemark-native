@@ -35,6 +35,7 @@ const TabsTrigger = React.forwardRef<
     className={cn(
       '-mb-px inline-flex items-center gap-1.5 border-0 border-b-2 border-transparent bg-transparent px-0 pb-[9px] pt-2 font-ui text-[13px] font-medium text-ink-muted transition-colors',
       'hover:text-ink-strong focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)]',
+      'disabled:pointer-events-none disabled:opacity-50', // disabled as the Button: half strength, no pointer
       'data-[state=active]:border-accent data-[state=active]:font-semibold data-[state=active]:text-ink-strong',
       className
     )}
