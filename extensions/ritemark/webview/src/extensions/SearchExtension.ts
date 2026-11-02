@@ -107,21 +107,34 @@ function buildDecorationSet(
   return DecorationSet.create(doc, decorations)
 }
 
+/**
+ * The find bar's marks (#647): the search results list's marks (components/search/search.css, `.rs-column mark`),
+ * not amber, because amber in a document means a comment. The other matches take the soft grey mark, the current
+ * one the kit's stronger step; on the Dark desk the results list's own lifted steps.
+ */
+export const FIND_MARK_STYLES = `
+    .find-highlight {
+      background: var(--r-hairline);
+      border-radius: 2px;
+    }
+    .find-highlight-active {
+      background: var(--r-hairline-strong);
+      border-radius: 2px;
+    }
+    body.vscode-dark .find-highlight,
+    body.ritemark-dark .find-highlight,
+    body[data-vscode-theme-kind='vscode-dark'] .find-highlight { background: rgba(199, 210, 254, 0.18); }
+    body.vscode-dark .find-highlight-active,
+    body.ritemark-dark .find-highlight-active,
+    body[data-vscode-theme-kind='vscode-dark'] .find-highlight-active { background: rgba(199, 210, 254, 0.32); }
+  `
+
 function ensureGlobalStyles() {
   if (typeof document === 'undefined') return
   if (document.getElementById('ritemark-search-styles')) return
   const style = document.createElement('style')
   style.id = 'ritemark-search-styles'
-  style.textContent = `
-    .find-highlight {
-      background: rgba(255, 200, 0, 0.25);
-      border-radius: 2px;
-    }
-    .find-highlight-active {
-      background: rgba(255, 180, 0, 0.55);
-      border-radius: 2px;
-    }
-  `
+  style.textContent = FIND_MARK_STYLES
   document.head.appendChild(style)
 }
 
