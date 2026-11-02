@@ -1669,7 +1669,7 @@ export function RitemarkSettings() {
           <button
             type="button"
             onClick={() => vscode.postMessage({ type: 'openExternal', url: AI_INFORMATION_URL })}
-            className="inline-flex shrink-0 items-center gap-1 rounded bg-transparent px-2 py-1 text-xs font-medium text-accent-deep hover:bg-surface-soft hover:underline focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)]"
+            className="inline-flex shrink-0 items-center gap-1 rounded bg-transparent px-2 py-1 text-xs font-medium text-accent-deep hover:bg-surface-soft hover:underline rm-focus-ring"
           >
             Open AI information
             <Icon name="arrow-square-out" size={12} tone="active" />
@@ -1965,7 +1965,7 @@ function ThemePreviewCard({
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      className={`group text-left rounded-lg border p-3 transition-all focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)] ${
+      className={`group text-left rounded-lg border p-3 transition-all rm-focus-ring ${
         selected
           ? 'border-accent shadow-ritemark-accent'
           : 'border-hairline hover:border-hairline-strong hover:bg-surface-soft'

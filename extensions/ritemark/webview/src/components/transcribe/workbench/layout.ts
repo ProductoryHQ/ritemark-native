@@ -17,5 +17,5 @@ export const WORKBENCH_LAYOUT_CLASSES = {
   insightsScroller:
     'min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-3 [overflow-wrap:anywhere]',
   regenerate:
-    'rounded-sm text-[10.5px] font-semibold text-accent outline-none hover:underline focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)]',
+    'rounded-sm text-[10.5px] font-semibold text-accent outline-none hover:underline rm-focus-ring',
 } as const;

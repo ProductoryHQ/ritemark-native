@@ -51,7 +51,7 @@ export function SelectedContextTab() {
               shrink-0 inline-flex items-center justify-center
               w-4 h-4 rounded
               text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)] hover:bg-[var(--r-surface-soft)]
-              focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]
+              rm-focus-ring
               transition-colors
             "
             aria-label="Remove selected text from chat context"

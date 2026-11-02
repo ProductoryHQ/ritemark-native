@@ -117,7 +117,7 @@ function UnreadableRow({ file, variant }: { file: UnreadableFile; variant: 'boar
         <Tooltip label={words.openTip} className="absolute inset-0">
           <button
             type="button"
-            className="absolute inset-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+            className="absolute inset-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--r-focus-ring)]"
             aria-label={`${file.fileName}: ${file.message}`}
             onClick={open}
           />

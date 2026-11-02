@@ -732,7 +732,7 @@ function RecordingRow({ recording }: { recording: RecordingSummary }) {
           <button
             type="button"
             aria-label={`Open ${title}`}
-            className="absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+            className="absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--r-focus-ring)]"
             onClick={() => vscode.postMessage({ type: 'transcribe:openSession', sessionId: recording.sessionId })}
           />
           {/* Beside the title's first line (13px at 1.5), however many lines follow. */}

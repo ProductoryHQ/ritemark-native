@@ -1189,8 +1189,10 @@ export function Editor({
         }
 
         :where(:root:not([data-input-mode="pointer"])) .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:focus-visible {
-          outline: none !important;
-          box-shadow: 0 0 0 4px var(--r-ring-color, rgba(67, 56, 202, 0.1)) !important;
+          opacity: 1 !important; /* shown while the keyboard is on it, not only on hover: an unseen button can't show its ring */
+          outline: 2px solid var(--r-focus-ring) !important;
+          outline-offset: 2px !important;
+          box-shadow: none !important;
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:disabled {

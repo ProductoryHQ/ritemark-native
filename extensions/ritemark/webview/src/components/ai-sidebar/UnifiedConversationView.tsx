@@ -50,7 +50,7 @@ function ContinuationNotice({
         type="button"
         aria-label="Dismiss continuation notice"
         onClick={onDismiss}
-        className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-md border-0 bg-transparent text-[var(--r-ink-muted)] hover:bg-[var(--r-surface)] hover:text-[var(--r-ink-strong)] focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)]"
+        className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-md border-0 bg-transparent text-[var(--r-ink-muted)] hover:bg-[var(--r-surface)] hover:text-[var(--r-ink-strong)] rm-focus-ring"
       >
         <Icon name="x" size={14} tone="inherit" />
       </button>

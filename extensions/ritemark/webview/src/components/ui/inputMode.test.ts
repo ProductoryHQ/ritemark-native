@@ -185,4 +185,32 @@ for (const file of ['button.tsx', 'dialog.tsx', 'tabs.tsx', 'filter-chip.tsx', '
   assert.doesNotMatch(text, /focus-visible:ring-/, `${file}: no soft halo on keyboard focus`)
 }
 
+// ── #635 follow-up: the ring everywhere a control drew the soft halo, and Progress's own fill ──
+const RING_USERS: Array<[string, RegExp]> = [
+  ['components/home/home.css', /\.rh-desk :is\(button, \[role="button"\], a\):focus-visible \{ outline: 2px solid var\(--r-focus-ring\); outline-offset: 2px;/],
+  ['components/home/home.css', /\.rp-row:focus-visible \{ outline: 2px solid var\(--r-focus-ring\);/],
+  ['components/welcome/welcome.css', /\.rw-row:focus-visible \{ outline: 2px solid var\(--r-focus-ring\); outline-offset: 2px;/],
+  ['components/welcome/welcome.css', /\.rw-project:focus-visible \{ outline: 2px solid var\(--r-focus-ring\); outline-offset: 2px;/],
+  ['components/welcome/welcome.css', /\.rw-dbtn\.rw-dbtn\.default:focus-visible \{ outline: 2px solid var\(--r-focus-ring\); outline-offset: 2px;/],
+  ['components/Editor.tsx', /\.code-copy-btn:focus-visible \{\s*opacity: 1 !important;[^\n]*\n\s*outline: 2px solid var\(--r-focus-ring\) !important;\s*outline-offset: 2px !important;/],
+  ['components/tasks/TasksList.tsx', /ring-\[var\(--r-focus-ring\)\]/],
+  ['components/tasks/BoardColumns.tsx', /ring-\[var\(--r-focus-ring\)\]/],
+  ['components/tasks/UnreadableCards.tsx', /ring-\[var\(--r-focus-ring\)\]/],
+  ['components/transcribe/TranscribePanel.tsx', /ring-\[var\(--r-focus-ring\)\]/],
+  ['components/transcribe/workbench/layout.ts', /\brm-focus-ring\b/],
+  ['components/settings/RitemarkSettings.tsx', /\brm-focus-ring\b/],
+  ['components/ai-sidebar/AIInformation.tsx', /\brm-focus-ring\b/],
+  ['components/ai-sidebar/SelectedContextTab.tsx', /\brm-focus-ring\b/],
+  ['components/ai-sidebar/UnifiedConversationView.tsx', /\brm-focus-ring\b/],
+  ['components/ai-sidebar/reporting/ReportDialog.tsx', /\brm-focus-ring\b/],
+]
+for (const [file, pattern] of RING_USERS) assert.match(readFileSync(join(SRC, file), 'utf8'), pattern, `${file}: the shared ring`)
+// No control keeps the soft halo on keyboard focus (a field's `focus:` look is its own)
+const HALO = /focus-visible:(?:ring-\[4px\] focus-visible:ring-\[var\(--r-ring-color\)\]|shadow-\[0_0_0_2px_var\(--r-ring-color\)\])/
+const halos = files.filter((file) => HALO.test(readFileSync(file, 'utf8'))).map((file) => relative(SRC, file))
+assert.deepEqual(halos, [], `no soft halo on a keyboard focus:\n${halos.join('\n')}`)
+const progress = readFileSync(join(SRC, 'components', 'ui', 'progress.tsx'), 'utf8')
+assert.match(progress, /bg-\[var\(--r-accent\)\]/, "Progress fills with Ritemark's accent")
+assert.doesNotMatch(progress, /--vscode-progressBar-/, "Progress doesn't read the workbench's progress bar colours")
+
 console.log('inputMode.test.ts: all assertions passed')
