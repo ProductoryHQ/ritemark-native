@@ -26,6 +26,7 @@ import {
   UNAVAILABLE_LINES,
   countLine,
   csvSnippet,
+  shownPassage,
   detailOf,
   joinedMarks,
   repeatsName,
@@ -88,7 +89,7 @@ function Snippet({ result }: { result: SearchResult }) {
     return (
       <span className="rs-snippet">
         {result.kind === 'chat' ? `${speakerWords(passage.at.speaker)}: ` : ''}
-        <Marked text={passage.text} marks={passage.marks} />
+        <Marked {...shownPassage(passage)} />
       </span>
     )
   }
@@ -161,8 +162,14 @@ export function SearchPanelView({
   const roots = setup?.roots ?? []
   const expandedKind = answer?.expanded?.kind ?? null
 
-  // A kind opened whole starts at its first rows again
+  // A kind opened whole starts at its first rows again; so does a new text, with the list scrolled to its top.
+  // A refresh of the same words (the index still reading) keeps both.
   useEffect(() => setDrawn(ROWS_AT_A_TIME), [expandedKind])
+  const answerText = answer?.text
+  useEffect(() => {
+    setDrawn(ROWS_AT_A_TIME)
+    if (column.current) column.current.scrollTop = 0
+  }, [answerText])
 
   // ... and draws more as the list scrolls (question 5). The marker under the drawn rows is a new element for each
   // count drawn (its key), so it is watched once when it comes and let go when it goes, never on other renders.

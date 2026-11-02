@@ -249,7 +249,19 @@ export interface CsvSnippet {
   cell: MarkedText | null
 }
 
-const CELL_SEPARATOR = ' · '
+/** The Unit Separator the CSV reader puts between a row's cells (src/search/worker/readers/csv.ts). */
+const CELL_SEPARATOR = '\u001F'
+
+/** A passage's words for the eye: a CSV row's cell separator drawn as " · ", the marks moved with the text. */
+export function shownPassage(source: MarkedText): MarkedText {
+  if (!source.text.includes(CELL_SEPARATOR)) return source
+  const extra = ' · '.length - CELL_SEPARATOR.length
+  const before = (offset: number) => source.text.slice(0, offset).split(CELL_SEPARATOR).length - 1
+  return {
+    text: source.text.split(CELL_SEPARATOR).join(' · '),
+    marks: source.marks.map(([s, e]) => [s + before(s) * extra, e + before(e) * extra] as [number, number]),
+  }
+}
 
 /**
  * A CSV row's words (question 4): its first cell, then the matching cell with its column's name,
@@ -296,7 +308,7 @@ export function rowLabel(result: SearchResult, detail: string | null): string {
   if (detail) parts.push(detail)
   if (result.passage && !repeatsName(result)) {
     const who = result.kind === 'chat' ? `${speakerWords(result.passage.at.speaker)}: ` : ''
-    parts.push(`${who}${result.passage.text}`)
+    parts.push(`${who}${shownPassage(result.passage).text}`)
   } else if (result.nameOnly === 'too-large') {
     parts.push(tooBigWords(result.size))
   }

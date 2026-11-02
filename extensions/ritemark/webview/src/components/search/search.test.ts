@@ -69,7 +69,7 @@ function state(groups: SearchGroup[], extra: Partial<ResultsMessage> = {}, rest:
     setup: { projectName: 'Leadership programme', roots: ['/p'], options: ALL },
     status: { state: 'ready', documents: { done: 900, total: 900 }, limited: false, tooLarge: 0, failed: 0, chats: 1, tasks: 1 },
     options: ALL,
-    answer: { type: 'search/results', queryId: 3, layer: 'words', tooShort: false, groups, reading: null, limited: false, tooLarge: 0, tookMs: 2, expanded: null, ...extra },
+    answer: { type: 'search/results', queryId: 3, layer: 'words', tooShort: false, groups, reading: null, limited: false, tooLarge: 0, tookMs: 2, expanded: null, text: 'mari', ...extra },
     ...rest,
   }
 }
@@ -204,19 +204,32 @@ test('the top row is chosen and shows Enter; no other row does (question 6)', ()
 test('a CSV row: its first cell in ink, then the matching cell with its column\'s name (question 4)', () => {
   const csv = doc(9, {
     name: 'Contacts', format: 'csv', columns: ['Company', 'Contact', 'Phone'],
-    passage: { text: 'Harbour Logistics · Mari Tamm · +372 555 0101', marks: [[25, 29]], at: { row: 4 } },
+    passage: { text: 'Harbour Logistics\u001FMari Tamm\u001F+372 555 0101', marks: [[23, 27]], at: { row: 4 } },
   })
   const page = render(state([groupOf('document', [csv])]))
   assert.equal(text(page.querySelector('.rs-snippet')), 'Harbour Logistics · Contact: Mari Tamm')
   assert.equal(text(page.querySelector('.rs-snippet .rs-ink')), 'Harbour Logistics')
   assert.equal(text(page.querySelector('.rs-snippet mark')), 'Tamm')
   // The match in the first cell: the next filled cell follows it
-  const first = model.csvSnippet({ ...csv, passage: { text: 'Harbour Logistics ·  · Mari Tamm', marks: [[0, 7]], at: { row: 2 } } })
+  const first = model.csvSnippet({ ...csv, passage: { text: 'Harbour Logistics\u001F\u001FMari Tamm', marks: [[0, 7]], at: { row: 2 } } })
   assert.equal(first?.column, 'Phone')
   assert.equal(first?.cell?.text, 'Mari Tamm')
   // The header row, or a row cut at its start, shows as it is
   assert.equal(model.csvSnippet({ ...csv, passage: { ...csv.passage!, at: { row: 0 } } }), null)
-  assert.equal(model.csvSnippet({ ...csv, passage: { ...csv.passage!, text: '…istics · Mari Tamm' } }), null)
+  assert.equal(model.csvSnippet({ ...csv, passage: { ...csv.passage!, text: '…istics\u001FMari Tamm' } }), null)
+  // A cell whose own text has " · " is still one cell: the match on B is in the first column, Mari in the second
+  const dotted = { ...csv, passage: { text: 'A · B\u001FMari', marks: [[4, 5]] as [number, number][], at: { row: 1 } } }
+  const inB = model.csvSnippet(dotted)
+  assert.equal(inB?.first.text, 'A · B')
+  assert.equal(inB?.column, 'Contact', 'a match on B is in the first cell, so the next filled cell and its column follow')
+  assert.equal(inB?.cell?.text, 'Mari')
+  const inMari = model.csvSnippet({ ...dotted, passage: { ...dotted.passage, marks: [[6, 10]] } })
+  assert.equal(inMari?.column, 'Contact')
+  assert.equal(inMari?.cell?.text, 'Mari')
+  assert.equal(text(render(state([groupOf('document', [dotted])])).querySelector('.rs-snippet')), 'A · B · Contact: Mari')
+  // A row shown as it is (the header) draws the separator as " · " with its marks moved along
+  const shown = model.shownPassage({ text: 'Name\u001FContact', marks: [[5, 12]] })
+  assert.deepEqual(shown, { text: 'Name · Contact', marks: [[7, 14]] })
 })
 
 test('a title heading that only repeats the name shows no words under it', () => {

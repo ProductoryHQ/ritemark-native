@@ -13,6 +13,7 @@ import { documentName, formatOf, readDocument } from './readers';
 import { documentXmlPassages } from './readers/docx';
 import { readCsv } from './readers/csv';
 import { readMarkdown } from './readers/markdown';
+import { forEachWord } from './text';
 import { decodeEntities, decodeText } from './readers/types';
 
 const BUDGET = 2 * 1024 * 1024;
@@ -100,9 +101,18 @@ async function main() {
   {
     const outcome = readCsv('Name,Contact\n"Harbour Logistics","Mari Tamm"\n"Line ""one""\nand two",x\n\n', BUDGET);
     assert.ok(outcome.ok);
-    assert.deepEqual(texts(outcome), ['Name · Contact', 'Harbour Logistics · Mari Tamm', 'Line "one" and two · x']);
+    assert.deepEqual(texts(outcome), ['Name\u001FContact', 'Harbour Logistics\u001FMari Tamm', 'Line "one" and two\u001Fx']);
     assert.deepEqual(outcome.ok && outcome.columns, ['Name', 'Contact']);
     assert.deepEqual(outcome.ok && outcome.passages.map((p) => p.at.row), [0, 1, 2]);
+  }
+  // A cell with " · " in it stays one cell (the row's cells are joined by U+001F, stripped from a cell first), and the word index
+  // treats the separator as no part of a word (Codex's review of #636)
+  {
+    const outcome = readCsv('Company,Contact\n"A · B",Mari\n"x\u001Fy",z\n', BUDGET);
+    assert.deepEqual(texts(outcome), ['Company\u001FContact', 'A · B\u001FMari', 'xy\u001Fz']);
+    const words: string[] = [];
+    forEachWord('A · B\u001FMari', (word) => words.push(word));
+    assert.deepEqual(words, ['A', 'B', 'Mari']);
   }
 
   // ── Word: document.xml through the preview's zip reader (A3) ────────────────

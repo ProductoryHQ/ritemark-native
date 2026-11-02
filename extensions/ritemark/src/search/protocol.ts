@@ -180,7 +180,7 @@ export type SearchHostToViewMessage =
    * restarts, so the view drops an older query's answer. `expanded` is the kind opened whole: by Show all, or
    * (`auto`) because it is the only kind with results (the Experience lead, question 5).
    */
-  | ({ type: 'search/results'; expanded: { kind: SearchKind; auto: boolean } | null } & SearchAnswer)
+  | ({ type: 'search/results'; expanded: { kind: SearchKind; auto: boolean } | null; /** The words these results are for: a new text starts the long list at the top again. */ text: string } & SearchAnswer)
   | { type: 'search/status'; status: IndexStatus }
   | { type: 'search/focus-first' };
 

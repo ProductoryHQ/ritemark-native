@@ -214,7 +214,7 @@ export class SearchPanelController {
       }
     }
     this.byKey = new Map(answer.groups.flatMap((group) => group.results.map((result) => [result.key, result] as const)));
-    this.shown = { ...answer, type: 'search/results', queryId: seq, expanded };
+    this.shown = { ...answer, type: 'search/results', queryId: seq, expanded, text };
     this.deps.post(this.shown);
   }
 
