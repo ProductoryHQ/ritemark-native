@@ -63,11 +63,15 @@ test('the occurrence; the last match when the page has fewer; -1 with none', () 
   assert.equal(landingIndex(request, 0), -1)
 })
 
-test('PDF: past the end, the first match at or after its page', () => {
-  const request = { text: 'a', occurrence: 9, page: 3, id: 1 }
+test('PDF: the occurrence when it is on the passage’s page, else the first match at or after that page', () => {
   const pages = [1, 2, 3, 3, 5]
-  assert.equal(landingIndex(request, pages.length, (i) => pages[i]), 2)
-  assert.equal(landingIndex({ ...request, page: 9 }, pages.length, (i) => pages[i]), 4)
+  const pageOf = (i: number) => pages[i]
+  assert.equal(landingIndex({ text: 'a', occurrence: 3, page: 3, id: 1 }, pages.length, pageOf), 3)
+  // The preview counted footers the index left out: occurrence 1 is on page 2, the passage on page 3.
+  assert.equal(landingIndex({ text: 'a', occurrence: 1, page: 3, id: 1 }, pages.length, pageOf), 2)
+  assert.equal(landingIndex({ text: 'a', occurrence: 9, page: 3, id: 1 }, pages.length, pageOf), 2)
+  assert.equal(landingIndex({ text: 'a', occurrence: 9, page: 4, id: 1 }, pages.length, pageOf), 4)
+  assert.equal(landingIndex({ text: 'a', occurrence: 0, page: 9, id: 1 }, pages.length, pageOf), 0, 'no match that late: the occurrence')
 })
 
 test('isRequestQuery: the same words, whatever their case or surrounding space; not other words', () => {

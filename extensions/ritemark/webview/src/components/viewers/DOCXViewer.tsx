@@ -527,6 +527,7 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
     searchRef.current?.focus()
   }, [])
   const closeSearch = useCallback(() => {
+    landing.current = null
     setSearchOpen(false)
     setQuery('')
     scrollerRef.current?.focus()

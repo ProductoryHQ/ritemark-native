@@ -40,14 +40,16 @@ export function decodeFindOpen(message: unknown, id: number): FindRequest | null
 /**
  * Which match to land on, once the find bar has `count` matches for the request's text: its occurrence, or the
  * last match when the document has fewer (the page's text and the index's can differ by a match). -1 for none.
- * `pageOf` (PDF): a match's page; an occurrence past the end then lands on the first match at or after `page`.
+ * `pageOf` (PDF): a match's page. The preview's text and the index's may count a word differently, so when the
+ * occurrence isn't on the passage's page, the first match at or after that page wins.
  */
 export function landingIndex(request: FindRequest, count: number, pageOf?: (index: number) => number): number {
   if (count <= 0) return -1
-  if (request.occurrence < count) return request.occurrence
   if (pageOf && request.page) {
+    if (request.occurrence < count && pageOf(request.occurrence) === request.page) return request.occurrence
     for (let i = 0; i < count; i++) if (pageOf(i) >= request.page) return i
   }
+  if (request.occurrence < count) return request.occurrence
   return count - 1
 }
 

@@ -203,6 +203,8 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
   // Sprint 148 (R9): a search result's match, until the index has matches to land on; the bar it opens leaves
   // the keyboard where it was.
   const landing = useRef<FindRequest | null>(null)
+  // The match a landing reveals: the reveal waits for it, not for the match current while the new words settle.
+  const landedAt = useRef<number | null>(null)
   const [landingVersion, setLandingVersion] = useState(0)
   const [searchAutoFocus, setSearchAutoFocus] = useState(true)
   const currentPageRef = useRef(1)
@@ -417,12 +419,15 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
 
   const openSearch = useCallback(() => {
     landing.current = null
+    landedAt.current = null
     setSearchAutoFocus(true)
     setSearchOpen(true)
     ensureSearchIndex()
     searchRef.current?.focus()
   }, [ensureSearchIndex])
   const closeSearch = useCallback(() => {
+    landing.current = null
+    landedAt.current = null
     setSearchOpen(false)
     setQuery('')
     containerRef.current?.focus()
@@ -452,7 +457,9 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
     const wanted = landing.current
     if (wanted && isRequestQuery(wanted, deferredQuery)) {
       landing.current = null
-      setCurrentMatch(landingIndex(wanted, matches.length, (i) => searchIndex.locations[matches[i].start.chunk].page))
+      const index = landingIndex(wanted, matches.length, (i) => searchIndex.locations[matches[i].start.chunk].page)
+      landedAt.current = index
+      setCurrentMatch(index)
       revealMatch.current = true
       return
     }
@@ -465,6 +472,7 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
   }, [matches, searchIndex, landingVersion])
 
   const stepSearch = useCallback((direction: 1 | -1) => {
+    landedAt.current = null
     revealMatch.current = true
     setCurrentMatch((c) => stepMatch(c, matches.length, direction))
   }, [matches.length])
@@ -475,6 +483,7 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
   // renderedVersion); once the match is in view it leaves the scroll alone.
   useEffect(() => {
     if (!revealMatch.current || !searchIndex || currentMatch < 0) return
+    if (landedAt.current !== null && landedAt.current !== currentMatch) return
     const match = matches[currentMatch]
     const container = containerRef.current
     if (!match || !container) return
@@ -486,6 +495,7 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
     const range = matchRanges[currentMatch]
     if (!range) return
     revealMatch.current = false
+    landedAt.current = null
     scrollPageIntoView(container, targetPage)
     const rect = range.getBoundingClientRect()
     const view = container.getBoundingClientRect()
@@ -581,6 +591,7 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
             query={query}
             onQueryChange={(next) => {
               landing.current = null
+              landedAt.current = null
               setQuery(next)
             }}
             autoFocus={searchAutoFocus}
