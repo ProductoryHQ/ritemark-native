@@ -1,22 +1,27 @@
 /**
- * Ritemark Settings Component
- *
- * Branded settings page for API keys and feature configuration.
+ * Ritemark Settings (Sprint 147, experience 15): a tab of plain sections, AI accounts, Appearance, Sharing, Usage data,
+ * Updates and Advanced (`settingsSections.ts`), drawn by `SettingsPage.tsx`. This component holds the page's data and
+ * sends today's messages; each section draws its rows. AI accounts holds today's Claude, ChatGPT, OpenCode and API key
+ * cards, moved whole (PR 2 redraws them). `settingsInventory.test.ts` holds the page to every message, setting and key.
  */
 
 import { useState, useEffect } from 'react';
 import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
-import { AdvancedSettingsLink } from './AdvancedSettingsLink';
-import { Switch } from '../ui/switch';
+import { Tooltip } from '../ui/tooltip';
 import { vscode } from '../../lib/vscode';
-import { Slider } from '../ui/slider';
 import { AI_INFORMATION_URL } from '../ai-sidebar/aiDisclosure';
 import { GoogleDocsSettingsCard, type GoogleDocsSettingsProjection } from './GoogleDocsSettingsCard';
-import { extensionVersionLabel } from './versionLabel';
 import { PLAN_LINES } from '../welcome/welcomeCopy';
+import { SettingsPage } from './SettingsPage';
+import { FIRST_SECTION, SETTINGS_SECTIONS, landingFor, type SettingsSectionId } from './settingsSections';
+import { ExternalLink, SettingsGroup, SettingsNote, TipButton } from './SettingsRow';
+import { AppearanceSection } from './AppearanceSection';
+import { UsageDataSection } from './UsageDataSection';
+import { UpdatesSection, updatesLede } from './UpdatesSection';
+import { AdvancedSection } from './AdvancedSection';
 
-interface SettingsData {
+export interface SettingsData {
   codexIntegration: boolean;
   codexApprovalPolicy: 'untrusted' | 'on-request' | 'on-failure' | 'never';
   codexSandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access';
@@ -155,8 +160,15 @@ interface TestResult {
   message?: string;
 }
 
-export function RitemarkSettings() {
-  const [settings, setSettings] = useState<SettingsData | null>(null);
+/** A first state, for render tests from a recorded payload (the page itself starts empty and asks the host). */
+export interface RitemarkSettingsInitial {
+  settings?: SettingsData;
+  section?: SettingsSectionId;
+  codexAuth?: CodexAuthStatus;
+}
+
+export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitial } = {}) {
+  const [settings, setSettings] = useState<SettingsData | null>(initial?.settings ?? null);
   const [openaiKey, setOpenaiKey] = useState('');
   const [googleKey, setGoogleKey] = useState('');
   const [anthropicKey, setAnthropicKey] = useState('');
@@ -178,13 +190,13 @@ export function RitemarkSettings() {
   // — prevents a "stuck updating" UI like Jarmo hit on 2026-05-07).
   const [updateCheckClickedAt, setUpdateCheckClickedAt] = useState<number | null>(null);
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
-  const [localAgentTimeout, setLocalAgentTimeout] = useState(15);
-  const [localChatFontSize, setLocalChatFontSize] = useState(13);
-  const [codexAuth, setCodexAuth] = useState<CodexAuthStatus>({ enabled: false });
+  const [codexAuth, setCodexAuth] = useState<CodexAuthStatus>(initial?.codexAuth ?? { enabled: false });
   const [codexLoading, setCodexLoading] = useState(false);
-  const [googleDocs, setGoogleDocs] = useState<GoogleDocsSettingsProjection | null>(null);
-  // Another feature opened Settings to show one section (Sprint 119).
-  const [focusSection, setFocusSection] = useState<string | null>(null);
+  const [googleDocs, setGoogleDocs] = useState<GoogleDocsSettingsProjection | null>(initial?.settings?.googleDocs ?? null);
+  // Sprint 147 (R2): one section at a time; AI accounts first (I62, I63)
+  const [section, setSection] = useState<SettingsSectionId>(initial?.section ?? FIRST_SECTION);
+  // Another feature opened Settings at one of today's five names (Sprint 119; I61): the row to bring into view there
+  const [focusAnchor, setFocusAnchor] = useState<string | null>(null);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -194,8 +206,6 @@ export function RitemarkSettings() {
         case 'settings':
           setSettings(message.data);
           setGoogleDocs(message.data.googleDocs ?? null);
-          setLocalAgentTimeout(message.data.agentTimeout || 15);
-          setLocalChatFontSize(message.data.chatFontSize || 13);
           // Don't overwrite user input if they're typing
           if (!openaiKey && message.data.openaiKey) {
             setOpenaiKey(message.data.openaiKey);
@@ -236,9 +246,12 @@ export function RitemarkSettings() {
           setGoogleDocs(message.projection ?? null);
           break;
 
-        case 'settings:focus-section':
-          if (typeof message.section === 'string') setFocusSection(message.section);
+        case 'settings:focus-section': {
+          const landing = landingFor(message.section);
+          setSection(landing.section);
+          setFocusAnchor(landing.anchor ?? null);
           break;
+        }
       }
     };
 
@@ -248,14 +261,14 @@ export function RitemarkSettings() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  // Scroll to a requested section once it has rendered.
+  // Bring a way in's row into view once its section has drawn it.
   useEffect(() => {
-    if (!focusSection || !settings) return;
-    const target = document.getElementById(`settings-section-${focusSection}`);
+    if (!focusAnchor || !settings) return;
+    const target = document.getElementById(focusAnchor);
     if (!target) return;
     target.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    setFocusSection(null);
-  }, [focusSection, settings, googleDocs]);
+    setFocusAnchor(null);
+  }, [focusAnchor, settings, googleDocs, section]);
 
   // Reset the manual update-check click marker as soon as the backend reports
   // a non-checking state, OR after 15s as a safety net (prevents a stuck
@@ -347,106 +360,19 @@ export function RitemarkSettings() {
     );
   }
 
+  const checkingUpdates = settings.updateCenter.state === 'checking' || updateCheckClickedAt !== null;
+
   return (
-    <div className="max-w-3xl mx-auto p-8 text-ink-body">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-[-0.02em] text-ink-strong mb-2">
-          Ritemark Settings
-        </h1>
-        <p className="text-sm text-ink-muted">
-          Configure API keys and features for Ritemark AI.
-        </p>
-      </div>
-
-      {/* Appearance Section */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Icon name="palette" size={20} className="text-ink-strong" />
-          <h2 className="text-lg font-semibold text-ink-strong">
-            Appearance
-          </h2>
-        </div>
-
-        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(settings.availableThemes || []).map((theme) => (
-              <ThemePreviewCard
-                key={theme.id}
-                theme={theme}
-                selected={settings.currentTheme === theme.id}
-                onSelect={() => handleThemeChange(theme.id)}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Agent Runtime Section */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Icon name="gear" size={20} className="text-ink-strong" />
-          <h2 className="text-lg font-semibold text-ink-strong">
-            Agent Runtime
-          </h2>
-        </div>
-        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm">
-          <label className="text-sm font-medium text-ink-strong block mb-1">
-            Runtime preference
-          </label>
-          <select
-            value={settings.agentRuntimePreference ?? 'bundled'}
-            onChange={(e) => handleSettingChange('agentRuntime.preference', e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
-          >
-            <option value="bundled">Bundled (recommended) — use the runtimes that ship with Ritemark</option>
-            <option value="system">Use system install — prefer ChatGPT and Claude installed on PATH; bundled is fallback</option>
-          </select>
-          <p className="text-xs text-ink-muted mt-1">
-            Applies to both ChatGPT and Claude. Bundled runtimes are pinned per Ritemark release; choose "system install" if you want to use your own up-to-date or custom builds.
-          </p>
-
-          {settings.environment && (
-            <SystemToolRows environment={settings.environment} showNode={settings.agentRuntimePreference === 'system'} />
-          )}
-
-          <div className="mt-4 pt-4 border-t border-hairline space-y-2">
-            <div className="text-xs font-medium text-ink-strong">Currently active</div>
-            <div className="grid gap-2 sm:grid-cols-2 text-xs">
-              <div className="flex items-center justify-between p-2 rounded bg-surface-soft">
-                <span className="text-ink-muted">Claude</span>
-                <span className="text-ink-strong">
-                  {getSourceChipLabel(settings.componentStatus.claudeCode.runtimeStatus.source) ?? 'Not detected'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded bg-surface-soft">
-                <span className="text-ink-muted">ChatGPT</span>
-                <span className="text-ink-strong">
-                  {getSourceChipLabel(settings.componentStatus.codex.runtimeStatus.source) ?? 'Not detected'}
-                </span>
-              </div>
-            </div>
-            {settings.agentRuntimePreference === 'system'
-              && (settings.componentStatus.claudeCode.runtimeStatus.source === 'bundled'
-                || settings.componentStatus.codex.runtimeStatus.source === 'bundled') && (
-              <p className="text-xs text-ink-muted mt-2">
-                One or more agents fell back to the bundled runtime because no system install was found on PATH.
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* API Keys Section */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Icon name="key" size={20} className="text-ink-strong" />
-          <h2 className="text-lg font-semibold text-ink-strong">
-            API Keys
-          </h2>
-        </div>
-
-        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm mb-6">
+    <SettingsPage
+      sections={SETTINGS_SECTIONS}
+      section={section}
+      onSectionChange={setSection}
+      lede={{ updates: updatesLede(settings.updateCenter, checkingUpdates) }}
+    >
+      {{
+        'ai-accounts': (
+          <>
+        <div data-settings-row="I7 I8 I9 I10 I11 I12 I13 I14 I15 I16 I18 I19" className="p-5 rounded-lg bg-surface border border-hairline shadow-sm mb-6">
           <div className="flex items-center justify-between mb-2">
             <div>
               {/* Sprint 144 P2: no "Experimental" badge; Claude is one of Ritemark's main AIs (experience 15) */}
@@ -469,12 +395,12 @@ export function RitemarkSettings() {
               <p className="text-xs text-ink-muted mb-3">
                 Install Claude to use Claude agent mode in Ritemark.
               </p>
-              <Button
+              <TipButton tip={'Installs Claude for Ritemark'}
  onClick={() => handleClaudeAction('claude:install')}
  
  >
                 Install Claude
-              </Button>
+              </TipButton>
             </>
           ) : settings.componentStatus.claudeCode.state === 'broken' ? (
             <>
@@ -483,19 +409,19 @@ export function RitemarkSettings() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {settings.componentStatus.claudeCode.repairAction === 'reload' ? (
-                  <Button
+                  <TipButton tip={'Reloads this window to finish the repair'}
  onClick={() => handleClaudeAction('claude:reload')}
  
  >
                     Reload Window
-                  </Button>
+                  </TipButton>
                 ) : (
-                  <Button
+                  <TipButton tip={"Repairs Claude's runtime"}
  onClick={() => handleClaudeAction('claude:repair')}
  
  >
                     Repair Claude
-                  </Button>
+                  </TipButton>
                 )}
               </div>
             </>
@@ -506,24 +432,22 @@ export function RitemarkSettings() {
                 {PLAN_LINES.claude} Choose Claude.ai for the simplest setup, or paste an Anthropic API key if you prefer.
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button
+                <TipButton tip={"Opens Claude's sign-in in your browser"}
                   onClick={() => handleClaudeAction('claude:login')}
                   size="lg"
                 >
                   Sign in with Claude.ai
-                </Button>
-                <Button
+                </TipButton>
+                <TipButton tip={'Asks for your Anthropic API key'}
                   onClick={() => handleClaudeAction('claude:enterApiKey')}
                   variant="secondary" size="lg"
                 >
                   Use Anthropic API key
-                </Button>
+                </TipButton>
               </div>
               <p className="text-xs text-ink-faint mt-3">
                 Don&apos;t have an API key? Get one at{' '}
-                <a href="https://console.anthropic.com/" className="text-accent-deep hover:underline">
-                  console.anthropic.com
-                </a>
+                <ExternalLink url="https://console.anthropic.com/">console.anthropic.com</ExternalLink>
                 .
               </p>
             </>
@@ -532,12 +456,12 @@ export function RitemarkSettings() {
               <p className="text-xs text-ink-muted mb-3">
                 Sign-in opened in your browser. Authorize to finish — Ritemark will refresh automatically.
               </p>
-              <Button
+              <TipButton tip={"Stops waiting for Claude's sign-in"}
                 onClick={() => handleClaudeAction('claude:cancelLogin')}
                 variant="secondary" size="lg"
               >
                 Cancel sign-in
-              </Button>
+              </TipButton>
             </>
           ) : (
             <>
@@ -565,27 +489,27 @@ export function RitemarkSettings() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {settings.componentStatus.claudeCode.authMethod === 'claude-oauth' && (
-                  <Button
+                  <TipButton tip={'Signs Claude out of your Claude.ai account here'}
                     onClick={() => handleClaudeAction('claude:logout')}
                     variant="secondary" size="lg"
                   >
                     Sign Out
-                  </Button>
+                  </TipButton>
                 )}
                 {settings.componentStatus.claudeCode.authMethod === 'api-key' && (
-                  <Button
+                  <TipButton tip={"Opens Claude's sign-in in your browser"}
                     onClick={() => handleClaudeAction('claude:login')}
                     variant="secondary" size="lg"
                   >
                     Switch to Claude.ai sign-in
-                  </Button>
+                  </TipButton>
                 )}
-                <Button
+                <TipButton tip={'Asks Claude for its state again'}
                   onClick={() => handleClaudeAction('claude:refreshStatus')}
                   variant="secondary" size="lg"
                 >
                   Refresh Status
-                </Button>
+                </TipButton>
               </div>
             </>
           )}
@@ -607,29 +531,21 @@ export function RitemarkSettings() {
                     {detail}
                   </div>
                 ))}
-                <button
-                  onClick={() => handleClaudeAction('claude:refreshStatus')}
-                  className="text-xs text-accent-deep hover:underline bg-transparent border-none p-0"
-                >
+                <TipButton tip="Asks Claude for its state again" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => handleClaudeAction('claude:refreshStatus')}>
                   Refresh Status
-                </button>
+                </TipButton>
               </div>
             </details>
           )}
 
           <p className="text-xs text-ink-muted mt-3">
             Used for: Claude agents (autonomous file work), Claude Flow nodes
-            <a
-              href="https://docs.anthropic.com/en/docs/claude-code/setup"
-              className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
-            >
-              Learn more <Icon name="arrow-square-out" size={12} />
-            </a>
+            <ExternalLink url="https://docs.anthropic.com/en/docs/claude-code/setup" className="ml-2">Learn more</ExternalLink>
           </p>
         </div>
 
         {/* Codex ChatGPT Auth. Sprint 144 P2: no "Experimental" badge (experience 15) */}
-        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm mb-6">
+        <div data-settings-row="I20 I21 I22 I23 I24 I25 I26 I27" className="p-5 rounded-lg bg-surface border border-hairline shadow-sm mb-6">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <label className="text-sm font-medium text-ink-strong">
@@ -675,24 +591,24 @@ export function RitemarkSettings() {
                   </div>
                 )}
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button
+                  <TipButton tip={"Repairs ChatGPT's runtime"}
                     onClick={() => vscode.postMessage({ type: 'codex:repair' })}
                     size="lg"
                   >
                     Repair ChatGPT
-                  </Button>
-                  <Button
+                  </TipButton>
+                  <TipButton tip={'Reloads this window'}
                     onClick={() => vscode.postMessage({ type: 'updates:reload' })}
                     variant="secondary" size="lg"
                   >
                     Reload Window
-                  </Button>
-                  <Button
+                  </TipButton>
+                  <TipButton tip={'Asks ChatGPT for its state again'}
                     onClick={() => vscode.postMessage({ type: 'codex:refreshStatus' })}
                     variant="secondary" size="lg"
                   >
                     Refresh Status
-                  </Button>
+                  </TipButton>
                 </div>
                 {codexAuth.repairCommand && (
                   <p className="text-xs text-ink-muted mt-2">
@@ -708,14 +624,11 @@ export function RitemarkSettings() {
                 <div className="flex flex-wrap gap-2">
                   {codexLoading ? (
                     <>
-                      <button
-                        disabled
-                        className="px-[18px] py-[10px] text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-ritemark-accent opacity-70 flex items-center gap-2 cursor-default"
-                      >
+                      <TipButton tip="Waiting for ChatGPT's sign-in in your browser" disabled aria-busy size="lg">
                         <Icon name="circle-notch" size={16} className="animate-spin" />
                         Opening browser...
-                      </button>
-                      <Button
+                      </TipButton>
+                      <TipButton tip={"Stops waiting for ChatGPT's sign-in"}
                         onClick={() => {
                           setCodexLoading(false);
                           vscode.postMessage({ type: 'codex:cancelLogin' });
@@ -723,10 +636,10 @@ export function RitemarkSettings() {
                         variant="secondary" size="lg"
                       >
                         Cancel sign-in
-                      </Button>
+                      </TipButton>
                     </>
                   ) : (
-                    <Button
+                    <TipButton tip={"Opens ChatGPT's sign-in in your browser"}
                       onClick={() => {
                         setCodexLoading(true);
                         vscode.postMessage({ type: 'codex:startLogin' });
@@ -734,7 +647,7 @@ export function RitemarkSettings() {
                       size="lg"
                     >
                       Sign in with ChatGPT
-                    </Button>
+                    </TipButton>
                   )}
                 </div>
                 {codexAuth.error && (
@@ -769,86 +682,35 @@ export function RitemarkSettings() {
                     </div>
                   )}
                 </div>
-                <Button
+                <TipButton tip={'Signs ChatGPT out here'}
                   onClick={() => vscode.postMessage({ type: 'codex:logout' })}
                   variant="secondary" size="lg"
                 >
                   Sign Out
-                </Button>
+                </TipButton>
               </>
             )}
 
             <p className="text-xs text-ink-muted mt-3">
               Used for: ChatGPT in chats, flows and the task board
-              <a
-                href="https://developers.openai.com/codex/cli"
-                className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
-              >
-                Learn more <Icon name="arrow-square-out" size={12} />
-              </a>
+              <ExternalLink url="https://developers.openai.com/codex/cli" className="ml-2">Learn more</ExternalLink>
             </p>
 
-            {/* Codex Approval & Sandbox settings — only show when Codex is enabled */}
-            {settings.codexIntegration && (
-              <div className="mt-4 pt-4 border-t border-hairline space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-ink-strong block mb-1">
-                    Approval Policy
-                  </label>
-                  <select
-                    value={settings.codexApprovalPolicy || 'untrusted'}
-                    onChange={(e) => handleSettingChange('codex.approvalPolicy', e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
-                  >
-                    <option value="untrusted">Ask before every command and file change (safest)</option>
-                    <option value="on-request">Ask only for operations outside workspace</option>
-                    <option value="on-failure">Auto-approve, ask only on failure</option>
-                    <option value="never">Never ask — run everything automatically</option>
-                  </select>
-                  <p className="text-xs text-ink-muted mt-1">
-                    Controls when ChatGPT asks for your approval before executing shell commands or modifying files.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-ink-strong block mb-1">
-                    Sandbox Mode
-                  </label>
-                  <select
-                    value={settings.codexSandboxMode || 'workspace-write'}
-                    onChange={(e) => handleSettingChange('codex.sandboxMode', e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
-                  >
-                    <option value="read-only">Read only — ChatGPT can only read files</option>
-                    <option value="workspace-write">Workspace write — read and write within project (recommended)</option>
-                    <option value="danger-full-access">Full access — includes network and system (use with caution)</option>
-                  </select>
-                  <p className="text-xs text-ink-muted mt-1">
-                    Controls what ChatGPT is allowed to do on your filesystem.
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
 
         {/* OpenCode runtime settings — only when the opencode-integration flag is on */}
         {settings.opencodeEnabled && (
-          <div className="mb-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+          <div data-settings-row="I30" className="mb-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
             <label className="text-sm font-medium text-ink-strong block mb-1">
               OpenCode
             </label>
             <p className="text-xs text-ink-muted mb-2">{PLAN_LINES.opencode}</p>
-            <ToggleRow
-              label="Auto-approve edits & tool calls"
-              description="Skip the approval card and let OpenCode edit files and run tools within the workspace automatically. Writes outside the workspace are still blocked. Use with caution."
-              checked={settings.opencodeAutoApprove ?? false}
-              onChange={(v) => handleToggle('opencode.autoApprove', v)}
-            />
           </div>
         )}
 
+        <SettingsGroup>Other ways to connect: API keys</SettingsGroup>
         {/* OpenAI; an OpenAI step's "Add it in Settings" opens the page here (Sprint 145, #580) */}
-        <div id="settings-section-openai-api-key" className="mb-6 scroll-mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+        <div id="settings-section-openai-api-key" data-settings-row="I32 I37 I38" className="mb-6 scroll-mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-ink-strong">
               OpenAI API Key
@@ -870,27 +732,26 @@ export function RitemarkSettings() {
                 placeholder="sk-..."
                 className="w-full px-3 py-2 pr-10 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
               />
-              <button
-                onClick={() => setShowOpenaiKey(!showOpenaiKey)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-ink-muted hover:text-ink-strong"
-              >
-                {showOpenaiKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
-              </button>
+              <Tooltip label={showOpenaiKey ? 'Hide the key' : 'Show the key'} className="absolute right-1 top-1/2 -translate-y-1/2">
+                <Button variant="ghost" size="icon-sm" aria-label={showOpenaiKey ? 'Hide the key' : 'Show the key'} onClick={() => setShowOpenaiKey(!showOpenaiKey)}>
+                  {showOpenaiKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
+                </Button>
+              </Tooltip>
             </div>
-            <Button
+            <TipButton tip={settings.openaiKeyConfigured ? 'Asks the service whether the saved key works' : 'Save a key first, then test it'}
               onClick={() => handleSaveApiKey('openai-api-key', openaiKey)}
               size="lg"
             >
               Save
-            </Button>
-            <Button
+            </TipButton>
+            <TipButton tip={settings.openaiKeyConfigured ? 'Asks the service whether the saved key works' : 'Save a key first, then test it'}
               onClick={() => handleTestApiKey('openai-api-key')}
               disabled={!settings.openaiKeyConfigured || testingOpenai}
               variant="secondary"
               size="lg"
             >
               {testingOpenai ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
-            </Button>
+            </TipButton>
           </div>
 
           {testResults.openai && (
@@ -916,17 +777,12 @@ export function RitemarkSettings() {
           <p className="text-xs text-ink-muted mt-2">
             {/* No model's name here: the image steps' default moves with modelConfig (it named GPT Image 1.5 after the default became GPT Image 2) */}
             Used for: AI Chat, Flows (LLM), Image Generation{settings.opencodeEnabled ? ', OpenCode (GPT models)' : ''}
-            <a
-              href="https://platform.openai.com/api-keys"
-              className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
-            >
-              Get API key <Icon name="arrow-square-out" size={12} />
-            </a>
+            <ExternalLink url="https://platform.openai.com/api-keys" className="ml-2">Get API key</ExternalLink>
           </p>
         </div>
 
         {/* Google AI; a Google image step's "Add it in Settings" opens the page here (Sprint 144) */}
-        <div id="settings-section-google-ai-key" className="scroll-mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+        <div id="settings-section-google-ai-key" data-settings-row="I33" className="scroll-mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-ink-strong">
               Google AI API Key
@@ -949,27 +805,26 @@ export function RitemarkSettings() {
                 placeholder="AIza..."
                 className="w-full px-3 py-2 pr-10 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
               />
-              <button
-                onClick={() => setShowGoogleKey(!showGoogleKey)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-ink-muted hover:text-ink-strong"
-              >
-                {showGoogleKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
-              </button>
+              <Tooltip label={showGoogleKey ? 'Hide the key' : 'Show the key'} className="absolute right-1 top-1/2 -translate-y-1/2">
+                <Button variant="ghost" size="icon-sm" aria-label={showGoogleKey ? 'Hide the key' : 'Show the key'} onClick={() => setShowGoogleKey(!showGoogleKey)}>
+                  {showGoogleKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
+                </Button>
+              </Tooltip>
             </div>
-            <Button
+            <TipButton tip={settings.googleKeyConfigured ? 'Asks the service whether the saved key works' : 'Save a key first, then test it'}
               onClick={() => handleSaveApiKey('google-ai-key', googleKey)}
               size="lg"
             >
               Save
-            </Button>
-            <Button
+            </TipButton>
+            <TipButton tip={settings.googleKeyConfigured ? 'Asks the service whether the saved key works' : 'Save a key first, then test it'}
               onClick={() => handleTestApiKey('google-ai-key')}
               disabled={!settings.googleKeyConfigured || testingGoogle}
               variant="secondary"
               size="lg"
             >
               {testingGoogle ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
-            </Button>
+            </TipButton>
           </div>
 
           {testResults.google && (
@@ -994,16 +849,11 @@ export function RitemarkSettings() {
 
           <p className="text-xs text-ink-muted mt-2">
             Used for: {settings.opencodeEnabled ? 'Gemini models in OpenCode, Flows' : 'Gemini models, Flows'}
-            <a
-              href="https://aistudio.google.com/apikey"
-              className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
-            >
-              Get API key <Icon name="arrow-square-out" size={12} />
-            </a>
+            <ExternalLink url="https://aistudio.google.com/apikey" className="ml-2">Get API key</ExternalLink>
           </p>
         </div>
         {/* Anthropic */}
-        <div className="mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+        <div data-settings-row="I34" className="mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-ink-strong">
               Anthropic API Key
@@ -1026,27 +876,26 @@ export function RitemarkSettings() {
                 placeholder="sk-ant-..."
                 className="w-full px-3 py-2 pr-10 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
               />
-              <button
-                onClick={() => setShowAnthropicKey(!showAnthropicKey)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-ink-muted hover:text-ink-strong"
-              >
-                {showAnthropicKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
-              </button>
+              <Tooltip label={showAnthropicKey ? 'Hide the key' : 'Show the key'} className="absolute right-1 top-1/2 -translate-y-1/2">
+                <Button variant="ghost" size="icon-sm" aria-label={showAnthropicKey ? 'Hide the key' : 'Show the key'} onClick={() => setShowAnthropicKey(!showAnthropicKey)}>
+                  {showAnthropicKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
+                </Button>
+              </Tooltip>
             </div>
-            <Button
+            <TipButton tip={settings.anthropicKeyConfigured ? 'Asks the service whether the saved key works' : 'Save a key first, then test it'}
               onClick={() => handleSaveApiKey('anthropic-api-key', anthropicKey)}
               size="lg"
             >
               Save
-            </Button>
-            <Button
+            </TipButton>
+            <TipButton tip={settings.anthropicKeyConfigured ? 'Asks the service whether the saved key works' : 'Save a key first, then test it'}
               onClick={() => handleTestApiKey('anthropic-api-key')}
               disabled={!settings.anthropicKeyConfigured || testingAnthropic}
               variant="secondary"
               size="lg"
             >
               {testingAnthropic ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
-            </Button>
+            </TipButton>
           </div>
 
           {testResults.anthropic && (
@@ -1071,18 +920,13 @@ export function RitemarkSettings() {
 
           <p className="text-xs text-ink-muted mt-2">
             Used for: Claude in Ritemark (alternative to signing in with Claude.ai){settings.opencodeEnabled ? ', OpenCode (Claude models)' : ''}
-            <a
-              href="https://console.anthropic.com/settings/keys"
-              className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
-            >
-              Get API key <Icon name="arrow-square-out" size={12} />
-            </a>
+            <ExternalLink url="https://console.anthropic.com/settings/keys" className="ml-2">Get API key</ExternalLink>
           </p>
         </div>
 
         {/* OpenRouter API Key — optional, flag-gated */}
         {settings.openrouterEnabled && (
-          <div className="mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+          <div data-settings-row="I35" className="mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-ink-strong">
                 OpenRouter API Key
@@ -1105,27 +949,26 @@ export function RitemarkSettings() {
                   placeholder="sk-or-..."
                   className="w-full px-3 py-2 pr-10 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
                 />
-                <button
-                  onClick={() => setShowOpenrouterKey(!showOpenrouterKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-ink-muted hover:text-ink-strong"
-                >
-                  {showOpenrouterKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
-                </button>
+                <Tooltip label={showOpenrouterKey ? 'Hide the key' : 'Show the key'} className="absolute right-1 top-1/2 -translate-y-1/2">
+                  <Button variant="ghost" size="icon-sm" aria-label={showOpenrouterKey ? 'Hide the key' : 'Show the key'} onClick={() => setShowOpenrouterKey(!showOpenrouterKey)}>
+                    {showOpenrouterKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
+                  </Button>
+                </Tooltip>
               </div>
-              <Button
+              <TipButton tip={settings.openrouterKeyConfigured ? 'Asks the service whether the saved key works' : 'Save a key first, then test it'}
                 onClick={() => handleSaveApiKey('openrouter-api-key', openrouterKey)}
                 size="lg"
               >
                 Save
-              </Button>
-              <Button
+              </TipButton>
+              <TipButton tip={settings.openrouterKeyConfigured ? 'Asks the service whether the saved key works' : 'Save a key first, then test it'}
                 onClick={() => handleTestApiKey('openrouter-api-key')}
                 disabled={!settings.openrouterKeyConfigured || testingOpenrouter}
                 variant="secondary"
                 size="lg"
               >
                 {testingOpenrouter ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
-              </Button>
+              </TipButton>
             </div>
 
             {testResults.openrouter && (
@@ -1150,12 +993,7 @@ export function RitemarkSettings() {
 
             <p className="text-xs text-ink-muted mt-2">
               Used for: OpenCode — hundreds of models from multiple providers through a single key
-              <a
-                href="https://openrouter.ai/keys"
-                className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
-              >
-                Get an OpenRouter key <Icon name="arrow-square-out" size={12} />
-              </a>
+              <ExternalLink url="https://openrouter.ai/keys" className="ml-2">Get an OpenRouter key</ExternalLink>
             </p>
           </div>
         )}
@@ -1164,7 +1002,7 @@ export function RitemarkSettings() {
             Optional: on-device transcription needs no key. What the key buys is
             speaker separation, which the on-device engine cannot do at all. */}
         {settings.transcriptionEnabled && (
-          <div id="settings-section-transcription" className="mt-6 scroll-mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
+          <div id="settings-section-elevenlabs-api-key" data-settings-row="I36" className="mt-6 scroll-mt-6 p-5 rounded-lg bg-surface border border-hairline shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-ink-strong">
                 ElevenLabs API Key
@@ -1187,27 +1025,26 @@ export function RitemarkSettings() {
                   placeholder="sk_..."
                   className="w-full px-3 py-2 pr-10 text-sm rounded bg-surface-soft text-ink-strong border border-hairline-strong focus:outline-none focus:ring-[4px] focus:ring-[var(--r-ring-color)]"
                 />
-                <button
-                  onClick={() => setShowElevenlabsKey(!showElevenlabsKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-ink-muted hover:text-ink-strong"
-                >
-                  {showElevenlabsKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
-                </button>
+                <Tooltip label={showElevenlabsKey ? 'Hide the key' : 'Show the key'} className="absolute right-1 top-1/2 -translate-y-1/2">
+                  <Button variant="ghost" size="icon-sm" aria-label={showElevenlabsKey ? 'Hide the key' : 'Show the key'} onClick={() => setShowElevenlabsKey(!showElevenlabsKey)}>
+                    {showElevenlabsKey ? <Icon name="eye-slash" size={16} /> : <Icon name="eye" size={16} />}
+                  </Button>
+                </Tooltip>
               </div>
-              <Button
+              <TipButton tip={settings.elevenlabsKeyConfigured ? 'Asks the service whether the saved key works' : 'Save a key first, then test it'}
                 onClick={() => handleSaveApiKey('elevenlabs-api-key', elevenlabsKey)}
                 size="lg"
               >
                 Save
-              </Button>
-              <Button
+              </TipButton>
+              <TipButton tip={settings.elevenlabsKeyConfigured ? 'Asks the service whether the saved key works' : 'Save a key first, then test it'}
                 onClick={() => handleTestApiKey('elevenlabs-api-key')}
                 disabled={!settings.elevenlabsKeyConfigured || testingElevenlabs}
                 variant="secondary"
                 size="lg"
               >
                 {testingElevenlabs ? <Icon name="circle-notch" size={16} className="animate-spin" /> : 'Test'}
-              </Button>
+              </TipButton>
             </div>
 
             {testResults.elevenlabs && (
@@ -1233,869 +1070,80 @@ export function RitemarkSettings() {
             <p className="text-xs text-ink-muted mt-2">
               Used for: Transcribe — speaker separation in recordings. On-device transcription works without a
               key, but cannot tell speakers apart. Audio is uploaded to ElevenLabs when you choose this engine.
-              <a
-                href="https://elevenlabs.io/app/settings/api-keys"
-                className="ml-2 inline-flex items-center gap-1 text-accent-deep hover:underline"
-              >
-                Get an ElevenLabs key <Icon name="arrow-square-out" size={12} />
-              </a>
+              <ExternalLink url="https://elevenlabs.io/app/settings/api-keys" className="ml-2">Get an ElevenLabs key</ExternalLink>
             </p>
           </div>
         )}
 
-      </section>
-
-      {/* Google Docs Section (Sprint 119) */}
-      <GoogleDocsSettingsCard projection={googleDocs} />
-
-      {/* Agent Timeout Section */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Icon name="timer" size={20} className="text-ink-strong" />
-          <h2 className="text-lg font-semibold text-ink-strong">
-            Agent Timeout
-          </h2>
-        </div>
-
-        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm">
-          <label className="text-sm font-medium text-ink-strong block mb-2">
-            Inactivity Timeout
-          </label>
-
-          <div className="flex items-center gap-4">
-            <Slider
-              min={5}
-              max={60}
-              step={5}
-              value={[localAgentTimeout]}
-              onValueChange={([v]) => setLocalAgentTimeout(v)}
-              onValueCommit={([v]) => handleSettingChange('ai.agentTimeout', v)}
-              className="flex-1"
-            />
-            <span className="text-sm font-mono w-16 text-right text-ink-strong">
-              {localAgentTimeout} min
-            </span>
-          </div>
-
-          <p className="text-xs text-ink-muted mt-2">
-            Claude will be stopped if it produces no activity for this duration.
-            Increase if the agent times out on complex tasks. Default: 15 minutes.
-          </p>
-
-          <div className="mt-4 pt-4 border-t border-hairline">
-            <ToggleRow
-              label="Debug Trace Logging"
-              description="Log AI agent activity to a temporary file for troubleshooting. Reload window after changing."
-              checked={settings?.debugTrace ?? false}
-              onChange={(v) => handleToggle('ai.debugTrace', v)}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Chat Appearance Section */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Icon name="text-t" size={20} className="text-ink-strong" />
-          <h2 className="text-lg font-semibold text-ink-strong">
-            Chat Appearance
-          </h2>
-        </div>
-
-        <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm">
-          <label className="text-sm font-medium text-ink-strong block mb-2">
-            Chat Font Size
-          </label>
-
-          <div className="flex items-center gap-4">
-            <Slider
-              min={10}
-              max={20}
-              step={1}
-              value={[localChatFontSize]}
-              onValueChange={([v]) => setLocalChatFontSize(v)}
-              onValueCommit={([v]) => handleSettingChange('chat.fontSize', v)}
-              className="flex-1"
-            />
-            <span className="text-sm font-mono w-12 text-right text-ink-strong">
-              {localChatFontSize}px
-            </span>
-          </div>
-
-          <div className="mt-3 p-3 rounded bg-surface-soft border border-hairline-strong">
-            <p
-              className="text-ink-strong"
-              style={{ fontSize: `${localChatFontSize}px` }}
-            >
-              Preview: This is how text will appear in the AI chat interface.
-            </p>
-          </div>
-
-          <p className="text-xs text-ink-muted mt-2">
-            Adjust the font size for the AI chat messages (10-20px).
-          </p>
-        </div>
-      </section>
-
-      {/* Usage data (Sprint 133, R7): the welcome's choice and words; on by default from the welcome (Jarmo, 19 October) */}
-      <section className="mb-8" id="settings-section-usage-data">
-        <div className="flex items-center gap-2 mb-4">
-          <Icon name="shield-check" size={20} className="text-ink-strong" />
-          <h2 className="text-lg font-semibold text-ink-strong">
-            Usage data
-          </h2>
-        </div>
-        <ToggleRow
-          label="Share anonymous usage data to improve Ritemark"
-          description={settings.usageData?.on
-            ? (settings.usageData.fromRitemark1
-              ? 'On, as you chose in Ritemark 1. Never your documents, chats or names.'
-              : 'On. Never your documents, chats or names.')
-            : 'Off. Never your documents, chats or names.'}
-          checked={settings.usageData?.on ?? false}
-          onChange={(value) => {
-            // Answer the click at once, as the theme choice does; the host's resend confirms it.
-            setSettings((prev) => prev ? { ...prev, usageData: { on: value, fromRitemark1: false } } : prev);
-            vscode.postMessage({ type: 'usageData:set', on: value });
-          }}
-        />
-        <p className="text-xs text-ink-muted mt-2">
-          <button type="button" className="underline underline-offset-2 hover:text-ink-strong" onClick={() => vscode.postMessage({ type: 'openExternal', url: 'https://ritemark.app/en/privacy/' })}>Privacy Policy</button>
-          {' · '}
-          <button type="button" className="underline underline-offset-2 hover:text-ink-strong" onClick={() => vscode.postMessage({ type: 'openExternal', url: 'https://ritemark.app/en/terms/' })}>Terms of Use</button>
-        </p>
-      </section>
-
-      {/* Updates Section */}
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-          <Icon name="arrows-clockwise" size={20} className="text-ink-strong" />
-          <h2 className="text-lg font-semibold text-ink-strong">
-            Updates
-          </h2>
-        </div>
-
-        <ToggleRow
-          label="Check for updates on startup"
-          description="Notify when a new version of Ritemark is available"
-          checked={settings.updatesEnabled}
-          onChange={(value) => handleToggle('updates.enabled', value)}
-        />
-
-        <div className="mt-4 p-5 rounded-lg bg-surface border border-hairline shadow-sm space-y-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-sm font-medium text-ink-strong flex items-center gap-2">
-                Update Center
-                <StatusBadge state={settings.updateCenter.state} />
-              </div>
-              <div className="text-xs text-ink-muted mt-1">
-                {/* Sprint 145 (#595): "2.2.0", not the bundled copy's floored "2.2.0-0"; an update's "-ext.N" shows as it is */}
-                App {settings.updateCenter.currentAppVersion} · Extension {extensionVersionLabel(settings.updateCenter.currentExtensionVersion)}
-              </div>
-            </div>
-
-            {(() => {
-              const isCheckingNow = settings.updateCenter.state === 'checking' || updateCheckClickedAt !== null;
-              return (
-                <Button
-                  onClick={() => handleUpdateAction('updates:checkNow')}
-                  variant="secondary"
-                  size="lg"
-                  aria-busy={isCheckingNow}
-                  aria-label={isCheckingNow ? 'Checking for updates' : 'Check now for updates'}
-                >
-                  {isCheckingNow ? (
-                    <Icon name="circle-notch" size={14} className="animate-spin" />
-                  ) : (
-                    <Icon name="arrows-clockwise" size={14} />
-                  )}
-                  {isCheckingNow ? 'Checking…' : 'Check Now'}
-                </Button>
-              );
-            })()}
-          </div>
-
-          <div className="grid gap-2 text-xs text-ink-muted sm:grid-cols-2">
-            <div>Last successful check: {formatTimestamp(settings.updateCenter.lastSuccessfulCheckAt)}</div>
-            <div>Last failed check: {formatTimestamp(settings.updateCenter.lastFailedCheckAt)}</div>
-            <div>Skipped version: {settings.updateCenter.skippedVersion || 'None'}</div>
-            <div>
-              Notifications paused until: {settings.updateCenter.snoozeUntil ? formatTimestamp(settings.updateCenter.snoozeUntil) : 'Not paused'}
-            </div>
-          </div>
-
-          <div className="text-xs text-ink-muted">
-            Update source: {settings.updateCenter.feedSource === 'feed'
-              ? 'Canonical release feed'
-              : settings.updateCenter.feedSource === 'legacy'
-                ? 'Legacy release fallback'
-                : 'No release metadata available'}
-          </div>
-
-          {settings.updateCenter.pendingRestartVersion && (
-            <div className="p-3 rounded bg-accent-soft border border-accent">
-              <div className="text-sm font-medium text-ink-strong">
-                Restart required
-              </div>
-              <div className="text-xs text-ink-muted mt-1">
-                Extension {settings.updateCenter.pendingRestartVersion} is installed and will activate after reload.
-              </div>
-              <Button
- onClick={() => handleUpdateAction('updates:reload')}
- className="mt-3"
- >
-                <Icon name="arrow-counter-clockwise" size={14} />
-                Reload Window
-              </Button>
-            </div>
-          )}
-
-          {settings.updateCenter.availableUpdate && (
-            <div className="p-4 rounded bg-surface-soft border border-hairline-strong">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm font-medium text-ink-strong">
-                    {settings.updateCenter.availableUpdate.action === 'full' ? 'Full app update' : 'Extension update'} {settings.updateCenter.availableUpdate.version}
-                  </div>
-                  <div className="text-xs text-ink-muted mt-1">
-                    {settings.updateCenter.availableUpdate.summary || 'No release summary available.'}
-                  </div>
-                </div>
-                <div className="text-xs text-ink-muted">
-                  {formatSize(settings.updateCenter.availableUpdate.downloadSize)}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2 mt-4">
-                <Button
- onClick={() => handleUpdateAction('updates:install')}
- 
- >
-                  <Icon name="download" size={14} />
-                  {settings.updateCenter.availableUpdate.action === 'full' ? 'Download Installer' : 'Install Update'}
-                </Button>
-                <Button
-                  onClick={() => handleUpdateAction('updates:skipVersion')}
-                  variant="secondary" size="lg"
-                >
-                  Skip This Version
-                </Button>
-                <Button
-                  onClick={() => handleUpdateAction('updates:pause')}
-                  variant="secondary" size="lg"
-                >
-                  Pause 7 Days
-                </Button>
-                {/* snoozeUntil is 0 when not paused; a bare number here would render "0". */}
-                {(Boolean(settings.updateCenter.skippedVersion) || settings.updateCenter.snoozeUntil > 0) && (
-                  <Button
-                    onClick={() => handleUpdateAction('updates:resume')}
-                    variant="secondary" size="lg"
-                  >
-                    Re-enable Notifications
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {settings.updateCenter.state === 'up-to-date' && !settings.updateCenter.pendingRestartVersion && (
-            <div className="text-sm text-ink-strong">
-              Ritemark is up to date.
-            </div>
-          )}
-
-          {settings.updateCenter.state === 'blocked' && settings.updateCenter.blockedReason && (
-            <div className="p-3 rounded bg-ritemark-warning-soft border border-ritemark-warning text-sm text-ink-strong flex items-start gap-2">
-              <Icon name="warning" size={16} className="mt-0.5" />
-              <span>{settings.updateCenter.blockedReason}</span>
-            </div>
-          )}
-
-          {settings.updateCenter.state === 'error' && settings.updateCenter.error && (
-            <div className="p-3 rounded bg-ritemark-error-soft border border-ritemark-error text-sm text-ink-strong">
-              Could not check for updates: {settings.updateCenter.error}
-            </div>
-          )}
-
-          <div>
-            <div className="text-sm font-medium text-ink-strong mb-3">
-              Component readiness
-            </div>
-            {/* The single update trigger lives on the Update Center card
-                above ("Check Now"). Don't duplicate it here — two buttons
-                firing the same action is confusing. */}
-
-            <div className="grid gap-3 md:grid-cols-3">
-              <ComponentCard
-                icon={<Icon name="hard-drive" size={16} />}
-                title="Voice model"
-                status={settings.componentStatus.voiceModel.installed ? 'Installed' : 'Missing'}
-                details={[
-                  `${settings.componentStatus.voiceModel.modelName} (${settings.componentStatus.voiceModel.filename})`,
-                  settings.componentStatus.voiceModel.installed
-                    ? `On disk: ${settings.componentStatus.voiceModel.sizeDisplay}`
-                    : `Download size: ${settings.componentStatus.voiceModel.sizeDisplay}`,
-                  'Managed by Ritemark'
-                ]}
-              />
-
-              <RuntimeStatusCard
-                icon={<Icon name="shield-check" size={16} />}
-                title="Claude"
-                runtimeStatus={settings.componentStatus.claudeCode.runtimeStatus}
-                version={settings.componentStatus.claudeCode.version}
-                sdkVersion={settings.componentStatus.claudeCode.sdkVersion}
-                errorMessage={settings.componentStatus.claudeCode.error}
-                diagnostics={settings.componentStatus.claudeCode.diagnostics}
-              >
-                {settings.componentStatus.claudeCode.repairAction === 'reload' ? (
-                  <button
-                    onClick={() => handleClaudeAction('claude:reload')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-primary-hover hover:shadow-ritemark-accent-md"
-                  >
-                    Reload window
-                  </button>
-                ) : settings.componentStatus.claudeCode.runtimeStatus.runtime === 'missing' ? (
-                  <button
-                    onClick={() => handleClaudeAction('claude:install')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-primary-hover hover:shadow-ritemark-accent-md"
-                  >
-                    Install Claude
-                  </button>
-                ) : settings.componentStatus.claudeCode.runtimeStatus.auth === 'sign_in_required' ? (
-                  <button
-                    onClick={() => handleClaudeAction('claude:login')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-primary-hover hover:shadow-ritemark-accent-md"
-                  >
-                    Sign in with Claude.ai
-                  </button>
-                ) : settings.componentStatus.claudeCode.state === 'auth-in-progress' ? (
-                  <button
-                    onClick={() => handleClaudeAction('claude:refreshStatus')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-transparent text-ink-body hover:bg-surface-soft hover:text-ink-strong transition-colors"
-                  >
-                    Refresh status
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleClaudeAction('claude:refreshStatus')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-transparent text-ink-body hover:bg-surface-soft hover:text-ink-strong transition-colors"
-                  >
-                    Check installation
-                  </button>
-                )}
-                <button
-                  onClick={() => handleClaudeAction('claude:repair')}
-                  className="px-[10px] py-[6px] rounded-[4px] text-xs bg-transparent text-ink-body hover:bg-surface-soft hover:text-ink-strong transition-colors"
-                >
-                  Repair runtime
-                </button>
-              </RuntimeStatusCard>
-
-              <RuntimeStatusCard
-                icon={<Icon name="robot" size={16} />}
-                title="ChatGPT"
-                runtimeStatus={settings.componentStatus.codex.runtimeStatus}
-                version={settings.componentStatus.codex.version}
-                errorMessage={settings.componentStatus.codex.error}
-                diagnostics={settings.componentStatus.codex.diagnostics}
-              >
-                {settings.componentStatus.codex.runtimeStatus.auth === 'sign_in_required' ? (
-                  <button
-                    onClick={() => handleCodexAction('codex:startLogin')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-primary text-primary-foreground shadow-ritemark-accent transition-all active:scale-[0.98] hover:bg-primary-hover hover:shadow-ritemark-accent-md"
-                  >
-                    Sign in with OpenAI
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleCodexAction('codex:refreshStatus')}
-                    className="px-[10px] py-[6px] rounded-[4px] text-xs bg-transparent text-ink-body hover:bg-surface-soft hover:text-ink-strong transition-colors"
-                  >
-                    Check installation
-                  </button>
-                )}
-                <button
-                  onClick={() => handleCodexAction('codex:repair')}
-                  className="px-[10px] py-[6px] rounded-[4px] text-xs bg-transparent text-ink-body hover:bg-surface-soft hover:text-ink-strong transition-colors"
-                >
-                  Repair runtime
-                </button>
-              </RuntimeStatusCard>
-            </div>
-
-            {/* Sprint 108 R12: transcripts live in app storage (D5), so the
-                only way a user can see or reclaim that space is here. */}
-            {settings.transcriptionEnabled && (
-              <div className="mt-3 flex items-start gap-3 p-3 rounded-lg bg-surface border border-hairline">
-                <Icon name="hard-drive" size={16} className="text-ink-muted shrink-0 mt-0.5" />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-ink-strong">Transcription data</div>
-                  <div className="text-xs text-ink-muted mt-0.5">
-                    {transcriptionStorageSummary(settings.transcriptionStorageBytes)} Your recordings and any documents
-                    you saved are stored separately and are not affected.
-                  </div>
-                </div>
-                <Button
-                  onClick={() => vscode.postMessage({ type: 'transcription:clearStorage' })}
-                  disabled={!settings.transcriptionStorageBytes}
-                  variant="secondary"
-                  size="sm"
-                  className="shrink-0"
-                >
-                  Clear
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-8 border-t border-hairline pt-5" aria-labelledby="ai-information-settings">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-2.5">
-            <Icon name="shield-check" size={16} tone="active" className="mt-0.5 shrink-0" />
-            <div>
-              <h2 id="ai-information-settings" className="text-sm font-medium text-ink-strong">
-                AI information
-              </h2>
-              <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
-                Learn which AI services Ritemark uses, what context may be shared, and how to review AI output.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => vscode.postMessage({ type: 'openExternal', url: AI_INFORMATION_URL })}
-            className="inline-flex shrink-0 items-center gap-1 rounded bg-transparent px-2 py-1 text-xs font-medium text-accent-deep hover:bg-surface-soft hover:underline rm-focus-ring"
-          >
-            Open AI information
-            <Icon name="arrow-square-out" size={12} tone="active" />
-          </button>
-        </div>
-      </section>
-
-      {/* Sprint 134 (R23): ⌘, opens this page, so VS Code's own settings need a way in. */}
-      <AdvancedSettingsLink post={(type) => vscode.postMessage({ type })} />
-    </div>
-  );
-}
-
-function formatTimestamp(timestamp: number): string {
-  if (!timestamp) {
-    return 'Never';
-  }
-
-  return new Date(timestamp).toLocaleString();
-}
-
-function formatSize(bytes?: number): string {
-  if (!bytes || bytes <= 0) {
-    return 'Size unknown';
-  }
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-  if (bytes < 1024 * 1024 * 1024) {
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-}
-
-/**
- * Sprint 108 R12. The whole sentence, not just the number: `formatSize` says
- * "Size unknown" at zero, and an empty store needs different words rather than
- * a number glued onto a sentence written for the non-empty case.
- */
-function transcriptionStorageSummary(bytes: number): string {
-  return !bytes || bytes <= 0
-    ? 'No stored transcripts yet.'
-    : `${formatSize(bytes)} of stored transcripts, speaker names and corrections.`;
-}
-
-interface ToggleRowProps {
-  label: string;
-  description: string;
-  checked: boolean;
-  onChange: (value: boolean) => void;
-  badge?: string;
-}
-
-function StatusBadge({ state }: { state: SettingsData['updateCenter']['state'] }) {
-  const label = state === 'update-available'
-    ? 'Update available'
-    : state === 'up-to-date'
-      ? 'Up to date'
-      : state === 'restart-required'
-        ? 'Restart required'
-        : state === 'paused'
-          ? 'Paused'
-          : state === 'blocked'
-            ? 'Blocked'
-            : state === 'error'
-              ? 'Error'
-              : state === 'checking'
-                ? 'Checking'
-                : 'Idle';
-
-  return (
-    <span className="text-xs px-2 py-0.5 rounded bg-accent-soft text-accent-deep">
-      {label}
-    </span>
-  );
-}
-
-function ComponentCard({
-  icon,
-  title,
-  status,
-  details,
-  children,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  status: string;
-  details: string[];
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className="min-w-0 p-4 rounded-lg bg-surface border border-hairline shadow-sm">
-      <div className="flex items-center gap-2 text-sm font-medium text-ink-strong">
-        {icon}
-        {title}
-      </div>
-      <div className="mt-2 text-sm text-ink-strong">{status}</div>
-      <div className="mt-2 space-y-1 text-xs text-ink-muted">
-        {details.map((detail) => (
-          <div key={detail} className="break-words [overflow-wrap:anywhere]">
-            {detail}
-          </div>
-        ))}
-      </div>
-      {children ? <div className="mt-3">{children}</div> : null}
-    </div>
-  );
-}
-
-function getRuntimeStatusCopy(model: RuntimeStatusModel): { label: string; sub: string | null } {
-  if (model.runtime === 'missing') {
-    return { label: 'Runtime missing', sub: 'The agent runtime was not found' };
-  }
-  if (model.runtime === 'architecture_mismatch') {
-    return { label: 'Architecture mismatch', sub: 'The installed runtime does not match this Mac' };
-  }
-  if (model.runtime === 'launch_failed') {
-    return { label: 'Launch failed', sub: 'The runtime could not start — see diagnostics' };
-  }
-  // runtime === 'installed'
-  switch (model.auth) {
-    case 'ready':
-      return { label: 'Ready', sub: null };
-    case 'sign_in_required':
-      return { label: 'Sign in required', sub: 'Runtime is installed — connect your account to continue' };
-    case 'unknown':
-      return { label: 'Status unknown', sub: 'Could not verify account connection' };
-    case 'error':
-      return { label: 'Account error', sub: 'There was a problem verifying your account' };
-  }
-}
-
-function getRuntimeDotClass(model: RuntimeStatusModel): { bg: string; pulse: boolean; ariaLabel: string } {
-  if (model.runtime === 'installed' && model.auth === 'ready') {
-    // Sprint 145 (#578): the one green is the ready dot, in the success token, so it is one colour everywhere
-    return { bg: 'bg-ritemark-success', pulse: false, ariaLabel: 'Status: ready' };
-  }
-  if (model.runtime === 'installed' && model.auth === 'sign_in_required') {
-    return { bg: 'bg-amber-500', pulse: true, ariaLabel: 'Status: attention required' };
-  }
-  if (model.runtime === 'installed') {
-    return { bg: 'bg-amber-500', pulse: false, ariaLabel: 'Status: attention required' };
-  }
-  return { bg: 'bg-rose-500', pulse: false, ariaLabel: 'Status: error' };
-}
-
-function getSourceChipLabel(source: RuntimeStatusModel['source']): string | null {
-  if (source === 'bundled') return 'Bundled with app';
-  if (source === 'system') return 'System installation';
-  return null;
-}
-
-function RuntimeStatusCard({
-  icon,
-  title,
-  runtimeStatus,
-  version,
-  sdkVersion,
-  errorMessage,
-  diagnostics,
-  children,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  runtimeStatus: RuntimeStatusModel;
-  version: string | null;
-  sdkVersion?: string | null;
-  errorMessage: string | null;
-  diagnostics: string[];
-  children?: React.ReactNode;
-}) {
-  const copy = getRuntimeStatusCopy(runtimeStatus);
-  const dot = getRuntimeDotClass(runtimeStatus);
-  const sourceLabel = getSourceChipLabel(runtimeStatus.source);
-  const cliLabel = version ? `v${version.replace(/^v/, '')}` : null;
-  const sdkLabel = sdkVersion ? `SDK ${sdkVersion.replace(/^v/, '')}` : null;
-  const versionLabel = cliLabel && sdkLabel
-    ? `${cliLabel} · ${sdkLabel}`
-    : cliLabel ?? sdkLabel;
-  // Auto-expand diagnostics when launch failed — user needs the detail immediately.
-  const autoOpenDiagnostics = runtimeStatus.runtime === 'launch_failed';
-  const showError = errorMessage && runtimeStatus.runtime !== 'installed';
-
-  return (
-    <div className="min-w-0 p-4 rounded-lg bg-surface border border-hairline shadow-sm">
-      <div className="flex items-center justify-between gap-2 pb-3 border-b border-hairline">
-        <div className="flex items-center gap-2 text-sm font-medium text-ink-strong">
-          {icon}
-          {title}
-        </div>
-        <span
-          className={`inline-block w-2 h-2 rounded-full ${dot.bg} ${dot.pulse ? 'animate-pulse' : ''}`}
-          aria-label={dot.ariaLabel}
-          role="status"
-        />
-      </div>
-
-      <div className="mt-3">
-        <div className="text-[13px] font-medium text-ink-strong leading-snug">
-          {copy.label}
-        </div>
-        {copy.sub && (
-          <div className="mt-0.5 text-xs text-ink-muted leading-normal">
-            {copy.sub}
-          </div>
-        )}
-        {showError && (
-          <div className="mt-1 text-xs text-rose-700 break-words [overflow-wrap:anywhere]">
-            {errorMessage}
-          </div>
-        )}
-      </div>
-
-      {(sourceLabel || versionLabel) && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {sourceLabel && (
-            <span className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-surface-soft text-ink-body">
-              {sourceLabel}
-            </span>
-          )}
-          {versionLabel && (
-            <span className="px-2 py-0.5 rounded-[3px] text-[11px] font-medium bg-surface-soft text-ink-body">
-              {versionLabel}
-            </span>
-          )}
-        </div>
-      )}
-
-      {children && (
-        <div className="mt-3 pt-3 border-t border-hairline flex flex-wrap gap-2">
-          {children}
-        </div>
-      )}
-
-      {diagnostics.length > 0 && (
-        <details className="mt-3" open={autoOpenDiagnostics}>
-          <summary className="cursor-pointer text-xs text-accent-deep hover:underline">
-            Diagnostics
-          </summary>
-          <div className="mt-2 space-y-1 text-xs text-ink-muted">
-            {diagnostics.map((detail) => (
-              <div key={detail} className="break-words [overflow-wrap:anywhere]">
-                {detail}
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
-    </div>
-  );
-}
-
-function ThemePreviewCard({
-  theme,
-  selected,
-  onSelect,
-}: {
-  theme: ThemeInfo;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const dark = theme.kind === 'dark';
-  // The themes' own colours (kit: the ground, the desk, the hairline, the inks and the accent)
-  const swatches = dark
-    ? {
-        frame: '#16132F',
-        sidebar: '#16132F',
-        surface: '#1E1B4B',
-        soft: 'rgba(129, 140, 248, 0.18)',
-        hairline: 'rgba(199, 210, 254, 0.12)',
-        text: '#F8FAFC',
-        muted: '#94A3B8',
-        body: '#C7D2FE',
-        accent: '#818CF8',
-      }
-    : {
-        frame: '#F1F5F9',
-        sidebar: '#F1F5F9',
-        surface: '#FFFFFF',
-        soft: '#E0E7FF',
-        hairline: '#E2E8F0',
-        text: '#1E1B4B',
-        muted: '#617187',
-        body: '#475569',
-        accent: '#4338CA',
-      };
-
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
-      className={`group text-left rounded-lg border p-3 transition-all rm-focus-ring ${
-        selected
-          ? 'border-accent shadow-ritemark-accent'
-          : 'border-hairline hover:border-hairline-strong hover:bg-surface-soft'
-      }`}
-    >
-      <div
-        className="overflow-hidden rounded-md border"
-        style={{
-          background: swatches.frame,
-          borderColor: swatches.hairline,
-        }}
-      >
-        <div
-          className="h-5 border-b"
-          style={{
-            background: swatches.frame,
-            borderColor: swatches.hairline,
-          }}
-        >
-          <div className="flex h-full items-center gap-1 px-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#F87171]" />
-            <span className="h-1.5 w-1.5 rounded-full bg-[#FBBF24]" />
-            <span className="h-1.5 w-1.5 rounded-full bg-[#4ADE80]" />
-            <span
-              className="ml-auto h-2 w-8 rounded-sm"
-              style={{ background: swatches.soft }}
-            />
-          </div>
-        </div>
-        <div className="grid h-28 grid-cols-[44px_1fr]">
-          <div
-            className="border-r p-2"
-            style={{
-              background: swatches.sidebar,
-              borderColor: swatches.hairline,
+            <SettingsNote icon="shield-check" row="I59">
+              What each AI service may see: <ExternalLink url={AI_INFORMATION_URL} tip="Which AI services Ritemark uses, what they may see, and how to review what they write">AI information</ExternalLink>
+            </SettingsNote>
+          </>
+        ),
+        appearance: (
+          <AppearanceSection
+            themes={settings.availableThemes || []}
+            currentTheme={settings.currentTheme}
+            onTheme={handleThemeChange}
+            chatFontSize={settings.chatFontSize || 13}
+            onChatFontSize={(size) => {
+              setSettings((prev) => prev ? { ...prev, chatFontSize: size } : prev);
+              handleSettingChange('chat.fontSize', size);
             }}
-          >
-            <div className="mb-2 h-2 w-5 rounded-sm" style={{ background: swatches.accent }} />
-            <div className="space-y-1.5">
-              <div className="h-1.5 w-7 rounded-sm" style={{ background: swatches.muted }} />
-              <div className="h-1.5 w-5 rounded-sm" style={{ background: swatches.muted }} />
-              <div className="h-1.5 w-6 rounded-sm" style={{ background: swatches.soft }} />
-              <div className="h-1.5 w-4 rounded-sm" style={{ background: swatches.muted }} />
-            </div>
-          </div>
-          <div
-            className="p-3"
-            style={{ background: swatches.surface }}
-          >
-            <div className="mb-3 h-3 w-24 rounded-sm" style={{ background: swatches.text }} />
-            <div className="space-y-2">
-              <div className="h-2 w-full rounded-sm" style={{ background: swatches.body }} />
-              <div className="h-2 w-5/6 rounded-sm" style={{ background: swatches.body }} />
-              <div className="h-2 w-2/3 rounded-sm" style={{ background: swatches.muted }} />
-            </div>
-            <div className="mt-3 flex gap-1.5">
-              <div className="h-2 w-2 rounded-full" style={{ background: swatches.accent }} />
-              <div className="h-2 w-16 rounded-sm" style={{ background: swatches.body }} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-3 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-medium text-ink-strong">{theme.label}</div>
-          <div className="mt-0.5 text-xs text-ink-muted">{theme.description}</div>
-        </div>
-        {selected && (
-          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Icon name="check" size={12} tone="inherit" />
-          </span>
-        )}
-      </div>
-    </button>
+          />
+        ),
+        sharing: (
+          <>
+            <GoogleDocsSettingsCard projection={googleDocs} />
+            <SettingsNote icon="file-pdf">PDF and Word copies need nothing set: Share makes them on this computer.</SettingsNote>
+          </>
+        ),
+        'usage-data': (
+          <UsageDataSection
+            usageData={settings.usageData}
+            onChange={(value) => {
+              // Answer the click at once, as the theme choice does; the host's resend confirms it.
+              setSettings((prev) => prev ? { ...prev, usageData: { on: value, fromRitemark1: false } } : prev);
+              vscode.postMessage({ type: 'usageData:set', on: value });
+            }}
+          />
+        ),
+        updates: (
+          <UpdatesSection
+            center={settings.updateCenter}
+            updatesEnabled={settings.updatesEnabled}
+            checking={checkingUpdates}
+            onToggle={(value) => handleToggle('updates.enabled', value)}
+            onAction={handleUpdateAction}
+          />
+        ),
+        advanced: (
+          <AdvancedSection
+            settings={settings}
+            onSetting={(key, value) => {
+              setSettings((prev) => prev ? { ...prev, ...localSetting(key, value) } : prev);
+              handleSettingChange(key, value);
+            }}
+            onClaude={handleClaudeAction}
+            onCodex={handleCodexAction}
+            onClearTranscripts={() => vscode.postMessage({ type: 'transcription:clearStorage' })}
+            onOpenAllSettings={(type) => vscode.postMessage({ type })}
+          />
+        ),
+      }}
+    </SettingsPage>
   );
 }
 
-/**
- * Sprint 133 (R12): 1.x's launch check rows, under the runtime choice, for this computer's runtime only. Words only:
- * no download or install link (patch 016, Microsoft Store policy 10.1.5).
- */
-/** 1.x's launch check rows (Sprint 133, R12): Git always, since File changes needs it; Node.js with this computer's runtime. */
-function SystemToolRows({ environment, showNode }: { environment: NonNullable<SettingsData['environment']>; showNode: boolean }) {
-  const rows = [
-    { name: 'Git', installed: environment.gitInstalled, required: environment.gitRequired, missingNote: ' File changes needs it.' },
-    ...(showNode ? [{ name: 'Node.js', installed: environment.nodeInstalled, required: environment.nodeRequired, missingNote: '' }] : []),
-  ];
-  return (
-    <div className="mt-4 pt-4 border-t border-hairline space-y-2" aria-label={showNode ? 'Git and Node.js' : 'Git'}>
-      <div className="text-xs font-medium text-ink-strong">This computer's tools</div>
-      {rows.map((row) => (
-        <div key={row.name} className="flex items-start gap-2 text-xs">
-          <Icon name={row.installed ? 'check-circle' : 'warning-circle'} size={14} tone="inherit" className={row.installed ? 'text-ink-strong mt-px' : 'text-ink-body mt-px'} />
-          <span className="text-ink-body">
-            <span className="font-medium text-ink-strong">{row.name}</span>
-            {row.installed
-              ? ' found on this computer.'
-              : row.required
-                ? ` isn’t installed, and Claude from this computer needs it. Use Ritemark’s own Claude instead, or install ${row.name} and restart Ritemark.`
-                : ` isn’t installed on this computer.${row.missingNote}`}
-          </span>
-        </div>
-      ))}
-      {environment.restartRequired && (
-        <div className="text-xs text-ink-body">Restart Ritemark to finish setting up Claude.</div>
-      )}
-    </div>
-  );
-}
-
-function ToggleRow({ label, description, checked, onChange, badge }: ToggleRowProps) {
-  return (
-    <div className="flex items-center justify-between p-4 rounded-lg bg-surface border border-hairline shadow-sm">
-      <div>
-        <div className="text-sm font-medium text-ink-strong flex items-center gap-2">
-          {label}
-          {badge && (
-            <span className="text-xs px-2 py-0.5 rounded bg-accent-soft text-accent-deep">
-              {badge}
-            </span>
-          )}
-        </div>
-        <div className="text-xs text-ink-muted">{description}</div>
-      </div>
-      <Switch
-        checked={checked}
-        onCheckedChange={onChange}
-        className="mt-0.5 shrink-0"
-      />
-    </div>
-  );
+/** A setting's place in the page's data, so a choice shows at once; the host's resend confirms it. */
+function localSetting(key: string, value: string | number | boolean): Partial<SettingsData> {
+  switch (key) {
+    case 'agentRuntime.preference': return { agentRuntimePreference: value as SettingsData['agentRuntimePreference'] };
+    case 'ai.agentTimeout': return { agentTimeout: Number(value) };
+    case 'ai.debugTrace': return { debugTrace: Boolean(value) };
+    case 'codex.approvalPolicy': return { codexApprovalPolicy: value as SettingsData['codexApprovalPolicy'] };
+    case 'codex.sandboxMode': return { codexSandboxMode: value as SettingsData['codexSandboxMode'] };
+    case 'opencode.autoApprove': return { opencodeAutoApprove: Boolean(value) };
+    default: return {};
+  }
 }

@@ -42,8 +42,7 @@ const ALLOWED: Array<{ file: string; line: RegExp; why: string }> = [
   { file: 'index.css', line: /^\s*--r-conversation-\d+:/, why: 'a conversation colour says which chat, not done' },
   { file: 'index.css', line: /^(?:body\.vscode-dark |body\.ritemark-dark |\.dark )?\.rm-step-chip\.action[ ,]/, why: "a Flow step's kind keeps one colour in both themes (experience 31): says which, not done" },
   { file: 'components/transcribe/workbench/playback.ts', line: /\{ dot: '#059669', text: '#047857' \}/, why: "a Transcribe speaker's colour says who" },
-  { file: 'components/settings/RitemarkSettings.tsx', line: /h-1\.5 w-1\.5 rounded-full bg-\[#4ADE80\]/, why: "the window's traffic lights in Settings' theme pictures" },
-  { file: 'components/settings/RitemarkSettings.tsx', line: /bg: 'bg-ritemark-success', pulse: false, ariaLabel: 'Status: ready'/, why: "Settings' runtime ready dot" },
+  { file: 'components/settings/AdvancedSection.tsx', line: /bg: 'bg-ritemark-success', pulse: false, ariaLabel: 'Status: ready'/, why: "Settings' runtime ready dot, in Ritemark's parts" },
   { file: 'components/transcribe/TranscribePanel.tsx', line: /engine\.readiness\.ready \? 'bg-ritemark-success'/, why: "a Transcribe engine's ready dot" },
   { file: 'components/agent/ProvenanceBadge.tsx', line: /label: 'ChatGPT'/, why: "ChatGPT's provenance badge says which, not done" },
 ]

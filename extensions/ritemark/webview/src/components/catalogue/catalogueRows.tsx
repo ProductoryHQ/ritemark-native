@@ -9,7 +9,7 @@
  * image. `catalogueCoverage.test.ts` checks that every exported control has a row.
  */
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Alert, AlertDescription } from '../ui/alert'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
@@ -36,6 +36,7 @@ import { Icon } from '../ui/Icon'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Pill } from '../ui/pill'
+import { SegmentedControl } from '../ui/segmented-control'
 import { Progress } from '../ui/progress'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '../ui/select'
 import { Slider } from '../ui/slider'
@@ -289,6 +290,45 @@ function select(props: { disabled?: boolean; long?: boolean } = {}): ReactNode {
 // The option that isn't the value: Radix marks the chosen one `data-state="checked"` (its aria-selected follows the focus)
 const NEXT_OPTION = '[role="option"]:not([data-disabled]):not([data-state="checked"])'
 
+// ── Segmented control ────────────────────────────────────────────────────────
+// Each cell keeps its own choice, so a click in one never shows in another; the target is the choice not chosen.
+function SegmentedRow({ disabled }: { disabled: boolean }) {
+  const [value, setValue] = useState('13')
+  return (
+    <SegmentedControl
+      aria-label="Text size in chats"
+      value={value}
+      onValueChange={setValue}
+      disabled={disabled}
+      inputProps={{ '15': { 'data-target': true } }}
+      options={[{ value: '12', label: 'Smaller' }, { value: '13', label: 'Usual' }, { value: '15', label: 'Larger' }]}
+    />
+  )
+}
+function SegmentedPictures({ disabled }: { disabled: boolean }) {
+  const [value, setValue] = useState('light')
+  const picture = (ground: string, desk: string) => (
+    <span className="block h-16 rounded-[7px] shadow-[0_0_0_1px_var(--r-hairline-strong)]" style={{ background: ground }}>
+      <span className="ml-6 block h-full w-12 rounded-t-[4px]" style={{ background: desk }} />
+    </span>
+  )
+  return (
+    <SegmentedControl
+      variant="picture"
+      aria-label="Theme"
+      value={value}
+      onValueChange={setValue}
+      disabled={disabled}
+      className="w-[260px]"
+      inputProps={{ dark: { 'data-target': true } }}
+      options={[
+        { value: 'light', label: 'Light', picture: picture('#F1F5F9', '#FFFFFF') },
+        { value: 'dark', label: 'Dark', picture: picture('#16132F', '#1E1B4B') },
+      ]}
+    />
+  )
+}
+
 // ── Dialog ───────────────────────────────────────────────────────────────────
 function dialog(): ReactNode {
   return (
@@ -443,6 +483,37 @@ export const CATALOGUE: CatalogueRow[] = [
             <TabsContent value="ideas" />
           </Tabs>
         ), { width: 200 })),
+    }, {
+      // Sprint 147: Settings' sections, a column of rows (the kit's .snav)
+      id: 'vertical',
+      label: 'vertical',
+      cells: (['rest', 'hover', 'pressed', 'focus', 'click', 'disabled'] as const).map((state) =>
+        t(state, () => (
+          <Tabs defaultValue="accounts" orientation="vertical">
+            <TabsList aria-label="Settings sections" className="w-[184px]">
+              <TabsTrigger value="accounts"><Icon name="sparkle" size={14} />AI accounts</TabsTrigger>
+              <TabsTrigger value="appearance" data-target disabled={state === 'disabled'}><Icon name="palette" size={14} />Appearance</TabsTrigger>
+            </TabsList>
+            <TabsContent value="accounts" />
+            <TabsContent value="appearance" />
+          </Tabs>
+        ), { width: 216, height: 96 })),
+    }],
+  },
+  {
+    id: 'segmented-control',
+    title: 'Segmented control',
+    covers: ['SegmentedControl'],
+    variants: [{
+      id: 'default',
+      label: 'default',
+      cells: (['rest', 'hover', 'pressed', 'focus', 'click', 'disabled'] as const).map((state) =>
+        t(state, () => <SegmentedRow disabled={state === 'disabled'} />, { width: 240 })),
+    }, {
+      id: 'picture',
+      label: 'picture',
+      cells: (['rest', 'hover', 'pressed', 'focus', 'click', 'disabled'] as const).map((state) =>
+        t(state, () => <SegmentedPictures disabled={state === 'disabled'} />, { width: 300, height: 160 })),
     }],
   },
   {

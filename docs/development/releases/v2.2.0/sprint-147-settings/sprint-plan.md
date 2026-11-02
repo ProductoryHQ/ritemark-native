@@ -109,7 +109,7 @@ Not cut: every setting in its place (R1), the sections in plain words, AI accoun
 Three, each with a recommendation. [spec.md](spec.md#decisions) carries the same list.
 
 1. **AI on this computer appears only when Sprint 151 ships it,** and Web pages only with Sprint 149. Nothing shows as "coming". **Recommended: yes.** If 151 is cut, 2.2's Settings has six sections.
-2. **A saved key never goes back to the page.** The API keys sheet says "Saved · it works", and the eye that showed a saved key goes; the eye for a key you're typing stays. To see a key again, you get it from the service. **Recommended: yes**, since a key then stays only in the part of Ritemark that stores it. You're asked because a way to do something leaves.
+2. **Void (Jarmo, 2 November 2026: the saved-key eye stays; a saved key can be shown when its eye is pressed).** ~~**A saved key never goes back to the page.**~~ The API keys sheet says "Saved · it works", and the eye that showed a saved key goes; the eye for a key you're typing stays. To see a key again, you get it from the service. **Recommended: yes**, since a key then stays only in the part of Ritemark that stores it. You're asked because a way to do something leaves.
 3. **This sprint's cut order:** what each AI can use first (to 2.3), then the theme pictures, then the Updates card's redraw. **Recommended: yes.**
 
 ## Feature Flag Check
@@ -166,7 +166,7 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 - [x] Approved on 1 November 2026 by the Development manager, on Jarmo's delegation of every 2.2 sprint until the release candidate: "võta nii et kõik sprindid on 2.2 osas approved until RC - ei vaja heakskiitu. I trust you. When needed use admin merge and clean worktrees" (ritemark-dev `decisions/log.md`, c45d69c).
 - [x] Decision 1: yes, as recommended. Decision 3: yes, as recommended.
-- [ ] Decision 2 (a saved key never back on the page): Jarmo's, since a way to do something leaves (HARD RULE #1). Today's behaviour stays until he answers.
+- [x] Decision 2: answered by Jarmo on 2 November 2026, **no**: the saved-key eye stays, and a saved key can be shown when its eye is pressed. The plan's "a saved key never goes back" is void; today's behaviour for a saved key stays, and PR 3 keeps the key values the eye needs.
 - [x] Sprint start: the audits now; the code after Sprint 146 has merged.
 
 ## Questions

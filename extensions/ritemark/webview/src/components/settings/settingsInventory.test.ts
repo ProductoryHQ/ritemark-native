@@ -47,10 +47,10 @@ export function pageSource(dir = HERE): string {
 
 /** Where a page sends a message type: a posted `type`, an action helper's argument, or a named message constant. */
 export function sends(source: string, type: string): boolean {
-  return new RegExp(`(type:\\s*|Action\\(\\s*|send\\(\\s*|message:\\s*)'${escape(type)}'`).test(source)
+  return new RegExp(`(type:\\s*|message:\\s*|\\b(?:\\w*Action|send|onClaude|onCodex)\\(\\s*)'${escape(type)}'`).test(source)
 }
 export function writesSetting(source: string, key: string): boolean {
-  return new RegExp(`(handleSettingChange|handleToggle|setSetting)\\(\\s*'${escape(key)}'`).test(source)
+  return new RegExp(`(handleSettingChange|handleToggle|onSetting)\\(\\s*'${escape(key)}'`).test(source)
 }
 export function savesAndTestsKey(source: string, name: string): boolean {
   return new RegExp(`handleSaveApiKey\\(\\s*'${escape(name)}'`).test(source) && new RegExp(`handleTestApiKey\\(\\s*'${escape(name)}'`).test(source)
@@ -82,7 +82,7 @@ assert.equal(PAGE_MESSAGES.length, 28, 'the 28 message types')
 assert.deepEqual(inventoryGaps(page, host, googleDocsProtocol), [], 'every message, setting and key of the inventory has its sender and its handler')
 
 // E1: the test fails when one is removed, from the page or from the host
-const withoutRepair = page.replace(/(type:\s*|Action\(\s*)'codex:repair'/g, "$1'removed'")
+const withoutRepair = page.replace(/(type:\s*|\b\w*Action\(\s*|onCodex\(\s*)'codex:repair'/g, "$1'removed'")
 assert.deepEqual(inventoryGaps(withoutRepair, host, googleDocsProtocol), ['the page no longer sends codex:repair'])
 assert.deepEqual(inventoryGaps(page, host.replace("case 'updates:pause':", ''), googleDocsProtocol), ['the host no longer handles updates:pause'])
 assert.deepEqual(

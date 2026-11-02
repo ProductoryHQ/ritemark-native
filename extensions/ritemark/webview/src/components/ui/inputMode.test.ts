@@ -198,7 +198,7 @@ const RING_USERS: Array<[string, RegExp]> = [
   ['components/tasks/UnreadableCards.tsx', /ring-\[var\(--r-focus-ring\)\]/],
   ['components/transcribe/TranscribePanel.tsx', /ring-\[var\(--r-focus-ring\)\]/],
   ['components/transcribe/workbench/layout.ts', /\brm-focus-ring\b/],
-  ['components/settings/RitemarkSettings.tsx', /\brm-focus-ring\b/],
+  ['components/ui/segmented-control.tsx', /\brm-focus-ring\b/], // Settings' theme choice (Sprint 147), its hand-rolled ring before
   ['components/ai-sidebar/AIInformation.tsx', /\brm-focus-ring\b/],
   ['components/ai-sidebar/SelectedContextTab.tsx', /\brm-focus-ring\b/],
   ['components/ai-sidebar/UnifiedConversationView.tsx', /\brm-focus-ring\b/],
