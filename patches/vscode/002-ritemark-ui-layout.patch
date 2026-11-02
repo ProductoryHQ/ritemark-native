@@ -64,10 +64,12 @@ Sprint 152, PR 3 (the Experience lead's "One loading look, for every slot"): rit
   it came just after the first frame's layout, so 019's whole-pixel tab widths were measured in the fallback.
 Sprint 148, PR 3 (R7): a head row may be the search box (`field: true` in the manifest, ritemarkFrame.ts; 018 draws it).
   While the box holds words (`ritemark.searchOpen`, set by 018) the extension's results view shows in Documents and the
-  Folders view is hidden in place, not removed (explorerViewlet.ts; PaneView.setPaneVisible in paneview.ts and
-  ViewPaneContainer.setPaneVisible in viewPaneContainer.ts, over SplitView's own setViewVisible): the tree keeps its
-  folders and scroll, and what works on it still does. Whatever opens the tree (Show in Documents, New file or folder, a
-  reveal) runs 018's `_ritemark.projectHead.clearSearch` first (the container's openView).
+  Folders pane is taken out of the container without being disposed (explorerViewlet.ts;
+  ViewPaneContainer.setPaneDetached in viewPaneContainer.ts, whose onDidRemoveViewDescriptors becomes protected so the
+  pane is put back before the views change): the container counts only the results, so it stays merged with no header,
+  and the tree keeps its folders and scroll and its place in ExplorerService. Whatever opens the tree (Show in Documents,
+  New file or folder, a reveal, Refresh Explorer) runs 018's `_ritemark.projectHead.clearSearch` first (the container's
+  openView).
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 index 833787070f3..e4fa4a207e5 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
@@ -2294,7 +2296,7 @@ index 75c746cf9eb..b434f06ca79 100644
  					localize('window.commandCenterWeb', "Show command launcher together with the window title.") :
  					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`'),
 diff --git a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
-index 565fb42cb18..5a7e5852415 100644
+index 565fb42cb18..e717ca5924a 100644
 --- a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 +++ b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 @@ -19,13 +19,14 @@ import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/w
@@ -2302,7 +2304,7 @@ index 565fb42cb18..5a7e5852415 100644
  import { IContextKeyService, IContextKey, ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
  import { IThemeService } from '../../../../platform/theme/common/themeService.js';
 -import { IViewsRegistry, IViewDescriptor, Extensions, ViewContainer, IViewContainersRegistry, ViewContainerLocation, IViewDescriptorService, ViewContentGroups } from '../../../common/views.js';
-+import { IViewsRegistry, IViewDescriptor, Extensions, ViewContainer, IViewContainersRegistry, ViewContainerLocation, IViewDescriptorService, ViewContentGroups, IView } from '../../../common/views.js';
++import { IViewsRegistry, IViewDescriptor, Extensions, ViewContainer, IViewContainersRegistry, ViewContainerLocation, IViewDescriptorService, ViewContentGroups, IView, IAddedViewDescriptorRef, IViewDescriptorRef } from '../../../common/views.js';
  import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
  import { Disposable } from '../../../../base/common/lifecycle.js';
  import { IWorkbenchContribution } from '../../../common/contributions.js';
@@ -2310,55 +2312,68 @@ index 565fb42cb18..5a7e5852415 100644
  import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
 -import { ViewPane } from '../../../browser/parts/views/viewPane.js';
 +import { ViewPane, ViewPaneShowActions } from '../../../browser/parts/views/viewPane.js';
-+import { ICommandService } from '../../../../platform/commands/common/commands.js';
++import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
  import { KeyChord, KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
  import { Registry } from '../../../../platform/registry/common/platform.js';
  import { IProgressService, ProgressLocation } from '../../../../platform/progress/common/progress.js';
-@@ -170,12 +171,43 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
- 		@IExtensionService extensionService: IExtensionService,
- 		@IViewDescriptorService viewDescriptorService: IViewDescriptorService,
- 		@ILogService logService: ILogService,
-+		@ICommandService private readonly commandService: ICommandService,
- 	) {
- 
- 		super(VIEWLET_ID, { mergeViewWithContainerWhenSingleView: true }, instantiationService, configurationService, layoutService, contextMenuService, telemetryService, extensionService, themeService, storageService, contextService, viewDescriptorService, logService);
- 
- 		this.viewletVisibleContextKey = ExplorerViewletVisibleContext.bindTo(contextKeyService);
+@@ -178,6 +179,56 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
  		this._register(this.contextService.onDidChangeWorkspaceName(e => this.updateTitleArea()));
-+		// Ritemark (Sprint 148, R7): while Documents' search box holds words, the extension's results view (its `when` is
-+		// ritemark.searchOpen, set by 018's head) takes the tree's place. The tree is hidden in place, not removed, so it
-+		// keeps its folders, scroll and selection, and what works on it (the desk's chosen folder) still does
-+		this._register(this.onDidAddViews(() => this.ritemarkSearchSwap()));
-+		this._register(this.onDidRemoveViews(() => this.ritemarkSearchSwap()));
-+	}
-+
-+	/** Ritemark (Sprint 148, R7): the extension's search results view, shown here while the head's box holds words. */
+ 	}
+ 
++	/**
++	 * Ritemark (Sprint 148, R7): while Documents' search box holds words, the extension's results view (its `when` is
++	 * ritemark.searchOpen, set by 018's head) takes the tree's place. The tree is taken out of the container but not
++	 * disposed (ViewPaneContainer.setPaneDetached), so it keeps its folders and scroll, and what works on it still does.
++	 */
 +	private readonly ritemarkSearchResultsView = 'ritemark.searchResults';
++	/** The Folders pane while the results take its place: out of the container, its tree alive. */
++	private ritemarkFolders: ViewPane | undefined;
 +
 +	private ritemarkSearchSwap(): void {
-+		const results = this.panes.find(pane => pane.id === this.ritemarkSearchResultsView);
 +		const folders = this.panes.find(pane => pane.id === VIEW_ID);
++		if (folders && this.panes.some(pane => pane.id === this.ritemarkSearchResultsView)) {
++			this.setPaneDetached(folders, true);
++			this.ritemarkFolders = folders;
++		}
++	}
++
++	private ritemarkAttachFolders(): void {
++		const folders = this.ritemarkFolders;
++		this.ritemarkFolders = undefined;
 +		if (folders) {
-+			this.setPaneVisible(folders, !results);
++			this.setPaneDetached(folders, false);
 +		}
-+		if (results) {
-+			results.headerVisible = false; // the results sit under the head's box, as the tree does
-+		}
++	}
++
++	// The container's panes mirror its visible views by index: the tree is put back before they change, then the swap
++	// is looked at again
++	protected override onDidAddViewDescriptors(added: IAddedViewDescriptorRef[]): ViewPane[] {
++		this.ritemarkAttachFolders();
++		const panes = super.onDidAddViewDescriptors(added);
++		this.ritemarkSearchSwap();
++		return panes;
++	}
++
++	protected override onDidRemoveViewDescriptors(removed: IViewDescriptorRef[]): void {
++		this.ritemarkAttachFolders();
++		super.onDidRemoveViewDescriptors(removed);
++		this.ritemarkSearchSwap();
 +	}
 +
 +	override openView(id: string, focus?: boolean): IView | undefined {
-+		// Ritemark (Sprint 148, R7): whatever opens the tree (Show in Documents, New file or folder, a reveal) closes the
-+		// search first, so the tree it works on is in sight
-+		const folders = this.panes.find(pane => pane.id === VIEW_ID);
-+		if (id === VIEW_ID && folders && this.panes.some(pane => pane.id === this.ritemarkSearchResultsView)) {
-+			this.commandService.executeCommand('_ritemark.projectHead.clearSearch');
-+			this.setPaneVisible(folders, true);
++		// Ritemark (Sprint 148, R7): whatever opens the tree (Show in Documents, New file or folder, a reveal, Refresh
++		// Explorer) closes the search first, so the tree it works on is in sight
++		if (id === VIEW_ID && this.ritemarkFolders) {
++			this.instantiationService.invokeFunction(accessor => CommandsRegistry.getCommand('_ritemark.projectHead.clearSearch')?.handler(accessor));
++			this.ritemarkAttachFolders();
 +		}
 +		return super.openView(id, focus);
- 	}
- 
++	}
++
  	override create(parent: HTMLElement): void {
-@@ -186,7 +218,9 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
+ 		super.create(parent);
+ 		parent.classList.add('explorer-viewlet');
+@@ -186,7 +237,9 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
  	protected override createView(viewDescriptor: IViewDescriptor, options: IViewletViewOptions): ViewPane {
  		if (viewDescriptor.id === VIEW_ID) {
  			return this.instantiationService.createInstance(ExplorerView, {
@@ -2369,7 +2384,7 @@ index 565fb42cb18..5a7e5852415 100644
  					willOpenElement: e => {
  						if (!isMouseEvent(e)) {
  							return; // only delay when user clicks
-@@ -257,28 +291,26 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
+@@ -257,28 +310,26 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
   */
  export const VIEW_CONTAINER: ViewContainer = viewContainerRegistry.registerViewContainer({
  	id: VIEWLET_ID,
@@ -2402,7 +2417,7 @@ index 565fb42cb18..5a7e5852415 100644
  const openFolderButton = `[${openFolder}](command:${OpenFolderAction.ID})`;
  const openFolderViaWorkspaceButton = `[${openFolder}](command:${OpenFolderViaWorkspaceAction.ID})`;
  const openRecentButton = `[${openRecent}](command:${OpenRecentAction.ID})`;
-@@ -326,7 +358,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
+@@ -326,7 +377,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  
  viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  	content: localize({ key: 'noFolderButEditorsHelp', comment: ['Please do not translate the word "command", it is part of our internal syntax which must not change'] },
@@ -2411,7 +2426,7 @@ index 565fb42cb18..5a7e5852415 100644
  	when: ContextKeyExpr.and(
  		// editors are opened
  		ContextKeyExpr.has('editorIsOpen'),
-@@ -343,7 +375,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
+@@ -343,7 +394,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  
  viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  	content: localize({ key: 'noFolderHelp', comment: ['Please do not translate the word "command", it is part of our internal syntax which must not change'] },
@@ -3028,38 +3043,72 @@ index 00000000000..49f42b3d5f5
 +		});
 +	}));
 +});
-diff --git a/src/vs/base/browser/ui/splitview/paneview.ts b/src/vs/base/browser/ui/splitview/paneview.ts
-index 6dc53aeee12..02fea262ee4 100644
---- a/src/vs/base/browser/ui/splitview/paneview.ts
-+++ b/src/vs/base/browser/ui/splitview/paneview.ts
-@@ -564,6 +564,14 @@ export class PaneView extends Disposable {
- 		paneItem.disposable.dispose();
- 	}
- 
-+	/** Ritemark (Sprint 148, R7): hides a pane without removing it: its size goes to the others and comes back with it. */
-+	setPaneVisible(pane: Pane, visible: boolean): void {
-+		const index = this.paneItems.findIndex(item => item.pane === pane);
-+		if (index !== -1 && this.splitview.isViewVisible(index) !== visible) {
-+			this.splitview.setViewVisible(index, visible);
-+		}
-+	}
-+
- 	movePane(from: Pane, to: Pane): void {
- 		const fromIndex = this.paneItems.findIndex(item => item.pane === from);
- 		const toIndex = this.paneItems.findIndex(item => item.pane === to);
 diff --git a/src/vs/workbench/browser/parts/views/viewPaneContainer.ts b/src/vs/workbench/browser/parts/views/viewPaneContainer.ts
-index 552fe08c2b0..c7bcb8117e6 100644
+index 552fe08c2b0..67b3236d56a 100644
 --- a/src/vs/workbench/browser/parts/views/viewPaneContainer.ts
 +++ b/src/vs/workbench/browser/parts/views/viewPaneContainer.ts
-@@ -765,6 +765,11 @@ export class ViewPaneContainer<MementoType extends object = object> extends Comp
+@@ -765,6 +765,55 @@ export class ViewPaneContainer<MementoType extends object = object> extends Comp
  		});
  	}
  
-+	/** Ritemark (Sprint 148, R7): hides a pane in place, so its view keeps its state and stays registered. */
-+	protected setPaneVisible(pane: ViewPane, visible: boolean): void {
-+		this.paneview?.setPaneVisible(pane, visible);
++	/** Ritemark (Sprint 148, R7): the panes taken out by setPaneDetached, their views alive, with the size each had. */
++	private readonly ritemarkDetached = (() => {
++		const detached = new Map<ViewPane, { readonly item: IViewPaneItem; readonly size: number; readonly index: number }>();
++		this._register(toDisposable(() => {
++			for (const [pane, { item }] of detached) {
++				item.disposable.dispose();
++				pane.dispose();
++			}
++		}));
++		return detached;
++	})();
++
++	/**
++	 * Ritemark (Sprint 148, R7): takes a pane out of the container without disposing its view, so its state and its
++	 * registrations stay, or puts it back where it was. The container counts only the panes in it: its merge, headers,
++	 * focus and saved state are the ones it has without the pane. Its panes mirror the visible view descriptors by index,
++	 * so a subclass puts a pane back before the descriptors change (onDidAdd/RemoveViewDescriptors).
++	 */
++	protected setPaneDetached(pane: ViewPane, detached: boolean): void {
++		if (!this.paneview || detached === this.ritemarkDetached.has(pane)) {
++			return;
++		}
++		const wasMerged = this.isViewMergedWithContainer();
++		if (detached) {
++			const index = this.paneItems.findIndex(item => item.pane === pane);
++			if (index === -1) {
++				return;
++			}
++			this.ritemarkDetached.set(pane, { item: this.paneItems[index], size: this.paneview.getPaneSize(pane), index });
++			this.paneItems.splice(index, 1);
++			this.paneview.removePane(pane);
++			if (this.lastFocusedPane === pane) {
++				this.lastFocusedPane = undefined;
++			}
++			pane.setVisible(false);
++		} else {
++			const { item, size } = this.ritemarkDetached.get(pane)!;
++			const index = Math.min(this.ritemarkDetached.get(pane)!.index, this.paneItems.length);
++			this.ritemarkDetached.delete(pane);
++			this.paneItems.splice(index, 0, item);
++			this.paneview.addPane(pane, size, index);
++			pane.setVisible(this.isVisible());
++		}
++		this.updateViewHeaders();
++		if (this.isViewMergedWithContainer() !== wasMerged) {
++			this.updateTitleArea();
++		}
 +	}
 +
  	openView(id: string, focus?: boolean): IView | undefined {
  		let view = this.getView(id);
  		if (!view) {
+@@ -825,7 +874,7 @@ export class ViewPaneContainer<MementoType extends object = object> extends Comp
+ 		return panes;
+ 	}
+ 
+-	private onDidRemoveViewDescriptors(removed: IViewDescriptorRef[]): void {
++	protected onDidRemoveViewDescriptors(removed: IViewDescriptorRef[]): void { // Ritemark (Sprint 148, R7): protected, as onDidAddViewDescriptors
+ 		removed = removed.sort((a, b) => b.index - a.index);
+ 		const panesToRemove: ViewPane[] = [];
+ 		for (const { index } of removed) {

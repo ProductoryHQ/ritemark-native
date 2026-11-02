@@ -5324,10 +5324,10 @@ index 00000000000..c6764e91723
 +registerWorkbenchContribution2(RitemarkWindowSizes.ID, RitemarkWindowSizes, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644
-index 00000000000..79718145065
+index 00000000000..a8f141ca535
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,591 @@
+@@ -0,0 +1,595 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -5519,6 +5519,8 @@ index 00000000000..79718145065
 +	private field: IRitemarkSearchField | undefined;
 +	private readonly fieldStore = this._register(new DisposableStore());
 +	private readonly searchOpen: IContextKey<boolean>;
++	/** The project the box's words are for. */
++	private projectUri: string | undefined;
 +	/** The place shown, as update() last had it. */
 +	private compositeId: string | undefined;
 +
@@ -5669,8 +5671,10 @@ index 00000000000..79718145065
 +
 +	private updateProject(): void {
 +		const folder = this.workspaceService.getWorkspace().folders[0];
-+		if (!folder) {
-+			this.setFieldText('', false); // the head goes with the folder: so do the box's words and the results
++		if (folder?.uri.toString() !== this.projectUri) {
++			// Another project, or none: the box's words and the results go with the one they were for
++			this.projectUri = folder?.uri.toString();
++			this.setFieldText('', this.searchEnabled);
 +		}
 +		this.mark.textContent = folder ? ritemarkProjectInitials(folder.name) : '';
 +		this.name.textContent = folder?.name ?? '';
