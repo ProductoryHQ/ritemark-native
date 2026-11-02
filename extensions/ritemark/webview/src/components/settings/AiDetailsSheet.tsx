@@ -35,8 +35,11 @@ function DetailRow({ label, children, action, row }: { label: string; children: 
   return (
     <div data-settings-row={row} className="flex items-center gap-4 border-t border-hairline py-3 first:border-t-0">
       <div className="w-[84px] shrink-0 text-[12px] leading-4 text-ink-muted">{label}</div>
-      <div className="grid min-w-0 flex-1 text-[13px] leading-[18px] text-ink-strong">{children}</div>
-      {action ? <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">{action}</div> : null}
+      {/* When the words and the actions don't fit side by side, the actions go on their own line under the words (the Experience lead, #645) */}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="grid min-w-0 flex-[1_1_180px] text-[13px] leading-[18px] text-ink-strong">{children}</div>
+        {action ? <div data-detail-actions className="flex min-w-0 max-w-full flex-wrap items-center gap-1">{action}</div> : null}
+      </div>
     </div>
   )
 }
@@ -97,8 +100,8 @@ function ClaudeDetails({ settings, onClaude }: Pick<AiDetailsProps, 'settings' |
   ) : (
     <DetailRow row="I10 I11 I12" label="Signed in" action={
       <>
-        <TipButton tip="Asks for your Anthropic API key" variant="ghost" size="sm" onClick={() => onClaude('claude:enterApiKey')}>Use an API key instead</TipButton>
         <TipButton tip="Opens Claude's sign-in in your browser" size="sm" onClick={() => onClaude('claude:login')}>Sign in with Claude.ai</TipButton>
+        <TipButton tip="Asks for your Anthropic API key" variant="ghost" size="sm" onClick={() => onClaude('claude:enterApiKey')}>Use an API key instead</TipButton>
       </>
     }>
       Not signed in

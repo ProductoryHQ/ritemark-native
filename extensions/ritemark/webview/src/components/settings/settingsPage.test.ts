@@ -233,6 +233,21 @@ assert.ok(!keysSheet().includes(OPENCODE_INTRO))
     for (const link of source.match(/<ExternalLink [^>]*>/g) ?? []) assert.match(link, /\btip=/, `${file}: ${link} has a tooltip`)
   }
 }
+// #645, the lead's fixes: Check again is today's Refresh Status; a signed-out Claude's actions wrap under the words,
+// Sign in first; Ritemark's parts says ChatGPT, never OpenAI, for the sign-in
+{
+  const sheetSource = readFileSync(join(HERE, 'AiDetailsSheet.tsx'), 'utf8')
+  assert.match(sheetSource, /onClick=\{\(\) => onClaude\('claude:refreshStatus'\)\}>Check again</, "Claude's Check again sends claude:refreshStatus")
+  assert.match(sheetSource, /onClick=\{\(\) => onCodex\('codex:refreshStatus'\)\}>Check again</, "ChatGPT's Check again sends codex:refreshStatus")
+  assert.match(readFileSync(join(HERE, 'RitemarkSettings.tsx'), 'utf8'), /const handleClaudeAction = \([\s\S]*?\) => \{\s*vscode\.postMessage\(\{ type \}\);/, 'a Claude action is posted as its own type')
+  assert.match(sheetSource, /flex min-w-0 flex-1 flex-wrap items-center/, 'a detail row wraps its actions under its words')
+  assert.match(sheetSource, /data-detail-actions className="flex min-w-0 max-w-full flex-wrap/, "the actions shrink to the sheet and wrap, never wider than its body (Codex on #645)")
+  assert.doesNotMatch(sheetSource.slice(sheetSource.indexOf('function DetailRow'), sheetSource.indexOf('const Sub')), /shrink-0[^"]*flex-wrap|flex-none/)
+  const out = details('claude', payload({ componentStatus: { ...payload().componentStatus, claudeCode: claudeStatus({ state: 'needs-auth', authMethod: null }) } }))
+  assert.ok(out.indexOf('>Sign in with Claude.ai<') < out.indexOf('>Use an API key instead<'), 'Sign in with Claude.ai first')
+  assert.match(readFileSync(join(HERE, 'AdvancedSection.tsx'), 'utf8'), />Sign in with ChatGPT</)
+  assert.doesNotMatch(readFileSync(join(HERE, 'AdvancedSection.tsx'), 'utf8'), /Sign in with OpenAI/)
+}
 // Ritemark's parts: a state that needs the person reads in words, with no amber dot (the lead's note for PR 2)
 assert.doesNotMatch(readFileSync(join(HERE, 'AdvancedSection.tsx'), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, ''), /amber|animate-pulse/)
 

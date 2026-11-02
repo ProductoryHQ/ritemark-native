@@ -128,7 +128,7 @@ desk; `checks.txt` there has every line.
 | I62 | ⌘, opens Settings at AI accounts | Pass |
 | I10, I21, I30, I59 | the signed-out rows' lines and buttons, OpenCode's Set up, AI information at the foot; no amber, no "Codex" | Pass |
 | I10–I12, I14, I19 | Claude's Details, signed out: Sign in with Claude.ai, Use an API key instead, Get one at Anthropic, Check again, Learn more, Repair Claude, Done | Pass |
-| I17 | Check again sends `claude:refreshStatus`: the scripted recorder in the webview's host frame saw no message, so it isn't proven here. The click ran; the message is held by the inventory test | FAIL (harness) |
+| I17 | Check again sends `claude:refreshStatus`: the first run's recorder saw nothing; re-run below | Pass (second launch) |
 | I32–I36 | five rows, each Not added with Get a key and Add | Pass |
 | I38 | Add opens the field masked and focused, Save off until a key; the eye shows and hides | Pass |
 | Review 1 | with a dummy draft `not-a-key` (never saved): Done off; a click outside keeps the sheet and the draft; Escape in the field keeps the sheet and cancels the field, the row still Not added; Escape on Cancel keeps both; Cancel closes the field and Done works again | Pass |
@@ -145,3 +145,14 @@ was removed after quitting.
 **Gate 1:** the key round trip (K) for all five keys (`scripts/qa/with-test-keys.sh` isn't written yet, and the keys
 reach only a test-channel build); the sign-in rows' start and cancel (I10, I13, I15, I16, I22, I26: each opens a
 browser); the links (I12, I19, I27, I44); Windows through the overlay.
+
+### Third launch (2 November, the lead's three fixes and Codex's P2)
+
+Same isolated environment; captures in `$TMPDIR/rm147-4` (not committed).
+
+| Check | Result |
+|---|---|
+| I17: Check again sends `claude:refreshStatus`. The page does send it. A recorder never sees it because the webview passes the page's messages to the host through a direct function call (`__vscode_post_message__` in VS Code's webview `pre/index.html`), not through a window `message` event. That listener stays empty, which is the harness, not the page. The proof is the host's answer: three times, no `settings` message arrived in 3 s at rest, and fresh `settings` messages arrived within 3 s of each Check again. `settingsPage.test.ts` pins the click to `claude:refreshStatus` and the action to `postMessage({ type })` | Pass |
+| The lead's fix 1: a signed-out Claude's actions sit under its words, with Sign in with Claude.ai first, at 1440 in Light and Dark and at 634 | Pass |
+| Codex P2: the actions wrapper shrinks (`min-w-0 max-w-full`, no `shrink-0`), and no detail row is wider than the sheet at 1440 (458 = 458) or at 634 (634 = 634) | Pass |
+| The lead's fix 3: Ritemark's parts says Sign in with ChatGPT | Pass |

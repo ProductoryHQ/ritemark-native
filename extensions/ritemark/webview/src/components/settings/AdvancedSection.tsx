@@ -331,7 +331,7 @@ function ReadinessCards({ status, onClaude, onCodex }: { status: ComponentStatus
         diagnostics={status.codex.diagnostics}
       >
         {status.codex.runtimeStatus.auth === 'sign_in_required' ? (
-          <TipButton tip="Opens ChatGPT's sign-in in your browser" size="sm" onClick={() => onCodex('codex:startLogin')}>Sign in with OpenAI</TipButton>
+          <TipButton tip="Opens ChatGPT's sign-in in your browser" size="sm" onClick={() => onCodex('codex:startLogin')}>Sign in with ChatGPT</TipButton>
         ) : (
           <TipButton tip="Checks ChatGPT's installation again" variant="ghost" size="sm" onClick={() => onCodex('codex:refreshStatus')}>Check installation</TipButton>
         )}
