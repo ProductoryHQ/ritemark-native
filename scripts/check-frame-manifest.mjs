@@ -19,9 +19,9 @@
 // exits 1 when there is one; a shell with no manifest (before Sprint 152) passes, since it draws no slots.
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const WEBVIEW = 'mainThreadWebview-';
 const CONTAINER = 'workbench.view.extension.';
@@ -35,7 +35,7 @@ export const FRAME_IDENTIFIERS = ['HOME_TAB_VIEW_TYPE', 'BOARD_TAB_VIEW_TYPE', '
  */
 export function readFrameIdentifiers(source) {
   const identifiers = {};
-  const string = /^(['"])(.*)\1$/;
+  const string = /^(['"])([^'"]*)\1$/;
   for (const match of source.matchAll(/export const (\w+)(?:\s*:\s*[^=]+?)?\s*=\s*([^;]+?)(?:\s+as\s+const)?\s*;/gs)) {
     const value = match[2].trim();
     if (string.test(value)) {
@@ -147,6 +147,9 @@ export function frameMismatches(product, pkg, identifiers) {
   // The settings that shape the frame, as the shell lists them: the extension's defaults are the shell's
   const shells = product.configurationDefaults ?? {};
   const defaults = contributes.configurationDefaults ?? {};
+  if (!Array.isArray(frame.settings) || !frame.settings.length) {
+    problems.push('the manifest lists no frame-shaping settings (ritemarkFrame.settings)');
+  }
   for (const key of Array.isArray(frame.settings) ? frame.settings : []) {
     if (JSON.stringify(shells[key]) !== JSON.stringify(defaults[key])) {
       problems.push(`setting ${key}: ${JSON.stringify(defaults[key])} in package.json, ${JSON.stringify(shells[key])} in the shell's product.json`);
@@ -186,7 +189,8 @@ function main(argv) {
   return problems.length ? 1 : 0;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Run as a script, however it was reached (a symlinked checkout, /tmp on a Mac): compare real paths
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   try {
     process.exitCode = main(process.argv.slice(2));
   } catch (error) {

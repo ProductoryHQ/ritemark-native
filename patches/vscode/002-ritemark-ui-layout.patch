@@ -1402,10 +1402,10 @@ index bfc8839cc65..745739c61f4 100644
  		};
 diff --git a/src/vs/workbench/browser/ritemarkFrame.ts b/src/vs/workbench/browser/ritemarkFrame.ts
 new file mode 100644
-index 00000000000..ff03e6593fa
+index 00000000000..f7f9b4ed934
 --- /dev/null
 +++ b/src/vs/workbench/browser/ritemarkFrame.ts
-@@ -0,0 +1,465 @@
+@@ -0,0 +1,468 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1420,8 +1420,8 @@ index 00000000000..ff03e6593fa
 + * sidebarPart.ts), the place a project window opens on (layout.ts), the AI column (layout.ts, paneCompositePart.ts,
 + * auxiliaryBarPart.ts), the head's rows (ritemarkProjectHead.ts), the permanent tabs and the desk's front
 + * (editorGroupView.ts, editorPart.ts, ritemarkSwitchGuard.ts), the welcome (ritemarkWelcomeAlone.ts). Unknown keys are
-+ * ignored; a missing or broken block reads as no frame, said once in the log, and the shell then draws as VS Code does
-+ * (validate-build-output.sh fails a build without it).
++ * ignored; a missing or broken block, or part of one, reads as no frame there, said once in the console, and the shell
++ * then draws that part as VS Code does (validate-build-output.sh fails a build without it).
 + *
 + * A slot is a box the shell draws at its final size before its content exists. When the extension that runs has
 + * nothing for it (an older extension, a failed start), the slot goes once, at a known moment: a contribution's slot
@@ -1565,8 +1565,11 @@ index 00000000000..ff03e6593fa
 +/** Ritemark's frame, as this build's product.json describes it. */
 +export const ritemarkFrame: IRitemarkFrame = readRitemarkFrame((product as { ritemarkFrame?: unknown }).ritemarkFrame);
 +
-+if (!ritemarkFrame.places.length || !ritemarkFrame.aiColumn) {
-+	console.warn('[ritemark] product.json has no usable ritemarkFrame block: the frame draws as VS Code does');
++{
++	const missing = Object.entries(ritemarkFrame).filter(([, value]) => value === undefined || (Array.isArray(value) && !value.length)).map(([key]) => key);
++	if (missing.length) {
++		console.warn(`[ritemark] product.json's ritemarkFrame block lacks ${missing.join(', ')}: those parts of the frame draw as VS Code does`);
++	}
 +}
 +
 +/** A Ritemark place's order in the places row (VS Code's view container order), from the manifest. */

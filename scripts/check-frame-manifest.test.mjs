@@ -47,6 +47,7 @@ test('the identifiers are read from the module the extension compiles, however i
     .replace(`WELCOME_VIEW_TYPE = 'ritemark.welcome'`, `WELCOME_VIEW_TYPE = 'ritemark.welcome' as const`));
   assert.deepEqual(restyled, identifiers);
   assert.deepEqual(readFrameIdentifiers(`export const LIST: readonly string[] = ['a', "b"] as const;`), { LIST: ['a', 'b'] });
+  assert.deepEqual(readFrameIdentifiers(`export const JOINED = 'ritemark.' + 'home';`), {}, 'an expression is not read as a value');
 });
 
 test('an identifier the check can\'t read is a mismatch, not a skip', () => {
@@ -83,6 +84,24 @@ test('a place the manifest doesn\'t name, a place gone, and a default that diffe
     'place workbench.view.extension.ritemark-notes: not in the manifest (it would arrive after the first frame)',
     'setting workbench.activityBar.location: "default" in package.json, "top" in the shell\'s product.json',
   ]);
+});
+
+test('a manifest that lists no frame-shaping settings is refused', () => {
+  const { settings: _settings, ...frame } = product.ritemarkFrame;
+  assert.deepEqual(frameMismatches({ ...product, ritemarkFrame: frame }, pkg, identifiers), ['the manifest lists no frame-shaping settings (ritemarkFrame.settings)']);
+});
+
+test('the check runs when it is reached through a symlink', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-frame-link-'));
+  try {
+    const link = path.join(dir, 'check-frame-manifest.mjs');
+    fs.symlinkSync(cli, link);
+    const run = spawnSync(process.execPath, [link, '--product', path.join(root, 'branding', 'product.json'), '--extension', path.join(root, 'extensions', 'ritemark')], { encoding: 'utf8' });
+    const broken = spawnSync(process.execPath, [link, '--product', path.join(dir, 'missing.json')], { encoding: 'utf8' });
+    assert.deepEqual({ status: run.status, failsLoudly: broken.status !== 0 }, { status: 0, failsLoudly: true });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('a shell from before the manifest draws no slots: nothing to fill', () => {
