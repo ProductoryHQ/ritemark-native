@@ -19,9 +19,9 @@
 
 import * as vscode from 'vscode';
 
-export const HOME_TAB_VIEW_TYPE = 'ritemark.home';
-export const BOARD_TAB_VIEW_TYPE = 'ritemark.taskBoard';
-export const HOME_PLACE_ID = 'workbench.view.extension.ritemark-home';
+// Sprint 152 (R7): the view types and Home's place are the frame manifest's, kept in one module the release check reads
+import { BOARD_TAB_VIEW_TYPE, HOME_PLACE_ID, HOME_TAB_VIEW_TYPE } from '../frameIdentifiers';
+export { BOARD_TAB_VIEW_TYPE, HOME_PLACE_ID, HOME_TAB_VIEW_TYPE };
 export const TASKS_PLACE_ID = 'workbench.view.extension.ritemark-tasks';
 
 export type PermanentKind = 'home' | 'board';
@@ -132,7 +132,7 @@ export async function ensurePermanentTabs(deps: PermanentTabsDependencies): Prom
     const home = facts().find((fact) => fact.kind === 'home')?.tab;
     if (home) await revealTab(home);
     // A window that had no tab of its own is a fresh project window: Home's place too (W5).
-    if (!before) await vscode.commands.executeCommand('workbench.view.extension.ritemark-home');
+    if (!before) await vscode.commands.executeCommand(HOME_PLACE_ID);
   }
 }
 

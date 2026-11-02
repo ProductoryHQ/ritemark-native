@@ -8,6 +8,7 @@
  */
 
 import * as vscode from 'vscode';
+import { BOARD_TAB_ICON_DARK, BOARD_TAB_ICON_LIGHT, BOARD_TAB_TITLE, BOARD_TAB_VIEW_TYPE } from '../frameIdentifiers';
 import { boardHtml, connectBoardSurface, type BoardSurfaceConnection, type BoardSurfaceContext } from './boardSurface';
 import type { BoardTab } from './protocol';
 
@@ -16,7 +17,7 @@ const FOCUS_GROUP_COMMANDS = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Si
   .map((nth) => `workbench.action.focus${nth}EditorGroup`);
 
 export class TaskBoardPanel {
-  public static readonly viewType = 'ritemark.taskBoard';
+  public static readonly viewType = BOARD_TAB_VIEW_TYPE; // Sprint 152 (R7): the frame manifest's (frameIdentifiers.ts)
   private static current: TaskBoardPanel | undefined;
   private static onRevive: (() => void) | undefined;
 
@@ -40,7 +41,7 @@ export class TaskBoardPanel {
       if (restored.length) await vscode.window.tabGroups.close(restored, true);
       const panel = vscode.window.createWebviewPanel(
         TaskBoardPanel.viewType,
-        'Task board',
+        BOARD_TAB_TITLE,
         { viewColumn, preserveFocus: false },
         { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')] },
       );
@@ -87,8 +88,8 @@ export class TaskBoardPanel {
     panel.webview.options = { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')] };
     // A tab icon is an image, so it cannot follow currentColor: one per theme.
     panel.iconPath = {
-      light: vscode.Uri.joinPath(extensionUri, 'media', 'tasks-tab-light.svg'),
-      dark: vscode.Uri.joinPath(extensionUri, 'media', 'tasks-tab-dark.svg'),
+      light: vscode.Uri.joinPath(extensionUri, BOARD_TAB_ICON_LIGHT),
+      dark: vscode.Uri.joinPath(extensionUri, BOARD_TAB_ICON_DARK),
     };
     panel.webview.html = boardHtml(panel.webview, extensionUri, 'task-board', 'Task board');
     this.connection = connectBoardSurface(panel.webview, 'panel', context);
