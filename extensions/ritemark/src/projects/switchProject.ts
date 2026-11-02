@@ -306,7 +306,9 @@ export class ProjectSwitcher {
    * (#623). So the notes wait for the window to go (`hold`). Stopping the chats can't wait: past `deactivate` a turn
    * can no longer be recorded as the person's stop, only as "Ritemark closed while this turn was running". So once the
    * person answers, the shell is asked whether its reload `attempt` still goes on (Sprint 152): when it was stopped
-   * meanwhile, the window stays, and its chats go on working.
+   * meanwhile, the window stays, and its chats go on working. VS Code ends an attempt only once every participant has
+   * answered, unless one says no at once: a no that is still a question (unsaved files, a running terminal) when the
+   * person answers here can't be known yet, so it still finds the chats stopped (#623's limit).
    */
   async beforeReload(target: unknown, attempt?: unknown): Promise<boolean> {
     const targetUri = typeof target === 'string' ? vscode.Uri.parse(target) : target instanceof vscode.Uri ? target : undefined;

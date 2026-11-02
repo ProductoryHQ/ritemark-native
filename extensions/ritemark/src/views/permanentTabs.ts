@@ -132,7 +132,7 @@ export async function ensurePermanentTabs(deps: PermanentTabsDependencies): Prom
     const home = facts().find((fact) => fact.kind === 'home')?.tab;
     if (home) await revealTab(home);
     // A window that had no tab of its own is a fresh project window: Home's place too (W5).
-    if (!before) await vscode.commands.executeCommand('workbench.view.extension.ritemark-home');
+    if (!before) await vscode.commands.executeCommand(HOME_PLACE_ID);
   }
 }
 

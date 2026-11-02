@@ -40,9 +40,18 @@ test('this repository\'s extension fills its shell\'s frame', () => {
   assert.deepEqual(runOnFixture(), { status: 0, out: [] });
 });
 
-test('the identifiers are read from the module the extension compiles', () => {
+test('the identifiers are read from the module the extension compiles, however it is written', () => {
   assert.equal(identifiers.HOME_TAB_VIEW_TYPE, 'ritemark.home');
   assert.ok(identifiers.FRAME_SHAPING_SETTINGS.includes('workbench.activityBar.location'));
+  const restyled = readFrameIdentifiers(identifiersSource
+    .replace(`HOME_TAB_VIEW_TYPE = 'ritemark.home'`, `HOME_TAB_VIEW_TYPE: string = "ritemark.home"`)
+    .replace(/FRAME_SHAPING_SETTINGS = \[([^\]]*)\];/, (_all, list) => `FRAME_SHAPING_SETTINGS: readonly string[] = [${list}] as const;`));
+  assert.deepEqual(restyled, identifiers);
+});
+
+test('an identifier the check can\'t read is a mismatch, not a skip', () => {
+  const result = runOnFixture(({ pkg: same, identifiers: source }) => ({ pkg: same, identifiers: source.replace('export const FRAME_SHAPING_SETTINGS = [', 'export const FRAME_SHAPING_SETTINGS = Object.freeze([').replace(/\];\s*$/, ']);\n') }));
+  assert.deepEqual(result, { status: 1, out: ['could not read FRAME_SHAPING_SETTINGS from src/frameIdentifiers.ts'] });
 });
 
 test('a renamed head command is refused, with its name', () => {

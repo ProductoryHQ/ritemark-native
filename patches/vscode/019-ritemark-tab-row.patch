@@ -1409,10 +1409,10 @@ index 00000000000..1699503e2b0
 +}
 diff --git a/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalTabs.ts b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalTabs.ts
 new file mode 100644
-index 00000000000..730058c9a8c
+index 00000000000..6617ccfea4a
 --- /dev/null
 +++ b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalTabs.ts
-@@ -0,0 +1,209 @@
+@@ -0,0 +1,211 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1444,6 +1444,7 @@ index 00000000000..730058c9a8c
 +import { IEditorService } from '../../../services/editor/common/editorService.js';
 +import { ITerminalGroupService, ITerminalInstance, ITerminalInstanceService, ITerminalService } from './terminal.js';
 +import { ILogService } from '../../../../platform/log/common/log.js';
++import { TitleEventSource } from '../../../../platform/terminal/common/terminal.js';
 +import { RITEMARK_SLOT_RELEASE_MS, ritemarkSlotReleased } from '../../../browser/ritemarkFrame.js';
 +
 +const RITEMARK_TERMINAL_NAME = 'Terminal';
@@ -1601,10 +1602,11 @@ index 00000000000..730058c9a8c
 +/**
 + * Sprint 152 (A1): a restored terminal's tab is named once, from the first frame. Its instance has no title until it
 + * reconnects to its process (2.3 s on a Mac, longer on a cold Windows start), so the tab was nameless, then the
-+ * shell's own name ("bash") for about 60 ms, then its saved name, each a different width. The saved name comes with
-+ * the restore: given as the tab's name as the instance is made, before its editor, the tab draws it at once, and the
-+ * shell's name can't replace it (`TerminalInstance._setTitle`). Once reconnected, VS Code sets the saved name again with
-+ * its saved source, as before.
++ * shell's own name ("bash") for about 60 ms, then its saved name, each a different width. A saved name that was given
++ * to the terminal (Ritemark's "Terminal 2", a person's rename, an extension's name: source Api) comes with the restore:
++ * given again as the instance is made, before its editor, the tab draws it at once and the shell's name can't replace
++ * it (`TerminalInstance._setTitle`); once reconnected, VS Code sets it again, as before. A title the process set is left
++ * to VS Code, so it keeps following the process.
 + */
 +export class RitemarkRestoredTerminalNames extends Disposable implements IWorkbenchContribution {
 +
@@ -1614,7 +1616,7 @@ index 00000000000..730058c9a8c
 +		super();
 +		this._register(terminalInstanceService.onDidCreateInstance(instance => {
 +			const saved = instance.shellLaunchConfig.attachPersistentProcess;
-+			if (saved?.title && !instance.title) {
++			if (saved?.title && saved.titleSource === TitleEventSource.Api && !instance.title) {
 +				void instance.rename(saved.title);
 +			}
 +		}));
@@ -1809,10 +1811,10 @@ index 576424a1298..be57eb737ff 100644
  			command: {
 diff --git a/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts b/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts
 new file mode 100644
-index 00000000000..ae135c994c1
+index 00000000000..ce4410bd135
 --- /dev/null
 +++ b/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts
-@@ -0,0 +1,192 @@
+@@ -0,0 +1,194 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1826,7 +1828,7 @@ index 00000000000..ae135c994c1
 +import { upcastPartial } from '../../../../../base/test/common/mock.js';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
 +import { runWithFakedTimers } from '../../../../../base/test/common/virtualScheduling/runWithFakedTimers.js';
-+import { IShellLaunchConfig } from '../../../../../platform/terminal/common/terminal.js';
++import { IShellLaunchConfig, TitleEventSource } from '../../../../../platform/terminal/common/terminal.js';
 +import { EditorInput } from '../../../../common/editor/editorInput.js';
 +import { IEditorService } from '../../../../services/editor/common/editorService.js';
 +import { ITerminalGroupService, ITerminalInstance, ITerminalInstanceService, ITerminalService } from '../../browser/terminal.js';
@@ -1978,7 +1980,7 @@ index 00000000000..ae135c994c1
 +		assert.deepStrictEqual([first, second, codex, task, revived].map(instance => instance.title), ['Terminal', 'Terminal 2', 'Install Codex', 'zsh', 'zsh']);
 +	});
 +
-+	test('Sprint 152: a restored terminal has its saved name as it is made, before its tab draws; a new one is left to the namer', () => {
++	test('Sprint 152: a restored terminal has the name it was given as it is made, before its tab draws; a process\'s title and a new one are left as they were', () => {
 +		const onDidCreateInstance = disposables.add(new Emitter<ITerminalInstance>());
 +		disposables.add(new RitemarkRestoredTerminalNames(upcastPartial<ITerminalInstanceService>({ onDidCreateInstance: onDidCreateInstance.event })));
 +		const nameless = (id: number, config: Partial<IShellLaunchConfig>) => {
@@ -1986,12 +1988,14 @@ index 00000000000..ae135c994c1
 +			(instance as { title: string }).title = '';
 +			return instance;
 +		};
-+		const restored = nameless(1, { attachPersistentProcess: upcastPartial<NonNullable<IShellLaunchConfig['attachPersistentProcess']>>({ id: 7, title: 'Terminal 2' }) });
-+		const fresh = nameless(2, {});
++		const saved = (title: string, titleSource: TitleEventSource) => upcastPartial<NonNullable<IShellLaunchConfig['attachPersistentProcess']>>({ id: 7, title, titleSource });
++		const restored = nameless(1, { attachPersistentProcess: saved('Terminal 2', TitleEventSource.Api) });
++		const processTitle = nameless(2, { attachPersistentProcess: saved('vim', TitleEventSource.Process) });
++		const fresh = nameless(3, {});
 +
-+		[restored, fresh].forEach(instance => onDidCreateInstance.fire(instance));
++		[restored, processTitle, fresh].forEach(instance => onDidCreateInstance.fire(instance));
 +
-+		assert.deepStrictEqual([restored, fresh].map(instance => instance.title), ['Terminal 2', '']);
++		assert.deepStrictEqual([restored, processTitle, fresh].map(instance => instance.title), ['Terminal 2', '', '']);
 +	});
 +
 +	test('the next name is the lowest free one', () => {
