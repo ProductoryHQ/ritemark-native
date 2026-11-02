@@ -19,6 +19,7 @@ import { recentItems, RECENT_EXTENSIONS, othersOf, showWhatMoved, switchNoteEnds
 import { projectInitials, readProject, setProjectCover, setProjectLine, nodeProjectFileFs } from '../projects/projectFile';
 import type { ProjectList } from '../projects/ProjectList';
 import { decodeHomeRequest, type HomeRequest, type HomeState } from '../projects/protocol';
+import { isShellPageSignal } from '../shellPageSignals';
 import { ProjectSwitcher, type SwitchedFrom } from '../projects/switchProject';
 import type { ProjectWaiting, WaitingReader } from '../projects/waiting';
 import { UPDATED_FROM_1X_KEY } from '../welcome/updateDetection';
@@ -198,6 +199,7 @@ export class HomeHost implements vscode.Disposable {
     panel.webview.html = homeHtml(panel.webview, this.deps.context.extensionUri);
     const subscriptions: vscode.Disposable[] = [
       panel.webview.onDidReceiveMessage((raw) => {
+        if (isShellPageSignal(raw)) return; // the shell's, not Home's (Sprint 152, PR 3)
         const decoded = decodeHomeRequest(raw);
         if (!decoded.ok) {
           console.warn('[Home] Refused a request:', decoded.reason);

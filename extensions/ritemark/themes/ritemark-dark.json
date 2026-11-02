@@ -104,7 +104,7 @@
 		"peekViewResult.matchHighlightBackground": "#818cf847",
 		"pickerGroup.border": "#C7D2FE1F",
 		"pickerGroup.foreground": "#94A3B8",
-		"progressBar.background": "#818cf8",
+		"progressBar.background": "#f8fafc",
 		"quickInput.background": "#1E1B4B",
 		"quickInput.foreground": "#f8fafc",
 		"quickInputList.focusIconForeground": "#F8FAFC",

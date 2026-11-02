@@ -182,6 +182,16 @@ said no at once stops no chats (a no still open as a question can't be seen); th
 (VS Code's one final veto is the unsaved files').
 Tests: workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts (R4) and ritemarkSwitchGuard.test.ts (#623).
 
+Sprint 152, PR 3 (the Experience lead's "One loading look, for every slot" and the PR 2 check): the loading look's
+stylesheet (ritemarkSurfaces.css: .ritemark-loading-look, -mark, -line; the AI column's mark rule became it). The welcome's
+window shows the look at its centre, with the line after ten seconds, until the welcome's page is drawn
+(ritemarkWelcomeAlone.ts). The AI column's mark is the look, its moment kept for the AI's view (W5), and Ritemark's own
+views no longer run under VS Code's progress, which drew a line across the left column's top and a badge on the place
+(webviewViewPane.ts, inside its hunks). No place shows VS Code's progress badge, and no line shows under a tab row while a
+tab waits; the welcome alone shows only the window's look; a terminal tab's icon keeps its settled box while its glyph and
+icon font arrive, so 019's whole-pixel pass measures its final width at a start (ritemarkSurfaces.css).
+Tests: workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts (the window's look).
+
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
 platform/window/common/window.ts; platform/windows/electron-main/windowImpl.ts; workbench/browser/{layout,style}.ts;
@@ -900,10 +910,10 @@ index 72cb1c1..a8b8807 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..c0df26af571
+index 00000000000..23efdc069a4
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1980 @@
+@@ -0,0 +1,2039 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1221,13 +1231,36 @@ index 00000000000..c0df26af571
 +
 +/* Sprint 145 (#569; the Experience lead, 1 November): no indigo line in the AI column (framework §3: indigo is a fill or
 +   an icon's colour, never a line), so VS Code's progress bar there is hidden. While the AI starts, the column stays bare
-+   ground; after a second the kit's turning mark (.spin: ink on the strong hairline, 16) turns at its centre, alone, until
-+   the AI's view draws (webviewViewPane.ts) */
++   ground; after a second the kit's turning mark turns at its centre, alone, until the AI's view draws (the loading look
++   below, webviewViewPane.ts) */
 +.monaco-workbench .part.auxiliarybar .monaco-progress-container {
 +	display: none !important; /* !important: the progress bar shows itself with an inline style */
 +}
 +
-+.monaco-workbench .part.auxiliarybar .ritemark-ai-starting {
++/* Sprint 152, PR 3 (the Experience lead's "One loading look, for every slot"): what a slot shows while its content isn't
++   there yet (ritemarkLoadingLook.ts). The slot's own material for a second, then the kit's turning mark (.spin: ink on
++   the strong hairline, 16, once a second) alone at its centre; at a start, in the window's main slot, after ten seconds
++   one line 12 under it (13, muted ink, centred, at most 320 wide). The mark keeps its place when the line comes. The look
++   covers the slot's box, takes no clicks, and goes in one change. Its slots: the AI column (the pane), a desk's tab (the
++   tab's box, and above its page once the page is there) and the welcome's window (the window, above the welcome's page
++   until it speaks). Working is ink, never indigo */
++.monaco-workbench .ritemark-loading-look {
++	position: absolute;
++	inset: 0;
++	z-index: 1; /* above a page's frame, drawn in the same box */
++	pointer-events: none;
++}
++
++.monaco-workbench .ritemark-loading-look.ritemark-loading-window {
++	z-index: 50; /* the welcome's window: above the welcome's page (a webview laid over the window) until it speaks */
++}
++
++/* The welcome alone has one look, the window's at its centre: its own tab's look on the hidden desk stays out */
++.monaco-workbench.ritemark-welcome-alone .ritemark-loading-look.ritemark-loading-desk {
++	display: none;
++}
++
++.monaco-workbench .ritemark-loading-mark {
 +	position: absolute;
 +	top: 50%;
 +	left: 50%;
@@ -1238,18 +1271,43 @@ index 00000000000..c0df26af571
 +	border-radius: 50%;
 +	border: 1.5px solid var(--vscode-input-border);
 +	border-top-color: var(--vscode-foreground);
-+	animation: ritemark-ai-starting 1s linear infinite;
-+	pointer-events: none;
++	animation: ritemark-loading-turn 1s linear infinite;
 +}
 +
-+@keyframes ritemark-ai-starting {
++@keyframes ritemark-loading-turn {
 +	to {
 +		transform: rotate(360deg);
 +	}
 +}
 +
-+.monaco-workbench.monaco-reduce-motion .part.auxiliarybar .ritemark-ai-starting {
++.monaco-workbench.monaco-reduce-motion .ritemark-loading-mark {
 +	animation: none;
++}
++
++.monaco-workbench .ritemark-loading-line {
++	position: absolute;
++	top: calc(50% + 8px + 12px); /* 12 under the mark */
++	left: 50%;
++	transform: translateX(-50%);
++	box-sizing: border-box;
++	width: max-content;
++	max-width: min(320px, calc(100% - 32px));
++	font-size: 13px;
++	line-height: 18px;
++	text-align: center;
++	color: var(--vscode-descriptionForeground); /* the kit's muted ink in Ritemark's themes */
++}
++
++/* A place never shows VS Code's progress badge: places carry counts only (the Experience lead's answer 6). Ritemark's own
++   views report no progress (webviewViewPane.ts); this keeps VS Code's own views' progress off their places too */
++.monaco-workbench .composite-bar .badge.progress-badge {
++	display: none !important; /* !important: over VS Code's own, more specific rules for the places' badges */
++}
++
++/* No progress line under the tab row while a tab's page isn't drawn yet: the tab shows the loading look instead
++   (webviewEditor.ts marks the tab's box while it waits; a box another editor replaced in front is no longer the desk's) */
++.monaco-workbench .part.editor > .content .editor-group-container:has(> .editor-container > .editor-instance.ritemark-tab-opening) > .monaco-progress-container {
++	display: none !important; /* !important: as the AI column's, above */
 +}
 +
 +
@@ -2339,6 +2397,17 @@ index 00000000000..c0df26af571
 +   glyph's own rule (the same weight, later in the cascade) as soon as it is there. */
 +.terminal-tab::before {
 +	content: '';
++}
++
++/* Sprint 152, PR 3: the icon's box is its settled one (16, 3 a side) whichever glyph and icon font it has while the start
++   writes them: in the codicon font it was about 3.4 px wider for a moment, and the whole-pixel pass (multiEditorTabsControl.ts)
++   measured that, so the tab narrowed a frame after the first. !important: over the icon themes' rules, which come later */
++.monaco-workbench .part.editor .tabs-container > .tab .monaco-icon-label.terminal-tab::before {
++	box-sizing: content-box !important;
++	display: block !important;
++	width: 16px !important;
++	padding: 0 3px !important;
++	overflow: hidden;
 +}
 +
 +/* A terminal tab (R8; comparison/after-terminal.png, files.html): its bar (ritemarkTerminalBar.ts; RITEMARK_TERMINAL_BAR_HEIGHT,
@@ -4817,10 +4886,10 @@ index 00000000000..ef6fb5eb84b
 +registerWorkbenchContribution2(RitemarkSwitchGuard.ID, RitemarkSwitchGuard, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/ritemarkWelcomeAlone.ts b/src/vs/workbench/browser/parts/ritemarkWelcomeAlone.ts
 new file mode 100644
-index 00000000000..c539e57b12e
+index 00000000000..eeca1e243b9
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkWelcomeAlone.ts
-@@ -0,0 +1,130 @@
+@@ -0,0 +1,142 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4841,11 +4910,16 @@ index 00000000000..c539e57b12e
 + * Ritemark isn't there once the extensions are read, or after RITEMARK_SLOT_RELEASE_MS with no welcome (a start that
 + * failed shows so: VS Code reports a failed activation only to its telemetry). The window is then VS Code's empty
 + * window: the columns the layout closed for the welcome alone come back.
++ *
++ * Sprint 152 (PR 3; the Experience lead's answer 1): while it waits for the welcome, the window shows the loading look at
++ * its centre, its main slot: the ground alone, the turning mark after a second ("Ritemark is starting" for screen
++ * readers), and the line after ten seconds. The welcome's page replaces it in one change, once the page is drawn.
 + */
 +
 +import { disposableTimeout } from '../../../base/common/async.js';
 +import { Emitter, Event } from '../../../base/common/event.js';
 +import { Disposable, MutableDisposable } from '../../../base/common/lifecycle.js';
++import { localize } from '../../../nls.js';
 +import { IContextKeyService } from '../../../platform/contextkey/common/contextkey.js';
 +import { ExtensionIdentifier } from '../../../platform/extensions/common/extensions.js';
 +import { ILogService } from '../../../platform/log/common/log.js';
@@ -4854,6 +4928,7 @@ index 00000000000..c539e57b12e
 +import { IEditorService } from '../../services/editor/common/editorService.js';
 +import { IWorkbenchLayoutService, Parts } from '../../services/layout/browser/layoutService.js';
 +import { isRitemarkWelcomeAloneExpected, RITEMARK_SLOT_RELEASE_MS, ritemarkFrame, ritemarkSlotReleased, ritemarkWelcomeAloneColumns } from '../ritemarkFrame.js';
++import { IRitemarkWebviewLike, ritemarkLoadingPage, RitemarkLoadingLook } from '../ritemarkLoadingLook.js';
 +
 +/** Set by the extension while its welcome is open alone in the window. */
 +const WELCOME_ALONE_CONTEXT_KEY = 'ritemark.welcomeAlone';
@@ -4879,6 +4954,8 @@ index 00000000000..c539e57b12e
 +	/** Sprint 152 (R4): the welcome's window, alone before the welcome opens, until the welcome takes over or the slot goes. */
 +	private expected = isRitemarkWelcomeAloneExpected();
 +	private readonly expectedRelease = this._register(new MutableDisposable());
++	/** Sprint 152 (PR 3): the window's loading look while it waits for the welcome. */
++	private readonly look = this._register(new MutableDisposable<RitemarkLoadingLook>());
 +
 +	constructor(
 +		@IContextKeyService private readonly contextKeyService: IContextKeyService,
@@ -4891,6 +4968,7 @@ index 00000000000..c539e57b12e
 +
 +		const id = ritemarkFrame.extension;
 +		if (this.expected && id) {
++			this.look.value = new RitemarkLoadingLook(layoutService.mainContainer, { slot: 'ritemark-loading-window', label: localize('ritemark.loadingLook.starting', "Ritemark is starting"), line: true });
 +			this.expectedRelease.value = disposableTimeout(() => this.release('no welcome came'), RITEMARK_SLOT_RELEASE_MS);
 +			extensionService.whenInstalledExtensionsRegistered().then(() => {
 +				if (!extensionService.extensions.some(extension => ExtensionIdentifier.equals(extension.identifier, id))) {
@@ -4914,6 +4992,7 @@ index 00000000000..c539e57b12e
 +		if (this.expected && !this._store.isDisposed) {
 +			this.expected = false;
 +			this.expectedRelease.clear();
++			this.look.clear();
 +			ritemarkSlotReleased(this.logService, 'the welcome alone', why);
 +			this.update();
 +			const columns = ritemarkWelcomeAloneColumns();
@@ -4935,6 +5014,8 @@ index 00000000000..c539e57b12e
 +			if (handedOver) {
 +				this.expected = false;
 +				this.expectedRelease.clear();
++				const webview = (active as { webview?: IRitemarkWebviewLike } | undefined)?.webview; // the welcome's webview editor
++				this.look.value?.settle(webview && ritemarkLoadingPage(webview, false)); // the look stays at the window's centre, above the page
 +			} else {
 +				this.release(`another editor is in front`);
 +				return;
@@ -5924,25 +6005,16 @@ index 86d357e665c..9b9f66fd54b 100644
  		this._syncOuterEdgeClasses(part);
  
 diff --git a/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts b/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
-index e0e445671e1..c84769ab83b 100644
+index e0e445671e1..3f08f7b9f45 100644
 --- a/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
 +++ b/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts
-@@ -3,7 +3,9 @@
-  *  Licensed under the MIT License. See License.txt in the project root for license information.
-  *--------------------------------------------------------------------------------------------*/
- 
--import { addDisposableListener, EventType, findParentWithClass, getWindow } from '../../../../base/browser/dom.js';
-+import { $, addDisposableListener, EventType, findParentWithClass, getWindow } from '../../../../base/browser/dom.js';
-+import { status } from '../../../../base/browser/ui/aria/aria.js';
-+import { disposableTimeout } from '../../../../base/common/async.js';
- import { CancellationTokenSource } from '../../../../base/common/cancellation.js';
- import { Emitter } from '../../../../base/common/event.js';
- import { DisposableStore, IDisposable, MutableDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
-@@ -18,10 +20,11 @@ import { IOpenerService } from '../../../../platform/opener/common/opener.js';
+@@ -18,10 +18,13 @@ import { IOpenerService } from '../../../../platform/opener/common/opener.js';
  import { IProgressService } from '../../../../platform/progress/common/progress.js';
  import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
  import { IThemeService } from '../../../../platform/theme/common/themeService.js';
 +import { localize } from '../../../../nls.js';
++import { ritemarkFrame } from '../../../browser/ritemarkFrame.js';
++import { RitemarkLoadingLook } from '../../../browser/ritemarkLoadingLook.js';
  import { ViewPane, ViewPaneShowActions } from '../../../browser/parts/views/viewPane.js';
  import { IViewletViewOptions } from '../../../browser/parts/views/viewsViewlet.js';
  import { Memento } from '../../../common/memento.js';
@@ -5951,86 +6023,63 @@ index e0e445671e1..c84769ab83b 100644
  import { IViewsService } from '../../../services/views/common/viewsService.js';
  import { ExtensionKeyedWebviewOriginStore, IOverlayWebview, IWebviewService, WebviewContentPurpose } from '../../webview/browser/webview.js';
  import { WebviewWindowDragMonitor } from '../../webview/browser/webviewWindowDragMonitor.js';
-@@ -38,6 +41,25 @@ interface WebviewViewState {
- 	[storageKeys.webviewState]?: string | undefined;
- }
- 
-+/** Ritemark 2.0 (Sprint 145, #569): how long the AI column stays bare ground before its turning mark shows. */
-+const RITEMARK_STARTING_MARK_AFTER_MS = 1000;
-+
-+/**
-+ * Ritemark 2.0 (Sprint 145, #569; the Experience lead, 1 November): while the AI column's view waits for its extension,
-+ * nothing for a second (a sign that flashes and goes is noise), then the kit's turning mark (ink, 16) at the column's
-+ * centre, alone, with no words but the screen reader's (drawn by ritemarkSurfaces.css). Disposing removes it.
-+ */
-+function ritemarkStartingMark(container: HTMLElement): IDisposable {
-+	const store = new DisposableStore();
-+	store.add(disposableTimeout(() => {
-+		const words = localize('ritemark.aiStarting', "The AI is starting");
-+		const mark = container.appendChild($('.ritemark-ai-starting', { role: 'status', 'aria-label': words }));
-+		store.add(toDisposable(() => mark.remove()));
-+		status(words); // a live region announces a change, not its own insertion; the label stays for anyone who reaches the mark
-+	}, RITEMARK_STARTING_MARK_AFTER_MS));
-+	return store;
-+}
-+
- export class WebviewViewPane extends ViewPane {
- 
- 	private static _originStore?: ExtensionKeyedWebviewOriginStore;
-@@ -50,6 +72,8 @@ export class WebviewViewPane extends ViewPane {
+@@ -50,6 +53,8 @@ export class WebviewViewPane extends ViewPane {
  	private readonly _webview = this._register(new MutableDisposable<IOverlayWebview>());
  	private readonly _webviewDisposables = this._register(new DisposableStore());
  	private _activated = false;
-+	/** Ritemark 2.0 (Sprint 145, #569): the AI column's turning mark while its view waits for its extension. */
-+	private readonly ritemarkStarting = this._register(new MutableDisposable());
++	/** Ritemark 2.0 (Sprint 145, #569; Sprint 152, PR 3): the AI column's loading look while its view waits for its extension. */
++	private readonly ritemarkStarting = this._register(new MutableDisposable<RitemarkLoadingLook>());
  
  	private _container?: HTMLElement;
  	private _rootContainer?: HTMLElement;
-@@ -170,6 +194,12 @@ export class WebviewViewPane extends ViewPane {
+@@ -170,6 +175,14 @@ export class WebviewViewPane extends ViewPane {
  
  		this._activated = true;
  
-+		// Ritemark 2.0 (Sprint 145, #569): the AI column's view shows the turning mark after a second, until it is resolved
++		// Ritemark 2.0 (Sprint 145, #569; Sprint 152, PR 3): the AI column's view shows the loading look (the turning mark
++		// after a second, no line: the window's own wait has the desk's) until it is resolved. Its moment is the slot's for
++		// W5, so the AI's page draws and turns its own mark in step (`_ritemark.loadingLook.since`)
 +		if (this.viewDescriptorService.getViewLocationById(this.id) === ViewContainerLocation.AuxiliaryBar) {
-+			this.ritemarkStarting.value = ritemarkStartingMark(this.element);
++			this.ritemarkStarting.value = new RitemarkLoadingLook(this.element, { slot: 'ritemark-loading-column', label: localize('ritemark.aiStarting', "The AI is starting"), id: this.id });
 +			this._webviewDisposables.add(toDisposable(() => this.ritemarkStarting.clear()));
 +		}
 +
  		const origin = this.extensionId ? WebviewViewPane.getOriginStore(this.storageService).getOrigin(this.id, this.extensionId) : undefined;
  		const webview = this.webviewService.createWebviewOverlay({
  			origin,
-@@ -209,7 +239,7 @@ export class WebviewViewPane extends ViewPane {
+@@ -209,7 +222,7 @@ export class WebviewViewPane extends ViewPane {
  		// so the webview view service drops any pending `_awaitingRevival` entry for this view.
  		this._webviewDisposables.add(toDisposable(() => source.cancel()));
  
 -		this.withProgress(async () => {
-+		this.withProgress(this.ritemarkUntilResolved(async () => {
++		this.ritemarkUntilResolved(async () => {
  			await this.extensionService.activateByEvent(`onView:${this.id}`);
  
  			const self = this;
-@@ -240,7 +270,21 @@ export class WebviewViewPane extends ViewPane {
- 			};
- 
- 			await this.webviewViewService.resolve(this.id, webviewView, source.token);
--		});
-+		}));
-+	}
-+
-+	/**
-+	 * Ritemark 2.0 (Sprint 145, #569): the AI column's turning mark goes when the view is resolved, and also when the
-+	 * extension's activation or its resolver fails, so it never says the AI is starting when it has stopped.
-+	 */
-+	private ritemarkUntilResolved(task: () => Promise<void>): () => Promise<void> {
-+		return async () => {
-+			try {
-+				await task();
-+			} finally {
-+				this.ritemarkStarting.clear();
-+			}
-+		};
+@@ -243,6 +256,23 @@ export class WebviewViewPane extends ViewPane {
+ 		});
  	}
  
++	/**
++	 * Ritemark 2.0 (Sprint 145, #569; Sprint 152, PR 3): Ritemark's own views wait with the shell's loading look, not with
++	 * VS Code's progress, so a start draws no line across the column's top and no progress badge on the place (the left
++	 * column's places show their ground: the desk carries the window's sign). Other extensions' views keep VS Code's. The
++	 * AI column's look goes when the view is resolved (the AI's resolve waits until its page has drawn its own mark in the
++	 * same place), and also when the extension's activation or its resolver fails, so it never says the AI is starting
++	 * when it has stopped.
++	 */
++	private async ritemarkUntilResolved(task: () => Promise<void>): Promise<void> {
++		const ritemarks = !!this.extensionId && !!ritemarkFrame.extension && ExtensionIdentifier.equals(this.extensionId, ritemarkFrame.extension);
++		try {
++			await (ritemarks ? task() : this.withProgress(task));
++		} finally {
++			this.ritemarkStarting.clear();
++		}
++	}
++
  	protected override updateTitle(value: string | undefined) {
+ 		this.setTitle = value;
+ 		super.updateTitle(typeof value === 'string' ? value : this.defaultTitle);
 diff --git a/src/vs/workbench/electron-browser/desktop.contribution.ts b/src/vs/workbench/electron-browser/desktop.contribution.ts
 index 41250d7b714..c6fc8a12257 100644
 --- a/src/vs/workbench/electron-browser/desktop.contribution.ts
@@ -6781,10 +6830,10 @@ index 00000000000..1610dcb6fc8
 +});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts b/src/vs/workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts
 new file mode 100644
-index 00000000000..594276fb38a
+index 00000000000..c11640fe67c
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts
-@@ -0,0 +1,101 @@
+@@ -0,0 +1,125 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -6800,6 +6849,7 @@ index 00000000000..594276fb38a
 +import { ExtensionIdentifier } from '../../../../platform/extensions/common/extensions.js';
 +import { NullLogService } from '../../../../platform/log/common/log.js';
 +import { RitemarkWelcomeAlone } from '../../../browser/parts/ritemarkWelcomeAlone.js';
++import { RITEMARK_LINE_AFTER_MS, RITEMARK_MARK_AFTER_MS } from '../../../browser/ritemarkLoadingLook.js';
 +import { resetRitemarkSlotReleasesForTesting, RITEMARK_SLOT_RELEASE_MS, ritemarkFrame, ritemarkNoteWelcomeAloneExpected } from '../../../browser/ritemarkFrame.js';
 +import { IEditorService } from '../../../services/editor/common/editorService.js';
 +import { IExtensionService } from '../../../services/extensions/common/extensions.js';
@@ -6820,7 +6870,7 @@ index 00000000000..594276fb38a
 +		const onDidActiveEditorChange = store.add(new Emitter<void>());
 +		const keys = new Map<string, unknown>();
 +		const shown: string[] = [];
-+		let active: { viewType?: string } | undefined;
++		let active: { viewType?: string; webview?: unknown } | undefined;
 +		const logged: string[] = [];
 +		const id = ritemarkFrame.extension!;
 +		store.add(new RitemarkWelcomeAlone(
@@ -6836,7 +6886,8 @@ index 00000000000..594276fb38a
 +		return {
 +			alone: () => container.classList.contains('ritemark-welcome-alone'),
 +			logged,
-+			show: (viewType: string | undefined) => { active = viewType ? { viewType } : undefined; onDidActiveEditorChange.fire(); },
++			show: (viewType: string | undefined, webview?: unknown) => { active = viewType ? { viewType, webview } : undefined; onDidActiveEditorChange.fire(); },
++			container,
 +			setKey: (value: boolean) => { keys.set('ritemark.welcomeAlone', value); onDidChangeContext.fire({ affectsSome: () => true } as unknown as IContextKeyChangeEvent); },
 +			shown,
 +		};
@@ -6878,6 +6929,28 @@ index 00000000000..594276fb38a
 +		await timeout(0);
 +
 +		assert.deepStrictEqual({ beforeTheMinute, afterTheMinute, notInstalled: missing.alone() }, { beforeTheMinute: true, afterTheMinute: false, notInstalled: false });
++	}));
++
++	test('while it waits for the welcome, the window\'s centre shows the loading look: the mark after a second, the line after ten; the welcome\'s page replaces it once it speaks', () => runWithFakedTimers({}, async () => {
++		ritemarkNoteWelcomeAloneExpected(true);
++		const { container, show, setKey } = setUp();
++		const look = () => {
++			const mark = container.querySelector('.ritemark-loading-look.ritemark-loading-window .ritemark-loading-mark');
++			return !mark ? 'ground' : `${mark.getAttribute('aria-label')}${container.querySelector('.ritemark-loading-line') ? ' + line' : ''}`;
++		};
++		const steps = [look()];
++		await timeout(RITEMARK_MARK_AFTER_MS);
++		steps.push(look());
++		await timeout(RITEMARK_LINE_AFTER_MS - RITEMARK_MARK_AFTER_MS);
++		steps.push(look());
++		const onMessage = store.add(new Emitter<unknown>());
++		const onDidDispose = store.add(new Emitter<void>());
++		show(ritemarkFrame.welcome, { container: document.createElement('div'), onMessage: onMessage.event, onDidDispose: onDidDispose.event, options: { retainContextWhenHidden: true }, extension: { id: new ExtensionIdentifier(ritemarkFrame.extension!) } });
++		setKey(true);
++		steps.push(look());
++		onMessage.fire({ message: { type: 'welcome/ready' } });
++		steps.push(look());
++		assert.deepStrictEqual(steps, ['ground', 'Ritemark is starting', 'Ritemark is starting + line', 'Ritemark is starting + line', 'ground']);
 +	}));
 +
 +	test('a window that isn\'t the welcome\'s (a folder, or files to open) is never alone before the welcome', () => {

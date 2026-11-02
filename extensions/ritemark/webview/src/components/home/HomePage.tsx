@@ -22,6 +22,7 @@ import { Tooltip } from '../ui/tooltip'
 import { middleCut, noteEndsOn, othersWords, placeParts, recentIcon, SWITCH_NOTE_MS, waitingIcon, waitingWords, whenWords } from './homeWords'
 import { ConversationBubbleIcon } from '../ai-sidebar/ConversationBubbleIcon'
 import { send } from './homeClient'
+import { usePageDrawn } from '../../lib/pageDrawn'
 import { GuidanceCard } from './GuidanceCards'
 import './home.css'
 
@@ -450,6 +451,7 @@ export function HomePage() {
     send({ type: 'home/ready' })
     return () => window.removeEventListener('message', onMessage)
   }, [])
+  usePageDrawn(state !== null) // Sprint 152, PR 3: the shell's loading look stays until Home is drawn
   if (!state) return <div className="rh-desk" aria-busy="true" />
   return <HomeView state={state} coverDefault={coverDefault} now={now} />
 }
