@@ -8,6 +8,7 @@ import { OFFICE_PREVIEW_LIMITS, checkOfficePackage, describeProblem, type Packag
 import { trackEvent } from '../analytics/posthog';
 import { isEnabled } from '../features';
 import { saveAsMarkdownHandler, type SaveAsMarkdownPayload } from '../export/saveAsMarkdown';
+import { findRequests } from '../search/findAtPassage';
 
 /** One app "Open externally" may send the file to. */
 interface ExternalAppChoice {
@@ -163,6 +164,11 @@ export class OfficePreviewProvider implements vscode.CustomReadonlyEditorProvide
         // `ready` comes before `load`, when only the waiting page is listening.
         case 'getOpenStatus':
           await this.postOpenStatus(webviewPanel.webview);
+          // Sprint 148 (R9): the viewer is listening now; a search result's find bar waits for this (Word only:
+          // search reads no presentations).
+          if (this.format.viewType === 'ritemark.docxViewer') {
+            findRequests.ready(document.uri.toString(), webviewPanel, (find) => webviewPanel.webview.postMessage(find));
+          }
           break;
         case 'refresh':
           await this.handleRefresh(document, webviewPanel.webview);
@@ -192,6 +198,7 @@ export class OfficePreviewProvider implements vscode.CustomReadonlyEditorProvide
 
     // Cleanup on dispose
     webviewPanel.onDidDispose(() => {
+      findRequests.gone(document.uri.toString(), webviewPanel);
       const filePath = document.uri.fsPath;
       const watcher = this.fileWatchers.get(filePath);
       if (watcher) {

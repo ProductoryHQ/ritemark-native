@@ -19,6 +19,11 @@ export interface FindBarShellProps {
   onPrevious: () => void
   onClose: () => void
   placeholder?: string
+  /**
+   * Focus the input when the bar opens (⌘F). False when a search result opened it (Sprint 148, R9): the keyboard
+   * stays in the results, and a click in the bar gives Esc and Enter as usual.
+   */
+  autoFocus?: boolean
 }
 
 export interface FindBarShellHandle {
@@ -26,7 +31,7 @@ export interface FindBarShellHandle {
 }
 
 export const FindBarShell = forwardRef<FindBarShellHandle, FindBarShellProps>(function FindBarShell(
-  { query, onQueryChange, countLabel, hasMatches, onNext, onPrevious, onClose, placeholder = 'Find in document…' },
+  { query, onQueryChange, countLabel, hasMatches, onNext, onPrevious, onClose, placeholder = 'Find in document…', autoFocus = true },
   ref,
 ) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -38,7 +43,9 @@ export const FindBarShell = forwardRef<FindBarShellHandle, FindBarShellProps>(fu
   }))
 
   useEffect(() => {
-    inputRef.current?.focus()
+    if (autoFocus) inputRef.current?.focus()
+    // Only when the bar opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {

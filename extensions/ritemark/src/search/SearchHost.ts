@@ -38,6 +38,7 @@ import {
   type SearchResult,
   type WorkerConfig,
 } from './protocol';
+import { findOpenMessage, findRequests } from './findAtPassage';
 import { enabledPatterns, mergeEvents, type FsEvent } from './hostEvents';
 import { SearchPanelController, searchRowAction, searchRowNeedsShell } from './searchPanel';
 import { SearchViewProvider } from './SearchViewProvider';
@@ -305,9 +306,14 @@ export function registerProjectSearch(deps: SearchHostDependencies & { opens: Se
   const open = async (result: SearchResult): Promise<void> => {
     const id = idOf(result);
     if (result.kind === 'document') {
-      // Its usual editor (Markdown in Ritemark, Word and PDF in their previews, CSV in the table), at its top until
-      // PR 4; the keyboard stays in the results, so the next one is one key away (R8).
-      if (result.path) await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(result.path), { preserveFocus: true });
+      // Its usual editor (Markdown in Ritemark, Word and PDF in their previews, CSV in the table); the keyboard stays
+      // in the results, so the next one is one key away (R8). Then its find bar opens on the match (R9, PR 4): a
+      // page that isn't listening yet gets it when it is, and without it the document stays at its top.
+      if (!result.path) return;
+      const uri = vscode.Uri.file(result.path);
+      await vscode.commands.executeCommand('vscode.open', uri, { preserveFocus: true });
+      const find = findOpenMessage(result);
+      if (find) findRequests.request(uri.toString(), find);
     } else if (result.kind === 'chat') {
       if (id) await opens.openConversation(id, { turnId: result.passage?.at.turnId ?? null, preserveFocus: true });
     } else if (id) {

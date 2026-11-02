@@ -5,6 +5,7 @@
 import { NUMPAGES_FIELD_MARK, PAGE_FIELD_MARK, weightFontFaces, type AnchorAxis, type PageAnchor } from './docxXml';
 import {
   BLOCK_MARKER,
+  REPEATED_ROW_MARKER,
   CARRIER_MARKER,
   CONTINUED_MARKER,
   EMPTY_MARKER,
@@ -489,9 +490,22 @@ export function fillPageNumbers(root: ParentNode): number {
 const BLOCK = 'p, td, th, li, h1, h2, h3, h4, h5, h6, header, footer, article, section';
 
 /** The document's text nodes and their text, marking where a new paragraph or cell begins. */
-export function textChunks(root: ParentNode): { nodes: Text[]; chunks: TextChunk[] } {
+/**
+ * Sprint 148 (R9): whether drawn text is the document's own body text, as the search index reads it from
+ * `word/document.xml`: not a page header or footer (drawn again on every page), and not a header row a split
+ * table repeats (`REPEATED_ROW_MARKER`). The find bar still finds them all; a search result counts only these.
+ */
+export function isBodyText(element: { closest(selector: string): { querySelector(selector: string): unknown } | null } | null): boolean {
+  if (!element) return true;
+  if (element.closest('header, footer')) return false;
+  const row = element.closest('tr');
+  return !(row && row.querySelector(`span[id^="${REPEATED_ROW_MARKER}"]`));
+}
+
+export function textChunks(root: ParentNode): { nodes: Text[]; chunks: TextChunk[]; body: boolean[] } {
   const nodes: Text[] = [];
   const chunks: TextChunk[] = [];
+  const body: boolean[] = [];
   let previousBlock: Element | null = null;
   for (const page of renderedPages(root)) {
     const walker = document.createTreeWalker(page, NodeFilter.SHOW_TEXT, {
@@ -501,8 +515,9 @@ export function textChunks(root: ParentNode): { nodes: Text[]; chunks: TextChunk
       const block = node.parentElement?.closest(BLOCK) ?? null;
       nodes.push(node as Text);
       chunks.push({ text: node.nodeValue ?? '', newBlock: block !== previousBlock });
+      body.push(isBodyText(node.parentElement));
       previousBlock = block;
     }
   }
-  return { nodes, chunks };
+  return { nodes, chunks, body };
 }

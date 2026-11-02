@@ -66,6 +66,7 @@ import {
   shareMenuItems,
   type HostPlatform,
 } from './viewerShare'
+import { bodyLandingIndex, decodeFindOpen, isRequestQuery, type FindRequest } from '../../utils/findRequest'
 import './documentSearch.css'
 import './docx/docxPreview.css'
 
@@ -195,6 +196,11 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
   const styleRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<FindBarShellHandle>(null)
   const [searchOpen, setSearchOpen] = useState(false)
+  // Sprint 148 (R9): a search result's match, until the drawn text has matches to land on; the bar it opens
+  // leaves the keyboard where it was.
+  const landing = useRef<FindRequest | null>(null)
+  const [landingVersion, setLandingVersion] = useState(0)
+  const [searchAutoFocus, setSearchAutoFocus] = useState(true)
   const pageToRestore = useRef<number | null>(null)
   const zoomChosen = useRef(false)
   const revealMatch = useRef(false)
@@ -232,6 +238,15 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
         sendToExtension('refresh')
       } else if (message.type === 'fileDeleted') {
         setDeleted(true)
+      } else if (message.type === 'find:open') {
+        // Sprint 148 (R9): opened from a search result. The find bar only: the document isn't touched.
+        const request = decodeFindOpen(message, Date.now())
+        if (!request) return
+        landing.current = request
+        setSearchAutoFocus(false)
+        setSearchOpen(true)
+        setQuery(request.text)
+        setLandingVersion((v) => v + 1)
       }
     }
     window.addEventListener('message', handler)
@@ -446,20 +461,29 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
       setCurrentMatch(-1)
       return
     }
-    const { nodes, chunks } = textChunks(stage)
-    const ranges = findDocumentMatches(chunks, deferredQuery).map((m) => {
+    const { nodes, chunks, body } = textChunks(stage)
+    const found = findDocumentMatches(chunks, deferredQuery)
+    const ranges = found.map((m) => {
       const range = document.createRange()
       range.setStart(nodes[m.start.chunk], m.start.offset)
       range.setEnd(nodes[m.end.chunk], m.end.offset)
       return range
     })
     setMatches(ranges)
+    revealMatch.current = ranges.length > 0
+    // A search result's match (R9), once its words are the query and the text has them.
+    const wanted = landing.current
+    if (wanted && isRequestQuery(wanted, deferredQuery) && ranges.length > 0) {
+      landing.current = null
+      // Counted in the body only, as the index counts it: not a page header or footer, not a repeated table row.
+      setCurrentMatch(bodyLandingIndex(wanted, found.map((m) => body[m.start.chunk])))
+      return
+    }
     // Start at the first match from where the reader is.
     const viewTop = scroller.getBoundingClientRect().top
     const first = ranges.findIndex((range) => range.getBoundingClientRect().top >= viewTop)
     setCurrentMatch(ranges.length ? Math.max(0, first) : -1)
-    revealMatch.current = ranges.length > 0
-  }, [deferredQuery, phase, renderVersion])
+  }, [deferredQuery, phase, renderVersion, landingVersion])
 
   useEffect(() => {
     if (!highlightsSupported()) return
@@ -499,10 +523,13 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
   // Search opens as the floating find bar, as in the Markdown editor: the
   // magnifier or Cmd/Ctrl+F; Escape or × closes it and clears the highlights.
   const openSearch = useCallback(() => {
+    landing.current = null
+    setSearchAutoFocus(true)
     setSearchOpen(true)
     searchRef.current?.focus()
   }, [])
   const closeSearch = useCallback(() => {
+    landing.current = null
     setSearchOpen(false)
     setQuery('')
     scrollerRef.current?.focus()
@@ -699,7 +726,11 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
           <FindBarShell
             ref={searchRef}
             query={query}
-            onQueryChange={setQuery}
+            onQueryChange={(next) => {
+              landing.current = null
+              setQuery(next)
+            }}
+            autoFocus={searchAutoFocus}
             countLabel={matchCountLabel(currentMatch, matches.length, deferredQuery)}
             hasMatches={matches.length > 0}
             onNext={() => stepSearch(1)}
