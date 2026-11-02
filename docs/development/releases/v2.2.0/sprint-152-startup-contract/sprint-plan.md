@@ -40,10 +40,10 @@ its first frame.
 | --- | --- | --- | --- | --- |
 | [#624](https://github.com/ProductoryHQ/ritemark-native/issues/624) | The AI column has one loading look: the empty chat flashes before "Almost there!", and "Preparing Agent Chat…" isn't Ritemark's | R5 | In Sprint 145's first-frame captures (`r9-switch-first-frames-*.png`); the Experience lead's check of #622. Placed after 2.2 by the lead; added to this sprint at the Development manager's request (1 November), being the same family | extension |
 | [#569](https://github.com/ProductoryHQ/ritemark-native/issues/569), [#501](https://github.com/ProductoryHQ/ritemark-native/issues/501) | Fixed in Sprint 145 by #622 (merged 1 November; both issues still open on GitHub): the AI column and the landing after a switch; restored terminals. This sprint keeps their behaviour and moves their code onto the contract | R2 | Measured before and after in Sprint 145's research | shell |
-| No issue | A project opened for the first time: the tree, then Home's place; an empty desk's tiles, then Home | R3 | Read in the code, not seen (inventory rows 5, 11) | shell |
-| No issue | A window with no folder: VS Code's frame, then the welcome alone | R4 | Read, not seen (row 13) | shell |
-| No issue | The AI column the person closed opens again when Ritemark starts | R6 | Read, not seen (row 14) | extension, or shell by decision 2 |
-| No issue | The frame-shaping settings and the places row on a new profile | R1, R9 | Read, not seen (rows 4, 15) | shell |
+| No issue | A project opened for the first time: the tree, then Home's place; an empty desk's tiles, then Home | R3 | Seen in A1, 10 of 10 (rows 5, 11; `research/first-frames.md`) | shell |
+| No issue | A window with no folder: VS Code's frame, then the welcome alone | R4 | Seen in A1, 5 of 5 (row 13; the AI column showing first was not seen) | shell |
+| No issue | The AI column the person closed opens again when Ritemark starts | R6 | Seen in A1, 5 of 5 (row 14); decision 2: it stays closed. PR 1 | extension |
+| No issue | The frame-shaping settings and the places row on a new profile | R1, R9 | Seen in A1 (rows 4, 15; row 16, the colours, too) | shell |
 
 A row A1 doesn't show is dropped with its reason; one it shows and this sprint leaves for 2.3 is filed with its capture.
 
@@ -158,7 +158,7 @@ before the merges. Screenshots before each merge: PR 1 (the AI column's start, s
 No feature flag. The contract changes when the frame is drawn, not what a person can do, and there is no flag in the
 shell. HARD RULE #1 holds: the welcome alone, the landing, the terminals' wait, the head's rows and the AI column's
 loading look keep working, moved onto one mechanism; the extension's `configurationDefaults` stay; the AI view's error
-card stays, in Ritemark's words. R6 changes behaviour only with Jarmo's answer to decision 2. #624's view stays under no
+card stays, in Ritemark's words. R6 changes behaviour by decision 2 (it stays closed). #624's view stays under no
 flag, as today.
 
 ## Testing
@@ -227,6 +227,7 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
       release candidate: "võta nii et kõik sprindid on 2.2 osas approved until RC - ei vaja heakskiitu. I trust you. When needed use admin merge and clean worktrees" (ritemark-dev `decisions/log.md`, c45d69c).
 - [x] Decision 1: yes, as recommended. Decision 3: yes, as recommended (after 146's shell PR, alongside 147; in the
       cut order PR 2 moves to 2.3 right after 151, PR 1 stays).
-- [ ] Decision 2 (the AI column you closed): decided by the manager after the Experience lead's view on question 9,
-      before PR 1's R6 work, and recorded here and in the decision log.
+- [x] Decision 2: stays closed, only the person's toggle counts; decided by the Development manager on Jarmo's 2.2
+      delegation after the Experience lead's view, 1 November. A column the narrow window stepped aside comes back
+      once the window is wide enough (the Experience lead's answer 9; patch 018's window sizes already do this).
 - [x] Sprint start: PR 1 starts now; PR 2 after Sprint 146's PR 4 merges.

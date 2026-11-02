@@ -65,6 +65,7 @@ These rules must stay true after every upstream sync. Breaking any of them is vi
 ## When patching layout
 
 1. Put a change in the patch that owns its kind (table above); `scripts/check-patch-stacking.mjs` (pre-commit Check 14) blocks a hunk that builds on another patch's lines.
-2. Always check the cached state, not just the default. View positions in particular.
-3. If you remove a UI surface, also remove its registrations across ALL the menu IDs it could be added to.
-4. After commenting out code, **always remove unused imports** — VS Code's strict TypeScript build fails after 22 minutes otherwise (see SKILL.md ## Gotchas).
+2. Run the first-frame check before and after (`scripts/qa/project-check.mjs --first-frame <start>`, Sprint 152, R8): a frame that is right once settled can still move after its first frame, in a start the settled checks (`frame-screenshots.mjs`, `frame-geometry.mjs`) never see. Its four starts and the held extension host are in the script's header; the moves known on `main` are in Sprint 152's `research/first-frames.md`.
+3. Always check the cached state, not just the default. View positions in particular.
+4. If you remove a UI surface, also remove its registrations across ALL the menu IDs it could be added to.
+5. After commenting out code, **always remove unused imports** — VS Code's strict TypeScript build fails after 22 minutes otherwise (see SKILL.md ## Gotchas).
