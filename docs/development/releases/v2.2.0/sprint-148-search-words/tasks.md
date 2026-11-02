@@ -12,7 +12,7 @@ Nothing here starts before the plan is approved (the Development manager, on Jar
 
 ## Phase 1: Audits (each in `research/`, before its code)
 
-- [ ] A1 `research/head-swap.md` (R7): the Folders view hidden and shown keeps its state, or the other mechanism; a lone view merged in Documents; where VS Code's search is reached; the field's room
+- [x] A1 `research/head-swap.md` (R7): the Folders view hidden and shown keeps its state, or the other mechanism; a lone view merged in Documents; where VS Code's search is reached; the field's room
 - [x] A2 `research/pdf-in-worker.md` (R2): `pdfjs-dist` inlined into a CJS worker or not; text with no canvas package; the fixtures; the size
 - [x] A3 `research/word-text.md` (R2): `word/document.xml` through the zip reader on the fixtures; the refusals
 - [ ] A4 `research/walk-and-cloud.md` (R1): `ignore` on the fixture; links; `files.exclude`; cloud files on the Mac and, through the overlay, on Windows (the Mac half done; Windows waits for the overlay, and until then nothing under OneDrive is read there)
@@ -50,11 +50,11 @@ Nothing here starts before the plan is approved (the Development manager, on Jar
 ## Phase 4: PR 3, the box and the swap (W7, R7)
 
 - [ ] Sprint 146's shell PR merged; Sprint 152's PR 2 not in review at the same time (or merged, and its manifest carries the field row and the view)
-- [ ] A CoW-cloned, patched `vscode/` in the worktree; `./scripts/apply-patches.sh --dry-run` passes before any change
-- [ ] Patch 018: the field row, `_ritemark.projectHead.focusSearch`, `ritemark.searchOpen`, the swap by A1's mechanism, New clears first; through `create-patch.sh`; its header gains a Sprint 148 paragraph
-- [ ] The field's unit test; `./scripts/test.sh --grep Ritemark`
+- [x] A CoW-cloned, patched `vscode/` in the worktree; `./scripts/apply-patches.sh --dry-run` passes before any change
+- [x] Patch 018: the field row, `_ritemark.projectHead.focusSearch`, `ritemark.searchOpen`, the swap by A1's mechanism, New clears first; through `create-patch.sh`; its header gains a Sprint 148 paragraph
+- [x] The field's unit test; `./scripts/test.sh --grep Ritemark`
 - [ ] `frame-screenshots.mjs --compare` with JOINS ok, `frame-geometry.mjs`; the swap and back, Light and Dark; the tree's folders, scroll and selection kept
-- [ ] `CLAUDE.md`'s patch table (018) and `layout-invariants.md`
+- [x] `CLAUDE.md`'s patch table (018) and `layout-invariants.md`
 - [ ] Screenshots to the Experience lead
 - [ ] PR 3 opened: High, `/code-review` at high and `/security-review`; every finding answered; merged at the reviewed head with the drift check
 - [ ] Windows proof on 2.2's candidate at Gate 2 (100%, 125%, 150%)

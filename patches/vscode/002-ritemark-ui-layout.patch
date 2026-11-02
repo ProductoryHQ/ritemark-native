@@ -62,6 +62,14 @@ Sprint 152, PR 3 (the Experience lead's "One loading look, for every slot"): rit
   Test: workbench/test/browser/ritemarkLoadingLook.test.ts. ritemarkFrame.ts starts loading the frame's text font
   (style.css's Sofia Sans, font-display swap) as the frame is read, while the window still starts: loaded on first use
   it came just after the first frame's layout, so 019's whole-pixel tab widths were measured in the fallback.
+Sprint 148, PR 3 (R7): a head row may be the search box (`field: true` in the manifest, ritemarkFrame.ts; 018 draws it).
+  While the box holds words (`ritemark.searchOpen`, set by 018) the extension's results view shows in Documents and the
+  Folders pane is taken out of the container without being disposed (explorerViewlet.ts;
+  ViewPaneContainer.setPaneDetached in viewPaneContainer.ts, whose onDidRemoveViewDescriptors becomes protected so the
+  pane is put back before the views change): the container counts only the results, so it stays merged with no header,
+  and the tree keeps its folders and scroll and its place in ExplorerService. Whatever opens the tree (Show in Documents,
+  New file or folder, a reveal, Refresh Explorer) runs 018's `_ritemark.projectHead.clearSearch` first (the container's
+  openView).
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 index 833787070f3..e4fa4a207e5 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
@@ -1414,10 +1422,10 @@ index bfc8839cc65..745739c61f4 100644
  		};
 diff --git a/src/vs/workbench/browser/ritemarkFrame.ts b/src/vs/workbench/browser/ritemarkFrame.ts
 new file mode 100644
-index 00000000000..30dde13e523
+index 00000000000..1eaf7d80f4f
 --- /dev/null
 +++ b/src/vs/workbench/browser/ritemarkFrame.ts
-@@ -0,0 +1,505 @@
+@@ -0,0 +1,507 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1472,6 +1480,8 @@ index 00000000000..30dde13e523
 +export interface IRitemarkFrameHeadRow {
 +	readonly command: string;
 +	readonly menu?: string;
++	/** Sprint 148 (R7): the row is the search box (ritemarkProjectHead.ts). */
++	readonly field?: boolean;
 +}
 +
 +/** A place in the places row, in order, with its placeholder's title and icon (the extension's media). */
@@ -1519,10 +1529,10 @@ index 00000000000..30dde13e523
 +}
 +
 +function headRow(value: unknown): IRitemarkFrameHeadRow | undefined {
-+	const row = value as { command?: unknown; menu?: unknown } | null;
++	const row = value as { command?: unknown; menu?: unknown; field?: unknown } | null;
 +	const command = text(row?.command);
 +	const menu = text(row?.menu);
-+	return command ? { command, ...(menu ? { menu } : {}) } : undefined;
++	return command ? { command, ...(menu ? { menu } : {}), ...(row?.field === true ? { field: true } : {}) } : undefined;
 +}
 +
 +function place(value: unknown): IRitemarkFramePlace | undefined {
@@ -2286,19 +2296,87 @@ index 75c746cf9eb..b434f06ca79 100644
  					localize('window.commandCenterWeb', "Show command launcher together with the window title.") :
  					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`'),
 diff --git a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
-index 565fb42cb18..6f8076410b8 100644
+index 565fb42cb18..87e3406d91e 100644
 --- a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 +++ b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
-@@ -25,7 +25,7 @@ import { Disposable } from '../../../../base/common/lifecycle.js';
+@@ -19,13 +19,14 @@ import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/w
+ import { ITelemetryService } from '../../../../platform/telemetry/common/telemetry.js';
+ import { IContextKeyService, IContextKey, ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
+ import { IThemeService } from '../../../../platform/theme/common/themeService.js';
+-import { IViewsRegistry, IViewDescriptor, Extensions, ViewContainer, IViewContainersRegistry, ViewContainerLocation, IViewDescriptorService, ViewContentGroups } from '../../../common/views.js';
++import { IViewsRegistry, IViewDescriptor, Extensions, ViewContainer, IViewContainersRegistry, ViewContainerLocation, IViewDescriptorService, ViewContentGroups, IView, IAddedViewDescriptorRef, IViewDescriptorRef } from '../../../common/views.js';
+ import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
+ import { Disposable } from '../../../../base/common/lifecycle.js';
  import { IWorkbenchContribution } from '../../../common/contributions.js';
  import { IWorkbenchLayoutService } from '../../../services/layout/browser/layoutService.js';
  import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
 -import { ViewPane } from '../../../browser/parts/views/viewPane.js';
 +import { ViewPane, ViewPaneShowActions } from '../../../browser/parts/views/viewPane.js';
++import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
  import { KeyChord, KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
  import { Registry } from '../../../../platform/registry/common/platform.js';
  import { IProgressService, ProgressLocation } from '../../../../platform/progress/common/progress.js';
-@@ -186,7 +186,9 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
+@@ -178,6 +179,59 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
+ 		this._register(this.contextService.onDidChangeWorkspaceName(e => this.updateTitleArea()));
+ 	}
+ 
++	/**
++	 * Ritemark (Sprint 148, R7): while Documents' search box holds words, the extension's results view (its `when` is
++	 * ritemark.searchOpen, set by 018's head) takes the tree's place. The tree is taken out of the container but not
++	 * disposed (ViewPaneContainer.setPaneDetached), so it keeps its folders and scroll, and what works on it still does.
++	 */
++	private readonly ritemarkSearchResultsView = 'ritemark.searchResults';
++	/** The Folders pane while the results take its place: out of the container, its tree alive. */
++	private ritemarkFolders: ViewPane | undefined;
++
++	private ritemarkSearchSwap(): void {
++		const folders = this.panes.find(pane => pane.id === VIEW_ID);
++		if (folders && this.panes.some(pane => pane.id === this.ritemarkSearchResultsView)) {
++			this.setPaneDetached(folders, true);
++			this.ritemarkFolders = folders;
++		}
++	}
++
++	private ritemarkAttachFolders(): void {
++		const folders = this.ritemarkFolders;
++		this.ritemarkFolders = undefined;
++		if (folders) {
++			this.setPaneDetached(folders, false);
++		}
++	}
++
++	// The container's panes mirror its visible views by index: the tree is put back before they change, then the swap
++	// is looked at again
++	protected override onDidAddViewDescriptors(added: IAddedViewDescriptorRef[]): ViewPane[] {
++		this.ritemarkAttachFolders();
++		const panes = super.onDidAddViewDescriptors(added);
++		this.ritemarkSearchSwap();
++		return panes;
++	}
++
++	protected override onDidRemoveViewDescriptors(removed: IViewDescriptorRef[]): void {
++		this.ritemarkAttachFolders();
++		super.onDidRemoveViewDescriptors(removed);
++		this.ritemarkSearchSwap();
++	}
++
++	override openView(id: string, focus?: boolean): IView | undefined {
++		// Ritemark (Sprint 148, R7): whatever opens the tree (Show in Documents, New file or folder, a reveal, Refresh
++		// Explorer) closes the search first, so the tree it works on is in sight
++		if (id === VIEW_ID && this.ritemarkFolders) {
++			try {
++				this.instantiationService.invokeFunction(accessor => CommandsRegistry.getCommand('_ritemark.projectHead.clearSearch')?.handler(accessor));
++			} finally {
++				this.ritemarkAttachFolders();
++			}
++		}
++		return super.openView(id, focus);
++	}
++
+ 	override create(parent: HTMLElement): void {
+ 		super.create(parent);
+ 		parent.classList.add('explorer-viewlet');
+@@ -186,7 +240,9 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
  	protected override createView(viewDescriptor: IViewDescriptor, options: IViewletViewOptions): ViewPane {
  		if (viewDescriptor.id === VIEW_ID) {
  			return this.instantiationService.createInstance(ExplorerView, {
@@ -2309,7 +2387,7 @@ index 565fb42cb18..6f8076410b8 100644
  					willOpenElement: e => {
  						if (!isMouseEvent(e)) {
  							return; // only delay when user clicks
-@@ -257,28 +259,26 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
+@@ -257,28 +313,26 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
   */
  export const VIEW_CONTAINER: ViewContainer = viewContainerRegistry.registerViewContainer({
  	id: VIEWLET_ID,
@@ -2342,7 +2420,7 @@ index 565fb42cb18..6f8076410b8 100644
  const openFolderButton = `[${openFolder}](command:${OpenFolderAction.ID})`;
  const openFolderViaWorkspaceButton = `[${openFolder}](command:${OpenFolderViaWorkspaceAction.ID})`;
  const openRecentButton = `[${openRecent}](command:${OpenRecentAction.ID})`;
-@@ -326,7 +326,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
+@@ -326,7 +380,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  
  viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  	content: localize({ key: 'noFolderButEditorsHelp', comment: ['Please do not translate the word "command", it is part of our internal syntax which must not change'] },
@@ -2351,7 +2429,7 @@ index 565fb42cb18..6f8076410b8 100644
  	when: ContextKeyExpr.and(
  		// editors are opened
  		ContextKeyExpr.has('editorIsOpen'),
-@@ -343,7 +343,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
+@@ -343,7 +397,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  
  viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  	content: localize({ key: 'noFolderHelp', comment: ['Please do not translate the word "command", it is part of our internal syntax which must not change'] },
@@ -2537,7 +2615,7 @@ index ef3388a877f..873b2dbf292 100644
  
 diff --git a/src/vs/workbench/test/browser/ritemarkFrame.test.ts b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
 new file mode 100644
-index 00000000000..a7f4adb4968
+index 00000000000..be058b5c8b9
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
 @@ -0,0 +1,153 @@
@@ -2579,7 +2657,7 @@ index 00000000000..a7f4adb4968
 +		welcome: 'mainThreadWebview-ritemark.welcome',
 +		places: [
 +			{ id: 'workbench.view.extension.ritemark-home', title: 'Home', order: -1, icon: 'media/home-icon.svg' },
-+			{ id: 'workbench.view.explorer', title: 'Documents', head: { rows: [{ command: 'ritemark.projectHead.newRow', menu: 'ritemark/projectHead/new' }, { command: 'ritemark.projectHead.search' }], label: 'Documents' } },
++			{ id: 'workbench.view.explorer', title: 'Documents', head: { rows: [{ command: 'ritemark.projectHead.newRow', menu: 'ritemark/projectHead/new' }, { command: 'ritemark.projectHead.search', field: true }], label: 'Documents' } },
 +		],
 +	};
 +
@@ -2588,7 +2666,7 @@ index 00000000000..a7f4adb4968
 +		const read = readRitemarkFrame({
 +			...manifest,
 +			futureKey: { anything: true },
-+			places: [...manifest.places, { id: 'no-title' }, { title: 'No id' }, { id: 'p', title: 'P', order: 'first', head: { rows: [{ menu: 'no command' }, { command: 'c' }] } }],
++			places: [...manifest.places, { id: 'no-title' }, { title: 'No id' }, { id: 'p', title: 'P', order: 'first', head: { rows: [{ menu: 'no command' }, { command: 'c', field: 'yes' }] } }],
 +			permanentTabs: [...manifest.permanentTabs, { title: 'No view type' }],
 +			welcome: 7,
 +		});
@@ -2968,3 +3046,71 @@ index 00000000000..49f42b3d5f5
 +		});
 +	}));
 +});
+diff --git a/src/vs/workbench/browser/parts/views/viewPaneContainer.ts b/src/vs/workbench/browser/parts/views/viewPaneContainer.ts
+index 552fe08c2b0..d2f011e4c8f 100644
+--- a/src/vs/workbench/browser/parts/views/viewPaneContainer.ts
++++ b/src/vs/workbench/browser/parts/views/viewPaneContainer.ts
+@@ -765,6 +765,54 @@ export class ViewPaneContainer<MementoType extends object = object> extends Comp
+ 		});
+ 	}
+ 
++	/** Ritemark (Sprint 148, R7): the panes taken out by setPaneDetached, their views alive, with the size each had. */
++	private readonly ritemarkDetached = (() => {
++		const detached = new Map<ViewPane, { readonly item: IViewPaneItem; readonly size: number; readonly index: number }>();
++		this._register(toDisposable(() => {
++			for (const { item } of detached.values()) {
++				item.disposable.dispose(); // it holds the pane too (onDidAddViewDescriptors)
++			}
++		}));
++		return detached;
++	})();
++
++	/**
++	 * Ritemark (Sprint 148, R7): takes a pane out of the container without disposing its view, so its state and its
++	 * registrations stay, or puts it back at its place. The container counts only the panes in it: its merge, headers,
++	 * focus and saved state are the ones it has without the pane. Its panes mirror the visible view descriptors by index,
++	 * so a subclass puts a pane back before the descriptors change (onDidAdd/RemoveViewDescriptors).
++	 */
++	protected setPaneDetached(pane: ViewPane, detached: boolean): void {
++		if (!this.paneview || detached === this.ritemarkDetached.has(pane)) {
++			return;
++		}
++		const wasMerged = this.isViewMergedWithContainer();
++		if (detached) {
++			const index = this.paneItems.findIndex(item => item.pane === pane);
++			if (index === -1) {
++				return;
++			}
++			this.ritemarkDetached.set(pane, { item: this.paneItems[index], size: this.paneview.getPaneSize(pane), index });
++			this.paneItems.splice(index, 1);
++			this.paneview.removePane(pane);
++			if (this.lastFocusedPane === pane) {
++				this.lastFocusedPane = undefined;
++			}
++			pane.setVisible(false);
++		} else {
++			const { item, size } = this.ritemarkDetached.get(pane)!;
++			const index = Math.min(this.ritemarkDetached.get(pane)!.index, this.paneItems.length);
++			this.ritemarkDetached.delete(pane);
++			this.paneItems.splice(index, 0, item);
++			this.paneview.addPane(pane, size, index);
++			pane.setVisible(this.isVisible());
++		}
++		this.updateViewHeaders();
++		if (this.isViewMergedWithContainer() !== wasMerged) {
++			this.updateTitleArea();
++		}
++	}
++
+ 	openView(id: string, focus?: boolean): IView | undefined {
+ 		let view = this.getView(id);
+ 		if (!view) {
+@@ -825,7 +873,7 @@ export class ViewPaneContainer<MementoType extends object = object> extends Comp
+ 		return panes;
+ 	}
+ 
+-	private onDidRemoveViewDescriptors(removed: IViewDescriptorRef[]): void {
++	protected onDidRemoveViewDescriptors(removed: IViewDescriptorRef[]): void { // Ritemark (Sprint 148, R7): protected, as onDidAddViewDescriptors
+ 		removed = removed.sort((a, b) => b.index - a.index);
+ 		const panesToRemove: ViewPane[] = [];
+ 		for (const { index } of removed) {

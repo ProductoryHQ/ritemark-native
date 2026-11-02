@@ -192,6 +192,18 @@ tab waits; the welcome alone shows only the window's look; a terminal tab's icon
 icon font arrive, so 019's whole-pixel pass measures its final width at a start (ritemarkSurfaces.css).
 Tests: workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts (the window's look).
 
+Sprint 148, PR 3 (R7, the Experience lead's answer 3): on Documents the head's Search row is the search box while the
+extension's search is on (`ritemark.projectSearch.enabled`; 002's manifest marks the row `field`). At rest it reads as
+the row; with the caret, or holding words, it is the kit's .sfield in the row's 32 and x (ritemarkSurfaces.css), × clears
+it. Its words and keys go to the row's command (`{ text }`, `{ key: 'down' | 'enter' }`); Escape clears, or leaves an empty
+box for the desk. `_ritemark.projectHead.focusSearch` (⌘⇧F, through the extension) shows Documents and puts the caret in
+it; the extension asks for that command to know the shell has the box. While the box holds words `ritemark.searchOpen` is
+set: 002 hides the Folders view and the extension's results view shows in its place, and the Documents label makes way.
+The words stay while the person goes to another place; New, the head's menus' items, and anything that opens the tree
+(`_ritemark.projectHead.clearSearch`), clear them first; the switch turned off, or the folder closed, takes them away
+without a search. The box is never taken out of the page while the rows are drawn again, so its caret and a word being
+composed stay. Test: workbench/test/browser/parts/ritemarkProjectHead.test.ts.
+
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
 platform/window/common/window.ts; platform/windows/electron-main/windowImpl.ts; workbench/browser/{layout,style}.ts;
@@ -910,10 +922,10 @@ index 72cb1c1..a8b8807 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..23efdc069a4
+index 00000000000..9580c3bd26e
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,2039 @@
+@@ -0,0 +1,2108 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -968,6 +980,7 @@ index 00000000000..23efdc069a4
 +/* Anything you can click shows the hand (Ritemark's rule for its own interface) */
 +.monaco-workbench .ritemark-frame-strip a,
 +.monaco-workbench .ritemark-project-row,
++.monaco-workbench .ritemark-project-field-clear,
 +.monaco-workbench .ritemark-project-head[role="button"],
 +.monaco-workbench .ritemark-new-tab,
 +.monaco-workbench .ritemark-more-tabs,
@@ -2376,6 +2389,74 @@ index 00000000000..23efdc069a4
 +	width: 14px;
 +	font-size: 14px !important; /* !important: the codicon rule sets 16 */
 +	color: var(--vscode-descriptionForeground);
++}
++
++/* Sprint 148 (R7, the Experience lead's answer 3): the search box in the Search row's place, the row's 32 and its x, so
++   nothing in the column moves. At rest it reads as the row; with the caret, or holding words, it is the kit's .sfield:
++   the desk's colour with the input's hairline inside, and while it has the caret the 3 px indigo-soft ring outside
++   (indigo stays a fill). × clears its words */
++.monaco-workbench .part.sidebar .ritemark-project-row.ritemark-project-field {
++	cursor: text;
++}
++
++.monaco-workbench .part.sidebar .ritemark-project-field:focus-within,
++.monaco-workbench .part.sidebar .ritemark-project-field.ritemark-project-field-filled {
++	border-radius: 6px;
++	background-color: var(--rm-desk);
++	box-shadow: inset 0 0 0 1px var(--vscode-input-border, var(--rm-hairline));
++}
++
++.monaco-workbench .part.sidebar .ritemark-project-field:focus-within {
++	box-shadow: inset 0 0 0 1px var(--vscode-input-border, var(--rm-hairline)), 0 0 0 3px var(--vscode-inputOption-activeBackground, transparent);
++}
++
++/* High contrast: the ring is the theme's focus line */
++.monaco-workbench.hc-black .part.sidebar .ritemark-project-field:focus-within,
++.monaco-workbench.hc-light .part.sidebar .ritemark-project-field:focus-within {
++	outline: 1px solid var(--vscode-focusBorder);
++	outline-offset: 1px;
++}
++
++.monaco-workbench .part.sidebar .ritemark-project-field-input {
++	flex: 1 1 auto;
++	min-width: 0;
++	height: 32px;
++	margin: 0;
++	padding: 0;
++	border: none;
++	outline: none !important; /* !important: the workbench's focus outline on inputs; the box's ring is its own */
++	background: transparent;
++	color: var(--vscode-input-foreground);
++	font: inherit;
++	font-size: 13px;
++}
++
++.monaco-workbench .part.sidebar .ritemark-project-field-input::placeholder {
++	color: var(--vscode-sideBar-foreground); /* at rest, the row's own words */
++	opacity: 1;
++}
++
++.monaco-workbench .part.sidebar .ritemark-project-field:focus-within .ritemark-project-field-input::placeholder {
++	color: var(--rm-muted);
++}
++
++.monaco-workbench .part.sidebar .ritemark-project-field-clear {
++	display: none;
++	flex: none;
++	align-items: center;
++	justify-content: center;
++	width: 20px;
++	height: 20px;
++	margin-right: -4px;
++	border-radius: 4px;
++}
++
++.monaco-workbench .part.sidebar .ritemark-project-field-filled .ritemark-project-field-clear {
++	display: flex;
++}
++
++.monaco-workbench .part.sidebar .ritemark-project-field-clear:hover {
++	background-color: var(--rm-hover);
 +}
 +
 +.monaco-workbench .part.sidebar .ritemark-project-group {
@@ -5243,10 +5324,10 @@ index 00000000000..c6764e91723
 +registerWorkbenchContribution2(RitemarkWindowSizes.ID, RitemarkWindowSizes, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644
-index 00000000000..feeaee393f5
+index 00000000000..7b143e34532
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,380 @@
+@@ -0,0 +1,607 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -5266,6 +5347,12 @@ index 00000000000..feeaee393f5
 + * (menusExtensionPoint.ts), so an extension release can change them; each menu group is set apart by a
 + * hairline. On Agents, New lists the library's four kinds and Search finds in the library; Documents adds its label
 + * over the tree. Other places keep their own simple head.
++ *
++ * Sprint 148 (R7): on Documents the Search row is the search box, while the extension's search is on
++ * (`ritemark.projectSearch.enabled`): at rest it reads as the row, a click or ⌘⇧F puts the caret in it
++ * (`_ritemark.projectHead.focusSearch`), and its words and keys go to the row's command
++ * (`ritemark.projectHead.search` with `{ text }` or `{ key }`). While it holds words, `ritemark.searchOpen` is set:
++ * the Folders view and the Documents label make way for the extension's results view (explorerViewlet.ts).
 + */
 +
 +import { $, addDisposableListener, append, EventType } from '../../../../base/browser/dom.js';
@@ -5278,9 +5365,12 @@ index 00000000000..feeaee393f5
 +import { ThemeIcon } from '../../../../base/common/themables.js';
 +import { localize } from '../../../../nls.js';
 +import { IMenuService, MenuId, MenuItemAction, MenuRegistry } from '../../../../platform/actions/common/actions.js';
-+import { ICommandService } from '../../../../platform/commands/common/commands.js';
-+import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
++import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
++import { IContextKey, IContextKeyService, RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
 +import { IContextViewService } from '../../../../platform/contextview/browser/contextView.js';
++import { getDefaultHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegateFactory.js';
++import { IHoverService } from '../../../../platform/hover/browser/hover.js';
++import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
 +import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 +import { IExtensionService } from '../../../services/extensions/common/extensions.js';
 +import { RITEMARK_MENU_SEPARATOR, RitemarkMenuEntry, showRitemarkMenu } from '../ritemarkMenu.js';
@@ -5296,6 +5386,42 @@ index 00000000000..feeaee393f5
 +interface IRitemarkHeadRow {
 +	readonly command: string;
 +	readonly menu?: MenuId;
++	/** Sprint 148 (R7): the row is the search box while the extension's search is on. */
++	readonly field?: boolean;
++}
++
++/** Sprint 148 (R7): set by the extension from its kill switch; the box is drawn only while it is true. */
++const SEARCH_ENABLED_KEY = 'ritemark.projectSearch.enabled';
++const SEARCH_ENABLED_KEYS = new Set([SEARCH_ENABLED_KEY]);
++/** Sprint 148 (R7): the box holds words; the Folders view makes way for the results (explorerViewlet.ts). */
++export const RITEMARK_SEARCH_OPEN = new RawContextKey<boolean>('ritemark.searchOpen', false);
++/** Sprint 148 (R7): ⌘⇧F and the extension put the caret in the box; the extension asks for it to know the box is here. */
++const FOCUS_SEARCH_COMMAND = '_ritemark.projectHead.focusSearch';
++/** Sprint 148 (R7): what opens the tree while the box holds words (Show in Documents, New file) clears it (explorerViewlet.ts). */
++const CLEAR_SEARCH_COMMAND = '_ritemark.projectHead.clearSearch';
++
++/** Whether the box's words open the results: any but spaces. */
++export function ritemarkSearchOpen(text: string): boolean {
++	return text.trim().length > 0;
++}
++
++/**
++ * What a key does in the box (the Experience lead, answer 3): ↓ and Enter go to the results while it holds words;
++ * Escape clears the words (the caret stays), or leaves an empty box for the desk.
++ */
++export function ritemarkSearchFieldKey(key: 'down' | 'enter' | 'escape', text: string): { readonly run?: { readonly key: 'down' | 'enter' } | { readonly text: '' }; readonly leave?: true } | undefined {
++	if (key === 'escape') {
++		return text.length ? { run: { text: '' } } : { leave: true };
++	}
++	return ritemarkSearchOpen(text) ? { run: { key } } : undefined;
++}
++
++/** The box: the row's place, an input, and its clear button. */
++interface IRitemarkSearchField {
++	readonly row: HTMLElement;
++	readonly icon: HTMLElement;
++	readonly input: HTMLInputElement;
++	command: string;
 +}
 +
 +/** The places with the project's head: their rows (up to two), and the label over their content. */
@@ -5309,7 +5435,7 @@ index 00000000000..feeaee393f5
 + * labels are the frame's manifest's (product.json's ritemarkFrame, ritemarkFrame.ts), read at the first frame.
 + */
 +const HEAD_PLACES = new Map<string, IRitemarkHeadPlace>(ritemarkFrame.places.flatMap(place => place.head ? [[place.id, {
-+	rows: place.head.rows.map(row => ({ command: row.command, ...(row.menu ? { menu: MenuId.for(row.menu) } : {}) })),
++	rows: place.head.rows.map(row => ({ command: row.command, ...(row.menu ? { menu: MenuId.for(row.menu) } : {}), ...(row.field ? { field: true } : {}) })),
 +	...(place.head.label ? { group: place.head.label } : {}),
 +}] as const] : []));
 +
@@ -5389,6 +5515,15 @@ index 00000000000..feeaee393f5
 +		return !!this.place;
 +	}
 +
++	/** Sprint 148 (R7): the search box, made once and kept, so its words stay while the person goes to another place. */
++	private field: IRitemarkSearchField | undefined;
++	private readonly fieldStore = this._register(new DisposableStore());
++	private readonly searchOpen: IContextKey<boolean>;
++	/** The project the box's words are for. */
++	private projectUri: string | undefined;
++	/** The place shown, as update() last had it. */
++	private compositeId: string | undefined;
++
 +	constructor(
 +		private readonly part: HTMLElement,
 +		titleArea: HTMLElement,
@@ -5399,9 +5534,12 @@ index 00000000000..feeaee393f5
 +		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
 +		@IExtensionService extensionService: IExtensionService,
 +		@ILogService private readonly logService: ILogService,
++		@IHoverService private readonly hoverService: IHoverService,
++		@IKeybindingService private readonly keybindingService: IKeybindingService,
 +	) {
 +		super();
 +		this.titleArea = titleArea;
++		this.searchOpen = RITEMARK_SEARCH_OPEN.bindTo(contextKeyService);
 +
 +		// The head: the project's mark, its whole name (in place of the place's own title) and a chevron; the whole
 +		// label opens the project's menu
@@ -5449,6 +5587,20 @@ index 00000000000..feeaee393f5
 +			}
 +		};
 +		this._register(MenuRegistry.onDidChangeMenu(drawRowsAgain));
++		// Sprint 148 (R7): the box comes and goes with the extension's search; turned off, its words go without a search
++		this._register(contextKeyService.onDidChangeContext(e => {
++			if (e.affectsSome(SEARCH_ENABLED_KEYS)) {
++				if (!this.searchEnabled) {
++					this.setFieldText('', false);
++				}
++				drawRowsAgain();
++			}
++		}));
++		this._register(CommandsRegistry.registerCommand(FOCUS_SEARCH_COMMAND, (_accessor, arg?: unknown) => {
++			const text = typeof arg === 'string' ? arg : typeof (arg as { text?: unknown } | undefined)?.text === 'string' ? (arg as { text: string }).text : undefined;
++			return this.focusSearch(text);
++		}));
++		this._register(CommandsRegistry.registerCommand(CLEAR_SEARCH_COMMAND, () => this.setFieldText('', true)));
 +		// Sprint 145 (#569): once the extensions are read, a row whose command is still missing goes (an older extension)
 +		extensionService.whenInstalledExtensionsRegistered().then(() => {
 +			if (!this._store.isDisposed) {
@@ -5471,6 +5623,7 @@ index 00000000000..feeaee393f5
 +
 +	/** The place shown; returns whether the column's head changed. */
 +	update(compositeId: string | undefined): boolean {
++		this.compositeId = compositeId;
 +		if (compositeId === undefined) {
 +			compositeId = this.restoring;
 +		} else if (this.restoring !== undefined) {
@@ -5500,7 +5653,7 @@ index 00000000000..feeaee393f5
 +		}
 +		this.part.classList.toggle('ritemark-project-place', !!place);
 +		this.group.textContent = place?.group ?? '';
-+		this.group.style.display = place?.group ? '' : 'none';
++		this.updateGroup();
 +		if (this.active === wasActive) {
 +			return true;
 +		}
@@ -5518,20 +5671,37 @@ index 00000000000..feeaee393f5
 +
 +	private updateProject(): void {
 +		const folder = this.workspaceService.getWorkspace().folders[0];
++		if (folder?.uri.toString() !== this.projectUri) {
++			// Another project, or none: the box's words and the results go with the one they were for
++			this.projectUri = folder?.uri.toString();
++			this.setFieldText('', this.searchEnabled);
++		}
 +		this.mark.textContent = folder ? ritemarkProjectInitials(folder.name) : '';
 +		this.name.textContent = folder?.name ?? '';
++	}
++
++	/** The label over the content; on a place with the box, it makes way for the results while the box holds words. */
++	private updateGroup(): void {
++		const place = this.place;
++		const hidden = !place?.group || (this.searchOpen.get() === true && place.rows.some(row => row.field));
++		this.group.style.display = hidden ? 'none' : '';
++	}
++
++	private get searchEnabled(): boolean {
++		return this.contextKeyService.getContextKeyValue<boolean>(SEARCH_ENABLED_KEY) === true;
 +	}
 +
 +	/** The place's rows: each command's own words and icon, as the extension contributes them. */
 +	private renderRows(place: IRitemarkHeadPlace): void {
 +		this.rowStore.clear();
-+		this.rowList.replaceChildren();
++		// The box is kept across draws and never taken out of the page, so its caret and a word being composed stay
++		const rows: HTMLElement[] = [];
 +		for (const spec of place.rows) {
 +			const command = MenuRegistry.getCommand(spec.command);
 +			if (!command) {
 +				if (!this.extensionsRead) {
 +					// Sprint 145 (#569): the extension's command comes once the extensions are read; its row keeps its room
-+					append(this.rowList, $('.ritemark-project-row.ritemark-project-row-waiting', { 'aria-hidden': 'true' }));
++					rows.push($('.ritemark-project-row.ritemark-project-row-waiting', { 'aria-hidden': 'true' }));
 +				} else {
 +					// Sprint 152 (R2): an older extension: the row's slot goes, once the extensions are read, and says so
 +					ritemarkSlotReleased(this.logService, `head row ${spec.command}`, 'its command is not registered');
@@ -5540,24 +5710,153 @@ index 00000000000..feeaee393f5
 +			}
 +			const text = typeof command.title === 'string' ? command.title : command.title.value;
 +			const icon = ThemeIcon.isThemeIcon(command.icon) ? command.icon : Codicon.circleSmall;
++			if (spec.field && this.searchEnabled) {
++				rows.push(this.drawField(spec.command, icon, text));
++				continue;
++			}
 +			const row = this.row(icon, text);
++			rows.push(row);
 +			if (spec.menu) {
 +				const menu = spec.menu;
++				const searches = place.rows.some(other => other.field);
 +				row.setAttribute('aria-haspopup', 'menu');
-+				this.rowStore.add(addDisposableListener(row, EventType.CLICK, () => this.showMenu(menu, row, text)));
++				this.rowStore.add(addDisposableListener(row, EventType.CLICK, () => {
++					// R7: New while searching clears the box first, so its File and Folder items work in the tree
++					if (searches && this.field?.input.value) {
++						this.setFieldText('', true);
++					}
++					this.showMenu(menu, row, text);
++				}));
 +			} else {
 +				this.rowStore.add(addDisposableListener(row, EventType.CLICK, () => this.commandService.executeCommand(spec.command)));
 +			}
 +		}
++		for (const child of [...this.rowList.children]) {
++			if (!rows.includes(child as HTMLElement)) {
++				child.remove();
++			}
++		}
++		rows.forEach((row, index) => {
++			const at = this.rowList.children[index];
++			if (at !== row) {
++				this.rowList.insertBefore(row, at ?? null);
++			}
++		});
 +		this.rowList.style.display = this.rowList.childElementCount ? '' : 'none';
 +		// A place with no rows and no label (Browser) draws its own content right under the head.
 +		this.rows.classList.toggle('ritemark-project-rows-empty', !this.rowList.childElementCount && !place.group);
 +	}
 +
++	/** Sprint 148 (R7): the search box in the Search row's place, made the first time and drawn again after. */
++	private drawField(command: string, icon: ThemeIcon, text: string): HTMLElement {
++		const field = this.field ??= this.createField(command);
++		field.command = command;
++		field.icon.className = '';
++		field.icon.classList.add(...ThemeIcon.asClassNameArray(icon));
++		field.input.placeholder = text;
++		field.input.setAttribute('aria-label', text);
++		return field.row;
++	}
++
++	private createField(command: string): IRitemarkSearchField {
++		const row = $('.ritemark-project-row.ritemark-project-field');
++		const icon = append(row, $('span', { 'aria-hidden': 'true' }));
++		const input = append(row, $<HTMLInputElement>('input.ritemark-project-field-input', { type: 'text', spellcheck: 'false', autocomplete: 'off' }));
++		const clear = append(row, $('a.ritemark-project-field-clear', { role: 'button', tabIndex: -1 }));
++		const clearLabel = localize('ritemark.search.clear', "Clear the search");
++		clear.setAttribute('aria-label', clearLabel);
++		append(clear, renderIcon(Codicon.close));
++		const field: IRitemarkSearchField = { row, icon, input, command };
++		const store = this.fieldStore;
++		// The Experience lead (answer 3): the tooltip names ⌘⇧F, which the row doesn't draw
++		store.add(this.hoverService.setupManagedHover(getDefaultHoverDelegate('mouse'), row, () => input.value ? undefined : this.keybindingService.appendKeybinding(localize('ritemark.search.tooltip', "Search this project"), field.command)));
++		store.add(this.hoverService.setupManagedHover(getDefaultHoverDelegate('mouse'), clear, clearLabel));
++		// A click anywhere on the row puts the caret in the box
++		store.add(addDisposableListener(row, EventType.MOUSE_DOWN, e => {
++			if (e.target !== input) {
++				e.preventDefault();
++				input.focus();
++			}
++		}));
++		store.add(addDisposableListener(clear, EventType.CLICK, () => this.setFieldText('', true)));
++		store.add(addDisposableListener(input, EventType.INPUT, () => this.onFieldText(true)));
++		store.add(addDisposableListener(input, EventType.KEY_DOWN, e => {
++			if (e.isComposing) {
++				return; // an IME's Enter, arrows and Escape pick its candidates (Codex on #641)
++			}
++			const event = new StandardKeyboardEvent(e);
++			const key = event.equals(KeyCode.DownArrow) ? 'down' : event.equals(KeyCode.Enter) ? 'enter' : event.equals(KeyCode.Escape) ? 'escape' : undefined;
++			const action = key ? ritemarkSearchFieldKey(key, input.value) : undefined;
++			if (!action) {
++				return;
++			}
++			event.preventDefault();
++			event.stopPropagation();
++			if (action.leave) {
++				input.blur();
++				this.commandService.executeCommand('workbench.action.focusActiveEditorGroup');
++			} else if (action.run && 'text' in action.run) {
++				this.setFieldText('', true);
++			} else if (action.run) {
++				this.commandService.executeCommand(field.command, action.run);
++			}
++		}));
++		return field;
++	}
++
++	/** Sets the box's words; `search` sends them to the row's command (a click on ×, Escape, New), else only the box changes (the extension's search turned off). */
++	private setFieldText(text: string, search: boolean): void {
++		if (!this.field || this.field.input.value === text) {
++			return;
++		}
++		this.field.input.value = text;
++		this.onFieldText(search);
++	}
++
++	private onFieldText(search: boolean): void {
++		const field = this.field!;
++		const text = field.input.value;
++		field.row.classList.toggle('ritemark-project-field-filled', text.length > 0);
++		const open = ritemarkSearchOpen(text);
++		if (open !== (this.searchOpen.get() === true)) {
++			this.searchOpen.set(open);
++			const before = this.rows.offsetHeight;
++			this.updateGroup();
++			if (this.rows.offsetHeight !== before) {
++				this._onDidChangeRows.fire();
++			}
++		}
++		if (search) {
++			this.commandService.executeCommand(field.command, { text });
++		}
++	}
++
++	/** `_ritemark.projectHead.focusSearch`: Documents shown, the caret in the box; with words, they are searched. */
++	private async focusSearch(text: string | undefined): Promise<void> {
++		const placeId = [...HEAD_PLACES].find(([, place]) => place.rows.some(row => row.field))?.[0];
++		if (!placeId || !this.searchEnabled || !this.workspaceService.getWorkspace().folders.length) {
++			await this.commandService.executeCommand('workbench.view.search');
++			return;
++		}
++		// The place's own command opens the column on it (it would give the focus to the desk if the column had it there already)
++		if (this.compositeId !== placeId || !this.part.offsetHeight) {
++			await this.commandService.executeCommand(placeId);
++		}
++		const input = this.field?.input;
++		if (!input?.isConnected) {
++			return;
++		}
++		input.focus();
++		if (text !== undefined) {
++			this.setFieldText(text, true);
++		}
++		input.select();
++	}
++
 +	private readonly rowStore = this._register(new DisposableStore());
 +
 +	private row(icon: ThemeIcon, text: string): HTMLElement {
-+		const row = append(this.rowList, $('a.ritemark-project-row', { role: 'button', tabIndex: 0 }));
++		const row = $('a.ritemark-project-row', { role: 'button', tabIndex: 0 });
 +		append(row, renderIcon(icon));
 +		append(row, $('span', undefined, text));
 +		this.rowStore.add(addDisposableListener(row, EventType.KEY_DOWN, e => {
@@ -5604,6 +5903,15 @@ index 00000000000..feeaee393f5
 +	/** One of the extension's menus, as a Ritemark menu under its anchor: a hairline between its groups. */
 +	private showMenu(menuId: MenuId, anchor: HTMLElement, ariaLabel: string): void {
 +		const folder = this.workspaceService.getWorkspace().folders[0]?.uri;
++		// Sprint 148 (R7): on a place with the box, the menus' items work on the tree (New folder, Collapse folders):
++		// the box's words go first, so the tree is back in the column
++		const clears = this.place?.rows.some(row => row.field) === true;
++		const run = (action: { run(arg: unknown): unknown }) => {
++			if (clears && this.field?.input.value) {
++				this.setFieldText('', true);
++			}
++			return action.run(folder);
++		};
 +		const entries: RitemarkMenuEntry[] = [];
 +		for (const [, actions] of this.menuService.getMenuActions(menuId, this.contextKeyService, { shouldForwardArgs: true })) {
 +			if (entries.length) {
@@ -5615,7 +5923,7 @@ index 00000000000..feeaee393f5
 +				entries.push({
 +					label: action.label,
 +					iconClassNames: icon ? ThemeIcon.asClassNameArray(icon) : [],
-+					run: () => action.run(folder),
++					run: () => run(action),
 +					submenu: flyout ? () => this.flyoutRows(flyout) : undefined,
 +				});
 +			}
@@ -7058,4 +7366,57 @@ index 00000000000..50a653619fa
 +	});
 +
 +	ensureNoDisposablesAreLeakedInTestSuite();
++});
+diff --git a/src/vs/workbench/test/browser/parts/ritemarkProjectHead.test.ts b/src/vs/workbench/test/browser/parts/ritemarkProjectHead.test.ts
+new file mode 100644
+index 00000000000..655537a4694
+--- /dev/null
++++ b/src/vs/workbench/test/browser/parts/ritemarkProjectHead.test.ts
+@@ -0,0 +1,47 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
++import { RITEMARK_SEARCH_OPEN, ritemarkSearchFieldKey, ritemarkSearchOpen } from '../../../browser/parts/sidebar/ritemarkProjectHead.js';
++
++/**
++ * Sprint 148 (R7): the search box in Documents' head. Its words open the results (`ritemark.searchOpen`), and its keys
++ * go to the Search row's command as the extension reads them (searchPanel.ts, searchRowAction).
++ */
++suite('Ritemark project head search box', () => {
++
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	test('the context key, and when the words open the results', () => {
++		assert.deepStrictEqual({
++			key: RITEMARK_SEARCH_OPEN.key,
++			empty: ritemarkSearchOpen(''),
++			spaces: ritemarkSearchOpen('   '),
++			word: ritemarkSearchOpen('hinna'),
++			padded: ritemarkSearchOpen(' hinna '),
++		}, { key: 'ritemark.searchOpen', empty: false, spaces: false, word: true, padded: true });
++	});
++
++	test('the keys: down and Enter go to the results with words; Escape clears, then leaves', () => {
++		assert.deepStrictEqual({
++			downWithWords: ritemarkSearchFieldKey('down', 'hinna'),
++			enterWithWords: ritemarkSearchFieldKey('enter', 'hinna'),
++			downEmpty: ritemarkSearchFieldKey('down', ''),
++			enterSpaces: ritemarkSearchFieldKey('enter', '  '),
++			escapeWithWords: ritemarkSearchFieldKey('escape', 'hinna'),
++			escapeSpaces: ritemarkSearchFieldKey('escape', ' '),
++			escapeEmpty: ritemarkSearchFieldKey('escape', ''),
++		}, {
++			downWithWords: { run: { key: 'down' } },
++			enterWithWords: { run: { key: 'enter' } },
++			downEmpty: undefined,
++			enterSpaces: undefined,
++			escapeWithWords: { run: { text: '' } },
++			escapeSpaces: { run: { text: '' } },
++			escapeEmpty: { leave: true },
++		});
++	});
 +});
