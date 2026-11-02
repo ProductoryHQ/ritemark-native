@@ -20,18 +20,16 @@ function rule(css: string, selector: string): string {
 
 // Light desk: the results list's tokens
 assert.match(rule(FIND_MARK_STYLES, '.find-highlight'), /background: var\(--r-hairline\);/)
-assert.match(rule(FIND_MARK_STYLES, '.find-highlight-active'), /background: var\(--r-hairline-strong\);/)
 assert.match(resultsCss, /\.rs-column mark \{ background: var\(--r-hairline\);/)
-assert.match(resultsCss, /\[data-chosen\] mark \{ background: var\(--r-hairline-strong\); \}/)
 
-// Dark desk: the results list's own steps, the current match stronger than the others
-for (const alpha of ['0.18', '0.32']) {
-  const step = `rgba(199, 210, 254, ${alpha})`
-  assert.ok(resultsCss.includes(step), `results list no longer uses ${step}`)
-  assert.ok(FIND_MARK_STYLES.includes(step), `find marks miss ${step}`)
-}
+// The current match: the chosen fill in both themes, never overridden on Dark
+assert.match(rule(FIND_MARK_STYLES, '.find-highlight-active'), /background: var\(--r-accent-soft\);/)
+assert.equal(FIND_MARK_STYLES.match(/\.find-highlight-active/g)?.length, 1, 'the current match has one rule, no Dark override')
+
+// Dark desk: the other matches take the results list's own lifted step
+assert.ok(resultsCss.includes('rgba(199, 210, 254, 0.18)'), 'results list no longer uses its 0.18 step')
 assert.match(FIND_MARK_STYLES, /vscode-dark'\] \.find-highlight \{ background: rgba\(199, 210, 254, 0\.18\)/)
-assert.match(FIND_MARK_STYLES, /vscode-dark'\] \.find-highlight-active \{ background: rgba\(199, 210, 254, 0\.32\)/)
+assert.ok(!FIND_MARK_STYLES.includes('0.32'), 'the current match has no Dark override')
 
 // Never the comment's colour: no amber, no warning token, not the comment mark's own values
 const commentLight = /mark\.ritemark-comment-mark \{[^}]*background-color: (#[0-9A-Fa-f]+)/.exec(indexCss)?.[1]
