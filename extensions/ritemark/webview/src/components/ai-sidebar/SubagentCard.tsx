@@ -31,10 +31,10 @@ export function SubagentCard({ subagent, onStop }: SubagentCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const statusIcon = {
-    running: <Icon name="circle-notch" size={12} className="animate-spin text-[var(--r-ink-strong)]" />,
+    running: <Icon name="circle-notch" size={12} className="animate-spin text-[var(--r-accent)]" />,
     stopping: <Icon name="circle-notch" size={12} className="animate-spin text-[var(--r-ink-muted)]" />,
-    // Sprint 145 (#578): done is ink; green is only the ready dot. Working is ink too (Sprint 146, #614: the classes
-    // here show since an Icon's tone stopped being its fill)
+    // Sprint 145 (#578): done is ink; green is only the ready dot. These marks sit in the row's Button, which gives
+    // every icon in it the row's words' colour (ui/button.tsx), so their colour classes don't show there (#614)
     done: <Icon name="check" size={12} tone="inherit" className="text-[var(--r-ink-strong)]" />,
     error: <Icon name="warning-circle" size={12} className="text-[var(--r-error)]" />,
     stopped: <Icon name="x-circle" size={12} className="text-[var(--r-ink-muted)]" />,

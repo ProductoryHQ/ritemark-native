@@ -1247,6 +1247,16 @@ export function Editor({
           content: none !important;
         }
 
+        /* The block's + sits at the editor's left edge: its tooltip runs right from the button, never past the edge */
+        .block-plus-btn::after {
+          left: 0 !important;
+          transform: translateY(-2px) !important;
+        }
+        .block-plus-btn:hover::after,
+        :where(:root:not([data-input-mode="pointer"])) .block-plus-btn:focus-visible::after {
+          transform: translateY(0) !important;
+        }
+
         /* Mermaid diagram styles */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block.mermaid-block {
           padding-top: 28px !important;

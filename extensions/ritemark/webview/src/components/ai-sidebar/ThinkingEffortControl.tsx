@@ -86,8 +86,9 @@ export function ThinkingEffortControl({
 
   return (
     <Popover.Root>
-      <Popover.Trigger asChild>
-        <Tooltip label={supported ? `Thinking effort: ${currentLabel}` : disabledReason} className="shrink-0">
+      {/* The tooltip outside the trigger: the trigger hands its handlers and ref to the button itself (Sprint 146) */}
+      <Tooltip label={supported ? `Thinking effort: ${currentLabel}` : disabledReason} className="shrink-0">
+        <Popover.Trigger asChild>
           <button
             type="button"
             aria-disabled={!supported}
@@ -100,8 +101,8 @@ export function ThinkingEffortControl({
             <span className="max-[531px]:hidden">{triggerLabel}</span>
             <Icon name={COMPACT_ICONS[value]} size={14} tone="inherit" className="hidden max-[531px]:block" />
           </button>
-        </Tooltip>
-      </Popover.Trigger>
+        </Popover.Trigger>
+      </Tooltip>
 
       {supported ? (
         <Popover.Portal>

@@ -13,6 +13,7 @@ import { writeClipboard, readClipboard } from '../lib/clipboard'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { compareCells } from './sheetSort'
 import { Tooltip } from './ui/tooltip'
+import { Button } from './ui/button'
 
 export interface DataTableProps {
   data: Record<string, unknown>[]
@@ -574,17 +575,22 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                     </div>
                   ) : selectedRow === virtualRow.index && onDeleteRow ? (
                     <Tooltip label="Delete row" className="flex justify-center">
-                      <div
-                        className="flex items-center justify-center rounded-full mx-auto"
-                        style={{ width: 20, height: 20, background: 'var(--r-error, #f44)', cursor: 'pointer' }}
+                      {/* A button, not a clickable div, so its name reaches assistive tech and the keyboard reaches it
+                          (Sprint 146: its title became the shared Tooltip); the same red dot as before */}
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="mx-auto size-5 rounded-full p-0 shadow-none"
+                        style={{ background: 'var(--r-error, #f44)' }}
                         onClick={(e) => {
                           e.stopPropagation()
                           setConfirmDeleteRow(virtualRow.index)
                         }}
                         aria-label="Delete row"
                       >
-                        <Icon name="minus" size={12} className="text-white" />
-                      </div>
+                        <Icon name="minus" size={12} />
+                      </Button>
                     </Tooltip>
                   ) : (
                     virtualRow.index + 1

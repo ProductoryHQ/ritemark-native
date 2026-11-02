@@ -396,7 +396,7 @@ export function ScheduleEditor({ cron, onCronChange }: ScheduleEditorProps) {
               value={advancedRaw}
               onChange={e => handleAdvancedRaw(e.target.value)}
               placeholder="min hour dom mon dow"
-              className={`flex-1 text-[12px] h-8 font-mono bg-surface-soft border-transparent ${advancedRaw && !isValidCron(advancedRaw) ? 'border-destructive' : ''}`}
+              className={`flex-1 text-[12px] h-8 font-mono bg-surface-soft border-transparent ${advancedRaw && !isValidCron(advancedRaw) ? 'border-[var(--r-error)]' : ''}`}
             />
             <Tooltip label="Copy">
               <Button
@@ -411,7 +411,7 @@ export function ScheduleEditor({ cron, onCronChange }: ScheduleEditorProps) {
             </Tooltip>
           </div>
           {advancedRaw && !isValidCron(advancedRaw) && (
-            <p className="text-[10px] text-destructive">Invalid — use 5 fields: min hour dom month dow</p>
+            <p className="text-[10px] text-[var(--r-error)]">Invalid — use 5 fields: min hour dom month dow</p>
           )}
         </div>
       ) : (
@@ -442,7 +442,7 @@ export function ScheduleEditor({ cron, onCronChange }: ScheduleEditorProps) {
                   value={advancedRaw}
                   onChange={e => handleAdvancedRaw(e.target.value)}
                   placeholder="min hour dom mon dow"
-                  className={`flex-1 text-[12px] h-8 font-mono bg-surface-soft border-transparent ${advancedRaw && !isValidCron(advancedRaw) ? 'border-destructive' : ''}`}
+                  className={`flex-1 text-[12px] h-8 font-mono bg-surface-soft border-transparent ${advancedRaw && !isValidCron(advancedRaw) ? 'border-[var(--r-error)]' : ''}`}
                 />
                 <Tooltip label="Copy">
                   <Button
@@ -457,7 +457,7 @@ export function ScheduleEditor({ cron, onCronChange }: ScheduleEditorProps) {
                 </Tooltip>
               </div>
               {advancedRaw && !isValidCron(advancedRaw) && (
-                <p className="text-[10px] text-destructive">Invalid — use 5 fields: min hour dom month dow</p>
+                <p className="text-[10px] text-[var(--r-error)]">Invalid — use 5 fields: min hour dom month dow</p>
               )}
             </>
           )}

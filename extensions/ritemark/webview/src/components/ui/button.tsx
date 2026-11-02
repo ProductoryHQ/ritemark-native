@@ -105,10 +105,19 @@ function useIconWhenNarrow(on: boolean, words: string) {
     const button = ref.current
     if (!on || !button || typeof ResizeObserver === "undefined") return
     let watchingButton = false
-    const observer = new ResizeObserver(() => check())
+    let pageWidth = -1
+    const page = document.documentElement
+    const observer = new ResizeObserver((entries) => {
+      // The page's height changes as its content grows; only its width can change the room
+      const pageEntry = entries.find((entry) => entry.target === page)
+      const widthMoved = pageEntry !== undefined && pageEntry.contentRect.width !== pageWidth
+      if (pageEntry) pageWidth = pageEntry.contentRect.width
+      if (widthMoved || entries.some((entry) => entry.target === button)) check()
+    })
     // The button is watched only while it shows its words, when its size is the room's. With its icon alone it is a
-    // fixed square, and the page's own size says when the room may have come back. Its own switch is never watched,
-    // so the observer never reports a change it made itself.
+    // fixed square, and the page's width says when the room may have come back. Its own switch is never watched,
+    // so the observer never reports a change it made itself. Room that comes back while the page keeps its width and
+    // the words stay the same (a neighbour that shrinks) is seen at the next change of either.
     const watchButton = (watch: boolean) => {
       if (watch === watchingButton) return
       watchingButton = watch
@@ -125,7 +134,7 @@ function useIconWhenNarrow(on: boolean, words: string) {
       watchButton(!cut)
       if (cut) button.setAttribute("data-icon-only", "")
     }
-    observer.observe(document.documentElement)
+    observer.observe(page)
     check()
     // A font that arrives after the first paint widens the words without moving the button's box
     const fonts = document.fonts
@@ -142,13 +151,16 @@ function useIconWhenNarrow(on: boolean, words: string) {
   return ref
 }
 
-/** The icon children and the words of a button that has both, or null (a button with only words keeps its cut). */
-function iconAndWords(children: React.ReactNode): { icons: React.ReactNode[]; words: string } | null {
+/**
+ * The icon children and the words of a button drawn as icon, then words; or null, and the children stay as they are:
+ * a button with only words keeps its cut, and one with anything after its words (a shortcut, a badge) keeps its order.
+ */
+export function iconAndWords(children: React.ReactNode): { icons: React.ReactNode[]; words: string } | null {
   const icons: React.ReactNode[] = []
   let words = ""
   for (const child of React.Children.toArray(children)) {
     if (typeof child === "string" || typeof child === "number") words += String(child)
-    else if (React.isValidElement(child)) icons.push(child)
+    else if (React.isValidElement(child) && !words) icons.push(child)
     else return null
   }
   return icons.length > 0 && words.trim() ? { icons, words } : null

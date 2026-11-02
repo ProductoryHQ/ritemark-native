@@ -27,7 +27,7 @@ In both themes the hover's colours are Ritemark's own tokens: `--r-surface`, `--
 
 | File | Controls |
 |---|---|
-| `DataTable.tsx` | Column actions, Add column, Confirm delete, Cancel, Delete row |
+| `DataTable.tsx` | Column actions, Add column, Confirm delete, Cancel, Delete row (a clickable div before, now the shared Button: its name reaches assistive tech, and the keyboard reaches it) |
 | `Dialog.tsx` | Close |
 | `FormattingBubbleMenu.tsx` | Bold, Italic, Heading 1–3, the three lists, Blockquote, Code block, Link, Add comment; the link dialog's Open |
 | `MarginCommentRail.tsx` | the card's Edit, Mark as done, Delete |
@@ -46,7 +46,7 @@ In both themes the hover's colours are Ritemark's own tokens: `--r-surface`, `--
 | `transcribe/workbench/InsightsRail.tsx` | Play from here |
 | `transcribe/workbench/Waveform.tsx` | the waveform's Seek (twice) |
 | `transcribe/workbench/Workbench.tsx` | Open the saved document, Play or Pause, Rename a speaker |
-| `Editor.tsx` | the block's + (the CSS tooltip above) |
+| `Editor.tsx` | the block's + (the CSS tooltip above, running right from the button, since the + sits at the editor's left edge) |
 
 **Left as they are**, for the lead's list (a cut text's whole words, or not a control); `controlsPolish.test.ts` names the four on buttons and fails on any other:
 
@@ -108,9 +108,7 @@ Sixty-five icons had a colour class that never showed (twelve more had `tone="in
 | `ai-sidebar/EnvironmentStatusNotice.tsx` | environment checks (warning) | muted | VS Code's failed red | `--r-error` |
 | `ai-sidebar/OnboardingWizard.tsx` | a missing or failed tool (x, 2) | muted | VS Code's failed red | `--r-error` |
 | `ai-sidebar/OnboardingWizard.tsx` | installing (spinner) | muted | indigo | ink-body (the installed check's ink) |
-| `ai-sidebar/SubagentCard.tsx` | running (spinner) | muted | indigo | ink-strong (the done check's ink) |
-| `ai-sidebar/SubagentCard.tsx` | stopping, stopped, ended, carets, robot (6) | muted | muted | muted |
-| `ai-sidebar/SubagentCard.tsx` | error (warning-circle) | muted | red | `--r-error` |
+| `ai-sidebar/SubagentCard.tsx` | all nine: running, stopping, error, stopped, ended, the carets, the robot | the row's words' colour | indigo, muted, red | unchanged: they sit in the row's Button, whose rule (ui/button.tsx) gives its icons its words' colour, before and after; the error's red doesn't show there (for the lead) |
 | `dialogs/ConflictDialog.tsx` | the title's warning | muted | amber | ink-strong |
 | `flows/ExecutionPanel.tsx` | a step running (spinner) | muted | the progress bar's colour | ink-strong (the done check's ink) |
 | `flows/ExecutionPanel.tsx` | a step failed (x-circle) | muted | VS Code's failed red | `--r-error` |

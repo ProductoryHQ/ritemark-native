@@ -23,7 +23,7 @@ const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
 const { Icon } = await import('./Icon')
-const { Button, firstWordCut, splitFirstWord, wholeWordsTip } = await import('./button')
+const { Button, firstWordCut, iconAndWords, splitFirstWord, wholeWordsTip } = await import('./button')
 const { SplitButton } = await import('./split-button')
 const { TOOLTIP_SURFACE } = await import('./tooltip')
 const { RuntimeNotice } = await import('../ai-sidebar/RuntimeNotice')
@@ -111,6 +111,10 @@ const render = (element: ReturnType<typeof createElement>) => parse(renderToStat
     }
   }
   assert.deepEqual(found, [], 'a button with a native title')
+  // A Tooltip is a plain component: right under a Radix `asChild` trigger it would take the trigger's handlers and ref
+  // and drop them (the effort control's popover stopped opening in this PR's first build). It goes outside the trigger.
+  const swallowed = sources.filter((path) => path.endsWith('.tsx') && /\basChild\b[^>]*>\s*<Tooltip\b/.test(readFileSync(path, 'utf-8')))
+  assert.deepEqual(swallowed.map((path) => relative(src, path)), [], 'a Tooltip directly under an asChild trigger')
   assert.equal(seen, NATIVE_TITLE_ON_A_BUTTON_KEPT.length, 'each title kept is still there, so the list holds no stale entry')
   // The editor's own buttons outside React draw the same look with CSS
   const editor = read('components/Editor.tsx')
@@ -154,6 +158,9 @@ const render = (element: ReturnType<typeof createElement>) => parse(renderToStat
     menu: { label: 'Open in another app', tooltip: 'Open in another app', content: null },
   }))
   assert.ok(!component.querySelector('[data-slot="button-label"]'), 'a component label keeps its cut')
+  // Anything after the words keeps the children as they are, in their order (a shortcut, a badge)
+  assert.equal(iconAndWords([createElement(Icon, { name: 'copy', key: 'i' }), 'Open', createElement('kbd', { key: 'k' }, '⌘O')]), null)
+  assert.ok(iconAndWords([createElement(Icon, { name: 'copy', key: 'i' }), 'Open']), 'an icon, then words')
   const wordsOnly = render(createElement(Button, { iconWhenNarrow: true }, 'Share'))
   assert.ok(!wordsOnly.querySelector('[data-slot="button-label"]'), 'a button with only words keeps its cut')
   // The tooltip starts with the whole words
