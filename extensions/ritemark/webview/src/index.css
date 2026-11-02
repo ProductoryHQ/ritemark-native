@@ -589,12 +589,12 @@ body {
 }
 .rm-bubble button { cursor: pointer; }
 
-/* A pinned comment (clicked, not merely hovered) reads as held open: a firmer
-   accent border and a deeper shadow. Without this, "why will this not go
-   away" is the next question — a latch the user cannot see is a stuck UI. */
+/* A pinned comment (clicked, not merely hovered) reads as held open: a deeper
+   shadow (shadow-lg) over its own edge. Without this, "why will this not go
+   away" is the next question — a latch the user cannot see is a stuck UI.
+   No indigo line: indigo is never a line (the Experience lead, §12). */
 .rm-rail-item-pinned .rm-bubble {
-  border-color: var(--r-accent);
-  box-shadow: 0 10px 28px -6px rgba(79,70,229,0.28);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
 @keyframes rmBubbleIn { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: none; } }

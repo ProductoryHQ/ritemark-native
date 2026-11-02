@@ -108,7 +108,7 @@ Sixty-five icons had a colour class that never showed (twelve more had `tone="in
 | `ai-sidebar/EnvironmentStatusNotice.tsx` | environment checks (warning) | muted | VS Code's failed red | `--r-error` |
 | `ai-sidebar/OnboardingWizard.tsx` | a missing or failed tool (x, 2) | muted | VS Code's failed red | `--r-error` |
 | `ai-sidebar/OnboardingWizard.tsx` | installing (spinner) | muted | indigo | ink-body (the installed check's ink) |
-| `ai-sidebar/SubagentCard.tsx` | all nine: running, stopping, error, stopped, ended, the carets, the robot | the row's words' colour | indigo, muted, red | unchanged: they sit in the row's Button, whose rule (ui/button.tsx) gives its icons its words' colour, before and after; the error's red doesn't show there (for the lead) |
+| `ai-sidebar/SubagentCard.tsx` | all nine: running, stopping, error, stopped, ended, the carets, the robot | the row's words' colour | indigo, muted, red | each its own, over the row Button's rule (`!`; the lead's §12): running and stopping ink-strong, the error `--r-error`, stopped, ended, the carets and the robot muted |
 | `dialogs/ConflictDialog.tsx` | the title's warning | muted | amber | ink-strong |
 | `flows/ExecutionPanel.tsx` | a step running (spinner) | muted | the progress bar's colour | ink-strong (the done check's ink) |
 | `flows/ExecutionPanel.tsx` | a step failed (x-circle) | muted | VS Code's failed red | `--r-error` |
@@ -131,7 +131,7 @@ Sixty-five icons had a colour class that never showed (twelve more had `tone="in
 
 ## #615: the comment card
 
-`.rm-marker` and `.rm-bubble` take `--r-surface`, a 1 px `--r-hairline-strong` and the menus' shadow; everything on them (the words, the done marks, Delete's and Edit's hovers, the agent badge and pill, the @ mentions and their picker, the compose field and its error) takes the theme's own tokens. No block of light values: the marker's focus ring keeps `--r-accent`, the idle dot `--r-ink-faint`. `theme/greenIsTheReadyDot.test.ts` pins it, and fails on any fixed light colour (`--ritemark-…`) left on the card. Two looks for the lead: the marker's hover darkens its edge one step further, to `--r-ink-faint`, since its rest edge is now the strong hairline; the marker's comment icon keeps the comment's amber, through the theme's `--r-warning`.
+`.rm-marker` and `.rm-bubble` take `--r-surface`, a 1 px `--r-hairline-strong` and the menus' shadow; everything on them (the words, the done marks, Delete's and Edit's hovers, the agent badge and pill, the @ mentions and their picker, the compose field and its error) takes the theme's own tokens. No block of light values: the marker's focus ring keeps `--r-accent`, the idle dot `--r-ink-faint`. A held-open card keeps its strong hairline and takes `shadow-lg`, with no indigo line (the lead's §12). `theme/greenIsTheReadyDot.test.ts` pins it, and fails on any fixed light colour (`--ritemark-…`) left on the card. Two looks for the lead: the marker's hover darkens its edge one step further, to `--r-ink-faint`, since its rest edge is now the strong hairline; the marker's comment icon keeps the comment's amber, through the theme's `--r-warning`.
 
 ## The catalogue, and the proof
 
