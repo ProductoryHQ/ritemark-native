@@ -1,0 +1,11 @@
+{
+  "//": "Sprint 148: the search worker's type check. It imports the webview's pure find-bar folding and PDF index (webview/src), so it can't share the host's rootDir; and no DOM, as a worker thread has none.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "lib": ["ES2022"],
+    "noEmit": true
+  },
+  "include": ["src/search/worker/**/*.ts"],
+  "exclude": ["node_modules", "out", "media", "src/**/*.test.ts"]
+}
