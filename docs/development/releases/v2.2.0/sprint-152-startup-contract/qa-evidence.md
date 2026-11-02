@@ -77,3 +77,31 @@ Gate 2 rows for the Windows session, on 2.2's candidate (PR 2 can't run through 
 - Reload Window with a terminal on the desk: the terminal's tab named from the first frame.
 - A PC without Git, a folder with `.git`: no "Git not found" notification (#633).
 - The window log (`renderer.log`) of a normal start has no `[ritemark] slot released:` line.
+
+## PR 3 (`sprint-152-startup-contract-loading`)
+
+Built on PR 2's head (`f604e8fa`), not signed in, with isolated profiles and AI homes, the extension host held 12 s (each start through `project-check.mjs --first-frame`, with a probe sampling the page every 50 ms beside it). The loading look's moments are counted from the probe's first laid-out sample.
+
+| Req | Check | PR 2 | PR 3 |
+| --- | --- | --- | --- |
+| R10 | Held starts, Light and Dark: a new profile's welcome window, a new project (twice), a switch, a relaunch, a relaunch with the AI column closed, a cold start with a document | Plain material only, VS Code's line under the tab | The mark at 0.96–1.04 s in every start (desk, welcome window, AI column); the line at 9.97–10.04 s, in the main slot only; screen readers get "Home is opening", "README.md is opening", "Ritemark is starting", "The AI is starting" |
+| R10 | A tab opened later while the extension host is paused (Notes.md from Documents) | VS Code's line under the tab | The mark about 1 s after the click, no line, gone when the page is drawn |
+| R10 | What replaces the look (screencast frames at the release): a cold start with README.md, with Home, the welcome window | — | The content in one change, with at most one frame of overlap. Ending the look at a page's first message, as first built, had left Home's bare sheet for about 0.45 s and the document's own "Loading..." for about 0.17 s, and the welcome about 37 ms of bare ground; the pages now say when they are drawn |
+| R10 | Reduce motion (`workbench.reduceMotion: on`): the welcome window and a held start on a folder | — | The mark's animation is `none`; the mark at 1 s, the line at 10 s |
+| R11 | VS Code's progress signs in the same samples (a visible progress line in the left column, under a tab row or in the AI column; a progress badge on a place) | Badge on Home's place, lines across the left column's top and under the tab row | None in any start, Light or Dark |
+| R11 | The themes' `progressBar.background` | #4338CA / #818CF8 | #1E1B4B / #F8FAFC |
+| R2 | `--first-frame relaunch`, five runs, and `relaunch --ai-closed`, five runs, twice (a document and a terminal on the desk) | 6 of 10 pass; the rest a 0.46 px step of the terminal's tab | 15 of 20 pass; no 0.46 px step. The rest: Known limits |
+| W5 | `aiStartingMark.test.ts` (the shell's answer, an older shell, no answer, a hung answer) | — | pass |
+| R1 | The frame check: `frame-screenshots.mjs` on the baseline's sample project, every scene compared with PR 2's capture pixel by pixel; `frame-geometry.mjs` | — | 28 scenes identical, 6 within 0.29% (Home's own content, Settings' foot, a terminal line); JOINS ok 34 of 34; geometry 34 PASS, 2 skipped |
+| E2 | New hunks in upstream files, against PR 2; `check-patch-stacking.mjs` | — | 2 (007's `webviewEditor.ts` import, 019's `multiEditorTabsControl.ts` layout call); 018's `webviewViewPane.ts` has 2 fewer; no upstream file newly touched; stacking clean |
+
+Tests: `./scripts/test.sh --grep Ritemark` (83 passing), `npm run typecheck-client`, the extension's `npm test`, `tsc --noEmit` there and in `webview/`, the pre-commit validator. The upstream suites near PR 3's changes (`--grep "Tabs|Webview|EditorGroup"`) fail the same 40 `MultiEditorTabsControl` tests on PR 2's code as on PR 3's: 019's tab row breaks them already. A real apply of the whole stack from the pin in a clean tree: 19 of 19 applied, and the 194 files the patches touch are identical to the tree PR 3 was written in; the dry run after it: 19 of 19.
+
+Screenshots in `qa/`: `pr3-new-project-mark-{light,dark}.png` (Home's tab and the AI column at about 1 s), `pr3-new-project-line-{light,dark}.png` (the line at 10 s; the toast is the hold's), `pr3-welcome-line-{light,dark}.png` (the welcome window), `pr3-tab-later-mark-light.png` (a tab opened later), `pr3-relaunch-line-light.png` (a relaunch: the terminal's tab named, the document's look, the AI column), `pr3-cold-start-mark-dark.png` (a cold start's document), `pr3-reduce-motion-mark-light.png`.
+
+Known limits:
+- **The terminal tab in a tree run from source:** 5 of 20 relaunches show a 3 px step of the terminal's tab (118 → 115 at +0.04–0.11 s). Its first measuring meets the UI font still loading: a tree run from source adds its style sheets as modules load, about when the first frame is laid out. A built app links `workbench.desktop.main.css` in the page's head, so the font starts loading before any script runs. Gate 1's first-frame check on 2.2's candidate confirms it there.
+- **The status bar's "Activating Extensions…"** still turns during a start: it goes to 2.3 with the other status bar items (answer 7).
+- **Answered in review:** the AI sidebar's plan dot and sub-agent icons follow `progressBar.background` into ink; the AI page waits for the shell's moment (at most 250 ms); restore-time tab layouts run per task until the desk has restored.
+
+Not run: Windows (2.2's Gate 2); signed in (no signed-in AI in a scratch home).
