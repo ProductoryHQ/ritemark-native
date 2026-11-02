@@ -71,6 +71,7 @@ import { MAX_PINNED_CONVERSATIONS } from './conversationActionsModel';
 import { projectionToConversation, reconciledOpenCodeModel, reconcileRestoredModels, type RestoreCatalogs } from './conversationProjection';
 import { appendStreamedText } from '../../../../src/agent/types';
 import type { StartingPlace } from '../../../../src/guidance/startingPlace';
+import { requestTurnReveal } from './turnReveal';
 import type {
   AgentId,
   AgentInfo,
@@ -1004,7 +1005,11 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     // "Open conversation" on a comment: show the task's own destination (R4).
     if (message.type === 'conversation/select') {
-      if (message.conversationId) get().loadSavedConversation(message.conversationId);
+      if (message.conversationId) {
+        // Sprint 148 (R8): from search, the matching message's turn is shown once the chat is drawn.
+        requestTurnReveal(message.conversationId, typeof message.turnId === 'string' ? message.turnId : null);
+        get().loadSavedConversation(message.conversationId);
+      }
       return true;
     }
 

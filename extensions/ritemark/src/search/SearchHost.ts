@@ -3,12 +3,17 @@
  *
  * It starts the worker (`out/search/searchWorker.js`, found through the
  * extension's path, never by `__dirname` depth) when something asks: a query, or
- * `startAfter` (R4's warm start, which the results view turns on in PR 2). From
- * then on it forwards the watcher's events in batches, the person's
+ * `startAfter` (R4's warm start, 5 s after activation on a shell with the box).
+ * From then on it forwards the watcher's events in batches, the person's
  * `files.exclude`, the chats' index file and the Task board's snapshots.
  *
  * The kill switch: `ritemark.features.project-search` (on by default). Off, the
- * index never starts, and a running one stops.
+ * index never starts, a running one stops, and the Search row and ⌘⇧F open
+ * VS Code's search (E3). The context key `ritemark.projectSearch.enabled` tells
+ * the shell (PR 3) whether to draw the box.
+ *
+ * PR 2 adds the results view (`SearchViewProvider`, `searchPanel.ts`) and the
+ * Search row's command with the box's arguments.
  *
  * Nothing leaves the computer (E2): no network, no AI, no usage event; the log
  * carries counts and timings, never words, names or paths.
@@ -30,9 +35,12 @@ import {
   type SearchAnswer,
   type SearchKind,
   type SearchOptions,
+  type SearchResult,
   type WorkerConfig,
 } from './protocol';
 import { enabledPatterns, mergeEvents, type FsEvent } from './hostEvents';
+import { SearchPanelController, searchRowAction, searchRowNeedsShell } from './searchPanel';
+import { SearchViewProvider } from './SearchViewProvider';
 import { SearchWorkerClient, type WorkerLike } from './searchWorkerClient';
 import { taskSources } from './sources/tasks';
 import { oneDriveRootsFromEnv } from './worker/cloudFiles';
@@ -47,6 +55,10 @@ export const EVENT_BATCH_MS = 300;
 export const WARM_START_MS = 5000;
 /** M3: how often the host's event-loop delay is sampled while the worker reads. */
 const HOST_DELAY_RESOLUTION_MS = 10;
+/** The shell's box (patch 018, PR 3) registers this; a shell without it has no box (E3). */
+export const FOCUS_BOX_COMMAND = '_ritemark.projectHead.focusSearch';
+/** Tells the shell (PR 3) to draw the box: the kill switch is on and the window has a project folder. */
+export const ENABLED_CONTEXT_KEY = 'ritemark.projectSearch.enabled';
 
 export interface SearchHostDependencies {
   context: vscode.ExtensionContext;
@@ -150,12 +162,16 @@ export class SearchHost implements vscode.Disposable {
     return true;
   }
 
-  /** R4's warm start: start after `ms` unless something asked sooner. */
-  startAfter(ms = WARM_START_MS): void {
+  /** R4's warm start: start after `ms` unless something asked sooner, and only if `shouldStart` still agrees then. */
+  startAfter(ms = WARM_START_MS, shouldStart: () => boolean | Promise<boolean> = () => true): void {
     if (this.warmTimer || this.client) return;
     this.warmTimer = setTimeout(() => {
       this.warmTimer = undefined;
-      this.ensureStarted();
+      void Promise.resolve()
+        .then(shouldStart)
+        .then((go) => {
+          if (go) this.ensureStarted();
+        }, () => undefined);
     }, ms);
   }
 
@@ -257,21 +273,125 @@ export class SearchHost implements vscode.Disposable {
   }
 }
 
+/** What opening a result needs from the rest of the extension (R8). */
+export interface SearchOpenDependencies {
+  /** A chat on the AI's sheet, with the matching message's turn in view when given (A5). */
+  openConversation(conversationId: string, reveal: { turnId: string | null; preserveFocus: boolean }): Promise<void>;
+  /** A task as its card's page, with the keyboard kept in the results. */
+  openCard(cardId: string): Promise<void>;
+}
+
+export interface ProjectSearch {
+  host: SearchHost;
+  /** The head's Search row (`ritemark.projectHead.search`): what the shell's box sends, or nothing. */
+  runSearchRow(arg?: unknown): Promise<unknown>;
+}
+
+/** A result's own id after its kind: `chat:<id>` → `<id>`. */
+function idOf(result: SearchResult): string | null {
+  const prefix = `${result.kind}:`;
+  return result.key.startsWith(prefix) ? result.key.slice(prefix.length) : null;
+}
+
 /**
- * Composes search for this window. PR 1 holds the index only: nothing starts it
- * yet but the internal commands below (Sprint 148's measurements and PR 2's view);
- * PR 2 adds the results view, and with it the warm start (`startAfter`).
+ * Composes search for this window: the index, the results view, the Search row's command, the kill switch's
+ * context key and R4's warm start. `_ritemark.search.query` and `_ritemark.search.stats` stay for the
+ * measurements (M1–M6).
  */
-export function registerProjectSearch(deps: SearchHostDependencies): SearchHost {
+export function registerProjectSearch(deps: SearchHostDependencies & { opens: SearchOpenDependencies }): ProjectSearch {
   const host = new SearchHost(deps);
-  deps.context.subscriptions.push(
+  const { context, opens } = deps;
+
+  const open = async (result: SearchResult): Promise<void> => {
+    const id = idOf(result);
+    if (result.kind === 'document') {
+      // Its usual editor (Markdown in Ritemark, Word and PDF in their previews, CSV in the table), at its top until
+      // PR 4; the keyboard stays in the results, so the next one is one key away (R8).
+      if (result.path) await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(result.path), { preserveFocus: true });
+    } else if (result.kind === 'chat') {
+      if (id) await opens.openConversation(id, { turnId: result.passage?.at.turnId ?? null, preserveFocus: true });
+    } else if (id) {
+      await opens.openCard(id);
+    }
+  };
+
+  // Whether the shell draws the box: its command is registered by the workbench before extensions run. A positive
+  // answer is kept; a negative one is asked again after a while.
+  let shellBox: { value: boolean; at: number } | null = null;
+  const shellHasBox = async (): Promise<boolean> => {
+    if (shellBox?.value) return true;
+    if (shellBox && Date.now() - shellBox.at < 10_000) return false;
+    const commands = await vscode.commands.getCommands(false);
+    shellBox = { value: commands.includes(FOCUS_BOX_COMMAND), at: Date.now() };
+    return shellBox.value;
+  };
+
+  let view: SearchViewProvider | null = null;
+  const panel = new SearchPanelController({
+    query: (text, options, perKind, expand) => host.query(text, options, perKind, expand),
+    post: (message) => view?.post(message),
+    setup: () => ({
+      projectName: vscode.workspace.name ?? vscode.workspace.workspaceFolders?.[0]?.name ?? '',
+      roots: (vscode.workspace.workspaceFolders ?? []).filter((folder) => folder.uri.scheme === 'file').map((folder) => folder.uri.fsPath),
+    }),
+    // E2: a failure logs its kind only, never a path.
+    open: (result) => open(result).catch((error: unknown) => console.warn('[search] could not open a result:', error instanceof Error ? error.name : 'error')),
+    focusResults: async () => view?.focus(),
+    focusBox: async () => {
+      if (await shellHasBox()) await vscode.commands.executeCommand(FOCUS_BOX_COMMAND);
+    },
+    now: () => performance.now(),
+  });
+  view = new SearchViewProvider(context.extensionUri, (message) => {
+    void panel.onViewMessage(message).catch((error: unknown) => console.warn('[search] a view message failed:', error instanceof Error ? error.name : 'error'));
+  });
+
+  const updateContextKey = () => void vscode.commands.executeCommand('setContext', ENABLED_CONTEXT_KEY, host.enabled);
+  updateContextKey();
+
+  const runSearchRow = async (arg?: unknown): Promise<unknown> => {
+    // The words and keys never wait on the shell's answer, so they reach the panel in the order typed
+    const action = searchRowAction(arg, { enabled: host.enabled, shellHasBox: searchRowNeedsShell(arg) ? await shellHasBox() : false });
+    switch (action.kind) {
+      case 'vscode-search':
+        return vscode.commands.executeCommand(action.command);
+      case 'query':
+        return panel.setText(action.text);
+      case 'focus-first':
+        return panel.key('down');
+      case 'open-top':
+        return panel.key('enter');
+      case 'focus-box':
+        return vscode.commands.executeCommand(FOCUS_BOX_COMMAND);
+    }
+  };
+
+  context.subscriptions.push(
     host,
+    { dispose: () => panel.dispose() },
+    vscode.window.registerWebviewViewProvider(SearchViewProvider.viewType, view, { webviewOptions: { retainContextWhenHidden: true } }),
+    host.onStatus((status) => panel.onStatus(status)),
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (!event.affectsConfiguration('ritemark.features.project-search')) return;
+      updateContextKey();
+      // Off: the index stops (SearchHost), and the view keeps no rows to click (the review of #636)
+      if (!host.enabled) panel.clear();
+    }),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      updateContextKey();
+      panel.refreshSetup();
+    }),
     vscode.commands.registerCommand(
       '_ritemark.search.query',
       (args?: { text?: string; options?: Partial<SearchOptions>; perKind?: number; expand?: SearchKind }) =>
         host.query(typeof args?.text === 'string' ? args.text : '', args?.options, args?.perKind, args?.expand),
     ),
-    vscode.commands.registerCommand('_ritemark.search.stats', () => host.stats()),
+    vscode.commands.registerCommand('_ritemark.search.stats', async () => ({ ...((await host.stats()) as object), panel: panel.stats() })),
   );
-  return host;
+
+  // R4: 5 s after activation, unless a query asked sooner; only where the box can be used (the kill switch on and a
+  // shell that draws it), so a shell without the box reads nothing in the background.
+  host.startAfter(WARM_START_MS, async () => host.enabled && (await shellHasBox()));
+
+  return { host, runSearchRow };
 }

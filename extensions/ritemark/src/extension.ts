@@ -485,9 +485,20 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   // ── Search, the words layer (Sprint 148, #591) ─────────────────────────────
-  // The index of this window's project, in its own worker thread. Composed here;
-  // nothing starts it until a query asks (PR 2's results view adds the warm start).
-  registerProjectSearch({ context, taskBoard, boardEnabled: () => isEnabled('task-board') });
+  // The index of this window's project, in its own worker thread, and its results
+  // view in Documents. It starts on the box's first words, or 5 s after activation
+  // on a shell that draws the box (R4); the head's Search row runs it (below).
+  const projectSearch = registerProjectSearch({
+    context,
+    taskBoard,
+    boardEnabled: () => isEnabled('task-board'),
+    opens: {
+      openConversation: (conversationId, reveal) => unifiedViewProvider.openConversation(conversationId, reveal),
+      openCard: async (cardId) => {
+        if (isEnabled('task-board')) await taskBoard?.cardPages?.open({ cardId, preserveFocus: true });
+      },
+    },
+  });
 
   // ── Google Docs publishing (Sprint 119) ────────────────────────────────────
   // Always composed, even with the flag off: flag-off hides the surfaces but
@@ -775,8 +786,8 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // The left column's head: its menus' entries (Ritemark 2.0, Sprint 132)
-  registerProjectHeadCommands(context);
+  // The left column's head: its menus' entries (Ritemark 2.0, Sprint 132); the Search row runs Ritemark's search (Sprint 148)
+  registerProjectHeadCommands(context, { search: (arg) => projectSearch.runSearchRow(arg) });
 
   // Initialize Settings Provider
   settingsProvider = new RitemarkSettingsProvider(context, updateService);

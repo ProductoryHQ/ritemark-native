@@ -1,6 +1,6 @@
 # Measurements (E1)
 
-PR 1's measurements: **M1** (the index's time and memory) and **M3** (the host during a cold index), on the Mac. M2, M4, M5 and M6 need the results view and are PR 2's. Windows (M1 with Defender) is the overlay session's.
+PR 1's measurements: **M1** (the index's time and memory) and **M3** (the host during a cold index), on the Mac. M2, M4, M5 and M6 need the results view and are PR 2's: they are in *PR 2: the results view* at the end. Windows (M1 with Defender) is the overlay session's.
 
 ## How they were made
 
@@ -62,3 +62,23 @@ A query while the index is still reading waits for the file in hand: p95 20–50
 
 - Windows (M1 with Defender scanning; A4's OneDrive case): the overlay session.
 - The extension host itself, in a dev instance: the harness talks to the worker over the same protocol as `SearchHost`, and the Electron probe ran the real worker in a utility process, but the host's other work (the AIs' turns) wasn't running beside it. PR 2's M4 checks the start with the index on and off.
+
+## PR 2: the results view (M2, M4, M5, M6)
+
+Made on 2 November 2026 on `sprint-148-search-words-panel`, in a hidden dev instance (darwin-arm64), with the plan's folder from `search-fixture.mjs --scale 1` (10,821 documents) and a scratch profile. The shell was a CoW clone of a sibling worktree's patched `vscode/` (gitlink `d956e8a6`). It has no box yet (PR 3), so the box's arguments went to `ritemark.projectHead.search` from the extension host's inspector, as the box will send them, and `ritemark.searchOpen` was set the same way. The numbers come from the panel itself (`_ritemark.search.stats` → `panel`): from the words' arrival at the host to the view's "drawn" message (`search/painted`, sent a frame after the answer is drawn). So they include the trip back to the host, and leave out the box's own trip to the extension host, which PR 3 adds (about a millisecond).
+
+| | Target (E1) | Result | |
+|---|---|---|---|
+| **M2**, a key to results drawn, 200 keys after the index has read (search-measure.mjs's mix: 1–3 word starts of 2–7 letters from the folder's text) | median ≤ 50 ms, p95 ≤ 100 ms | median **11.0 ms**, p95 **21.4 ms**, max 27.3 ms; 200 of 200 drawn | met |
+| The worker's own query, the same 200 words | p95 ≤ 15 ms | median 4.3 ms, p95 **10.5 ms**, max 24.4 ms | met |
+| **M5**, the first words in a new window to the first results drawn (Reload Window; the view's first load, and the index started by those words; Word and PDF from decision 3's copies) | reported | **447 ms** (469 ms on the run before); the count line then read "113 results so far · 95 of 10,821 documents read"; the index had read everything at 3.2 s | |
+| **M6**, a saved Markdown change to its result drawn (a new word appended to a file while the box held it; 5 files) | ≤ 2 s | **1.11–1.13 s** | met |
+| **M4**, the start with the index on and off (`project-check.mjs --switch-to --measure 10`: Sprint 152's first-frame check isn't on `main`) | unchanged | on: Home and the AI column at median **2.33 s** (2.27–3.18 s); off: median **2.31 s** (2.28–2.36 s); both PASS (the AI column 0 ms after Home, no document in front first) | see below |
+
+**What M2 changed.** The first run drew the key's results at median 45.1 ms, p95 100.3 ms, max 108.3 ms. The folder holds only documents, so every key had one kind with results, and the Experience lead's "one kind only: all of it at once" sent up to 500 rows (the worker's cap for a kind opened whole) before anything was drawn. The panel now draws that kind's first 5 rows at once and sends the rest from a second question: that is the run in the table. A project with chats and tasks draws 5 rows per kind and asks once.
+
+**M4, for the Development manager.** This shell has no box, and the warm start runs only where the box can be used (below), so for M4 the warm start was turned on in a local build for the run (not committed). It starts the index 5 s after a window starts, after the first frame, so the switches' own start is the same on and off. Two of ten switches with the index on were slower: both left the large folder (2.90 s and 3.18 s) at about the time its index was reading. Their workbench marks show the new window's own start late (`willRestoreEditors` at 2.88 s and 3.16 s against 2.28 s), before any extension loads. Whether the reading index in the closing window caused it isn't shown. Off, all ten were within 2.28–2.36 s.
+
+**The warm start on a shell without the box.** R4 starts the index 5 s after activation. PR 2 starts it then only when the kill switch is on and the shell draws the box (`_ritemark.projectHead.focusSearch` is registered), so a 2.1 shell with a newer extension, where nothing can ask the index anything, reads nothing in the background. On PR 3's shell it starts at 5 s, as R4 says.
+
+Not measured here: Windows (the overlay session), and a window with an AI turn running beside the index.

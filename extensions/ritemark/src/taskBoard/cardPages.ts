@@ -236,7 +236,7 @@ export class CardPages implements vscode.Disposable {
    * clicking through cards keeps one tab. A card file that won't read opens as
    * plain text, where the broken front matter can be fixed.
    */
-  async open(target: { cardId?: string; fileName?: string; focus?: boolean }): Promise<void> {
+  async open(target: { cardId?: string; fileName?: string; focus?: boolean; preserveFocus?: boolean }): Promise<void> {
     if (!target.cardId && target.fileName) {
       const file = path.join(this.store.tasksDir, path.basename(target.fileName));
       await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(file), 'default', { preview: false });
@@ -255,6 +255,8 @@ export class CardPages implements vscode.Disposable {
     await vscode.commands.executeCommand('vscode.openWith', uri, RITEMARK_EDITOR_VIEW_TYPE, {
       preview: false,
       ...(existing ? { viewColumn: existing.group.viewColumn } : {}),
+      // Search's results keep the keyboard, so the next result is one key away (Sprint 148, R8)
+      ...(target.preserveFocus ? { preserveFocus: true } : {}),
     });
     if (target.focus) await focusPage();
     if (existing) return;

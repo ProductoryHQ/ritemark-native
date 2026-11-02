@@ -2,12 +2,14 @@
 
 | Bundle | Before Sprint 148 (`b2ac230e`) | After PR 1 | Notes |
 |---|---|---|---|
-| `media/webview.js` | 8,749,976 bytes | unchanged | PR 1 changes no webview code. PR 2's panel measures it again. |
+| `media/webview.js` | 8,749,976 bytes | unchanged | PR 1 changes no webview code. After PR 2 (the results view, the AI sheet's turn reveal): see below. |
 | `media/office-preview.js` | 2,620,152 bytes | unchanged | |
 | `out/extension.js` | — | 5.9 MB | `SearchHost`, the worker client, the tasks source: a few KB. |
 | `out/search/searchWorker.js` | — (new) | 3.6 MB | The worker's own entry: pdf.js's legacy build and parser (~3.4 MB), `ignore`, `marked`, `papaparse`, the index. Loaded only in the worker thread. Its licence notices are a `/*! */` comment esbuild keeps at the end. |
 
 `out/` is built, not committed: the sizes are of `npm run compile` on the PR's head.
+
+**After PR 2:** `media/webview.js` 8,769,796 bytes, 19,820 more than before Sprint 148 (+0.2 %): the results view (`components/search/`, lazy like the other pages) and the AI sheet's turn reveal. `media/office-preview.js` 2,620,208 bytes (+56): the shared tooltip's hover-only option, which the Office bundle carries too.
 
 ## New dependencies
 

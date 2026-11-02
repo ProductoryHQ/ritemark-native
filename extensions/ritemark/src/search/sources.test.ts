@@ -18,12 +18,13 @@ async function main() {
       {
         conversationId: ID,
         title: 'Harbour fees',
+        identityColorSlot: 5,
         lastActivityAt: '2026-11-01T09:30:00.000Z',
         events: [
-          { kind: 'user-message', eventId: 'u1', text: 'How much are the harbour fees?' },
+          { kind: 'user-message', eventId: 'u1', turnId: 'turn-1', text: 'How much are the harbour fees?' },
           { kind: 'activity', eventId: 'a1', title: 'Read fees.csv', fileReferences: ['fees.csv'] },
           { kind: 'attention', eventId: 't1', prompt: 'Allow reading?', attentionKind: 'approval' },
-          { kind: 'assistant-message', eventId: 'r1', runtimeId: 'codex', content: 'They are 120 euros.' },
+          { kind: 'assistant-message', eventId: 'r1', turnId: 'turn-1', runtimeId: 'codex', content: 'They are 120 euros.' },
           { kind: 'dispatch-receipt', eventId: 'd1', dispatchState: 'accepted' },
           { kind: 'user-message', eventId: 'u2', text: 'Background work finished.', origin: 'background-task' },
           { kind: 'assistant-message', eventId: 'r2', content: '   ' },
@@ -36,9 +37,11 @@ async function main() {
     assert.equal(source.name, 'Harbour fees');
     assert.equal(source.changedAt, Date.parse('2026-11-01T09:30:00.000Z'));
     assert.deepEqual(source.passages, [
-      { text: 'How much are the harbour fees?', at: { eventId: 'u1', speaker: 'you' } },
-      { text: 'They are 120 euros.', at: { eventId: 'r1', speaker: 'codex' } },
-    ], 'tool activity, approvals, receipts and the host\'s own lines are left out');
+      { text: 'How much are the harbour fees?', at: { eventId: 'u1', speaker: 'you', turnId: 'turn-1' } },
+      { text: 'They are 120 euros.', at: { eventId: 'r1', speaker: 'codex', turnId: 'turn-1' } },
+    ], 'tool activity, approvals, receipts and the host\'s own lines are left out; each message keeps its turn (PR 2)');
+    assert.equal(source.colorSlot, 5, 'the chat keeps its colour on the rail (PR 2)');
+    assert.equal(chatSource({ conversationId: ID, title: 't', identityColorSlot: -1, events: [] }, 10)!.colorSlot, undefined, 'no colour for a slot that isn\'t one');
     // At most maxChars of message text, the newest kept.
     const capped = chatSource({ conversationId: ID, title: 't', events: [
       { kind: 'user-message', eventId: 'old', text: 'old '.repeat(100) },
