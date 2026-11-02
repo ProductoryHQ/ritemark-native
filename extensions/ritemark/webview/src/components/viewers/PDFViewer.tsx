@@ -502,7 +502,8 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
     if (rect.width > 0 || rect.height > 0) {
       container.scrollTop += rect.top - (view.top + view.height / 2)
     }
-  }, [currentMatch, matches, searchIndex, matchRanges])
+    // landingVersion: a repeat result on the current match (same words, same match) scrolls back to it.
+  }, [currentMatch, matches, searchIndex, matchRanges, landingVersion])
 
   // Highlight every match whose page has rendered; the current one gets its
   // own highlight layered on top — same CSS Custom Highlight API pattern as

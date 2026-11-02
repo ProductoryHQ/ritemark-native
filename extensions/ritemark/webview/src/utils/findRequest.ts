@@ -50,7 +50,25 @@ export function landingIndex(request: FindRequest, count: number, pageOf?: (inde
     for (let i = 0; i < count; i++) if (pageOf(i) >= request.page) return i
   }
   if (request.occurrence < count) return request.occurrence
+  // The index counts the occurrence in its own text, the page in what it drew; the two can differ by a match
+  // (a footer, a soft hyphen, a comment's words). Fewer matches here than the occurrence: the last one.
   return count - 1
+}
+
+/**
+ * The Markdown find bar's step once its matches change: null while the request's words aren't the query or have
+ * no matches yet; else the match to land on, and whether the bar must move to it (it may be current already —
+ * the bar then only scrolls back to it).
+ */
+export function landingMove(
+  request: FindRequest | null,
+  searchTerm: string,
+  count: number,
+  activeIndex: number,
+): { index: number; move: boolean } | null {
+  if (!request || !searchTerm || !isRequestQuery(request, searchTerm)) return null
+  const index = landingIndex(request, count)
+  return index < 0 ? null : { index, move: index !== activeIndex }
 }
 
 /** Whether the find bar's query is still the request's (the person hasn't typed something else). */

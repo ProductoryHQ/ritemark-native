@@ -3,7 +3,7 @@ import { matchCountLabel } from '../utils/textSearch'
 import { FindBarShell } from './FindBarShell'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { searchPluginKey } from '../extensions/SearchExtension'
-import { isRequestQuery, landingIndex, type FindRequest } from '../utils/findRequest'
+import { landingMove, type FindRequest } from '../utils/findRequest'
 
 interface FindBarProps {
   editor: TipTapEditor
@@ -17,6 +17,8 @@ export function FindBar({ editor, onClose, request = null }: FindBarProps) {
   // The match a search result asked for, until the editor has matches to land on (its text may still be loading).
   const landing = useRef<FindRequest | null>(request)
   const [autoFocus] = useState(request === null)
+  // The last request landed: the scroll below runs again for each one.
+  const [landedId, setLandedId] = useState<number | null>(null)
 
   const [matchCount, setMatchCount] = useState(0)
   const [activeIndex, setActiveIndex] = useState(-1)
@@ -44,15 +46,15 @@ export function FindBar({ editor, onClose, request = null }: FindBarProps) {
         setMatchCount(state.results.length)
         setActiveIndex(state.activeIndex)
         const wanted = landing.current
-        if (wanted && state.searchTerm && isRequestQuery(wanted, state.searchTerm)) {
-          const index = landingIndex(wanted, state.results.length)
-          if (index >= 0) {
-            landing.current = null
-            // After this transaction: a find-bar move, no document change.
-            if (index !== state.activeIndex) queueMicrotask(() => {
-              if (!editor.isDestroyed) editor.commands.goToSearchResult(index)
-            })
-          }
+        const step = landingMove(wanted, state.searchTerm, state.results.length, state.activeIndex)
+        if (wanted && step) {
+          landing.current = null
+          // Scrolls to it even when it is current already (a repeat result after the person scrolled away).
+          setLandedId(wanted.id)
+          // After this transaction: a find-bar move, no document change.
+          if (step.move) queueMicrotask(() => {
+            if (!editor.isDestroyed) editor.commands.goToSearchResult(step.index)
+          })
         }
       }
     }
@@ -81,7 +83,7 @@ export function FindBar({ editor, onClose, request = null }: FindBarProps) {
     } catch {
       // position no longer in viewport-resolvable state; ignore
     }
-  }, [activeIndex, matchCount, editor])
+  }, [activeIndex, matchCount, editor, landedId])
 
   // Clear search state when the find bar unmounts
   useEffect(() => {

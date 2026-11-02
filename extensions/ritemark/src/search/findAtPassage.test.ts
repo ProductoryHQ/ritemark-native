@@ -116,6 +116,16 @@ test('a page that never says ready leaves the document at its top: a late page g
   assert.deepEqual(got, []);
 });
 
+test('an expired request is dropped at the next request: a later Ritemark open of that file gets nothing', () => {
+  const time = clock();
+  const requests = new FindRequests(time.now);
+  requests.request('file:///p/opened-as-text.md', MESSAGE);
+  time.advance(FIND_WAIT_MS + 1);
+  requests.request('file:///p/b.md', MESSAGE);
+  assert.equal(requests.waiting('file:///p/opened-as-text.md'), null);
+  assert.equal(requests.waitingCount(), 1);
+});
+
 test('a newer result for the same document replaces the waiting one', () => {
   const requests = new FindRequests();
   requests.request('file:///p/a.md', MESSAGE);

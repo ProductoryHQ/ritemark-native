@@ -62,13 +62,17 @@ export class FindRequests {
 
   /** Opened from a result: post to the document's listening pages, or keep it until one says it is listening. */
   request(key: string, message: FindOpenMessage): 'posted' | 'waiting' {
+    // A request no page took in time goes, so a document opened elsewhere (a Markdown file in the text editor)
+    // and later in Ritemark doesn't open a find bar nobody asked for.
+    const now = this.now();
+    for (const [waitingKey, waiting] of this.pending) if (now - waiting.at > this.waitMs) this.pending.delete(waitingKey);
     const listening = this.pages.get(key);
     if (listening && listening.size > 0) {
       this.pending.delete(key);
       for (const post of listening.values()) send(post, message);
       return 'posted';
     }
-    this.pending.set(key, { message, at: this.now() });
+    this.pending.set(key, { message, at: now });
     return 'waiting';
   }
 
@@ -94,6 +98,11 @@ export class FindRequests {
   /** For tests. */
   waiting(key: string): FindOpenMessage | null {
     return this.pending.get(key)?.message ?? null;
+  }
+
+  /** For tests: how many requests wait. */
+  waitingCount(): number {
+    return this.pending.size;
   }
 }
 

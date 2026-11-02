@@ -13,7 +13,7 @@ import { history, undoDepth } from '@tiptap/pm/history'
 import type { Plugin } from '@tiptap/pm/state'
 import { SearchExtension, searchPluginKey } from '../extensions/SearchExtension'
 import { createEditorSchemaExtensions } from './editorMarkdown'
-import { MAX_FIND_TEXT, decodeFindOpen, isRequestQuery, landingIndex } from './findRequest'
+import { MAX_FIND_TEXT, decodeFindOpen, isRequestQuery, landingIndex, landingMove } from './findRequest'
 
 let failures = 0
 function test(name: string, run: () => void): void {
@@ -78,6 +78,18 @@ test('isRequestQuery: the same words, whatever their case or surrounding space; 
   const request = { text: 'Annual', occurrence: 0, id: 1 }
   assert.equal(isRequestQuery(request, ' annual '), true)
   assert.equal(isRequestQuery(request, 'annua'), false)
+})
+
+test('landingMove: waits for the words and matches; a repeat on the current match lands without a move', () => {
+  const request = { text: 'level', occurrence: 3, id: 2 }
+  assert.equal(landingMove(null, 'level', 6, 0), null)
+  assert.equal(landingMove(request, '', 6, 0), null)
+  assert.equal(landingMove(request, 'other', 6, 0), null)
+  assert.equal(landingMove(request, 'level', 0, -1), null, 'the text has not arrived yet')
+  assert.deepEqual(landingMove(request, 'level', 6, 0), { index: 3, move: true })
+  // The person scrolled away; the same result again: the bar keeps its match and scrolls back (keyed by the id).
+  assert.deepEqual(landingMove(request, 'level', 6, 3), { index: 3, move: false })
+  assert.deepEqual(landingMove({ ...request, occurrence: 0 }, 'Level', 6, 0), { index: 0, move: false })
 })
 
 console.log('The Markdown editor: nothing in the document changes')
