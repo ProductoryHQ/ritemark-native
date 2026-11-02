@@ -103,6 +103,9 @@ export interface SearchOptions {
 
 export const DEFAULT_SEARCH_OPTIONS: SearchOptions = { matchCase: false, wholeWords: false, kinds: [...SEARCH_KINDS] };
 
+/** At most this many results of a kind shown whole (Show all, or the only kind); the view says how many more there are. */
+export const WHOLE_KIND_LIMIT = 500;
+
 /** Where the index stands. */
 export interface IndexStatus {
   state: 'starting' | 'reading' | 'ready' | 'unavailable';

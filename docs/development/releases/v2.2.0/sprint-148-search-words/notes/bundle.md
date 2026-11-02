@@ -9,7 +9,7 @@
 
 `out/` is built, not committed: the sizes are of `npm run compile` on the PR's head.
 
-**After PR 2:** `media/webview.js` 8,768,521 bytes, 18,545 more than before Sprint 148 (+0.2 %): the results view (`components/search/`, lazy like the other pages) and the AI sheet's turn reveal. `media/office-preview.js` unchanged.
+**After PR 2:** `media/webview.js` 8,769,796 bytes, 19,820 more than before Sprint 148 (+0.2 %): the results view (`components/search/`, lazy like the other pages) and the AI sheet's turn reveal. `media/office-preview.js` 2,620,208 bytes (+56): the shared tooltip's hover-only option, which the Office bundle carries too.
 
 ## New dependencies
 

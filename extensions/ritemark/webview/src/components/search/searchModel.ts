@@ -12,6 +12,7 @@ import {
   DEFAULT_SEARCH_LIMITS,
   DEFAULT_SEARCH_OPTIONS,
   SEARCH_KINDS,
+  WHOLE_KIND_LIMIT,
   type IndexStatus,
   type SearchHostToViewMessage,
   type SearchKind,
@@ -68,8 +69,10 @@ export interface GroupView {
   heading: string
   total: number
   rows: SearchResult[]
-  /** The row under the group: Show all, Show fewer, or none. */
-  show: { kind: 'all'; words: string } | { kind: 'fewer'; words: string } | null
+  /** The row under the group: Show all, Show fewer, or none; with its tooltip. */
+  show: { kind: 'all'; words: string; tip: string } | { kind: 'fewer'; words: string; tip: string } | null
+  /** A kind shown whole past WHOLE_KIND_LIMIT: the muted line at its end, not a row (the Experience lead, #636). */
+  rest: string | null
 }
 
 /** The groups as drawn: the kinds More leaves on, 5 rows each, a kind opened whole with Show fewer at its end. */
@@ -80,10 +83,19 @@ export function groupsOf(answer: ResultsMessage, options: SearchOptions): GroupV
       const whole = answer.expanded?.kind === group.kind
       const rows = whole ? group.results : group.results.slice(0, ROWS_PER_KIND)
       const words = KIND_WORDS[group.kind]
+      const kindWords = group.total === 1 ? words.one : words.many
+      // "Show all 1,240 documents" would promise more than a kind shown whole holds: past the limit, "Show 500 of 1,240"
+      const capped = group.total > WHOLE_KIND_LIMIT
       const show: GroupView['show'] = whole
-        ? answer.expanded?.auto ? null : { kind: 'fewer', words: 'Show fewer' }
-        : group.total > rows.length ? { kind: 'all', words: `Show all ${number(group.total)} ${group.total === 1 ? words.one : words.many}` } : null
-      return { kind: group.kind, heading: words.heading, total: group.total, rows, show }
+        ? answer.expanded?.auto ? null : { kind: 'fewer', words: 'Show fewer', tip: `Back to the first ${ROWS_PER_KIND} of each kind` }
+        : group.total > rows.length
+          ? capped
+            ? { kind: 'all', words: `Show ${number(WHOLE_KIND_LIMIT)} of ${number(group.total)} ${kindWords}`, tip: `List the first ${number(WHOLE_KIND_LIMIT)} here` }
+            : { kind: 'all', words: `Show all ${number(group.total)} ${kindWords}`, tip: `List every ${words.one} with these words here` }
+          : null
+      const more = whole ? group.total - group.results.length : 0
+      const rest = more > 0 ? `${number(more)} more ${more === 1 ? 'has' : 'have'} these words. Add a word to narrow the list.` : null
+      return { kind: group.kind, heading: words.heading, total: group.total, rows, show, rest }
     })
 }
 
@@ -123,8 +135,12 @@ export function narrowingOf(options: SearchOptions): { words: string; button: st
   // The kinds' names are plural ("Chats are off"), however many are off
   const offWords = off.length ? `${listWords(off)} are off` : ''
   const words = on.length && off.length ? `${onWords}, and ${offWords}.` : `${onWords || offWords}.`
-  return { words, button: on.length ? 'Turn off' : 'Turn on' }
+  // Both at once: the button does both, and "Turn off" wouldn't say it turns the kinds back on (the Experience lead, #636)
+  return { words, button: on.length && off.length ? 'Search everything' : on.length ? 'Turn off' : 'Turn on' }
 }
+
+/** The nothing-found button's tooltip, whichever its words (the Experience lead, #636). */
+export const WIDEN_TIP = 'Search again in documents, chats and tasks, with no options on'
 
 /** Every option back to its default: what the nothing-found line's button does. */
 export function widened(): SearchOptions {
@@ -165,22 +181,26 @@ export function limitedLine(projectName: string, status: IndexStatus | null, lim
     return `${name} has more than ${max} documents. The ${max} newest are searched inside, the rest by their names.`
   }
   // Past the text kept for search (R1's budget) rather than the documents limit: the same rule in the same words
-  return `${name} has more text than search keeps. The newest documents are searched inside, the rest by their names.`
+  return `${name} has more text than search can keep. The newest documents are searched inside, the rest by their names.`
 }
 
+/** The index stopped twice (R4): what happened, then the way that still works, by its name on screen (the Experience lead, #636). */
 export const UNAVAILABLE_LINES = {
-  first: 'Search isn’t available in this project.',
-  second: 'VS Code’s search is still in More.',
+  first: 'Search couldn’t read this project.',
+  second: 'More ▸ Search still finds words in your documents.',
 }
 
-/** A chat's age at the right of its row (question 4): "Today", "Tue", "3 Oct", "3 Oct 2025". */
+/**
+ * A chat's age at the right of its row (question 4): today its time in the clock's short format ("14:32"), as Mail
+ * lists today's messages, then "Tue", "3 Oct", "3 Oct 2025".
+ */
 export function ageWords(iso: string | null, now: number): string | null {
   if (!iso) return null
   const then = new Date(iso)
   if (Number.isNaN(then.getTime())) return null
   const today = new Date(now)
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
-  if (then.getTime() >= startOfToday) return 'Today'
+  if (then.getTime() >= startOfToday) return then.toLocaleTimeString(undefined, { timeStyle: 'short' })
   if (then.getTime() >= startOfToday - 6 * 24 * 60 * 60 * 1000) return then.toLocaleDateString('en-GB', { weekday: 'short' })
   if (then.getFullYear() === today.getFullYear()) return then.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
   return then.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -294,9 +314,26 @@ export function relativePlace(path: string | undefined, roots: readonly string[]
   return normal.split('/').pop() ?? null
 }
 
-/** A row's tooltip: what a click does. */
-export function rowTip(result: SearchResult, roots: readonly string[]): string {
-  if (result.kind === 'document') return `Open ${relativePlace(result.path, roots) ?? result.name}`
-  if (result.kind === 'chat') return result.passage ? 'Open this chat at this message' : 'Open this chat'
-  return 'Open this task'
+/**
+ * A row's tooltip, on hover only (the Experience lead, #636): a document's place in the project, "Meetings/Weekly
+ * sync.md". Chats and tasks have none: their words say what they are, and the row's accessible name carries them.
+ */
+export function rowTip(result: SearchResult, roots: readonly string[]): string | null {
+  if (result.kind === 'document') return relativePlace(result.path, roots) ?? result.name
+  return null
+}
+
+/**
+ * Found words joined by a hyphen, or touching, are one mark, so "one-page" is marked whole; words with a space
+ * between them keep their own marks (the Experience lead, #636).
+ */
+export function joinedMarks(text: string, marks: readonly [number, number][]): [number, number][] {
+  const joined: [number, number][] = []
+  for (const [start, end] of [...marks].sort((a, b) => a[0] - b[0])) {
+    if (end <= start) continue
+    const last = joined[joined.length - 1]
+    if (last && start >= last[1] && /^[-‐‑]*$/.test(text.slice(last[1], start))) last[1] = Math.max(last[1], end)
+    else if (!last || start >= last[1]) joined.push([start, end])
+  }
+  return joined
 }

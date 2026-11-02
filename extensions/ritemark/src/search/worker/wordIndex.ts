@@ -25,7 +25,7 @@ import type {
   SearchOptions,
   SearchResult,
 } from '../protocol';
-import { SEARCH_KINDS } from '../protocol';
+import { SEARCH_KINDS, WHOLE_KIND_LIMIT } from '../protocol';
 import { baseOf, foldCase, forEachWord, matchWord, normalizeText, queryWord, wordsOf, type QueryWord } from './text';
 
 /** About two lines of a passage. */
@@ -391,7 +391,7 @@ export class WordIndex {
         ids.splice(0, head.length, ...head);
       }
       for (const id of ids) if (this.records[id]!.source.nameOnly === 'too-large') tooLarge++;
-      const limit = kind === shape.expand ? Math.max(shape.perKind, shape.expandLimit ?? 500) : shape.perKind;
+      const limit = kind === shape.expand ? Math.max(shape.perKind, shape.expandLimit ?? WHOLE_KIND_LIMIT) : shape.perKind;
       groups.push({
         kind,
         total: ids.length,

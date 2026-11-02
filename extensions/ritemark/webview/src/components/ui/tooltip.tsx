@@ -37,21 +37,32 @@ function onTriggerFocus(event: FocusEvent<HTMLElement>): void {
   if (!focusOpensTooltip(event.target as Element | null)) event.preventDefault();
 }
 
+/**
+ * Sprint 148 (#636, the Experience lead): `hoverOnly` tooltips never open on focus, keyboard focus included. For
+ * controls in a list the arrow keys move through: a tooltip at every step covers the next row.
+ */
+function onTriggerFocusHoverOnly(event: FocusEvent<HTMLElement>): void {
+  event.preventDefault();
+}
+
 export function Tooltip({
   label,
   side = 'bottom',
   className,
+  hoverOnly = false,
   children,
 }: {
   label: ReactNode;
   side?: 'top' | 'right' | 'bottom' | 'left';
   className?: string;
+  /** Open on hover only, never on focus (a list the arrow keys move through). */
+  hoverOnly?: boolean;
   children: ReactNode;
 }) {
   return (
     <TooltipPrimitive.Provider delayDuration={300} skipDelayDuration={100}>
       <TooltipPrimitive.Root>
-        <TooltipPrimitive.Trigger asChild onFocus={onTriggerFocus}>
+        <TooltipPrimitive.Trigger asChild onFocus={hoverOnly ? onTriggerFocusHoverOnly : onTriggerFocus}>
           <span className={cn('inline-flex', className)}>{children}</span>
         </TooltipPrimitive.Trigger>
         <TooltipPrimitive.Portal>

@@ -7,6 +7,9 @@
  */
 
 .rs-column {
+  /* The words take the side bar's ink, as the Documents tree they replace does: #CBD5E1 in Dark, #475569 in Light
+     (the Experience lead, #636, question 12). Names and marked words stay in ink-strong */
+  --rs-ink: var(--vscode-sideBar-foreground, var(--r-ink-body));
   /* Its own block formatting context: the count line's top margin stays inside, on the ground */
   display: flow-root;
   min-height: 100vh;
@@ -24,7 +27,7 @@
   gap: 12px;
   margin: 10px 8px 0;
   font: 400 12px/16px var(--ritemark-ui-font-family);
-  color: var(--r-ink-body);
+  color: var(--rs-ink);
 }
 .rs-count-words { min-width: 0; }
 /* More at the line's right end (frame 1); the tooltip's wrapper is the line's flex item */
@@ -37,7 +40,7 @@
   border-radius: 3px;
   background: transparent;
   font: 500 12px/16px var(--ritemark-ui-font-family);
-  color: var(--r-ink-body);
+  color: var(--rs-ink);
   transition: none;
 }
 .rs-column .rs-more:hover { background: transparent; color: var(--r-ink-strong); }
@@ -50,13 +53,13 @@
   margin-top: 6px;
   padding: 0 8px;
   font: 400 12.5px/18px var(--ritemark-ui-font-family);
-  color: var(--r-ink-body);
+  color: var(--rs-ink);
 }
 .rs-opt { display: flex; align-items: center; gap: 8px; height: 26px; }
-.rs-opt-count { margin-left: auto; color: var(--r-ink-body); font-variant-numeric: tabular-nums; }
+.rs-opt-count { margin-left: auto; color: var(--rs-ink); font-variant-numeric: tabular-nums; }
 
 /* Past the documents limit: muted, under the count, while results show (question 2) */
-.rs-limited { margin: 6px 8px 0; font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.rs-limited { margin: 6px 8px 0; font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--rs-ink); }
 
 /* A kind's heading and count (kit: .sres .g) */
 .rs-heading {
@@ -69,7 +72,7 @@
   text-transform: uppercase;
   color: var(--r-ink-strong);
 }
-.rs-heading-count { font-weight: 500; letter-spacing: 0; color: var(--r-ink-body); }
+.rs-heading-count { font-weight: 500; letter-spacing: 0; color: var(--rs-ink); }
 
 /* One row for every kind (question 4; kit: .sres .r): the shadcn Button, drawn as the row */
 .rs-column .rs-row {
@@ -95,7 +98,7 @@
 .rs-icon { display: inline-flex; flex: none; color: var(--r-ink-muted); }
 .rs-column .rs-row .rs-icon svg { width: 14px; height: 14px; }
 .rs-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rs-detail { flex: none; max-width: 45%; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 11px/16px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.rs-detail { flex: none; max-width: 45%; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 11px/16px var(--ritemark-ui-font-family); color: var(--rs-ink); }
 /* Enter on the chosen row (question 6; kit: .ask .key) */
 .rs-key {
   flex: none;
@@ -104,7 +107,7 @@
   border-radius: 4px;
   box-shadow: inset 0 0 0 1px var(--r-hairline-strong);
   font: 500 11px/18px var(--ritemark-ui-font-family);
-  color: var(--r-ink-body);
+  color: var(--rs-ink);
 }
 .rs-detail + .rs-key { margin-left: 6px; }
 /* The words around the match: up to two lines, muted, the match on the soft grey mark (kit: .sres .r .sn, mark) */
@@ -115,7 +118,7 @@
   overflow: hidden;
   margin-top: 2px;
   font: 400 12px/17px var(--ritemark-ui-font-family);
-  color: var(--r-ink-body);
+  color: var(--rs-ink);
   overflow-wrap: anywhere;
 }
 .rs-ink { color: var(--r-ink-strong); }
@@ -123,6 +126,19 @@
 body.vscode-dark .rs-column mark,
 body.ritemark-dark .rs-column mark,
 body[data-vscode-theme-kind='vscode-dark'] .rs-column mark { background: rgba(199, 210, 254, 0.18); }
+/* On a chosen or hovered row the mark takes the kit's stronger step (mark.cur), so the found words don't vanish
+   into the row's highlight, which is the light mark's own colour (the Experience lead, #636) */
+.rs-column .rs-row:hover mark,
+.rs-column .rs-row[data-chosen] mark { background: var(--r-hairline-strong); }
+body.vscode-dark .rs-column .rs-row:hover mark,
+body.vscode-dark .rs-column .rs-row[data-chosen] mark,
+body.ritemark-dark .rs-column .rs-row:hover mark,
+body.ritemark-dark .rs-column .rs-row[data-chosen] mark,
+body[data-vscode-theme-kind='vscode-dark'] .rs-column .rs-row:hover mark,
+body[data-vscode-theme-kind='vscode-dark'] .rs-column .rs-row[data-chosen] mark { background: rgba(199, 210, 254, 0.32); }
+
+/* Past the limit of a kind shown whole: a muted line at its end, not a row (the Experience lead, #636) */
+.rs-rest { margin: 6px 8px 2px; font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--rs-ink); }
 
 /* Show all and Show fewer, in the muted words of a link row (question 5) */
 .rs-column .rs-show {
@@ -134,7 +150,7 @@ body[data-vscode-theme-kind='vscode-dark'] .rs-column mark { background: rgba(19
   background: transparent;
   text-align: left;
   font: 400 12px/16px var(--ritemark-ui-font-family);
-  color: var(--r-ink-body);
+  color: var(--rs-ink);
   transition: none;
 }
 .rs-column .rs-show:hover,
@@ -144,5 +160,5 @@ body[data-vscode-theme-kind='vscode-dark'] .rs-column mark { background: rgba(19
 /* Nothing found (question 1) and not available: a line in ink, then muted lines */
 .rs-nothing { margin: 10px 8px 0; display: flex; flex-direction: column; gap: 6px; }
 .rs-nothing-first { font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
-.rs-nothing-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font: 400 12px/17px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.rs-nothing-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font: 400 12px/17px var(--ritemark-ui-font-family); color: var(--rs-ink); }
 .rs-column .rs-turn-off { height: 24px; padding: 0 8px; font: 500 12px/24px var(--ritemark-ui-font-family); }

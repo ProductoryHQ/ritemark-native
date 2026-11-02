@@ -74,8 +74,8 @@ function state(groups: SearchGroup[], extra: Partial<ResultsMessage> = {}, rest:
   }
 }
 
-function render(s: SearchViewState, moreOpen = false) {
-  return parse(renderToStaticMarkup(createElement(SearchPanelView, { state: s, now: NOW, initialMoreOpen: moreOpen, onOptions: () => undefined })))
+function render(s: SearchViewState, moreOpen = false, focused: number | null = null) {
+  return parse(renderToStaticMarkup(createElement(SearchPanelView, { state: s, now: NOW, initialMoreOpen: moreOpen, initialFocused: focused, onOptions: () => undefined })))
 }
 const text = (node: { text: string } | null | undefined) => (node?.text ?? '').replace(/\s+/g, ' ').trim()
 
@@ -99,6 +99,66 @@ test('a kind opened whole ends with Show fewer; the only kind with results shows
   const only = render(state([groupOf('document', docs, 23)], { expanded: { kind: 'document', auto: true } }))
   assert.equal(only.querySelectorAll('.rs-row').length, 23)
   assert.equal(only.querySelector('.rs-show'), null)
+})
+
+// ── The Experience lead's check of #636 ──
+
+test('Enter stays with the box: in the rows, the focused row is chosen, and no row shows Enter', () => {
+  const page = render(state([groupOf('document', [doc(1), doc(2), doc(3)])]), false, 2)
+  const rows = page.querySelectorAll('.rs-row')
+  assert.deepEqual(rows.map((row) => row.hasAttribute('data-chosen')), [false, false, true])
+  assert.equal(page.querySelectorAll('.rs-key').length, 0)
+})
+
+test('past 500: "Show 500 of 1,240", and a line, not a row, says how many more (question 7)', () => {
+  const docs = Array.from({ length: 5 }, (_, i) => doc(i))
+  const page = render(state([groupOf('document', docs, 1240), groupOf('chat', [chat])]))
+  assert.equal(text(page.querySelector('.rs-show')), 'Show 500 of 1,240 documents')
+  const capped = model.groupsOf(state([groupOf('document', docs, 1240), groupOf('chat', [chat])]).answer!, ALL)[0]
+  assert.equal(capped.show?.tip, 'List the first 500 here')
+  // Opened whole, its rows all drawn: the line above Show fewer
+  const some = Array.from({ length: 30 }, (_, i) => doc(i))
+  const opened = render(state([groupOf('document', some, 1240), groupOf('chat', [chat])], { expanded: { kind: 'document', auto: false } }))
+  assert.equal(text(opened.querySelector('.rs-rest')), '1,210 more have these words. Add a word to narrow the list.')
+  assert.equal(opened.querySelector('.rs-rest')?.hasAttribute('data-rs-item'), false, 'not an arrow-key stop')
+  assert.equal(text(opened.querySelector('.rs-show')), 'Show fewer')
+  // The same line ends a kind that shows whole on its own
+  const only = render(state([groupOf('document', some, 31)], { expanded: { kind: 'document', auto: true } }))
+  assert.equal(text(only.querySelector('.rs-rest')), '1 more has these words. Add a word to narrow the list.')
+  // Under the limit, no line
+  assert.equal(render(state([groupOf('document', some, 30)], { expanded: { kind: 'document', auto: true } })).querySelector('.rs-rest'), null)
+  const fewer = model.groupsOf(state([groupOf('document', some, 40), groupOf('chat', [chat])], { expanded: { kind: 'document', auto: false } }).answer!, ALL)[0]
+  assert.equal(fewer.show?.tip, 'Back to the first 5 of each kind')
+  const all = model.groupsOf(state([groupOf('document', docs, 23), groupOf('chat', [chat])]).answer!, ALL)[0]
+  assert.equal(all.show?.tip, 'List every document with these words here')
+})
+
+test('found words joined by a hyphen, or touching, are one mark; a space keeps two (question 11)', () => {
+  assert.deepEqual(model.joinedMarks('one-page report', [[0, 3], [4, 8], [9, 15]]), [[0, 8], [9, 15]])
+  assert.deepEqual(model.joinedMarks('abc', [[1, 3], [0, 1]]), [[0, 3]])
+  assert.deepEqual(model.joinedMarks('one page', [[0, 3], [4, 8]]), [[0, 3], [4, 8]])
+  const hyphen = doc(6, { passage: { text: 'What should the one-page report say?', marks: [[16, 19], [20, 24], [25, 31]], at: {} } })
+  assert.deepEqual(render(state([groupOf('document', [hyphen])])).querySelectorAll('mark').map(text), ['one-page', 'report'])
+})
+
+test('the words of questions 1–4', () => {
+  assert.equal(model.narrowingOf({ matchCase: false, wholeWords: true, kinds: ['document', 'chat'] })?.button, 'Search everything')
+  assert.equal(model.narrowingOf({ ...ALL, wholeWords: true })?.button, 'Turn off')
+  assert.equal(model.narrowingOf({ ...ALL, kinds: ['document'] })?.button, 'Turn on')
+  assert.equal(model.WIDEN_TIP, 'Search again in documents, chats and tasks, with no options on')
+  const budget: IndexStatus = { state: 'ready', documents: { done: 900, total: 900 }, limited: true, tooLarge: 0, failed: 0, chats: 0, tasks: 0 }
+  assert.equal(model.limitedLine('Leadership programme', budget, true), 'Leadership programme has more text than search can keep. The newest documents are searched inside, the rest by their names.')
+  assert.match(model.ageWords(new Date(2026, 10, 2, 14, 32).toISOString(), NOW) ?? '', /14|2/, 'a chat from today shows its time')
+  assert.match(model.ageWords(new Date(2026, 10, 2, 14, 32).toISOString(), NOW) ?? '', /32/)
+})
+
+test('a document\'s row has its place as a tooltip; chats and tasks have none (question 6)', () => {
+  const page = render(state([groupOf('document', [doc(1)]), groupOf('chat', [chat]), groupOf('task', [task])]))
+  // The tooltip's wrapper is a span round the document's row only; chats and tasks are wrapped in a plain div
+  const rows = page.querySelectorAll('.rs-row')
+  assert.equal(rows[0].parentNode.tagName, 'SPAN')
+  assert.equal(rows[1].parentNode.tagName, 'DIV')
+  assert.equal(rows[2].parentNode.tagName, 'DIV')
 })
 
 test('still reading: the count line says how far, in place (question 2)', () => {
@@ -205,10 +265,10 @@ test('fewer than two characters: nothing shows, and no line says nothing was fou
   assert.equal(text(page.querySelector('main')), '')
 })
 
-test('not available: one line, and where VS Code\'s search still is (R4)', () => {
+test('not available: what happened, and the way that still works (R4)', () => {
   const down: IndexStatus = { state: 'unavailable', documents: { done: 0, total: 0 }, limited: false, tooLarge: 0, failed: 0, chats: 0, tasks: 0 }
   const page = render(state([groupOf('document', [doc(1)])], {}, { status: down }))
-  assert.deepEqual(page.querySelectorAll('.rs-nothing p').map(text), ['Search isn’t available in this project.', 'VS Code’s search is still in More.'])
+  assert.deepEqual(page.querySelectorAll('.rs-nothing p').map(text), ['Search couldn’t read this project.', 'More ▸ Search still finds words in your documents.'])
 })
 
 test('words a person can\'t mistake for markup are drawn as text', () => {
@@ -226,18 +286,19 @@ test('an older query\'s answer is never drawn over a newer one (R5, R10)', () =>
   assert.equal(model.reduceSearchView(newer, newest).answer?.queryId, 10)
 })
 
-test('ages: Today, a weekday within a week, then the date', () => {
-  assert.equal(model.ageWords(new Date(2026, 10, 2, 8).toISOString(), NOW), 'Today')
+test('ages: today the time in the clock\'s short format, a weekday within a week, then the date', () => {
+  const morning = new Date(2026, 10, 2, 8, 5)
+  assert.equal(model.ageWords(morning.toISOString(), NOW), morning.toLocaleTimeString(undefined, { timeStyle: 'short' }))
   assert.equal(model.ageWords(new Date(2026, 9, 27).toISOString(), NOW), 'Tue')
   assert.equal(model.ageWords(new Date(2026, 9, 3).toISOString(), NOW), '3 Oct')
   assert.equal(model.ageWords(new Date(2025, 9, 3).toISOString(), NOW), '3 Oct 2025')
   assert.equal(model.ageWords(null, NOW), null)
 })
 
-test('a row\'s tooltip says what a click opens', () => {
-  assert.equal(model.rowTip(doc(1), ['/p']), 'Open Meetings/Brief 1.md')
-  assert.equal(model.rowTip(chat, ['/p']), 'Open this chat at this message')
-  assert.equal(model.rowTip(task, ['/p']), 'Open this task')
+test('a document\'s tooltip is its place in the project; chats and tasks have none', () => {
+  assert.equal(model.rowTip(doc(1), ['/p']), 'Meetings/Brief 1.md')
+  assert.equal(model.rowTip(chat, ['/p']), null)
+  assert.equal(model.rowTip(task, ['/p']), null)
   assert.equal(model.relativePlace('C:\\Work\\Harbour\\Notes\\a.md', ['C:\\Work\\Harbour']), 'Notes/a.md')
 })
 

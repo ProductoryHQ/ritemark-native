@@ -27,6 +27,7 @@ import {
   countLine,
   csvSnippet,
   detailOf,
+  joinedMarks,
   repeatsName,
   groupsOf,
   limitedLine,
@@ -39,6 +40,7 @@ import {
   tooBigWords,
   visibleTotal,
   widened,
+  WIDEN_TIP,
   type MarkedText,
   type SearchViewState,
 } from './searchModel'
@@ -52,7 +54,8 @@ const FORMAT_ICONS: Record<string, PhosphorIconName> = { markdown: 'file-text', 
 function Marked({ text, marks }: MarkedText) {
   const parts: ReactNode[] = []
   let at = 0
-  for (const [start, end] of [...marks].sort((a, b) => a[0] - b[0])) {
+  // Words joined by a hyphen, or touching, are one mark ("one-page")
+  for (const [start, end] of joinedMarks(text, marks)) {
     if (start < at || end <= start) continue
     if (start > at) parts.push(text.slice(at, start))
     parts.push(<mark key={start}>{text.slice(start, end)}</mark>)
@@ -93,28 +96,34 @@ function Snippet({ result }: { result: SearchResult }) {
   return null
 }
 
-function ResultRow({ result, item, chosen, now, roots }: { result: SearchResult; item: number; chosen: boolean; now: number; roots: string[] }) {
+/**
+ * One result. `chosen` draws the row's highlight (the top row while the keyboard is in the box, else the focused
+ * row); `enter` draws the Enter mark, which stays with the box: only on the top row, only while the keyboard is
+ * outside the rows (the Experience lead, #636).
+ */
+function ResultRow({ result, item, chosen, enter, now, roots }: { result: SearchResult; item: number; chosen: boolean; enter: boolean; now: number; roots: string[] }) {
   const detail = detailOf(result, now)
-  return (
-    <Tooltip label={rowTip(result, roots)} side="bottom" className="block">
-      <Button
-        variant="ghost"
-        className="rs-row"
-        data-rs-item={item}
-        data-chosen={chosen ? '' : undefined}
-        aria-label={rowLabel(result, detail)}
-        onClick={() => sendSearch({ type: 'search/open', key: result.key })}
-      >
-        <span className="rs-line">
-          <span className="rs-icon" aria-hidden="true"><KindIcon result={result} /></span>
-          <span className="rs-name">{result.name || 'Untitled'}</span>
-          {detail && <span className="rs-detail">{detail}</span>}
-          {chosen && <kbd className="rs-key">Enter</kbd>}
-        </span>
-        <Snippet result={result} />
-      </Button>
-    </Tooltip>
+  const tip = rowTip(result, roots)
+  const row = (
+    <Button
+      variant="ghost"
+      className="rs-row"
+      data-rs-item={item}
+      data-chosen={chosen ? '' : undefined}
+      aria-label={rowLabel(result, detail)}
+      onClick={() => sendSearch({ type: 'search/open', key: result.key })}
+    >
+      <span className="rs-line">
+        <span className="rs-icon" aria-hidden="true"><KindIcon result={result} /></span>
+        <span className="rs-name">{result.name || 'Untitled'}</span>
+        {detail && <span className="rs-detail">{detail}</span>}
+        {enter && <kbd className="rs-key">Enter</kbd>}
+      </span>
+      <Snippet result={result} />
+    </Button>
   )
+  // A document's place shows on hover only, never as the arrows move through the list; chats and tasks have none
+  return tip ? <Tooltip label={tip} side="bottom" className="block" hoverOnly>{row}</Tooltip> : <div>{row}</div>
 }
 
 function Option({ id, label, checked, count, onChange }: { id: string; label: string; checked: boolean; count?: number; onChange: (checked: boolean) => void }) {
@@ -132,15 +141,18 @@ export function SearchPanelView({
   state,
   now,
   initialMoreOpen = false,
+  initialFocused = null,
   onOptions,
 }: {
   state: SearchViewState
   now: number
   initialMoreOpen?: boolean
+  /** The row the keyboard is on at first (tests draw the keyboard in the rows with it). */
+  initialFocused?: number | null
   onOptions: (options: SearchOptions) => void
 }) {
   const [moreOpen, setMoreOpen] = useState(initialMoreOpen)
-  const [focused, setFocused] = useState<number | null>(null)
+  const [focused, setFocused] = useState<number | null>(initialFocused)
   const [drawn, setDrawn] = useState(ROWS_AT_A_TIME)
   const column = useRef<HTMLElement>(null)
   const observer = useRef<IntersectionObserver | null>(null)
@@ -205,7 +217,7 @@ export function SearchPanelView({
     const countRow = (
       <div className="rs-count" role="status">
         <span className="rs-count-words">{countLine(total, reading, options)}</span>
-        <Tooltip label={moreOpen ? 'Hide the options' : 'Match capital letters, whole words only, and which kinds to search'} side="bottom" className="rs-more-tip">
+        <Tooltip label={moreOpen ? 'Hide the search options' : 'Show the search options'} side="bottom" className="rs-more-tip" hoverOnly>
           <Button variant="ghost" size="sm" className="rs-more" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>
             {moreOpen ? 'Less' : 'More'}
           </Button>
@@ -233,7 +245,7 @@ export function SearchPanelView({
             {lines.narrowing && (
               <p className="rs-nothing-line">
                 {lines.narrowing.words}
-                <Tooltip label="Search again with every option off and every kind on" side="bottom">
+                <Tooltip label={WIDEN_TIP} side="bottom" hoverOnly>
                   <Button variant="outline" size="sm" className="rs-turn-off" onClick={() => onOptions(widened())}>{lines.narrowing.button}</Button>
                 </Tooltip>
               </p>
@@ -247,7 +259,6 @@ export function SearchPanelView({
 
     const limited = limitedLine(projectName, status, answer.limited || status?.limited === true)
     let item = 0
-    const firstResult = focused === null ? 0 : -1
     return (
       <>
         {countRow}
@@ -256,20 +267,25 @@ export function SearchPanelView({
         {groups.map((group) => {
           const whole = expandedKind === group.kind
           const rows = whole ? group.rows.slice(0, drawn) : group.rows
+          const allDrawn = rows.length === group.rows.length
           return (
             <section key={group.kind} className="rs-group" aria-label={KIND_WORDS[group.kind].heading}>
               <h2 className="rs-heading">{group.heading}<span className="rs-heading-count">{group.total.toLocaleString('en-US')}</span></h2>
               {rows.map((result) => {
                 const index = item++
-                const chosen = focused === null ? index === firstResult : focused === index
-                return <ResultRow key={result.key} result={result} item={index} chosen={chosen} now={now} roots={roots} />
+                // The keyboard in the box (outside the rows): the top row is chosen and shows Enter. In the rows: the
+                // focused row is chosen, with its ring, and no Enter (the Experience lead, #636)
+                const chosen = focused === null ? index === 0 : focused === index
+                return <ResultRow key={result.key} result={result} item={index} chosen={chosen} enter={focused === null && index === 0} now={now} roots={roots} />
               })}
-              {whole && rows.length < group.rows.length && <div key={`more-${drawn}`} ref={sentinel} aria-hidden="true" />}
+              {whole && !allDrawn && <div key={`more-${drawn}`} ref={sentinel} aria-hidden="true" />}
+              {/* Past the limit: a line, not a row the arrows stop on */}
+              {group.rest && allDrawn && <p className="rs-rest">{group.rest}</p>}
               {group.show && (() => {
                 const index = item++
                 const show = group.show
                 return (
-                  <Tooltip label={show.kind === 'all' ? `List every ${KIND_WORDS[group.kind].one} with these words here` : `Back to the first rows of each kind`} side="bottom" className="block">
+                  <Tooltip label={show.tip} side="bottom" className="block" hoverOnly>
                     <Button
                       variant="ghost"
                       className="rs-show"
