@@ -14,13 +14,13 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-150 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 [&_svg]:fill-current [&_svg]:text-current outline-none focus-visible:border-ring focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)] active:scale-[0.98] aria-invalid:ring-[var(--r-error-soft)] aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-150 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 [&_svg]:fill-current [&_svg]:text-current outline-none rm-focus-ring active:scale-[0.98] aria-invalid:ring-[var(--r-error-soft)] aria-invalid:border-destructive",
   {
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground shadow-ritemark-accent hover:bg-primary-hover hover:shadow-ritemark-accent-md",
         destructive:
-          "bg-destructive text-white hover:bg-destructive-hover focus-visible:ring-[var(--r-error-soft)]", // Sprint 146: the hover darkens, as the primary's does
+          "bg-destructive text-white hover:bg-destructive-hover", // Sprint 146: the hover darkens, as the primary's does
         outline:
           "border border-hairline-strong bg-background shadow-xs hover:bg-surface-soft hover:text-ink-strong",
         secondary:

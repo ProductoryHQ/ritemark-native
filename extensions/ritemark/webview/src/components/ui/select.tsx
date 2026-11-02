@@ -27,7 +27,7 @@ const SelectTrigger = React.forwardRef<
       'text-ink-strong',
       'border border-hairline-strong',
       // Not a field: its frame is the keyboard's, as every other control's ring (2.2, input-mode.ts)
-      'focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--vscode-focusBorder)]',
+      'focus:outline-none rm-focus-ring',
       'disabled:cursor-not-allowed disabled:opacity-50',
       // A long value is cut where the room ends, with an ellipsis 8 before the chevron (a line clamp cut at a word and
       // a button centres what is left), and starts at the left
