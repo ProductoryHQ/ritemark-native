@@ -16,6 +16,9 @@
  * removed rather than kept alongside the real fix.
  */
 
+import type { AgentId } from './types';
+import { listReadyAlternatives, type RuntimeAvailabilities } from './runtimeAvailability';
+
 export type SidebarView = 'onboarding' | 'claude-setup' | 'codex-setup' | 'opencode-setup' | 'chat';
 
 export interface SidebarGateInput {
@@ -45,6 +48,37 @@ export function hasUndismissedInlineRecovery(
       && !dismissedTurnIds.includes(latestTurn.id)
       && (failureKind === 'authentication' || failureKind === 'api-key-authentication'),
   );
+}
+
+/** What `AISidebar` knows, in the shape the gate's inputs are derived from (Sprint 152: shared with startLook's tests). */
+export interface SidebarFacts {
+  ready: boolean;
+  selectedAgent: AgentId;
+  availabilities: RuntimeAvailabilities;
+  onboardingStatusKnown: boolean;
+  onboardingDismissed: boolean;
+  hasConversation: boolean;
+  inlineRecoveryAvailable: boolean;
+}
+
+/** The gate's inputs from the sidebar's facts: the derivation `AISidebar` used to do inline. */
+export function sidebarGateInput(facts: SidebarFacts): SidebarGateInput {
+  const selected = facts.availabilities[facts.selectedAgent];
+  const known = selected.state !== 'checking' && selected.state !== 'error';
+  return {
+    ready: facts.ready,
+    inlineRecoveryAvailable: facts.inlineRecoveryAvailable,
+    onboardingNeeded: facts.onboardingStatusKnown
+      && !Object.values(facts.availabilities).some((availability) => availability.usable)
+      && !facts.onboardingDismissed,
+    hasConversation: facts.hasConversation,
+    hasReadyAlternative: listReadyAlternatives(facts.availabilities, facts.selectedAgent).length > 0,
+    needsSetup: facts.selectedAgent === 'claude-code' && known && !selected.usable,
+    showCodexSetup: facts.selectedAgent === 'codex' && known && !selected.usable,
+    // OpenCode zero-key: no conversation yet and no provider configured
+    showOpenCodeSetup: facts.selectedAgent === 'opencode' && known && !selected.usable
+      && !facts.hasConversation && selected.state === 'needs-configuration',
+  };
 }
 
 export function sidebarGate(i: SidebarGateInput): SidebarView {

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — 2.2.0
 
+### Sprint 152: the startup contract
+
+#### Changed
+- **The AI column draws once (#624).** While Ritemark finds out whether you are signed in, the AI column shows only the turning mark, in the place the window's own mark had, and then either the chat or "Almost there!". It no longer runs through "Loading...", "Preparing Agent Chat…", an empty chat and an AI's sign-in screen first. If the check takes more than 10 seconds, one line under the mark says so, with Try again; if the AI can't start, it says "The AI couldn't start".
+- **The AI column you closed stays closed.** Ritemark no longer opens it again a few seconds after it starts. Its toggle opens it, and what asks for the AI (the welcome's last step, a task's conversation) still does. A column a narrow window put away comes back when the window is wide again.
+
 ### Sprint 145: 2.1's loose ends
 
 #### Fixed

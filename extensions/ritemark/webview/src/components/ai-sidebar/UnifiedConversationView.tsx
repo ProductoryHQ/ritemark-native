@@ -135,6 +135,21 @@ export function UnifiedConversationView() {
     userScrolledRef.current = !atBottom;
   }, []);
 
+  // Sprint 152 (the Experience lead's check of #632): when something appears above the box (a notice, the queue), the
+  // conversation gets shorter at its foot. A conversation kept at its end keeps its last message in sight; one the
+  // person scrolled up stays where they left it, and a short one doesn't move.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let height = el.clientHeight;
+    const observer = new ResizeObserver(() => {
+      if (el.clientHeight < height && !userScrolledRef.current) el.scrollTop = el.scrollHeight;
+      height = el.clientHeight;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const compatibilityNotice = getCompatibilityNotice(codexStatus);
   const showCompatibilityNotice =
     codexConversation.length > 0 &&
