@@ -44,10 +44,11 @@ export function focusOpensTooltip(target: { matches(selector: string): boolean }
  * tab's hover, `.monaco-hover.workbench-hover.compact`, which has no arrow either). Light: white with ink words; Dark:
  * the desk's indigo with light words, as the status bar's hover. Its width rule (Sprint 142 merge 2): never wider than the page less its collision
  * padding, so a tooltip in a desk of 152 wraps its words instead of running past the edge. Every Radix tooltip in the
- * webview takes these classes (`ConversationTooltip` too).
+ * webview takes these classes (`ConversationTooltip` too). A tooltip draws above everything, the modals too: `Dialog`'s
+ * backdrop is at 9999 and its sheet at 10000, `PropertiesModal`'s at 999 (Codex on #637).
  */
 export const TOOLTIP_SURFACE =
-  'z-[100] rounded-[5px] border border-hairline bg-surface px-2 py-0.5 font-ui text-[12px] leading-[1.35] text-ink-strong shadow-md'
+  'z-[10001] rounded-[5px] border border-hairline bg-surface px-2 py-0.5 font-ui text-[12px] leading-[1.35] text-ink-strong shadow-md'
 
 function onTriggerFocus(event: FocusEvent<HTMLElement>): void {
   // Radix composes its own handler after this one and skips a prevented event
