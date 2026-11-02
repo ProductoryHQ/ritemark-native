@@ -857,7 +857,7 @@ index d81722d63af..8a11889fd80 100644
  		this._onDidRender.fire();
  
 diff --git a/src/vs/workbench/browser/layout.ts b/src/vs/workbench/browser/layout.ts
-index 8009bac..4fbb468 100644
+index 72cb1c1..a8b8807 100644
 --- a/src/vs/workbench/browser/layout.ts
 +++ b/src/vs/workbench/browser/layout.ts
 @@ -152,6 +152,12 @@ export const TITLE_BAR_SETTINGS = [
@@ -873,7 +873,7 @@ index 8009bac..4fbb468 100644
  const DEFAULT_WORKSPACE_WINDOW_DIMENSIONS = new Dimension(DEFAULT_WORKSPACE_WINDOW_SIZE.width, DEFAULT_WORKSPACE_WINDOW_SIZE.height);
  
  export abstract class Layout extends Disposable implements IWorkbenchLayoutService {
-@@ -3079,9 +3085,9 @@ class LayoutStateModel extends Disposable {
+@@ -3078,9 +3084,9 @@ class LayoutStateModel extends Disposable {
  		const auxiliaryBarForceMaximized = this.configurationService.getValue(WorkbenchLayoutSettings.AUXILIARYBAR_FORCE_MAXIMIZED);
  		const workbenchState = this.contextService.getWorkbenchState();
  		const mainContainerDimension = configuration.mainContainerDimension;
@@ -885,7 +885,7 @@ index 8009bac..4fbb468 100644
  		LayoutStateKeys.AUXILIARYBAR_HIDDEN.defaultValue = (() => {
  			if (isWeb && !this.environmentService.remoteAuthority) {
  				return true; // not required in web if unsupported
-@@ -3181,8 +3187,8 @@ class LayoutStateModel extends Disposable {
+@@ -3180,8 +3186,8 @@ class LayoutStateModel extends Disposable {
  
  		// Restrict auxiliary bar size in case of small window dimensions
  		if (this.isNew[StorageScope.WORKSPACE] && configuration.mainContainerDimension.width <= DEFAULT_WORKSPACE_WINDOW_DIMENSIONS.width) {
@@ -6779,10 +6779,10 @@ index 00000000000..1610dcb6fc8
 +});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts b/src/vs/workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts
 new file mode 100644
-index 00000000000..067e9e44824
+index 00000000000..594276fb38a
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts
-@@ -0,0 +1,100 @@
+@@ -0,0 +1,101 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -6798,7 +6798,7 @@ index 00000000000..067e9e44824
 +import { ExtensionIdentifier } from '../../../../platform/extensions/common/extensions.js';
 +import { NullLogService } from '../../../../platform/log/common/log.js';
 +import { RitemarkWelcomeAlone } from '../../../browser/parts/ritemarkWelcomeAlone.js';
-+import { RITEMARK_SLOT_RELEASE_MS, ritemarkFrame, ritemarkNoteWelcomeAloneExpected } from '../../../browser/ritemarkFrame.js';
++import { resetRitemarkSlotReleasesForTesting, RITEMARK_SLOT_RELEASE_MS, ritemarkFrame, ritemarkNoteWelcomeAloneExpected } from '../../../browser/ritemarkFrame.js';
 +import { IEditorService } from '../../../services/editor/common/editorService.js';
 +import { IExtensionService } from '../../../services/extensions/common/extensions.js';
 +import { IWorkbenchLayoutService, Parts } from '../../../services/layout/browser/layoutService.js';
@@ -6840,6 +6840,7 @@ index 00000000000..067e9e44824
 +		};
 +	}
 +
++	setup(() => resetRitemarkSlotReleasesForTesting());
 +	teardown(() => ritemarkNoteWelcomeAloneExpected(false));
 +
 +	test('alone from the first frame; the welcome takes over and keeps it; closing the welcome ends it, the columns left to the extension', async () => {

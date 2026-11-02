@@ -8,7 +8,7 @@
 // An extension release runs in a shell built from an older commit, so every identifier that manifest names must still
 // be the extension's: its view containers and their views, the head rows' commands and menus (package.json), the
 // permanent tabs', the desk front's and the welcome's view types and Home's place (src/frameIdentifiers.ts), and its
-// defaults for the frame-shaping settings. A slot the extension no longer fills is released, logged, and the frame
+// defaults for the frame-shaping settings the manifest lists (`settings`). A slot the extension no longer fills is released, logged, and the frame
 // moves; a place it adds that the manifest doesn't name arrives late. release-extension-preflight.sh stops either.
 //
 // Usage:
@@ -27,7 +27,7 @@ const WEBVIEW = 'mainThreadWebview-';
 const CONTAINER = 'workbench.view.extension.';
 
 /** What the check reads from src/frameIdentifiers.ts; one it can't read is a mismatch, never a skip. */
-export const FRAME_IDENTIFIERS = ['HOME_TAB_VIEW_TYPE', 'BOARD_TAB_VIEW_TYPE', 'WELCOME_VIEW_TYPE', 'HOME_PLACE_ID', 'FRAME_SHAPING_SETTINGS'];
+export const FRAME_IDENTIFIERS = ['HOME_TAB_VIEW_TYPE', 'BOARD_TAB_VIEW_TYPE', 'WELCOME_VIEW_TYPE', 'HOME_PLACE_ID'];
 
 /**
  * The string and string-array constants exported from src/frameIdentifiers.ts, read without compiling it: either
@@ -55,7 +55,7 @@ export function frameMismatches(product, pkg, identifiers) {
   }
   const problems = [];
   for (const name of FRAME_IDENTIFIERS) {
-    if (name === 'FRAME_SHAPING_SETTINGS' ? !Array.isArray(identifiers[name]) || !identifiers[name].length : typeof identifiers[name] !== 'string') {
+    if (typeof identifiers[name] !== 'string') {
       problems.push(`could not read ${name} from src/frameIdentifiers.ts`);
     }
   }
@@ -144,10 +144,10 @@ export function frameMismatches(product, pkg, identifiers) {
     problems.push(`Home's place is ${frame.homePlace} in the manifest, ${identifiers.HOME_PLACE_ID} in src/frameIdentifiers.ts`);
   }
 
-  // The settings that shape the frame: the extension's defaults are the shell's
+  // The settings that shape the frame, as the shell lists them: the extension's defaults are the shell's
   const shells = product.configurationDefaults ?? {};
   const defaults = contributes.configurationDefaults ?? {};
-  for (const key of identifiers.FRAME_SHAPING_SETTINGS ?? []) {
+  for (const key of Array.isArray(frame.settings) ? frame.settings : []) {
     if (JSON.stringify(shells[key]) !== JSON.stringify(defaults[key])) {
       problems.push(`setting ${key}: ${JSON.stringify(defaults[key])} in package.json, ${JSON.stringify(shells[key])} in the shell's product.json`);
     }

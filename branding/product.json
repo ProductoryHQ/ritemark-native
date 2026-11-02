@@ -246,6 +246,7 @@
     ],
     "deskFront": "mainThreadWebview-ritemark.home",
     "welcome": "mainThreadWebview-ritemark.welcome",
+    "settings": ["workbench.activityBar.location", "workbench.sideBar.location", "workbench.editor.tabSizing", "workbench.editor.tabSizingFixedMinWidth", "workbench.editor.tabSizingFixedMaxWidth", "workbench.editor.pinnedTabSizing", "workbench.editor.editorActionsLocation", "breadcrumbs.enabled", "workbench.iconTheme", "workbench.productIconTheme", "workbench.panel.defaultLocation", "terminal.integrated.defaultLocation", "terminal.integrated.hideOnStartup"],
     "places": [
       { "id": "workbench.view.extension.ritemark-home", "title": "Home", "order": -1, "icon": "media/home-icon.svg" },
       { "id": "workbench.view.explorer", "title": "Documents", "head": {"rows": [{"command": "ritemark.projectHead.newRow", "menu": "ritemark/projectHead/new"}, {"command": "ritemark.projectHead.search"}], "label": "Documents"} },

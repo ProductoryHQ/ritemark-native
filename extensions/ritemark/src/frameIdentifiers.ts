@@ -19,23 +19,6 @@ export const WELCOME_VIEW_TYPE = 'ritemark.welcome';
 /** The place a project window opens on when it has none of its own. */
 export const HOME_PLACE_ID = 'workbench.view.extension.ritemark-home';
 
-/**
- * The settings that shape the frame (Sprint 152, R1). The shell has them in `product.json`'s `configurationDefaults`,
- * so the frame has its shape from the first frame; the extension keeps its own copies in `package.json`, for a shell
- * without them. The two stay equal (`frameIdentifiers.test.ts`, and the release check).
- */
-export const FRAME_SHAPING_SETTINGS = [
-  'workbench.activityBar.location',
-  'workbench.sideBar.location',
-  'workbench.editor.tabSizing',
-  'workbench.editor.tabSizingFixedMinWidth',
-  'workbench.editor.tabSizingFixedMaxWidth',
-  'workbench.editor.pinnedTabSizing',
-  'workbench.editor.editorActionsLocation',
-  'breadcrumbs.enabled',
-  'workbench.iconTheme',
-  'workbench.productIconTheme',
-  'workbench.panel.defaultLocation',
-  'terminal.integrated.defaultLocation',
-  'terminal.integrated.hideOnStartup',
-];
+// The settings that shape the frame are the shell's list (the manifest's `settings`): the shell has them in
+// product.json's `configurationDefaults` for the first frame, and the extension's copies in `package.json` (for a shell
+// without them) stay equal to them (`frameIdentifiers.test.ts`, and the release check).

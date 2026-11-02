@@ -260,18 +260,18 @@ index f7b82f298f7..e8bbceb8706 100644
  	}
  ]);
 diff --git a/src/vs/workbench/browser/layout.ts b/src/vs/workbench/browser/layout.ts
-index 75f9238..8009bac 100644
+index 75f9238..72cb1c1 100644
 --- a/src/vs/workbench/browser/layout.ts
 +++ b/src/vs/workbench/browser/layout.ts
 @@ -51,6 +51,7 @@ import { ITelemetryService } from '../../platform/telemetry/common/telemetry.js'
  import { IAuxiliaryWindowService } from '../services/auxiliaryWindow/browser/auxiliaryWindowService.js';
  import { CodeWindow, mainWindow } from '../../base/browser/window.js';
  import { localize } from '../../nls.js';
-+import { isRitemarkPlace, ritemarkAiColumnBroughtBack, RITEMARK_AI_COLUMN_RELEASED_KEY, RITEMARK_PROJECT_OPENED_KEY, ritemarkFrame, ritemarkNotePlaceToRestore, ritemarkNoteWelcomeAloneExpected, ritemarkSlotReleased } from './ritemarkFrame.js';
++import { isRitemarkPlace, ritemarkAiColumnBroughtBack, RITEMARK_AI_COLUMN_RELEASED_KEY, RITEMARK_AI_COLUMN_WAITING_KEY, RITEMARK_PROJECT_OPENED_KEY, ritemarkFrame, ritemarkNotePlaceToRestore, ritemarkNoteWelcomeAloneExpected, ritemarkRestoresDocuments, ritemarkSlotReleased } from './ritemarkFrame.js';
  
  //#region Layout Implementation
  
-@@ -837,9 +838,49 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
+@@ -837,9 +838,50 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
  			}
  		}
  
@@ -289,11 +289,12 @@ index 75f9238..8009bac 100644
 +			this.state.initialization.views.containerToRestore.sideBar = isRitemarkPlace(ritemarkStoredPlace) ? ritemarkStoredPlace
 +				: ritemarkFirstOpening && ritemarkFrame.homePlace ? ritemarkFrame.homePlace : this.state.initialization.views.containerToRestore.sideBar;
 +		}
-+		if (ritemarkProjectWindow) {
++		if (ritemarkProjectWindow && ritemarkFirstOpening) {
 +			this.storageService.store(RITEMARK_PROJECT_OPENED_KEY, true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
 +		}
-+		ritemarkNoteWelcomeAloneExpected(!ritemarkProjectWindow && !initialEditorsState, { sideBar: this.isVisible(Parts.SIDEBAR_PART), aiColumn: this.isVisible(Parts.AUXILIARYBAR_PART) });
-+		if (!ritemarkProjectWindow && !initialEditorsState && ritemarkFrame.welcome) {
++		const ritemarkWelcomeAlone = !ritemarkProjectWindow && !initialEditorsState && !ritemarkRestoresDocuments(this.storageService);
++		ritemarkNoteWelcomeAloneExpected(ritemarkWelcomeAlone, { sideBar: this.isVisible(Parts.SIDEBAR_PART), aiColumn: this.isVisible(Parts.AUXILIARYBAR_PART) });
++		if (ritemarkWelcomeAlone && ritemarkFrame.welcome) {
 +			this.state.initialization.views.containerToRestore.sideBar = undefined;
 +			this.stateModel.setRuntimeValue(LayoutStateKeys.SIDEBAR_HIDDEN, true);
 +			this.stateModel.setRuntimeValue(LayoutStateKeys.AUXILIARYBAR_HIDDEN, true);
@@ -322,7 +323,7 @@ index 75f9238..8009bac 100644
  			if (viewContainerToRestore) {
  				this.state.initialization.views.containerToRestore.auxiliaryBar = viewContainerToRestore;
  			} else {
-@@ -1192,6 +1233,18 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
+@@ -1192,6 +1234,16 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
  
  			await this.openViewContainer(ViewContainerLocation.AuxiliaryBar, this.state.initialization.views.containerToRestore.auxiliaryBar);
  
@@ -332,16 +333,14 @@ index 75f9238..8009bac 100644
 +			// (above, and ritemarkFrame.ts), since the extension no longer opens it at its start (Sprint 152, decision 2)
 +			if (this.contextService.getWorkbenchState() !== WorkbenchState.EMPTY && !this.paneCompositeService.getActivePaneComposite(ViewContainerLocation.AuxiliaryBar)) {
 +				this.setPartHidden(true, Parts.AUXILIARYBAR_PART);
-+				if (!ritemarkAiColumnBroughtBack()) {
-+					this.storageService.store(RITEMARK_AI_COLUMN_RELEASED_KEY, true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
-+				}
++				this.storageService.store(ritemarkAiColumnBroughtBack() ? RITEMARK_AI_COLUMN_WAITING_KEY : RITEMARK_AI_COLUMN_RELEASED_KEY, true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
 +				ritemarkSlotReleased(this.logService, 'the AI column', 'Ritemark AI is not registered');
 +			}
 +
  			mark('code/didRestoreAuxiliaryBar');
  		})());
  
-@@ -1225,6 +1278,9 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
+@@ -1225,6 +1277,9 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
  			Promises.settled(layoutRestoredPromises).finally(() => {
  				if (
  					this.editorService.editors.length === 0 && 			// no editors opened or restored
@@ -351,7 +350,7 @@ index 75f9238..8009bac 100644
  					this.isVisible(Parts.AUXILIARYBAR_PART) && 			// auxiliary bar is visible
  					!this.hasFocus(Parts.AUXILIARYBAR_PART) && 			// auxiliary bar does not have focus yet
  					!this.environmentService.enableSmokeTestDriver 		// not in smoke test mode (where focus is sensitive)
-@@ -3037,8 +3093,11 @@ class LayoutStateModel extends Disposable {
+@@ -3037,8 +3092,11 @@ class LayoutStateModel extends Disposable {
  
  			// Unless auxiliary bar visibility is explicitly configured, make
  			// sure to not force open it in case we know it was empty before.
@@ -1403,10 +1402,10 @@ index bfc8839cc65..745739c61f4 100644
  		};
 diff --git a/src/vs/workbench/browser/ritemarkFrame.ts b/src/vs/workbench/browser/ritemarkFrame.ts
 new file mode 100644
-index 00000000000..1931d773ae8
+index 00000000000..ff03e6593fa
 --- /dev/null
 +++ b/src/vs/workbench/browser/ritemarkFrame.ts
-@@ -0,0 +1,402 @@
+@@ -0,0 +1,465 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1453,6 +1452,9 @@ index 00000000000..1931d773ae8
 +import { IEditorService } from '../services/editor/common/editorService.js';
 +import { IExtensionService } from '../services/extensions/common/extensions.js';
 +import { IWorkbenchLayoutService, Parts } from '../services/layout/browser/layoutService.js';
++import { generateUuid } from '../../base/common/uuid.js';
++import { Memento } from '../common/memento.js';
++import { IViewDescriptorService } from '../common/views.js';
 +
 +/** A row under a place's head: an extension command (its words and icon), with the extension's menu when it has one. */
 +export interface IRitemarkFrameHeadRow {
@@ -1563,8 +1565,8 @@ index 00000000000..1931d773ae8
 +/** Ritemark's frame, as this build's product.json describes it. */
 +export const ritemarkFrame: IRitemarkFrame = readRitemarkFrame((product as { ritemarkFrame?: unknown }).ritemarkFrame);
 +
-+if (ritemarkFrame === NO_FRAME) {
-+	console.warn('[ritemark] product.json has no ritemarkFrame: the frame draws as VS Code does');
++if (!ritemarkFrame.places.length || !ritemarkFrame.aiColumn) {
++	console.warn('[ritemark] product.json has no usable ritemarkFrame block: the frame draws as VS Code does');
 +}
 +
 +/** A Ritemark place's order in the places row (VS Code's view container order), from the manifest. */
@@ -1592,6 +1594,11 @@ index 00000000000..1931d773ae8
 +
 +const released = new Set<string>();
 +
++/** For tests: forget which slots have said they went. */
++export function resetRitemarkSlotReleasesForTesting(): void {
++	released.clear();
++}
++
 +/** A slot goes, once: says so in the log, the first time only. */
 +export function ritemarkSlotReleased(logService: ILogService, name: string, why: string): void {
 +	if (released.has(name)) {
@@ -1614,6 +1621,30 @@ index 00000000000..1931d773ae8
 +let placeToRestore: string | undefined;
 +let welcomeAloneExpected = false;
 +let welcomeAloneColumns: { readonly sideBar: boolean; readonly aiColumn: boolean } = { sideBar: false, aiColumn: false };
++
++/**
++ * Whether the window's saved tabs (VS Code's editor part state, read before the part is made) hold anything but the
++ * welcome: an empty window restoring documents (hot exit, a restored window) opens no welcome (the extension's
++ * `opensAtStart`), so it isn't the welcome alone. Read only; the editor part restores them as always.
++ */
++export function ritemarkRestoresDocuments(storageService: IStorageService): boolean {
++	const state = new Memento<{ 'editorpart.state'?: { serializedGrid?: { root?: unknown } } }>('workbench.parts.editor', storageService).getMemento(StorageScope.WORKSPACE, StorageTarget.MACHINE)['editorpart.state'];
++	const documents = (node: unknown): boolean => {
++		const branch = node as { type?: string; data?: unknown } | undefined;
++		if (branch?.type === 'branch' && Array.isArray(branch.data)) {
++			return branch.data.some(documents);
++		}
++		const editors = (branch?.data as { editors?: { id?: string; value?: string }[] } | undefined)?.editors ?? [];
++		return editors.some(editor => {
++			try {
++				return editor.id !== WEBVIEW_EDITOR_TYPE_ID || (JSON.parse(editor.value ?? '{}') as { viewType?: unknown }).viewType !== ritemarkFrame.welcome;
++			} catch {
++				return true;
++			}
++		});
++	};
++	return documents(state?.serializedGrid?.root);
++}
 +
 +/** layout.ts: the place the left column restores, perhaps before its extension has registered it (R2, R3); the side bar forgets it once a place opens. */
 +export function ritemarkNotePlaceToRestore(containerId: string | undefined): void {
@@ -1685,11 +1716,6 @@ index 00000000000..1931d773ae8
 + * off, Home stands alone. Undefined in a window with no folder, with no permanent tabs in the manifest, or with no
 + * saved webview tabs to restore (the plain desk, A3's fallback).
 + */
-+/** editorPart.ts: the first desk was placed (its grid was made from `ritemarkFirstDesk`), so its tabs may be released. */
-+export function ritemarkNoteFirstDeskPlaced(): void {
-+	placedDesk = true;
-+}
-+
 +export function ritemarkFirstDesk(accessor: ServicesAccessor, frame = ritemarkFrame, canRestore = () => !!Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).getEditorSerializer(WEBVIEW_EDITOR_TYPE_ID)): { grid: ISerializedGrid; group: number } | undefined {
 +	const extension = ritemarkBuiltinExtensionLocation(frame);
 +	if (!extension || !frame.extension || accessor.get(IWorkspaceContextService).getWorkbenchState() === WorkbenchState.EMPTY || !canRestore()) {
@@ -1701,12 +1727,26 @@ index 00000000000..1931d773ae8
 +		return undefined;
 +	}
 +	const media = joinPath(extension, 'media');
-+	const editors = tabs.map(entry => ({
++	// The origin VS Code gives a panel the extension makes (mainThreadWebviewPanels.ts: one per view type and extension,
++	// kept in application storage), so the page's storage is the same whichever made the tab
++	const origins = new Memento<Record<string, string>>('mainThreadWebviewPanel.origins', accessor.get(IStorageService));
++	const originState = origins.getMemento(StorageScope.APPLICATION, StorageTarget.MACHINE);
++	const originOf = (providedId: string) => {
++		const key = JSON.stringify({ viewType: providedId, key: frame.extension });
++		if (typeof originState[key] !== 'string') {
++			originState[key] = generateUuid();
++			origins.saveMemento();
++		}
++		return originState[key];
++	};
++	const editors = tabs.map(entry => {
++		const providedId = entry.viewType.startsWith(MAIN_THREAD_WEBVIEW_PREFIX) ? entry.viewType.slice(MAIN_THREAD_WEBVIEW_PREFIX.length) : entry.viewType;
++		return ({
 +		id: WEBVIEW_EDITOR_TYPE_ID,
 +		value: JSON.stringify({
-+			origin: undefined,
++			origin: originOf(providedId),
 +			viewType: entry.viewType,
-+			providedId: entry.viewType.startsWith(MAIN_THREAD_WEBVIEW_PREFIX) ? entry.viewType.slice(MAIN_THREAD_WEBVIEW_PREFIX.length) : entry.viewType,
++			providedId,
 +			title: entry.title,
 +			options: { retainContextWhenHidden: true, allowScripts: true, localResourceRoots: [media.toJSON()] },
 +			extensionLocation: extension.toJSON(),
@@ -1714,16 +1754,22 @@ index 00000000000..1931d773ae8
 +			state: undefined,
 +			iconPath: entry.icon ? { light: joinPath(extension, entry.icon.light).toJSON(), dark: joinPath(extension, entry.icon.dark).toJSON() } : undefined,
 +		}),
-+	}));
++		});
++	});
 +	const front = Math.max(0, tabs.findIndex(entry => entry.viewType === frame.deskFront));
 +	const group: ISerializedEditorGroupModel = { id: 1, editors, mru: [front, ...editors.map((_, index) => index).filter(index => index !== front)], sticky: editors.length - 1 };
 +	return { grid: { orientation: Orientation.HORIZONTAL, width: 800, height: 600, root: { type: 'branch', size: 600, data: [{ type: 'leaf', size: 800, data: group }] } }, group: group.id };
 +}
 +
++/** editorPart.ts: the first desk was placed (its grid was made from `ritemarkFirstDesk`), so its tabs may be released. */
++export function ritemarkNoteFirstDeskPlaced(): void {
++	placedDesk = true;
++}
++
 +/**
 + * Sprint 152 (R3): the tabs placed on a first desk wait for the extension to fill them. When it can't (it isn't there
-+ * once the extensions are read, or it hasn't started after RITEMARK_SLOT_RELEASE_MS, which is also how a start that
-+ * failed shows: VS Code reports a failed activation to no one but its telemetry), they go:
++ * once the extensions are read, or its activation hasn't even begun after RITEMARK_SLOT_RELEASE_MS), they go. An
++ * activation that began may have registered the serializers and filled them before it failed, so its tabs stay:
 + * a placed tab with nothing to fill it would stay empty, and come back at every start (A3). An extension may dispose
 + * a permanent tab (patch 019 stops only people and commands).
 + */
@@ -1741,7 +1787,7 @@ index 00000000000..1931d773ae8
 +		if (!placedDesk || !id) {
 +			return;
 +		}
-+		const started = () => !!extensionService.getExtensionsStatus()[id]?.activationTimes;
++		const started = () => !!extensionService.getExtensionsStatus()[id]?.activationStarted;
 +		extensionService.whenInstalledExtensionsRegistered().then(() => {
 +			if (!this._store.isDisposed && !extensionService.extensions.some(extension => ExtensionIdentifier.equals(extension.identifier, id))) {
 +				this.release('Ritemark is not installed');
@@ -1780,9 +1826,15 @@ index 00000000000..1931d773ae8
 +let aiColumnBroughtBack = false;
 +
 +/**
++ * The column was released twice in a row: it waits, closed, for Ritemark AI, and opens once when Ritemark AI is
++ * registered again (RitemarkAiColumnRelease), instead of opening and closing at every start while it is off.
++ */
++export const RITEMARK_AI_COLUMN_WAITING_KEY = 'ritemark.aiColumn.waiting';
++
++/**
 + * layout.ts: whether this start brought the released column back. If Ritemark AI is missing again, the column is
-+ * released again but not brought back at the next start: an extension that stays off (disabled, quarantined) would
-+ * otherwise open and close the column at every start.
++ * released again and waits (RITEMARK_AI_COLUMN_WAITING_KEY) rather than being brought back at the next start: an
++ * extension that stays off (disabled, quarantined) would otherwise open and close the column at every start.
 + */
 +export function ritemarkAiColumnBroughtBack(broughtBack?: boolean): boolean {
 +	if (broughtBack !== undefined) {
@@ -1798,13 +1850,23 @@ index 00000000000..1931d773ae8
 +	constructor(
 +		@IWorkbenchLayoutService layoutService: IWorkbenchLayoutService,
 +		@IStorageService storageService: IStorageService,
++		@IExtensionService extensionService: IExtensionService,
++		@IViewDescriptorService viewDescriptorService: IViewDescriptorService,
 +	) {
 +		super();
 +		this._register(layoutService.onDidChangePartVisibility(e => {
 +			if (e.partId === Parts.AUXILIARYBAR_PART) {
 +				storageService.remove(RITEMARK_AI_COLUMN_RELEASED_KEY, StorageScope.WORKSPACE);
++				storageService.remove(RITEMARK_AI_COLUMN_WAITING_KEY, StorageScope.WORKSPACE);
 +			}
 +		}));
++		// Ritemark AI is back after starts without it: the column opens once, where the person had it
++		extensionService.whenInstalledExtensionsRegistered().then(() => {
++			const aiColumn = ritemarkFrame.aiColumn;
++			if (!this._store.isDisposed && aiColumn && storageService.getBoolean(RITEMARK_AI_COLUMN_WAITING_KEY, StorageScope.WORKSPACE, false) && viewDescriptorService.getViewContainerById(aiColumn) && !layoutService.isVisible(Parts.AUXILIARYBAR_PART)) {
++				layoutService.setPartHidden(false, Parts.AUXILIARYBAR_PART);
++			}
++		});
 +	}
 +}
 +
@@ -2083,10 +2145,10 @@ index ef3388a877f..873b2dbf292 100644
  
 diff --git a/src/vs/workbench/test/browser/ritemarkFrame.test.ts b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
 new file mode 100644
-index 00000000000..45a10b9df72
+index 00000000000..db6aabe675c
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
-@@ -0,0 +1,144 @@
+@@ -0,0 +1,152 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2098,7 +2160,7 @@ index 00000000000..45a10b9df72
 +import { IConfigurationService } from '../../../platform/configuration/common/configuration.js';
 +import { ServicesAccessor } from '../../../platform/instantiation/common/instantiation.js';
 +import { NullLogService } from '../../../platform/log/common/log.js';
-+import { StorageScope } from '../../../platform/storage/common/storage.js';
++import { IStorageService, StorageScope } from '../../../platform/storage/common/storage.js';
 +import { IWorkspaceContextService, WorkbenchState } from '../../../platform/workspace/common/workspace.js';
 +import { readRitemarkFrame, ritemarkFirstDesk, ritemarkSeedPlaces, ritemarkSlotReleased } from '../../browser/ritemarkFrame.js';
 +import { ISerializedEditorGroupModel } from '../../common/editor/editorGroupModel.js';
@@ -2191,9 +2253,13 @@ index 00000000000..45a10b9df72
 +	test('R3: a project\'s first desk is Home and the Task board, pinned, Home in front; Home alone with the board\'s flag off; none without a folder', () => {
 +		const frame = readRitemarkFrame(manifest);
 +		const noSerializer = ritemarkFirstDesk({ get: (id: unknown) => id === IWorkspaceContextService ? { getWorkbenchState: () => WorkbenchState.FOLDER } : { getValue: () => undefined } } as unknown as ServicesAccessor, frame, () => false);
++		const storage = store.add(new TestStorageService());
 +		const desk = (state: WorkbenchState, settings: Record<string, unknown> = {}) => ritemarkFirstDesk({
-+			get: (id: unknown) => id === IWorkspaceContextService ? { getWorkbenchState: () => state } : id === IConfigurationService ? { getValue: (key: string) => settings[key] } : undefined,
++			get: (id: unknown) => id === IWorkspaceContextService ? { getWorkbenchState: () => state } : id === IConfigurationService ? { getValue: (key: string) => settings[key] } : id === IStorageService ? storage : undefined,
 +		} as unknown as ServicesAccessor, frame, () => true);
++		const origins = (result: ReturnType<typeof desk>) => (((result?.grid.root as { data: ISerializedNode[] }).data[0] as ISerializedLeafNode).data as ISerializedEditorGroupModel).editors.map(editor => JSON.parse(editor.value).origin as unknown);
++		const first = origins(desk(WorkbenchState.FOLDER));
++		const stored = JSON.parse(storage.get('memento/mainThreadWebviewPanel.origins', StorageScope.APPLICATION) ?? '{}');
 +		const tabs = (result: ReturnType<typeof desk>) => {
 +			const leaf = (result?.grid.root as { data: ISerializedNode[] } | undefined)?.data[0] as ISerializedLeafNode | undefined;
 +			const group = leaf?.data as ISerializedEditorGroupModel | undefined;
@@ -2209,12 +2275,16 @@ index 00000000000..45a10b9df72
 +		};
 +
 +		assert.deepStrictEqual({
++			originsStable: JSON.stringify(first) === JSON.stringify(origins(desk(WorkbenchState.FOLDER))) && first.every((origin: unknown) => typeof origin === 'string'),
++			originIsTheStores: first[0] === stored[JSON.stringify({ viewType: 'ritemark.home', key: 'ritemark.ritemark' })],
 +			project: tabs(desk(WorkbenchState.FOLDER)),
 +			boardOff: tabs(desk(WorkbenchState.FOLDER, { 'ritemark.features.task-board': false }))?.tabs.map(tab => tab.title),
 +			noFolder: desk(WorkbenchState.EMPTY),
 +			noSerializer,
 +			noTabs: ritemarkFirstDesk({ get: (id: unknown) => id === IWorkspaceContextService ? { getWorkbenchState: () => WorkbenchState.FOLDER } : { getValue: () => undefined } } as unknown as ServicesAccessor, readRitemarkFrame({ ...manifest, permanentTabs: [] }), () => true),
 +		}, {
++			originsStable: true,
++			originIsTheStores: true,
 +			project: {
 +				tabs: [
 +					{ id: 'workbench.editors.webviewInput', viewType: 'mainThreadWebview-ritemark.home', providedId: 'ritemark.home', title: 'Home', extensionId: 'ritemark.ritemark', icon: true },

@@ -1,29 +1,28 @@
 /**
- * Sprint 152 (R7): the frame-shaping defaults in the extension's package.json equal the shell's in
- * branding/product.json, and the manifest names this extension's own identifiers.
+ * Sprint 152 (R7): this extension fills the frame its shell draws (`branding/product.json`'s `ritemarkFrame`), by the
+ * release check's own rules (`scripts/check-frame-manifest.mjs`): its view containers, head rows, permanent tabs, desk
+ * front, welcome and Home's place, and its defaults for the shell's frame-shaping settings.
  * Run: npx tsx src/frameIdentifiers.test.ts
  */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { BOARD_TAB_VIEW_TYPE, FRAME_SHAPING_SETTINGS, HOME_PLACE_ID, HOME_TAB_VIEW_TYPE, WELCOME_VIEW_TYPE } from './frameIdentifiers';
+import { pathToFileURL } from 'node:url';
 
-const extensionDir = path.resolve(__dirname, '..');
-const pkg = JSON.parse(readFileSync(path.join(extensionDir, 'package.json'), 'utf8'));
-const product = JSON.parse(readFileSync(path.join(extensionDir, '..', '..', 'branding', 'product.json'), 'utf8'));
+async function main(): Promise<void> {
+  const extensionDir = path.resolve(__dirname, '..');
+  const root = path.resolve(extensionDir, '..', '..');
+  const { frameMismatches, readFrameIdentifiers } = await import(pathToFileURL(path.join(root, 'scripts', 'check-frame-manifest.mjs')).href);
+  const pkg = JSON.parse(readFileSync(path.join(extensionDir, 'package.json'), 'utf8'));
+  const product = JSON.parse(readFileSync(path.join(root, 'branding', 'product.json'), 'utf8'));
+  const identifiers = readFrameIdentifiers(readFileSync(path.join(extensionDir, 'src', 'frameIdentifiers.ts'), 'utf8'));
+  assert.ok(product.ritemarkFrame?.settings?.length, 'the manifest names the frame-shaping settings');
+  assert.deepEqual(frameMismatches(product, pkg, identifiers), []);
+  console.log('frameIdentifiers: all assertions passed');
+}
 
-const ours = pkg.contributes.configurationDefaults as Record<string, unknown>;
-const shells = product.configurationDefaults as Record<string, unknown>;
-const differ = FRAME_SHAPING_SETTINGS.filter((key) => JSON.stringify(ours[key]) !== JSON.stringify(shells[key]));
-assert.deepEqual(differ, [], `the frame-shaping defaults differ between package.json and branding/product.json: ${differ.join(', ')}`);
-assert.ok(FRAME_SHAPING_SETTINGS.every((key) => key in ours), 'every frame-shaping setting has the extension\'s own default');
-
-const frame = product.ritemarkFrame;
-assert.equal(frame.extension, `${pkg.publisher}.${pkg.name}`);
-assert.deepEqual(frame.permanentTabs.map((tab: { viewType: string }) => tab.viewType), [`mainThreadWebview-${HOME_TAB_VIEW_TYPE}`, `mainThreadWebview-${BOARD_TAB_VIEW_TYPE}`]);
-assert.equal(frame.deskFront, `mainThreadWebview-${HOME_TAB_VIEW_TYPE}`);
-assert.equal(frame.welcome, `mainThreadWebview-${WELCOME_VIEW_TYPE}`);
-assert.equal(frame.homePlace, HOME_PLACE_ID);
-
-console.log('frameIdentifiers: all assertions passed');
+void main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
