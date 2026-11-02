@@ -6,6 +6,7 @@ import { watchRitemarkThemeClass } from './utils/themeClass'
 import { captureWebviewScriptUrl } from './lib/webviewAssets'
 import { watchScrollingMark } from './lib/scrollingMark'
 import { watchInputMode } from './components/ui/input-mode'
+import { announcePageDrawing } from './lib/pageDrawn'
 
 // Sprint 138 (#481): webview.js's own URL, while it is still known, for the
 // files next to it in media/ (KaTeX's stylesheet and fonts).
@@ -81,6 +82,13 @@ const ControlCatalogue = lazy(() =>
 const rootElement = document.getElementById('root')!
 const editorType = rootElement.getAttribute('data-editor-type')
 
+// Sprint 152, PR 3: the desk pages whose content comes after their host answers say when it is drawn, so the shell's
+// loading look stays above them until then (lib/pageDrawn.ts): Home, the Task board and a document (App), first of all
+const RITEMARK_EDITOR_TYPES = ['settings', 'flow', 'flows-panel', 'ai-sidebar', 'transcribe-panel', 'transcript-workbench', 'tasks-panel', 'welcome', 'projects']
+if (editorType === 'home' || editorType === 'task-board' || !RITEMARK_EDITOR_TYPES.includes(editorType ?? '')) {
+  announcePageDrawing()
+}
+
 // Debug logging
 console.log('[Ritemark] Initializing editor, type:', editorType)
 
@@ -97,20 +105,16 @@ if (
   document.body.style.backgroundColor = 'var(--r-surface-muted)'
 }
 
-// Loading fallback
+// Loading fallback: the slot's own material and nothing else (Sprint 152, PR 3: no "Loading..."; the shell's loading look
+// shows over a desk tab while it waits, and a place in the left column is its ground)
 const LoadingFallback = () => (
   <div
+    aria-busy="true"
     style={{
       height: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
       background: 'var(--background)',
-      color: 'var(--foreground)',
     }}
-  >
-    Loading...
-  </div>
+  />
 )
 
 ReactDOM.createRoot(rootElement).render(

@@ -143,7 +143,7 @@ import {
   type ChatLinkAction,
   type ChatLocalTarget,
 } from './chatLinkTargets';
-import { aiColumnShownSince, aiStartingMarkBody, aiStartingMarkHead } from './aiStartingMark';
+import { aiColumnShownSince, aiStartingMarkBody, aiStartingMarkHead, shellLookSince } from './aiStartingMark';
 
 const _toolsInjector = new RitemarkToolsInjector();
 
@@ -458,13 +458,21 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri]
     };
 
-    // Sprint 152 (R5): the view's own turning mark takes over the shell's, timed from the column's first frame
-    const columnShownSince = aiColumnShownSince({
+    // Sprint 152 (R5; W5): the view's own turning mark takes over the shell's, timed from when the shell's slot began to
+    // wait, which the shell hands over; where it can't, from the host's estimate of the column's first frame
+    const estimate = aiColumnShownSince({
       extensionHostStartedAt: performance.timeOrigin,
       activatedAt: this._activatedAt,
       resolvedAt,
     });
-    webviewView.webview.html = this._getHtmlForWebview(webviewView.webview, columnShownSince);
+    void shellLookSince((command, viewId) => vscode.commands.executeCommand(command, viewId), UnifiedViewProvider.viewType).then((since) => {
+      if (viewGeneration !== this._viewGeneration) return; // a newer resolve of the view draws its own page
+      try {
+        webviewView.webview.html = this._getHtmlForWebview(webviewView.webview, since ?? estimate);
+      } catch {
+        // the view went while the shell answered
+      }
+    });
 
     // The resolve ends when the page asks for its bootstrap (its first frame, the mark, is drawn by then), or after
     // AI_VIEW_RESOLVE_LIMIT_MS, or when the view goes: VS Code awaits it before it takes the shell's mark away.

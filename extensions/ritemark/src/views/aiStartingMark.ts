@@ -1,8 +1,9 @@
 /**
  * The AI column's turning mark, drawn by the AI's view itself (Sprint 152, R5, #624; the Experience lead's answer 5).
  *
- * While the AI's view waits for its extension, patch 018 draws a turning mark at the column's centre a second after the
- * column's first frame (`webviewViewPane.ts`, `ritemarkSurfaces.css` `.ritemark-ai-starting`). When the view takes over
+ * While the AI's view waits for its extension, the shell draws a turning mark at the column's centre a second after the
+ * column's first frame (Sprint 152, PR 3: the shell's loading look, patch 002's `ritemarkLoadingLook.ts`, drawn by patch
+ * 018's `ritemarkSurfaces.css` `.ritemark-loading-mark`; `webviewViewPane.ts`). When the view takes over
  * it draws the same mark, in the same place, from its first frame, until it knows whether its settled look is the chat
  * or the sign-in: the same ring (16, 1.5 of `--vscode-input-border`, its top in `--vscode-foreground`, once a second),
  * centred in the view's window, which VS Code lays over the same pane the shell's mark is centred in, with the same
@@ -11,8 +12,9 @@
  *
  * The 1 s never starts again: if the shell's mark was showing, the view's shows from its first frame; if not, it shows
  * when 1 s has passed since the column's first frame, turning in step with where the shell's would be. Only the shell
- * knows that moment exactly; until it hands it over (Sprint 152, PR 2), the host gives its best estimate
- * (`aiColumnShownSince`).
+ * knows that moment exactly, and it hands it over (W5, Sprint 152 PR 3: `_ritemark.loadingLook.since`, the moment the
+ * column's slot began to wait); where it can't (an older shell, the view not in the AI column), the host gives its best
+ * estimate (`aiColumnShownSince`).
  *
  * Dependency-free (no `vscode`), so its tests run under `npx tsx`.
  */
@@ -23,8 +25,30 @@ export const AI_STARTING_MARK_ID = 'rm-ai-starting';
 /** What a screen reader says for the mark: the shell's words (`ritemark.aiStarting` in patch 018). */
 export const AI_STARTING_WORDS = 'The AI is starting';
 
-/** How long the column is bare ground before the mark shows: patch 018's `RITEMARK_STARTING_MARK_AFTER_MS`. */
+/** How long the column is bare ground before the mark shows: patch 002's `RITEMARK_MARK_AFTER_MS`. */
 export const AI_STARTING_MARK_AFTER_MS = 1000;
+
+/** The shell's command that hands over when a slot began to wait (W5; patch 002's `ritemarkLoadingLook.ts`). */
+export const SHELL_LOOK_SINCE_COMMAND = '_ritemark.loadingLook.since';
+
+/** How long the host waits for the shell's answer before its own estimate stands in. */
+export const SHELL_LOOK_SINCE_WAIT_MS = 250;
+
+/**
+ * W5: when the shell's slot for this view began to wait (epoch ms), or undefined when the shell has no such moment (an
+ * older shell without the command, a view the shell drew no look for) or doesn't answer within SHELL_LOOK_SINCE_WAIT_MS.
+ * `execute` runs a command (`vscode.commands.executeCommand`), so this stays free of `vscode`.
+ */
+export async function shellLookSince(execute: (command: string, viewId: string) => Thenable<unknown>, viewId: string): Promise<number | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<undefined>((resolve) => { timer = setTimeout(() => resolve(undefined), SHELL_LOOK_SINCE_WAIT_MS); });
+  try {
+    const answer = await Promise.race([Promise.resolve(execute(SHELL_LOOK_SINCE_COMMAND, viewId)).catch(() => undefined), late]);
+    return typeof answer === 'number' && Number.isFinite(answer) && answer > 0 ? answer : undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * A view resolved this soon after Ritemark activated belongs to the window's start, so its column has been showing
@@ -42,7 +66,7 @@ export interface AiColumnTiming {
 }
 
 /**
- * The host's estimate of the column's first frame, from which the 1 s counts.
+ * The host's estimate of the column's first frame, from which the 1 s counts, where the shell hands over none.
  *
  * A view resolved as part of the start: the extension host is spawned when VS Code starts reading the extensions,
  * 0.05–0.25 s after the window's first frame (A4; A2's Windows marks), so its start is the closest moment the host

@@ -250,6 +250,48 @@ Acceptance criteria:
 - When VS Code has stored no places, the composite bar draws Ritemark's six from the manifest's placeholders (title and
   icon), in order, from the first frame; the extension's registration replaces them in place.
 
+### R10: One loading look, for every slot (PR 3)
+
+As someone whose window is still starting, or whose tab's page isn't there yet, I want one quiet sign that something is
+on its way, the same everywhere, and a word when it takes long.
+
+The Experience lead's "One loading look, for every slot" and answers 1–5 (1 November), and the PR 2 check (2 November):
+- **The slot's own material first,** and nothing else: the ground for a column and the welcome's window, the desk's
+  sheet joined to its tab under a tab. No words, no bar, no tiles, no indigo.
+- **After 1 s, the kit's turning mark** (16, ink on the strong hairline, once a second) alone at the slot's centre, with
+  words for screen readers only: "<the tab's name> is opening" on the desk, "Ritemark is starting" in the welcome's
+  window, "The AI is starting" in the AI column. It stands still under Reduce motion.
+- **After 10 s, one line,** only in each window's main slot and only at a start: the desk in a project window, the centre
+  in the welcome's window. "Ritemark is still starting. The first start after an install or an update takes longer.",
+  13, the muted ink, centred, at most 320 wide, 12 under the mark. The mark keeps its place when the line comes.
+- **The content replaces the look in one change,** with no fade and nothing in between: a tab's wait ends when its page
+  is drawn, not when its frame is there. The look stays above the page until a Ritemark page says it is drawn (Home, the
+  Task board, a document) or any other page first speaks, so neither a bare sheet nor a page's own "Loading..." shows
+  between the mark and the content.
+- **Where:** the welcome's window before the welcome opens (answer 1); a desk's tab whose page isn't there yet, at a
+  start or opened later (answers 2–4: Home under its tab, a switch, the restored document of a cold start; a tab opened
+  later shows the mark, never the line); the AI column (Sprint 145's mark, now the same look). The left column's places
+  get none: their slot is the ground until the page draws.
+- **W5:** the AI column's slot hands its moment to the AI's view (`_ritemark.loadingLook.since`), so the view's own mark
+  (R5) doesn't start its second again; the host's estimate stands in for an older shell.
+
+### R11: No VS Code progress sign during a start, and VS Code's own lines in ink (PR 3)
+
+As someone starting Ritemark, I want no second sign beside the loading look.
+
+Acceptance criteria (the Experience lead's PR 2 check, 2 November):
+- A place never shows VS Code's progress badge: places carry counts only (answer 6). Ritemark's own views report no
+  progress, and the badge is hidden for VS Code's own views too.
+- No progress line under the tab row while a tab's page isn't there yet, and no progress line across the left column's
+  top (y 33–34) while a Ritemark place's view waits.
+- VS Code's own views that keep a progress line (Documents' tree, Search, File changes, Extensions) draw it in ink: the
+  themes' `progressBar.background` goes from indigo (#4338CA Light, #818CF8 Dark) to each theme's foreground (#1E1B4B,
+  #F8FAFC).
+- R2's last step: a restored terminal's tab has its whole-pixel width (019's join pass) from the first frame, where it
+  grew 0.46 px a frame later in some relaunches; nothing still arriving at the first frame (the row's font, the icon's
+  glyph) changes it afterwards.
+- The status bar's items stay as they are: filed for 2.3 (answer 7).
+
 ## Engineering requirements
 
 ### E1: Each fix has its check, and it fails first
@@ -264,11 +306,17 @@ At most three new hunks in upstream files across 002, 018 and 019, and no upstre
 before and after (`grep -c '^@@'`: 002 88, 018 123, 019 55 on `6d082c96`) and `check-patch-stacking.mjs` (pre-commit
 Check 14) go in `qa-evidence.md`. A design that needs more stops for a decision.
 
+PR 3 has its own budget: at most three new hunks in upstream files, the terminal tab's among them, counted against PR
+2's head, and no upstream file newly touched; Ritemark's own files, the stylesheet and the themes first. A fourth stops
+for a decision.
+
 ### E3: Tier
 
 Shell, by `patches/vscode/002-ritemark-ui-layout.patch`, `018-ritemark-surfaces.patch`, `019-ritemark-tab-row.patch`,
 `branding/product.json` and `scripts/validate-build-output.sh`. R5, R6 and R8 are extension-tier (`webview/src/`,
 `src/`, `scripts/qa/`, `.claude/skills/`). The tier line in the sprint plan changes first if an audit moves a fix.
+PR 3 is shell-tier by 002, 007 (`webviewEditor.ts`), 018 and 019; its theme colours and W5's host side are
+extension-tier files in the same PR.
 
 ### E4: Bundle
 

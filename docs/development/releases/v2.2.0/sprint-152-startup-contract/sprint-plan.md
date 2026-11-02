@@ -5,9 +5,11 @@ version skew; four artifacts, with the scenarios as the four starts in [spec.md]
 requirement is checked in the same four)
 Override with: "use plain full track"
 Branch: `sprint-152-startup-contract`, made from `origin/main` at Phase 3, after approval. PR 2 has its own branch,
-`sprint-152-startup-contract-shell` (*Pull requests* below). This plan was written on `plan/sprint-152-startup-contract`.
+`sprint-152-startup-contract-shell`, and PR 3 its own, `sprint-152-startup-contract-loading`, stacked on PR 2's
+(*Pull requests* below). This plan was written on `plan/sprint-152-startup-contract`.
 Release tier: shell, by `patches/vscode/002-ritemark-ui-layout.patch`, `018-ritemark-surfaces.patch`,
-`019-ritemark-tab-row.patch`, `branding/product.json` and `scripts/validate-build-output.sh` (PR 2). PR 1 is
+`019-ritemark-tab-row.patch`, `branding/product.json` and `scripts/validate-build-output.sh` (PR 2); PR 3 adds
+`007-ritemark-vscode-1117-compat.patch` (`webviewEditor.ts`, which 007 owns). PR 1 is
 extension-tier (`webview/src/`, `src/`, `scripts/qa/`, `.claude/skills/`). 2.2 is a shell release
 ([release-plan.md](../release-plan.md)), so neither adds a release step. If an audit moves a fix into or out of a patch,
 this line changes first.
@@ -85,16 +87,18 @@ start (#593, Sprint 147).
 
 ## Pull requests
 
-Two, so the shell change gets its High review alone and #624 doesn't wait for it.
+Three: the shell change gets its High review alone and #624 doesn't wait for it; the loading look in every slot came
+after the Experience lead's check of PR 2 (2 November) as its own shell PR (the decision log's 0e14391).
 
 | PR | Branch | Holds | Release tier | Review tier |
 | --- | --- | --- | --- | --- |
 | 1 | `sprint-152-startup-contract` | Phase 1's research (A1–A4); the first-frame check (R8); the AI column draws once (R5, #624); R6 by decision 2; this sprint's doc updates (the plan lands first, in its own PR) | extension | Standard (`webview/src/`, `src/`, `scripts/qa/`, `.claude/skills/`); the AI column's start to the Experience lead with screenshots |
 | 2 | `sprint-152-startup-contract-shell` | R1, R2, R3, R4, R7, R9 and E5 | shell | High: `/code-review` at high and `/security-review`; up to three rounds, the third only when the second found something Important (`REVIEW.md`, since #625). Built and checked on a CoW-cloned, patched `vscode/`; the drift check at merge |
+| 3 | `sprint-152-startup-contract-loading`, stacked on PR 2's | R10 (one loading look, for every slot; W5), R11 (no VS Code progress sign during a start, VS Code's own lines in ink, the terminal tab's 0.46 px step) and their docs | shell | High, as PR 2: up to three rounds. At most three new hunks in upstream files (E2). The first-frame check, held starts' captures in Light and Dark (the mark at 1 s, the line at 10 s, Reduce motion), the frame check against PR 2, the dry run and a real apply from the pin |
 
 **Order:** PR 1 first, after approval: it records `main`'s failing set before any shell code, and #624 needs no patch.
 PR 2 after Sprint 146's shell PR (its PR 4) has merged, since both change 018 and 019, and after the Experience lead has
-answered questions 1–4, 6 and 8.
+answered questions 1–4, 6 and 8. PR 3 merges right after PR 2.
 
 **Cut order if the sprint runs long** (the first goes first):
 
@@ -192,6 +196,10 @@ flag, as today.
       (R8).
 - [ ] The settled frame is unchanged: the same pixels in every baseline scene, every `JOINS` ok (R1).
 - [ ] At most three new hunks in upstream files, no upstream file newly touched (E2).
+- [ ] Every slot has the one loading look: the material, the mark after 1 s, at a start's main slot the line after 10 s,
+      the content replacing it in one change; the AI view takes the shell's moment (R10, PR 3).
+- [ ] No VS Code progress badge on a place, no progress line under the tab row or across the left column's top during a
+      start; VS Code's own lines in ink; no step of a restored terminal's tab (R11, PR 3; at most three new hunks).
 
 ## Risks
 

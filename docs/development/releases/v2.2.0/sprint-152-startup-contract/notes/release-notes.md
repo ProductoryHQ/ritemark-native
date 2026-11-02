@@ -6,11 +6,17 @@ Written with the `release-notes` skill, for `docs/releases/v2.2.0/release-notes.
 
 - **Nothing moves while Ritemark starts.** The window opens in its final shape: your places, your project's Home and its tabs are there from the first moment. A new project opens on its Home, and a first start opens on the welcome.
 
+## What you can do (PR 3, the loading look)
+
+- **A quiet sign while Ritemark starts.** When a tab or the welcome takes a moment, a small turning mark shows after a second, and after ten seconds a line says Ritemark is still starting.
+
 ## Smaller changes (PR 2)
 
 - **No more "Git not found" message.** Ritemark no longer asks you to download Git when a folder uses it.
 
 ## Left out, and why
+
+- PR 3's progress lines in ink and the terminal tab's half-pixel: too small to notice on their own. The changelog has them.
 
 - The switch question's fix (#623) has no line: it needs another app's question to stop a switch at once, which none of Ritemark's own do. The changelog has it.
 
