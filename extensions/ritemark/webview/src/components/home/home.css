@@ -129,7 +129,7 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   font: 400 14px/20px var(--ritemark-ui-font-family);
   color: var(--r-ink-muted);
   height: auto;
-  border-radius: 0;
+  border-radius: 6px; /* a field's radius: the keyboard ring follows it (#635 follow-up) */
 }
 .rh-line.empty { font-style: italic; }
 .rh-line:hover { color: var(--r-ink-body); }
