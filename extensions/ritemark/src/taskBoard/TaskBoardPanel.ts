@@ -8,6 +8,7 @@
  */
 
 import * as vscode from 'vscode';
+import { BOARD_TAB_VIEW_TYPE } from '../frameIdentifiers';
 import { boardHtml, connectBoardSurface, type BoardSurfaceConnection, type BoardSurfaceContext } from './boardSurface';
 import type { BoardTab } from './protocol';
 
@@ -16,7 +17,7 @@ const FOCUS_GROUP_COMMANDS = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Si
   .map((nth) => `workbench.action.focus${nth}EditorGroup`);
 
 export class TaskBoardPanel {
-  public static readonly viewType = 'ritemark.taskBoard';
+  public static readonly viewType = BOARD_TAB_VIEW_TYPE; // Sprint 152 (R7): the frame manifest's (frameIdentifiers.ts)
   private static current: TaskBoardPanel | undefined;
   private static onRevive: (() => void) | undefined;
 

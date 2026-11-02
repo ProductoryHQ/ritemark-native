@@ -19,9 +19,9 @@
 
 import * as vscode from 'vscode';
 
-export const HOME_TAB_VIEW_TYPE = 'ritemark.home';
-export const BOARD_TAB_VIEW_TYPE = 'ritemark.taskBoard';
-export const HOME_PLACE_ID = 'workbench.view.extension.ritemark-home';
+// Sprint 152 (R7): the view types and Home's place are the frame manifest's, kept in one module the release check reads
+import { BOARD_TAB_VIEW_TYPE, HOME_PLACE_ID, HOME_TAB_VIEW_TYPE } from '../frameIdentifiers';
+export { BOARD_TAB_VIEW_TYPE, HOME_PLACE_ID, HOME_TAB_VIEW_TYPE };
 export const TASKS_PLACE_ID = 'workbench.view.extension.ritemark-tasks';
 
 export type PermanentKind = 'home' | 'board';

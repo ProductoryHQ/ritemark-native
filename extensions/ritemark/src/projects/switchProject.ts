@@ -38,6 +38,23 @@ export const SWITCHED_NOTE_MS = 2 * 60 * 1000;
  */
 export const LANDING_FILE = 'land-on-home.json';
 
+/**
+ * #623 (Sprint 152, patch 018): the shell's answer to whether the reload it asked about, by its attempt's number, still
+ * goes on. Another participant can stop it while the person reads Ritemark's question; then the answer is no one's to
+ * act on.
+ */
+export const RELOAD_GOES_ON_COMMAND = '_ritemark.projects.reloadGoesOn';
+
+/** Whether the shell's reload `attempt` still goes on. An older shell passes no number, or has no such command: yes, as before. */
+async function reloadGoesOn(attempt: unknown): Promise<boolean> {
+  if (typeof attempt !== 'number') return true;
+  try {
+    return (await vscode.commands.executeCommand<boolean>(RELOAD_GOES_ON_COMMAND, attempt)) !== false;
+  } catch {
+    return true;
+  }
+}
+
 export function switchNoteFile(globalStoragePath: string, name: string): string {
   return path.join(globalStoragePath, 'projects', 'v1', name);
 }
@@ -287,10 +304,11 @@ export class ProjectSwitcher {
    *
    * The answer is this window's vote, not the outcome: another participant may stop the reload before or after it
    * (#623). So the notes wait for the window to go (`hold`). Stopping the chats can't wait: past `deactivate` a turn
-   * can no longer be recorded as the person's stop, only as "Ritemark closed while this turn was running". A late
-   * answer still stops them, until the shell tells the extension whether its answer counted (see #623).
+   * can no longer be recorded as the person's stop, only as "Ritemark closed while this turn was running". So once the
+   * person answers, the shell is asked whether its reload `attempt` still goes on (Sprint 152): when it was stopped
+   * meanwhile, the window stays, and its chats go on working.
    */
-  async beforeReload(target: unknown): Promise<boolean> {
+  async beforeReload(target: unknown, attempt?: unknown): Promise<boolean> {
     const targetUri = typeof target === 'string' ? vscode.Uri.parse(target) : target instanceof vscode.Uri ? target : undefined;
     // switchTo's own reload: the guard is passed its folder (the host service notes it). Another folder is another
     // switch (switchTo's reload was stopped), asked about and held for itself.
@@ -300,6 +318,10 @@ export class ProjectSwitcher {
       this.pending = undefined;
       if (choice === 'new-window') await vscode.commands.executeCommand('vscode.openFolder', targetUri, { forceNewWindow: true });
       return true;
+    }
+    if (choice !== undefined && !(await reloadGoesOn(attempt))) {
+      this.pending = undefined;
+      return false;
     }
     if (choice !== undefined) await this.deps.stopWorkingChats();
     this.hold(targetUri?.toString() ?? null, targetUri ? 'remember' : 'leave');

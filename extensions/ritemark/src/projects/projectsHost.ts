@@ -221,7 +221,7 @@ export function registerProjects(deps: ProjectsHostDependencies): ProjectsHost {
       await projectsView?.focusSearch();
     }),
     // Patch 018's veto: VS Code is about to reload this window for another folder (R9).
-    vscode.commands.registerCommand('_ritemark.projects.beforeReload', (target?: unknown) => switcher.beforeReload(target)),
+    vscode.commands.registerCommand('_ritemark.projects.beforeReload', (target?: unknown, attempt?: unknown) => switcher.beforeReload(target, attempt)),
     // The head's Switch project ▸ (R8): its rows, asked for by patch 018 when the flyout opens.
     vscode.commands.registerCommand('ritemark.projects.switcherItems', async () => {
       const rows = await projectsView!.projectRows();
