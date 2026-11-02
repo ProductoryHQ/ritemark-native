@@ -3,6 +3,7 @@ import { Icon } from '../ui/Icon'
 import type { PropertyType } from './types'
 import { TagsInput } from './TagsInput'
 import { StatusSelect } from './StatusSelect'
+import { Tooltip } from '../ui/tooltip'
 
 interface PropertyRowProps {
   propertyKey: string
@@ -132,13 +133,15 @@ export function PropertyRow({ propertyKey: _propertyKey, label, value, type, onC
         <span className="text-[10px] font-semibold uppercase tracking-[0.4px] text-ink-muted">
           {label}
         </span>
-        <button
-          onClick={onDelete}
-          className="p-0.5 text-ink-faint hover:text-[var(--r-error)] opacity-0 group-hover:opacity-100 transition-opacity"
-          title={`Remove ${label}`}
-        >
-          <Icon name="x" size={12} />
-        </button>
+        <Tooltip label={`Remove ${label}`}>
+          <button
+            onClick={onDelete}
+            className="p-0.5 text-ink-faint hover:text-[var(--r-error)] opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-label={`Remove ${label}`}
+          >
+            <Icon name="x" size={12} />
+          </button>
+        </Tooltip>
       </div>
       <div className="min-w-0">{renderControl()}</div>
     </div>

@@ -196,12 +196,12 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
       case 'pending':
         return <div className="w-5 h-5 rounded-full border-2 border-[var(--r-ink-muted)]" />;
       case 'running':
-        return <Icon name="circle-notch" size={20} className="animate-spin text-[var(--vscode-progressBar-foreground)]" />;
+        return <Icon name="circle-notch" size={20} className="animate-spin text-[var(--r-ink-strong)]" />;
       case 'complete':
         // Sprint 145 (#578): done is ink; green is only the ready dot (`inherit` lets the class colour it)
         return <Icon name="check-circle" size={20} tone="inherit" className="text-[var(--r-ink-strong)]" />;
       case 'error':
-        return <Icon name="x-circle" size={20} className="text-[var(--vscode-testing-iconFailed)]" />;
+        return <Icon name="x-circle" size={20} className="text-[var(--r-error)]" />;
     }
   };
 
@@ -347,9 +347,9 @@ export function ExecutionPanel({ flow, onClose }: ExecutionPanelProps) {
                       <div className="space-y-1.5 max-h-32 overflow-y-auto">
                         {step.progress.map((p, i) => (
                           <div key={i} className="flex items-start gap-2 text-xs">
-                            {p.type === 'init' && <Icon name="terminal" size={12} className="mt-0.5 text-[var(--vscode-terminal-ansiBlue)]" />}
-                            {p.type === 'tool_use' && <Icon name="lightning" size={12} className="mt-0.5 text-[var(--vscode-terminal-ansiYellow)]" />}
-                            {p.type === 'thinking' && <Icon name="star-four" size={12} className="mt-0.5 text-[var(--vscode-terminal-ansiMagenta)]" />}
+                            {p.type === 'init' && <Icon name="terminal" size={12} className="mt-0.5" />}
+                            {p.type === 'tool_use' && <Icon name="lightning" size={12} className="mt-0.5" />}
+                            {p.type === 'thinking' && <Icon name="star-four" size={12} className="mt-0.5" />}
                             {/* Sprint 145 (#578): done in its message's muted ink (the Icon's own tone); green is only the ready dot */}
                             {p.type === 'done' && <Icon name="check-circle" size={12} className="mt-0.5" />}
                             <span className="text-[var(--r-ink-muted)] leading-tight">{p.message}</span>

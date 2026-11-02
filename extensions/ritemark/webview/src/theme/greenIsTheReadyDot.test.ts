@@ -8,9 +8,9 @@
  * green (`color: lime`, `fill="green"`). It fails on any use outside the list below, each with its reason. Not
  * scanned: rgb()/rgba()/hsl() values, and hex values outside Tailwind's green and emerald scales.
  *
- * Also pins a comment's done marks (the marker and the bubble are white in both themes): they take the fixed light
- * inks, and the theme's own tokens stay in charge of everything else there, so the marker's focus ring (drawn on the
- * desk) and the idle dot's ring keep their contrast in Dark (review round 3).
+ * Also pins a comment's marker and card to the theme (Sprint 146, #615; the Experience lead, experience 31): their fill
+ * is the theme's surface, their done marks the theme's inks, and no rule there moves the theme's tokens, so the
+ * marker's focus ring (drawn on the desk) and the idle dot's ring keep their contrast in Dark (#612's review round 3).
  *
  * Run: npx tsx webview/src/theme/greenIsTheReadyDot.test.ts
  */
@@ -72,11 +72,10 @@ assert.deepEqual(found, [], `green outside the ready dot:\n${found.join('\n')}`)
 // Every allowance still matches something, so the list can't hide a stale entry.
 ALLOWED.forEach((entry, index) => assert.ok(used.has(index), `the allowance for ${entry.file} (${entry.why}) matches nothing`))
 
-// ── A comment's done marks (review rounds 1–3) ──
-// The marker and the bubble are white in both themes. Their done marks take the fixed light inks, as their words do
-// (the theme's inks fade on white in Dark). Everything else there keeps the theme's tokens: a light-token block on
-// the two surfaces (round 2) moved the marker's focus ring, which is drawn on the desk, to a dark indigo on Dark's
-// dark desk, and faded the idle dot's ring.
+// ── A comment's marker and card (#612's review rounds 1–3; Sprint 146, #615) ──
+// The marker and the bubble follow the theme, as every floating sheet does: the theme's surface, and the theme's inks
+// for their words and done marks. No block of light values: on #612 a light-token block on the two surfaces moved the
+// marker's focus ring, which is drawn on the desk, to a dark indigo on Dark's dark desk, and faded the idle dot's ring.
 const css = readFileSync(join(root, 'index.css'), 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '')
 /** Splits at the commas and combinators that are not inside parentheses or brackets. */
 function topLevel(text: string, at: (char: string) => boolean): string[] {
@@ -98,10 +97,10 @@ const hasClass = (compound: string, name: string) => new RegExp(`\\.${name}(?![\
 const styling = (name: string, also?: RegExp) => rules.filter((rule) => rule.subjects.some((compound) => hasClass(compound, name) && (!also || also.test(compound))))
 
 for (const surface of ['rm-marker', 'rm-bubble']) {
-  // Every rule that paints the surface itself (a dark-scoped, compound or pseudo-element one included) keeps it white
+  // Every rule that paints the surface itself (a dark-scoped, compound or pseudo-element one included) takes the theme's
   const painting = styling(surface).filter((rule) => /(?:^|[;\s])background(?:-color)?\s*:/.test(rule.body))
   assert.ok(painting.length >= 1, `.${surface} has its background rule`)
-  for (const rule of painting) assert.match(rule.body, /background(?:-color)?\s*:\s*var\(--ritemark-surface, #fff\)/, `.${surface} stays white in both themes (if it follows the theme, revisit the done inks below)`)
+  for (const rule of painting) assert.match(rule.body, /background(?:-color)?\s*:\s*var\(--r-surface\)/, `.${surface} is the theme's surface (#615)`)
   // No rule moves the theme's tokens on the surface: the focus ring and the idle ring take them as the theme has them
   for (const rule of styling(surface)) assert.doesNotMatch(rule.body, /(?:^|[;\s])--r-[\w-]+\s*:/, `.${surface} leaves the theme's tokens alone`)
 }
@@ -109,19 +108,19 @@ assert.ok(styling('rm-marker', /:focus-visible/).every((rule) => /outline:[^;]*v
 assert.ok(styling('rm-task-dot--idle').some((rule) => /var\(--r-ink-faint\b/.test(rule.body)), "the idle dot's ring is the theme's faint ink")
 
 const fixed: Array<[string, RegExp | undefined, RegExp]> = [
-  ['rm-task-dot--success', undefined, /^\s*background:\s*var\(--ritemark-ink-muted, #617187\);\s*$/], // muted, filled (the Experience lead, 486c2da)
-  ['rm-task-status--success', undefined, /^\s*color:\s*var\(--ritemark-ink-strong, #1e1b4b\);\s*$/],
-  ['rm-bubble-done', /:hover/, /^\s*color:\s*var\(--ritemark-ink-strong, #1e1b4b\);\s*background:\s*var\(--ritemark-surface-soft, #f1f5f9\);\s*$/],
+  ['rm-task-dot--success', undefined, /^\s*background:\s*var\(--r-ink-muted\);\s*$/], // muted, filled (the Experience lead, 486c2da)
+  ['rm-task-status--success', undefined, /^\s*color:\s*var\(--r-ink-strong\);\s*$/],
+  ['rm-bubble-done', /:hover/, /^\s*color:\s*var\(--r-ink-strong\);\s*background:\s*var\(--r-surface-soft\);\s*$/],
 ]
 for (const [name, also, body] of fixed) {
   const done = styling(name, also)
   assert.ok(done.length >= 1, `.${name} is styled`)
-  for (const rule of done) assert.match(rule.body, body, `.${name}${also ? ' ' + also.source : ''} takes the fixed light ink`)
+  for (const rule of done) assert.match(rule.body, body, `.${name}${also ? ' ' + also.source : ''} takes the theme's ink`)
 }
-// The fixed inks can't be moved by a theme: each is declared once, in :root
-for (const token of ['--ritemark-ink-strong', '--ritemark-ink-muted', '--ritemark-surface', '--ritemark-surface-soft']) {
-  const declaring = rules.filter((rule) => new RegExp(`(?:^|[;\\s])${token}\\s*:`).test(rule.body))
-  assert.deepEqual(declaring.map((rule) => rule.subjects.join(', ')), [':root'], `${token} is declared only in :root`)
-}
+// Nothing on the marker or the card keeps a fixed light colour (a `--ritemark-…` colour, which no theme moves)
+const onCard = /^rm-(?:marker|bubble|task|agent-badge|agent-pill|mention|compose)/
+const fixedOnCard = rules.filter((rule) => rule.subjects.some((compound) => [...compound.matchAll(/\.([\w-]+)/g)].some(([, name]) => onCard.test(name)))
+  && /var\(--ritemark-(?!ui-font-family|editor-font-family)[\w-]+/.test(rule.body))
+assert.deepEqual(fixedOnCard.map((rule) => rule.subjects.join(', ')), [], "the comment's marker and card take only the theme's tokens (#615)")
 
-console.log(`greenIsTheReadyDot: green only as the ready dot (${ALLOWED.length} allowances, each with its reason); a comment's done marks keep their light ink`)
+console.log(`greenIsTheReadyDot: green only as the ready dot (${ALLOWED.length} allowances, each with its reason); a comment's marker and card follow the theme`)

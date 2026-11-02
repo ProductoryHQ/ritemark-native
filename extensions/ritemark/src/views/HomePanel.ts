@@ -11,6 +11,7 @@ import { promises as fsp } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { HOME_TAB_ICON_DARK, HOME_TAB_ICON_LIGHT, HOME_TAB_TITLE, HOME_TAB_VIEW_TYPE } from '../frameIdentifiers';
 import type { BoardController } from '../taskBoard/BoardController';
 import type { BoardSnapshot } from '../taskBoard/protocol';
 import { isPointerOnly } from '../projects/aboutFile';
@@ -18,6 +19,7 @@ import { recentItems, RECENT_EXTENSIONS, othersOf, showWhatMoved, switchNoteEnds
 import { projectInitials, readProject, setProjectCover, setProjectLine, nodeProjectFileFs } from '../projects/projectFile';
 import type { ProjectList } from '../projects/ProjectList';
 import { decodeHomeRequest, type HomeRequest, type HomeState } from '../projects/protocol';
+import { isShellPageSignal } from '../shellPageSignals';
 import { ProjectSwitcher, type SwitchedFrom } from '../projects/switchProject';
 import type { ProjectWaiting, WaitingReader } from '../projects/waiting';
 import { UPDATED_FROM_1X_KEY } from '../welcome/updateDetection';
@@ -26,7 +28,7 @@ import type { GuidanceHost, HomeGuidanceInput } from '../guidance/GuidanceHost';
 import { normalizeProjectUri } from '../conversations/projectScope';
 import { pickerFolder } from '../utils/dialogDefaults';
 
-export const HOME_VIEW_TYPE = 'ritemark.home';
+export const HOME_VIEW_TYPE = HOME_TAB_VIEW_TYPE; // Sprint 152 (R7): the frame manifest's (frameIdentifiers.ts)
 export const WHAT_MOVED_SEEN_KEY = 'ritemark.whatMovedSeen';
 /** product.json's defaultChatAgent.chatExtensionId; More shows Copilot Chat only while it is installed and enabled. */
 const COPILOT_CHAT_EXTENSION_ID = 'GitHub.copilot-chat';
@@ -151,7 +153,7 @@ export class HomeHost implements vscode.Disposable {
     }
     const panel = vscode.window.createWebviewPanel(
       HOME_VIEW_TYPE,
-      'Home',
+      HOME_TAB_TITLE,
       { viewColumn: options.viewColumn ?? vscode.ViewColumn.One, preserveFocus: options.preserveFocus ?? false },
       { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: this.resourceRoots() },
     );
@@ -191,12 +193,13 @@ export class HomeHost implements vscode.Disposable {
     this.panel = panel;
     this.ready = false;
     panel.iconPath = {
-      light: vscode.Uri.joinPath(this.deps.context.extensionUri, 'media', 'home', 'home-tab-light.svg'),
-      dark: vscode.Uri.joinPath(this.deps.context.extensionUri, 'media', 'home', 'home-tab-dark.svg'),
+      light: vscode.Uri.joinPath(this.deps.context.extensionUri, HOME_TAB_ICON_LIGHT),
+      dark: vscode.Uri.joinPath(this.deps.context.extensionUri, HOME_TAB_ICON_DARK),
     };
     panel.webview.html = homeHtml(panel.webview, this.deps.context.extensionUri);
     const subscriptions: vscode.Disposable[] = [
       panel.webview.onDidReceiveMessage((raw) => {
+        if (isShellPageSignal(raw)) return; // the shell's, not Home's (Sprint 152, PR 3)
         const decoded = decodeHomeRequest(raw);
         if (!decoded.ok) {
           console.warn('[Home] Refused a request:', decoded.reason);

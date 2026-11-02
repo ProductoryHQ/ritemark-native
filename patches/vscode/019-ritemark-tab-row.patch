@@ -70,6 +70,21 @@ Test: test/browser/parts/editor/ritemarkTabMenu.test.ts (with ./scripts/test.sh 
 check that these six command IDs, from five other components, still exist: the five left out (chat's, the Copilot
 extension's, the Markdown extension's two, the TypeScript extension's) and revealInExplorer (contrib/files), which Show
 in Documents renames. Reopen Editor With… is named by the imported REOPEN_WITH_COMMAND_ID.
+
+Sprint 152 (the startup contract, R1, R2; A1): the permanent tabs' view types are 002's manifest's (editorGroupView.ts).
+Restored terminals wait for the desk's front slot: the minute is the slot's release, logged. A restored terminal's tab
+is named once, from the first frame: it was nameless until its process reconnected (2.3 s on a Mac), then the shell's
+own name ("bash") for about 60 ms, then its saved name. The saved name is given as the instance is made, before its
+editor (ritemarkTerminalTabs.ts, RitemarkRestoredTerminalNames); once reconnected, VS Code sets it again with its
+saved source.
+
+Sprint 152, PR 3: a restored terminal's tab grew 0.46 px a frame after the first frame, when its whole-pixel width
+(2.1.0's join pass) came a frame late. Until a desk has restored, its tab row is laid out at the end of the task that
+changed it, before the window paints, not at the next animation frame (multiEditorTabsControl.ts, ritemarkScheduleLayout;
+after the restore, upstream's buffering). Measuring that early met the row's font still loading (font-display is swap):
+002's ritemarkFrame.ts now starts it as the window starts, and a pass that still measured the fallback measures again on
+the loading face's own promise, in the task the face becomes usable (ritemarkMeasureWhenFontIsThere). The terminal
+icon's box is pinned to its settled size while its glyph and icon font arrive (ritemarkSurfaces.css, 018).
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index ac63294495c..8717025e650 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.ts
@@ -112,7 +127,7 @@ index da9871eaee6..c77789297d7 100644
  		}
  	}
 diff --git a/src/vs/workbench/browser/parts/editor/editorGroupView.ts b/src/vs/workbench/browser/parts/editor/editorGroupView.ts
-index 57087fd2e20..0594ce6ed7b 100644
+index 57087fd2e20..077a9977fda 100644
 --- a/src/vs/workbench/browser/parts/editor/editorGroupView.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorGroupView.ts
 @@ -18,7 +18,7 @@ import { ProgressBar } from '../../../../base/browser/ui/progressbar/progressbar
@@ -124,20 +139,21 @@ index 57087fd2e20..0594ce6ed7b 100644
  import { EditorPanes } from './editorPanes.js';
  import { IEditorProgressService } from '../../../../platform/progress/common/progress.js';
  import { EditorProgressIndicator } from '../../../services/progress/browser/progressIndicator.js';
-@@ -61,6 +61,12 @@ import { IHostService } from '../../../services/host/browser/host.js';
+@@ -60,6 +60,13 @@ import { IEditorResolverService } from '../../../services/editor/common/editorRe
+ import { IHostService } from '../../../services/host/browser/host.js';
  import { DiffEditorInput } from '../../../common/editor/diffEditorInput.js';
  import { FileSystemProviderCapabilities, IFileService } from '../../../../platform/files/common/files.js';
- 
-+/** Ritemark 2.0: the view types of the extension's Home and Task board tabs (see `isRitemarkPermanent`). */
-+const RITEMARK_PERMANENT_VIEW_TYPES: readonly string[] = ['mainThreadWebview-ritemark.home', 'mainThreadWebview-ritemark.taskBoard'];
++import { ritemarkFrame } from '../../ritemarkFrame.js';
++
++/** Ritemark 2.0: the view types of the extension's Home and Task board tabs (see `isRitemarkPermanent`), from the frame's manifest (Sprint 152, R1). */
++const RITEMARK_PERMANENT_VIEW_TYPES: readonly string[] = ritemarkFrame.permanentTabs.map(tab => tab.viewType);
 +
 +/** Ritemark 2.0: the ground between two desks, and between a desk and the window's edge. */
 +const RITEMARK_DESK_GAP = 8;
-+
+ 
  export class EditorGroupView extends Themable implements IEditorGroupView {
  
- 	//#region factory
-@@ -205,7 +211,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -205,7 +212,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  			this.createContainerContextMenu();
  
  			// Watermark & shortcuts
@@ -146,7 +162,7 @@ index 57087fd2e20..0594ce6ed7b 100644
  
  			// Progress bar
  			this.progressBar = this._register(new ProgressBar(this.element, defaultProgressBarStyles));
-@@ -1147,6 +1153,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1147,6 +1154,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doStickEditor(candidate: EditorInput | undefined, sticky: boolean): void {
@@ -157,7 +173,7 @@ index 57087fd2e20..0594ce6ed7b 100644
  		if (candidate && this.model.isSticky(candidate) !== sticky) {
  			const oldIndexOfEditor = this.getIndexOfEditor(candidate);
  
-@@ -1199,17 +1209,20 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1199,17 +1210,20 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  		// Fire the event letting everyone know we are about to open an editor
  		this._onWillOpenEditor.fire({ editor, groupId: this.id });
  
@@ -182,7 +198,7 @@ index 57087fd2e20..0594ce6ed7b 100644
  			transient: !!options?.transient,
  			inactiveSelection: internalOptions?.inactiveSelection,
  			active: this.count === 0 || !options?.inactive,
-@@ -1425,6 +1438,11 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1425,6 +1439,11 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  			return true;
  		}
  
@@ -194,7 +210,7 @@ index 57087fd2e20..0594ce6ed7b 100644
  		// Move across groups
  		else {
  			return this.doMoveOrCopyEditorAcrossGroups(editor, target, options, { ...internalOptions, keepCopy: false });
-@@ -1432,11 +1450,19 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1432,11 +1451,19 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doMoveEditorInsideGroup(candidate: EditorInput, options?: IEditorOpenOptions): void {
@@ -215,7 +231,7 @@ index 57087fd2e20..0594ce6ed7b 100644
  		// Update model and make sure to continue to use the editor we get from
  		// the model. It is possible that the editor was already opened and we
  		// want to ensure that we use the existing instance in that case.
-@@ -1556,9 +1582,38 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1556,9 +1583,38 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	//#region closeEditor()
  
  	async closeEditor(editor: EditorInput | undefined = this.activeEditor || undefined, options?: ICloseEditorOptions): Promise<boolean> {
@@ -254,7 +270,7 @@ index 57087fd2e20..0594ce6ed7b 100644
  	private async doCloseEditorWithConfirmationHandling(editor: EditorInput | undefined = this.activeEditor || undefined, options?: ICloseEditorOptions, internalOptions?: IInternalEditorCloseOptions): Promise<boolean> {
  		if (!editor) {
  			return false;
-@@ -1921,6 +1976,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1921,6 +1977,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doGetEditorsToClose(args: EditorInput[] | ICloseEditorsFilter): EditorInput[] {
@@ -265,7 +281,7 @@ index 57087fd2e20..0594ce6ed7b 100644
  		if (Array.isArray(args)) {
  			return args;
  		}
-@@ -2015,7 +2074,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -2015,7 +2075,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doCloseAllEditors(options?: ICloseAllEditorsOptions): void {
@@ -274,7 +290,7 @@ index 57087fd2e20..0594ce6ed7b 100644
  		if (options?.excludeConfirming) {
  			editors = editors.filter(editor => !this.shouldConfirmClose(editor));
  		}
-@@ -2233,6 +2292,22 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -2233,6 +2293,22 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  		this.lastLayout = { width, height, top, left };
  		this.element.classList.toggle('max-height-478px', height <= 478);
  
@@ -297,7 +313,7 @@ index 57087fd2e20..0594ce6ed7b 100644
  		const contentWidth = Math.max(0, width - this._contentRightInset);
  
  		// Keep tabs full-width while the header and editor pane follow the content inset.
-@@ -2265,6 +2340,27 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -2265,6 +2341,27 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  		this.relayout();
  	}
  
@@ -420,7 +436,7 @@ index 1c06de9c41f..dc62ce76eaf 100644
  			return {
  				markdown: new MarkdownString('', { supportThemeIcons: true, isTrusted: true }).
 diff --git a/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts b/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
-index 2ab980e4786..3281dc1b7ff 100644
+index 2ab980e4786..1bc0be87b83 100644
 --- a/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
 +++ b/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
 @@ -45,7 +45,7 @@ import { IPathService } from '../../../services/path/common/pathService.js';
@@ -455,21 +471,24 @@ index 2ab980e4786..3281dc1b7ff 100644
  export class MultiEditorTabsControl extends EditorTabsControl {
  
  	private static readonly SCROLLBAR_SIZES = {
-@@ -110,6 +119,8 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -110,6 +119,10 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  	private titleContainer: HTMLElement | undefined;
  	private tabsAndActionsContainer: HTMLElement | undefined;
  	private stickyTabsBackground: HTMLElement | undefined;
 +	private ritemarkFoldedTabs: RitemarkFoldedTabs | undefined;
 +	private ritemarkActivityService: IActivityService | undefined;
++	private ritemarkRestored = false;
++	private ritemarkFontLoading = false;
  	private tabsContainer: HTMLElement | undefined;
  	private tabsScrollbar: ScrollableElement | undefined;
  	private connectedTabOverflowEdge: HTMLElement | undefined;
-@@ -291,6 +302,18 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -291,6 +304,19 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  		if (this.menuIds?.tabsBarAddTab) {
  			this.addTabContainer = this.createAddTabControl(this.tabsContainer, this.menuIds.tabsBarAddTab);
  		}
 +		// Ritemark 2.0: tabs that do not fit fold into "N ⌄" before the +, which asks what kind of new tab
 +		this.ritemarkFoldedTabs = this._register(this.instantiationService.createInstance(RitemarkFoldedTabs, this.tabsAndActionsContainer, this.groupView));
++		Promise.resolve(this.groupView.whenRestored).then(() => this.ritemarkRestored = true); // Sprint 152, PR 3: see ritemarkScheduleLayout
 +		// Ritemark 2.0 (Sprint 134, R6): the Tasks tab carries the Tasks place's count, redrawn when it changes
 +		this.ritemarkActivityService = this.instantiationService.invokeFunction(accessor => accessor.get(IActivityService)) as IActivityService | undefined;
 +		if (this.ritemarkActivityService) { // absent in some test workbenches
@@ -483,7 +502,7 @@ index 2ab980e4786..3281dc1b7ff 100644
  
  		// Create Editor Toolbar
  		this.createEditorActionsToolBar(this.tabsAndActionsContainer, ['editor-actions']);
-@@ -1833,8 +1856,12 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -1833,8 +1859,12 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  			description = tabLabel.description || '';
  		}
  
@@ -497,7 +516,7 @@ index 2ab980e4786..3281dc1b7ff 100644
  			// Set aria-description to empty string so that screen readers would not read the title as well
  			// More details https://github.com/microsoft/vscode/issues/95378
  			tabContainer.setAttribute('aria-description', '');
-@@ -1845,7 +1872,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -1845,7 +1875,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  		tabLabelWidget.setResource(
  			{ name, description, resource: EditorResourceAccessor.getOriginalUri(editor, { supportSideBySide: SideBySideEditor.BOTH }) },
  			{
@@ -506,7 +525,7 @@ index 2ab980e4786..3281dc1b7ff 100644
  				extraClasses: coalesce(['tab-label', fileDecorationBadges ? 'tab-label-has-badge' : undefined].concat(editor.getLabelExtraClasses())),
  				italic: !this.tabsModel.isPinned(editor),
  				forceLabel,
-@@ -1856,6 +1883,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -1856,6 +1886,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  				icon: editor.getIcon(),
  				hideIcon: options.showIcons === false,
  				namePrefix,
@@ -514,7 +533,7 @@ index 2ab980e4786..3281dc1b7ff 100644
  			}
  		);
  
-@@ -2005,12 +2033,91 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -2005,12 +2036,143 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  		) {
  			height = this.tabsAndActionsContainer.offsetHeight;
  		} else {
@@ -555,6 +574,7 @@ index 2ab980e4786..3281dc1b7ff 100644
 +			return grid ? Math.round(width * grid) / grid : width;
 +		});
 +		tabsContainer.classList.remove('ritemark-measuring');
++		this.ritemarkMeasureWhenFontIsThere(tabs[0]);
 +
 +		const editors = this.tabsModel.getEditors(EditorsOrder.SEQUENTIAL);
 +		const active = this.tabsModel.activeEditor;
@@ -604,10 +624,70 @@ index 2ab980e4786..3281dc1b7ff 100644
 +		folded.update(foldedEditors);
 +	}
 +
++	/**
++	 * Ritemark 2.0 (Sprint 152, PR 3): measured while the row's own font is loading (font-display is swap, and a start
++	 * measures early: the measuring itself starts the load), the widths are the fallback's. The row is measured again on
++	 * the loading face's own promise, which settles in the task the face becomes usable, before anything else runs or is
++	 * painted, so no frame holds a fallback's width with the font's names in it.
++	 */
++	private ritemarkMeasureWhenFontIsThere(tab: HTMLElement | undefined): void {
++		if (!tab || this.ritemarkFontLoading) {
++			return;
++		}
++		const targetWindow = getWindow(tab);
++		const unquote = (family: string) => family.trim().replace(/^["']|["']$/g, '');
++		const family = unquote(targetWindow.getComputedStyle(tab).fontFamily.split(',')[0] ?? '');
++		const loading: Promise<FontFace>[] = [];
++		targetWindow.document.fonts.forEach(face => {
++			if (face.status === 'loading' && unquote(face.family) === family) {
++				loading.push(face.loaded);
++			}
++		});
++		if (!loading.length) {
++			return;
++		}
++		this.ritemarkFontLoading = true;
++		const measureAgain = () => {
++			this.ritemarkFontLoading = false;
++			if (!this._store.isDisposed) {
++				this.doLayout(this.dimensions, this.layoutScheduler.value?.options);
++			}
++		};
++		Promise.all(loading).then(measureAgain, measureAgain);
++	}
++
++	/**
++	 * Ritemark 2.0 (Sprint 152, PR 3): until its group has restored, the tab row is laid out at the end of the task that
++	 * changed it, before the window paints, not at the next animation frame: a start's tabs then have their whole-pixel
++	 * widths (the pass above) in the first frame, where a restored terminal's tab grew 0.46 px a frame after it. Once
++	 * restored, upstream's buffering to the next animation frame.
++	 */
++	private ritemarkScheduleLayout(targetWindow: Window, runner: () => void): IDisposable {
++		if (this.ritemarkRestored) {
++			return scheduleAtNextAnimationFrame(targetWindow, runner);
++		}
++		let cancelled = false;
++		queueMicrotask(() => {
++			if (!cancelled) {
++				runner();
++			}
++		});
++		return toDisposable(() => cancelled = true);
++	}
++
  	layout(dimensions: IEditorTitleControlDimensions, options?: IMultiEditorTabsControlLayoutOptions): Dimension {
  
  		// Remember dimensions that we get
-@@ -2335,6 +2442,8 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -2024,7 +2186,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+ 				// this a little bit we try at least to schedule this work on the next animation frame
+ 				// when we have restored or when idle otherwise.
+ 
+-				const disposable = scheduleAtNextAnimationFrame(getWindow(this.parent), () => {
++				const disposable = this.ritemarkScheduleLayout(getWindow(this.parent), () => {
+ 					this.doLayout(this.dimensions, this.layoutScheduler.value?.options /* ensure to pick up latest options */);
+ 
+ 					this.layoutScheduler.clear();
+@@ -2335,6 +2497,8 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  	private doLayoutTabsNonWrapping(options?: IMultiEditorTabsControlLayoutOptions): void {
  		const [tabsContainer, tabsScrollbar] = assertReturnsAllDefined(this.tabsContainer, this.tabsScrollbar);
  
@@ -616,7 +696,7 @@ index 2ab980e4786..3281dc1b7ff 100644
  		//
  		// Synopsis
  		// - allTabsWidth:   			sum of all tab widths
-@@ -2370,6 +2479,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -2370,6 +2534,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  				}
  				stickyTabsWidth += this.connectedTabLabels && stickyTabWidth > 0 && tab ? tab.offsetWidth : stickyTabWidth;
  			}
@@ -624,7 +704,7 @@ index 2ab980e4786..3281dc1b7ff 100644
  		}
  
  		const activeTabAndIndex = this.tabsModel.activeEditor ? this.getTabAndIndex(this.tabsModel.activeEditor) : undefined;
-@@ -2565,7 +2675,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -2565,7 +2730,7 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  	}
  
  	private get visible(): boolean {
@@ -1401,10 +1481,10 @@ index 00000000000..1699503e2b0
 +}
 diff --git a/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalTabs.ts b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalTabs.ts
 new file mode 100644
-index 00000000000..58f426a7c1b
+index 00000000000..6617ccfea4a
 --- /dev/null
 +++ b/src/vs/workbench/contrib/terminal/browser/ritemarkTerminalTabs.ts
-@@ -0,0 +1,178 @@
+@@ -0,0 +1,211 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1434,16 +1514,19 @@ index 00000000000..58f426a7c1b
 +import { TerminalCapability } from '../../../../platform/terminal/common/capabilities/capabilities.js';
 +import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 +import { IEditorService } from '../../../services/editor/common/editorService.js';
-+import { ITerminalGroupService, ITerminalInstance, ITerminalService } from './terminal.js';
++import { ITerminalGroupService, ITerminalInstance, ITerminalInstanceService, ITerminalService } from './terminal.js';
++import { ILogService } from '../../../../platform/log/common/log.js';
++import { TitleEventSource } from '../../../../platform/terminal/common/terminal.js';
++import { RITEMARK_SLOT_RELEASE_MS, ritemarkSlotReleased } from '../../../browser/ritemarkFrame.js';
 +
 +const RITEMARK_TERMINAL_NAME = 'Terminal';
 +
 +/**
-+ * Sprint 145 (#501): how long terminals restored onto an empty desk wait for a document before they open anyway. A
-+ * minute is also how long VS Code waits for the extension host to start before it gives up, after which no document
-+ * from the extension comes.
++ * Sprint 145 (#501): how long terminals restored onto an empty desk wait for a document before they open anyway: the
++ * desk's front slot's release (Sprint 152, R2; ritemarkFrame.ts). A minute is also how long VS Code waits for the
++ * extension host to start before it gives up, after which no document from the extension comes.
 + */
-+export const RITEMARK_RESTORED_TERMINALS_WAIT_MS = 60_000;
++export const RITEMARK_RESTORED_TERMINALS_WAIT_MS = RITEMARK_SLOT_RELEASE_MS;
 +
 +const running = new Set<number>();
 +const onDidChangeRunning = new Emitter<ITerminalInstance>();
@@ -1507,6 +1590,7 @@ index 00000000000..58f426a7c1b
 +		@ITerminalService terminalService: ITerminalService,
 +		@ITerminalGroupService private readonly terminalGroupService: ITerminalGroupService,
 +		@IEditorService private readonly editorService: IEditorService,
++		@ILogService private readonly logService: ILogService,
 +	) {
 +		super();
 +
@@ -1577,12 +1661,41 @@ index 00000000000..58f426a7c1b
 +				release();
 +			}
 +		}));
-+		store.add(disposableTimeout(release, RITEMARK_RESTORED_TERMINALS_WAIT_MS));
++		store.add(disposableTimeout(() => {
++			ritemarkSlotReleased(this.logService, 'the desk\'s front (restored terminals)', 'no document came');
++			release();
++		}, RITEMARK_RESTORED_TERMINALS_WAIT_MS));
 +		this.waitForDocument.value = store;
 +	}
 +}
 +
 +registerWorkbenchContribution2(RitemarkTerminalTabs.ID, RitemarkTerminalTabs, WorkbenchPhase.AfterRestored);
++
++/**
++ * Sprint 152 (A1): a restored terminal's tab is named once, from the first frame. Its instance has no title until it
++ * reconnects to its process (2.3 s on a Mac, longer on a cold Windows start), so the tab was nameless, then the
++ * shell's own name ("bash") for about 60 ms, then its saved name, each a different width. A saved name that was given
++ * to the terminal (Ritemark's "Terminal 2", a person's rename, an extension's name: source Api) comes with the restore:
++ * given again as the instance is made, before its editor, the tab draws it at once and the shell's name can't replace
++ * it (`TerminalInstance._setTitle`); once reconnected, VS Code sets it again, as before. A title the process set is left
++ * to VS Code, so it keeps following the process.
++ */
++export class RitemarkRestoredTerminalNames extends Disposable implements IWorkbenchContribution {
++
++	static readonly ID = 'workbench.contrib.ritemarkRestoredTerminalNames';
++
++	constructor(@ITerminalInstanceService terminalInstanceService: ITerminalInstanceService) {
++		super();
++		this._register(terminalInstanceService.onDidCreateInstance(instance => {
++			const saved = instance.shellLaunchConfig.attachPersistentProcess;
++			if (saved?.title && saved.titleSource === TitleEventSource.Api && !instance.title) {
++				void instance.rename(saved.title);
++			}
++		}));
++	}
++}
++
++registerWorkbenchContribution2(RitemarkRestoredTerminalNames.ID, RitemarkRestoredTerminalNames, WorkbenchPhase.BlockStartup);
 diff --git a/src/vs/workbench/contrib/terminal/browser/terminalEditor.ts b/src/vs/workbench/contrib/terminal/browser/terminalEditor.ts
 index 8b40d469375..42065eef04e 100644
 --- a/src/vs/workbench/contrib/terminal/browser/terminalEditor.ts
@@ -1770,10 +1883,10 @@ index 576424a1298..be57eb737ff 100644
  			command: {
 diff --git a/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts b/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts
 new file mode 100644
-index 00000000000..a1729227f9d
+index 00000000000..b08b1e20a80
 --- /dev/null
 +++ b/src/vs/workbench/contrib/terminal/test/browser/ritemarkTerminalTabs.test.ts
-@@ -0,0 +1,171 @@
+@@ -0,0 +1,196 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1787,11 +1900,13 @@ index 00000000000..a1729227f9d
 +import { upcastPartial } from '../../../../../base/test/common/mock.js';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
 +import { runWithFakedTimers } from '../../../../../base/test/common/virtualScheduling/runWithFakedTimers.js';
-+import { IShellLaunchConfig } from '../../../../../platform/terminal/common/terminal.js';
++import { IShellLaunchConfig, TitleEventSource } from '../../../../../platform/terminal/common/terminal.js';
 +import { EditorInput } from '../../../../common/editor/editorInput.js';
 +import { IEditorService } from '../../../../services/editor/common/editorService.js';
-+import { ITerminalGroupService, ITerminalInstance, ITerminalService } from '../../browser/terminal.js';
-+import { RITEMARK_RESTORED_TERMINALS_WAIT_MS, ritemarkNextTerminalName, RitemarkTerminalTabs } from '../../browser/ritemarkTerminalTabs.js';
++import { ITerminalGroupService, ITerminalInstance, ITerminalInstanceService, ITerminalService } from '../../browser/terminal.js';
++import { RITEMARK_RESTORED_TERMINALS_WAIT_MS, ritemarkNextTerminalName, RitemarkRestoredTerminalNames, RitemarkTerminalTabs } from '../../browser/ritemarkTerminalTabs.js';
++import { resetRitemarkSlotReleasesForTesting } from '../../../../browser/ritemarkFrame.js';
++import { ILogService, NullLogService } from '../../../../../platform/log/common/log.js';
 +
 +interface IOpened { resource: string; inactive: boolean; preserveFocus: boolean }
 +
@@ -1799,7 +1914,8 @@ index 00000000000..a1729227f9d
 + * Ritemark 2.0 (Sprint 132, R8): a terminal is a tab. Terminals that land in the panel move onto the desk, behind
 + * the open document at start and in front later; hidden ones stay where they are. Plain new terminals are named
 + * "Terminal", "Terminal 2", ...; a terminal with a name of its own keeps it. Sprint 145 (#501): terminals that come
-+ * back onto an empty desk wait for its first document, or a minute, and then open behind it.
++ * back onto an empty desk wait for its first document, or a minute, and then open behind it. Sprint 152: the minute is
++ * the desk's front slot's release, logged; a restored terminal's tab has its saved name from the first frame.
 + */
 +suite('Ritemark terminal tabs', () => {
 +
@@ -1822,7 +1938,7 @@ index 00000000000..a1729227f9d
 +		return upcastPartial<EditorInput>({ resource });
 +	}
 +
-+	function setUp(panel: ITerminalInstance[], { deskEmpty = false } = {}) {
++	function setUp(panel: ITerminalInstance[], { deskEmpty = false, logService = new NullLogService() as ILogService } = {}) {
 +		const onDidCreateInstance = disposables.add(new Emitter<ITerminalInstance>());
 +		const onDidActiveEditorChange = disposables.add(new Emitter<void>());
 +		let active: EditorInput | undefined = deskEmpty ? undefined : editor(URI.file('/project/Plan.md'));
@@ -1850,7 +1966,7 @@ index 00000000000..a1729227f9d
 +				return undefined;
 +			}) as unknown as IEditorService['openEditor'],
 +		});
-+		disposables.add(new RitemarkTerminalTabs(terminalService, terminalGroupService, editorService));
++		disposables.add(new RitemarkTerminalTabs(terminalService, terminalGroupService, editorService, logService));
 +		const create = (instance: ITerminalInstance) => {
 +			all.push(instance);
 +			onDidCreateInstance.fire(instance);
@@ -1905,8 +2021,11 @@ index 00000000000..a1729227f9d
 +	});
 +
 +	test('#501: with no document within the wait, restored terminals open anyway; one closed meanwhile does not', () => runWithFakedTimers({}, async () => {
++		resetRitemarkSlotReleasesForTesting();
 +		const kept = terminal(1);
-+		const { connect, opened, panel } = setUp([kept, terminal(2)], { deskEmpty: true });
++		const logged: string[] = [];
++		const logService = new class extends NullLogService { override warn(message: string) { logged.push(message); } }();
++		const { connect, opened, panel } = setUp([kept, terminal(2)], { deskEmpty: true, logService });
 +
 +		connect();
 +		await timeout(0);
@@ -1915,9 +2034,10 @@ index 00000000000..a1729227f9d
 +		const beforeTheMinute = opened.splice(0);
 +		await timeout(2);
 +
-+		assert.deepStrictEqual({ beforeTheMinute, after: opened }, {
++		assert.deepStrictEqual({ beforeTheMinute, after: opened, logged }, {
 +			beforeTheMinute: [],
 +			after: [{ resource: '/1', inactive: true, preserveFocus: true }],
++			logged: ['[ritemark] slot released: the desk\'s front (restored terminals) (no document came)'],
 +		});
 +	}));
 +
@@ -1932,6 +2052,24 @@ index 00000000000..a1729227f9d
 +		[first, second, codex, task, revived].forEach(create);
 +
 +		assert.deepStrictEqual([first, second, codex, task, revived].map(instance => instance.title), ['Terminal', 'Terminal 2', 'Install Codex', 'zsh', 'zsh']);
++	});
++
++	test('Sprint 152: a restored terminal has the name it was given as it is made, before its tab draws; a process\'s title and a new one are left as they were', () => {
++		const onDidCreateInstance = disposables.add(new Emitter<ITerminalInstance>());
++		disposables.add(new RitemarkRestoredTerminalNames(upcastPartial<ITerminalInstanceService>({ onDidCreateInstance: onDidCreateInstance.event })));
++		const nameless = (id: number, config: Partial<IShellLaunchConfig>) => {
++			const instance = terminal(id, config);
++			(instance as { title: string }).title = '';
++			return instance;
++		};
++		const saved = (title: string, titleSource: TitleEventSource) => upcastPartial<NonNullable<IShellLaunchConfig['attachPersistentProcess']>>({ id: 7, title, titleSource });
++		const restored = nameless(1, { attachPersistentProcess: saved('Terminal 2', TitleEventSource.Api) });
++		const processTitle = nameless(2, { attachPersistentProcess: saved('vim', TitleEventSource.Process) });
++		const fresh = nameless(3, {});
++
++		[restored, processTitle, fresh].forEach(instance => onDidCreateInstance.fire(instance));
++
++		assert.deepStrictEqual([restored, processTitle, fresh].map(instance => instance.title), ['Terminal 2', '', '']);
 +	});
 +
 +	test('the next name is the lowest free one', () => {

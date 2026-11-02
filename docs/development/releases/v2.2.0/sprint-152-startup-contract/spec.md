@@ -52,7 +52,7 @@ Acceptance criteria:
 - **The constants it replaces go:** 002's `RITEMARK_PLACE_ORDERS` and the hard-coded `workbench.view.extension.ritemark-ai`
   (`viewsExtensionPoint.ts`, `layout.ts`, `paneCompositePart.ts`), 018's `HEAD_PLACES` and `WELCOME_VIEW_TYPE`, 019's
   `RITEMARK_PERMANENT_VIEW_TYPES` read the manifest. One source; no copy left behind.
-- **The slot:** one module (`ritemarkSlots.ts`, 018). A slot is reserved at the first frame at its final size (the ground
+- **The slot:** one module (`ritemarkSlots.ts`, 018; *built in 002's `ritemarkFrame.ts`, with the manifest: 002's AI column releases a slot too, and 002 can't import 018*). A slot is reserved at the first frame at its final size (the ground
   or the desk's sheet, no words), filled by the extension, or released: a contribution's slot when the extensions are
   read, a content slot when Ritemark failed to start or after 60 s. Each release is logged once:
   `[ritemark] slot released: <name>`.
@@ -61,7 +61,9 @@ Acceptance criteria:
   `workbench.editor.pinnedTabSizing`, `workbench.editor.editorActionsLocation`, `breadcrumbs.enabled`,
   `workbench.iconTheme`, `workbench.productIconTheme`, `workbench.panel.defaultLocation`,
   `terminal.integrated.defaultLocation`, `terminal.integrated.hideOnStartup`. A1 confirms the list; a key it adds or
-  drops changes this line first. The extension keeps its copies (R7).
+  drops changes this line first. *A1 kept it:* `workbench.activityBar.location` moves a new profile's frame at
+  +0.2 s; the others draw nothing at a new profile's first frame in A1's starts, but arrive at the same moment, so
+  they stay. The extension keeps its copies (R7).
 - **The settled frame doesn't change:** `frame-screenshots.mjs --compare docs/development/frame-baseline` gives the same
   pixels in every scene, every `JOINS` line ok, and `frame-geometry.mjs` the same numbers, before and after.
 
@@ -138,34 +140,56 @@ sees the empty chat ("What shall we work on?", "Checking Claude…") for about a
 A start can show "Preparing Agent Chat… Loading the local model catalog and your last selection." (`AISidebar.tsx`'s
 not-ready card), which aren't Ritemark's words. The shell's side is done (Sprint 145); this is the extension's side.
 
-Acceptance criteria:
+A4 (`research/ai-view-start.md`) traced more: not signed in, the column shows "Loading...", the card, the empty chat
+and the AI's own sign-in screen within about 1.5 s before "Almost there!", for each AI; on a held start, 0.33 s of bare
+ground between the shell's mark and the view's first look.
+
+Acceptance criteria (the Experience lead's answer 5, 1 November):
 - **Traced first:** A4 records what the AI view draws from its load to its settled look, signed in and not, for Claude
   Code, Codex and OpenCode, and what tells it which look is the settled one.
-- Until the view knows whether to draw the chat or the sign-in, it draws only the ground and the turning mark, in the
-  place and size the shell's mark had, so nothing jumps when the view takes over (question 5).
+- Until the view knows whether to draw the chat or the sign-in, its first frame is the shell's turning mark: the same
+  size, colours and words for screen readers, centred in the same box, matched to the pixel, with no bare ground
+  between the two marks.
+- **The 1 s never starts again:** if the shell's mark was showing, the view's shows from its first frame; if not, it
+  shows when 1 s has passed since the column's first frame. In PR 1 the host estimates that moment (the extension
+  host's start for a view resolved as part of Ritemark's start, the resolve for a column opened later); PR 2's column
+  slot hands over the shell's own (W5).
 - Then it draws one look: the chat on its sheet, or "Almost there!" on the ground. No empty chat before the sign-in, and
   no sign-in before the chat.
-- No "Preparing Agent Chat…" or "Loading the local model catalog…" on a normal start. If the view can't start, its
-  card says so in the Experience lead's words, with Try again, as today's error does.
-- A check that takes long keeps today's "Still checking …" notice after its timeout, unless the lead sets other words
-  or another time (question 5).
-- Extension-tier: the webview and the host only, no new message type (a field on `agent:bootstrap` at most, A4).
+- No "Loading...", "Preparing Agent Chat…" or "Loading the local model catalog…" on a normal start.
+- **A slow check:** after 10 s of the view's own check, one line under the mark (13, `--r-ink-muted`, centred, at most
+  280 wide, 12 under the mark) and a ghost Try again 12 under the line: "Still checking whether Claude is ready." (by the
+  AI's own name), tooltip "Check again whether Claude is ready"; before the view has read which AI, "The AI is taking
+  longer than usual to start.", tooltip "Start the AI again". Try again takes the line away, keeps the mark and starts
+  the 10 s over. This replaces the 8 s card ("Agent Chat could not start") and the 15 s card ("Still checking Claude").
+- **A start that fails** (`agent:bootstrap-error`) is a settled look of its own: "The AI couldn't start", "Try again. If
+  it keeps happening, restart Ritemark.", and a filled Try again, on one of the column's cards (the column's edges,
+  radius 12, no shadow; the Experience lead's check of #632).
+- **A chat opened on a conversation while its AI's check hangs** (the review round's finding 1): after the same 10 s,
+  "Still checking whether Claude is ready." and "You can write your message now and send it when Claude is ready." on
+  a notice inside the sheet directly above the box, the mark in ink on the quiet chip, with a ghost Try again. The sheet
+  and the rail don't move.
+- Extension-tier: the webview and the host only, no new message type and no new field (A4: the statuses can't ride on
+  the bootstrap, which is local by rule).
 
 ### R6: The start never opens a column the person closed (decision 2)
 
 As someone who closed the AI column, I want it to stay as I left it, or come back from the first frame, never half a
 minute later.
 
-What is known (*read*, not seen): the layout restores the column closed, then the extension calls
+What is known (*seen* in A1, 5 of 5): the layout restores the column closed, then the extension calls
 `ritemark.unifiedView.focus` in every project window when it starts (`extension.ts:802`) and again 4 s later
-(`:378–382`), which opens it again.
+(`:378–382`), which opens it again (+11.0–11.2 s on a held start).
 
-Acceptance criteria, by Jarmo's answer to decision 2:
-- **Recommended (stays closed):** the extension's two start-time calls no longer open a column the layout restored
-  closed. The AI's toggle opens it as before. The welcome's landing still opens the AI beside the new project.
-- **Otherwise (always back):** the shell shows the AI column at the first frame of every project window, and the
-  extension's calls change nothing.
-- Either way: A1 shows it first; the first-frame check's relaunch start passes with the column closed at quit.
+Decision 2 (the Development manager, on Jarmo's 2.2 delegation, after the Experience lead's answer 9): **it stays
+closed.** Acceptance criteria:
+- The extension's two start-time calls no longer open a column the layout restored closed. The AI's toggle opens it
+  as before. What asks for the AI still opens it: the welcome's landing, a task's conversation, a chat from a
+  notification.
+- Only the person's own toggle counts as closing: a column the narrow window stepped aside (below 960) comes back once
+  the window is wide enough, at the next start too, and is never stored as the person's choice (patch 018's window
+  sizes already keep that apart).
+- A1 shows it first; the first-frame check's `relaunch --ai-closed` start passes with the column closed at quit.
 
 ### R7: An older or newer extension can't move the frame, and a mismatch is loud
 
@@ -195,14 +219,20 @@ As the team, I want one check that sees any member of this family, now and after
 
 Acceptance criteria:
 - `scripts/qa/project-check.mjs --first-frame` samples every 50 ms from the new window's first moment (as `--measure`
-  does) the boxes of the left column, the desk, the AI column, the places row's items, the head's rows and the tab row's
-  first tabs, and what is in front. **PASS** when every box in the first laid-out sample equals its box once the window
-  has settled (Ritemark started, its views drawn, then 2 s with no change), and what is in front never changed.
-  Content inside a box may change. The exit code is the number of failures, as today.
+  does) the boxes of the left column, the desk, the AI column, the status bar, VS Code's side places bar, the places
+  row's items, the head's rows and the tab row's first tabs, and what is in front (the desk's tab, the left column's
+  place). **PASS** when every box keeps the place it had in the first laid-out sample (after
+  `code/didRemovePartsSplash`) in every sample until the window has settled (Ritemark started at least 5 s before, so
+  its start's late moves are inside the run, such as the AI column's second call 4 s after activation in builds before
+  R6, then 2 s with no change), and what is in front never changed. A box that shifts and comes back has moved
+  (Codex's review of #632). A box is the room an element takes, so a hidden row keeping its room keeps its box. Content inside a box may change. The exit code
+  is the number of failures, as today.
 - It runs the four starts with the extension host held and let go, and prints, per start, each box that moved, by how
-  much and when.
-- **Fails first:** on `main`, in the starts A1 shows a move (expected: new project, new profile); passes on PR 2's
-  branch; 145's starts pass on both.
+  much and when. A fifth, `relaunch --ai-closed`, is R6's.
+- **Fails first:** on `main`, in the starts A1 shows a move: all of them (`research/first-frames.md`, *The failing
+  set*: new profile, new project, switch and relaunch, the last two because a stored Ritemark place shows only when the
+  extensions are read and a restored terminal tab is nameless for 2.3 s); passes on PR 2's branch; 145's own checks
+  pass on both.
 - Five runs of each start agree before the check gates anything (a hidden window's timing).
 - It is named in Gate 1's frame step (the `release` skill) beside `frame-screenshots.mjs` and `frame-geometry.mjs`, and
   in layout-invariants.md's *When patching layout*.
@@ -214,9 +244,53 @@ the start.
 
 Acceptance criteria:
 - **Shown first** (A1): a new profile's first window opened on a folder draws Documents alone, then the other five
-  places once the extensions are read. If A1 doesn't show it, R9 is dropped and the reason recorded.
+  places once the extensions are read. If A1 doesn't show it, R9 is dropped and the reason recorded. *A1 showed it, 2
+  of 2*: VS Code's side bar with Documents at the first frame, Ritemark's seven places on top at +0.3 s, with the AI
+  column arriving at the same moment. R9 stays.
 - When VS Code has stored no places, the composite bar draws Ritemark's six from the manifest's placeholders (title and
   icon), in order, from the first frame; the extension's registration replaces them in place.
+
+### R10: One loading look, for every slot (PR 3)
+
+As someone whose window is still starting, or whose tab's page isn't there yet, I want one quiet sign that something is
+on its way, the same everywhere, and a word when it takes long.
+
+The Experience lead's "One loading look, for every slot" and answers 1–5 (1 November), and the PR 2 check (2 November):
+- **The slot's own material first,** and nothing else: the ground for a column and the welcome's window, the desk's
+  sheet joined to its tab under a tab. No words, no bar, no tiles, no indigo.
+- **After 1 s, the kit's turning mark** (16, ink on the strong hairline, once a second) alone at the slot's centre, with
+  words for screen readers only: "<the tab's name> is opening" on the desk, "Ritemark is starting" in the welcome's
+  window, "The AI is starting" in the AI column. It stands still under Reduce motion.
+- **After 10 s, one line,** only in each window's main slot and only at a start: the desk in a project window, the centre
+  in the welcome's window. "Ritemark is still starting. The first start after an install or an update takes longer.",
+  13, the muted ink, centred, at most 320 wide, 12 under the mark. The mark keeps its place when the line comes.
+- **The content replaces the look in one change,** with no fade and nothing in between: a tab's wait ends when its page
+  is drawn, not when its frame is there. The look stays above the page until a Ritemark page says it is drawn (Home, the
+  Task board, a document) or any other page first speaks, so neither a bare sheet nor a page's own "Loading..." shows
+  between the mark and the content.
+- **Where:** the welcome's window before the welcome opens (answer 1); a desk's tab whose page isn't there yet, at a
+  start or opened later (answers 2–4: Home under its tab, a switch, the restored document of a cold start; a tab opened
+  later shows the mark, never the line); the AI column (Sprint 145's mark, now the same look). The left column's places
+  get none: their slot is the ground until the page draws.
+- **W5:** the AI column's slot hands its moment to the AI's view (`_ritemark.loadingLook.since`), so the view's own mark
+  (R5) doesn't start its second again; the host's estimate stands in for an older shell.
+
+### R11: No VS Code progress sign during a start, and VS Code's own lines in ink (PR 3)
+
+As someone starting Ritemark, I want no second sign beside the loading look.
+
+Acceptance criteria (the Experience lead's PR 2 check, 2 November):
+- A place never shows VS Code's progress badge: places carry counts only (answer 6). Ritemark's own views report no
+  progress, and the badge is hidden for VS Code's own views too.
+- No progress line under the tab row while a tab's page isn't there yet, and no progress line across the left column's
+  top (y 33–34) while a Ritemark place's view waits.
+- VS Code's own views that keep a progress line (Documents' tree, Search, File changes, Extensions) draw it in ink: the
+  themes' `progressBar.background` goes from indigo (#4338CA Light, #818CF8 Dark) to each theme's foreground (#1E1B4B,
+  #F8FAFC).
+- R2's last step: a restored terminal's tab has its whole-pixel width (019's join pass) from the first frame, where it
+  grew 0.46 px a frame later in some relaunches; nothing still arriving at the first frame (the row's font, the icon's
+  glyph) changes it afterwards.
+- The status bar's items stay as they are: filed for 2.3 (answer 7).
 
 ## Engineering requirements
 
@@ -232,11 +306,17 @@ At most three new hunks in upstream files across 002, 018 and 019, and no upstre
 before and after (`grep -c '^@@'`: 002 88, 018 123, 019 55 on `6d082c96`) and `check-patch-stacking.mjs` (pre-commit
 Check 14) go in `qa-evidence.md`. A design that needs more stops for a decision.
 
+PR 3 has its own budget: at most three new hunks in upstream files, the terminal tab's among them, counted against PR
+2's head, and no upstream file newly touched; Ritemark's own files, the stylesheet and the themes first. A fourth stops
+for a decision.
+
 ### E3: Tier
 
 Shell, by `patches/vscode/002-ritemark-ui-layout.patch`, `018-ritemark-surfaces.patch`, `019-ritemark-tab-row.patch`,
 `branding/product.json` and `scripts/validate-build-output.sh`. R5, R6 and R8 are extension-tier (`webview/src/`,
 `src/`, `scripts/qa/`, `.claude/skills/`). The tier line in the sprint plan changes first if an audit moves a fix.
+PR 3 is shell-tier by 002, 007 (`webviewEditor.ts`), 018 and 019; its theme colours and W5's host side are
+extension-tier files in the same PR.
 
 ### E4: Bundle
 

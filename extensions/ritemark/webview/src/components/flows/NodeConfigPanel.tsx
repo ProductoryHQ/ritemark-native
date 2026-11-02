@@ -1204,14 +1204,16 @@ function SaveFileNodeConfig({ data, onUpdate }: SaveFileNodeConfigProps) {
             placeholder="output/"
             className="flex-1"
           />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => vscode.postMessage({ type: 'flow:pickFolder', field: 'folder' })}
-            title="Browse folders"
-          >
-            <Icon name="folder-open" size={16} />
-          </Button>
+          <Tooltip label="Browse folders">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => vscode.postMessage({ type: 'flow:pickFolder', field: 'folder' })}
+              aria-label="Browse folders"
+            >
+              <Icon name="folder-open" size={16} />
+            </Button>
+          </Tooltip>
         </div>
       </Field>
 
@@ -1231,14 +1233,16 @@ function SaveFileNodeConfig({ data, onUpdate }: SaveFileNodeConfigProps) {
               placeholder="output.md"
               className="flex-1"
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowVarPicker(!showVarPicker)}
-              title="Insert variable"
-            >
-              <span className="text-xs font-mono">/</span>
-            </Button>
+            <Tooltip label="Insert variable">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowVarPicker(!showVarPicker)}
+                aria-label="Insert variable"
+              >
+                <span className="text-xs font-mono">/</span>
+              </Button>
+            </Tooltip>
           </div>
 
           {/* Variable picker dropdown */}

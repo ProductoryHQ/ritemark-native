@@ -28,6 +28,7 @@ import {
 } from './WelcomeParts'
 import { send } from './welcomeClient'
 import './welcome.css'
+import { usePageDrawn } from '../../lib/pageDrawn'
 
 const INITIAL: WelcomeState = {
   kind: 'fresh',
@@ -55,6 +56,7 @@ export function WelcomePage() {
   const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [addAnother, setAddAnother] = useState(false)
   const [starting, setStarting] = useState<StartingSignIn | null>(null)
+  usePageDrawn(state !== null) // Sprint 152, PR 3: the window's loading look stays until the host's welcome is painted
 
   useEffect(() => {
     const listener = (event: MessageEvent<WelcomeMessage>) => {

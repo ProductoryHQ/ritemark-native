@@ -14,7 +14,7 @@ export function OpenCodeSetupView() {
       <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 shrink-0">
-            <Icon name="key" size={20} className="text-[var(--r-accent)]" />
+            <Icon name="key" size={20} className="text-[var(--r-ink-strong)]" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold">Set up your API keys</div>

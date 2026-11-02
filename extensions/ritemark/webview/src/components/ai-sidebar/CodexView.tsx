@@ -18,6 +18,7 @@ import { StartingPoints } from './StartingPoints';
 import { extractPlanDisplayText } from './planText';
 import { TurnFailureCard } from './TurnFailureCard';
 import type { CodexConversationTurn, AgentProgress, CodexSidebarStatus } from './types';
+import { Tooltip } from '../ui/tooltip';
 
 export function CodexView() {
   const { agentConversation, codexConversation } = useActiveConversation();
@@ -486,7 +487,7 @@ export function CompatibilityNotice({
     <div className="rounded-lg border border-[var(--vscode-inputValidation-warningBorder)] bg-[color:color-mix(in_srgb,var(--vscode-input-background)_80%,transparent)] p-3 text-left shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2 min-w-0">
-          <Icon name="warning" size={14} className="mt-0.5 shrink-0 text-[var(--vscode-inputValidation-warningBorder)]" />
+          <Icon name="warning" size={14} className="mt-0.5 shrink-0 text-[var(--r-ink-strong)]" />
           <div className="min-w-0">
             <div className="text-xs font-semibold">{title}</div>
             <p className="mt-1 text-xs leading-5 opacity-80">{message}</p>
@@ -499,14 +500,15 @@ export function CompatibilityNotice({
             </div>
           </div>
         </div>
-        <button
-          onClick={onDismiss}
-          className="rounded-md p-1 text-[var(--r-ink-muted)] opacity-70 transition-colors hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] hover:opacity-100"
-          aria-label="Dismiss this notice about ChatGPT"
-          title="Dismiss"
-        >
-          <Icon name="x" size={12} />
-        </button>
+        <Tooltip label="Dismiss">
+          <button
+            onClick={onDismiss}
+            className="rounded-md p-1 text-[var(--r-ink-muted)] opacity-70 transition-colors hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] hover:opacity-100"
+            aria-label="Dismiss this notice about ChatGPT"
+          >
+            <Icon name="x" size={12} />
+          </button>
+        </Tooltip>
       </div>
     </div>
   );

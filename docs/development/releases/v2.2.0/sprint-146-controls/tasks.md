@@ -15,8 +15,8 @@ Nothing here starts before the plan is approved by Jarmo. Tick a box only when t
 - [x] A1 `research/menu-focus-audit.md` (R1, S1–S8): #585's commit cherry-picked; its audit table run live, mouse and keyboard, Light and Dark; the rows behind an AI run or marked not run
 - [x] A2 `research/focus-rings.md` (R3): every ring sorted by kind; the Tailwind 3.3 variant check and the mechanism chosen
 - [x] A3 `research/catalogue-capture.md` (R2, R4, S22–S26): focus emulation, hover and press into a webview, a cell at device pixels five times, the theme switch
-- [ ] A4 `research/tooltip-looks.md` (R5, S28–S31): both looks measured with crops; other users of `editorHoverWidget.*`; the native `title` list
-- [ ] A5 `research/narrow-buttons.md` (R6, S32–S35): every cut label; the CSS rule tried, the measured one only if needed
+- [x] A4 (R5, S28–S31): the workbench hover measured, the other tooltip looks and the native `title` list, in `research/pr3-polish.md` (the lead chose the look on 31 October, so no crops of both)
+- [x] A5 (R6, S32–S35): every cut label, in `research/pr3-polish.md`; a measured rule, since CSS alone can't make the icon-only button its size's square
 - [x] A6 `research/file-changes-audit.md` (R7, S37–S43): every Git and GitHub welcome string, its `when`, its owner patch; the focused element on a mouse open, for File changes and each place
 - [x] A7 `research/tab-menu-audit.md` (R8, S44–S48): each tab kind's menu on a dev build with Copilot Chat and on 2.1.0; each item's command and All commands (the dev build, with Copilot Chat; the shipped 2.1.0 not run: the filter drops Add File to Chat either way)
 - [x] A8 `research/hover-row-audit.md` (R9, S49): each list's row end and thumb edge at 1× and 2×, Light and Dark (2× only, Light and Dark; 1× is Gate 2's on Windows at 100%. The workbench's lists: Documents has the fault; the left column's webview lists are PR 3's half)
@@ -47,11 +47,12 @@ Nothing here starts before the plan is approved by Jarmo. Tick a box only when t
 - [ ] Windows through the overlay (S21)
 - [ ] PR 2 opened and reviewed at Standard; screenshots and `sheet.html` to the Experience lead
 
-## Phase 4: PR 3, tooltips and narrow buttons (W5, W6; R5, R6; R9 if a webview's)
+## Phase 4: PR 3, the controls' polish (W5, W6; R5, R6; #613, #614, #615 by Jarmo's word, 1 November)
 
-- [ ] The lead's tooltip look in `ui/tooltip.tsx` (or noted for PR 4 if the workbench's hover moves); its render test; the native titles on controls moved to `Tooltip` (S28–S31)
-- [ ] The split button's label in two parts and the wrap rule; the `Button` opt-in where A5 found cuts; render tests (S32–S35)
-- [ ] R9's webview fix, if A8 puts it there (S49–S51)
+- [x] The lead's tooltip look in `ui/tooltip.tsx`; its test; the native titles on controls moved to `Tooltip` (S28–S31)
+- [x] The split button's label in two parts and the measured rule; the `Button` opt-in (`iconWhenNarrow`) where A5 found cuts; tests (S32–S35)
+- [ ] R9's webview half: A8 left the left column's webview lists unmeasured (PR 3's if they have the fault); not done in PR 3 (the workbench's half is PR 4's, #630)
+- [x] #613 (the board's short column), #614 (an icon's colour, and the pass over 65 icons), #615 (the comment card follows the theme), the destructive red, working in ink
 - [ ] The catalogue's tooltip, long-label and narrow cells approved again; `control-states.mjs` passes
 - [ ] Windows through the overlay; screenshots in Light and Dark to the Experience lead
 - [ ] PR 3 opened and reviewed at Standard

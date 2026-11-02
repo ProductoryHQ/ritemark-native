@@ -31,14 +31,15 @@ export function SubagentCard({ subagent, onStop }: SubagentCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const statusIcon = {
-    running: <Icon name="circle-notch" size={12} className="animate-spin text-[var(--r-accent)]" />,
-    stopping: <Icon name="circle-notch" size={12} className="animate-spin text-[var(--r-ink-muted)]" />,
-    // Sprint 145 (#578): done is ink; green is only the ready dot. `inherit` lets the class colour the check (an
-    // Icon's own tone otherwise sets its fill, and the green class here never showed)
-    done: <Icon name="check" size={12} tone="inherit" className="text-[var(--r-ink-strong)]" />,
-    error: <Icon name="warning-circle" size={12} className="text-[var(--r-error)]" />,
-    stopped: <Icon name="x-circle" size={12} className="text-[var(--r-ink-muted)]" />,
-    ended: <Icon name="minus" size={12} className="text-[var(--r-ink-muted)]" />,
+    // These marks sit in the row's Button, which gives every icon in it the row's words' colour (ui/button.tsx). Each
+    // keeps its own here (`!`; the Experience lead, §12): working in ink, an error red, the rest muted (the carets and
+    // the robot below too). Sprint 145 (#578): done is ink; green is only the ready dot.
+    running: <Icon name="circle-notch" size={12} className="animate-spin !text-[var(--r-ink-strong)]" />,
+    stopping: <Icon name="circle-notch" size={12} className="animate-spin !text-[var(--r-ink-strong)]" />,
+    done: <Icon name="check" size={12} tone="inherit" className="!text-[var(--r-ink-strong)]" />,
+    error: <Icon name="warning-circle" size={12} className="!text-[var(--r-error)]" />,
+    stopped: <Icon name="x-circle" size={12} className="!text-[var(--r-ink-muted)]" />,
+    ended: <Icon name="minus" size={12} className="!text-[var(--r-ink-muted)]" />,
   }[subagent.status];
 
   const hasActivities = subagent.activities.length > 0;
@@ -62,16 +63,16 @@ export function SubagentCard({ subagent, onStop }: SubagentCardProps) {
           {/* Expand/collapse chevron */}
           {hasActivities ? (
             isExpanded ? (
-              <Icon name="caret-down" size={12} className="shrink-0 text-[var(--r-ink-muted)]" />
+              <Icon name="caret-down" size={12} className="shrink-0 !text-[var(--r-ink-muted)]" />
             ) : (
-              <Icon name="caret-right" size={12} className="shrink-0 text-[var(--r-ink-muted)]" />
+              <Icon name="caret-right" size={12} className="shrink-0 !text-[var(--r-ink-muted)]" />
             )
           ) : (
             <div className="w-3 shrink-0" />
           )}
 
           {/* Bot icon */}
-          <Icon name="robot" size={14} className="shrink-0 text-[var(--r-ink-muted)]" />
+          <Icon name="robot" size={14} className="shrink-0 !text-[var(--r-ink-muted)]" />
 
           {/* Task description */}
           <span className="flex-1 truncate text-[11px] font-medium text-[var(--r-ink-strong)]">

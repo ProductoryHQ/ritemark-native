@@ -5,9 +5,11 @@ version skew; four artifacts, with the scenarios as the four starts in [spec.md]
 requirement is checked in the same four)
 Override with: "use plain full track"
 Branch: `sprint-152-startup-contract`, made from `origin/main` at Phase 3, after approval. PR 2 has its own branch,
-`sprint-152-startup-contract-shell` (*Pull requests* below). This plan was written on `plan/sprint-152-startup-contract`.
+`sprint-152-startup-contract-shell`, and PR 3 its own, `sprint-152-startup-contract-loading`, stacked on PR 2's
+(*Pull requests* below). This plan was written on `plan/sprint-152-startup-contract`.
 Release tier: shell, by `patches/vscode/002-ritemark-ui-layout.patch`, `018-ritemark-surfaces.patch`,
-`019-ritemark-tab-row.patch`, `branding/product.json` and `scripts/validate-build-output.sh` (PR 2). PR 1 is
+`019-ritemark-tab-row.patch`, `branding/product.json` and `scripts/validate-build-output.sh` (PR 2); PR 3 adds
+`007-ritemark-vscode-1117-compat.patch` (`webviewEditor.ts`, which 007 owns). PR 1 is
 extension-tier (`webview/src/`, `src/`, `scripts/qa/`, `.claude/skills/`). 2.2 is a shell release
 ([release-plan.md](../release-plan.md)), so neither adds a release step. If an audit moves a fix into or out of a patch,
 this line changes first.
@@ -40,10 +42,10 @@ its first frame.
 | --- | --- | --- | --- | --- |
 | [#624](https://github.com/ProductoryHQ/ritemark-native/issues/624) | The AI column has one loading look: the empty chat flashes before "Almost there!", and "Preparing Agent Chat…" isn't Ritemark's | R5 | In Sprint 145's first-frame captures (`r9-switch-first-frames-*.png`); the Experience lead's check of #622. Placed after 2.2 by the lead; added to this sprint at the Development manager's request (1 November), being the same family | extension |
 | [#569](https://github.com/ProductoryHQ/ritemark-native/issues/569), [#501](https://github.com/ProductoryHQ/ritemark-native/issues/501) | Fixed in Sprint 145 by #622 (merged 1 November; both issues still open on GitHub): the AI column and the landing after a switch; restored terminals. This sprint keeps their behaviour and moves their code onto the contract | R2 | Measured before and after in Sprint 145's research | shell |
-| No issue | A project opened for the first time: the tree, then Home's place; an empty desk's tiles, then Home | R3 | Read in the code, not seen (inventory rows 5, 11) | shell |
-| No issue | A window with no folder: VS Code's frame, then the welcome alone | R4 | Read, not seen (row 13) | shell |
-| No issue | The AI column the person closed opens again when Ritemark starts | R6 | Read, not seen (row 14) | extension, or shell by decision 2 |
-| No issue | The frame-shaping settings and the places row on a new profile | R1, R9 | Read, not seen (rows 4, 15) | shell |
+| No issue | A project opened for the first time: the tree, then Home's place; an empty desk's tiles, then Home | R3 | Seen in A1, 10 of 10 (rows 5, 11; `research/first-frames.md`) | shell |
+| No issue | A window with no folder: VS Code's frame, then the welcome alone | R4 | Seen in A1, 5 of 5 (row 13; the AI column showing first was not seen) | shell |
+| No issue | The AI column the person closed opens again when Ritemark starts | R6 | Seen in A1, 5 of 5 (row 14); decision 2: it stays closed. PR 1 | extension |
+| No issue | The frame-shaping settings and the places row on a new profile | R1, R9 | Seen in A1 (rows 4, 15; row 16, the colours, too) | shell |
 
 A row A1 doesn't show is dropped with its reason; one it shows and this sprint leaves for 2.3 is filed with its capture.
 
@@ -85,16 +87,18 @@ start (#593, Sprint 147).
 
 ## Pull requests
 
-Two, so the shell change gets its High review alone and #624 doesn't wait for it.
+Three: the shell change gets its High review alone and #624 doesn't wait for it; the loading look in every slot came
+after the Experience lead's check of PR 2 (2 November) as its own shell PR (the decision log's 0e14391).
 
 | PR | Branch | Holds | Release tier | Review tier |
 | --- | --- | --- | --- | --- |
 | 1 | `sprint-152-startup-contract` | Phase 1's research (A1–A4); the first-frame check (R8); the AI column draws once (R5, #624); R6 by decision 2; this sprint's doc updates (the plan lands first, in its own PR) | extension | Standard (`webview/src/`, `src/`, `scripts/qa/`, `.claude/skills/`); the AI column's start to the Experience lead with screenshots |
 | 2 | `sprint-152-startup-contract-shell` | R1, R2, R3, R4, R7, R9 and E5 | shell | High: `/code-review` at high and `/security-review`; up to three rounds, the third only when the second found something Important (`REVIEW.md`, since #625). Built and checked on a CoW-cloned, patched `vscode/`; the drift check at merge |
+| 3 | `sprint-152-startup-contract-loading`, stacked on PR 2's | R10 (one loading look, for every slot; W5), R11 (no VS Code progress sign during a start, VS Code's own lines in ink, the terminal tab's 0.46 px step) and their docs | shell | High, as PR 2: up to three rounds. At most three new hunks in upstream files (E2). The first-frame check, held starts' captures in Light and Dark (the mark at 1 s, the line at 10 s, Reduce motion), the frame check against PR 2, the dry run and a real apply from the pin |
 
 **Order:** PR 1 first, after approval: it records `main`'s failing set before any shell code, and #624 needs no patch.
 PR 2 after Sprint 146's shell PR (its PR 4) has merged, since both change 018 and 019, and after the Experience lead has
-answered questions 1–4, 6 and 8.
+answered questions 1–4, 6 and 8. PR 3 merges right after PR 2.
 
 **Cut order if the sprint runs long** (the first goes first):
 
@@ -158,7 +162,7 @@ before the merges. Screenshots before each merge: PR 1 (the AI column's start, s
 No feature flag. The contract changes when the frame is drawn, not what a person can do, and there is no flag in the
 shell. HARD RULE #1 holds: the welcome alone, the landing, the terminals' wait, the head's rows and the AI column's
 loading look keep working, moved onto one mechanism; the extension's `configurationDefaults` stay; the AI view's error
-card stays, in Ritemark's words. R6 changes behaviour only with Jarmo's answer to decision 2. #624's view stays under no
+card stays, in Ritemark's words. R6 changes behaviour by decision 2 (it stays closed). #624's view stays under no
 flag, as today.
 
 ## Testing
@@ -192,6 +196,10 @@ flag, as today.
       (R8).
 - [ ] The settled frame is unchanged: the same pixels in every baseline scene, every `JOINS` ok (R1).
 - [ ] At most three new hunks in upstream files, no upstream file newly touched (E2).
+- [ ] Every slot has the one loading look: the material, the mark after 1 s, at a start's main slot the line after 10 s,
+      the content replacing it in one change; the AI view takes the shell's moment (R10, PR 3).
+- [ ] No VS Code progress badge on a place, no progress line under the tab row or across the left column's top during a
+      start; VS Code's own lines in ink; no step of a restored terminal's tab (R11, PR 3; at most three new hunks).
 
 ## Risks
 
@@ -227,6 +235,7 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
       release candidate: "võta nii et kõik sprindid on 2.2 osas approved until RC - ei vaja heakskiitu. I trust you. When needed use admin merge and clean worktrees" (ritemark-dev `decisions/log.md`, c45d69c).
 - [x] Decision 1: yes, as recommended. Decision 3: yes, as recommended (after 146's shell PR, alongside 147; in the
       cut order PR 2 moves to 2.3 right after 151, PR 1 stays).
-- [ ] Decision 2 (the AI column you closed): decided by the manager after the Experience lead's view on question 9,
-      before PR 1's R6 work, and recorded here and in the decision log.
+- [x] Decision 2: stays closed, only the person's toggle counts; decided by the Development manager on Jarmo's 2.2
+      delegation after the Experience lead's view, 1 November. A column the narrow window stepped aside comes back
+      once the window is wide enough (the Experience lead's answer 9; patch 018's window sizes already do this).
 - [x] Sprint start: PR 1 starts now; PR 2 after Sprint 146's PR 4 merges.

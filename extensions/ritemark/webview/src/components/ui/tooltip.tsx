@@ -1,6 +1,6 @@
 /**
- * A short explanation on hover and keyboard focus (Radix Tooltip, styled like
- * the conversation rail's tooltip). Wrap the trigger:
+ * A short explanation on hover and keyboard focus (Radix Tooltip, in the
+ * workbench hover's look: `TOOLTIP_SURFACE`). Wrap the trigger:
  *
  *   <Tooltip label="Record from the microphone"><Button …/></Tooltip>
  *
@@ -36,6 +36,19 @@ export function focusOpensTooltip(target: { matches(selector: string): boolean }
     return true; // a browser without :focus-visible keeps today's behaviour
   }
 }
+
+/**
+ * Sprint 146 (#576; the Experience lead, 31 October, §3): one tooltip look, the workbench hover's. A tooltip is a small
+ * floating sheet, so it takes the menus' family in the theme's own colours: the surface with the strong ink, a 1 px
+ * hairline and the menus' shadow, with no arrow, its radius (5) and padding (2 and 8) the hover's (measured on a
+ * tab's hover, `.monaco-hover.workbench-hover.compact`, which has no arrow either). Light: white with ink words; Dark:
+ * the desk's indigo with light words, as the status bar's hover. Its width rule (Sprint 142 merge 2): never wider than the page less its collision
+ * padding, so a tooltip in a desk of 152 wraps its words instead of running past the edge. Every Radix tooltip in the
+ * webview takes these classes (`ConversationTooltip` too). A tooltip draws above everything, the modals too: `Dialog`'s
+ * backdrop is at 9999 and its sheet at 10000, `PropertiesModal`'s at 999 (Codex on #637).
+ */
+export const TOOLTIP_SURFACE =
+  'z-[10001] rounded-[5px] border border-hairline bg-surface px-2 py-0.5 font-ui text-[12px] leading-[1.35] text-ink-strong shadow-md'
 
 function onTriggerFocus(event: FocusEvent<HTMLElement>): void {
   // Radix composes its own handler after this one and skips a prevented event
@@ -75,12 +88,9 @@ export function Tooltip({
             side={side}
             sideOffset={6}
             collisionPadding={8}
-            // Never wider than the page less its collision padding: a tooltip in a desk of 152 wraps its words instead
-            // of running past the edge (Sprint 142 merge 2, the narrowest Home's cut button)
-            className="z-[100] max-w-[min(240px,calc(100vw_-_16px))] rounded-[8px] bg-[var(--r-ink-strong)] px-2.5 py-1.5 font-ui text-[12px] leading-[1.35] text-[var(--r-surface)] shadow-lg"
+            className={cn(TOOLTIP_SURFACE, 'max-w-[min(240px,calc(100vw_-_16px))]')}
           >
             {label}
-            <TooltipPrimitive.Arrow className="fill-[var(--r-ink-strong)]" />
           </TooltipPrimitive.Content>
         </TooltipPrimitive.Portal>
       </TooltipPrimitive.Root>

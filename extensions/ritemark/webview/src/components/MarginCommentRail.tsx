@@ -57,6 +57,7 @@ import { Button } from './ui/button'
 import { sendToExtension } from '../bridge'
 import type { CommentTaskError } from '../../../src/commentTasks/protocol'
 import { onDocChanged } from '../lib/docChange'
+import { Tooltip } from './ui/tooltip'
 
 interface RailMarker {
   key: string
@@ -558,12 +559,14 @@ function RailItem({
           <div className="rm-bubble-head">
             <span className="rm-bubble-who">Comment</span>
             <span className="rm-grow" />
-            <button className="rm-bubble-del rm-bubble-edit" title="Edit comment" aria-label="Edit comment" onClick={onEdit}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
-              </svg>
-            </button>
+            <Tooltip label="Edit comment">
+              <button className="rm-bubble-del rm-bubble-edit" aria-label="Edit comment" onClick={onEdit}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+                </svg>
+              </button>
+            </Tooltip>
             {/* The same action, named for what the user is actually doing.
                 Jarmo, 2026-09-14: a red trash can on a comment the agent has
                 just finished reads as "throw this away", when the intent is
@@ -572,24 +575,27 @@ function RailItem({
                 to the user, and the agent never removes a marker itself. Every
                 other state keeps Delete, because nothing has been resolved. */}
             {presentation?.state === 'completed' ? (
-              <button
-                className="rm-bubble-del rm-bubble-done"
-                title="Mark as done — removes this comment from the document"
-                aria-label="Mark as done"
-                onClick={onRemove}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-              </button>
+              <Tooltip label="Mark as done — removes this comment from the document">
+                <button
+                  className="rm-bubble-del rm-bubble-done"
+                  aria-label="Mark as done"
+                  onClick={onRemove}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                </button>
+              </Tooltip>
             ) : (
-              <button className="rm-bubble-del" title="Delete comment" aria-label="Delete comment" onClick={onRemove}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                </svg>
-              </button>
+              <Tooltip label="Delete comment">
+                <button className="rm-bubble-del" aria-label="Delete comment" onClick={onRemove}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  </svg>
+                </button>
+              </Tooltip>
             )}
           </div>
 

@@ -13,6 +13,8 @@ import path from 'node:path';
 // switchProject.ts imports vscode for its glue: a small stand-in records what the switcher runs and answers its question.
 const calls: unknown[][] = [];
 let answer: string | undefined;
+/** The shell's answers to the commands the switcher runs (#623: whether a reload still goes on). */
+const answers = new Map<string, (...args: unknown[]) => unknown>();
 class FakeUri {
   constructor(private readonly value: string) {}
   static parse(value: string): FakeUri { return new FakeUri(value); }
@@ -20,7 +22,7 @@ class FakeUri {
 }
 const vscodeStub = {
   Uri: FakeUri,
-  commands: { executeCommand: async (...args: unknown[]) => { calls.push(args); } },
+  commands: { executeCommand: async (...args: unknown[]) => { calls.push(args); return answers.get(args[0] as string)?.(...args.slice(1)); } },
   window: {
     showWarningMessage: async (title: unknown, _options: unknown, ...items: { title: string; isCloseAffordance?: boolean }[]) => {
       calls.push(['ask', title, items.map((item) => `${item.title}${item.isCloseAffordance ? ' (close)' : ''}`)]);
@@ -165,6 +167,27 @@ async function main(): Promise<void> {
   slow.writePendingNotes(goesAt);
   assert.deepEqual([(note(LANDING_FILE) as { at: number }).at, (note(SWITCHED_FROM_FILE) as { at: number }).at], [goesAt, goesAt]);
   reset();
+  // #623 (Sprint 152): the shell's attempt. Another participant stopped the reload while the person read the question:
+  // "Switch and stop" then stops no chat and holds no note, and the window stays as it was.
+  reset(); working = [{ conversationId: 'c1', runtimeId: 'claude-code' }]; answer = 'Switch and stop';
+  answers.set('_ritemark.projects.reloadGoesOn', (asked) => asked !== 4);
+  const late = fresh();
+  assert.equal(await late.beforeReload('file:///p/sales', 4), false);
+  late.writePendingNotes();
+  assert.deepEqual({ stopped, landing: note(LANDING_FILE), asked: calls.filter((call) => call[0] === '_ritemark.projects.reloadGoesOn') }, {
+    stopped: 0, landing: undefined, asked: [['_ritemark.projects.reloadGoesOn', 4]],
+  });
+  // The attempt still goes on: the chats stop, as before.
+  assert.equal(await late.beforeReload('file:///p/sales', 5), false);
+  assert.equal(stopped, 1);
+  // An older shell, with no such command: as before.
+  reset(); working = [{ conversationId: 'c1', runtimeId: 'claude-code' }];
+  answers.set('_ritemark.projects.reloadGoesOn', () => { throw new Error('command not found'); });
+  assert.equal(await fresh().beforeReload('file:///p/sales', 6), false);
+  assert.equal(stopped, 1);
+  answers.clear();
+  reset(); working = [];
+
   // The reload goes on: the notes are written as the window goes, and the window it opened lands with its note.
   const going = fresh();
   await going.beforeReload('file:///p/sales');

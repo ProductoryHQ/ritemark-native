@@ -101,20 +101,16 @@ if (
   document.body.style.backgroundColor = 'var(--r-surface-muted)'
 }
 
-// Loading fallback
+// Loading fallback: the slot's own material and nothing else (Sprint 152, PR 3: no "Loading..."; the shell's loading look
+// shows over a desk tab while it waits, and a place in the left column is its ground)
 const LoadingFallback = () => (
   <div
+    aria-busy="true"
     style={{
       height: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
       background: 'var(--background)',
-      color: 'var(--foreground)',
     }}
-  >
-    Loading...
-  </div>
+  />
 )
 
 ReactDOM.createRoot(rootElement).render(
@@ -132,7 +128,8 @@ ReactDOM.createRoot(rootElement).render(
         <FlowsPanel />
       </Suspense>
     ) : editorType === 'ai-sidebar' ? (
-      <Suspense fallback={<LoadingFallback />}>
+      // Sprint 152 (R5, #624): no "Loading..." in the AI column; the page's own turning mark shows until the view draws
+      <Suspense fallback={null}>
         <AISidebar />
       </Suspense>
     ) : editorType === 'transcribe-panel' ? (

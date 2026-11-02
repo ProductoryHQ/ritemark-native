@@ -4,7 +4,7 @@
  * Supports @ agent mentions with autocomplete, slash commands, and drag-and-drop file paths.
  */
 
-import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react';
 import { Button } from '../ui/button';
 import { Icon } from '../ui/Icon';
 import { Tooltip } from '../ui/tooltip';
@@ -166,9 +166,15 @@ interface ChatInputProps {
    * menus open inside it, so the thread rail beside it never covers them.
    */
   menuBoundary: HTMLElement | null;
+  /**
+   * Sprint 152 (the Experience lead's check of #632): a notice about the box itself, such as the AI's check still
+   * running while Send is greyed. It sits directly above the box, under the AI disclosure, so it is the one nearest
+   * the box; the conversation above gets shorter at its foot and the sheet doesn't move.
+   */
+  notice?: ReactNode;
 }
 
-export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
+export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
   const [value, setValue] = useState('');
 
   // ── Sprint 99 (E5 / R14): the composer belongs to the ACTIVE thread ──
@@ -1165,6 +1171,8 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
         />
       )}
 
+      {notice && <div className="mb-2">{notice}</div>}
+
       {/* Sprint 64 bonus track (S5): docked selected-text context tab.
           Renders only when the editor has a non-empty selection. The tab's
           rounded-t-lg + border-b-0 makes it visually connect to the input
@@ -1413,13 +1421,16 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
                     </span>
                   </div>
                 )}
-                <button
-                  onClick={() => removeAttachment(att.id)}
-                  className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center rounded-bl border border-[var(--r-hairline)] bg-[var(--r-surface)] text-[var(--r-ink-body)] shadow-sm opacity-95 group-hover:text-[var(--r-error)] group-hover:opacity-100 transition-colors"
-                  title="Remove"
-                >
-                  <Icon name="x" size={12} />
-                </button>
+                {/* The tooltip's span holds the corner place, so the tooltip opens from the button (Sprint 146, #576) */}
+                <Tooltip label="Remove" className="absolute top-0 right-0">
+                  <button
+                    onClick={() => removeAttachment(att.id)}
+                    className="w-4 h-4 flex items-center justify-center rounded-bl border border-[var(--r-hairline)] bg-[var(--r-surface)] text-[var(--r-ink-body)] shadow-sm opacity-95 group-hover:text-[var(--r-error)] group-hover:opacity-100 transition-colors"
+                    aria-label={`Remove ${att.name}`}
+                  >
+                    <Icon name="x" size={12} />
+                  </button>
+                </Tooltip>
               </div>
             ))}
           </div>
@@ -1610,27 +1621,28 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
               }
             }}
           >
-            <SelectTrigger
-              className="h-6 w-auto shrink-0 gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus-visible:ring-0 focus-visible:border-[var(--r-hairline)] [&>svg]:h-3 [&>svg]:w-3 [&>svg]:shrink-0 max-[531px]:w-6 max-[531px]:justify-center max-[531px]:gap-0 max-[531px]:px-1 max-[531px]:[&>svg]:hidden"
-              aria-label={`Permission mode: ${composerPolicy.planFirst && planCapable ? 'Plan only' : composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}`}
-              title={composerPolicy.planFirst && planCapable
+            <Tooltip label={composerPolicy.planFirst && planCapable
                 ? 'Plan only — the agent plans and waits for your approval. Turns off when a plan is approved.'
                 : composerPolicy.autonomy === 'ask'
                   ? 'Manual — approves each file change and command with you'
-                  : 'Auto — makes changes without asking; you review the result'}
-            >
-              {/* div, not span — the SelectTrigger base applies [&>span]:line-clamp-1,
-                  whose -webkit-box/vertical layout stacks the icon above the label. */}
-              <div className="flex items-center gap-1 whitespace-nowrap">
-                <Icon
-                  name={composerPolicy.planFirst && planCapable ? 'clipboard-text' : composerPolicy.autonomy === 'ask' ? 'shield-check' : 'lightning'}
-                  size={12}
-                />
-                <span className="max-[531px]:sr-only">
-                  {composerPolicy.planFirst && planCapable ? 'Plan only' : composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}
-                </span>
-              </div>
-            </SelectTrigger>
+                  : 'Auto — makes changes without asking; you review the result'} className="shrink-0">
+              <SelectTrigger
+                className="h-6 w-auto shrink-0 gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] focus-visible:ring-0 focus-visible:border-[var(--r-hairline)] [&>svg]:h-3 [&>svg]:w-3 [&>svg]:shrink-0 max-[531px]:w-6 max-[531px]:justify-center max-[531px]:gap-0 max-[531px]:px-1 max-[531px]:[&>svg]:hidden"
+                aria-label={`Permission mode: ${composerPolicy.planFirst && planCapable ? 'Plan only' : composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}`}
+              >
+                {/* div, not span — the SelectTrigger base applies [&>span]:line-clamp-1,
+                    whose -webkit-box/vertical layout stacks the icon above the label. */}
+                <div className="flex items-center gap-1 whitespace-nowrap">
+                  <Icon
+                    name={composerPolicy.planFirst && planCapable ? 'clipboard-text' : composerPolicy.autonomy === 'ask' ? 'shield-check' : 'lightning'}
+                    size={12}
+                  />
+                  <span className="max-[531px]:sr-only">
+                    {composerPolicy.planFirst && planCapable ? 'Plan only' : composerPolicy.autonomy === 'ask' ? 'Manual' : 'Auto'}
+                  </span>
+                </div>
+              </SelectTrigger>
+            </Tooltip>
             <SelectContent collisionBoundary={menuBoundary} className={COMPOSER_MENU}>
               <SelectItem value="ask">
                 <div className="flex flex-col">

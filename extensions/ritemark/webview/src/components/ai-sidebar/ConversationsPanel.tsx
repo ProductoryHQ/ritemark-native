@@ -50,7 +50,7 @@ interface RowAction { label: string; icon: PhosphorIconName; danger?: boolean; d
 function RowMenus({ className, title, actions, children }: { className: string; title: string; actions: RowAction[]; children: ReactNode }) {
   const safe = actions.filter((action) => !action.danger);
   const danger = actions.filter((action) => action.danger);
-  const itemClass = 'gap-2 text-[13px] [&_svg]:shrink-0 [&_svg]:fill-current';
+  const itemClass = 'rm-icons-take-ink gap-2 text-[13px] [&_svg]:shrink-0 [&_svg]:fill-current';
   const dangerClass = 'text-[var(--r-error)] focus:text-[var(--r-error)]';
   return (
     <ContextMenu>

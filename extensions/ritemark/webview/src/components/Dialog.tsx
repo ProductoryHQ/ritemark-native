@@ -7,6 +7,7 @@
 
 import React, { useEffect, useCallback } from 'react'
 import { Icon } from './ui/Icon'
+import { Tooltip } from './ui/tooltip'
 
 interface DialogProps {
   isOpen: boolean
@@ -69,14 +70,15 @@ export function Dialog({
               {icon}
               <h2 className="dialog-title">{title}</h2>
             </div>
-            <button
-              className="dialog-close"
-              onClick={onClose}
-              aria-label="Close"
-              title="Close"
-            >
-              <Icon name="x" size={16} />
-            </button>
+            <Tooltip label="Close">
+              <button
+                className="dialog-close"
+                onClick={onClose}
+                aria-label="Close"
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </Tooltip>
           </div>
 
           {/* Content */}

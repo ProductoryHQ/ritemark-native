@@ -14,6 +14,7 @@ import {
 import { newCommentId } from '../extensions/comment/CommentMark'
 import { isEquationNodeSelection } from '../extensions/math/mathNodes'
 import { formattingToolbarShows } from './formattingToolbar'
+import { Tooltip } from './ui/tooltip'
 
 /**
  * FormattingBubbleMenu Component
@@ -289,162 +290,186 @@ export function FormattingBubbleMenu({
           style={{ '--r-surface-soft': 'var(--ritemark-surface-soft)' } as React.CSSProperties}
         >
           {/* Bold Button - Keyboard: Ctrl+B / Cmd+B */}
-          <button
-            onMouseDown={(e) => e.preventDefault()} // Prevents editor from losing focus
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            className={`px-3 py-1 rounded text-sm font-semibold hover:bg-surface-soft transition-colors ${
-              editor.isActive('bold') ? 'bg-surface-soft' : ''
-            }`}
-            title="Bold (Ctrl+B)"
-          >
-            B
-          </button>
+          <Tooltip label="Bold (Ctrl+B)">
+            <button
+              onMouseDown={(e) => e.preventDefault()} // Prevents editor from losing focus
+              onClick={() => editor.chain().focus().toggleBold().run()}
+              className={`px-3 py-1 rounded text-sm font-semibold hover:bg-surface-soft transition-colors ${
+                editor.isActive('bold') ? 'bg-surface-soft' : ''
+              }`}
+              aria-label="Bold"
+            >
+              B
+            </button>
+          </Tooltip>
 
           {/* Italic Button - Keyboard: Ctrl+I / Cmd+I */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={`px-3 py-1 rounded text-sm italic hover:bg-surface-soft transition-colors ${
-              editor.isActive('italic') ? 'bg-surface-soft' : ''
-            }`}
-            title="Italic (Ctrl+I)"
-          >
-            I
-          </button>
+          <Tooltip label="Italic (Ctrl+I)">
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+              className={`px-3 py-1 rounded text-sm italic hover:bg-surface-soft transition-colors ${
+                editor.isActive('italic') ? 'bg-surface-soft' : ''
+              }`}
+              aria-label="Italic"
+            >
+              I
+            </button>
+          </Tooltip>
 
           {/* Visual divider between text styles and headings */}
           <div className="w-px h-6 bg-hairline-strong mx-1" />
 
           {/* Heading 1 Button - Large heading */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            className={`px-3 py-1 rounded text-sm font-semibold hover:bg-surface-soft transition-colors ${
-              editor.isActive('heading', { level: 1 }) ? 'bg-surface-soft' : ''
-            }`}
-            title="Heading 1"
-          >
-            H1
-          </button>
+          <Tooltip label="Heading 1">
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+              className={`px-3 py-1 rounded text-sm font-semibold hover:bg-surface-soft transition-colors ${
+                editor.isActive('heading', { level: 1 }) ? 'bg-surface-soft' : ''
+              }`}
+              aria-label="Heading 1"
+            >
+              H1
+            </button>
+          </Tooltip>
 
           {/* Heading 2 Button - Medium heading */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            className={`px-3 py-1 rounded text-sm font-semibold hover:bg-surface-soft transition-colors ${
-              editor.isActive('heading', { level: 2 }) ? 'bg-surface-soft' : ''
-            }`}
-            title="Heading 2"
-          >
-            H2
-          </button>
+          <Tooltip label="Heading 2">
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+              className={`px-3 py-1 rounded text-sm font-semibold hover:bg-surface-soft transition-colors ${
+                editor.isActive('heading', { level: 2 }) ? 'bg-surface-soft' : ''
+              }`}
+              aria-label="Heading 2"
+            >
+              H2
+            </button>
+          </Tooltip>
 
           {/* Heading 3 Button - Small heading */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-            className={`px-3 py-1 rounded text-sm font-semibold hover:bg-surface-soft transition-colors ${
-              editor.isActive('heading', { level: 3 }) ? 'bg-surface-soft' : ''
-            }`}
-            title="Heading 3"
-          >
-            H3
-          </button>
+          <Tooltip label="Heading 3">
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+              className={`px-3 py-1 rounded text-sm font-semibold hover:bg-surface-soft transition-colors ${
+                editor.isActive('heading', { level: 3 }) ? 'bg-surface-soft' : ''
+              }`}
+              aria-label="Heading 3"
+            >
+              H3
+            </button>
+          </Tooltip>
 
           {/* Visual divider between headings and lists */}
           <div className="w-px h-6 bg-hairline-strong mx-1" />
 
           {/* Bullet List Button - Toggle on/off */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => editor.chain().focus().toggleBulletList().run()}
-            className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
-              editor.isActive('bulletList') ? 'bg-surface-soft' : ''
-            }`}
-            title="Bullet List"
-          >
-            <Icon name="list" size={16} />
-          </button>
+          <Tooltip label="Bullet List">
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editor.chain().focus().toggleBulletList().run()}
+              className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
+                editor.isActive('bulletList') ? 'bg-surface-soft' : ''
+              }`}
+              aria-label="Bullet List"
+            >
+              <Icon name="list" size={16} />
+            </button>
+          </Tooltip>
 
           {/* Ordered List Button - Toggle on/off */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
-              editor.isActive('orderedList') ? 'bg-surface-soft' : ''
-            }`}
-            title="Numbered List"
-          >
-            <Icon name="list-numbers" size={16} />
-          </button>
+          <Tooltip label="Numbered List">
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editor.chain().focus().toggleOrderedList().run()}
+              className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
+                editor.isActive('orderedList') ? 'bg-surface-soft' : ''
+              }`}
+              aria-label="Numbered List"
+            >
+              <Icon name="list-numbers" size={16} />
+            </button>
+          </Tooltip>
 
           {/* Task List Button - Toggle on/off */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => editor.chain().focus().toggleTaskList().run()}
-            className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
-              editor.isActive('taskList') ? 'bg-surface-soft' : ''
-            }`}
-            title="Task List"
-          >
-            <Icon name="list-checks" size={16} />
-          </button>
+          <Tooltip label="Task List">
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editor.chain().focus().toggleTaskList().run()}
+              className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
+                editor.isActive('taskList') ? 'bg-surface-soft' : ''
+              }`}
+              aria-label="Task List"
+            >
+              <Icon name="list-checks" size={16} />
+            </button>
+          </Tooltip>
 
           {/* Visual divider before blockquote and link */}
           <div className="w-px h-6 bg-hairline-strong mx-1" />
 
           {/* Blockquote Button - Toggle on/off */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
-              editor.isActive('blockquote') ? 'bg-surface-soft' : ''
-            }`}
-            title="Blockquote"
-          >
-            <Icon name="quotes" size={16} />
-          </button>
+          <Tooltip label="Blockquote">
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editor.chain().focus().toggleBlockquote().run()}
+              className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
+                editor.isActive('blockquote') ? 'bg-surface-soft' : ''
+              }`}
+              aria-label="Blockquote"
+            >
+              <Icon name="quotes" size={16} />
+            </button>
+          </Tooltip>
 
           {/* Code Block Button - Toggle on/off */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-            className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
-              editor.isActive('codeBlock') ? 'bg-surface-soft' : ''
-            }`}
-            title="Code Block"
-          >
-            <Icon name="code" size={16} />
-          </button>
+          <Tooltip label="Code Block">
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+              className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
+                editor.isActive('codeBlock') ? 'bg-surface-soft' : ''
+              }`}
+              aria-label="Code Block"
+            >
+              <Icon name="code" size={16} />
+            </button>
+          </Tooltip>
 
           {/* Link Button - Keyboard: Cmd+K / Ctrl+K */}
-          <button
-            onClick={handleOpenLinkDialog}
-            onMouseDown={(e) => e.preventDefault()}
-            className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
-              editor.isActive('link') ? 'bg-surface-soft' : ''
-            }`}
-            title={`Add/Edit Link (${modKey}+K)`}
-          >
-            <Icon name="link-simple" size={16} />
-          </button>
+          <Tooltip label={`Add/Edit Link (${modKey}+K)`}>
+            <button
+              onClick={handleOpenLinkDialog}
+              onMouseDown={(e) => e.preventDefault()}
+              className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
+                editor.isActive('link') ? 'bg-surface-soft' : ''
+              }`}
+              aria-label="Add or edit link"
+            >
+              <Icon name="link-simple" size={16} />
+            </button>
+          </Tooltip>
 
           {/* Comment Button (Sprint 94 #81) — anchors an empty comment on the
               selection; the margin rail opens a compose bubble for it. */}
           {commentCallouts && (
             <>
               <div className="w-px h-6 bg-hairline-strong mx-1" />
-              <button
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() =>
-                  editor.chain().focus().setCommentMark({ id: newCommentId(), note: '', agentAlias: null }).run()
-                }
-                className="px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center gap-1.5"
-                title="Add comment"
-              >
-                <Icon name="chat" size={16} />
-                Comment
-              </button>
+              <Tooltip label="Add comment">
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() =>
+                    editor.chain().focus().setCommentMark({ id: newCommentId(), note: '', agentAlias: null }).run()
+                  }
+                  className="px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center gap-1.5"
+                  aria-label="Add comment"
+                >
+                  <Icon name="chat" size={16} />
+                  Comment
+                </button>
+              </Tooltip>
             </>
           )}
         </div>
@@ -502,25 +527,27 @@ export function FormattingBubbleMenu({
                     if (target.kind !== 'external' && target.kind !== 'internal') return null
                     const isExternal = target.kind === 'external'
                     return (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (isExternal) {
-                            openExternalUrl(target.href)
-                          } else {
-                            openInternalLink(target.href)
-                          }
-                          setShowLinkDialog(false)
-                        }}
-                        className="px-3 py-2 border rounded text-ink-muted hover:text-ink-strong hover:bg-surface-muted transition-colors"
-                        title={
+                      <Tooltip label={
                           isExternal
                             ? `Open in browser (${modKey}+click also works)`
                             : `Open file (${modKey}+click also works)`
-                        }
-                      >
-                        <Icon name="arrow-square-out" size={16} />
-                      </button>
+                        }>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isExternal) {
+                              openExternalUrl(target.href)
+                            } else {
+                              openInternalLink(target.href)
+                            }
+                            setShowLinkDialog(false)
+                          }}
+                          className="px-3 py-2 border rounded text-ink-muted hover:text-ink-strong hover:bg-surface-muted transition-colors"
+                          aria-label={isExternal ? 'Open in browser' : 'Open file'}
+                        >
+                          <Icon name="arrow-square-out" size={16} />
+                        </button>
+                      </Tooltip>
                     )
                   })()}
                 </div>

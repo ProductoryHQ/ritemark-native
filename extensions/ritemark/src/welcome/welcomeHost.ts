@@ -80,6 +80,8 @@ import {
   type WelcomeState,
 } from './protocol';
 import { WELCOME_VIEW_TYPE, welcomeHtml } from './welcomePanel';
+import { HOME_PLACE_ID } from '../frameIdentifiers';
+import { isShellPageSignal } from '../shellPageSignals';
 
 /** The workbench draws the welcome alone while this is true (patch 018, `ritemarkWelcomeAlone.ts`). */
 export const WELCOME_ALONE_CONTEXT_KEY = 'ritemark.welcomeAlone';
@@ -143,17 +145,7 @@ function carryOverRitemark1Answer(context: vscode.ExtensionContext): void {
 
 // ── The host ─────────────────────────────────────────────────────────────────
 
-export interface WelcomeHost {
-  /** The welcome is open in this window. */
-  isOpen(): boolean;
-  /**
-   * Sprint 144 (P5): the welcome may open alone at this start (a window with no folder, the update welcome, or a
-   * restored welcome tab), decided before it has opened. The AI column is not brought forward early then.
-   */
-  mayOpenAtStart(): boolean;
-}
-
-export function registerWelcome(context: vscode.ExtensionContext, profileKind: ProfileKind, aiSheet: WelcomeAiSheet, projects?: WelcomeProjects): WelcomeHost {
+export function registerWelcome(context: vscode.ExtensionContext, profileKind: ProfileKind, aiSheet: WelcomeAiSheet, projects?: WelcomeProjects): void {
   const controller = new WelcomeController(context, profileKind, aiSheet, projects);
   context.subscriptions.push(
     controller,
@@ -165,7 +157,6 @@ export function registerWelcome(context: vscode.ExtensionContext, profileKind: P
     }),
   );
   void controller.start();
-  return { isOpen: () => controller.isOpen(), mayOpenAtStart: () => controller.mayOpenAtStart() };
 }
 
 type OpenReason = 'start' | 'command' | 'folder-gone';
@@ -240,18 +231,6 @@ class WelcomeController implements vscode.Disposable {
     );
   }
 
-  isOpen(): boolean {
-    return this.panel !== null;
-  }
-
-  /** Sprint 144 (P5): `start()` opens the welcome after an await, so `isOpen()` is still false right after it begins. */
-  mayOpenAtStart(): boolean {
-    const hasFolder = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
-    return this.panel !== null
-      || opensAtStart({ kind: this.kind, hasFolder, openingFiles: false })
-      || this.restoredWelcomeTabs().length > 0;
-  }
-
   dispose(): void {
     this.closePanel();
     for (const disposable of this.disposables) disposable.dispose();
@@ -303,7 +282,7 @@ class WelcomeController implements vscode.Disposable {
   private async land(record: LandingRecord): Promise<void> {
     // Sprint 134 (R10): the project's Home first, its projects list in the left column.
     if (this.projectSource) {
-      await vscode.commands.executeCommand('workbench.view.extension.ritemark-home');
+      await vscode.commands.executeCommand(HOME_PLACE_ID);
       await this.projectSource.revealHome();
     } else {
       await vscode.commands.executeCommand('workbench.view.explorer');
@@ -585,6 +564,7 @@ class WelcomeController implements vscode.Disposable {
   // ── Requests from the page ────────────────────────────────────────────────
 
   private async onRequest(raw: unknown): Promise<void> {
+    if (isShellPageSignal(raw)) return; // the shell's, not the welcome's (Sprint 152, PR 3)
     const decoded = decodeWelcomeRequest(raw);
     if (!decoded.ok) {
       console.warn(`[welcome] refused: ${decoded.reason}`);

@@ -56,7 +56,7 @@ const DropdownMenuItem = React.forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex select-none items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] outline-none focus:bg-surface-soft data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:shrink-0 [&_svg]:fill-current',
+      'rm-icons-take-ink relative flex select-none items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] outline-none focus:bg-surface-soft data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:shrink-0 [&_svg]:fill-current',
       tone === 'danger' && 'text-[var(--r-error)] focus:text-[var(--r-error)]',
       className
     )}

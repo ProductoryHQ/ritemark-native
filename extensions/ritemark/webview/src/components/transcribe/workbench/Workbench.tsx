@@ -37,6 +37,7 @@ import {
 import { normalizeSpeakerLabel } from '../../../../../src/speech/speakerNames';
 import { WORKBENCH_LAYOUT_CLASSES } from './layout';
 import { TranscriptSearchBar } from './TranscriptSearchBar';
+import { Tooltip } from '../../ui/tooltip';
 import {
   findTranscriptMatches,
   matchCountLabel,
@@ -286,15 +287,16 @@ export function Workbench() {
               folder, and the document they made stays linked here afterwards. */}
           <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
             {state.savedDocument && (
-              <button
-                type="button"
-                onClick={() => vscode.postMessage({ type: 'workbench:openDocument' })}
-                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-accent hover:bg-accent-soft sm:max-w-[16rem]"
-                title={`Open ${state.savedDocument.path}`}
-              >
-                <Icon name="file-text" size={14} />
-                <span className="truncate">{state.savedDocument.name}</span>
-              </button>
+              <Tooltip label={`Open ${state.savedDocument.path}`} className="min-w-0 max-w-full sm:max-w-[16rem]">
+                <button
+                  type="button"
+                  onClick={() => vscode.postMessage({ type: 'workbench:openDocument' })}
+                  className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-accent hover:bg-accent-soft sm:max-w-[16rem]"
+                >
+                  <Icon name="file-text" size={14} />
+                  <span className="truncate">{state.savedDocument.name}</span>
+                </button>
+              </Tooltip>
             )}
             <Button
               variant="secondary"
@@ -307,23 +309,25 @@ export function Workbench() {
         </div>
 
         <div className="mt-3 flex min-w-0 items-center gap-2 sm:gap-3">
-          <Button
-            size="icon"
-            className="shrink-0 rounded-full"
-            onClick={togglePlay}
-            title={playing ? 'Pause' : 'Play'}
-          >
-            {/* The icon pack has no pause glyph, and a minus reads as "remove".
-                Two bars is the universal mark and costs two divs. */}
-            {playing ? (
-              <span className="flex gap-[3px]">
-                <span className="block h-3.5 w-[3px] rounded-full bg-current" />
-                <span className="block h-3.5 w-[3px] rounded-full bg-current" />
-              </span>
-            ) : (
-              <Icon name="play" size={14} />
-            )}
-          </Button>
+          <Tooltip label={playing ? 'Pause' : 'Play'} className="shrink-0">
+            <Button
+              size="icon"
+              className="shrink-0 rounded-full"
+              onClick={togglePlay}
+              aria-label={playing ? 'Pause' : 'Play'}
+            >
+              {/* The icon pack has no pause glyph, and a minus reads as "remove".
+                  Two bars is the universal mark and costs two divs. */}
+              {playing ? (
+                <span className="flex gap-[3px]">
+                  <span className="block h-3.5 w-[3px] rounded-full bg-current" />
+                  <span className="block h-3.5 w-[3px] rounded-full bg-current" />
+                </span>
+              ) : (
+                <Icon name="play" size={14} />
+              )}
+            </Button>
+          </Tooltip>
 
           <Waveform
             peaks={session.peaks}
@@ -543,19 +547,20 @@ function SpeakerBar({
         const isRenaming = renaming === speaker.id;
         return (
           <div key={speaker.id} className="relative min-w-0">
-            <button
-              type="button"
-              onClick={() => onStartRename(speaker)}
-              className={[
-                'inline-flex max-w-48 min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold',
-                isRenaming ? 'border-accent ring-[3px] ring-[var(--r-accent-soft)]' : 'border-hairline hover:border-accent-fainter',
-              ].join(' ')}
-              title={`Rename ${speaker.label}`}
-              aria-label={`Rename ${speaker.label}`}
-            >
-              <span className="size-2 shrink-0 rounded-full" style={{ background: color.dot }} />
-              <span className="min-w-0 truncate">{speaker.label}</span>
-            </button>
+            <Tooltip label={`Rename ${speaker.label}`} className="min-w-0 max-w-48">
+              <button
+                type="button"
+                onClick={() => onStartRename(speaker)}
+                className={[
+                  'inline-flex max-w-48 min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+                  isRenaming ? 'border-accent ring-[3px] ring-[var(--r-accent-soft)]' : 'border-hairline hover:border-accent-fainter',
+                ].join(' ')}
+                aria-label={`Rename ${speaker.label}`}
+              >
+                <span className="size-2 shrink-0 rounded-full" style={{ background: color.dot }} />
+                <span className="min-w-0 truncate">{speaker.label}</span>
+              </button>
+            </Tooltip>
 
             {isRenaming && (
               <div className="absolute left-0 top-9 z-10 w-64 rounded-lg border border-hairline-strong bg-surface p-3 shadow-lg">

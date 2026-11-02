@@ -28,6 +28,7 @@ import { inlineMermaidDiagramsForExport } from './lib/mermaidExport'
 import { inlineSvgImagesForExport } from './lib/svgRasterExport'
 import { prepareMathForExport } from './lib/mathExport'
 import { writeClipboard } from './lib/clipboard'
+import { usePageDrawn } from './lib/pageDrawn'
 import { getHeadings } from './lib/headingUtils'
 import type { Heading } from './lib/headingUtils'
 import { marked } from 'marked'
@@ -81,6 +82,7 @@ function App() {
   const [properties, setProperties] = useState<DocumentProperties>({})
   const [_hasProperties, setHasProperties] = useState(false)
   const [isReady, setIsReady] = useState(false)
+  usePageDrawn(isReady) // Sprint 152, PR 3: the shell's loading look stays until the document is drawn
   const [imageMappings, setImageMappings] = useState<Record<string, string>>({})
   const [features, setFeatures] = useState<Features>({
     voiceDictation: false,
@@ -782,12 +784,10 @@ function App() {
     return onDocChanged(editor, refresh)
   }, [editorReady])
 
+  // Sprint 152, PR 3 (the Experience lead's answer 4): no "Loading...". Until the document is there the page is its sheet
+  // alone, under the shell's loading look, which stays until the page says it is drawn (usePageDrawn above)
   if (!isReady) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <div className="text-foreground">Loading...</div>
-      </div>
-    )
+    return <div className="h-screen bg-background" aria-busy="true" />
   }
 
   // Route to PDFViewer for PDF files

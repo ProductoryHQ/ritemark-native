@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-10-26 (Sprint 137: the editor's Markdown pipeline, files as written, a refused save goes to Ritemark first; Sprint 139: the AI you chose keeps working — one failure classifier and card, a chat's model kept, the turn counts; Sprint 140: the first day's guidance and the feedback door; Sprint 138: equations, typeset, edited in place and exported)
+**Last updated:** 2026-11-02 (Sprint 152: the shell's startup contract, the frame drawn from one description and one loading look in every slot; Sprint 137: the editor's Markdown pipeline, files as written, a refused save goes to Ritemark first; Sprint 139: the AI you chose keeps working — one failure classifier and card, a chat's model kept, the turn counts; Sprint 140: the first day's guidance and the feedback door; Sprint 138: equations, typeset, edited in place and exported)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -543,6 +543,51 @@ supplies defaults, words and colours.
   - **#451:** new Text and Table go in the project, in the folder chosen in the tree. 018's hidden `_ritemark.files.chosenFolder` (`fileCommands.ts`) gives the folder, and `src/newDocumentLocation.ts` names the file.
   - **The closeout:** 007's Copilot Chat entries (More, the View menu, Ctrl+Alt+I) count only a Copilot Chat that is installed and not disabled. Ctrl+Alt+I is always Ritemark's, so VS Code's own Chat never opens in its place.
 - **Sprint 134** (see *The project at the centre*): the head on Tasks, Browser and Transcribe, each place's rows from extension commands; on Home, no head and no title row; Switch project's flyout; File ▸ New tab, Switch project and Share from `ritemark/fileMenu`; ⌘T and Ctrl+T run 019's `ritemark.newTab`; the Task board tab's count.
+
+#### The startup contract (Sprint 152)
+
+The shell knows Ritemark's frame up front and draws its final geometry from the first frame; the extension only fills
+it in. Before, the frame took its shape from the extension's contributions, which exist only once VS Code has read the
+extensions (+0.2 s on a Mac) or Ritemark has started (12 s on a slow first start), so places came, the left column
+moved to Home's place, tabs arrived and the welcome took the window late.
+
+- **The manifest.** `branding/product.json`'s `ritemarkFrame` block, read at the first frame by 002's
+  `ritemarkFrame.ts` through `product`: the places (ids, order, placeholder titles and icons, each place's head rows
+  with their command and menu ids and the label over the content), Home's place, the AI column's container, the
+  permanent tabs (view type, title, icons, the flag setting that turns one off), the desk's front in a project window,
+  the welcome's view type and the extension's id. Unknown keys are ignored; no block reads as no frame and draws as VS
+  Code does, logged once. The settings that shape the frame are in product.json's `configurationDefaults` with the
+  extension's values. Every patch reads it from `ritemarkFrame.ts` (002 places, 018 the head, the desk's front, the
+  welcome, 019 the permanent tabs); 018 and 019 may import 002, never the other way.
+- **The slot.** A box drawn at its final size before its content exists, filled by the extension, or released once and
+  logged (`[ritemark] slot released: <name>`): a contribution's slot when the extensions are read (a place the window
+  restores, a head row, the AI column), a content slot when Ritemark isn't there or hasn't started after 60 s (a failed start shows so), VS Code's own limit
+  for the extension host (the welcome alone, a first desk's tabs, restored terminals' wait). The AI column the shell
+  closed as a release comes back with the layout at the next start; only the person's toggle closes it for good.
+  The slots live in `ritemarkFrame.ts` with the manifest, not in a module of 018's as planned: 002's AI column releases
+  one, and 002 can't import 018.
+- **What it draws from the first frame.** The places row with all six places (a new profile's too: VS Code's own stored
+  placeholders, seeded from the manifest), the place the window restores checked and its head drawn (a project with
+  none stored opens on Home's place), Home's and the Task board's tabs on a project's first desk (saved webview tabs of
+  the built-in extension, revived when its serializers register), the welcome alone in the welcome's window, the AI
+  column in a project window, and a restored terminal's tab with its name and its icon's room.
+- **Version skew.** An extension release runs in an older shell, so `release-extension-preflight.sh` compares every
+  identifier the manifest at its `--ref` names with the extension's own (`package.json`, and `src/frameIdentifiers.ts`
+  for those that live in code) and refuses a release that adds, removes or renames one
+  (`scripts/check-frame-manifest.mjs`); `frameIdentifiers.test.ts` keeps the frame-shaping defaults equal;
+  `validate-build-output.sh` fails a build without the block. `scripts/qa/project-check.mjs --first-frame` fails when the
+  frame moves after its first frame, in five starts.
+- **The loading look** (PR 3). What a slot shows while its content isn't there yet, the same in every slot: its own
+  material for a second, then the kit's turning mark alone at its centre (words for screen readers only), and at a start
+  in each window's main slot (the desk, or the welcome's window) one line after ten seconds; the content replaces it in
+  one change, the look waiting above a tab's page until it is drawn (Home, the Task board and a document post
+  `ritemark/pageDrawing` and then `ritemark/pageDrawn`, `src/shellPageSignals.ts`; other pages until their first
+  message). 002's `ritemarkLoadingLook.ts` draws it
+  (018's stylesheet); 007's `webviewEditor.ts` (every webview tab), 018's `ritemarkWelcomeAlone.ts` and
+  `webviewViewPane.ts` (the AI column) use it, and the AI's view takes the column's moment from the shell
+  (`_ritemark.loadingLook.since`, W5) so its own mark doesn't start its second again. No VS Code progress sign shows
+  beside it: Ritemark's views run under no `withProgress`, places show no progress badge, a waiting tab's desk no
+  progress line, and VS Code's own views' lines are ink (the themes' `progressBar.background`).
 
 ### The welcome and usage data (Sprint 133)
 
