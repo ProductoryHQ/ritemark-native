@@ -78,3 +78,37 @@ I10, I13, I15, I16, I22, I26 and I39's Connect; the key rows I11 and I32–I38 (
 I19, I27 and I44 (each opens the browser); I40 (a connected Google account); I58's Clear (no transcripts here); the ways
 in `google-docs` (Share, with Google Docs publishing on), `google-ai-key` and `openai-api-key` (a flow step with no key),
 `usage-data` (no opener passes it). Their landings are held by `settingsPage.test.ts`.
+
+## PR 2: AI accounts (W4; R3, R9)
+
+AI accounts draws Claude, ChatGPT and OpenCode as rows (answer 9's words, one button each, no amber or red), API keys
+under Other ways to connect with Open…, and AI information at the foot. Details… opens `AiDetailsSheet.tsx` (Claude,
+ChatGPT, and OpenCode's from answer 1); Open… and OpenCode's Set up open `ApiKeysSheet.tsx` (frame 9, answers 2 and 6).
+Every action sends today's message; no host, `src/settings/` key or sign-in code changed. The saved-key eye stays
+(decision 2, Jarmo, 2 November): Change opens the field filled with the saved key, hidden until its eye is pressed. The
+Repair sheet's amber dots are gone: a state that needs the person reads in words, with no dot (the lead's note).
+
+### The inventory test, extended
+
+`settingsInventory.test.ts` now holds each copy of a sign-in or repair message by its owner (the rows, the Details
+sheets, Ritemark's parts), the page's `setApiKey` and `testApiKey`, and each key row's Save, Remove key (`setApiKey` with
+an empty value, I37), Test, Get a key and eye (I38). Each was checked by removing it: a row's `codex:startLogin`, the
+sheet's `claude:enterApiKey` and `claude:repair`, the page's `testApiKey`, a row's Remove key, Test and eye, and the
+ElevenLabs row each fail it.
+
+### The rows
+
+| Rows | New place | Check | Result |
+|---|---|---|---|
+| I7–I10, I13 | Claude's row: Ready, Install, Repair, Reload window, Sign in, Cancel; Details… on every state | T; R (each state) | Pass |
+| I11, I12, I14–I19 | Claude's Details: Signed in (how, who is billed), Use an API key instead, Use Claude.ai sign-in, Get one at Anthropic, Version with Check again, Used for with Learn more, Technical details, Sign out, Repair Claude | T; R | Pass |
+| I20–I24 | ChatGPT's row: Ready, Sign in, Cancel, the sign-in error, Install, Repair | T; R | Pass |
+| I24–I27 | ChatGPT's Details: e-mail, plan, credits; the repair command, Reload window; Sign out; Learn more | T; R | Pass |
+| I30 | OpenCode's row: Set up, or Ready with the key it uses; its Details with Keys… | R | Pass |
+| I32–I38 | The API keys sheet: five rows in the drawing's order, Not added with Get a key and Add, Saved · it works, Test, Change, Remove key, the eye; the flags hide OpenRouter and ElevenLabs as before | T; R | Pass |
+| I59 | AI information at the foot | T; R | Pass |
+| I61 | `google-ai-key` and `openai-api-key` open the API keys sheet at their rows | R | Pass |
+
+**Not run here (Gate 1):** the dev-instance launch (the brief allows it only before 08:00 EET; this was built after
+22:00), so the key round trip (K) for the five keys, the sign-in rows' start and cancel (I10, I13, I22), the links
+(I12, I19, I27) and the captures wait for Gate 1 or a morning launch. Windows: through the overlay.

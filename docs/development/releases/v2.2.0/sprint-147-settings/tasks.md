@@ -33,10 +33,10 @@ The plan is approved on Jarmo's 2.2 delegation (sprint-plan.md, *Approval*). The
 
 ## Phase 3: PR 2, AI accounts (W4; R3, R9)
 
-- [ ] The three rows, with every state; render tests from recorded payloads
-- [ ] `AiDetailsSheet.tsx` for Claude and ChatGPT (and OpenCode's if drawn)
-- [ ] `ApiKeysSheet.tsx`: Add, Test, Change, Remove, Get a key. Until Jarmo answers decision 2, Change opens the field filled with the saved key and keeps today's eye; the empty field comes only with his yes, together with PR 3's key change
-- [ ] AI information at the foot
+- [x] The three rows, with every state; render tests from recorded payloads
+- [x] `AiDetailsSheet.tsx` for Claude and ChatGPT (and OpenCode's if drawn)
+- [x] `ApiKeysSheet.tsx`: Add, Test, Change, Remove, Get a key. Until Jarmo answers decision 2, Change opens the field filled with the saved key and keeps today's eye; the empty field comes only with his yes, together with PR 3's key change
+- [x] AI information at the foot
 - [ ] The key round trip (K) for all five keys, on the Mac and on Windows through the overlay; sign-in rows start and cancel
 - [ ] The inventory test passes; the rows I7–I38 and I59 checked
 - [ ] Screenshots in Light and Dark to the Experience lead

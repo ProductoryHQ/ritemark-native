@@ -19,6 +19,7 @@ export function SettingsRow({
   row,
   id,
   className,
+  mark,
 }: {
   name: ReactNode
   line?: ReactNode
@@ -28,9 +29,12 @@ export function SettingsRow({
   row?: string
   id?: string
   className?: string
+  /** A small picture at the row's left (AI accounts' rows, frame 2). */
+  mark?: ReactNode
 }) {
   return (
     <div id={id} data-settings-row={row} className={cn('flex scroll-mt-6 items-center gap-3.5 border-t border-hairline py-3.5', className)}>
+      {mark}
       <div className="grid min-w-0 flex-1">
         <div className="text-[14px] font-semibold leading-5 text-ink-strong">{name}</div>
         {line ? <div className="text-[13px] leading-[18px] text-ink-muted">{line}</div> : null}

@@ -6,7 +6,7 @@
  * never rewritten.
  *
  * Ritemark's parts: Check asks Claude and ChatGPT again; Repair… opens today's three readiness cards, moved whole into
- * a sheet (the Experience lead's answer 5 draws its rows; PR 2 redraws them).
+ * a sheet (the Experience lead's answer 5 draws its rows). A state that needs the person reads in words, with no dot.
  */
 
 import { useState, type ReactNode } from 'react'
@@ -365,12 +365,15 @@ function getRuntimeStatusCopy(model: RuntimeStatusModel): { label: string; sub: 
   }
 }
 
-function getRuntimeDotClass(model: RuntimeStatusModel): { bg: string; pulse: boolean; ariaLabel: string } {
+/**
+ * The card's dot: green when ready, the error token when the runtime can't run. A state that needs the person (Sign in
+ * required, an account to check) reads in words with no dot: the framework has no amber (the Experience lead, PR 2).
+ */
+export function getRuntimeDotClass(model: RuntimeStatusModel): { bg: string; ariaLabel: string } | null {
   // Sprint 145 (#578): the one green is the ready dot, in the success token, so it is one colour everywhere
-  if (model.runtime === 'installed' && model.auth === 'ready') return { bg: 'bg-ritemark-success', pulse: false, ariaLabel: 'Status: ready' }
-  if (model.runtime === 'installed' && model.auth === 'sign_in_required') return { bg: 'bg-amber-500', pulse: true, ariaLabel: 'Status: attention required' }
-  if (model.runtime === 'installed') return { bg: 'bg-amber-500', pulse: false, ariaLabel: 'Status: attention required' }
-  return { bg: 'bg-rose-500', pulse: false, ariaLabel: 'Status: error' }
+  if (model.runtime === 'installed' && model.auth === 'ready') return { bg: 'bg-ritemark-success', ariaLabel: 'Status: ready' }
+  if (model.runtime === 'installed') return null
+  return { bg: 'bg-ritemark-error', ariaLabel: 'Status: error' }
 }
 
 function getSourceChipLabel(source: RuntimeStatusModel['source']): string | null {
@@ -412,12 +415,12 @@ function RuntimeStatusCard({
     <div className="min-w-0 rounded-lg border border-hairline bg-surface p-4 shadow-sm">
       <div className="flex items-center justify-between gap-2 border-b border-hairline pb-3">
         <div className="flex items-center gap-2 text-sm font-medium text-ink-strong">{icon}{title}</div>
-        <span className={`inline-block h-2 w-2 rounded-full ${dot.bg} ${dot.pulse ? 'animate-pulse' : ''}`} aria-label={dot.ariaLabel} role="status" />
+        {dot ? <span className={`inline-block h-2 w-2 rounded-full ${dot.bg}`} aria-label={dot.ariaLabel} role="status" /> : null}
       </div>
       <div className="mt-3">
         <div className="text-[13px] font-medium leading-snug text-ink-strong">{copy.label}</div>
         {copy.sub && <div className="mt-0.5 text-xs leading-normal text-ink-muted">{copy.sub}</div>}
-        {showError && <div className="mt-1 break-words text-xs text-rose-700 [overflow-wrap:anywhere]">{errorMessage}</div>}
+        {showError && <div className="mt-1 break-words text-xs text-ritemark-error [overflow-wrap:anywhere]">{errorMessage}</div>}
       </div>
       {(sourceLabel || versionLabel) && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
