@@ -79,7 +79,8 @@ are finite, so nothing is checked twice for the same risk).
 - Codex reviews a PR by itself once, when it opens ready or goes from draft to ready. That review is its one loop:
   answer it once, in one commit, and stop. Never tag `@codex review`, and never toggle draft and ready to get
   another: each pass finds something new and the loop never ends (Jarmo, 1 November 2026). Open a PR as a draft
-  and mark it ready once, after round one, so Codex's review is answered after it (on High, inside round two).
+  and mark it ready once, after round one, so Codex's review is answered after it. Its fixes are checked against its
+  findings, as any commit after the last round is: on High they start round two only when they go beyond those findings.
 - The record: a comment by the merging session that starts with **Review record**, posted after the last round. It
   names the reviewed head commit (SHA), the rounds and each finding's outcome (fixed, rejected, intentional, didn't
   matter), and the security review's outcome for High tier. The merge uses that SHA in `--match-head-commit`.
