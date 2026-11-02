@@ -13,6 +13,19 @@
 export const HOME_TAB_VIEW_TYPE = 'ritemark.home';
 export const BOARD_TAB_VIEW_TYPE = 'ritemark.taskBoard';
 
+/**
+ * What the shell draws for each permanent tab before the extension starts (the manifest's `title`, `icon`, `setting`):
+ * the title, one icon per theme (relative to the extension's folder), and, for the board, the setting that turns it off.
+ * The panels set these same values when they open, so a tab does not change when the extension takes it over.
+ */
+export const HOME_TAB_TITLE = 'Home';
+export const HOME_TAB_ICON_LIGHT = 'media/home/home-tab-light.svg';
+export const HOME_TAB_ICON_DARK = 'media/home/home-tab-dark.svg';
+export const BOARD_TAB_TITLE = 'Task board';
+export const BOARD_TAB_ICON_LIGHT = 'media/tasks-tab-light.svg';
+export const BOARD_TAB_ICON_DARK = 'media/tasks-tab-dark.svg';
+export const BOARD_TAB_SETTING = 'ritemark.features.task-board';
+
 /** The welcome's webview panel. */
 export const WELCOME_VIEW_TYPE = 'ritemark.welcome';
 
