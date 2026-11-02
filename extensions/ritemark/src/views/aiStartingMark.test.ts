@@ -11,6 +11,9 @@ import {
   aiColumnShownSince,
   aiStartingMarkBody,
   aiStartingMarkHead,
+  SHELL_LOOK_SINCE_COMMAND,
+  SHELL_LOOK_SINCE_WAIT_MS,
+  shellLookSince,
 } from './aiStartingMark';
 
 // The column's first frame: a view resolved as part of the start counts from the extension host's start; one resolved
@@ -49,4 +52,22 @@ assert.match(head, /body\.vscode-reduce-motion \.rm-ai-starting \{\s*animation: 
 assert.equal(aiStartingMarkBody(), `<div id="${AI_STARTING_MARK_ID}" class="rm-ai-starting" role="status" aria-label="${AI_STARTING_WORDS}"></div>`);
 assert.equal(AI_STARTING_WORDS, 'The AI is starting');
 
-console.log('views/aiStartingMark: all assertions passed');
+// W5: the shell hands over when the column's slot began to wait; anything else leaves the host's estimate standing.
+void (async () => {
+  const asked: unknown[][] = [];
+  assert.equal(await shellLookSince(async (...args) => { asked.push(args); return 12_345; }, 'ritemark.unifiedView'), 12_345);
+  assert.deepEqual(asked, [[SHELL_LOOK_SINCE_COMMAND, 'ritemark.unifiedView']]);
+  assert.equal(SHELL_LOOK_SINCE_COMMAND, '_ritemark.loadingLook.since', 'the command patch 002 registers');
+  assert.equal(await shellLookSince(async () => { throw new Error('command \'_ritemark.loadingLook.since\' not found'); }, 'v'), undefined, 'an older shell');
+  for (const answer of [undefined, null, '12', Number.NaN, 0, -5]) {
+    assert.equal(await shellLookSince(async () => answer, 'v'), undefined, `no moment in ${String(answer)}`);
+  }
+  const startedAt = Date.now();
+  assert.equal(await shellLookSince(() => new Promise(() => undefined), 'v'), undefined, 'a shell that doesn\'t answer');
+  assert.ok(Date.now() - startedAt >= SHELL_LOOK_SINCE_WAIT_MS - 5, 'it waits for the shell a moment before the estimate stands in');
+
+  console.log('views/aiStartingMark: all assertions passed');
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

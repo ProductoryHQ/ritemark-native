@@ -70,6 +70,23 @@ are the audits.
 - [ ] The PR: High review (`/code-review` at high, `/security-review`), every finding answered, the Review record, the
       merge at the reviewed head with Jarmo's word (or the Development manager's while he has delegated merging)
 
+## Phase 3b: PR 3, one loading look and no VS Code progress sign (W8; R10, R11)
+
+- [x] Branch `sprint-152-startup-contract-loading` from PR 2's head (`f604e8fa`), stacked
+- [x] The look: `ritemarkLoadingLook.ts` (002) and its stylesheet rules (018); its unit tests
+- [x] The desk (`webviewEditor.ts`, 007), the welcome's window (`ritemarkWelcomeAlone.ts`), the AI column
+      (`webviewViewPane.ts`) on the look; W5's command and the AI view's host asking it (`shellLookSince`)
+- [x] No VS Code progress for Ritemark's views; the places' progress badge and the desk's line hidden; the themes'
+      `progressBar.background` in ink
+- [x] The terminal tab's 0.46 px step (`multiEditorTabsControl.ts`, 019)
+- [x] E2: two new hunks in upstream files (`webviewEditor.ts`, `multiEditorTabsControl.ts`), none newly touched
+- [x] The first-frame check on every start, held starts' captures Light and Dark (the mark at 1 s, the line at 10 s,
+      Reduce motion, a tab opened later), the frame check against PR 2, the dry run and a real apply from the pin
+- [x] Patches regenerated with `./scripts/create-patch.sh`; headers; docs (E5)
+- [x] High review, three rounds (`/code-review` at high, `/security-review`): 15, 14 and 9 findings, fixed or
+      answered; no security findings
+- [ ] The PR, opened as a draft right after PR 2 when the Development manager says so
+
 ## Phase 4: QA and closeout
 
 - [ ] `qa-evidence.md`: each requirement's check, failing on `main` and passing on the branch (E1) (PR 1's rows in)

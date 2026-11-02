@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-10-26 (Sprint 137: the editor's Markdown pipeline, files as written, a refused save goes to Ritemark first; Sprint 139: the AI you chose keeps working — one failure classifier and card, a chat's model kept, the turn counts; Sprint 140: the first day's guidance and the feedback door; Sprint 138: equations, typeset, edited in place and exported)
+**Last updated:** 2026-11-02 (Sprint 152: the shell's startup contract, the frame drawn from one description and one loading look in every slot; Sprint 137: the editor's Markdown pipeline, files as written, a refused save goes to Ritemark first; Sprint 139: the AI you chose keeps working — one failure classifier and card, a chat's model kept, the turn counts; Sprint 140: the first day's guidance and the feedback door; Sprint 138: equations, typeset, edited in place and exported)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -577,6 +577,17 @@ moved to Home's place, tabs arrived and the welcome took the window late.
   (`scripts/check-frame-manifest.mjs`); `frameIdentifiers.test.ts` keeps the frame-shaping defaults equal;
   `validate-build-output.sh` fails a build without the block. `scripts/qa/project-check.mjs --first-frame` fails when the
   frame moves after its first frame, in five starts.
+- **The loading look** (PR 3). What a slot shows while its content isn't there yet, the same in every slot: its own
+  material for a second, then the kit's turning mark alone at its centre (words for screen readers only), and at a start
+  in each window's main slot (the desk, or the welcome's window) one line after ten seconds; the content replaces it in
+  one change, the look waiting above a tab's page until it is drawn (Home, the Task board and a document post
+  `ritemark/pageDrawing` and then `ritemark/pageDrawn`, `src/shellPageSignals.ts`; other pages until their first
+  message). 002's `ritemarkLoadingLook.ts` draws it
+  (018's stylesheet); 007's `webviewEditor.ts` (every webview tab), 018's `ritemarkWelcomeAlone.ts` and
+  `webviewViewPane.ts` (the AI column) use it, and the AI's view takes the column's moment from the shell
+  (`_ritemark.loadingLook.since`, W5) so its own mark doesn't start its second again. No VS Code progress sign shows
+  beside it: Ritemark's views run under no `withProgress`, places show no progress badge, a waiting tab's desk no
+  progress line, and VS Code's own views' lines are ink (the themes' `progressBar.background`).
 
 ### The welcome and usage data (Sprint 133)
 

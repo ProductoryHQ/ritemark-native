@@ -23,6 +23,7 @@ import { IdeasView } from './IdeasView'
 import { LogView } from './LogView'
 import { Notice } from './Notice'
 import { waited } from './taskCopy'
+import { usePageDrawn } from '../../lib/pageDrawn'
 import './tasks.css'
 
 function savedTab(): BoardTab {
@@ -45,6 +46,7 @@ export function TaskBoard() {
       }),
     [],
   )
+  usePageDrawn(snapshot !== null) // Sprint 152, PR 3: the shell's loading look stays until the board is drawn
   if (!snapshot) return null
   if (snapshot.folder === null || !snapshot.enabled) {
     return (
