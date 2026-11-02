@@ -31,7 +31,8 @@ export function RuntimeNotice({
 }: RuntimeNoticeProps) {
   const visual = {
     warning: { icon: 'warning' as const, background: 'var(--r-warning-soft)', color: 'var(--r-warning)' },
-    progress: { icon: 'circle-notch' as const, background: 'var(--r-accent-soft)', color: 'var(--r-accent)' },
+    // Sprint 146: working is ink, not indigo (kit: .spin), on the quiet chip, as the done check is
+    progress: { icon: 'circle-notch' as const, background: 'var(--r-done-chip)', color: 'var(--r-ink-strong)' },
     // Sprint 145 (#578): done, in ink on a quiet chip, as "You're all set!" is; green is only the small ready dot.
     // A plain check, not check-circle, so the mark doesn't sit in two outlines (the Experience lead, 31 October).
     // The chip is --r-done-chip: the soft surface in Light (the muted one vanishes on the white card), muted in Dark.
@@ -66,7 +67,7 @@ export function RuntimeNotice({
       {(statusLabel || hasActions) && (
         <div className="border-t border-[var(--r-hairline)] bg-[var(--r-surface-muted)] px-3 py-2">
           {statusLabel && (
-            <div className="flex min-h-8 w-full items-center gap-1.5 pl-[34px] text-xs font-medium text-[var(--r-accent)]">
+            <div className="flex min-h-8 w-full items-center gap-1.5 pl-[34px] text-xs font-medium text-[var(--r-ink-strong)]" /* working: ink (Sprint 146) */>
               <Icon name="circle-notch" size={12} tone="inherit" className="animate-spin" />
               {statusLabel}
             </div>

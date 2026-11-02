@@ -790,7 +790,7 @@ function RecordingRow({ recording }: { recording: RecordingSummary }) {
             key={action.label}
             disabled={action.disabled}
             // Matches DropdownMenuItem, so the right-click menu and the More actions menu read as one.
-            className={`gap-2 text-[13px] [&_svg]:shrink-0 [&_svg]:fill-current${action.danger ? ' text-[var(--r-error)] focus:text-[var(--r-error)]' : ''}`}
+            className={`rm-icons-take-ink gap-2 text-[13px] [&_svg]:shrink-0 [&_svg]:fill-current${action.danger ? ' text-[var(--r-error)] focus:text-[var(--r-error)]' : ''}`}
             onSelect={action.run}
           >
             <Icon name={action.icon} size={14} />

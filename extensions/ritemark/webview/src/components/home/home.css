@@ -36,6 +36,7 @@
   position: absolute;
   right: 12px;
   bottom: 12px;
+  max-width: calc(100% - 24px); /* inside the cover, 12 clear each side: Change image shrinks to its room, then shows its icon alone (#566) */
   z-index: 2; /* above the page, which overlaps the cover's foot for the mark (S2) */
 }
 /* One focus ring on Home, tiles and rows alike (S17): the theme's focus colour, clear of the control */
@@ -308,13 +309,12 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
 }
 /* Sprint 142 R11 (#535): the AI's sheet forced open in a very narrow window leaves the desk about 150 wide (this
    container about 120). Home still fits it, as framework §4 asks of every page on the desk: the name steps down so a
-   word fits its line (it breaks inside a word only when one alone is wider), Change image keeps only its icon inside
-   the cover, the rows' times go under their names, and the tiles are one across at any width. */
+   word fits its line (it breaks inside a word only when one alone is wider), Change image shows its icon alone when
+   its first word doesn't fit (the shared rule, ui/button.tsx; Sprint 146, #566), the rows' times go under their
+   names, and the tiles are one across at any width. */
 @container rh-desk (max-width: 200px) {
   .rh-name { font-size: 20px; line-height: 26px; letter-spacing: 0; }
-  .rh-cover .rh-change { right: 8px; bottom: 8px; }
-  .rh-cover .rh-chip-label { display: none; }
-  .rh-cover .rh-chip-button { padding: 0 6px; }
+  .rh-cover .rh-change { right: 8px; bottom: 8px; max-width: calc(100% - 16px); }
   .rh-desk .rh-row, .rh-desk .rh-file { flex-wrap: wrap; height: auto; min-height: 40px; padding: 6px 0; row-gap: 2px; }
   /* The card's heading keeps clear of its × (QA N1): the icon keeps the ×'s line, the words go under it at the card's
      whole width, and the body and the button take that width too. A wider padding alone can't: the heading's longest

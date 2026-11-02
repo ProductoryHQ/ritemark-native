@@ -19,6 +19,7 @@ import { Input } from '../ui/input'
 import { FilterChip } from '../ui/filter-chip'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Icon } from '../ui/Icon'
+import { Tooltip } from '../ui/tooltip'
 import {
   cronToUi,
   uiToCron,
@@ -325,21 +326,21 @@ export function ScheduleEditor({ cron, onCronChange }: ScheduleEditorProps) {
               {WEEKDAYS.map(({ label, full, dow }) => {
                 const active = isDayActive(dow)
                 return (
-                  <FilterChip
-                    key={dow}
-                    selected={active}
-                    onClick={() => toggleDay(dow)}
-                    title={full}
-                    aria-label={full}
-                    className="flex-col h-auto gap-0.5 px-0 py-1.5 justify-center rounded-md text-[10px] shadow-none"
-                  >
-                    <Icon
-                      name={active ? 'check-circle' : 'circle'}
-                      size={14}
-                      tone={active ? 'active' : 'muted'}
-                    />
-                    {label}
-                  </FilterChip>
+                  <Tooltip key={dow} label={full} className="grid">
+                    <FilterChip
+                      selected={active}
+                      onClick={() => toggleDay(dow)}
+                      aria-label={full}
+                      className="flex-col h-auto gap-0.5 px-0 py-1.5 justify-center rounded-md text-[10px] shadow-none"
+                    >
+                      <Icon
+                        name={active ? 'check-circle' : 'circle'}
+                        size={14}
+                        tone={active ? 'active' : 'muted'}
+                      />
+                      {label}
+                    </FilterChip>
+                  </Tooltip>
                 )
               })}
             </div>
@@ -397,16 +398,17 @@ export function ScheduleEditor({ cron, onCronChange }: ScheduleEditorProps) {
               placeholder="min hour dom mon dow"
               className={`flex-1 text-[12px] h-8 font-mono bg-surface-soft border-transparent ${advancedRaw && !isValidCron(advancedRaw) ? 'border-destructive' : ''}`}
             />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={copyCron}
-              aria-label="Copy cron expression"
-              title="Copy"
-            >
-              <Icon name="copy" size={14} />
-            </Button>
+            <Tooltip label="Copy">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={copyCron}
+                aria-label="Copy cron expression"
+              >
+                <Icon name="copy" size={14} />
+              </Button>
+            </Tooltip>
           </div>
           {advancedRaw && !isValidCron(advancedRaw) && (
             <p className="text-[10px] text-destructive">Invalid — use 5 fields: min hour dom month dow</p>
@@ -442,16 +444,17 @@ export function ScheduleEditor({ cron, onCronChange }: ScheduleEditorProps) {
                   placeholder="min hour dom mon dow"
                   className={`flex-1 text-[12px] h-8 font-mono bg-surface-soft border-transparent ${advancedRaw && !isValidCron(advancedRaw) ? 'border-destructive' : ''}`}
                 />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={copyCron}
-                  aria-label="Copy cron expression"
-                  title="Copy"
-                >
-                  <Icon name="copy" size={14} />
-                </Button>
+                <Tooltip label="Copy">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={copyCron}
+                    aria-label="Copy cron expression"
+                  >
+                    <Icon name="copy" size={14} />
+                  </Button>
+                </Tooltip>
               </div>
               {advancedRaw && !isValidCron(advancedRaw) && (
                 <p className="text-[10px] text-destructive">Invalid — use 5 fields: min hour dom month dow</p>

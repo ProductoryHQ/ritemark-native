@@ -181,7 +181,10 @@
   --secondary-foreground: var(--r-ink-strong);
   --accent: var(--r-accent-soft);
   --accent-foreground: var(--r-ink-strong);
-  --destructive: var(--r-error);
+  /* The destructive button's fill, in both themes (Sprint 146; the Experience lead, §9 item 2): white words on it are
+     4.8:1, where the error red's were 3.8:1. Its hover darkens, as the primary's does, instead of fading. */
+  --destructive: #dc2626;
+  --destructive-hover: #b91c1c;
   --destructive-foreground: #ffffff;
   --radius: var(--ritemark-radius-md);
 }
@@ -318,6 +321,23 @@ body[data-vscode-theme-kind='vscode-dark'],
 .rm-split[data-tone="quiet"] .rm-split-part[data-state="open"] { background-color: transparent; }
 .rm-split[data-tone="quiet"]:not([data-disabled]):hover { background-color: var(--r-surface-soft); }
 .rm-split[data-tone="quiet"]:not([data-disabled]):hover .rm-split-more { box-shadow: inset 1px 0 0 var(--r-hairline); }
+
+/* Sprint 146 (#566; the Experience lead, §4): a button too narrow for its first word shows its icon alone
+   (ui/button.tsx, `iconWhenNarrow`). It keeps its fill or outline and its height, and is that height square: 32 for
+   `sm`, as `icon-sm`. Its words stay in it, out of sight, as its accessible name. `button` in the selector outranks a
+   screen's own padding for the button (Home's `.rh-split .rm-split-main`). */
+button[data-slot="button"][data-icon-only] { aspect-ratio: 1 / 1; width: auto; flex-shrink: 0; padding-left: 0; padding-right: 0; justify-content: center; }
+button[data-slot="button"][data-icon-only] > [data-slot="button-label"] { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* Sprint 146 (#614): an icon's colour. ui/Icon.tsx draws every icon in currentColor, as a button's icons are, and its
+   tone sets that colour here with no specificity, so a colour class on the icon (`text-…`) or a stylesheet's rule for
+   it wins, as it never did while the tone was the svg's fill. An icon with no colour of its own keeps its tone. */
+:where(svg[data-icon-tone="muted"]) { color: var(--r-ink-muted); }
+:where(svg[data-icon-tone="active"]) { color: var(--r-accent); }
+:where(svg[data-icon-tone="disabled"]) { color: var(--r-ink-disabled); }
+/* A row that gives its icons its words' colour (a menu's items): their tone yields to it, and an icon's own colour
+   class still wins, as before #614 (the items' `[&_svg]:fill-current` did this while the tone was a fill) */
+:where(.rm-icons-take-ink svg[data-icon-tone]) { color: inherit; }
 
 /* Sprint 142 R8 (#504): VS Code's webview defaults paint every scrollbar's track in the editor's background
    (`html { scrollbar-color: … var(--vscode-editor-background) }`, white in Ritemark Light), a white strip on the
@@ -532,18 +552,22 @@ body {
 .rm-comment-rail[data-density="compact"] { right: 2px; }
 .rm-rail-item { position: absolute; right: 0; width: 100%; pointer-events: auto; }
 
+/* Sprint 146 (#615; the Experience lead, experience 31): the comment's marker and card follow the theme, as every
+   floating sheet does (#576). White in both themes dated from before Ritemark Dark. The fill is the theme's surface,
+   the edge the strong hairline and the menus' shadow (`shadow-md`, as ui/dropdown-menu.tsx), and everything inside
+   takes the theme's own tokens, never a block of light values: the marker's focus ring keeps the theme's ring. */
 .rm-marker {
   display: inline-flex; align-items: center; gap: 6px; width: 100%; text-align: left;
-  background: var(--ritemark-surface, #fff);
-  border: 1px solid var(--ritemark-hairline, #e2e8f0);
+  background: var(--r-surface);
+  border: 1px solid var(--r-hairline-strong);
   border-radius: 6px; padding: 6px 9px;
   font-family: var(--ritemark-ui-font-family); font-size: 12px;
-  color: var(--ritemark-ink-muted, #617187); cursor: pointer;
-  box-shadow: 0 4px 6px -1px rgba(30,27,75,0.08), 0 2px 4px -2px rgba(30,27,75,0.06);
+  color: var(--r-ink-muted); cursor: pointer;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
-.rm-marker:hover { border-color: var(--ritemark-hairline-strong, #cbd5e1); }
+.rm-marker:hover { border-color: var(--r-ink-faint); }
 :where(:root:not([data-input-mode="pointer"])) .rm-marker:focus-visible { outline: 2px solid var(--r-accent, #4338ca); outline-offset: 2px; }
-.rm-marker-ico { color: #f59e0b; flex: none; display: inline-flex; }
+.rm-marker-ico { color: var(--r-warning); flex: none; display: inline-flex; } /* the comment's highlight colour, as the theme has it */
 .rm-marker-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* No preview text below the wide breakpoint — the marker shrinks to icon +
    status dot rather than pushing itself over the text column. */
@@ -557,10 +581,10 @@ body {
 .rm-bubble {
   position: absolute; right: 0; top: 0;
   box-sizing: border-box;
-  background: var(--ritemark-surface, #fff);
-  border: 1px solid var(--ritemark-hairline, #e2e8f0);
+  background: var(--r-surface);
+  border: 1px solid var(--r-hairline-strong);
   border-radius: 10px; padding: 10px 11px;
-  box-shadow: 0 8px 24px -6px rgba(30,27,75,0.18);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   transform-origin: top right; animation: rmBubbleIn 150ms cubic-bezier(0.22,0.61,0.36,1);
 }
 .rm-bubble button { cursor: pointer; }
@@ -569,7 +593,7 @@ body {
    accent border and a deeper shadow. Without this, "why will this not go
    away" is the next question — a latch the user cannot see is a stuck UI. */
 .rm-rail-item-pinned .rm-bubble {
-  border-color: var(--ritemark-accent, #4f46e5);
+  border-color: var(--r-accent);
   box-shadow: 0 10px 28px -6px rgba(79,70,229,0.28);
 }
 
@@ -626,21 +650,20 @@ body {
   }
 }
 .rm-bubble-head { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
-.rm-bubble-who { font-size: 12px; font-weight: 600; color: var(--ritemark-ink-strong, #1e1b4b); }
+.rm-bubble-who { font-size: 12px; font-weight: 600; color: var(--r-ink-strong); }
 .rm-agent-badge {
-  display: inline-flex; align-items: center; background: var(--ritemark-indigo, #4338ca);
-  color: #fff; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600;
+  display: inline-flex; align-items: center; background: var(--r-accent);
+  color: var(--r-on-accent); border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600;
   font-family: var(--ritemark-ui-font-family); text-transform: capitalize;
 }
 .rm-grow { flex: 1; }
-.rm-bubble-del { background: transparent; border: none; color: var(--ritemark-ink-faint, #94a3b8); cursor: pointer; padding: 3px; border-radius: 5px; display: inline-flex; }
-.rm-bubble-del:hover { color: #ef4444; background: rgba(239,68,68,0.09); }
+.rm-bubble-del { background: transparent; border: none; color: var(--r-ink-faint); cursor: pointer; padding: 3px; border-radius: 5px; display: inline-flex; }
+.rm-bubble-del:hover { color: var(--r-error); background: var(--r-error-soft); }
 /* Mark as done: the same action as Delete, but on a finished task it is a
    completion, not a discard — so it hovers in ink rather than red (green is
-   only the small ready dot, Sprint 145, #578). The bubble is white in both
-   themes, so the ink is the fixed light one, as its words are. */
-.rm-bubble-done:hover { color: var(--ritemark-ink-strong, #1e1b4b); background: var(--ritemark-surface-soft, #f1f5f9); }
-.rm-bubble-text { font-family: var(--ritemark-editor-font-family); font-size: 13px; color: var(--ritemark-ink-body, #475569); line-height: 1.5; word-wrap: break-word; }
+   only the small ready dot, Sprint 145, #578), the theme's ink as its words are. */
+.rm-bubble-done:hover { color: var(--r-ink-strong); background: var(--r-surface-soft); }
+.rm-bubble-text { font-family: var(--ritemark-editor-font-family); font-size: 13px; color: var(--r-ink-body); line-height: 1.5; word-wrap: break-word; }
 
 /* compose bubble (create flow)
    Sprint 117 R10: the field resizes vertically between a two-row floor and a
@@ -654,18 +677,18 @@ body {
   min-height: var(--rm-composer-min, calc(2.9em + 16px));
   max-height: var(--rm-composer-max, min(calc(11.6em + 16px), 40vh));
   overflow-y: auto;
-  border: 1px solid var(--ritemark-hairline-strong, #cbd5e1); border-radius: 6px;
+  border: 1px solid var(--r-hairline-strong); border-radius: 6px;
   padding: 7px 9px; font-family: var(--ritemark-editor-font-family); font-size: 13px;
-  color: var(--ritemark-ink-strong, #1e1b4b); background: var(--ritemark-surface, #fff); line-height: 1.45;
+  color: var(--r-ink-strong); background: var(--r-surface); line-height: 1.45;
 }
-.rm-compose-input:focus { outline: none; border-color: var(--ritemark-indigo, #4338ca); box-shadow: 0 0 0 4px rgba(67,56,202,0.10); }
-.rm-compose-err { margin-top: 5px; font-size: 11px; color: #ef4444; }
+.rm-compose-input:focus { outline: none; border-color: var(--r-accent); box-shadow: 0 0 0 4px var(--r-ring-color); }
+.rm-compose-err { margin-top: 5px; font-size: 11px; color: var(--r-error); }
 .rm-compose-foot { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 
 /* the agent shown explicitly while composing */
 .rm-agent-pill {
   display: inline-flex; align-items: center; border-radius: 999px;
-  background: var(--ritemark-indigo-soft, #e0e7ff); color: var(--ritemark-indigo, #4338ca);
+  background: var(--r-accent-soft); color: var(--r-accent);
   padding: 2px 8px; font-size: 11px; font-weight: 600;
   font-family: var(--ritemark-ui-font-family);
 }
@@ -675,41 +698,37 @@ body {
   position: absolute; left: 0; right: 0; bottom: calc(100% + 4px);
   z-index: 40; margin: 0; padding: 4px; list-style: none;
   max-height: 132px; overflow-y: auto;
-  background: var(--ritemark-surface, #fff);
-  border: 1px solid var(--ritemark-hairline-strong, #cbd5e1); border-radius: 8px;
+  background: var(--r-surface);
+  border: 1px solid var(--r-hairline-strong); border-radius: 8px;
   box-shadow: 0 8px 24px -6px rgba(30,27,75,0.22);
   font-family: var(--ritemark-ui-font-family);
 }
 .rm-mention-opt {
   display: flex; align-items: baseline; gap: 6px; cursor: pointer;
   padding: 5px 7px; border-radius: 6px; font-size: 12px;
-  color: var(--ritemark-ink-body, #475569);
+  color: var(--r-ink-body);
 }
 .rm-mention-opt[data-active="true"] {
-  background: var(--ritemark-indigo-soft, #e0e7ff); color: var(--ritemark-indigo, #4338ca);
+  background: var(--r-accent-soft); color: var(--r-accent);
 }
 .rm-mention-opt-alias { font-weight: 600; }
-.rm-mention-opt-label { color: var(--ritemark-ink-muted, #617187); }
+.rm-mention-opt-label { color: var(--r-ink-muted); }
 .rm-mention-opt[data-active="true"] .rm-mention-opt-label { color: inherit; }
 
 /* Send / Open conversation / recovery actions in a comment bubble */
 .rm-bubble-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: 9px; }
 
 /* edit-comment button — indigo hover (distinct from the red delete) */
-.rm-bubble-edit:hover { color: var(--ritemark-indigo, #4338ca); background: var(--ritemark-indigo-soft, #e0e7ff); }
+.rm-bubble-edit:hover { color: var(--r-accent); background: var(--r-accent-soft); }
 
 /* inline @agent mention chip (replaces the separate agent badge) */
 .rm-mention {
-  background: var(--ritemark-indigo-soft, #e0e7ff);
-  color: var(--ritemark-indigo, #4338ca);
+  background: var(--r-accent-soft);
+  color: var(--r-accent);
   border-radius: 4px;
   padding: 0 4px;
   font-weight: 600;
   font-family: var(--ritemark-ui-font-family);
-}
-.ritemark-dark .rm-mention, [data-theme="dark"] .rm-mention {
-  background: rgba(129, 140, 248, 0.18);
-  color: var(--ritemark-dark-indigo, #818cf8);
 }
 
 /* ── Sprint 117 (#292): comment task projection — marker dot, status line,
@@ -728,9 +747,8 @@ body {
 .rm-task-dot--attention { background: var(--r-warning); }
 /* Done is ink: green is only the ready dot (Sprint 145, #578). The done dot is muted ink, filled: at 7 px ink-strong
    is too close to the working dot's indigo, which doesn't pulse with Reduce motion (the Experience lead, 486c2da).
-   The marker and the bubble are white in both themes, so done takes the fixed light inks, as their words do (the
-   theme's inks would fade on white in Dark). */
-.rm-task-dot--success   { background: var(--ritemark-ink-muted, #617187); }
+   The marker and the bubble follow the theme (#615), so done takes the theme's inks, as their words do. */
+.rm-task-dot--success   { background: var(--r-ink-muted); }
 .rm-task-dot--error     { background: var(--r-error); }
 @keyframes rm-task-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .rm-task-dot--progress { animation: none; } }
@@ -749,7 +767,7 @@ body {
 .rm-task-status--idle      { color: var(--r-ink-muted, #617187); }
 .rm-task-status--progress  { color: var(--r-accent); }
 .rm-task-status--attention { color: var(--r-warning); }
-.rm-task-status--success   { color: var(--ritemark-ink-strong, #1e1b4b); }
+.rm-task-status--success   { color: var(--r-ink-strong); }
 .rm-task-status--error     { color: var(--r-error); }
 
 /* which conversation the task went to / will go to */
@@ -770,7 +788,7 @@ body {
   font-family: var(--ritemark-editor-font-family);
   font-size: 12px;
   line-height: 1.4;
-  color: var(--ritemark-ink-body, #475569);
+  color: var(--r-ink-body);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;

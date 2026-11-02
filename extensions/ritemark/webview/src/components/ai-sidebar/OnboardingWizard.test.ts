@@ -143,8 +143,8 @@ function click(recorded: Clickable[], words: string, where: string) {
   assert.equal(installed.length, 2, `${where}: Claude and ChatGPT both read Installed`)
   for (const el of installed) assert.ok(el.getAttribute('class')?.includes('--r-ink-muted'), `${where}: Installed is muted ink`)
   assert.ok(!root.toString().includes('testing-iconPassed'), `${where}: no green on the sign-in card`)
-  // Sprint 145 (#578): the checks are drawn in the ink their class names. An Icon's own tone sets its fill, so a
-  // colour class shows only with tone="inherit" (fill="currentColor"); before, these drew in the muted tone.
+  // Sprint 145 (#578): the checks are drawn in the ink their class names (fill="currentColor"); while an Icon's tone
+  // was its fill (before #614), these drew in the muted tone.
   const checks = root.querySelectorAll('svg').filter((svg) => svg.getAttribute('class')?.includes('--r-ink-body'))
   assert.equal(checks.length, 2, `${where}: Claude's and ChatGPT's Installed checks`)
   for (const svg of checks) assert.equal(svg.getAttribute('fill'), 'currentColor', `${where}: an Installed check takes its ink`)

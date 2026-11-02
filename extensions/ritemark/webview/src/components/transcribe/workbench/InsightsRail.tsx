@@ -16,6 +16,7 @@ import { vscode } from '../../../lib/vscode';
 import { formatClock } from './playback';
 import { WORKBENCH_LAYOUT_CLASSES } from './layout';
 import { InsightsLanguageCombobox } from './InsightsLanguageCombobox';
+import { Tooltip } from '../../ui/tooltip';
 import {
   insightsLanguageSelectionLabel,
   insightsLanguageProvenance,
@@ -83,7 +84,7 @@ export function InsightsRail({
   return (
     <aside className={WORKBENCH_LAYOUT_CLASSES.insights} data-insights-rail>
       <div className="flex min-w-0 items-center gap-2 border-b border-hairline px-4 py-2.5">
-        <Icon name="sparkle" size={14} className="text-accent" />
+        <Icon name="sparkle" size={14} className="text-ink-body" />
         <span className="text-[11px] font-bold uppercase tracking-wider text-ink-body">Insights</span>
       </div>
 
@@ -122,7 +123,7 @@ export function InsightsRail({
         {state === 'generating' && (
           <div className="rounded-lg border border-hairline bg-surface p-3">
             <div className="flex items-center gap-2 text-xs text-ink-body">
-              <Icon name="circle-notch" size={14} className="animate-spin text-accent" />
+              <Icon name="circle-notch" size={14} className="animate-spin text-ink-body" />
               Reading the transcript…
             </div>
             <Button
@@ -212,14 +213,16 @@ export function InsightsRail({
                             {item.text}
                           </span>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => onSeek(item.at)}
-                          className="ml-1.5 inline-block rounded bg-surface-soft px-1.5 py-px align-middle text-[10px] font-semibold tabular-nums text-ink-muted hover:bg-accent-soft hover:text-accent-deep"
-                          title="Play from here"
-                        >
-                          {formatClock(item.at)}
-                        </button>
+                        <Tooltip label="Play from here" className="align-middle">
+                          <button
+                            type="button"
+                            onClick={() => onSeek(item.at)}
+                            className="ml-1.5 inline-block rounded bg-surface-soft px-1.5 py-px align-middle text-[10px] font-semibold tabular-nums text-ink-muted hover:bg-accent-soft hover:text-accent-deep"
+                            aria-label="Play from here"
+                          >
+                            {formatClock(item.at)}
+                          </button>
+                        </Tooltip>
                       </li>
                     ))}
                   </ul>

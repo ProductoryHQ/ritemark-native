@@ -12,6 +12,7 @@ import { Icon } from './ui/Icon'
 import { writeClipboard, readClipboard } from '../lib/clipboard'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { compareCells } from './sheetSort'
+import { Tooltip } from './ui/tooltip'
 
 export interface DataTableProps {
   data: Record<string, unknown>[]
@@ -406,20 +407,22 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
 
                     {editable && (onRenameColumn || onDeleteColumn) && (
                       <div className="relative flex-shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setConfirmDeleteColumn(null)
-                            setOpenColumnMenu((prev) => prev === colId ? null : colId)
-                          }}
-                          className={`inline-flex h-6 w-6 items-center justify-center rounded-sm text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] ${
-                            isMenuOpen ? 'opacity-100 bg-[var(--r-surface-soft)]' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'
-                          }`}
-                          title="Column actions"
-                        >
-                          <Icon name="dots-three" size={14} />
-                        </button>
+                        <Tooltip label="Column actions">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setConfirmDeleteColumn(null)
+                              setOpenColumnMenu((prev) => prev === colId ? null : colId)
+                            }}
+                            className={`inline-flex h-6 w-6 items-center justify-center rounded-sm text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)] ${
+                              isMenuOpen ? 'opacity-100 bg-[var(--r-surface-soft)]' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'
+                            }`}
+                            aria-label="Column actions"
+                          >
+                            <Icon name="dots-three" size={14} />
+                          </button>
+                        </Tooltip>
 
                         {isMenuOpen && (
                           <div
@@ -496,16 +499,18 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                   className="h-8 px-2 py-0 border-b border-[var(--r-hairline)] bg-[var(--vscode-ritemark-aiSheet,var(--r-surface-muted))] text-center"
                   style={{ width: 36, minWidth: 36 }}
                 >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onAddColumn()
-                    }}
-                    className="inline-flex items-center justify-center rounded-sm opacity-40 hover:opacity-100 transition-opacity text-[var(--r-ink-muted)] hover:text-[var(--r-accent)]"
-                    title="Add column"
-                  >
-                    <Icon name="plus" size={14} />
-                  </button>
+                  <Tooltip label="Add column">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onAddColumn()
+                      }}
+                      className="inline-flex items-center justify-center rounded-sm opacity-40 hover:opacity-100 transition-opacity text-[var(--r-ink-muted)] hover:text-[var(--r-accent)]"
+                      aria-label="Add column"
+                    >
+                      <Icon name="plus" size={14} />
+                    </button>
+                  </Tooltip>
                 </th>
               )}
             </tr>
@@ -537,44 +542,50 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                 >
                   {confirmDeleteRow === virtualRow.index && onDeleteRow ? (
                     <div className="flex items-center justify-center gap-1">
-                      <button
-                        className="rounded px-1 text-white"
-                        style={{ background: 'var(--r-error, #f44)', fontSize: 10, lineHeight: '18px', border: 'none', cursor: 'pointer' }}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onDeleteRow(row.index) // the row's place in the file, not its place in a sorted view
-                          setConfirmDeleteRow(null)
-                          setSelectedRow(null)
-                        }}
-                        title="Confirm delete"
-                      >
-                        Yes
-                      </button>
-                      <button
-                        className="rounded px-1"
-                        style={{ background: 'var(--vscode-button-secondaryBackground, #555)', color: 'var(--vscode-button-secondaryForeground, #fff)', fontSize: 10, lineHeight: '18px', border: 'none', cursor: 'pointer' }}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setConfirmDeleteRow(null)
-                          setSelectedRow(null)
-                        }}
-                        title="Cancel"
-                      >
-                        No
-                      </button>
+                      <Tooltip label="Confirm delete">
+                        <button
+                          className="rounded px-1 text-white"
+                          style={{ background: 'var(--r-error, #f44)', fontSize: 10, lineHeight: '18px', border: 'none', cursor: 'pointer' }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onDeleteRow(row.index) // the row's place in the file, not its place in a sorted view
+                            setConfirmDeleteRow(null)
+                            setSelectedRow(null)
+                          }}
+                          aria-label="Confirm delete"
+                        >
+                          Yes
+                        </button>
+                      </Tooltip>
+                      <Tooltip label="Cancel">
+                        <button
+                          className="rounded px-1"
+                          style={{ background: 'var(--vscode-button-secondaryBackground, #555)', color: 'var(--vscode-button-secondaryForeground, #fff)', fontSize: 10, lineHeight: '18px', border: 'none', cursor: 'pointer' }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setConfirmDeleteRow(null)
+                            setSelectedRow(null)
+                          }}
+                          aria-label="Cancel"
+                        >
+                          No
+                        </button>
+                      </Tooltip>
                     </div>
                   ) : selectedRow === virtualRow.index && onDeleteRow ? (
-                    <div
-                      className="flex items-center justify-center rounded-full mx-auto"
-                      style={{ width: 20, height: 20, background: 'var(--r-error, #f44)', cursor: 'pointer' }}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setConfirmDeleteRow(virtualRow.index)
-                      }}
-                      title="Delete row"
-                    >
-                      <Icon name="minus" size={12} className="text-white" />
-                    </div>
+                    <Tooltip label="Delete row" className="flex justify-center">
+                      <div
+                        className="flex items-center justify-center rounded-full mx-auto"
+                        style={{ width: 20, height: 20, background: 'var(--r-error, #f44)', cursor: 'pointer' }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setConfirmDeleteRow(virtualRow.index)
+                        }}
+                        aria-label="Delete row"
+                      >
+                        <Icon name="minus" size={12} className="text-white" />
+                      </div>
+                    </Tooltip>
                   ) : (
                     virtualRow.index + 1
                   )}
@@ -793,7 +804,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                 className="h-8 pl-1 pr-2.5 py-0 text-right"
                 style={{ width: 36, minWidth: 36 }}
               >
-                <Icon name="plus" size={12} className="ml-auto text-[var(--r-ink-muted)] group-hover:text-[var(--r-accent)]" />
+                <Icon name="plus" size={12} className="ml-auto text-[var(--r-ink-muted)] group-hover:text-[var(--r-ink-strong)]" />
               </td>
               <td
                 colSpan={columns.length + (onAddColumn ? 1 : 0)}

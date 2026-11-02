@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { resamplePeaks } from './playback';
+import { Tooltip } from '../../ui/tooltip';
 
 const BAR_WIDTH = 3;
 const BAR_GAP = 1;
@@ -91,22 +92,25 @@ export function Waveform({
   if (peaks.length === 0) {
     const progress = durationSec > 0 ? Math.min(100, (currentTime / durationSec) * 100) : 0;
     return (
-      <div
-        ref={wrapRef}
-        className="h-9 min-w-0 flex-1 cursor-pointer select-none py-3.5"
-        onClick={seekFromEvent}
-        title="Seek"
-      >
-        <div className="h-1 w-full overflow-hidden rounded-full bg-hairline-strong">
-          <div className="h-full rounded-full bg-accent" style={{ width: `${progress}%` }} />
+      <Tooltip label="Seek" className="min-w-0 flex-1">
+        <div
+          ref={wrapRef}
+          className="h-9 min-w-0 flex-1 cursor-pointer select-none py-3.5"
+          onClick={seekFromEvent}
+        >
+          <div className="h-1 w-full overflow-hidden rounded-full bg-hairline-strong">
+            <div className="h-full rounded-full bg-accent" style={{ width: `${progress}%` }} />
+          </div>
         </div>
-      </div>
+      </Tooltip>
     );
   }
 
   return (
-    <div ref={wrapRef} className="h-9 min-w-0 flex-1 cursor-pointer select-none" onClick={seekFromEvent} title="Seek">
-      <canvas ref={canvasRef} className="block h-full min-w-0 w-full" />
-    </div>
+    <Tooltip label="Seek" className="min-w-0 flex-1">
+      <div ref={wrapRef} className="h-9 min-w-0 flex-1 cursor-pointer select-none" onClick={seekFromEvent}>
+        <canvas ref={canvasRef} className="block h-full min-w-0 w-full" />
+      </div>
+    </Tooltip>
   );
 }

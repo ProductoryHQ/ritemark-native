@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import type { HomeMessage, HomeState } from '../../../../src/projects/protocol'
-import { Button } from '../ui/button'
+import { Button, wholeWordsTip } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { middleCut, noteEndsOn, othersWords, placeParts, recentIcon, SWITCH_NOTE_MS, waitingIcon, waitingWords, whenWords } from './homeWords'
@@ -327,8 +327,9 @@ export function HomeView({ state, coverDefault, now }: { state: HomeState; cover
     <div className="rh-desk">
       <div className="rh-fit">
       <div className="rh-cover" style={{ backgroundImage: `url("${cover.replace(/"/g, '%22')}")` }} role="img" aria-label="The project's cover picture">
-        <Tooltip label="Choose a picture for this project's cover" className="rh-change">
-          <Button className="rh-chip-button" aria-label="Change image" onClick={() => send({ type: 'home/change-cover' })}><Icon name="image" size={14} tone="inherit" /><span className="rh-chip-label">Change image</span></Button>
+        {/* #566: on the shared rule, its icon alone when its first word doesn't fit; the words first in its tooltip */}
+        <Tooltip label={wholeWordsTip('Change image', "Choose a picture for this project's cover")} className="rh-change">
+          <Button className="rh-chip-button" iconWhenNarrow onClick={() => send({ type: 'home/change-cover' })}><Icon name="image" size={14} tone="inherit" />Change image</Button>
         </Tooltip>
       </div>
       <main className="rh-page">

@@ -9,4 +9,6 @@
 
 PR 2 (on PR 1's branch, measured at its head): `media/webview.js` 8,778,567 bytes, +27,338 on PR 1 (+28,591 on `main`): the control catalogue's page and rows, about 20.7 KB of it, the input-mode tracker, and about 4.6 KB of CSS for the variant's second selector (a field matches `focus-visible:` in both modes). `media/office-preview.js` 2,627,307 bytes, +5,882 on PR 1: the tracker, started in the Office previews' entry, and the same CSS. The catalogue is in the one bundle like every page; its stylesheet reaches only its own page (`body.rm-catalogue-page`, `.rm-cat-*`).
 
+PR 3 (on PR 2's branch at `1b8d8d08`, whose committed bundles are 8,778,824 and 2,627,354 bytes; measured at its head): `media/webview.js` 8,782,378 bytes, +3,554: the narrow-button rule in `ui/button.tsx`, the icon tones' CSS, the tooltip's shared classes, the tooltips that replace native titles, and the comment card's tokens. `media/office-preview.js` 2,628,708 bytes, +1,354: the same `index.css`, `Icon` and `Button` through the viewers' toolbars. Its test (`controlsPolish.test.ts`) adds nothing to either bundle: its class names are all in the source already.
+
 PR 1 carries #585's commit (`f370bb66`, now `2f691d92`): `webview/src/components/ui/` and `header/ExportMenu.tsx` only. Its test (`closeFocus.test.ts`) is not in either bundle.

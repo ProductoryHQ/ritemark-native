@@ -31,10 +31,10 @@ export function SubagentCard({ subagent, onStop }: SubagentCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const statusIcon = {
-    running: <Icon name="circle-notch" size={12} className="animate-spin text-[var(--r-accent)]" />,
+    running: <Icon name="circle-notch" size={12} className="animate-spin text-[var(--r-ink-strong)]" />,
     stopping: <Icon name="circle-notch" size={12} className="animate-spin text-[var(--r-ink-muted)]" />,
-    // Sprint 145 (#578): done is ink; green is only the ready dot. `inherit` lets the class colour the check (an
-    // Icon's own tone otherwise sets its fill, and the green class here never showed)
+    // Sprint 145 (#578): done is ink; green is only the ready dot. Working is ink too (Sprint 146, #614: the classes
+    // here show since an Icon's tone stopped being its fill)
     done: <Icon name="check" size={12} tone="inherit" className="text-[var(--r-ink-strong)]" />,
     error: <Icon name="warning-circle" size={12} className="text-[var(--r-error)]" />,
     stopped: <Icon name="x-circle" size={12} className="text-[var(--r-ink-muted)]" />,

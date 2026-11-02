@@ -20,6 +20,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { Icon } from './ui/Icon'
+import { Tooltip } from './ui/tooltip'
 
 interface TableInfo {
   tableRect: DOMRect
@@ -197,64 +198,68 @@ export function TableOverlayControls({ editor }: TableOverlayControlsProps) {
             >
               {hoveredRow?.tableIndex === tableIndex && hoveredRow?.rowIndex === rowIndex && (
                 <div className="handle-buttons">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
+                  <Tooltip label="Add row above">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
 
-                      // Find the cell element in the DOM
-                      const cell = tableInfo.tableElement.querySelector(`.tiptap-table-row:nth-child(${rowIndex + 1}) .tiptap-table-cell, .tiptap-table-row:nth-child(${rowIndex + 1}) .tiptap-table-header`)
+                        // Find the cell element in the DOM
+                        const cell = tableInfo.tableElement.querySelector(`.tiptap-table-row:nth-child(${rowIndex + 1}) .tiptap-table-cell, .tiptap-table-row:nth-child(${rowIndex + 1}) .tiptap-table-header`)
 
-                      if (cell) {
-                        // Get the DOM position of the cell
-                        const cellElement = cell as HTMLElement
-                        const pos = editor.view.posAtDOM(cellElement, 0)
+                        if (cell) {
+                          // Get the DOM position of the cell
+                          const cellElement = cell as HTMLElement
+                          const pos = editor.view.posAtDOM(cellElement, 0)
 
 
-                        // Set cursor to this position and add row
-                        editor.chain()
-                          .focus()
-                          .setTextSelection(pos)
-                          .addRowBefore()
-                          .run()
-                      }
-                    }}
-                    title="Add row above"
-                  >
-                    <Icon name="plus" size={14} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-
-                      const cell = tableInfo.tableElement.querySelector(`.tiptap-table-row:nth-child(${rowIndex + 1}) .tiptap-table-cell, .tiptap-table-row:nth-child(${rowIndex + 1}) .tiptap-table-header`)
-
-                      if (cell) {
-                        const cellElement = cell as HTMLElement
-                        const pos = editor.view.posAtDOM(cellElement, 0)
-
-                        // If this is the last row, delete the entire table
-                        if (tableInfo.rowRects.length <= 1) {
+                          // Set cursor to this position and add row
                           editor.chain()
                             .focus()
                             .setTextSelection(pos)
-                            .deleteTable()
-                            .run()
-                        } else {
-                          editor.chain()
-                            .focus()
-                            .setTextSelection(pos)
-                            .deleteRow()
+                            .addRowBefore()
                             .run()
                         }
-                      }
-                    }}
-                    title="Delete row"
-                    className="destructive"
-                  >
-                    <Icon name="trash" size={14} />
-                  </button>
+                      }}
+                      aria-label="Add row above"
+                    >
+                      <Icon name="plus" size={14} />
+                    </button>
+                  </Tooltip>
+                  <Tooltip label="Delete row">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+
+                        const cell = tableInfo.tableElement.querySelector(`.tiptap-table-row:nth-child(${rowIndex + 1}) .tiptap-table-cell, .tiptap-table-row:nth-child(${rowIndex + 1}) .tiptap-table-header`)
+
+                        if (cell) {
+                          const cellElement = cell as HTMLElement
+                          const pos = editor.view.posAtDOM(cellElement, 0)
+
+                          // If this is the last row, delete the entire table
+                          if (tableInfo.rowRects.length <= 1) {
+                            editor.chain()
+                              .focus()
+                              .setTextSelection(pos)
+                              .deleteTable()
+                              .run()
+                          } else {
+                            editor.chain()
+                              .focus()
+                              .setTextSelection(pos)
+                              .deleteRow()
+                              .run()
+                          }
+                        }
+                      }}
+                      aria-label="Delete row"
+                      className="destructive"
+                    >
+                      <Icon name="trash" size={14} />
+                    </button>
+                  </Tooltip>
                 </div>
               )}
             </div>
@@ -282,61 +287,65 @@ export function TableOverlayControls({ editor }: TableOverlayControlsProps) {
             >
               {hoveredCol?.tableIndex === tableIndex && hoveredCol?.colIndex === colIndex && (
                 <div className="handle-buttons horizontal">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
+                  <Tooltip label="Add column left">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
 
-                      const cell = tableInfo.tableElement.querySelector(`.tiptap-table-row:first-child > :nth-child(${colIndex + 1})`)
+                        const cell = tableInfo.tableElement.querySelector(`.tiptap-table-row:first-child > :nth-child(${colIndex + 1})`)
 
-                      if (cell) {
-                        const cellElement = cell as HTMLElement
-                        const pos = editor.view.posAtDOM(cellElement, 0)
+                        if (cell) {
+                          const cellElement = cell as HTMLElement
+                          const pos = editor.view.posAtDOM(cellElement, 0)
 
 
-                        editor.chain()
-                          .focus()
-                          .setTextSelection(pos)
-                          .addColumnBefore()
-                          .run()
-                      }
-                    }}
-                    title="Add column left"
-                  >
-                    <Icon name="plus" size={14} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-
-                      const cell = tableInfo.tableElement.querySelector(`.tiptap-table-row:first-child > :nth-child(${colIndex + 1})`)
-
-                      if (cell) {
-                        const cellElement = cell as HTMLElement
-                        const pos = editor.view.posAtDOM(cellElement, 0)
-
-                        // If this is the last column, delete the entire table
-                        if (tableInfo.colRects.length <= 1) {
                           editor.chain()
                             .focus()
                             .setTextSelection(pos)
-                            .deleteTable()
-                            .run()
-                        } else {
-                          editor.chain()
-                            .focus()
-                            .setTextSelection(pos)
-                            .deleteColumn()
+                            .addColumnBefore()
                             .run()
                         }
-                      }
-                    }}
-                    title="Delete column"
-                    className="destructive"
-                  >
-                    <Icon name="trash" size={14} />
-                  </button>
+                      }}
+                      aria-label="Add column left"
+                    >
+                      <Icon name="plus" size={14} />
+                    </button>
+                  </Tooltip>
+                  <Tooltip label="Delete column">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+
+                        const cell = tableInfo.tableElement.querySelector(`.tiptap-table-row:first-child > :nth-child(${colIndex + 1})`)
+
+                        if (cell) {
+                          const cellElement = cell as HTMLElement
+                          const pos = editor.view.posAtDOM(cellElement, 0)
+
+                          // If this is the last column, delete the entire table
+                          if (tableInfo.colRects.length <= 1) {
+                            editor.chain()
+                              .focus()
+                              .setTextSelection(pos)
+                              .deleteTable()
+                              .run()
+                          } else {
+                            editor.chain()
+                              .focus()
+                              .setTextSelection(pos)
+                              .deleteColumn()
+                              .run()
+                          }
+                        }
+                      }}
+                      aria-label="Delete column"
+                      className="destructive"
+                    >
+                      <Icon name="trash" size={14} />
+                    </button>
+                  </Tooltip>
                 </div>
               )}
             </div>

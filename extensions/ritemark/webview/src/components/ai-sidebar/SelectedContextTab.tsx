@@ -13,6 +13,7 @@
 
 import { Icon } from '../ui/Icon';
 import { useAISidebarStore } from './store';
+import { Tooltip } from '../ui/tooltip';
 
 const MAX_PREVIEW_CHARS = 140;
 
@@ -43,20 +44,21 @@ export function SelectedContextTab() {
         <span className="text-[11px] font-medium text-[var(--r-ink-muted)] flex-1 truncate">
           Working on selected text
         </span>
-        <button
-          onClick={dismissSelectedContext}
-          className="
-            shrink-0 inline-flex items-center justify-center
-            w-4 h-4 rounded
-            text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)] hover:bg-[var(--r-surface-soft)]
-            focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]
-            transition-colors
-          "
-          aria-label="Remove selected text from chat context"
-          title="Remove selected text from chat context"
-        >
-          <Icon name="x" size={12} />
-        </button>
+        <Tooltip label="Remove selected text from chat context" className="shrink-0">
+          <button
+            onClick={dismissSelectedContext}
+            className="
+              shrink-0 inline-flex items-center justify-center
+              w-4 h-4 rounded
+              text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)] hover:bg-[var(--r-surface-soft)]
+              focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--r-ring-color)]
+              transition-colors
+            "
+            aria-label="Remove selected text from chat context"
+          >
+            <Icon name="x" size={12} />
+          </button>
+        </Tooltip>
       </div>
       <div className="mt-0.5 text-[11px] leading-snug text-[var(--r-ink-body)] truncate">
         {preview}
