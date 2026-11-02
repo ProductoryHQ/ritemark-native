@@ -34,7 +34,7 @@ export function ConflictDialog({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onCancel() }}>
       <DialogContent className="max-w-[440px]">
-        <DialogHeader icon={<Icon name="warning" size={20} className="text-[var(--vscode-editorWarning-foreground)]" />} onClose={onCancel}>
+        <DialogHeader icon={<Icon name="warning" size={20} className="text-[var(--r-ink-strong)]" />} onClose={onCancel}>
           <DialogTitle>{isDiskConflict ? 'Unsaved Changes Conflict' : 'Unsaved Changes'}</DialogTitle>
         </DialogHeader>
 

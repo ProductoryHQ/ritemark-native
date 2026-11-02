@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '../ui/alert';
 import type { Flow, FlowsMessage } from './types';
 import { vscode } from '../../lib/vscode';
 import { formatScheduleDateTime, formatScheduleSummary } from './flowScheduleUi';
+import { Tooltip } from '../ui/tooltip';
 
 export function FlowsPanel() {
   const [flows, setFlows] = useState<Flow[]>([]);
@@ -137,27 +138,31 @@ export function FlowsPanel() {
                 </h3>
                 {/* Hover-revealed actions */}
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenFlow(flow);
-                    }}
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0"
-                    title="Edit flow"
-                  >
-                    <Icon name="pencil-simple" size={12} />
-                  </Button>
-                  <Button
-                    onClick={(e) => handleDeleteFlow(flow, e)}
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0 hover:text-ritemark-error"
-                    title="Delete flow"
-                  >
-                    <Icon name="trash" size={12} />
-                  </Button>
+                  <Tooltip label="Edit flow">
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenFlow(flow);
+                      }}
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0"
+                      aria-label="Edit flow"
+                    >
+                      <Icon name="pencil-simple" size={12} />
+                    </Button>
+                  </Tooltip>
+                  <Tooltip label="Delete flow">
+                    <Button
+                      onClick={(e) => handleDeleteFlow(flow, e)}
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 hover:text-ritemark-error"
+                      aria-label="Delete flow"
+                    >
+                      <Icon name="trash" size={12} />
+                    </Button>
+                  </Tooltip>
                 </div>
               </div>
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Icon } from '../ui/Icon';
 import type { CodexPlanStep } from './types';
 import { buildActivePlanViewModel } from './activePlan';
+import { Tooltip } from '../ui/tooltip';
 
 interface ActivePlanBannerProps {
   planText: string;
@@ -28,46 +29,49 @@ export function ActivePlanBanner({
   return (
     <div className="mx-3 mb-2 rounded-lg border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--vscode-input-background)_80%,transparent)] px-3 py-2 shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
       <div className="flex items-start justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          className="min-w-0 flex-1 text-left"
-          title={expanded ? 'Collapse plan details' : 'Expand plan details'}
-          aria-label={expanded ? 'Collapse plan details' : 'Expand plan details'}
-        >
-          <div className="flex items-center gap-2 text-[11px] text-[var(--r-ink-muted)]">
-            <Icon name="clipboard-text" size={14} className="shrink-0" />
-            <span>Current plan</span>
-          </div>
-          <div className="mt-1 text-[11px] font-semibold text-[var(--r-ink-strong)]">
-            {model.summary}
-          </div>
-        </button>
-        <div className="flex items-center gap-1">
-          {onDismiss && (
-            <button
-              type="button"
-              onClick={onDismiss}
-              className="rounded-md p-1 text-[var(--r-ink-muted)] transition-colors hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
-              title="Mark plan complete and hide"
-              aria-label="Mark plan complete and hide"
-            >
-              <Icon name="check" size={14} />
-            </button>
-          )}
+        <Tooltip label={expanded ? 'Collapse plan details' : 'Expand plan details'} className="min-w-0 flex-1">
           <button
             type="button"
             onClick={() => setExpanded((value) => !value)}
-            className="rounded-md p-1 text-[var(--r-ink-muted)] transition-colors hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
-            title={expanded ? 'Collapse plan details' : 'Expand plan details'}
+            className="min-w-0 flex-1 text-left"
             aria-label={expanded ? 'Collapse plan details' : 'Expand plan details'}
           >
-            {expanded ? (
-              <Icon name="caret-down" size={14} className="shrink-0" />
-            ) : (
-              <Icon name="caret-right" size={14} className="shrink-0" />
-            )}
+            <div className="flex items-center gap-2 text-[11px] text-[var(--r-ink-muted)]">
+              <Icon name="clipboard-text" size={14} className="shrink-0" />
+              <span>Current plan</span>
+            </div>
+            <div className="mt-1 text-[11px] font-semibold text-[var(--r-ink-strong)]">
+              {model.summary}
+            </div>
           </button>
+        </Tooltip>
+        <div className="flex items-center gap-1">
+          {onDismiss && (
+            <Tooltip label="Mark plan complete and hide">
+              <button
+                type="button"
+                onClick={onDismiss}
+                className="rounded-md p-1 text-[var(--r-ink-muted)] transition-colors hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
+                aria-label="Mark plan complete and hide"
+              >
+                <Icon name="check" size={14} />
+              </button>
+            </Tooltip>
+          )}
+          <Tooltip label={expanded ? 'Collapse plan details' : 'Expand plan details'}>
+            <button
+              type="button"
+              onClick={() => setExpanded((value) => !value)}
+              className="rounded-md p-1 text-[var(--r-ink-muted)] transition-colors hover:bg-[var(--r-surface-soft)] hover:text-[var(--r-ink-strong)]"
+              aria-label={expanded ? 'Collapse plan details' : 'Expand plan details'}
+            >
+              {expanded ? (
+                <Icon name="caret-down" size={14} className="shrink-0" />
+              ) : (
+                <Icon name="caret-right" size={14} className="shrink-0" />
+              )}
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -84,7 +88,7 @@ export function ActivePlanBanner({
                   // only the ready dot
                   <Icon name="check-circle" size={12} tone="inherit" className="opacity-60" />
                 ) : step.status === 'inProgress' ? (
-                  <Icon name="dot" size={16} className="-ml-[2px] text-[var(--vscode-progressBar-background)]" />
+                  <Icon name="dot" size={16} className="-ml-[2px] text-[var(--r-ink-strong)]" />
                 ) : (
                   <Icon name="circle" size={12} className="mt-[1px] text-[var(--r-ink-muted)]" />
                 )}

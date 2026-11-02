@@ -153,12 +153,12 @@ export type IconWeight = 'regular' | 'duotone'
  */
 export type IconTone = 'muted' | 'active' | 'disabled' | 'inherit'
 
-const toneToColor: Record<IconTone, string> = {
-  muted: 'var(--r-ink-muted)',
-  active: 'var(--r-accent)',
-  disabled: 'var(--r-ink-disabled)',
-  inherit: 'currentColor',
-}
+/*
+ * Sprint 146 (#614): every icon is drawn in currentColor, as a button's icons are, and its tone is that colour only
+ * where nothing else colours it: index.css's `svg[data-icon-tone]` rules carry no specificity, so a colour class on
+ * the icon (`className="text-…"`) or a stylesheet's rule for it wins. Before, the tone was the svg's fill, and about
+ * seventy colour classes never showed. `inherit` sets no tone: the icon takes its parent's colour.
+ */
 
 const iconMap = {
   'arrow-clockwise': ArrowClockwise,
@@ -319,7 +319,8 @@ export function Icon({
     <Component
       size={size}
       weight={weight}
-      color={toneToColor[tone]}
+      color="currentColor"
+      data-icon-tone={tone === 'inherit' ? undefined : tone}
       className={className}
       aria-hidden={hiddenFromAria}
       aria-label={ariaLabel}

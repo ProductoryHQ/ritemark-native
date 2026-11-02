@@ -15,9 +15,9 @@ export function EnvironmentStatusNotice({
       <div className="flex items-start gap-2">
         <div className="mt-0.5 shrink-0">
           {environmentStatus.restartRequired ? (
-            <Icon name="arrows-clockwise" size={16} className="text-[var(--r-accent)]" />
+            <Icon name="arrows-clockwise" size={16} className="text-[var(--r-ink-strong)]" />
           ) : (
-            <Icon name="warning" size={16} className="text-[var(--vscode-testing-iconFailed)]" />
+            <Icon name="warning" size={16} className="text-[var(--r-error)]" />
           )}
         </div>
         <div className="min-w-0 flex-1">

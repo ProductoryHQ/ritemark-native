@@ -712,7 +712,7 @@ export function Editor({
     const plusButton = document.createElement('button')
     plusButton.className = 'block-plus-btn'
     plusButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`
-    plusButton.title = 'Add block'
+    plusButton.dataset.tooltip = 'Add block' // the one tooltip look, drawn by CSS (the button lives outside React; #576)
     plusButton.setAttribute('aria-label', 'Add block')
 
     // Handle + button click
@@ -1200,45 +1200,61 @@ export function Editor({
 
         /* Copied state: the icon swaps to a check, which is the sign, and the button stays shown while it says
            so (a diagram's toolbar still hides with the pointer). The check is drawn in the Icon's own muted tone,
-           as the copy icon was: a colour here named green, which never showed, because an Icon's tone sets its
-           fill. Green is only the ready dot (Sprint 145, #578) */
+           as the copy icon was: a colour here named green never showed, because an Icon's tone was its fill
+           before #614. Green is only the ready dot (Sprint 145, #578) */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn.copied {
           opacity: 1 !important;
         }
 
-        /* Custom tooltip rendered below button on hover/focus (Ritemark style) */
-        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn::after {
+        /* A tooltip below the button on hover and keyboard focus, in the one tooltip look (Sprint 146, #576;
+           ui/tooltip.tsx's TOOLTIP_SURFACE): the theme's surface and strong ink, a hairline, the menus' shadow */
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn::after,
+        .block-plus-btn::after {
           content: attr(data-tooltip) !important;
           position: absolute !important;
           top: calc(100% + 6px) !important;
           left: 50% !important;
           transform: translateX(-50%) translateY(-2px) !important;
-          background: var(--r-ink-strong) !important;
-          color: #FFFFFF !important;
-          padding: 4px 8px !important;
-          border-radius: 4px !important;
+          background: var(--r-surface) !important;
+          color: var(--r-ink-strong) !important;
+          border: 1px solid var(--r-hairline) !important;
+          padding: 2px 8px !important;
+          border-radius: 5px !important;
           font-family: var(--ritemark-ui-font-family) !important;
-          font-size: 11px !important;
-          font-weight: 500 !important;
-          line-height: 1.4 !important;
+          font-size: 12px !important;
+          font-weight: 400 !important;
+          line-height: 1.35 !important;
           white-space: nowrap !important;
           pointer-events: none !important;
           opacity: 0 !important;
           transition: opacity 0.15s ease, transform 0.15s ease !important;
           transition-delay: 0.4s !important;
-          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18) !important;
+          box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
           z-index: 100 !important;
         }
 
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:hover::after,
-        :where(:root:not([data-input-mode="pointer"])) .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:focus-visible::after {
+        :where(:root:not([data-input-mode="pointer"])) .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:focus-visible::after,
+        .block-plus-btn:hover::after,
+        :where(:root:not([data-input-mode="pointer"])) .block-plus-btn:focus-visible::after {
           opacity: 1 !important;
           transform: translateX(-50%) translateY(0) !important;
         }
 
         /* Hide tooltip when no data-tooltip attribute (safety) */
-        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:not([data-tooltip])::after {
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn:not([data-tooltip])::after,
+        .block-plus-btn:not([data-tooltip])::after {
           content: none !important;
+        }
+
+        /* The block's + sits at the editor's left edge: its tooltip runs right from the button, never past the edge */
+        .block-plus-btn::after {
+          left: 0 !important;
+          transform: translateY(-2px) !important;
+        }
+        .block-plus-btn:hover::after,
+        :where(:root:not([data-input-mode="pointer"])) .block-plus-btn:focus-visible::after {
+          transform: translateY(0) !important;
         }
 
         /* Mermaid diagram styles */

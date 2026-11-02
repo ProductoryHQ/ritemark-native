@@ -391,7 +391,7 @@ function CompactRow({
         ) : optional ? (
           <Icon name="minus" size={14} className="opacity-30" />
         ) : (
-          <Icon name="x" size={14} className="text-[var(--vscode-testing-iconFailed)]" />
+          <Icon name="x" size={14} className="text-[var(--r-error)]" />
         )}
         <span className="text-xs">{label}</span>
       </div>
@@ -427,14 +427,14 @@ function StatusIcon({
   failed: boolean;
 }) {
   if (installing) {
-    return <Icon name="circle-notch" size={14} className="animate-spin text-[var(--r-accent)]" />;
+    return <Icon name="circle-notch" size={14} className="animate-spin text-[var(--r-ink-body)]" />;
   }
   if (installed) {
     // Sprint 145 (#578): `inherit`, so the check is the ink its class names, not the Icon's own muted tone
     return <Icon name="check" size={14} tone="inherit" className="text-[var(--r-ink-body)]" />;
   }
   if (failed) {
-    return <Icon name="x" size={14} className="text-[var(--vscode-testing-iconFailed)]" />;
+    return <Icon name="x" size={14} className="text-[var(--r-error)]" />;
   }
   return <Icon name="x" size={14} className="opacity-40" />;
 }

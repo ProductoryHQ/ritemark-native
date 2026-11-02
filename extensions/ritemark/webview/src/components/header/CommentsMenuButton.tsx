@@ -40,6 +40,7 @@ import {
 import { ALIAS_LABEL, type CommentAgentAlias } from '../../extensions/comment/commentModel'
 import type { CommentTaskError } from '../../../../src/commentTasks/protocol'
 import { onDocChanged } from '../../lib/docChange'
+import { Tooltip } from '../ui/tooltip'
 
 type GroupStates = Partial<Record<CommentAgentAlias, GroupSendState>>
 
@@ -211,21 +212,22 @@ export function CommentsMenuButton({ getEditor }: { getEditor: () => TipTapEdito
 
   return (
     <div ref={rootRef} className="relative">
-      <Button
-        variant="toolbar"
-        size="icon-sm"
-        data-state={open ? 'active' : undefined}
-        aria-pressed={open}
-        aria-label={`Comments (${summary.total})`}
-        onClick={() => { setOpen((o) => !o); setConfirming(false); setGroupStates({}); recompute() }}
-        title={`Comments (${summary.total})`}
-        className="relative"
-      >
-        <Icon name="chat-circle" size={14} tone={open ? 'inherit' : 'muted'} />
-        <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-[var(--r-accent)] text-[9px] font-semibold leading-[14px] text-[var(--r-on-accent)] text-center">
-          {summary.total}
-        </span>
-      </Button>
+      <Tooltip label={`Comments (${summary.total})`}>
+        <Button
+          variant="toolbar"
+          size="icon-sm"
+          data-state={open ? 'active' : undefined}
+          aria-pressed={open}
+          aria-label={`Comments (${summary.total})`}
+          onClick={() => { setOpen((o) => !o); setConfirming(false); setGroupStates({}); recompute() }}
+          className="relative"
+        >
+          <Icon name="chat-circle" size={14} tone={open ? 'inherit' : 'muted'} />
+          <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-[var(--r-accent)] text-[9px] font-semibold leading-[14px] text-[var(--r-on-accent)] text-center">
+            {summary.total}
+          </span>
+        </Button>
+      </Tooltip>
 
       {open && (
         <div className="absolute left-0 top-full z-[70] mt-1 w-72 rounded-lg border border-[var(--r-hairline)] bg-[var(--r-surface)] p-2.5 shadow-[0_6px_24px_rgba(15,23,42,0.16)]">

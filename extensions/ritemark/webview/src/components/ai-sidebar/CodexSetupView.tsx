@@ -53,11 +53,11 @@ export function CodexSetupView() {
             {isChecking ? (
               <Icon name="circle-notch" size={20} className="animate-spin opacity-60" />
             ) : isBroken ? (
-              <Icon name="warning" size={20} className="text-[var(--vscode-testing-iconFailed)]" />
+              <Icon name="warning" size={20} className="text-[var(--r-error)]" />
             ) : loginInProgress ? (
-              <Icon name="circle-notch" size={20} className="animate-spin text-[var(--r-accent)]" />
+              <Icon name="circle-notch" size={20} className="animate-spin text-[var(--r-ink-strong)]" />
             ) : (
-              <Icon name="sign-in" size={20} className="text-[var(--r-accent)]" />
+              <Icon name="sign-in" size={20} className="text-[var(--r-ink-strong)]" />
             )}
           </div>
           <div className="min-w-0 flex-1">

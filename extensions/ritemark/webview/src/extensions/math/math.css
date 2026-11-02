@@ -302,17 +302,13 @@ li .rm-math-field-result {
 .rm-math-mark-glyph {
   display: inline-flex;
 }
-/* In the tooltip (ink in Light, light in Dark): commands in the code face */
+/* In the tooltip: commands in the code face, in the tooltip's own ink. The tooltip is the theme's surface since
+   Sprint 146 (#576), so the code needs no colour of its own for an ink tooltip in Light and a light one in Dark. */
 .rm-math-sentence-code {
   font: 400 12px/18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  color: #c7d2fe;
+  color: inherit;
   background: none;
   padding: 0;
-}
-body.vscode-dark .rm-math-sentence-code,
-body.ritemark-dark .rm-math-sentence-code,
-body[data-vscode-theme-kind='vscode-dark'] .rm-math-sentence-code {
-  color: var(--r-accent-darker);
 }
 /* The same sentence in the bubble and under an open block: muted ink throughout */
 .ProseMirror .rm-math-bubble .rm-math-sentence-code,

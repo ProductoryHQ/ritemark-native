@@ -11,7 +11,7 @@
 
 import type { ReactNode, Ref } from 'react'
 import { cn } from '../../lib/utils'
-import { Button } from './button'
+import { Button, wholeWordsTip } from './button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './dropdown-menu'
 import { Icon } from './Icon'
 import { Tooltip } from './tooltip'
@@ -69,9 +69,13 @@ export function SplitButton({
   }
 }) {
   const state = splitButtonState({ disabled, busy })
+  // #566: with an icon and words, the main part shows its icon alone when its first word doesn't fit (ui/button.tsx,
+  // `iconWhenNarrow`), and its tooltip starts with the whole words. The caret and the line between the parts stay.
+  // Words that aren't text (a component) keep today's cut.
+  const narrow = Boolean(main.icon) && typeof main.label === 'string'
   return (
     <span ref={wrapperRef} className={cn('rm-split', className)} data-tone={tone} {...state.wrapper}>
-      <Tooltip label={main.tooltip} className="rm-split-slot min-w-0">
+      <Tooltip label={narrow ? wholeWordsTip(main.label as string, main.tooltip) : main.tooltip} className="rm-split-slot min-w-0">
         <Button
           type="button"
           size="sm"
@@ -80,9 +84,10 @@ export function SplitButton({
           disabled={state.mainDisabled}
           aria-label={main.ariaLabel}
           onClick={main.onClick}
+          iconWhenNarrow={narrow}
         >
           {main.icon}
-          <span className="truncate">{main.label}</span>
+          {narrow ? main.label : <span className="truncate">{main.label}</span>}
         </Button>
       </Tooltip>
       <DropdownMenu open={menu.open} onOpenChange={menu.onOpenChange} modal={false}>

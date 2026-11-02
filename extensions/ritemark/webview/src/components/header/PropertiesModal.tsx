@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react'
 import { Icon } from '../ui/Icon'
 import { PropertiesPanel, type DocumentProperties } from '../properties'
+import { Tooltip } from '../ui/tooltip'
 
 interface PropertiesModalProps {
   isOpen: boolean
@@ -63,14 +64,15 @@ export function PropertiesModal({
           {/* Modal header */}
           <div className="properties-modal-header">
             <h2 className="properties-modal-title">Properties</h2>
-            <button
-              className="properties-modal-close"
-              onClick={onClose}
-              aria-label="Close"
-              title="Close"
-            >
-              <Icon name="x" size={16} />
-            </button>
+            <Tooltip label="Close">
+              <button
+                className="properties-modal-close"
+                onClick={onClose}
+                aria-label="Close"
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </Tooltip>
           </div>
 
           {/* Modal content - PropertiesPanel */}

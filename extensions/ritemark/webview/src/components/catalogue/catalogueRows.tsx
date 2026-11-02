@@ -129,8 +129,8 @@ type ButtonVariant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghos
 const BUTTON_VARIANTS: ButtonVariant[] = ['default', 'destructive', 'outline', 'secondary', 'ghost', 'toolbar', 'link']
 function buttonCells(variant: ButtonVariant): CatalogueCell[] {
   const icon = variant === 'link' ? null : <Icon name="chat-circle" size={14} tone="inherit" />
-  const b = (props: { disabled?: boolean; label?: string; on?: boolean } = {}) => (
-    <Button data-target variant={variant} size="sm" disabled={props.disabled} data-state={props.on ? 'active' : undefined}>
+  const b = (props: { disabled?: boolean; label?: string; on?: boolean; narrow?: boolean } = {}) => (
+    <Button data-target variant={variant} size="sm" disabled={props.disabled} data-state={props.on ? 'active' : undefined} iconWhenNarrow={props.narrow}>
       {icon}{props.label ?? 'Ask Claude'}
     </Button>
   )
@@ -142,7 +142,8 @@ function buttonCells(variant: ButtonVariant): CatalogueCell[] {
     t('click', () => b()),
     t('disabled', () => b({ disabled: true })),
     t('long', () => b({ label: 'Ask Claude what is in this folder' }), { width: 300 }),
-    t('narrow', () => <div className="rm-cat-narrow" style={{ width: 72 }}>{b({ label: 'Ask Claude what is here' })}</div>),
+    // #566: narrower than the icon and the first word, so the icon shows alone (a button with only words keeps its cut)
+    t('narrow', () => <div className="rm-cat-narrow" style={{ width: 56 }}>{b({ label: 'Ask Claude what is here', narrow: true })}</div>),
   ]
   if (variant === 'toolbar') cells.splice(6, 0, t('on', () => b({ on: true })))
   return cells

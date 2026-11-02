@@ -336,7 +336,8 @@ assert.equal(words(guide.querySelector('.rh-guide-note')!), 'Reads the names, th
 assert.deepEqual(guide.querySelectorAll('button').map((button) => button.getAttribute('aria-label') ?? words(button)), ['Hide this in Training work', 'Ask Claude what is here', 'Ask with'], 'S15: the ×, the button and its caret, all named')
 assert.equal(withCard.querySelectorAll('.rh-moved').length, 0, 'one card at a time')
 // S19: no AI ready: the card still shows and names Claude
-assert.match(render(home({ guidance: ready({ aiReady: false }) })), /Ask Claude what is here/)
+// (its words are in two parts since #566, the first word apart, so they are read as text, not matched in the markup)
+assert.equal(words(parse(render(home({ guidance: ready({ aiReady: false }) }))).querySelector('.rh-split-main')!), 'Ask Claude what is here')
 // A press that did not start says so on the card
 assert.match(render(home({ guidance: ready({ problem: 'That card is no longer on the board.' }) })), /role="status">That card is no longer on the board\./)
 
