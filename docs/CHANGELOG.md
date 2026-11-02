@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Changed
 - **The AI column draws once (#624).** While Ritemark finds out whether you are signed in, the AI column shows only the turning mark, in the place the window's own mark had, and then either the chat or "Almost there!". It no longer runs through "Loading...", "Preparing Agent Chat…", an empty chat and an AI's sign-in screen first. If the check takes more than 10 seconds, one line under the mark says so, with Try again; if the AI can't start, it says "The AI couldn't start".
 - **The AI column you closed stays closed.** Ritemark no longer opens it again a few seconds after it starts. Its toggle opens it, and what asks for the AI (the welcome's last step, a task's conversation) still does. A column a narrow window put away comes back when the window is wide again.
+- **Nothing moves while Ritemark starts.** The window opens in its final shape: the six places, the place your project was on, a new project's Home with its Home and Task board tabs, and on a first start the welcome alone, all from the first moment, where they used to arrive while Ritemark started (up to 12 s on a slow start). A restored terminal's tab has its name from the start. The shell reads the frame from one description in `product.json` (`ritemarkFrame`); an extension release that would no longer fill it is refused before it ships.
+
+#### Fixed
+- **No more "Git not found" message (#633).** Ritemark no longer shows Git's own notification with **Download Git** when a folder uses Git and none is installed (Microsoft Store policy 10.1.5).
+- **A switch stopped by another question no longer stops your chats (#623).** If another part of the app stops a project switch at once, while Ritemark's own question is open, answering **Switch and stop** now leaves the chats working.
+- **The AI column comes back after a start without Ritemark AI.** When Ritemark AI couldn't be loaded at all, the column closed, and stayed closed at every later start. Now it comes back at the next start; only your own toggle closes it for good.
 
 ### Sprint 145: 2.1's loose ends
 
