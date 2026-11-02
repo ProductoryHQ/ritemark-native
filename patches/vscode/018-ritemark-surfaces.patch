@@ -857,7 +857,7 @@ index d81722d63af..8a11889fd80 100644
  		this._onDidRender.fire();
  
 diff --git a/src/vs/workbench/browser/layout.ts b/src/vs/workbench/browser/layout.ts
-index 387bbc2..f6707e1 100644
+index 8009bac..4fbb468 100644
 --- a/src/vs/workbench/browser/layout.ts
 +++ b/src/vs/workbench/browser/layout.ts
 @@ -152,6 +152,12 @@ export const TITLE_BAR_SETTINGS = [
@@ -873,7 +873,7 @@ index 387bbc2..f6707e1 100644
  const DEFAULT_WORKSPACE_WINDOW_DIMENSIONS = new Dimension(DEFAULT_WORKSPACE_WINDOW_SIZE.width, DEFAULT_WORKSPACE_WINDOW_SIZE.height);
  
  export abstract class Layout extends Disposable implements IWorkbenchLayoutService {
-@@ -3070,9 +3076,9 @@ class LayoutStateModel extends Disposable {
+@@ -3079,9 +3085,9 @@ class LayoutStateModel extends Disposable {
  		const auxiliaryBarForceMaximized = this.configurationService.getValue(WorkbenchLayoutSettings.AUXILIARYBAR_FORCE_MAXIMIZED);
  		const workbenchState = this.contextService.getWorkbenchState();
  		const mainContainerDimension = configuration.mainContainerDimension;
@@ -885,7 +885,7 @@ index 387bbc2..f6707e1 100644
  		LayoutStateKeys.AUXILIARYBAR_HIDDEN.defaultValue = (() => {
  			if (isWeb && !this.environmentService.remoteAuthority) {
  				return true; // not required in web if unsupported
-@@ -3172,8 +3178,8 @@ class LayoutStateModel extends Disposable {
+@@ -3181,8 +3187,8 @@ class LayoutStateModel extends Disposable {
  
  		// Restrict auxiliary bar size in case of small window dimensions
  		if (this.isNew[StorageScope.WORKSPACE] && configuration.mainContainerDimension.width <= DEFAULT_WORKSPACE_WINDOW_DIMENSIONS.width) {
@@ -3195,7 +3195,7 @@ index ae595e8ab3e..d2a137e7255 100644
  				renderBody,
  				icon: customOptions?.icon,
 diff --git a/src/vs/workbench/browser/parts/editor/editorPart.ts b/src/vs/workbench/browser/parts/editor/editorPart.ts
-index afa6942390e..bb3c3040637 100644
+index afa6942390e..8558295a3e9 100644
 --- a/src/vs/workbench/browser/parts/editor/editorPart.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorPart.ts
 @@ -36,6 +36,10 @@ import { IContextKeyService } from '../../../../platform/contextkey/common/conte
@@ -3205,7 +3205,7 @@ index afa6942390e..bb3c3040637 100644
 +import { RITEMARK_FRAME_WITHOUT_TITLE_ROW } from '../../../../platform/window/common/window.js';
 +import { createRitemarkFrameStrip, trackRitemarkZoom } from '../ritemarkFrameStrip.js';
 +import { ritemarkHomeInFront, ritemarkTakeSwitchLanding } from '../ritemarkSwitchGuard.js';
-+import { ritemarkFirstDesk } from '../../ritemarkFrame.js';
++import { ritemarkFirstDesk, ritemarkNoteFirstDeskPlaced } from '../../ritemarkFrame.js';
  
  /**
   * The width (in pixels) of the editor card border drawn on every side when the
@@ -3235,7 +3235,7 @@ index afa6942390e..bb3c3040637 100644
  		// Context keys
  		this.handleContextKeys();
  
-@@ -1285,10 +1301,22 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1285,10 +1301,29 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
  
  	private doCreateGridControl(): void {
  
@@ -3255,11 +3255,18 @@ index afa6942390e..bb3c3040637 100644
 +		// first frame, as a restore brings them back (ritemarkFrame.ts)
 +		const ritemarkDesk = !this.gridWidget && !restoreError && this.editorPartsView.mainPart === this ? this.instantiationService.invokeFunction(ritemarkFirstDesk) : undefined;
 +		if (ritemarkDesk) {
-+			this.doCreateGridControlWithState(ritemarkDesk.grid, ritemarkDesk.group);
++			try {
++				this.doCreateGridControlWithState(ritemarkDesk.grid, ritemarkDesk.group);
++				ritemarkNoteFirstDeskPlaced();
++			} catch (error) {
++				onUnexpectedError(new Error(`Error placing Ritemark's first desk: ${error}`));
++				this.disposeGroups(); // the plain desk below, as after a failed restore
++				restoreError = true;
++			}
  		}
  
  		// Grid Widget (no previous UI state or failed to restore)
-@@ -1307,7 +1335,7 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1307,7 +1342,7 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
  		this.notifyGroupIndexChange();
  	}
  
@@ -3268,7 +3275,7 @@ index afa6942390e..bb3c3040637 100644
  		const state: IEditorPartUIState | undefined = this.loadState();
  		if (state?.serializedGrid) {
  			try {
-@@ -1315,8 +1343,9 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1315,8 +1350,9 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
  				// MRU
  				this.mostRecentActiveGroups = state.mostRecentActiveGroups;
  
@@ -3280,7 +3287,7 @@ index afa6942390e..bb3c3040637 100644
  			} catch (error) {
  
  				// Log error
-@@ -1466,7 +1495,8 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1466,7 +1502,8 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
  		}
  
  		// Layout contents
@@ -4549,7 +4556,7 @@ index 00000000000..c515a8eb74f
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts b/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts
 new file mode 100644
-index 00000000000..442857fb6f3
+index 00000000000..ef6fb5eb84b
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts
 @@ -0,0 +1,253 @@
@@ -4716,7 +4723,7 @@ index 00000000000..442857fb6f3
 +}
 +
 +function isHomeEditor(editor: { id: string; value: string }): boolean {
-+	if (editor.id !== WEBVIEW_EDITOR_TYPE_ID) {
++	if (editor.id !== WEBVIEW_EDITOR_TYPE_ID || HOME_VIEW_TYPE === undefined) {
 +		return false;
 +	}
 +	try {
@@ -4808,10 +4815,10 @@ index 00000000000..442857fb6f3
 +registerWorkbenchContribution2(RitemarkSwitchGuard.ID, RitemarkSwitchGuard, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/ritemarkWelcomeAlone.ts b/src/vs/workbench/browser/parts/ritemarkWelcomeAlone.ts
 new file mode 100644
-index 00000000000..0f4c5a0997b
+index 00000000000..c539e57b12e
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkWelcomeAlone.ts
-@@ -0,0 +1,129 @@
+@@ -0,0 +1,130 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4828,23 +4835,23 @@ index 00000000000..0f4c5a0997b
 + * Sprint 152 (R4): the welcome's window is the welcome alone from its first frame, where it was VS Code's empty window
 + * until the extension had started (12 s on a slow first start). A window with no folder and nothing to open is the
 + * welcome's (layout.ts notes it, and closes both columns there): it is alone until the welcome takes over, and its
-+ * slot is released, logged once, when another editor comes in front, when Ritemark isn't there once the extensions
-+ * are read or failed to start, or after RITEMARK_SLOT_RELEASE_MS with no welcome. The window is then VS Code's empty
-+ * window.
++ * slot is released, logged once, when another editor comes in front (an empty window's restored editors), when
++ * Ritemark isn't there once the extensions are read, or after RITEMARK_SLOT_RELEASE_MS with no welcome (a start that
++ * failed shows so: VS Code reports a failed activation only to its telemetry). The window is then VS Code's empty
++ * window: the columns the layout closed for the welcome alone come back.
 + */
 +
 +import { disposableTimeout } from '../../../base/common/async.js';
 +import { Emitter, Event } from '../../../base/common/event.js';
 +import { Disposable, MutableDisposable } from '../../../base/common/lifecycle.js';
-+import Severity from '../../../base/common/severity.js';
 +import { IContextKeyService } from '../../../platform/contextkey/common/contextkey.js';
 +import { ExtensionIdentifier } from '../../../platform/extensions/common/extensions.js';
 +import { ILogService } from '../../../platform/log/common/log.js';
 +import { IExtensionService } from '../../services/extensions/common/extensions.js';
 +import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../common/contributions.js';
 +import { IEditorService } from '../../services/editor/common/editorService.js';
-+import { IWorkbenchLayoutService } from '../../services/layout/browser/layoutService.js';
-+import { isRitemarkWelcomeAloneExpected, RITEMARK_SLOT_RELEASE_MS, ritemarkFrame, ritemarkSlotReleased } from '../ritemarkFrame.js';
++import { IWorkbenchLayoutService, Parts } from '../../services/layout/browser/layoutService.js';
++import { isRitemarkWelcomeAloneExpected, RITEMARK_SLOT_RELEASE_MS, ritemarkFrame, ritemarkSlotReleased, ritemarkWelcomeAloneColumns } from '../ritemarkFrame.js';
 +
 +/** Set by the extension while its welcome is open alone in the window. */
 +const WELCOME_ALONE_CONTEXT_KEY = 'ritemark.welcomeAlone';
@@ -4882,18 +4889,12 @@ index 00000000000..0f4c5a0997b
 +
 +		const id = ritemarkFrame.extension;
 +		if (this.expected && id) {
-+			const status = () => extensionService.getExtensionsStatus()[id];
 +			this.expectedRelease.value = disposableTimeout(() => this.release('no welcome came'), RITEMARK_SLOT_RELEASE_MS);
 +			extensionService.whenInstalledExtensionsRegistered().then(() => {
 +				if (!extensionService.extensions.some(extension => ExtensionIdentifier.equals(extension.identifier, id))) {
 +					this.release('Ritemark is not installed');
 +				}
 +			});
-+			this._register(extensionService.onDidChangeExtensionsStatus(ids => {
-+				if (ids.some(changed => ExtensionIdentifier.equals(changed, id)) && status()?.messages.some(message => message.type === Severity.Error)) {
-+					this.release('Ritemark failed to start');
-+				}
-+			}));
 +		}
 +
 +		const keys = new Set([WELCOME_ALONE_CONTEXT_KEY]);
@@ -4913,13 +4914,20 @@ index 00000000000..0f4c5a0997b
 +			this.expectedRelease.clear();
 +			ritemarkSlotReleased(this.logService, 'the welcome alone', why);
 +			this.update();
++			const columns = ritemarkWelcomeAloneColumns();
++			if (columns.sideBar) {
++				this.layoutService.setPartHidden(false, Parts.SIDEBAR_PART);
++			}
++			if (columns.aiColumn) {
++				this.layoutService.setPartHidden(false, Parts.AUXILIARYBAR_PART);
++			}
 +		}
 +	}
 +
 +	private update(): void {
 +		const active = this.editorService.activeEditor;
 +		const viewType = (active as { viewType?: unknown } | undefined)?.viewType;
-+		const handedOver = this.contextKeyService.getContextKeyValue<boolean>(WELCOME_ALONE_CONTEXT_KEY) === true && viewType === WELCOME_VIEW_TYPE;
++		const handedOver = WELCOME_VIEW_TYPE !== undefined && this.contextKeyService.getContextKeyValue<boolean>(WELCOME_ALONE_CONTEXT_KEY) === true && viewType === WELCOME_VIEW_TYPE;
 +		if (this.expected && (handedOver || (active && viewType !== WELCOME_VIEW_TYPE))) {
 +			// The welcome took over, or another editor came in front first
 +			if (handedOver) {
@@ -5153,7 +5161,7 @@ index 00000000000..c6764e91723
 +registerWorkbenchContribution2(RitemarkWindowSizes.ID, RitemarkWindowSizes, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644
-index 00000000000..317b744cf1c
+index 00000000000..feeaee393f5
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 @@ -0,0 +1,380 @@
@@ -5389,7 +5397,7 @@ index 00000000000..317b744cf1c
 +			}
 +			this.restoring = undefined;
 +		}
-+		const home = compositeId === HOME_PLACE;
++		const home = HOME_PLACE !== undefined && compositeId === HOME_PLACE;
 +		const homeChanged = home !== this.home;
 +		if (homeChanged) {
 +			// Measure the title row before hiding it, so the content can take its height.
@@ -5538,7 +5546,7 @@ index 00000000000..317b744cf1c
 +	}
 +}
 diff --git a/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts b/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
-index cd93a447d1c..81e8c584be6 100644
+index cd93a447d1c..07cc347c00b 100644
 --- a/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
 +++ b/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
 @@ -5,7 +5,7 @@
@@ -5559,11 +5567,11 @@ index cd93a447d1c..81e8c584be6 100644
 +import { RITEMARK_FRAME_WITHOUT_TITLE_ROW } from '../../../../platform/window/common/window.js';
 +import { createRitemarkFrameStrip, trackRitemarkZoom } from '../ritemarkFrameStrip.js';
 +import { RitemarkProjectHead } from './ritemarkProjectHead.js';
-+import { ritemarkSeedPlaces } from '../../ritemarkFrame.js';
++import { ritemarkNotePlaceToRestore, ritemarkSeedPlaces } from '../../ritemarkFrame.js';
  
  const PRIMARY_SIDE_BAR_SASH_CLASS = 'primary-sidebar-sash';
  
-@@ -183,12 +189,60 @@ export class SidebarPart extends AbstractPaneCompositePart {
+@@ -183,12 +189,63 @@ export class SidebarPart extends AbstractPaneCompositePart {
  		container.style.outlineColor = this.getColor(SIDE_BAR_DRAG_AND_DROP_BACKGROUND) ?? '';
  	}
  
@@ -5585,7 +5593,10 @@ index cd93a447d1c..81e8c584be6 100644
 +				}
 +			};
 +			update(this.getActivePaneComposite()?.getId());
-+			this._register(this.onDidPaneCompositeOpen(composite => update(composite.getId())));
++			this._register(this.onDidPaneCompositeOpen(composite => {
++				ritemarkNotePlaceToRestore(undefined); // Sprint 152: a places row made later checks the place that is open
++				update(composite.getId());
++			}));
 +			this._register(head.onDidChangeRows(() => {
 +				if (this.ritemarkLastLayout) {
 +					this.layout(...this.ritemarkLastLayout);
@@ -5625,7 +5636,7 @@ index cd93a447d1c..81e8c584be6 100644
  	}
  
  	override setBoundarySashes(sashes: IBoundarySashes): void {
-@@ -230,7 +284,7 @@ export class SidebarPart extends AbstractPaneCompositePart {
+@@ -230,7 +287,7 @@ export class SidebarPart extends AbstractPaneCompositePart {
  			},
  			compositeSize: 0,
  			iconSize: 16,
@@ -6768,10 +6779,10 @@ index 00000000000..1610dcb6fc8
 +});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts b/src/vs/workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts
 new file mode 100644
-index 00000000000..88b6d52464d
+index 00000000000..067e9e44824
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,100 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -6780,7 +6791,6 @@ index 00000000000..88b6d52464d
 +import assert from 'assert';
 +import { timeout } from '../../../../base/common/async.js';
 +import { Emitter } from '../../../../base/common/event.js';
-+import Severity from '../../../../base/common/severity.js';
 +import { upcastPartial } from '../../../../base/test/common/mock.js';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
 +import { runWithFakedTimers } from '../../../../base/test/common/virtualScheduling/runWithFakedTimers.js';
@@ -6790,13 +6800,13 @@ index 00000000000..88b6d52464d
 +import { RitemarkWelcomeAlone } from '../../../browser/parts/ritemarkWelcomeAlone.js';
 +import { RITEMARK_SLOT_RELEASE_MS, ritemarkFrame, ritemarkNoteWelcomeAloneExpected } from '../../../browser/ritemarkFrame.js';
 +import { IEditorService } from '../../../services/editor/common/editorService.js';
-+import { IExtensionService, IExtensionsStatus } from '../../../services/extensions/common/extensions.js';
-+import { IWorkbenchLayoutService } from '../../../services/layout/browser/layoutService.js';
++import { IExtensionService } from '../../../services/extensions/common/extensions.js';
++import { IWorkbenchLayoutService, Parts } from '../../../services/layout/browser/layoutService.js';
 +
 +/**
 + * Ritemark 2.0 (Sprint 152, R4): the welcome's window is the welcome alone from its first frame, until the welcome takes
-+ * over; the slot goes when another editor comes in front, when Ritemark isn't there or failed to start, or after a
-+ * minute with no welcome.
++ * over; the slot goes when another editor comes in front, when Ritemark isn't there, or after a minute with no welcome
++ * (a failed start shows so), and the columns the layout closed for it come back.
 + */
 +suite('Ritemark welcome alone', () => {
 +
@@ -6806,21 +6816,18 @@ index 00000000000..88b6d52464d
 +		const container = document.createElement('div');
 +		const onDidChangeContext = store.add(new Emitter<IContextKeyChangeEvent>());
 +		const onDidActiveEditorChange = store.add(new Emitter<void>());
-+		const onDidChangeExtensionsStatus = store.add(new Emitter<ExtensionIdentifier[]>());
 +		const keys = new Map<string, unknown>();
-+		const status: Record<string, Partial<IExtensionsStatus>> = {};
++		const shown: string[] = [];
 +		let active: { viewType?: string } | undefined;
 +		const logged: string[] = [];
 +		const id = ritemarkFrame.extension!;
 +		store.add(new RitemarkWelcomeAlone(
 +			upcastPartial<IContextKeyService>({ getContextKeyValue: <T>(key: string) => keys.get(key) as T, onDidChangeContext: onDidChangeContext.event }),
 +			upcastPartial<IEditorService>({ get activeEditor() { return active as never; }, onDidActiveEditorChange: onDidActiveEditorChange.event }),
-+			upcastPartial<IWorkbenchLayoutService>({ mainContainer: container }),
++			upcastPartial<IWorkbenchLayoutService>({ mainContainer: container, setPartHidden: (hidden: boolean, part: Parts) => { shown.push(`${part} ${hidden ? 'hidden' : 'shown'}`); } }),
 +			upcastPartial<IExtensionService>({
 +				whenInstalledExtensionsRegistered: async () => true,
 +				get extensions() { return installed ? [{ identifier: new ExtensionIdentifier(id) }] as never : []; },
-+				getExtensionsStatus: () => status as never,
-+				onDidChangeExtensionsStatus: onDidChangeExtensionsStatus.event,
 +			}),
 +			new class extends NullLogService { override warn(message: string) { logged.push(message); } }(),
 +		));
@@ -6829,15 +6836,15 @@ index 00000000000..88b6d52464d
 +			logged,
 +			show: (viewType: string | undefined) => { active = viewType ? { viewType } : undefined; onDidActiveEditorChange.fire(); },
 +			setKey: (value: boolean) => { keys.set('ritemark.welcomeAlone', value); onDidChangeContext.fire({ affectsSome: () => true } as unknown as IContextKeyChangeEvent); },
-+			fail: () => { status[id] = { messages: [{ type: Severity.Error, message: 'Activating extension failed', extensionId: new ExtensionIdentifier(id), extensionPointId: '' }] }; onDidChangeExtensionsStatus.fire([new ExtensionIdentifier(id)]); },
++			shown,
 +		};
 +	}
 +
 +	teardown(() => ritemarkNoteWelcomeAloneExpected(false));
 +
-+	test('alone from the first frame; the welcome takes over and keeps it; closing the welcome ends it', async () => {
-+		ritemarkNoteWelcomeAloneExpected(true);
-+		const { alone, show, setKey } = setUp();
++	test('alone from the first frame; the welcome takes over and keeps it; closing the welcome ends it, the columns left to the extension', async () => {
++		ritemarkNoteWelcomeAloneExpected(true, { sideBar: false, aiColumn: true });
++		const { alone, show, setKey, shown } = setUp();
 +		const atFirst = alone();
 +		await timeout(0);
 +		show(ritemarkFrame.welcome);
@@ -6845,18 +6852,18 @@ index 00000000000..88b6d52464d
 +		const withTheWelcome = alone();
 +		setKey(false);
 +		show(undefined);
-+		assert.deepStrictEqual({ atFirst, withTheWelcome, after: alone() }, { atFirst: true, withTheWelcome: true, after: false });
++		assert.deepStrictEqual({ atFirst, withTheWelcome, after: alone(), shown }, { atFirst: true, withTheWelcome: true, after: false, shown: [] });
 +	});
 +
-+	test('another editor in front first releases it, logged once', () => {
-+		ritemarkNoteWelcomeAloneExpected(true);
-+		const { alone, show, logged } = setUp();
++	test('another editor in front first (an empty window\'s restored editors) releases it, logged once, and the columns it closed come back', () => {
++		ritemarkNoteWelcomeAloneExpected(true, { sideBar: false, aiColumn: true });
++		const { alone, show, logged, shown } = setUp();
 +		const atFirst = alone();
 +		show('workbench.editors.file');
-+		assert.deepStrictEqual({ atFirst, after: alone(), logged }, { atFirst: true, after: false, logged: ['[ritemark] slot released: the welcome alone (another editor is in front)'] });
++		assert.deepStrictEqual({ atFirst, after: alone(), logged, shown }, { atFirst: true, after: false, logged: ['[ritemark] slot released: the welcome alone (another editor is in front)'], shown: [`${Parts.AUXILIARYBAR_PART} shown`] });
 +	});
 +
-+	test('a minute with no welcome, Ritemark not installed, or Ritemark failed to start: released', () => runWithFakedTimers({}, async () => {
++	test('a minute with no welcome (a failed start too), or Ritemark not installed: released', () => runWithFakedTimers({}, async () => {
 +		ritemarkNoteWelcomeAloneExpected(true);
 +		const late = setUp();
 +		await timeout(RITEMARK_SLOT_RELEASE_MS - 1);
@@ -6867,10 +6874,7 @@ index 00000000000..88b6d52464d
 +		const missing = setUp({ installed: false });
 +		await timeout(0);
 +
-+		const failed = setUp();
-+		failed.fail();
-+
-+		assert.deepStrictEqual({ beforeTheMinute, afterTheMinute, notInstalled: missing.alone(), failed: failed.alone() }, { beforeTheMinute: true, afterTheMinute: false, notInstalled: false, failed: false });
++		assert.deepStrictEqual({ beforeTheMinute, afterTheMinute, notInstalled: missing.alone() }, { beforeTheMinute: true, afterTheMinute: false, notInstalled: false });
 +	}));
 +
 +	test('a window that isn\'t the welcome\'s (a folder, or files to open) is never alone before the welcome', () => {

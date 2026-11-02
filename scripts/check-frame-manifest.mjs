@@ -26,14 +26,23 @@ import { pathToFileURL } from 'node:url';
 const WEBVIEW = 'mainThreadWebview-';
 const CONTAINER = 'workbench.view.extension.';
 
-/** The string and string-array constants exported from src/frameIdentifiers.ts, read without compiling it. */
+/** What the check reads from src/frameIdentifiers.ts; one it can't read is a mismatch, never a skip. */
+export const FRAME_IDENTIFIERS = ['HOME_TAB_VIEW_TYPE', 'BOARD_TAB_VIEW_TYPE', 'WELCOME_VIEW_TYPE', 'HOME_PLACE_ID', 'FRAME_SHAPING_SETTINGS'];
+
+/**
+ * The string and string-array constants exported from src/frameIdentifiers.ts, read without compiling it: either
+ * quote, an optional type annotation, an optional `as const`.
+ */
 export function readFrameIdentifiers(source) {
   const identifiers = {};
-  for (const match of source.matchAll(/export const (\w+) = '([^']*)';/g)) {
-    identifiers[match[1]] = match[2];
-  }
-  for (const match of source.matchAll(/export const (\w+) = \[([^\]]*)\];/g)) {
-    identifiers[match[1]] = [...match[2].matchAll(/'([^']*)'/g)].map(entry => entry[1]);
+  const string = /^(['"])(.*)\1$/;
+  for (const match of source.matchAll(/export const (\w+)(?:\s*:\s*[^=]+?)?\s*=\s*([^;]+?)(?:\s+as\s+const)?\s*;/gs)) {
+    const value = match[2].trim();
+    if (string.test(value)) {
+      identifiers[match[1]] = value.match(string)[2];
+    } else if (value.startsWith('[') && value.endsWith(']')) {
+      identifiers[match[1]] = [...value.matchAll(/(['"])([^'"]*)\1/g)].map(entry => entry[2]);
+    }
   }
   return identifiers;
 }
@@ -45,6 +54,11 @@ export function frameMismatches(product, pkg, identifiers) {
     return [];
   }
   const problems = [];
+  for (const name of FRAME_IDENTIFIERS) {
+    if (name === 'FRAME_SHAPING_SETTINGS' ? !Array.isArray(identifiers[name]) || !identifiers[name].length : typeof identifiers[name] !== 'string') {
+      problems.push(`could not read ${name} from src/frameIdentifiers.ts`);
+    }
+  }
   const contributes = pkg.contributes ?? {};
   const containers = contributes.viewsContainers ?? {};
   const views = contributes.views ?? {};
