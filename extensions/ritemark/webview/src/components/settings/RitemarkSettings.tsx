@@ -14,7 +14,7 @@ import { AI_INFORMATION_URL } from '../ai-sidebar/aiDisclosure';
 import { GoogleDocsSettingsCard, type GoogleDocsSettingsProjection } from './GoogleDocsSettingsCard';
 import { PLAN_LINES } from '../welcome/welcomeCopy';
 import { SettingsPage } from './SettingsPage';
-import { FIRST_SECTION, SETTINGS_SECTIONS, landingFor, type SettingsSectionId } from './settingsSections';
+import { FIRST_SECTION, SETTINGS_SECTIONS, isKnownLanding, landingFor, type SettingsSectionId } from './settingsSections';
 import { ExternalLink, SettingsGroup, SettingsNote, TipButton } from './SettingsRow';
 import { AppearanceSection } from './AppearanceSection';
 import { UsageDataSection } from './UsageDataSection';
@@ -247,6 +247,8 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
           break;
 
         case 'settings:focus-section': {
+          // As before: a name the page doesn't know moves nothing
+          if (!isKnownLanding(message.section)) break;
           const landing = landingFor(message.section);
           setSection(landing.section);
           setFocusAnchor(landing.anchor ?? null);

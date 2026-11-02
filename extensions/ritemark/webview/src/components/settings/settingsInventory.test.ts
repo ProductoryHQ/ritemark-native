@@ -37,12 +37,34 @@ export const API_KEYS = ['openai-api-key', 'google-ai-key', 'anthropic-api-key',
 
 const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')
 
-/** Every settings component's source, tests left out. */
+/** A source with its comments taken out, so a message named only in a comment doesn't count (a URL's // stays). */
+export function withoutComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\w])\/\/[^\n]*/g, '$1')
+}
+
+/** Every settings component's source, tests left out, comments taken out. */
 export function pageSource(dir = HERE): string {
   return readdirSync(dir)
     .filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
-    .map((file) => read(join(dir, file)))
+    .map((file) => withoutComments(read(join(dir, file))))
     .join('\n')
+}
+
+/**
+ * Messages sent from more than one place, by the file that owns each copy: the AI accounts cards (moved whole), the
+ * Ritemark's parts sheet in Advanced, and Updates. Dropping one copy fails the test even while another remains.
+ */
+export const OWNERS: Readonly<Record<string, readonly string[]>> = {
+  'RitemarkSettings.tsx': ['claude:install', 'claude:repair', 'claude:reload', 'claude:login', 'claude:refreshStatus', 'claude:cancelLogin', 'claude:enterApiKey', 'claude:logout', 'codex:repair', 'codex:refreshStatus', 'codex:startLogin', 'codex:cancelLogin', 'codex:logout', 'updates:reload'],
+  'AdvancedSection.tsx': ['claude:install', 'claude:repair', 'claude:reload', 'claude:login', 'claude:refreshStatus', 'codex:repair', 'codex:refreshStatus', 'codex:startLogin'],
+  'UpdatesSection.tsx': ['updates:checkNow', 'updates:install', 'updates:skipVersion', 'updates:pause', 'updates:resume', 'updates:reload'],
+}
+export function ownerGaps(sources: Record<string, string>): string[] {
+  const gaps: string[] = []
+  for (const [file, types] of Object.entries(OWNERS)) {
+    for (const type of types) if (!sends(sources[file] ?? '', type)) gaps.push(`${file} no longer sends ${type}`)
+  }
+  return gaps
 }
 
 /** Where a page sends a message type: a posted `type`, an action helper's argument, or a named message constant. */
@@ -75,11 +97,13 @@ export function inventoryGaps(page: string, host: string, googleDocsProtocol: st
 }
 
 const page = pageSource()
+const owned = Object.fromEntries(Object.keys(OWNERS).map((file) => [file, withoutComments(read(join(HERE, file)))]))
 const host = read(join(HERE, '../../../../src/settings/RitemarkSettingsProvider.ts'))
 const googleDocsProtocol = read(join(HERE, '../../../../src/googleDocs/protocol.ts'))
 
 assert.equal(PAGE_MESSAGES.length, 28, 'the 28 message types')
 assert.deepEqual(inventoryGaps(page, host, googleDocsProtocol), [], 'every message, setting and key of the inventory has its sender and its handler')
+assert.deepEqual(ownerGaps(owned), [], 'each copy of a message sent from more than one place is still sent by its owner')
 
 // E1: the test fails when one is removed, from the page or from the host
 const withoutRepair = page.replace(/(type:\s*|\b\w*Action\(\s*|onCodex\(\s*)'codex:repair'/g, "$1'removed'")
@@ -92,6 +116,16 @@ assert.deepEqual(
 assert.deepEqual(
   inventoryGaps(page.replace(/'ai\.debugTrace'/g, "'gone'"), host, googleDocsProtocol),
   ['the page no longer writes ritemark.ai.debugTrace'],
+)
+
+// A message named only in a comment doesn't count
+assert.ok(!sends(withoutComments("// vscode.postMessage({ type: 'codex:repair' })\n/* onClaude('claude:install') */"), 'codex:repair'))
+assert.ok(!sends(withoutComments("/* onClaude('claude:install') */"), 'claude:install'))
+assert.ok(withoutComments("url: 'https://example.com'").includes('https://example.com'), "a URL's // stays")
+// Dropping the AI accounts card's copy of claude:repair fails, though Ritemark's parts still sends it
+assert.deepEqual(
+  ownerGaps({ ...owned, 'RitemarkSettings.tsx': owned['RitemarkSettings.tsx'].replace(/Action\('claude:repair'\)/g, "Action('gone')") }),
+  ['RitemarkSettings.tsx no longer sends claude:repair'],
 )
 
 console.log(`settingsInventory.test.ts: all assertions passed (${PAGE_MESSAGES.length} messages, ${GOOGLE_DOCS_MESSAGES.length} Google Docs, ${SETTING_KEYS.length} settings, ${API_KEYS.length} keys)`)

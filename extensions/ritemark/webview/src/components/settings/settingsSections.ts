@@ -22,8 +22,8 @@ export interface SettingsSectionInfo {
 export const SETTINGS_SECTIONS: readonly SettingsSectionInfo[] = [
   { id: 'ai-accounts', name: 'AI accounts', icon: 'sparkle', lede: 'The AIs you work with, through the accounts you already pay for.' },
   { id: 'appearance', name: 'Appearance', icon: 'palette', lede: 'How Ritemark looks on this computer.' },
-  { id: 'sharing', name: 'Sharing', icon: 'cloud-arrow-up', lede: 'Where your copies and pages go when you share them.' },
-  { id: 'usage-data', name: 'Usage data', icon: 'shield-check', lede: 'What Ritemark learns about how it is used, so it can get better.' },
+  { id: 'sharing', name: 'Sharing', icon: 'share-network', lede: 'Where your copies and pages go when you share them.' },
+  { id: 'usage-data', name: 'Usage data', icon: 'chart-bar', lede: 'What Ritemark learns about how it is used, so it can get better.' },
   // The Updates lede carries the version and the last check, so the section draws its own
   { id: 'updates', name: 'Updates', icon: 'arrows-clockwise', lede: '' },
   { id: 'advanced', name: 'Advanced', icon: 'wrench', lede: 'Nothing in this section is needed to write with Ritemark.' },
@@ -46,6 +46,12 @@ export const LEGACY_SECTION_LANDINGS: Readonly<Record<string, SettingsLanding>> 
   'usage-data': { section: 'usage-data' },
   'google-ai-key': { section: 'ai-accounts', anchor: 'settings-section-google-ai-key' },
   'openai-api-key': { section: 'ai-accounts', anchor: 'settings-section-openai-api-key' },
+}
+
+/** Whether a way in names a place: one of today's five names, or a section's id. Anything else is ignored. */
+export function isKnownLanding(name: unknown): name is string {
+  return typeof name === 'string'
+    && (Object.prototype.hasOwnProperty.call(LEGACY_SECTION_LANDINGS, name) || SETTINGS_SECTIONS.some((section) => section.id === name))
 }
 
 /** A way in's landing; an unknown name lands on the first section, as an opener with none does. */

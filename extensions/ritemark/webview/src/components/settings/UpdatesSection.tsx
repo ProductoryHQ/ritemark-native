@@ -108,6 +108,7 @@ export function UpdatesSection({
 
   return (
     <>
+      {/* The two cards are independent, as on the old page: an update can be on offer while another waits for a reload */}
       {center.pendingRestartVersion ? (
         <div data-settings-row="I52" className="mb-3.5 grid gap-2.5 rounded-[10px] bg-accent-soft px-4 py-3.5">
           <div>
@@ -121,7 +122,8 @@ export function UpdatesSection({
             </TipButton>
           </div>
         </div>
-      ) : update ? (
+      ) : null}
+      {update ? (
         <div data-settings-row="I53" className="mb-3.5 grid gap-2.5 rounded-[10px] bg-accent-soft px-4 py-3.5">
           <div>
             <div className="text-[14px] font-semibold leading-5 text-ink-strong">Ritemark {update.version} is ready</div>

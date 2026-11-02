@@ -45,4 +45,36 @@ The D and L rows, and Windows, are checked on the dev instance and through the o
 - `control-states.mjs --only segmented-control,tabs`: the horizontal Tabs' 12 states match their approved images; the
   36 new states (Tabs vertical, Segmented control default and picture, both themes) have no approved image yet and wait
   for the Experience lead.
-- Not run here: the other D rows, the L rows by their openers, and Windows (the overlay, before the merge).
+- Not run in that launch: the other D and L rows (run in the second launch, below), and Windows.
+
+### Second launch (2 November, the lead's fixes on the branch, same isolated environment)
+
+The profile's settings were seeded with `ritemark.ai.agentTimeout: 22` and `ritemark.chat.fontSize: 16`; each check read the
+profile's `settings.json` back.
+
+| Row | Check | Result |
+|---|---|---|
+| Tab | reads Settings with the gear; Sharing's icon share-network, Usage data's chart-bar (`rm147-2/light-tab-and-sections.png`) | Pass |
+| I63 | after Reload Window the restored tab opens at AI accounts | Pass |
+| I41 | a stored 22 shows as "22 minutes", and opening Settings wrote nothing; choosing 20 minutes writes 20 | Pass |
+| I2 | a stored 16 shows as no step, "16 px, set in All settings"; Larger writes 15 | Pass |
+| I3 | This computer's writes `system`, Ritemark's own writes `bundled` back | Pass |
+| I4, I5, I6 | the Now line and this computer's tools ("Now: Claude and ChatGPT from this computer's. This computer has Git. This computer has Node.js.") | Pass |
+| I28, I29 | ChatGPT asks before: Only when something fails writes `on-failure`; Where ChatGPT may write: Nowhere writes `read-only` | Pass |
+| I31, I42 | the OpenCode and detailed-log switches write `true` | Pass |
+| I17 | Check sends the two status checks; the row stays drawn | Pass |
+| I56, I57 | Repair… opens Ritemark's parts with the voice model, Claude and ChatGPT | Pass |
+| I60 | All settings opens VS Code's settings (it opens over the window, as a modal editor) | Pass |
+| I45 | the startup check's switch writes `false`, and back | Pass |
+| I47, I48 | Check now runs; "Last check worked today at …. None failed." | Pass |
+| I43 | the switch goes Off and On, in the welcome's words | Pass |
+| I39 | Sharing draws Your Google account (the dev build's "isn't available in this version" state) | Pass |
+| I1 | the Dark picture turns the window dark (first launch) | Pass |
+| L: I62 | ⌘, opens Settings at AI accounts | Pass |
+| L: `transcription` | Transcribe's gear, with Settings open at AI accounts, lands on Advanced | Pass |
+
+**Checked at Gate 1** (they need a signed-in AI, a real key, a browser or a feature this dev build lacks): the sign-in rows
+I10, I13, I15, I16, I22, I26 and I39's Connect; the key rows I11 and I32–I38 (the key round trip, PR 2); the links I12,
+I19, I27 and I44 (each opens the browser); I40 (a connected Google account); I58's Clear (no transcripts here); the ways
+in `google-docs` (Share, with Google Docs publishing on), `google-ai-key` and `openai-api-key` (a flow step with no key),
+`usage-data` (no opener passes it). Their landings are held by `settingsPage.test.ts`.
