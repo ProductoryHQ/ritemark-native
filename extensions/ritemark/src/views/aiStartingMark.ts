@@ -43,7 +43,8 @@ export async function shellLookSince(execute: (command: string, viewId: string) 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<undefined>((resolve) => { timer = setTimeout(() => resolve(undefined), SHELL_LOOK_SINCE_WAIT_MS); });
   try {
-    const answer = await Promise.race([Promise.resolve(execute(SHELL_LOOK_SINCE_COMMAND, viewId)).catch(() => undefined), late]);
+    const asked = new Promise<unknown>((resolve) => resolve(execute(SHELL_LOOK_SINCE_COMMAND, viewId))).catch(() => undefined); // a throw is no answer too
+    const answer = await Promise.race([asked, late]);
     return typeof answer === 'number' && Number.isFinite(answer) && answer > 0 ? answer : undefined;
   } finally {
     clearTimeout(timer);

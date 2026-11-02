@@ -210,8 +210,11 @@ begins and when its content is on its way. Two new hunks in upstream files, both
   showing yet; otherwise the layer moves above the page's frame (the webview's overlay, laid over the same box), its
   timers go on, and it goes in one change when the page first speaks, or, for a page that posts
   `RITEMARK_PAGE_DRAWING` first, when it posts `RITEMARK_PAGE_DRAWN`; when the webview goes; or after
-  `RITEMARK_PAGE_LIMIT_MS` (10 s; `RITEMARK_QUIET_PAGE_MS`, 2 s, for another extension's page). A mark drawn again keeps
-  its place in the turn (its `animation-delay` counts from the moment it first showed). Seen first on a cold start:
+  `RITEMARK_PAGE_LIMIT_MS` (10 s; `RITEMARK_QUIET_PAGE_MS`, 2 s, for another extension's page). What a page says is
+  watched from the first look that waited for it until the page goes, so a kept page drawn while no look waited is
+  there at once when shown again, and one that has only said "drawing" is waited for. No wait outlasts its slot's
+  minute (`RITEMARK_SLOT_RELEASE_MS`); a page has one tab look; a look only a screen reader can't see says nothing. A
+  mark drawn again keeps its place in the turn (its `animation-delay` counts from the moment it first showed). Seen first on a cold start:
   ending at the first message left Home's bare sheet for about 0.45 s (its content waits for its host's state) and the
   document's own "Loading..." for about 0.17 s. `ritemarkSurfaces.css` (018) draws
   it: `.ritemark-loading-look`, `.ritemark-loading-mark`, `.ritemark-loading-line`, the mark still under
@@ -231,11 +234,12 @@ begins and when its content is on its way. Two new hunks in upstream files, both
   mark. Ritemark's own views (the manifest's extension) no longer run under VS Code's `withProgress`, which drew the left
   column's line at y 33–34 and the progress badge on the place; other extensions' views keep it.
 - **The pages:** `src/shellPageSignals.ts` names the two messages (the shell's same strings, tested against patch 002);
-  `webview/src/lib/pageDrawn.ts` posts "drawing" first (`main.tsx`, for Home, the Task board and the default page, a
-  document) and "drawn" in the frame after the first render with content (`usePageDrawn`: `HomePage.tsx` once its state
-  is there, `TaskBoard.tsx` once its snapshot is, `App.tsx` once the document is ready). `App.tsx`'s "Loading..." and
-  `main.tsx`'s fallback "Loading..." are now the sheet alone (answer 4). Home's host skips both messages
-  (`isShellPageSignal`), as the board's and the document's already skip what isn't theirs.
+  `webview/src/lib/pageDrawn.ts`'s `usePageDrawn(ready)` posts "drawing" on the component's first render, before the
+  page's own effects post anything, and "drawn" just after the frame that paints the first render with content
+  (`HomePage.tsx` once its state is there, `TaskBoard.tsx` once its snapshot is, `App.tsx` once the document is ready,
+  `WelcomePage.tsx` at once). `App.tsx`'s "Loading..." and `main.tsx`'s fallback "Loading..." are now the sheet alone
+  (answer 4). Home's and the welcome's hosts skip both messages (`isShellPageSignal`), as the board's and the
+  document's already skip what isn't theirs.
 - **W5:** `_ritemark.loadingLook.since` (registered by the module) returns when a named slot's wait began;
   `UnifiedViewProvider.resolveWebviewView` asks it (`shellLookSince`, `aiStartingMark.ts`, at most 250 ms) before it
   writes the page, and keeps `aiColumnShownSince`'s estimate for an older shell or a view the shell drew no look for.

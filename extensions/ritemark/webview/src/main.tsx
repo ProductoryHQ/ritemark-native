@@ -5,7 +5,6 @@ import './index.css'
 import { watchRitemarkThemeClass } from './utils/themeClass'
 import { captureWebviewScriptUrl } from './lib/webviewAssets'
 import { watchScrollingMark } from './lib/scrollingMark'
-import { announcePageDrawing } from './lib/pageDrawn'
 
 // Sprint 138 (#481): webview.js's own URL, while it is still known, for the
 // files next to it in media/ (KaTeX's stylesheet and fonts).
@@ -72,13 +71,6 @@ const ProjectsList = lazy(() =>
 // Check if this is a flow editor instance
 const rootElement = document.getElementById('root')!
 const editorType = rootElement.getAttribute('data-editor-type')
-
-// Sprint 152, PR 3: the desk pages whose content comes after their host answers say when it is drawn, so the shell's
-// loading look stays above them until then (lib/pageDrawn.ts): Home, the Task board and a document (App), first of all
-const RITEMARK_EDITOR_TYPES = ['settings', 'flow', 'flows-panel', 'ai-sidebar', 'transcribe-panel', 'transcript-workbench', 'tasks-panel', 'welcome', 'projects']
-if (editorType === 'home' || editorType === 'task-board' || !RITEMARK_EDITOR_TYPES.includes(editorType ?? '')) {
-  announcePageDrawing()
-}
 
 // Debug logging
 console.log('[Ritemark] Initializing editor, type:', editorType)

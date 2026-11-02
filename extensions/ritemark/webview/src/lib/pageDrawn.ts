@@ -3,31 +3,38 @@
  * shell's loading look stays above the page until then and the content replaces it in one change: no bare sheet while
  * the page waits for its host's first answer.
  *
- * `announcePageDrawing()` comes first, before anything else the page posts (`main.tsx`, for the pages that say when
- * they are drawn); `usePageDrawn(ready)` posts PAGE_DRAWN once, in the frame after the first render where `ready` is
- * true, so the content has been painted by the time the shell takes its look away.
+ * `usePageDrawn(ready)` in the page's component posts PAGE_DRAWING on its first render, before anything the page's own
+ * effects post, and PAGE_DRAWN once, just after the frame that paints the first render where `ready` is true, so the
+ * content has been painted by the time the shell takes its look away.
  */
 
 import { useLayoutEffect } from 'react'
 import { PAGE_DRAWING, PAGE_DRAWN } from '../../../src/shellPageSignals'
 import { vscode } from './vscode'
 
+let drawing = false
 let drawn = false
 
-/** The page will say when it is drawn: posted first. */
-export function announcePageDrawing(): void {
+/** The page will say when it is drawn: posted once, first. */
+function announcePageDrawing(): void {
+  if (drawing) return
+  drawing = true
   vscode.postMessage({ type: PAGE_DRAWING })
 }
 
-/** The page's content is on screen: posted once, after the frame that paints it. */
-export function announcePageDrawn(): void {
+/**
+ * The page's content is on screen: posted once. A frame callback runs before that frame's paint, so the message waits
+ * for the task after it.
+ */
+function announcePageDrawn(): void {
   if (drawn) return
   drawn = true
-  requestAnimationFrame(() => vscode.postMessage({ type: PAGE_DRAWN }))
+  requestAnimationFrame(() => setTimeout(() => vscode.postMessage({ type: PAGE_DRAWN }), 0))
 }
 
-/** Announces the page drawn after the first render where `ready` is true. */
+/** For a page whose content comes after its host answers: "drawing" now, "drawn" after the first render with `ready`. */
 export function usePageDrawn(ready: boolean): void {
+  announcePageDrawing() // during the first render, before the page's own effects post anything
   useLayoutEffect(() => {
     if (ready) announcePageDrawn()
   }, [ready])
