@@ -214,6 +214,25 @@ const keysOff = keysSheet(payload({ openrouterEnabled: false, transcriptionEnabl
 assert.ok(!keysOff.includes('settings-section-openrouter-api-key') && !keysOff.includes('settings-section-elevenlabs-api-key'))
 assert.ok(keysSheet(payload(), { forOpenCode: true }).includes(OPENCODE_INTRO))
 assert.ok(!keysSheet().includes(OPENCODE_INTRO))
+// #645's review: while a key's field is open, Escape cancels the field only, and Done, the X and a click outside wait
+{
+  const sheetSource = readFileSync(join(HERE, 'ApiKeysSheet.tsx'), 'utf8')
+  assert.match(sheetSource, /onEscapeKeyDown=\{\(event\) => \{ if \(editing\) event\.preventDefault\(\) \}\}/, 'Escape keeps the sheet while a field is open')
+  assert.match(sheetSource, /onInteractOutside=\{\(event\) => \{ if \(editing\) event\.preventDefault\(\) \}\}/, 'a click outside keeps the sheet while a field is open')
+  assert.match(sheetSource, /<DialogHeader onClose=\{close\}>/, 'the X waits too')
+  assert.match(sheetSource, /const close = \(\) => \{ if \(!editing\) onDone\(\) \}/)
+  assert.match(sheetSource, /tip=\{editing \? CLOSE_WAITS_TIP : 'Closes this sheet'\} size="sm" disabled=\{editing\}/, 'Done is off, and says why')
+  assert.match(sheetSource, /if \(event\.key === 'Escape'\) \{ event\.stopPropagation\(\); close\(\) \}/, "the field's Escape cancels the field")
+  assert.equal((sheetSource.match(/<ExternalLink url=\{row\.url\}/g) ?? []).length, 2, 'Get a key in the row and in the open field, for a saved key too')
+  const page = readFileSync(join(HERE, 'RitemarkSettings.tsx'), 'utf8')
+  assert.match(page, /ai=\{detailsFor \?\? lastDetails\.current\}/, 'the Details sheet keeps its AI while it closes')
+  assert.match(page, /setDetailsFor\(null\);\s*setKeys\(\(prev\) => \(\{ \.\.\.prev, open: false \}\)\);\s*setFocusAnchor/, 'a way in to another place closes the sheets')
+  assert.match(page, /returnFocus=\{keys\.forOpenCode \? \(\) => document\.querySelector<HTMLElement>\('\[data-settings-row="I30"\] button'\)/, "after Set up the focus goes to OpenCode's row")
+  for (const file of ['AiAccountsSection.tsx', 'AiDetailsSheet.tsx', 'ApiKeysSheet.tsx']) {
+    const source = readFileSync(join(HERE, file), 'utf8')
+    for (const link of source.match(/<ExternalLink [^>]*>/g) ?? []) assert.match(link, /\btip=/, `${file}: ${link} has a tooltip`)
+  }
+}
 // Ritemark's parts: a state that needs the person reads in words, with no amber dot (the lead's note for PR 2)
 assert.doesNotMatch(readFileSync(join(HERE, 'AdvancedSection.tsx'), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, ''), /amber|animate-pulse/)
 

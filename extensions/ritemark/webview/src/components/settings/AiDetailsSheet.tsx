@@ -53,7 +53,7 @@ function Technical({ lines, children }: { lines: string[]; children?: ReactNode 
         <span className="text-[12px] text-ink-muted">where it runs from, and what Ritemark found</span>
       </summary>
       <div className="mt-2 grid gap-1 pl-[18px] text-[12px] leading-4 text-ink-muted">
-        {lines.map((line) => <div key={line} className="break-words [overflow-wrap:anywhere]">{line}</div>)}
+        {lines.map((line, i) => <div key={`${i}-${line}`} className="break-words [overflow-wrap:anywhere]">{line}</div>)}
         {children}
       </div>
     </details>
@@ -102,7 +102,7 @@ function ClaudeDetails({ settings, onClaude }: Pick<AiDetailsProps, 'settings' |
       </>
     }>
       Not signed in
-      <Sub>{PLAN_LINES.claude} No key yet? <ExternalLink url="https://console.anthropic.com/" className="text-[12px]">Get one at Anthropic</ExternalLink></Sub>
+      <Sub>{PLAN_LINES.claude} No key yet? <ExternalLink url="https://console.anthropic.com/" tip="Opens Anthropic's console, where you can make an API key" className="text-[12px]">Get one at Anthropic</ExternalLink></Sub>
     </DetailRow>
   )
 
@@ -113,7 +113,7 @@ function ClaudeDetails({ settings, onClaude }: Pick<AiDetailsProps, 'settings' |
         {claude.version ? `Claude ${claude.version}` : 'Claude'}
         <Sub>{sourceWords(claude.runtimeStatus.source)}{ready ? ', ready' : ''}</Sub>
       </DetailRow>
-      <DetailRow row="I19" label="Used for" action={<ExternalLink url="https://docs.anthropic.com/en/docs/claude-code/setup">Learn more</ExternalLink>}>
+      <DetailRow row="I19" label="Used for" action={<ExternalLink url="https://docs.anthropic.com/en/docs/claude-code/setup" tip="Opens Anthropic's page about Claude in your browser">Learn more</ExternalLink>}>
         Chats, tasks and flows
       </DetailRow>
       <Technical lines={[
@@ -168,7 +168,7 @@ function ChatgptDetails({ settings, codexAuth, codexSigningIn, onCodex }: Pick<A
         {codex.version ? `ChatGPT ${codex.version}` : 'ChatGPT'}
         <Sub>{sourceWords(codex.runtimeStatus.source)}{codexAuth.authenticated ? ', ready' : ''}</Sub>
       </DetailRow>
-      <DetailRow row="I27" label="Used for" action={<ExternalLink url="https://developers.openai.com/codex/cli">Learn more</ExternalLink>}>
+      <DetailRow row="I27" label="Used for" action={<ExternalLink url="https://developers.openai.com/codex/cli" tip="Opens OpenAI's page about ChatGPT's agent in your browser">Learn more</ExternalLink>}>
         Chats, flows and the task board
       </DetailRow>
       <Technical lines={[...(codexAuth.diagnostics ?? codex.diagnostics)]} />

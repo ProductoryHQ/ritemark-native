@@ -5,7 +5,7 @@
  * their Details sheets and the API keys sheet (PR 2, W4). `settingsInventory.test.ts` holds the page to every message, setting and key.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../ui/Icon';
 import { vscode } from '../../lib/vscode';
 import { GoogleDocsSettingsCard, type GoogleDocsSettingsProjection } from './GoogleDocsSettingsCard';
@@ -170,6 +170,9 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
   const [settings, setSettings] = useState<SettingsData | null>(initial?.settings ?? null);
   // Sprint 147 (R3): the Details sheet's AI, and the API keys sheet with the row a way in or Set up brings into view
   const [detailsFor, setDetailsFor] = useState<AiId | null>(null);
+  // The sheet keeps its AI while it closes, so it doesn't flash Claude's content (#645's review)
+  const lastDetails = useRef<AiId>('claude');
+  if (detailsFor) lastDetails.current = detailsFor;
   const [keys, setKeys] = useState<{ open: boolean; focus: ApiKeyRow['name'] | null; forOpenCode: boolean }>({ open: false, focus: null, forOpenCode: false });
   const [testing, setTesting] = useState<Partial<Record<TestResult['key'], boolean>>>({});
   // Track last manual update-check click. Used to show the spinner during the
@@ -225,6 +228,9 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
             setKeys({ open: true, focus: landing.keyRow, forOpenCode: false });
             setFocusAnchor(null);
           } else {
+            // Another place: no sheet left open to come back later (#645's review)
+            setDetailsFor(null);
+            setKeys((prev) => ({ ...prev, open: false }));
             setFocusAnchor(landing.anchor ?? null);
           }
           break;
@@ -350,7 +356,7 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
             />
             <AiDetailsSheet
               open={detailsFor !== null}
-              ai={detailsFor ?? 'claude'}
+              ai={detailsFor ?? lastDetails.current}
               settings={settings}
               codexAuth={codexAuth}
               codexSigningIn={codexLoading}
@@ -369,7 +375,8 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
               results={testResults}
               onSave={handleSaveApiKey}
               onTest={handleTestApiKey}
-              onDone={() => setKeys({ open: false, focus: null, forOpenCode: false })}
+              onDone={() => setKeys((prev) => ({ ...prev, open: false }))}
+              returnFocus={keys.forOpenCode ? () => document.querySelector<HTMLElement>('[data-settings-row="I30"] button') : undefined}
             />
           </>
         ),

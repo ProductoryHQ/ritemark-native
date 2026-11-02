@@ -109,6 +109,39 @@ ElevenLabs row each fail it.
 | I59 | AI information at the foot | T; R | Pass |
 | I61 | `google-ai-key` and `openai-api-key` open the API keys sheet at their rows | R | Pass |
 
-**Not run here (Gate 1):** the dev-instance launch (the brief allows it only before 08:00 EET; this was built after
-22:00), so the key round trip (K) for the five keys, the sign-in rows' start and cancel (I10, I13, I22), the links
-(I12, I19, I27) and the captures wait for Gate 1 or a morning launch. Windows: through the overlay.
+### #645's review fixes
+
+Escape in a key field cancels that field only; while a field is open, Done is off ("Save or cancel the key first"), and
+the X and a click outside wait. The Details sheet keeps its AI while it closes. After OpenCode's Set up the focus returns
+to OpenCode's row. A way in to another place closes both sheets. Get a key shows in an open field, for a saved key too.
+The Technical list's keys are unique, and every link on the three files has a tooltip. Held by `settingsPage.test.ts`.
+
+### On a dev instance (2 November, 22:37–23:10, one launch)
+
+Isolated AI homes and XDG dirs, a new `--user-data-dir`, `--shared-data-dir ~/.ritemark-dev-shared`, mock keychain,
+`RITEMARK_CONTROL_CATALOGUE=1`, a scratch folder. Clicks inside the page are DOM clicks; keys and the outside click are CDP
+input. Captures: `$TMPDIR/rm147-3` on the build machine (not committed), Light and Dark at 1440 and Light at a 634-wide
+desk; `checks.txt` there has every line.
+
+| Row | Check | Result |
+|---|---|---|
+| I62 | ⌘, opens Settings at AI accounts | Pass |
+| I10, I21, I30, I59 | the signed-out rows' lines and buttons, OpenCode's Set up, AI information at the foot; no amber, no "Codex" | Pass |
+| I10–I12, I14, I19 | Claude's Details, signed out: Sign in with Claude.ai, Use an API key instead, Get one at Anthropic, Check again, Learn more, Repair Claude, Done | Pass |
+| I17 | Check again sends `claude:refreshStatus`: the scripted recorder in the webview's host frame saw no message, so it isn't proven here. The click ran; the message is held by the inventory test | FAIL (harness) |
+| I32–I36 | five rows, each Not added with Get a key and Add | Pass |
+| I38 | Add opens the field masked and focused, Save off until a key; the eye shows and hides | Pass |
+| Review 1 | with a dummy draft `not-a-key` (never saved): Done off; a click outside keeps the sheet and the draft; Escape in the field keeps the sheet and cancels the field, the row still Not added; Escape on Cancel keeps both; Cancel closes the field and Done works again | Pass |
+| Answer 6 | Set up opens API keys with OpenCode's line and the focus on OpenRouter's Add | Pass |
+| I61 | `openai-api-key` and `google-ai-key` (the host's `settings:focus-section`, injected) open the sheet at their rows | Pass |
+| Lead's note | Ritemark's parts: no amber dot; sign-in states in words | Pass |
+| I20, I25–I27 | a Ready row and ChatGPT's Details from an injected `codex:authStatus` (test@example.com): Ready, Details…, e-mail, plan, Sign out, Learn more. In Dark and at 634 the host's own status came back first, so those captures show the signed-out sheet | Pass |
+
+**Incident:** before the second run, a scripted focus click at (130, 700) landed on the shared Projects list and switched
+the window to the home folder's project for about a minute. Nothing was written to the home folder (checked); the window
+was switched back to the scratch folder, and later clicks avoid the list. The instance's Copilot lock in `~/.copilot/ide`
+was removed after quitting.
+
+**Gate 1:** the key round trip (K) for all five keys (`scripts/qa/with-test-keys.sh` isn't written yet, and the keys
+reach only a test-channel build); the sign-in rows' start and cancel (I10, I13, I15, I16, I22, I26: each opens a
+browser); the links (I12, I19, I27, I44); Windows through the overlay.

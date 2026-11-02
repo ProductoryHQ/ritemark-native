@@ -10,7 +10,7 @@
  * `ApiKeysRows` is the sheet's content without its dialog, so render tests can draw it.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '../ui/button'
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Icon } from '../ui/Icon'
@@ -96,7 +96,7 @@ export interface ApiKeysProps {
   forOpenCode?: boolean
 }
 
-function KeyRow({ row, settings, testing, result, onSave, onTest, focused }: {
+function KeyRow({ row, settings, testing, result, onSave, onTest, focused, onEditing }: {
   row: ApiKeyRow
   settings: SettingsData
   testing: boolean
@@ -104,6 +104,8 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, focused }: {
   onSave: ApiKeysProps['onSave']
   onTest: ApiKeysProps['onTest']
   focused: boolean
+  /** Tells the sheet a field is open, so Escape and closing wait for Save or Cancel (#645's review). */
+  onEditing?: (name: ApiKeyRow['name'], editing: boolean) => void
 }) {
   const saved = Boolean(settings[row.configured])
   const [editing, setEditing] = useState(false)
@@ -112,6 +114,11 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, focused }: {
   const [confirming, setConfirming] = useState(false)
   const rowRef = useRef<HTMLDivElement>(null)
   const usedFor = row.usedFor(settings)
+
+  useEffect(() => {
+    onEditing?.(row.name, editing)
+  }, [editing])
+  useEffect(() => () => onEditing?.(row.name, false), [])
 
   useEffect(() => {
     if (!focused) return
@@ -205,8 +212,12 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, focused }: {
               </div>
               <div className="flex items-center gap-1">
                 {saved ? (
-                  <TipButton tip={`Removes the ${row.label} key from this computer; it asks first`} variant="ghost" size="sm" className="mr-auto" onClick={() => setConfirming(true)}>Remove key</TipButton>
-                ) : <span className="mr-auto" />}
+                  <TipButton tip={`Removes the ${row.label} key from this computer; it asks first`} variant="ghost" size="sm" onClick={() => setConfirming(true)}>Remove key</TipButton>
+                ) : null}
+                {/* Get a key stays a way in while the field is open, for a saved key too (#645's review) */}
+                <ExternalLink url={row.url} tip={`Opens ${row.label}'s page for API keys in your browser`} className="mr-auto px-2">
+                  Get a key <Icon name="arrow-square-out" size={12} />
+                </ExternalLink>
                 <TipButton tip="Closes the field without saving" variant="ghost" size="sm" onClick={close}>Cancel</TipButton>
                 <TipButton tip={draft.trim() ? `Saves the ${row.label} key on this computer` : 'Paste or type a key first'} size="sm" disabled={!draft.trim()} onClick={() => { onSave(row.name, draft); close() }}>Save</TipButton>
               </div>
@@ -218,7 +229,7 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, focused }: {
   )
 }
 
-export function ApiKeysRows({ settings, testing, results, onSave, onTest, focus, forOpenCode }: ApiKeysProps) {
+export function ApiKeysRows({ settings, testing, results, onSave, onTest, focus, forOpenCode, onEditing }: ApiKeysProps & { onEditing?: (name: ApiKeyRow['name'], editing: boolean) => void }) {
   const rows = API_KEY_ROWS.filter((row) => !row.flag || settings[row.flag])
   return (
     <>
@@ -235,27 +246,56 @@ export function ApiKeysRows({ settings, testing, results, onSave, onTest, focus,
           onSave={onSave}
           onTest={onTest}
           focused={focus === row.name}
+          onEditing={onEditing}
         />
       ))}
     </>
   )
 }
 
-export function ApiKeysSheet({ open, onDone, ...props }: ApiKeysProps & { open: boolean; onDone: () => void }) {
+/** While a key's field is open, the sheet waits: Escape cancels that field only, and Done, the X and a click outside wait for Save or Cancel, so a typed key is never dropped without a word. */
+export const CLOSE_WAITS_TIP = 'Save or cancel the key first'
+
+export function ApiKeysSheet({ open, onDone, returnFocus, ...props }: ApiKeysProps & {
+  open: boolean
+  onDone: () => void
+  /** Where the focus goes when the sheet closes, if its opener is gone (OpenCode's Set up becomes Details…). */
+  returnFocus?: () => HTMLElement | null
+}) {
+  const [editingRows, setEditingRows] = useState<ReadonlySet<string>>(new Set())
+  const editing = editingRows.size > 0
+  const onEditing = useCallback((name: string, on: boolean) => {
+    setEditingRows((prev) => {
+      if (prev.has(name) === on) return prev
+      const next = new Set(prev)
+      if (on) next.add(name)
+      else next.delete(name)
+      return next
+    })
+  }, [])
+  const close = () => { if (!editing) onDone() }
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) onDone() }}>
-      <DialogContent className="max-w-[520px]">
-        <DialogHeader onClose={onDone}>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) close() }}>
+      <DialogContent
+        className="max-w-[520px]"
+        onEscapeKeyDown={(event) => { if (editing) event.preventDefault() }}
+        onInteractOutside={(event) => { if (editing) event.preventDefault() }}
+        onCloseAutoFocus={(event) => {
+          const target = returnFocus?.()
+          if (target) { event.preventDefault(); target.focus() }
+        }}
+      >
+        <DialogHeader onClose={close}>
           <div className="grid gap-1">
             <DialogTitle>API keys</DialogTitle>
             <DialogDescription className="text-[13px]">Only if you have them. Claude and ChatGPT work without one. Keys stay on this computer.</DialogDescription>
           </div>
         </DialogHeader>
         <DialogBody className="py-2">
-          <ApiKeysRows {...props} />
+          <ApiKeysRows {...props} onEditing={onEditing} />
         </DialogBody>
         <DialogFooter>
-          <TipButton tip="Closes this sheet" size="sm" onClick={onDone}>Done</TipButton>
+          <TipButton tip={editing ? CLOSE_WAITS_TIP : 'Closes this sheet'} size="sm" disabled={editing} onClick={close}>Done</TipButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
