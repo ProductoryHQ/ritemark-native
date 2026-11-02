@@ -81,6 +81,7 @@ import {
 } from './protocol';
 import { WELCOME_VIEW_TYPE, welcomeHtml } from './welcomePanel';
 import { HOME_PLACE_ID } from '../frameIdentifiers';
+import { isShellPageSignal } from '../shellPageSignals';
 
 /** The workbench draws the welcome alone while this is true (patch 018, `ritemarkWelcomeAlone.ts`). */
 export const WELCOME_ALONE_CONTEXT_KEY = 'ritemark.welcomeAlone';
@@ -563,6 +564,7 @@ class WelcomeController implements vscode.Disposable {
   // ── Requests from the page ────────────────────────────────────────────────
 
   private async onRequest(raw: unknown): Promise<void> {
+    if (isShellPageSignal(raw)) return; // the shell's, not the welcome's (Sprint 152, PR 3)
     const decoded = decodeWelcomeRequest(raw);
     if (!decoded.ok) {
       console.warn(`[welcome] refused: ${decoded.reason}`);

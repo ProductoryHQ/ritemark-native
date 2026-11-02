@@ -465,14 +465,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       activatedAt: this._activatedAt,
       resolvedAt,
     });
-    void shellLookSince((command, viewId) => vscode.commands.executeCommand(command, viewId), UnifiedViewProvider.viewType).then((since) => {
+    const writePage = (since: number | undefined) => {
       if (viewGeneration !== this._viewGeneration) return; // a newer resolve of the view draws its own page
       try {
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview, since ?? estimate);
       } catch {
         // the view went while the shell answered
       }
-    });
+    };
+    void shellLookSince((command, viewId) => vscode.commands.executeCommand(command, viewId), UnifiedViewProvider.viewType).then(writePage, () => writePage(undefined));
 
     // The resolve ends when the page asks for its bootstrap (its first frame, the mark, is drawn by then), or after
     // AI_VIEW_RESOLVE_LIMIT_MS, or when the view goes: VS Code awaits it before it takes the shell's mark away.
