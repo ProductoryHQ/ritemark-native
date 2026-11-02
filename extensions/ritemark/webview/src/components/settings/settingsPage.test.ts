@@ -20,6 +20,7 @@ const { SETTINGS_SECTIONS, LEGACY_SECTION_LANDINGS, landingFor, isKnownLanding, 
 const { chatSizeLine } = await import('./AppearanceSection')
 const { quietChoices, partsLine, runtimeLine } = await import('./AdvancedSection')
 const { checkNowLine, versionLine, whenText } = await import('./UpdatesSection')
+const { usageDataLine } = await import('./UsageDataSection')
 type Settings = import('./RitemarkSettings').SettingsData
 type Section = import('./settingsSections').SettingsSectionId
 
@@ -130,6 +131,22 @@ assert.ok(rows(restart).has('I52') && rows(restart).has('I53'), 'a reload waitin
 const failed = draw('updates', payload({ updateCenter: { ...payload().updateCenter, availableUpdate: undefined, state: 'error', error: 'offline' } }))
 assert.match(failed, /Could not check for updates: offline/)
 
+// I43: the usage data switch, the person's consent: the welcome's words in each state, and the same message as main
+assert.equal(usageDataLine({ on: true, fromRitemark1: false }), 'On. Never your documents, chats or names.')
+assert.equal(usageDataLine({ on: true, fromRitemark1: true }), 'On, as you chose in Ritemark 1. Never your documents, chats or names.')
+assert.equal(usageDataLine({ on: false, fromRitemark1: false }), 'Off. Never your documents, chats or names.')
+assert.equal(usageDataLine(undefined), 'Off. Never your documents, chats or names.')
+for (const on of [true, false]) {
+  const markup = draw('usage-data', payload({ usageData: { on, fromRitemark1: false } }))
+  assert.match(markup, on ? /On\. Never your documents, chats or names\./ : /Off\. Never your documents, chats or names\./)
+  assert.match(markup, new RegExp(`role="switch"[^>]*aria-checked="${on}"[^>]*aria-label="Share anonymous usage data"|aria-label="Share anonymous usage data"[^>]*aria-checked="${on}"|role="switch" aria-checked="${on}"`))
+}
+assert.match(
+  readFileSync(join(HERE, 'RitemarkSettings.tsx'), 'utf8'),
+  /<UsageDataSection[\s\S]*?onChange=\{\(value\) => \{[\s\S]*?usageData: \{ on: value, fromRitemark1: false \}[\s\S]*?vscode\.postMessage\(\{ type: 'usageData:set', on: value \}\);/,
+  'the switch sends usageData:set with its new value, as main did',
+)
+
 // R1: a stored value no control offers shows as it is, never rewritten
 assert.equal(chatSizeLine(13), 'In every chat, with any AI')
 assert.equal(chatSizeLine(16), '16 px, set in All settings')
@@ -144,6 +161,23 @@ assert.equal(runtimeLine(payload()), "Now: Claude and ChatGPT from Ritemark's ow
 assert.match(runtimeLine(payload({ agentRuntimePreference: 'system' })), /wasn't found, so Ritemark's own runs instead/)
 assert.equal(partsLine(payload().componentStatus), 'The voice model, Claude and ChatGPT: all ready')
 assert.equal(partsLine({ ...payload().componentStatus, codex: { ...payload().componentStatus.codex, state: 'broken' } }), 'ChatGPT needs a repair')
+// Codex on #644: a part that needs a sign-in is never "all ready"
+{
+  const base = payload().componentStatus
+  const claude = (over: object) => ({ ...base, claudeCode: { ...base.claudeCode, ...over } })
+  const chatgpt = (auth: 'sign_in_required' | 'error') => ({ ...base, codex: { ...base.codex, runtimeStatus: { ...base.codex.runtimeStatus, auth } } })
+  const cases: [string, typeof base, string][] = [
+    ['Claude needs-auth', claude({ state: 'needs-auth', runtimeStatus: { ...runtime, auth: 'sign_in_required' } }), 'Claude needs you to sign in'],
+    ['Claude auth-in-progress', claude({ state: 'auth-in-progress' }), 'Claude is signing in'],
+    ['Claude account error', claude({ runtimeStatus: { ...runtime, auth: 'error' } }), "Claude's account couldn't be checked"],
+    ['ChatGPT sign_in_required', chatgpt('sign_in_required'), 'ChatGPT needs you to sign in'],
+    ['ChatGPT error', chatgpt('error'), "ChatGPT's account couldn't be checked"],
+  ]
+  for (const [name, status, line] of cases) {
+    assert.notEqual(partsLine(status), 'The voice model, Claude and ChatGPT: all ready', `${name} is not all ready`)
+    assert.equal(partsLine(status), line, name)
+  }
+}
 assert.equal(versionLine(payload().updateCenter), "App 2.1.0 · Extension 2.1.0 · from Ritemark's release feed")
 assert.equal(checkNowLine({ ...payload().updateCenter, lastSuccessfulCheckAt: 0 }), 'No check has worked yet. None failed.')
 assert.equal(whenText(0), 'never')

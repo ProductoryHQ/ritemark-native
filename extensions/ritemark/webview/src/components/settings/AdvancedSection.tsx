@@ -131,15 +131,22 @@ export function runtimeLine(settings: AdvancedSettings): string {
   return parts.join(' ')
 }
 
-/** Ritemark's parts' line: all ready, or what needs a hand. */
+/** Ritemark's parts' line: all ready, or what needs a hand, a sign-in included. */
 export function partsLine(status: ComponentStatus): string {
   const needs: string[] = []
   if (!status.voiceModel.installed) needs.push("the voice model isn't on this computer")
   const claude = status.claudeCode
   if (claude.state === 'not-installed') needs.push("Claude isn't installed")
   else if (claude.state === 'broken') needs.push(claude.repairAction === 'reload' ? 'Claude waits for a reload' : 'Claude needs a repair')
-  if (status.codex.state === 'not-installed') needs.push("ChatGPT isn't installed")
-  else if (status.codex.state === 'broken') needs.push('ChatGPT needs a repair')
+  // Sign-in, as the Repair sheet's cards name it (Codex on #644): words, never an amber dot
+  else if (claude.state === 'needs-auth' || claude.runtimeStatus.auth === 'sign_in_required') needs.push('Claude needs you to sign in')
+  else if (claude.state === 'auth-in-progress') needs.push('Claude is signing in')
+  else if (claude.runtimeStatus.auth === 'error') needs.push("Claude's account couldn't be checked")
+  const codex = status.codex
+  if (codex.state === 'not-installed') needs.push("ChatGPT isn't installed")
+  else if (codex.state === 'broken') needs.push('ChatGPT needs a repair')
+  else if (codex.runtimeStatus.auth === 'sign_in_required') needs.push('ChatGPT needs you to sign in')
+  else if (codex.runtimeStatus.auth === 'error') needs.push("ChatGPT's account couldn't be checked")
   if (needs.length === 0) return 'The voice model, Claude and ChatGPT: all ready'
   const text = needs.join('; ')
   return text.charAt(0).toUpperCase() + text.slice(1)

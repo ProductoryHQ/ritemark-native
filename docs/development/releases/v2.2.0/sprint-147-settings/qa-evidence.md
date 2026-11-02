@@ -64,10 +64,10 @@ profile's `settings.json` back.
 | I31, I42 | the OpenCode and detailed-log switches write `true` | Pass |
 | I17 | Check sends the two status checks; the row stays drawn | Pass |
 | I56, I57 | Repair… opens Ritemark's parts with the voice model, Claude and ChatGPT | Pass |
-| I60 | All settings opens VS Code's settings (it opens over the window, as a modal editor) | Pass |
+| I60 | All settings opens VS Code's settings. The scripted check first reported FAIL: it looked for a new tab, but `workbench.action.openSettings` (the same command on `main`) opens VS Code's settings as a dialog over the window. The check was wrong, not the page (`rm147-2/i60.png`) | Pass |
 | I45 | the startup check's switch writes `false`, and back | Pass |
 | I47, I48 | Check now runs; "Last check worked today at …. None failed." | Pass |
-| I43 | the switch goes Off and On, in the welcome's words | Pass |
+| I43 | The scripted check first reported FAIL: it assumed the switch started On, but this profile's usage data was Off. The page's path is `main`'s: the same `usageData:set` message with the new value, the same host handler (`setUsageData` writes `ritemark.analytics.enabled`), and the same words. Re-checked in a third launch, reading the profile back: Off/`false` → click → "On. Never your documents, chats or names.", checked, `true` → click → Off, `false` (`rm147-2/i43.txt`). `settingsPage.test.ts` now pins the words in each state and the message | Pass |
 | I39 | Sharing draws Your Google account (the dev build's "isn't available in this version" state) | Pass |
 | I1 | the Dark picture turns the window dark (first launch) | Pass |
 | L: I62 | ⌘, opens Settings at AI accounts | Pass |
