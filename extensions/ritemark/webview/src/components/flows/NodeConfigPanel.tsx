@@ -1249,21 +1249,27 @@ function SaveFileNodeConfig({ data, onUpdate }: SaveFileNodeConfigProps) {
           {showVarPicker && (
             <div className="absolute z-50 mt-1 w-full bg-[var(--r-surface)] border border-[var(--r-hairline)] rounded shadow-lg max-h-48 overflow-y-auto">
               {availableVars.map((v, i) => (
-                <button
-                  key={i}
-                  onClick={() => insertVariable(v.value)}
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--r-surface-soft)] flex justify-between items-center"
-                >
-                  <span className="text-[var(--r-ink-strong)]">{v.label}</span>
-                  <span className="text-xs text-[var(--r-ink-muted)]">{v.type}</span>
-                </button>
+                // #577 (Sprint 147): the shared Button, laid out as the list's row it was
+                <Tooltip key={i} label={`Inserts ${v.value} at the cursor`} side="left" hoverOnly className="flex w-full">
+                  <Button
+                    variant="ghost"
+                    onClick={() => insertVariable(v.value)}
+                    className="h-auto w-full justify-between rounded-none px-3 py-2 text-left font-normal"
+                  >
+                    <span className="text-[var(--r-ink-strong)]">{v.label}</span>
+                    <span className="text-xs text-[var(--r-ink-muted)]">{v.type}</span>
+                  </Button>
+                </Tooltip>
               ))}
-              <button
-                onClick={() => setShowVarPicker(false)}
-                className="w-full px-3 py-1 text-left text-xs text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] border-t border-[var(--r-hairline)]"
-              >
-                Cancel
-              </button>
+              <Tooltip label="Closes the list without inserting" side="left" className="flex w-full">
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowVarPicker(false)}
+                  className="h-auto w-full justify-start rounded-none border-t border-[var(--r-hairline)] px-3 py-1 text-xs font-normal text-[var(--r-ink-muted)]"
+                >
+                  Cancel
+                </Button>
+              </Tooltip>
             </div>
           )}
         </div>

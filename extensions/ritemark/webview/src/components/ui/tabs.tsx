@@ -10,6 +10,10 @@
  *     </TabsList>
  *     <TabsContent value="calls">…</TabsContent>
  *   </Tabs>
+ *
+ * Vertical (Sprint 147, Settings' sections; the kit's `.snav`): `<Tabs orientation="vertical">` draws the list as a
+ * column of rows, 32 high, the chosen one on the indigo-soft fill with its icon in the accent. Radix puts
+ * `data-orientation` on the list and each trigger, and the arrows move up and down.
  */
 
 import * as React from 'react'
@@ -22,7 +26,15 @@ const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
 >(({ className, ...props }, ref) => (
-  <TabsPrimitive.List ref={ref} className={cn('flex gap-5 border-b border-hairline', className)} {...props} />
+  <TabsPrimitive.List
+    ref={ref}
+    className={cn(
+      'flex gap-5 border-b border-hairline',
+      'data-[orientation=vertical]:flex-col data-[orientation=vertical]:gap-0.5 data-[orientation=vertical]:border-b-0',
+      className
+    )}
+    {...props}
+  />
 ))
 TabsList.displayName = TabsPrimitive.List.displayName
 
@@ -37,6 +49,13 @@ const TabsTrigger = React.forwardRef<
       'hover:text-ink-strong rm-focus-ring',
       'disabled:pointer-events-none disabled:opacity-50', // disabled as the Button: half strength, no pointer
       'data-[state=active]:border-accent data-[state=active]:font-semibold data-[state=active]:text-ink-strong',
+      // Vertical: a row with a fill, no rule
+      'data-[orientation=vertical]:m-0 data-[orientation=vertical]:h-8 data-[orientation=vertical]:w-full data-[orientation=vertical]:justify-start',
+      'data-[orientation=vertical]:gap-2 data-[orientation=vertical]:rounded-md data-[orientation=vertical]:border-0 data-[orientation=vertical]:px-2.5',
+      'data-[orientation=vertical]:py-0 data-[orientation=vertical]:text-left data-[orientation=vertical]:font-normal data-[orientation=vertical]:text-ink-body',
+      'data-[orientation=vertical]:data-[state=inactive]:hover:bg-surface-soft',
+      'data-[orientation=vertical]:data-[state=active]:bg-accent-soft data-[orientation=vertical]:data-[state=active]:font-medium',
+      'data-[orientation=vertical]:data-[state=active]:text-ink-strong data-[orientation=vertical]:data-[state=active]:[&_svg]:text-accent',
       className
     )}
     {...props}

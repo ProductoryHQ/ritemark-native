@@ -32,7 +32,8 @@
   a[href],
   label[for],
   summary,
-  select
+  select,
+  input[type="radio"]:not(:disabled)
 ) {
   cursor: pointer;
 }

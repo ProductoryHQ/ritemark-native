@@ -5,9 +5,9 @@ The plan is approved on Jarmo's 2.2 delegation (sprint-plan.md, *Approval*). The
 ## Phase 0: Branch and starting tree
 
 - [x] The plan's approval is recorded (the manager, on Jarmo's 2.2 delegation; decisions 1 and 3). Decision 2 is Jarmo's and gates only PR 3's key change
-- [ ] Sprint 146's PRs are merged before the first code edit
-- [ ] `git checkout -b sprint-147-settings` from `origin/main`; `git branch --show-current` shows it before any edit. Later PRs: `sprint-147-settings-ai`, `-host`, `-capabilities`, each from `origin/main` the same way
-- [ ] `media/webview.js` size recorded in `notes/bundle.md` (E4)
+- [x] Sprint 146's PRs are merged before the first code edit
+- [x] `git checkout -b sprint-147-settings` from `origin/main`; `git branch --show-current` shows it before any edit. Later PRs: `sprint-147-settings-ai`, `-host`, `-capabilities`, each from `origin/main` the same way
+- [x] `media/webview.js` size recorded in `notes/bundle.md` (E4)
 - [ ] Asked: the Experience lead for the answers to the plan's questions; the "Ritemark on Windows" session for A1 and the overlay checks
 
 ## Phase 1: Audits (each in `research/`, before its code)
@@ -19,13 +19,13 @@ The plan is approved on Jarmo's 2.2 delegation (sprint-plan.md, *Approval*). The
 
 ## Phase 2: PR 1, the frame and five sections (W1, W2, W3; R1, R2, R4–R9)
 
-- [ ] `settingsInventory.test.ts` against today's page: passes; with one message removed, fails (E1)
-- [ ] The section-name mapping and its test (I61)
-- [ ] `ui/segmented-control.tsx`, its catalogue row, its images approved by the Experience lead; `control-states.mjs` exits 0
-- [ ] The vertical Tabs for the list (a `tabs.tsx` variant if the drawing needs one, with its catalogue cells)
-- [ ] `SettingsPage.tsx` and the sections list as data; the page draws from whatever parts it has
-- [ ] Appearance, Sharing, Usage data, Updates, Advanced, from today's code in the lead's words; AI accounts holds today's AI and key cards, moved whole
-- [ ] Every button on the page the shared Button with a tooltip; the links its link variant through `openExternal`; no native `<select>` left; the Flow step panel's two buttons (#577)
+- [x] `settingsInventory.test.ts` against today's page: passes; with one message removed, fails (E1)
+- [x] The section-name mapping and its test (I61)
+- [ ] `ui/segmented-control.tsx`, its catalogue row, its images approved by the Experience lead; `control-states.mjs` exits 0 (the control and its row are on the branch; the images wait for the lead, so the run exits 1 on the 36 new states)
+- [x] The vertical Tabs for the list (a `tabs.tsx` variant if the drawing needs one, with its catalogue cells)
+- [x] `SettingsPage.tsx` and the sections list as data; the page draws from whatever parts it has
+- [x] Appearance, Sharing, Usage data, Updates, Advanced, from today's code in the lead's words; AI accounts holds today's AI and key cards, moved whole
+- [x] Every button on the page the shared Button with a tooltip; the links its link variant through `openExternal`; no native `<select>` left; the Flow step panel's two buttons (#577)
 - [ ] The rows of the inventory this PR moves checked (T, R, D), and the ways in (L); results in `qa-evidence.md`
 - [ ] Light and Dark, at a wide and a narrow desk; screenshots to the Experience lead
 - [ ] Windows through the overlay

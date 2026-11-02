@@ -26,15 +26,16 @@ for (const [version, expected] of cases) {
 
 // The versions line passes the extension's version through it, and nothing else on the page does: the version an
 // update will activate and the update on offer are -ext.N values, shown as they are.
-const page = readFileSync(fileURLToPath(new URL('./RitemarkSettings.tsx', import.meta.url)), 'utf-8')
+// Since Sprint 147 the versions line is Updates' Version row (UpdatesSection.tsx).
+const page = readFileSync(fileURLToPath(new URL('./UpdatesSection.tsx', import.meta.url)), 'utf-8')
 assert.match(
   page,
-  /App \{settings\.updateCenter\.currentAppVersion\} · Extension \{extensionVersionLabel\(settings\.updateCenter\.currentExtensionVersion\)\}/,
+  /App \$\{center\.currentAppVersion\} · Extension \$\{extensionVersionLabel\(center\.currentExtensionVersion\)\}/,
   'the versions line shows the extension version through the label',
 )
 assert.equal(page.match(/extensionVersionLabel\(/g)?.length, 1, 'the label is used once, for the installed extension')
-assert.match(page, /Extension \{settings\.updateCenter\.pendingRestartVersion\} is installed/, 'a pending update shows its own version')
-assert.match(page, /\{settings\.updateCenter\.availableUpdate\.version\}/, 'the update on offer shows its own version')
+assert.match(page, /Ritemark \{center\.pendingRestartVersion\} is installed/, 'a pending update shows its own version')
+assert.match(page, /Ritemark \{update\.version\} is ready/, 'the update on offer shows its own version')
 // The update code is not touched: it keeps the floored value, and its own tests (S38) pass unchanged.
 
 console.log('versionLabel: all passed')

@@ -1,14 +1,13 @@
 /**
- * Settings → Google Docs (Sprint 119, W7).
+ * Settings ▸ Sharing (Sprint 119, W7; Sprint 147, R5, experience 15 frame 5): Google Docs as two rows, Your Google
+ * account and Template for new Google Docs, with every state the card had (I39, I40).
  *
- * Renders the host's redacted account projection and sends intent only. The
- * shape mirrors `GoogleDocsSettingsProjection` in `src/googleDocs/types.ts`;
- * no token, account id or file id ever reaches this webview.
+ * Renders the host's redacted account projection and sends intent only. The shape mirrors
+ * `GoogleDocsSettingsProjection` in `src/googleDocs/types.ts`; no token, account id or file id ever reaches this webview.
  */
 
-import { Icon } from '../ui/Icon';
-import { Button } from '../ui/button';
 import { vscode } from '../../lib/vscode';
+import { ExternalLink, SettingsGroup, SettingsRow, TipButton } from './SettingsRow';
 
 export interface GoogleDocsSettingsProjection {
   enabled: boolean;
@@ -33,141 +32,86 @@ function send(type: GoogleDocsSettingsAction) {
   vscode.postMessage({ type });
 }
 
+const ABOUT = 'Share a document as a Google Doc, and keep it up to date with Sync. Ritemark opens only the Google Docs it makes, and your template.';
+
 export function GoogleDocsSettingsCard({ projection }: { projection: GoogleDocsSettingsProjection | null }) {
   if (!projection || !projection.enabled) return null;
   const { state } = projection;
 
+  const accountLine = state === 'unavailable'
+    ? "Google Docs publishing isn't available in this version of Ritemark."
+    : state === 'connecting'
+      ? 'Google sign-in opened in your browser. Allow access to finish. Ritemark updates automatically.'
+      : state === 'reauthorize'
+        ? `Google needs you to sign in again${projection.email ? ` as ${projection.email}` : ''} before Ritemark can publish.`
+        : state === 'connected'
+          ? `Connected as ${projection.email ?? 'your Google account'}.`
+          : ABOUT;
+
   return (
-    <section id="settings-section-google-docs" className="mb-8 scroll-mt-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Icon name="cloud-arrow-up" size={20} className="text-ink-strong" />
-        <h2 className="text-lg font-semibold text-ink-strong">
-          Google Docs
-        </h2>
-      </div>
-
-      <div className="p-5 rounded-lg bg-surface border border-hairline shadow-sm">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <span className="text-sm font-medium text-ink-strong">Google account</span>
-          </div>
-          {/* Sprint 145 (#578): connected is ink; green is only the small ready dot */}
-          {state === 'connected' && (
-            <span className="flex items-center gap-1 text-xs text-ink-strong">
-              <Icon name="check" size={12} tone="inherit" />
-              Connected
-            </span>
-          )}
-        </div>
-
-        {state === 'unavailable' && (
-          <p className="text-xs text-ink-muted">
-            Google Docs publishing isn&apos;t available in this version of Ritemark.
-          </p>
-        )}
-
+    <section id="settings-section-google-docs" className="scroll-mt-6">
+      <SettingsGroup>Google Docs</SettingsGroup>
+      <SettingsRow row="I39" name="Your Google account" line={accountLine}>
         {state === 'disconnected' && (
-          <>
-            <p className="text-xs text-ink-muted mb-3">
-              Publish Markdown documents as Google Docs and keep them up to date with Sync.
-              Ritemark can open only the Google Docs it creates and the template you choose.
-            </p>
-            <Button onClick={() => send('google-docs/connect')} size="lg">
-              Connect Google account
-            </Button>
-          </>
+          <TipButton tip="Opens Google's sign-in in your browser" variant="outline" size="sm" onClick={() => send('google-docs/connect')}>
+            Connect
+          </TipButton>
         )}
-
         {state === 'connecting' && (
-          <>
-            <p className="text-xs text-ink-muted mb-3">
-              Google sign-in opened in your browser. Allow access to finish. Ritemark updates automatically.
-            </p>
-            <Button onClick={() => send('google-docs/cancel')} variant="secondary" size="lg">
-              Cancel sign-in
-            </Button>
-          </>
+          <TipButton tip="Stops waiting for Google's sign-in" variant="outline" size="sm" onClick={() => send('google-docs/cancel')}>
+            Cancel
+          </TipButton>
         )}
-
         {state === 'reauthorize' && (
-          <>
-            <div className="text-xs p-2 mb-3 rounded bg-ritemark-error-soft text-ritemark-error">
-              <span className="flex items-center gap-1">
-                <Icon name="warning" size={12} />
-                Google needs you to sign in again{projection.email ? ` as ${projection.email}` : ''} before Ritemark can publish.
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => send('google-docs/connect')} size="lg">
-                Reconnect
-              </Button>
-              <Button onClick={() => send('google-docs/disconnect')} variant="secondary" size="lg">
-                Disconnect
-              </Button>
-            </div>
-          </>
+          <TipButton tip="Opens Google's sign-in in your browser again" variant="outline" size="sm" onClick={() => send('google-docs/connect')}>
+            Reconnect
+          </TipButton>
         )}
-
-        {state === 'connected' && (
-          <>
-            <div className="space-y-2 mb-3 text-xs">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-ink-muted">Account:</span>
-                <span className="text-ink-strong font-mono truncate">{projection.email}</span>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-ink-muted">Template for new Google Docs:</span>
-                <span className="text-ink-strong truncate">
-                  {projection.template ? projection.template.name : 'None (Google Docs default styles)'}
-                </span>
-              </div>
-            </div>
-
-            {projection.choosingTemplate ? (
-              <>
-                <p className="text-xs text-ink-muted mb-3">
-                  The Google file picker opened in your browser. Choose a Google Doc to use as the template.
-                </p>
-                <Button onClick={() => send('google-docs/cancel')} variant="secondary" size="lg">
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={() => send('google-docs/choose-template')} variant="secondary" size="lg">
-                  {projection.template ? 'Change template' : 'Choose template'}
-                </Button>
-                {projection.template && (
-                  <Button onClick={() => send('google-docs/clear-template')} variant="secondary" size="lg">
-                    Remove template
-                  </Button>
-                )}
-                <Button onClick={() => send('google-docs/disconnect')} variant="secondary" size="lg">
-                  Disconnect
-                </Button>
-              </div>
-            )}
-          </>
+        {(state === 'connected' || state === 'reauthorize') && (
+          <TipButton tip="Forgets your Google account here. Your Google Docs stay." variant="ghost" size="sm" onClick={() => send('google-docs/disconnect')}>
+            Disconnect
+          </TipButton>
         )}
+      </SettingsRow>
 
-        {projection.message && (
-          <div className="text-xs p-2 mt-3 rounded bg-ritemark-error-soft text-ritemark-error">
-            <span className="flex items-center gap-1">
-              <Icon name="x" size={12} /> {projection.message}
-            </span>
-          </div>
-        )}
+      {state === 'connected' && (
+        <SettingsRow
+          row="I40"
+          name="Template for new Google Docs"
+          line={projection.choosingTemplate
+            ? 'The Google file picker opened in your browser. Choose a Google Doc to use as the template.'
+            : projection.template ? projection.template.name : "None: Google Docs' own styles"}
+        >
+          {projection.choosingTemplate ? (
+            <TipButton tip="Stops waiting for the file picker" variant="outline" size="sm" onClick={() => send('google-docs/cancel')}>
+              Cancel
+            </TipButton>
+          ) : (
+            <>
+              <TipButton tip="Opens Google's file picker in your browser" variant="outline" size="sm" onClick={() => send('google-docs/choose-template')}>
+                {projection.template ? 'Change…' : 'Choose…'}
+              </TipButton>
+              {projection.template && (
+                <TipButton tip="New Google Docs use Google Docs' own styles again" variant="ghost" size="sm" onClick={() => send('google-docs/clear-template')}>
+                  Clear
+                </TipButton>
+              )}
+            </>
+          )}
+        </SettingsRow>
+      )}
 
-        {state !== 'unavailable' && (
-          <p className="text-xs text-ink-muted mt-3">
-            The template applies when a Google Doc is created. Sync replaces only the text of an existing Google Doc,
-            so its header and styles stay. Disconnecting never deletes your Google Docs.{' '}
-            <a href={PRIVACY_URL} className="text-accent-deep hover:underline">
-              How Ritemark uses Google data
-            </a>
-          </p>
-        )}
-      </div>
+      {projection.message && (
+        <p role="alert" className="mt-2 text-[13px] leading-[18px] text-ritemark-error">{projection.message}</p>
+      )}
+
+      {state !== 'unavailable' && (
+        <p className="mt-2 text-[13px] leading-[18px] text-ink-muted">
+          The template applies when a Google Doc is created. Sync replaces only the text of an existing Google Doc,
+          so its header and styles stay. Disconnecting never deletes your Google Docs.{' '}
+          <ExternalLink url={PRIVACY_URL}>How Ritemark uses Google data</ExternalLink>
+        </p>
+      )}
     </section>
   );
 }

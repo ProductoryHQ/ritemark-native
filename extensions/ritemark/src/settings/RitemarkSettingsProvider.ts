@@ -279,7 +279,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
     const panel = vscode.window.createWebviewPanel(
       RitemarkSettingsProvider.viewType,
-      'Ritemark Settings',
+      'Settings',
       column || vscode.ViewColumn.One,
       this.getWebviewOptions()
     );
@@ -542,7 +542,12 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     RitemarkSettingsProvider.googleDocsFeature()?.setSettingsListener((projection) => {
       panel.webview.postMessage({ type: 'google-docs/settings', projection }).then(undefined, () => {});
     });
-    panel.title = 'Ritemark Settings';
+    // Sprint 147 (experience 15, frames 2–7): the tab reads Settings, with the gear, as You's menu does
+    panel.title = 'Settings';
+    panel.iconPath = {
+      light: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'settings-tab-light.svg'),
+      dark: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'settings-tab-dark.svg'),
+    };
     panel.webview.options = this.getWebviewOptions();
     panel.webview.html = await this.getHtmlContent(panel.webview);
 
@@ -1321,7 +1326,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource} data:; img-src ${webview.cspSource} data:; connect-src https://api.openai.com https://api.anthropic.com;">
-  <title>Ritemark Settings</title>
+  <title>Settings</title>
   <style>
     * {
       margin: 0;
