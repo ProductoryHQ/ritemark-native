@@ -2,7 +2,7 @@
  * SearchExtension
  *
  * Adds in-document find to TipTap using ProseMirror decorations.
- * Provides commands: setSearchTerm, nextSearchResult, previousSearchResult, clearSearch.
+ * Provides commands: setSearchTerm, nextSearchResult, previousSearchResult, goToSearchResult, clearSearch.
  * Plugin state tracks results + active index and emits decorations that highlight
  * matches without touching the DOM directly. Decorations are rebuilt automatically
  * when the document changes while a search is active.
@@ -29,6 +29,7 @@ type SearchMeta =
   | { type: 'setSearchTerm'; searchTerm: string }
   | { type: 'next' }
   | { type: 'prev' }
+  | { type: 'goto'; index: number }
   | { type: 'clear' }
 
 export const searchPluginKey = new PluginKey<SearchPluginState>('ritemarkSearch')
@@ -39,6 +40,8 @@ declare module '@tiptap/core' {
       setSearchTerm: (term: string) => ReturnType
       nextSearchResult: () => ReturnType
       previousSearchResult: () => ReturnType
+      /** Sprint 148 (R9): make match `index` the current one (clamped), as stepping to it would. */
+      goToSearchResult: (index: number) => ReturnType
       clearSearch: () => ReturnType
     }
   }
@@ -177,6 +180,16 @@ export const SearchExtension = Extension.create({
                 }
               }
 
+              if (meta.type === 'goto') {
+                if (prev.results.length === 0) return prev
+                const activeIndex = Math.min(Math.max(Math.trunc(meta.index) || 0, 0), prev.results.length - 1)
+                return {
+                  ...prev,
+                  activeIndex,
+                  decorations: buildDecorationSet(newState.doc, prev.results, activeIndex),
+                }
+              }
+
               if (meta.type === 'clear') {
                 return {
                   searchTerm: '',
@@ -234,6 +247,13 @@ export const SearchExtension = Extension.create({
         () =>
         ({ tr, dispatch }) => {
           if (dispatch) dispatch(tr.setMeta(searchPluginKey, { type: 'prev' }))
+          return true
+        },
+      goToSearchResult:
+        (index: number) =>
+        ({ tr, dispatch }) => {
+          // A find-bar move only: no step, kept out of undo.
+          if (dispatch) dispatch(tr.setMeta(searchPluginKey, { type: 'goto', index }).setMeta('addToHistory', false))
           return true
         },
       clearSearch:

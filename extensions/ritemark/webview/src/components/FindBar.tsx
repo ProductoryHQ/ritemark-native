@@ -1,19 +1,35 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { matchCountLabel } from '../utils/textSearch'
 import { FindBarShell } from './FindBarShell'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { searchPluginKey } from '../extensions/SearchExtension'
+import { isRequestQuery, landingIndex, type FindRequest } from '../utils/findRequest'
 
 interface FindBarProps {
   editor: TipTapEditor
   onClose: () => void
+  /** Sprint 148 (R9): opened from a search result, with its words and the match to land on. */
+  request?: FindRequest | null
 }
 
-export function FindBar({ editor, onClose }: FindBarProps) {
-  const [query, setQuery] = useState('')
+export function FindBar({ editor, onClose, request = null }: FindBarProps) {
+  const [query, setQuery] = useState(request?.text ?? '')
+  // The match a search result asked for, until the editor has matches to land on (its text may still be loading).
+  const landing = useRef<FindRequest | null>(request)
+  const [autoFocus] = useState(request === null)
+
   const [matchCount, setMatchCount] = useState(0)
   const [activeIndex, setActiveIndex] = useState(-1)
-  // FindBarShell focuses its own input when it opens.
+  // FindBarShell focuses its own input when it opens (not when a search result opened it).
+
+  // A result opened (or opened again) this document: its words, and its match. Searching the words again lands
+  // even when they are already the query.
+  useEffect(() => {
+    if (!request) return
+    landing.current = request
+    setQuery(request.text)
+    editor.commands.setSearchTerm(request.text)
+  }, [request, editor])
 
   // Push query changes into the editor plugin
   useEffect(() => {
@@ -27,6 +43,17 @@ export function FindBar({ editor, onClose }: FindBarProps) {
       if (state) {
         setMatchCount(state.results.length)
         setActiveIndex(state.activeIndex)
+        const wanted = landing.current
+        if (wanted && state.searchTerm && isRequestQuery(wanted, state.searchTerm)) {
+          const index = landingIndex(wanted, state.results.length)
+          if (index >= 0) {
+            landing.current = null
+            // After this transaction: a find-bar move, no document change.
+            if (index !== state.activeIndex) queueMicrotask(() => {
+              if (!editor.isDestroyed) editor.commands.goToSearchResult(index)
+            })
+          }
+        }
       }
     }
     sync()
@@ -74,12 +101,16 @@ export function FindBar({ editor, onClose }: FindBarProps) {
   return (
     <FindBarShell
       query={query}
-      onQueryChange={setQuery}
+      onQueryChange={(next) => {
+        landing.current = null
+        setQuery(next)
+      }}
       countLabel={matchCountLabel(activeIndex, matchCount, query)}
       hasMatches={matchCount > 0}
       onNext={goToNext}
       onPrevious={goToPrev}
       onClose={onClose}
+      autoFocus={autoFocus}
     />
   )
 }

@@ -7,6 +7,7 @@ import { isEnabled } from './features';
 import { saveAsMarkdownHandler, type SaveAsMarkdownPayload } from './export/saveAsMarkdown';
 import { openInExternalApp, openWithDefaultApp } from './utils/openExternal';
 import { getCurrentPlatform } from './utils/platform';
+import { findRequests } from './search/findAtPassage';
 
 /**
  * Custom editor provider for PDF files
@@ -108,6 +109,8 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider<Pd
         // is drawn, to name Finder or File Explorer, Preview or the default app.
         case 'getOpenStatus':
           webviewPanel.webview.postMessage({ type: 'openStatus', platform: getCurrentPlatform() });
+          // Sprint 148 (R9): the viewer is listening now; a search result's find bar waits for this.
+          findRequests.ready(document.uri.toString(), webviewPanel, (find) => webviewPanel.webview.postMessage(find));
           break;
         case 'revealInOS':
           await vscode.commands.executeCommand('revealFileInOS', document.uri);
@@ -120,6 +123,7 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider<Pd
 
     // Cleanup on dispose
     webviewPanel.onDidDispose(() => {
+      findRequests.gone(document.uri.toString(), webviewPanel);
       const filePath = document.uri.fsPath;
       const watcher = this.fileWatchers.get(filePath);
       if (watcher) {

@@ -22,6 +22,7 @@ import { PropertiesSidePanel } from './components/properties'
 import { AgentConfiguratorPanel } from './components/agent'
 import type { AgentFrontmatter, AgentSkill } from './components/agent'
 import { FindBar } from './components/FindBar'
+import { decodeFindOpen, type FindRequest } from './utils/findRequest'
 import { dictationPlaceholderPos } from './extensions/DictationPlaceholder'
 import { InlineTableOfContents } from './components/InlineTableOfContents'
 import { inlineMermaidDiagramsForExport } from './lib/mermaidExport'
@@ -135,6 +136,8 @@ function App() {
 
   // Find bar state
   const [showFindBar, setShowFindBar] = useState(false)
+  // Sprint 148 (R9): the words and match a search result opened the find bar with; null when ⌘F opened it.
+  const [findRequest, setFindRequest] = useState<FindRequest | null>(null)
 
   const contentsButtonRef = useRef<HTMLButtonElement>(null)
 
@@ -281,6 +284,15 @@ function App() {
         case 'share:open':
           setShowExportMenu(true)
           return
+        // Sprint 148 (R9): a search result opened this document; its find bar opens on the match. The find bar
+        // only: nothing in the document is read, changed or sent.
+        case 'find:open': {
+          const request = decodeFindOpen(message, Date.now())
+          if (!request) return
+          setFindRequest(request)
+          setShowFindBar(true)
+          return
+        }
         // Sprint 134 (R8): the host says whether About this project shows its note
         case 'about:note':
           setAboutNote(message.show === true ? 'shown' : 'hidden')
@@ -388,6 +400,7 @@ function App() {
           // Already open: cycle to next match
           editorRef.current.commands.nextSearchResult()
         } else {
+          setFindRequest(null)
           setShowFindBar(true)
         }
       }
@@ -918,7 +931,11 @@ function App() {
           {showFindBar && editorRef.current && (
             <FindBar
               editor={editorRef.current}
-              onClose={() => setShowFindBar(false)}
+              request={findRequest}
+              onClose={() => {
+                setShowFindBar(false)
+                setFindRequest(null)
+              }}
             />
           )}
 

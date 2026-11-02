@@ -9,6 +9,7 @@ import { convertPdfToMarkdown } from '../../conversion/pdfToMarkdown'
 import { stripExt } from '../../utils/imageNaming'
 import { matchCountLabel, normalizeQuery, stepMatch } from '../../utils/textSearch'
 import { FindBarShell, type FindBarShellHandle } from '../FindBarShell'
+import { decodeFindOpen, isRequestQuery, landingIndex, type FindRequest } from '../../utils/findRequest'
 import { buildMatchRange, isPageTextLayerRendered, scrollPageIntoView } from './pdfSearchDom'
 import { startPdfWorker } from './pdfWorker'
 import { buildPdfSearchIndex, findDocumentMatches, resolvePdfMatch, type PdfSearchIndex } from './pdfSearchIndex'
@@ -199,6 +200,11 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
   // not every time a page renders while they scroll around.
   const revealMatch = useRef(false)
   const searchRef = useRef<FindBarShellHandle>(null)
+  // Sprint 148 (R9): a search result's match, until the index has matches to land on; the bar it opens leaves
+  // the keyboard where it was.
+  const landing = useRef<FindRequest | null>(null)
+  const [landingVersion, setLandingVersion] = useState(0)
+  const [searchAutoFocus, setSearchAutoFocus] = useState(true)
   const currentPageRef = useRef(1)
   currentPageRef.current = currentPage
 
@@ -236,6 +242,15 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
       if (message.type === 'openStatus') {
         const reported = parsePlatform(message.platform)
         if (reported) setPlatform(reported)
+      } else if (message.type === 'find:open') {
+        // Sprint 148 (R9): opened from a search result. The find bar only: the document isn't touched.
+        const request = decodeFindOpen(message, Date.now())
+        if (!request) return
+        landing.current = request
+        setSearchAutoFocus(false)
+        setSearchOpen(true)
+        setQuery(request.text)
+        setLandingVersion((v) => v + 1)
       } else if (message.type === 'saveAsMarkdownResult') {
         setIsSavingMd(false)
         if (message.success) {
@@ -401,6 +416,8 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
   }, [])
 
   const openSearch = useCallback(() => {
+    landing.current = null
+    setSearchAutoFocus(true)
     setSearchOpen(true)
     ensureSearchIndex()
     searchRef.current?.focus()
@@ -421,17 +438,31 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [openSearch])
 
-  // Pick the first match at or after the page the reader is on.
+  // The find bar can open before the document has loaded (a search result, R9): its index is built once it has.
+  useEffect(() => {
+    if (searchOpen && numPages > 0) ensureSearchIndex()
+  }, [searchOpen, numPages, ensureSearchIndex])
+
+  // Pick the first match at or after the page the reader is on; a search result's match when it opened the bar.
   useEffect(() => {
     if (!searchIndex || matches.length === 0) {
       setCurrentMatch(-1)
+      return
+    }
+    const wanted = landing.current
+    if (wanted && isRequestQuery(wanted, deferredQuery)) {
+      landing.current = null
+      setCurrentMatch(landingIndex(wanted, matches.length, (i) => searchIndex.locations[matches[i].start.chunk].page))
+      revealMatch.current = true
       return
     }
     const startPage = currentPageRef.current
     const first = matches.findIndex((m) => searchIndex.locations[m.start.chunk].page >= startPage)
     setCurrentMatch(Math.max(0, first))
     revealMatch.current = true
-  }, [matches, searchIndex])
+    // deferredQuery is read only with a waiting result's match; landingVersion re-runs it for the same words.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matches, searchIndex, landingVersion])
 
   const stepSearch = useCallback((direction: 1 | -1) => {
     revealMatch.current = true
@@ -548,7 +579,11 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
           <FindBarShell
             ref={searchRef}
             query={query}
-            onQueryChange={setQuery}
+            onQueryChange={(next) => {
+              landing.current = null
+              setQuery(next)
+            }}
+            autoFocus={searchAutoFocus}
             countLabel={searchStatusLabel(indexStatus, deferredQuery, currentMatch, matches.length)}
             hasMatches={indexStatus === 'ready' && matches.length > 0}
             onNext={() => stepSearch(1)}

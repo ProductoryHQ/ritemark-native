@@ -38,6 +38,7 @@ import type { CommentTaskProjectionV1 } from './commentTasks/types';
 import type { CommentTaskDocument } from './commentTasks/CommentTaskController';
 import { systemLanguage } from './voiceDictation/systemLanguage';
 import { pickerFolder } from './utils/dialogDefaults';
+import { findRequests } from './search/findAtPassage';
 
 // Properties type for front-matter (Sprint 137: lives with the split and join)
 export type { DocumentProperties };
@@ -848,7 +849,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         if (this.documentSync.handles(message)) {
           this.documentSync.handle(document, webview, message);
           // Sprint 134 (R8): a synced document says it is ready here, not with 'ready'
-          if (message.type === 'document:ready') void this.postAboutNote(document, webview);
+          if (message.type === 'document:ready') {
+            void this.postAboutNote(document, webview);
+            // Sprint 148 (R9): a search result's find bar, waiting for this page. It opens the find bar only.
+            findRequests.ready(commentTaskKey, webview, (find) => webview.postMessage(find));
+          }
           return;
         }
 
@@ -895,6 +900,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             // webview memory that a reload just threw away (audit F15).
             void RitemarkEditorProvider.publishCommentTasksFor(document);
             void this.postAboutNote(document, webview);
+            findRequests.ready(commentTaskKey, webview, (find) => webview.postMessage(find));
             return;
 
           // Sprint 134 (R8): Add the line, on About this project's note
@@ -1179,6 +1185,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
       // Remove from active set using stored reference
       RitemarkEditorProvider.activeWebviews.delete(webview);
+      findRequests.gone(commentTaskKey, webview);
       const remaining = RitemarkEditorProvider.commentTaskWebviews.get(commentTaskKey);
       if (remaining) {
         remaining.delete(webview);
