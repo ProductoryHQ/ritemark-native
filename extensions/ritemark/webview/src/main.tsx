@@ -5,6 +5,7 @@ import './index.css'
 import { watchRitemarkThemeClass } from './utils/themeClass'
 import { captureWebviewScriptUrl } from './lib/webviewAssets'
 import { watchScrollingMark } from './lib/scrollingMark'
+import { watchInputMode } from './components/ui/input-mode'
 
 // Sprint 138 (#481): webview.js's own URL, while it is still known, for the
 // files next to it in media/ (KaTeX's stylesheet and fonts).
@@ -12,6 +13,9 @@ captureWebviewScriptUrl()
 
 // Sprint 142 (#504): a list on the ground shows its slider while it scrolls
 watchScrollingMark()
+
+// Sprint 146 (R3): keyboard or pointer, the one rule for whether a focus ring shows on any control
+watchInputMode()
 
 // Lazy load FlowEditor to avoid loading React Flow for markdown files
 const FlowEditor = lazy(() =>
@@ -71,6 +75,10 @@ const ProjectsList = lazy(() =>
 // Search's results (Sprint 148): the left column under the box while it holds words.
 const SearchPanel = lazy(() =>
   import('./components/search/SearchPanel').then((m) => ({ default: m.SearchPanel }))
+)
+// The control catalogue (Sprint 146): opened only by a test script's launch setting (src/views/ControlCataloguePanel.ts)
+const ControlCatalogue = lazy(() =>
+  import('./components/catalogue/ControlCatalogue').then((m) => ({ default: m.ControlCatalogue }))
 )
 
 // Check if this is a flow editor instance
@@ -158,6 +166,10 @@ ReactDOM.createRoot(rootElement).render(
     ) : editorType === 'search' ? (
       <Suspense fallback={null}>
         <SearchPanel />
+      </Suspense>
+    ) : editorType === 'control-catalogue' ? (
+      <Suspense fallback={null}>
+        <ControlCatalogue />
       </Suspense>
     ) : (
       <App />

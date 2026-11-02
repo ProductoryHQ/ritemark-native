@@ -122,7 +122,8 @@ const DialogHeader = ({
         <DialogPrimitive.Close
           onClick={onClose}
           aria-label="Close dialog"
-          className="flex items-center justify-center w-7 h-7 rounded-md border-none bg-transparent text-ink-muted cursor-pointer transition-colors hover:bg-surface-soft hover:text-ink-strong"
+          // Ritemark's own ring for the keyboard, as DialogButton's; never Chromium's outline in the system's accent colour
+          className="flex items-center justify-center w-7 h-7 rounded-md border-none bg-transparent text-ink-muted cursor-pointer transition-colors hover:bg-surface-soft hover:text-ink-strong focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--r-ring-color)]"
         >
           <Icon name="x" size={16} />
         </DialogPrimitive.Close>

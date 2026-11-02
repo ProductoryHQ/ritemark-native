@@ -64,9 +64,6 @@ export function ShareMenu({
 }: ShareMenuProps) {
   const anchorRef = useRef<HTMLElement | null>(null)
   const leftOutsideRef = useRef(false)
-  // Focus goes back to Share when the keyboard closed the menu. After a click
-  // on an item it does not, or Share's tooltip would show over the bar.
-  const lastInputRef = useRef<'keyboard' | 'pointer'>('keyboard')
   const copiedTimerRef = useRef<number | undefined>(undefined)
   const [box, setBox] = useState<AnchorBox | null>(null)
   const [copied, setCopied] = useState(false)
@@ -80,7 +77,6 @@ export function ShareMenu({
     const anchor = anchorElement ?? document.querySelector<HTMLElement>(`[${SHARE_BUTTON_ATTRIBUTE}]`)
     anchorRef.current = anchor
     leftOutsideRef.current = false
-    lastInputRef.current = 'keyboard'
     const update = () => setBox(measureAnchor(anchor))
     update()
     window.addEventListener('resize', update)
@@ -133,13 +129,14 @@ export function ShareMenu({
           leftOutsideRef.current = true
         }}
         onCloseAutoFocus={(event) => {
+          // The menu's trigger is the stand-in, so Share itself gets the focus back after every close but a click
+          // outside (2.2, decision 1). After a mouse pick it shows no ring and opens no tooltip: the page's input mode
+          // decides (ui/input-mode.ts).
           event.preventDefault()
-          if (!leftOutsideRef.current && lastInputRef.current === 'keyboard') anchorRef.current?.focus()
+          if (!leftOutsideRef.current) anchorRef.current?.focus()
           leftOutsideRef.current = false
         }}
-        onPointerDown={() => { lastInputRef.current = 'pointer' }}
         onKeyDown={(event) => {
-          lastInputRef.current = 'keyboard'
           if (event.key === 'Tab') {
             event.preventDefault()
             onClose()

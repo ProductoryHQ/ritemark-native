@@ -195,6 +195,14 @@ Every checklist carries the section **"The base window against the baseline"** (
 
 How to read the results: `docs/development/frame-baseline/README.md`, "Comparing a release candidate".
 
+The same checklist carries **"Every control's states"** (Sprint 146, R4; the review process's Step 8). 2.1 RC3 shipped a focus ring after a mouse pick because every check saw the controls at rest:
+
+- Launch the installed candidate the same way, with `RITEMARK_CONTROL_CATALOGUE=1` in the environment as well, and open a folder: the control catalogue opens as a tab.
+- Run `node scripts/qa/control-states.mjs --port <port> --out <dir> --compare docs/development/control-baseline` on the Mac. It exits 0 when every state matches its approved image; on 1, `<dir>/compare.html` shows each state that differs. A state that differs is fixed, or the Experience lead approves its new image and Jarmo the change, before Gate 1 passes.
+- On Windows, the catalogue is checked by eye through the same launch at 100% and 150% (the approved images are the Mac's).
+
+How to run it and take a new set: `docs/development/control-baseline/README.md`.
+
 ### Step 3 — Sign + DMG arm64 (NO notarization yet)
 
 ```bash

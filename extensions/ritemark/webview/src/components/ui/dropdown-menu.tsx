@@ -4,6 +4,11 @@
  * Radix: Enter/Space/↓ open it, arrows move, Escape closes and returns focus
  * to the trigger.
  *
+ * After every close the trigger has the focus again, as Radix gives it, and
+ * the next Tab carries on from it. Whether a ring shows is the page's input
+ * mode's (2.2, `input-mode.ts`): after a mouse pick none, after the keyboard
+ * the ring (decision 1).
+ *
  *   <DropdownMenu>
  *     <DropdownMenuTrigger asChild><Button …/></DropdownMenuTrigger>
  *     <DropdownMenuContent align="end">
