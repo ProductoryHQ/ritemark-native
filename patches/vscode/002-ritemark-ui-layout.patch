@@ -2696,10 +2696,10 @@ index 00000000000..a7f4adb4968
 +});
 diff --git a/src/vs/workbench/test/browser/ritemarkLoadingLook.test.ts b/src/vs/workbench/test/browser/ritemarkLoadingLook.test.ts
 new file mode 100644
-index 00000000000..63d90046a9a
+index 00000000000..49f42b3d5f5
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/ritemarkLoadingLook.test.ts
-@@ -0,0 +1,248 @@
+@@ -0,0 +1,268 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2924,6 +2924,26 @@ index 00000000000..63d90046a9a
 +			beforeTheMinute: true,
 +			afterTheMinute: 'ground',
 +		});
++	}));
++
++	test('settled twice a look goes on; a slot\'s moment is its own look\'s; a gone webview ends the look even when the look stays where it is', () => runWithFakedTimers({}, async () => {
++		const twice = page();
++		const look = store.add(ritemarkTabLoadingLook({}, document.createElement('div'), 'README.md', false));
++		await timeout(RITEMARK_MARK_AFTER_MS);
++		look.settle(twice.page);
++		look.settle(twice.page);
++		const afterTwice = seen(twice.container);
++
++		const first = store.add(new RitemarkLoadingLook(document.createElement('div'), { slot: 'test-slot', label: 'The AI is starting', id: 'test.same', since: 1000 }));
++		const second = store.add(new RitemarkLoadingLook(document.createElement('div'), { slot: 'test-slot', label: 'The AI is starting', id: 'test.same', since: 1000 }));
++		first.dispose();
++		const handedOver: unknown = await CommandsRegistry.getCommand('_ritemark.loadingLook.since')!.handler(undefined!, 'test.same');
++		second.dispose();
++
++		const onMessage = store.add(new Emitter<unknown>());
++		const onDidDispose = store.add(new Emitter<void>());
++		const gone = { onMessage: onMessage.event, onDidDispose: onDidDispose.event, options: {}, extension: undefined, get container(): HTMLElement { throw new Error('OverlayWebview has been disposed'); } };
++		assert.deepStrictEqual({ afterTwice, handedOver, goneInPlace: ritemarkLoadingPage(gone, false) }, { afterTwice: 'mark (status: README.md is opening)', handedOver: 1000, goneInPlace: undefined });
 +	}));
 +
 +	test('a tab\'s look marks its box while it waits (the desk hides its progress line), and the box\'s next tab ends the last one\'s look', () => runWithFakedTimers({}, async () => {
