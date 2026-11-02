@@ -11,6 +11,7 @@ import { promises as fsp } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { HOME_TAB_VIEW_TYPE } from '../frameIdentifiers';
 import type { BoardController } from '../taskBoard/BoardController';
 import type { BoardSnapshot } from '../taskBoard/protocol';
 import { isPointerOnly } from '../projects/aboutFile';
@@ -26,7 +27,7 @@ import type { GuidanceHost, HomeGuidanceInput } from '../guidance/GuidanceHost';
 import { normalizeProjectUri } from '../conversations/projectScope';
 import { pickerFolder } from '../utils/dialogDefaults';
 
-export const HOME_VIEW_TYPE = 'ritemark.home';
+export const HOME_VIEW_TYPE = HOME_TAB_VIEW_TYPE; // Sprint 152 (R7): the frame manifest's (frameIdentifiers.ts)
 export const WHAT_MOVED_SEEN_KEY = 'ritemark.whatMovedSeen';
 /** product.json's defaultChatAgent.chatExtensionId; More shows Copilot Chat only while it is installed and enabled. */
 const COPILOT_CHAT_EXTENSION_ID = 'GitHub.copilot-chat';

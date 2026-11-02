@@ -7,7 +7,8 @@
 
 import * as vscode from 'vscode';
 
-export const WELCOME_VIEW_TYPE = 'ritemark.welcome';
+// Sprint 152 (R7): the frame manifest's, kept in one module the release check reads
+export { WELCOME_VIEW_TYPE } from '../frameIdentifiers';
 
 export function welcomeHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
   const nonce = nonceOf();
