@@ -52,7 +52,7 @@ Acceptance criteria:
 - **The constants it replaces go:** 002's `RITEMARK_PLACE_ORDERS` and the hard-coded `workbench.view.extension.ritemark-ai`
   (`viewsExtensionPoint.ts`, `layout.ts`, `paneCompositePart.ts`), 018's `HEAD_PLACES` and `WELCOME_VIEW_TYPE`, 019's
   `RITEMARK_PERMANENT_VIEW_TYPES` read the manifest. One source; no copy left behind.
-- **The slot:** one module (`ritemarkSlots.ts`, 018). A slot is reserved at the first frame at its final size (the ground
+- **The slot:** one module (`ritemarkSlots.ts`, 018; *built in 002's `ritemarkFrame.ts`, with the manifest: 002's AI column releases a slot too, and 002 can't import 018*). A slot is reserved at the first frame at its final size (the ground
   or the desk's sheet, no words), filled by the extension, or released: a contribution's slot when the extensions are
   read, a content slot when Ritemark failed to start or after 60 s. Each release is logged once:
   `[ritemark] slot released: <name>`.

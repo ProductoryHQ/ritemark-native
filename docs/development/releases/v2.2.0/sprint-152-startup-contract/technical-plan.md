@@ -145,6 +145,9 @@ choice. `WelcomeHost`'s two queries (`isOpen`, `mayOpenAtStart`), which only tho
 
 - `branding/product.json`: the `ritemarkFrame` block, and the frame-shaping settings in `configurationDefaults`.
 - 002: `ritemarkFrame.ts`, the typed reader (no block, unknown keys); the place order and the AI column's id read it.
+- *As built (PR 2): the slots live in 002's `ritemarkFrame.ts` with the reader, since 002's AI column releases one and
+  002 can't import 018. Each part that draws a slot keeps its own box and calls `ritemarkSlotReleased` (logged once) at
+  its moment; there is no slot object with states.* Planned:
 - 018: `ritemarkSlots.ts`: a slot has a name, a kind (contribution or content), a box, and three states; it releases a
   contribution slot at `whenInstalledExtensionsRegistered()` and a content slot on a failed activation or after 60 s,
   and logs each release once. The loading look (the ground, the mark after 1 s) is the slot's, given per slot.
@@ -164,6 +167,17 @@ choice. `WelcomeHost`'s two queries (`isOpen`, `mayOpenAtStart`), which only tho
 - Sprint 145's checks before and after, unchanged in what they assert.
 
 ## Workstream 6: the new members (R3, R4, R9, PR 2)
+
+*As built (PR 2):* R3's desk is A3's answer, the two tabs, made as a restore makes them: with nothing stored, the main
+editor part creates its grid from a saved state the manifest describes (Home's and the Task board's webview tabs of the
+built-in extension, pinned, Home in front; `ritemarkFirstDesk`), so no tiles show and `ritemarkEmptyDesk.ts` is
+unchanged. The tabs are released (closed, logged) when Ritemark isn't there or hasn't started after 60 s (how a failed start shows). The left column's place is decided in 002's existing `layout.ts` hunk, after upstream's own rule, to stay inside
+E2's budget. R9's placeholders are VS Code's own stored placeholders, seeded from the manifest by the side bar before
+its places row is made; the AI column stays open while VS Code's own containers move out of a new profile's column.
+Not built: the welcome alone's turning mark after 1 s and its line after 10 s (Q1: it shows the plain ground until the
+welcome opens), the desk's mark after 1 s on a Home tab not yet filled (Q2/Q3; VS Code's progress line under the tab shows
+meanwhile, as on every relaunch), and W5's hand-over of the shell's moment to the AI view (the host's estimate from
+PR 1 stays). The AI column's loading look is Sprint 145's, unchanged.
 
 - **R3:** `layout.ts` (002) opens Home's place in a project window with no stored place; the desk's front for a project
   with no stored tabs follows A3 (the two tabs restored from the manifest, or the plain desk); `ritemarkEmptyDesk.ts`

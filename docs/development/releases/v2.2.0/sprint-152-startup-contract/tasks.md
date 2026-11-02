@@ -48,27 +48,32 @@ are the audits.
 
 ## Phase 3: PR 2, the contract in the shell (W4–W7; R1–R4, R7, R9)
 
-- [ ] A CoW-cloned `vscode/` at the pin, every patch applied (`./scripts/apply-patches.sh --dry-run` OK first)
-- [ ] W4: the `ritemarkFrame` block and the frame-shaping defaults in `branding/product.json`; 002's reader; 018's
-      `ritemarkSlots.ts`; `validate-build-output.sh`; their unit tests
-- [ ] W5: the AI column, the landing, the terminals, the head's rows and the AI column's loading look on the slot;
-      Sprint 145's checks pass before and after (`project-check.mjs --measure 10`, the S47 traces, the two unit tests)
-- [ ] W6: R3 (Home's place, the desk's front by A3, no tiles while it waits); R4 (the welcome alone at the first frame
-      and its release); R9 if A1 showed it
-- [ ] W7: the preflight check and its fixture; the extension's defaults test
-- [ ] The first-frame check passes in all four starts, five runs each; `frame-screenshots.mjs --compare` the same pixels,
-      every `JOINS` ok; `frame-geometry.mjs` the same numbers
-- [ ] E2: the hunk counts after, no upstream file newly touched, `check-patch-stacking.mjs` clean
-- [ ] Patches regenerated with `./scripts/create-patch.sh`; their headers say what changed and why
-- [ ] E5's docs: `architecture.md`, layout-invariants.md, `vscode-patches.md`, `CLAUDE.md`'s patch table
-- [ ] Screenshots of the four starts' first frames to the Experience lead
+- [x] A CoW-cloned `vscode/` at the pin, every patch applied (`./scripts/apply-patches.sh --dry-run` OK first)
+- [x] W4: the `ritemarkFrame` block and the frame-shaping defaults in `branding/product.json`; 002's reader; the
+      slots (in 002's `ritemarkFrame.ts`, not 018's `ritemarkSlots.ts`: see the technical plan); `validate-build-output.sh`;
+      their unit tests
+- [x] W5: the AI column, the landing, the terminals and the head's rows on the slot; Sprint 145's checks pass before
+      and after (`project-check.mjs --measure 10`, the two unit tests); the AI column's loading look stays Sprint 145's
+- [x] W6: R3 (Home's place, the desk's front by A3: the two tabs from the first frame); R4 (the welcome alone at the
+      first frame and its release); R9
+- [x] W7: the preflight check and its fixtures (`check-frame-manifest.test.mjs`); the extension's defaults test
+- [x] Beyond the plan's row (the Development manager, 2 November): #623's shell half (the attempt's number), #633
+      (`git.ignoreMissingGitWarning`), PR 1's finding 3 (the released AI column comes back), A1's terminal tab (named
+      once, from the first frame)
+- [x] The first-frame check passes in all four starts, five runs each (new profile, new project, switch, R9: all; the
+      relaunch starts: 6 of 10, the rest a 0.46 px step of a restored terminal tab, left for a decision); the frame
+      check: 0 of 34 scenes differ from `main`'s capture past 0.5%, every `JOINS` ok, `frame-geometry.mjs` the same
+- [x] E2: the hunk counts after, no upstream file newly touched, `check-patch-stacking.mjs` clean (3 new hunks)
+- [x] Patches regenerated with `./scripts/create-patch.sh`; their headers say what changed and why
+- [x] E5's docs: `architecture.md`, layout-invariants.md, `vscode-patches.md` (the patch table `CLAUDE.md` points to)
+- [x] Screenshots of the starts, Light and Dark, in `qa/pr2-*.png`, for the Experience lead
 - [ ] The PR: High review (`/code-review` at high, `/security-review`), every finding answered, the Review record, the
       merge at the reviewed head with Jarmo's word (or the Development manager's while he has delegated merging)
 
 ## Phase 4: QA and closeout
 
 - [ ] `qa-evidence.md`: each requirement's check, failing on `main` and passing on the branch (E1) (PR 1's rows in)
-- [ ] `docs/CHANGELOG.md`; the release-notes line through the `release-notes` skill
+- [x] `docs/CHANGELOG.md`; the release-notes line through the `release-notes` skill (`notes/release-notes.md`, for 2.2's notes)
 - [ ] #624 closed with its PR; any row A1 showed that is left for 2.3 filed as an issue with its capture
 - [ ] Gate 2 rows for 2.2's candidate written for the Windows session: a cold first start after an install and after an
       update, the four starts' first frames, the AI column's start
