@@ -55,9 +55,21 @@ editor within a minute (VS Code's own limit for the extension host to start) the
 lost; one closed meanwhile is not opened. The sweep still opens a terminal made later in front, as asked.
 
 Files: workbench/browser/parts/editor/{editor,editorCommands,editorGroupView,editorGroupWatermark,editorTabsControl,
-multiEditorTabsControl,ritemarkEmptyDesk,ritemarkFoldedTabs,ritemarkNewTab,singleEditorTabsControl}.ts; workbench/contrib/terminal/browser/{ritemarkTerminalBar,ritemarkTerminalTabs,
+multiEditorTabsControl,ritemarkEmptyDesk,ritemarkFoldedTabs,ritemarkNewTab,ritemarkTabMenu,singleEditorTabsControl}.ts; workbench/contrib/terminal/browser/{ritemarkTerminalBar,ritemarkTerminalTabs,
 terminalEditor,terminalEditorInput,terminalInstance,terminalMenus}.ts; workbench/contrib/customEditor/browser/
 customEditorInputFactory.ts (Sprint 142); and the two tests above.
+
+Sprint 146 (R8, #568; the Experience lead's answers, section 6): a tab's menu holds the usual tab items, not VS Code's.
+One filter where the tab row builds the menu (editorTabsControl.ts → ritemarkTabMenu.ts) leaves out Add File to Chat,
+Add File to Copilot CLI (the lead's section 10), Open Preview, Reopen Editor With… and Find File References, whatever
+registered them (the workbench, chat, the built-in Copilot, Markdown and TypeScript extensions), and names Reveal in
+Explorer View "Show in Documents"; the commands stay, so All commands runs them (decision 4). It names what goes: an item
+no one has named still shows. Every kind of tab passes through it; a terminal tab's menu has none of them and stays as
+it was (its extras went at their source above).
+Test: test/browser/parts/editor/ritemarkTabMenu.test.ts (with ./scripts/test.sh --grep Ritemark). On a VS Code update,
+check that these six command IDs, from five other components, still exist: the five left out (chat's, the Copilot
+extension's, the Markdown extension's two, the TypeScript extension's) and revealInExplorer (contrib/files), which Show
+in Documents renames. Reopen Editor With… is named by the imported REOPEN_WITH_COMMAND_ID.
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index ac63294495c..8717025e650 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.ts
@@ -353,10 +365,27 @@ index a63f37ce249..f99b30f6765 100644
  
  		this.render();
 diff --git a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
-index 1c06de9c41f..f95abbd7234 100644
+index 1c06de9c41f..dc62ce76eaf 100644
 --- a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
-@@ -104,7 +104,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
+@@ -12,7 +12,7 @@ import { ActionsOrientation, IActionViewItem, prepareActions } from '../../../..
+ import { IAction, ActionRunner, toAction } from '../../../../base/common/actions.js';
+ import { ResolvedKeybinding } from '../../../../base/common/keybindings.js';
+ import { DisposableStore, IDisposable } from '../../../../base/common/lifecycle.js';
+-import { createActionViewItem, getFlatActionBarActions } from '../../../../platform/actions/browser/menuEntryActionViewItem.js';
++import { createActionViewItem, getFlatActionBarActions, getFlatContextMenuActions } from '../../../../platform/actions/browser/menuEntryActionViewItem.js';
+ import { IMenuService, MenuId } from '../../../../platform/actions/common/actions.js';
+ import { IContextKeyService, IContextKey } from '../../../../platform/contextkey/common/contextkey.js';
+ import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
+@@ -50,6 +50,7 @@ import { applyDragImage } from '../../../../base/browser/ui/dnd/dnd.js';
+ import { Codicon } from '../../../../base/common/codicons.js';
+ import { ThemeIcon } from '../../../../base/common/themables.js';
+ import { DropdownMenuActionViewItem } from '../../../../base/browser/ui/dropdown/dropdownActionViewItem.js';
++import { ritemarkTabMenuActions } from './ritemarkTabMenu.js';
+ 
+ export class EditorCommandsContextActionRunner extends ActionRunner {
+ 
+@@ -104,7 +105,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
  	protected readonly treeItemsTransfer = LocalSelectionTransfer.getInstance<DraggedTreeItemsIdentifier>();
  
  	private static readonly EDITOR_TAB_HEIGHT = {
@@ -365,6 +394,22 @@ index 1c06de9c41f..f95abbd7234 100644
  		compact: 22 as const,
  		// Modern UI multi-tab mode adds 4px top + 4px bottom padding to
  		// the tabs-and-actions-container (tabs.css), so the total title-bar height is the
+@@ -601,12 +602,11 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
+ 			anchor = new StandardMouseEvent(getWindow(node), e);
+ 		}
+ 
+-		// Show it
++		// Show it. Ritemark (Sprint 146, R8): the menu's items pass through Ritemark's filter (ritemarkTabMenu.ts)
++		const resource = this.resourceContext.get();
+ 		this.contextMenuService.showContextMenu({
+ 			getAnchor: () => anchor,
+-			menuId: MenuId.EditorTitleContext,
+-			menuActionOptions: { shouldForwardArgs: true, arg: this.resourceContext.get() },
+-			contextKeyService: this.contextMenuContextKeyService,
++			getActions: () => ritemarkTabMenuActions(getFlatContextMenuActions(this.menuService.getMenuActions(MenuId.EditorTitleContext, this.contextMenuContextKeyService, { shouldForwardArgs: true, arg: resource }))),
+ 			getActionsContext: () => ({ groupId: this.groupView.id, editorIndex: this.groupView.getIndexOfEditor(editor) }),
+ 			getKeyBinding: action => this.keybindingService.lookupKeybinding(action.id, this.contextMenuContextKeyService),
+ 			onHide: () => this.groupsView.activeGroup.focus() // restore focus to active group
 @@ -640,7 +640,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
  	}
  
@@ -1111,6 +1156,71 @@ index 00000000000..60fd89edea9
 +		?? document.querySelector<HTMLElement>('.part.editor .ritemark-new-tab');
 +	plus?.click();
 +});
+diff --git a/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts b/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts
+new file mode 100644
+index 00000000000..7bd6397dbcc
+--- /dev/null
++++ b/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts
+@@ -0,0 +1,59 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/*
++ * Ritemark (Sprint 146, R8, #568; the Experience lead's answers for the sprint, section 6): a tab's menu holds the usual
++ * tab items, not VS Code's developer ones. One filter where the tab row builds the menu (editorTabsControl.ts), so it
++ * catches an item whatever registered it: the workbench, the chat contribution or a built-in extension. It names what
++ * goes, so an item no one has named still shows. The commands stay registered, and All commands still runs them
++ * (decision 4). A terminal tab's menu has none of them: its own extras went at their source in Sprint 132.
++ */
++
++import { IAction, Separator, toAction } from '../../../../base/common/actions.js';
++import { localize } from '../../../../nls.js';
++import { REOPEN_WITH_COMMAND_ID } from './editorCommands.js';
++
++/** What a tab's menu leaves out, by command ID, with the reason the Experience lead gave. */
++export const RITEMARK_TAB_MENU_LEAVES_OUT: ReadonlyMap<string, string> = new Map([
++	['workbench.action.chat.attachFile', 'Add File to Chat adds the file to Copilot Chat, not to Ritemark\'s AI; the composer\'s + is Ritemark\'s way'],
++	['github.copilot.chat.copilotCLI.addFileReference', 'Add File to Copilot CLI hands the file to Copilot too, not to Ritemark\'s AI (the built-in Copilot, while a Copilot CLI session runs)'],
++	['markdown.showPreview', 'Open Preview: Ritemark\'s editor already shows the document as it reads'],
++	[REOPEN_WITH_COMMAND_ID, 'Reopen Editor With… lists editors by their developer names; View: Reopen Editor With… stays in All commands'],
++	['markdown.findAllFileReferences', 'Find File References is a code tool'],
++	['typescript.findAllFileReferences', 'Find File References is a code tool (the same item on a script file\'s tab)'],
++]);
++
++/** Reveal in Explorer View (contrib/files' REVEAL_IN_EXPLORER_COMMAND_ID) reads as the left column names the tree. */
++const REVEAL_IN_DOCUMENTS = 'revealInExplorer';
++
++/**
++ * A tab's menu as Ritemark shows it: the left-out items gone, Reveal in Explorer View named Show in Documents, and no
++ * separator left at either end or twice in a row where a group emptied.
++ */
++export function ritemarkTabMenuActions(actions: readonly IAction[]): IAction[] {
++	const kept: IAction[] = [];
++	for (const action of actions) {
++		if (RITEMARK_TAB_MENU_LEAVES_OUT.has(action.id)) {
++			continue;
++		}
++		if (action.id === Separator.ID) {
++			if (kept.length && kept[kept.length - 1].id !== Separator.ID) {
++				kept.push(action);
++			}
++			continue;
++		}
++		kept.push(action.id === REVEAL_IN_DOCUMENTS ? toAction({
++			id: action.id,
++			label: localize('ritemark.tabMenu.showInDocuments', "Show in Documents"),
++			enabled: action.enabled,
++			class: action.class,
++			run: (...args: unknown[]) => action.run(...args)
++		}) : action);
++	}
++	while (kept.length && kept[kept.length - 1].id === Separator.ID) {
++		kept.pop();
++	}
++	return kept;
++}
 diff --git a/src/vs/workbench/browser/parts/editor/singleEditorTabsControl.ts b/src/vs/workbench/browser/parts/editor/singleEditorTabsControl.ts
 index 05c6ecb9a54..2f3a608c528 100644
 --- a/src/vs/workbench/browser/parts/editor/singleEditorTabsControl.ts
@@ -2056,5 +2166,80 @@ index 00000000000..79d6463bf76
 +		assert.strictEqual(ritemarkIsTaskBoard({ viewType: 'mainThreadWebview-ritemark.taskBoard' } as unknown as EditorInput), true);
 +		assert.strictEqual(ritemarkIsTaskBoard({ viewType: 'mainThreadWebview-ritemark.home' } as unknown as EditorInput), false);
 +		assert.strictEqual(ritemarkIsTaskBoard({} as EditorInput), false);
++	});
++});
+diff --git a/src/vs/workbench/test/browser/parts/editor/ritemarkTabMenu.test.ts b/src/vs/workbench/test/browser/parts/editor/ritemarkTabMenu.test.ts
+new file mode 100644
+index 00000000000..b6b35e9f1d6
+--- /dev/null
++++ b/src/vs/workbench/test/browser/parts/editor/ritemarkTabMenu.test.ts
+@@ -0,0 +1,69 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { IAction, Separator, toAction } from '../../../../../base/common/actions.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
++import { REOPEN_WITH_COMMAND_ID } from '../../../../browser/parts/editor/editorCommands.js';
++import { RITEMARK_TAB_MENU_LEAVES_OUT, ritemarkTabMenuActions } from '../../../../browser/parts/editor/ritemarkTabMenu.js';
++
++/** A menu as getFlatContextMenuActions gives it: [id, label] rows, '---' for a separator. */
++function menu(rows: ReadonlyArray<string | [string, string]>, ran: unknown[][] = []): IAction[] {
++	return rows.map(row => row === '---' ? new Separator() : toAction({ id: row[0], label: row[1], run: (...args: unknown[]) => { ran.push([row[0], ...args]); } }));
++}
++
++function shown(actions: readonly IAction[]): string[] {
++	return actions.map(action => action.id === Separator.ID ? '---' : action.label);
++}
++
++/** The usual tab items, as every kind of tab has them at the top and the foot of its menu. */
++const CLOSE: Array<string | [string, string]> = [['workbench.action.closeActiveEditor', 'Close'], ['workbench.action.closeOtherEditors', 'Close Others'], ['workbench.action.closeEditorsToTheRight', 'Close to the Right'], ['workbench.files.action.closeSavedEditors', 'Close Saved'], ['workbench.action.closeEditorsInGroup', 'Close All']];
++const FOOT: Array<string | [string, string]> = [['workbench.action.splitEditor', 'Split Right'], ['workbench.action.splitMoveSubmenu', 'Split & Move'], '---', ['workbench.action.moveEditorToNewWindow', 'Move into New Window'], ['workbench.action.copyEditorToNewWindow', 'Copy into New Window']];
++
++/**
++ * Ritemark (Sprint 146, R8, #568): a tab's menu leaves out Add File to Chat, Open Preview, Reopen Editor With… and Find File
++ * References, and names Reveal in Explorer View Show in Documents (the Experience lead's answers, section 6). The menus
++ * here are the ones a dev build drew on main before the change (the sprint's research/tab-menu-audit.md).
++ */
++suite('Ritemark tab menu', () => {
++
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	test('a document\'s tab: the usual items and Show in Documents, none of VS Code\'s', () => {
++		const document = menu([...CLOSE, '---', ['copyFilePath', 'Copy Path'], ['copyRelativeFilePath', 'Copy Relative Path'], '---', ['markdown.showPreview', 'Open Preview'], [REOPEN_WITH_COMMAND_ID, 'Reopen Editor With...'], '---', ['workbench.action.chat.attachFile', 'Add File to Chat'], '---', ['revealFileInOS', 'Reveal in Finder'], ['revealInExplorer', 'Reveal in Explorer View'], '---', ['workbench.action.pinEditor', 'Pin'], '---', ...FOOT, '---', ['markdown.findAllFileReferences', 'Find File References']]);
++		assert.deepStrictEqual(shown(ritemarkTabMenuActions(document)), ['Close', 'Close Others', 'Close to the Right', 'Close Saved', 'Close All', '---', 'Copy Path', 'Copy Relative Path', '---', 'Reveal in Finder', 'Show in Documents', '---', 'Pin', '---', 'Split Right', 'Split & Move', '---', 'Move into New Window', 'Copy into New Window']);
++	});
++
++	test('Home and the Task board lose Reopen Editor With… and keep the rest; a terminal\'s menu is as it was', () => {
++		const home = menu([...CLOSE, '---', [REOPEN_WITH_COMMAND_ID, 'Reopen Editor With...'], '---', ['workbench.action.unpinEditor', 'Unpin'], '---', ...FOOT]);
++		assert.deepStrictEqual(shown(ritemarkTabMenuActions(home)), ['Close', 'Close Others', 'Close to the Right', 'Close Saved', 'Close All', '---', 'Unpin', '---', 'Split Right', 'Split & Move', '---', 'Move into New Window', 'Copy into New Window']);
++		const terminal = menu([...CLOSE, '---', ['workbench.action.terminal.renameInstance', 'Rename...'], '---', ['workbench.action.pinEditor', 'Pin'], '---', ...FOOT]);
++		assert.deepStrictEqual(shown(ritemarkTabMenuActions(terminal)), shown(terminal));
++	});
++
++	test('the filter names what goes: an item no one named still shows', () => {
++		const actions = menu([['workbench.action.closeActiveEditor', 'Close'], '---', ['someExtension.newThing', 'A New Thing'], ['typescript.findAllFileReferences', 'Find File References']]);
++		assert.deepStrictEqual(shown(ritemarkTabMenuActions(actions)), ['Close', '---', 'A New Thing']);
++		assert.deepStrictEqual([...RITEMARK_TAB_MENU_LEAVES_OUT.keys()], ['workbench.action.chat.attachFile', 'github.copilot.chat.copilotCLI.addFileReference', 'markdown.showPreview', REOPEN_WITH_COMMAND_ID, 'markdown.findAllFileReferences', 'typescript.findAllFileReferences']);
++	});
++
++	test('a file\'s tab during a Copilot CLI session loses Add File to Copilot CLI, as it loses Add File to Chat', () => {
++		const copilot = menu([...CLOSE, '---', ['workbench.action.chat.attachFile', 'Add File to Chat'], '---', ['github.copilot.chat.copilotCLI.addFileReference', 'Add File to Copilot CLI'], '---', ['revealInExplorer', 'Reveal in Explorer View']]);
++		assert.deepStrictEqual(shown(ritemarkTabMenuActions(copilot)), ['Close', 'Close Others', 'Close to the Right', 'Close Saved', 'Close All', '---', 'Show in Documents']);
++	});
++
++	test('Show in Documents runs Reveal in Explorer View with the menu\'s arguments', async () => {
++		const ran: unknown[][] = [];
++		const [showInDocuments] = ritemarkTabMenuActions(menu([['revealInExplorer', 'Reveal in Explorer View']], ran));
++		assert.deepStrictEqual([showInDocuments.id, showInDocuments.label, showInDocuments.enabled], ['revealInExplorer', 'Show in Documents', true]);
++		await showInDocuments.run({ groupId: 1, editorIndex: 2 });
++		assert.deepStrictEqual(ran, [['revealInExplorer', { groupId: 1, editorIndex: 2 }]]);
++	});
++
++	test('no separator is left at either end or twice in a row', () => {
++		const actions = menu(['---', ['markdown.showPreview', 'Open Preview'], '---', '---', ['workbench.action.closeActiveEditor', 'Close'], '---', ['workbench.action.chat.attachFile', 'Add File to Chat'], '---', ['markdown.findAllFileReferences', 'Find File References']]);
++		assert.deepStrictEqual(shown(ritemarkTabMenuActions(actions)), ['Close']);
 +	});
 +});

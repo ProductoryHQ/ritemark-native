@@ -17,6 +17,7 @@
 import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import { cn } from '../../lib/utils'
+import { lastInputKind } from '../ui/close-focus'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { Icon } from '../ui/Icon'
 import type { GoogleDocsAction, GoogleDocsProjection } from './googleDocsMenu'
@@ -64,9 +65,6 @@ export function ShareMenu({
 }: ShareMenuProps) {
   const anchorRef = useRef<HTMLElement | null>(null)
   const leftOutsideRef = useRef(false)
-  // Focus goes back to Share when the keyboard closed the menu. After a click
-  // on an item it does not, or Share's tooltip would show over the bar.
-  const lastInputRef = useRef<'keyboard' | 'pointer'>('keyboard')
   const copiedTimerRef = useRef<number | undefined>(undefined)
   const [box, setBox] = useState<AnchorBox | null>(null)
   const [copied, setCopied] = useState(false)
@@ -80,7 +78,6 @@ export function ShareMenu({
     const anchor = anchorElement ?? document.querySelector<HTMLElement>(`[${SHARE_BUTTON_ATTRIBUTE}]`)
     anchorRef.current = anchor
     leftOutsideRef.current = false
-    lastInputRef.current = 'keyboard'
     const update = () => setBox(measureAnchor(anchor))
     update()
     window.addEventListener('resize', update)
@@ -133,13 +130,13 @@ export function ShareMenu({
           leftOutsideRef.current = true
         }}
         onCloseAutoFocus={(event) => {
+          // The menu's trigger is the stand-in, so Share itself gets the focus back, and only after a keyboard close
+          // (ui/close-focus.ts): after a click on an item it does not, or Share's tooltip would show over the bar.
           event.preventDefault()
-          if (!leftOutsideRef.current && lastInputRef.current === 'keyboard') anchorRef.current?.focus()
+          if (!leftOutsideRef.current && lastInputKind() === 'keyboard') anchorRef.current?.focus()
           leftOutsideRef.current = false
         }}
-        onPointerDown={() => { lastInputRef.current = 'pointer' }}
         onKeyDown={(event) => {
-          lastInputRef.current = 'keyboard'
           if (event.key === 'Tab') {
             event.preventDefault()
             onClose()
