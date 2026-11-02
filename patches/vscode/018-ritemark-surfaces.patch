@@ -173,11 +173,13 @@ new profile's places row gets the manifest's places as placeholders before it is
 column stays open in a project window while VS Code's own containers move out of a new profile's column, before
 Ritemark AI has registered (auxiliaryBarPart.ts). A project's first window has Home's and the Task board's tabs on its
 desk from its first frame, as a restore brings them back (editorPart.ts, R3). The welcome's window is the welcome alone
-from its first frame and its slot goes when another editor comes in front, when Ritemark isn't there or failed to
-start, or after 60 s (ritemarkWelcomeAlone.ts, R4). A terminal tab's icon keeps its room before the icons' glyphs are
+from its first frame (a window with no folder whose saved tabs hold no document) and its slot goes, the columns it
+closed shown again, when another editor comes in front, when Ritemark isn't there, or after 60 s with no welcome, a
+failed start included (ritemarkWelcomeAlone.ts, R4). A terminal tab's icon keeps its room before the icons' glyphs are
 written (ritemarkSurfaces.css). #623: the switch guard passes the extension the shutdown attempt's number with its
 question and answers _ritemark.projects.reloadGoesOn, so a "Switch and stop" answered after another participant has
-stopped the reload stops no chats; the question can't be asked last (VS Code's one final veto is the unsaved files').
+said no at once stops no chats (a no still open as a question can't be seen); the question can't be asked last
+(VS Code's one final veto is the unsaved files').
 Tests: workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts (R4) and ritemarkSwitchGuard.test.ts (#623).
 
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
