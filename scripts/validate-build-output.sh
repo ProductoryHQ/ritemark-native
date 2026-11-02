@@ -260,6 +260,31 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+# Check 4b: The frame's manifest (Sprint 152, R1/R7)
+# The shell draws Ritemark's frame from product.json's ritemarkFrame block at the
+# first frame (patch 002's ritemarkFrame.ts); without it the frame draws as VS
+# Code's and Sprint 145's fixes are undone, with nothing failing but a log line.
+# -----------------------------------------------------------------------------
+echo -n "Checking the frame's manifest... "
+case "$TARGET" in
+  darwin-arm64|darwin-x64) PRODUCT_JSON="$APP_PATH/Contents/Resources/app/product.json" ;;
+  win32-x64) PRODUCT_JSON="$APP_PATH/resources/app/product.json" ;;
+esac
+if FRAME_SUMMARY=$(node -e '
+const frame = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).ritemarkFrame;
+const missing = ["places", "homePlace", "aiColumn", "permanentTabs", "deskFront", "welcome", "extension"].filter(key => !frame || frame[key] === undefined || (Array.isArray(frame[key]) && !frame[key].length));
+if (missing.length) { console.log(frame ? "missing " + missing.join(", ") : "no ritemarkFrame block"); process.exit(1); }
+console.log(frame.places.length + " places, " + frame.permanentTabs.length + " permanent tabs");
+' "$PRODUCT_JSON" 2>&1); then
+  echo -e "${GREEN}OK${NC} ($FRAME_SUMMARY)"
+else
+  echo -e "${RED}FAIL${NC}"
+  echo "  $PRODUCT_JSON: $FRAME_SUMMARY"
+  echo "  FIX: the build copies branding/product.json, which holds the ritemarkFrame block"
+  ERRORS=$((ERRORS + 1))
+fi
+
+# -----------------------------------------------------------------------------
 # Check 5: Bundled Agent Runtimes (manifest-driven)
 # -----------------------------------------------------------------------------
 echo ""

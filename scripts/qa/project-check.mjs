@@ -301,10 +301,11 @@ const FRAME_SAMPLE = `(() => {
 	[...document.querySelectorAll('.part.sidebar .ritemark-project-row-list > .ritemark-project-row')].forEach((row, index) => { boxes['head row ' + (index + 1)] = box(row); });
 	boxes['the head\\'s label'] = box(document.querySelector('.part.sidebar .ritemark-project-group'));
 	const group = [...document.querySelectorAll('.part.editor .editor-group-container')].find(element => box(element));
-	[...(group?.querySelectorAll('.tabs-container > .tab') ?? [])].slice(0, 3).forEach((tab, index) => { boxes['tab ' + (index + 1) + ' (' + name(tab) + ')'] = box(tab); });
+	// The welcome alone hides the tab row (ritemarkSurfaces.css): its tabs are no part of the frame drawn, so they are not read
+	const alone = workbench.classList.contains('ritemark-welcome-alone');
+	[...(alone ? [] : group?.querySelectorAll('.tabs-container > .tab') ?? [])].slice(0, 3).forEach((tab, index) => { boxes['tab ' + (index + 1) + ' (' + name(tab) + ')'] = box(tab); });
 	for (const key of Object.keys(boxes)) { if (boxes[key] === null && !/^the (left column|desk|AI column|status bar|side places bar)$/.test(key)) { delete boxes[key]; } }
 	sample.boxes = boxes;
-	const alone = workbench.classList.contains('ritemark-welcome-alone');
 	const tab = document.querySelector('.part.editor .editor-group-container.active .tabs-container > .tab.active') ?? group?.querySelector('.tabs-container > .tab.active');
 	const place = places.find(item => item.classList.contains('checked'));
 	sample.front = { desk: alone ? 'the welcome alone' : (tab ? name(tab) : '(none)'), place: boxes['the left column'] ? (place ? name(place.querySelector('.action-label')) : '(none)') : '(closed)' };
