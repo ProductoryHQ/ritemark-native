@@ -2296,7 +2296,7 @@ index 75c746cf9eb..b434f06ca79 100644
  					localize('window.commandCenterWeb', "Show command launcher together with the window title.") :
  					localize({ key: 'window.commandCenter', comment: ['{0}, {1} is a placeholder for a setting identifier.'] }, "Show command launcher together with the window title. This setting only has an effect when {0} is not set to {1}.", '`#window.customTitleBarVisibility#`', '`never`'),
 diff --git a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
-index 565fb42cb18..e717ca5924a 100644
+index 565fb42cb18..87e3406d91e 100644
 --- a/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 +++ b/src/vs/workbench/contrib/files/browser/explorerViewlet.ts
 @@ -19,13 +19,14 @@ import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/w
@@ -2316,7 +2316,7 @@ index 565fb42cb18..e717ca5924a 100644
  import { KeyChord, KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
  import { Registry } from '../../../../platform/registry/common/platform.js';
  import { IProgressService, ProgressLocation } from '../../../../platform/progress/common/progress.js';
-@@ -178,6 +179,56 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
+@@ -178,6 +179,59 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
  		this._register(this.contextService.onDidChangeWorkspaceName(e => this.updateTitleArea()));
  	}
  
@@ -2364,8 +2364,11 @@ index 565fb42cb18..e717ca5924a 100644
 +		// Ritemark (Sprint 148, R7): whatever opens the tree (Show in Documents, New file or folder, a reveal, Refresh
 +		// Explorer) closes the search first, so the tree it works on is in sight
 +		if (id === VIEW_ID && this.ritemarkFolders) {
-+			this.instantiationService.invokeFunction(accessor => CommandsRegistry.getCommand('_ritemark.projectHead.clearSearch')?.handler(accessor));
-+			this.ritemarkAttachFolders();
++			try {
++				this.instantiationService.invokeFunction(accessor => CommandsRegistry.getCommand('_ritemark.projectHead.clearSearch')?.handler(accessor));
++			} finally {
++				this.ritemarkAttachFolders();
++			}
 +		}
 +		return super.openView(id, focus);
 +	}
@@ -2373,7 +2376,7 @@ index 565fb42cb18..e717ca5924a 100644
  	override create(parent: HTMLElement): void {
  		super.create(parent);
  		parent.classList.add('explorer-viewlet');
-@@ -186,7 +237,9 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
+@@ -186,7 +240,9 @@ export class ExplorerViewPaneContainer extends ViewPaneContainer {
  	protected override createView(viewDescriptor: IViewDescriptor, options: IViewletViewOptions): ViewPane {
  		if (viewDescriptor.id === VIEW_ID) {
  			return this.instantiationService.createInstance(ExplorerView, {
@@ -2384,7 +2387,7 @@ index 565fb42cb18..e717ca5924a 100644
  					willOpenElement: e => {
  						if (!isMouseEvent(e)) {
  							return; // only delay when user clicks
-@@ -257,28 +310,26 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
+@@ -257,28 +313,26 @@ const viewContainerRegistry = Registry.as<IViewContainersRegistry>(Extensions.Vi
   */
  export const VIEW_CONTAINER: ViewContainer = viewContainerRegistry.registerViewContainer({
  	id: VIEWLET_ID,
@@ -2417,7 +2420,7 @@ index 565fb42cb18..e717ca5924a 100644
  const openFolderButton = `[${openFolder}](command:${OpenFolderAction.ID})`;
  const openFolderViaWorkspaceButton = `[${openFolder}](command:${OpenFolderViaWorkspaceAction.ID})`;
  const openRecentButton = `[${openRecent}](command:${OpenRecentAction.ID})`;
-@@ -326,7 +377,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
+@@ -326,7 +380,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  
  viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  	content: localize({ key: 'noFolderButEditorsHelp', comment: ['Please do not translate the word "command", it is part of our internal syntax which must not change'] },
@@ -2426,7 +2429,7 @@ index 565fb42cb18..e717ca5924a 100644
  	when: ContextKeyExpr.and(
  		// editors are opened
  		ContextKeyExpr.has('editorIsOpen'),
-@@ -343,7 +394,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
+@@ -343,7 +397,7 @@ viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  
  viewsRegistry.registerViewWelcomeContent(EmptyView.ID, {
  	content: localize({ key: 'noFolderHelp', comment: ['Please do not translate the word "command", it is part of our internal syntax which must not change'] },
@@ -3044,10 +3047,10 @@ index 00000000000..49f42b3d5f5
 +	}));
 +});
 diff --git a/src/vs/workbench/browser/parts/views/viewPaneContainer.ts b/src/vs/workbench/browser/parts/views/viewPaneContainer.ts
-index 552fe08c2b0..67b3236d56a 100644
+index 552fe08c2b0..d2f011e4c8f 100644
 --- a/src/vs/workbench/browser/parts/views/viewPaneContainer.ts
 +++ b/src/vs/workbench/browser/parts/views/viewPaneContainer.ts
-@@ -765,6 +765,55 @@ export class ViewPaneContainer<MementoType extends object = object> extends Comp
+@@ -765,6 +765,54 @@ export class ViewPaneContainer<MementoType extends object = object> extends Comp
  		});
  	}
  
@@ -3055,9 +3058,8 @@ index 552fe08c2b0..67b3236d56a 100644
 +	private readonly ritemarkDetached = (() => {
 +		const detached = new Map<ViewPane, { readonly item: IViewPaneItem; readonly size: number; readonly index: number }>();
 +		this._register(toDisposable(() => {
-+			for (const [pane, { item }] of detached) {
-+				item.disposable.dispose();
-+				pane.dispose();
++			for (const { item } of detached.values()) {
++				item.disposable.dispose(); // it holds the pane too (onDidAddViewDescriptors)
 +			}
 +		}));
 +		return detached;
@@ -3065,7 +3067,7 @@ index 552fe08c2b0..67b3236d56a 100644
 +
 +	/**
 +	 * Ritemark (Sprint 148, R7): takes a pane out of the container without disposing its view, so its state and its
-+	 * registrations stay, or puts it back where it was. The container counts only the panes in it: its merge, headers,
++	 * registrations stay, or puts it back at its place. The container counts only the panes in it: its merge, headers,
 +	 * focus and saved state are the ones it has without the pane. Its panes mirror the visible view descriptors by index,
 +	 * so a subclass puts a pane back before the descriptors change (onDidAdd/RemoveViewDescriptors).
 +	 */
@@ -3103,7 +3105,7 @@ index 552fe08c2b0..67b3236d56a 100644
  	openView(id: string, focus?: boolean): IView | undefined {
  		let view = this.getView(id);
  		if (!view) {
-@@ -825,7 +874,7 @@ export class ViewPaneContainer<MementoType extends object = object> extends Comp
+@@ -825,7 +873,7 @@ export class ViewPaneContainer<MementoType extends object = object> extends Comp
  		return panes;
  	}
  

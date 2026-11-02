@@ -199,8 +199,8 @@ it. Its words and keys go to the row's command (`{ text }`, `{ key: 'down' | 'en
 box for the desk. `_ritemark.projectHead.focusSearch` (⌘⇧F, through the extension) shows Documents and puts the caret in
 it; the extension asks for that command to know the shell has the box. While the box holds words `ritemark.searchOpen` is
 set: 002 hides the Folders view and the extension's results view shows in its place, and the Documents label makes way.
-The words stay while the person goes to another place; New, and anything that opens the tree
-(`_ritemark.projectHead.clearSearch`), clears them first; the switch turned off, or the folder closed, takes them away
+The words stay while the person goes to another place; New, the head's menus' items, and anything that opens the tree
+(`_ritemark.projectHead.clearSearch`), clear them first; the switch turned off, or the folder closed, takes them away
 without a search. The box is never taken out of the page while the rows are drawn again, so its caret and a word being
 composed stay. Test: workbench/test/browser/parts/ritemarkProjectHead.test.ts.
 
@@ -5324,10 +5324,10 @@ index 00000000000..c6764e91723
 +registerWorkbenchContribution2(RitemarkWindowSizes.ID, RitemarkWindowSizes, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644
-index 00000000000..a8f141ca535
+index 00000000000..7b143e34532
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,595 @@
+@@ -0,0 +1,604 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -5900,6 +5900,15 @@ index 00000000000..a8f141ca535
 +	/** One of the extension's menus, as a Ritemark menu under its anchor: a hairline between its groups. */
 +	private showMenu(menuId: MenuId, anchor: HTMLElement, ariaLabel: string): void {
 +		const folder = this.workspaceService.getWorkspace().folders[0]?.uri;
++		// Sprint 148 (R7): on a place with the box, the menus' items work on the tree (New folder, Collapse folders):
++		// the box's words go first, so the tree is back in the column
++		const clears = this.place?.rows.some(row => row.field) === true;
++		const run = (action: { run(arg: unknown): unknown }) => {
++			if (clears && this.field?.input.value) {
++				this.setFieldText('', true);
++			}
++			return action.run(folder);
++		};
 +		const entries: RitemarkMenuEntry[] = [];
 +		for (const [, actions] of this.menuService.getMenuActions(menuId, this.contextKeyService, { shouldForwardArgs: true })) {
 +			if (entries.length) {
@@ -5911,7 +5920,7 @@ index 00000000000..a8f141ca535
 +				entries.push({
 +					label: action.label,
 +					iconClassNames: icon ? ThemeIcon.asClassNameArray(icon) : [],
-+					run: () => action.run(folder),
++					run: () => run(action),
 +					submenu: flyout ? () => this.flyoutRows(flyout) : undefined,
 +				});
 +			}
