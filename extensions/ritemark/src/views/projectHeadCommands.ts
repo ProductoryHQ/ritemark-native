@@ -54,10 +54,15 @@ export const AGENTS_NEW_MENU_COMMANDS: readonly ProjectHeadCommand[] = [
 /**
  * The rows under the head (Sprint 134, R16): the shell draws each row with its command's title and icon from
  * package.json. New opens the place's New menu under the row; run on its own (a key), it makes a document.
+ * Search (Sprint 148, decision 1) is Ritemark's search when `registerProjectHeadCommands` is given it: the shell's
+ * box (PR 3) sends it the words and keys, and ⌘⇧F runs it too. VS Code's search, which it runs on a shell without
+ * the box and with the kill switch off, stays in More.
  */
+export const SEARCH_ROW_COMMAND = 'ritemark.projectHead.search';
+
 export const HEAD_ROW_COMMANDS: readonly ProjectHeadCommand[] = [
   { id: 'ritemark.projectHead.newRow', runs: 'ritemark.newDocument' },
-  { id: 'ritemark.projectHead.search', runs: 'workbench.view.search' },
+  { id: SEARCH_ROW_COMMAND, runs: 'workbench.view.search' },
 ];
 
 /** Every head command once (a command can sit in two menus). */
@@ -65,12 +70,20 @@ export const PROJECT_HEAD_COMMANDS: readonly ProjectHeadCommand[] = [...new Map(
   [...PROJECT_MENU_COMMANDS, ...NEW_MENU_COMMANDS, ...AGENTS_NEW_MENU_COMMANDS, ...HEAD_ROW_COMMANDS].map(command => [command.id, command]),
 ).values()];
 
-export function registerProjectHeadCommands(context: vscode.ExtensionContext): void {
+export interface ProjectHeadOverrides {
+  /** The Search row, with the argument the shell's box or a key binding passes (Sprint 148). */
+  search?: (arg?: unknown) => unknown;
+}
+
+export function registerProjectHeadCommands(context: vscode.ExtensionContext, overrides: ProjectHeadOverrides = {}): void {
   for (const { id, runs, onFolder } of PROJECT_HEAD_COMMANDS) {
+    const search = id === SEARCH_ROW_COMMAND ? overrides.search : undefined;
     context.subscriptions.push(
-      vscode.commands.registerCommand(id, () => onFolder
-        ? vscode.commands.executeCommand(runs, vscode.workspace.workspaceFolders?.[0]?.uri)
-        : vscode.commands.executeCommand(runs)),
+      vscode.commands.registerCommand(id, (arg?: unknown) => search
+        ? search(arg)
+        : onFolder
+          ? vscode.commands.executeCommand(runs, vscode.workspace.workspaceFolders?.[0]?.uri)
+          : vscode.commands.executeCommand(runs)),
     );
   }
 }

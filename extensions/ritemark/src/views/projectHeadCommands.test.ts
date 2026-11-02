@@ -51,12 +51,13 @@ const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'package
     commands: Array<{ command: string; title: string; icon?: string }>;
     icons: Record<string, { default: { fontPath: string; fontCharacter: string } }>;
     menus: Record<string, MenuItem[]>;
-    keybindings: Array<{ key: string; mac?: string; command: string; when?: string }>;
+    keybindings: Array<{ key: string; mac?: string; command: string; when?: string; args?: unknown }>;
     configurationDefaults: Record<string, unknown>;
     colors: Array<{ id: string; defaults: Record<string, string> }>;
+    views: Record<string, Array<{ id: string; type?: string; name: string; when?: string }>>;
   };
 };
-const { commands, icons, menus, keybindings, configurationDefaults, colors } = pkg.contributes;
+const { commands, icons, menus, keybindings, configurationDefaults, colors, views } = pkg.contributes;
 
 let failures = 0;
 function test(name: string, run: () => void): void {
@@ -124,6 +125,36 @@ test('each head command runs the command that does the work', () => {
   assert.deepEqual(executed, all.map(c => c.onFolder ? [c.runs, projectFolder] : [c.runs]));
 });
 
+test('the Search row runs Ritemark\'s search when given it, with what the shell\'s box sends (Sprint 148)', () => {
+  registered.length = 0;
+  executed.length = 0;
+  const calls: unknown[] = [];
+  registerProjectHeadCommands({ subscriptions: [] } as unknown as import('vscode').ExtensionContext, {
+    search: (arg) => { calls.push(arg); },
+  });
+  // The stub runs each command once with no argument: the Search row went to the override, nothing else did.
+  assert.deepEqual(calls, [undefined]);
+  assert.ok(!executed.some(([id]) => id === 'workbench.view.search'), 'the override, not VS Code\'s search');
+  assert.equal(executed.length, PROJECT_HEAD_COMMANDS.length - 1, 'every other head command runs as before');
+});
+
+test('⌘⇧F (Ctrl+Shift+F on Windows) is the Search row while project search is on (Sprint 148, decision 1)', () => {
+  const binding = keybindings.find(candidate => candidate.command === 'ritemark.projectHead.search');
+  assert.ok(binding, 'no binding for search');
+  assert.equal(binding.key, 'ctrl+shift+f');
+  assert.equal(binding.mac, 'cmd+shift+f');
+  // Off, VS Code's own ⌘⇧F answers; on a shell without the box, the row runs VS Code's search as the key did (E3)
+  assert.equal(binding.when, 'ritemark.projectSearch.enabled');
+  assert.deepEqual(binding.args, { via: 'key' });
+});
+
+test('the results view sits in Documents and shows only while the box holds words (Sprint 148, R7, E3)', () => {
+  const view = (views.explorer ?? []).find(candidate => candidate.id === 'ritemark.searchResults');
+  assert.ok(view, 'no results view in Documents');
+  assert.equal(view.type, 'webview');
+  assert.equal(view.when, 'ritemark.searchOpen');
+});
+
 test('the 2.0 defaults', () => {
   assert.equal(configurationDefaults['workbench.activityBar.location'], 'top');
   assert.equal(configurationDefaults['breadcrumbs.enabled'], false);
@@ -137,8 +168,8 @@ test('the 2.0 defaults', () => {
   assert.deepEqual(configurationDefaults['files.exclude'], { '**/.ritemark': true, '**/.claude/worktrees': true });
   assert.equal(configurationDefaults['terminal.integrated.defaultLocation'], 'editor');
   assert.equal(configurationDefaults['terminal.integrated.hideOnStartup'], 'always');
-  // ⌘T reaches the tab row from a terminal tab too (Sprint 134, R21)
-  assert.deepEqual(configurationDefaults['terminal.integrated.commandsToSkipShell'], ['workbench.action.createTerminalEditor', 'ritemark.newTab']);
+  // ⌘T reaches the tab row from a terminal tab too (Sprint 134, R21), and ⌘⇧F search (Sprint 148)
+  assert.deepEqual(configurationDefaults['terminal.integrated.commandsToSkipShell'], ['workbench.action.createTerminalEditor', 'ritemark.newTab', 'ritemark.projectHead.search']);
   // The project's AGENTS.md is About this project wherever VS Code draws a file's name (Sprint 134, R8)
   assert.deepEqual(configurationDefaults['workbench.editor.customLabels.patterns'], { '*/AGENTS.md': 'About this project' });
 });

@@ -433,6 +433,7 @@ export class WordIndex {
     if (source.nameOnly !== undefined) result.nameOnly = source.nameOnly;
     if (source.size !== undefined) result.size = source.size;
     if (source.columns !== undefined) result.columns = source.columns;
+    if (source.colorSlot !== undefined) result.colorSlot = source.colorSlot;
     if (!textHit) return result;
 
     // The first passage with the most of the query's words.

@@ -254,6 +254,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private readonly _originListeners: Array<(origin: ChatOrigin) => void> = [];
   /** Sprint 134 (R4): a chat Home asked to open before the sidebar's page was ready. */
   private _pendingSelectConversation: string | null = null;
+  /** Sprint 148 (R8): the turn search asked to show in that chat, if any. */
+  private _pendingSelectTurnId: string | null = null;
   /**
    * Set once the CURRENT webview instance has signalled `sidebar/ready`.
    * `_view` existing only means a view object was created — its page may
@@ -653,8 +655,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           }
           if (this._pendingSelectConversation) {
             const conversationId = this._pendingSelectConversation;
+            const turnId = this._pendingSelectTurnId;
             this._pendingSelectConversation = null;
-            void webviewView.webview.postMessage({ type: 'conversation/select', conversationId });
+            this._pendingSelectTurnId = null;
+            void webviewView.webview.postMessage({ type: 'conversation/select', conversationId, ...(turnId ? { turnId } : {}) });
           }
           if (this._startingPlace) void webviewView.webview.postMessage({ type: 'starting-place', ...this._startingPlace });
           if (this._pendingChatStart) {
@@ -1964,14 +1968,21 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   /**
    * Home's Waiting for you (Sprint 134, R4): open a chat on the AI's sheet,
    * which reads it. Held until the sidebar's page is ready, like the landing.
+   * Search (Sprint 148, R8) passes the matching message's turn, which the sheet
+   * scrolls into view, and keeps the keyboard in its results.
    */
-  public async openConversation(conversationId: string): Promise<void> {
-    await vscode.commands.executeCommand('ritemark.unifiedView.focus');
+  public async openConversation(
+    conversationId: string,
+    reveal: { turnId?: string | null; preserveFocus?: boolean } = {},
+  ): Promise<void> {
+    await vscode.commands.executeCommand('ritemark.unifiedView.focus', ...(reveal.preserveFocus ? [{ preserveFocus: true }] : []));
+    const turnId = reveal.turnId ?? null;
     if (this._view && this._sidebarReady) {
-      void this._view.webview.postMessage({ type: 'conversation/select', conversationId });
+      void this._view.webview.postMessage({ type: 'conversation/select', conversationId, ...(turnId ? { turnId } : {}) });
       return;
     }
     this._pendingSelectConversation = conversationId;
+    this._pendingSelectTurnId = turnId;
   }
 
   /**

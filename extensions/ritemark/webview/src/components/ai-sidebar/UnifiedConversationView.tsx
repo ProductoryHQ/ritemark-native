@@ -18,6 +18,7 @@ import type {
   ConversationTranscriptBoundary,
 } from './conversationState';
 import { continuationPresentation } from './continuationPresentation';
+import { takeTurnReveal, useTurnRevealVersion } from './turnReveal';
 import { Icon } from '../ui/Icon';
 
 type MergedTurn =
@@ -128,6 +129,24 @@ export function UnifiedConversationView() {
     scrollToBottom,
   ]);
 
+  // Sprint 148 (R8): a chat opened from search shows the matching message's turn, once, after the scroll to the
+  // end above; the person's scroll is then kept, as if they had scrolled there.
+  const revealVersion = useTurnRevealVersion();
+  const turnIds = merged.map((item) => item.turn.id).join('\n');
+  useEffect(() => {
+    const turnId = takeTurnReveal(activeConversation.id, turnIds ? turnIds.split('\n') : []);
+    if (!turnId) return;
+    // A frame later, so it lands after this render's scroll to the end. Only the transcript scrolls, not the page.
+    requestAnimationFrame(() => {
+      const container = containerRef.current;
+      const anchor = container?.querySelector(`[data-turn-anchor="${CSS.escape(turnId)}"]`);
+      const turn = anchor?.nextElementSibling;
+      if (!container || !turn) return;
+      userScrolledRef.current = true;
+      container.scrollTo({ top: container.scrollTop + turn.getBoundingClientRect().top - container.getBoundingClientRect().top - 12 });
+    });
+  }, [revealVersion, activeConversation.id, turnIds]);
+
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -164,6 +183,8 @@ export function UnifiedConversationView() {
               || (!continuationNotice.turnId && index === merged.length - 1));
           return (
             <Fragment key={`${item.runtime}:${item.turn.id}`}>
+              {/* Sprint 148: where search's reveal finds this turn; hidden, so the list's spacing doesn't count it */}
+              <span hidden data-turn-anchor={item.turn.id} />
               {boundaries.map((boundary) => (
                 <TranscriptBoundary key={boundary.id} boundary={boundary} />
               ))}

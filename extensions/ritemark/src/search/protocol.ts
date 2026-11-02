@@ -25,6 +25,8 @@ export interface PassageLocation {
   eventId?: string;
   /** A chat's message: who said it, `you` or the AI's runtime id (`claude-code`, `codex`, `opencode`). */
   speaker?: string;
+  /** A chat's message: its turn, so the AI's sheet can open the chat with that message in view (R8, A5). */
+  turnId?: string;
   field?: 'doneWhen' | 'description';
   /** A Markdown comment's words: found, but not in the text a document's find bar searches (R9). */
   comment?: true;
@@ -73,6 +75,8 @@ export interface SearchResult {
   size?: number;
   /** A CSV's first row, so a matching row can show its column's name. */
   columns?: string[];
+  /** Chats only: the chat's colour on the rail and in All chats (its identity colour slot). */
+  colorSlot?: number;
   /** The first matching passage; null for a hit in the name alone. */
   passage: SearchPassage | null;
   /**
@@ -158,16 +162,67 @@ export interface MapEntry {
 
 // ── Host ↔ results view (PR 2 draws the view) ───────────────────────────────
 
+/** What the view needs once: the project's name for its lines, its folders for a row's tooltip, the options. */
+export interface SearchViewSetup {
+  projectName: string;
+  /** The project's folders, so a document's tooltip can say where it is inside the project. */
+  roots: string[];
+  options: SearchOptions;
+}
+
 export type SearchHostToViewMessage =
-  | ({ type: 'search/results' } & SearchAnswer)
+  | { type: 'search/setup'; setup: SearchViewSetup }
+  /**
+   * The words layer's answer, drawn at once (R10). `queryId` is the panel's own, increasing across worker
+   * restarts, so the view drops an older query's answer. `expanded` is the kind opened whole: by Show all, or
+   * (`auto`) because it is the only kind with results (the Experience lead, question 5).
+   */
+  | ({ type: 'search/results'; expanded: { kind: SearchKind; auto: boolean } | null } & SearchAnswer)
   | { type: 'search/status'; status: IndexStatus }
   | { type: 'search/focus-first' };
 
 export type SearchViewToHostMessage =
+  | { type: 'search/ready' }
   | { type: 'search/open'; key: string }
   | { type: 'search/options'; matchCase: boolean; wholeWords: boolean; kinds: SearchKind[] }
+  /** Show all of a kind. */
   | { type: 'search/more'; kind: SearchKind }
-  | { type: 'search/back-to-box' };
+  /** Show fewer: back to the first rows of each kind. */
+  | { type: 'search/fewer' }
+  | { type: 'search/back-to-box' }
+  /** The view drew this answer (M2: a key to results drawn). Carries the query's id only. */
+  | { type: 'search/painted'; queryId: number };
+
+const MAX_KEY_CHARS = 4096;
+
+function isKind(value: unknown): value is SearchKind {
+  return value === 'document' || value === 'chat' || value === 'task';
+}
+
+/** The host reads every message from the view through this: anything else is dropped. */
+export function decodeSearchViewMessage(raw: unknown): SearchViewToHostMessage | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const message = raw as Record<string, unknown>;
+  switch (message.type) {
+    case 'search/ready':
+    case 'search/fewer':
+    case 'search/back-to-box':
+      return { type: message.type };
+    case 'search/open':
+      return typeof message.key === 'string' && message.key.length > 0 && message.key.length <= MAX_KEY_CHARS ? { type: 'search/open', key: message.key } : null;
+    case 'search/options': {
+      if (typeof message.matchCase !== 'boolean' || typeof message.wholeWords !== 'boolean' || !Array.isArray(message.kinds)) return null;
+      const kinds = SEARCH_KINDS.filter((kind) => (message.kinds as unknown[]).includes(kind));
+      return { type: 'search/options', matchCase: message.matchCase, wholeWords: message.wholeWords, kinds };
+    }
+    case 'search/more':
+      return isKind(message.kind) ? { type: 'search/more', kind: message.kind } : null;
+    case 'search/painted':
+      return typeof message.queryId === 'number' && Number.isSafeInteger(message.queryId) ? { type: 'search/painted', queryId: message.queryId } : null;
+    default:
+      return null;
+  }
+}
 
 // ── Host ↔ worker ───────────────────────────────────────────────────────────
 
@@ -186,6 +241,7 @@ export interface IndexSource {
   nameOnly?: NameOnlyReason;
   size?: number;
   columns?: string[];
+  colorSlot?: number;
 }
 
 export interface SearchLimits {
