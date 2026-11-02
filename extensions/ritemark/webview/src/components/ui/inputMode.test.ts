@@ -175,4 +175,14 @@ for (const file of files) {
 }
 assert.deepEqual(ungated, [], `every hand-written ring carries the keyboard mode's prefix:\n${ungated.join('\n')}`)
 
+// ── #635: one keyboard ring for every control, a 2 px line with a 2 px gap in one colour per theme ──
+const css = readFileSync(join(SRC, 'index.css'), 'utf8')
+assert.match(css, /:where\(:root:not\(\[data-input-mode="pointer"\]\)\) \.rm-focus-ring:focus-visible \{ outline: 2px solid var\(--r-focus-ring\); outline-offset: 2px; \}/, 'the shared ring: keyboard only, 2 px line, 2 px gap')
+assert.deepEqual([...css.matchAll(/--r-focus-ring: (#[0-9a-f]{6});/g)].map((m) => m[1]), ['#4338ca', '#818cf8'], "Light's indigo, then Dark's")
+for (const file of ['button.tsx', 'dialog.tsx', 'tabs.tsx', 'filter-chip.tsx', 'slider.tsx', 'switch.tsx', 'select.tsx']) {
+  const text = readFileSync(join(SRC, 'components', 'ui', file), 'utf8')
+  assert.match(text, /\brm-focus-ring\b/, `${file}: the shared ring`)
+  assert.doesNotMatch(text, /focus-visible:ring-/, `${file}: no soft halo on keyboard focus`)
+}
+
 console.log('inputMode.test.ts: all assertions passed')

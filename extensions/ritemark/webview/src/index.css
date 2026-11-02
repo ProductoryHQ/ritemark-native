@@ -10,6 +10,11 @@
   outline: none;
 }
 
+/* #635 (Sprint 146): the keyboard focus ring. A 2 px indigo line with a 2 px gap of the surface, so it never has to
+   contrast with the control's own fill: 3:1 or more against the ground, the AI's sheet and the desk in both themes
+   (WCAG 2.2, 1.4.11). Keyboard only. Every control's ring is this one class; a field keeps its border change. */
+:where(:root:not([data-input-mode="pointer"])) .rm-focus-ring:focus-visible { outline: 2px solid var(--r-focus-ring); outline-offset: 2px; }
+
 /* Everything clickable shows the pointing hand — Tailwind's preflight leaves
    buttons at `cursor: default`. `:where()` keeps this at zero specificity, so
    any class (`cursor-not-allowed` on a refused action, `cursor-text`, …) and
@@ -165,6 +170,8 @@
   --r-conversation-22: #8b5cf6;
   --r-conversation-23: #d946ef;
   --r-ring-color: var(--ritemark-ring-color);
+  /* #635: the keyboard focus ring, a line of its own (the rule under the pointer-mode one at the top) */
+  --r-focus-ring: #4338ca;
 
   --background: var(--r-surface);
   --foreground: var(--r-ink-strong);
@@ -241,6 +248,7 @@ body[data-vscode-theme-kind='vscode-dark'],
   --r-conversation-22: #c4b5fd;
   --r-conversation-23: #f0abfc;
   --r-ring-color: var(--ritemark-ring-color-dark);
+  --r-focus-ring: #818cf8;
 
   /* F1 (Sprint 130): a custom property is resolved where it is declared, so the
      shadcn role tokens on :root kept their light values in dark mode
@@ -296,7 +304,7 @@ body[data-vscode-theme-kind='vscode-dark'],
 .rm-split .rm-split-part:disabled { opacity: 1; }
 .rm-split .rm-split-main { min-width: 0; max-width: 100%; border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .rm-split .rm-split-more { flex: none; border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 8px; padding-right: 8px; }
-:where(:root:not([data-input-mode="pointer"])) .rm-split .rm-split-part:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--r-accent); outline-offset: 1px; }
+:where(:root:not([data-input-mode="pointer"])) .rm-split .rm-split-part:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--r-focus-ring); outline-offset: 2px; }
 .rm-split:not([data-disabled]):has(.rm-split-part:active) { transform: scale(0.98); }
 .rm-split[data-disabled] { opacity: 0.5; }
 .rm-split[data-disabled] .rm-split-part { cursor: default; }
@@ -415,7 +423,7 @@ body {
   border-width: 0 0 1.5px 1.5px;
   transform: translateY(-1px) rotate(-45deg);
 }
-:where(:root:not([data-input-mode="pointer"])) .rm-check:focus-visible { outline: 2px solid var(--r-ring-color); outline-offset: 2px; }
+:where(:root:not([data-input-mode="pointer"])) .rm-check:focus-visible { outline: 2px solid var(--r-focus-ring); outline-offset: 2px; }
 
 /* TipTap ProseMirror styles - will be expanded in Task 2 */
 .ProseMirror {
