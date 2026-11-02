@@ -143,7 +143,7 @@ export function SearchPanelView({
   const [focused, setFocused] = useState<number | null>(null)
   const [drawn, setDrawn] = useState(ROWS_AT_A_TIME)
   const column = useRef<HTMLElement>(null)
-  const sentinel = useRef<HTMLDivElement>(null)
+  const observer = useRef<IntersectionObserver | null>(null)
   const { answer, status, options, setup } = state
   const projectName = setup?.projectName ?? ''
   const roots = setup?.roots ?? []
@@ -152,16 +152,17 @@ export function SearchPanelView({
   // A kind opened whole starts at its first rows again
   useEffect(() => setDrawn(ROWS_AT_A_TIME), [expandedKind])
 
-  // ... and draws more as the list scrolls (question 5)
-  useEffect(() => {
-    const target = sentinel.current
-    if (!target || typeof IntersectionObserver === 'undefined') return
-    const observer = new IntersectionObserver((entries) => {
+  // ... and draws more as the list scrolls (question 5). The marker under the drawn rows is a new element for each
+  // count drawn (its key), so it is watched once when it comes and let go when it goes, never on other renders.
+  const sentinel = useCallback((node: HTMLDivElement | null) => {
+    observer.current?.disconnect()
+    observer.current = null
+    if (!node || typeof IntersectionObserver === 'undefined') return
+    observer.current = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) setDrawn((count) => count + ROWS_AT_A_TIME)
     })
-    observer.observe(target)
-    return () => observer.disconnect()
-  })
+    observer.current.observe(node)
+  }, [])
 
   const items = () => Array.from(column.current?.querySelectorAll<HTMLElement>('[data-rs-item]') ?? [])
 
@@ -263,7 +264,7 @@ export function SearchPanelView({
                 const chosen = focused === null ? index === firstResult : focused === index
                 return <ResultRow key={result.key} result={result} item={index} chosen={chosen} now={now} roots={roots} />
               })}
-              {whole && rows.length < group.rows.length && <div ref={sentinel} aria-hidden="true" />}
+              {whole && rows.length < group.rows.length && <div key={`more-${drawn}`} ref={sentinel} aria-hidden="true" />}
               {group.show && (() => {
                 const index = item++
                 const show = group.show

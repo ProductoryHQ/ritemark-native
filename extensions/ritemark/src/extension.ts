@@ -495,7 +495,7 @@ export function activate(context: vscode.ExtensionContext) {
     opens: {
       openConversation: (conversationId, reveal) => unifiedViewProvider.openConversation(conversationId, reveal),
       openCard: async (cardId) => {
-        if (isEnabled('task-board')) await taskBoard?.cardPages?.open({ cardId });
+        if (isEnabled('task-board')) await taskBoard?.cardPages?.open({ cardId, preserveFocus: true });
       },
     },
   });

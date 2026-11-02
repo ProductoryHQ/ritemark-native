@@ -29,7 +29,7 @@ const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
 const { SearchPanelView } = await import('./SearchPanel')
 const model = await import('./searchModel')
-const { takeTurnReveal, requestTurnReveal } = await import('../ai-sidebar/turnReveal')
+const { takeTurnReveal, requestTurnReveal, TURN_REVEAL_WAIT_MS } = await import('../ai-sidebar/turnReveal')
 
 let failures = 0
 function test(name: string, run: () => void): void {
@@ -250,6 +250,10 @@ test('the AI sheet shows a chat\'s turn once, only in that chat, and a later sel
   requestTurnReveal('c1', 't2')
   requestTurnReveal('c1', null)
   assert.equal(takeTurnReveal('c1', ['t2']), null, 'a select without a turn clears it')
+  // A turn never drawn lapses: it can't scroll the chat when the person comes back to it later (the review of #636)
+  requestTurnReveal('c1', 't9', 1_000)
+  assert.equal(takeTurnReveal('c1', ['t1'], 2_000), null)
+  assert.equal(takeTurnReveal('c1', ['t1', 't9'], 1_000 + TURN_REVEAL_WAIT_MS + 1), null)
 })
 
 if (failures) {

@@ -8,7 +8,7 @@
  */
 import assert from 'node:assert/strict';
 import { decodeSearchViewMessage, type IndexStatus, type SearchAnswer, type SearchGroup, type SearchHostToViewMessage, type SearchKind, type SearchOptions, type SearchResult } from './protocol';
-import { PER_KIND, REFRESH_MS, SearchPanelController, searchRowAction } from './searchPanel';
+import { PER_KIND, REFRESH_MS, SearchPanelController, searchRowAction, searchRowNeedsShell } from './searchPanel';
 
 let failures = 0;
 async function test(name: string, run: () => void | Promise<void>): Promise<void> {
@@ -235,6 +235,78 @@ async function main() {
     assert.equal(stats.keyToPaint!.max, 30);
     assert.equal(stats.firstPaintMs, 12);
     assert.deepEqual(stats.lastPaint, { at: 1042, total: 1 });
+  });
+
+  // ── The review of #636 ──
+
+  await test('Enter right after a key opens the top row of that key\'s answer, not the one before', async () => {
+    let release: (a: SearchAnswer) => void = () => undefined;
+    const h = harness((call) => {
+      if (call.text === 'report') return new Promise<SearchAnswer>((resolve) => { release = resolve; });
+      return answer([group('document', 1)]);
+    });
+    await h.panel.setText('repor');
+    const typing = h.panel.setText('report');
+    const enter = h.panel.key('enter');
+    await flush();
+    assert.equal(h.opened.length, 0, 'waits for the new words\' answer');
+    release(answer([{ kind: 'chat', total: 1, results: [result('chat', 7)] }]));
+    await typing;
+    await enter;
+    assert.deepEqual(h.opened.map((r) => r.key), ['chat:7']);
+  });
+
+  await test('a refresh of a kind shown whole asks for it whole: the list never shrinks to 5 and back', async () => {
+    const h = harness((call) => answer([group('document', 23, call.expand === 'document' ? 23 : 5)], { reading: { done: 1, total: 9 } }));
+    await h.panel.setText('brief');
+    const before = h.results().length;
+    h.panel.onStatus(READING);
+    await flush();
+    const refreshed = h.results().slice(before);
+    assert.deepEqual(refreshed.map((m) => m.groups[0].results.length), [23], 'one answer, whole');
+    assert.equal(h.calls.at(-1)!.expand, 'document');
+  });
+
+  await test('the words and keys never wait on the shell\'s answer; nothing and ⌘⇧F do', () => {
+    assert.equal(searchRowNeedsShell({ text: 'r' }), false);
+    assert.equal(searchRowNeedsShell({ text: '' }), false);
+    assert.equal(searchRowNeedsShell({ key: 'down' }), false);
+    assert.equal(searchRowNeedsShell({ key: 'enter' }), false);
+    assert.equal(searchRowNeedsShell(undefined), true);
+    assert.equal(searchRowNeedsShell({ via: 'key' }), true);
+  });
+
+  await test('the kill switch turned off clears the view, and Enter opens nothing', async () => {
+    const h = harness(() => answer([group('document', 2)]));
+    await h.panel.setText('brief');
+    h.panel.clear();
+    const last = h.results().at(-1)!;
+    assert.equal(last.tooShort, true);
+    assert.deepEqual(last.groups, []);
+    await h.panel.key('enter');
+    await h.panel.onViewMessage({ type: 'search/open', key: 'document:0' });
+    assert.equal(h.opened.length, 0);
+    h.panel.onStatus(READING);
+    await flush();
+    assert.equal(h.calls.length, 1, 'nothing runs again');
+  });
+
+  await test('the project\'s folders changing sends the view its name and folders again', () => {
+    const h = harness(() => null);
+    h.panel.refreshSetup();
+    assert.equal(h.posted.at(-1)!.type, 'search/setup');
+  });
+
+  await test('↓ while the view loads: its first rows take the keyboard once it is ready', async () => {
+    const h = harness(() => answer([group('document', 1)]));
+    await h.panel.setText('brief');
+    await h.panel.key('down');
+    h.posted.length = 0;
+    await h.panel.onViewMessage({ type: 'search/ready' });
+    assert.equal(h.posted.at(-1)!.type, 'search/focus-first');
+    h.posted.length = 0;
+    await h.panel.onViewMessage({ type: 'search/ready' });
+    assert.ok(!h.posted.some((m) => m.type === 'search/focus-first'), 'once');
   });
 
   if (failures) {

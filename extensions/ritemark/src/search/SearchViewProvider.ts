@@ -10,6 +10,7 @@
  */
 import { createHash } from 'node:crypto';
 import * as vscode from 'vscode';
+import { versionedWebviewAssetUri } from '../views/webviewAssetUri';
 import { decodeSearchViewMessage, type SearchHostToViewMessage, type SearchViewToHostMessage } from './protocol';
 
 export class SearchViewProvider implements vscode.WebviewViewProvider {
@@ -47,7 +48,10 @@ export class SearchViewProvider implements vscode.WebviewViewProvider {
 
 function searchHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
   const nonce = createHash('sha256').update(`${Math.random()}${Date.now()}`).digest('hex').slice(0, 32);
-  const script = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'webview.js'));
+  // Versioned by the bundle's change time, as the AI sheet's and the editor's are, so an extension update's bundle
+  // isn't served from the webview's cache (the review of #636)
+  const scriptPath = vscode.Uri.joinPath(extensionUri, 'media', 'webview.js');
+  const script = versionedWebviewAssetUri(webview.asWebviewUri(scriptPath).toString(), scriptPath.fsPath);
   // The results scroll on the ground, as the other left-column lists do (index.css, html.rm-ground)
   return `<!DOCTYPE html>
 <html lang="en" class="rm-ground">

@@ -50,6 +50,15 @@ export type SearchRowAction =
  * argument (E3). `{ text }` runs the words; `{ key: 'down' }` moves into the results; `{ key: 'enter' }` opens the
  * chosen (top) row. Nothing, or ⌘⇧F's `{ via: 'key' }`: the box when the shell has one, else VS Code's search, as 2.1.
  */
+/**
+ * Whether the row's action depends on the shell having the box: only with no words and no key. The words and keys are
+ * handled without asking, so keys reach the panel in the order typed (the review of #636).
+ */
+export function searchRowNeedsShell(arg: unknown): boolean {
+  const value = arg && typeof arg === 'object' ? (arg as Record<string, unknown>) : {};
+  return typeof value.text !== 'string' && value.key !== 'down' && value.key !== 'enter';
+}
+
 export function searchRowAction(arg: unknown, state: { enabled: boolean; shellHasBox: boolean }): SearchRowAction {
   const value = arg && typeof arg === 'object' ? (arg as Record<string, unknown>) : {};
   const byKey = value.via === 'key';
@@ -97,6 +106,9 @@ function percentile(sorted: number[], p: number): number {
 
 const round = (value: number) => Math.round(value * 10) / 10;
 
+/** ↓ in the box while the view is still loading: its first rows take the keyboard once it says it is ready. */
+const FOCUS_FIRST_WAIT_MS = 3000;
+
 /** The groups a person sees: the kinds More leaves on. */
 export function visibleGroups(answer: Pick<SearchAnswer, 'groups'>, kinds: readonly SearchKind[]) {
   return answer.groups.filter((group) => kinds.includes(group.kind) && group.total > 0);
@@ -109,6 +121,11 @@ export class SearchPanelController {
   private generation = 0;
   private seq = 0;
   private shown: ResultsMessage | null = null;
+  /** The words `shown` answers. */
+  private shownText: string | null = null;
+  /** The run the newest words started: Enter waits for it. */
+  private latest: Promise<void> = Promise.resolve();
+  private focusFirstAt: number | null = null;
   private status: IndexStatus | null = null;
   private byKey = new Map<string, SearchResult>();
   /** seq → when the words of that answer arrived (keys only, not refreshes). */
@@ -133,7 +150,22 @@ export class SearchPanelController {
     this.generation++;
     const at = this.deps.now();
     if (this.text.trim().length > 0) this.firstKeyAt ??= at;
-    return this.run(at);
+    this.latest = this.run(at);
+    return this.latest;
+  }
+
+  /** The kill switch turned off: nothing shows, and Enter opens nothing, until new words come. */
+  clear(): void {
+    this.text = '';
+    this.expanded = null;
+    this.generation++;
+    this.byKey = new Map();
+    this.show({ queryId: 0, layer: 'words', tooShort: true, groups: [], reading: null, limited: false, tooLarge: 0, tookMs: 0 }, null, null, '');
+  }
+
+  /** The project's folders changed: the view's name and folders again. */
+  refreshSetup(): void {
+    this.deps.post({ type: 'search/setup', setup: { ...this.deps.setup(), options: this.options } });
   }
 
   private queryOptions(): SearchOptions {
@@ -145,28 +177,33 @@ export class SearchPanelController {
     const generation = this.generation;
     const text = this.text;
     const options = this.queryOptions();
-    const answer = await this.deps.query(text, options, PER_KIND, this.expanded ?? undefined);
+    // A refresh of a kind shown whole asks for it whole at once, so the open list never shrinks to its first rows
+    // and grows back (the review of #636).
+    const shownWhole = keyAt === null && this.shown?.expanded?.auto ? this.shown.expanded.kind : undefined;
+    const expand = this.expanded ?? shownWhole;
+    const answer = await this.deps.query(text, options, PER_KIND, expand);
     if (!answer || generation !== this.generation) return;
     if (this.expanded) {
-      this.show(answer, { kind: this.expanded, auto: false }, keyAt);
+      this.show(answer, { kind: this.expanded, auto: false }, keyAt, text);
       return;
     }
-    // One kind only: all of it at once (the Experience lead, question 5). Its first rows are drawn at once, and the
-    // rest follow from a second question, so the key's results don't wait for a long list.
+    // One kind only: all of it at once (the Experience lead, question 5). For a key, its first rows are drawn at
+    // once and the rest follow from a second question, so the key's results don't wait for a long list.
     const visible = answer.tooShort ? [] : visibleGroups(answer, this.options.kinds);
     if (visible.length !== 1) {
-      this.show(answer, null, keyAt);
+      this.show(answer, null, keyAt, text);
       return;
     }
     const only = visible[0];
-    this.show(answer, { kind: only.kind, auto: true }, keyAt);
-    if (only.total <= only.results.length) return;
+    this.show(answer, { kind: only.kind, auto: true }, keyAt, text);
+    if (only.kind === expand || only.total <= only.results.length) return;
     const whole = await this.deps.query(text, options, PER_KIND, only.kind);
     if (!whole || generation !== this.generation) return;
-    this.show(whole, { kind: only.kind, auto: true }, null);
+    this.show(whole, { kind: only.kind, auto: true }, null, text);
   }
 
-  private show(answer: SearchAnswer, expanded: ResultsMessage['expanded'], keyAt: number | null): void {
+  private show(answer: SearchAnswer, expanded: ResultsMessage['expanded'], keyAt: number | null, text: string): void {
+    this.shownText = text;
     const seq = ++this.seq;
     if (keyAt !== null) {
       this.typedAt.set(seq, keyAt);
@@ -205,9 +242,9 @@ export class SearchPanelController {
     if (status.state !== 'unavailable') this.refresh();
   }
 
-  /** The first visible row: what Enter in the box opens (the Experience lead, question 6). */
+  /** The first visible row of the answer to the box's words: what Enter in the box opens (the Experience lead, question 6). */
   topResult(): SearchResult | null {
-    if (!this.shown || this.shown.tooShort) return null;
+    if (!this.shown || this.shown.tooShort || this.shownText !== this.text) return null;
     for (const group of visibleGroups(this.shown, this.options.kinds)) {
       if (group.results[0]) return group.results[0];
     }
@@ -216,10 +253,17 @@ export class SearchPanelController {
 
   async key(key: 'down' | 'enter'): Promise<void> {
     if (key === 'enter') {
+      // Enter right after a key waits for that key's answer, so it never opens a row of the words before it
+      let run: Promise<void>;
+      do {
+        run = this.latest;
+        await run;
+      } while (run !== this.latest);
       const top = this.topResult();
       if (top) await this.deps.open(top);
       return;
     }
+    this.focusFirstAt = this.deps.now();
     await this.deps.focusResults();
     this.deps.post({ type: 'search/focus-first' });
   }
@@ -227,10 +271,12 @@ export class SearchPanelController {
   async onViewMessage(message: SearchViewToHostMessage): Promise<void> {
     switch (message.type) {
       case 'search/ready':
-        // The view (re)loaded: everything it shows comes again.
-        this.deps.post({ type: 'search/setup', setup: { ...this.deps.setup(), options: this.options } });
+        // The view (re)loaded: everything it shows comes again, and a ↓ that came while it loaded
+        this.refreshSetup();
         if (this.status) this.deps.post({ type: 'search/status', status: this.status });
         if (this.shown) this.deps.post(this.shown);
+        if (this.focusFirstAt !== null && this.deps.now() - this.focusFirstAt < FOCUS_FIRST_WAIT_MS) this.deps.post({ type: 'search/focus-first' });
+        this.focusFirstAt = null;
         return;
       case 'search/open': {
         const result = this.byKey.get(message.key);

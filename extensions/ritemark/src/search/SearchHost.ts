@@ -39,7 +39,7 @@ import {
   type WorkerConfig,
 } from './protocol';
 import { enabledPatterns, mergeEvents, type FsEvent } from './hostEvents';
-import { SearchPanelController, searchRowAction } from './searchPanel';
+import { SearchPanelController, searchRowAction, searchRowNeedsShell } from './searchPanel';
 import { SearchViewProvider } from './SearchViewProvider';
 import { SearchWorkerClient, type WorkerLike } from './searchWorkerClient';
 import { taskSources } from './sources/tasks';
@@ -277,7 +277,7 @@ export class SearchHost implements vscode.Disposable {
 export interface SearchOpenDependencies {
   /** A chat on the AI's sheet, with the matching message's turn in view when given (A5). */
   openConversation(conversationId: string, reveal: { turnId: string | null; preserveFocus: boolean }): Promise<void>;
-  /** A task as its card's page. */
+  /** A task as its card's page, with the keyboard kept in the results. */
   openCard(cardId: string): Promise<void>;
 }
 
@@ -350,7 +350,8 @@ export function registerProjectSearch(deps: SearchHostDependencies & { opens: Se
   updateContextKey();
 
   const runSearchRow = async (arg?: unknown): Promise<unknown> => {
-    const action = searchRowAction(arg, { enabled: host.enabled, shellHasBox: await shellHasBox() });
+    // The words and keys never wait on the shell's answer, so they reach the panel in the order typed
+    const action = searchRowAction(arg, { enabled: host.enabled, shellHasBox: searchRowNeedsShell(arg) ? await shellHasBox() : false });
     switch (action.kind) {
       case 'vscode-search':
         return vscode.commands.executeCommand(action.command);
@@ -371,9 +372,15 @@ export function registerProjectSearch(deps: SearchHostDependencies & { opens: Se
     vscode.window.registerWebviewViewProvider(SearchViewProvider.viewType, view, { webviewOptions: { retainContextWhenHidden: true } }),
     host.onStatus((status) => panel.onStatus(status)),
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration('ritemark.features.project-search')) updateContextKey();
+      if (!event.affectsConfiguration('ritemark.features.project-search')) return;
+      updateContextKey();
+      // Off: the index stops (SearchHost), and the view keeps no rows to click (the review of #636)
+      if (!host.enabled) panel.clear();
     }),
-    vscode.workspace.onDidChangeWorkspaceFolders(() => updateContextKey()),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      updateContextKey();
+      panel.refreshSetup();
+    }),
     vscode.commands.registerCommand(
       '_ritemark.search.query',
       (args?: { text?: string; options?: Partial<SearchOptions>; perKind?: number; expand?: SearchKind }) =>
