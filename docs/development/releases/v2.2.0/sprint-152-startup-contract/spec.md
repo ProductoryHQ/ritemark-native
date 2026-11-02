@@ -221,11 +221,11 @@ Acceptance criteria:
 - `scripts/qa/project-check.mjs --first-frame` samples every 50 ms from the new window's first moment (as `--measure`
   does) the boxes of the left column, the desk, the AI column, the status bar, VS Code's side places bar, the places
   row's items, the head's rows and the tab row's first tabs, and what is in front (the desk's tab, the left column's
-  place). **PASS** when every box in the first laid-out sample (after `code/didRemovePartsSplash`) equals its box once
-  the window has settled (Ritemark started at least 5 s before, so its start's late moves are inside the run, such as
-  the AI column's second call 4 s after activation in builds before R6, then 2 s with no change), and what is in front
-  never changed. A box is the
-  room an element takes, so a hidden row keeping its room keeps its box. Content inside a box may change. The exit code
+  place). **PASS** when every box keeps the place it had in the first laid-out sample (after
+  `code/didRemovePartsSplash`) in every sample until the window has settled (Ritemark started at least 5 s before, so
+  its start's late moves are inside the run, such as the AI column's second call 4 s after activation in builds before
+  R6, then 2 s with no change), and what is in front never changed. A box that shifts and comes back has moved
+  (Codex's review of #632). A box is the room an element takes, so a hidden row keeping its room keeps its box. Content inside a box may change. The exit code
   is the number of failures, as today.
 - It runs the four starts with the extension host held and let go, and prints, per start, each box that moved, by how
   much and when. A fifth, `relaunch --ai-closed`, is R6's.
