@@ -164,6 +164,22 @@ the fill doesn't stop at the slider, which comes and goes, so a row's end never 
 and the pane view's split view's (.monaco-pane-view > .monaco-split-view2, as upstream's list.css names it); any other,
 such as the commit message's box, keeps the theme's.
 
+Sprint 152 (the startup contract, R1, R2, R4, R9, #623): what 018 draws reads 002's manifest (ritemarkFrame.ts): the
+head's places, rows and labels (ritemarkProjectHead.ts; a row whose command an older extension lacks is released once
+the extensions are read, logged), the desk's front a switch lands on (ritemarkSwitchGuard.ts), the welcome's view type
+(ritemarkWelcomeAlone.ts). The place a window restores is drawn from the first frame: checked in the places row
+(paneCompositeBar.ts) and by the head, before its extension registers it; another place opening first releases it. A
+new profile's places row gets the manifest's places as placeholders before it is made (sidebarPart.ts, R9). The AI
+column stays open in a project window while VS Code's own containers move out of a new profile's column, before
+Ritemark AI has registered (auxiliaryBarPart.ts). A project's first window has Home's and the Task board's tabs on its
+desk from its first frame, as a restore brings them back (editorPart.ts, R3). The welcome's window is the welcome alone
+from its first frame and its slot goes when another editor comes in front, when Ritemark isn't there or failed to
+start, or after 60 s (ritemarkWelcomeAlone.ts, R4). A terminal tab's icon keeps its room before the icons' glyphs are
+written (ritemarkSurfaces.css). #623: the switch guard passes the extension the shutdown attempt's number with its
+question and answers _ritemark.projects.reloadGoesOn, so a "Switch and stop" answered after another participant has
+stopped the reload stops no chats; the question can't be asked last (VS Code's one final veto is the unsaved files').
+Tests: workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts (R4) and ritemarkSwitchGuard.test.ts (#623).
+
 Files: base/browser/ui/iconLabel/iconLabel.ts; base/browser/ui/menu/{menu,menubar}.ts; platform/quickinput/browser/quickInputList.ts and
 tree/{quickInputDelegate,quickInputTreeController}.ts; platform/theme/browser/defaultStyles.ts;
 platform/window/common/window.ts; platform/windows/electron-main/windowImpl.ts; workbench/browser/{layout,style}.ts;
@@ -841,10 +857,10 @@ index d81722d63af..8a11889fd80 100644
  		this._onDidRender.fire();
  
 diff --git a/src/vs/workbench/browser/layout.ts b/src/vs/workbench/browser/layout.ts
-index 79add6fa2a9..ed88fcd86de 100644
+index 387bbc2..f6707e1 100644
 --- a/src/vs/workbench/browser/layout.ts
 +++ b/src/vs/workbench/browser/layout.ts
-@@ -151,6 +151,12 @@ export const TITLE_BAR_SETTINGS = [
+@@ -152,6 +152,12 @@ export const TITLE_BAR_SETTINGS = [
  ];
  
  const DEFAULT_EMPTY_WINDOW_DIMENSIONS = new Dimension(DEFAULT_EMPTY_WINDOW_SIZE.width, DEFAULT_EMPTY_WINDOW_SIZE.height);
@@ -857,7 +873,7 @@ index 79add6fa2a9..ed88fcd86de 100644
  const DEFAULT_WORKSPACE_WINDOW_DIMENSIONS = new Dimension(DEFAULT_WORKSPACE_WINDOW_SIZE.width, DEFAULT_WORKSPACE_WINDOW_SIZE.height);
  
  export abstract class Layout extends Disposable implements IWorkbenchLayoutService {
-@@ -3039,9 +3045,9 @@ class LayoutStateModel extends Disposable {
+@@ -3070,9 +3076,9 @@ class LayoutStateModel extends Disposable {
  		const auxiliaryBarForceMaximized = this.configurationService.getValue(WorkbenchLayoutSettings.AUXILIARYBAR_FORCE_MAXIMIZED);
  		const workbenchState = this.contextService.getWorkbenchState();
  		const mainContainerDimension = configuration.mainContainerDimension;
@@ -869,7 +885,7 @@ index 79add6fa2a9..ed88fcd86de 100644
  		LayoutStateKeys.AUXILIARYBAR_HIDDEN.defaultValue = (() => {
  			if (isWeb && !this.environmentService.remoteAuthority) {
  				return true; // not required in web if unsupported
-@@ -3141,8 +3147,8 @@ class LayoutStateModel extends Disposable {
+@@ -3172,8 +3178,8 @@ class LayoutStateModel extends Disposable {
  
  		// Restrict auxiliary bar size in case of small window dimensions
  		if (this.isNew[StorageScope.WORKSPACE] && configuration.mainContainerDimension.width <= DEFAULT_WORKSPACE_WINDOW_DIMENSIONS.width) {
@@ -882,10 +898,10 @@ index 79add6fa2a9..ed88fcd86de 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..cdf3c2c1030
+index 00000000000..c0df26af571
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,1972 @@
+@@ -0,0 +1,1980 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2315,6 +2331,14 @@ index 00000000000..cdf3c2c1030
 +}
 +
 +
++/* Sprint 152 (A1): a terminal tab's icon keeps its room from the first frame. The icons' glyphs are written a moment
++   after the first layout (workbenchThemeService.ts schedules the codicon style sheet), and until then the icon drew
++   nothing, so a restored terminal's tab grew by its icon's 22 px about 50 ms in. This empty icon is replaced by the
++   glyph's own rule (the same weight, later in the cascade) as soon as it is there. */
++.terminal-tab::before {
++	content: '';
++}
++
 +/* A terminal tab (R8; comparison/after-terminal.png, files.html): its bar (ritemarkTerminalBar.ts; RITEMARK_TERMINAL_BAR_HEIGHT,
 +   52: the document bar's 28 at 12, then the terminal under a hairline) and, behind other tabs, the chat rail's working dot
 +   on its tab while a command runs (terminalEditorInput.ts) */
@@ -2859,10 +2883,10 @@ index 00000000000..cdf3c2c1030
 +	color: var(--rm-body);
 +}
 diff --git a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
-index 168ae722004..37f11376eb1 100644
+index c165d26..78f8b4a 100644
 --- a/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
 +++ b/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts
-@@ -15,9 +15,9 @@ import { contrastBorder } from '../../../../platform/theme/common/colorRegistry.
+@@ -16,9 +16,9 @@ import { contrastBorder } from '../../../../platform/theme/common/colorRegistry.
  import { IThemeService } from '../../../../platform/theme/common/themeService.js';
  import { ActiveAuxiliaryContext, AuxiliaryBarFocusContext } from '../../../common/contextkeys.js';
  import { ACTIVITY_BAR_BADGE_BACKGROUND, ACTIVITY_BAR_BADGE_FOREGROUND, ACTIVITY_BAR_TOP_ACTIVE_BORDER, ACTIVITY_BAR_TOP_DRAG_AND_DROP_BORDER, ACTIVITY_BAR_TOP_FOREGROUND, ACTIVITY_BAR_TOP_INACTIVE_FOREGROUND, PANEL_ACTIVE_TITLE_BORDER, PANEL_ACTIVE_TITLE_FOREGROUND, PANEL_DRAG_AND_DROP_BORDER, PANEL_INACTIVE_TITLE_FOREGROUND, SIDE_BAR_BACKGROUND, SIDE_BAR_BORDER, SIDE_BAR_TITLE_BORDER, SIDE_BAR_FOREGROUND } from '../../../common/theme.js';
@@ -2874,7 +2898,7 @@ index 168ae722004..37f11376eb1 100644
  import { HoverPosition } from '../../../../base/browser/ui/hover/hoverWidget.js';
  import { IAction, Separator, SubmenuAction, toAction } from '../../../../base/common/actions.js';
  import { ToggleAuxiliaryBarAction } from './auxiliaryBarActions.js';
-@@ -35,6 +35,13 @@ import { IHoverService } from '../../../../platform/hover/browser/hover.js';
+@@ -36,6 +36,14 @@ import { IHoverService } from '../../../../platform/hover/browser/hover.js';
  import { VisibleViewContainersTracker } from '../visibleViewContainersTracker.js';
  import { Extensions } from '../../panecomposite.js';
  import { IToolBarResponsiveBehaviorOptions } from '../../../../base/browser/ui/toolbar/toolbar.js';
@@ -2885,10 +2909,11 @@ index 168ae722004..37f11376eb1 100644
 +import { RITEMARK_FRAME_WITHOUT_TITLE_ROW } from '../../../../platform/window/common/window.js';
 +import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 +import { createRitemarkFrameStrip, trackRitemarkZoom } from '../ritemarkFrameStrip.js';
++import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
  
  interface IAuxiliaryBarPartConfiguration {
  	position: ActivityBarPosition;
-@@ -85,7 +92,7 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+@@ -86,7 +94,7 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
  	static readonly viewContainersWorkspaceStateKey = 'workbench.auxiliarybar.viewContainersWorkspaceState';
  
  	// Use the side bar dimensions
@@ -2897,7 +2922,7 @@ index 168ae722004..37f11376eb1 100644
  	override readonly maximumWidth: number = Number.POSITIVE_INFINITY;
  	override readonly minimumHeight: number = 0;
  	override readonly maximumHeight: number = Number.POSITIVE_INFINITY;
-@@ -137,7 +144,7 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+@@ -138,7 +146,7 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
  		super(
  			Parts.AUXILIARYBAR_PART,
  			{
@@ -2906,7 +2931,7 @@ index 168ae722004..37f11376eb1 100644
  				trailingSeparator: true,
  				borderWidth: () => (this.getColor(SIDE_BAR_BORDER) || this.getColor(contrastBorder)) ? 1 : 0,
  			},
-@@ -309,6 +316,10 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+@@ -310,6 +318,10 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
  	}
  
  	protected shouldShowCompositeBar(): boolean {
@@ -2917,7 +2942,7 @@ index 168ae722004..37f11376eb1 100644
  		if (this.configuration.position === ActivityBarPosition.HIDDEN) {
  			return false;
  		}
-@@ -341,9 +352,122 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
+@@ -342,9 +354,134 @@ export class AuxiliaryBarPart extends AbstractPaneCompositePart {
  		}
  	}
  
@@ -2963,7 +2988,7 @@ index 168ae722004..37f11376eb1 100644
 +
 +/** Ritemark 2.0: the AI column holds only Ritemark's AI (R4); the terminal and Copilot Chat open as tabs. */
 +const RITEMARK_AI_COLUMN_ALONE = true;
-+const RITEMARK_AI_CONTAINER = 'workbench.view.extension.ritemark-ai';
++const RITEMARK_AI_CONTAINER = ritemarkFrame.aiColumn;
 +const COPILOT_CHAT_CONTAINER = 'workbench.panel.chat';
 +
 +/**
@@ -2979,6 +3004,8 @@ index 168ae722004..37f11376eb1 100644
 +
 +	constructor(
 +		@IViewDescriptorService private readonly viewDescriptorService: IViewDescriptorService,
++		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
++		@IWorkspaceContextService private readonly contextService: IWorkspaceContextService,
 +	) {
 +		super();
 +
@@ -3016,13 +3043,20 @@ index 168ae722004..37f11376eb1 100644
 +	}
 +
 +	private moveOut(containers: readonly ViewContainer[]): void {
-+		const strays = containers.filter(container => container.id !== RITEMARK_AI_CONTAINER);
++		// A build without the frame's manifest has no Ritemark AI to keep the column for: the column is VS Code's
++		const strays = RITEMARK_AI_CONTAINER ? containers.filter(container => container.id !== RITEMARK_AI_CONTAINER) : [];
 +		if (!strays.length) {
 +			return;
 +		}
 +
 +		// After the change that brought them here has finished
 +		queueMicrotask(() => {
++			// Sprint 152 (R9): in a new profile, VS Code's own containers start in the column and go before Ritemark AI has
++			// registered, and VS Code closes a column left with none (paneCompositePart.ts), to open it again with Ritemark
++			// AI a moment later. In a project window the column is Ritemark AI's slot from the first frame: it stays open
++			// (layout.ts releases it once the extensions are read, if Ritemark AI never comes)
++			const keepSlot = !!RITEMARK_AI_CONTAINER && this.contextService.getWorkbenchState() !== WorkbenchState.EMPTY
++				&& this.layoutService.isVisible(Parts.AUXILIARYBAR_PART) && !this.viewDescriptorService.getViewContainerById(RITEMARK_AI_CONTAINER);
 +			for (const container of strays) {
 +				if (this.viewDescriptorService.getViewContainerLocation(container) !== ViewContainerLocation.AuxiliaryBar) {
 +					continue;
@@ -3032,6 +3066,9 @@ index 168ae722004..37f11376eb1 100644
 +					: home !== null && home !== ViewContainerLocation.AuxiliaryBar ? home
 +						: ViewContainerLocation.Sidebar;
 +				this.viewDescriptorService.moveViewContainerToLocation(container, to, undefined, 'ritemark.aiColumn');
++			}
++			if (keepSlot && !this.layoutService.isVisible(Parts.AUXILIARYBAR_PART)) {
++				this.layoutService.setPartHidden(false, Parts.AUXILIARYBAR_PART);
 +			}
 +		});
 +	}
@@ -3158,20 +3195,21 @@ index ae595e8ab3e..d2a137e7255 100644
  				renderBody,
  				icon: customOptions?.icon,
 diff --git a/src/vs/workbench/browser/parts/editor/editorPart.ts b/src/vs/workbench/browser/parts/editor/editorPart.ts
-index afa6942390e..9d283019916 100644
+index afa6942390e..bb3c3040637 100644
 --- a/src/vs/workbench/browser/parts/editor/editorPart.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorPart.ts
-@@ -36,6 +36,9 @@ import { IContextKeyService } from '../../../../platform/contextkey/common/conte
+@@ -36,6 +36,10 @@ import { IContextKeyService } from '../../../../platform/contextkey/common/conte
  import { ServiceCollection } from '../../../../platform/instantiation/common/serviceCollection.js';
  import { EditorAreaFocusContext, EditorPartMaximizedEditorGroupContext, EditorPartMultipleEditorGroupsContext, EditorTabsVisibleContext, IsTopRightEditorGroupContext } from '../../../common/contextkeys.js';
  import { mainWindow } from '../../../../base/browser/window.js';
 +import { RITEMARK_FRAME_WITHOUT_TITLE_ROW } from '../../../../platform/window/common/window.js';
 +import { createRitemarkFrameStrip, trackRitemarkZoom } from '../ritemarkFrameStrip.js';
 +import { ritemarkHomeInFront, ritemarkTakeSwitchLanding } from '../ritemarkSwitchGuard.js';
++import { ritemarkFirstDesk } from '../../ritemarkFrame.js';
  
  /**
   * The width (in pixels) of the editor card border drawn on every side when the
-@@ -97,6 +100,9 @@ class GridWidgetView<T extends IView> implements IView {
+@@ -97,6 +101,9 @@ class GridWidgetView<T extends IView> implements IView {
  	}
  }
  
@@ -3181,7 +3219,7 @@ index afa6942390e..9d283019916 100644
  export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart, IEditorGroupsView {
  
  	private static readonly EDITOR_PART_UI_STATE_STORAGE_KEY = 'editorpart.state';
-@@ -1080,6 +1086,15 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1080,6 +1087,15 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
  		// Drag & Drop support
  		this.setupDragAndDropSupport(parent, this.container);
  
@@ -3197,7 +3235,7 @@ index afa6942390e..9d283019916 100644
  		// Context keys
  		this.handleContextKeys();
  
-@@ -1285,10 +1300,15 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1285,10 +1301,22 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
  
  	private doCreateGridControl(): void {
  
@@ -3211,10 +3249,17 @@ index afa6942390e..9d283019916 100644
  		if (this._willRestoreState) {
 -			restoreError = !this.doCreateGridControlWithPreviousState();
 +			restoreError = !this.doCreateGridControlWithPreviousState(ritemarkLanding);
++		}
++
++		// Ritemark 2.0 (Sprint 152, R3): a project's first window has Home's and the Task board's tabs on its desk from its
++		// first frame, as a restore brings them back (ritemarkFrame.ts)
++		const ritemarkDesk = !this.gridWidget && !restoreError && this.editorPartsView.mainPart === this ? this.instantiationService.invokeFunction(ritemarkFirstDesk) : undefined;
++		if (ritemarkDesk) {
++			this.doCreateGridControlWithState(ritemarkDesk.grid, ritemarkDesk.group);
  		}
  
  		// Grid Widget (no previous UI state or failed to restore)
-@@ -1307,7 +1327,7 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1307,7 +1335,7 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
  		this.notifyGroupIndexChange();
  	}
  
@@ -3223,7 +3268,7 @@ index afa6942390e..9d283019916 100644
  		const state: IEditorPartUIState | undefined = this.loadState();
  		if (state?.serializedGrid) {
  			try {
-@@ -1315,8 +1335,9 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1315,8 +1343,9 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
  				// MRU
  				this.mostRecentActiveGroups = state.mostRecentActiveGroups;
  
@@ -3235,7 +3280,7 @@ index afa6942390e..9d283019916 100644
  			} catch (error) {
  
  				// Log error
-@@ -1466,7 +1487,8 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
+@@ -1466,7 +1495,8 @@ export class EditorPart extends Part<IEditorPartMemento> implements IEditorPart,
  		}
  
  		// Layout contents
@@ -3591,10 +3636,32 @@ index ebb6b6f90c3..9e42d3ffb9f 100644
  		if (isNonEmptyArray(notification.actions?.secondary)) {
  			actions++; // secondary actions
 diff --git a/src/vs/workbench/browser/parts/paneCompositeBar.ts b/src/vs/workbench/browser/parts/paneCompositeBar.ts
-index 29725b7f835..37ca4a483b0 100644
+index 29725b7..10bf358 100644
 --- a/src/vs/workbench/browser/parts/paneCompositeBar.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositeBar.ts
-@@ -860,6 +860,12 @@ class ViewContainerActivityAction extends CompositeBarAction {
+@@ -4,6 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import { localize } from '../../../nls.js';
++import { ritemarkPlaceToRestore } from '../ritemarkFrame.js';
+ import { ActionsOrientation } from '../../../base/browser/ui/actionbar/actionbar.js';
+ import { IActivityService } from '../../services/activity/common/activity.js';
+ import { IWorkbenchLayoutService, Parts } from '../../services/layout/browser/layoutService.js';
+@@ -136,6 +137,13 @@ export class PaneCompositeBar extends Disposable {
+ 		this.compositeBar = this.createCompositeBar(cachedItems);
+ 		this.onDidRegisterViewContainers(this.getViewContainers());
+ 		this.registerListeners();
++
++		// Ritemark 2.0 (Sprint 152, R2, R3): the place the left column restores is in front in the places row from the first
++		// frame, before its extension has registered it (layout.ts); its own opening, or another place's, follows
++		const ritemarkRestoring = this.location === ViewContainerLocation.Sidebar && !this.paneCompositePart.getActivePaneComposite() ? ritemarkPlaceToRestore() : undefined;
++		if (ritemarkRestoring) {
++			this.compositeBar.activateComposite(ritemarkRestoring);
++		}
+ 	}
+ 
+ 	private createCompositeBar(cachedItems: ICompositeBarItem[]) {
+@@ -860,6 +868,12 @@ class ViewContainerActivityAction extends CompositeBarAction {
  			}
  		}
  
@@ -3608,10 +3675,10 @@ index 29725b7f835..37ca4a483b0 100644
  		return this.activate();
  	}
 diff --git a/src/vs/workbench/browser/parts/paneCompositePart.ts b/src/vs/workbench/browser/parts/paneCompositePart.ts
-index 491c451f7fa..251b2dfaebf 100644
+index 252bcf8..718e4a1 100644
 --- a/src/vs/workbench/browser/parts/paneCompositePart.ts
 +++ b/src/vs/workbench/browser/parts/paneCompositePart.ts
-@@ -704,6 +704,9 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
+@@ -705,6 +705,9 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
  			const padding = this.compositeBarPosition === CompositeBarPosition.TITLE ? 16 : 8;
  			const borderWidth = this.partId === Parts.PANEL_PART ? 0 : 1;
  			let availableWidth = this.contentDimension.width - padding - borderWidth;
@@ -4482,10 +4549,10 @@ index 00000000000..c515a8eb74f
 +}
 diff --git a/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts b/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts
 new file mode 100644
-index 00000000000..79a3f867a70
+index 00000000000..442857fb6f3
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkSwitchGuard.ts
-@@ -0,0 +1,238 @@
+@@ -0,0 +1,253 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4507,12 +4574,19 @@ index 00000000000..79a3f867a70
 + * after it had started, with the document the project was left on in front until then. The rule is the extension's own
 + * (`ProjectSwitcher.takeLanding`): within two minutes, in the folder the switch opened, or in any other folder when
 + * the window did not know it.
++ *
++ * Sprint 152 (#623): the extension's answer is a vote, and another participant may already have stopped the reload
++ * while the person read Ritemark's question (VS Code ends a shutdown at a participant's synchronous no without waiting
++ * for the others' answers). The guard passes the extension the shutdown attempt's number with its question, and
++ * answers `_ritemark.projects.reloadGoesOn` with whether that attempt is still going on, so a late "Switch and stop"
++ * stops no chats in a window that stays. The question can't be asked last: VS Code's one final veto is the unsaved
++ * files' (workingCopyBackupTracker.ts).
 + */
 +
 +import { Disposable, toDisposable } from '../../../base/common/lifecycle.js';
 +import { URI } from '../../../base/common/uri.js';
 +import { ISerializedGrid, ISerializedNode } from '../../../base/browser/ui/grid/grid.js';
-+import { ICommandService } from '../../../platform/commands/common/commands.js';
++import { CommandsRegistry, ICommandService } from '../../../platform/commands/common/commands.js';
 +import { IDialogService } from '../../../platform/dialogs/common/dialogs.js';
 +import { ServicesAccessor } from '../../../platform/instantiation/common/instantiation.js';
 +import { IStorageService, StorageScope, StorageTarget, WillSaveStateReason } from '../../../platform/storage/common/storage.js';
@@ -4520,8 +4594,11 @@ index 00000000000..79a3f867a70
 +import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../common/contributions.js';
 +import { isSerializedEditorGroupModel, ISerializedEditorGroupModel } from '../../common/editor/editorGroupModel.js';
 +import { ILifecycleService, ShutdownReason } from '../../services/lifecycle/common/lifecycle.js';
++import { ritemarkFrame } from '../ritemarkFrame.js';
 +
 +const BEFORE_RELOAD_COMMAND = '_ritemark.projects.beforeReload';
++/** Sprint 152 (#623): whether the shutdown attempt the extension was asked about still goes on. */
++export const RELOAD_GOES_ON_COMMAND = '_ritemark.projects.reloadGoesOn';
 +
 +/** A noted folder counts only for the unload that follows it at once; the main process may open it in a new window instead. */
 +const TARGET_FRESH_MS = 5_000;
@@ -4542,8 +4619,9 @@ index 00000000000..79a3f867a70
 +/**
 + * Ritemark 2.0: the extension's answer to an unload that opens another folder here; true stops it. Anything but a
 + * clear true lets the reload go on: no command, an error, or `ceilingMs` without an answer while no question shows.
++ * `attempt` is the shutdown attempt's number, for the extension to ask `RELOAD_GOES_ON_COMMAND` about (#623).
 + */
-+export function askRitemarkBeforeReload(commandService: ICommandService, dialogService: Pick<IDialogService, 'onWillShowDialog'>, target: URI | undefined, ceilingMs = 10_000): Promise<boolean> {
++export function askRitemarkBeforeReload(commandService: ICommandService, dialogService: Pick<IDialogService, 'onWillShowDialog'>, target: URI | undefined, attempt: number, ceilingMs = 10_000): Promise<boolean> {
 +	return new Promise<boolean>(resolve => {
 +		const timer = setTimeout(() => finish(false), ceilingMs);
 +		const asking = dialogService.onWillShowDialog(() => clearTimeout(timer)); // the person reads the question
@@ -4552,7 +4630,7 @@ index 00000000000..79a3f867a70
 +			stop.dispose();
 +			resolve(veto);
 +		}
-+		commandService.executeCommand<boolean>(BEFORE_RELOAD_COMMAND, target?.toString()).then(answer => finish(answer === true), () => finish(false));
++		commandService.executeCommand<boolean>(BEFORE_RELOAD_COMMAND, target?.toString(), attempt).then(answer => finish(answer === true), () => finish(false));
 +	});
 +}
 +
@@ -4562,7 +4640,8 @@ index 00000000000..79a3f867a70
 +/** As the extension's `SWITCHED_NOTE_MS`: a note older than this is from a switch that did not happen. */
 +const LANDING_FRESH_MS = 2 * 60 * 1000;
 +
-+const HOME_VIEW_TYPE = 'mainThreadWebview-ritemark.home';
++/** The tab a switch puts in front: the frame's manifest's desk front (Sprint 152, R1). */
++const HOME_VIEW_TYPE = ritemarkFrame.deskFront;
 +/** `WebviewInput.typeId`, the serializer id a saved webview tab carries. */
 +const WEBVIEW_EDITOR_TYPE_ID = 'workbench.editors.webviewInput';
 +
@@ -4694,12 +4773,15 @@ index 00000000000..79a3f867a70
 +		let landing: Omit<IRitemarkSwitchLanding, 'at'> | undefined;
 +		let attempt = 0;
 +
++		// Sprint 152 (#623): the extension asks the same before it acts on the person's answer (stops the working chats).
++		this._register(CommandsRegistry.registerCommand(RELOAD_GOES_ON_COMMAND, (_accessor, asked: unknown) => asked === attempt));
++
 +		this._register(lifecycleService.onBeforeShutdown(e => {
 +			const thisAttempt = ++attempt;
 +			landing = undefined;
 +			const target = takeSwitchTarget();
 +			if (e.reason === ShutdownReason.LOAD) {
-+				e.veto(askRitemarkBeforeReload(commandService, dialogService, target).then(veto => {
++				e.veto(askRitemarkBeforeReload(commandService, dialogService, target, thisAttempt).then(veto => {
 +					if (!veto && thisAttempt === attempt) {
 +						landing = { from: projectFolder(contextService) ?? null, target: target?.toString() ?? null };
 +					}
@@ -4726,10 +4808,10 @@ index 00000000000..79a3f867a70
 +registerWorkbenchContribution2(RitemarkSwitchGuard.ID, RitemarkSwitchGuard, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/ritemarkWelcomeAlone.ts b/src/vs/workbench/browser/parts/ritemarkWelcomeAlone.ts
 new file mode 100644
-index 00000000000..e7200373201
+index 00000000000..0f4c5a0997b
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkWelcomeAlone.ts
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,129 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4742,20 +4824,33 @@ index 00000000000..e7200373201
 + * (ritemarkSurfaces.css). The strips keep their boxes, so the window still drags by its top; the traffic lights and
 + * Windows' window buttons stay, and Windows' menu button is not mounted. The class goes as soon as anything else is in
 + * front, and nothing is written: the person's own status bar and tab settings are untouched.
++ *
++ * Sprint 152 (R4): the welcome's window is the welcome alone from its first frame, where it was VS Code's empty window
++ * until the extension had started (12 s on a slow first start). A window with no folder and nothing to open is the
++ * welcome's (layout.ts notes it, and closes both columns there): it is alone until the welcome takes over, and its
++ * slot is released, logged once, when another editor comes in front, when Ritemark isn't there once the extensions
++ * are read or failed to start, or after RITEMARK_SLOT_RELEASE_MS with no welcome. The window is then VS Code's empty
++ * window.
 + */
 +
++import { disposableTimeout } from '../../../base/common/async.js';
 +import { Emitter, Event } from '../../../base/common/event.js';
-+import { Disposable } from '../../../base/common/lifecycle.js';
++import { Disposable, MutableDisposable } from '../../../base/common/lifecycle.js';
++import Severity from '../../../base/common/severity.js';
 +import { IContextKeyService } from '../../../platform/contextkey/common/contextkey.js';
++import { ExtensionIdentifier } from '../../../platform/extensions/common/extensions.js';
++import { ILogService } from '../../../platform/log/common/log.js';
++import { IExtensionService } from '../../services/extensions/common/extensions.js';
 +import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../common/contributions.js';
 +import { IEditorService } from '../../services/editor/common/editorService.js';
 +import { IWorkbenchLayoutService } from '../../services/layout/browser/layoutService.js';
++import { isRitemarkWelcomeAloneExpected, RITEMARK_SLOT_RELEASE_MS, ritemarkFrame, ritemarkSlotReleased } from '../ritemarkFrame.js';
 +
 +/** Set by the extension while its welcome is open alone in the window. */
 +const WELCOME_ALONE_CONTEXT_KEY = 'ritemark.welcomeAlone';
 +
-+/** The welcome's webview editor, as the workbench names an extension's webview panel. */
-+const WELCOME_VIEW_TYPE = 'mainThreadWebview-ritemark.welcome';
++/** The welcome's webview editor, as the workbench names an extension's webview panel (Sprint 152: the frame's manifest's). */
++const WELCOME_VIEW_TYPE = ritemarkFrame.welcome;
 +
 +let welcomeAlone = false;
 +const onDidChange = new Emitter<boolean>();
@@ -4768,16 +4863,38 @@ index 00000000000..e7200373201
 +	return welcomeAlone;
 +}
 +
-+class RitemarkWelcomeAlone extends Disposable implements IWorkbenchContribution {
++export class RitemarkWelcomeAlone extends Disposable implements IWorkbenchContribution {
 +
 +	static readonly ID = 'workbench.contrib.ritemarkWelcomeAlone';
++
++	/** Sprint 152 (R4): the welcome's window, alone before the welcome opens, until the welcome takes over or the slot goes. */
++	private expected = isRitemarkWelcomeAloneExpected();
++	private readonly expectedRelease = this._register(new MutableDisposable());
 +
 +	constructor(
 +		@IContextKeyService private readonly contextKeyService: IContextKeyService,
 +		@IEditorService private readonly editorService: IEditorService,
 +		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
++		@IExtensionService extensionService: IExtensionService,
++		@ILogService private readonly logService: ILogService,
 +	) {
 +		super();
++
++		const id = ritemarkFrame.extension;
++		if (this.expected && id) {
++			const status = () => extensionService.getExtensionsStatus()[id];
++			this.expectedRelease.value = disposableTimeout(() => this.release('no welcome came'), RITEMARK_SLOT_RELEASE_MS);
++			extensionService.whenInstalledExtensionsRegistered().then(() => {
++				if (!extensionService.extensions.some(extension => ExtensionIdentifier.equals(extension.identifier, id))) {
++					this.release('Ritemark is not installed');
++				}
++			});
++			this._register(extensionService.onDidChangeExtensionsStatus(ids => {
++				if (ids.some(changed => ExtensionIdentifier.equals(changed, id)) && status()?.messages.some(message => message.type === Severity.Error)) {
++					this.release('Ritemark failed to start');
++				}
++			}));
++		}
 +
 +		const keys = new Set([WELCOME_ALONE_CONTEXT_KEY]);
 +		this._register(contextKeyService.onDidChangeContext(e => {
@@ -4789,9 +4906,31 @@ index 00000000000..e7200373201
 +		this.update();
 +	}
 +
++	/** Sprint 152 (R4): the welcome's window stops waiting for it; logged once, when it was still waiting. */
++	private release(why: string): void {
++		if (this.expected && !this._store.isDisposed) {
++			this.expected = false;
++			this.expectedRelease.clear();
++			ritemarkSlotReleased(this.logService, 'the welcome alone', why);
++			this.update();
++		}
++	}
++
 +	private update(): void {
-+		const viewType = (this.editorService.activeEditor as { viewType?: unknown } | undefined)?.viewType;
-+		const alone = this.contextKeyService.getContextKeyValue<boolean>(WELCOME_ALONE_CONTEXT_KEY) === true && viewType === WELCOME_VIEW_TYPE;
++		const active = this.editorService.activeEditor;
++		const viewType = (active as { viewType?: unknown } | undefined)?.viewType;
++		const handedOver = this.contextKeyService.getContextKeyValue<boolean>(WELCOME_ALONE_CONTEXT_KEY) === true && viewType === WELCOME_VIEW_TYPE;
++		if (this.expected && (handedOver || (active && viewType !== WELCOME_VIEW_TYPE))) {
++			// The welcome took over, or another editor came in front first
++			if (handedOver) {
++				this.expected = false;
++				this.expectedRelease.clear();
++			} else {
++				this.release(`another editor is in front`);
++				return;
++			}
++		}
++		const alone = this.expected || handedOver;
 +		if (alone === welcomeAlone) {
 +			return;
 +		}
@@ -5014,10 +5153,10 @@ index 00000000000..c6764e91723
 +registerWorkbenchContribution2(RitemarkWindowSizes.ID, RitemarkWindowSizes, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644
-index 00000000000..a19755eb243
+index 00000000000..317b744cf1c
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,361 @@
+@@ -0,0 +1,380 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -5055,6 +5194,8 @@ index 00000000000..a19755eb243
 +import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 +import { IExtensionService } from '../../../services/extensions/common/extensions.js';
 +import { RITEMARK_MENU_SEPARATOR, RitemarkMenuEntry, showRitemarkMenu } from '../ritemarkMenu.js';
++import { ILogService } from '../../../../platform/log/common/log.js';
++import { ritemarkFrame, ritemarkPlaceToRestore, ritemarkSlotReleased } from '../../ritemarkFrame.js';
 +
 +const PROJECT_MENU = MenuId.for('ritemark/projectHead');
 +
@@ -5073,15 +5214,14 @@ index 00000000000..a19755eb243
 +	readonly group?: string;
 +}
 +
-+const NEW_ROW = 'ritemark.projectHead.newRow';
-+const HEAD_PLACES = new Map<string, IRitemarkHeadPlace>([
-+	['workbench.view.explorer', { rows: [{ command: NEW_ROW, menu: MenuId.for('ritemark/projectHead/new') }, { command: 'ritemark.projectHead.search' }], group: localize('ritemark.project.documents', "Documents") }],
-+	['workbench.view.extension.ritemark-agent-library', { rows: [{ command: NEW_ROW, menu: MenuId.for('ritemark/projectHead/agents/new') }, { command: 'ritemark.agentLibrary.search' }] }],
-+	// Sprint 134 (R16–R18): the project's head on every place but Home
-+	['workbench.view.extension.ritemark-tasks', { rows: [{ command: 'ritemark.tasks.newTask' }, { command: 'ritemark.tasks.search' }] }],
-+	['workbench.view.extension.ritemark-browser', { rows: [{ command: 'ritemark.browser.newPage' }] }],
-+	['workbench.view.extension.ritemark-transcribe', { rows: [{ command: 'ritemark.transcribe.record' }, { command: 'ritemark.transcribe.addFile' }] }],
-+]);
++/**
++ * Sprint 134 (R16–R18): the project's head on every place but Home. Sprint 152 (R1): the places, their rows and their
++ * labels are the frame's manifest's (product.json's ritemarkFrame, ritemarkFrame.ts), read at the first frame.
++ */
++const HEAD_PLACES = new Map<string, IRitemarkHeadPlace>(ritemarkFrame.places.flatMap(place => place.head ? [[place.id, {
++	rows: place.head.rows.map(row => ({ command: row.command, ...(row.menu ? { menu: MenuId.for(row.menu) } : {}) })),
++	...(place.head.label ? { group: place.head.label } : {}),
++}] as const] : []));
 +
 +/**
 + * Sprint 134 (R8): a project menu entry that opens a flyout, and the extension command that gives its rows when it
@@ -5113,7 +5253,7 @@ index 00000000000..a19755eb243
 +}
 +
 +/** Home's place (Sprint 134, R7): the column is the projects list, with no title row. */
-+const HOME_PLACE = 'workbench.view.extension.ritemark-home';
++const HOME_PLACE = ritemarkFrame.homePlace;
 +
 +/** "Harbour leadership programme" → "HL": the first letter or digit of the first two words. */
 +export function ritemarkProjectInitials(name: string): string {
@@ -5145,6 +5285,12 @@ index 00000000000..a19755eb243
 +	 */
 +	private extensionsRead = false;
 +
++	/**
++	 * Sprint 152 (R2, R3): the place the column restores (layout.ts), drawn from the first frame until a place opens: a
++	 * Ritemark place opens only once the extensions are read. Another place opening first releases it.
++	 */
++	private restoring = ritemarkPlaceToRestore();
++
 +	private readonly _onDidChangeRows = this._register(new Emitter<void>());
 +	/** The rows changed outside update(): the column lays its content out again (rowsHeight) */
 +	readonly onDidChangeRows = this._onDidChangeRows.event;
@@ -5162,6 +5308,7 @@ index 00000000000..a19755eb243
 +		@IMenuService private readonly menuService: IMenuService,
 +		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
 +		@IExtensionService extensionService: IExtensionService,
++		@ILogService private readonly logService: ILogService,
 +	) {
 +		super();
 +		this.titleArea = titleArea;
@@ -5234,6 +5381,14 @@ index 00000000000..a19755eb243
 +
 +	/** The place shown; returns whether the column's head changed. */
 +	update(compositeId: string | undefined): boolean {
++		if (compositeId === undefined) {
++			compositeId = this.restoring;
++		} else if (this.restoring !== undefined) {
++			if (compositeId !== this.restoring) {
++				ritemarkSlotReleased(this.logService, `place ${this.restoring}`, `${compositeId} opened instead`);
++			}
++			this.restoring = undefined;
++		}
 +		const home = compositeId === HOME_PLACE;
 +		const homeChanged = home !== this.home;
 +		if (homeChanged) {
@@ -5287,6 +5442,9 @@ index 00000000000..a19755eb243
 +				if (!this.extensionsRead) {
 +					// Sprint 145 (#569): the extension's command comes once the extensions are read; its row keeps its room
 +					append(this.rowList, $('.ritemark-project-row.ritemark-project-row-waiting', { 'aria-hidden': 'true' }));
++				} else {
++					// Sprint 152 (R2): an older extension: the row's slot goes, once the extensions are read, and says so
++					ritemarkSlotReleased(this.logService, `head row ${spec.command}`, 'its command is not registered');
 +				}
 +				continue; // an older extension: no row rather than a row that does nothing
 +			}
@@ -5380,7 +5538,7 @@ index 00000000000..a19755eb243
 +	}
 +}
 diff --git a/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts b/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
-index cd93a447d1c..ccf760af283 100644
+index cd93a447d1c..81e8c584be6 100644
 --- a/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
 +++ b/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts
 @@ -5,7 +5,7 @@
@@ -5392,7 +5550,7 @@ index cd93a447d1c..ccf760af283 100644
  import { SidebarFocusContext, ActiveViewletContext } from '../../../common/contextkeys.js';
  import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
  import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
-@@ -36,6 +36,11 @@ import { localize2 } from '../../../../nls.js';
+@@ -36,6 +36,12 @@ import { localize2 } from '../../../../nls.js';
  import { IHoverService } from '../../../../platform/hover/browser/hover.js';
  import { VisibleViewContainersTracker } from '../visibleViewContainersTracker.js';
  import { Extensions } from '../../panecomposite.js';
@@ -5401,10 +5559,11 @@ index cd93a447d1c..ccf760af283 100644
 +import { RITEMARK_FRAME_WITHOUT_TITLE_ROW } from '../../../../platform/window/common/window.js';
 +import { createRitemarkFrameStrip, trackRitemarkZoom } from '../ritemarkFrameStrip.js';
 +import { RitemarkProjectHead } from './ritemarkProjectHead.js';
++import { ritemarkSeedPlaces } from '../../ritemarkFrame.js';
  
  const PRIMARY_SIDE_BAR_SASH_CLASS = 'primary-sidebar-sash';
  
-@@ -183,12 +188,58 @@ export class SidebarPart extends AbstractPaneCompositePart {
+@@ -183,12 +189,60 @@ export class SidebarPart extends AbstractPaneCompositePart {
  		container.style.outlineColor = this.getColor(SIDE_BAR_DRAG_AND_DROP_BACKGROUND) ?? '';
  	}
  
@@ -5412,6 +5571,8 @@ index cd93a447d1c..ccf760af283 100644
 +	private ritemarkLastLayout: [number, number, number, number] | undefined;
 +
 +	override create(parent: HTMLElement): void {
++		// Ritemark 2.0 (Sprint 152, R9): a new profile's places row has the frame's places from its first frame
++		ritemarkSeedPlaces(this.storageService, ActivitybarPart.pinnedViewContainersKey, ActivitybarPart.placeholderViewContainersKey);
 +		super.create(parent);
 +
 +		// Ritemark 2.0: on Documents and Agents the column's head is the project, then New and Search (R10; experience 31)
@@ -5464,7 +5625,7 @@ index cd93a447d1c..ccf760af283 100644
  	}
  
  	override setBoundarySashes(sashes: IBoundarySashes): void {
-@@ -230,7 +281,7 @@ export class SidebarPart extends AbstractPaneCompositePart {
+@@ -230,7 +284,7 @@ export class SidebarPart extends AbstractPaneCompositePart {
  			},
  			compositeSize: 0,
  			iconSize: 16,
@@ -6376,10 +6537,10 @@ index 00000000000..7924086e116
 +});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts b/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts
 new file mode 100644
-index 00000000000..b8d451ffc33
+index 00000000000..1610dcb6fc8
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkSwitchGuard.test.ts
-@@ -0,0 +1,195 @@
+@@ -0,0 +1,225 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -6390,7 +6551,7 @@ index 00000000000..b8d451ffc33
 +import { Emitter } from '../../../../base/common/event.js';
 +import { URI } from '../../../../base/common/uri.js';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
-+import { ICommandService } from '../../../../platform/commands/common/commands.js';
++import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
 +import { Orientation } from '../../../../base/browser/ui/grid/grid.js';
 +import { IDialogService } from '../../../../platform/dialogs/common/dialogs.js';
 +import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
@@ -6422,15 +6583,15 @@ index 00000000000..b8d451ffc33
 +		const dialogs = store.add(new Emitter<void>());
 +		const calls: unknown[][] = [];
 +		const target = URI.file('/projects/Other');
-+		const stop = await askRitemarkBeforeReload(commands(async () => true, calls), { onWillShowDialog: dialogs.event }, target);
-+		const go = await askRitemarkBeforeReload(commands(async () => false), { onWillShowDialog: dialogs.event }, undefined);
-+		assert.deepStrictEqual({ stop, go, calls }, { stop: true, go: false, calls: [['_ritemark.projects.beforeReload', target.toString()]] });
++		const stop = await askRitemarkBeforeReload(commands(async () => true, calls), { onWillShowDialog: dialogs.event }, target, 7);
++		const go = await askRitemarkBeforeReload(commands(async () => false), { onWillShowDialog: dialogs.event }, undefined, 8);
++		assert.deepStrictEqual({ stop, go, calls }, { stop: true, go: false, calls: [['_ritemark.projects.beforeReload', target.toString(), 7]] });
 +	});
 +
 +	test('no such command, or no answer and no question within the ceiling: the reload goes on', async () => {
 +		const dialogs = store.add(new Emitter<void>());
-+		const missing = await askRitemarkBeforeReload(commands(() => Promise.reject(new Error('command not found'))), { onWillShowDialog: dialogs.event }, undefined);
-+		const silent = await askRitemarkBeforeReload(commands(() => new Promise(() => { })), { onWillShowDialog: dialogs.event }, undefined, 5);
++		const missing = await askRitemarkBeforeReload(commands(() => Promise.reject(new Error('command not found'))), { onWillShowDialog: dialogs.event }, undefined, 1);
++		const silent = await askRitemarkBeforeReload(commands(() => new Promise(() => { })), { onWillShowDialog: dialogs.event }, undefined, 1, 5);
 +		assert.deepStrictEqual({ missing, silent }, { missing: false, silent: false });
 +	});
 +
@@ -6440,7 +6601,7 @@ index 00000000000..b8d451ffc33
 +			dialogs.fire();
 +			await timeout(30);
 +			return true;
-+		}), { onWillShowDialog: dialogs.event }, undefined, 5);
++		}), { onWillShowDialog: dialogs.event }, undefined, 1, 5);
 +		assert.strictEqual(await answer, true);
 +	});
 +
@@ -6573,6 +6734,149 @@ index 00000000000..b8d451ffc33
 +		storage.testEmitWillSaveState(WillSaveStateReason.SHUTDOWN); // a later quit
 +
 +		assert.strictEqual(storage.get('ritemark.switch.landOnHome', StorageScope.APPLICATION), undefined);
++	});
++
++	test('#623: the extension is told its attempt, and whether that attempt still goes on once the person answers', async () => {
++		const beforeShutdown = store.add(new Emitter<BeforeShutdownEvent>());
++		const shutdownVeto = store.add(new Emitter<void>());
++		const dialogs = store.add(new Emitter<void>());
++		const storage = store.add(new TestStorageService());
++		const lifecycle = { onBeforeShutdown: beforeShutdown.event, onShutdownVeto: shutdownVeto.event } as unknown as ILifecycleService;
++		const workspace = { getWorkbenchState: () => WorkbenchState.FOLDER, getWorkspace: () => ({ folders: [{ uri: URI.file('/p/lead') }] }) } as unknown as IWorkspaceContextService;
++		const calls: unknown[][] = [];
++		store.add(new RitemarkSwitchGuard(lifecycle, commands(async () => false, calls), { onWillShowDialog: dialogs.event } as unknown as IDialogService, storage, workspace));
++		const goesOn = (asked: unknown) => CommandsRegistry.getCommand('_ritemark.projects.reloadGoesOn')?.handler(undefined as unknown as ServicesAccessor, asked);
++		const unload = () => beforeShutdown.fire({ reason: ShutdownReason.LOAD, veto: () => { } });
++
++		unload();
++		const asked = calls[0]?.[2];
++		const whileAsking = goesOn(asked);
++		shutdownVeto.fire(); // another participant said no at once, while the person still read Ritemark's question
++		const afterTheVeto = goesOn(asked);
++		unload(); // the person tries again
++		const next = calls[1]?.[2];
++
++		assert.deepStrictEqual({ asked, whileAsking, afterTheVeto, next, nextGoesOn: goesOn(next), notANumber: goesOn('1') }, {
++			asked: 1,
++			whileAsking: true,
++			afterTheVeto: false,
++			next: 3,
++			nextGoesOn: true,
++			notANumber: false,
++		});
++	});
++});
+diff --git a/src/vs/workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts b/src/vs/workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts
+new file mode 100644
+index 00000000000..88b6d52464d
+--- /dev/null
++++ b/src/vs/workbench/test/browser/parts/ritemarkWelcomeAlone.test.ts
+@@ -0,0 +1,107 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { timeout } from '../../../../base/common/async.js';
++import { Emitter } from '../../../../base/common/event.js';
++import Severity from '../../../../base/common/severity.js';
++import { upcastPartial } from '../../../../base/test/common/mock.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
++import { runWithFakedTimers } from '../../../../base/test/common/virtualScheduling/runWithFakedTimers.js';
++import { IContextKeyChangeEvent, IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
++import { ExtensionIdentifier } from '../../../../platform/extensions/common/extensions.js';
++import { NullLogService } from '../../../../platform/log/common/log.js';
++import { RitemarkWelcomeAlone } from '../../../browser/parts/ritemarkWelcomeAlone.js';
++import { RITEMARK_SLOT_RELEASE_MS, ritemarkFrame, ritemarkNoteWelcomeAloneExpected } from '../../../browser/ritemarkFrame.js';
++import { IEditorService } from '../../../services/editor/common/editorService.js';
++import { IExtensionService, IExtensionsStatus } from '../../../services/extensions/common/extensions.js';
++import { IWorkbenchLayoutService } from '../../../services/layout/browser/layoutService.js';
++
++/**
++ * Ritemark 2.0 (Sprint 152, R4): the welcome's window is the welcome alone from its first frame, until the welcome takes
++ * over; the slot goes when another editor comes in front, when Ritemark isn't there or failed to start, or after a
++ * minute with no welcome.
++ */
++suite('Ritemark welcome alone', () => {
++
++	const store = ensureNoDisposablesAreLeakedInTestSuite();
++
++	function setUp({ installed = true } = {}) {
++		const container = document.createElement('div');
++		const onDidChangeContext = store.add(new Emitter<IContextKeyChangeEvent>());
++		const onDidActiveEditorChange = store.add(new Emitter<void>());
++		const onDidChangeExtensionsStatus = store.add(new Emitter<ExtensionIdentifier[]>());
++		const keys = new Map<string, unknown>();
++		const status: Record<string, Partial<IExtensionsStatus>> = {};
++		let active: { viewType?: string } | undefined;
++		const logged: string[] = [];
++		const id = ritemarkFrame.extension!;
++		store.add(new RitemarkWelcomeAlone(
++			upcastPartial<IContextKeyService>({ getContextKeyValue: <T>(key: string) => keys.get(key) as T, onDidChangeContext: onDidChangeContext.event }),
++			upcastPartial<IEditorService>({ get activeEditor() { return active as never; }, onDidActiveEditorChange: onDidActiveEditorChange.event }),
++			upcastPartial<IWorkbenchLayoutService>({ mainContainer: container }),
++			upcastPartial<IExtensionService>({
++				whenInstalledExtensionsRegistered: async () => true,
++				get extensions() { return installed ? [{ identifier: new ExtensionIdentifier(id) }] as never : []; },
++				getExtensionsStatus: () => status as never,
++				onDidChangeExtensionsStatus: onDidChangeExtensionsStatus.event,
++			}),
++			new class extends NullLogService { override warn(message: string) { logged.push(message); } }(),
++		));
++		return {
++			alone: () => container.classList.contains('ritemark-welcome-alone'),
++			logged,
++			show: (viewType: string | undefined) => { active = viewType ? { viewType } : undefined; onDidActiveEditorChange.fire(); },
++			setKey: (value: boolean) => { keys.set('ritemark.welcomeAlone', value); onDidChangeContext.fire({ affectsSome: () => true } as unknown as IContextKeyChangeEvent); },
++			fail: () => { status[id] = { messages: [{ type: Severity.Error, message: 'Activating extension failed', extensionId: new ExtensionIdentifier(id), extensionPointId: '' }] }; onDidChangeExtensionsStatus.fire([new ExtensionIdentifier(id)]); },
++		};
++	}
++
++	teardown(() => ritemarkNoteWelcomeAloneExpected(false));
++
++	test('alone from the first frame; the welcome takes over and keeps it; closing the welcome ends it', async () => {
++		ritemarkNoteWelcomeAloneExpected(true);
++		const { alone, show, setKey } = setUp();
++		const atFirst = alone();
++		await timeout(0);
++		show(ritemarkFrame.welcome);
++		setKey(true);
++		const withTheWelcome = alone();
++		setKey(false);
++		show(undefined);
++		assert.deepStrictEqual({ atFirst, withTheWelcome, after: alone() }, { atFirst: true, withTheWelcome: true, after: false });
++	});
++
++	test('another editor in front first releases it, logged once', () => {
++		ritemarkNoteWelcomeAloneExpected(true);
++		const { alone, show, logged } = setUp();
++		const atFirst = alone();
++		show('workbench.editors.file');
++		assert.deepStrictEqual({ atFirst, after: alone(), logged }, { atFirst: true, after: false, logged: ['[ritemark] slot released: the welcome alone (another editor is in front)'] });
++	});
++
++	test('a minute with no welcome, Ritemark not installed, or Ritemark failed to start: released', () => runWithFakedTimers({}, async () => {
++		ritemarkNoteWelcomeAloneExpected(true);
++		const late = setUp();
++		await timeout(RITEMARK_SLOT_RELEASE_MS - 1);
++		const beforeTheMinute = late.alone();
++		await timeout(2);
++		const afterTheMinute = late.alone();
++
++		const missing = setUp({ installed: false });
++		await timeout(0);
++
++		const failed = setUp();
++		failed.fail();
++
++		assert.deepStrictEqual({ beforeTheMinute, afterTheMinute, notInstalled: missing.alone(), failed: failed.alone() }, { beforeTheMinute: true, afterTheMinute: false, notInstalled: false, failed: false });
++	}));
++
++	test('a window that isn\'t the welcome\'s (a folder, or files to open) is never alone before the welcome', () => {
++		ritemarkNoteWelcomeAloneExpected(false);
++		const { alone } = setUp();
++		assert.strictEqual(alone(), false);
 +	});
 +});
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts b/src/vs/workbench/test/browser/parts/ritemarkWindowSizes.test.ts
