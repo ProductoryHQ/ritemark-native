@@ -211,6 +211,20 @@
     "update.showPostInstallInfo": false,
     "workbench.browser.enableChatTools": false,
     "workbench.commandPalette.showAskInChat": false,
+    "workbench.activityBar.location": "top",
+    "workbench.sideBar.location": "left",
+    "workbench.editor.tabSizing": "fixed",
+    "workbench.editor.tabSizingFixedMinWidth": 38,
+    "workbench.editor.tabSizingFixedMaxWidth": 200,
+    "workbench.editor.pinnedTabSizing": "compact",
+    "workbench.editor.editorActionsLocation": "hidden",
+    "breadcrumbs.enabled": false,
+    "workbench.iconTheme": "ritemark-icons",
+    "workbench.productIconTheme": "ritemark-product-icons",
+    "workbench.panel.defaultLocation": "right",
+    "terminal.integrated.defaultLocation": "editor",
+    "terminal.integrated.hideOnStartup": "always",
+    "git.ignoreMissingGitWarning": true,
     "workbench.editorAssociations": {
       "*.md": "ritemark.editor",
       "*.markdown": "ritemark.editor",
@@ -221,5 +235,24 @@
       "*.docx": "ritemark.docxViewer",
       "*.flow.json": "ritemark.flowEditor"
     }
+  },
+  "ritemarkFrame": {
+    "extension": "ritemark.ritemark",
+    "homePlace": "workbench.view.extension.ritemark-home",
+    "aiColumn": "workbench.view.extension.ritemark-ai",
+    "permanentTabs": [
+      { "viewType": "mainThreadWebview-ritemark.home", "title": "Home", "icon": {"light": "media/home/home-tab-light.svg", "dark": "media/home/home-tab-dark.svg"} },
+      { "viewType": "mainThreadWebview-ritemark.taskBoard", "title": "Task board", "icon": {"light": "media/tasks-tab-light.svg", "dark": "media/tasks-tab-dark.svg"}, "setting": "ritemark.features.task-board" }
+    ],
+    "deskFront": "mainThreadWebview-ritemark.home",
+    "welcome": "mainThreadWebview-ritemark.welcome",
+    "places": [
+      { "id": "workbench.view.extension.ritemark-home", "title": "Home", "order": -1, "icon": "media/home-icon.svg" },
+      { "id": "workbench.view.explorer", "title": "Documents", "head": {"rows": [{"command": "ritemark.projectHead.newRow", "menu": "ritemark/projectHead/new"}, {"command": "ritemark.projectHead.search"}], "label": "Documents"} },
+      { "id": "workbench.view.extension.ritemark-tasks", "title": "Tasks", "order": 0.5, "icon": "media/tasks-icon.svg", "head": {"rows": [{"command": "ritemark.tasks.newTask"}, {"command": "ritemark.tasks.search"}]} },
+      { "id": "workbench.view.extension.ritemark-browser", "title": "Browser", "order": 0.6, "icon": "media/browser-icon.svg", "head": {"rows": [{"command": "ritemark.browser.newPage"}]} },
+      { "id": "workbench.view.extension.ritemark-agent-library", "title": "Agents", "order": 0.7, "icon": "media/agent-library-icon.svg", "head": {"rows": [{"command": "ritemark.projectHead.newRow", "menu": "ritemark/projectHead/agents/new"}, {"command": "ritemark.agentLibrary.search"}]} },
+      { "id": "workbench.view.extension.ritemark-transcribe", "title": "Transcribe", "order": 0.8, "icon": "media/transcribe-icon.svg", "head": {"rows": [{"command": "ritemark.transcribe.record"}, {"command": "ritemark.transcribe.addFile"}]} }
+    ]
   }
 }
