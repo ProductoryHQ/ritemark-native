@@ -4,7 +4,7 @@
  * Supports @ agent mentions with autocomplete, slash commands, and drag-and-drop file paths.
  */
 
-import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react';
 import { Button } from '../ui/button';
 import { Icon } from '../ui/Icon';
 import { Tooltip } from '../ui/tooltip';
@@ -166,9 +166,15 @@ interface ChatInputProps {
    * menus open inside it, so the thread rail beside it never covers them.
    */
   menuBoundary: HTMLElement | null;
+  /**
+   * Sprint 152 (the Experience lead's check of #632): a notice about the box itself, such as the AI's check still
+   * running while Send is greyed. It sits directly above the box, under the AI disclosure, so it is the one nearest
+   * the box; the conversation above gets shorter at its foot and the sheet doesn't move.
+   */
+  notice?: ReactNode;
 }
 
-export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
+export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
   const [value, setValue] = useState('');
 
   // ── Sprint 99 (E5 / R14): the composer belongs to the ACTIVE thread ──
@@ -1164,6 +1170,8 @@ export function ChatInput({ onReport, menuBoundary }: ChatInputProps) {
           onDismiss={aiInformation.acknowledge}
         />
       )}
+
+      {notice && <div className="mb-2">{notice}</div>}
 
       {/* Sprint 64 bonus track (S5): docked selected-text context tab.
           Renders only when the editor has a non-empty selection. The tab's

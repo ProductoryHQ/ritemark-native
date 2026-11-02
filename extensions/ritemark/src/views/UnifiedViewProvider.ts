@@ -143,8 +143,15 @@ import {
   type ChatLinkAction,
   type ChatLocalTarget,
 } from './chatLinkTargets';
+import { aiColumnShownSince, aiStartingMarkBody, aiStartingMarkHead } from './aiStartingMark';
 
 const _toolsInjector = new RitemarkToolsInjector();
+
+/**
+ * Sprint 152 (R5): the longest VS Code waits for the AI view's resolve, so the shell's mark never outlives a page that
+ * did not ask for its bootstrap (an old bundle, a failed load). The page asks 0.3–0.4 s after it loads (A4).
+ */
+const AI_VIEW_RESOLVE_LIMIT_MS = 3000;
 
 /**
  * Conversation id used when a webview message predates the Sprint 99 protocol.
@@ -231,6 +238,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * prevent those results from hydrating the replacement view.
    */
   private _viewGeneration = 0;
+
+  /** When Ritemark activated: this provider is made in `activate()` (Sprint 152, R5: the column's first frame). */
+  private readonly _activatedAt = Date.now();
+
+  /**
+   * Sprint 152 (R5, #624): ends the view's resolve once its page has drawn its own turning mark, so patch 018 keeps
+   * its mark until then (it takes it away when the resolve ends) and no bare ground shows between the two.
+   */
+  private _endViewResolve: { generation: number; end: () => void } | undefined;
 
   /**
    * Set when the report window is requested before the webview can hear it —
@@ -430,7 +446,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
-  ) {
+  ): Thenable<void> {
+    const resolvedAt = Date.now();
     this._view = webviewView;
     this._sidebarReady = false;
     const viewGeneration = ++this._viewGeneration;
@@ -441,7 +458,26 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri]
     };
 
-    webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+    // Sprint 152 (R5): the view's own turning mark takes over the shell's, timed from the column's first frame
+    const columnShownSince = aiColumnShownSince({
+      extensionHostStartedAt: performance.timeOrigin,
+      activatedAt: this._activatedAt,
+      resolvedAt,
+    });
+    webviewView.webview.html = this._getHtmlForWebview(webviewView.webview, columnShownSince);
+
+    // The resolve ends when the page asks for its bootstrap (its first frame, the mark, is drawn by then), or after
+    // AI_VIEW_RESOLVE_LIMIT_MS, or when the view goes: VS Code awaits it before it takes the shell's mark away.
+    this._endViewResolve?.end();
+    const resolved = new Promise<void>((resolve) => {
+      const timer = setTimeout(() => end(), AI_VIEW_RESOLVE_LIMIT_MS);
+      const end = () => {
+        clearTimeout(timer);
+        if (this._endViewResolve?.generation === viewGeneration) this._endViewResolve = undefined;
+        resolve();
+      };
+      this._endViewResolve = { generation: viewGeneration, end };
+    });
 
     // Handle messages from the webview
     webviewView.webview.onDidReceiveMessage(async (message) => {
@@ -485,6 +521,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       switch (message.type) {
         case 'ready': // Compatibility request from an older webview bundle.
         case 'agent:bootstrap/request': {
+          if (this._endViewResolve?.generation === viewGeneration) this._endViewResolve.end();
           if (message.type === 'ready') this._legacySidebarViewGeneration = viewGeneration;
           const delivered = await this._sendAgentBootstrap(
             webviewView.webview,
@@ -1816,6 +1853,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       if (webviewView.visible) modelCatalog.pollFeedIfStale();
     });
     webviewView.onDidDispose(() => {
+      if (this._endViewResolve?.generation === viewGeneration) this._endViewResolve.end();
       for (const listener of activeFileListeners) listener.dispose();
       if (this._activeFileTimer) {
         clearTimeout(this._activeFileTimer);
@@ -1839,6 +1877,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       }
     });
     this._refreshBrowserContextPolling();
+    return resolved;
   }
 
   /**
@@ -3630,7 +3669,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     };
   }
 
-  private _getHtmlForWebview(webview: vscode.Webview): string {
+  private _getHtmlForWebview(webview: vscode.Webview, columnShownSince: number): string {
     const nonce = this._getNonce();
 
     // Match the editor provider's cache policy. Without a content version this
@@ -3655,9 +3694,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       background: var(--vscode-sideBar-background) !important;
     }
   </style>
+  ${aiStartingMarkHead(nonce, columnShownSince)}
 </head>
 <body>
   <div id="root" data-editor-type="ai-sidebar"></div>
+  ${aiStartingMarkBody()}
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

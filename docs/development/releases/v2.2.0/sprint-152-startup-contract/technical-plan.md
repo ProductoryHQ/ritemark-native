@@ -85,6 +85,11 @@ be free. A held extension host's inspector is checked to be a child of that inst
 
 When an audit changes a requirement or the tier, `spec.md` and the sprint plan's tier line change first.
 
+**A2's answer for W4's release bounds** (1 November, the "Ritemark on Windows" session): Ritemark was active at 17.2 s on
+the closest-to-cold start (12.0 s after the parts splash went, 7.0 s of it Ritemark's own code loading with Defender
+reading), 3.4–3.5 s on warm starts; a start after an install measured about 26 s for #401. The content slots' 60 s
+release stays: every measured start is well inside it, and it is VS Code's own limit for the extension host.
+
 ## Workstream 1: the first-frame check (R8, PR 1)
 
 - `project-check.mjs --first-frame`: reuse `--measure`'s sampler and its CDP session; add the boxes (`getBoundingClientRect`
@@ -94,6 +99,11 @@ When an audit changes a requirement or the tier, `spec.md` and the sprint plan's
   the held extension host is let go over its inspector (`Runtime.runIfWaitingForDebugger`), as in S47.
 - Five runs per start on `main` before it gates; the result is A1's failing set.
 - The `release` skill's Gate 1 frame step and layout-invariants.md's *When patching layout* name it.
+- *As built:* the first frame is the first sample after `code/didRemovePartsSplash` (a switch keeps a hidden splash
+  element in the page); the window has settled when Ritemark's Send feedback has been in the status bar 5 s and
+  nothing changed for 2 s (a restored Home tab is there before Ritemark starts, so it can't be the sign); a held
+  extension host is found on `--ext-port` or VS Code's next tries, 2048 apart, and let go only once its process is
+  shown to descend from the instance with this `--user-data-dir`. `relaunch --ai-closed` is R6's start.
 
 ## Workstream 2: the AI column draws once (R5, PR 1)
 
@@ -104,6 +114,20 @@ When an audit changes a requirement or the tier, `spec.md` and the sprint plan's
 - No new message type. If the host has to say more in `agent:bootstrap`, it is a field the webview reads when present.
 - Webview tests: the view draws neither the chat nor the sign-in before the deciding answer; the two orders of answers.
   Bundle size in `notes/bundle.md`.
+- *As built:* the mark is plain HTML and CSS in the view's page (`src/views/aiStartingMark.ts`), so it is the page's
+  first frame; a nonce'd script in the page's head times it from the column's first frame (the host's estimate,
+  `aiColumnShownSince`) and turns it in step with the shell's. `resolveWebviewView` returns a promise that ends when
+  the page asks for its bootstrap (or after 3 s), so patch 018 keeps its mark until the view's covers it. `startLook.ts`
+  decides when the look is certain (the bootstrap; the chosen AI's answer; then the other AIs, a conversation on its
+  way and the onboarding status, awaited 2 s at most); `sidebarGate.ts` now derives its own inputs (`sidebarGateInput`),
+  so the view and the tests share them; `StartingLook.tsx` draws the 10 s line and the failure. A chat that is the
+  settled look at once (a conversation was open) while its AI's check hangs gets, after the same 10 s, "Still checking
+  whether Claude is ready." and "You can write your message now and send it when Claude is ready." on `RuntimeNotice`'s
+  new `checking` tone (the kit's mark in ink on the quiet chip, `role="status"`), inside the sheet directly above the box
+  (`ChatInput`'s `notice`, under the AI disclosure), with a ghost Try again: the 15 s card's job, so a hung check always
+  has a way to check again. Only the conversation gets shorter at its foot; one kept at its end keeps its last message in
+  sight (`UnifiedConversationView`). The Experience lead's check of #632 set both cards' words and looks. The AI view's lazy
+  load has no "Loading..." fallback. No message type and no field: the statuses can't ride on the bootstrap (A4).
 
 ## Workstream 3: the AI column at start (R6, PR 1)
 
@@ -111,6 +135,11 @@ By Jarmo's answer to decision 2. Recommended: the two start-time `ritemark.unifi
 `:802`) don't open a column the layout restored closed; A1 says whether they are still needed for anything else (their
 comment names the terminal taking the focus). Otherwise: the calls stay, and PR 2's `layout.ts` shows the AI column at
 the first frame of every project window.
+
+*As built (decision 2: it stays closed):* both calls are gone. A1 found no other use: the AI column of a project window
+is there from the first frame by the layout since Sprint 145, both calls already passed `preserveFocus`, and a column
+the narrow window stepped aside is brought back by patch 018's window sizes, which keep that apart from the person's
+choice. `WelcomeHost`'s two queries (`isOpen`, `mayOpenAtStart`), which only those calls asked, go with them.
 
 ## Workstream 4: the manifest and the slot (R1, PR 2)
 
@@ -124,7 +153,10 @@ the first frame of every project window.
 
 ## Workstream 5: Sprint 145's four on the slot (R2, PR 2)
 
-- `layout.ts` (002): the AI column restored from the manifest; closing it again is its release.
+- `layout.ts` (002): the AI column restored from the manifest; closing it again is its release. The release must
+  not store the column hidden: 002's comment says the extension opens it again at its next start, and PR 1's R6 removed
+  that call, so after a start where Ritemark AI never registered (the extension not read at all) the column would
+  otherwise stay closed though the person never closed it (PR 1's review, finding 3).
 - `ritemarkSwitchGuard.ts` and `editorPart.ts` (018): the note as it is; the decision goes through the desk's front slot.
 - `ritemarkTerminalTabs.ts` (019): restored terminals wait for the front slot; the 60 s constant is the slot's release.
 - `ritemarkProjectHead.ts` (018): `HEAD_PLACES` from the manifest, the rows' room as slots.

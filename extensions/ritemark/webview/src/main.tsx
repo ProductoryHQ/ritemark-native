@@ -119,7 +119,8 @@ ReactDOM.createRoot(rootElement).render(
         <FlowsPanel />
       </Suspense>
     ) : editorType === 'ai-sidebar' ? (
-      <Suspense fallback={<LoadingFallback />}>
+      // Sprint 152 (R5, #624): no "Loading..." in the AI column; the page's own turning mark shows until the view draws
+      <Suspense fallback={null}>
         <AISidebar />
       </Suspense>
     ) : editorType === 'transcribe-panel' ? (
