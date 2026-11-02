@@ -1404,10 +1404,10 @@ index bfc8839cc65..745739c61f4 100644
  		};
 diff --git a/src/vs/workbench/browser/ritemarkFrame.ts b/src/vs/workbench/browser/ritemarkFrame.ts
 new file mode 100644
-index 00000000000..7cd666b8dc2
+index 00000000000..895e9edc035
 --- /dev/null
 +++ b/src/vs/workbench/browser/ritemarkFrame.ts
-@@ -0,0 +1,468 @@
+@@ -0,0 +1,473 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1688,15 +1688,20 @@ index 00000000000..7cd666b8dc2
 + * stored last time (as placeholders, until their extension registers them), and a new profile has none, so its row was
 + * Documents alone until the extensions were read. With nothing stored, the manifest's places are stored as those
 + * placeholders before the row is made, in its order, with their titles and the built-in copy's icons; the extension's
-+ * registration replaces each in place, and VS Code stores the real ones as it always does.
++ * registration replaces each in place, and VS Code stores the real ones as it always does. Only the extension's places
++ * are seeded (those with an order): VS Code's own (Documents) is registered before the row is made and takes its spot
++ * among them by itself. A seeded Documents, with no order, made every other place VS Code added after it go in at the
++ * places' end, one before the other, so More's order differed from a profile without seeds (Chat Debug before
++ * Extensions).
 + */
 +export function ritemarkSeedPlaces(storageService: IStorageService, pinnedKey: string, placeholderKey: string, frame = ritemarkFrame): void {
-+	if (!frame.places.length || storageService.get(pinnedKey, StorageScope.PROFILE) !== undefined) {
++	const places = frame.places.filter(entry => entry.order !== undefined);
++	if (!places.length || storageService.get(pinnedKey, StorageScope.PROFILE) !== undefined) {
 +		return;
 +	}
 +	const extension = ritemarkBuiltinExtensionLocation(frame);
-+	storageService.store(pinnedKey, JSON.stringify(frame.places.map(entry => ({ id: entry.id, pinned: true, visible: true, order: entry.order }))), StorageScope.PROFILE, StorageTarget.USER);
-+	storageService.store(placeholderKey, JSON.stringify(frame.places.map(entry => ({
++	storageService.store(pinnedKey, JSON.stringify(places.map(entry => ({ id: entry.id, pinned: true, visible: true, order: entry.order }))), StorageScope.PROFILE, StorageTarget.USER);
++	storageService.store(placeholderKey, JSON.stringify(places.map(entry => ({
 +		id: entry.id,
 +		name: entry.title,
 +		iconUrl: extension && entry.icon ? joinPath(extension, entry.icon).toJSON() : undefined,
@@ -2150,10 +2155,10 @@ index ef3388a877f..873b2dbf292 100644
  
 diff --git a/src/vs/workbench/test/browser/ritemarkFrame.test.ts b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
 new file mode 100644
-index 00000000000..db6aabe675c
+index 00000000000..f083c0d3174
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
-@@ -0,0 +1,152 @@
+@@ -0,0 +1,151 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2230,7 +2235,7 @@ index 00000000000..db6aabe675c
 +		assert.deepStrictEqual(logged, ['[ritemark] slot released: a test slot (why)', '[ritemark] slot released: another test slot (why)']);
 +	});
 +
-+	test('R9: a new profile\'s places row gets the manifest\'s places as placeholders; a stored row is left alone', () => {
++	test('R9: a new profile\'s places row gets the extension\'s places as placeholders (not VS Code\'s own Documents); a stored row is left alone', () => {
 +		const frame = readRitemarkFrame(manifest);
 +		const fresh = store.add(new TestStorageService());
 +		ritemarkSeedPlaces(fresh, 'pinned', 'placeholders', frame);
@@ -2246,10 +2251,9 @@ index 00000000000..db6aabe675c
 +			placeholders: placeholders.map((entry: { id: string; name: string; iconUrl?: { path: string }; isBuiltin: boolean; views: object[] }) => ({ id: entry.id, name: entry.name, icon: entry.iconUrl?.path.endsWith('/ritemark/media/home-icon.svg') ?? null, isBuiltin: entry.isBuiltin, views: entry.views })),
 +			storedLeftAlone: [stored.get('pinned', StorageScope.PROFILE), stored.get('placeholders', StorageScope.PROFILE)],
 +		}, {
-+			pinned: [{ id: 'workbench.view.extension.ritemark-home', pinned: true, visible: true, order: -1 }, { id: 'workbench.view.explorer', pinned: true, visible: true }],
++			pinned: [{ id: 'workbench.view.extension.ritemark-home', pinned: true, visible: true, order: -1 }],
 +			placeholders: [
 +				{ id: 'workbench.view.extension.ritemark-home', name: 'Home', icon: true, isBuiltin: true, views: [{}] },
-+				{ id: 'workbench.view.explorer', name: 'Documents', icon: null, isBuiltin: true, views: [{}] },
 +			],
 +			storedLeftAlone: ['[{"id":"workbench.view.search","pinned":true,"visible":true}]', undefined],
 +		});
