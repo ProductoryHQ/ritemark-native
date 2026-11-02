@@ -38,6 +38,23 @@ const CARRIER_BOOKMARK_ID = 1_700_000_000;
 const SPLIT_BOOKMARK_ID = 1_600_000_000;
 const CONTINUED_BOOKMARK_ID = 1_500_000_000;
 const EMPTY_BOOKMARK_ID = 1_400_000_000;
+/**
+ * Sprint 148 (R9): marks each header row a split table repeats, so search can tell the copies from the row the
+ * document holds (`renderedDocx.isBodyText`). In the row's first paragraph: `_rmh3`.
+ */
+export const REPEATED_ROW_MARKER = '_rmh';
+const REPEATED_ROW_BOOKMARK_ID = 1_300_000_000;
+let repeatedRows = 0;
+
+/** The repeated header rows, each with a `_rmh` bookmark at the start of its first paragraph. */
+export function markRepeatedRows(rowsXml: string): string {
+  return rowsXml.replace(/<w:tr\b[\s\S]*?<\/w:tr>/g, (row) =>
+    row.replace(/<w:p(?:\s[^>]*)?>(?:<w:pPr\/>|<w:pPr\b[^>]*\/>|<w:pPr\b[\s\S]*?<\/w:pPr>)?/, (open) => {
+      const n = repeatedRows++ % 100_000_000;
+      return `${open}${markerBookmark(REPEATED_ROW_BOOKMARK_ID + n, `${REPEATED_ROW_MARKER}${n}`)}`;
+    }),
+  );
+}
 
 /** What a block marker stands for. */
 export type BlockMarker =
@@ -748,7 +765,7 @@ export function insertPageBreaks(markedXml: string, breaks: ReadonlySet<string>)
         edits.push({ start: block.start, end: block.start, text: carrier(carriers++) });
         return;
       }
-      const repeat = index >= headerRows.length ? headerXml : '';
+      const repeat = index >= headerRows.length && headerXml ? markRepeatedRows(headerXml) : '';
       const tblPr = repeat ? block.tblPr : withoutFirstRowLook(block.tblPr);
       const rowXml = markedXml.slice(row.start, row.end);
       edits.push({

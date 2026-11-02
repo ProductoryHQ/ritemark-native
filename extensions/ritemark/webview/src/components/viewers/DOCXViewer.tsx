@@ -66,7 +66,7 @@ import {
   shareMenuItems,
   type HostPlatform,
 } from './viewerShare'
-import { decodeFindOpen, isRequestQuery, landingIndex, type FindRequest } from '../../utils/findRequest'
+import { bodyLandingIndex, decodeFindOpen, isRequestQuery, type FindRequest } from '../../utils/findRequest'
 import './documentSearch.css'
 import './docx/docxPreview.css'
 
@@ -461,8 +461,9 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
       setCurrentMatch(-1)
       return
     }
-    const { nodes, chunks } = textChunks(stage)
-    const ranges = findDocumentMatches(chunks, deferredQuery).map((m) => {
+    const { nodes, chunks, body } = textChunks(stage)
+    const found = findDocumentMatches(chunks, deferredQuery)
+    const ranges = found.map((m) => {
       const range = document.createRange()
       range.setStart(nodes[m.start.chunk], m.start.offset)
       range.setEnd(nodes[m.end.chunk], m.end.offset)
@@ -474,7 +475,8 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
     const wanted = landing.current
     if (wanted && isRequestQuery(wanted, deferredQuery) && ranges.length > 0) {
       landing.current = null
-      setCurrentMatch(landingIndex(wanted, ranges.length))
+      // Counted in the body only, as the index counts it: not a page header or footer, not a repeated table row.
+      setCurrentMatch(bodyLandingIndex(wanted, found.map((m) => body[m.start.chunk])))
       return
     }
     // Start at the first match from where the reader is.

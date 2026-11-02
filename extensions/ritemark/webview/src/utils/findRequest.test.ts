@@ -13,7 +13,11 @@ import { history, undoDepth } from '@tiptap/pm/history'
 import type { Plugin } from '@tiptap/pm/state'
 import { SearchExtension, searchPluginKey } from '../extensions/SearchExtension'
 import { createEditorSchemaExtensions } from './editorMarkdown'
-import { MAX_FIND_TEXT, decodeFindOpen, isRequestQuery, landingIndex, landingMove } from './findRequest'
+import { parse, type HTMLElement as ParsedElement, type Node as ParsedNode } from 'node-html-parser'
+import { MAX_FIND_TEXT, bodyLandingIndex, decodeFindOpen, isRequestQuery, landingIndex, landingMove } from './findRequest'
+import { isBodyText } from '../components/viewers/docx/renderedDocx'
+import { markRepeatedRows } from '../components/viewers/docx/pagination'
+import { findDocumentMatches, type TextChunk } from '../components/viewers/documentSearch'
 
 let failures = 0
 function test(name: string, run: () => void): void {
@@ -90,6 +94,69 @@ test('landingMove: waits for the words and matches; a repeat on the current matc
   // The person scrolled away; the same result again: the bar keeps its match and scrolls back (keyed by the id).
   assert.deepEqual(landingMove(request, 'level', 6, 3), { index: 3, move: false })
   assert.deepEqual(landingMove({ ...request, occurrence: 0 }, 'Level', 6, 0), { index: 0, move: false })
+})
+
+console.log('The Word preview: the body only, as the index counts it')
+
+test('bodyLandingIndex: the occurrence among body matches, mapped back to the match list', () => {
+  const isBody = [false, true, false, true, true, false]
+  assert.equal(bodyLandingIndex({ text: 'a', occurrence: 0, id: 1 }, isBody), 1)
+  assert.equal(bodyLandingIndex({ text: 'a', occurrence: 2, id: 1 }, isBody), 4)
+  assert.equal(bodyLandingIndex({ text: 'a', occurrence: 9, id: 1 }, isBody), 4, 'past the end: the last body match')
+  assert.equal(bodyLandingIndex({ text: 'a', occurrence: 1, id: 1 }, [false, false, false]), 1, 'no body match: all count')
+  assert.equal(bodyLandingIndex({ text: 'a', occurrence: 0, id: 1 }, []), -1)
+})
+
+test('markRepeatedRows: a marker at the start of each repeated row’s first paragraph, after its properties', () => {
+  const rows = '<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>Annual</w:t></w:r></w:p><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p w:rsidR="1"><w:r><w:t>b</w:t></w:r></w:p></w:tc></w:tr>'
+  const marked = markRepeatedRows(rows)
+  assert.equal((marked.match(/w:name="_rmh\d+"/g) ?? []).length, 2)
+  assert.match(marked, /<\/w:pPr><w:bookmarkStart w:id="\d+" w:name="_rmh\d+"\/><w:bookmarkEnd w:id="\d+"\/><w:r><w:t>Annual/)
+  assert.match(marked, /<w:p w:rsidR="1"><w:bookmarkStart /)
+  assert.ok(!marked.includes('<w:trPr><w:bookmarkStart'), 'never in the row properties')
+  assert.equal(markRepeatedRows(''), '')
+})
+
+// A page as docx-preview draws it: header, the body (article) with a table split across two pages whose header
+// row repeats (marked), footer. "Annual" is in the header, the footer, the table's header row (drawn twice) and
+// twice more in the body. The index counts 3 in the body (the table's header row once, then two paragraphs).
+const DRAWN = `
+<section><header><p>Annual report</p></header><article>
+  <table><tr><td><p><span id="_rmb4"></span>Annual figures</p></td></tr><tr><td><p>1</p></td></tr></table>
+</article><footer><p>Annual report, page 1</p></footer></section>
+<section><header><p>Annual report</p></header><article>
+  <table><tr><td><p><span id="_rmh0"></span>Annual figures</p></td></tr><tr><td><p>2</p></td></tr></table>
+  <p>The annual plan</p><p>Another annual review</p>
+</article><footer><p>Annual report, page 2</p></footer></section>`
+
+function drawnChunks(html: string): { chunks: TextChunk[]; parents: ParsedElement[] } {
+  const chunks: TextChunk[] = []
+  const parents: ParsedElement[] = []
+  const walk = (node: ParsedNode) => {
+    for (const child of node.childNodes) {
+      if (child.nodeType === 3) {
+        if (!child.text.trim()) continue
+        chunks.push({ text: child.text, newBlock: true })
+        parents.push(child.parentNode as ParsedElement)
+      } else walk(child)
+    }
+  }
+  walk(parse(html))
+  return { chunks, parents }
+}
+
+test('a later body result lands on its body copy, not on a header, a footer or a repeated row', () => {
+  const { chunks, parents } = drawnChunks(DRAWN)
+  const matches = findDocumentMatches(chunks, 'annual')
+  assert.equal(matches.length, 8, 'the find bar still finds every drawn copy')
+  const isBody = matches.map((m) => isBodyText(parents[m.start.chunk]))
+  assert.deepEqual(isBody, [false, true, false, false, false, true, true, false])
+  // Occurrence 1 in the body ("The annual plan") is match 5 here, not match 1 of all drawn copies.
+  const land = bodyLandingIndex({ text: 'annual', occurrence: 1, id: 1 }, isBody)
+  assert.equal(land, 5)
+  assert.equal(chunks[matches[land].start.chunk].text, 'The annual plan')
+  assert.equal(chunks[matches[bodyLandingIndex({ text: 'annual', occurrence: 2, id: 1 }, isBody)].start.chunk].text, 'Another annual review')
+  assert.equal(chunks[matches[bodyLandingIndex({ text: 'annual', occurrence: 0, id: 1 }, isBody)].start.chunk].text, 'Annual figures')
 })
 
 console.log('The Markdown editor: nothing in the document changes')

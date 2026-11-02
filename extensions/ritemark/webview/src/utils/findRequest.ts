@@ -56,6 +56,21 @@ export function landingIndex(request: FindRequest, count: number, pageOf?: (inde
 }
 
 /**
+ * The Word preview's landing (R9). The index counts the occurrence in the body (`word/document.xml`); the preview
+ * also draws page headers and footers on every page and repeats a split table's header rows. `isBody[i]` says
+ * whether match i is body text: the occurrence counts those alone and the landing maps back to the match list.
+ * With no body match at all, every match counts.
+ */
+export function bodyLandingIndex(request: FindRequest, isBody: readonly boolean[]): number {
+  const bodyMatches: number[] = []
+  isBody.forEach((body, i) => {
+    if (body) bodyMatches.push(i)
+  })
+  if (bodyMatches.length === 0) return landingIndex(request, isBody.length)
+  return bodyMatches[landingIndex(request, bodyMatches.length)]
+}
+
+/**
  * The Markdown find bar's step once its matches change: null while the request's words aren't the query or have
  * no matches yet; else the match to land on, and whether the bar must move to it (it may be current already —
  * the bar then only scrolls back to it).

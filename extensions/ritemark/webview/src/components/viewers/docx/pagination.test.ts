@@ -217,7 +217,11 @@ const heading1 = paragraphStyles(
   const continuation = out.slice(split);
   assert.ok(continuation.startsWith('</w:tbl><w:p><w:pPr><w:pageBreakBefore/><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr><w:bookmarkStart w:id="1700000000" w:name="_rmc0"/>'), continuation.slice(0, 300));
   assert.ok(continuation.includes('<w:tbl><w:tblPr><w:tblStyle w:val="Grid"/><w:tblLook w:val="04A0" w:firstRow="1"/></w:tblPr><w:tblGrid>'));
-  assert.ok(/<w:tblHeader\/><\/w:trPr><w:tc><w:tcPr><w:tcW w:w="100"\/><\/w:tcPr><w:p><w:r><w:t>h1</.test(continuation), 'the header row repeats, without its marker');
+  assert.ok(
+    /<w:tblHeader\/><\/w:trPr><w:tc><w:tcPr><w:tcW w:w="100"\/><\/w:tcPr><w:p><w:bookmarkStart w:id="13\d{8}" w:name="_rmh\d+"\/><w:bookmarkEnd w:id="13\d{8}"\/><w:r><w:t>h1</.test(continuation),
+    'the header row repeats, without its block marker, with a repeated-row marker (Sprint 148, R9)',
+  );
+  assert.equal((out.match(/w:name="_rmh/g) ?? []).length, 1, 'the original header row carries none');
   assert.ok(continuation.includes('<w:vMerge w:val="restart"/></w:tcPr><w:p><w:bookmarkStart w:id="1800000006"'), 'the continuing merge restarts');
   // Table 2: a break before its first row starts the page before the whole table (a carrier paragraph)...
   assert.ok(out.includes('<w:bookmarkStart w:id="1700000001" w:name="_rmc1"/><w:bookmarkEnd w:id="1700000001"/></w:p><w:tbl>'), out);
