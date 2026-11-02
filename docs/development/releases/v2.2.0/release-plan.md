@@ -97,6 +97,7 @@ The five items, in the shape's order:
 | 146 | `sprint-146-controls` (plan on `plan/v2.2.0-sprint-146`) | Plan: [#603](https://github.com/ProductoryHQ/ritemark-native/pull/603) | #585, #576, #566, #567, #568, #594, #598 | Plan approved 1 Nov; PR 1 (#585 carried over) and PR 2 under way | — | — |
 | 146, PR 4 | `sprint-146-controls-shell` | [#630](https://github.com/ProductoryHQ/ritemark-native/pull/630) | #567, #568, #594 | Draft. Shell-tier, High: in review | Mac: before and after on dev instances of `main`'s patches and this branch's (A6, A7, A8), the frame check (0 of 34 scenes differ from `main`'s capture, JOINS ok 34 of 34, geometry 34 PASS); Windows at Gate 2 (S43, S47, the hovered row at 100/125/150%) | At the sprint's closeout |
 | Plan: 152 and the startup contract's proposal | `plan/sprint-152-startup-contract` | [#626](https://github.com/ProductoryHQ/ritemark-native/pull/626) | #624 | Light; the plan is Approved (the manager, on Jarmo's 2.2 delegation) | n/a | n/a |
+| 148, PR 1 (the index) | `sprint-148-search-words` | [#631](https://github.com/ProductoryHQ/ritemark-native/pull/631) | #591 (part) | Draft. Extension-tier, Standard: one round, 15 findings, all fixed (the Review record is in the PR's description) | Mac: the unit tests; M1 and M3 on the generated folder (`research/measurements.md`), two targets missed past the plan's folder, for the manager; A2 in an Electron utility process; Windows through the overlay (to send) | None: the index has no screen until PR 2 |
 
 ## Risks and Blockers
 

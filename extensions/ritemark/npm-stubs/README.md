@@ -44,3 +44,14 @@ Re-check its `peerDependencies` versions and update the stub `version` fields to
 stay within the declared ranges, then regenerate the lockfile with
 `npm install --legacy-peer-deps`. If a future SDK actually starts loading these
 packages at runtime, replace the stubs with the real dependencies.
+
+## `@napi-rs/canvas` (Sprint 148)
+
+`pdfjs-dist` (a dev dependency: the search worker's bundle inlines it) lists the
+native `@napi-rs/canvas` as an optional dependency, for drawing pages in Node.
+The search worker only reads text and never draws, and the Mac builds copy
+`node_modules` whole, so the real package would ship a 25 MB native module to be
+signed and never used. `overrides` in `package.json` points it here instead; the
+bundle never loads it (pdf.js's own `require` of it fails inside a CJS bundle,
+and pdf.js carries on without it). If `pdfjs-dist` is bumped, keep the stub's
+`version` inside its declared range.

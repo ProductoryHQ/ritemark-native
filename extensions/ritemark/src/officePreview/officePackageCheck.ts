@@ -157,6 +157,35 @@ function inflateCapped(data: Uint8Array, maxOutputLength: number): Promise<numbe
   });
 }
 
+/** Where an entry's stored bytes are, after its local header; null when the header isn't there. */
+function entryDataRange(bytes: Uint8Array, entry: ZipEntry): { start: number; end: number } | null {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const at = entry.localHeaderOffset;
+  if (at + 30 > bytes.length || view.getUint32(at, true) !== LOCAL_FILE) return null;
+  const start = at + 30 + view.getUint16(at + 26, true) + view.getUint16(at + 28, true);
+  const end = start + entry.compressedSize;
+  if (end > bytes.length) return null;
+  return { start, end };
+}
+
+/**
+ * Sprint 148 (search, R2): one entry's contents, inflated and capped at its
+ * declared size. Null when it is encrypted, damaged, of another method, or not
+ * the size it declares. Call it on a package `checkOfficePackage` passed.
+ */
+export function readZipEntry(bytes: Uint8Array, entry: ZipEntry): Promise<Uint8Array | null> {
+  const range = entryDataRange(bytes, entry);
+  if (!range || entry.flags & 0x1) return Promise.resolve(null);
+  const data = bytes.subarray(range.start, range.end);
+  if (entry.method === 0) return Promise.resolve(entry.compressedSize === entry.uncompressedSize ? data : null);
+  if (entry.method !== 8) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    inflateRaw(data, { maxOutputLength: entry.uncompressedSize + 1 }, (error, output) => {
+      resolve(error || output.length !== entry.uncompressedSize ? null : new Uint8Array(output.buffer, output.byteOffset, output.byteLength));
+    });
+  });
+}
+
 /**
  * Does every part hold what the directory says it holds? Each deflated part is
  * inflated in the extension host's thread pool, capped at its declared size plus
@@ -165,14 +194,11 @@ function inflateCapped(data: Uint8Array, maxOutputLength: number): Promise<numbe
  * package the webview must not receive.
  */
 export async function verifyDeclaredSizes(bytes: Uint8Array, entries: readonly ZipEntry[]): Promise<boolean> {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   for (const entry of entries) {
     if (entry.flags & 0x1) return false;
-    const at = entry.localHeaderOffset;
-    if (at + 30 > bytes.length || view.getUint32(at, true) !== LOCAL_FILE) return false;
-    const start = at + 30 + view.getUint16(at + 26, true) + view.getUint16(at + 28, true);
-    const end = start + entry.compressedSize;
-    if (end > bytes.length) return false;
+    const range = entryDataRange(bytes, entry);
+    if (!range) return false;
+    const { start, end } = range;
     if (entry.method === 0) {
       if (entry.compressedSize !== entry.uncompressedSize) return false;
     } else if (entry.method === 8) {
@@ -188,11 +214,16 @@ export async function verifyDeclaredSizes(bytes: Uint8Array, entries: readonly Z
 /**
  * Is this a package the preview may open? `partPrefix` is the folder the
  * format keeps its parts in: `word/` for .docx, `ppt/` for .pptx.
+ *
+ * `verifyParts: false` (Sprint 148, search) skips the last step, inflating every
+ * part: search reads one part, through `readZipEntry`, which is capped at that
+ * part's declared size itself, so the pictures needn't be inflated to be checked.
  */
 export async function checkOfficePackage(
   bytes: Uint8Array,
   partPrefix: string,
   limits: typeof OFFICE_PREVIEW_LIMITS = OFFICE_PREVIEW_LIMITS,
+  { verifyParts = true }: { verifyParts?: boolean } = {},
 ): Promise<PackageVerdict> {
   if (bytes.length > limits.maxFileBytes) return { ok: false, reason: 'too-large', bytes: bytes.length };
   if (startsWith(bytes, CFB_SIGNATURE)) {
@@ -219,7 +250,7 @@ export async function checkOfficePackage(
   if (!names.includes('[Content_Types].xml')) return { ok: false, reason: 'not-an-office-file' };
   if (!names.some((n) => n.startsWith(partPrefix))) return { ok: false, reason: 'wrong-kind' };
   // Last, and only now that the declared sizes are within the limits: are they true?
-  if (!(await verifyDeclaredSizes(bytes, entries))) return { ok: false, reason: 'damaged' };
+  if (verifyParts && !(await verifyDeclaredSizes(bytes, entries))) return { ok: false, reason: 'damaged' };
   return { ok: true };
 }
 
