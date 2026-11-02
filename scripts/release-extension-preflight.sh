@@ -211,6 +211,32 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+# Check 5b: the extension fills the frame its shell draws (Sprint 152, R7)
+#
+# The shell at $REF draws Ritemark's frame from the first frame, from the
+# ritemarkFrame block of its branding/product.json: the places, the head's rows,
+# the AI column, the permanent tabs, the desk's front, the welcome and the
+# frame-shaping settings. This release's extension must still be what that
+# manifest names, or a slot is released and the frame moves. A release that
+# adds, removes or renames one of them is a shell release; --allow-unshipped
+# does not pass it. The rules live in scripts/check-frame-manifest.mjs.
+# -----------------------------------------------------------------------------
+FRAME_LOG=/tmp/release-extension-preflight-frame.log
+if FRAME=$(node scripts/check-frame-manifest.mjs --ref "$REF" 2>"$FRAME_LOG"); then
+  if [[ -s "$FRAME_LOG" ]]; then
+    ok "the extension fills the frame the shell at $REF draws ($(head -1 "$FRAME_LOG"))"
+  else
+    ok "the extension fills the frame the shell at $REF draws"
+  fi
+elif [[ -n "$FRAME" ]]; then
+  fail "the extension no longer fills the frame the shell at $REF draws (a shell release changes these):"
+  echo "$FRAME" | sed 's/^/  /'
+else
+  fail "could not compare the extension with the shell's frame manifest:"
+  sed '/^$/d; s/^/  /' "$FRAME_LOG"
+fi
+
+# -----------------------------------------------------------------------------
 # Check 6: changes an extension release cannot deliver
 #
 # Extension-tier by path does not mean an extension release carries it. The
