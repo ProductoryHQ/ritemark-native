@@ -56,6 +56,7 @@ export type FlagId =
   | 'composer-thinking-effort'
   // Sprint 119: publish a Markdown document to Google Docs and Sync it later
   | 'google-docs-publishing'
+  | 'web-page-publishing'
   // Sprint 118: record from the microphone directly in Transcribe (#328)
   | 'transcribe-direct-recording'
   // Sprint 125: read-only PowerPoint (.pptx) preview (#285)
@@ -135,6 +136,18 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     id: 'google-docs-publishing',
     label: 'Google Docs Publishing',
     description: 'Publish a Markdown document to Google Docs and keep that same Doc updated with Sync.',
+    status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  // Sprint 149 (#590): the kill switch for creating, connecting, publishing and updating a web
+  // page on the person's Cloudflare. ON by default (HARD RULE #2). It never gates taking a page
+  // down: with it off, Settings ▸ Sharing ▸ Web pages still lists every published page with Open
+  // and Unpublish, `ritemark.page.unpublish` and Disconnect still work (S28b). Open in browser
+  // and the page on the desk need no flag. Landed in PR 1, gating `ritemark.page.publish`.
+  'web-page-publishing': {
+    id: 'web-page-publishing',
+    label: 'Web Page Publishing',
+    description: 'Publish an .html page from the project to your own Cloudflare, then update or unpublish it.',
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },

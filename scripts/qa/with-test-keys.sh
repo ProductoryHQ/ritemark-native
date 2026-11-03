@@ -131,14 +131,19 @@ esac
 DIR_COUNT=0
 prev=""
 for arg in "$@"; do
+  found=0
   dir=""
-  case "$arg" in --user-data-dir=*) dir="${arg#--user-data-dir=}"; DIR_COUNT=$((DIR_COUNT + 1)) ;; esac
-  if [ "$prev" = "--user-data-dir" ]; then dir="$arg"; DIR_COUNT=$((DIR_COUNT + 1)); fi
-  if [ -n "$dir" ] && [ "${dir%/}" != "${PROFILE%/}" ]; then
-    refuse "refused: the command's --user-data-dir isn't RITEMARK_TEST_PROFILE"
+  case "$arg" in --user-data-dir=*) dir="${arg#--user-data-dir=}"; found=1 ;; esac
+  if [ "$prev" = "--user-data-dir" ]; then dir="$arg"; found=1; fi
+  if [ "$found" = 1 ]; then
+    DIR_COUNT=$((DIR_COUNT + 1))
+    # Every value is checked, an empty one included.
+    [ -n "$dir" ] || refuse "refused: the command's --user-data-dir is empty"
+    [ "${dir%/}" = "${PROFILE%/}" ] || refuse "refused: the command's --user-data-dir isn't RITEMARK_TEST_PROFILE"
   fi
   prev="$arg"
 done
+[ "$prev" != "--user-data-dir" ] || refuse "refused: the command's --user-data-dir has no value"
 [ "$DIR_COUNT" = 1 ] || refuse "refused: the command needs exactly one --user-data-dir=\$RITEMARK_TEST_PROFILE (found $DIR_COUNT)"
 
 [ -x "$SECURITY_BIN" ] || refuse "the macOS 'security' tool isn't there; the Mac vault is the Keychain (Windows: with-test-keys.ps1, not written yet)"

@@ -20,6 +20,7 @@ Nothing here starts before the plan's approval (sprint-plan.md, *Approval*). Tic
 
 - [x] `scripts/qa/with-test-keys.sh`: names only, refuses without the test channel and a test profile; its test
 - [x] `ritemark.page.openInSystemBrowser` (any local `.html`) and `ritemark.page.publish` (refuses a file outside the project by `realpath`), reachable from no menu yet
+- [x] `web-page-publishing` registered (ON) and gating `ritemark.page.publish`'s handler, brought forward from PR 4 (Codex on #654)
 - [ ] Review (Standard), Windows overlay, merge
 
 ## Phase 3: PR 2, the page's bar in patch 010 (W2; R1, R2; the lead's answers 1 and 2)
@@ -45,7 +46,7 @@ Nothing here starts before the plan's approval (sprint-plan.md, *Approval*). Tic
 - [ ] The workers.dev name row in the first sheet (R5, S28a)
 - [ ] Settings ▸ Sharing ▸ Web pages: the card's two states, the published pages with Open and Unpublish, Disconnect's question (R9, S22, S30)
 - [ ] The bar's states, Unpublish's question, "Unpublishing…", the 10 s line, the failure line (R7, S24–S29)
-- [ ] `web-page-publishing`: gates creating, connecting, publishing and updating; the list, Unpublish and Disconnect stay with it off (S28b)
+- [ ] `web-page-publishing` (registered in PR 1): gates creating, connecting, publishing and updating; the list, Unpublish and Disconnect stay with it off (S28b)
 - [ ] **After A4:** `scripts/qa/cloudflare-contract.mjs` green; S17–S28b live on the Mac; S21's log search
 - [ ] Review (High, `/security-review`), Windows overlay (offline scenarios; live when the Windows vault exists), merge
 

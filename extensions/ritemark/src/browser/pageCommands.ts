@@ -13,6 +13,7 @@
  */
 
 import * as vscode from 'vscode';
+import { isEnabled } from '../features';
 import { PageLocation, PageTarget, locatePage, localPagePath } from './localPage';
 
 export const OPEN_IN_SYSTEM_BROWSER_COMMAND = 'ritemark.page.openInSystemBrowser';
@@ -57,6 +58,8 @@ export async function openPageInSystemBrowser(arg?: unknown): Promise<boolean> {
  * reason and returns undefined otherwise. Nothing is read beyond the paths, and nothing is sent.
  */
 export async function publishPage(arg?: unknown): Promise<PageLocation | undefined> {
+  // The kill switch: with `web-page-publishing` off, a direct executeCommand does nothing.
+  if (!isEnabled('web-page-publishing')) return undefined;
   const fsPath = localPagePath(targetOf(arg));
   if (!fsPath) {
     void vscode.window.showInformationMessage(NOT_A_PAGE_MESSAGE);

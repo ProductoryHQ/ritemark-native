@@ -123,8 +123,8 @@ test('a short TMPDIR (/ or $HOME) does not widen the allowed roots', { skip }, (
   } finally {
     fs.rmSync(homeProfile, { recursive: true, force: true });
   }
-  // /private/tmp still works whatever TMPDIR says
-  const p = fs.mkdtempSync('/private/tmp/wtk-');
+  // the fixed temp root (/private/tmp on macOS, /tmp elsewhere) still works whatever TMPDIR says
+  const p = fs.mkdtempSync(path.join(process.platform === 'darwin' ? '/private/tmp' : '/tmp', 'wtk-'));
   try {
     const r = run(w, ['--only', 'cloudflare', '--', process.execPath, w.child, '{}', `--user-data-dir=${p}`], {
       TMPDIR: '/',
@@ -142,6 +142,10 @@ test('the command needs exactly one --user-data-dir, this profile, and no wrappe
   assert.equal(st([process.execPath, w.child, '{}']), 64, 'none');
   assert.equal(st([process.execPath, w.child, '{}', '--user-data-dir', '/private/tmp/somewhere-else']), 64, 'another');
   assert.equal(st([...launch(w), `--user-data-dir=${w.profile}`]), 64, 'two');
+  assert.equal(st([process.execPath, w.child, '{}', '--user-data-dir=']), 64, 'empty, one-word form');
+  assert.equal(st([process.execPath, w.child, '{}', '--user-data-dir', '']), 64, 'empty, two-word form');
+  assert.equal(st([process.execPath, w.child, '{}', `--user-data-dir=${w.profile}`, '--user-data-dir']), 64, 'a dangling flag');
+  assert.equal(st([process.execPath, w.child, '{}', '--user-data-dir', '', `--user-data-dir=${w.profile}`]), 64, 'empty beside the right one');
   assert.equal(st(['bash', '-c', `node x --user-data-dir=${w.profile}`, `--user-data-dir=${w.profile}`]), 64, 'bash -c');
   assert.equal(st(['/usr/bin/env', ...launch(w)]), 64, 'env');
   assert.ok(!fs.existsSync(w.marker), 'a refused command ran');
