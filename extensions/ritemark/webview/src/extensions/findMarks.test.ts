@@ -22,8 +22,9 @@ function rule(css: string, selector: string): string {
 assert.match(rule(FIND_MARK_STYLES, '.find-highlight'), /background: var\(--r-hairline\);/)
 assert.match(resultsCss, /\.rs-column mark \{ background: var\(--r-hairline\);/)
 
-// The current match: the chosen fill in both themes, never overridden on Dark
-assert.match(rule(FIND_MARK_STYLES, '.find-highlight-active'), /background: var\(--r-accent-soft\);/)
+// The current match: the accent fill with its own words, in both themes, never overridden on Dark
+assert.match(rule(FIND_MARK_STYLES, '.find-highlight-active'), /background: var\(--r-accent\);/)
+assert.match(rule(FIND_MARK_STYLES, '.find-highlight-active'), /color: var\(--r-on-accent\);/)
 assert.equal(FIND_MARK_STYLES.match(/\.find-highlight-active/g)?.length, 1, 'the current match has one rule, no Dark override')
 
 // Dark desk: the other matches take the results list's own lifted step

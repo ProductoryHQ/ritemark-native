@@ -476,7 +476,8 @@ ${rrt(o)}
       border-radius: 2px;
     }
     .find-highlight-active {
-      background: var(--r-accent-soft);
+      background: var(--r-accent);
+      color: var(--r-on-accent);
       border-radius: 2px;
     }
     body.vscode-dark .find-highlight,

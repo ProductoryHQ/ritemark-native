@@ -110,8 +110,8 @@ function buildDecorationSet(
 /**
  * The find bar's marks (#647): the search results list's marks (components/search/search.css, `.rs-column mark`),
  * not amber, because amber in a document means a comment. The other matches take the soft grey mark (on the Dark
- * desk the results list's own lifted step); the current one the chosen fill, `--r-accent-soft`, in both themes, as
- * a chosen row has it (the Experience lead, a538372).
+ * desk the results list's own lifted step); the current one the accent itself, `--r-accent` with `--r-on-accent`
+ * words, in both themes, since the soft accent sat almost on the grey marks (the Experience lead, 675f7e5).
  */
 export const FIND_MARK_STYLES = `
     .find-highlight {
@@ -119,7 +119,8 @@ export const FIND_MARK_STYLES = `
       border-radius: 2px;
     }
     .find-highlight-active {
-      background: var(--r-accent-soft);
+      background: var(--r-accent);
+      color: var(--r-on-accent);
       border-radius: 2px;
     }
     body.vscode-dark .find-highlight,
