@@ -224,6 +224,9 @@ workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts (Sprint 140: the rout
 Sprint 146 follow-up (#634; the Experience lead's answers, section 10 item 5): File changes' Graph, empty right after Set
 up Git here, says "No commits yet. Each commit you make shows here." instead of naming a source control provider
 (scm.contribution.ts, which this patch owns for File changes' name).
+Advanced search (Jarmo, 3 Nov 2026): VS Code's Search view, in More and the View menu, is named Advanced search, so it
+isn't taken for Documents' Search (Ritemark's own, Sprint 148); it keeps Replace, regular expressions and patterns
+(search.contribution.ts, the container's title, the view's name and the View menu's mnemonic).
 diff --git a/src/vs/base/browser/ui/dialog/dialog.ts b/src/vs/base/browser/ui/dialog/dialog.ts
 index 34d22b5d162..644a11f194a 100644
 --- a/src/vs/base/browser/ui/dialog/dialog.ts
@@ -7434,3 +7437,32 @@ index 00000000000..655537a4694
 +		});
 +	});
 +});
+diff --git a/src/vs/workbench/contrib/search/browser/search.contribution.ts b/src/vs/workbench/contrib/search/browser/search.contribution.ts
+index 4c4dd674f8f..fd244316da5 100644
+--- a/src/vs/workbench/contrib/search/browser/search.contribution.ts
++++ b/src/vs/workbench/contrib/search/browser/search.contribution.ts
+@@ -52,7 +52,7 @@ const SEARCH_MODE_CONFIG = 'search.mode';
+ 
+ const viewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewContainersRegistry).registerViewContainer({
+ 	id: VIEWLET_ID,
+-	title: nls.localize2('search', "Search"),
++	title: nls.localize2('ritemark.advancedSearch', "Advanced search"), // Ritemark: Documents' Search is Ritemark's own; this one has Replace, regular expressions and patterns (Jarmo, 3 Nov)
+ 	ctorDescriptor: new SyncDescriptor(ViewPaneContainer, [VIEWLET_ID, { mergeViewWithContainerWhenSingleView: true }]),
+ 	hideIfEmpty: true,
+ 	icon: searchViewIcon,
+@@ -62,13 +62,13 @@ const viewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewCo
+ const viewDescriptor: IViewDescriptor = {
+ 	id: VIEW_ID,
+ 	containerIcon: searchViewIcon,
+-	name: nls.localize2('search', "Search"),
++	name: nls.localize2('ritemark.advancedSearch', "Advanced search"),
+ 	ctorDescriptor: new SyncDescriptor(SearchView),
+ 	canToggleVisibility: false,
+ 	canMoveView: true,
+ 	openCommandActionDescriptor: {
+ 		id: viewContainer.id,
+-		mnemonicTitle: nls.localize({ key: 'miViewSearch', comment: ['&& denotes a mnemonic'] }, "&&Search"),
++		mnemonicTitle: nls.localize({ key: 'miViewSearch', comment: ['&& denotes a mnemonic'] }, "&&Advanced search"),
+ 		keybindings: {
+ 			primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyF,
+ 			// Yes, this is weird. See #116188, #115556, #115511, and now #124146, for examples of what can go wrong here.
