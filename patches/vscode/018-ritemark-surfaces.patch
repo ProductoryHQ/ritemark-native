@@ -221,6 +221,9 @@ R13), workbench/test/browser/parts/ritemarkSwitchGuard.test.ts and base/test/bro
 (Sprint 134, R9), workbench/test/browser/parts/ritemarkMenu.test.ts (Sprint 134, R8: one flyout),
 workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts (Sprint 140: the route words, the keys, after pressing); run with
 ./scripts/test.sh --grep Ritemark.
+Sprint 146 follow-up (#634; the Experience lead's answers, section 10 item 5): File changes' Graph, empty right after Set
+up Git here, says "No commits yet. Each commit you make shows here." instead of naming a source control provider
+(scm.contribution.ts, which this patch owns for File changes' name).
 diff --git a/src/vs/base/browser/ui/dialog/dialog.ts b/src/vs/base/browser/ui/dialog/dialog.ts
 index 34d22b5d162..644a11f194a 100644
 --- a/src/vs/base/browser/ui/dialog/dialog.ts
@@ -6252,7 +6255,7 @@ index 8178f4c4edc..ce07f487a4f 100644
  		const ignoreFile = this.ignoreTreesPerRoot.get(rootResource.toString())?.findSubstr(resource);
  		const isIncludedInTraversal = ignoreFile?.isPathIncludedInTraversal(resource.path, isDirectory);
 diff --git a/src/vs/workbench/contrib/scm/browser/scm.contribution.ts b/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
-index 22920b5f2d1..b627614e08a 100644
+index 22920b5f2d1..756d6297ca5 100644
 --- a/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
 +++ b/src/vs/workbench/contrib/scm/browser/scm.contribution.ts
 @@ -55,7 +55,7 @@ const sourceControlViewIcon = registerIcon('source-control-view-icon', Codicon.s
@@ -6273,6 +6276,17 @@ index 22920b5f2d1..b627614e08a 100644
  
  viewsRegistry.registerViewWelcomeContent(VIEW_PANE_ID, {
  	content: localize('no open repo', "No source control providers registered."),
+@@ -82,8 +82,9 @@ viewsRegistry.registerViewWelcomeContent(VIEW_PANE_ID, {
+ 	when: ContextKeyExpr.and(ContextKeyExpr.equals('scm.providerCount', 0), WorkspaceTrustContext.IsEnabled, WorkspaceTrustContext.IsTrusted.toNegated())
+ });
+ 
++// Ritemark (Sprint 146, #634): the Graph's empty state, seen right after Set up Git here, in the Experience lead's words
+ viewsRegistry.registerViewWelcomeContent(HISTORY_VIEW_PANE_ID, {
+-	content: localize('no history items', "The selected source control provider does not have any source control history items."),
++	content: localize('no history items', "No commits yet. Each commit you make shows here."),
+ 	when: ContextKeys.SCMHistoryItemCount.isEqualTo(0)
+ });
+ 
 diff --git a/src/vs/workbench/contrib/splash/browser/partsSplash.ts b/src/vs/workbench/contrib/splash/browser/partsSplash.ts
 index 43cd923deb6..9365ad8152a 100644
 --- a/src/vs/workbench/contrib/splash/browser/partsSplash.ts
