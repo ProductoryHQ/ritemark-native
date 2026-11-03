@@ -24,9 +24,10 @@ export const OUTSIDE_PROJECT_MESSAGE =
 export const MISSING_PAGE_MESSAGE = "This page's file can't be found. It may have been moved or deleted.";
 
 function targetOf(arg: unknown): PageTarget | undefined {
+  if (arg === undefined) return vscode.window.activeTextEditor?.document.uri;
   if (typeof arg === 'string') return arg;
   if (arg instanceof vscode.Uri) return arg;
-  return vscode.window.activeTextEditor?.document.uri;
+  return undefined; // anything else is not a page, never the active editor's file
 }
 
 function projectFolders(): string[] {
@@ -41,7 +42,14 @@ export async function openPageInSystemBrowser(arg?: unknown): Promise<boolean> {
     void vscode.window.showInformationMessage(NOT_A_PAGE_MESSAGE);
     return false;
   }
-  return vscode.env.openExternal(vscode.Uri.file(fsPath));
+  const location = await locatePage(fsPath, projectFolders());
+  if (location.kind === 'missing') {
+    void vscode.window.showInformationMessage(MISSING_PAGE_MESSAGE);
+    return false;
+  }
+  // The OS's handler for .html opens it (normally the default browser); to prove on Mac and
+  // Windows before PR 2 puts the button on the bar.
+  return vscode.env.openExternal(vscode.Uri.file(location.realPath));
 }
 
 /**

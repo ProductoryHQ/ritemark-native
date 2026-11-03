@@ -22,6 +22,11 @@ async function main(): Promise<void> {
   assert.equal(localPagePath('file:///C:/Users/me/a.html'), 'C:/Users/me/a.html');
   assert.equal(localPagePath('file://server/share/a.html'), '//server/share/a.html');
   assert.equal(localPagePath('file:///Users/me/notes.md'), undefined);
+  assert.equal(localPagePath('file://localhost/Users/me/a.html'), '/Users/me/a.html', 'localhost is no host');
+  assert.equal(localPagePath('file://LOCALHOST/C:/me/a.html'), 'C:/me/a.html');
+  assert.equal(isInside('/p/..notes/a.html', '/p', 'darwin'), true, 'a folder named ..notes is inside');
+  assert.equal(isInside('C:\\proj\\..x\\a.html', 'C:\\proj', 'win32'), true);
+  assert.equal(isInside('/p/../q/a.html', '/p', 'darwin'), false);
   assert.equal(localPagePath(undefined), undefined);
 
   // --- isInside, both platforms ---

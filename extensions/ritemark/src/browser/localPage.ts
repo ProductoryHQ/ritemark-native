@@ -39,7 +39,8 @@ export function localPagePath(target: PageTarget | undefined): string | undefine
     try {
       const url = new URL(target);
       // file://host/share/… (a UNC path) keeps its host
-      fsPath = url.host ? `//${url.host}${decodeURIComponent(url.pathname)}` : decodeURIComponent(url.pathname);
+      const host = url.hostname.toLowerCase() === 'localhost' ? '' : url.host; // file://localhost/… is local
+      fsPath = host ? `//${host}${decodeURIComponent(url.pathname)}` : decodeURIComponent(url.pathname);
       if (/^\/[a-zA-Z]:\//.test(fsPath)) fsPath = fsPath.slice(1); // file:///C:/…
     } catch {
       return undefined;
@@ -61,7 +62,9 @@ export function isInside(child: string, parent: string, platform: NodeJS.Platfor
   const p = platform === 'win32' ? path.win32 : path.posix;
   const norm = (s: string) => (platform === 'win32' ? s.toLowerCase() : s);
   const rel = p.relative(norm(parent), norm(child));
-  return rel === '' || (!!rel && !rel.startsWith('..') && !p.isAbsolute(rel));
+  if (rel === '') return true;
+  const leaves = rel === '..' || rel.startsWith('..' + p.sep);
+  return !leaves && !p.isAbsolute(rel);
 }
 
 /**
