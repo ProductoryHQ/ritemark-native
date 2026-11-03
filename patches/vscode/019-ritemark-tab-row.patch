@@ -93,6 +93,9 @@ stays, because its command (workbench.action.configureEditorTabs) is not in All 
 menus (pinned, with a permanent view type from 002's ritemarkFrame.ts) leave out Close, Unpin, Split & Move and Move
 into New Window, which this patch refuses on those tabs (editorTabsControl.ts). One test, ritemarkIsPermanentTab in
 ritemarkTabMenu.ts, decides a permanent tab for both the menu and editorGroupView.ts' refusals.
+It reads the frame's manifest when asked, so ritemarkPermanentTabs.test.ts gives the manifest Home and the Task board,
+as branding/product.json does: since Sprint 152 (PR 2) the view types come from product.json, which a unit test's
+product doesn't carry, and the suite's three refusal cases had failed since then for want of them.
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index ac63294495c..8717025e650 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.ts
@@ -1263,10 +1266,10 @@ index 00000000000..60fd89edea9
 +});
 diff --git a/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts b/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts
 new file mode 100644
-index 00000000000..9224d680212
+index 00000000000..06e01e40eb9
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,116 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1296,11 +1299,13 @@ index 00000000000..9224d680212
 +	['typescript.findAllFileReferences', 'Find File References is a code tool (the same item on a script file\'s tab)'],
 +]);
 +
-+/** The view types of the extension's Home and Task board tabs, from the frame's manifest (002's ritemarkFrame.ts). */
-+const RITEMARK_PERMANENT_VIEW_TYPES: readonly string[] = ritemarkFrame.permanentTabs.map(tab => tab.viewType);
++/** The view types of the extension's Home and Task board tabs, from the frame's manifest (002's ritemarkFrame.ts), read when asked. */
++function permanentViewTypes(): readonly string[] {
++	return ritemarkFrame.permanentTabs.map(tab => tab.viewType);
++}
 +
 +/** Ritemark 2.0: whether an editor is Home or the Task board by its view type, pinned or not. */
-+export function ritemarkIsPermanentType(editor: object, viewTypes: readonly string[] = RITEMARK_PERMANENT_VIEW_TYPES): boolean {
++export function ritemarkIsPermanentType(editor: object, viewTypes: readonly string[] = permanentViewTypes()): boolean {
 +	const viewType = (editor as { viewType?: unknown }).viewType;
 +	return typeof viewType === 'string' && viewTypes.includes(viewType);
 +}
@@ -1309,7 +1314,7 @@ index 00000000000..9224d680212
 + * Ritemark 2.0: whether a tab is permanent, Home or the Task board while pinned. editorGroupView.ts refuses to close,
 + * unpin or move such a tab, and editorTabsControl.ts leaves those items out of its menu, with this one test (#634).
 + */
-+export function ritemarkIsPermanentTab(editor: object, sticky: boolean, viewTypes: readonly string[] = RITEMARK_PERMANENT_VIEW_TYPES): boolean {
++export function ritemarkIsPermanentTab(editor: object, sticky: boolean, viewTypes: readonly string[] = permanentViewTypes()): boolean {
 +	return sticky && ritemarkIsPermanentType(editor, viewTypes);
 +}
 +
@@ -2165,10 +2170,10 @@ index 00000000000..b08b1e20a80
 +});
 diff --git a/src/vs/workbench/services/editor/test/browser/ritemarkPermanentTabs.test.ts b/src/vs/workbench/services/editor/test/browser/ritemarkPermanentTabs.test.ts
 new file mode 100644
-index 00000000000..949c7891831
+index 00000000000..48704eefa87
 --- /dev/null
 +++ b/src/vs/workbench/services/editor/test/browser/ritemarkPermanentTabs.test.ts
-@@ -0,0 +1,141 @@
+@@ -0,0 +1,153 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2184,6 +2189,7 @@ index 00000000000..949c7891831
 +import { EditorExtensions, EditorsOrder, IEditorFactoryRegistry } from '../../../../common/editor.js';
 +import { createEditorParts, ITestInstantiationService, registerTestEditor, TestEditorPart, TestFileEditorInput, workbenchInstantiationService, workbenchTeardown } from '../../../../test/browser/workbenchTestServices.js';
 +import { GroupDirection, IEditorGroupsService } from '../../common/editorGroupsService.js';
++import { IRitemarkFrame, ritemarkFrame } from '../../../../browser/ritemarkFrame.js';
 +
 +/** A tab the group takes for the extension's Task board: a webview of that view type. */
 +class TestTaskBoardInput extends TestFileEditorInput {
@@ -2203,11 +2209,22 @@ index 00000000000..949c7891831
 +	const disposables = new DisposableStore();
 +	let instantiationService: ITestInstantiationService | undefined;
 +
++	// Since Sprint 152 (PR 2, #638) the permanent tabs' view types come from the frame's manifest in product.json, which a
++	// unit test's product doesn't carry: the suite gives the manifest its two tabs, as branding/product.json does (#634)
++	const frame = ritemarkFrame as { -readonly [K in keyof IRitemarkFrame]: IRitemarkFrame[K] };
++	let shippedTabs: IRitemarkFrame['permanentTabs'] = [];
++
 +	setup(() => {
++		shippedTabs = frame.permanentTabs;
++		frame.permanentTabs = [
++			{ viewType: 'mainThreadWebview-ritemark.home', title: 'Home' },
++			{ viewType: 'mainThreadWebview-ritemark.taskBoard', title: 'Task board' },
++		] as IRitemarkFrame['permanentTabs'];
 +		disposables.add(registerTestEditor(TEST_EDITOR_ID, [new SyncDescriptor(TestFileEditorInput)], TEST_EDITOR_INPUT_ID));
 +	});
 +
 +	teardown(async () => {
++		frame.permanentTabs = shippedTabs;
 +		if (instantiationService) {
 +			await workbenchTeardown(instantiationService);
 +			instantiationService = undefined;
