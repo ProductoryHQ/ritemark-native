@@ -85,6 +85,13 @@ after the restore, upstream's buffering). Measuring that early met the row's fon
 002's ritemarkFrame.ts now starts it as the window starts, and a pass that still measured the fallback measures again on
 the loading face's own promise, in the task the face becomes usable (ritemarkMeasureWhenFontIsThere). The terminal
 icon's box is pinned to its settled size while its glyph and icon font arrive (ritemarkSurfaces.css, 018).
+Sprint 146 follow-ups (#634; the Experience lead's answers, section 10 items 7 and 8; ritemarkTabMenu.ts, with its test):
+the tab row's empty area offers New tab (ritemark.newTab, ⌘T) and Reopen closed tab (⇧⌘T) first, as a browser's tab
+strip does, and drops Tab Bar ▸ (multiEditorTabsControl.ts builds that menu through ritemarkTabRowMenuActions): its show,
+single and hide commands are f1 and Ritemark's palette filter names none, so they stay in All commands. Configure Tabs
+stays, because its command (workbench.action.configureEditorTabs) is not in All commands. Home's and the Task board's
+menus (pinned, with a permanent view type from 002's ritemarkFrame.ts) leave out Close, Unpin, Split & Move and Move
+into New Window, which this patch refuses on those tabs (editorTabsControl.ts).
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index ac63294495c..8717025e650 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.ts
@@ -381,7 +388,7 @@ index a63f37ce249..f99b30f6765 100644
  
  		this.render();
 diff --git a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
-index 1c06de9c41f..dc62ce76eaf 100644
+index 1c06de9c41f..1d66386ccd1 100644
 --- a/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorTabsControl.ts
 @@ -12,7 +12,7 @@ import { ActionsOrientation, IActionViewItem, prepareActions } from '../../../..
@@ -393,15 +400,16 @@ index 1c06de9c41f..dc62ce76eaf 100644
  import { IMenuService, MenuId } from '../../../../platform/actions/common/actions.js';
  import { IContextKeyService, IContextKey } from '../../../../platform/contextkey/common/contextkey.js';
  import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
-@@ -50,6 +50,7 @@ import { applyDragImage } from '../../../../base/browser/ui/dnd/dnd.js';
+@@ -50,6 +50,8 @@ import { applyDragImage } from '../../../../base/browser/ui/dnd/dnd.js';
  import { Codicon } from '../../../../base/common/codicons.js';
  import { ThemeIcon } from '../../../../base/common/themables.js';
  import { DropdownMenuActionViewItem } from '../../../../base/browser/ui/dropdown/dropdownActionViewItem.js';
 +import { ritemarkTabMenuActions } from './ritemarkTabMenu.js';
++import { ritemarkFrame } from '../../ritemarkFrame.js';
  
  export class EditorCommandsContextActionRunner extends ActionRunner {
  
-@@ -104,7 +105,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
+@@ -104,7 +106,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
  	protected readonly treeItemsTransfer = LocalSelectionTransfer.getInstance<DraggedTreeItemsIdentifier>();
  
  	private static readonly EDITOR_TAB_HEIGHT = {
@@ -410,23 +418,26 @@ index 1c06de9c41f..dc62ce76eaf 100644
  		compact: 22 as const,
  		// Modern UI multi-tab mode adds 4px top + 4px bottom padding to
  		// the tabs-and-actions-container (tabs.css), so the total title-bar height is the
-@@ -601,12 +602,11 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
+@@ -601,12 +603,14 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
  			anchor = new StandardMouseEvent(getWindow(node), e);
  		}
  
 -		// Show it
-+		// Show it. Ritemark (Sprint 146, R8): the menu's items pass through Ritemark's filter (ritemarkTabMenu.ts)
++		// Show it. Ritemark (Sprint 146, R8): the menu's items pass through Ritemark's filter (ritemarkTabMenu.ts); on Home and
++		// the Task board (pinned, as editorGroupView.ts' isRitemarkPermanent reads them) it also leaves out what they refuse (#634)
 +		const resource = this.resourceContext.get();
++		const viewType = (editor as { viewType?: unknown }).viewType;
++		const permanent = typeof viewType === 'string' && ritemarkFrame.permanentTabs.some(tab => tab.viewType === viewType) && this.tabsModel.isSticky(editor);
  		this.contextMenuService.showContextMenu({
  			getAnchor: () => anchor,
 -			menuId: MenuId.EditorTitleContext,
 -			menuActionOptions: { shouldForwardArgs: true, arg: this.resourceContext.get() },
 -			contextKeyService: this.contextMenuContextKeyService,
-+			getActions: () => ritemarkTabMenuActions(getFlatContextMenuActions(this.menuService.getMenuActions(MenuId.EditorTitleContext, this.contextMenuContextKeyService, { shouldForwardArgs: true, arg: resource }))),
++			getActions: () => ritemarkTabMenuActions(getFlatContextMenuActions(this.menuService.getMenuActions(MenuId.EditorTitleContext, this.contextMenuContextKeyService, { shouldForwardArgs: true, arg: resource })), permanent),
  			getActionsContext: () => ({ groupId: this.groupView.id, editorIndex: this.groupView.getIndexOfEditor(editor) }),
  			getKeyBinding: action => this.keybindingService.lookupKeybinding(action.id, this.contextMenuContextKeyService),
  			onHide: () => this.groupsView.activeGroup.focus() // restore focus to active group
-@@ -640,7 +640,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
+@@ -640,7 +644,7 @@ export abstract class EditorTabsControl extends Themable implements IEditorTabsC
  	}
  
  	protected getHoverTitle(editor: EditorInput): string | IManagedHoverTooltipMarkdownString {
@@ -436,7 +447,7 @@ index 1c06de9c41f..dc62ce76eaf 100644
  			return {
  				markdown: new MarkdownString('', { supportThemeIcons: true, isTrusted: true }).
 diff --git a/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts b/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
-index 2ab980e4786..1bc0be87b83 100644
+index 2ab980e4786..07a7fd4dec6 100644
 --- a/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
 +++ b/src/vs/workbench/browser/parts/editor/multiEditorTabsControl.ts
 @@ -45,7 +45,7 @@ import { IPathService } from '../../../services/path/common/pathService.js';
@@ -448,17 +459,19 @@ index 2ab980e4786..1bc0be87b83 100644
  import { equals } from '../../../../base/common/objects.js';
  import { EditorActivation, IEditorOptions } from '../../../../platform/editor/common/editor.js';
  import { UNLOCK_GROUP_COMMAND_ID } from './editorCommands.js';
-@@ -59,6 +59,9 @@ import { IReadonlyEditorGroupModel } from '../../../common/editor/editorGroupMod
+@@ -59,6 +59,11 @@ import { IReadonlyEditorGroupModel } from '../../../common/editor/editorGroupMod
  import { IHostService } from '../../../services/host/browser/host.js';
  import { BugIndicatingError } from '../../../../base/common/errors.js';
  import { applyDragImage } from '../../../../base/browser/ui/dnd/dnd.js';
 +import { createRitemarkNewTabButton } from './ritemarkNewTab.js';
++import { ritemarkTabRowMenuActions } from './ritemarkTabMenu.js';
++import { getFlatContextMenuActions } from '../../../../platform/actions/browser/menuEntryActionViewItem.js';
 +import { RitemarkFoldedTabs, RITEMARK_TASKS_CONTAINER, ritemarkIsTaskBoard, ritemarkShowTabCount, ritemarkTabCountWords, ritemarkTasksCount } from './ritemarkFoldedTabs.js';
 +import { IActivityService } from '../../../services/activity/common/activity.js';
  
  interface IEditorInputLabel {
  	readonly editor: EditorInput;
-@@ -88,6 +91,12 @@ interface IScheduledMultiEditorTabsControlLayout extends IDisposable {
+@@ -88,6 +93,12 @@ interface IScheduledMultiEditorTabsControlLayout extends IDisposable {
  	options?: IMultiEditorTabsControlLayoutOptions;
  }
  
@@ -471,7 +484,7 @@ index 2ab980e4786..1bc0be87b83 100644
  export class MultiEditorTabsControl extends EditorTabsControl {
  
  	private static readonly SCROLLBAR_SIZES = {
-@@ -110,6 +119,10 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -110,6 +121,10 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  	private titleContainer: HTMLElement | undefined;
  	private tabsAndActionsContainer: HTMLElement | undefined;
  	private stickyTabsBackground: HTMLElement | undefined;
@@ -482,7 +495,7 @@ index 2ab980e4786..1bc0be87b83 100644
  	private tabsContainer: HTMLElement | undefined;
  	private tabsScrollbar: ScrollableElement | undefined;
  	private connectedTabOverflowEdge: HTMLElement | undefined;
-@@ -291,6 +304,19 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+@@ -291,6 +306,19 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  		if (this.menuIds?.tabsBarAddTab) {
  			this.addTabContainer = this.createAddTabControl(this.tabsContainer, this.menuIds.tabsBarAddTab);
  		}
@@ -502,6 +515,21 @@ index 2ab980e4786..1bc0be87b83 100644
  
  		// Create Editor Toolbar
  		this.createEditorActionsToolBar(this.tabsAndActionsContainer, ['editor-actions']);
+@@ -606,12 +634,10 @@ export class MultiEditorTabsControl extends EditorTabsControl {
+ 				anchor = new StandardMouseEvent(getWindow(this.parent), e);
+ 			}
+ 
+-			// Show it
++			// Show it. Ritemark (Sprint 146, #634): New tab and Reopen closed tab first, and no Tab Bar ▸ (ritemarkTabMenu.ts)
+ 			this.contextMenuService.showContextMenu({
+ 				getAnchor: () => anchor,
+-				menuId: this.menuIds?.tabsBarContext ?? MenuId.EditorTabsBarContext,
+-				contextKeyService: this.contextKeyService,
+-				menuActionOptions: { shouldForwardArgs: true },
++				getActions: () => ritemarkTabRowMenuActions(getFlatContextMenuActions(this.menuService.getMenuActions(this.menuIds?.tabsBarContext ?? MenuId.EditorTabsBarContext, this.contextKeyService, { shouldForwardArgs: true }))),
+ 				getActionsContext: () => ({ groupId: this.groupView.id }),
+ 				getKeyBinding: action => this.getKeybinding(action),
+ 				onHide: () => this.groupView.focus()
 @@ -1833,8 +1859,12 @@ export class MultiEditorTabsControl extends EditorTabsControl {
  			description = tabLabel.description || '';
  		}
@@ -1238,10 +1266,10 @@ index 00000000000..60fd89edea9
 +});
 diff --git a/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts b/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts
 new file mode 100644
-index 00000000000..7bd6397dbcc
+index 00000000000..6c76cfae1c8
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts
-@@ -0,0 +1,59 @@
+@@ -0,0 +1,96 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1257,7 +1285,8 @@ index 00000000000..7bd6397dbcc
 +
 +import { IAction, Separator, toAction } from '../../../../base/common/actions.js';
 +import { localize } from '../../../../nls.js';
-+import { REOPEN_WITH_COMMAND_ID } from './editorCommands.js';
++import { MenuId, MenuRegistry } from '../../../../platform/actions/common/actions.js';
++import { CLOSE_EDITOR_COMMAND_ID, MOVE_EDITOR_INTO_NEW_WINDOW_COMMAND_ID, REOPEN_WITH_COMMAND_ID, UNPIN_EDITOR_COMMAND_ID } from './editorCommands.js';
 +
 +/** What a tab's menu leaves out, by command ID, with the reason the Experience lead gave. */
 +export const RITEMARK_TAB_MENU_LEAVES_OUT: ReadonlyMap<string, string> = new Map([
@@ -1269,19 +1298,55 @@ index 00000000000..7bd6397dbcc
 +	['typescript.findAllFileReferences', 'Find File References is a code tool (the same item on a script file\'s tab)'],
 +]);
 +
++/**
++ * Ritemark (Sprint 146, #634; the Experience lead's answers, section 10 item 8): what Home's and the Task board's menus
++ * also leave out. Patch 019 refuses all four on a permanent tab (editorGroupView.ts: it can't be closed, unpinned or
++ * moved to another group or window), so each did nothing there. The commands stay registered for every other tab.
++ */
++export const RITEMARK_PERMANENT_TAB_MENU_LEAVES_OUT: ReadonlySet<string> = new Set([
++	CLOSE_EDITOR_COMMAND_ID,
++	UNPIN_EDITOR_COMMAND_ID,
++	`submenuitem.${MenuId.EditorSplitMoveSubmenu.id}`, // Split & Move (a submenu's action takes this ID, actions.ts' SubmenuItemAction)
++	MOVE_EDITOR_INTO_NEW_WINDOW_COMMAND_ID,
++]);
++
++/**
++ * Ritemark (Sprint 146, #634; the Experience lead's answers, section 10 item 7): what the tab row's empty area leaves out.
++ * Tab Bar ▸ can change or hide the tab row the frame depends on (the Home and Task board tabs, the folded tabs). Its
++ * commands stay in All commands (layoutActions.ts' AbstractSetShowTabsAction is f1, and Ritemark's palette filter names
++ * none of them), so the submenu goes (decision 4). Configure Tabs stays: its command (workbench.action.configureEditorTabs)
++ * is not in All commands, so the menu is its only way in.
++ */
++export const RITEMARK_TAB_ROW_MENU_LEAVES_OUT: ReadonlySet<string> = new Set([
++	`submenuitem.${MenuId.EditorTabsBarShowTabsSubmenu.id}`,
++	`submenuitem.${MenuId.EditorTabsBarShowTabsZenModeSubmenu.id}`,
++]);
++
++/** The tab row's empty area offers New tab (⌘T) and Reopen closed tab (⇧⌘T) first, as a browser's tab strip does. */
++MenuRegistry.appendMenuItem(MenuId.EditorTabsBarContext, { command: { id: 'ritemark.newTab', title: localize('ritemark.tabRow.newTab', "New tab") }, group: '0_ritemark', order: 10 });
++MenuRegistry.appendMenuItem(MenuId.EditorTabsBarContext, { command: { id: 'workbench.action.reopenClosedEditor', title: localize('ritemark.tabRow.reopenClosedTab', "Reopen closed tab") }, group: '0_ritemark', order: 20 });
++
 +/** Reveal in Explorer View (contrib/files' REVEAL_IN_EXPLORER_COMMAND_ID) reads as the left column names the tree. */
 +const REVEAL_IN_DOCUMENTS = 'revealInExplorer';
 +
 +/**
-+ * A tab's menu as Ritemark shows it: the left-out items gone, Reveal in Explorer View named Show in Documents, and no
-+ * separator left at either end or twice in a row where a group emptied.
++ * A tab's menu as Ritemark shows it: the left-out items gone (on Home and the Task board, `permanent`, also what those
++ * tabs refuse), Reveal in Explorer View named Show in Documents, and no separator left at either end or twice in a row
++ * where a group emptied.
 + */
-+export function ritemarkTabMenuActions(actions: readonly IAction[]): IAction[] {
++export function ritemarkTabMenuActions(actions: readonly IAction[], permanent = false): IAction[] {
++	return tidied(actions.filter(action => !RITEMARK_TAB_MENU_LEAVES_OUT.has(action.id) && !(permanent && RITEMARK_PERMANENT_TAB_MENU_LEAVES_OUT.has(action.id))));
++}
++
++/** The tab row's empty area's menu as Ritemark shows it: no Tab Bar ▸, and no separator left stray. */
++export function ritemarkTabRowMenuActions(actions: readonly IAction[]): IAction[] {
++	return tidied(actions.filter(action => !RITEMARK_TAB_ROW_MENU_LEAVES_OUT.has(action.id)));
++}
++
++/** Reveal in Explorer View named Show in Documents, and no separator at either end or twice in a row. */
++function tidied(actions: readonly IAction[]): IAction[] {
 +	const kept: IAction[] = [];
 +	for (const action of actions) {
-+		if (RITEMARK_TAB_MENU_LEAVES_OUT.has(action.id)) {
-+			continue;
-+		}
 +		if (action.id === Separator.ID) {
 +			if (kept.length && kept[kept.length - 1].id !== Separator.ID) {
 +				kept.push(action);
@@ -2308,10 +2373,10 @@ index 00000000000..79d6463bf76
 +});
 diff --git a/src/vs/workbench/test/browser/parts/editor/ritemarkTabMenu.test.ts b/src/vs/workbench/test/browser/parts/editor/ritemarkTabMenu.test.ts
 new file mode 100644
-index 00000000000..b6b35e9f1d6
+index 00000000000..3f98fb42c49
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/editor/ritemarkTabMenu.test.ts
-@@ -0,0 +1,69 @@
+@@ -0,0 +1,84 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2321,7 +2386,8 @@ index 00000000000..b6b35e9f1d6
 +import { IAction, Separator, toAction } from '../../../../../base/common/actions.js';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
 +import { REOPEN_WITH_COMMAND_ID } from '../../../../browser/parts/editor/editorCommands.js';
-+import { RITEMARK_TAB_MENU_LEAVES_OUT, ritemarkTabMenuActions } from '../../../../browser/parts/editor/ritemarkTabMenu.js';
++import { MenuId, MenuRegistry } from '../../../../../platform/actions/common/actions.js';
++import { RITEMARK_TAB_MENU_LEAVES_OUT, ritemarkTabMenuActions, ritemarkTabRowMenuActions } from '../../../../browser/parts/editor/ritemarkTabMenu.js';
 +
 +/** A menu as getFlatContextMenuActions gives it: [id, label] rows, '---' for a separator. */
 +function menu(rows: ReadonlyArray<string | [string, string]>, ran: unknown[][] = []): IAction[] {
@@ -2374,6 +2440,20 @@ index 00000000000..b6b35e9f1d6
 +		assert.deepStrictEqual([showInDocuments.id, showInDocuments.label, showInDocuments.enabled], ['revealInExplorer', 'Show in Documents', true]);
 +		await showInDocuments.run({ groupId: 1, editorIndex: 2 });
 +		assert.deepStrictEqual(ran, [['revealInExplorer', { groupId: 1, editorIndex: 2 }]]);
++	});
++
++	test('Home and the Task board leave out what they refuse: Close, Unpin, Split & Move and Move into New Window (#634)', () => {
++		const home = menu([...CLOSE, '---', ['workbench.action.unpinEditor', 'Unpin'], '---', ['workbench.action.splitEditor', 'Split Right'], ['submenuitem.EditorSplitMoveSubmenu', 'Split & Move'], '---', ['workbench.action.moveEditorToNewWindow', 'Move into New Window'], ['workbench.action.copyEditorToNewWindow', 'Copy into New Window']]);
++		assert.deepStrictEqual(shown(ritemarkTabMenuActions(home, true)), ['Close Others', 'Close to the Right', 'Close Saved', 'Close All', '---', 'Split Right', '---', 'Copy into New Window']);
++		const document = menu([...CLOSE, '---', ['workbench.action.unpinEditor', 'Unpin'], '---', ['submenuitem.EditorSplitMoveSubmenu', 'Split & Move'], ['workbench.action.moveEditorToNewWindow', 'Move into New Window']]);
++		assert.deepStrictEqual(shown(ritemarkTabMenuActions(document)), shown(document));
++	});
++
++	test('the tab row\'s empty area offers New tab and Reopen closed tab first, and no Tab Bar (#634)', () => {
++		const first = MenuRegistry.getMenuItems(MenuId.EditorTabsBarContext).filter(item => item.group === '0_ritemark').map(item => 'command' in item ? [item.command.id, item.command.title] : []);
++		assert.deepStrictEqual(first, [['ritemark.newTab', 'New tab'], ['workbench.action.reopenClosedEditor', 'Reopen closed tab']]);
++		const row = menu([['ritemark.newTab', 'New tab'], ['workbench.action.reopenClosedEditor', 'Reopen closed tab'], '---', ['workbench.action.splitEditorRight', 'Split Right'], '---', ['submenuitem.EditorTabsBarShowTabsSubmenu', 'Tab Bar'], ['submenuitem.EditorActionsPositionSubmenu', 'Editor Actions Position'], '---', ['submenuitem.EditorTabsBarShowTabsZenModeSubmenu', 'Tab Bar'], '---', ['workbench.action.configureEditorTabs', 'Configure Tabs']]);
++		assert.deepStrictEqual(shown(ritemarkTabRowMenuActions(row)), ['New tab', 'Reopen closed tab', '---', 'Split Right', '---', 'Editor Actions Position', '---', 'Configure Tabs']);
 +	});
 +
 +	test('no separator is left at either end or twice in a row', () => {

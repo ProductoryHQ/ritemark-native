@@ -36,6 +36,17 @@ two lines, so its reload and troubleshoot links went with it. The welcome's Stor
 Not here: the Git extension's own "Git not found" toast with its Download Git button (extensions/git/src/main.ts,
 warnAboutMissingGit), a separate surface; the sprint's research/file-changes-audit.md names it and a one-line fix for it
 (git.ignoreMissingGitWarning in product.json's configurationDefaults), not tracked by an issue when this was written.
+Sprint 146 follow-ups (#634; the Experience lead's words, the same answers file, section 10 items 6 and the vscode.dev
+link, on Jarmo's word of 2 November 2026): the pickers behind File changes' buttons speak Ritemark too
+(extensions/git/src/commands.ts). Open it again (git.reopenClosedRepositories) is "Open File changes again" / "Choose a
+folder", and with only one folder closed it opens that folder without asking. Allow this folder… (git.manageUnsafeRepositories)
+is "Allow folders for Git" / "Choose the folders Git may use". Set up Git here in a project with several folders (git.init)
+asks "Choose the folder to set up Git in", offers "Choose another folder…", and that folder dialog's button says "Set up Git
+here". Both pickers' all-at-once row reads "All folders". GitHub's Copy vscode.dev Link leaves every menu: the six
+github.copyVscodeDevLink* entries under file/share, editor/context/share, explorer/context/share, editor/lineNumber/context
+and editor/title/context/share (extensions/github/package.json). A vscode.dev link opens the folder in VS Code's web
+editor, not in Ritemark. Only the menu entries go: the commands and the share provider stay registered, and the commands
+were already hidden from All commands upstream (commandPalette when false).
 ---
 diff --git a/extensions/git/package.nls.json b/extensions/git/package.nls.json
 index e8acff6826e..ab7bf028a08 100644
@@ -191,11 +202,119 @@ index e8acff6826e..ab7bf028a08 100644
  		"comment": [
  			"{Locked='](command:git.reopenClosedRepositories'}",
  			"Do not translate the 'command:*' part inside of the '(..)'. It is an internal command syntax for VS Code",
+diff --git a/extensions/git/src/commands.ts b/extensions/git/src/commands.ts
+index 52a752a8f00..49a0b5e2aee 100644
+--- a/extensions/git/src/commands.ts
++++ b/extensions/git/src/commands.ts
+@@ -1120,8 +1120,9 @@ export class CommandCenter {
+ 				repositoryPath = workspace.workspaceFolders[0].uri.fsPath;
+ 				askToOpen = false;
+ 			} else {
+-				const placeHolder = l10n.t('Pick workspace folder to initialize git repo in');
+-				const pick = { label: l10n.t('Choose Folder...') };
++				// Ritemark (Sprint 146, #634): the Experience lead's words for Set up Git here in a project with several folders
++				const placeHolder = l10n.t('Choose the folder to set up Git in');
++				const pick = { label: l10n.t('Choose another folder…') };
+ 				const items: { label: string; folder?: WorkspaceFolder }[] = [
+ 					...workspace.workspaceFolders.map(folder => ({ label: folder.name, description: folder.uri.fsPath, folder })),
+ 					pick
+@@ -1148,7 +1149,7 @@ export class CommandCenter {
+ 				canSelectFolders: true,
+ 				canSelectMany: false,
+ 				defaultUri,
+-				openLabel: l10n.t('Initialize Repository')
++				openLabel: l10n.t('Set up Git here') // Ritemark (Sprint 146, #634): the button's own words
+ 			});
+ 
+ 			if (!result || result.length === 0) {
+@@ -1242,10 +1243,17 @@ export class CommandCenter {
+ 
+ 		const closedRepositories: string[] = [];
+ 
+-		const title = l10n.t('Reopen Closed Repositories');
+-		const placeHolder = l10n.t('Pick a repository to reopen');
++		// Ritemark (Sprint 146, #634): with only one folder closed, Open it again opens it without asking
++		if (this.model.closedRepositories.length === 1) {
++			await this.model.openRepository(this.model.closedRepositories[0], true, true);
++			return;
++		}
+ 
+-		const allRepositoriesLabel = l10n.t('All Repositories');
++		// Ritemark (Sprint 146, #634): the Experience lead's words for Open it again
++		const title = l10n.t('Open File changes again');
++		const placeHolder = l10n.t('Choose a folder');
++
++		const allRepositoriesLabel = l10n.t('All folders');
+ 		const allRepositoriesQuickPickItem: QuickPickItem = { label: allRepositoriesLabel };
+ 		const repositoriesQuickPickItems: QuickPickItem[] = this.model.closedRepositories
+ 			.sort(compareRepositoryLabel).map(r => new RepositoryItem(r));
+@@ -5019,10 +5027,11 @@ export class CommandCenter {
+ 		const unsafeRepositories: string[] = [];
+ 
+ 		const quickpick = window.createQuickPick();
+-		quickpick.title = l10n.t('Manage Unsafe Repositories');
+-		quickpick.placeholder = l10n.t('Pick a repository to mark as safe and open');
++		// Ritemark (Sprint 146, #634): the Experience lead's words for Allow this folder…
++		quickpick.title = l10n.t('Allow folders for Git');
++		quickpick.placeholder = l10n.t('Choose the folders Git may use');
+ 
+-		const allRepositoriesLabel = l10n.t('All Repositories');
++		const allRepositoriesLabel = l10n.t('All folders');
+ 		const allRepositoriesQuickPickItem: QuickPickItem = { label: allRepositoriesLabel };
+ 		const repositoriesQuickPickItems: QuickPickItem[] = this.model.unsafeRepositories
+ 			.sort(compareRepositoryLabel).map(r => new RepositoryItem(r));
 diff --git a/extensions/github/package.json b/extensions/github/package.json
-index 5769ea62474..0d1df99317b 100644
+index 5769ea62474..5f0eff8ac6d 100644
 --- a/extensions/github/package.json
 +++ b/extensions/github/package.json
-@@ -219,18 +219,6 @@
+@@ -129,46 +129,6 @@
+           "when": "false"
+         }
+       ],
+-      "file/share": [
+-        {
+-          "command": "github.copyVscodeDevLinkFile",
+-          "when": "github.hasGitHubRepo && remoteName != 'codespaces'",
+-          "group": "0_vscode@0"
+-        }
+-      ],
+-      "editor/context/share": [
+-        {
+-          "command": "github.copyVscodeDevLink",
+-          "when": "github.hasGitHubRepo && resourceScheme != untitled && !isInEmbeddedEditor && remoteName != 'codespaces'",
+-          "group": "0_vscode@0"
+-        }
+-      ],
+-      "explorer/context/share": [
+-        {
+-          "command": "github.copyVscodeDevLinkWithoutRange",
+-          "when": "github.hasGitHubRepo && resourceScheme != untitled && !isInEmbeddedEditor && remoteName != 'codespaces'",
+-          "group": "0_vscode@0"
+-        }
+-      ],
+-      "editor/lineNumber/context": [
+-        {
+-          "command": "github.copyVscodeDevLink",
+-          "when": "github.hasGitHubRepo && resourceScheme != untitled && activeEditor == workbench.editors.files.textFileEditor && config.editor.lineNumbers == on && remoteName != 'codespaces'",
+-          "group": "1_cutcopypaste@2"
+-        },
+-        {
+-          "command": "github.copyVscodeDevLink",
+-          "when": "github.hasGitHubRepo && resourceScheme != untitled && activeEditor == workbench.editor.notebook && remoteName != 'codespaces'",
+-          "group": "1_cutcopypaste@2"
+-        }
+-      ],
+-      "editor/title/context/share": [
+-        {
+-          "command": "github.copyVscodeDevLinkWithoutRange",
+-          "when": "github.hasGitHubRepo && resourceScheme != untitled && remoteName != 'codespaces'",
+-          "group": "0_vscode@0"
+-        }
+-      ],
+       "scm/historyItem/context": [
+         {
+           "command": "github.graph.openOnGitHub",
+@@ -219,18 +179,6 @@
          }
        }
      ],
