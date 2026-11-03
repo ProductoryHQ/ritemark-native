@@ -25,7 +25,7 @@ Nothing here starts before the plan's approval (sprint-plan.md, *Approval*). Tic
 
 ## Phase 3: PR 2, the shell (W1, W2; R1, R2), only if A1 or decision 4 needs it
 
-- [ ] `./scripts/create-patch.sh` on patch 010: the two actions in `MenuId.BrowserActionsToolbar`, the workbench context key, Ephemeral for project pages
+- [ ] `./scripts/create-patch.sh` on patch 010: the two actions in `MenuId.BrowserActionsToolbar`, the workbench context key (no Ephemeral session for project pages: Jarmo's decision 4, 3 Nov)
 - [ ] A2 again on the branch (S5, S6); the frame check; `CLAUDE.md`'s patch table row for 010 updated
 - [ ] Review (High, `/security-review`), merge; Windows at Gate 2
 
