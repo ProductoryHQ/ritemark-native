@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../ui/Icon';
 import { vscode } from '../../lib/vscode';
+import { settingsTimingMark } from '../../lib/settingsTiming';
 import { GoogleDocsSettingsCard, type GoogleDocsSettingsProjection } from './GoogleDocsSettingsCard';
 import { AiAccountsSection, type AiId, type ClaudeAction, type CodexAction } from './AiAccountsSection';
 import { AiDetailsSheet } from './AiDetailsSheet';
@@ -243,6 +244,14 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
 
     return () => window.removeEventListener('message', handleMessage);
   }, []);
+
+  // Sprint 147, A1: measurement only; each mark once, and nothing unless the host turned timing on
+  useEffect(() => {
+    settingsTimingMark('first-render');
+  }, []);
+  useEffect(() => {
+    if (settings) settingsTimingMark('first-render-with-settings');
+  }, [settings]);
 
   // Bring a way in's row into view once its section has drawn it.
   useEffect(() => {

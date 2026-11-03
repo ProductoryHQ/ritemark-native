@@ -32,6 +32,7 @@ import { CLAUDE_MODEL_IDS, ELEVENLABS_STT_MODEL_IDS } from '../ai/modelConfig';
 import { geminiHeaders, geminiUrl } from '../ai/geminiRequest';
 import { runProcess } from '../utils/runProcess';
 import { setUsageData, usageDataState } from '../analytics/posthog';
+import { settingsTimed, settingsTimingEnabled, settingsTimingMark, settingsTimingPage, settingsTimingStart } from './settingsTiming';
 
 /**
  * Phase E status model: split runtime health, source provenance, and auth
@@ -277,6 +278,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       if (RitemarkSettingsProvider.panel) return;
     }
 
+    settingsTimingStart('created');
     const panel = vscode.window.createWebviewPanel(
       RitemarkSettingsProvider.viewType,
       'Settings',
@@ -288,6 +290,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   }
 
   public async deserializeWebviewPanel(panel: vscode.WebviewPanel): Promise<void> {
+    settingsTimingStart('restored');
     await this.resolvePanel(panel);
   }
 
@@ -308,7 +311,13 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     }
 
     switch (message.type) {
+      // Sprint 147, A1: the page's timing marks (sent only when timing is on)
+      case 'settings:timing':
+        settingsTimingPage(message as Parameters<typeof settingsTimingPage>[0]);
+        break;
+
       case 'ready':
+        settingsTimingMark('ready-received');
         await this.sendCurrentSettings(webview);
         if (this.pendingSection) {
           void webview.postMessage({ type: 'settings:focus-section', section: this.pendingSection });
@@ -549,7 +558,16 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       dark: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'settings-tab-dark.svg'),
     };
     panel.webview.options = this.getWebviewOptions();
+    // Sprint 147, A1: with timing on, each message posted writes its line
+    if (settingsTimingEnabled()) {
+      const post = panel.webview.postMessage.bind(panel.webview);
+      panel.webview.postMessage = (message: { type?: unknown }) => {
+        settingsTimingMark(`post:${typeof message?.type === 'string' ? message.type : 'unknown'}`);
+        return post(message);
+      };
+    }
     panel.webview.html = await this.getHtmlContent(panel.webview);
+    settingsTimingMark('html-set');
 
     panel.webview.onDidReceiveMessage(
       async (message) => {
@@ -597,6 +615,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     //   'openai-api-key', 'google-ai-key', 'anthropic-api-key', and the new
     //   'openrouter-api-key'. These same values power the OpenCode runtime —
     //   no separate key store (spec R3a: configure each provider once).
+    settingsTimingMark('send-settings-start');
     const openaiKey = await this.context.secrets.get('openai-api-key');
     const googleKey = await this.context.secrets.get('google-ai-key');
     const anthropicKey = await this.context.secrets.get('anthropic-api-key');
@@ -612,16 +631,17 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     const elevenlabsKey = transcriptionEnabled
       ? await this.context.secrets.get('elevenlabs-api-key')
       : undefined;
-    const transcriptionStorageBytes = transcriptionEnabled ? await this.transcriptionStorageBytes() : 0;
+    settingsTimingMark('probe:secrets');
+    const transcriptionStorageBytes = transcriptionEnabled ? await settingsTimed('transcription-storage', this.transcriptionStorageBytes()) : 0;
 
-    const initialUpdateSnapshot = await this.updateService.getStatusSnapshot();
+    const initialUpdateSnapshot = await settingsTimed('update-snapshot', this.updateService.getStatusSnapshot());
     const updateCenterPromise = initialUpdateSnapshot.lastCheckedAt === 0
       ? this.updateService.checkForUpdates({ manual: false, notify: false })
       : Promise.resolve(initialUpdateSnapshot);
 
     const [updateCenterResult, componentStatusResult] = await Promise.allSettled([
-      updateCenterPromise,
-      this.getComponentStatus()
+      settingsTimed('update-check', updateCenterPromise),
+      settingsTimed('component-status', this.getComponentStatus())
     ]);
 
     const updateCenter = updateCenterResult.status === 'fulfilled'
@@ -674,7 +694,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         };
 
     // Git's row shows whichever Claude runs (File changes needs Git); Node.js's only with this computer's runtime.
-    const environment = await getAgentEnvironmentStatus().catch(() => null);
+    const environment = await settingsTimed('environment', getAgentEnvironmentStatus().catch(() => null));
 
     webview.postMessage({
       type: 'settings',
@@ -790,10 +810,10 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
     const anthropicKey = await this.context.secrets.get('anthropic-api-key');
     setAnthropicKeyAvailable(Boolean(anthropicKey));
-    const claudeStatus = await getSetupStatus();
+    const claudeStatus = await settingsTimed('claude-setup-status', getSetupStatus());
 
     const codexManager = new CodexManager();
-    const codexStatus = await codexManager.getBinaryStatus();
+    const codexStatus = await settingsTimed('codex-binary-status', codexManager.getBinaryStatus());
 
     // Resolve Codex auth state independently of the binary inspection. This
     // can fail if the app-server is not reachable; treat any failure as
@@ -801,7 +821,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     let codexAuthState: AuthState = 'unknown';
     if (codexStatus.runnable && this.codexAuth) {
       try {
-        const authStatus = await this.codexAuth.getStatus();
+        const authStatus = await settingsTimed('codex-auth-status', this.codexAuth.getStatus());
         codexAuthState = authStatus.authenticated ? 'ready' : 'sign_in_required';
       } catch {
         codexAuthState = 'error';
@@ -1346,7 +1366,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   </style>
 </head>
 <body>
-  <div id="root" data-editor-type="settings"></div>
+  <div id="root" data-editor-type="settings"${settingsTimingEnabled() ? ' data-settings-timing="1"' : ''}></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
