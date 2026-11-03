@@ -164,12 +164,15 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
 
 ## Approval
 
-- [ ] Plan approved by the Development manager on Jarmo's 2.2 delegation
-- [ ] Decision 1: the test account and token in the vault (Jarmo)
-- [ ] Decisions 2–5 answered (Jarmo)
-- [ ] Decision 6: the private OAuth client (Jarmo); the public one before the RC
-- [ ] Sprint start
-
+- [x] Plan approved on 3 November 2026 by the Development manager, on Jarmo's 2.2 delegation ("võta nii et kõik sprindid on 2.2 osas approved until RC - ei vaja heakskiitu", ritemark-dev `decisions/log.md`, 1 Nov).
+- [ ] Decision 1: the test account and token in the vault (Jarmo). Asked on 3 Nov.
+- [x] Decisions 2–5, answered by Jarmo on 3 November 2026:
+  - 2: as recommended. A key-shaped hit stops Publish, and "Publish anyway" needs a second, explicit press.
+  - 3: as recommended. The address carries a random part, editable in the sheet.
+  - 4: **no.** Project pages keep the browser's shared session, as today. No patch 010 change is made for a private session, and PR 2 shrinks to what the Publish buttons need.
+  - 5: as recommended. A page can still reach local servers in 2.2, and that is noted.
+- [ ] Decision 6: the private OAuth client (Jarmo); the public one before the RC.
+- [x] Sprint start: PR 1 and the audits now; PRs 2–3 after the lead's answers; PR 4's merge after M1–M14.
 ## Questions
 
 **For the Experience lead:**
