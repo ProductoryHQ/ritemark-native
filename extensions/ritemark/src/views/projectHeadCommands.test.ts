@@ -148,6 +148,13 @@ test('⌘⇧F (Ctrl+Shift+F on Windows) is the Search row while project search i
   assert.deepEqual(binding.args, { via: 'key' });
 });
 
+test('⌘T (Ctrl+T on Windows) is New tab, which the tab row\'s empty area offers too (#634)', () => {
+  const binding = keybindings.find(candidate => candidate.command === 'ritemark.newTab');
+  assert.ok(binding, 'no binding for New tab');
+  assert.equal(binding.key, 'ctrl+t');
+  assert.equal(binding.mac, 'cmd+t');
+});
+
 test('the results view sits in Documents and shows only while the box holds words (Sprint 148, R7, E3)', () => {
   const view = (views.explorer ?? []).find(candidate => candidate.id === 'ritemark.searchResults');
   assert.ok(view, 'no results view in Documents');

@@ -203,7 +203,7 @@ index e8acff6826e..ab7bf028a08 100644
  			"{Locked='](command:git.reopenClosedRepositories'}",
  			"Do not translate the 'command:*' part inside of the '(..)'. It is an internal command syntax for VS Code",
 diff --git a/extensions/git/src/commands.ts b/extensions/git/src/commands.ts
-index 52a752a8f00..49a0b5e2aee 100644
+index 52a752a8f00..733b8e97221 100644
 --- a/extensions/git/src/commands.ts
 +++ b/extensions/git/src/commands.ts
 @@ -1120,8 +1120,9 @@ export class CommandCenter {
@@ -227,7 +227,7 @@ index 52a752a8f00..49a0b5e2aee 100644
  			});
  
  			if (!result || result.length === 0) {
-@@ -1242,10 +1243,17 @@ export class CommandCenter {
+@@ -1242,16 +1243,22 @@ export class CommandCenter {
  
  		const closedRepositories: string[] = [];
  
@@ -248,7 +248,14 @@ index 52a752a8f00..49a0b5e2aee 100644
  		const allRepositoriesQuickPickItem: QuickPickItem = { label: allRepositoriesLabel };
  		const repositoriesQuickPickItems: QuickPickItem[] = this.model.closedRepositories
  			.sort(compareRepositoryLabel).map(r => new RepositoryItem(r));
-@@ -5019,10 +5027,11 @@ export class CommandCenter {
+ 
+-		const items = this.model.closedRepositories.length === 1 ? [...repositoriesQuickPickItems] :
+-			[...repositoriesQuickPickItems, { label: '', kind: QuickPickItemKind.Separator }, allRepositoriesQuickPickItem];
++		const items = [...repositoriesQuickPickItems, { label: '', kind: QuickPickItemKind.Separator }, allRepositoriesQuickPickItem];
+ 
+ 		const repositoryItem = await window.showQuickPick(items, { title, placeHolder });
+ 		if (!repositoryItem) {
+@@ -5019,10 +5026,11 @@ export class CommandCenter {
  		const unsafeRepositories: string[] = [];
  
  		const quickpick = window.createQuickPick();
