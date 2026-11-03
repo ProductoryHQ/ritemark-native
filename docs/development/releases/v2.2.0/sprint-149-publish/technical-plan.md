@@ -31,8 +31,8 @@ The plan for [spec.md](spec.md). File references are to `origin/main` at `e23e21
 
 Each writes one file in `research/`.
 
-- **A1, the bar** (`research/page-bar.md`), gates W2. Can the extension put Open in browser and Publish on the page's bar without a patch? Try, on a dev instance: an `editor/title` contribution with `when: activeEditor == 'workbench.editor.browser' && ritemark.publish.pageInProject`, the context key set by the extension from `getActiveContext` and the active-tab change. If it draws where frame 1 does, and switches correctly between two page tabs and a web tab, no patch. If not (or it draws in the tab row instead of the bar), PR 2 adds two Ritemark actions to `MenuId.BrowserActionsToolbar` in patch 010 that call extension commands, plus a workbench context key for "this tab shows a project `.html`". Question 1 to the lead either way.
-- **A2, the sandbox live** (`research/page-sandbox-live.md`), no account. `page-sandbox.md`'s live-check steps on a hidden dev instance with `hostile.html` and a decoy local server: every row of its escape table, plus the session (Global today) and what `file://` subresource tags can load. Gates decision 4 and PR 2's Ephemeral change.
+- **A1, the bar** (`research/page-bar.md`), gates W2. Answered by the lead (answer 1): the buttons go on the page's own bar, so PR 2 patches 010. The audit now only maps what patch 010 needs: where `MenuId.BrowserActionsToolbar`'s right end is, how the address row and back/forward are hidden for local pages, how a link's navigation is turned into a new tab, and whether the browser model can reload on a file change (or keeps its reload button).
+- **A2, the sandbox live** (`research/page-sandbox-live.md`), no account. `page-sandbox.md`'s live-check steps on a hidden dev instance with `hostile.html` and a decoy local server: every row of its escape table, plus the session (the shared one, kept by Jarmo's decision 4) and what `file://` subresource tags can load. Recorded, not changed.
 - **A3, the gather's corpus** (`research/gather-corpus.md`), no account. Ten real pages: Claude and ChatGPT HTML artifacts, a page with pictures in a folder, a page with a linked stylesheet and fonts, a page from a template site. What each references, so R3's rules are right before W3's tests freeze them.
 - **A4, the live measurements** (`research/cloudflare-measurements.md`), **needs the account**. The 14 below, by `scripts/qa/cloudflare-contract.mjs` through the vault script, one Worker created and deleted per run. Gates W4's client and W5's connection; R6 and R7 change in `spec.md` first if a measurement says so.
 
@@ -65,15 +65,16 @@ The spike's list was kept with the manager's session; this is its reconstruction
 
 `scripts/qa/with-test-keys.sh -- <command>`: reads named entries of the `ritemark-test-keys` Keychain service into that one process's environment (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and the registry's five), prints only the names, refuses without `RITEMARK_BUILD_CHANNEL=test` and a test profile path. The registry's `.ps1` twin waits for the Windows vault. `governance/test-keys.md` gains row 6 (Cloudflare) in ritemark-dev, by the manager.
 
-### W1: The page's bar and Open in browser (R1, R2), PR 1 (+ PR 2 if A1 says so)
+### W1: The extension's commands (R2), PR 1
 
-- New command `ritemark.page.openInSystemBrowser` (`vscode.env.openExternal` on the file URI), and `ritemark.page.publish` registered but contributed to no menu until PR 4.
-- A context key `ritemark.publish.pageInProject`, set from the active page's URL: `file:`, `.html?`, inside a workspace folder by `realpath`.
-- If A1 needs the patch: PR 2 adds the two actions to `MenuId.BrowserActionsToolbar` (group before Tools) and a workbench context key computed from the model's URL, so the extension's key isn't needed for placement.
+- New command `ritemark.page.openInSystemBrowser` (`vscode.env.openExternal` on the file URI, any local `.html`), and `ritemark.page.publish` registered but reachable from no menu until PR 4; it refuses a file outside the project by `realpath`.
 
-### W2: The Ephemeral session for project pages (R1, decision 4), PR 2
+### W2: The page's bar in patch 010 (R1, R2), PR 2
 
-Patch 010's resolver opens project `file://` pages with `BrowserViewStorageScope.Ephemeral` (the `getOrCreateLazy` call at `:204` passes a scope; A2 confirms the parameter path). Web addresses keep the person's setting.
+- Two Ritemark actions at the right end of `MenuId.BrowserActionsToolbar`, calling the extension's commands: Open in browser when `ritemarkBrowserLocalPage`, Publish (and later the Published chip and Copy link) when `ritemarkBrowserProjectPage`. Both keys computed in the workbench from the model's URL and the workspace folders.
+- For local pages: no address row, no back or forward; a link to a website opens a new browser tab, a link to another local page opens that page in its own tab.
+- Reload on a file change through a file watcher on the page's file; if A1 finds no clean way, the reload button stays at the bar's left.
+- The session is unchanged (Jarmo, decision 4: no).
 
 ### W3: What goes and the guard (R3, R4, R5, R8), PR 3
 
@@ -93,12 +94,12 @@ New folder `src/publish/` (no `vscode` import in the pure parts, so they test un
 - `src/publish/cloudflare/oauth.ts`: Google's flow shape (listener, PKCE, `state`, deadline) with Cloudflare's endpoints and M12's redirect; token auth `none`.
 - `src/publish/cloudflare/config.ts` + `esbuild.config.mjs` define `__RITEMARK_CLOUDFLARE_OAUTH__` from `RITEMARK_CLOUDFLARE_CLIENT_ID`; `scripts/check-google-oauth-build.mjs`'s twin check for releases once the public client exists.
 - `src/publish/cloudflare/account.ts`: the SecretStorage entry, single-flight refresh, Disconnect with revoke (M14).
-- The token path: the template link, one paste field in the host's own input box (`vscode.window.showInputBox({ password: true })`), so the value never touches a webview.
-- Settings ▸ Sharing ▸ Web pages: a row like `GoogleDocsSettingsCard.tsx`, with messages `publish:connect`, `publish:useToken`, `publish:disconnect`, `publish:unpublish`. **The generic `setApiKey` gets an allowlist** of today's five key names (`RitemarkSettingsProvider.ts:382–389`), so the page can't write `ritemark.publish.*` or any other secret: the adjacent defect fixed in the same PR, with its failing-first test.
+- The token path: on `publish:startTokenEntry` (which carries no value) the host opens the template link and its own input box (`vscode.window.showInputBox({ password: true })`, the lead's words in spec R6), checks the token, and stores it; the value never touches a webview.
+- Settings ▸ Sharing ▸ Web pages: a row like `GoogleDocsSettingsCard.tsx`, with messages `publish:connect`, `publish:startTokenEntry`, `publish:disconnect`, `publish:open`, `publish:unpublish`, none carrying a token. **The generic `setApiKey` gets an allowlist** of today's five key names (`RitemarkSettingsProvider.ts:382–389`), so the page can't write `ritemark.publish.*` or any other secret: the adjacent defect fixed in the same PR, with its failing-first test.
 
 ### W6: The states and wiring (R2, R7), PR 4
 
-Publish, Publishing…, Published (Copy link, Open the page, Update the page, Unpublish), Published · changed, Failed with Try again, Signed out. Where the chip and menu draw follows A1 (the same toolbar as W1). The flag `web-page-publishing` gates the Publish entry, the Settings row and the commands.
+Publish, Publishing…, Published (Copy link, Open the page, Update the page, Unpublish), Published · changed, Failed with Try again, Signed out. The chip and menu draw in the same toolbar as W2. The flag `web-page-publishing` gates creating, connecting, publishing and updating; the published-page list and Unpublish stay when it's off.
 
 ## Pull requests
 
@@ -114,6 +115,6 @@ See [sprint-plan.md](sprint-plan.md#pull-requests).
 | The direct-upload API differs from the docs | A4 before W4's code is final; the contract script stays as a check before each release |
 | Cloudflare's OAuth client is late or refused | The token path ships alone (cut order 1); OAuth joins in an extension release |
 | Unpublish leaves the page up (cache, old version) | M9; Ritemark says "Unpublished" only after the address check |
-| Patch 010 conflicts with another 2.2 shell PR | 146 and 152 change 018/019, not 009/010; PR 2 is small and rebases alone |
-| A hostile local page uses the person's sign-ins | Decision 4's Ephemeral session (A2 proves the before and after) |
+| Patch 010 conflicts with another 2.2 shell PR | 146 and 152 change 018/019, not 009/010; PR 2 rebases alone |
+| A hostile local page uses the person's sign-ins in the shared session | Accepted by Jarmo (decision 4: no private session); A2 records what a page can do with it, and the release notes don't promise more |
 | The free plan's 100 Workers per account | One Worker per page; Settings lists them with Unpublish; a refusal reads plainly |
