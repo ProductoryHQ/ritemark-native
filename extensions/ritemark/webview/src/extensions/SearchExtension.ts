@@ -107,21 +107,33 @@ function buildDecorationSet(
   return DecorationSet.create(doc, decorations)
 }
 
+/**
+ * The find bar's marks (#647): the search results list's marks (components/search/search.css, `.rs-column mark`),
+ * not amber, because amber in a document means a comment. The other matches take the soft grey mark (on the Dark
+ * desk the results list's own lifted step); the current one the accent itself, `--r-accent` with `--r-on-accent`
+ * words, in both themes, since the soft accent sat almost on the grey marks (the Experience lead, 675f7e5).
+ */
+export const FIND_MARK_STYLES = `
+    .find-highlight {
+      background: var(--r-hairline);
+      border-radius: 2px;
+    }
+    .find-highlight-active {
+      background: var(--r-accent);
+      color: var(--r-on-accent);
+      border-radius: 2px;
+    }
+    body.vscode-dark .find-highlight,
+    body.ritemark-dark .find-highlight,
+    body[data-vscode-theme-kind='vscode-dark'] .find-highlight { background: rgba(199, 210, 254, 0.18); }
+  `
+
 function ensureGlobalStyles() {
   if (typeof document === 'undefined') return
   if (document.getElementById('ritemark-search-styles')) return
   const style = document.createElement('style')
   style.id = 'ritemark-search-styles'
-  style.textContent = `
-    .find-highlight {
-      background: rgba(255, 200, 0, 0.25);
-      border-radius: 2px;
-    }
-    .find-highlight-active {
-      background: rgba(255, 180, 0, 0.55);
-      border-radius: 2px;
-    }
-  `
+  style.textContent = FIND_MARK_STYLES
   document.head.appendChild(style)
 }
 
