@@ -58,6 +58,7 @@ import {
   openIntegratedBrowserUrlExternally,
   reloadIntegratedBrowser,
 } from './browser/IntegratedBrowser';
+import { registerPageCommands } from './browser/pageCommands';
 import { BrowserHistoryStore } from './browser/BrowserHistoryStore';
 import { BrowserNavigationRecorder, DID_NAVIGATE_COMMAND } from './browser/browserNavigationRecorder';
 import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
@@ -1060,6 +1061,9 @@ export function activate(context: vscode.ExtensionContext) {
       }
     )
   );
+
+  // Sprint 149 (R2): the page's Open in browser (the system browser) and Publish's way in.
+  registerPageCommands(context);
 
   // Command: open empty browser tab (Activity Bar "New Tab" button).
   context.subscriptions.push(
