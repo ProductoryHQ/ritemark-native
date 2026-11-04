@@ -359,6 +359,9 @@ export async function walkTree(
       const format = formatOf(name);
       if (!format || rootRules.excluded(relative, false)) continue;
       if (hasAgents && name.toLowerCase() === 'claude.md' && (await isPointer(fs, target, rules))) continue;
+      // No stat past the names limit is ever queued: at the allowance, what is listed settles first (a file whose
+      // stat failed gives its place back), so a flat folder of a million files issues about `maxNames` stats.
+      if (documents.length + listed.length >= maxNames && (await settle())) return true;
       listed.push({
         target,
         relative,

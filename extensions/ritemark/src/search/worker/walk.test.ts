@@ -161,6 +161,27 @@ async function main() {
     const inOneDrive = await walkProject([{ path: root, name: 'fixture' }], { platform: 'win32', oneDriveRoots: [root], filesExclude: {} }, windowsFs, 100_000, pause);
     assert.deepEqual(windowsOpened, []);
     assert.ok(inOneDrive.documents.every((doc) => doc.cloud === 'cloud-folder'));
+
+    // A flat folder with far more files than the names limit: no stat past the allowance is queued.
+    {
+      const entries = Array.from({ length: 5000 }, (_, i) => ({ name: `n${i}.md`, isDirectory: () => false, isFile: () => true, isSymbolicLink: () => false }));
+      let stats = 0;
+      const flatFs: WalkFs = {
+        readdir: async () => entries,
+        stat: async () => {
+          stats++;
+          await new Promise((resolve) => setImmediate(resolve));
+          return { size: 1, mtimeMs: 1, blocks: 1, isFile: () => true, isDirectory: () => false };
+        },
+        readHead: async () => new Uint8Array(),
+      };
+      const flat = await walkProject([{ path: '/flat', name: 'flat' }], { platform: 'darwin', oneDriveRoots: [], filesExclude: {} }, flatFs, 100, pause);
+      assert.equal(flat.documents.length, 100);
+      assert.equal(flat.limited, true);
+      assert.deepEqual(flat.documents.slice(0, 3).map((doc) => doc.name), ['n0', 'n1', 'n2'], 'in the listing order');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      assert.ok(stats <= 100 + 32, `at most the allowance and the concurrency are stat'ed (${stats})`);
+    }
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }
