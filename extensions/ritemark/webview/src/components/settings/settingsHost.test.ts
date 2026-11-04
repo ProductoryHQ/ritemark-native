@@ -13,7 +13,12 @@ const React = await import('react')
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
-const { composeSettings, withPart, afterBase, splitSettings, CHECKING, PENDING_PARTS } = await import('./settingsParts')
+const { composeSettings, withPart, afterBase, splitSettings, PENDING_PARTS } = await import('./settingsParts')
+const { WaitingMark, MARK_AFTER_MS } = await import('../ui/turning-mark')
+const { AdvancedSection } = await import('./AdvancedSection')
+/** A row waiting: its status label, nothing drawn yet. */
+const WAITING_EMPTY = /role="status" aria-label="([^"]+)" data-waiting="empty"/g
+const labels = (markup: string): string[] => [...markup.matchAll(WAITING_EMPTY)].map((match) => match[1])
 const { requestSavedKey, afterEyeCloses, closeEye, eyeMustClose, RevealGate } = await import('./apiKeyReveal')
 const { AiAccountsSection } = await import('./AiAccountsSection')
 const { AiDetailsRows } = await import('./AiDetailsSheet')
@@ -59,20 +64,38 @@ const accounts = (settings: Settings, codexAuth: object = { enabled: true }) => 
   settings, codexAuth, codexSigningIn: false, testResults: {}, onClaude() {}, onCodex() {}, onDetails() {}, onKeys() {},
 }))
 const waiting = accounts(first)
-assert.equal((waiting.match(new RegExp(CHECKING, 'g')) ?? []).length, 2, "Claude's and ChatGPT's rows say Checking…")
+// The Experience lead (answer 9, the one loading look): no words while an answer comes. The line is empty for the
+// first second, then the kit's turning mark; screen readers hear "Checking <the row>"
+assert.deepEqual(labels(waiting), ['Checking Claude', 'Checking ChatGPT'], "Claude's and ChatGPT's lines wait, named for screen readers")
+assert.doesNotMatch(waiting, /data-turning-mark/, 'the first second: no mark yet')
+assert.doesNotMatch(waiting, /Checking…|Checking\.\.\./, 'no Checking… words')
 assert.doesNotMatch(waiting, />Sign in</, 'no Sign in before the answer: it might be signed in')
 assert.doesNotMatch(waiting, />Install</, 'no Install before the answer')
 assert.match(waiting, />Details…</, 'Details stays')
 assert.match(waiting, /data-settings-row="I32 I33 I34/, 'the API keys row draws at once')
-assert.equal(partsLine(first.componentStatus, first.pending), CHECKING)
-assert.equal(runtimeLine(first), `Now: ${CHECKING}`)
-// The AIs in, the tools line still out: it says so rather than drawing nothing
-assert.equal(
-  runtimeLine(composeSettings(base, { claudeCode, codex })!),
-  `Now: Claude and ChatGPT from Ritemark's own. This computer's tools: ${CHECKING}`,
-)
+assert.equal(partsLine(first.componentStatus, first.pending), null, "Ritemark's parts has no words while it waits")
+assert.equal(runtimeLine(first), null, 'nor does where the AI runs from')
+assert.equal(runtimeLine(composeSettings(base, { claudeCode, codex })!), null, 'the tools line still out: it waits too')
+const advanced = renderToStaticMarkup(createElement(AdvancedSection as never, {
+  settings: first, onSetting() {}, onClaude() {}, onCodex() {}, onClearTranscripts() {}, onOpenAllSettings() {},
+}))
+assert.deepEqual(labels(advanced), ['Checking where the AI runs from', "Checking Ritemark&#x27;s parts", "Checking transcripts&#x27; working files"])
+assert.doesNotMatch(advanced, /Checking…/)
+// After the second: the mark, still named; the mark is the kit's (ink top, the strong hairline, still under Reduce motion)
+const later = renderToStaticMarkup(createElement(WaitingMark, { label: 'Checking Claude', afterMs: 0 }))
+assert.match(later, /role="status" aria-label="Checking Claude" data-waiting="mark"/)
+assert.match(later, /data-turning-mark/)
+assert.match(later, /h-4 w-4/, '16 px')
+assert.match(later, /motion-reduce:animate-none/, 'still under Reduce motion')
+assert.match(later, /border-top-color:var\(--vscode-foreground\)/, 'ink')
+assert.equal(MARK_AFTER_MS, 1000, 'the loading look\'s second')
+{
+  const source = readFileSync(join(HERE, '../ui/turning-mark.tsx'), 'utf8')
+  assert.match(source, /setTimeout\(\(\) => setShown\(true\), afterMs\)/, 'the mark comes once the second is over')
+  assert.match(readFileSync(join(HERE, '../ai-sidebar/RuntimeNotice.tsx'), 'utf8'), /<TurningMark \/>/, "RuntimeNotice's chip draws the same mark")
+}
 const sheet = renderToStaticMarkup(createElement(AiDetailsRows as never, { ai: 'claude', settings: first, codexAuth: { enabled: true }, codexSigningIn: false, testResults: {}, onClaude() {}, onCodex() {}, onKeys() {} }))
-assert.match(sheet, new RegExp(CHECKING), "Claude's Details says Checking… until its answer")
+assert.deepEqual(labels(sheet), ['Checking Claude'], "Claude's Details waits the same way until its answer")
 
 // --- Fill in: each part fills its own rows, the others still wait ----------------------------------------------
 let parts = withPart({}, 'codex', codex)
@@ -80,13 +103,13 @@ const half = composeSettings(base, parts)!
 assert.equal(half.pending?.codex, undefined, "ChatGPT's answer is in")
 assert.equal(half.pending?.claudeCode, true, "Claude's is still out")
 const halfRow = accounts(half, { enabled: true, authenticated: true, email: 'test@example.com' })
-assert.equal((halfRow.match(new RegExp(CHECKING, 'g')) ?? []).length, 1, 'only Claude still checks')
+assert.deepEqual(labels(halfRow), ['Checking Claude'], 'only Claude still waits')
 assert.match(halfRow, /Signed in as test@example\.com/)
 parts = withPart(withPart(withPart(parts, 'claudeCode', claudeCode), 'environment', null), 'transcriptionStorageBytes', 2048)
 const full = composeSettings(base, parts)!
 assert.deepEqual(full.pending, {}, 'every part in')
 assert.equal(full.transcriptionStorageBytes, 2048)
-assert.doesNotMatch(accounts(full, { enabled: true, authenticated: true }), new RegExp(CHECKING))
+assert.deepEqual(labels(accounts(full, { enabled: true, authenticated: true })), [], 'every answer in: nothing waits')
 
 // A first update check's answer shows until settings comes again, whose snapshot is newer
 parts = withPart(parts, 'updateCenter', { ...updateCenter, state: 'update-available' })
@@ -190,5 +213,16 @@ assert.equal(afterEyeCloses('sk-new', null), 'sk-new')
 const savedRow = renderToStaticMarkup(createElement(ApiKeysRows as never, { settings: full, testing: {}, results: {}, onSave() {}, onTest() {}, onReveal: async () => 'sk-x' }))
 assert.doesNotMatch(savedRow, /sk-x/)
 assert.ok(SAVED_KEY_PLACEHOLDER.includes('eye'))
+
+// The Experience lead's point 2 (§11): the section list's buttons ring only for the keyboard (Sprint 146's input mode)
+{
+  const tabs = readFileSync(join(HERE, '../ui/tabs.tsx'), 'utf8')
+  const css = readFileSync(join(HERE, '../../index.css'), 'utf8')
+  assert.match(readFileSync(join(HERE, 'SettingsPage.tsx'), 'utf8'), /<TabsTrigger key=\{item\.id\}/, 'the list is the shared Tabs')
+  assert.match(tabs, /rm-focus-ring/, 'its trigger rings through the shared rule')
+  assert.doesNotMatch(tabs.slice(tabs.indexOf('const TabsTrigger'), tabs.indexOf('const TabsContent')), /(^|[\s'"])focus:/, 'no plain focus: look on the trigger')
+  assert.match(css, /:where\(:root:not\(\[data-input-mode="pointer"\]\)\) \.rm-focus-ring\.rm-focus-ring:focus-visible/, 'the ring is the keyboard mode\'s only')
+  assert.match(css, /:where\(:root\[data-input-mode="pointer"\]\) :is\(button, a, summary, \[role\], \[tabindex\]\):focus-visible/, "and a click draws not even Chromium's outline")
+}
 
 console.log('settingsHost.test.ts: all assertions passed')

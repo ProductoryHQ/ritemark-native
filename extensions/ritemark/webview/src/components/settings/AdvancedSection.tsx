@@ -18,7 +18,8 @@ import { Switch } from '../ui/switch'
 import { AdvancedSettingsLink } from './AdvancedSettingsLink'
 import { SettingsGroup, SettingsRow, TipButton } from './SettingsRow'
 import { formatSize } from './UpdatesSection'
-import { CHECKING, type SettingsPending } from './settingsParts'
+import { type SettingsPending } from './settingsParts'
+import { WaitingMark } from '../ui/turning-mark'
 
 export interface RuntimeStatusModel {
   runtime: 'missing' | 'installed' | 'architecture_mismatch' | 'launch_failed'
@@ -107,8 +108,9 @@ function sourceName(source: RuntimeStatusModel['source']): string {
 }
 
 /** Where the AI runs from: what runs now, this computer's tools, and the fallback (I4, I5, I6). */
-export function runtimeLine(settings: AdvancedSettings): string {
-  if (settings.pending?.claudeCode || settings.pending?.codex) return `Now: ${CHECKING}`
+export function runtimeLine(settings: AdvancedSettings): string | null {
+  // An answer still coming: no words; the row draws the waiting mark
+  if (settings.pending?.claudeCode || settings.pending?.codex || settings.pending?.environment) return null
   const claude = settings.componentStatus.claudeCode.runtimeStatus.source
   const chatgpt = settings.componentStatus.codex.runtimeStatus.source
   const parts = [claude === chatgpt
@@ -118,9 +120,7 @@ export function runtimeLine(settings: AdvancedSettings): string {
     parts.push("This computer's install wasn't found, so Ritemark's own runs instead.")
   }
   const env = settings.environment
-  if (settings.pending?.environment) {
-    parts.push(`This computer's tools: ${CHECKING}`)
-  } else if (env) {
+  if (env) {
     const tools: { name: string; installed: boolean; required: boolean; note: string }[] = [
       { name: 'Git', installed: env.gitInstalled, required: env.gitRequired, note: ' File changes needs it.' },
       ...(settings.agentRuntimePreference === 'system' ? [{ name: 'Node.js', installed: env.nodeInstalled, required: env.nodeRequired, note: '' }] : []),
@@ -138,8 +138,8 @@ export function runtimeLine(settings: AdvancedSettings): string {
 }
 
 /** Ritemark's parts' line: all ready, or what needs a hand, a sign-in included. */
-export function partsLine(status: ComponentStatus, pending?: SettingsPending): string {
-  if (pending?.claudeCode || pending?.codex) return CHECKING
+export function partsLine(status: ComponentStatus, pending?: SettingsPending): string | null {
+  if (pending?.claudeCode || pending?.codex) return null
   const needs: string[] = []
   if (!status.voiceModel.installed) needs.push("the voice model isn't on this computer")
   const claude = status.claudeCode
@@ -181,7 +181,7 @@ export function AdvancedSection({
 
   return (
     <>
-      <SettingsRow row="I3 I4 I5 I6" name="Where the AI runs from" line={runtimeLine(settings)}>
+      <SettingsRow row="I3 I4 I5 I6" name="Where the AI runs from" line={runtimeLine(settings) ?? <WaitingMark label="Checking where the AI runs from" />}>
         <SegmentedControl
           aria-label="Where the AI runs from"
           value={settings.agentRuntimePreference ?? 'bundled'}
@@ -232,7 +232,7 @@ export function AdvancedSection({
       )}
 
       <SettingsGroup>When something isn&apos;t right</SettingsGroup>
-      <SettingsRow row="I56 I57 I17" name="Ritemark's parts" line={partsLine(status, settings.pending)}>
+      <SettingsRow row="I56 I57 I17" name="Ritemark's parts" line={partsLine(status, settings.pending) ?? <WaitingMark label="Checking Ritemark's parts" />}>
         <TipButton
           tip="Checks Claude and ChatGPT again"
           variant="ghost"
@@ -256,7 +256,7 @@ export function AdvancedSection({
           row="I58"
           id="settings-section-transcription"
           name="Transcripts' working files"
-          line={settings.pending?.transcriptionStorageBytes ? CHECKING : `${settings.transcriptionStorageBytes > 0 ? `${formatSize(settings.transcriptionStorageBytes)} of transcripts, speaker names and corrections.` : 'None yet.'} Your recordings and saved documents are kept apart.`}
+          line={settings.pending?.transcriptionStorageBytes ? <WaitingMark label="Checking transcripts' working files" /> : `${settings.transcriptionStorageBytes > 0 ? `${formatSize(settings.transcriptionStorageBytes)} of transcripts, speaker names and corrections.` : 'None yet.'} Your recordings and saved documents are kept apart.`}
         >
           <TipButton
             tip={settings.transcriptionStorageBytes ? 'Removes them; your recordings and documents stay' : 'Nothing to clear yet'}

@@ -7,7 +7,7 @@
  */
 import type { SettingsData } from './RitemarkSettings'
 
-export const CHECKING = 'Checking…'
+/** A row whose answer is still coming draws no words: its line is empty for a second, then the kit's mark (`WaitingMark`). */
 
 /** The parts a probe answers; `updateCenter` is in `settings` too (the snapshot), so it is never pending. */
 export type SettingsPartName = 'claudeCode' | 'codex' | 'environment' | 'transcriptionStorageBytes' | 'updateCenter'

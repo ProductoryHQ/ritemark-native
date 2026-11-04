@@ -293,7 +293,7 @@ assert.deepEqual(quietChoices(22), [5, 10, 15, 20, 22, 30, 45, 60])
 
 // Advanced's lines say what runs and what is found
 assert.equal(runtimeLine(payload()), "Now: Claude and ChatGPT from Ritemark's own. This computer has Git.")
-assert.match(runtimeLine(payload({ agentRuntimePreference: 'system' })), /wasn't found, so Ritemark's own runs instead/)
+assert.match(runtimeLine(payload({ agentRuntimePreference: 'system' })) ?? '', /wasn't found, so Ritemark's own runs instead/)
 assert.equal(partsLine(payload().componentStatus), 'The voice model, Claude and ChatGPT: all ready')
 assert.equal(partsLine({ ...payload().componentStatus, codex: { ...payload().componentStatus.codex, state: 'broken' } }), 'ChatGPT needs a repair')
 // Codex on #644: a part that needs a sign-in is never "all ready"

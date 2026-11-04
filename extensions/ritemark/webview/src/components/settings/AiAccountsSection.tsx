@@ -13,7 +13,7 @@ import { AI_INFORMATION_URL } from '../ai-sidebar/aiDisclosure'
 import { PLAN_LINES } from '../welcome/welcomeCopy'
 import { ExternalLink, SettingsGroup, SettingsNote, SettingsRow, TipButton } from './SettingsRow'
 import type { CodexAuthStatus, SettingsData, TestResult } from './RitemarkSettings'
-import { CHECKING } from './settingsParts'
+import { WaitingMark } from '../ui/turning-mark'
 
 export type ClaudeAction =
   | 'claude:install' | 'claude:repair' | 'claude:login' | 'claude:logout' | 'claude:reload' | 'claude:refreshStatus'
@@ -133,14 +133,14 @@ export function AiAccountsSection({
   // PR 3 (R10): a row whose answer is still coming reads Checking…, with no action yet; Details stays
   const claudeChecking = Boolean(settings.pending?.claudeCode)
   const chatgptChecking = Boolean(settings.pending?.codex) && !codexSigningIn
-  const claudeState = claudeChecking ? { line: CHECKING, ready: false } : claudeRow(claude)
-  const chatgptState = chatgptChecking ? { line: CHECKING, ready: false } : chatgptRow(codexAuth, codexSigningIn)
+  const claudeState = claudeChecking ? { line: '', ready: false } : claudeRow(claude)
+  const chatgptState = chatgptChecking ? { line: '', ready: false } : chatgptRow(codexAuth, codexSigningIn)
   const opencodeState = opencodeRow(settings, testResults)
   const saved = savedKeyCount(settings)
 
   return (
     <>
-      <SettingsRow row="I7 I8 I9 I10 I13 I14 I16" mark={<Mark>C</Mark>} name="Claude" line={claudeState.line}>
+      <SettingsRow row="I7 I8 I9 I10 I13 I14 I16" mark={<Mark>C</Mark>} name="Claude" line={claudeChecking ? <WaitingMark label="Checking Claude" /> : claudeState.line}>
           {claudeChecking ? null
             : claudeState.ready ? <ReadyMark />
             : claude.state === 'not-installed' ? <TipButton tip="Installs Claude for Ritemark" variant="outline" size="sm" onClick={() => onClaude('claude:install')}>Install</TipButton>
@@ -153,7 +153,7 @@ export function AiAccountsSection({
 
       <SettingsRow row="I20 I21 I22 I23 I24" mark={<Mark><Icon name="open-ai-logo" size={16} /></Mark>}
           name="ChatGPT"
-          line={chatgptState.note ? <>{chatgptState.line}<span className="block">{chatgptState.note}</span></> : chatgptState.line}
+          line={chatgptChecking ? <WaitingMark label="Checking ChatGPT" /> : chatgptState.note ? <>{chatgptState.line}<span className="block">{chatgptState.note}</span></> : chatgptState.line}
         >
           {chatgptChecking ? null
             : chatgptState.ready ? <ReadyMark />
