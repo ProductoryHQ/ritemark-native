@@ -268,6 +268,11 @@ async function main() {
       const changed = makeIndexer(fs, new Clock(), { cacheDir, read });
       await changed.indexer.start(changed.config);
       assert.equal(reads, 5, 'only the changed Markdown is read again');
+      // The same size, only the change time moved: read again too.
+      fs.write(`${ROOT}/Notes.md`, 'markdown words CHANGED');
+      const sameSize = makeIndexer(fs, new Clock(), { cacheDir, read });
+      await sameSize.indexer.start(sameSize.config);
+      assert.equal(reads, 6, 'a same-size change is read again');
       // A PDF and a Markdown file removed while Ritemark was closed: their copies go at the next start.
       fs.remove(`${ROOT}/Deck.pdf`);
       fs.remove(`${ROOT}/Notes.md`);

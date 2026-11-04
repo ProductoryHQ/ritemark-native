@@ -75,6 +75,8 @@ export interface WalkResult {
   documents: FoundDocument[];
   /** Stopped at `maxNames`. */
   limited: boolean;
+  /** A folder couldn't be listed: what is under it is missing, not gone. */
+  partial: boolean;
 }
 
 const POINTER = '@agents.md';
@@ -255,6 +257,7 @@ export async function walkProject(
 ): Promise<WalkResult> {
   const documents: FoundDocument[] = [];
   let limited = false;
+  const report = { unreadable: 0 };
   for (const root of roots) {
     const rootRules = new RootRules(root, rules.filesExclude[root.path] ?? [], rules);
     rulesOut?.set(root.path, rootRules);
@@ -262,10 +265,10 @@ export async function walkProject(
       const exclude = await readSmallText(fs, nodePath.join(root.path, '.git', 'info', 'exclude'), rules.platform, rules.oneDriveRoots);
       if (exclude) rootRules.addGitRules('', exclude);
     }
-    limited = await walkTree(rootRules, root.path, fs, documents, maxNames, pause);
+    limited = await walkTree(rootRules, root.path, fs, documents, maxNames, pause, report);
     if (limited) break;
   }
-  return { documents, limited };
+  return { documents, limited, partial: report.unreadable > 0 };
 }
 
 /**
@@ -281,6 +284,7 @@ export async function walkTree(
   documents: FoundDocument[],
   maxNames: number,
   pause: () => Promise<void>,
+  report?: { unreadable: number },
 ): Promise<boolean> {
   const { root, rules } = rootRules;
   if (documents.length >= maxNames) return true;
@@ -320,6 +324,7 @@ export async function walkTree(
     try {
       entries = await fs.readdir(dir);
     } catch {
+      if (report) report.unreadable++;
       continue;
     }
     const relativeDir = dir === root.path ? '' : toRelative(root.path, dir);

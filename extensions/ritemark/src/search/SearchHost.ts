@@ -18,6 +18,7 @@
  * Nothing leaves the computer (E2): no network, no AI, no usage event; the log
  * carries counts and timings, never words, names or paths.
  */
+import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import { monitorEventLoopDelay, type IntervalHistogram } from 'node:perf_hooks';
 import { Worker } from 'node:worker_threads';
@@ -56,6 +57,8 @@ export const EVENT_BATCH_MS = 300;
 export const WARM_START_MS = 5000;
 /** M3: how often the host's event-loop delay is sampled while the worker reads. */
 const HOST_DELAY_RESOLUTION_MS = 10;
+/** How long after the kill switch goes off the copies are removed: the stopped worker has ended by then. */
+const DROP_COPIES_MS = 1000;
 /** The shell's box (patch 018, PR 3) registers this; a shell without it has no box (E3). */
 export const FOCUS_BOX_COMMAND = '_ritemark.projectHead.focusSearch';
 /** Tells the shell (PR 3) to draw the box: the kill switch is on and the window has a project folder. */
@@ -84,7 +87,10 @@ export class SearchHost implements vscode.Disposable {
     this.disposables.push(
       this.statusEmitter,
       vscode.workspace.onDidChangeConfiguration((event) => {
-        if (event.affectsConfiguration('ritemark.features.project-search') && !this.enabled) this.stop();
+        if (event.affectsConfiguration('ritemark.features.project-search') && !this.enabled) {
+          this.stop();
+          if (!isEnabled('project-search')) this.dropCopies();
+        }
         if (event.affectsConfiguration('files.exclude') && this.client) this.client.post({ type: 'rules', filesExclude: this.filesExclude() });
       }),
       // A folder added to or removed from the project: a running index starts again over the new folders.
@@ -252,6 +258,20 @@ export class SearchHost implements vscode.Disposable {
   private logCounts(event: string, counts: Record<string, number>): void {
     const parts = Object.entries(counts).map(([key, value]) => `${key}=${value}`);
     console.log(`[search] ${event} ${parts.join(' ')}`);
+  }
+
+  /**
+   * The kill switch turned search off: the project's copies of its documents' text go too, as nothing will use
+   * them. A project that only closes keeps them, so its next open is warm. After a moment, once the stopped
+   * worker can no longer write, and only while search is still off.
+   */
+  private dropCopies(): void {
+    const dir = this.config().cacheDir;
+    if (!dir) return;
+    setTimeout(() => {
+      if (isEnabled('project-search')) return;
+      void fsp.rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    }, DROP_COPIES_MS);
   }
 
   /** Stops the worker and what follows it (the kill switch turned off). */

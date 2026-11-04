@@ -114,4 +114,8 @@ Not measured here: Windows (the overlay session), and a window with an AI turn r
 
 The same documents, words and terms in every run (10,821; 10,801 with text; 146,220 terms; 36.2 MB). A cold start costs about 0.3 s more on the Mac: writing 10,200 more copies. A warm start no longer reads any document; what is left of its 1.3 s is parsing the copies and indexing them. The Mac's query was already within its target, so the query changes show little here.
 
+**Known limit: exact change times.** A copy is used while its file's size and change time match exactly. FAT and exFAT drives keep change times to 2 s. On them, a same-size edit made within the same 2 s as the copy keeps the old copy until the file changes again. NTFS, APFS and HFS+ are not affected.
+
+After the review round: the copies' files are made 0600 and their folders 0700. Eviction drops copies down to 90% of the cap in one batch. The index is written right after the pack is rewritten. A walk stopped at the names limit, or one that couldn't list a folder, keeps the copies it didn't see. Turning search off with the kill switch removes the project's copies; closing the project keeps them.
+
 Not measured here: Windows. The Windows session runs the same script on the same folder next.

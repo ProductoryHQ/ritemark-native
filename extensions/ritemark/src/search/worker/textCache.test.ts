@@ -8,6 +8,7 @@ import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { TextCache, type CachedText } from './textCache';
+import { walkProject, type WalkFs } from './walk';
 
 const text = (words: string): CachedText => ({ kind: 'text', passages: [{ text: words, at: { page: 1 } }], truncated: false, budget: 2 * 1024 * 1024 });
 
@@ -137,6 +138,73 @@ async function main() {
     await packsCut.open();
     assert.equal(await packsCut.get('/p/a.md', 1, 5), null);
     assert.ok(await packsCut.get('/p/w.pdf', 3, 3));
+    // Garbage at a line's valid offset (a disk error, a stray write): no copy, no throw, the other lines still read.
+    {
+      const dirG = path.join(base, 'garbage');
+      const g = new TextCache(dirG, 1024 * 1024, undefined, () => clock++);
+      await g.open();
+      await g.put('/p/one.md', 1, 1, text('first line'));
+      await g.put('/p/two.md', 2, 2, text('second line'));
+      await g.flush();
+      const packPath = path.join(dirG, 'pack.jsonl');
+      const lines = (await fsp.readFile(packPath, 'utf8')).split('\n');
+      await fsp.writeFile(packPath, ['\u0001'.repeat(lines[0].length), ...lines.slice(1)].join('\n'));
+      const g2 = new TextCache(dirG, 1024 * 1024);
+      await g2.open();
+      assert.equal(await g2.get('/p/one.md', 1, 1), null, 'a garbled line is no copy');
+      assert.deepEqual(await g2.get('/p/two.md', 2, 2), text('second line'));
+      assert.equal(g2.has('/p/one.md', 1, 1), false, 'and its row is dropped');
+
+      // A torn tail (a write cut short by a crash), then a new line after it: both old and new lines read.
+      await fsp.appendFile(packPath, '{"p":"/p/torn.md","s":3,"m');
+      const g3 = new TextCache(dirG, 1024 * 1024, undefined, () => clock++);
+      await g3.open();
+      await g3.put('/p/three.md', 3, 3, text('after the tear'));
+      await g3.flush();
+      const g4 = new TextCache(dirG, 1024 * 1024);
+      await g4.open();
+      assert.deepEqual(await g4.get('/p/three.md', 3, 3), text('after the tear'), 'a line after a torn tail');
+      assert.deepEqual(await g4.get('/p/two.md', 2, 2), text('second line'));
+    }
+
+    // A same-size change: only the change time differs, and the copy is not used.
+    assert.equal(await packsCut.get('/p/w.pdf', 3, 4), null);
+
+    // A document replaced by a link to another file: the walk sees the linked file's size and change time, so its
+    // copy no longer matches and it is read again.
+    {
+      const project = path.join(base, 'linked');
+      await fsp.mkdir(project, { recursive: true });
+      await fsp.writeFile(path.join(project, 'a.md'), 'the original words');
+      const nodeWalkFs: WalkFs = {
+        readdir: (dir) => fsp.readdir(dir, { withFileTypes: true }),
+        stat: (target) => fsp.stat(target),
+        readHead: async (target) => new Uint8Array(await fsp.readFile(target)),
+      };
+      const rules = { platform: process.platform, oneDriveRoots: [], filesExclude: {} };
+      const walkOnce = async () => (await walkProject([{ path: project, name: 'linked' }], rules, nodeWalkFs, 100, async () => undefined)).documents;
+      const [original] = await walkOnce();
+      const links = new TextCache(path.join(base, 'links'), 1024 * 1024);
+      await links.open();
+      await links.put(original.path, original.size, original.mtimeMs, text('the original words'));
+      assert.ok(links.has(original.path, original.size, original.mtimeMs));
+      const other = path.join(base, 'elsewhere.md');
+      await fsp.writeFile(other, 'other words, and more of them');
+      await fsp.rm(original.path);
+      await fsp.symlink(other, original.path);
+      const [linked] = await walkOnce();
+      assert.equal(linked.path, original.path, 'a linked file is still a document');
+      assert.equal(links.has(linked.path, linked.size, linked.mtimeMs), false, 'its copy is not used');
+      assert.equal(await links.get(linked.path, linked.size, linked.mtimeMs), null);
+    }
+
+    // Files are this person's only (the Mac and Linux).
+    if (process.platform !== 'win32') {
+      assert.equal((await fsp.stat(path.join(packDir, 'pack.jsonl'))).mode & 0o777, 0o600);
+      assert.equal((await fsp.stat(path.join(packDir, 'index.json'))).mode & 0o777, 0o600);
+      assert.equal((await fsp.stat(packDir)).mode & 0o777, 0o700);
+    }
+
     // Lines count toward the cap, and the oldest go first, whatever their kind.
     const mixed = new TextCache(path.join(base, 'mixed'), 300, undefined, () => clock++);
     await mixed.open();

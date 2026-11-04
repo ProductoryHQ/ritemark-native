@@ -68,18 +68,22 @@ export interface PackFile {
   close(): Promise<void>;
 }
 
+/**
+ * The copies are documents' text: on a Mac shared by several people they are this person's only. Folders are
+ * made 0700 and files 0600 (Windows keeps the profile folder's own rights).
+ */
 export const nodeCacheFs: CacheFs = {
   mkdir: async (dir) => {
-    await fsp.mkdir(dir, { recursive: true });
+    await fsp.mkdir(dir, { recursive: true, mode: 0o700 });
   },
   readFile: (target) => fsp.readFile(target, 'utf8'),
-  writeFile: (target, data) => fsp.writeFile(target, data, 'utf8'),
+  writeFile: (target, data) => fsp.writeFile(target, data, { encoding: 'utf8', mode: 0o600 }),
   rename: (from, to) => fsp.rename(from, to),
   // Files only: the cache never removes a folder.
   rm: (target) => fsp.rm(target, { force: true }),
   readdir: (dir) => fsp.readdir(dir),
   openPack: async (target) => {
-    const handle = await fsp.open(target, 'a+');
+    const handle = await fsp.open(target, 'a+', 0o600);
     return {
       size: async () => (await handle.stat()).size,
       read: async (offset, length) => {
@@ -101,6 +105,8 @@ const PACK = 'pack.jsonl';
 const OWN_FILE = /^(?:[0-9a-f]{40}\.json|index\.json|pack\.jsonl)(?:\.tmp)?$/;
 /** Lines not yet written past this many bytes are written at once, not only at the next flush. */
 const PENDING_BYTES = 4 * 1024 * 1024;
+/** Eviction leaves this share of the cap. */
+const EVICT_TO = 0.9;
 /** The pack is written again when its waste passes this and what is live. */
 const WASTE_BYTES = 16 * 1024 * 1024;
 
@@ -382,7 +388,9 @@ export class TextCache {
       for (const [hash, at] of moved) this.rows.get(hash)!.packAt = at;
       this.packSize = offset;
       this.packWaste = 0;
+      // The old offsets are wrong from the rename on: the index follows at once.
       this.dirty = true;
+      await this.writeIndex();
     } catch {
       await next?.close().catch(() => undefined);
     }
@@ -432,6 +440,11 @@ export class TextCache {
     await this.writePending();
     if (this.pending.size > 0) return;
     await this.compactPack();
+    if (this.dirty) await this.writeIndex();
+  }
+
+  private async writeIndex(): Promise<void> {
+    if (!this.dir) return;
     const index: IndexFile = { schema: 1, readerVersion: this.readerVersion, entries: Object.fromEntries(this.rows) };
     const target = nodePath.join(this.dir, INDEX);
     this.dirty = false;
@@ -458,11 +471,13 @@ export class TextCache {
     if (this.dir) await this.fs.rm(nodePath.join(this.dir, `${hash}.json`)).catch(() => undefined);
   }
 
+  /** Past the cap, the oldest copies go in one batch, down to EVICT_TO of it, so the next puts don't sort again. */
   private async evict(): Promise<void> {
     if (this.totalBytes <= this.maxBytes) return;
+    const goal = this.maxBytes * EVICT_TO;
     const oldest = [...this.rows.entries()].sort((a, b) => a[1].at - b[1].at);
     for (const [hash] of oldest) {
-      if (this.totalBytes <= this.maxBytes) break;
+      if (this.totalBytes <= goal) break;
       await this.drop(hash);
     }
   }

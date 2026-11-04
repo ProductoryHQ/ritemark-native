@@ -233,7 +233,9 @@ export class Indexer {
     for (const path of [...this.documents.keys()]) {
       if (!live.has(path)) this.forget(path);
     }
-    const dropped = await this.deps.cache.sweep(live);
+    // A walk stopped at the names limit, or one with a folder it couldn't list, didn't see every document: the
+    // copies of those it missed aren't orphans, and stay.
+    const dropped = result.limited || result.partial ? 0 : await this.deps.cache.sweep(live);
     if (generation !== this.generation) return;
     for (const doc of found) {
       const known = this.documents.get(doc.path);
