@@ -45,6 +45,7 @@ import { Switch } from '../ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Textarea } from '../ui/textarea'
 import { Tooltip } from '../ui/tooltip'
+import { TurningMark, WaitingMark } from '../ui/turning-mark'
 
 /** What the script does to reach each state (it lives in `control-states.mjs`; named here so the two agree). */
 export const STATE_INPUT = {
@@ -654,6 +655,16 @@ export const CATALOGUE: CatalogueRow[] = [
     variants: ([['empty', 0], ['partway', 40], ['full', 100]] as const).map(([id, value]) => ({
       id, label: id, cells: [t('rest', () => <div className="w-[140px]"><Progress value={value} /></div>)],
     })),
+  },
+  {
+    // Sprint 147, PR 3: the loading look's mark inside a page (Sprint 152, #639), and a line waiting for its answer
+    id: 'turning-mark',
+    title: 'Turning mark',
+    covers: ['TurningMark', 'WaitingMark'],
+    variants: [
+      { id: 'mark', label: 'mark', cells: [t('rest', () => <TurningMark />)] },
+      { id: 'waiting', label: 'waiting, after 1 s', cells: [t('rest', () => <WaitingMark label="Checking Claude" afterMs={0} />)] },
+    ],
   },
   {
     id: 'icon',
