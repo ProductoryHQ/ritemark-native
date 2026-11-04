@@ -234,7 +234,7 @@ async function main() {
     assert.equal(indexer.query(1, 'older', DEFAULT_SEARCH_OPTIONS, 5).groups[0].results[0].nameOnly, 'limited');
   }
 
-  // ── Decision 3: Word and PDF text from the copies after a restart ──────────
+  // ── Decision 3: every document's text from the copies after a restart (Markdown and CSV since the Windows speed PR)
   {
     const cacheDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'search-fresh-'));
     try {
@@ -242,28 +242,46 @@ async function main() {
       fs.write(`${ROOT}/Deck.pdf`, '%PDF-fake');
       fs.write(`${ROOT}/Letter.docx`, 'PK-fake');
       fs.write(`${ROOT}/Notes.md`, 'markdown words');
+      fs.write(`${ROOT}/Budget.csv`, 'Item,Cost');
       let reads = 0;
       const read = async (format: string) => {
         reads++;
         if (format === 'docx') return { ok: false, reason: 'protected' } as const;
+        if (format === 'csv') return { ok: true, passages: [{ text: 'Item Cost ledger', at: { row: 1 } }], truncated: false, columns: ['Item', 'Cost'] } as const;
         const words = format === 'pdf' ? 'quarterly figures' : 'markdown words';
         return { ok: true, passages: [{ text: words, at: { page: 1 } }], truncated: false } as const;
       };
       const first = makeIndexer(fs, new Clock(), { cacheDir, read });
       await first.indexer.start(first.config);
-      assert.equal(reads, 3);
+      assert.equal(reads, 4);
       assert.deepEqual(found(first.indexer, 'quarterly'), ['Deck']);
+      const before = JSON.stringify([first.indexer.query(1, 'markdown', DEFAULT_SEARCH_OPTIONS, 5), first.indexer.query(2, 'ledger', DEFAULT_SEARCH_OPTIONS, 5)].map((answer) => answer.groups));
       const second = makeIndexer(fs, new Clock(), { cacheDir, read });
       await second.indexer.start(second.config);
-      assert.equal(reads, 4, 'only the Markdown is read again');
+      assert.equal(reads, 4, 'nothing is read again: Markdown and CSV come from their copies too');
       assert.deepEqual(found(second.indexer, 'quarterly'), ['Deck']);
+      const after = JSON.stringify([second.indexer.query(1, 'markdown', DEFAULT_SEARCH_OPTIONS, 5), second.indexer.query(2, 'ledger', DEFAULT_SEARCH_OPTIONS, 5)].map((answer) => answer.groups));
+      assert.equal(after, before, 'the same results from a copy, a CSV\'s columns too');
       assert.equal(second.indexer.query(1, 'letter', DEFAULT_SEARCH_OPTIONS, 5).groups[0].results[0].nameOnly, 'protected');
-      // A PDF removed while Ritemark was closed: its copy goes at the next start.
+      // A changed Markdown file is read again, not taken from its copy.
+      fs.write(`${ROOT}/Notes.md`, 'markdown words changed');
+      const changed = makeIndexer(fs, new Clock(), { cacheDir, read });
+      await changed.indexer.start(changed.config);
+      assert.equal(reads, 5, 'only the changed Markdown is read again');
+      // The same size, only the change time moved: read again too.
+      fs.write(`${ROOT}/Notes.md`, 'markdown words CHANGED');
+      const sameSize = makeIndexer(fs, new Clock(), { cacheDir, read });
+      await sameSize.indexer.start(sameSize.config);
+      assert.equal(reads, 6, 'a same-size change is read again');
+      // A PDF and a Markdown file removed while Ritemark was closed: their copies go at the next start.
       fs.remove(`${ROOT}/Deck.pdf`);
+      fs.remove(`${ROOT}/Notes.md`);
       const third = makeIndexer(fs, new Clock(), { cacheDir, read });
       await third.indexer.start(third.config);
-      const left = (await fsp.readdir(cacheDir)).filter((name) => name !== 'index.json');
+      const left = (await fsp.readdir(cacheDir)).filter((name) => name !== 'index.json' && name !== 'pack.jsonl');
       assert.equal(left.length, 1, 'only the Word file\'s copy stays');
+      const index = JSON.parse(await fsp.readFile(path.join(cacheDir, 'index.json'), 'utf8')) as { entries: Record<string, { path: string }> };
+      assert.deepEqual(Object.values(index.entries).map((row) => path.basename(row.path)).sort(), ['Budget.csv', 'Letter.docx'], 'the Markdown file\'s line went with it');
     } finally {
       await fsp.rm(cacheDir, { recursive: true, force: true });
     }

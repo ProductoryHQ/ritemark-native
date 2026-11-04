@@ -8,6 +8,7 @@ import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { TextCache, type CachedText } from './textCache';
+import { walkProject, type WalkFs } from './walk';
 
 const text = (words: string): CachedText => ({ kind: 'text', passages: [{ text: words, at: { page: 1 } }], truncated: false, budget: 2 * 1024 * 1024 });
 
@@ -98,6 +99,121 @@ async function main() {
     assert.equal(reopened.entries, 3, 'every row reached index.json');
     assert.deepEqual(await reopened.get('/p/b.pdf', 1, 1), text('b again'));
     assert.deepEqual((await fsp.readdir(busy)).filter((name) => name.endsWith('.tmp')), []);
+
+    // Markdown and CSV copies are lines of one pack, read in place; a restart reads them back.
+    const packDir = path.join(base, 'pack');
+    const packs = new TextCache(packDir, 64 * 1024 * 1024, undefined, () => clock++);
+    await packs.open();
+    const csv: CachedText = { ...text('Item Cost'), columns: ['Item', 'Cost'] };
+    await packs.put('/p/a.md', 1, 1, text('markdown alpha'));
+    await packs.put('/p/t.csv', 2, 2, csv);
+    await packs.put('/p/w.pdf', 3, 3, text('pdf'));
+    assert.ok(packs.has('/p/a.md', 1, 1) && !packs.has('/p/a.md', 1, 2));
+    assert.deepEqual(await packs.get('/p/a.md', 1, 1), text('markdown alpha'), 'a line not yet written is found');
+    await packs.flush();
+    assert.deepEqual((await fsp.readdir(packDir)).filter((name) => name.endsWith('.json') && name !== 'index.json').length, 1, 'only the PDF has a file of its own');
+    const packsAgain = new TextCache(packDir, 64 * 1024 * 1024, undefined, () => clock++);
+    await packsAgain.open();
+    assert.deepEqual(await packsAgain.get('/p/a.md', 1, 1), text('markdown alpha'));
+    assert.deepEqual(await packsAgain.get('/p/t.csv', 2, 2), csv, "a CSV's columns are kept");
+    assert.equal(await packsAgain.get('/p/a.md', 1, 9), null, 'another change time');
+    // A changed file's new line replaces the old; the old line is waste until the pack is written again.
+    await packsAgain.put('/p/a.md', 1, 5, text('markdown beta'));
+    await packsAgain.delete('/p/t.csv');
+    const big = text('x'.repeat(17 * 1024 * 1024));
+    await packsAgain.put('/p/big.md', 4, 4, big);
+    await packsAgain.flush();
+    await packsAgain.delete('/p/big.md');
+    await packsAgain.flush();
+    const packBytes = (await fsp.stat(path.join(packDir, 'pack.jsonl'))).size;
+    assert.ok(packBytes < 1024 * 1024, `the waste went when it outgrew the live lines (${packBytes} bytes)`);
+    const packsThird = new TextCache(packDir, 64 * 1024 * 1024);
+    await packsThird.open();
+    assert.equal(packsThird.entries, 2);
+    assert.deepEqual(await packsThird.get('/p/a.md', 1, 5), text('markdown beta'), 'moved lines are found at their new place');
+    assert.deepEqual(await packsThird.get('/p/w.pdf', 3, 3), text('pdf'));
+    // A pack cut short: the rows past its end are dropped, the rest kept.
+    await fsp.truncate(path.join(packDir, 'pack.jsonl'), 0);
+    const packsCut = new TextCache(packDir, 64 * 1024 * 1024);
+    await packsCut.open();
+    assert.equal(await packsCut.get('/p/a.md', 1, 5), null);
+    assert.ok(await packsCut.get('/p/w.pdf', 3, 3));
+    // Garbage at a line's valid offset (a disk error, a stray write): no copy, no throw, the other lines still read.
+    {
+      const dirG = path.join(base, 'garbage');
+      const g = new TextCache(dirG, 1024 * 1024, undefined, () => clock++);
+      await g.open();
+      await g.put('/p/one.md', 1, 1, text('first line'));
+      await g.put('/p/two.md', 2, 2, text('second line'));
+      await g.flush();
+      const packPath = path.join(dirG, 'pack.jsonl');
+      const lines = (await fsp.readFile(packPath, 'utf8')).split('\n');
+      await fsp.writeFile(packPath, ['\u0001'.repeat(lines[0].length), ...lines.slice(1)].join('\n'));
+      const g2 = new TextCache(dirG, 1024 * 1024);
+      await g2.open();
+      assert.equal(await g2.get('/p/one.md', 1, 1), null, 'a garbled line is no copy');
+      assert.deepEqual(await g2.get('/p/two.md', 2, 2), text('second line'));
+      assert.equal(g2.has('/p/one.md', 1, 1), false, 'and its row is dropped');
+
+      // A torn tail (a write cut short by a crash), then a new line after it: both old and new lines read.
+      await fsp.appendFile(packPath, '{"p":"/p/torn.md","s":3,"m');
+      const g3 = new TextCache(dirG, 1024 * 1024, undefined, () => clock++);
+      await g3.open();
+      await g3.put('/p/three.md', 3, 3, text('after the tear'));
+      await g3.flush();
+      const g4 = new TextCache(dirG, 1024 * 1024);
+      await g4.open();
+      assert.deepEqual(await g4.get('/p/three.md', 3, 3), text('after the tear'), 'a line after a torn tail');
+      assert.deepEqual(await g4.get('/p/two.md', 2, 2), text('second line'));
+    }
+
+    // A same-size change: only the change time differs, and the copy is not used.
+    assert.equal(await packsCut.get('/p/w.pdf', 3, 4), null);
+
+    // A document replaced by a link to another file: the walk sees the linked file's size and change time, so its
+    // copy no longer matches and it is read again.
+    {
+      const project = path.join(base, 'linked');
+      await fsp.mkdir(project, { recursive: true });
+      await fsp.writeFile(path.join(project, 'a.md'), 'the original words');
+      const nodeWalkFs: WalkFs = {
+        readdir: (dir) => fsp.readdir(dir, { withFileTypes: true }),
+        stat: (target) => fsp.stat(target),
+        readHead: async (target) => new Uint8Array(await fsp.readFile(target)),
+      };
+      const rules = { platform: process.platform, oneDriveRoots: [], filesExclude: {} };
+      const walkOnce = async () => (await walkProject([{ path: project, name: 'linked' }], rules, nodeWalkFs, 100, async () => undefined)).documents;
+      const [original] = await walkOnce();
+      const links = new TextCache(path.join(base, 'links'), 1024 * 1024);
+      await links.open();
+      await links.put(original.path, original.size, original.mtimeMs, text('the original words'));
+      assert.ok(links.has(original.path, original.size, original.mtimeMs));
+      const other = path.join(base, 'elsewhere.md');
+      await fsp.writeFile(other, 'other words, and more of them');
+      await fsp.rm(original.path);
+      await fsp.symlink(other, original.path);
+      const [linked] = await walkOnce();
+      assert.equal(linked.path, original.path, 'a linked file is still a document');
+      assert.equal(links.has(linked.path, linked.size, linked.mtimeMs), false, 'its copy is not used');
+      assert.equal(await links.get(linked.path, linked.size, linked.mtimeMs), null);
+    }
+
+    // Files are this person's only (the Mac and Linux).
+    if (process.platform !== 'win32') {
+      assert.equal((await fsp.stat(path.join(packDir, 'pack.jsonl'))).mode & 0o777, 0o600);
+      assert.equal((await fsp.stat(path.join(packDir, 'index.json'))).mode & 0o777, 0o600);
+      assert.equal((await fsp.stat(packDir)).mode & 0o777, 0o700);
+    }
+
+    // Lines count toward the cap, and the oldest go first, whatever their kind.
+    const mixed = new TextCache(path.join(base, 'mixed'), 300, undefined, () => clock++);
+    await mixed.open();
+    await mixed.put('/p/1.md', 1, 1, text('one '.repeat(10)));
+    await mixed.put('/p/2.pdf', 1, 1, text('two '.repeat(10)));
+    await mixed.put('/p/3.md', 1, 1, text('three '.repeat(10)));
+    assert.ok(mixed.bytes <= 300);
+    assert.equal(await mixed.get('/p/1.md', 1, 1), null, 'the oldest went');
+    assert.ok(await mixed.get('/p/3.md', 1, 1));
 
     // Without a project storage folder there is no cache, and nothing fails.
     const none = new TextCache(null, 10_000);

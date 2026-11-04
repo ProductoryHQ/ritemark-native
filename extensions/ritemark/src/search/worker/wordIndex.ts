@@ -63,6 +63,8 @@ interface TokenMatch {
   /** 1 at each matching term's id. */
   set: Uint8Array;
   size: number;
+  /** `matchWord` for this word against a term's written form, worked out once per term per query. */
+  marks: Map<number, ReturnType<typeof matchWord>>;
 }
 
 export interface QueryShape {
@@ -310,7 +312,7 @@ export class WordIndex {
         size += this.textPostings[term].length + this.namePostings[term].length;
         set[term] = 1;
       }
-      return { query, order, terms, exact, set, size };
+      return { query, order, terms, exact, set, size, marks: new Map() };
     });
   }
 
@@ -324,6 +326,8 @@ export class WordIndex {
     const hits = new Int32Array(count);
     const nameMask = new Uint32Array(count);
     const exactMask = new Uint32Array(count);
+    /** The words found in a source's text, not only in its name: the words together need every one there. */
+    const textMask = new Uint32Array(count);
     const touched: number[] = [];
     // The rarest word first: only its sources can have them all.
     const byRarity = [...tokens].sort((a, b) => a.size - b.size);
@@ -333,13 +337,17 @@ export class WordIndex {
         const state = have[id];
         if (state < step) return;
         if (state === step) {
-          const record = this.records[id];
-          if (!record || !kinds.has(record.source.kind)) return;
+          if (step === 0) {
+            // Only the first word's sources can have them all: the source and its kind are looked at there only.
+            const record = this.records[id];
+            if (!record || !kinds.has(record.source.kind)) return;
+            touched.push(id);
+          }
           have[id] = step + 1;
-          if (step === 0) touched.push(id);
         }
         hits[id] += textCount;
         if (inName) nameMask[id] |= bit;
+        else textMask[id] |= bit;
         if (exact) exactMask[id] |= bit;
       };
       for (const term of token.terms) {
@@ -366,6 +374,8 @@ export class WordIndex {
       return n;
     };
     const ordered = [...tokens].sort((a, b) => a.order - b.order);
+    // The words together are looked for from the rarest word's place: the cheapest test, failing most often.
+    const anchor = ordered.indexOf(byRarity[0]);
     // The order's keys, worked out once per source: the name's words, then the exact letters, then the
     // words together, then more hits, then the most recently changed.
     const tier = new Uint8Array(count);
@@ -386,7 +396,8 @@ export class WordIndex {
       ids.sort(compare);
       if (all > 1) {
         const head = ids.slice(0, PHRASE_CANDIDATES);
-        for (const id of head) phrase[id] = this.hasPhrase(this.records[id]!, ordered) ? 1 : 0;
+        // A source whose text lacks one of the words can't have them together: no walk through its words.
+        for (const id of head) phrase[id] = textMask[id] === allBits && this.hasPhrase(this.records[id]!, ordered, anchor) ? 1 : 0;
         head.sort(compare);
         ids.splice(0, head.length, ...head);
       }
@@ -401,15 +412,20 @@ export class WordIndex {
     return { tooShort: false, groups, tooLarge };
   }
 
-  /** The query's words together, in the order typed, inside one passage. */
-  private hasPhrase(record: SourceRecord, ordered: TokenMatch[]): boolean {
+  /**
+   * The query's words together, in the order typed, inside one passage. Each start is tested first at the
+   * `anchor` word (the rarest), then at the rest in order.
+   */
+  private hasPhrase(record: SourceRecord, ordered: TokenMatch[], anchor: number): boolean {
     const { words, passageStarts } = record;
     const n = ordered.length;
+    const anchorSet = ordered[anchor].set;
     for (let p = 0; p + 1 < passageStarts.length; p++) {
       const end = passageStarts[p + 1];
       for (let i = passageStarts[p]; i + n <= end; i++) {
+        if (anchorSet[words[i + anchor]] !== 1) continue;
         let j = 0;
-        while (j < n && ordered[j].set[words[i + j]] === 1) j++;
+        while (j < n && (j === anchor || ordered[j].set[words[i + j]] === 1)) j++;
         if (j === n) return true;
       }
     }
@@ -464,7 +480,12 @@ export class WordIndex {
       const term = words[index++];
       for (const token of ordered) {
         if (token.set[term] !== 1) continue;
-        const match = matchWord(token.query, word, options.matchCase, options.wholeWords);
+        // A term's word is its written form: the same answer for every place and every source it is in.
+        let match = token.marks.get(term);
+        if (match === undefined) {
+          match = matchWord(token.query, word, options.matchCase, options.wholeWords);
+          token.marks.set(term, match);
+        }
         if (match) {
           marks.push([start, start + match.length]);
           first ??= { word, start };
