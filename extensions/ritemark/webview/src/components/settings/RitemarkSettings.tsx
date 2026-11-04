@@ -3,11 +3,16 @@
  * Updates and Advanced (`settingsSections.ts`), drawn by `SettingsPage.tsx`. This component holds the page's data and
  * sends today's messages; each section draws its rows. AI accounts draws Claude, ChatGPT and OpenCode as rows, with
  * their Details sheets and the API keys sheet (PR 2, W4). `settingsInventory.test.ts` holds the page to every message, setting and key.
+ *
+ * PR 3 (R10, R11, decision 2): the page draws from `settings` at once and fills in from each `settings:part`
+ * (`settingsParts.ts`); a row whose part is still coming reads Checking…. It holds no saved key: a key's eye asks
+ * the host for that one key (`apiKeyReveal.ts`).
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../ui/Icon';
 import { vscode } from '../../lib/vscode';
+import { settingsTimingMark } from '../../lib/settingsTiming';
 import { GoogleDocsSettingsCard, type GoogleDocsSettingsProjection } from './GoogleDocsSettingsCard';
 import { AiAccountsSection, type AiId, type ClaudeAction, type CodexAction } from './AiAccountsSection';
 import { AiDetailsSheet } from './AiDetailsSheet';
@@ -19,6 +24,8 @@ import { AppearanceSection } from './AppearanceSection';
 import { UsageDataSection } from './UsageDataSection';
 import { UpdatesSection, updatesLede } from './UpdatesSection';
 import { AdvancedSection } from './AdvancedSection';
+import { afterBase, composeSettings, isSettingsPartName, splitSettings, withPart, type SettingsBase, type SettingsParts, type SettingsPending } from './settingsParts';
+import { requestSavedKey, type RevealPort } from './apiKeyReveal';
 
 export interface SettingsData {
   codexIntegration: boolean;
@@ -32,20 +39,16 @@ export interface SettingsData {
   updatesEnabled: boolean;
   agentTimeout: number;
   debugTrace: boolean;
-  openaiKey: string;
+  // Whether each key is saved; never its value (decision 2: the eye asks the host for one key)
   openaiKeyConfigured: boolean;
-  googleKey: string;
   googleKeyConfigured: boolean;
-  anthropicKey: string;
   anthropicKeyConfigured: boolean;
   opencodeEnabled: boolean;
   opencodeAutoApprove: boolean;
   openrouterEnabled: boolean;
-  openrouterKey: string;
   openrouterKeyConfigured: boolean;
   // Sprint 108 R4/R12: transcription key + stored-transcript footprint.
   transcriptionEnabled: boolean;
-  elevenlabsKey: string;
   elevenlabsKeyConfigured: boolean;
   transcriptionStorageBytes: number;
   chatFontSize: number;
@@ -75,6 +78,8 @@ export interface SettingsData {
     error?: string;
     blockedReason?: string;
   };
+  /** PR 3 (R10): the parts still coming; their rows read Checking…. Absent: every part is in. */
+  pending?: SettingsPending;
   componentStatus: {
     voiceModel: {
       installed: boolean;
@@ -166,8 +171,22 @@ export interface RitemarkSettingsInitial {
   codexAuth?: CodexAuthStatus;
 }
 
+/** The eye's way to the host: one `apiKey:reveal`, and its one answer. */
+const revealPort: RevealPort = {
+  post: (message) => vscode.postMessage(message),
+  listen: (handler) => {
+    const listener = (event: MessageEvent) => handler(event.data);
+    window.addEventListener('message', listener);
+    return () => window.removeEventListener('message', listener);
+  },
+};
+
 export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitial } = {}) {
-  const [settings, setSettings] = useState<SettingsData | null>(initial?.settings ?? null);
+  // PR 3 (R10): `settings` (no probe) and the parts in so far; the page draws as soon as `settings` comes
+  const initialSplit = useMemo(() => (initial?.settings ? splitSettings(initial.settings) : null), []);
+  const [base, setBase] = useState<SettingsBase | null>(initialSplit?.base ?? null);
+  const [parts, setParts] = useState<SettingsParts>(initialSplit?.parts ?? {});
+  const settings = useMemo(() => composeSettings(base, parts), [base, parts]);
   // Sprint 147 (R3): the Details sheet's AI, and the API keys sheet with the row a way in or Set up brings into view
   const [detailsFor, setDetailsFor] = useState<AiId | null>(null);
   // The sheet keeps its AI while it closes, so it doesn't flash Claude's content (#645's review)
@@ -188,6 +207,8 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
   const [section, setSection] = useState<SettingsSectionId>(initial?.section ?? FIRST_SECTION);
   // Another feature opened Settings at one of today's five names (Sprint 119; I61): the row to bring into view there
   const [focusAnchor, setFocusAnchor] = useState<string | null>(null);
+  // PR 3 (the review of #657): goes up when the tab is hidden, so a shown saved key goes
+  const [hideEyes, setHideEyes] = useState(0);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -195,8 +216,21 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
 
       switch (message.type) {
         case 'settings':
-          setSettings(message.data);
+          setBase(message.data);
+          setParts(afterBase);
           setGoogleDocs(message.data.googleDocs ?? null);
+          break;
+
+        case 'settings:hidden':
+          setHideEyes((count) => count + 1);
+          break;
+
+        case 'settings:part':
+          // One probe's answer: its rows stop saying Checking…
+          if (isSettingsPartName(message.part)) {
+            const { part, value } = message;
+            setParts((prev) => withPart(prev, part, value));
+          }
           break;
 
         case 'testResult':
@@ -238,11 +272,28 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
       }
     };
 
+    // The page's own view of being hidden, as well as the host's
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') setHideEyes((count) => count + 1);
+    };
+
     window.addEventListener('message', handleMessage);
+    document.addEventListener('visibilitychange', handleVisibility);
     vscode.postMessage({ type: 'ready' });
 
-    return () => window.removeEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
+
+  // Sprint 147, A1: measurement only; each mark once, and nothing unless the host turned timing on
+  useEffect(() => {
+    settingsTimingMark('first-render');
+  }, []);
+  useEffect(() => {
+    if (settings) settingsTimingMark('first-render-with-settings');
+  }, [settings]);
 
   // Bring a way in's row into view once its section has drawn it.
   useEffect(() => {
@@ -276,7 +327,7 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
   };
 
   const handleThemeChange = (themeId: string) => {
-    setSettings((prev) => prev ? { ...prev, currentTheme: themeId } : prev);
+    setBase((prev) => prev ? { ...prev, currentTheme: themeId } : prev);
     vscode.postMessage({ type: 'theme:set', value: themeId });
   };
 
@@ -375,6 +426,8 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
               results={testResults}
               onSave={handleSaveApiKey}
               onTest={handleTestApiKey}
+              onReveal={(name) => requestSavedKey(name, revealPort)}
+              hideEyes={hideEyes}
               onDone={() => setKeys((prev) => ({ ...prev, open: false }))}
               returnFocus={keys.forOpenCode ? () => document.querySelector<HTMLElement>('[data-settings-row="I30"] button') : undefined}
             />
@@ -387,7 +440,7 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
             onTheme={handleThemeChange}
             chatFontSize={settings.chatFontSize || 13}
             onChatFontSize={(size) => {
-              setSettings((prev) => prev ? { ...prev, chatFontSize: size } : prev);
+              setBase((prev) => prev ? { ...prev, chatFontSize: size } : prev);
               handleSettingChange('chat.fontSize', size);
             }}
           />
@@ -403,7 +456,7 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
             usageData={settings.usageData}
             onChange={(value) => {
               // Answer the click at once, as the theme choice does; the host's resend confirms it.
-              setSettings((prev) => prev ? { ...prev, usageData: { on: value, fromRitemark1: false } } : prev);
+              setBase((prev) => prev ? { ...prev, usageData: { on: value, fromRitemark1: false } } : prev);
               vscode.postMessage({ type: 'usageData:set', on: value });
             }}
           />
@@ -421,7 +474,7 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
           <AdvancedSection
             settings={settings}
             onSetting={(key, value) => {
-              setSettings((prev) => prev ? { ...prev, ...localSetting(key, value) } : prev);
+              setBase((prev) => prev ? { ...prev, ...localSetting(key, value) } : prev);
               handleSettingChange(key, value);
             }}
             onClaude={handleClaudeAction}

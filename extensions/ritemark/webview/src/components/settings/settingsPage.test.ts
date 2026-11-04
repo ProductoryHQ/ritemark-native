@@ -41,15 +41,15 @@ function payload(over: Partial<Settings> = {}): Settings {
     updatesEnabled: true,
     agentTimeout: 15,
     debugTrace: false,
-    openaiKey: '', openaiKeyConfigured: false,
-    googleKey: '', googleKeyConfigured: false,
-    anthropicKey: '', anthropicKeyConfigured: false,
+    openaiKeyConfigured: false,
+    googleKeyConfigured: false,
+    anthropicKeyConfigured: false,
     opencodeEnabled: true,
     opencodeAutoApprove: false,
     openrouterEnabled: true,
-    openrouterKey: '', openrouterKeyConfigured: false,
+    openrouterKeyConfigured: false,
     transcriptionEnabled: true,
-    elevenlabsKey: '', elevenlabsKeyConfigured: false,
+    elevenlabsKeyConfigured: false,
     transcriptionStorageBytes: 128 * 1024 * 1024,
     chatFontSize: 13,
     googleDocs: { enabled: true, state: 'connected', email: 'test@example.com', displayName: null, template: null, choosingTemplate: false, message: null },
@@ -200,11 +200,11 @@ assert.equal((emptyKeys.match(/>Not added</g) ?? []).length, 5)
 assert.equal((emptyKeys.match(/>Add</g) ?? []).length, 5)
 assert.equal((emptyKeys.match(/Get a key/g) ?? []).length, 5)
 // A saved key: Saved, Test and Change; Saved · it works after a passing Test; the error after a failing one
-const savedKeys = keysSheet(payload({ openaiKeyConfigured: true, openaiKey: 'sk-recorded' }), { results: { openai: { key: 'openai', success: true } } })
+const savedKeys = keysSheet(payload({ openaiKeyConfigured: true }), { results: { openai: { key: 'openai', success: true } } })
 assert.match(savedKeys, /Saved · it works/)
 assert.match(savedKeys, />Test</)
 assert.match(savedKeys, />Change</)
-assert.doesNotMatch(savedKeys, /sk-recorded/, 'a saved key is never drawn until Change and its eye')
+assert.doesNotMatch(savedKeys, /sk-/, 'a saved key is never drawn: the page holds none (PR 3)')
 assert.equal(keyStateLine(true, { key: 'openai', success: false, error: 'Invalid' }), "Saved · it didn't work")
 assert.equal(keyStateLine(true, undefined), 'Saved')
 assert.match(keysSheet(payload({ anthropicKeyConfigured: true }), { results: { anthropic: { key: 'anthropic', success: false, error: 'Invalid key' } } }), /Invalid key/)
@@ -293,7 +293,7 @@ assert.deepEqual(quietChoices(22), [5, 10, 15, 20, 22, 30, 45, 60])
 
 // Advanced's lines say what runs and what is found
 assert.equal(runtimeLine(payload()), "Now: Claude and ChatGPT from Ritemark's own. This computer has Git.")
-assert.match(runtimeLine(payload({ agentRuntimePreference: 'system' })), /wasn't found, so Ritemark's own runs instead/)
+assert.match(runtimeLine(payload({ agentRuntimePreference: 'system' })) ?? '', /wasn't found, so Ritemark's own runs instead/)
 assert.equal(partsLine(payload().componentStatus), 'The voice model, Claude and ChatGPT: all ready')
 assert.equal(partsLine({ ...payload().componentStatus, codex: { ...payload().componentStatus.codex, state: 'broken' } }), 'ChatGPT needs a repair')
 // Codex on #644: a part that needs a sign-in is never "all ready"

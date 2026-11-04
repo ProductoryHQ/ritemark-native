@@ -15,6 +15,7 @@ import { vscode } from '../../lib/vscode'
 import { ExternalLink, TipButton } from './SettingsRow'
 import { opencodeRow, type AiId, type ClaudeAction, type CodexAction } from './AiAccountsSection'
 import type { CodexAuthStatus, SettingsData, TestResult } from './RitemarkSettings'
+import { WaitingMark } from '../ui/turning-mark'
 
 export interface AiDetailsProps {
   ai: AiId
@@ -209,6 +210,10 @@ export function detailsLede(ai: AiId, settings: SettingsData, codexAuth: CodexAu
 }
 
 export function AiDetailsRows(props: AiDetailsProps) {
+  // PR 3 (R10): opened before its AI's answer came: one row says so, and the sheet fills in when it comes
+  if ((props.ai === 'claude' && props.settings.pending?.claudeCode) || (props.ai === 'chatgpt' && props.settings.pending?.codex && !props.codexSigningIn)) {
+    return <DetailRow label="Signed in"><WaitingMark label={`Checking ${NAMES[props.ai]}`} /></DetailRow>
+  }
   return props.ai === 'claude' ? <ClaudeDetails {...props} />
     : props.ai === 'chatgpt' ? <ChatgptDetails {...props} />
     : <OpencodeDetails {...props} />

@@ -1,5 +1,6 @@
 import { Button } from '../ui/button';
 import { Icon, type PhosphorIconName } from '../ui/Icon';
+import { TurningMark } from '../ui/turning-mark';
 import { Tooltip } from '../ui/tooltip';
 
 export interface RuntimeNoticeAction {
@@ -67,11 +68,7 @@ export function RuntimeNotice({
           {tone === 'checking' ? (
             // The kit's turning mark, as the AI column's starting look draws it (src/views/aiStartingMark.ts): 16, 1.5 of
             // the strong hairline with its top in ink, once a second; still under Reduce motion
-            <span
-              aria-hidden="true"
-              className="box-border h-4 w-4 animate-spin rounded-full border-[1.5px] border-solid motion-reduce:animate-none [.vscode-reduce-motion_&]:animate-none"
-              style={{ borderColor: 'var(--vscode-input-border)', borderTopColor: 'var(--vscode-foreground)' }}
-            />
+            <TurningMark />
           ) : (
             <Icon
               name={visual.icon}

@@ -18,6 +18,8 @@ import { Switch } from '../ui/switch'
 import { AdvancedSettingsLink } from './AdvancedSettingsLink'
 import { SettingsGroup, SettingsRow, TipButton } from './SettingsRow'
 import { formatSize } from './UpdatesSection'
+import { type SettingsPending } from './settingsParts'
+import { WaitingMark } from '../ui/turning-mark'
 
 export interface RuntimeStatusModel {
   runtime: 'missing' | 'installed' | 'architecture_mismatch' | 'launch_failed'
@@ -76,6 +78,8 @@ export interface AdvancedSettings {
   transcriptionEnabled: boolean
   transcriptionStorageBytes: number
   componentStatus: ComponentStatus
+  /** PR 3 (R10): the parts still coming. */
+  pending?: SettingsPending
 }
 
 type ClaudeAction = 'claude:install' | 'claude:repair' | 'claude:login' | 'claude:reload' | 'claude:refreshStatus'
@@ -104,7 +108,9 @@ function sourceName(source: RuntimeStatusModel['source']): string {
 }
 
 /** Where the AI runs from: what runs now, this computer's tools, and the fallback (I4, I5, I6). */
-export function runtimeLine(settings: AdvancedSettings): string {
+export function runtimeLine(settings: AdvancedSettings): string | null {
+  // An answer still coming: no words; the row draws the waiting mark
+  if (settings.pending?.claudeCode || settings.pending?.codex || settings.pending?.environment) return null
   const claude = settings.componentStatus.claudeCode.runtimeStatus.source
   const chatgpt = settings.componentStatus.codex.runtimeStatus.source
   const parts = [claude === chatgpt
@@ -132,7 +138,8 @@ export function runtimeLine(settings: AdvancedSettings): string {
 }
 
 /** Ritemark's parts' line: all ready, or what needs a hand, a sign-in included. */
-export function partsLine(status: ComponentStatus): string {
+export function partsLine(status: ComponentStatus, pending?: SettingsPending): string | null {
+  if (pending?.claudeCode || pending?.codex) return null
   const needs: string[] = []
   if (!status.voiceModel.installed) needs.push("the voice model isn't on this computer")
   const claude = status.claudeCode
@@ -174,7 +181,7 @@ export function AdvancedSection({
 
   return (
     <>
-      <SettingsRow row="I3 I4 I5 I6" name="Where the AI runs from" line={runtimeLine(settings)}>
+      <SettingsRow row="I3 I4 I5 I6" name="Where the AI runs from" line={runtimeLine(settings) ?? <WaitingMark label="Checking where the AI runs from" />}>
         <SegmentedControl
           aria-label="Where the AI runs from"
           value={settings.agentRuntimePreference ?? 'bundled'}
@@ -225,7 +232,7 @@ export function AdvancedSection({
       )}
 
       <SettingsGroup>When something isn&apos;t right</SettingsGroup>
-      <SettingsRow row="I56 I57 I17" name="Ritemark's parts" line={partsLine(status)}>
+      <SettingsRow row="I56 I57 I17" name="Ritemark's parts" line={partsLine(status, settings.pending) ?? <WaitingMark label="Checking Ritemark's parts" />}>
         <TipButton
           tip="Checks Claude and ChatGPT again"
           variant="ghost"
@@ -249,13 +256,13 @@ export function AdvancedSection({
           row="I58"
           id="settings-section-transcription"
           name="Transcripts' working files"
-          line={`${settings.transcriptionStorageBytes > 0 ? `${formatSize(settings.transcriptionStorageBytes)} of transcripts, speaker names and corrections.` : 'None yet.'} Your recordings and saved documents are kept apart.`}
+          line={settings.pending?.transcriptionStorageBytes ? <WaitingMark label="Checking transcripts' working files" /> : `${settings.transcriptionStorageBytes > 0 ? `${formatSize(settings.transcriptionStorageBytes)} of transcripts, speaker names and corrections.` : 'None yet.'} Your recordings and saved documents are kept apart.`}
         >
           <TipButton
             tip={settings.transcriptionStorageBytes ? 'Removes them; your recordings and documents stay' : 'Nothing to clear yet'}
             variant="ghost"
             size="sm"
-            disabled={!settings.transcriptionStorageBytes}
+            disabled={!settings.transcriptionStorageBytes || Boolean(settings.pending?.transcriptionStorageBytes)}
             onClick={onClearTranscripts}
           >
             Clear

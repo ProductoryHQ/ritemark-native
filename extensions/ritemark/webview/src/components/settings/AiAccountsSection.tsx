@@ -13,6 +13,7 @@ import { AI_INFORMATION_URL } from '../ai-sidebar/aiDisclosure'
 import { PLAN_LINES } from '../welcome/welcomeCopy'
 import { ExternalLink, SettingsGroup, SettingsNote, SettingsRow, TipButton } from './SettingsRow'
 import type { CodexAuthStatus, SettingsData, TestResult } from './RitemarkSettings'
+import { WaitingMark } from '../ui/turning-mark'
 
 export type ClaudeAction =
   | 'claude:install' | 'claude:repair' | 'claude:login' | 'claude:logout' | 'claude:reload' | 'claude:refreshStatus'
@@ -129,15 +130,19 @@ export function AiAccountsSection({
   onKeys: (opts?: { forOpenCode?: boolean }) => void
 }) {
   const claude = settings.componentStatus.claudeCode
-  const claudeState = claudeRow(claude)
-  const chatgptState = chatgptRow(codexAuth, codexSigningIn)
+  // PR 3 (R10): a row whose answer is still coming reads Checking…, with no action yet; Details stays
+  const claudeChecking = Boolean(settings.pending?.claudeCode)
+  const chatgptChecking = Boolean(settings.pending?.codex) && !codexSigningIn
+  const claudeState = claudeChecking ? { line: '', ready: false } : claudeRow(claude)
+  const chatgptState = chatgptChecking ? { line: '', ready: false } : chatgptRow(codexAuth, codexSigningIn)
   const opencodeState = opencodeRow(settings, testResults)
   const saved = savedKeyCount(settings)
 
   return (
     <>
-      <SettingsRow row="I7 I8 I9 I10 I13 I14 I16" mark={<Mark>C</Mark>} name="Claude" line={claudeState.line}>
-          {claudeState.ready ? <ReadyMark />
+      <SettingsRow row="I7 I8 I9 I10 I13 I14 I16" mark={<Mark>C</Mark>} name="Claude" line={claudeChecking ? <WaitingMark label="Checking Claude" /> : claudeState.line}>
+          {claudeChecking ? null
+            : claudeState.ready ? <ReadyMark />
             : claude.state === 'not-installed' ? <TipButton tip="Installs Claude for Ritemark" variant="outline" size="sm" onClick={() => onClaude('claude:install')}>Install</TipButton>
             : claude.state === 'broken' && claude.repairAction === 'reload' ? <TipButton tip="Reloads this window to finish the repair; your work stays as it is" variant="outline" size="sm" onClick={() => onClaude('claude:reload')}>Reload window</TipButton>
             : claude.state === 'broken' ? <TipButton tip="Repairs Claude's runtime" variant="outline" size="sm" onClick={() => onClaude('claude:repair')}>Repair</TipButton>
@@ -148,9 +153,10 @@ export function AiAccountsSection({
 
       <SettingsRow row="I20 I21 I22 I23 I24" mark={<Mark><Icon name="open-ai-logo" size={16} /></Mark>}
           name="ChatGPT"
-          line={chatgptState.note ? <>{chatgptState.line}<span className="block">{chatgptState.note}</span></> : chatgptState.line}
+          line={chatgptChecking ? <WaitingMark label="Checking ChatGPT" /> : chatgptState.note ? <>{chatgptState.line}<span className="block">{chatgptState.note}</span></> : chatgptState.line}
         >
-          {chatgptState.ready ? <ReadyMark />
+          {chatgptChecking ? null
+            : chatgptState.ready ? <ReadyMark />
             : codexAuth.binaryMissing ? <TipButton tip="Installs ChatGPT for Ritemark" variant="outline" size="sm" onClick={() => onCodex('codex:repair')}>Install</TipButton>
             : codexAuth.binaryBroken ? <TipButton tip="Repairs ChatGPT's runtime" variant="outline" size="sm" onClick={() => onCodex('codex:repair')}>Repair</TipButton>
             : codexSigningIn ? <TipButton tip="Stops waiting for ChatGPT's sign-in" variant="outline" size="sm" onClick={() => onCodex('codex:cancelLogin')}>Cancel</TipButton>
