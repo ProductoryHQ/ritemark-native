@@ -45,6 +45,25 @@ export interface EyeState {
   draft: string
   revealed: string | null
   show: boolean
+  /** The host is still answering the eye's request. */
+  pending?: boolean
+}
+
+/**
+ * Codex on #657: an eye's request still out when the tab is hidden (or the key removed, or the field closed) must not
+ * land. Each request takes a ticket; cancelling moves the generation on, so the old ticket's answer is refused.
+ */
+export class RevealGate {
+  private generation = 0
+  begin(): number {
+    return ++this.generation
+  }
+  cancel(): void {
+    this.generation += 1
+  }
+  accepts(ticket: number): boolean {
+    return ticket === this.generation
+  }
 }
 
 /** The eye-close step: the saved key leaves the field and the row's state; a typed key stays, hidden. */
@@ -57,6 +76,6 @@ export function closeEye(state: EyeState): EyeState {
  * when the key is removed elsewhere, so it never sits in a field nobody is looking at.
  */
 export function eyeMustClose(state: EyeState, event: { hidden: boolean; saved: boolean }): boolean {
-  if (state.revealed === null && !state.show) return false
-  return event.hidden || (!event.saved && state.revealed !== null)
+  if (state.revealed === null && !state.show && !state.pending) return false
+  return event.hidden || (!event.saved && (state.revealed !== null || Boolean(state.pending)))
 }

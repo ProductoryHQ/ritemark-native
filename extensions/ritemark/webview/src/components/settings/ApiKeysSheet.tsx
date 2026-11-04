@@ -18,7 +18,7 @@ import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, Dia
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { ExternalLink, TipButton } from './SettingsRow'
-import { closeEye, eyeMustClose } from './apiKeyReveal'
+import { RevealGate, closeEye, eyeMustClose } from './apiKeyReveal'
 import type { SettingsData, TestResult } from './RitemarkSettings'
 
 type KeyFlag = 'openrouterEnabled' | 'transcriptionEnabled'
@@ -126,7 +126,7 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, hide
   const [revealed, setRevealed] = useState<string | null>(null)
   const [revealing, setRevealing] = useState(false)
   // A field closed while the host answers drops the answer
-  const openedAt = useRef(0)
+  const gate = useRef(new RevealGate())
   const rowRef = useRef<HTMLDivElement>(null)
   const usedFor = row.usedFor(settings)
 
@@ -146,7 +146,7 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, hide
 
   const open = () => {
     // The page holds no saved key (PR 3): the field opens empty; its eye asks for the saved one (decision 2, Jarmo)
-    openedAt.current += 1
+    gate.current.cancel()
     setDraft('')
     setRevealed(null)
     setShow(false)
@@ -154,7 +154,7 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, hide
     setEditing(true)
   }
   const close = () => {
-    openedAt.current += 1
+    gate.current.cancel()
     setEditing(false)
     setConfirming(false)
     setDraft('')
@@ -164,6 +164,9 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, hide
   }
   /** The eye-close step (`closeEye`): the saved key goes; a key typed over it stays, hidden. */
   const shutEye = () => {
+    // A request still out is refused when it answers
+    gate.current.cancel()
+    setRevealing(false)
     const next = closeEye({ draft, revealed, show })
     setDraft(next.draft)
     setRevealed(next.revealed)
@@ -171,10 +174,10 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, hide
   }
   // The tab hidden, or the key removed elsewhere: the eye closes (the review of #657)
   useEffect(() => {
-    if (eyeMustClose({ draft, revealed, show }, { hidden: true, saved })) shutEye()
+    if (eyeMustClose({ draft, revealed, show, pending: revealing }, { hidden: true, saved })) shutEye()
   }, [hideEyes])
   useEffect(() => {
-    if (eyeMustClose({ draft, revealed, show }, { hidden: false, saved })) shutEye()
+    if (eyeMustClose({ draft, revealed, show, pending: revealing }, { hidden: false, saved })) shutEye()
   }, [saved])
   const toggleEye = async () => {
     if (show) {
@@ -182,10 +185,10 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, hide
       return
     }
     if (saved && !draft && onReveal) {
-      const ticket = openedAt.current
+      const ticket = gate.current.begin()
       setRevealing(true)
       const value = await onReveal(row.name)
-      if (ticket !== openedAt.current) return
+      if (!gate.current.accepts(ticket)) return
       setRevealing(false)
       if (value) {
         // Text typed while the host answered stays as typed

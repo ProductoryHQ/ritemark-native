@@ -14,7 +14,7 @@ const React = await import('react')
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { composeSettings, withPart, afterBase, splitSettings, CHECKING, PENDING_PARTS } = await import('./settingsParts')
-const { requestSavedKey, afterEyeCloses, closeEye, eyeMustClose } = await import('./apiKeyReveal')
+const { requestSavedKey, afterEyeCloses, closeEye, eyeMustClose, RevealGate } = await import('./apiKeyReveal')
 const { AiAccountsSection } = await import('./AiAccountsSection')
 const { AiDetailsRows } = await import('./AiDetailsSheet')
 const { partsLine, runtimeLine } = await import('./AdvancedSection')
@@ -133,10 +133,38 @@ assert.equal(afterEyeCloses('sk-new', null), 'sk-new')
   assert.equal(eyeMustClose(shown, { hidden: false, saved: true }), false, 'nothing changed: it stays open')
   assert.equal(eyeMustClose({ draft: '', revealed: null, show: false }, { hidden: true, saved: true }), false, 'no eye open: nothing to do')
   assert.deepEqual(closeEye(shown), { draft: '', revealed: null, show: false }, 'the saved key leaves the field and the state')
+  // Codex on #657: hidden while the host still answers, then the answer comes: nothing shown or kept
+  const waitingEye = { draft: '', revealed: null, show: false, pending: true }
+  assert.equal(eyeMustClose(waitingEye, { hidden: true, saved: true }), true, 'a request still out is cancelled on hide')
+  assert.equal(eyeMustClose(waitingEye, { hidden: false, saved: false }), true, 'and when the key is removed elsewhere')
+  {
+    const gate = new RevealGate()
+    let draft = ''
+    let revealedKey: string | null = null
+    let show = false
+    const press = async (answer: Promise<string | null>) => {
+      const ticket = gate.begin()
+      const value = await answer
+      if (!gate.accepts(ticket)) return
+      if (value) { draft = draft || value; revealedKey = value }
+      show = true
+    }
+    let answer!: (value: string | null) => void
+    const pressed = press(new Promise((resolve) => { answer = resolve }))
+    gate.cancel() // the tab is hidden while SecretStorage answers
+    answer('sk-saved')
+    await pressed
+    assert.deepEqual({ draft, revealedKey, show }, { draft: '', revealedKey: null, show: false }, 'the late answer is dropped')
+    // A fresh press after that works as before
+    await press(Promise.resolve('sk-saved'))
+    assert.deepEqual({ draft, revealedKey, show }, { draft: 'sk-saved', revealedKey: 'sk-saved', show: true })
+  }
   assert.deepEqual(closeEye({ draft: 'sk-typed', revealed: 'sk-saved', show: true }), { draft: 'sk-typed', revealed: null, show: false }, 'a typed key stays, hidden')
   const source = readFileSync(join(HERE, 'ApiKeysSheet.tsx'), 'utf8')
-  assert.match(source, /eyeMustClose\(\{ draft, revealed, show \}, \{ hidden: true, saved \}\)\) shutEye\(\)\s*\}, \[hideEyes\]\)/, 'each open row closes its eye when the tab is hidden')
-  assert.match(source, /eyeMustClose\(\{ draft, revealed, show \}, \{ hidden: false, saved \}\)\) shutEye\(\)\s*\}, \[saved\]\)/, 'and when its key is removed elsewhere')
+  assert.match(source, /eyeMustClose\(\{ draft, revealed, show, pending: revealing \}, \{ hidden: true, saved \}\)\) shutEye\(\)\s*\}, \[hideEyes\]\)/, 'each open row closes its eye when the tab is hidden')
+  assert.match(source, /eyeMustClose\(\{ draft, revealed, show, pending: revealing \}, \{ hidden: false, saved \}\)\) shutEye\(\)\s*\}, \[saved\]\)/, 'and when its key is removed elsewhere')
+  assert.match(source, /const shutEye = \(\) => \{\s*\/\/[^\n]*\n\s*gate\.current\.cancel\(\)/, 'closing the eye refuses a request still out')
+  assert.match(source, /if \(!gate\.current\.accepts\(ticket\)\) return/, 'a refused answer sets nothing')
   assert.match(source, /setDraft\(\(current\) => current \|\| value\)/, 'text typed while the host answered is kept')
   const page = readFileSync(join(HERE, 'RitemarkSettings.tsx'), 'utf8')
   assert.match(page, /case 'settings:hidden':\s*setHideEyes/, "the host's hidden tab closes the eyes")
@@ -147,10 +175,10 @@ assert.equal(afterEyeCloses('sk-new', null), 'sk-new')
 }
 {
   const source = readFileSync(join(HERE, 'ApiKeysSheet.tsx'), 'utf8')
-  const close = source.slice(source.indexOf('const close = () => {\n    openedAt'), source.indexOf('const toggleEye'))
+  const close = source.slice(source.indexOf('const close = () => {\n    gate.current.cancel()'), source.indexOf('const toggleEye'))
   assert.match(close, /setDraft\(''\)/, 'closing the field drops what it showed')
   assert.match(close, /setRevealed\(null\)/, 'closing the field drops the saved key')
-  assert.match(source, /if \(ticket !== openedAt\.current\) return/, 'an answer after the field closed is dropped')
+  assert.match(source, /if \(!gate\.current\.accepts\(ticket\)\) return/, 'an answer after the field closed is dropped')
   assert.match(source, /if \(saved && !draft && onReveal\)/, 'only a saved key, with an empty field, is asked for')
   assert.doesNotMatch(source, /settings\[row\.value\]/, 'the field never fills from the page\'s data')
   // The sheet's rows live only while it is open (Radix unmounts closed content): closing the sheet drops the state
