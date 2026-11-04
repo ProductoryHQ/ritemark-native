@@ -207,6 +207,8 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
   const [section, setSection] = useState<SettingsSectionId>(initial?.section ?? FIRST_SECTION);
   // Another feature opened Settings at one of today's five names (Sprint 119; I61): the row to bring into view there
   const [focusAnchor, setFocusAnchor] = useState<string | null>(null);
+  // PR 3 (the review of #657): goes up when the tab is hidden, so a shown saved key goes
+  const [hideEyes, setHideEyes] = useState(0);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -217,6 +219,10 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
           setBase(message.data);
           setParts(afterBase);
           setGoogleDocs(message.data.googleDocs ?? null);
+          break;
+
+        case 'settings:hidden':
+          setHideEyes((count) => count + 1);
           break;
 
         case 'settings:part':
@@ -266,10 +272,19 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
       }
     };
 
+    // The page's own view of being hidden, as well as the host's
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') setHideEyes((count) => count + 1);
+    };
+
     window.addEventListener('message', handleMessage);
+    document.addEventListener('visibilitychange', handleVisibility);
     vscode.postMessage({ type: 'ready' });
 
-    return () => window.removeEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   // Sprint 147, A1: measurement only; each mark once, and nothing unless the host turned timing on
@@ -412,6 +427,7 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
               onSave={handleSaveApiKey}
               onTest={handleTestApiKey}
               onReveal={(name) => requestSavedKey(name, revealPort)}
+              hideEyes={hideEyes}
               onDone={() => setKeys((prev) => ({ ...prev, open: false }))}
               returnFocus={keys.forOpenCode ? () => document.querySelector<HTMLElement>('[data-settings-row="I30"] button') : undefined}
             />

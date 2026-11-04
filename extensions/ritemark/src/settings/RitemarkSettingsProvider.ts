@@ -41,6 +41,7 @@ import {
   claudeEventParts,
   codexEventParts,
   configChangeAction,
+  pageSettingAllowed,
   secretChangeAction,
   settingsSummaryLine,
   shouldRecheckOnView,
@@ -200,6 +201,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   private baseQueued = false;
   private readonly queuedParts = new Set<SettingsPartName>();
   private queueTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Each `settings` send's number; only the newest posts. */
+  private baseSequence = 0;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -353,6 +356,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         // Sprint 147, PR 3 (R10): the page draws from what needs no probe, at once; then this open's probes start,
         // together, once. A page that asks again (a reload) gets the answers already in, without a second run.
         settingsTimingMark('ready-received');
+        // A page whose panel has gone (a late ready) starts nothing
+        if (RitemarkSettingsProvider.panel?.webview !== webview) break;
         await this.sendBaseSettings(webview);
         if (this.pendingSection) {
           void webview.postMessage({ type: 'settings:focus-section', section: this.pendingSection });
@@ -385,8 +390,9 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       }
 
       case 'setSetting':
-        // Update VS Code setting
-        if (message.key && message.value !== undefined) {
+        // Sprint 147, PR 3 (the review): only the settings the page shows and writes (`PAGE_SETTING_KEYS`); it wrote
+        // any `ritemark.*` key it was sent before
+        if (pageSettingAllowed(message.key) && message.value !== undefined) {
           await config.update(message.key, message.value, vscode.ConfigurationTarget.Global);
           // The configuration listener answers (R11): `settings` again, no probe; the runtime choice also
           // invalidates Claude's and ChatGPT's state there (which binary runs), as it did here before.
@@ -638,6 +644,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         now: Date.now(),
       });
       wasVisible = visible;
+      // A shown saved key goes when the tab is hidden (the page keeps its state while hidden)
+      if (!visible) void panel.webview.postMessage({ type: 'settings:hidden' }).then(undefined, () => false);
       if (recheck) {
         // Claude's answer is cached until an event: ask the runtime itself, as the poll during a sign-in does
         void getSetupStatus({ refresh: true }).catch(() => undefined).finally(() => {
@@ -714,11 +722,16 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
   /** This open's probes, once: all together, each posting its part; then R10's one summary line. */
   private startOpenProbes(webview: vscode.Webview): void {
-    if (!this.probes) this.probes = new SettingsProbeScheduler(this.panelOrigin || Date.now());
+    // resolvePanel made this open's scheduler; none after dispose, and none is made here
+    if (!this.probes || RitemarkSettingsProvider.panel?.webview !== webview) return;
     const run = this.probes.runOnce(this.buildProbes(webview, ALL_PARTS));
     if (!run) {
-      // The page asked again (a reload): draw it whole from the answers already in
-      for (const [part, value] of this.lastParts) void webview.postMessage({ type: 'settings:part', part, value });
+      // The page asked again (a reload): draw it whole from the answers already in. The update state is not
+      // replayed: the `settings` just sent carries a newer snapshot
+      for (const [part, value] of this.lastParts) {
+        if (part === 'updateCenter') continue;
+        void webview.postMessage({ type: 'settings:part', part, value });
+      }
       if (this.lastCodexAuth) void webview.postMessage({ type: 'codex:authStatus', data: this.lastCodexAuth });
       return;
     }
@@ -732,6 +745,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
    * key's value, decision 2), the theme, Google Docs, usage data, the versions and the update state as it stands.
    */
   private async sendBaseSettings(webview: vscode.Webview): Promise<void> {
+    // An older send that finishes its reads after a newer one is dropped, so it can't draw over it
+    const sequence = ++this.baseSequence;
     const config = vscode.workspace.getConfiguration('ritemark');
     const workbenchConfig = vscode.workspace.getConfiguration('workbench');
     const windowConfig = vscode.workspace.getConfiguration('window');
@@ -753,6 +768,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     // The update state as it stands (no network); a first-ever check is a probe of its own
     const updateCenter = await settingsTimed('update-snapshot', this.updateService.getStatusSnapshot())
       .catch((error: unknown) => ({ ...this.updateFallback(), error: error instanceof Error ? error.message : 'Unknown update status error' }));
+    if (sequence !== this.baseSequence) return;
 
     await webview.postMessage({
       type: 'settings',
@@ -863,7 +879,11 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
   /** The probes for these parts, each posting `settings:part` when it answers. */
   private buildProbes(webview: vscode.Webview, parts: readonly SettingsPartName[]): SettingsProbe[] {
+    // A probe that answers after its panel closed (or another opened) touches nothing
+    const panel = RitemarkSettingsProvider.panel;
+    const live = () => panel !== undefined && RitemarkSettingsProvider.panel === panel && panel.webview === webview;
     const post = (part: SettingsPartName, value: unknown) => {
+      if (!live()) return;
       this.lastParts.set(part, value);
       void webview.postMessage({ type: 'settings:part', part, value }).then(undefined, () => false);
     };
@@ -883,9 +903,11 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         }),
         deliver: (value) => {
           const { part, auth } = value as { part: unknown; auth: unknown };
-          post('codex', part);
+          if (!live()) return;
+          // The sign-in first, so ChatGPT's row never shows its part without its account
           this.lastCodexAuth = auth;
           void webview.postMessage({ type: 'codex:authStatus', data: auth }).then(undefined, () => false);
+          post('codex', part);
         },
       }),
       environment: () => ({

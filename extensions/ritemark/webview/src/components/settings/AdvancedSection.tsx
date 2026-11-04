@@ -118,7 +118,9 @@ export function runtimeLine(settings: AdvancedSettings): string {
     parts.push("This computer's install wasn't found, so Ritemark's own runs instead.")
   }
   const env = settings.environment
-  if (env) {
+  if (settings.pending?.environment) {
+    parts.push(`This computer's tools: ${CHECKING}`)
+  } else if (env) {
     const tools: { name: string; installed: boolean; required: boolean; note: string }[] = [
       { name: 'Git', installed: env.gitInstalled, required: env.gitRequired, note: ' File changes needs it.' },
       ...(settings.agentRuntimePreference === 'system' ? [{ name: 'Node.js', installed: env.nodeInstalled, required: env.nodeRequired, note: '' }] : []),

@@ -40,3 +40,23 @@ export function requestSavedKey(key: string, port: RevealPort, timeoutMs = 5000)
 export function afterEyeCloses(draft: string, revealed: string | null): string {
   return revealed !== null && draft === revealed ? '' : draft
 }
+
+export interface EyeState {
+  draft: string
+  revealed: string | null
+  show: boolean
+}
+
+/** The eye-close step: the saved key leaves the field and the row's state; a typed key stays, hidden. */
+export function closeEye(state: EyeState): EyeState {
+  return { draft: afterEyeCloses(state.draft, state.revealed), revealed: null, show: false }
+}
+
+/**
+ * The review of #657: a shown saved key also goes when the tab is hidden (the page keeps its state while hidden) and
+ * when the key is removed elsewhere, so it never sits in a field nobody is looking at.
+ */
+export function eyeMustClose(state: EyeState, event: { hidden: boolean; saved: boolean }): boolean {
+  if (state.revealed === null && !state.show) return false
+  return event.hidden || (!event.saved && state.revealed !== null)
+}

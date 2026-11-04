@@ -140,6 +140,30 @@ export const PAGE_CONFIG_KEYS = [
   'window.autoDetectColorScheme',
 ] as const;
 
+/**
+ * The settings the page writes through `setSetting`, without `ritemark.` (the review of #657: it wrote any key it was
+ * sent). Each is one of `PAGE_CONFIG_KEYS`; usage data has its own message (`usageData:set`), the theme its own.
+ */
+export const PAGE_SETTING_KEYS = [
+  'agentRuntime.preference',
+  'ai.agentTimeout',
+  'ai.debugTrace',
+  'chat.fontSize',
+  'codex.approvalPolicy',
+  'codex.sandboxMode',
+  'opencode.autoApprove',
+  'updates.enabled',
+] as const;
+
+export type PageSettingKey = (typeof PAGE_SETTING_KEYS)[number];
+
+/** A `setSetting` key the page may write. */
+export function pageSettingAllowed(key: unknown): key is PageSettingKey {
+  return typeof key === 'string'
+    && (PAGE_SETTING_KEYS as readonly string[]).includes(key)
+    && (PAGE_CONFIG_KEYS as readonly string[]).includes(`ritemark.${key}`);
+}
+
 export interface FollowAction {
   /** Send `settings` again (no probe). */
   base: boolean;
@@ -184,7 +208,7 @@ export function codexEventParts(): SettingsPartName[] {
 export const RECHECK_PARTS: readonly SettingsPartName[] = ['claudeCode', 'codex', 'environment'];
 
 /** At most one check per this many ms, so flicking between tabs doesn't start a probe run each time. */
-export const RECHECK_MIN_GAP_MS = 5_000;
+export const RECHECK_MIN_GAP_MS = 30_000;
 
 /**
  * The tab came back into view: check again when the open's run has begun, nothing is still out, and the last answer

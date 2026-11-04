@@ -12,6 +12,9 @@ import {
   claudeEventParts,
   codexEventParts,
   configChangeAction,
+  PAGE_CONFIG_KEYS,
+  PAGE_SETTING_KEYS,
+  pageSettingAllowed,
   secretChangeAction,
   settingsSummaryLine,
   shouldRecheckOnView,
@@ -159,6 +162,19 @@ async function main(): Promise<void> {
     assert.equal(shouldRecheckOnView({ ...view, started: false }), false, 'before the open\'s run');
     assert.equal(shouldRecheckOnView({ ...view, busy: true }), false, 'while it still fills in');
     assert.equal(shouldRecheckOnView({ ...view, lastEndedAt: 1, now: RECHECK_MIN_GAP_MS }), false, 'a flick back within the gap');
+  }
+
+  // --- setSetting's allowlist (the review of #657): the eight settings the page writes, nothing else ---------------
+  {
+    assert.equal(PAGE_SETTING_KEYS.length, 8);
+    for (const key of PAGE_SETTING_KEYS) {
+      assert.equal(pageSettingAllowed(key), true, `${key} is written by the page`);
+      assert.ok((PAGE_CONFIG_KEYS as readonly string[]).includes(`ritemark.${key}`), `${key} is followed too`);
+    }
+    for (const key of ['analytics.enabled', 'features.overrides', 'ritemark.ai.agentTimeout', 'agentRuntime', '', undefined, 7, 'codex.approvalPolicy.x']) {
+      assert.equal(pageSettingAllowed(key), false, `${String(key)} is not written through setSetting`);
+    }
+    assert.equal(RECHECK_MIN_GAP_MS, 30_000, 'the check on view waits 30 s between runs');
   }
 
   // --- The setter's allowlist (Sprint 149's audit) --------------------------------------------------------------

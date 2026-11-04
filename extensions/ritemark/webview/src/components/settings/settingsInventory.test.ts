@@ -33,7 +33,7 @@ export const PAGE_MESSAGES = [
  */
 export const HOST_MESSAGES = [
   'settings', 'settings:part', 'apiKey:revealed', 'codex:authStatus', 'codex:loginStarting', 'testResult',
-  'google-docs/settings', 'settings:focus-section',
+  'google-docs/settings', 'settings:focus-section', 'settings:hidden',
 ] as const
 /** The parts the host's probes post, each one the page composes (`settingsParts.ts`). */
 export const PROBE_PARTS = ['claudeCode', 'codex', 'environment', 'transcriptionStorageBytes', 'updateCenter'] as const
@@ -156,6 +156,8 @@ export function keyHandlingGaps(host: string, keys: string): string[] {
   const setter = host.slice(host.indexOf("case 'setApiKey':"), host.indexOf("case 'testApiKey':"))
   if (!/if \(!settingsKeyAllowed\(message\.key, this\.keyFlags\(\)\)\)/.test(setter)) gaps.push('setApiKey saves a name off the list')
   if (!/settingsKeyAllowed\(key, this\.keyFlags\(\)\)/.test(host.slice(host.indexOf('private async revealApiKey(')))) gaps.push('the eye answers a name off the list')
+  const settingSetter = host.slice(host.indexOf("case 'setSetting':"), host.indexOf("case 'usageData:set':"))
+  if (!/if \(pageSettingAllowed\(message\.key\)/.test(settingSetter)) gaps.push('setSetting writes a key off the list')
   return gaps
 }
 
@@ -175,6 +177,13 @@ assert.deepEqual(hostMessageGaps(page.replace("case 'settings:part':", ''), host
 assert.deepEqual(hostMessageGaps(page, host.replace(/part: 'environment'/g, "part: 'gone'"), partsSource), ['the host no longer probes environment'])
 assert.deepEqual(keyHandlingGaps(host.replace("openaiKeyConfigured: saved['openai-api-key'],", "openaiKey: 'x', openaiKeyConfigured: true,"), keysSource), ["the host's settings carry a key's value"])
 assert.deepEqual(keyHandlingGaps(host.replace('if (!settingsKeyAllowed(message.key, this.keyFlags())) {', 'if (!message.key) {'), keysSource), ['setApiKey saves a name off the list'])
+assert.deepEqual(keyHandlingGaps(host.replace('if (pageSettingAllowed(message.key)', 'if (message.key'), keysSource), ['setSetting writes a key off the list'])
+// setSetting's list holds every setting the page writes (the review of #657)
+{
+  const probes = read(join(HERE, '../../../../src/settings/settingsProbes.ts'))
+  const list = probes.slice(probes.indexOf('export const PAGE_SETTING_KEYS'), probes.indexOf('] as const', probes.indexOf('export const PAGE_SETTING_KEYS')))
+  for (const key of SETTING_KEYS) assert.ok(list.includes(`'${key}'`), `setSetting may write ritemark.${key}`)
+}
 assert.deepEqual(inventoryGaps(page, host, googleDocsProtocol), [], 'every message, setting and key of the inventory has its sender and its handler')
 assert.deepEqual(ownerGaps(owned), [], 'each copy of a message sent from more than one place is still sent by its owner')
 assert.deepEqual(keySheetGaps(sheet, owned['RitemarkSettings.tsx']), [], "each key row adds, tests, changes, removes and links, with today's messages")

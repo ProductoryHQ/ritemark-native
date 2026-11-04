@@ -14,7 +14,7 @@ const React = await import('react')
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { composeSettings, withPart, afterBase, splitSettings, CHECKING, PENDING_PARTS } = await import('./settingsParts')
-const { requestSavedKey, afterEyeCloses } = await import('./apiKeyReveal')
+const { requestSavedKey, afterEyeCloses, closeEye, eyeMustClose } = await import('./apiKeyReveal')
 const { AiAccountsSection } = await import('./AiAccountsSection')
 const { AiDetailsRows } = await import('./AiDetailsSheet')
 const { partsLine, runtimeLine } = await import('./AdvancedSection')
@@ -66,6 +66,11 @@ assert.match(waiting, />Details…</, 'Details stays')
 assert.match(waiting, /data-settings-row="I32 I33 I34/, 'the API keys row draws at once')
 assert.equal(partsLine(first.componentStatus, first.pending), CHECKING)
 assert.equal(runtimeLine(first), `Now: ${CHECKING}`)
+// The AIs in, the tools line still out: it says so rather than drawing nothing
+assert.equal(
+  runtimeLine(composeSettings(base, { claudeCode, codex })!),
+  `Now: Claude and ChatGPT from Ritemark's own. This computer's tools: ${CHECKING}`,
+)
 const sheet = renderToStaticMarkup(createElement(AiDetailsRows as never, { ai: 'claude', settings: first, codexAuth: { enabled: true }, codexSigningIn: false, testResults: {}, onClaude() {}, onCodex() {}, onKeys() {} }))
 assert.match(sheet, new RegExp(CHECKING), "Claude's Details says Checking… until its answer")
 
@@ -120,6 +125,26 @@ assert.deepEqual(composeSettings(split.base, split.parts), full)
 assert.equal(afterEyeCloses('sk-saved', 'sk-saved'), '')
 assert.equal(afterEyeCloses('sk-new', 'sk-saved'), 'sk-new')
 assert.equal(afterEyeCloses('sk-new', null), 'sk-new')
+// The review of #657: a shown saved key goes when the tab is hidden, and when the key is removed elsewhere
+{
+  const shown = { draft: 'sk-saved', revealed: 'sk-saved', show: true }
+  assert.equal(eyeMustClose(shown, { hidden: true, saved: true }), true, 'the tab hidden: the eye closes')
+  assert.equal(eyeMustClose(shown, { hidden: false, saved: false }), true, 'the key removed elsewhere: the eye closes')
+  assert.equal(eyeMustClose(shown, { hidden: false, saved: true }), false, 'nothing changed: it stays open')
+  assert.equal(eyeMustClose({ draft: '', revealed: null, show: false }, { hidden: true, saved: true }), false, 'no eye open: nothing to do')
+  assert.deepEqual(closeEye(shown), { draft: '', revealed: null, show: false }, 'the saved key leaves the field and the state')
+  assert.deepEqual(closeEye({ draft: 'sk-typed', revealed: 'sk-saved', show: true }), { draft: 'sk-typed', revealed: null, show: false }, 'a typed key stays, hidden')
+  const source = readFileSync(join(HERE, 'ApiKeysSheet.tsx'), 'utf8')
+  assert.match(source, /eyeMustClose\(\{ draft, revealed, show \}, \{ hidden: true, saved \}\)\) shutEye\(\)\s*\}, \[hideEyes\]\)/, 'each open row closes its eye when the tab is hidden')
+  assert.match(source, /eyeMustClose\(\{ draft, revealed, show \}, \{ hidden: false, saved \}\)\) shutEye\(\)\s*\}, \[saved\]\)/, 'and when its key is removed elsewhere')
+  assert.match(source, /setDraft\(\(current\) => current \|\| value\)/, 'text typed while the host answered is kept')
+  const page = readFileSync(join(HERE, 'RitemarkSettings.tsx'), 'utf8')
+  assert.match(page, /case 'settings:hidden':\s*setHideEyes/, "the host's hidden tab closes the eyes")
+  assert.match(page, /document\.visibilityState === 'hidden'\) setHideEyes/, "the page's own visibilitychange too")
+  assert.match(page, /hideEyes=\{hideEyes\}/)
+  const host = readFileSync(join(HERE, '../../../../src/settings/RitemarkSettingsProvider.ts'), 'utf8')
+  assert.match(host, /if \(!visible\) void panel\.webview\.postMessage\(\{ type: 'settings:hidden' \}\)/, 'the host tells the page when the tab is hidden')
+}
 {
   const source = readFileSync(join(HERE, 'ApiKeysSheet.tsx'), 'utf8')
   const close = source.slice(source.indexOf('const close = () => {\n    openedAt'), source.indexOf('const toggleEye'))

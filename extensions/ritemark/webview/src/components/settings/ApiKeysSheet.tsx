@@ -18,7 +18,7 @@ import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, Dia
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { ExternalLink, TipButton } from './SettingsRow'
-import { afterEyeCloses } from './apiKeyReveal'
+import { closeEye, eyeMustClose } from './apiKeyReveal'
 import type { SettingsData, TestResult } from './RitemarkSettings'
 
 type KeyFlag = 'openrouterEnabled' | 'transcriptionEnabled'
@@ -98,11 +98,13 @@ export interface ApiKeysProps {
   forOpenCode?: boolean
   /** The saved-key eye (decision 2): asks the host for this one saved key; null when none came. */
   onReveal?: (name: ApiKeyRow['name']) => Promise<string | null>
+  /** Goes up each time the tab is hidden: every open eye closes (the review of #657). */
+  hideEyes?: number
 }
 
 export const SAVED_KEY_PLACEHOLDER = 'Paste a new key, or press the eye to see the saved one'
 
-function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, focused, onEditing }: {
+function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, hideEyes, focused, onEditing }: {
   row: ApiKeyRow
   settings: SettingsData
   testing: boolean
@@ -110,6 +112,7 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, focu
   onSave: ApiKeysProps['onSave']
   onTest: ApiKeysProps['onTest']
   onReveal?: ApiKeysProps['onReveal']
+  hideEyes?: number
   focused: boolean
   /** Tells the sheet a field is open, so Escape and closing wait for Save or Cancel (#645's review). */
   onEditing?: (name: ApiKeyRow['name'], editing: boolean) => void
@@ -159,12 +162,23 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, focu
     setRevealing(false)
     setShow(false)
   }
+  /** The eye-close step (`closeEye`): the saved key goes; a key typed over it stays, hidden. */
+  const shutEye = () => {
+    const next = closeEye({ draft, revealed, show })
+    setDraft(next.draft)
+    setRevealed(next.revealed)
+    setShow(next.show)
+  }
+  // The tab hidden, or the key removed elsewhere: the eye closes (the review of #657)
+  useEffect(() => {
+    if (eyeMustClose({ draft, revealed, show }, { hidden: true, saved })) shutEye()
+  }, [hideEyes])
+  useEffect(() => {
+    if (eyeMustClose({ draft, revealed, show }, { hidden: false, saved })) shutEye()
+  }, [saved])
   const toggleEye = async () => {
     if (show) {
-      // The saved key goes as soon as it is hidden again; a key typed over it stays, hidden
-      setDraft((current) => afterEyeCloses(current, revealed))
-      setRevealed(null)
-      setShow(false)
+      shutEye()
       return
     }
     if (saved && !draft && onReveal) {
@@ -174,7 +188,8 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, focu
       if (ticket !== openedAt.current) return
       setRevealing(false)
       if (value) {
-        setDraft(value)
+        // Text typed while the host answered stays as typed
+        setDraft((current) => current || value)
         setRevealed(value)
       }
     }
@@ -267,7 +282,7 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, focu
   )
 }
 
-export function ApiKeysRows({ settings, testing, results, onSave, onTest, onReveal, focus, forOpenCode, onEditing }: ApiKeysProps & { onEditing?: (name: ApiKeyRow['name'], editing: boolean) => void }) {
+export function ApiKeysRows({ settings, testing, results, onSave, onTest, onReveal, hideEyes, focus, forOpenCode, onEditing }: ApiKeysProps & { onEditing?: (name: ApiKeyRow['name'], editing: boolean) => void }) {
   const rows = API_KEY_ROWS.filter((row) => !row.flag || settings[row.flag])
   return (
     <>
@@ -284,6 +299,7 @@ export function ApiKeysRows({ settings, testing, results, onSave, onTest, onReve
           onSave={onSave}
           onTest={onTest}
           onReveal={onReveal}
+          hideEyes={hideEyes}
           focused={focus === row.name}
           onEditing={onEditing}
         />

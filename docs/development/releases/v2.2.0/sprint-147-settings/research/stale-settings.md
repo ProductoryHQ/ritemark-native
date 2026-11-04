@@ -32,7 +32,7 @@ a dev instance, on PR 3's branch, is a launch check still to do; this file gets 
 
 - **Listeners:** one `onDidChangeConfiguration` for every setting the page shows (rows 5–8), `secrets.onDidChange`
   for the five key names (rows 9–11), and `onDidChangeViewState` for what no event reports (rows 13–14). The
-  check on view runs once the open's probes are in, not while they fill in, and at most once in 5 s.
+  check on view runs once the open's probes are in, not while they fill in, and at most once in 30 s. A shown saved key is dropped when the tab is hidden or the key is removed elsewhere.
 - **What each redraw sends:** only what changed: `settings` (no probe) for a setting or a key, and the part of the AI
   whose event it was. Changes in one turn are coalesced into one `settings` and one probe run.
 - **No `src/update/` event.** Row 13 is covered by the check on view, which is enough for a tab that isn't in view
