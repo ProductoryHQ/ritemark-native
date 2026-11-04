@@ -99,6 +99,54 @@ async function main() {
     assert.deepEqual(await reopened.get('/p/b.pdf', 1, 1), text('b again'));
     assert.deepEqual((await fsp.readdir(busy)).filter((name) => name.endsWith('.tmp')), []);
 
+    // Markdown and CSV copies are lines of one pack, read in place; a restart reads them back.
+    const packDir = path.join(base, 'pack');
+    const packs = new TextCache(packDir, 64 * 1024 * 1024, undefined, () => clock++);
+    await packs.open();
+    const csv: CachedText = { ...text('Item Cost'), columns: ['Item', 'Cost'] };
+    await packs.put('/p/a.md', 1, 1, text('markdown alpha'));
+    await packs.put('/p/t.csv', 2, 2, csv);
+    await packs.put('/p/w.pdf', 3, 3, text('pdf'));
+    assert.ok(packs.has('/p/a.md', 1, 1) && !packs.has('/p/a.md', 1, 2));
+    assert.deepEqual(await packs.get('/p/a.md', 1, 1), text('markdown alpha'), 'a line not yet written is found');
+    await packs.flush();
+    assert.deepEqual((await fsp.readdir(packDir)).filter((name) => name.endsWith('.json') && name !== 'index.json').length, 1, 'only the PDF has a file of its own');
+    const packsAgain = new TextCache(packDir, 64 * 1024 * 1024, undefined, () => clock++);
+    await packsAgain.open();
+    assert.deepEqual(await packsAgain.get('/p/a.md', 1, 1), text('markdown alpha'));
+    assert.deepEqual(await packsAgain.get('/p/t.csv', 2, 2), csv, "a CSV's columns are kept");
+    assert.equal(await packsAgain.get('/p/a.md', 1, 9), null, 'another change time');
+    // A changed file's new line replaces the old; the old line is waste until the pack is written again.
+    await packsAgain.put('/p/a.md', 1, 5, text('markdown beta'));
+    await packsAgain.delete('/p/t.csv');
+    const big = text('x'.repeat(17 * 1024 * 1024));
+    await packsAgain.put('/p/big.md', 4, 4, big);
+    await packsAgain.flush();
+    await packsAgain.delete('/p/big.md');
+    await packsAgain.flush();
+    const packBytes = (await fsp.stat(path.join(packDir, 'pack.jsonl'))).size;
+    assert.ok(packBytes < 1024 * 1024, `the waste went when it outgrew the live lines (${packBytes} bytes)`);
+    const packsThird = new TextCache(packDir, 64 * 1024 * 1024);
+    await packsThird.open();
+    assert.equal(packsThird.entries, 2);
+    assert.deepEqual(await packsThird.get('/p/a.md', 1, 5), text('markdown beta'), 'moved lines are found at their new place');
+    assert.deepEqual(await packsThird.get('/p/w.pdf', 3, 3), text('pdf'));
+    // A pack cut short: the rows past its end are dropped, the rest kept.
+    await fsp.truncate(path.join(packDir, 'pack.jsonl'), 0);
+    const packsCut = new TextCache(packDir, 64 * 1024 * 1024);
+    await packsCut.open();
+    assert.equal(await packsCut.get('/p/a.md', 1, 5), null);
+    assert.ok(await packsCut.get('/p/w.pdf', 3, 3));
+    // Lines count toward the cap, and the oldest go first, whatever their kind.
+    const mixed = new TextCache(path.join(base, 'mixed'), 300, undefined, () => clock++);
+    await mixed.open();
+    await mixed.put('/p/1.md', 1, 1, text('one '.repeat(10)));
+    await mixed.put('/p/2.pdf', 1, 1, text('two '.repeat(10)));
+    await mixed.put('/p/3.md', 1, 1, text('three '.repeat(10)));
+    assert.ok(mixed.bytes <= 300);
+    assert.equal(await mixed.get('/p/1.md', 1, 1), null, 'the oldest went');
+    assert.ok(await mixed.get('/p/3.md', 1, 1));
+
     // Without a project storage folder there is no cache, and nothing fails.
     const none = new TextCache(null, 10_000);
     await none.open();

@@ -286,6 +286,33 @@ export async function walkTree(
   if (documents.length >= maxNames) return true;
   const queue: string[] = [start];
   let visited = 0;
+  // Files are listed in the walk's order and stat'ed STAT_CONCURRENCY at a time, across folders: one stat after
+  // another waited on the disk (and on Windows on Defender) for most of the walk.
+  let listed: Candidate[] = [];
+  const stats = limiter(STAT_CONCURRENCY);
+  /** Adds what was listed, in order; true when the names limit is reached. */
+  const settle = async (): Promise<boolean> => {
+    const batch = listed;
+    listed = [];
+    for (const candidate of batch) {
+      const stat = await candidate.stat;
+      if (!stat) continue;
+      const cloud = rootRules.readable ? cloudState(candidate.target, stat, rules.platform, rules.oneDriveRoots) : 'cloud-folder';
+      documents.push({
+        path: candidate.target,
+        rootPath: root.path,
+        relativePath: candidate.relative,
+        name: nameOf(candidate.name, candidate.relative),
+        where: candidate.where,
+        format: candidate.format,
+        size: stat.size,
+        mtimeMs: stat.mtimeMs,
+        cloud,
+      });
+      if (documents.length >= maxNames) return true;
+    }
+    return false;
+  };
   while (queue.length > 0) {
     const dir = queue.shift()!;
     if (++visited % 50 === 0) await pause();
@@ -327,28 +354,53 @@ export async function walkTree(
       const format = formatOf(name);
       if (!format || rootRules.excluded(relative, false)) continue;
       if (hasAgents && name.toLowerCase() === 'claude.md' && (await isPointer(fs, target, rules))) continue;
-      let stat: WalkStat;
-      try {
-        stat = await fs.stat(target);
-      } catch {
-        continue;
-      }
-      const cloud = rootRules.readable ? cloudState(target, stat, rules.platform, rules.oneDriveRoots) : 'cloud-folder';
-      documents.push({
-        path: target,
-        rootPath: root.path,
-        relativePath: relative,
-        name: nameOf(name, relative),
+      listed.push({
+        target,
+        relative,
+        name,
         where: relativeDir ? nodePath.basename(dir) : null,
         format,
-        size: stat.size,
-        mtimeMs: stat.mtimeMs,
-        cloud,
+        stat: stats(() => fs.stat(target)).catch(() => null),
       });
-      if (documents.length >= maxNames) return true;
+    }
+    // Settled before the limit could be passed, and now and then so the list of promises stays short.
+    if (documents.length + listed.length >= maxNames || listed.length >= SETTLE_BATCH) {
+      if (await settle()) return true;
     }
   }
-  return false;
+  return settle();
+}
+
+/** Files stat'ed at once by the walk. */
+const STAT_CONCURRENCY = 32;
+/** The walk adds its listed files to the documents after at most this many. */
+const SETTLE_BATCH = 512;
+
+interface Candidate {
+  target: string;
+  relative: string;
+  name: string;
+  where: string | null;
+  format: DocumentFormat;
+  stat: Promise<WalkStat | null>;
+}
+
+/** Runs at most `limit` of the given tasks at once, in the order given. */
+function limiter(limit: number): <T>(task: () => Promise<T>) => Promise<T> {
+  let running = 0;
+  const waiting: (() => void)[] = [];
+  return async <T>(task: () => Promise<T>): Promise<T> => {
+    // A finished task hands its place straight to the next one waiting, so no more than `limit` ever run.
+    if (running >= limit) await new Promise<void>((resolve) => waiting.push(resolve));
+    else running++;
+    try {
+      return await task();
+    } finally {
+      const wake = waiting.shift();
+      if (wake) wake();
+      else running--;
+    }
+  };
 }
 
 /** Checks one path from the watcher against its root's rules: its document, or null when search leaves it out. */

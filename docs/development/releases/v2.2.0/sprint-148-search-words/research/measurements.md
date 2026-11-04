@@ -82,3 +82,36 @@ Made on 2 November 2026 on `sprint-148-search-words-panel`, in a hidden dev inst
 **The warm start on a shell without the box.** R4 starts the index 5 s after activation. PR 2 starts it then only when the kill switch is on and the shell draws the box (`_ritemark.projectHead.focusSearch` is registered), so a 2.1 shell with a newer extension, where nothing can ask the index anything, reads nothing in the background. On PR 3's shell it starts at 5 s, as R4 says.
 
 Not measured here: Windows (the overlay session), and a window with an AI turn running beside the index.
+
+## Windows speed PR (4 Nov)
+
+**What Windows showed** (3 Nov, `main` at e23e2140, the plan's folder: 10,821 documents, 12,074 entries, Ritemark's Electron Node):
+
+| Step | Windows | |
+|---|---|---|
+| The walk (all of "names") | ~4.7 s, ~2,600 entries/s | Mac: 0.36 s |
+| Markdown and CSV read | ~11.4 s, ~900 files/s | read again at every start: decision 3 kept only Word and PDF copies |
+| Word and PDF | 9.4 s cold, ~1.4 s warm | all 620 from their copies when warm |
+| Ready | cold ~26 s (79 s on a first read under Defender), warm ~17.4 s | targets: cold 15 s, warm 3 s |
+| The worker's query, p95 | 29–32 ms | target 15 ms; the profile: `query` 11.5%, `termId` 6.1%, `hasPhrase` 4.5%, `post` 4.4%; 18.5% idle on I/O |
+
+**What changed.**
+- Markdown and CSV copies are kept too (decision 3 revised under the 2.2 delegation), in the same cache and its 200 MB cap, as lines of one file (`pack.jsonl`) read in place, so a warm start opens one file, not 10,000. A Markdown or CSV file with a copy isn't read ahead. The cache's index is written every 2 s while reading, not every 50 Word and PDF files (it now holds every document's row).
+- The walk stats files 32 at a time, in the walk's order. It already read folders with their entry types and didn't stat folders.
+- The query: a term's marks are worked out once per query, not at each place; a source whose text lacks one of the words skips the words-together walk; that walk tests the rarest word first. A digest test (`querySame.test.ts`) shows 1,200 answers identical to `main`'s code.
+
+**The Mac, before (`main` 3e964a6a) and after**, the same fixture (`search-fixture.mjs`, 12,074 files), 3 runs each of `search-measure.mjs` (each a cold and a warm start), the worker's own timings in ms; Node 22.21, Apple M4 Pro:
+
+| | Before: cold | After: cold | Before: warm | After: warm |
+|---|---|---|---|---|
+| The walk | 166 / 165 / 166 | 107 / 105 / 106 | 163 / 163 / 169 | 116 / 117 / 122 |
+| Names listed | 203 / 200 / 200 | 140 / 139 / 149 | 198 / 197 / 203 | 154 / 155 / 160 |
+| Markdown and CSV | 2,615 / 2,437 / 2,414 | 2,873 / 2,682 / 2,786 | 2,481 / 2,677 / 2,444 | **1,335 / 1,352 / 1,354** |
+| Word and PDF | 1,725 / 1,628 / 1,643 | 1,701 / 1,755 / 1,764 | 289 / 302 / 287 | 277 / 288 / 286 |
+| Ready | 4,577 / 4,299 / 4,289 | 4,803 / 4,649 / 4,717 | 2,968 / 3,176 / 2,934 | **1,766 / 1,795 / 1,800** |
+| Query p95 (200 queries after ready) | 8.4 / 8.7 / 8.5 | 8.4 / 8.3 / 8.4 | 7.9 / 7.9 / 8.0 | 7.1 / 6.7 / 7.6 |
+| Copies | 620 | 10,821 | 620 hits | 10,821 hits |
+
+The same documents, words and terms in every run (10,821; 10,801 with text; 146,220 terms; 36.2 MB). A cold start costs about 0.3 s more on the Mac: writing 10,200 more copies. A warm start no longer reads any document; what is left of its 1.3 s is parsing the copies and indexing them. The Mac's query was already within its target, so the query changes show little here.
+
+Not measured here: Windows. The Windows session runs the same script on the same folder next.

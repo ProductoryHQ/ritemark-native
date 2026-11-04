@@ -3,7 +3,7 @@
  *
  * A cold start walks the folders and lists every document by its name at once,
  * then reads text, the most recently changed first: Markdown and CSV, then Word
- * and PDF (from decision 3's copies when they still match, else read). The
+ * and PDF (each from decision 3's copies when they still match, else read). The
  * documents limit is shared out newest first across the four kinds when the
  * walk ends; the text budget is spent as documents are read; past them, the
  * rest are found by name. Reading yields between files and between a PDF's
@@ -69,8 +69,12 @@ const REWALK_MS = 500;
  * extension host shares, and more would keep its own reads and lookups waiting.
  */
 const READ_AHEAD = 2;
-/** Decision 3's index is written after this many Word and PDF files, not only when the walk ends. */
-const FLUSH_EVERY = 50;
+/**
+ * Decision 3's index is written this often while documents are read, not only when the walk ends. By time, not
+ * by count: with every document's copy in it, the index is a few MB, and writing it every 50 files cost more
+ * than the reading it saves.
+ */
+const FLUSH_MS = 2000;
 /** Chats' words may take at most this share of the text budget; the rest is the documents'. */
 const CHAT_SHARE = 0.25;
 const STATUS_MS = 250;
@@ -229,7 +233,7 @@ export class Indexer {
     for (const path of [...this.documents.keys()]) {
       if (!live.has(path)) this.forget(path);
     }
-    const dropped = await this.deps.cache.sweep(new Set(found.filter((doc) => doc.format === 'docx' || doc.format === 'pdf').map((doc) => doc.path)));
+    const dropped = await this.deps.cache.sweep(live);
     if (generation !== this.generation) return;
     for (const doc of found) {
       const known = this.documents.get(doc.path);
@@ -266,16 +270,26 @@ export class Indexer {
       ['office', ['docx', 'pdf']],
     ] as const) {
       const list = order([...formats]);
-      // Markdown and CSV are read a file or two ahead, so the disk works while the last file is parsed. Word
-      // and PDF are not: most of them come from decision 3's copies, and a read ahead of a copy is wasted.
+      // Markdown and CSV are read a file or two ahead, so the disk works while the last file is parsed; a file
+      // with a copy is not, as a read ahead of a copy is wasted. Word and PDF are not read ahead at all: most of
+      // them come from decision 3's copies.
       const ahead = phase === 'text' ? READ_AHEAD : 0;
       const fetched = new Map<string, Promise<Uint8Array | null>>();
+      let flushedAt = this.deps.timers.now();
       for (let i = 0; i < list.length; i++) {
         if (generation !== this.generation) return;
         for (let j = i; j < Math.min(list.length, i + 1 + ahead); j++) {
           const next = list[j];
           const nextState = this.documents.get(next.path);
-          if (!fetched.has(next.path) && nextState && nextState.found === next && !nextState.settled && !nextState.overLimit && !this.nameOnlyOf(next)) {
+          if (
+            !fetched.has(next.path) &&
+            nextState &&
+            nextState.found === next &&
+            !nextState.settled &&
+            !nextState.overLimit &&
+            !this.nameOnlyOf(next) &&
+            !this.deps.cache.has(next.path, next.size, next.mtimeMs)
+          ) {
             fetched.set(next.path, this.deps.fs.readFile(next.path).catch(() => null));
           }
         }
@@ -286,7 +300,10 @@ export class Indexer {
         if (!state || state.settled || state.found !== doc) continue;
         await this.readOne(state, bytes);
         // Decision 3's index is written as the copies come, so a worker stopped half way keeps what it read.
-        if (phase === 'office' && i % FLUSH_EVERY === FLUSH_EVERY - 1) await this.deps.cache.flush();
+        if (this.deps.timers.now() - flushedAt >= FLUSH_MS) {
+          await this.deps.cache.flush();
+          flushedAt = this.deps.timers.now();
+        }
         this.emitStatus();
         await this.deps.pause();
       }
@@ -420,13 +437,10 @@ export class Indexer {
       if (kept.length === 0 && passages.length > 0) return settle('limited');
       settle(undefined, kept, columns);
     };
-    const office = doc.format === 'docx' || doc.format === 'pdf';
-    if (office) {
-      const cached = await this.deps.cache.get(doc.path, doc.size, doc.mtimeMs);
-      if (cached?.kind === 'name-only') return settle(cached.reason);
-      // A copy cut short under a smaller budget than this read's isn't the whole of what this read would find.
-      if (cached?.kind === 'text' && (!cached.truncated || cached.budget >= budget)) return settleText(withinBudget(cached.passages, budget));
-    }
+    const cached = await this.deps.cache.get(doc.path, doc.size, doc.mtimeMs);
+    if (cached?.kind === 'name-only') return settle(cached.reason);
+    // A copy cut short under a smaller budget than this read's isn't the whole of what this read would find.
+    if (cached?.kind === 'text' && (!cached.truncated || cached.budget >= budget)) return settleText(withinBudget(cached.passages, budget), cached.columns);
     let bytes: Uint8Array;
     let outcome: ReadOutcome;
     try {
@@ -437,12 +451,14 @@ export class Indexer {
       // the file: found by name this time, kept nowhere, read again when it changes or Ritemark starts again.
       return settle('unreadable');
     }
-    if (office && budget === fullBudget) {
+    if (budget === fullBudget) {
       await this.deps.cache.put(
         doc.path,
         doc.size,
         doc.mtimeMs,
-        outcome.ok ? { kind: 'text', passages: outcome.passages, truncated: outcome.truncated, budget } : { kind: 'name-only', reason: outcome.reason },
+        outcome.ok
+          ? { kind: 'text', passages: outcome.passages, truncated: outcome.truncated, budget, ...(outcome.columns ? { columns: outcome.columns } : {}) }
+          : { kind: 'name-only', reason: outcome.reason },
       );
     }
     if (!outcome.ok) return settle(outcome.reason);
