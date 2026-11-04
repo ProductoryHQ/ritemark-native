@@ -5,7 +5,9 @@
  *
  * It sends today's messages: Save is `setApiKey` with the value, Remove key is `setApiKey` with an empty value (the
  * host deletes the secret, as Save with an empty field did, I37), Test is `testApiKey`. The saved-key eye stays
- * (Jarmo's decision 2, 2 November): Change opens the field filled with the saved key, hidden until its eye is pressed.
+ * (Jarmo's decision 2, 2 November), and the page holds no saved key (Sprint 147, PR 3): Change opens an empty field,
+ * and pressing its eye asks the host for that one key (`onReveal`, `apiKeyReveal.ts`). Closing the eye, the field or
+ * the sheet drops it.
  *
  * `ApiKeysRows` is the sheet's content without its dialog, so render tests can draw it.
  */
@@ -16,6 +18,7 @@ import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, Dia
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { ExternalLink, TipButton } from './SettingsRow'
+import { afterEyeCloses } from './apiKeyReveal'
 import type { SettingsData, TestResult } from './RitemarkSettings'
 
 type KeyFlag = 'openrouterEnabled' | 'transcriptionEnabled'
@@ -32,7 +35,6 @@ export interface ApiKeyRow {
   url: string
   placeholder: string
   configured: 'openaiKeyConfigured' | 'anthropicKeyConfigured' | 'googleKeyConfigured' | 'openrouterKeyConfigured' | 'elevenlabsKeyConfigured'
-  value: 'openaiKey' | 'anthropicKey' | 'googleKey' | 'openrouterKey' | 'elevenlabsKey'
   /** The flag that shows the row, as before (R1). */
   flag?: KeyFlag
   /** The inventory row (I32–I36). */
@@ -46,31 +48,31 @@ export const API_KEY_ROWS: readonly ApiKeyRow[] = [
     // No model's name here: the image steps' default moves with modelConfig
     usedFor: (s) => s.opencodeEnabled ? 'Pictures in flows, and GPT models in OpenCode' : 'Pictures in flows',
     stops: (s) => s.opencodeEnabled ? 'Pictures in flows, and GPT models in OpenCode, stop working' : 'Pictures in flows stop working',
-    url: 'https://platform.openai.com/api-keys', placeholder: 'sk-...', configured: 'openaiKeyConfigured', value: 'openaiKey',
+    url: 'https://platform.openai.com/api-keys', placeholder: 'sk-...', configured: 'openaiKeyConfigured',
   },
   {
     name: 'anthropic-api-key', short: 'anthropic', label: 'Anthropic', row: 'I34',
     usedFor: (s) => s.opencodeEnabled ? 'Claude without signing in, and Claude in OpenCode' : 'Claude without signing in',
     stops: (s) => s.opencodeEnabled ? 'Claude without signing in, and Claude in OpenCode, stop working' : 'Claude without signing in stops working',
-    url: 'https://console.anthropic.com/settings/keys', placeholder: 'sk-ant-...', configured: 'anthropicKeyConfigured', value: 'anthropicKey',
+    url: 'https://console.anthropic.com/settings/keys', placeholder: 'sk-ant-...', configured: 'anthropicKeyConfigured',
   },
   {
     name: 'google-ai-key', short: 'google', label: 'Google AI', row: 'I33',
     usedFor: (s) => s.opencodeEnabled ? 'Gemini in flows and OpenCode, and Google pictures' : 'Gemini in flows, and Google pictures',
     stops: () => 'Gemini and Google pictures stop working',
-    url: 'https://aistudio.google.com/apikey', placeholder: 'AIza...', configured: 'googleKeyConfigured', value: 'googleKey',
+    url: 'https://aistudio.google.com/apikey', placeholder: 'AIza...', configured: 'googleKeyConfigured',
   },
   {
     name: 'openrouter-api-key', short: 'openrouter', label: 'OpenRouter', row: 'I35', flag: 'openrouterEnabled',
     usedFor: () => 'Hundreds of models in OpenCode, with one key',
     stops: () => "OpenCode's OpenRouter models stop working",
-    url: 'https://openrouter.ai/keys', placeholder: 'sk-or-...', configured: 'openrouterKeyConfigured', value: 'openrouterKey',
+    url: 'https://openrouter.ai/keys', placeholder: 'sk-or-...', configured: 'openrouterKeyConfigured',
   },
   {
     name: 'elevenlabs-api-key', short: 'elevenlabs', label: 'ElevenLabs', row: 'I36', flag: 'transcriptionEnabled',
     usedFor: () => 'Who said what, in recordings. Transcribing works without it; with it, audio goes to ElevenLabs.',
     stops: () => 'Telling speakers apart in recordings stops working',
-    url: 'https://elevenlabs.io/app/settings/api-keys', placeholder: 'sk_...', configured: 'elevenlabsKeyConfigured', value: 'elevenlabsKey',
+    url: 'https://elevenlabs.io/app/settings/api-keys', placeholder: 'sk_...', configured: 'elevenlabsKeyConfigured',
   },
 ]
 
@@ -94,15 +96,20 @@ export interface ApiKeysProps {
   focus?: ApiKeyRow['name'] | null
   /** Opened from OpenCode's Set up: the line that says what OpenCode needs (answer 6). */
   forOpenCode?: boolean
+  /** The saved-key eye (decision 2): asks the host for this one saved key; null when none came. */
+  onReveal?: (name: ApiKeyRow['name']) => Promise<string | null>
 }
 
-function KeyRow({ row, settings, testing, result, onSave, onTest, focused, onEditing }: {
+export const SAVED_KEY_PLACEHOLDER = 'Paste a new key, or press the eye to see the saved one'
+
+function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, focused, onEditing }: {
   row: ApiKeyRow
   settings: SettingsData
   testing: boolean
   result: TestResult | undefined
   onSave: ApiKeysProps['onSave']
   onTest: ApiKeysProps['onTest']
+  onReveal?: ApiKeysProps['onReveal']
   focused: boolean
   /** Tells the sheet a field is open, so Escape and closing wait for Save or Cancel (#645's review). */
   onEditing?: (name: ApiKeyRow['name'], editing: boolean) => void
@@ -112,6 +119,11 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, focused, onEdi
   const [draft, setDraft] = useState('')
   const [show, setShow] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  // The saved key while its eye is open, and only then (decision 2)
+  const [revealed, setRevealed] = useState<string | null>(null)
+  const [revealing, setRevealing] = useState(false)
+  // A field closed while the host answers drops the answer
+  const openedAt = useRef(0)
   const rowRef = useRef<HTMLDivElement>(null)
   const usedFor = row.usedFor(settings)
 
@@ -130,17 +142,43 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, focused, onEdi
   }, [focused])
 
   const open = () => {
-    // Today's field held the saved key, with its eye (decision 2, Jarmo): Change opens it filled, hidden
-    setDraft(saved ? settings[row.value] ?? '' : '')
+    // The page holds no saved key (PR 3): the field opens empty; its eye asks for the saved one (decision 2, Jarmo)
+    openedAt.current += 1
+    setDraft('')
+    setRevealed(null)
     setShow(false)
     setConfirming(false)
     setEditing(true)
   }
   const close = () => {
+    openedAt.current += 1
     setEditing(false)
     setConfirming(false)
     setDraft('')
+    setRevealed(null)
+    setRevealing(false)
     setShow(false)
+  }
+  const toggleEye = async () => {
+    if (show) {
+      // The saved key goes as soon as it is hidden again; a key typed over it stays, hidden
+      setDraft((current) => afterEyeCloses(current, revealed))
+      setRevealed(null)
+      setShow(false)
+      return
+    }
+    if (saved && !draft && onReveal) {
+      const ticket = openedAt.current
+      setRevealing(true)
+      const value = await onReveal(row.name)
+      if (ticket !== openedAt.current) return
+      setRevealing(false)
+      if (value) {
+        setDraft(value)
+        setRevealed(value)
+      }
+    }
+    setShow(true)
   }
 
   return (
@@ -198,14 +236,14 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, focused, onEdi
                     if (event.key === 'Enter' && draft.trim()) { onSave(row.name, draft); close() }
                     if (event.key === 'Escape') { event.stopPropagation(); close() }
                   }}
-                  placeholder={row.placeholder}
+                  placeholder={saved ? SAVED_KEY_PLACEHOLDER : row.placeholder}
                   aria-label={`${row.label} API key`}
                   spellCheck={false}
                   autoComplete="off"
                   className="rm-focus-ring w-full rounded-md border border-hairline-strong bg-surface-soft px-3 py-1.5 pr-10 font-mono text-[13px] text-ink-strong"
                 />
                 <Tooltip label={show ? 'Hide the key' : 'Show the key'} className="absolute right-0.5 top-1/2 -translate-y-1/2">
-                  <Button variant="ghost" size="icon-sm" aria-label={show ? 'Hide the key' : 'Show the key'} onClick={() => setShow(!show)}>
+                  <Button variant="ghost" size="icon-sm" aria-label={show ? 'Hide the key' : 'Show the key'} disabled={revealing} aria-busy={revealing || undefined} onClick={() => { void toggleEye() }}>
                     <Icon name={show ? 'eye-slash' : 'eye'} size={16} />
                   </Button>
                 </Tooltip>
@@ -229,7 +267,7 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, focused, onEdi
   )
 }
 
-export function ApiKeysRows({ settings, testing, results, onSave, onTest, focus, forOpenCode, onEditing }: ApiKeysProps & { onEditing?: (name: ApiKeyRow['name'], editing: boolean) => void }) {
+export function ApiKeysRows({ settings, testing, results, onSave, onTest, onReveal, focus, forOpenCode, onEditing }: ApiKeysProps & { onEditing?: (name: ApiKeyRow['name'], editing: boolean) => void }) {
   const rows = API_KEY_ROWS.filter((row) => !row.flag || settings[row.flag])
   return (
     <>
@@ -245,6 +283,7 @@ export function ApiKeysRows({ settings, testing, results, onSave, onTest, focus,
           result={results[row.short]}
           onSave={onSave}
           onTest={onTest}
+          onReveal={onReveal}
           focused={focus === row.name}
           onEditing={onEditing}
         />

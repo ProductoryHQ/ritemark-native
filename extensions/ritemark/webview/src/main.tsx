@@ -6,6 +6,7 @@ import { watchRitemarkThemeClass } from './utils/themeClass'
 import { captureWebviewScriptUrl } from './lib/webviewAssets'
 import { watchScrollingMark } from './lib/scrollingMark'
 import { watchInputMode } from './components/ui/input-mode'
+import { settingsTimingMark } from './lib/settingsTiming'
 
 // Sprint 138 (#481): webview.js's own URL, while it is still known, for the
 // files next to it in media/ (KaTeX's stylesheet and fonts).
@@ -84,6 +85,8 @@ const ControlCatalogue = lazy(() =>
 // Check if this is a flow editor instance
 const rootElement = document.getElementById('root')!
 const editorType = rootElement.getAttribute('data-editor-type')
+// Sprint 147, A1: measurement only; sends nothing unless the host turned it on
+if (editorType === 'settings') settingsTimingMark('script-start')
 
 // Debug logging
 console.log('[Ritemark] Initializing editor, type:', editorType)

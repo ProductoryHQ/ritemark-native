@@ -13,7 +13,7 @@ The plan is approved on Jarmo's 2.2 delegation (sprint-plan.md, *Approval*). The
 ## Phase 1: Audits (each in `research/`, before its code)
 
 - [ ] **A1 first:** the measurement branch's timing lines; ten runs on the Windows PC through the overlay and ten on the Mac; `research/windows-draw-time.md`; R10's target confirmed or changed in `spec.md`
-- [ ] A2 `research/stale-settings.md`: every way a change elsewhere reaches an open Settings tab, redrawn or stale
+- [x] A2 `research/stale-settings.md`: every way a change elsewhere reaches an open Settings tab, redrawn or stale (by code reading on PR 3's branch; its re-run on a dev instance is with PR 3's launch checks)
 - [ ] A3 `research/agent-capabilities.md`: what Claude, ChatGPT and OpenCode report of their skills, connectors and plugins, and at what cost
 - [ ] A4 `research/inventory-check.md`: the inventory against the code at the branch's start; rows it adds go into spec R1 first; the timeout's AIs; the `docs/user/` pages to update
 
@@ -44,12 +44,12 @@ The plan is approved on Jarmo's 2.2 delegation (sprint-plan.md, *Approval*). The
 
 ## Phase 4: PR 3, the host (W5; R10, R11, decision 2)
 
-- [ ] `settings` without probes; `settings:part` per probe; the first update check off the first draw
-- [ ] One probe run per open; a setting change sends its own part; a test of both
-- [ ] Key values out of the payload; the CSP's `connect-src` closed if unused
+- [x] `settings` without probes; `settings:part` per probe; the first update check off the first draw
+- [x] One probe run per open; a setting change sends its own part; a test of both
+- [x] Key values out of the payload; the CSP's `connect-src` closed if unused; the eye asks for its one key (decision 2); `setApiKey` held to the five names
 - [ ] The listeners A2 calls for; the check when the tab comes back into view; A2's table run again, every row redrawn
-- [ ] The tab's title; the summary log line
-- [ ] A fix in `src/agent/setup.ts` only if A1 points there
+- [x] The tab's title; the summary log line
+- [x] A fix in `src/agent/setup.ts` only if A1 points there (it doesn't: Claude's status is cached; the restored delay was the serializer awaiting every probe)
 - [ ] A1's runs again on the Windows PC and the Mac: before and after in `research/windows-draw-time.md`
 - [ ] The key round trip (K) again, on the Mac and on Windows
 - [ ] PR 3 opened: **High**, `/code-review` at high and `/security-review`, up to three rounds; every finding answered; merged at the reviewed head

@@ -32,6 +32,22 @@ import { CLAUDE_MODEL_IDS, ELEVENLABS_STT_MODEL_IDS } from '../ai/modelConfig';
 import { geminiHeaders, geminiUrl } from '../ai/geminiRequest';
 import { runProcess } from '../utils/runProcess';
 import { setUsageData, usageDataState } from '../analytics/posthog';
+import { settingsTimed, settingsTimingEnabled, settingsTimingMark, settingsTimingPage, settingsTimingStart } from './settingsTiming';
+import { SETTINGS_KEY_NAMES, isSettingsKeyName, settingsKeyAllowed, type SettingsKeyFlags, type SettingsKeyName } from './settingsKeys';
+import {
+  ALL_PARTS,
+  RECHECK_PARTS,
+  SettingsProbeScheduler,
+  claudeEventParts,
+  codexEventParts,
+  configChangeAction,
+  secretChangeAction,
+  settingsSummaryLine,
+  shouldRecheckOnView,
+  type FollowAction,
+  type SettingsPartName,
+  type SettingsProbe,
+} from './settingsProbes';
 
 /**
  * Phase E status model: split runtime health, source provenance, and auth
@@ -166,18 +182,46 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   private disposeClaudeStatusListener: (() => void) | null = null;
   private disposeCodexStatusListener: (() => void) | null = null;
   private claudeLoginPoll: ReturnType<typeof setInterval> | null = null;
-  /** Sprint 133: the usage-data choice changes from the welcome too; the page shows it at once. */
-  private readonly usageDataListener: vscode.Disposable;
+  /**
+   * Sprint 147, PR 3 (R11, A2): an open tab follows every setting it shows (All settings, `settings.json`, the
+   * welcome's usage-data switch) and every key saved or removed anywhere. Replaces Sprint 133's usage-data listener.
+   */
+  private readonly followListeners: vscode.Disposable[];
+  /** Sprint 147, PR 3 (R10): this open's probes, once per open, each posting its own part. */
+  private probes: SettingsProbeScheduler | null = null;
+  /** The panel's creation, the clock's zero for the summary line. */
+  private panelOrigin = 0;
+  /** When this open's `settings` went out, in ms since the panel's creation (0 until it has). */
+  private drawnMs = 0;
+  /** Each part's last answer, so a page that asks again (`ready`) is drawn whole without a second probe run. */
+  private readonly lastParts = new Map<SettingsPartName, unknown>();
+  private lastCodexAuth: unknown = null;
+  /** Changes in one turn (a theme's three writes, a key and its status event) send one `settings` and one run. */
+  private baseQueued = false;
+  private readonly queuedParts = new Set<SettingsPartName>();
+  private queueTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly updateService: UpdateService
   ) {
-    this.usageDataListener = vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration('ritemark.analytics.enabled') && RitemarkSettingsProvider.panel) {
-        void this.sendCurrentSettings(RitemarkSettingsProvider.panel.webview);
-      }
-    });
+    this.followListeners = [
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        const action = configChangeAction((key) => event.affectsConfiguration(key));
+        // The runtime choice, from this page, All settings or settings.json: which binary each AI runs moved, so
+        // every surface's cached state is stale (it was emitted from this page's setSetting alone before)
+        if (action.runtimeChanged) {
+          emitClaudeStatusInvalidated('settings-updated');
+          emitCodexStatusInvalidated('status-refresh');
+        }
+        this.follow(action);
+      }),
+      // A key saved or removed anywhere: the welcome, Configure API Key, the guidance, this page. Only the event's
+      // name is read; no value leaves the store here.
+      this.context.secrets.onDidChange((event) => {
+        this.follow(secretChangeAction(event.key, isSettingsKeyName));
+      }),
+    ];
 
     // Initialize Codex integration if feature is enabled
     if (isEnabled('codex-integration')) {
@@ -185,10 +229,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       this.codexAuth = new CodexAuth(this.codexAppServer);
 
       // Listen for auth status changes and update webview
-      this.codexAuth.on('statusChanged', (status) => {
-        if (RitemarkSettingsProvider.panel) {
-          this.sendCodexAuthStatus(RitemarkSettingsProvider.panel.webview);
-        }
+      this.codexAuth.on('statusChanged', () => {
+        this.queueParts(codexEventParts());
       });
       this.codexAuth.on('loginComplete', (event: { success: boolean }) => {
         if (event.success) {
@@ -203,10 +245,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       } else if (event.reason === 'login-finished' || event.reason === 'authentication-failed' || event.reason === 'logout' || event.reason === 'install-finished' || event.reason === 'settings-updated') {
         this.stopClaudeLoginPolling();
       }
-      const panel = RitemarkSettingsProvider.panel;
-      if (panel) {
-        void this.sendCurrentSettings(panel.webview);
-      }
+      // Only Claude's own parts are asked again (R10): no other probe runs for a Claude event
+      this.queueParts(claudeEventParts());
     });
 
     // Listen for Codex auth changes from other surfaces (AI sidebar) so the
@@ -223,10 +263,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         if (isEnabled('codex-integration')) {
           this.codexAppServer = new CodexAppServer();
           this.codexAuth = new CodexAuth(this.codexAppServer);
-          this.codexAuth.on('statusChanged', (_status) => {
-            if (RitemarkSettingsProvider.panel) {
-              void this.sendCodexAuthStatus(RitemarkSettingsProvider.panel.webview);
-            }
+          this.codexAuth.on('statusChanged', () => {
+            this.queueParts(codexEventParts());
           });
           this.codexAuth.on('loginComplete', (e: { success: boolean }) => {
             if (e.success) {
@@ -238,11 +276,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           this.codexAuth = null;
         }
       }
-      const panel = RitemarkSettingsProvider.panel;
-      if (panel) {
-        void this.sendCodexAuthStatus(panel.webview);
-        void this.sendCurrentSettings(panel.webview);
-      }
+      this.queueParts(codexEventParts());
     });
   }
 
@@ -277,6 +311,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       if (RitemarkSettingsProvider.panel) return;
     }
 
+    settingsTimingStart('created');
     const panel = vscode.window.createWebviewPanel(
       RitemarkSettingsProvider.viewType,
       'Settings',
@@ -288,6 +323,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   }
 
   public async deserializeWebviewPanel(panel: vscode.WebviewPanel): Promise<void> {
+    settingsTimingStart('restored');
     await this.resolvePanel(panel);
   }
 
@@ -295,7 +331,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
    * Handle messages from webview
    */
   private async handleMessage(
-    message: { type: string; key?: string; value?: unknown; url?: unknown; on?: unknown },
+    message: { type: string; key?: string; value?: unknown; url?: unknown; on?: unknown; requestId?: unknown },
     webview: vscode.Webview
   ): Promise<void> {
     const config = vscode.workspace.getConfiguration('ritemark');
@@ -308,12 +344,27 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     }
 
     switch (message.type) {
+      // Sprint 147, A1: the page's timing marks (sent only when timing is on)
+      case 'settings:timing':
+        settingsTimingPage(message as Parameters<typeof settingsTimingPage>[0]);
+        break;
+
       case 'ready':
-        await this.sendCurrentSettings(webview);
+        // Sprint 147, PR 3 (R10): the page draws from what needs no probe, at once; then this open's probes start,
+        // together, once. A page that asks again (a reload) gets the answers already in, without a second run.
+        settingsTimingMark('ready-received');
+        await this.sendBaseSettings(webview);
         if (this.pendingSection) {
           void webview.postMessage({ type: 'settings:focus-section', section: this.pendingSection });
           this.pendingSection = undefined;
         }
+        this.startOpenProbes(webview);
+        break;
+
+      // Sprint 147, PR 3 (decision 2, Jarmo): the saved-key eye. The one message that carries a key's value, for the
+      // one key whose eye was pressed, when it was pressed; the page drops it when the eye or the sheet closes.
+      case 'apiKey:reveal':
+        await this.revealApiKey(message.key, message.requestId, webview);
         break;
 
       case 'openExternal': {
@@ -337,15 +388,9 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         // Update VS Code setting
         if (message.key && message.value !== undefined) {
           await config.update(message.key, message.value, vscode.ConfigurationTarget.Global);
-          // Changing the runtime preference invalidates Claude/Codex resolver state
-          // (which binary is selected, source chip readout, capabilities). Force a
-          // refresh so the Settings page reflects the active choice immediately.
-          if (message.key === 'agentRuntime.preference') {
-            emitClaudeStatusInvalidated('settings-updated');
-            emitCodexStatusInvalidated('status-refresh');
-          }
-          // Send updated settings back
-          await this.sendCurrentSettings(webview);
+          // The configuration listener answers (R11): `settings` again, no probe; the runtime choice also
+          // invalidates Claude's and ChatGPT's state there (which binary runs), as it did here before.
+          this.queueBase();
         }
         break;
 
@@ -353,7 +398,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         // Sprint 133 (R7): the same choice as the welcome's switch; it takes effect at once.
         if (typeof message.on === 'boolean') {
           await setUsageData(message.on, 'settings');
-          await this.sendCurrentSettings(webview);
+          this.queueBase();
         }
         break;
 
@@ -368,20 +413,18 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           } else {
             await workbenchConfig.update('preferredDarkColorTheme', message.value, vscode.ConfigurationTarget.Global);
           }
-          await this.sendCurrentSettings(webview);
+          this.queueBase();
         }
         break;
 
       case 'setApiKey':
-        // Sprint 76 R3a/R7: the OpenRouter key handler is inert while the
-        // opencode-integration flag is off (the card is hidden too). All other
-        // provider keys are unaffected.
-        if (message.key === 'openrouter-api-key' && !isEnabled('opencode-integration')) {
+        // Sprint 147, PR 3: only the five keys, each with its row's flag on (`settingsKeys.ts`); it saved any secret
+        // name it was sent before (Sprint 149's audit). The OpenRouter key stays inert while opencode-integration is
+        // off (Sprint 76 R3a/R7), ElevenLabs' while transcription-workbench is (Sprint 108 R4).
+        if (!settingsKeyAllowed(message.key, this.keyFlags())) {
           break;
         }
-        // Store API key in SecretStorage. Generic on `message.key`, so the new
-        // 'openrouter-api-key' (Sprint 76 R3a) saves/clears with no extra branch.
-        if (message.key && typeof message.value === 'string') {
+        if (typeof message.value === 'string') {
           if (message.value.trim()) {
             await this.context.secrets.store(message.key, message.value.trim());
           } else {
@@ -391,8 +434,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
             setAnthropicKeyAvailable(Boolean(message.value.trim()));
             emitClaudeStatusInvalidated('settings-updated');
           }
-          // Send updated settings back
-          await this.sendCurrentSettings(webview);
+          // The secrets listener redraws which keys are saved; this covers a store that reports no change
+          this.queueBase();
 
           // Show confirmation
           vscode.window.showInformationMessage(
@@ -441,7 +484,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
       case 'claude:cancelLogin':
         this.cancelClaudeLogin();
-        await this.sendCurrentSettings(webview);
+        this.queueParts(['claudeCode']);
         break;
 
       case 'claude:enterApiKey':
@@ -457,8 +500,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         break;
 
       case 'claude:refreshStatus':
+        // The event asks Claude's parts again (the constructor's listener)
         emitClaudeStatusInvalidated('status-refresh');
-        await this.sendCurrentSettings(webview);
         break;
 
       case 'codex:startLogin':
@@ -474,12 +517,12 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       case 'codex:refreshStatus':
         // Refresh Codex auth status
         emitCodexStatusInvalidated('status-refresh');
-        await this.sendCodexAuthStatus(webview);
+        this.queueParts(codexEventParts());
         break;
 
       case 'codex:cancelLogin':
+        // The logout event recreates ChatGPT's runtime here and asks its part again
         emitCodexStatusInvalidated('logout');
-        await this.sendCodexAuthStatus(webview);
         vscode.window.showInformationMessage(
           'ChatGPT sign-in cancelled. If a browser tab is still open, you can close it.'
         );
@@ -487,32 +530,32 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
       case 'codex:repair':
         await this.openCodexRepairTerminal();
-        await this.sendCurrentSettings(webview);
+        this.queueParts(codexEventParts());
         break;
 
       case 'updates:checkNow':
         await this.updateService.checkForUpdates({ manual: true, notify: false });
-        await this.sendCurrentSettings(webview);
+        this.queueBase();
         break;
 
       case 'updates:install':
         await this.updateService.installResolvedUpdate();
-        await this.sendCurrentSettings(webview);
+        this.queueBase();
         break;
 
       case 'updates:skipVersion':
         await this.updateService.skipResolvedUpdate();
-        await this.sendCurrentSettings(webview);
+        this.queueBase();
         break;
 
       case 'updates:pause':
         await this.updateService.pauseNotifications();
-        await this.sendCurrentSettings(webview);
+        this.queueBase();
         break;
 
       case 'updates:resume':
         await this.updateService.resumeNotifications();
-        await this.sendCurrentSettings(webview);
+        this.queueBase();
         break;
 
       case 'updates:reload':
@@ -539,6 +582,13 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
   private async resolvePanel(panel: vscode.WebviewPanel): Promise<void> {
     RitemarkSettingsProvider.panel = panel;
+    // A new open: its own probe run, once, after the page's `ready` (R10)
+    this.panelOrigin = Date.now();
+    this.drawnMs = 0;
+    this.probes = new SettingsProbeScheduler(this.panelOrigin);
+    this.lastParts.clear();
+    this.lastCodexAuth = null;
+    this.clearQueue();
     RitemarkSettingsProvider.googleDocsFeature()?.setSettingsListener((projection) => {
       panel.webview.postMessage({ type: 'google-docs/settings', projection }).then(undefined, () => {});
     });
@@ -549,7 +599,16 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       dark: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'settings-tab-dark.svg'),
     };
     panel.webview.options = this.getWebviewOptions();
+    // Sprint 147, A1: with timing on, each message posted writes its line
+    if (settingsTimingEnabled()) {
+      const post = panel.webview.postMessage.bind(panel.webview);
+      panel.webview.postMessage = (message: { type?: unknown }) => {
+        settingsTimingMark(`post:${typeof message?.type === 'string' ? message.type : 'unknown'}`);
+        return post(message);
+      };
+    }
     panel.webview.html = await this.getHtmlContent(panel.webview);
+    settingsTimingMark('html-set');
 
     panel.webview.onDidReceiveMessage(
       async (message) => {
@@ -561,25 +620,118 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
     // The Appearance choice follows the theme however it changes (the command palette, the OS's light and dark)
     const themeListener = vscode.window.onDidChangeActiveColorTheme(() => {
-      void this.sendCurrentSettings(panel.webview);
+      this.queueBase();
+    });
+
+    // Sprint 147, PR 3 (R11): what no event reports (a sign-in in a terminal for this computer's runtime, an update
+    // handled from the bell) is checked again when the tab comes back into view
+    let wasVisible = panel.visible;
+    const viewListener = panel.onDidChangeViewState(() => {
+      const visible = panel.visible;
+      const probes = this.probes;
+      const recheck = probes !== null && shouldRecheckOnView({
+        visible,
+        wasVisible,
+        started: probes.started,
+        busy: probes.busy,
+        lastEndedAt: probes.lastEndedAt,
+        now: Date.now(),
+      });
+      wasVisible = visible;
+      if (recheck) {
+        // Claude's answer is cached until an event: ask the runtime itself, as the poll during a sign-in does
+        void getSetupStatus({ refresh: true }).catch(() => undefined).finally(() => {
+          this.queueBase();
+          this.queueParts(RECHECK_PARTS);
+        });
+      }
     });
 
     panel.onDidDispose(() => {
       themeListener.dispose();
+      viewListener.dispose();
       if (RitemarkSettingsProvider.panel === panel) {
         RitemarkSettingsProvider.panel = undefined;
         RitemarkSettingsProvider.googleDocsFeature()?.setSettingsListener(null);
+        this.probes = null;
+        this.lastParts.clear();
+        this.lastCodexAuth = null;
+        this.clearQueue();
       }
       this.stopClaudeLoginPolling();
     });
+    // Sprint 147, PR 3 (R10, #593): nothing is awaited here. A restored tab's webview is shown only once this
+    // resolves (VS Code awaits the serializer), so the probes it awaited before held the page's navigation for seconds
+    // (A1: 3.4 s on Windows). The page asks for its data with `ready`.
+  }
 
-    await this.sendCurrentSettings(panel.webview);
+  /** The flags that show the OpenRouter and ElevenLabs rows. */
+  private keyFlags(): SettingsKeyFlags {
+    return { opencode: isEnabled('opencode-integration'), transcription: isEnabled('transcription-workbench') };
+  }
+
+  /** A change elsewhere (A2): `settings` again and the parts it names, coalesced. */
+  private follow(action: FollowAction): void {
+    if (action.base) this.queueBase();
+    if (action.parts.length) this.queueParts(action.parts);
+  }
+
+  /** Sends `settings` once at the end of this turn, however many changes asked for it. */
+  private queueBase(): void {
+    if (!RitemarkSettingsProvider.panel) return;
+    this.baseQueued = true;
+    this.armQueue();
+  }
+
+  /** Asks these parts again at the end of this turn, each once. Before the open's run has begun, that run answers them. */
+  private queueParts(parts: readonly SettingsPartName[]): void {
+    if (!RitemarkSettingsProvider.panel || !this.probes?.started) return;
+    for (const part of parts) this.queuedParts.add(part);
+    this.armQueue();
+  }
+
+  private armQueue(): void {
+    if (this.queueTimer) return;
+    this.queueTimer = setTimeout(() => {
+      this.queueTimer = null;
+      const panel = RitemarkSettingsProvider.panel;
+      const base = this.baseQueued;
+      const parts = [...this.queuedParts];
+      this.baseQueued = false;
+      this.queuedParts.clear();
+      if (!panel) return;
+      if (base) void this.sendBaseSettings(panel.webview);
+      if (parts.length && this.probes) void this.probes.run(this.buildProbes(panel.webview, parts));
+    }, 0);
+  }
+
+  private clearQueue(): void {
+    if (this.queueTimer) clearTimeout(this.queueTimer);
+    this.queueTimer = null;
+    this.baseQueued = false;
+    this.queuedParts.clear();
+  }
+
+  /** This open's probes, once: all together, each posting its part; then R10's one summary line. */
+  private startOpenProbes(webview: vscode.Webview): void {
+    if (!this.probes) this.probes = new SettingsProbeScheduler(this.panelOrigin || Date.now());
+    const run = this.probes.runOnce(this.buildProbes(webview, ALL_PARTS));
+    if (!run) {
+      // The page asked again (a reload): draw it whole from the answers already in
+      for (const [part, value] of this.lastParts) void webview.postMessage({ type: 'settings:part', part, value });
+      if (this.lastCodexAuth) void webview.postMessage({ type: 'codex:authStatus', data: this.lastCodexAuth });
+      return;
+    }
+    void run.then((timings) => {
+      console.log(settingsSummaryLine(this.drawnMs, timings));
+    });
   }
 
   /**
-   * Send current settings to webview
+   * Sprint 147, PR 3 (R10): what the page draws first, with no probe: every setting, which keys are saved (never a
+   * key's value, decision 2), the theme, Google Docs, usage data, the versions and the update state as it stands.
    */
-  private async sendCurrentSettings(webview: vscode.Webview): Promise<void> {
+  private async sendBaseSettings(webview: vscode.Webview): Promise<void> {
     const config = vscode.workspace.getConfiguration('ritemark');
     const workbenchConfig = vscode.workspace.getConfiguration('workbench');
     const windowConfig = vscode.workspace.getConfiguration('window');
@@ -592,91 +744,17 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         : 'ritemark-light'
       : configuredTheme;
 
-    // Get API keys (masked)
-    // SecretStorage key names (single source for BYOK / Sprint 76 R3a):
-    //   'openai-api-key', 'google-ai-key', 'anthropic-api-key', and the new
-    //   'openrouter-api-key'. These same values power the OpenCode runtime —
-    //   no separate key store (spec R3a: configure each provider once).
-    const openaiKey = await this.context.secrets.get('openai-api-key');
-    const googleKey = await this.context.secrets.get('google-ai-key');
-    const anthropicKey = await this.context.secrets.get('anthropic-api-key');
-    // Sprint 76 R3a: OpenRouter card is only surfaced when opencode-integration
-    // is on. When off the key handlers are inert (R7 gating).
-    const openrouterEnabled = isEnabled('opencode-integration');
-    const openrouterKey = openrouterEnabled
-      ? await this.context.secrets.get('openrouter-api-key')
-      : undefined;
-    // Sprint 108 R4: 'elevenlabs-api-key' joins the same SecretStorage list.
-    // Gated on the transcription flag so the card disappears with the feature.
-    const transcriptionEnabled = isEnabled('transcription-workbench');
-    const elevenlabsKey = transcriptionEnabled
-      ? await this.context.secrets.get('elevenlabs-api-key')
-      : undefined;
-    const transcriptionStorageBytes = transcriptionEnabled ? await this.transcriptionStorageBytes() : 0;
+    settingsTimingMark('send-settings-start');
+    // Which of the five keys are saved, read together; only whether each is there leaves this function.
+    const flags = this.keyFlags();
+    const saved = await this.savedKeys(flags);
+    settingsTimingMark('probe:secrets');
 
-    const initialUpdateSnapshot = await this.updateService.getStatusSnapshot();
-    const updateCenterPromise = initialUpdateSnapshot.lastCheckedAt === 0
-      ? this.updateService.checkForUpdates({ manual: false, notify: false })
-      : Promise.resolve(initialUpdateSnapshot);
+    // The update state as it stands (no network); a first-ever check is a probe of its own
+    const updateCenter = await settingsTimed('update-snapshot', this.updateService.getStatusSnapshot())
+      .catch((error: unknown) => ({ ...this.updateFallback(), error: error instanceof Error ? error.message : 'Unknown update status error' }));
 
-    const [updateCenterResult, componentStatusResult] = await Promise.allSettled([
-      updateCenterPromise,
-      this.getComponentStatus()
-    ]);
-
-    const updateCenter = updateCenterResult.status === 'fulfilled'
-      ? updateCenterResult.value
-      : {
-          ...initialUpdateSnapshot,
-          state: 'error' as const,
-          error: updateCenterResult.reason instanceof Error
-            ? updateCenterResult.reason.message
-            : 'Unknown update status error',
-        };
-
-    const componentStatus = componentStatusResult.status === 'fulfilled'
-      ? componentStatusResult.value
-      : {
-          voiceModel: {
-            installed: false,
-            modelName: AVAILABLE_MODELS[voiceModelFile()]?.name ?? 'large-v3-turbo',
-            filename: voiceModelFile(),
-            managedBy: 'ritemark' as const,
-            sizeBytes: 0,
-            sizeDisplay: 'Unknown',
-          },
-          claudeCode: {
-            installed: false,
-            runnable: false,
-            authenticated: false,
-            version: null,
-            sdkVersion: null,
-            binaryPath: null,
-            authMethod: null,
-            managedBy: 'user' as const,
-            state: 'not-installed' as const,
-            error: null,
-            diagnostics: [],
-            repairAction: 'install' as const,
-          },
-          codex: {
-            installed: false,
-            version: null,
-            managedBy: 'user' as const,
-            state: 'broken' as const,
-            error: componentStatusResult.reason instanceof Error
-              ? componentStatusResult.reason.message
-              : 'Failed to inspect component status',
-            diagnostics: [],
-            repairCommand: null,
-            compatibility: null,
-          },
-        };
-
-    // Git's row shows whichever Claude runs (File changes needs Git); Node.js's only with this computer's runtime.
-    const environment = await getAgentEnvironmentStatus().catch(() => null);
-
-    webview.postMessage({
+    await webview.postMessage({
       type: 'settings',
       data: {
         // Codex availability is gated by the feature flag system, not the
@@ -691,8 +769,6 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
         // Agent runtime preference (bundled vs system)
         agentRuntimePreference: config.get('agentRuntime.preference', 'bundled'),
-        // Sprint 133 (R12): 1.x's launch check rows: Git always, Node.js for this computer's runtime
-        environment,
 
         // Sprint 133 (R7): usage data, on only after the person's yes (on by default from the welcome); the welcome's words
         usageData: usageDataState(),
@@ -712,163 +788,292 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         // Chat appearance
         chatFontSize: config.get('chat.fontSize', 13),
 
-        // API Keys (masked for display, full for input)
-        openaiKey: openaiKey || '',
-        openaiKeyConfigured: !!openaiKey,
-        googleKey: googleKey || '',
-        googleKeyConfigured: !!googleKey,
-        anthropicKey: anthropicKey || '',
-        anthropicKeyConfigured: !!anthropicKey,
+        // API keys: whether each is saved, never its value (decision 2: the eye asks for one key, `apiKey:reveal`)
+        openaiKeyConfigured: saved['openai-api-key'],
+        googleKeyConfigured: saved['google-ai-key'],
+        anthropicKeyConfigured: saved['anthropic-api-key'],
         // Sprint 76 R3a: OpenCode flag-gating. `opencodeEnabled` tells the
         // Settings webview whether the "Used for:" lines mention OpenCode.
         // `openrouterEnabled` tells it whether to render the OpenRouter card.
-        opencodeEnabled: openrouterEnabled,
-        openrouterEnabled,
-        openrouterKey: openrouterKey || '',
-        openrouterKeyConfigured: !!openrouterKey,
+        opencodeEnabled: flags.opencode,
+        openrouterEnabled: flags.opencode,
+        openrouterKeyConfigured: saved['openrouter-api-key'],
         // Sprint 108 R4/R12: the ElevenLabs card and the transcription-data row
         // both disappear when the feature flag is off.
-        transcriptionEnabled,
-        elevenlabsKey: elevenlabsKey || '',
-        elevenlabsKeyConfigured: !!elevenlabsKey,
-        transcriptionStorageBytes,
+        transcriptionEnabled: flags.transcription,
+        elevenlabsKeyConfigured: saved['elevenlabs-api-key'],
 
-        // Update-adjacent components
-        componentStatus,
+        // The voice model: a file's size on this computer, no probe
+        voiceModel: this.voiceModelStatus(),
 
         // Sprint 119: Google Docs publishing card (redacted projection only).
         googleDocs: RitemarkSettingsProvider.googleDocsFeature()?.controller.settingsProjection() ?? null,
       },
-    });
-
-    // Also send Codex auth status
-    void this.sendCodexAuthStatus(webview);
+    }).then(undefined, () => false);
+    if (!this.drawnMs && this.panelOrigin) this.drawnMs = Date.now() - this.panelOrigin;
   }
 
-  private async getComponentStatus(): Promise<{
-    voiceModel: {
-      installed: boolean;
-      modelName: string;
-      filename: string;
-      managedBy: 'ritemark';
-      sizeBytes: number;
-      sizeDisplay: string;
+  /** Whether each of the five keys is saved (a key whose flag is off reads as not saved, as before). */
+  private async savedKeys(flags: SettingsKeyFlags): Promise<Record<SettingsKeyName, boolean>> {
+    const entries = await Promise.all(SETTINGS_KEY_NAMES.map(async (name) => {
+      if (!settingsKeyAllowed(name, flags)) return [name, false] as const;
+      try {
+        return [name, Boolean(await this.context.secrets.get(name))] as const;
+      } catch {
+        return [name, false] as const;
+      }
+    }));
+    return Object.fromEntries(entries) as Record<SettingsKeyName, boolean>;
+  }
+
+  /**
+   * The saved-key eye (decision 2): the one key asked for, to this page only, once per press. Never logged; a name off
+   * the list, or a key whose row's flag is off, answers with no value.
+   */
+  private async revealApiKey(key: unknown, requestId: unknown, webview: vscode.Webview): Promise<void> {
+    const id = typeof requestId === 'string' || typeof requestId === 'number' ? requestId : null;
+    if (id === null) return;
+    let value: string | null = null;
+    if (settingsKeyAllowed(key, this.keyFlags())) {
+      try {
+        value = (await this.context.secrets.get(key)) ?? null;
+      } catch {
+        value = null;
+      }
+    }
+    await webview.postMessage({ type: 'apiKey:revealed', requestId: id, key: typeof key === 'string' ? key : null, value })
+      .then(undefined, () => false);
+  }
+
+  private updateFallback() {
+    return {
+      state: 'error' as const,
+      currentAppVersion: '',
+      currentExtensionVersion: '',
+      updatesEnabled: true,
+      lastCheckedAt: 0,
+      lastSuccessfulCheckAt: 0,
+      lastFailedCheckAt: 0,
+      skippedVersion: '',
+      snoozeUntil: 0,
+      pendingRestartVersion: '',
+      feedSource: 'none' as const,
     };
-    claudeCode: {
-      installed: boolean;
-      runnable: boolean;
-      authenticated: boolean;
-      version: string | null;
-      sdkVersion: string | null;
-      binaryPath: string | null;
-      authMethod: 'claude-oauth' | 'api-key' | null;
-      managedBy: 'user';
-      state: 'ready' | 'needs-auth' | 'auth-in-progress' | 'not-installed' | 'broken';
-      error: string | null;
-      diagnostics: string[];
-      repairAction: 'install' | 'repair' | 'reload' | null;
-      runtimeStatus: RuntimeStatusModel;
+  }
+
+  /** The probes for these parts, each posting `settings:part` when it answers. */
+  private buildProbes(webview: vscode.Webview, parts: readonly SettingsPartName[]): SettingsProbe[] {
+    const post = (part: SettingsPartName, value: unknown) => {
+      this.lastParts.set(part, value);
+      void webview.postMessage({ type: 'settings:part', part, value }).then(undefined, () => false);
     };
-    codex: {
-      installed: boolean;
-      version: string | null;
-      managedBy: 'user';
-      state: 'ready' | 'broken' | 'not-installed';
-      error: string | null;
-      diagnostics: string[];
-      repairCommand: string | null;
-      compatibility: CodexCompatibilityStatus | null;
-      runtimeStatus: RuntimeStatusModel;
+    const probes: Record<SettingsPartName, () => SettingsProbe> = {
+      claudeCode: () => ({
+        part: 'claudeCode',
+        run: () => settingsTimed('claude-setup-status', this.probeClaude()),
+        fallback: (error) => this.claudeFallback(error),
+        deliver: (value) => post('claudeCode', value),
+      }),
+      codex: () => ({
+        part: 'codex',
+        run: () => settingsTimed('codex-status', this.probeCodex()),
+        fallback: (error) => ({
+          part: this.codexFallback(error),
+          auth: { enabled: isEnabled('codex-integration'), authenticated: false, error: errorText(error) || 'Unknown error' },
+        }),
+        deliver: (value) => {
+          const { part, auth } = value as { part: unknown; auth: unknown };
+          post('codex', part);
+          this.lastCodexAuth = auth;
+          void webview.postMessage({ type: 'codex:authStatus', data: auth }).then(undefined, () => false);
+        },
+      }),
+      environment: () => ({
+        // Git's row shows whichever Claude runs (File changes needs Git); Node.js's only with this computer's runtime.
+        part: 'environment',
+        run: () => settingsTimed('environment', getAgentEnvironmentStatus()),
+        fallback: () => null,
+        deliver: (value) => post('environment', value),
+      }),
+      transcriptionStorageBytes: () => ({
+        part: 'transcriptionStorageBytes',
+        run: () => isEnabled('transcription-workbench')
+          ? settingsTimed('transcription-storage', this.transcriptionStorageBytes())
+          : Promise.resolve(0),
+        fallback: () => 0,
+        deliver: (value) => post('transcriptionStorageBytes', value),
+      }),
+      updateCenter: () => ({
+        // The first-ever update check no longer holds the first draw (R10): the snapshot draws, the check fills in
+        part: 'updateCenter',
+        run: async () => {
+          const snapshot = await this.updateService.getStatusSnapshot();
+          if (snapshot.lastCheckedAt !== 0) return snapshot;
+          return settingsTimed('update-check', this.updateService.checkForUpdates({ manual: false, notify: false }));
+        },
+        fallback: (error) => ({ ...this.updateFallback(), error: errorText(error) || 'Unknown update status error' }),
+        deliver: (value) => post('updateCenter', value),
+      }),
     };
-  }> {
+    return parts.map((part) => probes[part]());
+  }
+
+  /** The voice model's row: whether its file is here, and its size. */
+  private voiceModelStatus() {
     // Sprint 129 R13: the 8-bit model on Windows (and Intel Macs).
     const defaultModelFile = voiceModelFile();
     const modelInfo = AVAILABLE_MODELS[defaultModelFile];
-    const modelPath = getModelPath(defaultModelFile);
-    const voiceInstalled = isModelDownloaded(defaultModelFile);
-    const sizeBytes = voiceInstalled && fs.existsSync(modelPath) ? fs.statSync(modelPath).size : 0;
+    let voiceInstalled = false;
+    let sizeBytes = 0;
+    try {
+      const modelPath = getModelPath(defaultModelFile);
+      voiceInstalled = isModelDownloaded(defaultModelFile);
+      sizeBytes = voiceInstalled && fs.existsSync(modelPath) ? fs.statSync(modelPath).size : 0;
+    } catch {
+      voiceInstalled = false;
+    }
+    return {
+      installed: voiceInstalled,
+      modelName: modelInfo?.name ?? 'large-v3-turbo',
+      filename: defaultModelFile,
+      managedBy: 'ritemark' as const,
+      sizeBytes,
+      sizeDisplay: voiceInstalled
+        ? this.formatBytes(sizeBytes)
+        : (modelInfo?.sizeDisplay ?? 'Unknown'),
+    };
+  }
 
+  /** Claude's part: its setup status (cached until an event says it changed). */
+  private async probeClaude() {
     const anthropicKey = await this.context.secrets.get('anthropic-api-key');
     setAnthropicKeyAvailable(Boolean(anthropicKey));
     const claudeStatus = await getSetupStatus();
+    return {
+      installed: claudeStatus.cliInstalled,
+      runnable: claudeStatus.runnable,
+      authenticated: claudeStatus.authenticated,
+      version: claudeStatus.cliVersion ?? null,
+      sdkVersion: readClaudeAgentSdkVersion(),
+      binaryPath: claudeStatus.binaryPath ?? null,
+      authMethod: claudeStatus.authMethod,
+      managedBy: 'user' as const,
+      state: claudeStatus.state === 'broken-install'
+        ? 'broken' as const
+        : claudeStatus.state,
+      error: claudeStatus.error,
+      diagnostics: claudeStatus.diagnostics,
+      repairAction: claudeStatus.repairAction,
+      runtimeStatus: deriveClaudeRuntimeStatus(claudeStatus),
+    };
+  }
 
-    const codexManager = new CodexManager();
-    const codexStatus = await codexManager.getBinaryStatus();
+  private claudeFallback(error: unknown) {
+    return {
+      installed: false,
+      runnable: false,
+      authenticated: false,
+      version: null,
+      sdkVersion: null,
+      binaryPath: null,
+      authMethod: null,
+      managedBy: 'user' as const,
+      state: 'broken' as const,
+      error: errorText(error) || 'Failed to inspect Claude',
+      diagnostics: [],
+      repairAction: 'repair' as const,
+      runtimeStatus: { runtime: 'launch_failed' as const, source: 'unknown' as const, auth: 'unknown' as const },
+    };
+  }
+
+  /**
+   * ChatGPT's part and its sign-in (`codex:authStatus`) from one look: its binary is read once and its account once
+   * per run (both were read twice per open before, in the parts and again for the sign-in).
+   */
+  private async probeCodex(): Promise<{ part: unknown; auth: unknown }> {
+    const codexStatus = await new CodexManager().getBinaryStatus();
+    const codexAuth = isEnabled('codex-integration') ? this.codexAuth : null;
 
     // Resolve Codex auth state independently of the binary inspection. This
     // can fail if the app-server is not reachable; treat any failure as
     // 'unknown' so the UI shows attention required without hiding the runtime.
     let codexAuthState: AuthState = 'unknown';
-    if (codexStatus.runnable && this.codexAuth) {
+    let auth: Record<string, unknown>;
+    if (!codexAuth) {
+      auth = { enabled: false };
+    } else if (!codexStatus.available) {
+      auth = {
+        enabled: true,
+        authenticated: false,
+        binaryMissing: true,
+        error: codexStatus.error ?? 'ChatGPT was not found.',
+        diagnostics: codexStatus.diagnostics,
+        repairCommand: codexStatus.repairCommand,
+      };
+    } else if (!codexStatus.runnable) {
+      auth = {
+        enabled: true,
+        authenticated: false,
+        binaryBroken: true,
+        error: codexStatus.error ?? 'ChatGPT is installed but could not start.',
+        diagnostics: codexStatus.diagnostics,
+        repairCommand: codexStatus.repairCommand,
+      };
+    } else {
       try {
-        const authStatus = await this.codexAuth.getStatus();
-        codexAuthState = authStatus.authenticated ? 'ready' : 'sign_in_required';
-      } catch {
+        const status = await settingsTimed('codex-auth-status', codexAuth.getStatus());
+        codexAuthState = status.authenticated ? 'ready' : 'sign_in_required';
+        auth = { enabled: true, authenticated: status.authenticated, authMethod: status.authMethod, email: status.email, plan: status.plan };
+      } catch (error) {
         codexAuthState = 'error';
+        auth = { enabled: true, authenticated: false, error: errorText(error) || 'Unknown error' };
       }
     }
 
-    const claudeRuntimeStatus = deriveClaudeRuntimeStatus(claudeStatus);
-    const codexRuntimeStatus = deriveCodexRuntimeStatus(
-      {
-        available: codexStatus.available,
-        runnable: codexStatus.runnable,
-        runtimeSource: codexStatus.runtimeSource,
-        installNodeArch: codexStatus.installNodeArch,
-        machineArch: codexStatus.machineArch,
-      },
-      codexAuthState,
-    );
+    const part = {
+      installed: codexStatus.available,
+      version: codexStatus.version,
+      managedBy: 'user' as const,
+      state: !codexStatus.available
+        ? 'not-installed' as const
+        : codexStatus.runnable
+          ? 'ready' as const
+          : 'broken' as const,
+      error: codexStatus.runnable ? null : codexStatus.error,
+      diagnostics: codexStatus.diagnostics,
+      repairCommand: codexStatus.repairCommand,
+      compatibility: codexStatus.compatibility,
+      runtimeStatus: deriveCodexRuntimeStatus(
+        {
+          available: codexStatus.available,
+          runnable: codexStatus.runnable,
+          runtimeSource: codexStatus.runtimeSource,
+          installNodeArch: codexStatus.installNodeArch,
+          machineArch: codexStatus.machineArch,
+        },
+        codexAuthState,
+      ),
+    };
+    return { part, auth };
+  }
 
+  private codexFallback(error: unknown) {
     return {
-      voiceModel: {
-        installed: voiceInstalled,
-        modelName: modelInfo?.name ?? 'large-v3-turbo',
-        filename: defaultModelFile,
-        managedBy: 'ritemark',
-        sizeBytes,
-        sizeDisplay: voiceInstalled
-          ? this.formatBytes(sizeBytes)
-          : (modelInfo?.sizeDisplay ?? 'Unknown')
-      },
-      claudeCode: {
-        installed: claudeStatus.cliInstalled,
-        runnable: claudeStatus.runnable,
-        authenticated: claudeStatus.authenticated,
-        version: claudeStatus.cliVersion ?? null,
-        sdkVersion: readClaudeAgentSdkVersion(),
-        binaryPath: claudeStatus.binaryPath ?? null,
-        authMethod: claudeStatus.authMethod,
-        managedBy: 'user',
-        state: claudeStatus.state === 'broken-install'
-          ? 'broken'
-          : claudeStatus.state,
-        error: claudeStatus.error,
-        diagnostics: claudeStatus.diagnostics,
-        repairAction: claudeStatus.repairAction,
-        runtimeStatus: claudeRuntimeStatus,
-      },
-      codex: {
-        installed: codexStatus.available,
-        version: codexStatus.version,
-        managedBy: 'user',
-        state: !codexStatus.available
-          ? 'not-installed'
-          : codexStatus.runnable
-            ? 'ready'
-            : 'broken',
-        error: codexStatus.runnable ? null : codexStatus.error,
-        diagnostics: codexStatus.diagnostics,
-        repairCommand: codexStatus.repairCommand,
-        compatibility: codexStatus.compatibility,
-        runtimeStatus: codexRuntimeStatus,
-      }
+      installed: false,
+      version: null,
+      managedBy: 'user' as const,
+      state: 'broken' as const,
+      error: errorText(error) || 'Failed to inspect component status',
+      diagnostics: [],
+      repairCommand: null,
+      compatibility: null,
+      runtimeStatus: { runtime: 'launch_failed' as const, source: 'unknown' as const, auth: 'unknown' as const },
     };
   }
 
   /**
    * Public health status for the Welcome page.
-   * Reuses the same data sources as sendCurrentSettings().
+   * Reuses the same data sources as Settings' probes.
    */
   async getHealthStatus(): Promise<{
     codexAvailable: boolean;
@@ -969,14 +1174,14 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     }
 
     emitClaudeStatusInvalidated('install-finished');
-    await this.sendCurrentSettings(webview);
+    this.queueParts(claudeEventParts());
   }
 
   private async startClaudeLogin(webview: vscode.Webview): Promise<void> {
     const status = await getSetupStatus({ refresh: true });
     if (!status.runnable || !status.binaryPath || status.state === 'not-installed' || status.state === 'broken-install') {
       vscode.window.showErrorMessage(status.error || 'Claude is not ready yet. Install or repair it first.');
-      await this.sendCurrentSettings(webview);
+      this.queueParts(claudeEventParts());
       return;
     }
 
@@ -1003,7 +1208,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       vscode.window.showInformationMessage('Claude sign-in is already open. Finish it in your browser.');
     }
 
-    await this.sendCurrentSettings(webview);
+    this.queueParts(claudeEventParts());
   }
 
   private cancelClaudeLogin(): void {
@@ -1025,7 +1230,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     });
 
     if (!key) {
-      await this.sendCurrentSettings(webview);
+      this.queueParts(claudeEventParts());
       return;
     }
 
@@ -1033,14 +1238,14 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     setAnthropicKeyAvailable(true);
     emitClaudeStatusInvalidated('settings-updated');
     vscode.window.showInformationMessage('Anthropic API key saved.');
-    await this.sendCurrentSettings(webview);
+    this.queueBase();
   }
 
   private async logoutClaudeFromSettings(webview: vscode.Webview): Promise<void> {
     const status = await getSetupStatus({ refresh: true });
     if (status.authMethod !== 'claude-oauth' || !status.binaryPath) {
       vscode.window.showWarningMessage('Claude.ai sign-out is only available when Claude CLI OAuth is active.');
-      await this.sendCurrentSettings(webview);
+      this.queueParts(claudeEventParts());
       return;
     }
 
@@ -1055,7 +1260,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       );
     }
 
-    await this.sendCurrentSettings(webview);
+    this.queueParts(claudeEventParts());
   }
 
   private stopClaudeLoginPolling(): void {
@@ -1075,7 +1280,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         const status = await getSetupStatus({ refresh: true });
         const panel = RitemarkSettingsProvider.panel;
         if (panel) {
-          await this.sendCurrentSettings(panel.webview);
+          this.queueParts(['claudeCode']);
         }
 
         if (status.state === 'ready') {
@@ -1089,7 +1294,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           setClaudeLoginInProgress(false);
           this.stopClaudeLoginPolling();
           if (panel) {
-            await this.sendCurrentSettings(panel.webview);
+            this.queueParts(['claudeCode']);
           }
         }
       })();
@@ -1278,7 +1483,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         `Could not delete stored transcripts: ${err instanceof Error ? err.message : 'unknown error'}`
       );
     }
-    await this.sendCurrentSettings(webview);
+    this.queueParts(['transcriptionStorageBytes']);
   }
 
   private async testOpenRouterKey(webview: vscode.Webview): Promise<void> {
@@ -1325,7 +1530,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource} data:; img-src ${webview.cspSource} data:; connect-src https://api.openai.com https://api.anthropic.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource} data:; img-src ${webview.cspSource} data:;">
   <title>Settings</title>
   <style>
     * {
@@ -1346,7 +1551,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   </style>
 </head>
 <body>
-  <div id="root" data-editor-type="settings"></div>
+  <div id="root" data-editor-type="settings"${settingsTimingEnabled() ? ' data-settings-timing="1"' : ''}></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
@@ -1404,7 +1609,6 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     try {
       await this.codexAuth.logout();
       emitCodexStatusInvalidated('logout');
-      await this.sendCodexAuthStatus(webview);
       vscode.window.showInformationMessage('Signed out from ChatGPT');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1435,99 +1639,11 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   }
 
   /**
-   * Send Codex auth status to webview
-   */
-  private async sendCodexAuthStatus(webview: vscode.Webview): Promise<void> {
-    // Check if feature is enabled
-    if (!isEnabled('codex-integration') || !this.codexAuth) {
-      webview.postMessage({
-        type: 'codex:authStatus',
-        data: { enabled: false },
-      });
-      return;
-    }
-
-    // Pre-flight: check if codex binary is installed
-    const codexManager = this.codexAppServer
-      ? new (await import('../codex/codexManager')).CodexManager()
-      : null;
-    const binaryStatus = codexManager
-      ? await codexManager.getBinaryStatus()
-      : {
-          available: false,
-          runnable: false,
-          version: null,
-          error: null,
-          binaryPath: null,
-          installNodeVersion: null,
-          runtimeNodeVersion: process.version.replace(/^v/, ''),
-          diagnostics: [],
-          repairCommand: null,
-          installNodeArch: null,
-          runtimeNodeArch: process.arch,
-          machineArch: process.arch,
-        };
-
-    if (!binaryStatus.available) {
-      webview.postMessage({
-        type: 'codex:authStatus',
-        data: {
-          enabled: true,
-          authenticated: false,
-          binaryMissing: true,
-          error: binaryStatus.error ?? 'ChatGPT was not found.',
-          diagnostics: binaryStatus.diagnostics,
-          repairCommand: binaryStatus.repairCommand,
-        },
-      });
-      return;
-    }
-
-    if (!binaryStatus.runnable) {
-      webview.postMessage({
-        type: 'codex:authStatus',
-        data: {
-          enabled: true,
-          authenticated: false,
-          binaryBroken: true,
-          error: binaryStatus.error ?? 'ChatGPT is installed but could not start.',
-          diagnostics: binaryStatus.diagnostics,
-          repairCommand: binaryStatus.repairCommand,
-        },
-      });
-      return;
-    }
-
-    try {
-      const status = await this.codexAuth.getStatus();
-      webview.postMessage({
-        type: 'codex:authStatus',
-        data: {
-          enabled: true,
-          authenticated: status.authenticated,
-          authMethod: status.authMethod,
-          email: status.email,
-          plan: status.plan,
-        },
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      webview.postMessage({
-        type: 'codex:authStatus',
-        data: {
-          enabled: true,
-          authenticated: false,
-          error: errorMessage,
-        },
-      });
-    }
-  }
-
-  /**
    * Cleanup resources
    */
   dispose(): void {
-    this.usageDataListener.dispose();
+    for (const listener of this.followListeners) listener.dispose();
+    this.clearQueue();
     this.codexAppServer?.dispose();
     this.codexAuth?.removeAllListeners();
     this.codexAuth = null;
@@ -1560,4 +1676,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     }
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
   }
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : typeof error === 'string' ? error : '';
 }

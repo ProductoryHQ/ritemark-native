@@ -14,7 +14,10 @@ import { fileURLToPath } from 'node:url'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string): string => readFileSync(path, 'utf8')
 
-/** The 28 message types the page sends today (spec R1; `RitemarkSettingsProvider.ts`'s `handleMessage`). */
+/**
+ * The 28 message types the page sent before the new Settings (spec R1; `RitemarkSettingsProvider.ts`'s `handleMessage`),
+ * and PR 3's one more: `apiKey:reveal`, the saved-key eye asking for its one key (decision 2).
+ */
 export const PAGE_MESSAGES = [
   'ready', 'openExternal', 'setSetting', 'usageData:set', 'theme:set', 'setApiKey', 'testApiKey',
   'settings:openAdvanced', 'transcription:clearStorage',
@@ -22,7 +25,18 @@ export const PAGE_MESSAGES = [
   'claude:reload', 'claude:refreshStatus',
   'codex:startLogin', 'codex:logout', 'codex:refreshStatus', 'codex:cancelLogin', 'codex:repair',
   'updates:checkNow', 'updates:install', 'updates:skipVersion', 'updates:pause', 'updates:resume', 'updates:reload',
+  'apiKey:reveal',
 ] as const
+/**
+ * What the host sends the page (PR 3): `settings` (no probe), each probe's `settings:part`, the eye's one answer, and
+ * today's others. The page must handle each, and the host must still send each.
+ */
+export const HOST_MESSAGES = [
+  'settings', 'settings:part', 'apiKey:revealed', 'codex:authStatus', 'codex:loginStarting', 'testResult',
+  'google-docs/settings', 'settings:focus-section',
+] as const
+/** The parts the host's probes post, each one the page composes (`settingsParts.ts`). */
+export const PROBE_PARTS = ['claudeCode', 'codex', 'environment', 'transcriptionStorageBytes', 'updateCenter'] as const
 /** Google Docs' five, which the host hands to its controller by their prefix. */
 export const GOOGLE_DOCS_MESSAGES = [
   'google-docs/connect', 'google-docs/cancel', 'google-docs/disconnect', 'google-docs/choose-template', 'google-docs/clear-template',
@@ -115,13 +129,52 @@ export function inventoryGaps(page: string, host: string, googleDocsProtocol: st
   return gaps
 }
 
+/** PR 3: each host message is still posted by the host and handled by the page; each probe part is posted and composed. */
+export function hostMessageGaps(page: string, host: string, parts: string): string[] {
+  const gaps: string[] = []
+  for (const type of HOST_MESSAGES) {
+    if (!new RegExp(`type:\\s*'${escape(type)}'`).test(host)) gaps.push(`the host no longer sends ${type}`)
+    if (!new RegExp(`(case\\s*|type\\s*!==\\s*|type\\s*===\\s*)'${escape(type)}'`).test(page)) gaps.push(`the page no longer handles ${type}`)
+  }
+  for (const part of PROBE_PARTS) {
+    if (!new RegExp(`part:\\s*'${escape(part)}'`).test(host)) gaps.push(`the host no longer probes ${part}`)
+    if (!parts.includes(`'${part}'`)) gaps.push(`the page no longer composes ${part}`)
+  }
+  return gaps
+}
+
+/**
+ * PR 3 (decision 2): no saved key's value in `settings`, and every key message held to the five names. A host that
+ * sends a value again, or saves a name it was sent without the list, fails.
+ */
+export function keyHandlingGaps(host: string, keys: string): string[] {
+  const gaps: string[] = []
+  const base = host.slice(host.indexOf('private async sendBaseSettings('), host.indexOf('private async savedKeys('))
+  if (!base) gaps.push('the host no longer has sendBaseSettings')
+  if (/\b(openai|google|anthropic|openrouter|elevenlabs)Key:/.test(base)) gaps.push("the host's settings carry a key's value")
+  for (const name of API_KEYS) if (!keys.includes(`'${name}'`)) gaps.push(`the key list no longer has ${name}`)
+  const setter = host.slice(host.indexOf("case 'setApiKey':"), host.indexOf("case 'testApiKey':"))
+  if (!/if \(!settingsKeyAllowed\(message\.key, this\.keyFlags\(\)\)\)/.test(setter)) gaps.push('setApiKey saves a name off the list')
+  if (!/settingsKeyAllowed\(key, this\.keyFlags\(\)\)/.test(host.slice(host.indexOf('private async revealApiKey(')))) gaps.push('the eye answers a name off the list')
+  return gaps
+}
+
 const page = pageSource()
 const owned = Object.fromEntries(Object.keys(OWNERS).map((file) => [file, withoutComments(read(join(HERE, file)))]))
 const host = read(join(HERE, '../../../../src/settings/RitemarkSettingsProvider.ts'))
 const sheet = withoutComments(read(join(HERE, 'ApiKeysSheet.tsx')))
 const googleDocsProtocol = read(join(HERE, '../../../../src/googleDocs/protocol.ts'))
+const keysSource = read(join(HERE, '../../../../src/settings/settingsKeys.ts'))
+const partsSource = withoutComments(read(join(HERE, 'settingsParts.ts')))
 
-assert.equal(PAGE_MESSAGES.length, 28, 'the 28 message types')
+assert.equal(PAGE_MESSAGES.length, 29, "the 28 message types, and PR 3's apiKey:reveal")
+assert.deepEqual(hostMessageGaps(page, host, partsSource), [], 'every host message is sent and handled; every part probed and composed')
+assert.deepEqual(keyHandlingGaps(host, keysSource), [], 'no key value in settings; every key message held to the five names')
+// E1 for PR 3: each check fails when its line goes
+assert.deepEqual(hostMessageGaps(page.replace("case 'settings:part':", ''), host, partsSource), ['the page no longer handles settings:part'])
+assert.deepEqual(hostMessageGaps(page, host.replace(/part: 'environment'/g, "part: 'gone'"), partsSource), ['the host no longer probes environment'])
+assert.deepEqual(keyHandlingGaps(host.replace("openaiKeyConfigured: saved['openai-api-key'],", "openaiKey: 'x', openaiKeyConfigured: true,"), keysSource), ["the host's settings carry a key's value"])
+assert.deepEqual(keyHandlingGaps(host.replace('if (!settingsKeyAllowed(message.key, this.keyFlags())) {', 'if (!message.key) {'), keysSource), ['setApiKey saves a name off the list'])
 assert.deepEqual(inventoryGaps(page, host, googleDocsProtocol), [], 'every message, setting and key of the inventory has its sender and its handler')
 assert.deepEqual(ownerGaps(owned), [], 'each copy of a message sent from more than one place is still sent by its owner')
 assert.deepEqual(keySheetGaps(sheet, owned['RitemarkSettings.tsx']), [], "each key row adds, tests, changes, removes and links, with today's messages")
@@ -166,4 +219,4 @@ assert.deepEqual(
   ['AiDetailsSheet.tsx no longer sends claude:repair'],
 )
 
-console.log(`settingsInventory.test.ts: all assertions passed (${PAGE_MESSAGES.length} messages, ${GOOGLE_DOCS_MESSAGES.length} Google Docs, ${SETTING_KEYS.length} settings, ${API_KEYS.length} keys)`)
+console.log(`settingsInventory.test.ts: all assertions passed (${PAGE_MESSAGES.length} messages, ${HOST_MESSAGES.length} from the host, ${GOOGLE_DOCS_MESSAGES.length} Google Docs, ${SETTING_KEYS.length} settings, ${API_KEYS.length} keys)`)
