@@ -111,6 +111,6 @@ assert.ok(liveCard.includes('{view.noSound && <NoSoundLine platform={platform} /
 assert.ok(liveCard.includes('<span className="text-ink-body"> from {view.inputName}</span>'), 'Recording from <input>');
 assert.ok(panelSource.includes('platform={state.platform}\n            onStop'), 'the live card knows the platform for the settings name');
 const noSoundLine = cardsSource.slice(cardsSource.indexOf('function NoSoundLine'), cardsSource.indexOf('/** Where the live recording goes'));
-assert.ok(noSoundLine.includes('<Tooltip label=') && noSoundLine.includes('<Button') && !/\btitle=/.test(noSoundLine), 'its link is a Button with a tooltip, never a native title');
+assert.ok(/<Tooltip [^>]*label=/.test(noSoundLine) && noSoundLine.includes('<Button') && !/\btitle=/.test(noSoundLine), 'its link is a Button with a tooltip, never a native title');
 
 console.log('panelChrome tests passed');

@@ -81,7 +81,7 @@ function NoSoundLine({ platform }: { platform: string }) {
     <p className="mt-2 text-[11px] leading-relaxed text-ritemark-warning-foreground">
       No sound from the microphone. Check the input in{' '}
       {where ? (
-        <Tooltip label="Open the sound settings, where the input is chosen">
+        <Tooltip side="top" label="Open the sound settings, where the input is chosen">
           <Button
             variant="link"
             size="sm"
@@ -179,24 +179,27 @@ export function LiveRecordingCard({
 
   return (
     <Card label="Recording" containerRef={cardRef}>
-      <div className="flex items-center gap-2">
-        <RecordDot live />
-        {/* #656 (Jarmo, 4 Nov): the input is named from the first second, so a wrong one shows at once. */}
+      {/* #656 (Jarmo, 4 Nov): the input is named from the first second, so a wrong one shows at once. The name
+          wraps rather than being cut: at sidebar width "MacBook Pro Mi…" would hide what the line is for. */}
+      <div className="flex items-start gap-2">
+        <span className="mt-[5px] flex shrink-0">
+          <RecordDot live />
+        </span>
         {view.inputName ? (
           <Tooltip
             className="min-w-0"
             side="top"
             label={`Recording from ${view.inputName}.${settings ? ` The input is chosen in ${settings}.` : ''}`}
           >
-            <span className="truncate text-xs">
+            <span className="min-w-0 break-words text-xs leading-5">
               <span className="font-semibold text-accent-deep">Recording</span>
               <span className="text-ink-body"> from {view.inputName}</span>
             </span>
           </Tooltip>
         ) : (
-          <span className="text-xs font-semibold text-accent-deep">Recording</span>
+          <span className="text-xs font-semibold leading-5 text-accent-deep">Recording</span>
         )}
-        <span className="ml-auto shrink-0 text-sm font-semibold tabular-nums" aria-label={`Recorded ${elapsed}`}>
+        <span className="ml-auto shrink-0 text-sm font-semibold leading-5 tabular-nums" aria-label={`Recorded ${elapsed}`}>
           {elapsed}
         </span>
       </div>
