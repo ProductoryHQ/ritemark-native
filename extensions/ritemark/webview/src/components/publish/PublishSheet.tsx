@@ -8,6 +8,10 @@
  *
  * It shows only what the host sent: names, folders, reasons, line numbers. It holds no value, path or token, and it
  * answers with `publish:cancel`, `publish:confirm` or `publish:openHit` (an index into the host's own list).
+ *
+ * As a dialog (the lead, 5 November): focus moves into the sheet when it opens and the default button is ringed:
+ * Publish, or Cancel when something looks like a key. Enter presses it; Esc and Cancel close the sheet. The ring
+ * shows while the sheet itself holds the focus, and the focus ring takes over once Tab moves to a button.
  */
 
 import { useEffect, useState } from 'react'
@@ -27,11 +31,16 @@ import {
   leftOutCount,
   leftOutName,
   leftOutReasonFor,
+  leftOutTip,
   limitLine,
   openWords,
   sheetButtons,
+  showsFileList,
   whatGoesLine,
 } from './publishSheetCopy'
+
+/** The default button's ring while the sheet itself has the focus: the focus ring's look (`rm-focus-ring`). */
+const DEFAULT_RING = 'group-focus/sheet:outline group-focus/sheet:outline-2 group-focus/sheet:outline-offset-2 group-focus/sheet:outline-[color:var(--r-focus-ring)]'
 
 function send(message: PublishSheetWebviewMessage): void {
   vscode.postMessage(message)
@@ -52,12 +61,20 @@ export function PublishSheetView({ model, onAnswer }: { model: PublishSheetModel
   const limit = limitLine(model.tooBig, model.tooMany)
   const buttons = sheetButtons(model.keyHits.length > 0, limit !== null)
   const left = leftOutCount(model.leftOut)
+  const fold = showsFileList(model.files.length, model.leftOut)
+  const confirm = () => onAnswer({ type: 'publish:confirm', anyway: model.keyHits.length > 0, pagePart: model.address?.page })
+  const pressDefault = () => {
+    if (buttons.main === 'cancel') onAnswer({ type: 'publish:cancel' })
+    else if (!buttons.publishDisabled) confirm()
+  }
 
   const cancel = (
     <Tooltip label={buttons.cancelTip}>
       <Button
         variant={buttons.main === 'cancel' ? 'default' : 'ghost'}
         size="sm"
+        className={buttons.main === 'cancel' ? DEFAULT_RING : undefined}
+        data-default={buttons.main === 'cancel' ? '' : undefined}
         onClick={() => onAnswer({ type: 'publish:cancel' })}
       >
         Cancel
@@ -69,8 +86,10 @@ export function PublishSheetView({ model, onAnswer }: { model: PublishSheetModel
       <Button
         variant={buttons.main === 'publish' ? 'default' : 'ghost'}
         size="sm"
+        className={buttons.main === 'publish' ? DEFAULT_RING : undefined}
+        data-default={buttons.main === 'publish' ? '' : undefined}
         disabled={buttons.publishDisabled}
-        onClick={() => onAnswer({ type: 'publish:confirm', anyway: model.keyHits.length > 0, pagePart: model.address?.page })}
+        onClick={confirm}
       >
         <Icon name="globe-simple" size={16} />
         {buttons.publishWords}
@@ -80,7 +99,17 @@ export function PublishSheetView({ model, onAnswer }: { model: PublishSheetModel
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next) onAnswer({ type: 'publish:cancel' }) }}>
-      <DialogContent className="max-w-[440px]" aria-describedby="publish-sheet-subtitle">
+      <DialogContent
+        className="group/sheet max-w-[440px]"
+        aria-describedby="publish-sheet-subtitle"
+        onKeyDown={(event) => {
+          // Enter on the sheet itself presses the default button; on a button or link, that control's own press
+          if (event.key === 'Enter' && event.target === event.currentTarget && !event.nativeEvent.isComposing) {
+            event.preventDefault()
+            pressDefault()
+          }
+        }}
+      >
         <div className="px-5 pt-4 pb-1">
           <DialogTitle className="text-[15px] font-semibold leading-5">Publish {model.title}</DialogTitle>
           <DialogDescription id="publish-sheet-subtitle" className="mt-1 text-[13px] leading-[18px]">{SUBTITLE}</DialogDescription>
@@ -105,13 +134,15 @@ export function PublishSheetView({ model, onAnswer }: { model: PublishSheetModel
             <span className="block">{whatGoesLine(model.files)}</span>
             <span className="block text-[12px] leading-4 text-ink-muted">{NOTHING_ELSE}</span>
             {model.scriptBuilt && <span className="mt-1 block text-[12px] leading-4 text-ink-muted">{SCRIPT_BUILT_LINE}</span>}
-            <Tooltip label={open ? 'Hide the list of files' : 'List every file that goes, and what is left out'} className="mt-1 inline-flex">
-              <Button variant="ghost" size="sm" className="-ml-2 h-7 px-2 text-[12px] text-ink-body" aria-expanded={open} onClick={() => setOpen(!open)}>
-                <Icon name={open ? 'caret-down' : 'caret-right'} size={12} tone="inherit" />
-                {left > 0 ? `${SEE_THE_FILES} · ${left} left out` : SEE_THE_FILES}
-              </Button>
-            </Tooltip>
-            {open && (
+            {fold && (
+              <Tooltip label={open ? 'Hide the list of files' : 'List every file that goes, and what is left out'} className="mt-1 inline-flex">
+                <Button variant="ghost" size="sm" className="-ml-2 h-7 px-2 text-[12px] text-ink-body" aria-expanded={open} onClick={() => setOpen(!open)}>
+                  <Icon name={open ? 'caret-down' : 'caret-right'} size={12} tone="inherit" />
+                  {left > 0 ? `${SEE_THE_FILES} · ${left} left out` : SEE_THE_FILES}
+                </Button>
+              </Tooltip>
+            )}
+            {fold && open && (
               <div className="mt-1">
                 <ul className="m-0 list-none p-0">
                   {model.files.map((f, i) => (
@@ -126,13 +157,28 @@ export function PublishSheetView({ model, onAnswer }: { model: PublishSheetModel
                   <>
                     <div className="mt-2 text-[12px] font-medium leading-4 text-ink-muted">{left} left out</div>
                     <ul className="m-0 list-none p-0">
-                      {model.leftOut.map((l, i) => (
-                        <li key={`${l.reason}/${l.display}/${i}`} className="flex min-w-0 items-baseline gap-1.5 py-0.5 text-[12px] leading-4">
-                          <span className="max-w-[60%] flex-none truncate text-ink-strong">{leftOutName(l)}</span>
-                          <span className="flex-none text-ink-muted">·</span>
-                          <span className="min-w-0 text-ink-muted">{leftOutReasonFor(l)}</span>
-                        </li>
-                      ))}
+                      {model.leftOut.map((l, i) => {
+                        const tip = leftOutTip(l)
+                        const row = (
+                          <>
+                            <span className="max-w-[60%] flex-none truncate text-ink-strong">{leftOutName(l)}</span>
+                            <span className="flex-none text-ink-muted">·</span>
+                            <span className="min-w-0 text-ink-muted">{leftOutReasonFor(l)}</span>
+                          </>
+                        )
+                        return (
+                          <li key={`${l.reason}/${l.display}/${i}`} className="py-0.5 text-[12px] leading-4">
+                            {tip ? (
+                              // the full path on hover, never as the row's text (the lead's change 2)
+                              <Tooltip label={tip} side="top" hoverOnly className="flex min-w-0 max-w-full items-baseline gap-1.5">
+                                {row}
+                              </Tooltip>
+                            ) : (
+                              <span className="flex min-w-0 items-baseline gap-1.5">{row}</span>
+                            )}
+                          </li>
+                        )
+                      })}
                     </ul>
                   </>
                 )}

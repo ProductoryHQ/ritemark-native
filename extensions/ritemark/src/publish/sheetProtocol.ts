@@ -18,7 +18,12 @@ export interface SheetFileRow {
 }
 
 export interface SheetLeftOutRow {
-  /** One file's name or reference; for folded other pages, the count is in `count`. */
+  /** The file's name, first in its row as in the sent rows ("budget.png · outside this project"). Empty when folded. */
+  name: string;
+  /**
+   * Where it is, for the row's tooltip: its path in the project, or the reference as the page writes it when it is
+   * outside (`../../secrets/budget.png`). Never a real path from the disk. Empty when folded.
+   */
   display: string;
   reason: LeftOutReason;
   /** Several other pages folded into one row (A3, finding 3). */

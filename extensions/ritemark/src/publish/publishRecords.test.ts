@@ -94,7 +94,12 @@ async function main(): Promise<void> {
       { name: 'harbour.jpg', folder: 'Pictures', kind: 'picture' },
     ]);
     assert.equal(model.title, 'Harbour programme');
-    assert.deepEqual(model.leftOut, [{ display: '../../secrets/scan.png', reason: 'outside' }, { display: '', reason: 'otherPage', count: 2 }]);
+    assert.deepEqual(model.leftOut, [
+      { name: 'scan.png', display: '../../secrets/scan.png', reason: 'outside' },
+      { name: '', display: '', reason: 'otherPage', count: 2 },
+    ], "each row starts with the file's name; the reference as written is for its tooltip (the lead's change 2)");
+    const one = sheetModelOf({ ...plan([['a.html', 'a']]), leftOut: [{ display: 'slides/b.html', reason: 'otherPage' }, { display: 'C:\\Users\\me\\x.png', reason: 'outside' }] }, 'p');
+    assert.deepEqual(one.leftOut.map((l) => [l.name, l.display]), [['x.png', 'C:\\Users\\me\\x.png'], ['b.html', 'slides/b.html']]);
     assert.deepEqual(model.keyHits, [{ index: 0, fileName: 'script.js', line: 12 }]);
     assert.ok(!JSON.stringify(model).includes('/p/'), 'no real path reaches the sheet');
 

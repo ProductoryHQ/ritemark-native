@@ -13,8 +13,12 @@ export type RefOrigin = 'page' | 'style' | 'module';
 export interface Reference {
   /** As written, entities decoded, whitespace trimmed. */
   value: string;
-  /** What kind of thing the page expects there, when the tag says so. */
-  as: 'style' | 'module' | 'script' | 'any';
+  /**
+   * What kind of thing the page expects there, when the tag says so. `link`: a place the page links to (`<a href>`,
+   * `<area href>`, a `<link>` that loads nothing for the page, such as `rel="alternate"`), not a file the page uses.
+   * R3 sends only what the page uses, so a linked document stays behind and is named (`gather.ts`).
+   */
+  as: 'style' | 'module' | 'script' | 'link' | 'any';
 }
 
 export interface PageReferences {
@@ -37,6 +41,13 @@ const SINGLE_URL_ATTRIBUTES = ['src', 'href', 'xlink:href', 'poster', 'data', 'b
 const DATA_URL_TAGS = new Set(['object']);
 /** Tags whose `href` the browser never loads for the page (navigation and forms are handled as links). */
 const NON_LOADING_HREF_TAGS = new Set(['base']);
+/** Tags whose `href` is a place to go, not a file the page uses (R3): a link to `notes.md` doesn't take `notes.md`. */
+const LINK_TAGS = new Set(['a', 'area']);
+/**
+ * `<link rel>` words that make the page load the file (a stylesheet, an icon, a preload, a manifest). Any other
+ * `<link>` (`alternate`, `next`, `canonical`, `author`, `license`…, or none at all) only points somewhere.
+ */
+const LOADING_LINK_RELS = /\b(?:stylesheet|icon|apple-touch-icon(?:-precomposed)?|mask-icon|manifest|preload|modulepreload|prefetch)\b/;
 
 function parsed(html: string): HTMLElement {
   return parse(html, {
@@ -118,6 +129,9 @@ export function pageReferences(html: string): PageReferences {
       if (tag === 'link' && name === 'href') {
         if (/\bstylesheet\b/.test(rel)) as = 'style';
         else if (/\bmodulepreload\b/.test(rel)) as = 'module';
+        else if (!LOADING_LINK_RELS.test(rel)) as = 'link';
+      } else if ((name === 'href' || name === 'xlink:href') && LINK_TAGS.has(tag)) {
+        as = 'link';
       }
       out.refs.push({ value: value.trim(), as });
     }

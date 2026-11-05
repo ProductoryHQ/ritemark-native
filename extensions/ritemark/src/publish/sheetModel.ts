@@ -7,6 +7,12 @@ import * as path from 'node:path';
 import type { PublishSheetModel, SheetFileRow, SheetLeftOutRow } from './sheetProtocol';
 import type { PublishPlan } from './types';
 
+/** A file's name from a path or a reference as written (either slash, or a `file:` URL): what its row starts with. */
+export function nameOf(display: string): string {
+  const parts = display.split(/[\\/]+/).filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] : display;
+}
+
 /** The sheet's model for a plan. `projectName` names the files at the project's top. */
 export function sheetModelOf(plan: PublishPlan, projectName: string): PublishSheetModel {
   const files: SheetFileRow[] = plan.files.map((f) => {
@@ -16,9 +22,9 @@ export function sheetModelOf(plan: PublishPlan, projectName: string): PublishShe
   const pages = plan.leftOut.filter((l) => l.reason === 'otherPage');
   const leftOut: SheetLeftOutRow[] = plan.leftOut
     .filter((l) => l.reason !== 'otherPage')
-    .map((l) => ({ display: l.display, reason: l.reason }));
-  if (pages.length === 1) leftOut.push({ display: path.posix.basename(pages[0].display), reason: 'otherPage' });
-  else if (pages.length > 1) leftOut.push({ display: '', reason: 'otherPage', count: pages.length });
+    .map((l) => ({ name: nameOf(l.display), display: l.display, reason: l.reason }));
+  if (pages.length === 1) leftOut.push({ name: nameOf(pages[0].display), display: pages[0].display, reason: 'otherPage' });
+  else if (pages.length > 1) leftOut.push({ name: '', display: '', reason: 'otherPage', count: pages.length });
   const page = plan.files[0];
   const title = path.posix.basename(page.projectPath).replace(/\.html?$/i, '');
   return {

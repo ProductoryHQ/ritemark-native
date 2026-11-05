@@ -5,7 +5,9 @@
  * it (against the page, its `<base href>`, or the stylesheet or module that makes it), then checked twice, as written
  * and by real path, so `..`, an absolute path, `file://`, a drive letter, a UNC path and a symlink that leave the
  * project are all **outside**. Never a path with a segment starting with `.`, nothing in `node_modules`, nothing Git
- * ignores, and no other page. Each is left out and named. Remote references stay where they are.
+ * ignores (or can't answer for), no other page, and no file the page only links to (`<a href="notes.md">`: R3 sends
+ * the files a page uses, not the documents it points to). Each is left out and named. Remote references stay where
+ * they are.
  *
  * Linked stylesheets (and their `@import`s) and module scripts are followed; a file left out is never followed, so
  * nothing it names can come in through it. Every file that goes is hashed, and every text file is scanned for things
@@ -165,6 +167,12 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     leftOut.push({ display, reason });
   };
   let scriptBuilt = page.builtAttribute || page.inlineScripts.some(scriptBuildsReferences);
+  /**
+   * Files the page only links to, named after the walk unless the page also uses them (`<a href="a.png">` beside
+   * `<img src="a.png">` sends the picture). A link never marks a file seen, so it can't keep a used file back.
+   */
+  const linked: { lexical: string; real: string; display: string }[] = [];
+  const linkedSeen = new Set<string>();
 
   // The first level: the page's own references, against its base (a stylesheet's and a module's resolve against
   // their own file).
@@ -184,8 +192,9 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
         continue;
       }
       const lexical = resolved.fsPath;
+      const isLink = ref.as === 'link';
       if (seen.has(key(lexical))) continue;
-      seen.add(key(lexical));
+      if (!isLink) seen.add(key(lexical));
       if (!isInside(lexical, projectFolder, platform)) {
         addLeftOut(displayOf(ref.value), 'outside');
         continue;
@@ -219,19 +228,34 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
         addLeftOut(shown, 'otherPage');
         continue;
       }
+      if (isLink) {
+        if (!linkedSeen.has(key(lexical))) {
+          linkedSeen.add(key(lexical));
+          linked.push({ lexical, real, display: shown });
+        }
+        continue;
+      }
       candidates.push({ fsPath: lexical, realPath: real, size: info.size, as: ref.as, display: shown });
     }
 
     // Git decides for the whole level at once, before anything in it is followed
     let ignored = new Set<string>();
+    let unchecked = new Set<string>();
     if (candidates.length > 0) {
+      // Both paths: a name the page uses can be a symlink to a file Git ignores, or the other way round
       const asked = [...new Set(candidates.flatMap((c) => [c.fsPath, c.realPath]))];
-      ignored = new Set([...(await gitIgnoredFn(projectFolder, asked))].map(key));
+      const answer = await gitIgnoredFn(projectFolder, asked);
+      ignored = new Set([...answer.ignored].map(key));
+      unchecked = new Set([...answer.unchecked].map(key));
     }
     const next: { ref: Reference; base: URL }[] = [];
     for (const c of candidates) {
       if (ignored.has(key(c.fsPath)) || ignored.has(key(c.realPath))) {
         addLeftOut(c.display, 'gitIgnored');
+        continue;
+      }
+      if (unchecked.has(key(c.fsPath)) || unchecked.has(key(c.realPath))) {
+        addLeftOut(c.display, 'gitUnchecked');
         continue;
       }
       accepted.push(c);
@@ -247,6 +271,12 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
       }
     }
     level = next;
+  }
+
+  // Links to files the page doesn't also use: named, never sent
+  const acceptedKeys = new Set(accepted.flatMap((c) => [key(c.fsPath), key(c.realPath)]));
+  for (const l of linked) {
+    if (!acceptedKeys.has(key(l.lexical)) && !acceptedKeys.has(key(l.real))) addLeftOut(l.display, 'link');
   }
 
   // Sizes, hashes and the key scan, over the page and every file that goes
@@ -278,7 +308,9 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     file.sha256 = createHash('sha256').update(bytes).digest('hex');
     if (isText(bytes)) {
       const text = bytes.toString('utf8');
-      for (const hit of scanText(text)) keyHits.push({ projectPath, realPath: f.real, line: hit.line, rule: hit.rule });
+      for (const hit of scanText(text)) {
+        keyHits.push({ projectPath, realPath: f.real, line: hit.line, column: hit.column, endColumn: hit.endColumn, rule: hit.rule });
+      }
       if (file.kind === 'script' && scriptBuildsReferences(text)) scriptBuilt = true;
     }
     files.push(file);

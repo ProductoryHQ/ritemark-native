@@ -14,9 +14,11 @@ import {
   leftOutCount,
   leftOutName,
   leftOutReasonFor,
+  leftOutTip,
   limitLine,
   openWords,
   sheetButtons,
+  showsFileList,
   whatGoesLine,
   WHO_CAN_SEE,
   NOTHING_ELSE,
@@ -39,12 +41,30 @@ assert.equal(whatGoesLine(of('other')), 'This page and one file')
 assert.equal(NOTHING_ELSE, 'Nothing else from the project.')
 assert.equal(WHO_CAN_SEE, "Anyone with the link can open the page. It isn't listed or searchable, and you can unpublish it any time.")
 
-// Left out, the five reasons (answer 3)
-const reasons = (['outside', 'hidden', 'toolFolder', 'gitIgnored', 'otherPage'] as const).map((reason) => leftOutReasonFor({ display: 'x', reason }))
-assert.deepEqual(reasons, ['outside this project', 'a hidden file', "a tool's folder", 'Git ignores it', "another page, so its link won't work"])
-assert.equal(leftOutName({ display: '', reason: 'otherPage', count: 7 }), '7 other pages', 'A3 finding 3: folded')
-assert.equal(leftOutReasonFor({ display: '', reason: 'otherPage', count: 7 }), "so their links won't work")
-assert.equal(leftOutCount([{ display: 'a', reason: 'outside' }, { display: '', reason: 'otherPage', count: 7 }]), 8)
+// Left out, the five reasons (answer 3), a link (review of #669) and a path Git can't check (minor 6)
+const reasons = (['outside', 'hidden', 'toolFolder', 'gitIgnored', 'otherPage', 'link', 'gitUnchecked'] as const).map((reason) => leftOutReasonFor({ name: 'x', display: 'x', reason }))
+assert.deepEqual(reasons, ['outside this project', 'a hidden file', "a tool's folder", 'Git ignores it', "another page, so its link won't work", 'a link, not part of the page', "Git couldn't check it"])
+const folded = { name: '', display: '', reason: 'otherPage' as const, count: 7 }
+assert.equal(leftOutName(folded), '7 other pages', 'A3 finding 3: folded')
+assert.equal(leftOutReasonFor(folded), "so their links won't work")
+assert.equal(leftOutTip(folded), null, 'a folded row has no path to show')
+assert.equal(leftOutCount([{ name: 'a', display: 'a', reason: 'outside' }, folded]), 8)
+
+// The lead's change 2: a left-out row starts with the file's name; the path is its tooltip, never its text
+const budget = { name: 'budget.png', display: '../../secrets/budget.png', reason: 'outside' as const }
+assert.equal(`${leftOutName(budget)} · ${leftOutReasonFor(budget)}`, 'budget.png · outside this project')
+assert.equal(leftOutTip(budget), '../../secrets/budget.png')
+const chart = { name: 'chart.js', display: 'node_modules/chart/chart.js', reason: 'toolFolder' as const }
+assert.equal(`${leftOutName(chart)} · ${leftOutReasonFor(chart)}`, "chart.js · a tool's folder")
+const notes = { name: 'notes.png', display: 'drafts/notes.png', reason: 'gitIgnored' as const }
+assert.equal(`${leftOutName(notes)} · ${leftOutReasonFor(notes)}`, 'notes.png · Git ignores it')
+const doc = { name: 'notes.md', display: 'notes.md', reason: 'link' as const }
+assert.equal(`${leftOutName(doc)} · ${leftOutReasonFor(doc)}`, 'notes.md · a link, not part of the page')
+
+// The lead's change 1: no fold for "This page, one file" with nothing left out
+assert.equal(showsFileList(1, []), false, 'nothing to see beyond the line')
+assert.equal(showsFileList(2, []), true, 'the page uses a file')
+assert.equal(showsFileList(1, [doc]), true, 'something is left out')
 
 // The key warning (answer 4, S14): one place, then several
 const hit = (index: number, fileName = 'script.js', line = 12) => ({ index, fileName, line })
@@ -56,6 +76,13 @@ assert.equal(five.lead, '5 things look like keys or passwords:')
 assert.deepEqual(five.places.map((p) => p.words), ['script.js, line 12', 'page.html, line 3', 'style.css, line 40'])
 assert.equal(five.more, 'and 2 more')
 assert.equal(keyWarning([hit(0), hit(1)])!.more, '')
+// The lead's change 3: four places show the fourth instead of "and 1 more"; "and N more" starts at 2
+const four = keyWarning([hit(0), hit(1, 'data.js', 1), hit(2, 'data.js', 2), hit(3, 'page.html', 4)])!
+assert.deepEqual(four.places.map((p) => p.words), ['script.js, line 12', 'data.js, line 1', 'data.js, line 2', 'page.html, line 4'])
+assert.equal(four.more, '', 'never "and 1 more"')
+assert.equal(keyWarning([hit(0), hit(1)])!.places.length, 2)
+assert.equal(keyWarning([hit(0), hit(1), hit(2)])!.places.length, 3)
+assert.deepEqual([five.places.length, five.more], [3, 'and 2 more'], 'five: three places and "and 2 more"')
 assert.equal(keyWarning([]), null)
 
 // The buttons (decision 2)
@@ -87,7 +114,11 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(join(HERE, 'PublishSheet.tsx'), 'utf8')
 assert.ok(!/<button\b/.test(source), 'no hand-rolled <button>')
 assert.ok(!/\stitle=/.test(source), 'no native title')
-assert.equal((source.match(/<Button\b/g) ?? []).length, (source.match(/<Tooltip\b/g) ?? []).length, 'every Button has a Tooltip')
+assert.equal((source.match(/<Tooltip\b[^>]*>\s*<Button\b/g) ?? []).length, (source.match(/<Button\b/g) ?? []).length, 'every Button sits in a Tooltip')
+// The lead's sheet behaviour: the default button is ringed while the sheet holds the focus, and Enter presses it
+assert.ok(source.includes('group/sheet') && /className=\{buttons\.main === 'publish' \? DEFAULT_RING/.test(source) && /className=\{buttons\.main === 'cancel' \? DEFAULT_RING/.test(source), 'Publish, or Cancel when keys are found, is ringed')
+assert.ok(/event\.key === 'Enter' && event\.target === event\.currentTarget/.test(source), 'Enter on the sheet presses the default button')
+assert.ok(/\{fold && \(/.test(source), 'See the files only when there is something to see')
 assert.ok(source.includes("name=\"shield-warning\""), 'the key warning carries shield-warning')
 assert.ok(!/text-(?:destructive|warning|amber|red)|bg-(?:destructive|warning|amber|red)/.test(source), 'the warning is in ink: no amber, no red')
 

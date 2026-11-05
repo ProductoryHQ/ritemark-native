@@ -12,7 +12,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { contentHashOf, gatherPage, kindOf } from './gather';
-import { GitCheckError } from './gitIgnore';
+import { GitCheckError, gitIgnored } from './gitIgnore';
 import { srcsetUrls } from './references';
 import type { LeftOutReason, PublishPlan } from './types';
 
@@ -37,9 +37,19 @@ function reasonOf(plan: PublishPlan, display: string): LeftOutReason | undefined
   return plan.leftOut.find((l) => l.display === display)?.reason;
 }
 
+/** A3's pages, gathered: each must hold nothing that looks like a key (review of #669, minor 3: clean pages stay clean). */
+const corpusPlans: [string, PublishPlan][] = [];
+
 async function gather(rel: string, html: string): Promise<PublishPlan> {
   const page = write(rel, html);
   return gatherPage(page, project);
+}
+
+/** One of A3's pages: gathered as any page, and kept for the check that their scans are quiet. */
+async function corpus(rel: string, html: string): Promise<PublishPlan> {
+  const plan = await gather(rel, html);
+  corpusPlans.push([path.basename(rel), plan]);
+  return plan;
 }
 
 let passed = 0;
@@ -63,7 +73,7 @@ async function main(): Promise<void> {
   // ---------- A3's corpus ----------
 
   await check('P1: a single-file board with Google Fonts and script-built content', async () => {
-    const plan = await gather('boards/P1 planning board.html', `<!doctype html><link rel="preconnect" href="https://fonts.gstatic.com">
+    const plan = await corpus('boards/P1 planning board.html', `<!doctype html><link rel="preconnect" href="https://fonts.gstatic.com">
 <link href="https://fonts.googleapis.com/css2?family=Sofia+Sans&display=swap" rel="stylesheet">
 <div id="board"></div><script>
 const rows = data.map((r) => '<div class="row">' + r.name + '</div>');
@@ -77,7 +87,7 @@ const card = document.createElement('img');
 
   await check('P2: pictures named by template strings in src and srcset', async () => {
     write('heroes/img/slide-a.webp', 'webp');
-    const plan = await gather('heroes/P2 hero options.html', `<link href="https://fonts.googleapis.com/css2?family=Montserrat" rel="stylesheet">
+    const plan = await corpus('heroes/P2 hero options.html', `<link href="https://fonts.googleapis.com/css2?family=Montserrat" rel="stylesheet">
 <div id="o"></div><script>
 for (const key of ['a','b']) {
   o.insertAdjacentHTML('beforeend', \`<img src="img/slide-\${key}.webp" srcset="img/slide-\${key}@2x.webp 2x">\`);
@@ -89,14 +99,14 @@ for (const key of ['a','b']) {
 
   await check('P3: an API reference linking to a page in a sibling folder by ../', async () => {
     write('demo/dashboard/index.html', '<h1>dash</h1>');
-    const plan = await gather('demo/api/P3 api.html', '<a href="../dashboard/index.html">Dashboard</a><a href="#auth">Auth</a>');
+    const plan = await corpus('demo/api/P3 api.html', '<a href="../dashboard/index.html">Dashboard</a><a href="#auth">Auth</a>');
     assert.deepEqual(goes(plan), ['P3 api.html']);
     assert.deepEqual(left(plan), [['demo/dashboard/index.html', 'otherPage']], 'S13: another page, its link named');
     assert.equal(plan.scriptBuilt, false);
   });
 
   await check('P4: a dashboard with inline SVG and url(#fragment) only', async () => {
-    const plan = await gather('demo/P4 dashboard.html', `<svg><defs><linearGradient id="grad"/></defs><rect fill="url(#grad)"/><use href="#bar"/></svg>
+    const plan = await corpus('demo/P4 dashboard.html', `<svg><defs><linearGradient id="grad"/></defs><rect fill="url(#grad)"/><use href="#bar"/></svg>
 <style>.a { fill: url(#grad); }</style>`);
     assert.deepEqual(goes(plan), ['P4 dashboard.html']);
     assert.deepEqual(left(plan), []);
@@ -104,7 +114,7 @@ for (const key of ['a','b']) {
   });
 
   await check('P5: a users dashboard; GitHub links; one link built from data', async () => {
-    const plan = await gather('demo/P5 users.html', `<a href="https://github.com/ProductoryHQ">GitHub</a>
+    const plan = await corpus('demo/P5 users.html', `<a href="https://github.com/ProductoryHQ">GitHub</a>
 <table id="t"></table><script>t.innerHTML = users.map(u => \`<tr><td><a href="\${u.url}">\${u.name}</a></td></tr>\`).join('');</script>`);
     assert.deepEqual(goes(plan), ['P5 users.html']);
     assert.equal(plan.scriptBuilt, true);
@@ -115,7 +125,7 @@ for (const key of ['a','b']) {
     for (let i = 1; i <= 20; i++) imgs.push(`before/shot-${i}.png`);
     for (let i = 1; i <= 19; i++) imgs.push(`after-${i}.png`);
     for (const img of imgs) write(`compare/${img}`, `png ${img}`);
-    const plan = await gather('compare/P6 before and after.html', imgs.map((i) => `<img src="${i}" alt="">`).join('\n'));
+    const plan = await corpus('compare/P6 before and after.html', imgs.map((i) => `<img src="${i}" alt="">`).join('\n'));
     assert.equal(plan.files.length, 40, 'the page and its 39 pictures');
     assert.deepEqual(goes(plan).slice(1), imgs, 'in the order the page uses them, the page first');
     assert.ok(plan.files.slice(1).every((f) => f.kind === 'picture'));
@@ -129,7 +139,7 @@ for (const key of ['a','b']) {
       write(`design/slides/slide-${i}.html`, `<h1>${i}</h1>`);
       links.push(`<a href="slide-${i}.html">Slide ${i}</a>`);
     }
-    const plan = await gather('design/slides/P7 index.html', `<link rel="stylesheet" href="../tokens.css">${links.join('')}`);
+    const plan = await corpus('design/slides/P7 index.html', `<link rel="stylesheet" href="../tokens.css">${links.join('')}`);
     assert.deepEqual(goes(plan), ['slides/P7 index.html', 'tokens.css'], 'A3 finding 1: ../ inside the project goes up');
     assert.equal(plan.root, path.join(project, 'design'), 'the tree is rooted where the page and its files meet');
     assert.equal(plan.leftOut.filter((l) => l.reason === 'otherPage').length, 7);
@@ -137,30 +147,35 @@ for (const key of ['a','b']) {
 
   await check('P8: a design-system preview, ../tokens.css and 3 sibling pages', async () => {
     for (const n of ['colours', 'type', 'space']) write(`design/preview/${n}.html`, n);
-    const plan = await gather('design/preview/P8 preview.html', `<link rel="stylesheet" href="../tokens.css"><nav><a href="colours.html">C</a><a href="type.html">T</a><a href="space.html">S</a></nav>`);
+    const plan = await corpus('design/preview/P8 preview.html', `<link rel="stylesheet" href="../tokens.css"><nav><a href="colours.html">C</a><a href="type.html">T</a><a href="space.html">S</a></nav>`);
     assert.deepEqual(goes(plan), ['preview/P8 preview.html', 'tokens.css']);
     assert.equal(plan.leftOut.length, 3);
   });
 
   await check('P9: an interactive prototype that builds in script', async () => {
-    const plan = await gather('proto/P9 prototype.html', `<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans" rel="stylesheet"><main></main>
+    const plan = await corpus('proto/P9 prototype.html', `<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans" rel="stylesheet"><main></main>
 <script>const el = document.createElement('img'); el.src = 'shots/' + step + '.png'; main.append(el);</script>`);
     assert.deepEqual(goes(plan), ['P9 prototype.html']);
     assert.equal(plan.scriptBuilt, true);
   });
 
   await check('P10: a foundation drawing, nothing local', async () => {
-    const plan = await gather('proto/P10 foundation.html', `<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans" rel="stylesheet"><svg viewBox="0 0 10 10"><circle r="4"/></svg>`);
+    const plan = await corpus('proto/P10 foundation.html', `<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans" rel="stylesheet"><svg viewBox="0 0 10 10"><circle r="4"/></svg>`);
     assert.deepEqual(goes(plan), ['P10 foundation.html']);
     assert.equal(plan.scriptBuilt, false);
   });
 
   await check("H: the spike's hostile.html; file:// only in fetch, a CDN script", async () => {
-    const plan = await gather('spike/hostile.html', `<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    const plan = await corpus('spike/hostile.html', `<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
 <script>fetch('file:///etc/hostname').then(r => r.text()); fetch('file:///etc/hosts'); try { acquireVsCodeApi(); } catch {} window.open('https://example.com');</script>`);
     assert.deepEqual(goes(plan), ['hostile.html'], 'S12: the CDN script stays remote; fetch is never followed');
     assert.deepEqual(left(plan), []);
     assert.equal(plan.scriptBuilt, true);
+  });
+
+  await check("A3's corpus holds nothing key-shaped: every page's scan is quiet", () => {
+    assert.equal(corpusPlans.length, 11);
+    for (const [name, plan] of corpusPlans) assert.deepEqual(plan.keyHits, [], `${name}: ${JSON.stringify(plan.keyHits)}`);
   });
 
   // ---------- S7: what goes ----------
@@ -201,6 +216,33 @@ for (const key of ['a','b']) {
     assert.deepEqual(goes(plan), ['page.html', 'assets/logo.png']);
     const remote = await gather('based/remote.html', '<base href="https://example.com/"><img src="assets/logo.png">');
     assert.deepEqual(goes(remote), ['remote.html'], 'a remote base makes every relative reference remote');
+  });
+
+  await check('R3: a link to a document is "a link, not part of the page"; a stylesheet or icon <link> still goes', async () => {
+    write('links/notes.md', '# notes');
+    write('links/budget.xlsx', 'xlsx');
+    write('links/report.pdf', 'pdf');
+    write('links/style.css', 'body { color: #222 }');
+    write('links/favicon.png', 'ico');
+    write('links/touch.png', 'touch');
+    write('links/feed.xml', 'rss');
+    write('links/map.png', 'map');
+    const plan = await gather('links/page.html', [
+      '<link rel="stylesheet" href="style.css"><link rel="icon" href="favicon.png"><link rel="apple-touch-icon" href="touch.png">',
+      '<link rel="alternate" type="application/rss+xml" href="feed.xml">',
+      '<a href="notes.md">Notes</a><a href="budget.xlsx">Budget</a>',
+      '<map><area href="report.pdf" shape="rect" coords="0,0,1,1"></map><svg><a href="notes.md"><text>n</text></a></svg>',
+      '<a href="map.png">See the map</a><img src="map.png" alt="">',
+    ].join('\n'));
+    assert.deepEqual(goes(plan), ['page.html', 'style.css', 'favicon.png', 'touch.png', 'map.png'], 'what the page uses goes; a picture it both shows and links goes');
+    assert.deepEqual(left(plan).sort(), [['links/budget.xlsx', 'link'], ['links/feed.xml', 'link'], ['links/notes.md', 'link'], ['links/report.pdf', 'link']]);
+  });
+
+  await check('a link that comes before the picture it links never keeps the picture back', async () => {
+    write('links2/big.png', 'big');
+    const plan = await gather('links2/page.html', '<a href="big.png">Full size</a><img src="big.png">');
+    assert.deepEqual(goes(plan), ['page.html', 'big.png']);
+    assert.deepEqual(left(plan), []);
   });
 
   await check('a missing file and a folder go nowhere and are not named', async () => {
@@ -305,6 +347,49 @@ for (const key of ['a','b']) {
     assert.equal(reasonOf(plan, 'gi/build/app.js'), 'gitIgnored');
     assert.equal(reasonOf(plan, 'gi/theme.local.css'), 'gitIgnored');
     assert.ok(!goes(plan).includes('secret-bg.png'), "a left-out stylesheet's files never come in through it");
+  });
+
+  await check('minor 7: a symlink in the project to a file Git ignores is "Git ignores it" (Git is asked about the real path)', async () => {
+    write('gi7/build/key.png', 'a picture Git ignores');
+    fs.symlinkSync(path.join(project, 'gi7/build/key.png'), path.join(project, 'gi7/logo.png'));
+    write('gi7/kept.png', 'kept');
+    const plan = await gather('gi7/page.html', '<img src="logo.png"><img src="kept.png">');
+    assert.deepEqual(goes(plan), ['page.html', 'kept.png'], 'the name the page uses is not ignored; the file it points to is');
+    assert.deepEqual(left(plan), [['gi7/logo.png', 'gitIgnored']]);
+  });
+
+  await check('minor 6: a file behind a linked folder in the project is left out ("Git couldn\'t check it"); the rest still go', async () => {
+    write('gi6/real/a.png', 'a');
+    write('gi6/b.png', 'b');
+    fs.symlinkSync(path.join(project, 'gi6/real'), path.join(project, 'gi6/alias'));
+    const plan = await gather('gi6/page.html', '<img src="alias/a.png"><img src="b.png">');
+    assert.deepEqual(goes(plan), ['page.html', 'b.png'], 'one refused path never fails the whole gather');
+    assert.deepEqual(left(plan), [['gi6/alias/a.png', 'gitUnchecked']]);
+    const direct = await gatherPage(path.join(project, 'gi6/page.html'), project);
+    assert.deepEqual(direct.leftOut, plan.leftOut, 'the same on a second ask');
+  });
+
+  await check('minor 6: Git is asked with LC_ALL=C, so its messages read the same in any language', async () => {
+    const before = { LC_ALL: process.env.LC_ALL, LANG: process.env.LANG, LANGUAGE: process.env.LANGUAGE };
+    process.env.LC_ALL = 'de_DE.UTF-8';
+    process.env.LANG = 'de_DE.UTF-8';
+    process.env.LANGUAGE = 'de';
+    try {
+      const answer = await gitIgnored(project, [path.join(project, 'gi6/alias/a.png'), path.join(project, 'gi7/build/key.png')]);
+      assert.deepEqual([...answer.unchecked], [path.join(project, 'gi6/alias/a.png')]);
+      assert.deepEqual([...answer.ignored], [path.join(project, 'gi7/build/key.png')]);
+      const plain = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'publish-nogit-lc-')));
+      try {
+        assert.deepEqual(await gitIgnored(plain, [path.join(plain, 'a.png')]), { ignored: new Set(), unchecked: new Set() }, 'no repository: nothing ignored, in any language');
+      } finally {
+        fs.rmSync(plain, { recursive: true, force: true });
+      }
+    } finally {
+      for (const [k, v] of Object.entries(before)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
   });
 
   await check('a hidden stylesheet is never followed', async () => {

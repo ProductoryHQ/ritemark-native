@@ -40,14 +40,33 @@ export function reasonWords(row: Pick<SheetLeftOutRow, 'reason' | 'count'>): str
     toolFolder: "a tool's folder",
     gitIgnored: 'Git ignores it',
     otherPage: "another page, so its link won't work",
+    link: 'a link, not part of the page',
+    gitUnchecked: "Git couldn't check it",
   }
   return words[row.reason]
 }
 
-/** A left-out row's name; several other pages fold into one row (A3, finding 3). */
+/**
+ * A left-out row's name: the file's name first, as the sent rows start ("budget.png · outside this project", the
+ * lead's change 2); several other pages fold into one row (A3, finding 3). The path is the row's tooltip.
+ */
 export function leftOutName(row: SheetLeftOutRow): string {
   if (row.reason === 'otherPage' && row.count && row.count > 1) return `${row.count} other pages`
-  return row.display
+  return row.name || row.display
+}
+
+/** A left-out row's tooltip: where the file is, as the project or the page names it; none for a folded row. */
+export function leftOutTip(row: SheetLeftOutRow): string | null {
+  if (row.count && row.count > 1) return null
+  return row.display || null
+}
+
+/**
+ * Whether the sheet offers See the files: only when it has something to show beyond the line above it, a file the
+ * page uses or something left out (the lead's change 1). "This page, one file" with nothing left out has no fold.
+ */
+export function showsFileList(fileCount: number, leftOut: readonly SheetLeftOutRow[]): boolean {
+  return fileCount > 1 || leftOut.length > 0
 }
 
 export function leftOutReasonFor(row: SheetLeftOutRow): string {
@@ -63,7 +82,7 @@ export function leftOutCount(rows: readonly SheetLeftOutRow[]): number {
 export interface KeyWarning {
   /** The line before the places, or the whole sentence for one place. */
   lead: string
-  /** Up to three places: "script.js, line 12". */
+  /** Up to three places ("script.js, line 12"), or all four when four: "and N more" starts at 2. */
   places: { hit: SheetKeyHit; words: string }[]
   /** "and 2 more", or empty. */
   more: string
@@ -73,6 +92,7 @@ export interface KeyWarning {
 /**
  * The key warning (answer 4): "This looks like a key or password: script.js, line 12. Anyone with the link could
  * read it and use it." With more than one: "3 things look like keys or passwords:", up to three places, "and 2 more".
+ * Four places show all four: "and 1 more" would take the same line the fourth place takes (the lead's change 3).
  * Never the value: the sheet has none to show.
  */
 export function keyWarning(hits: readonly SheetKeyHit[]): KeyWarning | null {
@@ -86,11 +106,11 @@ export function keyWarning(hits: readonly SheetKeyHit[]): KeyWarning | null {
       tail: 'Anyone with the link could read it and use it.',
     }
   }
-  const shown = hits.slice(0, 3)
+  const shown = hits.length <= 4 ? hits : hits.slice(0, 3)
   return {
     lead: `${hits.length} things look like keys or passwords:`,
     places: shown.map((hit) => ({ hit, words: place(hit) })),
-    more: hits.length > 3 ? `and ${hits.length - 3} more` : '',
+    more: hits.length > shown.length ? `and ${hits.length - shown.length} more` : '',
     tail: 'Anyone with the link could read them and use them.',
   }
 }

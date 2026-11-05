@@ -5,16 +5,20 @@
  * press past a key warning, decision 2); PR 4 does the publishing after it. Closing the sheet's tab is Cancel.
  *
  * The sheet gets names, folders, reasons and line numbers (`sheetModel.ts`); the only file it can ask to open is a
- * hit, by its index in this plan's own list, at its line (Open script.js). No token or value ever reaches it.
+ * hit, by its index in this plan's own list (Open script.js). Open closes the sheet without publishing and opens the
+ * file's text, a page's too, as a tab on the same desk, with the key selected as Find selects (the Experience lead,
+ * 5 November). Publish on the bar then gathers and scans again. No token or value ever reaches the sheet.
  *
- * In PR 3 nothing in a menu reaches this: only the dev harness (`devSheetHarness.ts`) opens it.
+ * In PR 3 nothing in a menu reaches this: only the dev harness (`devSheetHarness.ts`) opens it, as a tab with the
+ * sheet over a dimmed backdrop. The lead's place for it is over the whole window; that needs one command in patch 018
+ * (`docs/development/releases/v2.2.0/sprint-149-publish/research/sheet-host.md`), built as its own shell PR.
  */
 
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { sheetModelOf } from './sheetModel';
 import { isSheetWebviewMessage, PublishSheetHostMessage, PublishSheetModel } from './sheetProtocol';
-import type { PublishPlan } from './types';
+import type { KeyHit, PublishPlan } from './types';
 
 export const PUBLISH_SHEET_VIEW_TYPE = 'ritemark.publishSheet';
 
@@ -79,7 +83,10 @@ export function showPublishSheet(
           case 'publish:openHit': {
             const hit = plan.keyHits[message.index];
             if (!hit) return;
-            void openAtLine(hit.realPath, hit.line);
+            // the desk the sheet is on, read before the sheet goes
+            const column = panel.viewColumn ?? vscode.ViewColumn.Active;
+            answer({ kind: 'cancel' });
+            void openKeyPlace(hit, column);
             break;
           }
         }
@@ -88,12 +95,24 @@ export function showPublishSheet(
   });
 }
 
-/** Opens the file as text at the line, beside the sheet (a page opens as text, not as the page). */
-async function openAtLine(realPath: string, line: number): Promise<void> {
-  const position = new vscode.Position(Math.max(0, line - 1), 0);
-  await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(realPath), 'default', {
-    selection: new vscode.Range(position, position),
-    viewColumn: vscode.ViewColumn.Beside,
+/**
+ * Opens the file's text in the text editor (`'default'`: an `.html` page opens as text, not in the browser) as a tab
+ * on the desk the sheet was on. With the key's columns the key is selected, as Find selects; else the caret at the
+ * line's start.
+ */
+export function keyPlaceSelection(hit: Pick<KeyHit, 'line' | 'column' | 'endColumn'>): vscode.Range {
+  const line = Math.max(0, hit.line - 1);
+  const known = typeof hit.column === 'number' && typeof hit.endColumn === 'number' && hit.endColumn > hit.column;
+  return known
+    ? new vscode.Range(new vscode.Position(line, hit.column!), new vscode.Position(line, hit.endColumn!))
+    : new vscode.Range(new vscode.Position(line, 0), new vscode.Position(line, 0));
+}
+
+async function openKeyPlace(hit: KeyHit, viewColumn: vscode.ViewColumn): Promise<void> {
+  await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(hit.realPath), 'default', {
+    selection: keyPlaceSelection(hit),
+    viewColumn,
+    preview: false,
   });
 }
 

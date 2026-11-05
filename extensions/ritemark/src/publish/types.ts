@@ -28,9 +28,12 @@ export interface GatheredFile {
  * - `hidden`: a path segment starts with `.` (`.env`, `.git`, `.claude`…);
  * - `toolFolder`: inside `node_modules`;
  * - `gitIgnored`: Git ignores it in the project;
- * - `otherPage`: another `.html` page (one page per publish), so its link won't work.
+ * - `otherPage`: another `.html` page (one page per publish), so its link won't work;
+ * - `link`: a file the page only links to (`<a href="notes.md">`), not one it uses (R3; Opus review of #669);
+ * - `gitUnchecked`: Git can't say whether it ignores the path (a path behind a linked folder), so it stays behind
+ *   (fail closed, one file at a time).
  */
-export type LeftOutReason = 'outside' | 'hidden' | 'toolFolder' | 'gitIgnored' | 'otherPage';
+export type LeftOutReason = 'outside' | 'hidden' | 'toolFolder' | 'gitIgnored' | 'otherPage' | 'link' | 'gitUnchecked';
 
 export interface LeftOut {
   /** What the person recognises: the reference as written for `outside`, else its path in the project. Never a query. */
@@ -45,6 +48,12 @@ export interface KeyHit {
   realPath: string;
   /** 1-based. */
   line: number;
+  /**
+   * Where the key starts and ends on its line (0-based, in UTF-16 units as the text editor counts them), so Open can
+   * select it as Find does. Positions only: never the text.
+   */
+  column?: number;
+  endColumn?: number;
   /** Which rule matched (`secretScan.ts`), for tests and review; never shown with the value. */
   rule: string;
 }

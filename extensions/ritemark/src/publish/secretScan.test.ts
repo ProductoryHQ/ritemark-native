@@ -13,7 +13,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { gatherPage } from './gather';
-import { isText, RULES, scanText } from './secretScan';
+import { isPlaceholder, isText, RULES, scanText } from './secretScan';
 
 /** A deterministic run of letters and digits: looks random enough for a key's shape, means nothing. */
 function run(n: number, alphabet = 'Ab3Cd5Ef7Gh9Jk2Mn4Pq6Rs8Tu'): string {
@@ -43,6 +43,11 @@ const FIXTURES: Record<string, string> = {
   jwt: j('<td>', 'ey', 'J', run(16), '.ey', 'J', run(20), '.', run(24), '</td>'),
   assignment: j('const ', 'pass', 'word', ' = "', run(16), '";'),
   'query-key': j('<img src="https://api.example.com/x.png?', 'api', '_key=', run(24), '">'),
+  huggingface: j('login(', '"', 'hf', '_', run(34), '")'),
+  gitlab: j('git clone https://oauth2:', 'gl', 'pat-', run(20), '@gitlab.com/x/y.git'),
+  'stripe-webhook': j('<code>', 'wh', 'sec_', run(32), '</code>'),
+  'query-token': j('<img src="https://cdn.example.com/x.png?', 'tok', 'en=', run(24), '">'),
+  'token-assignment': j('const ', 'tok', 'en', ' = "', run(24), '";'),
 };
 
 let passed = 0;
@@ -67,14 +72,55 @@ async function main(): Promise<void> {
     await check(`${rule.id}: found, on its line`, () => {
       const text = `<!doctype html>\n<p>Hello</p>\n${FIXTURES[rule.id]}\n<p>Bye</p>`;
       const hits = scanText(text);
-      assert.deepEqual(hits, [{ line: 3, rule: rule.id }], `${rule.id}: ${JSON.stringify(hits)}`);
+      assert.deepEqual(hits.map((h) => ({ line: h.line, rule: h.rule })), [{ line: 3, rule: rule.id }], `${rule.id}: ${JSON.stringify(hits)}`);
+      const fixture = FIXTURES[rule.id];
+      assert.ok(hits[0].column >= 0 && hits[0].endColumn > hits[0].column && hits[0].endColumn <= fixture.length, `${rule.id}: the key's columns lie on its line`);
     });
   }
 
   await check('a hit carries no value', () => {
     for (const fixture of Object.values(FIXTURES)) {
-      for (const hit of scanText(fixture)) assert.deepEqual(Object.keys(hit).sort(), ['line', 'rule']);
+      for (const hit of scanText(fixture)) assert.deepEqual(Object.keys(hit).sort(), ['column', 'endColumn', 'line', 'rule']);
     }
+  });
+
+  await check('A2: the Cloudflare rule finds quoted values: a constant, a JSON key, a camel-case property', () => {
+    const lines = [
+      j('const ', 'CF', '_API_TOKEN', ' = "', run(40), '";'),
+      j('{"', 'CLOUDFLARE', '_API_TOKEN', '": "', run(40), '"}'),
+      j('  ', 'cloudflare', 'ApiToken', ": '", run(40), "',"),
+    ];
+    assert.deepEqual(scanText(lines.join('\n')).map((h) => [h.line, h.rule]), [[1, 'cloudflare'], [2, 'cloudflare'], [3, 'cloudflare']]);
+  });
+
+  await check('minor 3: a real password that contains "sample" or "your" is still found; whole placeholders stay quiet', () => {
+    const found = [
+      j('const ', 'pass', 'word', ' = "', 'MySample', run(10), '";'),
+      j('pass', 'word', ': "', 'Yours4Ever', run(8), '",'),
+      j('api_', 'key', ' = "', 'example', run(14), '"'),
+      j('pass', 'word', ': "', 'SampleHarbourGate', '",'),
+      j('sec', 'ret', ' = "', 'YourGreyHeronMarsh', '";'),
+    ];
+    assert.deepEqual(scanText(found.join('\n')).map((h) => [h.line, h.rule]), [[1, 'assignment'], [2, 'assignment'], [3, 'assignment'], [4, 'assignment'], [5, 'assignment']]);
+    for (const p of ['your-password-here', 'sample_api_key', 'changeme_changeme', 'YOUR_API_KEY_HERE', '<your password>', 'xxxxxxxxxxxx', 'insert-your-token-here', 'Your Password Goes Here']) {
+      assert.equal(isPlaceholder(p), true, p);
+    }
+    for (const p of ['MySampleP4ssw0rd', 'yourmum1234567', 'example123456789', 'Sunrise-Harbour-Gate']) assert.equal(isPlaceholder(p), false, p);
+  });
+
+  await check('Open selects the key: its columns on the line, the value only for a named assignment', () => {
+    const key = j('sk', '-ant-', 'api03-', run(40));
+    const [hit] = scanText(j('x\n  const k = "', key, '";'));
+    assert.deepEqual([hit.line, hit.column, hit.endColumn], [2, 13, 13 + key.length]);
+    const value = run(16);
+    const [assign] = scanText(j('const ', 'pass', 'word', ' = "', value, '";'));
+    assert.deepEqual([assign.column, assign.endColumn], [18, 18 + value.length], 'the value, not its name');
+    const [cf] = scanText(j('{"', 'CLOUDFLARE', '_API_TOKEN', '": "', run(40), '"}'));
+    assert.deepEqual([cf.column, cf.endColumn], [26, 66]);
+    const [bom] = scanText(j('\ufeff', key));
+    assert.deepEqual([bom.line, bom.column, bom.endColumn], [1, 0, key.length], 'a byte-order mark the editor drops is not counted');
+    const [crlf] = scanText(j('a\r\n', 'pass', 'word', ' = "', value, '"\r\n'));
+    assert.deepEqual([crlf.line, crlf.column, crlf.endColumn], [2, 12, 12 + value.length]);
   });
 
   await check('ordinary pages are quiet: placeholders, password fields, prose about keys, CSS, a publishable key', () => {
@@ -90,6 +136,15 @@ async function main(): Promise<void> {
       '<a href="?page=2&sort=asc">Next</a>',
       'const secret = "";',
       'let passwordHint = "at least eight characters";',
+      // the new rules' near misses (minor 3): camel-case page tokens, short or letter-only values, prose about prefixes
+      j('const csrf', 'Token = "', run(24), '";'),
+      j('next', 'Page', 'Token: "', run(24), '",'),
+      '<a href="/share?token=abc123">share</a>',
+      j('tok', 'en: "', 'abcdefghijklmnopqrstuvwxyz', '",'),
+      j('"tok', 'en": "${', 'TOKEN}"'),
+      '<p>A Hugging Face token starts with hf_ and a GitLab one with glpat-; a webhook secret with whsec_.</p>',
+      '.hf_header_footer_wrapper_container_block_inner { margin: 0 }',
+      '<a href="?page_token=2">More</a>',
       'background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==);',
     ].join('\n');
     assert.deepEqual(scanText(quiet), []);
@@ -113,7 +168,7 @@ async function main(): Promise<void> {
       fs.writeFileSync(path.join(project, 'js', 'script.js'), script);
       fs.writeFileSync(path.join(project, 'pic.png'), Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0]), Buffer.from(FIXTURES.stripe)]));
       fs.writeFileSync(path.join(project, 'page.html'), `<script src="js/script.js"></script><img src="pic.png">\n${FIXTURES.jwt}`);
-      const plan = await gatherPage(path.join(project, 'page.html'), project, { gitIgnored: async () => new Set() });
+      const plan = await gatherPage(path.join(project, 'page.html'), project, { gitIgnored: async () => ({ ignored: new Set(), unchecked: new Set() }) });
       assert.deepEqual(
         plan.keyHits.map((h) => [h.projectPath, h.line, h.rule]),
         [['page.html', 2, 'jwt'], ['js/script.js', 12, 'anthropic']],
@@ -123,6 +178,26 @@ async function main(): Promise<void> {
     } finally {
       fs.rmSync(project, { recursive: true, force: true });
     }
+  });
+
+  await check("A3's kinds of page are quiet: fonts, dashboards with data, slides, a prototype", () => {
+    const pages = [
+      '<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@400;600&display=swap" rel="stylesheet">',
+      '<script>const users = [{ name: "Mari", url: "https://github.com/mari", id: "a1b2c3d4e5f6a7b8c9d0" }];</script>',
+      '<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js" integrity="sha512-WFN04846sdKMIP5LKNphMaWzU7YpMyCU245etK3g/2ARYbPK9Ub18eG+ljU96qKRCWh+quCY7yefSmlkQw1ANQ==" crossorigin="anonymous"></script>',
+      '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/></svg>',
+      '<img src="hero.webp?v=3f9a1c2b7d4e5f60" alt="">',
+      '<meta name="google-site-verification" content="verification-for-the-site">',
+      '<script>const state = { sessionId: "s-2026-11-05", step: 3, version: "2.2.0-rc.1" };</script>',
+    ];
+    assert.deepEqual(scanText(pages.join('\n')), []);
+  });
+
+  await check('a long run of letters and dashes scans in linear time (bounded name parts; a minified script is such a run)', () => {
+    const t = Date.now();
+    scanText(j('ab-'.repeat(40_000), 'x-tok', 'en'.repeat(1), '-'.repeat(1), 'a.b'.repeat(40_000)));
+    const ms = Date.now() - t;
+    assert.ok(ms < 1500, `took ${ms} ms`);
   });
 
   // Mutation check: without each rule, its fixture goes unseen. Proves no rule is shadowed by another.
