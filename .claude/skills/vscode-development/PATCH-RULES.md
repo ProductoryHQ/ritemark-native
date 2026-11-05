@@ -12,7 +12,7 @@ Eighteen patches, numbered 001 through 019 (017 retired with the Getting Started
 |-------|--------|---------|
 | `001-ritemark-branding.patch` | Branding | Theme, fonts, icons, about dialog, breadcrumbs; Help: Welcome opens Ritemark's welcome; the Phosphor font declared once, in codicon.css (Sprint 145) |
 | `002-ritemark-ui-layout.patch` | UI Layout | Sidebar, titlebar, tabs, explorer, panels, Cmd+B removal; the AI column restored with the layout (Sprint 145) |
-| `003-ritemark-menu-cleanup.patch` | Menu Cleanup + OSS Fixes | 26 files -- Selection/Go/Terminal/Run menus hidden, Edit menu cleaned, Chat/Debug hidden, the palette's developer commands left out, the Agents window closed, no agent host prewarm, defaultChatAgent null-safety |
+| `003-ritemark-menu-cleanup.patch` | Menu Cleanup + OSS Fixes | 29 files -- Selection/Go/Terminal/Run menus hidden, Edit menu cleaned, Chat/Debug hidden, the palette's developer commands left out, the Agents window closed, no agent host prewarm, no Copilot chat items in Documents', Search's and the text editor's menus (#650), defaultChatAgent null-safety |
 | `004-ritemark-build-system.patch` | Build System | jschardet, microphone permission, integrity check skip; packaging skips the built-in Copilot's SDK shim when a build from source has stripped the SDK, and product.json names Ritemark's source commit (`RITEMARK_SOURCE_COMMIT`; the commit reader also follows a gitdir file) (Sprint 135) |
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows + OSS | Windows-specific and OSS compatibility fixes |
 | `006-ritemark-dev-launch-fallback.patch` | Dev Launch | Development launch fallback behavior |
@@ -27,7 +27,7 @@ Eighteen patches, numbered 001 through 019 (017 retired with the Getting Started
 | `015-ritemark-help-menu-policy.patch` | Menus | The Help menu focused on Ritemark, with Getting started, Support and Send feedback |
 | `016-ritemark-store-acquisition-policy.patch` | Store policy | No external software-acquisition promotion (Source Control's Git download button); File changes' Git welcome words, Ritemark's, and no Publish to GitHub paragraph (Sprint 146); its pickers' words, and no Copy vscode.dev Link in any menu (#634) |
 | `018-ritemark-surfaces.patch` | The 2.0 frame | No title row, strips, sheets and gaps, zoom, Ritemark's menus, the left column's head, the welcome alone, a file's extension muted, File changes as Source Control's name, the desk's whole edge (sizes, drawing and names); a switch lands on Home, a loading column shows the ground (Sprint 145); no outline on a view's welcome words after a mouse open, the left column's slider one tone over a row (Sprint 146); the Graph's empty state (#634) |
-| `019-ritemark-tab-row.patch` | The 2.0 tab row | Tab sizes, the +, folded tabs, permanent tabs, terminals as tabs, an empty desk's tiles, a restored task tab's title; restored terminals wait for a document (Sprint 145); a tab's menu without VS Code's items, and Show in Documents (Sprint 146); the empty area's New tab and Reopen closed tab, no Tab Bar ▸, and the permanent tabs' menus without what they refuse (#634) |
+| `019-ritemark-tab-row.patch` | The 2.0 tab row | Tab sizes, the +, folded tabs, permanent tabs, terminals as tabs, an empty desk's tiles, a restored task tab's title; restored terminals wait for a document (Sprint 145); a tab's menu without VS Code's items, and Show in Documents (Sprint 146); the empty area's New tab and Reopen closed tab, no Tab Bar ▸, and the permanent tabs' menus without what they refuse (#634); no Editor Actions Position ▸ (#650) |
 
 **Rule:** Patches must not overlap in domain. Two patches may touch one file (002 and 018 share `titlebarPart.ts`,
 `auxiliaryBarPart.ts` and `paneCompositePart.ts`: placement and drawing), but no hunk may build on another patch's
@@ -39,9 +39,9 @@ and 019, a change goes in the patch that owns its kind: placement, the frame's s
 
 ---
 
-## 2. Patch 003 Complete File Inventory (26 Files)
+## 2. Patch 003 Complete File Inventory (29 Files)
 
-This is the authoritative reference (VS Code 1.142.0, Sprint 135). If ANY file is missing after a future patch change, it is a regression.
+This is the authoritative reference (VS Code 1.142.0, Sprint 135; Sprint 154 added #27–#29). If ANY file is missing after a future patch change, it is a regression.
 
 | # | File Path | What It Does |
 |---|-----------|-------------|
@@ -71,11 +71,14 @@ This is the authoritative reference (VS Code 1.142.0, Sprint 135). If ANY file i
 | 24 | `src/vs/workbench/services/agentHost/electron-browser/agentHostService.ts` | No agent host prewarm at window start (Sprint 135 E5): with a commit in product.json it started GitHub's Copilot runtime in every window; the agent host starts only when something asks for it. |
 | 25 | `src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts` | Null-safety on `defaultChatAgent`; skips the built-in chat extension's enablement migration (`ensureChatExtensionInitialDisabledState` is empty), so a Marketplace Copilot Chat is never disabled behind the person's back. |
 | 26 | `src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts` | Null-safety: the same `extensionId?.toLowerCase()` pattern as #25. |
+| 27 | `src/vs/workbench/contrib/chat/browser/actions/chatContextActions.ts` | Sprint 154 (#650): Add File to Chat leaves Documents', the text editor's and Search's context menus, Add Selection to Chat leaves the text editor's; All commands keeps both. Add Folder to Chat stays as upstream has it (its folder menu is its only way in, decision 4). The three actions are exported for #29. |
+| 28 | `src/vs/workbench/contrib/inlineChat/browser/inlineChatActions.ts` | Sprint 154 (#650): Open Inline Chat leaves the text editor's context menu; All commands and ⌘I keep it. |
+| 29 | `src/vs/workbench/contrib/inlineChat/test/browser/ritemarkChatMenus.test.ts` | The test of #27 and #28: each action's exact menu list. |
 
 **Verification command:**
 ```bash
 grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l
-# Must show: 26
+# Must show: 29
 ```
 
 ---
@@ -253,7 +256,7 @@ On the Mac the menus can be read from the profile's `storage.json` (`lastKnownMe
 
 ### Build Checklist
 
-- [ ] `grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l` shows 26 (§2)
+- [ ] `grep '^diff --git' patches/vscode/003-ritemark-menu-cleanup.patch | wc -l` shows 29 (§2)
 - [ ] `./scripts/apply-patches.sh --dry-run` reports every patch can apply and none conflicts (it checks against `vscode/`'s HEAD, so keep HEAD at the pin)
 - [ ] `node scripts/check-patch-stacking.mjs` passes
 - [ ] TypeScript compiles without "declared but never read" errors (`npm run typecheck-client` in `vscode/`)
