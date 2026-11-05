@@ -44,17 +44,26 @@ export async function openPageInSystemBrowser(arg?: unknown): Promise<boolean> {
     return false;
   }
   const location = await locatePage(fsPath, projectFolders());
-  if (location.kind === 'missing') {
-    void vscode.window.showInformationMessage(MISSING_PAGE_MESSAGE);
-    return false;
+  // Exhaustive: a new kind of location fails to compile here, so nothing opens by default.
+  switch (location.kind) {
+    case 'missing':
+      void vscode.window.showInformationMessage(MISSING_PAGE_MESSAGE);
+      return false;
+    case 'notAPage':
+      // a `.html` name that is a link to a program or a folder (security review of PR 2)
+      void vscode.window.showInformationMessage(NOT_A_PAGE_MESSAGE);
+      return false;
+    case 'project':
+    case 'outside':
+      // The OS's handler for .html opens the resolved file (normally the default browser).
+      return vscode.env.openExternal(vscode.Uri.file(location.realPath));
+    default:
+      return unhandledLocation(location);
   }
-  if (location.kind === 'notAPage') {
-    void vscode.window.showInformationMessage(NOT_A_PAGE_MESSAGE);
-    return false;
-  }
-  // The OS's handler for .html opens it (normally the default browser); to prove on Mac and
-  // Windows before PR 2 puts the button on the bar.
-  return vscode.env.openExternal(vscode.Uri.file(location.realPath));
+}
+
+function unhandledLocation(location: never): never {
+  throw new Error(`Unhandled page location: ${JSON.stringify(location)}`);
 }
 
 /**
@@ -70,19 +79,21 @@ export async function publishPage(arg?: unknown): Promise<PageLocation | undefin
     return undefined;
   }
   const location = await locatePage(fsPath, projectFolders());
-  if (location.kind === 'outside') {
-    void vscode.window.showInformationMessage(OUTSIDE_PROJECT_MESSAGE);
-    return undefined;
+  switch (location.kind) {
+    case 'outside':
+      void vscode.window.showInformationMessage(OUTSIDE_PROJECT_MESSAGE);
+      return undefined;
+    case 'missing':
+      void vscode.window.showInformationMessage(MISSING_PAGE_MESSAGE);
+      return undefined;
+    case 'notAPage':
+      void vscode.window.showInformationMessage(NOT_A_PAGE_MESSAGE);
+      return undefined;
+    case 'project':
+      return location;
+    default:
+      return unhandledLocation(location);
   }
-  if (location.kind === 'missing') {
-    void vscode.window.showInformationMessage(MISSING_PAGE_MESSAGE);
-    return undefined;
-  }
-  if (location.kind === 'notAPage') {
-    void vscode.window.showInformationMessage(NOT_A_PAGE_MESSAGE);
-    return undefined;
-  }
-  return location;
 }
 
 export function registerPageCommands(context: vscode.ExtensionContext): void {

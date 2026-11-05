@@ -8,7 +8,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { isInside, isPagePath, locatePage, localPagePath } from './localPage';
+import { execFileSync } from 'node:child_process';
+import { finderInfoIsAlias, isFinderAlias, isInside, isPagePath, locatePage, localPagePath } from './localPage';
 
 async function main(): Promise<void> {
   // --- which targets are pages ---
@@ -94,6 +95,26 @@ async function main(): Promise<void> {
   fs.symlinkSync(inPage, pageLink);
   const k = await locatePage(pageLink, [project]);
   assert.equal(k.kind === 'project' && k.realPath, inPage, 'a link to a page in the project is that page');
+
+  // Round 2 of PR 2's review: a Finder alias named .html is a regular file that realpath doesn't follow, and the
+  // system's opener would open what it points to. Its FinderInfo has kIsAlias (0x8000 in the flags, bytes 8–9).
+  const aliasInfo = '616C6973 4D414353 80000000 00000000 00000000 00000000 00000000 00000000';
+  assert.equal(finderInfoIsAlias(aliasInfo), true);
+  assert.equal(finderInfoIsAlias('54455854 74747874 00000000 00000000 00000000 00000000 00000000 00000000'), false, 'a plain text file');
+  assert.equal(finderInfoIsAlias(''), false);
+  const injected = await locatePage(inPage, [project], { isAlias: async () => true });
+  assert.equal(injected.kind, 'notAPage', 'a .html that is a Finder alias is not a page');
+  assert.equal((await locatePage(inPage, [project], { isAlias: async () => false })).kind, 'project');
+  assert.equal(await isFinderAlias(inPage, 'win32'), false, 'no Finder aliases off the Mac');
+  if (process.platform === 'darwin') {
+    // The default check reads the real attribute: the same bytes Finder writes on an alias
+    const fakeAlias = path.join(project, 'shortcut.html');
+    fs.writeFileSync(fakeAlias, 'book\0\0\0\0mark');
+    execFileSync('/usr/bin/xattr', ['-wx', 'com.apple.FinderInfo', aliasInfo.replace(/ /g, ''), fakeAlias]);
+    assert.equal(await isFinderAlias(fakeAlias), true);
+    assert.equal((await locatePage(fakeAlias, [project])).kind, 'notAPage', 'the default check refuses a Finder alias');
+    assert.equal(await isFinderAlias(inPage), false, 'a page with no FinderInfo is no alias');
+  }
 
   // A file URL from the bar round-trips through localPagePath into locatePage.
   const fromBar = localPagePath(pathToFileURL(inPage).toString());
