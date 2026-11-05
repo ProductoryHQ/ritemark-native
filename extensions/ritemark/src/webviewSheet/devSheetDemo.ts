@@ -87,6 +87,8 @@ function demoHtml(webview: vscode.Webview): string {
     });
     document.getElementById('close').addEventListener('click', () => vscode.postMessage('close'));
     document.getElementById('close').focus();
+    // The sheet gives the page the focus once it has drawn (round 3): Close keeps it, ringed
+    window.addEventListener('focus', () => { if (document.activeElement === document.body) document.getElementById('close').focus(); });
   </script>
 </body>
 </html>`;

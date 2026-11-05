@@ -169,6 +169,56 @@ async function main(): Promise<void> {
     vscodeStub.commands.getCommands = getCommands;
   }
 
+  // A shell without the sheet, as it really answers: its `_ritemark.webviewSheet.*` commands don't exist, so running
+  // one rejects. Nothing tries to close a sheet that never opened, and no rejection is left unhandled (Codex on #672)
+  {
+    const getCommands = vscodeStub.commands.getCommands;
+    const executeCommand = vscodeStub.commands.executeCommand;
+    vscodeStub.commands.getCommands = async () => [];
+    vscodeStub.commands.executeCommand = async (...args: unknown[]) => {
+      if (String(args[0]).startsWith('_ritemark.webviewSheet.')) throw new Error(`command '${String(args[0])}' not found`);
+      return executeCommand(...args);
+    };
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled);
+    const before = sheetCommands.length;
+    assert.deepEqual(await showPublishSheet(context, plan()), { kind: 'cancel' });
+    // the close wrapper itself never rejects there: false, whoever calls it
+    const { closeWebviewSheet } = await import('../webviewSheet/webviewSheet');
+    const closed = await closeWebviewSheet('ritemark.sheet.publish').catch((e: unknown) => `rejected: ${String(e)}`);
+    await new Promise((r) => setTimeout(r, 20));
+    process.off('unhandledRejection', onUnhandled);
+    vscodeStub.commands.getCommands = getCommands;
+    vscodeStub.commands.executeCommand = executeCommand;
+    assert.deepEqual(unhandled.map(String), [], 'no unhandled rejection on a shell without the sheet');
+    assert.equal(sheetCommands.length, before, 'no sheet command runs there');
+    assert.equal(closed, false, 'the close wrapper answers false on a shell without the sheet');
+  }
+
+  // A quick double press: the second request answers cancel at once and never touches the first, which keeps its
+  // sheet, its model and its answer (Codex on #672)
+  {
+    const opens = sheetCommands.filter((c) => c === 'open').length;
+    const first = showPublishSheet(context, plan({ pagePath: '/Users/mari/Leadership programme/First.html' }), { address: { page: 'first', suffix: '.x' } });
+    const second = showPublishSheet(context, plan(), { address: { page: 'second', suffix: '.x' } });
+    assert.deepEqual(await second, { kind: 'cancel' }, 'the second press answers at once');
+    const panel = await shown();
+    assert.equal(sheetCommands.filter((c) => c === 'open').length, opens + 1, 'one sheet opened, not two');
+    panel.send({ type: 'publish:sheetReady' });
+    assert.equal((panel.posted[0] as { model: { address: { page: string } } }).model.address.page, 'first', "the sheet shows the first request's page");
+    await tick();
+    assert.equal(panel.disposed, false, 'the first sheet stays open');
+    panel.send({ type: 'publish:confirm', anyway: false, pagePart: 'first' });
+    assert.deepEqual(await first, { kind: 'publish', pagePart: 'first' }, 'and its own answer comes back');
+    // once answered, the next request opens its own sheet again
+    const third = showPublishSheet(context, plan());
+    const again = await shown();
+    assert.notEqual(again, panel);
+    again.send({ type: 'publish:cancel' });
+    assert.deepEqual(await third, { kind: 'cancel' });
+  }
+
   type Opened = { selection: { start: { line: number; character: number }; end: { line: number; character: number } }; viewColumn: number; preview: boolean };
   const keyHits = [
     { projectPath: 'js/script.js', realPath: '/Users/mari/Leadership programme/js/script.js', line: 12, column: 11, endColumn: 59, rule: 'anthropic' },

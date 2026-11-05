@@ -40,7 +40,15 @@ export async function openWebviewSheet(request: WebviewSheetRequest): Promise<We
   return OUTCOMES.includes(outcome as WebviewSheetOutcome) ? (outcome as WebviewSheetOutcome) : 'failed';
 }
 
-/** Close the sheet showing `viewType`; true when it was showing. */
+/**
+ * Close the sheet showing `viewType`; true when it was showing. Never rejects: on a shell without the sheet (no close
+ * command) it is false, so a caller that closes on every answer leaves no unhandled rejection (Codex on #672).
+ */
 export async function closeWebviewSheet(viewType: string): Promise<boolean> {
-  return (await vscode.commands.executeCommand<unknown>(WEBVIEW_SHEET_CLOSE_COMMAND, { viewType })) === true;
+  try {
+    if (!(await hasWebviewSheet())) return false;
+    return (await vscode.commands.executeCommand<unknown>(WEBVIEW_SHEET_CLOSE_COMMAND, { viewType })) === true;
+  } catch {
+    return false;
+  }
 }

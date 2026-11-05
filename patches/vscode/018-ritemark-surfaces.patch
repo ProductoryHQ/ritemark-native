@@ -235,8 +235,9 @@ show one of the Ritemark extension's webview views (a view type starting `ritema
 its provider registered with registerWebviewViewProvider) centred over the whole window dimmed, drawn as the feedback
 sheet is: 440 wide unless asked, radius 12, the desk's colour, the hairline and one shadow; never a tab, never in a
 desk. The frame is the anchor of VS Code's overlay webview (one z-index above the dim) and its height follows the
-page's own (intrinsicContentSize), up to the window's height less 64. The focus moves in and stays in; Escape closes it
-wherever the focus is, and the focus goes back to where it was; the window's keybindings wait meanwhile, except the
+page's own (intrinsicContentSize), up to the window's height less 64. The focus moves in, into the page once it has drawn
+(its first height, round 3), and stays in; Escape closes it wherever the focus is, and the focus goes back to where it
+was; the window's keybindings wait meanwhile, except the
 editing keys; a press on the dim does nothing; the webview's own menu draws over the sheet. open resolves when it
 closes (escape, closed, refused or failed) and the extension's onDidDispose fires; a second sheet is refused, and a
 view another extension answered, or a resolve that throws, is refused before anything shows: no dim, no key held
@@ -6404,10 +6405,10 @@ index 00000000000..8f4469959ad
 +}
 diff --git a/src/vs/workbench/contrib/webviewView/browser/ritemarkWebviewSheet.ts b/src/vs/workbench/contrib/webviewView/browser/ritemarkWebviewSheet.ts
 new file mode 100644
-index 00000000000..52344abdc27
+index 00000000000..743c508e2e0
 --- /dev/null
 +++ b/src/vs/workbench/contrib/webviewView/browser/ritemarkWebviewSheet.ts
-@@ -0,0 +1,310 @@
+@@ -0,0 +1,321 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -6428,9 +6429,11 @@ index 00000000000..52344abdc27
 + * reports its document's height (`intrinsicContentSize`), so a page must not give `<html>` a 100% height; it is held
 + * at the window's height less 64, and the page scrolls past that.
 + *
-+ * Keys: Escape closes it, wherever the focus is; the workbench's own shortcuts wait while it is open, except the
-+ * editing keys (copy, cut, paste, undo, redo, select all), which reach the page as in any webview. The focus stays in
-+ * the sheet, a press on the dimmed window does nothing, and on close the focus goes back to where it was.
++ * Focus: it moves into the sheet as it opens, and into the page once the page has drawn (its first height), so the
++ * page's own focus (a dialog's default button) shows. Keys: Escape closes it, wherever the focus is; the workbench's
++ * own shortcuts wait while it is open, except the editing keys (copy, cut, paste, undo, redo, select all), which reach
++ * the page as in any webview. The focus stays in the sheet, a press on the dimmed window does nothing, and on close the
++ * focus goes back to where it was.
 + */
 +
 +import './media/ritemarkWebviewSheet.css';
@@ -6621,12 +6624,21 @@ index 00000000000..52344abdc27
 +			resolve(outcome);
 +		};
 +
++		// Shown, the page gets the focus (round 3, the Experience lead: the default button's ring was missing). The
++		// earlier focus reached only the webview's own frame: its page was not there yet, and the webview hands the
++		// focus to a page that arrives later only when that frame still holds the window's focus. Once the page has
++		// drawn (its first height), the focus goes into the page itself, whose dialog rings its default button.
++		let revealed = false;
 +		const reveal = () => {
 +			if (closed || !deps.isAllowed(webview)) {
 +				return;
 +			}
 +			frame.classList.remove('waiting');
 +			webview.container.classList.remove('waiting');
++			if (!revealed) {
++				revealed = true;
++				webview.focus();
++			}
 +		};
 +		const revealAnyway = setTimeout(reveal, SHOW_ANYWAY_MS);
 +		store.add(toDisposable(() => clearTimeout(revealAnyway)));
@@ -6806,10 +6818,10 @@ index e0e445671e1..0f09ef5e3e9 100644
  		super.updateTitle(typeof value === 'string' ? value : this.defaultTitle);
 diff --git a/src/vs/workbench/contrib/webviewView/test/browser/ritemarkWebviewSheet.test.ts b/src/vs/workbench/contrib/webviewView/test/browser/ritemarkWebviewSheet.test.ts
 new file mode 100644
-index 00000000000..6bd15539cd9
+index 00000000000..b81d74cb100
 --- /dev/null
 +++ b/src/vs/workbench/contrib/webviewView/test/browser/ritemarkWebviewSheet.test.ts
-@@ -0,0 +1,210 @@
+@@ -0,0 +1,213 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -6925,6 +6937,9 @@ index 00000000000..6bd15539cd9
 +
 +		sheet.webview.intrinsicContentSize.set({ width: 440, height: 312.5 }, undefined, undefined);
 +		assert.deepStrictEqual([sheet.frame()?.style.height, sheet.frame()?.classList.contains('waiting'), sheet.webview.container.classList.contains('waiting')], ['313px', false, false]);
++		// Once the page has drawn, the focus goes into it (round 3: the default button's ring), once, not on every height
++		sheet.webview.intrinsicContentSize.set({ width: 440, height: 340 }, undefined, undefined);
++		assert.deepStrictEqual(sheet.log, ['claim', 'anchor ritemark-webview-sheet waiting', 'focus', 'focus', 'focus']);
 +
 +		// A key the window would act on is held; Escape closes
 +		const held = new KeyboardEvent('keydown', { key: 'w', metaKey: true, bubbles: true });

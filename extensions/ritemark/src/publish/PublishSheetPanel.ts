@@ -35,6 +35,8 @@ export interface ShowSheetOptions {
 /** The view type's one provider: each sheet the workbench opens is handed to the request that asked for it. */
 class PublishSheetViews implements vscode.WebviewViewProvider {
   next: ((view: vscode.WebviewView) => void) | undefined;
+  /** A request is open or opening: a second one is answered at once and never touches it (Codex on #672). */
+  busy = false;
   resolveWebviewView(view: vscode.WebviewView): void {
     const take = this.next;
     this.next = undefined;
@@ -60,24 +62,36 @@ export function showPublishSheet(
   plan: PublishPlan,
   options: ShowSheetOptions = {},
 ): Promise<SheetAnswer> {
+  const sheets = publishSheetViews(context);
+  // One sheet at a time: a second request while one is open or opening (a quick double press) answers cancel at
+  // once, and the first keeps its resolver, its model and its sheet
+  if (sheets.busy) return Promise.resolve({ kind: 'cancel' });
   const projectName = path.basename(plan.projectFolder);
   const model: PublishSheetModel = { ...sheetModelOf(plan, projectName), ...options };
   const media = vscode.Uri.joinPath(context.extensionUri, 'media');
-  const sheets = publishSheetViews(context);
   // The desk the sheet opened over: the sheet takes no group, so it is the active one, read before the sheet shows
   const desk = vscode.window.tabGroups?.activeTabGroup?.viewColumn ?? vscode.ViewColumn.Active;
+  sheets.busy = true; // free again once this request has answered
 
   return new Promise<SheetAnswer>((resolve) => {
     let answered = false;
+    let shown = false;
     const subscriptions: vscode.Disposable[] = [];
+    // The sheet closes first (when one showed: a shell without it has nothing to close), then the request is free and
+    // the answer goes, so the next request finds no sheet in its way
     const answer = async (a: SheetAnswer): Promise<void> => {
       if (answered) return;
       answered = true;
-      resolve(a);
-      await closeWebviewSheet(PUBLISH_SHEET_VIEW_TYPE);
+      try {
+        if (shown) await closeWebviewSheet(PUBLISH_SHEET_VIEW_TYPE);
+      } finally {
+        sheets.busy = false;
+        resolve(a);
+      }
     };
 
     const take = (view: vscode.WebviewView): void => {
+      shown = true;
       view.webview.options = { enableScripts: true, localResourceRoots: [media] };
       view.webview.html = publishSheetHtml(view.webview, context.extensionUri);
       subscriptions.push(
