@@ -55,7 +55,7 @@ Status: **Approved**, 3 November 2026, by the Development manager on Jarmo's 2.2
 
 ## Pull requests
 
-Four. The High paths sit in PRs 3 and 4; the two that need no account come first. Each PR's Risk section names its tier and the paths that set it. Findings are answered and the merge is at the reviewed head (`REVIEW.md`, *Before the merge*).
+Five (PR 5, the sheet's shell host, added 5 November). The High paths sit in PRs 3 and 4; the two that need no account come first. Each PR's Risk section names its tier and the paths that set it. Findings are answered and the merge is at the reviewed head (`REVIEW.md`, *Before the merge*).
 
 | PR | Branch | Holds | Before the account? | Release tier | Review tier |
 |---|---|---|---|---|---|
@@ -63,6 +63,7 @@ Four. The High paths sit in PRs 3 and 4; the two that need no account come first
 | 2 | `sprint-149-publish-shell` | The page's bar (W2): Open in browser (every local page) and Publish (project pages) at the right end of `MenuId.BrowserActionsToolbar`, right of the address, and the two context keys. The rest of the bar stays the browser's (4 November): the address `file:///…`, back, forward and reload; links open in the same tab and back returns; the page reloads on a file change (upstream's auto-reload, already on). No session change (decision 4) | **Yes** | **shell** (`patches/vscode/010-…`) | **High** (shell-tier list). `/code-review` at high + `/security-review`; proof: A2 on the branch, the frame check, screenshots to the lead, Windows at Gate 2 |
 | 3 | `sprint-149-publish-gather` | What goes and the guard: the gather, the boundary, the exclusions, the key scan, the Publish sheet, the records (W3). No network; Publish isn't reachable from any menu until PR 4 | **Yes** | extension | **High** by content: it decides what becomes public. `src/publish/` joins `REVIEW.md`'s High row in this PR. `/code-review` at high + `/security-review` |
 | 4 | `sprint-149-publish-cloudflare` | The Cloudflare client, the connection (OAuth + token), SecretStorage, Settings ▸ Sharing ▸ Web pages, the `setApiKey` allowlist, the states, the flag (W4–W6) | Code yes; **merge no**: it waits on A4's measurements | extension | **High**: token storage and OAuth, the key handling in `src/settings/`, the upload. `/code-review` at high + `/security-review`; proof: S17–S28b live, S21's search |
+| 5 | `sprint-149-publish-sheet` | The sheet over the whole window (added 5 November, the Development manager on Jarmo's 2.2 delegation; the Experience lead's design, ritemark-dev 093de1e and 70cc8bc): a general hidden command `_ritemark.webviewSheet.open`/`.close` in patch 018 that shows one of the extension's webview views centred over the dimmed window, drawn as the feedback sheet is (`research/sheet-host.md`); a dev-only demo; after PR 3's merge, `PublishSheetPanel.ts` moves from a tab to it | **Yes** | **shell** (`patches/vscode/018-…`) | **High** (shell-tier list). Unit tests, the patch match and dry run, live checks in Light and Dark, the frame check; Windows at Gate 2 |
 
 **Order:** PR 1 first (A1–A3 run on it). PR 2 after A1's map. PR 3 alongside, after A3. PR 4's code from the start against a fake server; its live runs and merge after A4, and after PR 3.
 

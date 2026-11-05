@@ -65,6 +65,7 @@ import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
 import { findReplacedTextTab, findStuckMarkdownTabs } from './utils/stickyTabHealer';
 import { openControlCatalogueIfAsked } from './views/ControlCataloguePanel';
+import { registerWebviewSheetDemoIfAsked } from './webviewSheet/devSheetDemo';
 import { registerProjectHeadCommands } from './views/projectHeadCommands';
 import { prepareWelcome, registerWelcome } from './welcome/welcomeHost';
 import { newDocumentFolder, nextUntitledPath } from './newDocumentLocation';
@@ -444,6 +445,8 @@ export function activate(context: vscode.ExtensionContext) {
     openReportWindow: () => unifiedViewProvider.openReportWindow(),
   });
   registerFeedbackStatusBar(context);
+  // Dev-only (VSCODE_DEV=1 and RITEMARK_WEBVIEW_SHEET_DEMO): a page in the whole-window sheet (Sprint 149, PR 5)
+  registerWebviewSheetDemoIfAsked(context);
 
   // ── Comment tasks (Sprint 117, #292) ───────────────────────────────────────
   // One host-owned ledger for "send this comment to an agent". Composed here,
