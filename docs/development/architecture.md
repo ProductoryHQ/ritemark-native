@@ -1310,6 +1310,7 @@ src/speech/
 ├── SessionStore.ts          file-backed sessions in globalStorage (D5)
 ├── audioPrep.ts             format gate, afconvert for m4a/aac, waveform peaks
 ├── durationProbe.ts         afinfo / WAV header — returns null rather than guessing
+├── silence.ts               a file with no sound is never sent to an engine (#656)
 ├── segmentFolding.ts        word stream → segments (majority-vote speaker)
 ├── insights.ts              one-shot extraction on the existing agent runtime
 ├── insightsParsing.ts       prompt + citation resolution (pure, unit-tested)
@@ -1429,6 +1430,16 @@ the device rate plus a streaming box-filter resampler. Input is unprocessed
 fifth stops with `too-slow` rather than buffering. Elapsed time and size come from
 **acked samples**, never the wall clock. A suspended context gets one `resume()`,
 then an honest `suspended` stop; a track `ended` stops with `device-lost`.
+The card names the input from the track's `label` ("Recording from …", nothing
+when there is no label), and `SilenceWatch` turns on a "No sound from the
+microphone" line after 3 s with no sample at -80 dBFS (dictation's rule,
+`hooks/dictationLevel.ts`); the recording goes on (#656).
+
+**No sound, no engine (#656).** `speech/silence.ts` reads a PCM or float WAV to
+its first audible sample. A file silent from start to end is said so on the
+pending card, with no engine offered, and `JobManager` refuses it with
+`silent-audio` before any engine runs (a WAV itself, another format through the
+Mac's peaks WAV). Other formats on Windows go on as before.
 
 **File (host).** `WavRecordingSink` creates `<name>.wav.part` exclusively with a
 placeholder header and appends in accepted order through one serialized queue.

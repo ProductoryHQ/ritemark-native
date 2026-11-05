@@ -252,6 +252,7 @@ export function TranscribePanel() {
           <LiveRecordingCard
             view={capture}
             host={host}
+            platform={state.platform}
             onStop={() => recording.stop()}
             onCancel={() => recording.cancel()}
           />
@@ -425,7 +426,11 @@ function PendingImportCard({
   const pending = state.pending!;
   const refusalOf = (engineId: string) => pending.estimates.find((entry) => entry.engineId === engineId)?.refusal;
   // Sprint 143 (#509): an engine that can't take this file here is shown with why, and never selected.
-  const selected = state.engines.find((engine) => engine.id === selectedEngineId && !refusalOf(engine.id)) ?? null;
+  // #656: a file with no sound selects none: there is nothing to send.
+  const silence = pending.silence ?? null;
+  const selected = silence
+    ? null
+    : (state.engines.find((engine) => engine.id === selectedEngineId && !refusalOf(engine.id)) ?? null);
   const estimate = pending.estimates.find((entry) => entry.engineId === selectedEngineId);
 
   return (
@@ -440,18 +445,27 @@ function PendingImportCard({
         </div>
       </div>
 
-      <div className="mt-3 space-y-1.5">
-        {state.engines.map((engine) => (
-          <EngineChoice
-            key={engine.id}
-            engine={engine}
-            selected={engine.id === selected?.id}
-            costUsd={pending.estimates.find((entry) => entry.engineId === engine.id)?.costUsd ?? null}
-            refusal={refusalOf(engine.id)}
-            onSelect={() => onSelectEngine(engine.id)}
-          />
-        ))}
-      </div>
+      {/* #656: said before anything starts, in place of the engine choice; Transcribe stays off. */}
+      {silence && (
+        <div className="mt-3 rounded-md border border-ritemark-warning/40 bg-ritemark-warning-soft px-2.5 py-2">
+          <p className="text-[12px] leading-relaxed text-ritemark-warning-foreground">{silence}</p>
+        </div>
+      )}
+
+      {!silence && (
+        <div className="mt-3 space-y-1.5">
+          {state.engines.map((engine) => (
+            <EngineChoice
+              key={engine.id}
+              engine={engine}
+              selected={engine.id === selected?.id}
+              costUsd={pending.estimates.find((entry) => entry.engineId === engine.id)?.costUsd ?? null}
+              refusal={refusalOf(engine.id)}
+              onSelect={() => onSelectEngine(engine.id)}
+            />
+          ))}
+        </div>
+      )}
 
       {selected && !selected.isLocal && selected.readiness.ready && (
         <div className="mt-2.5 rounded-md border border-ritemark-warning/40 bg-ritemark-warning-soft px-2.5 py-2">
@@ -468,7 +482,13 @@ function PendingImportCard({
       <div className="mt-3 flex gap-2">
         <Tooltip
           className="min-w-0 flex-1"
-          label={selected?.readiness.ready ? 'Start transcribing with the selected engine' : 'Choose an engine that is ready'}
+          label={
+            silence
+              ? 'This recording has no sound, so there is nothing to transcribe'
+              : selected?.readiness.ready
+                ? 'Start transcribing with the selected engine'
+                : 'Choose an engine that is ready'
+          }
         >
           <Button
             className="w-full"

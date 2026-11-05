@@ -19,7 +19,7 @@ function run(): void {
   assert.ok(!isRecordingMessage({ type: 7 }));
 
   // --- bare messages
-  for (const type of ['transcribe:record/start', 'transcribe:record/changeLocation', 'transcribe:record/dismissNotice', 'transcribe:record/openMicrophoneSettings']) {
+  for (const type of ['transcribe:record/start', 'transcribe:record/changeLocation', 'transcribe:record/dismissNotice', 'transcribe:record/openMicrophoneSettings', 'transcribe:record/openSoundSettings']) {
     assert.deepEqual(decodeRecordingRequest({ type }), { type });
     assert.equal(decodeRecordingRequest({ type, path: '/etc' }), null, `${type} takes no fields`);
   }

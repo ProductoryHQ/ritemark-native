@@ -61,6 +61,44 @@ export function RecordDot({ live = false, size = 'md' }: { live?: boolean; size?
   );
 }
 
+/**
+ * #656: where the sound input is chosen, by its name in the system's settings; null where Ritemark can't say
+ * (and has no page to open). As `soundSettingsName` in `src/speech/silence.ts`.
+ */
+export function soundSettingsName(platform: string): string | null {
+  if (platform === 'darwin') return 'System Settings ▸ Sound';
+  if (platform === 'win32') return 'Settings ▸ System ▸ Sound';
+  return null;
+}
+
+/**
+ * #656: the recorder heard nothing for a few seconds. One line in the card, the recording going on; the settings'
+ * name is the link that opens them. It goes as soon as sound arrives.
+ */
+function NoSoundLine({ platform }: { platform: string }) {
+  const where = soundSettingsName(platform);
+  return (
+    <p className="mt-2 text-[11px] leading-relaxed text-ritemark-warning-foreground">
+      No sound from the microphone. Check the input in{' '}
+      {where ? (
+        <Tooltip label="Open the sound settings, where the input is chosen">
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto px-0 py-0 text-[11px] font-semibold has-[>svg]:px-0"
+            onClick={() => post({ type: 'transcribe:record/openSoundSettings' })}
+          >
+            {where}
+          </Button>
+        </Tooltip>
+      ) : (
+        'your sound settings'
+      )}
+      .
+    </p>
+  );
+}
+
 /** Where the live recording goes: shortened for the sidebar, in full for the tooltip. */
 function destination(host: RecordingProjection): { short: string; full: string } | null {
   if (!host.fileName) return null;
@@ -122,11 +160,13 @@ export function RecordPromptCard({ onStart, onCancel }: { onStart: () => void; o
 export function LiveRecordingCard({
   view,
   host,
+  platform,
   onStop,
   onCancel,
 }: {
   view: CaptureView;
   host: RecordingProjection;
+  platform: string;
   onStop: () => void;
   onCancel: () => void;
 }) {
@@ -135,13 +175,28 @@ export function LiveRecordingCard({
   const cardRef = useRef<HTMLDivElement>(null);
   const where = host.sessionId === view.sessionId ? destination(host) : null;
   const elapsed = formatElapsed(view.savedSeconds);
+  const settings = soundSettingsName(platform);
 
   return (
     <Card label="Recording" containerRef={cardRef}>
       <div className="flex items-center gap-2">
         <RecordDot live />
-        <span className="text-xs font-semibold text-accent-deep">Recording</span>
-        <span className="ml-auto text-sm font-semibold tabular-nums" aria-label={`Recorded ${elapsed}`}>
+        {/* #656 (Jarmo, 4 Nov): the input is named from the first second, so a wrong one shows at once. */}
+        {view.inputName ? (
+          <Tooltip
+            className="min-w-0"
+            side="top"
+            label={`Recording from ${view.inputName}.${settings ? ` The input is chosen in ${settings}.` : ''}`}
+          >
+            <span className="truncate text-xs">
+              <span className="font-semibold text-accent-deep">Recording</span>
+              <span className="text-ink-body"> from {view.inputName}</span>
+            </span>
+          </Tooltip>
+        ) : (
+          <span className="text-xs font-semibold text-accent-deep">Recording</span>
+        )}
+        <span className="ml-auto shrink-0 text-sm font-semibold tabular-nums" aria-label={`Recorded ${elapsed}`}>
           {elapsed}
         </span>
       </div>
@@ -151,6 +206,7 @@ export function LiveRecordingCard({
         </Tooltip>
       )}
       <div className="mt-0.5 text-[11px] text-ink-muted">{formatSavedSize(view.savedSeconds)}</div>
+      {view.noSound && <NoSoundLine platform={platform} />}
       {host.warnLong && host.sessionId === view.sessionId && (
         <p className="mt-2 text-[11px] leading-relaxed text-ritemark-warning-foreground">
           This recording is over 2 hours. It stops and saves automatically at 4 hours.
@@ -320,10 +376,15 @@ export function useRecordingAnnouncement(view: CaptureView, host: RecordingProje
     previous.current = view.phase;
     if (before === view.phase) return;
     if (view.phase === 'permission') setMessage('Waiting for microphone permission');
-    else if (view.phase === 'recording') setMessage('Recording started');
+    else if (view.phase === 'recording') setMessage(view.inputName ? `Recording started, from ${view.inputName}` : 'Recording started');
     else if (view.phase === 'stopping') setMessage('Saving recording');
     else if (view.phase === 'idle' && before === 'stopping' && !host?.error) setMessage('Recording saved');
-  }, [view.phase, host?.error]);
+  }, [view.phase, view.inputName, host?.error]);
+
+  // #656: the no-sound line is announced once each time it appears.
+  useEffect(() => {
+    if (view.phase === 'recording' && view.noSound) setMessage('No sound from the microphone');
+  }, [view.phase, view.noSound]);
 
   useEffect(() => {
     const problem = host?.error?.message ?? host?.notice ?? null;

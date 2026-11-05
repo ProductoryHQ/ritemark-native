@@ -16,9 +16,11 @@ import {
   ChunkLedger,
   Int16Chunker,
   SAMPLE_RATE,
+  SilenceWatch,
   StreamingResampler,
   classifyCaptureError,
   floatToInt16,
+  inputDeviceName,
   int16ToBase64,
   type CaptureFailureCode,
 } from './capture';
@@ -32,6 +34,10 @@ export interface CaptureView {
   sessionId: string | null;
   /** Seconds of audio the host confirmed as written. */
   savedSeconds: number;
+  /** #656: the input being recorded, from the track's label; null when it has none. */
+  inputName: string | null;
+  /** #656: the input has given no sound for a few seconds (the recording goes on). */
+  noSound: boolean;
 }
 
 // ---------------------------------------------------------------- environment
@@ -46,6 +52,8 @@ export interface ProcessorLike extends AudioNodeLike {
 }
 
 export interface TrackLike {
+  /** The device's name, once permission is granted (#656). */
+  readonly label?: string;
   stop(): void;
   addEventListener(type: 'ended', listener: () => void): void;
 }
@@ -113,6 +121,8 @@ export class CaptureSession {
   private resampler: StreamingResampler | null = null;
   private chunker = new Int16Chunker();
   private ledger = new ChunkLedger();
+  private silence = new SilenceWatch();
+  private inputName: string | null = null;
   private resuming = false;
 
   constructor(
@@ -122,7 +132,13 @@ export class CaptureSession {
   ) {}
 
   view(): CaptureView {
-    return { phase: this.phase, sessionId: this.sessionId, savedSeconds: this.ledger.ackedSeconds };
+    return {
+      phase: this.phase,
+      sessionId: this.sessionId,
+      savedSeconds: this.ledger.ackedSeconds,
+      inputName: this.inputName,
+      noSound: this.silence.silent,
+    };
   }
 
   // ---------------------------------------------------------------- user actions
@@ -137,6 +153,8 @@ export class CaptureSession {
     }
     this.ledger = new ChunkLedger();
     this.chunker = new Int16Chunker();
+    this.silence = new SilenceWatch();
+    this.inputName = null;
     this.setPhase('requesting');
     this.post({ type: 'transcribe:record/start' });
   }
@@ -234,6 +252,8 @@ export class CaptureSession {
       return;
     }
     this.stream = stream;
+    // Named from the first moment, before any audio: a wrong input shows at once (#656).
+    this.inputName = inputDeviceName(stream.getTracks()[0]?.label);
     try {
       await this.buildGraph(stream);
     } catch {
@@ -281,7 +301,8 @@ export class CaptureSession {
 
   private onAudio(input: Float32Array): void {
     const id = this.sessionId;
-    if (this.phase !== 'recording' || !id || !this.resampler) return;
+    if (this.phase !== 'recording' || !id || !this.resampler || !this.ctx) return;
+    if (this.silence.push(input, this.ctx.sampleRate)) this.emit();
     const pcm = floatToInt16(this.resampler.push(input));
     for (const chunk of this.chunker.push(pcm)) {
       this.sendChunk(id, chunk);

@@ -62,6 +62,8 @@ export interface PendingImport {
   durationSec: number | null;
   /** `refusal`: why this engine can't take this file on this computer (Sprint 143, #509). */
   estimates: Array<{ engineId: string; costUsd: number | null; refusal?: string }>;
+  /** #656: the file has no sound at all; what the card says instead of the engines. */
+  silence?: string;
 }
 
 export interface TranscribeState {

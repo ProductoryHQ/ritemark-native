@@ -32,10 +32,10 @@ class FakeMemento implements Memento {
   }
 }
 
-/** Minimal valid mono 16-bit WAV so the real audioPrep gate is exercised. */
-function writeWav(filePath: string): void {
+/** Minimal valid mono 16-bit WAV so the real audioPrep gate is exercised. `silent`: every sample 0 (#656). */
+function writeWav(filePath: string, silent = false): void {
   const data = Buffer.alloc(3200 * 2);
-  for (let i = 0; i < 3200; i++) data.writeInt16LE(i % 2 === 0 ? 12000 : -12000, i * 2);
+  if (!silent) for (let i = 0; i < 3200; i++) data.writeInt16LE(i % 2 === 0 ? 12000 : -12000, i * 2);
   const header = Buffer.alloc(44);
   header.write('RIFF', 0, 'ascii');
   header.writeUInt32LE(36 + data.length, 4);
@@ -150,6 +150,31 @@ async function run(): Promise<void> {
         .map((event) => event.job.state);
       assert.ok(phases.includes('preparing'), 'the preparing phase is observable');
       assert.ok(phases.includes('saving'), 'so is saving');
+    }
+
+    // ── #656: a recording with no sound never reaches an engine ──
+    {
+      const silentPath = path.join(dir, 'wrong-input.wav');
+      writeWav(silentPath, true);
+      let calls = 0;
+      const { manager, events } = setup(
+        fakeEngine({
+          onTranscribe: async () => {
+            calls++;
+            return { segments: [], language: null, speakerSeparation: 'none' };
+          },
+        }),
+        dir,
+      );
+      const job = manager.enqueue({ audioPath: silentPath, engineId: 'whisper-local', durationSec: 236, language: null });
+      await waitFor(() => manager.get(job.id)?.state === 'failed', 'the silent job to fail');
+      assert.equal(calls, 0, 'the engine is never called for a silent file');
+      const failed = manager.get(job.id);
+      assert.equal(failed?.error?.code, 'silent-audio');
+      assert.equal(failed?.error?.message, 'This recording is silent from start to end, so there is nothing to transcribe.');
+      assert.equal(failed?.error?.retryable, false, 'retrying the same silence cannot help');
+      assert.ok(events.some((event) => event.type === 'job-failed'), 'the panel hears why');
+      assert.ok(!events.some((event) => event.type === 'job-updated' && event.job.state === 'transcribing'), 'it never starts transcribing');
     }
 
     // ── progress passes through, including the indeterminate case ──

@@ -12,8 +12,10 @@ import {
   ChunkLedger,
   Int16Chunker,
   MAX_UNACKED_CHUNKS,
+  SilenceWatch,
   StreamingResampler,
   classifyCaptureError,
+  inputDeviceName,
   displayPath,
   floatToInt16,
   fullPath,
@@ -22,6 +24,45 @@ import {
   formatSavedSize,
   int16ToBase64,
 } from './capture';
+
+/** A seeded generator, so the noise buffers are the same on every run. */
+function seeded(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
+/** Gaussian-ish noise at `rmsDbfs` (sum of uniforms), like a room heard by a working microphone. */
+function noise(rate: number, seconds: number, rmsDbfs: number, seed = 7): Float32Array {
+  const random = seeded(seed);
+  const rms = 10 ** (rmsDbfs / 20);
+  const out = new Float32Array(Math.round(rate * seconds));
+  for (let i = 0; i < out.length; i++) {
+    const g = random() + random() + random() + random() - 2; // variance 1/3
+    out[i] = g * rms * Math.sqrt(3);
+  }
+  return out;
+}
+
+/** A hardware-muted microphone: 99% non-zero, but never above 2.6e-5 (about -92 dBFS; dictationLevel.test.ts). */
+function mutedFloor(rate: number, seconds: number): Float32Array {
+  const random = seeded(11);
+  const out = new Float32Array(Math.round(rate * seconds));
+  for (let i = 0; i < out.length; i++) out[i] = (random() * 2 - 1) * 2.6e-5;
+  return out;
+}
+
+/** Feed a SilenceWatch in ScriptProcessor-sized buffers; returns `silent` after each buffer. */
+function watch(w: SilenceWatch, input: Float32Array, rate: number, block = 4096): boolean[] {
+  const states: boolean[] = [];
+  for (let i = 0; i < input.length; i += block) {
+    w.push(input.subarray(i, i + block), rate);
+    states.push(w.silent);
+  }
+  return states;
+}
 
 function sine(rate: number, seconds: number, hz = 440): Float32Array {
   const out = new Float32Array(Math.round(rate * seconds));
@@ -151,6 +192,70 @@ function run(): void {
   assert.equal(displayPath('D:\\Audio\\Team\\Weekly\\2026', 'x.wav'), '…\\Weekly\\2026\\x.wav');
   assert.equal(fullPath('D:\\Audio', 'x.wav'), 'D:\\Audio\\x.wav');
   assert.equal(fullPath('~/Voice', 'x.wav'), '~/Voice/x.wav');
+
+  // --- #656: no sound from the microphone (synthetic buffers; no microphone is ever opened)
+  for (const rate of [16_000, 48_000, 44_100]) {
+    // All zeros, as Jarmo's 236 s from the wrong input: silent after 3 s, not before.
+    {
+      const w = new SilenceWatch();
+      const states = watch(w, new Float32Array(rate * 2.9), rate);
+      assert.ok(states.every((silent) => !silent), `${rate}: 2.9 s of zeros is not yet "no sound"`);
+      watch(w, new Float32Array(Math.ceil(rate * 0.2)), rate);
+      assert.equal(w.silent, true, `${rate}: 3 s of zeros is "no sound"`);
+      watch(w, new Float32Array(rate * 60), rate);
+      assert.equal(w.silent, true, `${rate}: and stays so while the zeros go on`);
+    }
+    // A low floor: a muted microphone's -92 dBFS is still "no sound".
+    {
+      const w = new SilenceWatch();
+      watch(w, mutedFloor(rate, 4), rate);
+      assert.equal(w.silent, true, `${rate}: a muted microphone's floor is "no sound"`);
+    }
+    // Real-looking noise: a quiet room through a working microphone (-70 and -60 dBFS RMS) is never "no sound".
+    for (const level of [-70, -60]) {
+      const w = new SilenceWatch();
+      const states = watch(w, noise(rate, 30, level), rate);
+      assert.ok(states.every((silent) => !silent), `${rate}: room noise at ${level} dBFS RMS is sound`);
+    }
+    // Speech after silence turns the line off at once; a pause shorter than 3 s never turns it on.
+    {
+      const w = new SilenceWatch();
+      watch(w, new Float32Array(rate * 4), rate);
+      assert.equal(w.silent, true);
+      assert.equal(w.push(sine(rate, 0.1), rate), true, `${rate}: sound arriving is a change`);
+      assert.equal(w.silent, false, `${rate}: sound clears "no sound"`);
+      const pause = watch(w, new Float32Array(Math.floor(rate * 2.5)), rate);
+      assert.ok(pause.every((silent) => !silent), `${rate}: a 2.5 s pause in speech is not "no sound"`);
+      watch(w, sine(rate, 0.05), rate);
+      watch(w, new Float32Array(Math.floor(rate * 2.5)), rate);
+      assert.equal(w.silent, false, `${rate}: the count starts again after each sound`);
+    }
+  }
+  {
+    // `push` reports a change only when `silent` flips, so the panel redraws twice, not on every buffer.
+    const w = new SilenceWatch();
+    const changes = [
+      ...Array.from({ length: 20 }, () => w.push(new Float32Array(4096), 16_000)),
+      w.push(sine(16_000, 0.1), 16_000),
+      w.push(sine(16_000, 0.1), 16_000),
+    ].filter(Boolean).length;
+    assert.equal(changes, 2);
+  }
+
+  // --- #656: the input's name, from the track's label; nothing rather than a guess
+  assert.equal(inputDeviceName('MacBook Pro Microphone (Built-in)'), 'MacBook Pro Microphone');
+  assert.equal(inputDeviceName('Default - MacBook Pro Microphone (Built-in)'), 'MacBook Pro Microphone');
+  assert.equal(inputDeviceName('Blue Yeti Stereo Microphone (046d:0ab7)'), 'Blue Yeti Stereo Microphone');
+  assert.equal(inputDeviceName('BlackHole 2ch (Virtual)'), 'BlackHole 2ch (Virtual)', 'a virtual input says so');
+  assert.equal(inputDeviceName('AirPods Pro (Bluetooth)'), 'AirPods Pro (Bluetooth)');
+  assert.equal(inputDeviceName('Default - Microphone Array (Realtek(R) Audio)'), 'Microphone Array (Realtek(R) Audio)');
+  assert.equal(inputDeviceName('Communications - Headset Microphone (Jabra Evolve 65)'), 'Headset Microphone (Jabra Evolve 65)');
+  assert.equal(inputDeviceName('Fake Default Audio Input'), 'Fake Default Audio Input');
+  assert.equal(inputDeviceName(''), null, 'no label before permission');
+  assert.equal(inputDeviceName('   '), null);
+  assert.equal(inputDeviceName('Default'), null, 'a generic name is not a device');
+  assert.equal(inputDeviceName(undefined), null);
+  assert.equal(inputDeviceName(42), null);
 
   console.log('capture.test.ts: all tests passed');
 }

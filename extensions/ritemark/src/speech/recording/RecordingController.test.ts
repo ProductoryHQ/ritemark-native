@@ -28,6 +28,7 @@ interface Harness {
   locationAsks: Array<string | null>;
   folderAsks: number;
   settingsOpened: number;
+  soundSettingsOpened: number;
   set: {
     folders(folders: WorkspaceFolderInfo[]): void;
     active(file: string | null): void;
@@ -55,6 +56,7 @@ function harness(root: string, opts: { fs?: SinkFs; store?: Map<string, unknown>
     locationAsks: [],
     folderAsks: 0,
     settingsOpened: 0,
+    soundSettingsOpened: 0,
     set: {
       folders: (f) => { folders = f; },
       active: (f) => { active = f; },
@@ -81,6 +83,7 @@ function harness(root: string, opts: { fs?: SinkFs; store?: Map<string, unknown>
     },
     postEvent: (e) => h.events.push(e),
     openMicrophoneSettings: () => { h.settingsOpened++; },
+    openSoundSettings: () => { h.soundSettingsOpened++; },
     onChange: () => {},
   };
   h.controller = new RecordingController(h.deps);
@@ -369,6 +372,10 @@ async function run(): Promise<void> {
       assert.equal(view.error?.message, 'Microphone access is denied for Ritemark.');
       await h.controller.handle({ type: 'transcribe:record/openMicrophoneSettings' });
       assert.equal(h.settingsOpened, 1, 'the denied state can open the OS privacy page');
+      // #656: the "no sound" line opens where the input is chosen, not the privacy page.
+      await h.controller.handle({ type: 'transcribe:record/openSoundSettings' });
+      assert.equal(h.soundSettingsOpened, 1, 'the no-sound line can open the sound input settings');
+      assert.equal(h.settingsOpened, 1);
       assert.deepEqual(h.store.get(PARTIALS_KEY), []);
 
       // A new start clears the old error.

@@ -53,7 +53,7 @@ export interface TranscribeRecording {
 }
 
 export function useTranscribeRecording(host: HostRecordingView | null): TranscribeRecording {
-  const [view, setView] = useState<CaptureView>({ phase: 'idle', sessionId: null, savedSeconds: 0 });
+  const [view, setView] = useState<CaptureView>({ phase: 'idle', sessionId: null, savedSeconds: 0, inputName: null, noSound: false });
   const sessionRef = useRef<CaptureSession | null>(null);
   if (!sessionRef.current) {
     sessionRef.current = new CaptureSession(browserAudioEnv, (message) => vscode.postMessage(message), setView);
