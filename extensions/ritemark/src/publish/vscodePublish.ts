@@ -18,6 +18,7 @@ import { setPublishHandler } from '../browser/pageCommands';
 import { CloudflareAccount, CONNECTION_SECRET_KEY } from './cloudflare/account';
 import { CloudflareClient } from './cloudflare/client';
 import { CloudflareHost } from './cloudflare/CloudflareHost';
+import { openExternalStubbed } from './devSheetHarness';
 import { gatherPage } from './gather';
 import { PublishRecordStore } from './publishRecords';
 import { PublishController, sheetHostAvailable, type PageBarState, type PublishUi } from './PublishController';
@@ -109,7 +110,14 @@ export function createPublishFeature(
     records,
     gather: (pagePath, projectFolder) => gatherPage(pagePath, projectFolder),
     ui: {
-      openExternal: async (url) => vscode.env.openExternal(vscode.Uri.parse(url, true)),
+      openExternal: async (url) => {
+        // A development test run's stand-in (devSheetHarness.ts): the address goes to the log, nothing opens
+        if (openExternalStubbed(process.env)) {
+          log(`[publish] openExternal (dev stand-in, not opened): ${url}`);
+          return true;
+        }
+        return vscode.env.openExternal(vscode.Uri.parse(url, true));
+      },
       askToken,
       showSheet: async ({ plan, options, setup, onConfirm }) => {
         const answer = await showPublishSheet(context, plan, { ...options, setup, onConfirm });

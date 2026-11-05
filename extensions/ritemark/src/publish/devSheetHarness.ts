@@ -32,6 +32,16 @@ export const HARNESS_SETTING = 'RITEMARK_PUBLISH_SHEET_HARNESS';
 export const HARNESS_FIRST_SETTING = 'RITEMARK_PUBLISH_SHEET_HARNESS_FIRST';
 export const HARNESS_TRIGGER_SETTING = 'RITEMARK_PUBLISH_SHEET_HARNESS_TRIGGER';
 
+/**
+ * A test run's stand-in for the system browser (merge with PR 5): with `RITEMARK_PUBLISH_STUB_OPEN_EXTERNAL=1` in a
+ * development build, what Publish would open outside (Cloudflare's token page, a published address) is logged, never
+ * opened, so a run on Jarmo's computer opens nothing on his screen. Pure, tested: never in an installed Ritemark.
+ */
+export const STUB_OPEN_EXTERNAL_SETTING = 'RITEMARK_PUBLISH_STUB_OPEN_EXTERNAL';
+export function openExternalStubbed(env: Record<string, string | undefined>): boolean {
+  return env.VSCODE_DEV === '1' && env[STUB_OPEN_EXTERNAL_SETTING] === '1';
+}
+
 /** The pages a launch asked for (pure, tested): none outside a development build. */
 export function harnessPages(env: Record<string, string | undefined>, delimiter: string = path.delimiter): string[] {
   if (env.VSCODE_DEV !== '1') return [];

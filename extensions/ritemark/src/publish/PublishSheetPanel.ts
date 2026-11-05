@@ -13,7 +13,9 @@
  * opens the host's own password box and carries no value), the name row and the address field, and `onConfirm`,
  * which checks a press of Publish on the host (the page part, the workers.dev name, an address already taken) before
  * the sheet closes, so "This name is taken. Try another." shows in the sheet and Publish waits. The page part the
- * sheet sends is checked here too (`isValidPagePart`), before anything else sees it.
+ * sheet sends is checked here too (`isValidPagePart`), before anything else sees it. Set up closes the sheet while the
+ * password box asks (the box is VS Code's quick input, which the whole-window sheet would cover and keep from the
+ * keys), then opens it again at the frame it got to.
  *
  * Where it shows (PR 5): over the whole window, centred, the window dimmed behind it, never a tab (the lead, 5
  * November; publish.html frame 3). The workbench draws that frame (patch 018, `_ritemark.webviewSheet`); the page is
@@ -91,7 +93,13 @@ export function showPublishSheet(
   return new Promise<SheetAnswer>((resolve) => {
     let answered = false;
     let shown = false;
-    const subscriptions: vscode.Disposable[] = [];
+    // Set up steps out of the sheet (merge with PR 5): the host's password box is VS Code's quick input, which the
+    // whole-window sheet would cover and keep from the focus and the keys. So the sheet closes while the box asks, and
+    // opens again at the frame it got to (frame 3 once connected, frame 2 again if not). While it is away, its close
+    // is not an answer. Each opening is its own generation; only the current one's close can answer.
+    let away = false;
+    let generation = 0;
+    let current: vscode.WebviewView | undefined;
     // The sheet closes first (when one showed: a shell without it has nothing to close), then the request is free and
     // the answer goes, so the next request finds no sheet in its way
     const answer = async (a: SheetAnswer): Promise<void> => {
@@ -104,106 +112,125 @@ export function showPublishSheet(
         resolve(a);
       }
     };
+    const post = (out: PublishSheetHostMessage) => { if (current) void current.webview.postMessage(out); };
+    const show = () => post(model ? { type: 'publish:sheet', model } : { type: 'publish:setup', setup: setupModel });
+    let confirming = false;
+    let settingUp = false;
 
-    const take = (view: vscode.WebviewView): void => {
-      shown = true;
-      view.webview.options = { enableScripts: true, localResourceRoots: [media] };
-      view.webview.html = publishSheetHtml(view.webview, context.extensionUri);
-      const post = (out: PublishSheetHostMessage) => { void view.webview.postMessage(out); };
-      const show = () => post(model ? { type: 'publish:sheet', model } : { type: 'publish:setup', setup: setupModel });
-      let confirming = false;
-      let settingUp = false;
-      subscriptions.push(
-        view.onDidDispose(() => {
-          for (const s of subscriptions) s.dispose();
-          void answer({ kind: 'cancel' });
-        }),
-        view.webview.onDidReceiveMessage((message: unknown) => {
-          if (!isSheetWebviewMessage(message)) return;
-          switch (message.type) {
-            case 'publish:sheetReady':
-              show();
-              break;
-            case 'publish:cancel':
-              void answer({ kind: 'cancel' });
-              break;
-            case 'publish:setUp': {
-              // Frame 2's Set up: no value rides on it; the host's own box asks for the token
-              if (model || !setup || settingUp) return;
-              settingUp = true;
-              setupModel = { waiting: true, line: null };
-              show();
-              void setup.run().then(
-                (result) => {
-                  settingUp = false;
-                  if (answered) return;
-                  if (result && 'stop' in result) return void answer({ kind: 'cancel' });
-                  if (result) {
-                    plan = result.plan;
-                    model = modelFor(result.plan, result.options);
-                  } else {
-                    setupModel = { waiting: false, line: null };
-                  }
-                  show();
-                },
-                () => { settingUp = false; void answer({ kind: 'cancel' }); },
-              );
-              break;
-            }
-            case 'publish:confirm': {
-              const current = plan;
-              if (!current || !model || confirming) return;
-              // "Publish anyway" counts only when the plan has hits; a plain Publish never skips the warning
-              if (current.keyHits.length > 0 && !message.anyway) return;
-              if (current.tooBig.length > 0 || current.tooMany) return;
-              // The page part names a Worker: checked here before anything else sees it (PR 3's blocking item)
-              if (model.address?.editable && !isValidPagePart(message.pagePart)) {
-                post({ type: 'publish:refused', reason: 'addressInvalid' });
-                return;
+    const runSetUp = async (run: () => Promise<SheetSetupResult>): Promise<void> => {
+      settingUp = true;
+      away = true;
+      shown = false;
+      current = undefined;
+      await closeWebviewSheet(PUBLISH_SHEET_VIEW_TYPE);
+      let result: SheetSetupResult;
+      try {
+        result = await run();
+      } catch {
+        settingUp = false;
+        away = false;
+        return void answer({ kind: 'cancel' });
+      }
+      settingUp = false;
+      away = false;
+      if (answered) return;
+      if (result && 'stop' in result) return void answer({ kind: 'cancel' });
+      if (result) {
+        plan = result.plan;
+        model = modelFor(result.plan, result.options);
+      } else {
+        setupModel = { waiting: false, line: null };
+      }
+      openSheet();
+    };
+
+    const openSheet = (): void => {
+      const mine = ++generation;
+      const subscriptions: vscode.Disposable[] = [];
+      const isCurrent = () => mine === generation && !away;
+      const take = (view: vscode.WebviewView): void => {
+        shown = true;
+        current = view;
+        view.webview.options = { enableScripts: true, localResourceRoots: [media] };
+        view.webview.html = publishSheetHtml(view.webview, context.extensionUri);
+        subscriptions.push(
+          view.onDidDispose(() => {
+            for (const s of subscriptions) s.dispose();
+            if (current === view) current = undefined;
+            if (isCurrent()) void answer({ kind: 'cancel' });
+          }),
+          view.webview.onDidReceiveMessage((message: unknown) => {
+            if (!isCurrent() || !isSheetWebviewMessage(message)) return;
+            switch (message.type) {
+              case 'publish:sheetReady':
+                show();
+                break;
+              case 'publish:cancel':
+                void answer({ kind: 'cancel' });
+                break;
+              case 'publish:setUp': {
+                // Frame 2's Set up: no value rides on it; the host's own box asks for the token, with the sheet away
+                if (model || !setup || settingUp) return;
+                void runSetUp(setup.run);
+                break;
               }
-              const pagePart = model.address?.editable ? message.pagePart : undefined;
-              const subdomain = model.nameRow ? message.subdomain : undefined;
-              const done = () => answer({ kind: current.keyHits.length > 0 ? 'publishAnyway' : 'publish', pagePart, subdomain, plan: current });
-              if (!onConfirm) return void done();
-              confirming = true;
-              void onConfirm({ anyway: message.anyway, pagePart, subdomain }).then(
-                (reply) => {
-                  confirming = false;
-                  if (answered) return;
-                  switch (reply.kind) {
-                    case 'close': return void done();
-                    case 'stop': return void answer({ kind: 'cancel' });
-                    case 'refuse': return post({ type: 'publish:refused', reason: reply.reason });
-                    case 'update':
-                      model = modelFor(current, reply.options);
-                      return show();
-                  }
-                },
-                () => { confirming = false; void answer({ kind: 'cancel' }); },
-              );
-              break;
+              case 'publish:confirm': {
+                const shownPlan = plan;
+                if (!shownPlan || !model || confirming) return;
+                // "Publish anyway" counts only when the plan has hits; a plain Publish never skips the warning
+                if (shownPlan.keyHits.length > 0 && !message.anyway) return;
+                if (shownPlan.tooBig.length > 0 || shownPlan.tooMany) return;
+                // The page part names a Worker: checked here before anything else sees it (PR 3's blocking item)
+                if (model.address?.editable && !isValidPagePart(message.pagePart)) {
+                  post({ type: 'publish:refused', reason: 'addressInvalid' });
+                  return;
+                }
+                const pagePart = model.address?.editable ? message.pagePart : undefined;
+                const subdomain = model.nameRow ? message.subdomain : undefined;
+                const done = () => answer({ kind: shownPlan.keyHits.length > 0 ? 'publishAnyway' : 'publish', pagePart, subdomain, plan: shownPlan });
+                if (!onConfirm) return void done();
+                confirming = true;
+                void onConfirm({ anyway: message.anyway, pagePart, subdomain }).then(
+                  (reply) => {
+                    confirming = false;
+                    if (answered) return;
+                    switch (reply.kind) {
+                      case 'close': return void done();
+                      case 'stop': return void answer({ kind: 'cancel' });
+                      case 'refuse': return post({ type: 'publish:refused', reason: reply.reason });
+                      case 'update':
+                        model = modelFor(shownPlan, reply.options);
+                        return show();
+                    }
+                  },
+                  () => { confirming = false; void answer({ kind: 'cancel' }); },
+                );
+                break;
+              }
+              case 'publish:openHit': {
+                const hit = plan?.keyHits[message.index];
+                if (!hit) return;
+                // the sheet goes first (the focus back on the bar), then the file opens on that desk and takes the focus
+                void answer({ kind: 'cancel' }).then(() => openKeyPlace(hit, desk));
+                break;
+              }
             }
-            case 'publish:openHit': {
-              const hit = plan?.keyHits[message.index];
-              if (!hit) return;
-              // the sheet goes first (the focus back on the bar), then the file opens on that desk and takes the focus
-              void answer({ kind: 'cancel' }).then(() => openKeyPlace(hit, desk));
-              break;
-            }
-          }
-        }),
+          }),
+        );
+      };
+      sheets.next = take;
+
+      void openWebviewSheet({ viewType: PUBLISH_SHEET_VIEW_TYPE, title: `Publish ${model?.title ?? title}` }).then(
+        (outcome) => {
+          if (sheets.next === take) sheets.next = undefined; // never shown (no sheet in this shell, or one already showing)
+          if (!isCurrent()) return; // closed for Set up, or an older sheet
+          if (outcome !== 'escape' && outcome !== 'closed') console.log(`[publish] the sheet did not show: ${outcome}`);
+          void answer({ kind: 'cancel' });
+        },
+        () => { if (isCurrent()) void answer({ kind: 'cancel' }); },
       );
     };
-    sheets.next = take;
-
-    void openWebviewSheet({ viewType: PUBLISH_SHEET_VIEW_TYPE, title: `Publish ${title}` }).then(
-      (outcome) => {
-        if (sheets.next === take) sheets.next = undefined; // never shown (no sheet in this shell, or one already showing)
-        if (outcome !== 'escape' && outcome !== 'closed') console.log(`[publish] the sheet did not show: ${outcome}`);
-        void answer({ kind: 'cancel' });
-      },
-      () => void answer({ kind: 'cancel' }),
-    );
+    openSheet();
   });
 }
 

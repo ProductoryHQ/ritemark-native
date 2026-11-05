@@ -105,7 +105,11 @@ const load = (Module as unknown as { _load: (request: string, ...rest: unknown[]
 type Plan = import('./types').PublishPlan;
 
 async function main(): Promise<void> {
-  const { harnessPages } = await import('./devSheetHarness');
+  const { harnessPages, openExternalStubbed } = await import('./devSheetHarness');
+  assert.equal(openExternalStubbed({ RITEMARK_PUBLISH_STUB_OPEN_EXTERNAL: '1' }), false, 'an installed Ritemark always opens the system browser');
+  assert.equal(openExternalStubbed({ VSCODE_DEV: '1' }), false);
+  assert.equal(openExternalStubbed({ VSCODE_DEV: '1', RITEMARK_PUBLISH_STUB_OPEN_EXTERNAL: 'yes' }), false);
+  assert.equal(openExternalStubbed({ VSCODE_DEV: '1', RITEMARK_PUBLISH_STUB_OPEN_EXTERNAL: '1' }), true);
   const { showPublishSheet } = await import('./PublishSheetPanel');
 
   // --- the harness runs only in a development build with its setting ---
@@ -341,28 +345,66 @@ async function main(): Promise<void> {
     ]);
   }
 
-  // PR 4: frame 2 first; Set up carries no value, and the sheet becomes the plan's once connected
+  // PR 4: frame 2 first; Set up carries no value. The sheet steps away while the host's password box asks (the box is
+  // VS Code's quick input, which the whole-window sheet would cover), and comes back at the frame it got to
   {
+    const settle = () => new Promise((r) => setTimeout(r, 20));
     let runs = 0;
+    const sheetWhileAsking: boolean[] = [];
     const later = plan();
     const answer = showPublishSheet(context, null, {
-      setup: { title: 'Harbour programme', run: async () => (++runs === 1 ? null : { plan: later, options: {} }) },
+      setup: {
+        title: 'Harbour programme',
+        run: async () => {
+          sheetWhileAsking.push(showing !== undefined);
+          return ++runs === 1 ? null : { plan: later, options: {} };
+        },
+      },
     });
-    const panel = await shown();
+    let panel = await shown();
     panel.send({ type: 'publish:sheetReady' });
     assert.deepEqual(panel.posted.at(-1), { type: 'publish:setup', setup: { waiting: false, line: null } });
     panel.send({ type: 'publish:confirm', anyway: false });
     assert.equal(panel.disposed, false, 'nothing to publish before Set up');
     panel.send({ type: 'publish:setUp' });
-    assert.deepEqual(panel.posted.at(-1), { type: 'publish:setup', setup: { waiting: true, line: null } });
-    await new Promise((r) => setTimeout(r, 5));
-    assert.deepEqual(panel.posted.at(-1), { type: 'publish:setup', setup: { waiting: false, line: null } }, 'not connected: frame 2 again');
+    await settle();
+    assert.equal(panel.disposed, true, 'Set up: the sheet steps away');
+    const first = panel;
+    // a second press on the bar while the box asks answers cancel and opens nothing
+    assert.deepEqual(await showPublishSheet(context, plan()), { kind: 'cancel' });
+    panel = await shown();
+    assert.notEqual(panel, first, 'not connected: the sheet comes back');
+    first.send({ type: 'publish:confirm', anyway: false });
+    panel.send({ type: 'publish:sheetReady' });
+    assert.deepEqual(panel.posted.at(-1), { type: 'publish:setup', setup: { waiting: false, line: null } }, 'at frame 2');
     panel.send({ type: 'publish:setUp' });
-    await new Promise((r) => setTimeout(r, 5));
-    assert.equal((panel.posted.at(-1) as { type: string }).type, 'publish:sheet', 'connected: the plan sheet');
+    await settle();
+    panel = await shown();
+    panel.send({ type: 'publish:sheetReady' });
+    assert.equal((panel.posted.at(-1) as { type: string }).type, 'publish:sheet', 'connected: the sheet comes back at the plan');
+    assert.deepEqual(sheetWhileAsking, [false, false], 'no sheet over the password box');
     panel.send({ type: 'publish:confirm', anyway: false });
     const done = await answer;
     assert.ok(done.kind === 'publish' && done.plan === later);
+  }
+
+  // Set up's box stopped (the flag went off) or failed: cancel, and the sheet doesn't come back
+  for (const run of [async () => ({ stop: true as const }), async () => { throw new Error('box'); }]) {
+    const answer = showPublishSheet(context, null, { setup: { title: 'Harbour programme', run } });
+    const panel = await shown();
+    const opens = sheetCommands.filter((c) => c === 'open').length;
+    panel.send({ type: 'publish:setUp' });
+    assert.deepEqual(await answer, { kind: 'cancel' });
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(sheetCommands.filter((c) => c === 'open').length, opens, 'no sheet opened again');
+    assert.equal(showing, undefined);
+  }
+
+  // Escape on frame 2 before Set up is still Cancel
+  {
+    const answer = showPublishSheet(context, null, { setup: { title: 'Harbour programme', run: async () => null } });
+    (await shown()).dispose();
+    assert.deepEqual(await answer, { kind: 'cancel' });
   }
 
   console.log('devSheetHarness.test: passed');
