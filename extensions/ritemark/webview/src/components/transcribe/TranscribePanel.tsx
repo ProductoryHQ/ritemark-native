@@ -546,7 +546,7 @@ export function PendingImportCard({
         )}
         <Tooltip label="Don't transcribe now. The audio file stays where it is.">
           <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
             onClick={() => vscode.postMessage({ type: 'transcribe:clearPending' })}
           >
