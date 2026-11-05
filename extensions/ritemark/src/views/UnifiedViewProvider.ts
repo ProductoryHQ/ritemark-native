@@ -58,7 +58,7 @@ import {
   traceClaude,
 } from '../agent';
 import { BrowserContextStore, type ShareWaitResult } from '../browser/BrowserContextStore';
-import { browserTurnPageFor } from '../browser/BrowserActionTools';
+import { browserTurnPageFor, chooseTurnPage } from '../browser/BrowserActionTools';
 import { decodeBrowserShareAnswer, type BrowserShareQuestionClearMessage, type BrowserShareQuestionMessage } from './agentSidebarProtocol';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
@@ -1012,6 +1012,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           let stoppedBeforeStart = false;
           // #658: the page this turn's browser context came from; the turn's browser actions go to it.
           let contextPageId: string | undefined;
+          // A context dropped on purpose (a comment task, or a page other than the one asked about after the share
+          // wait) leaves the turn with no page: it never falls back to the page in front.
+          let turnHasNoPage = skipBrowserContext;
           if (!skipBrowserContext && capabilitiesFor(agentId as import('../agent/types').AgentId).browserContext) {
             // Sprint 136 (Windows round 5): a message sent while the share question waits on this sheet waits for
             // the answer, so a Share reaches this turn; Stop ends it before it starts. Comment tasks never wait.
@@ -1027,6 +1030,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               if (browserContext.claudeAttachments.length > 0) {
                 turnAttachments = [...(turnAttachments ?? []), ...browserContext.claudeAttachments];
               }
+            } else if (browserContext) {
+              turnHasNoPage = true;
             }
           }
 
@@ -1045,7 +1050,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // desk brought to the front during the turn never moves the AI's actions.
           const browserPage = browserTurnPageFor(conversationId);
           if (browserEnabled) {
-            browserPage.startTurn(contextPageId ?? await BrowserContextStore.instance.activePageId());
+            browserPage.startTurn(await chooseTurnPage({
+              contextPageId,
+              contextDropped: turnHasNoPage,
+              activePageId: () => BrowserContextStore.instance.activePageId(),
+            }));
           }
 
           // Ritemark's tools for Claude Code: one in-process MCP server per group.

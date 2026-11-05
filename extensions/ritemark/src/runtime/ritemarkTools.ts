@@ -152,7 +152,7 @@ const pageIdInput = z
   );
 
 const NO_PAGE_ERROR =
-  'No browser page for this message: the user had no browser page in front when they sent it. Nothing was done. Ask the user to bring the page to the front and send the message again, or open an address with browser_navigate.';
+  'No browser page was given to this turn: the user had no browser page in front when they sent the message, or this kind of message does not carry one. Nothing was done. Ask the user to bring the page to the front and send the message again, or open an address with browser_navigate.';
 
 /**
  * Runs a browser action in the turn's page (#658), or in the page the AI named

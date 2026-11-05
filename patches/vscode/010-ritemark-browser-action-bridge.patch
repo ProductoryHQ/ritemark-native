@@ -29,9 +29,16 @@
 #   browser tab are gone. A page the AI names itself (requireShared) must be shared
 #   already: no action shares a page the AI was not given. Results list the
 #   window's page ids and the pages new since the caller's knownPageIds (title and
-#   address only when shared). A page in a background tab is shown in its group
-#   first (preserveFocus). The control question names the page. Logic in
-#   common/ritemarkBrowserPageTarget.ts, tested in test/common/.
+#   address only when shared). An action never moves what the person sees:
+#   no tab is brought forward. An input action (click, fill, type, key, scroll,
+#   navigate into an existing page) on a page that is not in front is refused at
+#   once ("The page isn't in front"), before any question; reads work on a hidden
+#   page. The one exception is a navigate that opens a new tab
+#   (the AI has no page): it cannot open in the background, because sharing it
+#   asks the person a question about a tab they would not see. The first summary
+#   of a new tab waits for the load and retries once. The control question
+#   names the page. Logic in common/ritemarkBrowserPageTarget.ts, tested in
+#   test/common/; the action path in test/electron-browser/features/.
 #
 # File(s): src/vs/platform/browserView/common/browserView.ts,
 #          src/vs/workbench/contrib/browserView/common/browserView.ts,
@@ -41,9 +48,10 @@
 #          src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts,
-#          src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts
+#          src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts,
+#          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts
 # Created: 2026-05-13
-# Updated: 2026-11-05 (#658: actions act in the page named by id)
+# Updated: 2026-11-05 (#658: actions act in the page named by id, never moving what the person sees)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
 index 31466d78914..e7d9a1af46e 100644
@@ -435,10 +443,10 @@ index 62a4c272e93..20fb0cdb554 100644
  		this._widget = { location: BrowserWidgetLocation.ContentArea, element: this._container, order: 50 };
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
 new file mode 100644
-index 00000000000..e3604fbd199
+index 00000000000..5c9411c2bf5
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
-@@ -0,0 +1,579 @@
+@@ -0,0 +1,610 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -448,10 +456,10 @@ index 00000000000..e3604fbd199
 +import { Action2, registerAction2 } from '../../../../../platform/actions/common/actions.js';
 +import { BrowserViewCommandId } from '../../../../../platform/browserView/common/browserView.js';
 +import { IPlaywrightService } from '../../../../../platform/browserView/common/playwrightService.js';
-+import { BrowserViewUri } from '../../../../../platform/browserView/common/browserViewUri.js';
 +import { ServicesAccessor } from '../../../../../platform/instantiation/common/instantiation.js';
 +import { IDialogService } from '../../../../../platform/dialogs/common/dialogs.js';
 +import { ACTIVE_GROUP, IEditorService } from '../../../../services/editor/common/editorService.js';
++import { BrowserViewUri } from '../../../../../platform/browserView/common/browserViewUri.js';
 +import { BrowserActionCategory, BrowserEditor } from '../browserEditor.js';
 +import { RITEMARK_PLAYWRIGHT_SESSION } from './ritemarkBrowserContextFeature.js';
 +import { IBrowserViewModel, IBrowserViewWorkbenchService } from '../../common/browserView.js';
@@ -473,7 +481,30 @@ index 00000000000..e3604fbd199
 +}
 +
 +/** The page `target` names, or the active browser tab when it names none; otherwise the result to return (#658). */
-+function targetModel(
++const pause = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
++
++/**
++ * Ritemark (#658): the first read of a tab that has just opened can answer "Page not found" before the page is
++ * tracked. Wait for the load to finish (up to 5 s), then read; if the read fails or says so, wait a moment and read once more.
++ */
++async function summaryAfterLoad(model: IBrowserViewModel, playwrightService: IPlaywrightService): Promise<string> {
++	for (let waited = 0; model.loading && waited < 5000; waited += 100) {
++		await pause(100);
++	}
++	let first: string | undefined;
++	try {
++		first = await playwrightService.getSummary(RITEMARK_PLAYWRIGHT_SESSION, model.id);
++	} catch {
++		first = undefined;
++	}
++	if (first !== undefined && !/Page not found/i.test(first)) {
++		return first;
++	}
++	await pause(500);
++	return playwrightService.getSummary(RITEMARK_PLAYWRIGHT_SESSION, model.id);
++}
++
++export function targetModel(
 +	target: IRitemarkPageTarget,
 +	editorService: IEditorService,
 +	browserViewWorkbenchService: IBrowserViewWorkbenchService,
@@ -483,22 +514,18 @@ index 00000000000..e3604fbd199
 +}
 +
 +/**
-+ * Ritemark (#658): the AI's page may sit in a background tab once another tab came to the front. Playwright waits for
-+ * an element to be visible before it clicks (and times out in a hidden tab), and the person should see what the AI
-+ * does, so an action first shows its page in the tab's own group. preserveFocus: the person's focus and active group
-+ * stay where they are.
++ * Ritemark (#658): the AI's actions never move what the person sees. An input action (click, fill, type, key, scroll,
++ * navigate into an existing page) on a page that is not in front is refused at once, before any question is asked:
++ * Playwright would wait for the element to be visible and time out, and bringing the tab forward would hide the
++ * person's document or tab. Reads (snapshot, summary) work on a hidden page and do not call this.
 + */
-+async function showPage(model: IBrowserViewModel, editorService: IEditorService): Promise<void> {
-+	if (model.visible) {
-+		return;
-+	}
-+	const [found] = editorService.findEditors(BrowserViewUri.forId(model.id));
-+	if (found) {
-+		await editorService.openEditor(found.editor, { preserveFocus: true }, found.groupId);
-+	}
++export const RITEMARK_PAGE_NOT_IN_FRONT_ERROR = 'The page isn\'t in front. Ask the person to bring its browser tab forward. Nothing was done.';
++
++export function pageNotInFrontError(model: { readonly visible: boolean }): string | undefined {
++	return model.visible ? undefined : RITEMARK_PAGE_NOT_IN_FRONT_ERROR;
 +}
 +
-+function isModel(value: IBrowserViewModel | IRitemarkBrowserActionResult): value is IBrowserViewModel {
++export function isModel(value: IBrowserViewModel | IRitemarkBrowserActionResult): value is IBrowserViewModel {
 +	return typeof (value as IBrowserViewModel).loadURL === 'function';
 +}
 +
@@ -606,7 +633,7 @@ index 00000000000..e3604fbd199
 +	}
 +}
 +
-+async function runNavigateInternal(ctx: {
++export async function runNavigateInternal(ctx: {
 +	args: IBrowserNavigateArgs;
 +	type: 'url' | 'back' | 'forward' | 'reload';
 +	dialogService: IDialogService;
@@ -628,11 +655,15 @@ index 00000000000..e3604fbd199
 +		if (!model) {
 +			return { error: 'No active integrated browser tab.' };
 +		}
++		// An existing page must be in front (a new tab is); the control question is asked only about a page the person can see.
++		const notInFront = resolved.kind === 'page' ? pageNotInFrontError(model) : undefined;
++		if (notInFront) {
++			return { ...modelMeta(model), error: notInFront };
++		}
 +		const granted = await ensureControlConsent(model, dialogService);
 +		if (!granted) {
 +			return { ...modelMeta(model), error: 'Browser control consent was not granted for this tab.' };
 +		}
-+		await showPage(model, editorService);
 +		try {
 +			if (type === 'url') {
 +				if (args.url && model.url !== args.url) {
@@ -653,7 +684,7 @@ index 00000000000..e3604fbd199
 +			}
 +		}
 +		try {
-+			const summary = await playwrightService.getSummary(RITEMARK_PLAYWRIGHT_SESSION, model.id);
++			const summary = await summaryAfterLoad(model, playwrightService);
 +			return { ...modelMeta(model), summary };
 +		} catch (err) {
 +			return {
@@ -674,6 +705,10 @@ index 00000000000..e3604fbd199
 +/**
 + * Ritemark (#658): a new browser tab for the address. It used to fall back to the first visible browser pane, or to
 + * the first browser tab in tab order, and load the address there: into a page the AI was not given.
++ *
++ * This is the one case where a tab comes forward. It cannot open in the background: sharing a tab with the AI asks the
++ * person a question, which must not be asked about a tab they cannot see. A new tab is what the person asked for when
++ * the AI has no page to act in.
 + */
 +async function openNewBrowserTab(
 +	editorService: IEditorService,
@@ -710,7 +745,7 @@ index 00000000000..e3604fbd199
 +	return withPages(browserViewWorkbenchService, target, () => invokeInTarget(ctx));
 +}
 +
-+async function invokeInTarget(ctx: {
++export async function invokeInTarget(ctx: {
 +	editorService: IEditorService;
 +	dialogService: IDialogService;
 +	playwrightService: IPlaywrightService;
@@ -727,15 +762,19 @@ index 00000000000..e3604fbd199
 +			return found;
 +		}
 +		const model = found;
-+		const granted = await ensureControlConsent(model, dialogService);
-+		if (!granted) {
-+			return { ...modelMeta(model), error: 'Browser control consent was not granted for this tab.' };
-+		}
 +		const validationError = validate();
 +		if (validationError) {
 +			return { ...modelMeta(model), error: validationError };
 +		}
-+		await showPage(model, editorService);
++		// Visibility is decided first: the control question is never asked about a page that is not in front.
++		const notInFront = pageNotInFrontError(model);
++		if (notInFront) {
++			return { ...modelMeta(model), error: notInFront };
++		}
++		const granted = await ensureControlConsent(model, dialogService);
++		if (!granted) {
++			return { ...modelMeta(model), error: 'Browser control consent was not granted for this tab.' };
++		}
 +		const result = await playwrightService.invokeFunction(RITEMARK_PLAYWRIGHT_SESSION, model.id, functionBody, invokeArgs);
 +		if (result.error) {
 +			return { ...modelMeta(model), summary: result.summary, error: result.error };
@@ -1145,5 +1184,153 @@ index 00000000000..9c59b93d0a7
 +			ritemarkActionArgs({ selector: '#btn', pageId: 'c', requireShared: true, knownPageIds: ['a'], newTab: false }),
 +			{ selector: '#btn' },
 +		);
++	});
++});
+diff --git a/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts
+new file mode 100644
+index 00000000000..9e0dca03c18
+--- /dev/null
++++ b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts
+@@ -0,0 +1,142 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { createStubInstance } from 'sinon';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
++import { IDialogService } from '../../../../../../platform/dialogs/common/dialogs.js';
++import { IPlaywrightService } from '../../../../../../platform/browserView/common/playwrightService.js';
++import { IEditorService } from '../../../../../services/editor/common/editorService.js';
++import { IBrowserViewModel, IBrowserViewWorkbenchService } from '../../../common/browserView.js';
++import { RITEMARK_PAGE_GONE_ERROR } from '../../../common/ritemarkBrowserPageTarget.js';
++import { BrowserEditor } from '../../../electron-browser/browserEditor.js';
++import { invokeInTarget, isModel, RITEMARK_PAGE_NOT_IN_FRONT_ERROR, runNavigateInternal, targetModel } from '../../../electron-browser/features/ritemarkBrowserActionFeature.js';
++
++/**
++ * Ritemark (#658): the real action path (`targetModel`, `invokeInTarget`, `runNavigateInternal`), with a fake editor
++ * service whose active browser is another page. The AI's action goes to the turn's page by id; it never acts in the
++ * active tab, and it never brings a tab forward or asks about one the person cannot see.
++ */
++suite('Ritemark browser actions (#658)', () => {
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	interface IFakePage extends Pick<IBrowserViewModel, 'id' | 'url' | 'title' | 'visible' | 'ritemarkSharedWithAgent' | 'sharedWithAgentForControl'> {
++		loaded: string[];
++		loadURL(url: string): Promise<void>;
++		setSharedWithAgentForControl(shared: boolean): Promise<void>;
++	}
++
++	function page(id: string, visible: boolean): IFakePage {
++		const fake: IFakePage = {
++			id, url: `http://127.0.0.1/${id}`, title: `Page ${id}`, visible,
++			ritemarkSharedWithAgent: true, sharedWithAgentForControl: true,
++			loaded: [],
++			async loadURL(url: string) { fake.loaded.push(url); },
++			async setSharedWithAgentForControl(shared: boolean) { (fake as { sharedWithAgentForControl: boolean }).sharedWithAgentForControl = shared; },
++		};
++		return fake;
++	}
++
++	function setup(opts: { pages: IFakePage[]; active: IFakePage | undefined; control?: boolean }) {
++		const log = { openEditor: 0, confirm: 0, invoked: [] as string[], opened: [] as unknown[] };
++		const pane = createStubInstance(BrowserEditor);
++		if (opts.active) {
++			Object.defineProperty(pane, 'model', { value: opts.active });
++		}
++		// The pane a new tab opens in (the one case where a tab comes forward).
++		const newTab = page('new', true);
++		(newTab as { url: string }).url = 'about:blank';
++		(newTab as { sharedWithAgentForControl: boolean }).sharedWithAgentForControl = false;
++		const newPane = createStubInstance(BrowserEditor);
++		Object.defineProperty(newPane, 'model', { value: newTab });
++		const editorService = {
++			activeEditorPane: opts.active ? pane : undefined,
++			findEditors: () => [],
++			openEditor: async (...args: unknown[]) => { log.openEditor++; log.opened.push(args); return newPane; },
++		} as unknown as IEditorService;
++		const views = new Map(opts.pages.map(p => [p.id, { model: p }] as const));
++		const browserViewWorkbenchService = { getKnownBrowserViews: () => views } as unknown as IBrowserViewWorkbenchService;
++		const dialogService = { confirm: async () => { log.confirm++; return { confirmed: true }; } } as unknown as IDialogService;
++		const playwrightService = {
++			invokeFunction: async (_session: string, id: string) => { log.invoked.push(id); return { summary: `summary ${id}` }; },
++			getSummary: async (_session: string, id: string) => `summary ${id}`,
++		} as unknown as IPlaywrightService;
++		return { log, editorService, browserViewWorkbenchService, dialogService, playwrightService, newTab };
++	}
++
++	test('targetModel finds the turn\'s page by id, not the active browser tab', () => {
++		const a = page('a', true);
++		const c = page('c', false);
++		const s = setup({ pages: [a, page('b', false), c], active: a });
++		const found = targetModel({ pageId: 'c' }, s.editorService, s.browserViewWorkbenchService);
++		assert.ok(isModel(found));
++		assert.strictEqual((found as unknown as IFakePage).id, 'c');
++		assert.deepStrictEqual(targetModel({ pageId: 'gone' }, s.editorService, s.browserViewWorkbenchService), { pageId: 'gone', pageGone: true, error: RITEMARK_PAGE_GONE_ERROR });
++	});
++
++	test('an input action in the turn\'s page, which is in front, acts in it and not in the active tab', async () => {
++		const a = page('a', false);
++		const c = page('c', true);
++		const s = setup({ pages: [a, c], active: a });
++		const result = await invokeInTarget({ ...s, target: { pageId: 'c' }, validate: () => null, functionBody: '', invokeArgs: [] });
++		assert.strictEqual(result.error, undefined);
++		assert.strictEqual(result.pageId, 'c');
++		assert.deepStrictEqual(s.log.invoked, ['c']);
++		assert.strictEqual(s.log.openEditor, 0, 'no editor is opened or revealed');
++	});
++
++	test('a page that is not in front is refused at once: no question, nothing opened, nothing done', async () => {
++		for (const control of [true, false]) {
++			const a = page('a', true); // another browser tab in front
++			const c = page('c', false);
++			(c as { sharedWithAgentForControl: boolean }).sharedWithAgentForControl = control;
++			const s = setup({ pages: [a, c], active: a });
++			const result = await invokeInTarget({ ...s, target: { pageId: 'c' }, validate: () => null, functionBody: '', invokeArgs: [] });
++			assert.strictEqual(result.error, RITEMARK_PAGE_NOT_IN_FRONT_ERROR);
++			assert.strictEqual(s.log.confirm, 0, 'the control question is never asked about a page that is not in front');
++			assert.strictEqual(s.log.openEditor, 0, 'nothing is brought forward');
++			assert.deepStrictEqual(s.log.invoked, []);
++		}
++	});
++
++	test('the control question is asked about a page in front', async () => {
++		const c = page('c', true);
++		(c as { sharedWithAgentForControl: boolean }).sharedWithAgentForControl = false;
++		const s = setup({ pages: [c], active: undefined });
++		await invokeInTarget({ ...s, target: { pageId: 'c' }, validate: () => null, functionBody: '', invokeArgs: [] });
++		assert.strictEqual(s.log.confirm, 1);
++	});
++
++	test('navigate with the turn\'s page loads the address there, never in the active tab', async () => {
++		const a = page('a', true);
++		const c = page('c', true);
++		const s = setup({ pages: [a, c], active: a });
++		const result = await runNavigateInternal({ ...s, args: { pageId: 'c', url: 'http://127.0.0.1/next' }, type: 'url' });
++		assert.strictEqual(result.error, undefined);
++		assert.deepStrictEqual([a.loaded, c.loaded], [[], ['http://127.0.0.1/next']]);
++		assert.strictEqual(s.log.openEditor, 0);
++	});
++
++	test('navigate into an existing page that is not in front is refused: nothing loaded, no question, nothing opened', async () => {
++		const a = page('a', true);
++		const c = page('c', false);
++		const s = setup({ pages: [a, c], active: a });
++		const result = await runNavigateInternal({ ...s, args: { pageId: 'c', url: 'http://127.0.0.1/next' }, type: 'url' });
++		assert.strictEqual(result.error, RITEMARK_PAGE_NOT_IN_FRONT_ERROR);
++		assert.deepStrictEqual([a.loaded, c.loaded], [[], []]);
++		assert.deepStrictEqual([s.log.confirm, s.log.openEditor], [0, 0]);
++	});
++
++	test('navigate with no page opens a new tab (the one tab that comes forward), asks about it in front, and loads the address there', async () => {
++		const a = page('a', true);
++		const s = setup({ pages: [a], active: a });
++		const result = await runNavigateInternal({ ...s, args: { newTab: true, url: 'http://127.0.0.1/new' }, type: 'url' });
++		assert.strictEqual(result.error, undefined);
++		assert.deepStrictEqual(a.loaded, [], 'the tab in front is not retargeted');
++		assert.deepStrictEqual(s.newTab.loaded, ['http://127.0.0.1/new']);
++		assert.strictEqual(s.log.openEditor, 1);
++		assert.strictEqual(s.log.confirm, 1, 'the new tab is in front, so the control question is about a page the person sees');
 +	});
 +});

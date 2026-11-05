@@ -18,6 +18,7 @@ import { AcpManager } from './acpManager';
 import { traceAcp } from './acpTrace';
 import { findBundledAgentRuntime, findBundledOpenCodePathEntries, readBundledRuntimeVersion } from '../utils/bundledAgentRuntime';
 import { RitemarkIpcServer } from '../runtime/RitemarkIpcServer';
+import type { RitemarkIpcRequest, RitemarkIpcResult } from '../runtime/RitemarkIpcServer';
 import { RitemarkToolsInjector } from '../runtime/RitemarkToolsInjector';
 import { BOARD_TOOL_GROUP, toolGroupsFor } from '../runtime/ritemarkTools';
 import { isEnabled } from '../features';
@@ -51,6 +52,10 @@ import { noteOpenCodeModels } from '../ai/modelCatalog';
 type PendingApproval = (result: { approved: boolean; alwaysAllow: boolean }) => void;
 
 const _toolsInjector = new RitemarkToolsInjector();
+
+/** #658: OpenCode's browser requests name no conversation, so two conversations mid-turn cannot share the browser. */
+export const ANOTHER_OPENCODE_CONVERSATION_ERROR =
+  'Another OpenCode conversation is using the browser right now. Nothing was done. Try again when that conversation has finished.';
 
 /**
  * A permission request for one of the board tools (Phase 0, P3). With
@@ -173,7 +178,6 @@ export class AcpSession implements RuntimeSession {
     }
     const config = this._config;
     this._dispatchAccepted = false;
-    this._runtime.noteBrowserPage(config.browserPage);
 
     config.onProgress({ type: 'init', message: 'Starting OpenCode…', timestamp: Date.now() });
 
@@ -192,6 +196,8 @@ export class AcpSession implements RuntimeSession {
       config.onProgress({ type: 'text', message: `Note: ${imageAttachmentCount} image attachment(s) converted to text (OpenCode BYOK does not support inline multimodal in this version).`, timestamp: Date.now() });
     }
 
+    // #658: this session is mid-turn from here; its conversation's page is the one OpenCode's browser tools act in.
+    this._runtime.beginBrowserTurn(this, config.browserPage);
     try {
       // Apply model for this turn (strip 'opencode:' composite prefix if present).
       // Must be inside try/catch — setModel throws if the model ID is invalid.
@@ -282,6 +288,8 @@ export class AcpSession implements RuntimeSession {
       const raw = err instanceof Error ? err.message : String(err);
       const errorCode = acpTurnErrorCode(err);
       config.onCodexComplete?.({ status: 'error', error: describeAcpTurnError(raw), ...(errorCode ? { errorCode } : {}) });
+    } finally {
+      this._runtime.endBrowserTurn(this);
     }
   }
 
@@ -501,9 +509,35 @@ export class AcpRuntime implements AgentRuntime {
   /** #658: the browser page holder of the conversation prompted last; the browser tools act in its page. */
   private _browserPage: BrowserTurnPage | undefined;
 
-  /** #658: a session prompts a turn; its conversation's browser page is the one OpenCode's browser tools act in. */
-  noteBrowserPage(page: BrowserTurnPage | undefined): void {
+  /** #658: the sessions mid-turn, with the browser page holder of each one's conversation. */
+  private readonly _turnPages = new Map<AcpSession, BrowserTurnPage | undefined>();
+
+  /** #658: a session starts a turn; its conversation's browser page is the one OpenCode's browser tools act in. */
+  beginBrowserTurn(session: AcpSession, page: BrowserTurnPage | undefined): void {
+    this._turnPages.set(session, page);
     this._browserPage = page;
+  }
+
+  /** #658: a session's turn ended. */
+  endBrowserTurn(session: AcpSession): void {
+    this._turnPages.delete(session);
+  }
+
+  /**
+   * #658: OpenCode's browser requests name no conversation. While two sessions are mid-turn with different turn pages,
+   * which one asked cannot be told, so a browser action would land in the wrong conversation's page: refuse it.
+   */
+  browserContested(): boolean {
+    const pageIds = new Set([...this._turnPages.values()].map((page) => page?.pageId ?? ''));
+    return this._turnPages.size > 1 && pageIds.size > 1;
+  }
+
+  /** #658: an adapter's request, the browser's refused while another conversation's turn holds a different page. */
+  async handleToolRequest(req: RitemarkIpcRequest): Promise<RitemarkIpcResult> {
+    if (req.op === 'call' && req.group === 'browser' && this.browserContested()) {
+      return { text: ANOTHER_OPENCODE_CONVERSATION_ERROR, isError: true };
+    }
+    return _toolsInjector.handleIpc(req, 'opencode', this._browserPage);
   }
 
   private async _ensureManager(config: RuntimeSessionConfig): Promise<void> {
@@ -528,7 +562,7 @@ export class AcpRuntime implements AgentRuntime {
       const ipcSessionId = crypto.randomUUID();
       const ipcServer = new RitemarkIpcServer(ipcSessionId);
       // #658: the requests name no conversation; the page is the last-prompted conversation's (one shared browser, D2).
-      await ipcServer.start((req) => _toolsInjector.handleIpc(req, 'opencode', this._browserPage));
+      await ipcServer.start((req) => this.handleToolRequest(req));
       this._ipcServer = ipcServer;
       mcpServers = _toolsInjector.acpMcpServers(groups, ipcServer.socketPath);
       traceAcp('runtime', 'ipc-started', { socketPath: ipcServer.socketPath, groups: groups.map((group) => group.id) });

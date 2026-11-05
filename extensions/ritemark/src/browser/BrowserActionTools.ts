@@ -186,9 +186,14 @@ export class BrowserTurnPage {
   private turnPageId: string | undefined;
   private knownPageIds: string[] | undefined;
 
-  /** A turn starts with this page (undefined: the turn has none). */
+  /**
+   * A turn starts with this page (undefined: the turn has none). The pages known from an earlier turn are forgotten:
+   * patch 010 then takes the pages open when the turn's first action starts as known, so a tab the person opened
+   * between turns is never announced, and only a page that opens during this turn is.
+   */
   startTurn(pageId: string | undefined): void {
     this.turnPageId = pageId;
+    this.knownPageIds = undefined;
   }
 
   get pageId(): string | undefined {
@@ -216,6 +221,20 @@ export class BrowserTurnPage {
     if (Array.isArray(result.pageIds)) this.knownPageIds = result.pageIds.filter((id) => typeof id === 'string');
     if (options.adopt && typeof result.pageId === 'string' && !result.pageGone) this.turnPageId = result.pageId;
   }
+}
+
+/**
+ * The page a turn starts with: the page its browser context came from, else the browser page in front now (none with
+ * a document in front). A context dropped on purpose (a comment task, or a page other than the one asked about after
+ * the share wait) leaves the turn with no page at all; it never falls back to the page in front.
+ */
+export async function chooseTurnPage(options: {
+  contextPageId: string | undefined;
+  contextDropped: boolean;
+  activePageId: () => Promise<string | undefined>;
+}): Promise<string | undefined> {
+  if (options.contextPageId) return options.contextPageId;
+  return options.contextDropped ? undefined : options.activePageId();
 }
 
 const turnPages = new Map<string, BrowserTurnPage>();

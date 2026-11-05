@@ -162,7 +162,7 @@ async function main(): Promise<void> {
     const noPage = new BrowserTurnPage();
     const refused = await call('browser_click', { selector: '#btn' }, noPage);
     assert.equal(refused.isError, true);
-    assert.match(refused.text, /No browser page for this message/);
+    assert.match(refused.text, /No browser page was given to this turn/);
     assert.equal(calls.length, 0, `${runtime}: without a page, nothing reaches the browser`);
     const back = await call('browser_navigate', { type: 'back' }, noPage);
     assert.equal(back.isError, true, `${runtime}: back with no page is refused`);
@@ -199,6 +199,48 @@ async function main(): Promise<void> {
 
     await runTool(tool('browser_click'), { selector: '#btn', page_id: 'p-c' }, { runtimeId: 'claude-code', browserPage: page });
     assert.equal(calls.at(-1)!.args.requireShared, undefined, 'naming the turn\'s own page asks nothing more');
+  }
+
+  // ── #658 fix 3: a context dropped on purpose leaves the turn with no page; it never falls back to the page in front ──
+  {
+    reset(); // Page A is in front
+    const inFront = async () => active;
+    assert.equal(await actions.chooseTurnPage({ contextPageId: 'p-c', contextDropped: false, activePageId: inFront }), 'p-c', 'the context page wins');
+    assert.equal(await actions.chooseTurnPage({ contextPageId: undefined, contextDropped: false, activePageId: inFront }), 'p-a', 'no context at all: the page in front');
+    assert.equal(await actions.chooseTurnPage({ contextPageId: undefined, contextDropped: true, activePageId: inFront }), undefined, 'a comment task or share-wait mismatch: no page, not the page in front');
+
+    for (const [runtime, call] of await runtimes()) {
+      reset();
+      const page = new BrowserTurnPage();
+      page.startTurn(await actions.chooseTurnPage({ contextPageId: undefined, contextDropped: true, activePageId: inFront }));
+      const refused = await call('browser_click', { selector: '#btn' }, page);
+      assert.equal(refused.isError, true, `${runtime}: an action without page_id is refused`);
+      assert.match(refused.text, /No browser page was given to this turn/);
+      assert.equal(calls.length, 0, `${runtime}: nothing reached the browser, Page A got no click`);
+      const named = await call('browser_click', { selector: '#btn', page_id: 'p-b' }, page);
+      assert.equal(named.isError, false, named.text);
+      assert.equal(calls[0].args.pageId, 'p-b');
+      assert.equal(calls[0].args.requireShared, true, `${runtime}: an explicit page still goes through the share check`);
+    }
+  }
+
+  // ── #658 fix 4: pages known from an earlier turn are forgotten; a tab opened between turns is never announced ──
+  {
+    reset();
+    const page = new BrowserTurnPage();
+    page.startTurn('p-c');
+    await runTool(tool('browser_click'), { selector: '#btn' }, { runtimeId: 'claude-code', browserPage: page });
+    await runTool(tool('browser_click'), { selector: '#btn' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.deepEqual(calls.at(-1)!.args.knownPageIds, ['p-a', 'p-b', 'p-c'], 'within a turn the known pages go back');
+    pages.set('p-between', { url: 'http://127.0.0.1:18764/', title: 'Opened between turns', shared: true });
+    page.startTurn('p-c'); // the next turn
+    await runTool(tool('browser_click'), { selector: '#btn' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.equal('knownPageIds' in calls.at(-1)!.args, false, 'the new turn sends no stale list, so patch 010 counts only pages opened from this action on');
+    const text = await runTool(tool('browser_click'), { selector: '#btn' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.doesNotMatch(text.text, /A new browser page opened/, 'the tab opened between turns is not announced');
+    pages.set('p-during', { url: 'http://127.0.0.1:18765/', title: 'Popup', shared: true });
+    const during = await runTool(tool('browser_click'), { selector: '#btn' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.match(during.text, /page id p-during/, 'a page opened during the turn is announced');
   }
 
   // ── A shared new page is named with its title and address ──

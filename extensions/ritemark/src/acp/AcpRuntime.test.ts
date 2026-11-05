@@ -581,7 +581,52 @@ async function run() {
     console.log('✓ Test 13: ACP provider evidence accepts dispatch once');
   }
 
-  console.log('\nAll 15 AcpRuntime tests passed!');
+  // #658: two OpenCode conversations mid-turn with different browser pages: its browser requests name no
+  // conversation, so a browser action is refused rather than landing in the wrong page.
+  {
+    const runtime = new AcpRuntime();
+    const { BrowserTurnPage } = require('../browser/BrowserActionTools') as typeof import('../browser/BrowserActionTools');
+    const releases: Array<() => void> = [];
+    const hanging = {
+      ...mockManager,
+      prompt: () => new Promise((resolve) => { releases.push(() => resolve({ stopReason: 'end_turn' })); }),
+    };
+    const pageA = new BrowserTurnPage();
+    pageA.startTurn('page-a');
+    const pageB = new BrowserTurnPage();
+    pageB.startTurn('page-b');
+    const request = { id: '1', op: 'call', group: 'browser', tool: 'browser_snapshot', params: {} } as const;
+
+    const first = addSession(runtime, 'conv-a', { ...dummyConfig, browserPage: pageA });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._manager = hanging;
+    const turnA = first.prompt({ prompt: 'a' });
+    await new Promise((r) => setImmediate(r));
+    assert.strictEqual(runtime.browserContested(), false, 'one conversation mid-turn: nothing contested');
+
+    const second = addSession(runtime, 'conv-b', { ...dummyConfig, browserPage: pageB });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._manager = hanging;
+    const turnB = second.prompt({ prompt: 'b' });
+    await new Promise((r) => setImmediate(r));
+    assert.strictEqual(runtime.browserContested(), true, 'two turns with different pages: contested');
+    const refused = await runtime.handleToolRequest(request);
+    assert.strictEqual(refused.isError, true);
+    assert.match(refused.text ?? '', /Another OpenCode conversation is using the browser right now/);
+    const other = await runtime.handleToolRequest({ id: '2', op: 'list', group: 'browser' });
+    assert.strictEqual(other.isError, undefined, 'listing the tools is not an action');
+
+    pageB.startTurn('page-a'); // both turns have the same page: nothing to confuse
+    assert.strictEqual(runtime.browserContested(), false, 'the same page in both turns is not contested');
+    pageB.startTurn('page-b');
+
+    releases.forEach((release) => release());
+    await Promise.all([turnA, turnB]);
+    assert.strictEqual(runtime.browserContested(), false, 'turns that ended contest nothing');
+    console.log('✓ Test 16: a second OpenCode conversation with another page is refused the browser');
+  }
+
+  console.log('\nAll 16 AcpRuntime tests passed!');
 }
 
 run().then(
