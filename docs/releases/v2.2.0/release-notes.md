@@ -68,7 +68,7 @@ Type a few words, and Ritemark finds them in your documents, chats and tasks. 2.
 
 ## Known issues
 
-- **A much later copy can still replace your words.** If another app saves a copy more than 30 seconds after your last save, Ritemark takes that copy.
+- **A much later copy can still replace your words, rarely.** When another app saves a copy, Ritemark merges it with your words if it still has a version to merge from (it keeps them for ten minutes). Only when it has none, for example after a near-whole rewrite more than 30 seconds after your last save, does it take that copy.
 - **A rewrite of almost the whole file can't be merged.** Within 30 seconds, Ritemark asks which version to keep.
 - **If your project is in OneDrive on Windows, search finds its files by name only.**
 - **Files kept only online are found by name.** Search doesn't download them.
