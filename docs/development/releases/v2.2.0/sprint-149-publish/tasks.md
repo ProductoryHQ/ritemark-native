@@ -25,9 +25,10 @@ Nothing here starts before the plan's approval (sprint-plan.md, *Approval*). Tic
 
 ## Phase 3: PR 2, the page's bar in patch 010 (W2; R1, R2; the lead's answers 1 and 2)
 
-- [ ] `./scripts/create-patch.sh` on patch 010: Open in browser (icon, `arrow-square-out`, "Open in your browser") and Publish (outline, globe) at the right end of `MenuId.BrowserActionsToolbar`; `ritemarkBrowserLocalPage` gates Open in browser, `ritemarkBrowserProjectPage` gates Publish (S1, S3, S4). No session change (Jarmo's decision 4, 3 Nov)
-- [ ] Local pages: no address row, no back or forward; website links open a new browser tab, project pages their own tab (S4a); reload on a file change, or the reload button kept at the bar's left (S4b)
-- [ ] A2 again on the branch (S5); screenshots Light and Dark to the lead; the frame check; `CLAUDE.md`'s patch table row for 010 updated
+- [x] Patch 010 regenerated (not `create-patch.sh`, which only makes new patches): Open in browser (icon, `arrow-square-out`, "Open in your browser") and Publish (outline, globe) at the right end of `MenuId.BrowserActionsToolbar`; `ritemarkBrowserLocalPage` gates Open in browser, `ritemarkBrowserProjectPage` and `ritemark.publish.ready` gate Publish (S1, S3, S4). No session change (Jarmo's decision 4, 3 Nov)
+- [x] `sprint-plan.md` and `spec.md` follow ritemark-dev 14e0d03 and 05bc028 (4 November): the address, back, forward and reload stay; links open in the same tab (S4a); reload on a file change is upstream's auto-reload (S4b)
+- [ ] A2 again on the branch (S5); screenshots Light and Dark to the lead; the frame check
+- [x] Patch 010's rows updated (`docs/development/vscode-patches.md`, `PATCH-RULES.md`; `CLAUDE.md` no longer carries the patch table)
 - [ ] Review (High, `/security-review`), merge; Windows at Gate 2
 
 ## Phase 4: PR 3, what goes and the guard (W3; R3, R4, R5, R8)

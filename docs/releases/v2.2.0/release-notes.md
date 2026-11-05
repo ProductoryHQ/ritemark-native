@@ -83,7 +83,7 @@ Type a few words, and Ritemark finds them in your documents, chats and tasks. 2.
 ## Share your ideas as a web page
 
 - **Open a web page on the desk.** Any web page file in your project opens as the page, not as code.
-- **Open it in your own browser.** Press **Open in browser** at the right of the page's bar.
+- **Open it in your own browser.** **Open in your browser**, on the page's bar, shows the page in Safari, Chrome or whichever browser you use.
 <!-- 149 PR 4 (Publish) START: delete from here to "PR 4 END" if PR 4 has not merged -->
 - **Publish it with one press.** **Publish** puts the page online in your own Cloudflare account. Anyone with the link can open it.
 - **See exactly what goes.** Before anything leaves your computer, Ritemark lists the page and the files it uses. Nothing else from the project goes.

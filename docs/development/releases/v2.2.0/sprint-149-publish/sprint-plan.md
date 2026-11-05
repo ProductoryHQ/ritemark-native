@@ -4,7 +4,7 @@ Track: SDD (auto-detected: a new subsystem that sends the person's files to the 
 Override with: "use plain full track"
 Branch: `sprint-149-publish`, made from `origin/main` at Phase 3, after approval. Each later PR has its own branch that starts with the same name (*Pull requests* below). This plan was written on `plan/v2.2.0-sprint-149`.
 Release tier: **shell**, by `patches/vscode/010-ritemark-browser-action-bridge.patch` (PR 2: the page's bar, where the lead put the buttons); everything else is extension-tier. 2.2 is a shell release ([release-plan.md](../release-plan.md)), so this adds no release step.
-Status: **Approved**, 3 November 2026, by the Development manager on Jarmo's 2.2 delegation (*Approval* below), with **PR 4's merge gated on A4** (*Pre-Implementation Gate*). Jarmo answered decisions 2–5 on 3 November; the Experience lead answered the eight questions the same day (ritemark-dev `releases/v2.2.0/analysis/2026-11-03-sprint-149-experience-answers.md`, ae618e8). The code named under *What reading the code added* was read for the plan, not run.
+Status: **Approved**, 3 November 2026, by the Development manager on Jarmo's 2.2 delegation (*Approval* below), with **PR 4's merge gated on A4** (*Pre-Implementation Gate*). Jarmo answered decisions 2–5 on 3 November; the Experience lead answered the eight questions the same day (ritemark-dev `releases/v2.2.0/analysis/2026-11-03-sprint-149-experience-answers.md`, ae618e8). **On 4 November Jarmo kept the browser's address on a page's bar** (ritemark-dev 14e0d03 and 05bc028), which corrects answers 1 and 2: see *Later decisions (4 November)* below; this plan and `spec.md` follow them. The code named under *What reading the code added* was read for the plan, not run.
 
 ## SDD Artifacts
 
@@ -60,7 +60,7 @@ Four. The High paths sit in PRs 3 and 4; the two that need no account come first
 | PR | Branch | Holds | Before the account? | Release tier | Review tier |
 |---|---|---|---|---|---|
 | 1 | `sprint-149-publish` | The vault script (W0); the extension's commands, Open in browser (system) and Publish (unreachable until PR 4) (W1); A1, A2, A3's research | **Yes** | extension | Standard (`src/browser/`, `scripts/qa/`) |
-| 2 | `sprint-149-publish-shell` | The page's bar (W2): Open in browser (every local page) and Publish (project pages) at the right end of `MenuId.BrowserActionsToolbar`, the two context keys, no address row and no back/forward for local pages, links into new tabs, reload on a file change (or the reload button kept). No session change (decision 4) | **Yes** | **shell** (`patches/vscode/010-…`) | **High** (shell-tier list). `/code-review` at high + `/security-review`; proof: A2 on the branch, the frame check, screenshots to the lead, Windows at Gate 2 |
+| 2 | `sprint-149-publish-shell` | The page's bar (W2): Open in browser (every local page) and Publish (project pages) at the right end of `MenuId.BrowserActionsToolbar`, right of the address, and the two context keys. The rest of the bar stays the browser's (4 November): the address `file:///…`, back, forward and reload; links open in the same tab and back returns; the page reloads on a file change (upstream's auto-reload, already on). No session change (decision 4) | **Yes** | **shell** (`patches/vscode/010-…`) | **High** (shell-tier list). `/code-review` at high + `/security-review`; proof: A2 on the branch, the frame check, screenshots to the lead, Windows at Gate 2 |
 | 3 | `sprint-149-publish-gather` | What goes and the guard: the gather, the boundary, the exclusions, the key scan, the Publish sheet, the records (W3). No network; Publish isn't reachable from any menu until PR 4 | **Yes** | extension | **High** by content: it decides what becomes public. `src/publish/` joins `REVIEW.md`'s High row in this PR. `/code-review` at high + `/security-review` |
 | 4 | `sprint-149-publish-cloudflare` | The Cloudflare client, the connection (OAuth + token), SecretStorage, Settings ▸ Sharing ▸ Web pages, the `setApiKey` allowlist, the states, the flag (W4–W6) | Code yes; **merge no**: it waits on A4's measurements | extension | **High**: token storage and OAuth, the key handling in `src/settings/`, the upload. `/code-review` at high + `/security-review`; proof: S17–S28b live, S21's search |
 
@@ -173,12 +173,21 @@ The full list is in [technical-plan.md](technical-plan.md#risks-inside-the-sprin
   - 5: as recommended. A page can still reach local servers in 2.2, and that is noted.
 - [ ] Decision 6: the private OAuth client (Jarmo); the public one before the RC.
 - [x] Sprint start: PR 1 and the audits now; PRs 2–3 after the lead's answers; PR 4's merge after M1–M14.
+## Later decisions (4 November)
+
+Two commits in ritemark-dev change the lead's answers 1 and 2. They are Jarmo's (decisions log, 4 November), so this plan and `spec.md` follow them; PR 2 builds to them.
+
+- **14e0d03** (the Experience lead, from Jarmo's question): "experience 39: the page keeps the browser's address (Jarmo, 4 November); frames 1, 3, 4 redrawn; Sprint 149 answers 1 and 2 corrected". The answer now reads: "**Keep it, as today: `file:///…/Harbour programme.html`.**" The bar, left to right, is back, forward and reload; the address; Open in browser; Publish; the browser's ⋯. "A link to another page in the project, or to a website, opens in the same tab, and back returns to the page. Publish shows only while a project page is in front." "Reload stays", and the page also reloads by itself when its file changes.
+- **05bc028** (Jarmo, through the lead): "a published page's tab keeps file:///, Open the page opens the public page in a new tab (Jarmo, 4 November)". The decisions log row: "**a project page keeps the browser's address row**, `file:///…`, also once published; **Open the page** opens the public page in a new tab of Ritemark's browser beside it, at its `https://…workers.dev` address, so the local copy and the public page show two addresses". Settings' Open does the same (PR 4).
+
+What this changes: PR 2 no longer hides the address row or back and forward, and adds no navigation handler (links open in the same tab, as in any browser); the keys follow the address, so Open in browser and Publish leave when a link goes to a website and come back with back. Reload on a file change was already upstream's (`workbench.browser.autoReloadOnFileChange`, on by default), so nothing is built for it. PR 4's Open the page and Settings' Open open a new tab of Ritemark's browser, not the system browser.
+
 ## Questions
 
 **For the Experience lead: answered on 3 November 2026** (ritemark-dev `releases/v2.2.0/analysis/2026-11-03-sprint-149-experience-answers.md`, ae618e8). Each answer is in the spec and lands in the PR named.
 
-1. **Where the buttons sit:** on the page's own bar at its right end, never the tab row; Open in browser an icon button, Publish the outline button with the globe. Spec R2; **PR 2**.
-2. **The address row:** none for local pages; no back or forward; links open new tabs; the page reloads when its file changes, or keeps its reload button for now. Spec R1; **PR 2**.
+1. **Where the buttons sit:** on the browser's bar, right of the address (corrected 4 November, 14e0d03), never the tab row; Open in browser an icon button, Publish the outline button with the globe, the browser's ⋯ last. Spec R2; **PR 2**.
+2. **The address row:** ~~none for local pages; no back or forward; links open new tabs~~. **Corrected 4 November (14e0d03, 05bc028): kept.** The page shows `file:///…` as any browser shows a file, back, forward and reload stay, links open in the same tab, and a published page's tab keeps `file:///` too; the page reloads when its file changes. Spec R1; **PR 2**.
 3. **What goes:** "This page and its 2 pictures" / "This page and 4 files" / "This page, one file", "Nothing else from the project.", See the files folded, Left out with five reasons, nothing to untick. Spec R5; **PR 3**.
 4. **The key warning:** in ink with `shield-warning`, above the link note; Cancel the main button, "Publish anyway" quiet; Open script.js. Spec R4; **PR 3**.
 5. **The workers.dev name:** one row in the first sheet, "pages-4821", "This name is taken. Try another." Spec R5; **PR 4** (it needs the account).
