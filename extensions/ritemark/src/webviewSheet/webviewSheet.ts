@@ -2,7 +2,8 @@
  * The whole-window sheet for a webview (Sprint 149, PR 5): the workbench (patch 018, `ritemarkWebviewSheet.ts`) shows a
  * webview view of this extension centred over the dimmed window, drawn as the feedback sheet is. It is never a tab.
  *
- * Register a `WebviewViewProvider` for a view type that starts with `ritemark.` (no `views` contribution), then
+ * Register a `WebviewViewProvider` for a view type that starts with `ritemark.sheet.` (no `views` contribution; the
+ * shell refuses any other name, a contributed view and another extension's provider), then
  * `openWebviewSheet`: the provider's `resolveWebviewView` fills the sheet in, its `webviewView.onDidDispose` fires as
  * the sheet closes, and the promise resolves with how it closed. The sheet is as tall as the page's `<html>` (so the
  * page must not give it a 100% height), up to the window's height less 64; the page draws its own padding and leaves

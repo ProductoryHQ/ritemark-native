@@ -32,7 +32,7 @@ const sheetCommands: string[] = [];
 let provider: { resolveWebviewView(view: unknown): void } | undefined;
 let showing: { panel: FakePanel; close(outcome: string): void } | undefined;
 function openSheet(request: { viewType: string }): Promise<string> {
-  if (showing || !provider || request.viewType !== 'ritemark.publishSheet') return Promise.resolve('refused');
+  if (showing || !provider || request.viewType !== 'ritemark.sheet.publish') return Promise.resolve('refused');
   return new Promise<string>((resolveOpen) => {
     let onMessage: Listener = () => {};
     const onDispose: Array<() => void> = [];
@@ -91,7 +91,7 @@ const vscodeStub = {
     // the desk the sheet opens over: the active group
     tabGroups: { activeTabGroup: { viewColumn: 2 } },
     registerWebviewViewProvider: (viewType: string, p: { resolveWebviewView(view: unknown): void }) => {
-      assert.equal(viewType, 'ritemark.publishSheet');
+      assert.equal(viewType, 'ritemark.sheet.publish');
       assert.equal(provider, undefined, 'one provider for every sheet');
       provider = p;
       return { dispose() { provider = undefined; } };

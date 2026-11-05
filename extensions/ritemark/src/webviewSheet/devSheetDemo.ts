@@ -13,7 +13,7 @@ import * as vscode from 'vscode';
 import { sheetDemoTrigger } from './sheetDemoTrigger';
 import { closeWebviewSheet, openWebviewSheet } from './webviewSheet';
 
-export const SHEET_DEMO_VIEW_TYPE = 'ritemark.dev.webviewSheetDemo';
+export const SHEET_DEMO_VIEW_TYPE = 'ritemark.sheet.devDemo';
 
 export function registerWebviewSheetDemoIfAsked(context: vscode.ExtensionContext, env: Record<string, string | undefined> = process.env): void {
   const trigger = sheetDemoTrigger(env);

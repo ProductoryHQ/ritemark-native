@@ -231,16 +231,17 @@ isn't taken for Documents' Search (Ritemark's own, Sprint 148); it keeps Replace
 (search.contribution.ts, the container's title, the view's name and the View menu's mnemonic).
 A webview in a sheet over the window (Sprint 149, PR 5; the Experience lead, 5 Nov: publish.html frame 3): the hidden
 commands `_ritemark.webviewSheet.open` ({ viewType, title?, width? }) and `_ritemark.webviewSheet.close` ({ viewType })
-show one of the Ritemark extension's webview views (a view type starting `ritemark.`, its provider registered with
-registerWebviewViewProvider and no `views` contribution) centred over the whole window dimmed, drawn as the feedback
+show one of the Ritemark extension's webview views (a view type starting `ritemark.sheet.`, never a contributed view,
+its provider registered with registerWebviewViewProvider) centred over the whole window dimmed, drawn as the feedback
 sheet is: 440 wide unless asked, radius 12, the desk's colour, the hairline and one shadow; never a tab, never in a
 desk. The frame is the anchor of VS Code's overlay webview (one z-index above the dim) and its height follows the
 page's own (intrinsicContentSize), up to the window's height less 64. The focus moves in and stays in; Escape closes it
 wherever the focus is, and the focus goes back to where it was; the window's keybindings wait meanwhile, except the
 editing keys; a press on the dim does nothing; the webview's own menu draws over the sheet. open resolves when it
-closes (escape, closed, refused or failed) and the extension's onDidDispose fires; a second sheet, or a view another
-extension answered, is refused (ritemarkWebviewSheet.ts, loaded by webviewView.contribution.ts, since workbench/browser
-can't import the webview contribution). The feedback sheet stays as it is.
+closes (escape, closed, refused or failed) and the extension's onDidDispose fires; a second sheet is refused, and a
+view another extension answered, or a resolve that throws, is refused before anything shows: no dim, no key held
+(ritemarkWebviewSheet.ts, loaded by webviewView.contribution.ts, since workbench/browser can't import the webview
+contribution). The feedback sheet stays as it is.
 diff --git a/src/vs/base/browser/ui/dialog/dialog.ts b/src/vs/base/browser/ui/dialog/dialog.ts
 index 34d22b5d162..644a11f194a 100644
 --- a/src/vs/base/browser/ui/dialog/dialog.ts
@@ -6403,10 +6404,10 @@ index 00000000000..8f4469959ad
 +}
 diff --git a/src/vs/workbench/contrib/webviewView/browser/ritemarkWebviewSheet.ts b/src/vs/workbench/contrib/webviewView/browser/ritemarkWebviewSheet.ts
 new file mode 100644
-index 00000000000..42ad066762c
+index 00000000000..52344abdc27
 --- /dev/null
 +++ b/src/vs/workbench/contrib/webviewView/browser/ritemarkWebviewSheet.ts
-@@ -0,0 +1,277 @@
+@@ -0,0 +1,310 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -6418,8 +6419,8 @@ index 00000000000..42ad066762c
 + * (ritemarkFeedbackSheet.ts): the whole window dimmed, the sheet centred, 440 wide by default, the desk's colour, the
 + * hairline and one shadow. It is never a tab and never inside a desk.
 + *
-+ * The extension registers a `WebviewViewProvider` for a view type of its own (no `views` contribution is needed) and
-+ * runs the hidden command `_ritemark.webviewSheet.open` with `{ viewType, title?, width? }`. The sheet resolves that view
++ * The extension registers a `WebviewViewProvider` for a view type of its own under `ritemark.sheet.` (never a
++ * contributed view; no `views` contribution is needed) and runs the hidden command `_ritemark.webviewSheet.open` with `{ viewType, title?, width? }`. The sheet resolves that view
 + * type's webview over its frame (VS Code's overlay webview, anchored to the frame, one z-index above the dim), moves the
 + * focus into it, and the command's promise resolves when the sheet closes, with how: Escape, `closed` (the extension's
 + * `_ritemark.webviewSheet.close`), `refused` (another sheet is showing, or the view type is not Ritemark's) or `failed`.
@@ -6442,6 +6443,7 @@ index 00000000000..42ad066762c
 +import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
 +import { ILayoutService } from '../../../../platform/layout/browser/layoutService.js';
 +import { isRitemarkExtension } from '../../../browser/ritemarkFrame.js';
++import { IViewDescriptorService } from '../../../common/views.js';
 +import { IOverlayWebview, IWebviewService, WebviewContentPurpose } from '../../webview/browser/webview.js';
 +import { IWebviewViewService, WebviewView } from './webviewViewService.js';
 +
@@ -6528,9 +6530,54 @@ index 00000000000..42ad066762c
 +	const viewType = request.viewType;
 +	const targetWindow = getWindow(container);
 +	const doc = container.ownerDocument;
-+	const store = new DisposableStore();
 +	const previouslyFocused = doc.activeElement as HTMLElement | null;
 +
++	// First the provider answers, before anything shows (the review of f4fc37f3): the main thread names the extension
++	// that registered the view type as its resolve starts (mainThreadWebviewViews.ts), so a view another extension
++	// answered is refused with no dim and no key held, and so is a resolve that throws at once
++	const webview = deps.createWebview(request);
++	const onDispose = new Emitter<void>();
++	const source = new CancellationTokenSource();
++	let close: ((outcome: RitemarkWebviewSheetOutcome) => void) | undefined;
++	const pending = { viewType, close: (outcome: RitemarkWebviewSheetOutcome) => close?.(outcome) };
++	showing = pending; // a second open waits while this one asks
++	const refuse = (outcome: RitemarkWebviewSheetOutcome): Promise<RitemarkWebviewSheetOutcome> => {
++		if (showing === pending) {
++			showing = undefined;
++		}
++		source.cancel();
++		onDispose.fire(); // the extension's onDidDispose, if its resolve began
++		onDispose.dispose();
++		source.dispose();
++		webview.dispose();
++		return Promise.resolve(outcome);
++	};
++	const view: WebviewView = {
++		webview: webview as IOverlayWebview,
++		title: request.title,
++		description: undefined,
++		badge: undefined,
++		onDidChangeVisibility: Event.None,
++		onDispose: onDispose.event,
++		dispose: () => close?.('closed'),
++		show: preserveFocus => {
++			if (!preserveFocus) {
++				webview.focus();
++			}
++		},
++	};
++	let resolving: Promise<void>;
++	try {
++		resolving = deps.resolve(view, source.token);
++	} catch {
++		return refuse('failed');
++	}
++	if (!deps.isAllowed(webview)) {
++		resolving.catch(() => { /* refused already */ });
++		return refuse('refused');
++	}
++
++	const store = new DisposableStore();
 +	container.classList.add('ritemark-webview-sheet-open'); // a menu the page opens draws over the sheet (the CSS)
 +	const block = append(container, $('.monaco-dialog-modal-block.dimmed.ritemark-webview-sheet-block'));
 +	const frame = append(block, $('.ritemark-webview-sheet.waiting'));
@@ -6543,23 +6590,19 @@ index 00000000000..42ad066762c
 +	frame.style.height = `${FIRST_HEIGHT}px`;
 +
 +	// The webview is anchored to the frame, after the block is in the page: its z-index is the dim's plus one
-+	const webview = deps.createWebview(request);
 +	const owner = {};
 +	webview.claim(owner, targetWindow, undefined);
 +	webview.setAnchorElement(frame);
 +	webview.container.classList.add('ritemark-webview-sheet-content', 'waiting'); // after the claim, which makes the layer it names
 +
-+	const onDispose = new Emitter<void>();
-+	const source = new CancellationTokenSource();
-+
 +	return new Promise<RitemarkWebviewSheetOutcome>(resolve => {
 +		let closed = false;
-+		const close = (outcome: RitemarkWebviewSheetOutcome) => {
++		close = (outcome: RitemarkWebviewSheetOutcome) => {
 +			if (closed) {
 +				return;
 +			}
 +			closed = true;
-+			if (showing?.close === close) {
++			if (showing === pending) {
 +				showing = undefined;
 +			}
 +			source.cancel();
@@ -6577,9 +6620,11 @@ index 00000000000..42ad066762c
 +			onDidCloseEmitter.fire({ viewType, outcome });
 +			resolve(outcome);
 +		};
-+		showing = { viewType, close };
 +
 +		const reveal = () => {
++			if (closed || !deps.isAllowed(webview)) {
++				return;
++			}
 +			frame.classList.remove('waiting');
 +			webview.container.classList.remove('waiting');
 +		};
@@ -6605,7 +6650,7 @@ index 00000000000..42ad066762c
 +			if (action === 'close') {
 +				event.preventDefault();
 +				event.stopImmediatePropagation();
-+				close('escape');
++				close?.('escape');
 +			} else if (action === 'hold') {
 +				event.stopImmediatePropagation();
 +			}
@@ -6630,38 +6675,27 @@ index 00000000000..42ad066762c
 +			webview.focus();
 +		}));
 +
-+		const view: WebviewView = {
-+			webview: webview as IOverlayWebview,
-+			title: request.title,
-+			description: undefined,
-+			badge: undefined,
-+			onDidChangeVisibility: Event.None,
-+			onDispose: onDispose.event,
-+			dispose: () => close('closed'),
-+			show: preserveFocus => {
-+				if (!preserveFocus) {
-+					webview.focus();
-+				}
-+			},
-+		};
-+
-+		deps.resolve(view, source.token).then(() => {
++		resolving.then(() => {
 +			if (closed) {
 +				return;
 +			}
 +			if (!deps.isAllowed(webview)) {
-+				close('refused');
++				close?.('refused');
 +				return;
 +			}
 +			webview.focus();
-+		}, () => close('failed'));
++		}, () => close?.('failed'));
 +		webview.focus();
 +	});
 +}
 +
++/** Only view types made for a sheet, under this prefix; never a contributed view (the AI's side bar is `ritemark.…`). */
++export const RITEMARK_WEBVIEW_SHEET_VIEW_PREFIX = 'ritemark.sheet.';
++
 +CommandsRegistry.registerCommand(RITEMARK_WEBVIEW_SHEET_OPEN, (accessor, request: IRitemarkWebviewSheetRequest) => {
-+	// Only Ritemark's own view types: the name first, then the extension that answered
-+	if (typeof request?.viewType !== 'string' || !request.viewType.startsWith('ritemark.')) {
++	// Any extension can run this command and register a provider: the name and the views first, then (in
++	// showRitemarkWebviewSheet) the extension that answered, before anything shows
++	if (typeof request?.viewType !== 'string' || !request.viewType.startsWith(RITEMARK_WEBVIEW_SHEET_VIEW_PREFIX) || accessor.get(IViewDescriptorService).getViewDescriptorById(request.viewType)) {
 +		return 'refused';
 +	}
 +	const layoutService = accessor.get(ILayoutService);
@@ -6673,7 +6707,7 @@ index 00000000000..42ad066762c
 +			title,
 +			options: { purpose: WebviewContentPurpose.WebviewView },
 +			contentOptions: {},
-+			extension: undefined, // set by the provider's side as it resolves (mainThreadWebviewViews.ts)
++			extension: undefined, // set by the provider's side as its resolve starts (mainThreadWebviewViews.ts)
 +		}),
 +		resolve: (view, token) => webviewViewService.resolve(request.viewType, view, token),
 +		isAllowed: webview => isRitemarkExtension(webview.extension?.id),
@@ -6772,10 +6806,10 @@ index e0e445671e1..0f09ef5e3e9 100644
  		super.updateTitle(typeof value === 'string' ? value : this.defaultTitle);
 diff --git a/src/vs/workbench/contrib/webviewView/test/browser/ritemarkWebviewSheet.test.ts b/src/vs/workbench/contrib/webviewView/test/browser/ritemarkWebviewSheet.test.ts
 new file mode 100644
-index 00000000000..623f3efed64
+index 00000000000..6bd15539cd9
 --- /dev/null
 +++ b/src/vs/workbench/contrib/webviewView/test/browser/ritemarkWebviewSheet.test.ts
-@@ -0,0 +1,167 @@
+@@ -0,0 +1,210 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -6790,6 +6824,9 @@ index 00000000000..623f3efed64
 +import { observableValue } from '../../../../../base/common/observable.js';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
 +import { CommandsRegistry } from '../../../../../platform/commands/common/commands.js';
++import { ExtensionIdentifier } from '../../../../../platform/extensions/common/extensions.js';
++import { ServicesAccessor } from '../../../../../platform/instantiation/common/instantiation.js';
++import { IViewDescriptorService } from '../../../../common/views.js';
 +import { closeRitemarkWebviewSheet, IRitemarkWebviewSheetRequest, RITEMARK_WEBVIEW_SHEET_CLOSE, RITEMARK_WEBVIEW_SHEET_OPEN, RitemarkSheetWebview, ritemarkWebviewSheetKey, ritemarkWebviewSheetShowing, ritemarkWebviewSheetWidth, showRitemarkWebviewSheet } from '../../browser/ritemarkWebviewSheet.js';
 +import { WebviewView } from '../../browser/webviewViewService.js';
 +
@@ -6821,7 +6858,7 @@ index 00000000000..623f3efed64
 +		return { webview, log };
 +	}
 +
-+	function open(request: Partial<IRitemarkWebviewSheetRequest> = {}, allowed = true) {
++	function open(request: Partial<IRitemarkWebviewSheetRequest> = {}, allowed = true, resolve?: (view: WebviewView, token: CancellationToken) => Promise<void>) {
 +		const container = mainWindow.document.createElement('div');
 +		mainWindow.document.body.appendChild(container);
 +		const button = mainWindow.document.createElement('button');
@@ -6831,14 +6868,15 @@ index 00000000000..623f3efed64
 +		const resolved: { view?: WebviewView; token?: CancellationToken } = {};
 +		let disposed = 0;
 +		const subscriptions = new DisposableStore();
-+		const outcome = showRitemarkWebviewSheet(container, { viewType: 'ritemark.test', title: 'Publish', ...request }, {
++		const outcome = showRitemarkWebviewSheet(container, { viewType: 'ritemark.sheet.test', title: 'Publish', ...request }, {
 +			createWebview: () => webview,
-+			resolve: async (view, token) => {
++			resolve: (view, token) => {
 +				resolved.view = view;
 +				resolved.token = token;
 +				subscriptions.add(view.onDispose(() => disposed++));
++				return resolve ? resolve(view, token) : Promise.resolve();
 +			},
-+			isAllowed: () => allowed,
++			isAllowed: webview => allowed && (!resolve || webview.extension?.id.value === 'ritemark.ritemark'),
 +			mac: true,
 +		});
 +		const frame = () => container.querySelector<HTMLElement>('.ritemark-webview-sheet');
@@ -6881,7 +6919,7 @@ index 00000000000..623f3efed64
 +			label: 'Publish',
 +			width: '440px',
 +			log: ['claim', 'anchor ritemark-webview-sheet waiting', 'focus', 'focus'],
-+			showing: 'ritemark.test',
++			showing: 'ritemark.sheet.test',
 +			resolved: true,
 +		});
 +
@@ -6913,8 +6951,8 @@ index 00000000000..623f3efed64
 +
 +	test('close by view type, a second sheet waits, and the view\'s own dispose closes it', async () => {
 +		const first = open();
-+		assert.strictEqual(await showRitemarkWebviewSheet(first.container, { viewType: 'ritemark.other' }, { createWebview: () => fakeWebview().webview, resolve: async () => { }, isAllowed: () => true, mac: true }), 'refused');
-+		assert.deepStrictEqual([closeRitemarkWebviewSheet('ritemark.other'), CommandsRegistry.getCommand(RITEMARK_WEBVIEW_SHEET_CLOSE)?.handler(undefined!, { viewType: 'ritemark.test' })], [false, true]);
++		assert.strictEqual(await showRitemarkWebviewSheet(first.container, { viewType: 'ritemark.sheet.other' }, { createWebview: () => fakeWebview().webview, resolve: async () => { }, isAllowed: () => true, mac: true }), 'refused');
++		assert.deepStrictEqual([closeRitemarkWebviewSheet('ritemark.sheet.other'), CommandsRegistry.getCommand(RITEMARK_WEBVIEW_SHEET_CLOSE)?.handler(undefined!, { viewType: 'ritemark.sheet.test' })], [false, true]);
 +		assert.deepStrictEqual([await first.outcome, first.block(), first.disposed()], ['closed', null, 1]);
 +		first.dispose();
 +
@@ -6932,15 +6970,54 @@ index 00000000000..623f3efed64
 +
 +		const pressed = open();
 +		pressed.block()!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-+		assert.deepStrictEqual([pressed.block() !== null, ritemarkWebviewSheetShowing()], [true, 'ritemark.test']);
++		assert.deepStrictEqual([pressed.block() !== null, ritemarkWebviewSheetShowing()], [true, 'ritemark.sheet.test']);
 +		closeRitemarkWebviewSheet();
 +		await pressed.outcome;
 +		pressed.dispose();
 +	});
 +
-+	test('the open command takes only Ritemark\'s view types', () => {
-+		const handler = CommandsRegistry.getCommand(RITEMARK_WEBVIEW_SHEET_OPEN)?.handler;
-+		assert.deepStrictEqual([handler?.(undefined!, { viewType: 'someone.else' }), handler?.(undefined!, {} as IRitemarkWebviewSheetRequest)], ['refused', 'refused']);
++	// Round 2 (the review of f4fc37f3): another extension can run the command and register a provider, so nothing shows
++	// until the provider that answered is known to be Ritemark's, and a view that is a contributed view is never a sheet
++	const foreign = { id: new ExtensionIdentifier('someone.else') };
++
++	test('a foreign extension\'s view is refused before anything shows', async () => {
++		const sheet = open({}, true, async view => { (view.webview as unknown as RitemarkSheetWebview & { extension: unknown }).extension = foreign; });
++		const shownAtOnce = [sheet.block(), sheet.container.className];
++		assert.deepStrictEqual({ shownAtOnce, outcome: await sheet.outcome, block: sheet.block(), claimed: sheet.log.includes('claim'), showing: ritemarkWebviewSheetShowing() }, { shownAtOnce: [null, ''], outcome: 'refused', block: null, claimed: false, showing: undefined });
++		sheet.dispose();
++	});
++
++	test('a foreign view whose resolve never returns never shows', async () => {
++		const sheet = open({}, true, view => { (view.webview as unknown as RitemarkSheetWebview & { extension: unknown }).extension = foreign; return new Promise<void>(() => { }); });
++		const shownAtOnce = sheet.block();
++		const outcome = await sheet.outcome;
++		await timeout(0);
++		assert.deepStrictEqual({ shownAtOnce, outcome, block: sheet.block(), claimed: sheet.log.includes('claim'), cancelled: sheet.resolved.token?.isCancellationRequested, showing: ritemarkWebviewSheetShowing() }, { shownAtOnce: null, outcome: 'refused', block: null, claimed: false, cancelled: true, showing: undefined });
++		sheet.dispose();
++	});
++
++	test('a resolve that throws at once leaves no dim', async () => {
++		const sheet = open({}, true, () => { throw new Error('View already awaiting revival'); });
++		assert.deepStrictEqual({ outcome: await sheet.outcome, block: sheet.block(), container: sheet.container.className, showing: ritemarkWebviewSheetShowing() }, { outcome: 'failed', block: null, container: '', showing: undefined });
++		sheet.dispose();
++	});
++
++	test('the open command takes only ritemark.sheet. view types that are no contributed view', () => {
++		const handler = CommandsRegistry.getCommand(RITEMARK_WEBVIEW_SHEET_OPEN)!.handler;
++		const accessor = {
++			get: (id: unknown) => {
++				if (id === IViewDescriptorService) {
++					return { getViewDescriptorById: (viewType: string) => viewType === 'ritemark.sheet.contributed' ? { id: viewType } : null };
++				}
++				throw new Error('refused before any other service is asked');
++			}
++		} as unknown as ServicesAccessor;
++		assert.deepStrictEqual([
++			handler(accessor, { viewType: 'ritemark.unifiedView' }),
++			handler(accessor, { viewType: 'ritemark.sheet.contributed' }),
++			handler(accessor, { viewType: 'someone.else' }),
++			handler(accessor, {} as IRitemarkWebviewSheetRequest),
++		], ['refused', 'refused', 'refused', 'refused']);
 +	});
 +});
 diff --git a/src/vs/workbench/electron-browser/desktop.contribution.ts b/src/vs/workbench/electron-browser/desktop.contribution.ts

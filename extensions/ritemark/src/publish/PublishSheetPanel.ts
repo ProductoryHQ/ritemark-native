@@ -11,7 +11,7 @@
  *
  * Where it shows (PR 5): over the whole window, centred, the window dimmed behind it, never a tab (the lead, 5
  * November; publish.html frame 3). The workbench draws that frame (patch 018, `_ritemark.webviewSheet`); the page is
- * this extension's webview view `ritemark.publishSheet`, registered here once (`webviewSheet.ts`). A shell without the
+ * this extension's webview view `ritemark.sheet.publish`, registered here once (`webviewSheet.ts`). A shell without the
  * sheet answers cancel: Publish on the bar needs a 2.2 shell anyway.
  */
 
@@ -22,7 +22,7 @@ import { sheetModelOf } from './sheetModel';
 import { isSheetWebviewMessage, PublishSheetHostMessage, PublishSheetModel } from './sheetProtocol';
 import type { KeyHit, PublishPlan } from './types';
 
-export const PUBLISH_SHEET_VIEW_TYPE = 'ritemark.publishSheet';
+export const PUBLISH_SHEET_VIEW_TYPE = 'ritemark.sheet.publish';
 
 export type SheetAnswer = { kind: 'cancel' } | { kind: 'publish' | 'publishAnyway'; pagePart?: string };
 
