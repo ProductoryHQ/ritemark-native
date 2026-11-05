@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Sprint 153: the browser's and the microphone's fixes
 
 #### Fixed
+- **Transcribe tells you when the microphone gives no sound (#656).** While you record, the card names the microphone it records from, and if it hears nothing for a few seconds it says "No sound from the microphone" with a link to the sound settings where the input is chosen; the recording goes on. A recording with no sound at all is never sent to on-device or ElevenLabs transcription: the card says nothing was recorded and offers Record again.
 - **The AI works in the page you gave it, with several browser tabs open (#658).** When you ask the AI about a web page, its clicks, typing and page loads now go to that page, even if another tab is in front by then or the page opened a popup. They no longer land in whichever tab happens to be active. The AI never brings a tab forward or changes what you see: if its page isn't in front, it doesn't click or type there, and asks you instead. If its page was closed, it says so instead of acting somewhere else, and an address you ask for with no page in front opens in a new tab. The AI acts in a page it opened only once you share it. A ChatGPT conversation from before the update continues with its history on screen; because the browser tools changed, ChatGPT starts its own side of it afresh once, from what Ritemark passes it about the conversation.
 
 ### Sprint 152: the startup contract

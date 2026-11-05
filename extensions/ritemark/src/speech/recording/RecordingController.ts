@@ -78,6 +78,8 @@ export interface RecordingControllerDeps {
   postEvent(event: RecordingEvent): void;
   /** The OS privacy page for the microphone (R2: the denied state's action). */
   openMicrophoneSettings(): void;
+  /** The OS sound settings, where the input is chosen (#656: the "no sound" line's action). */
+  openSoundSettings(): void;
   /** Something the panel shows changed. */
   onChange(): void;
   log?(message: string): void;
@@ -162,6 +164,9 @@ export class RecordingController {
         return Promise.resolve();
       case 'transcribe:record/openMicrophoneSettings':
         this.deps.openMicrophoneSettings();
+        return Promise.resolve();
+      case 'transcribe:record/openSoundSettings':
+        this.deps.openSoundSettings();
         return Promise.resolve();
     }
   }

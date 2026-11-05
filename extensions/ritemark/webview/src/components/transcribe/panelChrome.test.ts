@@ -96,4 +96,17 @@ assert.ok(hostSource.includes(`case '${ATTENTION_ACTIONS.dismiss.message}':`), '
 assert.ok(panelSource.includes('refusal={refusalOf(engine.id)}'));
 assert.ok(hostSource.includes('cannotTakeOnDevice(path.extname(audioPath)'), 'the host decides it before anything starts');
 
+// #656: the behaviour is rendered and clicked in pendingSilence.test.ts and TranscribeViewProvider.silence.test.ts;
+// here, the wiring between the files.
+assert.match(hostSource, /const silent = path\.extname\(audioPath\)\.toLowerCase\(\) === '\.wav' && \(await wavSound\(audioPath\)\) === 'silent'/);
+assert.ok(hostSource.includes('soundSettings: soundSettingsName(process.platform)'), 'the host names the settings, once');
+assert.ok(hostSource.includes("darwin: 'x-apple.systempreferences:com.apple.preference.sound?input'"), 'the link opens Sound ▸ Input');
+assert.ok(hostSource.includes("win32: 'ms-settings:sound'"), 'and Settings ▸ System ▸ Sound on Windows');
+assert.ok(panelSource.includes('soundSettings={state.soundSettings}\n            onStop'), 'the live card gets the name from the host');
+assert.ok(panelSource.includes('start: () => recordAgain((message) => vscode.postMessage(message), recording)'), 'Record again records');
+const cardsSource = readFileSync(fileURLToPath(new URL('./recording/RecordingCards.tsx', import.meta.url)), 'utf-8');
+assert.ok(!/'System Settings ▸ Sound'|'Settings ▸ System ▸ Sound'/.test(cardsSource + panelSource), 'the webview keeps no copy of the names');
+const liveCard = cardsSource.slice(cardsSource.indexOf('export function LiveRecordingCard'), cardsSource.indexOf('export function SavingCard'));
+assert.ok(liveCard.includes('{view.noSound && <NoSoundLine soundSettings={soundSettings} />}'));
+
 console.log('panelChrome tests passed');

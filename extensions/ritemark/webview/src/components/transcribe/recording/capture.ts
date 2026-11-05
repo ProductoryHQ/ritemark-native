@@ -8,6 +8,8 @@
  * Constants mirror `src/speech/recording/types.ts` (Phase 0 §5 freeze).
  */
 
+import { MUTED_SECONDS, reachesLiveLevel } from '../../../hooks/dictationLevel';
+
 export const SAMPLE_RATE = 16_000;
 /** One chunk ≈ one second of 16 kHz audio. */
 export const CHUNK_SAMPLES = SAMPLE_RATE;
@@ -161,6 +163,58 @@ export class ChunkLedger {
   get ackedSeconds(): number {
     return this.acked / SAMPLE_RATE;
   }
+}
+
+/**
+ * #656: whether the microphone has given no sound for a few seconds. Jarmo
+ * recorded 236 s from the wrong input and every sample was 0; nothing said so
+ * until the engine found no speech.
+ *
+ * Dictation's rule, so both recorders mean the same by "no sound"
+ * (`dictationLevel.ts`): `MUTED_SECONDS` with no sample reaching -80 dBFS. A
+ * live microphone always reaches it within seconds, a muted or wrong input
+ * (exact zeros, or a muted mic's -92 dBFS) never does. Measured on the raw
+ * input, before resampling, so the rule is the same at every device rate.
+ * Unlike dictation the recording keeps going: the watch only turns a line on,
+ * and off again as soon as sound arrives.
+ */
+export class SilenceWatch {
+  private quiet = 0;
+  private silentNow = false;
+
+  get silent(): boolean {
+    return this.silentNow;
+  }
+
+  /** Feed one input buffer; returns true when `silent` changed. */
+  push(samples: ArrayLike<number>, sampleRate: number): boolean {
+    const before = this.silentNow;
+    if (reachesLiveLevel(samples)) {
+      this.quiet = 0;
+      this.silentNow = false;
+    } else {
+      this.quiet += samples.length;
+      if (this.quiet >= sampleRate * MUTED_SECONDS) this.silentNow = true;
+    }
+    return before !== this.silentNow;
+  }
+}
+
+/**
+ * #656 (Jarmo, 4 Nov): the input's name for "Recording from …", from the capture
+ * track's `label`. Chromium names the system default "Default - …" (Windows
+ * also "Communications - …") and appends "(Built-in)" or a USB id ("(046d:0ab7)")
+ * on the Mac; those go, the rest of the name stays. No label, or only a generic
+ * one, gives null: the panel shows nothing rather than a guess.
+ */
+export function inputDeviceName(label: unknown): string | null {
+  if (typeof label !== 'string') return null;
+  const name = label
+    .trim()
+    .replace(/^(?:default|communications)\s+-\s+/i, '')
+    .replace(/\s*\((?:built-in|[0-9a-f]{4}:[0-9a-f]{4})\)$/i, '')
+    .trim();
+  return name === '' || /^default$/i.test(name) ? null : name;
 }
 
 export type CaptureFailureCode = 'os-denied' | 'no-device' | 'device-busy' | 'internal-config' | 'unexpected';

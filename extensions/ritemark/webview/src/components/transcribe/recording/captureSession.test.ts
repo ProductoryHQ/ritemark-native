@@ -21,6 +21,7 @@ import {
 } from './captureSession';
 
 class FakeTrack implements TrackLike {
+  constructor(readonly label = 'Default - MacBook Pro Microphone (Built-in)') {}
   stopped = false;
   private listeners: Array<() => void> = [];
   stop() { this.stopped = true; }
@@ -29,7 +30,7 @@ class FakeTrack implements TrackLike {
 }
 
 class FakeStream implements StreamLike {
-  readonly track = new FakeTrack();
+  constructor(readonly track = new FakeTrack()) {}
   getTracks() { return [this.track]; }
 }
 
@@ -393,6 +394,84 @@ async function run(): Promise<void> {
     assertReleased(r, 'dispose');
     assert.equal(r.of('transcribe:record/stop').length, 0, 'the host keeps the partial for recovery');
     assert.equal(r.session.view().phase, 'idle');
+  }
+
+  // ------------------------------------------------ #656: the input's name, from the first moment
+  {
+    const r = rig();
+    r.session.start();
+    assert.equal(r.session.view().inputName, null, 'no name before the microphone opens');
+    r.session.handleEvent({ type: 'transcribe:record/begin', sessionId: ID });
+    r.resolveMic();
+    await tick();
+    const first = r.views.find((view) => view.phase === 'recording');
+    assert.equal(first?.inputName, 'MacBook Pro Microphone', 'named in the first recording view, before any audio');
+    assert.equal(first?.savedSeconds, 0);
+    r.session.cancel();
+
+    // A track with no label (no permission detail, or a browser that hides it): nothing, not a guess.
+    const unnamed = rig();
+    unnamed.session.start();
+    unnamed.session.handleEvent({ type: 'transcribe:record/begin', sessionId: ID });
+    unnamed.resolveMic(new FakeStream(new FakeTrack('')));
+    await tick();
+    assert.equal(unnamed.session.view().phase, 'recording');
+    assert.equal(unnamed.session.view().inputName, null);
+    unnamed.session.cancel();
+
+    // The next recording starts without the last one's name.
+    const again = rig();
+    await recording(again);
+    again.session.stop();
+    again.session.syncHost({ phase: 'idle', sessionId: null });
+    again.session.start();
+    assert.equal(again.session.view().inputName, null, 'a new start forgets the last input');
+  }
+
+  // ------------------------------------------------ #656: no sound from the microphone, the recording going on
+  // At 16 kHz, and at the device rate with the resampler (the fallback path).
+  for (const fallback of [false, true]) {
+    const r = rig({ rate: 16_000, fallbackRate: 48_000 });
+    r.session.start();
+    if (fallback) r.ctx().rejectSource = true;
+    r.session.handleEvent({ type: 'transcribe:record/begin', sessionId: ID });
+    r.resolveMic();
+    await tick();
+    const ctx = r.ctx();
+    const deviceRate = ctx.sampleRate;
+    const feed = (samples: Float32Array) => {
+      for (let i = 0; i < samples.length; i += 4096) ctx.processor!.feed(samples.subarray(i, i + 4096));
+    };
+    const ackAll = () => {
+      for (const chunk of r.of('transcribe:record/chunk')) r.session.handleEvent({ type: 'transcribe:record/ack', sessionId: ID, sequence: chunk.sequence });
+    };
+
+    feed(new Float32Array(deviceRate * 2));
+    ackAll();
+    assert.equal(r.session.view().noSound, false, `${deviceRate}: 2 s of zeros is not yet "no sound"`);
+    feed(new Float32Array(deviceRate * 2));
+    ackAll();
+    assert.equal(r.session.view().noSound, true, `${deviceRate}: 4 s of zeros is "no sound"`);
+    assert.equal(r.session.view().phase, 'recording', `${deviceRate}: the recording goes on`);
+    assert.equal(r.of('transcribe:record/stop').length, 0, `${deviceRate}: nothing stops it`);
+    assert.equal(r.of('transcribe:record/chunk').length, 4, `${deviceRate}: the silence is still saved, second by second`);
+    const flips = r.views.filter((view, i) => i > 0 && view.noSound !== r.views[i - 1].noSound).length;
+    assert.equal(flips, 1, `${deviceRate}: the panel hears about it once`);
+
+    feed(second(deviceRate));
+    assert.equal(r.session.view().noSound, false, `${deviceRate}: sound clears it`);
+    r.session.stop();
+    assertReleased(r, `no sound at ${deviceRate}`);
+  }
+  {
+    // The next recording starts without the last one's warning.
+    const r = rig();
+    await recording(r);
+    r.ctx().processor!.feed(new Float32Array(16_000 * 4));
+    assert.equal(r.session.view().noSound, true);
+    r.session.cancel();
+    r.session.start();
+    assert.equal(r.session.view().noSound, false, 'a new start forgets the last warning');
   }
 
   assert.equal(new CaptureSession({} as AudioEnv, () => {}, () => {}).handleEvent({ type: 'transcribe:state' }), false, 'other messages pass through');

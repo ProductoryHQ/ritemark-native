@@ -20,6 +20,7 @@ import type { EngineRegistry } from '../speech/engineRegistry';
 import type { JobManager } from '../speech/JobManager';
 import type { SessionStore } from '../speech/SessionStore';
 import { AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, canConvertLocally, cannotTakeOnDevice, classifyInput } from '../speech/audioPrep';
+import { soundSettingsName, wavSound } from '../speech/silence';
 import { pickerFolder } from '../utils/dialogDefaults';
 import { probeDurationSec } from '../speech/durationProbe';
 import { sessionIdForPath } from '../speech/SessionStore';
@@ -56,6 +57,11 @@ interface PendingImport {
   durationSec: number | null;
   /** `refusal`: why this engine can't take this file on this computer (Sprint 143, #509). */
   estimates: Array<{ engineId: string; costUsd: number | null; refusal?: string }>;
+  /**
+   * #656: set when the file has no sound at all, and no engine is started. `recordedHere`: recorded in this panel,
+   * so the card says where the input is chosen and offers Record again.
+   */
+  silence?: { recordedHere: boolean };
 }
 
 export class TranscribeViewProvider implements vscode.WebviewViewProvider {
@@ -156,6 +162,10 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
       postEvent: (event) => this._post(event),
       openMicrophoneSettings: () => {
         const page = MICROPHONE_SETTINGS[process.platform];
+        if (page) void vscode.env.openExternal(vscode.Uri.parse(page));
+      },
+      openSoundSettings: () => {
+        const page = SOUND_INPUT_SETTINGS[process.platform];
         if (page) void vscode.env.openExternal(vscode.Uri.parse(page));
       },
       onChange: () => void this._pushState(),
@@ -357,11 +367,16 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
       };
     });
 
+    // #656: said before anything starts. Only a WAV is read here (Ritemark's own recordings are WAV); the job
+    // checks again before any engine runs, from the same reading while the file is unchanged (`wavSound`).
+    const silent = path.extname(audioPath).toLowerCase() === '.wav' && (await wavSound(audioPath)) === 'silent';
+
     this._pending = {
       audioPath,
       audioName: path.basename(audioPath),
       durationSec,
       estimates,
+      ...(silent ? { silence: { recordedHere: this._recordedPaths.has(audioPath) } } : {}),
     };
     await this._pushState();
   }
@@ -369,8 +384,9 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
   private async _start(engineId: EngineId, language: string | null): Promise<void> {
     const pending = this._pending;
     if (!pending) return;
-    // Sprint 143 (#509): an engine that can't take this file on this computer is never started (a stale page).
-    if (pending.estimates.some((estimate) => estimate.engineId === engineId && estimate.refusal)) {
+    // Sprint 143 (#509): an engine that can't take this file on this computer is never started (a stale page);
+    // nor is any engine for a file with no sound (#656).
+    if (pending.silence || pending.estimates.some((estimate) => estimate.engineId === engineId && estimate.refusal)) {
       await this._pushState();
       return;
     }
@@ -560,6 +576,8 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
         pending: this._pending,
         preferredEngineId: preferred?.id ?? null,
         platform: process.platform,
+        // #656: where the sound input is chosen, by name; the one source of these words (`src/speech/silence.ts`).
+        soundSettings: soundSettingsName(process.platform),
         acceptedExtensions: AUDIO_EXTENSIONS,
         videoExtensions: VIDEO_EXTENSIONS,
         otherProjectCount: elsewhere.length,
@@ -627,6 +645,12 @@ const RECORD_REQUEST_TTL_MS = 10_000;
 const MICROPHONE_SETTINGS: Partial<Record<NodeJS.Platform, string>> = {
   darwin: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
   win32: 'ms-settings:privacy-microphone',
+};
+
+/** #656: where the sound input is chosen (System Settings ▸ Sound ▸ Input; Settings ▸ System ▸ Sound). */
+const SOUND_INPUT_SETTINGS: Partial<Record<NodeJS.Platform, string>> = {
+  darwin: 'x-apple.systempreferences:com.apple.preference.sound?input',
+  win32: 'ms-settings:sound',
 };
 
 /** The folder a recording belongs to, or null when none is open. */

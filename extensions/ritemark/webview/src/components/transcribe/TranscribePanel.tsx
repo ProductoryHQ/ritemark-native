@@ -31,6 +31,7 @@ import {
   RecordPromptCard,
   RecordingProblem,
   SavingCard,
+  SoundSettingsLink,
   useRecordingAnnouncement,
 } from './recording/RecordingCards';
 import { useTranscribeRecording } from './recording/useTranscribeRecording';
@@ -252,6 +253,7 @@ export function TranscribePanel() {
           <LiveRecordingCard
             view={capture}
             host={host}
+            soundSettings={state.soundSettings}
             onStop={() => recording.stop()}
             onCancel={() => recording.cancel()}
           />
@@ -273,6 +275,16 @@ export function TranscribePanel() {
             state={state}
             selectedEngineId={pendingEngine}
             onSelectEngine={setSelectedEngine}
+            recordAgain={{
+              blocked: canRecord
+                ? null
+                : recordingBusy
+                  ? 'A recording is in progress'
+                  : nothingReady
+                    ? 'Set up a transcription engine first'
+                    : 'Recording is turned off',
+              start: () => recordAgain((message) => vscode.postMessage(message), recording),
+            }}
           />
         )}
 
@@ -410,22 +422,38 @@ function Section({
 }
 
 /**
+ * #656: a silent recording's Record again. The silent file is put aside (it stays where it is) and a new recording
+ * starts in the same click, which the microphone's audio context needs (`captureSession.ts`).
+ */
+export function recordAgain(post: (message: { type: string }) => void, recording: { start(): void }): void {
+  post({ type: 'transcribe:clearPending' });
+  recording.start();
+}
+
+/**
  * The engine choice, made once per recording with the trade stated in full:
  * what leaves the machine, what it costs, and what it can and cannot do.
  */
-function PendingImportCard({
+export function PendingImportCard({
   state,
   selectedEngineId,
   onSelectEngine,
+  recordAgain,
 }: {
   state: TranscribeState;
   selectedEngineId: string | null;
   onSelectEngine: (id: string) => void;
+  /** #656: a silent recording's main button. `blocked`: why a new recording can't start now, or null. */
+  recordAgain: { blocked: string | null; start: () => void };
 }) {
   const pending = state.pending!;
   const refusalOf = (engineId: string) => pending.estimates.find((entry) => entry.engineId === engineId)?.refusal;
   // Sprint 143 (#509): an engine that can't take this file here is shown with why, and never selected.
-  const selected = state.engines.find((engine) => engine.id === selectedEngineId && !refusalOf(engine.id)) ?? null;
+  // #656: a file with no sound selects none: there is nothing to send.
+  const silence = pending.silence ?? null;
+  const selected = silence
+    ? null
+    : (state.engines.find((engine) => engine.id === selectedEngineId && !refusalOf(engine.id)) ?? null);
   const estimate = pending.estimates.find((entry) => entry.engineId === selectedEngineId);
 
   return (
@@ -433,25 +461,46 @@ function PendingImportCard({
       <div className="flex items-start gap-2">
         <Icon name="microphone" size={16} className="mt-0.5 shrink-0 text-accent" />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-semibold" title={pending.audioName}>
-            {pending.audioName}
-          </div>
+          <Tooltip className="flex min-w-0" label={pending.audioName}>
+            <span className="truncate text-xs font-semibold">{pending.audioName}</span>
+          </Tooltip>
           <div className="mt-0.5 text-[12px] text-ink-muted">{formatDuration(pending.durationSec)}</div>
         </div>
       </div>
 
-      <div className="mt-3 space-y-1.5">
-        {state.engines.map((engine) => (
-          <EngineChoice
-            key={engine.id}
-            engine={engine}
-            selected={engine.id === selected?.id}
-            costUsd={pending.estimates.find((entry) => entry.engineId === engine.id)?.costUsd ?? null}
-            refusal={refusalOf(engine.id)}
-            onSelect={() => onSelectEngine(engine.id)}
-          />
-        ))}
-      </div>
+      {/* #656: said before anything starts, in place of the engine choice. Not a warning (nothing failed): the sheets'
+          quiet note, the ground's fill with a hairline, as Publish's "Anyone with the link" (the Experience lead, 5 Nov). */}
+      {silence && (
+        <div
+          role="note"
+          className="mt-3 flex items-start gap-2 rounded-[8px] border border-hairline bg-[var(--vscode-ritemark-ground,var(--r-surface-soft))] px-3 py-2.5 text-[12px] leading-[18px]"
+        >
+          <Icon name="microphone-slash" size={14} tone="inherit" className="mt-0.5 shrink-0" />
+          {silence.recordedHere ? (
+            <p className="min-w-0">
+              No sound was recorded, so there's nothing to transcribe. Check the input in{' '}
+              <SoundSettingsLink soundSettings={state.soundSettings} textClass="text-[12px]" trailing="," /> then record again.
+            </p>
+          ) : (
+            <p className="min-w-0">No sound in this file, so there's nothing to transcribe.</p>
+          )}
+        </div>
+      )}
+
+      {!silence && (
+        <div className="mt-3 space-y-1.5">
+          {state.engines.map((engine) => (
+            <EngineChoice
+              key={engine.id}
+              engine={engine}
+              selected={engine.id === selected?.id}
+              costUsd={pending.estimates.find((entry) => entry.engineId === engine.id)?.costUsd ?? null}
+              refusal={refusalOf(engine.id)}
+              onSelect={() => onSelectEngine(engine.id)}
+            />
+          ))}
+        </div>
+      )}
 
       {selected && !selected.isLocal && selected.readiness.ready && (
         <div className="mt-2.5 rounded-md border border-ritemark-warning/40 bg-ritemark-warning-soft px-2.5 py-2">
@@ -466,25 +515,38 @@ function PendingImportCard({
       )}
 
       <div className="mt-3 flex gap-2">
-        <Tooltip
-          className="min-w-0 flex-1"
-          label={selected?.readiness.ready ? 'Start transcribing with the selected engine' : 'Choose an engine that is ready'}
-        >
-          <Button
-            className="w-full"
-            size="sm"
-            disabled={!selected?.readiness.ready}
-            onClick={() =>
-              vscode.postMessage({ type: 'transcribe:start', engineId: selected?.id ?? null, language: null })
-            }
+        {/* #656: a silent recording has nothing to transcribe, so Record again is the main button; a silent file from
+            elsewhere has only Cancel. */}
+        {silence ? (
+          silence.recordedHere && (
+            <Tooltip className="min-w-0 flex-1" label={recordAgain.blocked ?? 'Start a new recording now'}>
+              <Button className="w-full" size="sm" disabled={recordAgain.blocked !== null} onClick={recordAgain.start}>
+                <RecordDot />
+                Record again
+              </Button>
+            </Tooltip>
+          )
+        ) : (
+          <Tooltip
+            className="min-w-0 flex-1"
+            label={selected?.readiness.ready ? 'Start transcribing with the selected engine' : 'Choose an engine that is ready'}
           >
-            <Icon name="play" size={14} />
-            Transcribe
-          </Button>
-        </Tooltip>
+            <Button
+              className="w-full"
+              size="sm"
+              disabled={!selected?.readiness.ready}
+              onClick={() =>
+                vscode.postMessage({ type: 'transcribe:start', engineId: selected?.id ?? null, language: null })
+              }
+            >
+              <Icon name="play" size={14} />
+              Transcribe
+            </Button>
+          </Tooltip>
+        )}
         <Tooltip label="Don't transcribe now. The audio file stays where it is.">
           <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
             onClick={() => vscode.postMessage({ type: 'transcribe:clearPending' })}
           >

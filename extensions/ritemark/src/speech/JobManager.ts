@@ -17,6 +17,7 @@ import type { EngineRegistry } from './engineRegistry';
 import type { SessionStore } from './SessionStore';
 import { fingerprintFile, sessionIdForPath } from './SessionStore';
 import { cleanupTemp, computePeaks, prepareAudio } from './audioPrep';
+import { silentRecordingMessage, wavSound } from './silence';
 import { TranscriptionError } from './types';
 import type {
   EngineId,
@@ -205,6 +206,14 @@ export class JobManager {
       if (prepared.isTemp) tempFiles.push(prepared.path);
       if (prepared.wavForPeaks && prepared.wavForPeaks !== prepared.path) tempFiles.push(prepared.wavForPeaks);
 
+      throwIfAborted(controller.signal);
+
+      // #656: a file with no sound is never sent to an engine, on the device or in the cloud. A WAV is read
+      // itself; another format through the WAV made for its waveform, where there is one (the Mac).
+      const pcm = path.extname(job.audioPath).toLowerCase() === '.wav' ? job.audioPath : prepared.wavForPeaks;
+      if (pcm && (await wavSound(pcm)) === 'silent') {
+        throw new TranscriptionError('silent-audio', silentRecordingMessage());
+      }
       throwIfAborted(controller.signal);
 
       // A missing waveform is a cosmetic loss; it must never fail a transcript.

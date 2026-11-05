@@ -161,6 +161,8 @@ export type TranscriptionErrorCode =
   | 'unsupported-format'
   | 'video-not-supported'
   | 'unreadable-audio'
+  /** #656: no sound anywhere in the file; never sent to an engine. */
+  | 'silent-audio'
   | 'engine-unavailable'
   | 'model-missing'
   | 'no-api-key'

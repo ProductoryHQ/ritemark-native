@@ -183,10 +183,14 @@ export function convertToWav(source: string, dest: string, sampleRate: number): 
 interface WavFormat {
   dataOffset: number;
   dataLength: number;
+  /** 1 PCM, 3 IEEE float; WAVE_FORMAT_EXTENSIBLE is read through to its sub-format (#656). */
+  audioFormat: number;
   bitsPerSample: number;
   channels: number;
   sampleRate: number;
 }
+
+const WAVE_FORMAT_EXTENSIBLE = 0xfffe;
 
 /**
  * Parse a RIFF header by walking its chunks.
@@ -208,7 +212,9 @@ export function parseWavHeader(header: Buffer): WavFormat {
     const body = offset + 8;
 
     if (id === 'fmt ' && body + 16 <= header.length) {
+      const tag = header.readUInt16LE(body);
       fmt = {
+        audioFormat: tag === WAVE_FORMAT_EXTENSIBLE && size >= 40 && body + 26 <= header.length ? header.readUInt16LE(body + 24) : tag,
         channels: header.readUInt16LE(body + 2),
         sampleRate: header.readUInt32LE(body + 4),
         bitsPerSample: header.readUInt16LE(body + 14),

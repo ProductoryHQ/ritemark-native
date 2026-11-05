@@ -19,7 +19,9 @@ export type RecordingRequest =
   | { type: 'transcribe:record/recover'; partialId: string }
   | { type: 'transcribe:record/discard'; partialId: string }
   | { type: 'transcribe:record/dismissNotice' }
-  | { type: 'transcribe:record/openMicrophoneSettings' };
+  | { type: 'transcribe:record/openMicrophoneSettings' }
+  /** #656: the system's sound input settings, from the recorder's "no sound" line. */
+  | { type: 'transcribe:record/openSoundSettings' };
 
 /** Failures the webview can report before any audio exists (R2). */
 export type CaptureFailureCode = Extract<
@@ -73,6 +75,7 @@ export function decodeRecordingRequest(raw: unknown): RecordingRequest | null {
     case 'transcribe:record/changeLocation':
     case 'transcribe:record/dismissNotice':
     case 'transcribe:record/openMicrophoneSettings':
+    case 'transcribe:record/openSoundSettings':
       return exactKeys(message, ['type']) ? { type: message.type } : null;
     case 'transcribe:record/captureStarted':
     case 'transcribe:record/cancel':

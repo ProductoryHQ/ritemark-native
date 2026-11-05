@@ -62,6 +62,8 @@ export interface PendingImport {
   durationSec: number | null;
   /** `refusal`: why this engine can't take this file on this computer (Sprint 143, #509). */
   estimates: Array<{ engineId: string; costUsd: number | null; refusal?: string }>;
+  /** #656: the file has no sound at all; the card says so instead of the engines. `recordedHere`: made in this panel. */
+  silence?: { recordedHere: boolean };
 }
 
 export interface TranscribeState {
@@ -71,6 +73,8 @@ export interface TranscribeState {
   pending: PendingImport | null;
   preferredEngineId: string | null;
   platform: string;
+  /** #656: where the sound input is chosen, by name ("System Settings ▸ Sound"), from the host; null where it can't say. */
+  soundSettings: string | null;
   acceptedExtensions: string[];
   videoExtensions: string[];
   /** Recordings that belong to other projects — never hidden without saying so. */
