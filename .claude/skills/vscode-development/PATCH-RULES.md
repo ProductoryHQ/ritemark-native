@@ -12,7 +12,7 @@ Eighteen patches, numbered 001 through 019 (017 retired with the Getting Started
 |-------|--------|---------|
 | `001-ritemark-branding.patch` | Branding | Theme, fonts, icons, about dialog, breadcrumbs; Help: Welcome opens Ritemark's welcome; the Phosphor font declared once, in codicon.css (Sprint 145) |
 | `002-ritemark-ui-layout.patch` | UI Layout | Sidebar, titlebar, tabs, explorer, panels, Cmd+B removal; the AI column restored with the layout (Sprint 145) |
-| `003-ritemark-menu-cleanup.patch` | Menu Cleanup + OSS Fixes | 29 files -- Selection/Go/Terminal/Run menus hidden, Edit menu cleaned, Chat/Debug hidden, the palette's developer commands left out, the Agents window closed, no agent host prewarm, no Copilot chat items in Documents' and the text editor's menus (#650), defaultChatAgent null-safety |
+| `003-ritemark-menu-cleanup.patch` | Menu Cleanup + OSS Fixes | 29 files -- Selection/Go/Terminal/Run menus hidden, Edit menu cleaned, Chat/Debug hidden, the palette's developer commands left out, the Agents window closed, no agent host prewarm, no Copilot chat items in Documents', Search's and the text editor's menus (#650), defaultChatAgent null-safety |
 | `004-ritemark-build-system.patch` | Build System | jschardet, microphone permission, integrity check skip; packaging skips the built-in Copilot's SDK shim when a build from source has stripped the SDK, and product.json names Ritemark's source commit (`RITEMARK_SOURCE_COMMIT`; the commit reader also follows a gitdir file) (Sprint 135) |
 | `005-ritemark-windows-and-oss-fixes.patch` | Windows + OSS | Windows-specific and OSS compatibility fixes |
 | `006-ritemark-dev-launch-fallback.patch` | Dev Launch | Development launch fallback behavior |
@@ -71,9 +71,9 @@ This is the authoritative reference (VS Code 1.142.0, Sprint 135; Sprint 154 add
 | 24 | `src/vs/workbench/services/agentHost/electron-browser/agentHostService.ts` | No agent host prewarm at window start (Sprint 135 E5): with a commit in product.json it started GitHub's Copilot runtime in every window; the agent host starts only when something asks for it. |
 | 25 | `src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts` | Null-safety on `defaultChatAgent`; skips the built-in chat extension's enablement migration (`ensureChatExtensionInitialDisabledState` is empty), so a Marketplace Copilot Chat is never disabled behind the person's back. |
 | 26 | `src/vs/workbench/services/inlineCompletions/common/inlineCompletionsUnification.ts` | Null-safety: the same `extensionId?.toLowerCase()` pattern as #25. |
-| 27 | `src/vs/workbench/contrib/chat/browser/actions/chatContextActions.ts` | Sprint 154 (#650): Add File to Chat leaves Documents' and the text editor's context menus; the command stays in All commands. The action is exported for #29. |
+| 27 | `src/vs/workbench/contrib/chat/browser/actions/chatContextActions.ts` | Sprint 154 (#650): Add File to Chat leaves Documents', the text editor's and Search's context menus, Add Folder to Chat leaves Documents' folder menu, Add Selection to Chat leaves the text editor's; All commands keeps the two that had it (Add Folder to Chat is upstream's `f1: false`). The three actions are exported for #29. |
 | 28 | `src/vs/workbench/contrib/inlineChat/browser/inlineChatActions.ts` | Sprint 154 (#650): Open Inline Chat leaves the text editor's context menu; All commands and ⌘I keep it. |
-| 29 | `src/vs/workbench/contrib/inlineChat/test/browser/ritemarkChatMenus.test.ts` | The test of #27 and #28. |
+| 29 | `src/vs/workbench/contrib/inlineChat/test/browser/ritemarkChatMenus.test.ts` | The test of #27 and #28: each action's exact menu list. |
 
 **Verification command:**
 ```bash

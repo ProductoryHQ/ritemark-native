@@ -9,10 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — 2.2.0
 
-### Sprint 154: two menus lose items that don't belong to Ritemark
+### Sprint 154: right-click menus lose items that don't belong to Ritemark
 
 #### Changed
-- **Fewer stray items in right-click menus (#650).** Right-clicking the empty part of the tab row no longer offers Editor Actions Position, which could move or hide the buttons at the desk's edge. Right-clicking a file in Documents, or inside a plain text file, no longer offers Copilot's Add File to Chat and Open Inline Chat, which sat next to Ritemark's own Send to AI Chat but gave the file to Copilot instead of Ritemark's AI. All of them are still in All commands, and ⌘I still opens Inline Chat where Copilot is set up.
+- **Fewer stray items in right-click menus (#650).** Right-clicking the empty part of the tab row no longer offers Editor Actions Position, which could move or hide the buttons at the desk's edge. Right-clicking a file or folder in Documents, a plain text file or its selected text, or a search result no longer offers Copilot's Add File to Chat, Add Folder to Chat, Add Selection to Chat or Open Inline Chat, which handed the file or text to Copilot instead of Ritemark's AI (Send to AI Chat in Documents does that). Add File to Chat, Add Selection to Chat and Open Inline Chat are still in All commands, and ⌘I still opens Inline Chat where Copilot is set up.
 
 ### Sprint 153: the browser's and the microphone's fixes
 
