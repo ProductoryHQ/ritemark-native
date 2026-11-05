@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { addressHint, addressPreview, nameReady, NAME_ROW, pagePartReady, randomEndOf, refusalLine, SETUP_COPY, webSafeName, webSafePagePart } from '../publish/workersDevName'
+import { addressHint, addressPreview, nameReady, NAME_ROW, pagePartReady, PUT_IT_BACK, randomEndOf, refusalLine, SETUP_COPY, webSafeName, webSafePagePart, withRandomEnd } from '../publish/workersDevName'
 import { isValidPagePart } from '../../../../src/publish/sheetProtocol'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -77,5 +77,39 @@ for (const [part, ok] of [['harbour-programme-7f3a2c', true], ['harbour-programm
   assert.equal(pagePartReady(part), ok, part)
   assert.equal(pagePartReady(part), isValidPagePart(part), `the sheet and the host agree on ${part}`)
 }
+
+// Round 3: the lead's hint and Put it back (PR 4, round 2)
+assert.equal(addressHint('-7f3a2c'), "Keep the random end, -7f3a2c, so a guessed address doesn't find the page.")
+assert.equal(PUT_IT_BACK.label, 'Put it back')
+assert.match(sheet, /<Tooltip label=\{PUT_IT_BACK\.tip\}>\s*<Button variant="link"[^>]*onClick=\{putBack\}>\s*\{PUT_IT_BACK\.label\}/, 'Put it back: a text link, with a tooltip')
+assert.match(sheet, /!addressReady \? addressHint\(randomEnd\)/, 'the disabled Publish\'s tooltip: the same sentence, without the link')
+assert.doesNotMatch(addressHint('-7f3a2c'), /Put it back/)
+assert.match(sheet, /const canPutBack = editable && randomEnd !== '' && !pagePartReady\(pagePart\)/, 'Put it back while the random end is missing')
+assert.match(sheet, /\{canPutBack && \(\s*<>\s*\{' '\}\s*<Tooltip label=\{PUT_IT_BACK\.tip\}>/, 'the link after the hint, while it can put the end back')
+assert.match(sheet, /setPagePart\(withRandomEnd\(pagePart, randomEnd, model\.address\?\.page \?\? ''\)\)/, 'it restores the end the sheet suggested')
+const suggested = 'harbour-programme-7f3a2c'
+for (const [typed, back] of [
+  ['harbour-programme', 'harbour-programme-7f3a2c'],
+  ['harbour-programme-', 'harbour-programme-7f3a2c'],
+  ['harbour-programme-7f3a', 'harbour-programme-7f3a2c'],
+  ['harbour-programme-7f3a2', 'harbour-programme-7f3a2c'],
+  ['summer-2026', 'summer-2026-7f3a2c'],
+  ['harbour1', 'harbour1-7f3a2c'],
+  ['', suggested],
+  ['a'.repeat(63), 'a'.repeat(56) + '-7f3a2c'],
+  ['harbour-programme-abcdef', 'harbour-programme-abcdef'],
+] as const) {
+  const result = withRandomEnd(typed, '-7f3a2c', suggested)
+  assert.equal(result, back, `Put it back on "${typed}"`)
+  assert.ok(pagePartReady(result), `"${result}" lets Publish go`)
+}
+assert.equal(withRandomEnd('harbour', '', suggested), 'harbour', 'no suggested end: nothing to put back')
+
+// Round 3: Settings offers Set up only once Publish is reachable (the card reads the host's rule)
+assert.match(card, /const setUp = offersSetUp\(projection\)/)
+assert.match(card, /if \(!showsWebPagesCard\(projection\)\) return null/)
+assert.match(card, /\{setUp && \(\s*<TipButton[\s\S]*?Set up\s*<\/TipButton>/, 'Set up only with setUp')
+assert.doesNotMatch(card, /projection\.enabled &&/, 'nothing offered on the flag alone')
+assert.match(card, /page\.status !== 'unpublished' && \(\s*<TipButton tip="Opens the published page in your browser"[^\n]*\n\s*Open\n/, 'no Open for a page that is down')
 
 console.log('webPagesCard.test.ts: all assertions passed')

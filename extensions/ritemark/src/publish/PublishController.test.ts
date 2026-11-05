@@ -29,11 +29,12 @@ import {
   TOKEN_WORDS,
   UNPUBLISHED_LIST_STALE,
   SHEET_HOST_COMMAND,
+  SWITCHED_OFF,
   sheetHostAvailable,
   type PublishUi,
 } from './PublishController';
 import { PublishRecordStore, RECORDS_FILE, RECORDS_FOLDER } from './publishRecords';
-import { decodeSettingsRequest, type WebPagesSettingsProjection } from './settingsProtocol';
+import { decodeSettingsRequest, offersSetUp, showsWebPagesCard, type WebPagesSettingsProjection } from './settingsProtocol';
 import type { SheetConfirm, SheetConfirmReply, SheetOptions } from './sheetModel';
 import type { GatheredPlan, PublishPlan } from './types';
 import { PublishError } from './host';
@@ -96,7 +97,7 @@ function driveSheet(seen: SheetSeen[], presses: Array<Partial<SheetConfirm> | 'c
   };
 }
 
-async function setup(options: { flag?: boolean; pasted?: string[]; goneAfterChecks?: number; files?: Record<string, string | Uint8Array> } = {}) {
+async function setup(options: { flag?: boolean; entry?: boolean; pasted?: string[]; goneAfterChecks?: number; files?: Record<string, string | Uint8Array> } = {}) {
   const fake = await new FakeCloudflare().start();
   fake.tokens.set(TOKEN, 'ok');
   fake.tokens.set(WEAK, 'no-publish');
@@ -136,7 +137,7 @@ async function setup(options: { flag?: boolean; pasted?: string[]; goneAfterChec
     showSheet: driveSheet(sheets) as PublishUi['showSheet'],
     showFailure: (line: string) => { failures.push(line); },
   };
-  const controller = new PublishController({
+  const makeController = () => new PublishController({
     host,
     records,
     ui,
@@ -149,9 +150,12 @@ async function setup(options: { flag?: boolean; pasted?: string[]; goneAfterChec
     now: () => 5_000,
     random: RANDOM,
   });
+  const controller = makeController();
+  // PR 5's whole-window sheet, as once it lands; `entry: false` is today's build, where Publish can't be reached
+  if (options.entry ?? true) controller.setPublishEntryAvailable(true);
   const page = { realPath: project.page(), projectFolder: project.dir };
   const cleanup = async () => { await fake.stop(); await fs.rm(storage, { recursive: true, force: true }); await project.cleanup(); };
-  return { fake, secrets, account, host, records, controller, posted, opened, boxes, ready, pageEvents, failures, sheets, ui, flag, log, cleanup, storage, pasted, project, page };
+  return { makeController, fake, secrets, account, host, records, controller, posted, opened, boxes, ready, pageEvents, failures, sheets, ui, flag, log, cleanup, storage, pasted, project, page };
 }
 
 type T = Awaited<ReturnType<typeof setup>>;
@@ -386,7 +390,7 @@ test('flag off: no token box, no connect, no publish; the list, Open, Unpublish 
 });
 
 test('ritemark.publish.ready: only with the flag on and the whole-window sheet host there (PR 5)', async () => {
-  const t = await setup();
+  const t = await setup({ entry: false });
   try {
     t.controller.refreshReady();
     assert.equal(t.ready.at(-1), false, 'no sheet host yet: Publish never shows');
@@ -466,11 +470,23 @@ test('Unpublish that went through, with the list not updated: the truth, never "
     assert.equal(t.fake.scripts.has(record.siteName), false, 'down on Cloudflare');
     const row = (await t.controller.settingsProjection()).pages[0];
     assert.equal(row.message, UNPUBLISHED_LIST_STALE);
+    assert.equal(row.status, 'unpublished', 'never listed as online');
     assert.notEqual(row.message, COULD_NOT_REACH_UNPUBLISH);
     assert.equal((await t.controller.pageState(t.page.realPath)).kind, 'unpublished', 'the bar doesn\'t say published');
+    // Round 3: after a restart (a new controller over the same records), still not online, nowhere
+    const restarted = t.makeController();
+    restarted.setPublishEntryAvailable(true);
+    const after = (await restarted.settingsProjection()).pages[0];
+    assert.deepEqual([after.status, after.message], ['unpublished', UNPUBLISHED_LIST_STALE], 'Settings after a restart');
+    assert.equal((await restarted.pageState(t.page.realPath)).kind, 'unpublished', 'the bar after a restart');
+    assert.equal(await restarted.recordFor(t.page.realPath), undefined, 'no Copy link or Open the page for it');
+    assert.equal(await restarted.needsCurrentHash(t.page.realPath), false);
+    const opened = t.opened.length;
+    await restarted.openSite(record.siteName);
+    assert.equal(t.opened.length, opened, 'Open does nothing for a page that is down');
     t.records.remove = remove;
-    await t.controller.unpublishSite(record.siteName);
-    assert.equal((await t.controller.settingsProjection()).pages.length, 0, 'Try again: an already-deleted page counts as deleted');
+    await restarted.unpublishSite(record.siteName);
+    assert.equal((await restarted.settingsProjection()).pages.length, 0, 'Try again: an already-deleted page counts as deleted');
   } finally { await t.cleanup(); }
 });
 
@@ -531,6 +547,109 @@ test('S21: through every flow above, nothing posted to the page or the sheet and
       if (r.authorization?.includes(TOKEN)) assert.ok(r.path.startsWith('/client/v4/') && !r.path.includes('/assets/upload'), `${r.path} carried the token`);
     }
     assert.ok(!t.fake.allTraffic().includes(TOKEN), 'no URL, query or body carries the token');
+  } finally { await t.cleanup(); }
+});
+
+// ---------------------------------------------------------------- round 3: nothing reaches the sheet or the upload before PR 5
+
+test('before the whole-window sheet (PR 5): ritemark.page.publish by a direct call, publishPage, the name and Set up all do nothing', async () => {
+  const t = await setup({ entry: false, pasted: [TOKEN, TOKEN] });
+  try {
+    await t.controller.publishFromBar(t.page);
+    assert.equal(t.sheets.length, 0, 'no sheet');
+    assert.equal(t.boxes.length, 0, 'no token box');
+    assert.deepEqual(t.opened, [], 'no Cloudflare page');
+    assert.equal(t.failures.length, 0, 'no failure line either: it simply isn\'t there');
+    await t.controller.handleSettingsMessage({ type: 'publish:startTokenEntry' });
+    await t.controller.handleSettingsMessage({ type: 'publish:connect' });
+    assert.equal(t.boxes.length, 0, 'Settings\' Set up does nothing');
+    assert.equal(t.fake.requests.length, 0, 'nothing reached Cloudflare');
+    // Connected some other way (another window, before this build): still no upload, no name
+    assert.equal(await t.host.connectWithToken(TOKEN), 'connected');
+    const plan = await t.project.gather();
+    await assert.rejects(t.controller.publishPage({ plan, consent: 'sheet', pagePart: 'harbour-programme-7f3a2c' }), (e: unknown) => e instanceof PublishError && e.message === SWITCHED_OFF);
+    assert.deepEqual(await t.controller.chooseSubdomain('pages-1111'), { error: SWITCHED_OFF });
+    await t.controller.publishFromBar(t.page);
+    assert.equal(t.sheets.length, 0, 'connected, and still no sheet');
+    assert.equal(uploads(t).length, 0, 'nothing uploaded');
+    assert.equal(t.fake.requests.filter((r) => r.path.endsWith('/assets-upload-session') || r.method === 'PUT').length, 0, 'no deploy, no name');
+    assert.equal(await t.records.get(t.page.realPath), undefined);
+    // Once PR 5's sheet is there, the same call publishes
+    const drawn = t.posted.length;
+    t.controller.setPublishEntryAvailable(true);
+    for (let i = 0; i < 100 && t.posted.length === drawn; i++) await new Promise((r) => setTimeout(r, 5));
+    assert.equal(t.posted.at(-1)?.entryAvailable, true, 'Settings is drawn again, now offering Set up');
+    await t.controller.publishFromBar(t.page);
+    assert.equal(t.sheets.length, 1);
+    assert.ok(await t.records.get(t.page.realPath), t.failures.join(' | '));
+  } finally { await t.cleanup(); }
+});
+
+test('Settings ▸ Web pages before PR 5: no Set up, and no card for someone with nothing to take down', async () => {
+  const t = await setup({ entry: false, pasted: [TOKEN] });
+  try {
+    const before = await t.controller.settingsProjection();
+    assert.equal(before.enabled, true);
+    assert.equal(before.entryAvailable, false);
+    assert.equal(offersSetUp(before), false, 'Set up isn\'t offered');
+    assert.equal(showsWebPagesCard(before), false, 'the card is hidden: nothing to set up, forget or take down');
+    // Someone connected already (another window) keeps Disconnect; someone with a page keeps Unpublish
+    assert.equal(showsWebPagesCard({ ...before, state: 'connected' }), true);
+    assert.equal(showsWebPagesCard({ ...before, pages: [{ id: 'a-7f3a2c', name: 'a.html', address: 'https://a-7f3a2c.x.workers.dev/', status: 'online', slow: false, message: null }] }), true);
+    t.controller.setPublishEntryAvailable(true);
+    const after = await t.controller.settingsProjection();
+    assert.equal(offersSetUp(after), true);
+    assert.equal(showsWebPagesCard(after), true);
+    t.flag.on = false;
+    assert.equal(offersSetUp(await t.controller.settingsProjection()), false, 'and never with the flag off');
+  } finally { await t.cleanup(); }
+});
+
+// ---------------------------------------------------------------- round 3: the two guards, each on its own
+
+test('publishPage: "unchanged-update" with a record but a changed file list is refused before anything is sent', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    const record = await publishedOnce(t);
+    await t.project.write('Harbour programme.html', '<link rel="stylesheet" href="style.css"><h1>Harbour</h1><img src="img/a.png"><img src="img/b.png">');
+    await t.project.write('img/b.png', new Uint8Array([1, 2]));
+    const plan = await t.project.gather();
+    assert.equal(plan.keyHits.length, 0, 'nothing key-shaped: only the list guard stands');
+    assert.ok(plan.files.length > record.files.length, 'a new file goes');
+    const sent = uploads(t).length;
+    const sessions = t.fake.requests.filter((r) => r.path.endsWith('/assets-upload-session')).length;
+    await assert.rejects(t.controller.publishPage({ plan, consent: 'unchanged-update' }), (e: unknown) => e instanceof PublishError && /What goes changed/.test(e.message));
+    assert.equal(uploads(t).length, sent, 'nothing uploaded');
+    assert.equal(t.fake.requests.filter((r) => r.path.endsWith('/assets-upload-session')).length, sessions, 'no upload session');
+    assert.equal((await t.records.get(t.page.realPath))?.contentHash, record.contentHash, 'the record is the first publish\'s');
+  } finally { await t.cleanup(); }
+});
+
+test('the sheet answering for another plan than the one prepared publishes nothing', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    await t.controller.startTokenEntry();
+    t.ui.showSheet = (async (req: SheetRequest) => {
+      const result = await driveSheet(t.sheets)(req);
+      // A different plan object (a copy of it) comes back with the press
+      return result.kind === 'cancel' ? result : { ...result, plan: { ...result.plan } };
+    }) as PublishUi['showSheet'];
+    await t.controller.publishFromBar(t.page);
+    assert.deepEqual(t.sheets[0].replies, ['close'], 'the press itself was accepted');
+    assert.equal(await t.records.get(t.page.realPath), undefined, 'not published');
+    assert.equal(t.fake.requests.filter((r) => r.path.endsWith('/assets-upload-session')).length, 0, 'nothing sent');
+    assert.equal(t.fake.scripts.size, 0);
+  } finally { await t.cleanup(); }
+});
+
+test('the bar\'s state needs the gather only for a page shown as published', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    assert.equal(await t.controller.needsCurrentHash(t.page.realPath), false, 'never published');
+    const record = await publishedOnce(t);
+    assert.equal(await t.controller.needsCurrentHash(t.page.realPath), true, 'published: "· changed" needs it');
+    await t.controller.unpublishSite(record.siteName);
+    assert.equal(await t.controller.needsCurrentHash(t.page.realPath), false, 'unpublished');
   } finally { await t.cleanup(); }
 });
 

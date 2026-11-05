@@ -161,11 +161,12 @@ export function createPublishFeature(
     vscode.commands.registerCommand(PAGE_STATE_COMMAND, async (arg?: unknown): Promise<PageBarState | undefined> => {
       const pagePath = await pagePathOf(arg);
       if (!pagePath) return undefined;
-      // "Published · changed" compares PR 3's content hash of what would go now with the record's
+      // "Published · changed" compares PR 3's content hash of what would go now with the record's. Only a page shown as
+      // published needs it: Publishing…, Unpublishing… and an unpublished page skip the gather and scan (round 3). Not
+      // memoised: a file saved between two asks must show as changed
       let currentHash: string | undefined;
-      const record = await controller.recordFor(pagePath);
       const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(pagePath));
-      if (record && folder?.uri.scheme === 'file') {
+      if (folder?.uri.scheme === 'file' && await controller.needsCurrentHash(pagePath)) {
         const projectFolder = await fs.promises.realpath(folder.uri.fsPath).catch(() => folder.uri.fsPath);
         currentHash = await gatherPage(pagePath, projectFolder).then((plan) => plan.contentHash, () => undefined);
       }

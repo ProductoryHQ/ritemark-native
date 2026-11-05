@@ -42,9 +42,34 @@ export function refusalLine(reason: SheetRefusal, randomEnd: string): string {
   }
 }
 
-/** Shown while the page part has lost its random end, and Publish waits. */
+/**
+ * Shown while the page part has lost its random end, and Publish waits (the lead, PR 4 round 2): the sentence, with
+ * Put it back after it as a link (`PUT_IT_BACK`). The disabled Publish's tooltip says the same sentence alone.
+ */
 export function addressHint(randomEnd: string): string {
-  return `Keep an end like ${randomEnd || '-7f3a2c'}, so a guessed address doesn't find the page.`
+  return `Keep the random end, ${randomEnd || '-7f3a2c'}, so a guessed address doesn't find the page.`
+}
+
+/** The link after the hint, and its tooltip. */
+export const PUT_IT_BACK = {
+  label: 'Put it back',
+  tip: 'Adds the random end Ritemark suggested to the address again',
+} as const
+
+/**
+ * Put it back: what the person typed, with the random end the sheet suggested at its end again. A part of that end
+ * left at the end ("-7f3a", a dash) is taken off first, so it isn't doubled; the start is shortened to keep 63 at
+ * most; with nothing typed, the suggested part comes back whole. Always passes `pagePartReady` for a suggested end.
+ */
+export function withRandomEnd(typed: string, randomEnd: string, suggested: string): string {
+  if (!/^-[0-9a-f]{6}$/.test(randomEnd)) return typed
+  if (pagePartReady(typed)) return typed
+  let start = typed
+  for (let k = randomEnd.length - 1; k >= 1; k--) {
+    if (start.endsWith(randomEnd.slice(0, k))) { start = start.slice(0, -k); break }
+  }
+  start = start.replace(/-+$/, '').slice(0, 63 - randomEnd.length).replace(/-+$/, '')
+  return start ? `${start}${randomEnd}` : suggested
 }
 
 /** The random end the host suggested (`-7f3a2c`), from the page part it sent. */

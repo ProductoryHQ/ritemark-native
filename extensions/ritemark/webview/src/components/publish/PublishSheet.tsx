@@ -28,7 +28,7 @@ import { Tooltip } from '../ui/tooltip'
 import { vscode } from '../../lib/vscode'
 import type { PublishSetupModel, PublishSheetHostMessage, PublishSheetModel, PublishSheetWebviewMessage, SheetRefusal } from '../../../../src/publish/sheetProtocol'
 import { WorkersDevNameRow } from './WorkersDevNameRow'
-import { addressHint, nameReady, pagePartReady, randomEndOf, refusalLine, SETUP_COPY, webSafePagePart } from './workersDevName'
+import { addressHint, nameReady, pagePartReady, PUT_IT_BACK, randomEndOf, refusalLine, SETUP_COPY, webSafePagePart, withRandomEnd } from './workersDevName'
 import {
   NOTHING_ELSE,
   SCRIPT_BUILT_LINE,
@@ -117,6 +117,12 @@ export function PublishSheetView({
   }
   const nameRefused = refusal?.reason === 'nameTaken'
   const addressRefused = refusal && refusal.reason !== 'nameTaken' ? refusalLine(refusal.reason, randomEnd) : null
+  // The lead's Put it back (PR 4, round 2): while the random end is missing, a link restores the one suggested
+  const canPutBack = editable && randomEnd !== '' && !pagePartReady(pagePart)
+  const putBack = () => {
+    setPagePart(withRandomEnd(pagePart, randomEnd, model.address?.page ?? ''))
+    onEdit?.()
+  }
 
   const cancel = (
     <Tooltip label={buttons.cancelTip}>
@@ -202,6 +208,16 @@ export function PublishSheetView({
                   {(addressRefused || !addressReady) && (
                     <span id="publish-address-line" role="alert" className="mt-1 block text-[12px] leading-4 text-ink-strong">
                       {addressRefused ?? addressHint(randomEnd)}
+                      {canPutBack && (
+                        <>
+                          {' '}
+                          <Tooltip label={PUT_IT_BACK.tip}>
+                            <Button variant="link" size="sm" className="h-auto p-0 text-[12px] leading-4" onClick={putBack}>
+                              {PUT_IT_BACK.label}
+                            </Button>
+                          </Tooltip>
+                        </>
+                      )}
                     </span>
                   )}
                 </>

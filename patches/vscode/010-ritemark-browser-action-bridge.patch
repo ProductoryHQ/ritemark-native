@@ -93,6 +93,10 @@
 #   (taking a page down never waits for the flag); Publish shows unless a
 #   published state says otherwise, so a bar the extension hasn't answered shows
 #   Publish as PR 2's did. Only https addresses under workers.dev are opened.
+#   Round 3: moving the tab to another project page resets the key and the
+#   chip's address at once, before the bar asks, so the last page's chip and
+#   Open the page never stand for the new one; the same page asked again (a
+#   reload, the project's folders) keeps its chip until the answer.
 #
 # File(s): src/vs/platform/browserView/common/browserView.ts,
 #          src/vs/platform/browserView/electron-main/browserViewMainService.ts,
@@ -114,7 +118,7 @@
 #          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts,
 #          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
 # Created: 2026-05-13
-# Updated: 2026-11-06 (Sprint 149 PR 4: the Published chip, Copy link, Publishing… and Unpublishing…); 2026-11-05 (PR 2: the page's bar, Open in your browser and Publish; round 2: no file reaches the system's opener)
+# Updated: 2026-11-06 (Sprint 149 PR 4: the Published chip, Copy link, Publishing… and Unpublishing…; round 3: no chip carried to another page); 2026-11-05 (PR 2: the page's bar, Open in your browser and Publish; round 2: no file reaches the system's opener)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
 index 31466d78914..e7d9a1af46e 100644
@@ -1572,10 +1576,10 @@ index 00000000000..ae9c58f7d67
 +registerAction2(BrowserSnapshotAction);
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts
 new file mode 100644
-index 00000000000..b3cbda6f6f2
+index 00000000000..f784b1a465b
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts
-@@ -0,0 +1,434 @@
+@@ -0,0 +1,440 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1740,11 +1744,17 @@ index 00000000000..b3cbda6f6f2
 +
 +	private _update(url: string | undefined): void {
 +		const kind = ritemarkBrowserPageKind(url, file => !!this._workspaceContextService.getWorkspaceFolder(file));
++		const samePage = url === this._url;
 +		this._localPage.set(kind.local);
 +		this._projectPage.set(kind.project);
 +		this._url = url;
 +		this._project = kind.project;
 +		if (kind.project) {
++			// Another page: the last page's chip and address go at once, never shown for this one while it is asked about
++			// (round 3). The same page asked again (a reload, the project's folders) keeps its chip until the answer.
++			if (!samePage) {
++				this._resetPublish();
++			}
 +			void this._askPublishState();
 +		} else {
 +			this._resetPublish();
@@ -2683,10 +2693,10 @@ index 00000000000..dd63f850d69
 +});
 diff --git a/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
 new file mode 100644
-index 00000000000..4ea064f3ff4
+index 00000000000..3b1f6098073
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,170 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2694,15 +2704,19 @@ index 00000000000..4ea064f3ff4
 +
 +import assert from 'assert';
 +import { createStubInstance } from 'sinon';
++import { Event } from '../../../../../../base/common/event.js';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
 +import { isIMenuItem, MenuId, MenuRegistry } from '../../../../../../platform/actions/common/actions.js';
 +import { BrowserViewCommandId } from '../../../../../../platform/browserView/common/browserView.js';
 +import { CommandsRegistry, ICommandService } from '../../../../../../platform/commands/common/commands.js';
 +import { ContextKeyExpression, IContext } from '../../../../../../platform/contextkey/common/contextkey.js';
 +import { ServicesAccessor } from '../../../../../../platform/instantiation/common/instantiation.js';
++import { MockContextKeyService } from '../../../../../../platform/keybinding/test/common/mockKeybindingService.js';
++import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
 +import { IOpenerService } from '../../../../../../platform/opener/common/opener.js';
 +import { IEditorService } from '../../../../../services/editor/common/editorService.js';
 +import { IBrowserViewModel } from '../../../common/browserView.js';
++import { BrowserEditorInput } from '../../../common/browserEditorInput.js';
 +import {
 +	RITEMARK_BROWSER_LOCAL_PAGE,
 +	RITEMARK_BROWSER_PROJECT_PAGE,
@@ -2711,7 +2725,7 @@ index 00000000000..4ea064f3ff4
 +} from '../../../common/ritemarkBrowserPage.js';
 +import { BrowserEditor } from '../../../electron-browser/browserEditor.js';
 +import '../../../electron-browser/features/browserNavigationFeatures.js';
-+import { OPEN_PAGE_IN_BROWSER_ID, PUBLISH_PAGE_ID } from '../../../electron-browser/features/ritemarkBrowserPageFeature.js';
++import { OPEN_PAGE_IN_BROWSER_ID, PUBLISH_PAGE_ID, RitemarkBrowserPageContribution } from '../../../electron-browser/features/ritemarkBrowserPageFeature.js';
 +
 +/**
 + * Ritemark (Sprint 149, PR 2, round 2): the page's bar and upstream's Open in External Browser, as they are registered.
@@ -2807,5 +2821,49 @@ index 00000000000..4ea064f3ff4
 +		});
 +		assert.strictEqual(publish.command.tooltip, 'Get a link anyone can open');
 +		assert.strictEqual(open.command.tooltip, 'Open in your browser');
++	});
++	test('another page never shows the last page\'s chip or address while it is asked about; the same page keeps its own', async () => {
++		const asked: { url: unknown; answer: (value: unknown) => void }[] = [];
++		const commandService: Partial<ICommandService> = {
++			executeCommand: <T>(_id: string, url?: unknown) => new Promise<T>(resolve => { asked.push({ url, answer: resolve as (value: unknown) => void }); }),
++		};
++		const workspace: Partial<IWorkspaceContextService> = { onDidChangeWorkspaceFolders: Event.None, getWorkspaceFolder: () => ({}) as never };
++		const editor = { onDidChangeModel: Event.None } as unknown as BrowserEditor;
++		const bar = new RitemarkBrowserPageContribution(editor, new MockContextKeyService(), workspace as IWorkspaceContextService, commandService as ICommandService);
++		try {
++			const pageA = 'file:///Users/mari/Harbour/programme.html';
++			const pageB = 'file:///Users/mari/Harbour/agenda.html';
++			const published = (address: string) => ({ kind: 'published', address, changed: false });
++			const settle = () => new Promise(resolve => setTimeout(resolve, 0));
++
++			bar.prerenderInput({ url: pageA } as BrowserEditorInput);
++			asked[0].answer(published('https://programme-7f3a2c.pages-4821.workers.dev/'));
++			await settle();
++			assert.deepStrictEqual([bar.publishState, bar.publishedAddress], ['published', 'https://programme-7f3a2c.pages-4821.workers.dev/']);
++
++			bar.prerenderInput({ url: pageB } as BrowserEditorInput);
++			assert.deepStrictEqual([bar.publishState, bar.publishedAddress], ['unpublished', undefined], 'reset before the answer');
++			assert.strictEqual(asked[1].url, pageB);
++			asked[1].answer(published('https://agenda-1b2c3d.pages-4821.workers.dev/'));
++			await settle();
++			assert.deepStrictEqual([bar.publishState, bar.publishedAddress], ['published', 'https://agenda-1b2c3d.pages-4821.workers.dev/'], 'then filled in');
++
++			bar.prerenderInput({ url: pageB } as BrowserEditorInput);
++			assert.deepStrictEqual([bar.publishState, bar.publishedAddress], ['published', 'https://agenda-1b2c3d.pages-4821.workers.dev/'], 'the same page keeps its chip while asked again');
++			asked[2].answer({ kind: 'unpublished', address: null });
++			await settle();
++			assert.deepStrictEqual([bar.publishState, bar.publishedAddress], ['unpublished', undefined]);
++
++			// A late answer for a page the tab has left is dropped
++			bar.prerenderInput({ url: pageA } as BrowserEditorInput);
++			bar.prerenderInput({ url: pageB } as BrowserEditorInput);
++			asked[3].answer(published('https://programme-7f3a2c.pages-4821.workers.dev/'));
++			await settle();
++			assert.deepStrictEqual([bar.publishState, bar.publishedAddress], ['unpublished', undefined], 'page A\'s answer never reaches page B');
++			asked[4].answer({ kind: 'unpublished', address: null });
++			await settle();
++		} finally {
++			bar.dispose();
++		}
 +	});
 +});

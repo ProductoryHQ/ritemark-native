@@ -29,6 +29,11 @@ export interface PublishRecord {
   contentHash: string;
   /** ISO date of the last publish or update. */
   publishedAt: string;
+  /**
+   * Taken down, with the record not removed (Sprint 149, PR 4 round 3): the page is gone from the host, so it never
+   * shows as online, here or after a restart, and Unpublish's Try again removes it.
+   */
+  unpublished?: true;
 }
 
 interface RecordsFile {
@@ -112,6 +117,21 @@ export class PublishRecordStore {
       const records = (await this.read()).filter((r) => this.key(r.pagePath) !== this.key(record.pagePath));
       records.push(record);
       await this.write(records);
+    });
+  }
+
+  /**
+   * Notes that a page is down when its record couldn't be removed: it is kept, so Try again can still remove it, and
+   * read as unpublished (`unpublished: true`). Resolves false when there is no such record.
+   */
+  markUnpublished(pagePath: string): Promise<boolean> {
+    return this.serial(async () => {
+      const records = await this.read();
+      const found = records.find((r) => this.key(r.pagePath) === this.key(pagePath));
+      if (!found) return false;
+      found.unpublished = true;
+      await this.write(records);
+      return true;
     });
   }
 

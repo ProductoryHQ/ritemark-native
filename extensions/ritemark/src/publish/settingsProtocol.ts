@@ -28,8 +28,11 @@ export interface WebPageRow {
   id: string;
   name: string;
   address: string;
-  /** Unpublishing: the row's buttons wait; `slow` after 10 s (the lead, answer 7). */
-  status: 'online' | 'unpublishing';
+  /**
+   * Unpublishing: the row's buttons wait; `slow` after 10 s (the lead, answer 7). Unpublished: the page is down and only
+   * its record stayed (round 3); the row says so and offers Try again, never Open.
+   */
+  status: 'online' | 'unpublishing' | 'unpublished';
   slow: boolean;
   /** Its own failure line ("…The page is still online."), or null. */
   message: string | null;
@@ -39,6 +42,11 @@ export interface WebPageRow {
 export interface WebPagesSettingsProjection {
   /** `web-page-publishing`: with it off the list stays, and nothing offers to connect (S28b). */
   enabled: boolean;
+  /**
+   * The whole-window sheet is there (PR 5), so a connection can be used. Until then nothing offers Set up: a person
+   * who connected couldn't publish (round 3).
+   */
+  entryAvailable: boolean;
   state: 'disconnected' | 'connected';
   accountName: string | null;
   subdomain: string | null;
@@ -48,6 +56,19 @@ export interface WebPagesSettingsProjection {
   oauthAvailable: boolean;
   pages: WebPageRow[];
   message: string | null;
+}
+
+/**
+ * Whether Settings ▸ Sharing ▸ Web pages offers Set up: the flag on, and Publish reachable, which needs the
+ * whole-window sheet (PR 5). Before that, connecting would leave a person with no way to publish (round 3).
+ */
+export function offersSetUp(projection: Pick<WebPagesSettingsProjection, 'enabled' | 'entryAvailable'>): boolean {
+  return projection.enabled && projection.entryAvailable;
+}
+
+/** Whether the card shows at all: something to set up, a connection to forget, or a page to take down (S28b). */
+export function showsWebPagesCard(projection: Pick<WebPagesSettingsProjection, 'enabled' | 'entryAvailable' | 'state' | 'pages'>): boolean {
+  return offersSetUp(projection) || projection.state === 'connected' || projection.pages.length > 0;
 }
 
 const SITE_ID = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;

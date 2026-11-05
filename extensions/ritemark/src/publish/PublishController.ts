@@ -15,7 +15,10 @@
  * - **The flag** `web-page-publishing` gates creating, connecting, publishing and updating. It never gates taking a
  *   page down: the list, Open, Unpublish and Disconnect work with it off (sprint-plan.md, *Feature Flag Check*).
  * - **`ritemark.publish.ready`** is set only with the flag on and the whole-window sheet available
- *   (`setPublishEntryAvailable`, from PR 5's `_ritemark.webviewSheet`). Until then the bar's Publish never shows.
+ *   (`setPublishEntryAvailable`, from PR 5's `_ritemark.webviewSheet`). Until then the bar's Publish never shows,
+ *   and nothing else reaches the sheet, the token box or the upload either: `ritemark.page.publish` from a keybinding
+ *   or another extension, `publishPage`, `chooseSubdomain` and Settings' Set up all do nothing (round 3), so nobody
+ *   connects Cloudflare and then finds no way to publish. Taking a page down never waits for it.
  */
 
 import * as path from 'node:path';
@@ -170,10 +173,22 @@ export class PublishController {
   setPublishEntryAvailable(available: boolean): void {
     this.entryAvailable = available;
     this.refreshReady();
+    void this.post(); // Settings offers Set up only now
   }
 
   refreshReady(): void {
-    this.deps.setReady(this.deps.isFeatureEnabled() && this.entryAvailable);
+    this.deps.setReady(this.canPublish());
+  }
+
+  /** The flag on and the whole-window sheet there: the one gate for every way into the sheet, the token box or the upload. */
+  private canPublish(): boolean {
+    return this.deps.isFeatureEnabled() && this.entryAvailable;
+  }
+
+  /** A page's record, unless it was taken down and only its removal failed (`unpublished`). */
+  private async liveRecord(pagePath: string): Promise<PublishRecord | undefined> {
+    const record = await this.deps.records.get(pagePath);
+    return record && !record.unpublished && !this.gone.has(record.siteName) ? record : undefined;
   }
 
   // ------------------------------------------------------------------ Settings
@@ -183,16 +198,21 @@ export class PublishController {
     const records = await this.deps.records.list();
     const pages: WebPageRow[] = records
       .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
-      .map((r) => ({
-        id: r.siteName,
-        name: path.basename(r.pagePath),
-        address: r.address,
-        status: this.unpublishing.has(r.siteName) ? 'unpublishing' : 'online',
-        slow: this.unpublishing.get(r.siteName)?.slow ?? false,
-        message: this.siteLines.get(r.siteName) ?? null,
-      }));
+      .map((r) => {
+        const down = Boolean(r.unpublished) || this.gone.has(r.siteName);
+        return {
+          id: r.siteName,
+          name: path.basename(r.pagePath),
+          address: r.address,
+          status: this.unpublishing.has(r.siteName) ? 'unpublishing' as const : down ? 'unpublished' as const : 'online' as const,
+          slow: this.unpublishing.get(r.siteName)?.slow ?? false,
+          // A page down whose record stayed: the truth, after a restart too
+          message: this.siteLines.get(r.siteName) ?? (down ? UNPUBLISHED_LIST_STALE : null),
+        };
+      });
     return {
       enabled: this.deps.isFeatureEnabled(),
+      entryAvailable: this.entryAvailable,
       state: snapshot.state,
       accountName: snapshot.accountName,
       subdomain: snapshot.subdomain,
@@ -234,7 +254,7 @@ export class PublishController {
 
   /** Set up: Cloudflare's token page and the host's password box at once (answer 8). */
   async startTokenEntry(): Promise<void> {
-    if (!this.deps.isFeatureEnabled() || this.enteringToken) return;
+    if (!this.canPublish() || this.enteringToken) return;
     this.enteringToken = true;
     this.message = null;
     await this.post();
@@ -278,7 +298,7 @@ export class PublishController {
 
   async openSite(id: string): Promise<void> {
     const record = await this.bySite(id);
-    if (!record || !/^https:\/\/[a-z0-9.-]+\.workers\.dev\//.test(record.address)) return;
+    if (!record || record.unpublished || this.gone.has(id) || !/^https:\/\/[a-z0-9.-]+\.workers\.dev\//.test(record.address)) return;
     await this.deps.ui.openExternal(record.address);
   }
 
@@ -316,10 +336,14 @@ export class PublishController {
         this.gone.delete(id);
       } catch (error) {
         if (down) {
-          // The page is down; only this computer's list is behind. Say that, never "still online"
+          // The page is down; only this computer's list is behind. Say that, never "still online", and note it in the
+          // record, so a restart doesn't show it as published either
           this.gone.add(id);
           this.siteLines.set(id, UNPUBLISHED_LIST_STALE);
           this.deps.log('[publish] unpublished, but the record could not be removed');
+          await this.deps.records.markUnpublished(record.pagePath).catch(() => {
+            this.deps.log('[publish] unpublished, and the record could not be marked either');
+          });
         } else {
           this.siteLines.set(id, error instanceof PublishError ? error.message : COULD_NOT_REACH_UNPUBLISH);
         }
@@ -339,7 +363,7 @@ export class PublishController {
    * `page` is a project page by real path (`pageCommands.publishPage` refused anything else).
    */
   async publishFromBar(page: ProjectPage): Promise<void> {
-    if (!this.deps.isFeatureEnabled()) return;
+    if (!this.canPublish()) return; // ritemark.page.publish from a keybinding or code, before PR 5's sheet: nothing
     const key = page.realPath;
     if (this.publishing.has(key) || this.sheets.has(key)) return;
     this.sheets.add(key);
@@ -410,7 +434,7 @@ export class PublishController {
   private async prepare(page: ProjectPage): Promise<Prepared> {
     const accountId = this.deps.host.accountId();
     if (!accountId) throw new PublishError('not-connected', CONNECT_AGAIN);
-    const record = await this.deps.records.get(page.realPath);
+    const record = await this.liveRecord(page.realPath);
     if (record && record.accountId !== accountId) throw new PublishError('failed', OTHER_ACCOUNT_UPDATE);
     const subdomain = await this.deps.host.refreshSubdomain();
     const plan = await this.deps.gather(page.realPath, page.projectFolder);
@@ -461,7 +485,7 @@ export class PublishController {
 
   /** The name row's choice. Taken or not allowed: "This name is taken. Try another.", and Publish waits. */
   async chooseSubdomain(typed: string): Promise<{ name: string } | { existing: string } | { error: string }> {
-    if (!this.deps.isFeatureEnabled()) return { error: SWITCHED_OFF };
+    if (!this.canPublish()) return { error: SWITCHED_OFF };
     try {
       return { name: await this.deps.host.chooseSubdomain(typed) };
     } catch (error) {
@@ -478,7 +502,7 @@ export class PublishController {
    * page's part of the address is checked again here.
    */
   async publishPage(input: { plan: GatheredPlan; consent: PublishConsent; pagePart?: string }): Promise<PublishedSite> {
-    if (!this.deps.isFeatureEnabled()) throw new PublishError('failed', SWITCHED_OFF);
+    if (!this.canPublish()) throw new PublishError('failed', SWITCHED_OFF);
     const { plan, consent } = input;
     if (!isGatheredPlan(plan)) throw new PublishError('failed', 'Ritemark could not check what goes. Press Publish again.');
     const accountId = this.deps.host.accountId();
@@ -486,7 +510,7 @@ export class PublishController {
     if (plan.tooBig.length > 0 || plan.tooMany) throw new PublishError(plan.tooMany ? 'too-many' : 'too-big', 'This page is too big for Cloudflare\'s free plan. Nothing was sent.');
     const pagePath = plan.pagePath;
     if (this.publishing.has(pagePath)) throw new PublishError('failed', 'This page is being published.');
-    const record = await this.deps.records.get(pagePath);
+    const record = await this.liveRecord(pagePath);
     if (record && record.accountId !== accountId) throw new PublishError('failed', OTHER_ACCOUNT_UPDATE);
     if (plan.keyHits.length > 0 && consent !== 'sheet-anyway') throw new PublishError('failed', KEY_NEEDS_SHEET);
     if (consent === 'unchanged-update' && (!record || sheetNeeded(record, plan))) {
@@ -527,12 +551,13 @@ export class PublishController {
 
   /** The bar's state for a page. `currentHash` is PR 3's `contentHash` of what would go now, when known. */
   async pageState(pagePath: string, currentHash?: string): Promise<PageBarState> {
-    const record = await this.deps.records.get(pagePath);
-    const line = this.pageLines.get(pagePath) ?? (record ? this.siteLines.get(record.siteName) ?? null : null);
+    const stored = await this.deps.records.get(pagePath);
+    const record = stored && !stored.unpublished && !this.gone.has(stored.siteName) ? stored : undefined;
+    const line = this.pageLines.get(pagePath) ?? (stored ? this.siteLines.get(stored.siteName) ?? null : null);
     if (this.publishing.has(pagePath)) {
       return { kind: 'publishing', address: record?.address ?? null, changed: false, signedOut: false, slow: false, line: null };
     }
-    if (!record || this.gone.has(record.siteName)) return { kind: 'unpublished', address: null, changed: false, signedOut: false, slow: false, line };
+    if (!record) return { kind: 'unpublished', address: null, changed: false, signedOut: false, slow: false, line };
     const going = this.unpublishing.get(record.siteName);
     const connected = this.deps.host.accountId();
     return {
@@ -545,14 +570,24 @@ export class PublishController {
     };
   }
 
-  /** The page's record, for the bar's Copy link and Unpublish. */
+  /** The page's record while it is online, for the bar's Copy link, Open the page and Unpublish. */
   recordFor(pagePath: string): Promise<PublishRecord | undefined> {
-    return this.deps.records.get(pagePath);
+    return this.liveRecord(pagePath);
+  }
+
+  /**
+   * Whether the bar's answer needs "what would go now" (PR 3's gather and scan, for "Published · changed"): only for a
+   * page shown as published. Publishing…, Unpublishing… and an unpublished page skip the gather.
+   */
+  async needsCurrentHash(pagePath: string): Promise<boolean> {
+    if (this.publishing.has(pagePath)) return false;
+    const record = await this.liveRecord(pagePath);
+    return Boolean(record) && !this.unpublishing.has(record!.siteName);
   }
 
   /** The bar's Unpublish, after its question. */
   async unpublishPage(pagePath: string): Promise<void> {
-    const record = await this.deps.records.get(pagePath);
+    const record = await this.liveRecord(pagePath);
     if (record) await this.unpublishSite(record.siteName);
   }
 }

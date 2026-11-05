@@ -8,6 +8,9 @@
  *
  * 2.2 ships the token path only (the plan's cut 1): with no OAuth client, Set up is the token path, and the muted
  * "Have a Cloudflare token? Use it instead" line waits for OAuth's Connect.
+ *
+ * Set up is offered only once a page can be published (`offersSetUp`: the flag on and the whole-window sheet there,
+ * PR 5). Before that a person could connect Cloudflare and find no Publish, so the card behaves as with the flag off.
  */
 
 import { useState } from 'react'
@@ -15,18 +18,20 @@ import { vscode } from '../../lib/vscode'
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
 import { TurningMark } from '../ui/turning-mark'
 import { SettingsGroup, SettingsRow, TipButton } from './SettingsRow'
+import { offersSetUp, showsWebPagesCard } from '../../../../src/publish/settingsProtocol'
 
 export interface WebPageRow {
   id: string
   name: string
   address: string
-  status: 'online' | 'unpublishing'
+  status: 'online' | 'unpublishing' | 'unpublished'
   slow: boolean
   message: string | null
 }
 
 export interface WebPagesSettingsProjection {
   enabled: boolean
+  entryAvailable: boolean
   state: 'disconnected' | 'connected'
   accountName: string | null
   subdomain: string | null
@@ -65,8 +70,9 @@ export function WebPagesSettingsCard({ projection }: { projection: WebPagesSetti
   const [question, setQuestion] = useState<Question>(null)
   if (!projection) return null
   const connected = projection.state === 'connected'
-  // With the flag off, a person with no connection and no page has nothing here to do (S28b)
-  if (!projection.enabled && !connected && projection.pages.length === 0) return null
+  const setUp = offersSetUp(projection)
+  // With the flag off, or before Publish is reachable, a person with no connection and no page has nothing here to do
+  if (!showsWebPagesCard(projection)) return null
 
   const answer = () => {
     if (question?.kind === 'disconnect') send({ type: 'publish:disconnect' })
@@ -89,9 +95,9 @@ export function WebPagesSettingsCard({ projection }: { projection: WebPagesSetti
           name="Where your web pages go"
           line={projection.enteringToken
             ? 'Paste the token in the box Ritemark opened. Cloudflare’s page opened in your browser.'
-            : projection.enabled ? NOT_SET_UP_LINE : 'Not set up.'}
+            : setUp ? NOT_SET_UP_LINE : 'Not set up.'}
         >
-          {projection.enabled && (
+          {setUp && (
             <TipButton
               tip={projection.enteringToken ? 'Ritemark is waiting for the token' : 'Opens Cloudflare’s token page and a box to paste the token in'}
               variant="outline"
@@ -105,7 +111,7 @@ export function WebPagesSettingsCard({ projection }: { projection: WebPagesSetti
         </SettingsRow>
       )}
 
-      {projection.enabled && !connected && projection.oauthAvailable && (
+      {setUp && !connected && projection.oauthAvailable && (
         <p className="mt-2 text-[13px] leading-[18px] text-ink-muted">
           Have a Cloudflare token?{' '}
           <TipButton tip="Opens Cloudflare's token page and a box to paste the token in" variant="link" size="sm" className="h-auto p-0 text-[13px]" onClick={() => send({ type: 'publish:startTokenEntry' })}>
@@ -136,9 +142,11 @@ export function WebPagesSettingsCard({ projection }: { projection: WebPagesSetti
               </span>
             ) : (
               <>
-                <TipButton tip="Opens the published page in your browser" variant="ghost" size="sm" onClick={() => send({ type: 'publish:open', id: page.id })}>
-                  Open
-                </TipButton>
+                {page.status !== 'unpublished' && (
+                  <TipButton tip="Opens the published page in your browser" variant="ghost" size="sm" onClick={() => send({ type: 'publish:open', id: page.id })}>
+                    Open
+                  </TipButton>
+                )}
                 <TipButton tip="Takes the page off the internet. The file stays in this project." variant="outline" size="sm" onClick={() => setQuestion({ kind: 'unpublish', page })}>
                   {page.message ? 'Try again' : 'Unpublish'}
                 </TipButton>
