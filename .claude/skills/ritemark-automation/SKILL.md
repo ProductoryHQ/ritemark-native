@@ -51,6 +51,15 @@ lsof -t -i :9224 && echo "port in use" || echo "port free"
 
 ## Canonical launch incantation
 
+**Use the script (5 Nov 2026).** `scripts/qa/dev-launch-isolated.sh start --name <run> [--folder <dir>] [--env KEY=VALUE]`
+does everything below in one call, and more: a fresh profile and extensions folder, throwaway AI homes
+(`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `XDG_*`) so no runtime touches the person's own, a free CDP port, seeded settings
+(simple file dialog, trust off, no confirm on close), a visible window on the folder, and it returns once the
+project has drawn, printing `RUN_DIR`, `BUILD_ROOT`, `PORT`, `PID`. It runs this checkout's dev build, or the main
+checkout's when this is a light worktree with an empty `vscode/` (that build runs the main checkout's extension). `scripts/qa/dev-launch-isolated.sh stop <RUN_DIR>` ends the
+whole process tree and prints `LEFT=0`. From 08:00 to 18:00 Tallinn time it refuses unless Jarmo said yes in chat.
+The hand-written shape below is what the script does, for when you need to depart from it.
+
 There is exactly one correct way to launch Ritemark for automation. Memorize the shape:
 
 ```bash
