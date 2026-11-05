@@ -40,13 +40,13 @@ Nothing here starts before the plan's approval (sprint-plan.md, *Approval*). Tic
 
 ## Phase 5: PR 4, Cloudflare (W4, W5, W6; R6, R7, R9)
 
-- [ ] `setApiKey` allowlist with its failing-first test (`RitemarkSettingsProvider.ts:382–389`)
-- [ ] `src/publish/host.ts`; `cloudflare/client.ts` against a fake server; `redact()` on every error
+- [x] `setApiKey` allowlist with its failing-first test (`RitemarkSettingsProvider.ts:382–389`): the list landed in Sprint 147 PR 3; PR 4 moves the write into `applyApiKeyMessage` and adds `settingsKeys.test.ts`, mutation-checked
+- [x] `src/publish/host.ts`; `cloudflare/client.ts` against a fake server; `redact()` on every error
 - [ ] `cloudflare/oauth.ts`, `config.ts` (the esbuild define), `account.ts` (SecretStorage, refresh, Disconnect); the token path: `publish:startTokenEntry` (no value) → Cloudflare's page + the host's password box with the lead's words and three outcomes (R6, S20, S20a)
 - [ ] The workers.dev name row in the first sheet (R5, S28a)
-- [ ] Settings ▸ Sharing ▸ Web pages: the card's two states, the published pages with Open and Unpublish, Disconnect's question (R9, S22, S30)
+- [x] Settings ▸ Sharing ▸ Web pages: the card's two states, the published pages with Open and Unpublish, Disconnect's question (R9, S22, S30)
 - [ ] The bar's states, Unpublish's question, "Unpublishing…", the 10 s line, the failure line (R7, S24–S29)
-- [ ] `web-page-publishing` (registered in PR 1): gates creating, connecting, publishing and updating; the list, Unpublish and Disconnect stay with it off (S28b)
+- [x] `web-page-publishing` (registered in PR 1): gates creating, connecting, publishing and updating; the list, Unpublish and Disconnect stay with it off (S28b)
 - [ ] **After A4:** `scripts/qa/cloudflare-contract.mjs` green; S17–S28b live on the Mac; S21's log search
 - [ ] Review (High, `/security-review`), Windows overlay (offline scenarios; live when the Windows vault exists), merge
 

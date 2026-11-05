@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A restored terminal's tab no longer shifts after the window opens.** It has its final width from the first moment, where it grew by half a pixel a moment later in some restarts.
 - **The AI column comes back after a start without Ritemark AI.** When Ritemark AI couldn't be loaded at all, the column closed, and stayed closed at every later start. Now it comes back at the next start; only your own toggle closes it for good.
 
+### Sprint 149: Publish a web page
+
+#### Added
+- **Settings ▸ Sharing ▸ Web pages, and your own Cloudflare to publish to (#590, PR 4).** Set up opens Cloudflare's page for a token and Ritemark's own password box at the same time; Ritemark checks the token at once and says plainly when Cloudflare doesn't accept it or when it can't publish pages. The token stays in this computer's keychain and never reaches a page, a log or the project. Once pages are published, the card lists each with Open and Unpublish, and Unpublish says the page is down only once its address has stopped answering. Disconnect asks first and leaves published pages online. Settings can now save only its five API keys, never another secret. Sign-in through Cloudflare's own page waits for a later release; until the bar's Publish arrives with the sprint's other parts, nothing can be published yet.
+
 ### Sprint 145: 2.1's loose ends
 
 #### Fixed

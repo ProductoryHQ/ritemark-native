@@ -36,3 +36,31 @@ export function settingsKeyAllowed(name: unknown, flags: SettingsKeyFlags): name
 export function isSettingsKeyName(name: unknown): name is SettingsKeyName {
   return typeof name === 'string' && (SETTINGS_KEY_NAMES as readonly string[]).includes(name);
 }
+
+/** The part of SecretStorage the page's key messages may touch. */
+export interface KeySecretsLike {
+  store(key: string, value: string): PromiseLike<void>;
+  delete(key: string): PromiseLike<void>;
+}
+
+/**
+ * The page's `setApiKey`, applied (Sprint 149, PR 4): a non-empty value is stored trimmed, an empty one removes the
+ * key. Only one of the five keys, with its row's flag on, is ever written or removed; anything else
+ * (`ritemark.publish.cloudflare.v1`, Google's tokens, a name made up by a page) answers null and touches nothing.
+ * `settingsKeys.test.ts` holds it to that.
+ */
+export async function applyApiKeyMessage(
+  message: { key?: unknown; value?: unknown },
+  flags: SettingsKeyFlags,
+  secrets: KeySecretsLike,
+): Promise<{ key: SettingsKeyName; action: 'stored' | 'removed' } | null> {
+  const key = message.key;
+  if (!settingsKeyAllowed(key, flags) || typeof message.value !== 'string') return null;
+  const value = message.value.trim();
+  if (value) {
+    await secrets.store(key, value);
+    return { key, action: 'stored' };
+  }
+  await secrets.delete(key);
+  return { key, action: 'removed' };
+}

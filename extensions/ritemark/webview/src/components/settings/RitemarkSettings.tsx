@@ -14,6 +14,7 @@ import { Icon } from '../ui/Icon';
 import { vscode } from '../../lib/vscode';
 import { settingsTimingMark } from '../../lib/settingsTiming';
 import { GoogleDocsSettingsCard, type GoogleDocsSettingsProjection } from './GoogleDocsSettingsCard';
+import { WebPagesSettingsCard, type WebPagesSettingsProjection } from './WebPagesSettingsCard';
 import { AiAccountsSection, type AiId, type ClaudeAction, type CodexAction } from './AiAccountsSection';
 import { AiDetailsSheet } from './AiDetailsSheet';
 import { API_KEY_ROWS, ApiKeysSheet, type ApiKeyRow } from './ApiKeysSheet';
@@ -54,6 +55,8 @@ export interface SettingsData {
   chatFontSize: number;
   // Sprint 119: Google Docs publishing account (null when the feature is off).
   googleDocs?: GoogleDocsSettingsProjection | null;
+  // Sprint 149, PR 4: Web pages (no token, no account ID; null before the host has one).
+  webPages?: WebPagesSettingsProjection | null;
   currentTheme: string;
   availableThemes: ThemeInfo[];
   updateCenter: {
@@ -203,6 +206,7 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
   const [codexAuth, setCodexAuth] = useState<CodexAuthStatus>(initial?.codexAuth ?? { enabled: false });
   const [codexLoading, setCodexLoading] = useState(false);
   const [googleDocs, setGoogleDocs] = useState<GoogleDocsSettingsProjection | null>(initial?.settings?.googleDocs ?? null);
+  const [webPages, setWebPages] = useState<WebPagesSettingsProjection | null>(initial?.settings?.webPages ?? null);
   // Sprint 147 (R2): one section at a time; AI accounts first (I62, I63)
   const [section, setSection] = useState<SettingsSectionId>(initial?.section ?? FIRST_SECTION);
   // Another feature opened Settings at one of today's five names (Sprint 119; I61): the row to bring into view there
@@ -219,6 +223,7 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
           setBase(message.data);
           setParts(afterBase);
           setGoogleDocs(message.data.googleDocs ?? null);
+          setWebPages(message.data.webPages ?? null);
           break;
 
         case 'settings:hidden':
@@ -249,6 +254,10 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
 
         case 'google-docs/settings':
           setGoogleDocs(message.projection ?? null);
+          break;
+
+        case 'publish:settings':
+          setWebPages(message.projection ?? null);
           break;
 
         case 'settings:focus-section': {
@@ -448,6 +457,7 @@ export function RitemarkSettings({ initial }: { initial?: RitemarkSettingsInitia
         sharing: (
           <>
             <GoogleDocsSettingsCard projection={googleDocs} />
+            <WebPagesSettingsCard projection={webPages} />
             <SettingsNote icon="file-pdf">PDF and Word copies need nothing set: Share makes them on this computer.</SettingsNote>
           </>
         ),

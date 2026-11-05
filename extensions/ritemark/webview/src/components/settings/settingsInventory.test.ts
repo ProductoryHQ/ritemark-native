@@ -33,13 +33,20 @@ export const PAGE_MESSAGES = [
  */
 export const HOST_MESSAGES = [
   'settings', 'settings:part', 'apiKey:revealed', 'codex:authStatus', 'codex:loginStarting', 'testResult',
-  'google-docs/settings', 'settings:focus-section', 'settings:hidden',
+  'google-docs/settings', 'settings:focus-section', 'settings:hidden', 'publish:settings',
 ] as const
 /** The parts the host's probes post, each one the page composes (`settingsParts.ts`). */
 export const PROBE_PARTS = ['claudeCode', 'codex', 'environment', 'transcriptionStorageBytes', 'updateCenter'] as const
 /** Google Docs' five, which the host hands to its controller by their prefix. */
 export const GOOGLE_DOCS_MESSAGES = [
   'google-docs/connect', 'google-docs/cancel', 'google-docs/disconnect', 'google-docs/choose-template', 'google-docs/clear-template',
+] as const
+/**
+ * Sprint 149, PR 4: Web pages' five, which the host hands to the publish controller by their prefix. None carries a
+ * token: `publish:startTokenEntry` makes the host open its own password box.
+ */
+export const PUBLISH_MESSAGES = [
+  'publish:connect', 'publish:startTokenEntry', 'publish:disconnect', 'publish:open', 'publish:unpublish',
 ] as const
 /** The `ritemark.*` settings the page writes through `setSetting` (its `key`, without `ritemark.`). */
 export const SETTING_KEYS = [
@@ -154,7 +161,9 @@ export function keyHandlingGaps(host: string, keys: string): string[] {
   if (/\b(openai|google|anthropic|openrouter|elevenlabs)Key:/.test(base)) gaps.push("the host's settings carry a key's value")
   for (const name of API_KEYS) if (!keys.includes(`'${name}'`)) gaps.push(`the key list no longer has ${name}`)
   const setter = host.slice(host.indexOf("case 'setApiKey':"), host.indexOf("case 'testApiKey':"))
-  if (!/if \(!settingsKeyAllowed\(message\.key, this\.keyFlags\(\)\)\)/.test(setter)) gaps.push('setApiKey saves a name off the list')
+  // Sprint 149, PR 4: the write moved into `applyApiKeyMessage`, which holds the list (`settingsKeys.test.ts`)
+  if (!/applyApiKeyMessage\(message, this\.keyFlags\(\), this\.context\.secrets\)/.test(setter) || /secrets\.(store|delete)\(/.test(setter)
+    || !/if \(!settingsKeyAllowed\(key, flags\)/.test(keys)) gaps.push('setApiKey saves a name off the list')
   if (!/settingsKeyAllowed\(key, this\.keyFlags\(\)\)/.test(host.slice(host.indexOf('private async revealApiKey(')))) gaps.push('the eye answers a name off the list')
   const settingSetter = host.slice(host.indexOf("case 'setSetting':"), host.indexOf("case 'usageData:set':"))
   if (!/if \(pageSettingAllowed\(message\.key\)/.test(settingSetter)) gaps.push('setSetting writes a key off the list')
@@ -176,7 +185,8 @@ assert.deepEqual(keyHandlingGaps(host, keysSource), [], 'no key value in setting
 assert.deepEqual(hostMessageGaps(page.replace("case 'settings:part':", ''), host, partsSource), ['the page no longer handles settings:part'])
 assert.deepEqual(hostMessageGaps(page, host.replace(/part: 'environment'/g, "part: 'gone'"), partsSource), ['the host no longer probes environment'])
 assert.deepEqual(keyHandlingGaps(host.replace("openaiKeyConfigured: saved['openai-api-key'],", "openaiKey: 'x', openaiKeyConfigured: true,"), keysSource), ["the host's settings carry a key's value"])
-assert.deepEqual(keyHandlingGaps(host.replace('if (!settingsKeyAllowed(message.key, this.keyFlags())) {', 'if (!message.key) {'), keysSource), ['setApiKey saves a name off the list'])
+assert.deepEqual(keyHandlingGaps(host.replace('applyApiKeyMessage(message, this.keyFlags(), this.context.secrets)', 'this.context.secrets.store(message.key, message.value)'), keysSource), ['setApiKey saves a name off the list'])
+assert.deepEqual(keyHandlingGaps(host, keysSource.replace('if (!settingsKeyAllowed(key, flags)', 'if (!key')), ['setApiKey saves a name off the list'])
 assert.deepEqual(keyHandlingGaps(host.replace('if (pageSettingAllowed(message.key)', 'if (message.key'), keysSource), ['setSetting writes a key off the list'])
 // setSetting's list holds every setting the page writes (the review of #657)
 {
@@ -185,6 +195,15 @@ assert.deepEqual(keyHandlingGaps(host.replace('if (pageSettingAllowed(message.ke
   for (const key of SETTING_KEYS) assert.ok(list.includes(`'${key}'`), `setSetting may write ritemark.${key}`)
 }
 assert.deepEqual(inventoryGaps(page, host, googleDocsProtocol), [], 'every message, setting and key of the inventory has its sender and its handler')
+// Sprint 149, PR 4: Web pages' five, sent by the card, decoded by the publish protocol, routed by the host's prefix
+const publishProtocol = read(join(HERE, '../../../../src/publish/settingsProtocol.ts'))
+for (const type of PUBLISH_MESSAGES) {
+  assert.ok(sends(page, type), `the page no longer sends ${type}`)
+  assert.ok(publishProtocol.includes(`case '${type}':`), `the publish protocol no longer decodes ${type}`)
+}
+assert.ok(host.includes('startsWith(PUBLISH_PREFIX)'), 'the host no longer routes publish: messages')
+assert.ok(!/publish:[A-Za-z]+',\s*(token|value|key)\s*:/.test(page), 'no publish: message from the page carries a token')
+
 assert.deepEqual(ownerGaps(owned), [], 'each copy of a message sent from more than one place is still sent by its owner')
 assert.deepEqual(keySheetGaps(sheet, owned['RitemarkSettings.tsx']), [], "each key row adds, tests, changes, removes and links, with today's messages")
 
