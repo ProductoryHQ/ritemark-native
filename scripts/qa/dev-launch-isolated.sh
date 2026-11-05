@@ -140,11 +140,15 @@ start_run() {
 	local app="$build_root/vscode/.build/electron/Ritemark.app/Contents/MacOS/Ritemark"
 	# The build must be of the VS Code this checkout pins: a stale dev build (the main checkout's can be months old,
 	# pre-2.0) opens a different app, and a run on it proves nothing. RITEMARK_LAUNCH_ANY_BUILD=1 skips the check.
-	local pin built
-	pin=$(git -C "$ROOT" rev-parse HEAD:vscode 2>/dev/null || true)
-	built=$(git -C "$build_root/vscode" rev-parse HEAD 2>/dev/null || true)
-	if [[ -n $pin && $built != "$pin" && ${RITEMARK_LAUNCH_ANY_BUILD:-} != 1 ]]; then
-		die "the dev build in $build_root/vscode is of VS Code ${built:-unknown}, not the pinned $pin: rebuild it, or give this worktree its own vscode (RITEMARK_LAUNCH_ANY_BUILD=1 to run it anyway)"
+	local pin built="" top
+	pin=$(git -C "$ROOT" rev-parse --verify --quiet HEAD:vscode 2>/dev/null || true)
+	# Only vscode/'s own checkout counts: a copy that lost its gitfile would otherwise report the Ritemark commit.
+	top=$(git -C "$build_root/vscode" rev-parse --show-toplevel 2>/dev/null || true)
+	if [[ -n $top && $(cd "$top" && pwd -P) == $(cd "$build_root/vscode" && pwd -P) ]]; then
+		built=$(git -C "$build_root/vscode" rev-parse --verify --quiet HEAD 2>/dev/null || true)
+	fi
+	if [[ ( -z $pin || $built != "$pin" ) && ${RITEMARK_LAUNCH_ANY_BUILD:-} != 1 ]]; then
+		die "the dev build in $build_root/vscode is of VS Code ${built:-unknown}, not the pinned ${pin:-unknown (no vscode gitlink in $ROOT)}: rebuild it, or give this worktree its own vscode (RITEMARK_LAUNCH_ANY_BUILD=1 to run it anyway)"
 	fi
 
 	local tmp=${TMPDIR:-/private/tmp}
