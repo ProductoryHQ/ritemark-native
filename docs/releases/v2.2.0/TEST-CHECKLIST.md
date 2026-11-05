@@ -14,8 +14,8 @@ Release: Ritemark 2.2 ([release plan](../../development/releases/v2.2.0/release-
 
 | Platform | File in the release worktree's `dist/` | SHA-256 as tested (un-notarized) | DMG built | Notarize no earlier than | SHA-256 as published |
 |---|---|---|---|---|---|
-| macOS arm64 | `Ritemark-arm64.dmg` | | | | |
-| macOS x64 | `Ritemark-x64.dmg` | | | | |
+| macOS arm64 | `Ritemark-2.2.0-darwin-arm64.dmg` | | | | |
+| macOS x64 | `Ritemark-2.2.0-darwin-x64.dmg` | | | | |
 | Windows x64 | `Ritemark-Setup.exe` (from CI) | | CI | n/a | |
 
 2.1's closeout couldn't recover the hashes of the DMGs that passed its gates, so this time each un-notarized hash is written above when its gate starts.
@@ -44,10 +44,11 @@ Release: Ritemark 2.2 ([release plan](../../development/releases/v2.2.0/release-
 
 ## Gate 1: the release session, before handover (arm64 Mac)
 
-1. [ ] `node ./scripts/worktree-hygiene.mjs --report` is read before the release worktree is made; the worktree is new, detached at the exact `origin/main`, `release-preflight.sh` passes and prints RELEASE SOURCE VERIFIED. <sub>release skill, Step 0</sub>
+1. [ ] `node ./scripts/worktree-hygiene.mjs --check` passes before the release worktree is made; the worktree is new, detached at the exact `origin/main`, `release-preflight.sh` passes and prints RELEASE SOURCE VERIFIED. <sub>release skill, Step 0</sub>
 2. [ ] Version 2.2.0 in every version file; the release notes' Sprint 149 markers resolved for what merged (PR 4 in or out); `CHANGELOG.md` covers everything since v2.1.0. <sub>release-notes.md</sub>
 3. [ ] `check:anthropic-models` prints OK in the release worktree (the catalogue expires on 12 November); `verify-agent-runtimes.sh` exits 0, with OpenCode's permission gate. <sub>runtime-review.md</sub>
 4. [ ] `build-prod.sh` and `validate-build-output.sh` pass; check 5f finds Electron 43.8.6; `codesign-app.sh` reports 0 failures, `codesign --verify --deep --strict` passes, TeamIdentifier `JKBSC3ZDT5`. <sub>#620, release skill</sub>
+4a. [ ] **The DMG itself, mounted.** `create-dmg.sh` (or the `ditto` + `hdiutil` fallback) makes `dist/Ritemark-2.2.0-darwin-arm64.dmg`, signed with the Developer ID. Then `hdiutil attach -readonly -nobrowse` it and check the app **inside the mounted image**, not `VSCode-darwin-arm64/`: `codesign --verify --deep --strict` passes with TeamIdentifier `JKBSC3ZDT5`; `lipo -archs` on the main binary says `arm64`; `CFBundleShortVersionString` is 2.2.0; the embedded `ritemark-build-provenance.json` names the candidate commit; `diff -rq` against `VSCode-darwin-arm64/Ritemark.app` finds no difference. `spctl -a -t open --context context:primary-signature -v` on the DMG accepts its signature. Detach, record the DMG's SHA-256 in the table above and its build time (the 60-minute clock starts). Only then is it handed over. <sub>release skill, Step 3</sub>
 5. [ ] **The reference images.** The frame baseline is retaken under the isolated launch rule (a fresh profile, isolated AI homes, the sample project) before the compare, since the 2.0 set had signed-in AIs and differs by about 8% on the AI's sheet alone; Jarmo approves the new set. If it was already retaken, write its commit here. <sub>release plan, Risks; frame-baseline/README.md</sub>
 6. [ ] **The base window against the baseline.** On a test launch of the installed candidate: `node scripts/qa/frame-screenshots.mjs --port 9411 --out <dir> --compare docs/development/frame-baseline --release docs/development/frame-baseline/release` and `node scripts/qa/frame-geometry.mjs --port 9411`. Every scene's **JOINS** line is ok; a scene over 0.5% is fixed or approved by Jarmo (look at `<dir>/joins.html` at 4×); geometry passes. Note whether the share-question and settings-foot scenes crashed in the full run. <sub>release skill; #641, #672</sub>
 7. [ ] **The first frame.** `node scripts/qa/project-check.mjs --port <port> --user-data-dir <dir> --first-frame <start> --ext-port <port>` for `new-profile`, `new-project --to <folder>`, `switch --to <folder>`, `relaunch` and `relaunch --ai-closed`, on a candidate launched with `--inspect-brk-extensions`. Nothing in the frame moves after its first frame; the 3 px terminal-tab step seen in source trees is gone. <sub>152 R8; #632, #638, #639</sub>
@@ -159,6 +160,7 @@ Release: Ritemark 2.2 ([release plan](../../development/releases/v2.2.0/release-
 
 The x64 candidate runs on Jarmo's Mac under Rosetta unless an Intel Mac is at hand; the evidence says which.
 
+84a. [ ] **The x64 candidate, prepared and checked before install** (release session). `build-macos-x64.yml` ran on the candidate commit and is green; `gh run download` the artifact into `dist/x64-ci`; `./scripts/extract-macos-x64-artifact.sh`; `RITEMARK_RELEASE_COMMIT=<candidate commit> ./scripts/codesign-app.sh darwin-x64` reports 0 failures; `./scripts/create-dmg.sh x64` makes `dist/Ritemark-2.2.0-darwin-x64.dmg`. Then the same mounted-DMG checks as row 4a, with `lipo -archs` saying `x86_64` and provenance verified against the release commit's objects. Record the SHA-256 and build time in the table. <sub>release skill, Step 6</sub>
 85. [ ] **Install.** Replace the arm64 app with the x64 DMG's (one Ritemark at a time), right-click ▸ Open, start it with `open --arch x86_64 -a /Applications/Ritemark.app`. Activity Monitor shows Kind **Intel**. <sub>release skill</sub>
 86. [ ] **About.** 2.2.0, the candidate's commit, Electron 43.8.6, Node.js 24.22.1. <sub>#620</sub>
 87. [ ] **A Claude turn and a ChatGPT turn** each answer. **AI: Claude, ChatGPT** <sub>release plan, Gates</sub>
@@ -168,6 +170,8 @@ The x64 candidate runs on Jarmo's Mac under Rosetta unless an Intel Mac is at ha
 91. [ ] Afterwards the arm64 candidate is back in `/Applications`.
 
 ## Gate 2: Windows x64
+
+- [ ] **Before install** (release session): `build-windows.yml` ran on the candidate commit and is green; the artifact's `Ritemark-Setup.sha256.txt` names that `source_commit`, and its SHA-256 matches the downloaded `Ritemark-Setup.exe`, recorded in the table. <sub>release skill, Gate 2</sub>
 
 Ctrl replaces ⌘. File, Edit, View and Help are behind the menu button at the start of the left strip. Every row needs the Windows PC; the Windows session reports row by row through the Development manager. The AI's browser actions (row 33) are Mac-only behind a flag, so they aren't tested here.
 
