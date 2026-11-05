@@ -162,40 +162,258 @@ export function pageReferences(html: string): PageReferences {
   return out;
 }
 
-/** `url(…)` and `@import` in CSS text. Comments are dropped first, so a commented-out file doesn't go. */
+/**
+ * CSS with its comments gone and its strings set aside (round 4 of #669): `code` holds each string as `"N"`, its
+ * text in `strings[N]`, so `url(` or `@import` inside a comment or inside `content: "…"` names nothing, while
+ * `url("a.png")` and `@import "b.css"` keep theirs. An unquoted `url(…)` is kept whole, as CSS reads it: a `/*` inside
+ * it opens no comment. An unclosed comment runs to the end and an unclosed string to the end of its line, as in CSS.
+ */
+export function maskCss(css: string): { code: string; strings: string[] } {
+  const strings: string[] = [];
+  let code = '';
+  let i = 0;
+  const n = css.length;
+  while (i < n) {
+    const c = css[i];
+    if (c === '/' && css[i + 1] === '*') {
+      const close = css.indexOf('*/', i + 2);
+      i = close < 0 ? n : close + 2;
+      code += ' ';
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      let j = i + 1;
+      while (j < n && css[j] !== c && css[j] !== '\n') j += css[j] === '\\' ? 2 : 1;
+      strings.push(css.slice(i + 1, Math.min(j, n)));
+      code += `"${strings.length - 1}"`;
+      i = j < n && css[j] === c ? j + 1 : j;
+      continue;
+    }
+    if ((c === 'u' || c === 'U') && !/[\w-]/.test(css[i - 1] ?? '')) {
+      const unquotedUrl = /^url\(\s*(?=[^\s"')])/i.exec(css.slice(i, i + 64));
+      if (unquotedUrl) {
+        const close = css.indexOf(')', i + unquotedUrl[0].length);
+        const stop = close < 0 ? n : close;
+        code += css.slice(i, stop);
+        i = stop;
+        continue;
+      }
+    }
+    code += c;
+    i++;
+  }
+  return { code, strings };
+}
+
+/** `url(…)` and `@import` in CSS text. Comments and the text of other strings name nothing (`maskCss`). */
 export function cssReferences(css: string): Reference[] {
-  const text = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const { code, strings } = maskCss(css);
   const refs: Reference[] = [];
-  const importRe = /@import\s+(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^\s;)]+))/gi;
-  for (const m of text.matchAll(importRe)) {
-    const value = (m[1] ?? m[2] ?? m[3] ?? '').trim();
+  const importRe = /@import\s*(?:url\(\s*)?(?:"(\d+)"|([^\s;)"]+))/gi;
+  for (const m of code.matchAll(importRe)) {
+    const value = (m[1] !== undefined ? strings[Number(m[1])] : m[2] ?? '').trim();
     if (value) refs.push({ value, as: 'style' });
   }
-  const urlRe = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi;
-  for (const m of text.matchAll(urlRe)) {
+  const urlRe = /url\(\s*(?:"(\d+)"|([^)\s"]*))\s*\)/gi;
+  for (const m of code.matchAll(urlRe)) {
     // `@import url(x.css)` was taken above as a stylesheet; the same text here would be taken twice
-    const before = text.slice(Math.max(0, (m.index ?? 0) - 12), m.index ?? 0);
-    if (/@import\s+$/i.test(before)) continue;
-    const value = (m[1] ?? m[2] ?? m[3] ?? '').trim();
+    const before = code.slice(Math.max(0, (m.index ?? 0) - 12), m.index ?? 0);
+    if (/@import\s*$/i.test(before)) continue;
+    const value = (m[1] !== undefined ? strings[Number(m[1])] : m[2] ?? '').trim();
     if (value) refs.push({ value, as: 'any' });
   }
   return refs;
 }
 
+/** Words after which a `/` starts a regular expression, not a division. */
+const REGEX_AFTER_WORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw', 'case', 'do', 'else', 'yield', 'await']);
+/** Templates nested deeper than this are not followed: the module names nothing (fail safe). */
+const MAX_TEMPLATE_DEPTH = 32;
+
+export interface MaskedJs {
+  /** The script with comments gone, each top-level string as `"N"`, each template as two backticks. */
+  code: string;
+  /** The top-level strings' text, as written (escapes kept). */
+  strings: string[];
+  /** False when a string, template, comment or regular expression never closes: such a module never runs. */
+  complete: boolean;
+}
+
 /**
- * A module's static imports and re-exports, and dynamic `import('…')` with a literal string. Only `./`, `../` and `/`
- * specifiers name a file; a bare one (`react`) can't load from a page without an import map and is not a file here.
+ * A small JavaScript tokenizer, not a parser (round 4 of #669): enough to tell code from comments, strings, templates
+ * and regular expressions, so `// import "./x.js"` or `'import "./x.js"'` names nothing. A `/` starts a regular
+ * expression where an expression may start (after an operator, an opening bracket, a comma, or a word such as
+ * `return`) and is a division after a name, a number or a closing bracket, as tokenizers guess without a parser.
+ * Template text and everything inside `${…}` are masked whole: an import inside one is never followed (fail safe).
+ */
+export function maskJs(js: string): MaskedJs {
+  const n = js.length;
+  const strings: string[] = [];
+  let code = '';
+  let complete = true;
+
+  /** Scans code from `start`. Nested (inside `${…}`): emits nothing and returns after the `}` that closes it. */
+  const scanCode = (start: number, nested: boolean, depth: number): number => {
+    let i = start;
+    let braces = 0;
+    let regexAllowed = true;
+    const emit = (text: string) => {
+      if (!nested) code += text;
+    };
+    while (i < n) {
+      const c = js[i];
+      if (c === '/' && js[i + 1] === '/') {
+        while (i < n && js[i] !== '\n' && js[i] !== '\r' && js[i] !== '\u2028' && js[i] !== '\u2029') i++;
+        continue;
+      }
+      if (c === '/' && js[i + 1] === '*') {
+        const close = js.indexOf('*/', i + 2);
+        if (close < 0) {
+          complete = false;
+          return n;
+        }
+        emit(/[\n\r\u2028\u2029]/.test(js.slice(i, close)) ? '\n' : ' ');
+        i = close + 2;
+        continue;
+      }
+      if (c === '/' && regexAllowed) {
+        let j = i + 1;
+        let inClass = false;
+        for (; j < n; j++) {
+          const ch = js[j];
+          if (ch === '\\') {
+            j++;
+            continue;
+          }
+          if (ch === '\n' || ch === '\r') break;
+          if (inClass) {
+            if (ch === ']') inClass = false;
+          } else if (ch === '[') {
+            inClass = true;
+          } else if (ch === '/') {
+            break;
+          }
+        }
+        if (j >= n || js[j] !== '/') {
+          complete = false;
+          return n;
+        }
+        j++;
+        while (j < n && /[A-Za-z]/.test(js[j])) j++;
+        emit(' /re/ ');
+        i = j;
+        regexAllowed = false;
+        continue;
+      }
+      if (c === '"' || c === "'") {
+        let j = i + 1;
+        while (j < n && js[j] !== c) {
+          if (js[j] === '\\') {
+            j += 2;
+            continue;
+          }
+          if (js[j] === '\n' || js[j] === '\r') break;
+          j++;
+        }
+        if (j >= n || js[j] !== c) {
+          complete = false;
+          return n;
+        }
+        if (!nested) {
+          strings.push(js.slice(i + 1, j));
+          code += `"${strings.length - 1}"`;
+        }
+        i = j + 1;
+        regexAllowed = false;
+        continue;
+      }
+      if (c === '`') {
+        i = scanTemplate(i + 1, depth + 1);
+        if (!complete) return n;
+        emit('``');
+        regexAllowed = false;
+        continue;
+      }
+      if (c === '{') {
+        braces++;
+        emit(c);
+        i++;
+        regexAllowed = true;
+        continue;
+      }
+      if (c === '}') {
+        if (nested && braces === 0) return i + 1;
+        braces--;
+        emit(c);
+        i++;
+        regexAllowed = false;
+        continue;
+      }
+      if (/[A-Za-z_$0-9\u0080-\uffff]/.test(c)) {
+        let j = i + 1;
+        while (j < n && /[\w$\u0080-\uffff]/.test(js[j])) j++;
+        const word = js.slice(i, j);
+        emit(word);
+        i = j;
+        regexAllowed = REGEX_AFTER_WORDS.has(word);
+        continue;
+      }
+      emit(c);
+      i++;
+      if (!/\s/.test(c)) regexAllowed = !/[)\].]/.test(c);
+    }
+    if (nested) complete = false;
+    return n;
+  };
+
+  /** Scans a template's text from after its opening backtick; returns after the closing one. */
+  const scanTemplate = (start: number, depth: number): number => {
+    if (depth > MAX_TEMPLATE_DEPTH) {
+      complete = false;
+      return n;
+    }
+    let i = start;
+    while (i < n) {
+      const c = js[i];
+      if (c === '\\') {
+        i += 2;
+        continue;
+      }
+      if (c === '`') return i + 1;
+      if (c === '$' && js[i + 1] === '{') {
+        i = scanCode(i + 2, true, depth);
+        if (!complete) return n;
+        continue;
+      }
+      i++;
+    }
+    complete = false;
+    return n;
+  };
+
+  // A hashbang line is a comment
+  scanCode(js.startsWith('#!') ? js.indexOf('\n') + 1 || n : 0, false, 0);
+  return { code, strings, complete };
+}
+
+/**
+ * A module's static imports and re-exports, and dynamic `import('…')` with a literal string, read from its code only
+ * (`maskJs`): an import in a comment, a string or a template names nothing, and a module that doesn't tokenize (it
+ * would never run) names nothing at all. Only `./`, `../` and `/` specifiers name a file; a bare one (`react`) can't
+ * load from a page without an import map and is not a file here.
  */
 export function moduleReferences(js: string): Reference[] {
+  const { code, strings, complete } = maskJs(js);
+  if (!complete) return [];
   const refs: Reference[] = [];
   const res = [
-    /\bimport\s+(?:[\w*{}\s,$]+?\s+from\s+)?["']([^"'\n]+)["']/g,
-    /\bexport\s+(?:\*|\{[^}]*\})(?:\s+as\s+[\w$]+)?\s+from\s+["']([^"'\n]+)["']/g,
-    /\bimport\s*\(\s*["']([^"'\n]+)["']\s*\)/g,
+    /(?<![\w$.])import\s*(?:[\w*{}\s,$]+?\s*\bfrom\s*)?"(\d+)"/g,
+    /(?<![\w$.])export\s*(?:\*|\{[^}]*\})(?:\s*as\s+[\w$]+)?\s*from\s*"(\d+)"/g,
+    /(?<![\w$.])import\s*\(\s*"(\d+)"\s*[,)]/g,
   ];
   for (const re of res) {
-    for (const m of js.matchAll(re)) {
-      const value = m[1].trim();
+    for (const m of code.matchAll(re)) {
+      const value = strings[Number(m[1])].trim();
       if (/^(\.{1,2}\/|\/)/.test(value)) refs.push({ value, as: 'module' });
     }
   }

@@ -33,12 +33,15 @@ const FIXTURES: Record<string, string> = {
   'google-api': j('maps.js?key=', 'AI', 'za', 'Sy', run(33), '&callback=init'),
   'google-oauth-secret': j('<code>', 'GOC', 'SPX-', run(28), '</code>'),
   'aws-access-key': j('id: ', 'AK', 'IA', run(16, UPPER)),
-  'aws-secret': j('aws_secret', '_access_key = ', run(40)),
+  // letters only: an unquoted value with digits is also an unquoted assignment (round 4); this rule knows the shape
+  'aws-secret': j('aws_secret', '_access_key = ', run(40, 'AbCdEfGh+JkLmNoPqRsTu/VwXyZ')),
   github: j('git clone https://', 'gh', 'p_', run(36), '@github.com/x/y'),
   'slack-token': j('<pre>', 'xo', 'xb-', '1234-', run(20), '</pre>'),
   'slack-webhook': j('post("https://', 'hooks.slack', '.com/services/', 'T0', run(8, UPPER), '/B0', run(8, UPPER), '/', run(24), '")'),
   stripe: j('<p>', 'sk', '_live_', run(24), '</p>'),
-  cloudflare: j('CLOUDFLARE', '_API_TOKEN=', run(40)),
+  // the global key's header: an unquoted CLOUDFLARE_API_TOKEN=… is also an unquoted assignment (round 4), so the
+  // fixture that proves this rule is the form only it knows
+  cloudflare: j('headers: { "X-Auth', '-Key": "', run(37, HEX), '" }'),
   bearer: j('headers: { Authorization: `', 'Bear', 'er ', run(32), '` }'),
   jwt: j('<td>', 'ey', 'J', run(16), '.ey', 'J', run(20), '.', run(24), '</td>'),
   assignment: j('const ', 'pass', 'word', ' = "', run(16), '";'),
@@ -49,6 +52,7 @@ const FIXTURES: Record<string, string> = {
   'query-token': j('<img src="https://cdn.example.com/x.png?', 'tok', 'en=', run(24), '">'),
   'token-assignment': j('const ', 'tok', 'en', ' = "', run(24), '";'),
   'telegram-bot': j('BOT', '_TOKEN', " = '", '123456789', ':', 'AA', 'F', run(32), "'"),
+  'assignment-unquoted': j('DB_', 'PASS', 'WORD', '=', 'Sunrise', 'Harbour', '12345'),
 };
 
 let passed = 0;
@@ -220,6 +224,89 @@ async function main(): Promise<void> {
     assert.deepEqual(scanText(quiet.join('\n')), []);
   });
 
+  await check('round 4: unquoted secret assignments in .env, .ini, YAML, a connection string and a URL query are found', () => {
+    const lines = [
+      // .env
+      j('PASS', 'WORD', '=', 'Sunrise', 'Harbour', '12345'),
+      j('export ', 'API', '_KEY=', run(20)),
+      j('GITHUB', '_TOKEN=', run(24), ' # deploy'),
+      // .ini
+      '[database]',
+      j('pass', 'word = ', 'Sunrise12345', 'Harbour', ' ; set by ops'),
+      j('api', 'key=', run(14)),
+      // YAML without quotes
+      'service:',
+      j('  sec', 'ret: ', run(18)),
+      j('  access', '_key: ', run(16)),
+      j('  private', '_key: ', run(30)),
+      j('  db', 'Password: ', 'Harbour', '2026', 'Gate'),
+      // a connection string; Java properties
+      j('Server=db;User Id=app;', 'Pass', 'word=', 'Sunrise', '12345x', ';'),
+      j('db.', 'pass', 'wd=', 'Sunrise', '12345', 'Harbour'),
+      // a URL query: 12 to 15 characters, with letters and digits
+      j('https://example.com/login?user=mari&', 'pass', 'word=', 'Sunrise', '12345'),
+      j('<a href="/cb?code=1&', 'client', '_secret=', run(14), '">'),
+      // HTML that shows an env file
+      j('<pre><code>', 'STRIPE', '_SECRET=', run(20), '</code></pre>'),
+    ];
+    const hits = scanText(lines.join('\n'));
+    assert.deepEqual(hits.map((h) => [h.line, h.rule]), [
+      [1, 'assignment-unquoted'], [2, 'assignment-unquoted'], [3, 'assignment-unquoted'],
+      [5, 'assignment-unquoted'], [6, 'assignment-unquoted'],
+      [8, 'assignment-unquoted'], [9, 'assignment-unquoted'], [10, 'assignment-unquoted'], [11, 'assignment-unquoted'],
+      [12, 'assignment-unquoted'], [13, 'assignment-unquoted'],
+      [14, 'query-key'], [15, 'query-key'],
+      [16, 'assignment-unquoted'],
+    ]);
+    // Open selects the value only, never its name or what follows it
+    const [env] = scanText(lines[0]);
+    assert.deepEqual([env.column, env.endColumn], [9, 9 + 'SunriseHarbour12345'.length]);
+    const [ini] = scanText(lines[4]);
+    assert.deepEqual([ini.column, ini.endColumn], [11, 11 + 'Sunrise12345Harbour'.length]);
+    const [conn] = scanText(lines[11]);
+    assert.equal(lines[11].slice(conn.column, conn.endColumn), j('Sunrise', '12345x'));
+    const [query] = scanText(lines[13]);
+    assert.equal(lines[13].slice(query.column, query.endColumn), j('Sunrise', '12345'));
+  });
+
+  await check('round 4: unquoted near misses stay quiet: prose, placeholders, variables, URLs, paths, words, page tokens', () => {
+    const quiet = [
+      'password = the one you chose',
+      'Password: use at least 12 characters, with a digit',
+      'The secret: practise every day.',
+      j('PASS', 'WORD=', 'changeme_changeme'),
+      j('API', '_KEY=', 'your-api-key-here'),
+      j('SEC', 'RET=', '<your-secret-here>'),
+      j('PASS', 'WORD=', '${DB_PASSWORD_2}'),
+      j('tok', 'en: ', '$GITHUB_TOKEN_2'),
+      j('PASS', 'WORD=', '%DB_PASS_2%'),
+      j('PASS', 'WORD=', 'SunriseHarbourGate'),
+      j('pass', 'word=', 'abc123'),
+      j('pass', 'word=', '123456789012345'),
+      j('pass', 'word_hint=', 'remember2fa-device'),
+      j('tok', 'en_url: ', 'https://github.com/login/oauth/access_token2'),
+      j('private', '_key: ', './keys/server2048.pem'),
+      j('csrf', '_token=', 'abc123def456ghi'),
+      j('next', '_page', '_token=', 'CAoQAA12345678'),
+      j('const pass', 'word = ', 'process.env.DB_PASSWORD;'),
+      j('tok', 'en_expiry: ', '2026-11-05T12:00:00Z'),
+      j('pass', 'word=$(cat ', 'secret2.txt)'),
+      j('sec', 'ret: !vault |'),
+      j('pass', 'word:'),
+      j('tok', 'enizer: ', 'gpt2-tokenizer-v12'),
+      j('.pass', 'word-input:focus { outline: 2px solid var(--ink) }'),
+      j('--sec', 'ret-bg: #a1b2c3d4e5f6a7;'),
+      j('api', '_key_name: ', 'maps-browser-2026'),
+      j('Secret::', 'KeyManager2026'),
+      // a date, a call, a query value under 16 characters with no digit or no letter
+      j('pass', 'word_changed: ', '2026-11-05T12:00:00Z'),
+      j('const pass', 'word = ', 'readSecret2026x(user);'),
+      j('<a href="/login?', 'pass', 'word=', 'forgottenpass', '">'),
+      j('<a href="/x?', 'sec', 'ret=', '1234567890123', '">'),
+    ];
+    assert.deepEqual(scanText(quiet.join('\n')).map((h) => [h.line, h.rule]), []);
+  });
+
   await check('a long run of letters and dashes scans in linear time: four times the text takes about four times as long', () => {
     // bounded name parts keep this linear; an unbounded `[\w.-]*` before a word made it quadratic, and a minified
     // script is exactly such a run. Timing two sizes (best of three each) asks for growth, not for a fast machine
@@ -237,6 +324,24 @@ async function main(): Promise<void> {
     best(2_000); // warm the regex engine
     const small = Math.max(best(10_000), 1);
     const large = best(40_000);
+    assert.ok(large / small < 8, `4x the text took ${(large / small).toFixed(1)}x as long (${small.toFixed(1)} ms, ${large.toFixed(1)} ms); linear is ~4, quadratic ~16`);
+  });
+
+  await check('round 4: a long run of name:name:… with no end scans in linear time (the unquoted value is bounded)', () => {
+    const text = (n: number) => j('x:'.repeat(n), '(');
+    const best = (n: number): number => {
+      const t = text(n);
+      let min = Infinity;
+      for (let i = 0; i < 3; i++) {
+        const start = process.hrtime.bigint();
+        scanText(t);
+        min = Math.min(min, Number(process.hrtime.bigint() - start) / 1e6);
+      }
+      return min;
+    };
+    best(1_000);
+    const small = Math.max(best(5_000), 1);
+    const large = best(20_000);
     assert.ok(large / small < 8, `4x the text took ${(large / small).toFixed(1)}x as long (${small.toFixed(1)} ms, ${large.toFixed(1)} ms); linear is ~4, quadratic ~16`);
   });
 

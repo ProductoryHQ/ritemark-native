@@ -262,13 +262,13 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
       if (c.size > MAX_FILE_BYTES) continue;
       const ext = p.extname(c.fsPath).toLowerCase();
       const fileBase = pathToFileURL(c.fsPath);
-      if (c.as === 'style' || ext === '.css') {
-        const css = (await readFile(c.realPath)).toString('utf8');
-        for (const ref of cssReferences(css)) next.push({ ref, base: fileBase });
-      } else if (c.as === 'module' || ext === '.mjs') {
-        const js = (await readFile(c.realPath)).toString('utf8');
-        for (const ref of moduleReferences(js)) next.push({ ref, base: fileBase });
-      }
+      const isStyle = c.as === 'style' || ext === '.css';
+      if (!isStyle && c.as !== 'module' && ext !== '.mjs') continue;
+      // a file that grew past the limit since its stat goes as too big (below) and is not followed
+      const bytes = await readFile(c.realPath);
+      if (bytes.length > MAX_FILE_BYTES) continue;
+      const text = bytes.toString('utf8');
+      for (const ref of isStyle ? cssReferences(text) : moduleReferences(text)) next.push({ ref, base: fileBase });
     }
     level = next;
   }
@@ -305,6 +305,12 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     }
     const bytes = f.lexical === pagePath ? pageBytes : await readFile(f.real);
     file.size = bytes.length;
+    // A file can grow between its stat and this read: the limit holds for the bytes read, which are what would go
+    if (bytes.length > MAX_FILE_BYTES) {
+      tooBig.push({ projectPath, size: bytes.length });
+      files.push(file);
+      continue;
+    }
     file.sha256 = createHash('sha256').update(bytes).digest('hex');
     if (isText(bytes)) {
       const text = bytes.toString('utf8');

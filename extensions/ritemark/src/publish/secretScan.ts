@@ -56,6 +56,13 @@ function placeholderValue(match: RegExpExecArray): boolean {
   return isPlaceholder(match.groups?.value ?? '');
 }
 
+/** `?password=…`: a placeholder isn't a key, and a value under 16 characters is one only when it mixes letters and digits. */
+function shortQueryValue(match: RegExpExecArray): boolean {
+  const value = match.groups?.value ?? '';
+  if (isPlaceholder(value)) return true;
+  return value.length < 16 && (!/[A-Za-z]/.test(value) || !/\d/.test(value));
+}
+
 /** For a rule whose whole match is the key (`sk-ant-…`): a key only when the match isn't plainly a placeholder. */
 function wholeMatchPlaceholder(match: RegExpExecArray): boolean {
   return isPlaceholder(match[0]);
@@ -68,6 +75,55 @@ function wholeMatchPlaceholder(match: RegExpExecArray): boolean {
 function notKeyLike(match: RegExpExecArray): boolean {
   const value = match.groups?.value ?? '';
   return !/[A-Za-z]/.test(value) || !/\d/.test(value) || isPlaceholder(value);
+}
+
+/** The words of a name: `DB_PASSWORD` → db, password; `dbPassword` → db, password; `APIKey` → apikey. */
+function nameParts(name: string): string[] {
+  return name
+    .replace(/([a-z\d])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+const SECRET_WORDS = new Set(['password', 'passwd', 'secret', 'token', 'apikey', 'accesskey', 'privatekey', 'secretkey']);
+const SECRET_PAIRS = new Set(['api key', 'access key', 'private key']);
+/** A name whose last word says what the value is about, not that it is the key: `password_hint`, `token_url`. */
+const DESCRIBING_WORDS = new Set([
+  'url', 'uri', 'urls', 'path', 'file', 'filename', 'dir', 'endpoint', 'host', 'name', 'id', 'type', 'kind', 'length',
+  'len', 'min', 'max', 'count', 'hint', 'label', 'field', 'prompt', 'policy', 'header', 'param', 'expiry', 'expires',
+  'expiration', 'ttl', 'enabled', 'required', 'regex', 'pattern', 'format', 'placeholder', 'title', 'text', 'message',
+  'msg', 'error', 'help', 'description', 'desc', 'mode', 'version', 'algorithm', 'alg', 'provider', 'env', 'var', 'ref',
+  'location', 'color', 'colour', 'bg', 'style', 'class', 'input', 'form', 'button', 'icon', 'source', 'store', 'manager',
+]);
+/** Tokens a page or an API hands out openly: a form's CSRF token, a list's next-page token. */
+const OPEN_TOKEN_WORDS = new Set(['csrf', 'xsrf', 'page', 'next', 'continuation', 'sync', 'cancel', 'cancellation', 'cursor', 'pagination']);
+
+/** Whether a name names a key or password: `DB_PASSWORD`, `api_key`, `client_secret`, `GITHUB_TOKEN`, `db.passwd`. */
+export function namesSecret(name: string): boolean {
+  const parts = nameParts(name);
+  if (parts.length === 0) return false;
+  const named = parts.some((part, i) => SECRET_WORDS.has(part) || (i > 0 && SECRET_PAIRS.has(`${parts[i - 1]} ${part}`)));
+  if (!named) return false;
+  if (DESCRIBING_WORDS.has(parts[parts.length - 1])) return false;
+  return !parts.some((part) => OPEN_TOKEN_WORDS.has(part));
+}
+
+/**
+ * The unquoted assignment rule's strength test (round 4 of #669): the name names a key, and the value is one. At least
+ * 12 characters (the rule) mixing letters and digits, not a placeholder, and not something that only points to a key:
+ * a variable (`$X`, `%X%`), a URL, a path or a date. `process.env.DB_PASSWORD` has no digit. Prose
+ * ("password = the one you chose") fails on length or digits; a word list like `changeme_changeme` on the placeholder
+ * test.
+ */
+function weakUnquoted(match: RegExpExecArray): boolean {
+  const name = match.groups?.name ?? '';
+  const value = match.groups?.value ?? '';
+  if (!namesSecret(name)) return true;
+  if (!/[A-Za-z]/.test(value) || !/\d/.test(value)) return true;
+  if (isPlaceholder(value)) return true;
+  if (/^[$%]/.test(value)) return true;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value) || /^(?:\.{0,2}|~)\//.test(value)) return true;
+  return /^\d{4}-\d{2}-\d{2}/.test(value);
 }
 
 /**
@@ -92,7 +148,8 @@ export const RULES: readonly SecretRule[] = [
   { id: 'bearer', re: /\bBearer\s+[A-Za-z0-9._~+/-]{20,}=*/g },
   { id: 'jwt', re: /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g },
   { id: 'assignment', re: /\b[\w.-]{0,40}?(?:password|passwd|pwd|secret|api[_-]?key|apikey|access[_-]?token|auth[_-]?token|private[_-]?key)[\w-]{0,40}["']?\s*[:=]\s*["'`](?<value>[^"'`\s]{12,})["'`]/gi, skip: placeholderValue },
-  { id: 'query-key', re: /[?&](?:api[_-]?key|apikey|access[_-]?token|auth[_-]?token|password|secret)=(?<value>[^&#\s"'<>]{16,})/gi, skip: placeholderValue },
+  // `?api_key=…`, `&client_secret=…`; from 12 characters when the value mixes letters and digits (round 4 of #669)
+  { id: 'query-key', re: /[?&](?:[a-z]{1,24}[_-])?(?:api[_-]?key|apikey|access[_-]?(?:token|key)|auth[_-]?token|private[_-]?key|password|passwd|secret)=(?<value>[^&#\s"'<>]{12,})/gi, skip: shortQueryValue },
   { id: 'huggingface', re: /\bhf_(?=[A-Za-z0-9]*[A-Z])(?=[A-Za-z0-9]*[a-z])[A-Za-z0-9]{30,}(?![A-Za-z0-9_])/g },
   { id: 'gitlab', re: /\bglpat-[A-Za-z0-9_-]{20,}/g },
   { id: 'stripe-webhook', re: /\bwhsec_[A-Za-z0-9+/=]{24,}/g },
@@ -103,6 +160,11 @@ export const RULES: readonly SecretRule[] = [
   // `token-assignment`'s value class, so it has its own rule and is found wherever it stands (round 3 of #669)
   { id: 'telegram-bot', re: /(?<![\d:])\d{8,12}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/g },
   { id: 'token-assignment', re: /\b(?:(?:[A-Za-z0-9]{1,24}[_-]){0,4}token|(?:api|bot|bearer|refresh|session|personal|secret|private|github|gitlab|slack|discord|telegram|npm)token)["']?\s*[:=]\s*["'`](?<value>[A-Za-z0-9._~+/=-]{20,})["'`]/gi, skip: notKeyLike },
+  // Unquoted, as in .env, .ini, YAML, Java properties and connection strings (round 4 of #669): `DB_PASSWORD=…`,
+  // `password = … ; note`, `  api_key: …`, `Server=db;Password=…;`. The name starts a word (never inside another name
+  // or after `?`/`&`, which the query rules own); the value runs to whitespace, `;`, `&`, a quote, `<`, `#` or the end
+  // of the line. Which names and values count is `weakUnquoted`'s strength test. Both parts are bounded (linear time).
+  { id: 'assignment-unquoted', re: /(?<![\w.?&$@-])(?<name>[A-Za-z_][\w.-]{0,59})[ \t]*[:=][ \t]*(?<value>[^\s"'`;&,<>(){}[\]=#:][^\s"'`;&,<>(){}[\]=#]{11,255}=*)(?=[\s;&"'`<>#]|$)/gm, skip: weakUnquoted },
 ];
 
 /** A match made with the `d` flag (ES2022's indices; the extension's lib is ES2020). */

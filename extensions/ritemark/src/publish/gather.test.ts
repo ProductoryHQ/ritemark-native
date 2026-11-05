@@ -13,7 +13,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { contentHashOf, gatherPage, kindOf } from './gather';
 import { GitCheckError, gitIgnored } from './gitIgnore';
-import { relTokens, srcsetUrls } from './references';
+import { cssReferences, moduleReferences, relTokens, srcsetUrls } from './references';
+import { MAX_FILE_BYTES } from './types';
 import type { LeftOutReason, PublishPlan } from './types';
 
 const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'publish-gather-')));
@@ -445,6 +446,69 @@ for (const key of ['a','b']) {
     });
     assert.deepEqual(plan.tooBig, [{ projectPath: 'big/clip.mp4', size: 30 * 1024 * 1024 }]);
     assert.ok(!read.includes(big));
+  });
+
+  await check('round 4: a file that grows past 25 MiB between stat and read is too big: not hashed, not scanned', async () => {
+    const grows = write('grows/clip.txt', 'small on disk');
+    const page = write('grows/page.html', '<video src="clip.txt"></video>');
+    // what it grew into holds a key-shaped line (built here, so no such string sits in the repository)
+    const grown = Buffer.alloc(MAX_FILE_BYTES + 1, 0x20);
+    grown.write(['sk', '_live_', 'Ab3Cd5Ef7Gh9Jk2Mn4Pq6Rs8'].join(''));
+    const plan = await gatherPage(page, project, {
+      readFile: async (p) => (p === grows ? grown : fs.promises.readFile(p)),
+    });
+    assert.deepEqual(plan.keyHits, [], 'a file over the limit is not scanned');
+    assert.deepEqual(plan.tooBig, [{ projectPath: 'grows/clip.txt', size: MAX_FILE_BYTES + 1 }]);
+    const file = plan.files.find((f) => f.projectPath === 'grows/clip.txt');
+    assert.ok(file && file.sha256 === undefined, 'a file over the limit is not hashed');
+    assert.equal(file?.size, MAX_FILE_BYTES + 1, 'the size read, not the size stat gave');
+  });
+
+  await check('round 4: imports in comments and strings name nothing; real imports, re-exports and import() still go', async () => {
+    for (const f of ['private1', 'private2', 'private3', 'private4', 'private5', 'private6', 'private7', 'private8', 'real1', 'real2', 'real3', 'real4', 'real5', 'real6', 'real7', 'real8', 'real9']) {
+      write(`masked/js/${f}.js`, 'export default 1;');
+    }
+    write('masked/js/main.js', [
+      '// import "./private1.js"',
+      "/* import './private2.js'; export * from './private3.js' */",
+      "const s = 'import \"./private4.js\"';",
+      'const t = `import(\'./private5.js\') ${s + `nested ${"}"}`} import "./private6.js"`;',
+      'const re = /\\/*/; import "./real1.js";',
+      'const half = total / 2; import { r2 } from \'./real2.js\'; const k = 1 / 3;',
+      'export { r3 } from "./real3.js";',
+      "const m = await import('./real4.js');",
+      "const q = \"it's\"; import './real5.js';",
+      "const cls = /[/'\"]/g; import './real6.js';",
+      "import{a7}from'./real7.js';export*from\"./real8.js\";",
+      'const obj = { import: 1 }; obj.import("./private7.js");',
+      "/** a doc comment with a quote ' in it */ import './real9.js';",
+      "const r = x => x\n  /* still a comment */; const u = 'import \"./private8.js\"';",
+    ].join('\n'));
+    const plan = await gather('masked/index.html', '<script type="module" src="js/main.js"></script>');
+    assert.deepEqual(goes(plan).slice(1).sort(), ['js/main.js', 'js/real1.js', 'js/real2.js', 'js/real3.js', 'js/real4.js', 'js/real5.js', 'js/real6.js', 'js/real7.js', 'js/real8.js', 'js/real9.js']);
+  });
+
+  await check('round 4: an inline module, a stylesheet and an HTML comment mask their comments and strings', async () => {
+    for (const f of ['real.js', 'private.js', 'gone.js', 'real.css', 'private.css', 'gone.css', 'real.png', 'private.png', 'quoted.png', 'gone.png', 'cdo.png']) write(`masked2/${f}`, 'x');
+    const plan = await gather('masked2/page.html', [
+      "<script type=\"module\">// import './private.js'\nconst x = 'import \"./private.js\"';\nimport './real.js';</script>",
+      '<style>/* @import "private.css"; */ @import "real.css"; .a { content: "url(quoted.png)"; background: url(real.png) } /* url(private.png) */</style>',
+      '<style><!-- .b { background: url(cdo.png) } --></style>',
+      '<!-- <link rel="stylesheet" href="gone.css"><script type="module" src="gone.js"></script><img src="gone.png"> -->',
+    ].join('\n'));
+    assert.deepEqual(goes(plan).slice(1).sort(), ['cdo.png', 'real.css', 'real.js', 'real.png']);
+  });
+
+  await check('round 4: the tokenizer: a module that does not parse loads nothing; CSS keeps url() with a /* inside', () => {
+    assert.deepEqual(moduleReferences("import './a.js'; const s = 'never closed\n;"), [], 'an unclosed string: the module never runs');
+    assert.deepEqual(moduleReferences("import './a.js'; /* never closed"), []);
+    assert.deepEqual(moduleReferences("import './a.js'; const t = `never closed"), []);
+    assert.deepEqual(moduleReferences("import './a.js'; const r = /never closed\n;"), []);
+    assert.deepEqual(moduleReferences("import './a.js';").map((r) => r.value), ['./a.js']);
+    assert.deepEqual(moduleReferences("if (a) return /'/.test(b); import './b.js';").map((r) => r.value), ['./b.js'], 'a regex after return');
+    assert.deepEqual(cssReferences('.a { background: url(img/a/*b.png) } .b { background: url("c.png") }').map((r) => r.value), ['img/a/*b.png', 'c.png']);
+    assert.deepEqual(cssReferences('.a { content: "/*"; background: url(d.png) } /* url(e.png) */').map((r) => r.value), ['d.png'], 'a /* inside a string opens no comment');
+    assert.deepEqual(cssReferences("@import url('f.css'); .x { content: 'url(g.png)' }").map((r) => [r.value, r.as]), [['f.css', 'style']]);
   });
 
   await check('CSS loops end', async () => {
