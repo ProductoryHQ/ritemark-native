@@ -2,7 +2,7 @@
 
 Track: Lightweight (one shell PR, two menu items, no new surface)<br>
 Release tier: shell. Patch 019 (the tab row's empty-area menu, `ritemarkTabMenu.ts`) and patch 003 (the chat items in the text editor's and Documents' context menus).<br>
-**Status:** Under way.<br>
+**Status:** In review as draft PR #664 (`proof-650.txt`: 19 PASS, 0 FAIL).<br>
 **Approval:** the Development manager approved #650 as a lightweight sprint on 5 November 2026, under Jarmo's 2.2 delegation of 1 November (the manager approves 2.2's plans and starts its sprints until 2.2's RC). Release approval stays Jarmo's.<br>
 **Release:** [v2.2.0](../release-plan.md)
 
@@ -10,7 +10,7 @@ Release tier: shell. Patch 019 (the tab row's empty-area menu, `ritemarkTabMenu.
 
 | Issue | What | PR | Branch |
 |---|---|---|---|
-| [#650](https://github.com/ProductoryHQ/ritemark-native/issues/650) | Editor Actions Position ▸ leaves the tab row's empty-area menu; Copilot's Add File to Chat and Open Inline Chat leave the editor's and Documents' context menus. Every command stays in All commands | — | `sprint-154-menu-cleanup` |
+| [#650](https://github.com/ProductoryHQ/ritemark-native/issues/650) | Editor Actions Position ▸ leaves the tab row's empty-area menu; Copilot's Add File to Chat and Open Inline Chat leave the editor's and Documents' context menus. Every command stays in All commands | [#664](https://github.com/ProductoryHQ/ritemark-native/pull/664) | `sprint-154-menu-cleanup` |
 
 Both items come from the Experience lead's check of #649 (ritemark-dev `486b302`, the Sprint 146 answers, "For later, not this PR"). The PR goes in series with the other patch-019 PRs.
 
@@ -58,3 +58,4 @@ Both chat items are VS Code core's, not the built-in Copilot extension's `packag
 
 - [x] The Development manager approves #650 as a lightweight sprint (5 November 2026, Jarmo's 2.2 delegation of 1 November).
 - [x] GitHub issue exists: #650.
+- [x] One branch and PR: #664.
