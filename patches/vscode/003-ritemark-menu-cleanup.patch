@@ -316,7 +316,7 @@ index 4794c30c9ec..8716b6de49f 100644
  MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
  	submenu: MenuId.MenubarHelpMenu,
 diff --git a/src/vs/workbench/contrib/chat/browser/actions/chatContextActions.ts b/src/vs/workbench/contrib/chat/browser/actions/chatContextActions.ts
-index 7f368a27ce9..db7c96c31e2 100644
+index 7f368a27ce9..dec03163872 100644
 --- a/src/vs/workbench/contrib/chat/browser/actions/chatContextActions.ts
 +++ b/src/vs/workbench/contrib/chat/browser/actions/chatContextActions.ts
 @@ -37,7 +37,6 @@ import { EditorResourceAccessor, isEditorCommandsContext, isEditorInput, SideByS
@@ -390,16 +390,17 @@ index 7f368a27ce9..db7c96c31e2 100644
  
 -class AttachFolderToChatAction extends AttachResourceAction {
 +// Ritemark (Sprint 154, #650): no Add Folder to Chat in Documents' menu on a folder, for the same reason as Add File to
-+// Chat. Upstream keeps it out of All commands (f1: false); Copilot Chat still takes a folder dropped on its input.
-+// Exported for its test (ritemarkChatMenus.test.ts).
++// Chat. Its menu was its only way in (upstream has f1: false), so it joins All commands (decision 4). Exported for its
++// test (ritemarkChatMenus.test.ts).
 +export class AttachFolderToChatAction extends AttachResourceAction {
  
  	static readonly ID = 'workbench.action.chat.attachFolder';
  
-@@ -219,19 +193,6 @@ class AttachFolderToChatAction extends AttachResourceAction {
+@@ -218,20 +192,7 @@ class AttachFolderToChatAction extends AttachResourceAction {
+ 			id: AttachFolderToChatAction.ID,
  			title: localize2('workbench.action.chat.attachFolder.label', "Add Folder to Chat"),
  			category: CHAT_CATEGORY,
- 			f1: false,
+-			f1: false,
 -			menu: {
 -				id: MenuId.ExplorerContext,
 -				group: '5_chat',
@@ -413,6 +414,7 @@ index 7f368a27ce9..db7c96c31e2 100644
 -					)
 -				)
 -			}
++			f1: true,
  		});
  	}
  
@@ -767,7 +769,7 @@ index 7e5d8f63136..6e14eb6c26c 100644
  				order: 3,
 diff --git a/src/vs/workbench/contrib/inlineChat/test/browser/ritemarkChatMenus.test.ts b/src/vs/workbench/contrib/inlineChat/test/browser/ritemarkChatMenus.test.ts
 new file mode 100644
-index 00000000000..43646c48269
+index 00000000000..ded5ccfd5e0
 --- /dev/null
 +++ b/src/vs/workbench/contrib/inlineChat/test/browser/ritemarkChatMenus.test.ts
 @@ -0,0 +1,59 @@
@@ -792,9 +794,9 @@ index 00000000000..43646c48269
 +/**
 + * Ritemark (Sprint 154, #650; the Experience lead's check of #649): Copilot's Add File to Chat, Add Folder to Chat, Add
 + * Selection to Chat and Open Inline Chat leave the text editor's, Documents' and Search's context menus, where they handed
-+ * the file or selection to Copilot beside Ritemark's Send to AI Chat. Their commands keep their All commands entry (or,
-+ * for Add Folder to Chat, upstream's none), and their other places are unchanged. Each menu list is exact, so an entry
-+ * that comes back fails the test.
++ * the file or selection to Copilot beside Ritemark's Send to AI Chat. Their commands are in All commands (Add Folder to
++ * Chat joins it, decision 4), and their other places are unchanged. Each menu list is exact, so an entry that comes back
++ * fails the test.
 + */
 +suite('Ritemark: no Copilot chat items in the editor\'s, Documents\' and Search\'s menus', () => {
 +
@@ -807,11 +809,11 @@ index 00000000000..43646c48269
 +		assert.strictEqual(action.desc.f1, true);
 +	});
 +
-+	test('Add Folder to Chat is not in Documents\' menu, and keeps upstream\'s f1', () => {
++	test('Add Folder to Chat is not in Documents\' menu and is in All commands', () => {
 +		const action = new AttachFolderToChatAction();
 +		assert.strictEqual(action.desc.id, 'workbench.action.chat.attachFolder');
 +		assert.deepStrictEqual(menus(action), []);
-+		assert.strictEqual(action.desc.f1, false);
++		assert.strictEqual(action.desc.f1, true);
 +	});
 +
 +	test('Add Selection to Chat is not in the editor\'s menu and stays in All commands', () => {
@@ -1040,10 +1042,10 @@ index e05b71bd72c..01e13f0a5fd 100644
  				iconClass: ThemeIcon.asClassName(Codicon.gear),
 diff --git a/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts b/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts
 new file mode 100644
-index 00000000000..27941a6b39a
+index 00000000000..a8c9cca23d6
 --- /dev/null
 +++ b/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts
-@@ -0,0 +1,275 @@
+@@ -0,0 +1,276 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1250,6 +1252,7 @@ index 00000000000..27941a6b39a
 +			'workbench.action.showEditorActions',
 +			'workbench.action.chat.attachFile', // Add File to Chat (the text editor's, Documents' and Search's menus, 003)
 +			'workbench.action.chat.attachSelection', // Add Selection to Chat (the text editor's menu, 003)
++			'workbench.action.chat.attachFolder', // Add Folder to Chat (Documents' folders, 003; f1 from Sprint 154)
 +			'inlineChat.start', // Open Inline Chat (the text editor's menu, 003)
 +		];
 +		assert.deepStrictEqual(kept.filter(id => isHiddenFromRitemarkPalette('ritemark', id)), []);
