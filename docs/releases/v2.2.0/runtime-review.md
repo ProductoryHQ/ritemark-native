@@ -10,7 +10,7 @@ Done on 5 November 2026 for the 2.2.0 candidate, read-only: no binary, manifest 
 | Claude Agent SDK | 0.3.310 (`extensions/ritemark/package.json`) | 0.3.318 | — | `npm view @anthropic-ai/claude-agent-sdk` |
 | Codex (`codex-app-server`) | 0.164.0 (23 Oct) | 0.166.0 (0.165.0 on 27 Oct) | 29 Oct | `gh release list -R openai/codex`, `npm view @openai/codex` |
 | OpenCode | 1.19.4 (22 Oct) | 1.19.5 | 28 Oct | `npm view opencode-ai`, `gh release view -R sst/opencode` |
-| ripgrep (OpenCode's) | 15.1.0 | 15.2.0 | 15 Jul | `gh release view -R BurntSushi/ripgrep` |
+| ripgrep (OpenCode's) | 15.1.0 | 15.2.0 | 15 Jul 2026 (checked on the GitHub release) | `gh release view -R BurntSushi/ripgrep` |
 
 Every runtime is behind by a patch or minor step. None of the newer versions has been run with Ritemark.
 

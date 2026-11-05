@@ -88,7 +88,7 @@ The five items, in the shape's order:
 - **146 PR 5, a task card in a dialog over the board (#598):** third in the order, and the first cut inside 146 ("#598 is the first item cut if 2.2 runs tight"). It has no drawing approved, and it needs a security review of its own because a card file may come from someone else's folder.
 - **147 PR 4, what each AI can use (#415):** first in 147's own cut order: "new information the drawing doesn't place yet, and the most new host code".
 
-**Not cut:** 149, publishing a web page, is 2.2's story and can't be cut. Its PR 1 (#654) merged on 3 November; PRs 2–4 are in progress, and PR 4's merge waits on A4, the 14 live measurements on Jarmo's Cloudflare test account. If Publish doesn't reach `main` before the candidate, the release notes' last section goes and the headline stays on search.
+**Not cut:** 149, publishing a web page, is 2.2's story and can't be cut. Its PR 1 (#654) merged on 3 November; PRs 2–4 are in progress, and PR 4's merge waits on A4, the 14 live measurements on Jarmo's Cloudflare test account. Its PRs ship separately, and the release notes follow each one (markers in the notes' last section): if PR 2 (the page's bar: a web page opens on the desk, **Open in browser**) merges before the candidate, its lines stay; the Publish lines stay only if PR 4 merges; and the headline moves to Publish only with PR 4. If neither merges, the last section goes and the headline stays on search.
 
 ## Sprint / Issue / PR Tracker
 
@@ -158,4 +158,4 @@ The five items, in the shape's order:
 | 2026-10-31 | The review process starts now; the sprint order: loose ends and Settings, search's words, publishing, search's meaning, local AI | Jarmo |
 | 2026-10-31 | The milestone's other issues go into item 4; #598 is the first to move to 2.3 if the appetite is tight | The Development manager ("otsusta ise") |
 | 2026-10-31 | The appetite: the core is items 1, 2's words layer, 4 and 5; cut 151, then 150, then #598. Sprint 145's plan approved, with its decisions as recommended (#588 asks; #501 keeps terminals behind; #515 ships on 43.8.3 with the risk recorded if no fixed Electron; #507 closes with the evidence) | Jarmo ("agreed with all") |
-| 2026-11-05 | The cut order applies for an RC on 6 November: 151 (#534), 150, 146 PR 5 (#598) and 147 PR 4 (#415) move to 2.3; 149 stays, PR 4's merge gated on A4 | Jarmo ("yes. proceed. … RC tahan homme õhtul! seega 24h to go"), recorded by the Development manager |
+| 2026-11-05 | The cut order applies for an RC on 6 November: 151 (#534), 150 and 146 PR 5 (#598) move to 2.3, the three Jarmo's 31 October cut order named; 147 PR 4 (#415) moves too, by 147's own decision 3, which the manager approved under the 2.2 delegation. 149 stays, PR 4's merge gated on A4 | Jarmo for the three ("yes. proceed. … RC tahan homme õhtul! seega 24h to go"); the Development manager for #415 (2.2 delegation); recorded by the Development manager |
