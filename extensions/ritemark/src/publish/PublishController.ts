@@ -15,7 +15,7 @@
  * - **The flag** `web-page-publishing` gates creating, connecting, publishing and updating. It never gates taking a
  *   page down: the list, Open, Unpublish and Disconnect work with it off (sprint-plan.md, *Feature Flag Check*).
  * - **`ritemark.publish.ready`** is set only with the flag on and the whole-window sheet available
- *   (`setPublishEntryAvailable`, from PR 5's `_ritemark.webviewSheet`). Until then the bar's Publish never shows,
+ *   (`setPublishEntryAvailable`, from PR 5's `_ritemark.webviewSheet.open`). Until then the bar's Publish never shows,
  *   and nothing else reaches the sheet, the token box or the upload either: `ritemark.page.publish` from a keybinding
  *   or another extension, `publishPage`, `chooseSubdomain` and Settings' Set up all do nothing (round 3), so nobody
  *   connects Cloudflare and then finds no way to publish. Taking a page down never waits for it.
@@ -64,8 +64,11 @@ export const DISCONNECT_FAILED = "Ritemark couldn't disconnect Cloudflare. Try a
 /** A plan with something key-shaped goes only by the sheet's "Publish anyway" (decision 2). */
 export const KEY_NEEDS_SHEET = 'Something that would go looks like a key or password. Publish from the sheet to decide.';
 
-/** PR 5's whole-window sheet host (patch 018, `_ritemark.webviewSheet`). Publish is reachable only once it exists. */
-export const SHEET_HOST_COMMAND = '_ritemark.webviewSheet';
+/**
+ * PR 5's whole-window sheet host: its open command (patch 018, `webviewSheet.ts`'s `WEBVIEW_SHEET_OPEN_COMMAND`, kept
+ * equal by the test). Publish is reachable only once it exists.
+ */
+export const SHEET_HOST_COMMAND = '_ritemark.webviewSheet.open';
 
 /**
  * Whether the whole-window sheet host is registered. Its name starts with `_`, so the list is asked for with the

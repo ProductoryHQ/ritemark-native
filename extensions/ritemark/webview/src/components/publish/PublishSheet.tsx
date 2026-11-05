@@ -19,7 +19,7 @@
  * shows while the sheet itself holds the focus, and the focus ring takes over once Tab moves to a button.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '../ui/dialog'
 import { Icon } from '../ui/Icon'
@@ -49,6 +49,28 @@ import {
 
 /** The default button's ring while the sheet itself has the focus: the focus ring's look (`rm-focus-ring`). */
 const DEFAULT_RING = 'group-focus/sheet:outline group-focus/sheet:outline-2 group-focus/sheet:outline-offset-2 group-focus/sheet:outline-[color:var(--r-focus-ring)]'
+
+/** The dialog lies in the page's flow inside the workbench's sheet (PR 5): no dim, corners, border or shadow of its own. */
+const IN_SHEET = 'group/sheet static w-full max-w-none max-h-none translate-x-0 translate-y-0 rounded-none border-0 bg-transparent shadow-none data-[state=open]:animate-none'
+
+/**
+ * The page comes into a sheet over the whole window (PR 5), which gives it the focus once it has drawn (round 3): when
+ * its window gets the focus with nothing in the sheet focused, the sheet itself takes it, so the default button is
+ * ringed and Enter presses it, as when the dialog opened (Radix focuses it then, which a window without the focus
+ * doesn't show). A control in the sheet that has the focus keeps it. Frame 2 and frame 3 both use it.
+ */
+function useSheetFocus() {
+  const sheetRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const onWindowFocus = () => {
+      const sheet = sheetRef.current
+      if (sheet && !sheet.contains(document.activeElement)) sheet.focus()
+    }
+    window.addEventListener('focus', onWindowFocus)
+    return () => window.removeEventListener('focus', onWindowFocus)
+  }, [])
+  return sheetRef
+}
 
 function send(message: PublishSheetWebviewMessage): void {
   vscode.postMessage(message)
@@ -81,6 +103,7 @@ export function PublishSheetView({
   const [waiting, setWaiting] = useState(false)
   // A refusal or a new model ends the wait for the host's check
   useEffect(() => { setWaiting(false) }, [refusal, model])
+  const sheetRef = useSheetFocus()
   const warning = keyWarning(model.keyHits)
   const limit = limitLine(model.tooBig, model.tooMany)
   const base = sheetButtons(model.keyHits.length > 0, limit !== null)
@@ -155,8 +178,13 @@ export function PublishSheetView({
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next) onAnswer({ type: 'publish:cancel' }) }}>
+      {/* The workbench's sheet over the whole window is the frame (PR 5, patch 018: the dim, the centring, the desk's
+          colour, the hairline and the shadow), and it is as tall as this page: so the dialog lies in the page's flow,
+          with no dim, corners, border or shadow of its own. It keeps its focus trap, Escape and Enter. */}
       <DialogContent
-        className="group/sheet max-w-[440px]"
+        ref={sheetRef}
+        overlayClassName="hidden"
+        className={IN_SHEET}
         aria-describedby="publish-sheet-subtitle"
         onKeyDown={(event) => {
           // Enter on the sheet itself presses the default button; on a button or link, that control's own press
@@ -349,9 +377,23 @@ function OpenHit({ hit, onAnswer, short = false }: { hit: { index: number; fileN
  * Cloudflare's token page and its own password box, and the sheet becomes frame 3 once connected.
  */
 export function SetupSheetView({ setup, onAnswer }: { setup: PublishSetupModel; onAnswer: (m: PublishSheetWebviewMessage) => void }) {
+  const sheetRef = useSheetFocus()
   return (
     <Dialog open onOpenChange={(next) => { if (!next) onAnswer({ type: 'publish:cancel' }) }}>
-      <DialogContent className="group/sheet max-w-[440px]" aria-describedby="publish-setup-lede">
+      {/* In the workbench's sheet over the whole window, as frame 3 (PR 5) */}
+      <DialogContent
+        ref={sheetRef}
+        overlayClassName="hidden"
+        className={IN_SHEET}
+        aria-describedby="publish-setup-lede"
+        onKeyDown={(event) => {
+          // Enter on the sheet itself presses Set up, the default button; on a button, that control's own press
+          if (event.key === 'Enter' && event.target === event.currentTarget && !event.nativeEvent.isComposing) {
+            event.preventDefault()
+            if (!setup.waiting) onAnswer({ type: 'publish:setUp' })
+          }
+        }}
+      >
         <div className="px-5 pt-4 pb-1">
           <DialogTitle className="text-[15px] font-semibold leading-5">{SETUP_COPY.title}</DialogTitle>
           <DialogDescription id="publish-setup-lede" className="mt-1 text-[13px] leading-[18px]">{SETUP_COPY.lede}</DialogDescription>

@@ -402,12 +402,16 @@ test('ritemark.publish.ready: only with the flag on and the whole-window sheet h
   } finally { await t.cleanup(); }
 });
 
-test('the sheet host check: only PR 5\'s _ritemark.webviewSheet makes Publish reachable; internal commands asked for', async () => {
-  assert.equal(SHEET_HOST_COMMAND, '_ritemark.webviewSheet');
+test('the sheet host check: only PR 5\'s _ritemark.webviewSheet.open makes Publish reachable; internal commands asked for', async () => {
+  // the name the shell really registers (PR 5's webviewSheet.ts), not a guess
+  const sheetSource = await fs.readFile(path.join(__dirname, '..', 'webviewSheet', 'webviewSheet.ts'), 'utf8');
+  assert.equal(SHEET_HOST_COMMAND, /WEBVIEW_SHEET_OPEN_COMMAND = '([^']+)'/.exec(sheetSource)?.[1]);
+  assert.equal(SHEET_HOST_COMMAND, '_ritemark.webviewSheet.open');
   const asked: boolean[] = [];
   const commands = (list: string[]) => async (filterInternal: boolean) => { asked.push(filterInternal); return filterInternal ? list.filter((c) => !c.startsWith('_')) : list; };
   assert.equal(await sheetHostAvailable(commands(['ritemark.page.publish', '_ritemark.feedbackSheet'])), false, 'today: no sheet host');
-  assert.equal(await sheetHostAvailable(commands(['_ritemark.webviewSheet'])), true, 'once PR 5 lands');
+  assert.equal(await sheetHostAvailable(commands(['_ritemark.webviewSheet'])), false, 'not a near name');
+  assert.equal(await sheetHostAvailable(commands(['_ritemark.webviewSheet.open', '_ritemark.webviewSheet.close'])), true, 'with PR 5\'s sheet');
   assert.ok(asked.every((a) => a === false), 'asked with the internal commands in');
   assert.equal(await sheetHostAvailable(async () => { throw new Error('no'); }), false);
 });

@@ -2,7 +2,7 @@
  * The Publish sheet's host side (Sprint 149, R4, R5, W3): shows a plan's sheet and waits for the person's answer.
  *
  * Sends nothing anywhere: it only asks. The answer is `cancel`, `publish`, or `publishAnyway` (the second, explicit
- * press past a key warning, decision 2); PR 4 does the publishing after it. Closing the sheet's tab is Cancel.
+ * press past a key warning, decision 2); PR 4 does the publishing after it. Closing the sheet (Escape, Cancel) is Cancel.
  *
  * The sheet gets names, folders, reasons and line numbers (`sheetModel.ts`); the only file it can ask to open is a
  * hit, by its index in this plan's own list (Open script.js). Open closes the sheet without publishing and opens the
@@ -15,18 +15,20 @@
  * the sheet closes, so "This name is taken. Try another." shows in the sheet and Publish waits. The page part the
  * sheet sends is checked here too (`isValidPagePart`), before anything else sees it.
  *
- * Until the whole-window sheet host lands (PR 5), nothing in a menu reaches this but the dev harness
- * (`devSheetHarness.ts`), which opens it as a tab with the sheet over a dimmed backdrop. The lead's place for it is over the whole window; that needs one command in patch 018
- * (`docs/development/releases/v2.2.0/sprint-149-publish/research/sheet-host.md`), built as its own shell PR.
+ * Where it shows (PR 5): over the whole window, centred, the window dimmed behind it, never a tab (the lead, 5
+ * November; publish.html frame 3). The workbench draws that frame (patch 018, `_ritemark.webviewSheet`); the page is
+ * this extension's webview view `ritemark.sheet.publish`, registered here once (`webviewSheet.ts`). A shell without the
+ * sheet answers cancel: Publish on the bar needs a 2.2 shell anyway.
  */
 
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { closeWebviewSheet, openWebviewSheet } from '../webviewSheet/webviewSheet';
 import { sheetModelOf, type SheetConfirm, type SheetConfirmReply, type SheetOptions, type SheetSetupResult } from './sheetModel';
 import { isSheetWebviewMessage, isValidPagePart, PublishSheetHostMessage, PublishSheetModel, PublishSetupModel } from './sheetProtocol';
 import type { KeyHit, PublishPlan } from './types';
 
-export const PUBLISH_SHEET_VIEW_TYPE = 'ritemark.publishSheet';
+export const PUBLISH_SHEET_VIEW_TYPE = 'ritemark.sheet.publish';
 
 export type SheetAnswer =
   | { kind: 'cancel' }
@@ -39,126 +41,168 @@ export interface ShowSheetOptions extends SheetOptions {
   setup?: { title: string; run: () => Promise<SheetSetupResult> };
 }
 
+/** The view type's one provider: each sheet the workbench opens is handed to the request that asked for it. */
+class PublishSheetViews implements vscode.WebviewViewProvider {
+  next: ((view: vscode.WebviewView) => void) | undefined;
+  /** A request is open or opening: a second one is answered at once and never touches it (Codex on #672). */
+  busy = false;
+  resolveWebviewView(view: vscode.WebviewView): void {
+    const take = this.next;
+    this.next = undefined;
+    if (take) take(view);
+    else void closeWebviewSheet(PUBLISH_SHEET_VIEW_TYPE); // nobody asked: an empty sheet never stays
+  }
+}
+let views: PublishSheetViews | undefined;
+function publishSheetViews(context: vscode.ExtensionContext): PublishSheetViews {
+  if (!views) {
+    const created = new PublishSheetViews();
+    context.subscriptions.push(
+      vscode.window.registerWebviewViewProvider(PUBLISH_SHEET_VIEW_TYPE, created),
+      { dispose: () => { if (views === created) views = undefined; } },
+    );
+    views = created;
+  }
+  return views;
+}
+
 export function showPublishSheet(
   context: vscode.ExtensionContext,
   firstPlan: PublishPlan | null,
   firstOptions: ShowSheetOptions = {},
 ): Promise<SheetAnswer> {
-  const { onConfirm, setup, ...shown } = firstOptions;
+  const sheets = publishSheetViews(context);
+  const { onConfirm, setup, ...firstShown } = firstOptions;
   if (!firstPlan && !setup) return Promise.resolve({ kind: 'cancel' });
+  // One sheet at a time: a second request while one is open or opening (a quick double press) answers cancel at
+  // once, and the first keeps its resolver, its model and its sheet
+  if (sheets.busy) return Promise.resolve({ kind: 'cancel' });
   let plan: PublishPlan | null = firstPlan;
   let model: PublishSheetModel | null = null;
   const modelFor = (p: PublishPlan, o: SheetOptions): PublishSheetModel => ({ ...sheetModelOf(p, path.basename(p.projectFolder)), ...o });
-  if (plan) model = modelFor(plan, shown);
+  if (plan) model = modelFor(plan, firstShown);
   let setupModel: PublishSetupModel = { waiting: false, line: null };
   const title = model?.title ?? setup!.title;
   const media = vscode.Uri.joinPath(context.extensionUri, 'media');
-  const panel = vscode.window.createWebviewPanel(
-    PUBLISH_SHEET_VIEW_TYPE,
-    `Publish ${title}`,
-    { viewColumn: vscode.ViewColumn.Active, preserveFocus: false },
-    { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [media] },
-  );
-  panel.webview.html = publishSheetHtml(panel.webview, context.extensionUri);
+  // The desk the sheet opened over: the sheet takes no group, so it is the active one, read before the sheet shows
+  const desk = vscode.window.tabGroups?.activeTabGroup?.viewColumn ?? vscode.ViewColumn.Active;
+  sheets.busy = true; // free again once this request has answered
 
   return new Promise<SheetAnswer>((resolve) => {
     let answered = false;
-    const answer = (a: SheetAnswer) => {
+    let shown = false;
+    const subscriptions: vscode.Disposable[] = [];
+    // The sheet closes first (when one showed: a shell without it has nothing to close), then the request is free and
+    // the answer goes, so the next request finds no sheet in its way
+    const answer = async (a: SheetAnswer): Promise<void> => {
       if (answered) return;
       answered = true;
-      resolve(a);
-      panel.dispose();
+      try {
+        if (shown) await closeWebviewSheet(PUBLISH_SHEET_VIEW_TYPE);
+      } finally {
+        sheets.busy = false;
+        resolve(a);
+      }
     };
-    const subscriptions: vscode.Disposable[] = [];
-    const post = (out: PublishSheetHostMessage) => { void panel.webview.postMessage(out); };
-    const show = () => post(model ? { type: 'publish:sheet', model } : { type: 'publish:setup', setup: setupModel });
-    let confirming = false;
-    let settingUp = false;
-    subscriptions.push(
-      panel.onDidDispose(() => {
-        for (const s of subscriptions) s.dispose();
-        if (!answered) {
-          answered = true;
-          resolve({ kind: 'cancel' });
-        }
-      }),
-      panel.webview.onDidReceiveMessage((message: unknown) => {
-        if (!isSheetWebviewMessage(message)) return;
-        switch (message.type) {
-          case 'publish:sheetReady':
-            show();
-            break;
-          case 'publish:cancel':
-            answer({ kind: 'cancel' });
-            break;
-          case 'publish:setUp': {
-            // Frame 2's Set up: no value rides on it; the host's own box asks for the token
-            if (model || !setup || settingUp) return;
-            settingUp = true;
-            setupModel = { waiting: true, line: null };
-            show();
-            void setup.run().then(
-              (result) => {
-                settingUp = false;
-                if (answered) return;
-                if (result && 'stop' in result) return answer({ kind: 'cancel' });
-                if (result) {
-                  plan = result.plan;
-                  model = modelFor(result.plan, result.options);
-                  panel.title = `Publish ${model.title}`;
-                } else {
-                  setupModel = { waiting: false, line: null };
-                }
-                show();
-              },
-              () => { settingUp = false; answer({ kind: 'cancel' }); },
-            );
-            break;
-          }
-          case 'publish:confirm': {
-            const current = plan;
-            if (!current || !model || confirming) return;
-            // "Publish anyway" counts only when the plan has hits; a plain Publish never skips the warning
-            if (current.keyHits.length > 0 && !message.anyway) return;
-            if (current.tooBig.length > 0 || current.tooMany) return;
-            // The page part names a Worker: checked here before anything else sees it (PR 3's blocking item)
-            if (model.address?.editable && !isValidPagePart(message.pagePart)) {
-              post({ type: 'publish:refused', reason: 'addressInvalid' });
-              return;
+
+    const take = (view: vscode.WebviewView): void => {
+      shown = true;
+      view.webview.options = { enableScripts: true, localResourceRoots: [media] };
+      view.webview.html = publishSheetHtml(view.webview, context.extensionUri);
+      const post = (out: PublishSheetHostMessage) => { void view.webview.postMessage(out); };
+      const show = () => post(model ? { type: 'publish:sheet', model } : { type: 'publish:setup', setup: setupModel });
+      let confirming = false;
+      let settingUp = false;
+      subscriptions.push(
+        view.onDidDispose(() => {
+          for (const s of subscriptions) s.dispose();
+          void answer({ kind: 'cancel' });
+        }),
+        view.webview.onDidReceiveMessage((message: unknown) => {
+          if (!isSheetWebviewMessage(message)) return;
+          switch (message.type) {
+            case 'publish:sheetReady':
+              show();
+              break;
+            case 'publish:cancel':
+              void answer({ kind: 'cancel' });
+              break;
+            case 'publish:setUp': {
+              // Frame 2's Set up: no value rides on it; the host's own box asks for the token
+              if (model || !setup || settingUp) return;
+              settingUp = true;
+              setupModel = { waiting: true, line: null };
+              show();
+              void setup.run().then(
+                (result) => {
+                  settingUp = false;
+                  if (answered) return;
+                  if (result && 'stop' in result) return void answer({ kind: 'cancel' });
+                  if (result) {
+                    plan = result.plan;
+                    model = modelFor(result.plan, result.options);
+                  } else {
+                    setupModel = { waiting: false, line: null };
+                  }
+                  show();
+                },
+                () => { settingUp = false; void answer({ kind: 'cancel' }); },
+              );
+              break;
             }
-            const pagePart = model.address?.editable ? message.pagePart : undefined;
-            const subdomain = model.nameRow ? message.subdomain : undefined;
-            const done = () => answer({ kind: current.keyHits.length > 0 ? 'publishAnyway' : 'publish', pagePart, subdomain, plan: current });
-            if (!onConfirm) return done();
-            confirming = true;
-            void onConfirm({ anyway: message.anyway, pagePart, subdomain }).then(
-              (reply) => {
-                confirming = false;
-                if (answered) return;
-                switch (reply.kind) {
-                  case 'close': return done();
-                  case 'stop': return answer({ kind: 'cancel' });
-                  case 'refuse': return post({ type: 'publish:refused', reason: reply.reason });
-                  case 'update':
-                    model = modelFor(current, reply.options);
-                    return show();
-                }
-              },
-              () => { confirming = false; answer({ kind: 'cancel' }); },
-            );
-            break;
+            case 'publish:confirm': {
+              const current = plan;
+              if (!current || !model || confirming) return;
+              // "Publish anyway" counts only when the plan has hits; a plain Publish never skips the warning
+              if (current.keyHits.length > 0 && !message.anyway) return;
+              if (current.tooBig.length > 0 || current.tooMany) return;
+              // The page part names a Worker: checked here before anything else sees it (PR 3's blocking item)
+              if (model.address?.editable && !isValidPagePart(message.pagePart)) {
+                post({ type: 'publish:refused', reason: 'addressInvalid' });
+                return;
+              }
+              const pagePart = model.address?.editable ? message.pagePart : undefined;
+              const subdomain = model.nameRow ? message.subdomain : undefined;
+              const done = () => answer({ kind: current.keyHits.length > 0 ? 'publishAnyway' : 'publish', pagePart, subdomain, plan: current });
+              if (!onConfirm) return void done();
+              confirming = true;
+              void onConfirm({ anyway: message.anyway, pagePart, subdomain }).then(
+                (reply) => {
+                  confirming = false;
+                  if (answered) return;
+                  switch (reply.kind) {
+                    case 'close': return void done();
+                    case 'stop': return void answer({ kind: 'cancel' });
+                    case 'refuse': return post({ type: 'publish:refused', reason: reply.reason });
+                    case 'update':
+                      model = modelFor(current, reply.options);
+                      return show();
+                  }
+                },
+                () => { confirming = false; void answer({ kind: 'cancel' }); },
+              );
+              break;
+            }
+            case 'publish:openHit': {
+              const hit = plan?.keyHits[message.index];
+              if (!hit) return;
+              // the sheet goes first (the focus back on the bar), then the file opens on that desk and takes the focus
+              void answer({ kind: 'cancel' }).then(() => openKeyPlace(hit, desk));
+              break;
+            }
           }
-          case 'publish:openHit': {
-            const hit = plan?.keyHits[message.index];
-            if (!hit) return;
-            // the desk the sheet is on, read before the sheet goes
-            const column = panel.viewColumn ?? vscode.ViewColumn.Active;
-            answer({ kind: 'cancel' });
-            void openKeyPlace(hit, column);
-            break;
-          }
-        }
-      }),
+        }),
+      );
+    };
+    sheets.next = take;
+
+    void openWebviewSheet({ viewType: PUBLISH_SHEET_VIEW_TYPE, title: `Publish ${title}` }).then(
+      (outcome) => {
+        if (sheets.next === take) sheets.next = undefined; // never shown (no sheet in this shell, or one already showing)
+        if (outcome !== 'escape' && outcome !== 'closed') console.log(`[publish] the sheet did not show: ${outcome}`);
+        void answer({ kind: 'cancel' });
+      },
+      () => void answer({ kind: 'cancel' }),
     );
   });
 }
@@ -196,8 +240,9 @@ export function publishSheetHtml(webview: vscode.Webview, extensionUri: vscode.U
   <title>Publish</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { min-height: 100%; }
-    body { color: var(--vscode-foreground); background: var(--vscode-editor-background); }
+    /* The workbench's sheet is as tall as this page and draws the desk's colour behind it (patch 018), so the page
+       keeps its own height (no 100%) and no background */
+    html body { color: var(--vscode-foreground); background: transparent; }
   </style>
 </head>
 <body>

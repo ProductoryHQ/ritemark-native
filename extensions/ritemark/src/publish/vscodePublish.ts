@@ -6,9 +6,9 @@
  * Always composed, even with `web-page-publishing` off: the flag hides creating and connecting, but Settings still
  * lists the published pages with Open and Unpublish, and Disconnect still works (S28b).
  *
- * **Reachability.** Publish is ready only when the whole-window sheet host is there (PR 5's `_ritemark.webviewSheet`
- * command, patch 018): until it lands the sheet would open as a tab, which the Experience lead ruled out, so the bar's
- * Publish stays hidden.
+ * **Reachability.** Publish is ready only when the whole-window sheet host is there (PR 5's `_ritemark.webviewSheet.open`
+ * command, patch 018): a shell without it can't show the sheet (the Experience lead ruled out a tab), so there the
+ * bar's Publish stays hidden.
  */
 
 import * as fs from 'node:fs';
