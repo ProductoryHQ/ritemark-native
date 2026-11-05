@@ -15,6 +15,8 @@
 #     dialog, workspace trust off, no confirm before close;
 #   - the folder on the command line, so the window opens on that project (a sample project of three Markdown
 #     documents in the run folder when --folder is not given), visible, since a hidden window draws only the welcome;
+#   - extra Ritemark/Chromium flags after `--`, placed after the folder (a value-less flag such as
+#     --use-fake-ui-for-media-stream used to swallow the folder that followed it);
 #   - each --env pair in the instance's environment (e.g. RITEMARK_SETTINGS_TIMING=1); ELECTRON_RUN_AS_NODE unset.
 # HOME is never changed. It waits until the window has drawn the project (its title names the folder), then prints
 # RUN_DIR, PORT, PID and FOLDER lines (also in <run-dir>/run.env) and returns, leaving the instance running.
@@ -136,6 +138,14 @@ start_run() {
 	done
 	[[ -n $build_root ]] || die "no dev build in $ROOT/vscode or the main checkout's (build it first: vscode-development skill)"
 	local app="$build_root/vscode/.build/electron/Ritemark.app/Contents/MacOS/Ritemark"
+	# The build must be of the VS Code this checkout pins: a stale dev build (the main checkout's can be months old,
+	# pre-2.0) opens a different app, and a run on it proves nothing. RITEMARK_LAUNCH_ANY_BUILD=1 skips the check.
+	local pin built
+	pin=$(git -C "$ROOT" rev-parse HEAD:vscode 2>/dev/null || true)
+	built=$(git -C "$build_root/vscode" rev-parse HEAD 2>/dev/null || true)
+	if [[ -n $pin && $built != "$pin" && ${RITEMARK_LAUNCH_ANY_BUILD:-} != 1 ]]; then
+		die "the dev build in $build_root/vscode is of VS Code ${built:-unknown}, not the pinned $pin: rebuild it, or give this worktree its own vscode (RITEMARK_LAUNCH_ANY_BUILD=1 to run it anyway)"
+	fi
 
 	local tmp=${TMPDIR:-/private/tmp}
 	local run_dir
@@ -182,14 +192,15 @@ start_run() {
 		--shared-data-dir="$HOME/.ritemark-dev-shared"
 		--use-mock-keychain
 		--remote-debugging-port="$port"
-		"${extra[@]+"${extra[@]}"}"
 		"$folder"
+		"${extra[@]+"${extra[@]}"}"
 	)
 
 	if (( dry_run )); then
 		printf 'DRY_RUN '; printf '%q ' "${cmd[@]}"; echo
 		echo "RUN_DIR=$run_dir"
 		echo "BUILD_ROOT=$build_root"
+		echo "BUILD_VSCODE=$built"
 		return 0
 	fi
 
@@ -200,6 +211,7 @@ start_run() {
 	{
 		echo "RUN_DIR=$run_dir"
 		echo "BUILD_ROOT=$build_root"
+		echo "BUILD_VSCODE=$built"
 		echo "PORT=$port"
 		echo "PID=$pid"
 		echo "FOLDER=$folder"
