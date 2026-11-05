@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import * as vscode from 'vscode';
 
 /**
@@ -113,15 +114,31 @@ function isBrowserActionResult(value: unknown): value is BrowserActionResult {
  */
 let browserActionChain: Promise<unknown> = Promise.resolve();
 
-async function callBrowserAction(command: string, args?: Record<string, unknown>): Promise<BrowserActionResult> {
+/** Set while work queued by `inBrowserQueue` runs: its own commands then run at once, not behind itself. */
+const insideBrowserQueue = new AsyncLocalStorage<true>();
+
+function enqueue<T>(work: () => Promise<T>): Promise<T> {
   // Queue behind whatever is in flight. The chain is kept un-rejectable so one
   // failed action cannot wedge every later one.
-  const run = browserActionChain.then(
-    () => runBrowserAction(command, args),
-    () => runBrowserAction(command, args),
-  );
+  const run = browserActionChain.then(work, work);
   browserActionChain = run.then(() => undefined, () => undefined);
   return run;
+}
+
+async function callBrowserAction(command: string, args?: Record<string, unknown>): Promise<BrowserActionResult> {
+  if (insideBrowserQueue.getStore()) return runBrowserAction(command, args);
+  return enqueue(() => runBrowserAction(command, args));
+}
+
+/**
+ * #658: runs `work` as one step of the browser queue, so that what it reads before its commands and records after
+ * them belongs to the same step. A tool call reads the turn's page, acts, and notes the page its action opened; two
+ * calls a runtime starts together (Codex does not wait for one dynamic tool before the next) would otherwise both
+ * see a turn with no page and each open a tab. The browser commands `work` makes run inside its step.
+ */
+export function inBrowserQueue<T>(work: () => Promise<T>): Promise<T> {
+  if (insideBrowserQueue.getStore()) return work();
+  return enqueue(() => insideBrowserQueue.run(true, work));
 }
 
 async function runBrowserAction(command: string, args?: Record<string, unknown>): Promise<BrowserActionResult> {

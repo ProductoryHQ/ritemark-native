@@ -30,6 +30,7 @@ import {
   browserSnapshot,
   browserType,
   formatActionResultForAgent,
+  inBrowserQueue,
   BrowserTurnPage,
   type BrowserActionResult,
   type BrowserActionTarget,
@@ -169,16 +170,20 @@ async function onPage(
   const { page_id: pageIdArg, ...actionArgs } = args;
   const explicit = typeof pageIdArg === 'string' && pageIdArg.trim() ? pageIdArg.trim() : undefined;
   const page = context.browserPage ?? new BrowserTurnPage();
-  const target = page.target(explicit);
-  if (!target) {
-    if (!options.opensTab) return { text: `Error: ${NO_PAGE_ERROR}`, isError: true };
-    const opened = await act(actionArgs, page.newTabTarget());
-    page.noteResult(opened, { adopt: true });
-    return browserText(opened);
-  }
-  const result = await act(actionArgs, target);
-  page.noteResult(result);
-  return browserText(result);
+  // One step of the browser queue: the page is read, acted in and noted before the next call reads it, so a second
+  // call started at the same time acts in the tab the first one opened instead of opening its own.
+  return inBrowserQueue(async () => {
+    const target = page.target(explicit);
+    if (!target) {
+      if (!options.opensTab) return { text: `Error: ${NO_PAGE_ERROR}`, isError: true };
+      const opened = await act(actionArgs, page.newTabTarget());
+      page.noteResult(opened, { adopt: true });
+      return browserText(opened);
+    }
+    const result = await act(actionArgs, target);
+    page.noteResult(result);
+    return browserText(result);
+  });
 }
 
 export const BROWSER_TOOL_GROUP: RitemarkToolGroup = {

@@ -20,6 +20,7 @@ const pages = new Map<string, Page>();
 let active: string | undefined;
 let nextNewTab = 'p-new';
 const calls: Array<{ command: string; args: Record<string, unknown> }> = [];
+let navigateDelayMs = 0;
 /** Where each action landed, as patch 010 would act. */
 const landed: string[] = [];
 
@@ -49,7 +50,17 @@ function shell(command: string, raw: unknown): unknown {
 const moduleAny = Module as unknown as { _load: (request: string, parent: unknown, isMain?: boolean) => unknown };
 const originalLoad = moduleAny._load.bind(Module);
 moduleAny._load = (request: string, parent: unknown, isMain?: boolean): unknown => {
-  if (request === 'vscode') return { commands: { executeCommand: async (command: string, args?: unknown) => shell(command, args) } };
+  if (request === 'vscode') {
+    return {
+      commands: {
+        executeCommand: async (command: string, args?: unknown) => {
+          // A navigate takes a moment, as a page load does: a second call started meanwhile must wait for it.
+          if (command.endsWith('agentNavigate') && navigateDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, navigateDelayMs));
+          return shell(command, args);
+        },
+      },
+    };
+  }
   return originalLoad(request, parent, isMain);
 };
 
@@ -292,6 +303,32 @@ async function main(): Promise<void> {
       newPages: [{ pageId: 'p-x', shared: true, title: 'Docs', url: 'https://example.com/' }],
     });
     assert.match(text, /A new browser page opened: "Docs" https:\/\/example\.com\/, page id p-x\. To act in it, pass page_id "p-x"/);
+  }
+
+  // ── Codex review on #660: two calls started together in a turn with no page. The first opens a tab; the second
+  //    acts in that tab, because reading the turn's page, acting and noting the opened tab are one step of the
+  //    browser queue. Every runtime goes through the same queue. ──
+  for (const [runtime, call] of await runtimes()) {
+    reset();
+    active = undefined; // a document is in front
+    navigateDelayMs = 20;
+    const page = new BrowserTurnPage();
+    page.startTurn(undefined);
+    const [first, second] = await Promise.all([
+      call('browser_navigate', { type: 'url', url: 'http://127.0.0.1:18764/one' }, page),
+      call('browser_navigate', { type: 'url', url: 'http://127.0.0.1:18764/two' }, page),
+    ]);
+    navigateDelayMs = 0;
+    assert.equal(first.isError, false, `${runtime} first: ${first.text}`);
+    assert.equal(second.isError, false, `${runtime} second: ${second.text}`);
+    assert.equal(calls.length, 2, `${runtime}: two navigates`);
+    assert.equal(calls[0].args.newTab, true, `${runtime}: the first call opens a tab`);
+    assert.equal(calls.filter((entry) => entry.args.newTab).length, 1, `${runtime}: only one tab is opened`);
+    assert.equal(calls[1].args.pageId, 'p-new', `${runtime}: the second call acts in the tab the first one opened`);
+    assert.match(first.text, /Page id: p-new/, `${runtime}: the first names the new tab`);
+    assert.match(second.text, /Page id: p-new/, `${runtime}: the second names the same tab`);
+    assert.deepEqual(landed, ['p-new', 'p-new'], `${runtime}: both landed in the new tab`);
+    assert.equal(page.pageId, 'p-new', `${runtime}: the new tab is the turn's page`);
   }
 
   // ── One holder per conversation, kept across turns ──
