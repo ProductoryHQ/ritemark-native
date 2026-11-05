@@ -1039,7 +1039,8 @@
         "*": true
       },
       "github.copilot.editor.enableAutoCompletions": true,
-      "github.copilot.editor.enableCodeActions": true,
+      "github.copilot.editor.enableCodeActions": false,
+      "inlineChat.affordance": "off",
       "workbench.panel.defaultLocation": "right",
       "terminal.integrated.defaultLocation": "editor",
       "terminal.integrated.hideOnStartup": "always",

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Changed
 - **Fewer stray items in right-click menus (#650).** Right-clicking the empty part of the tab row no longer offers Editor Actions Position, which could move or hide the buttons at the desk's edge. Right-clicking a file in Documents, a plain text file or its selected text, or a search result no longer offers Copilot's Add File to Chat, Add Selection to Chat or Open Inline Chat, which handed the file or text to Copilot instead of Ritemark's AI (Send to AI Chat in Documents does that). All three are still in All commands, and ⌘I still opens Inline Chat where Copilot is set up. A folder's Add Folder to Chat stays, since that menu is the only way to it.
+- **No Copilot sparkle beside selected text (#665).** Selecting text in a text file no longer lights the amber sparkle at the edge of the editor, whose Modify and Review handed the text to Copilot instead of Ritemark's AI. VS Code's own light bulb still appears where it has something to offer, and ⌘I and All commands still open Inline Chat.
 
 ### Sprint 153: the browser's and the microphone's fixes
 

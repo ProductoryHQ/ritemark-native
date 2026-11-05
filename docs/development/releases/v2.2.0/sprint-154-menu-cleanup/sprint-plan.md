@@ -77,3 +77,19 @@ Send to AI Chat is Ritemark's item in Documents' menu only (`extensions/ritemark
 - [x] The Development manager approves #650 as a lightweight sprint (5 November 2026, Jarmo's 2.2 delegation of 1 November).
 - [x] GitHub issue exists: #650.
 - [x] One branch and PR: #664.
+
+## PR 2: Copilot's sparkle leaves the editor's margin (#665)
+
+The Experience lead's decision (ritemark-dev `fa5e286`): the amber sparkle that shows beside selected text goes. Everyone sees it, and it hands the selection to Copilot where Ritemark's AI is meant. ⌘I and All commands keep Inline Chat. The Development manager approved it as Sprint 154's second PR on Jarmo's 2.2 delegation (1 November). Branch `sprint-154-inline-chat-sparkle`.
+
+**What the sparkle is (proved live, `captures-665/before-*`).** It is the editor's code-action light bulb, drawn as `lightbulb-sparkle` (amber) because Copilot offers AI code actions for any selection: Modify and Review (and Fix and Explain on a problem). It showed in a fresh, signed-out profile, in a Markdown file opened in the text editor and in a TypeScript file. It is neither core's inline-chat affordance (`inlineChat.affordance`, default `off`) nor anything in `MenuId.InlineChatEditorAffordance`. Copilot gives those actions only while `inlineChat.affordance` is `off`. At `editor`, core's own sparkle shows instead, with Add Selection to Chat in its menu, as the issue describes. Ritemark's shell ships no `tasConfig`, so `experimentsEnabled()` is false and no experiment can switch the affordance on.
+
+**Lever: a configuration default, no patch.** Copilot has a setting, `github.copilot.editor.enableCodeActions`. Ritemark's own extension had set it to `true` in its `configurationDefaults` (`4e1131cfa`, "enable marketplace copilot support"). A product.json default was tried first and lost to that line (Settings showed "Default value changed" with the box still ticked), because the extension's defaults register after the shell's. So the change is in `extensions/ritemark/package.json`: `github.copilot.editor.enableCodeActions: false`, and `inlineChat.affordance: "off"` pinned beside it, so core's sparkle cannot take the place of Copilot's. The two settings live in that one place. `scripts/copilot-sparkle-defaults.test.mjs` pins both values, checks that product.json does not hold either, and checks that the settings and the Copilot code that reads them still exist upstream.
+
+**Tier.** Extension-tier: `extensions/ritemark/package.json` ships in an extension release. Patch 003 and `docs/development/vscode-patches.md` are unchanged.
+
+**What stays.** VS Code's own light bulb still shows where it has something to offer: plain, no sparkle. In Markdown that means the Surround With snippets, and in TypeScript Move and Surround With. ⌘I opens Inline Chat on the selection, and All commands finds "Inline Chat: Open Inline Chat ⌘I". Copilot's other code actions (Generate alt text, Fix test failure) leave with the same setting. They were Copilot handoffs too.
+
+**Not covered.** Windows was not run; a configuration default is the same on both. No signed-in Copilot: the sparkle showed without sign-in, so the before and after needed none.
+
+**Gate 1 row (at the RC).** Select text in a text file (a Markdown file reopened with the text editor, and a code file): no amber sparkle at the editor's edge, and the plain light bulb shows only VS Code's own actions. ⌘I still opens Inline Chat, and All commands still finds it.
