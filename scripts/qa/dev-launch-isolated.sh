@@ -5,8 +5,8 @@
 #                                           [--dry-run] [-- <extra Ritemark args>]
 #   scripts/qa/dev-launch-isolated.sh stop <run-dir>
 #
-# `start` launches the dev build in this checkout (vscode/.build/electron, built with the patches applied) the
-# way scripts/code.sh does, with everything a test run needs and nothing of the person's own:
+# `start` launches the dev build (vscode/.build/electron, built with the patches applied) of this checkout, or of the
+# main checkout when this is a light worktree with an empty vscode/ (BUILD_ROOT says which), the way scripts/code.sh does, with everything a test run needs and nothing of the person's own:
 #   - a new run folder under $TMPDIR (rm-<run>.XXXX) holding a fresh profile (--user-data-dir), a fresh
 #     --extensions-dir, and throwaway AI homes: CLAUDE_CONFIG_DIR, CODEX_HOME and XDG_CONFIG/DATA/STATE/CACHE_HOME;
 #   - --shared-data-dir ~/.ritemark-dev-shared (the dev builds' own, never ~/.ritemark-shared), --use-mock-keychain;
@@ -127,8 +127,15 @@ start_run() {
 		die "it is ${hour}:xx in Tallinn: a test window in the day needs Jarmo's yes in chat (then RITEMARK_LAUNCH_DAYTIME_OK=1)"
 	fi
 
-	local app="$ROOT/vscode/.build/electron/Ritemark.app/Contents/MacOS/Ritemark"
-	[[ -x $app ]] || die "no dev build at $app (build it first: vscode-development skill)"
+	# The dev build: this checkout's, or else the main checkout's, since a light .claude/worktrees/* checkout has an
+	# empty vscode/ (the main checkout's build then runs the main checkout's extensions/ritemark through its link).
+	local build_root="" r common
+	common=$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
+	for r in "$ROOT" "$(dirname "${common:-$ROOT/.git}")"; do
+		if [[ -x $r/vscode/.build/electron/Ritemark.app/Contents/MacOS/Ritemark ]]; then build_root=$r; break; fi
+	done
+	[[ -n $build_root ]] || die "no dev build in $ROOT/vscode or the main checkout's (build it first: vscode-development skill)"
+	local app="$build_root/vscode/.build/electron/Ritemark.app/Contents/MacOS/Ritemark"
 
 	local tmp=${TMPDIR:-/private/tmp}
 	local run_dir
@@ -182,15 +189,17 @@ start_run() {
 	if (( dry_run )); then
 		printf 'DRY_RUN '; printf '%q ' "${cmd[@]}"; echo
 		echo "RUN_DIR=$run_dir"
+		echo "BUILD_ROOT=$build_root"
 		return 0
 	fi
 
 	# exec all the way down (nohup, env and arch each exec), so $! is the instance itself and no shell is left
 	# holding this script's stdout open (a caller's $(...) would wait on it for ever).
-	(cd "$ROOT/vscode" && exec nohup "${cmd[@]}") > "$run_dir/stdout.log" 2>&1 < /dev/null &
+	(cd "$build_root/vscode" && exec nohup "${cmd[@]}") > "$run_dir/stdout.log" 2>&1 < /dev/null &
 	local pid=$!
 	{
 		echo "RUN_DIR=$run_dir"
+		echo "BUILD_ROOT=$build_root"
 		echo "PORT=$port"
 		echo "PID=$pid"
 		echo "FOLDER=$folder"
