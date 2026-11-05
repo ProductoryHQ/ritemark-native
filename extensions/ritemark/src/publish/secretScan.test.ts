@@ -48,6 +48,7 @@ const FIXTURES: Record<string, string> = {
   'stripe-webhook': j('<code>', 'wh', 'sec_', run(32), '</code>'),
   'query-token': j('<img src="https://cdn.example.com/x.png?', 'tok', 'en=', run(24), '">'),
   'token-assignment': j('const ', 'tok', 'en', ' = "', run(24), '";'),
+  'telegram-bot': j('BOT', '_TOKEN', " = '", '123456789', ':', 'AA', 'F', run(32), "'"),
 };
 
 let passed = 0;
@@ -193,11 +194,50 @@ async function main(): Promise<void> {
     assert.deepEqual(scanText(pages.join('\n')), []);
   });
 
-  await check('a long run of letters and dashes scans in linear time (bounded name parts; a minified script is such a run)', () => {
-    const t = Date.now();
-    scanText(j('ab-'.repeat(40_000), 'x-tok', 'en'.repeat(1), '-'.repeat(1), 'a.b'.repeat(40_000)));
-    const ms = Date.now() - t;
-    assert.ok(ms < 1500, `took ${ms} ms`);
+  await check('round 3: an Anthropic placeholder is quiet; a real-shaped key still fires', () => {
+    const quiet = [
+      j('const k = "', 'sk', '-ant-', 'your-key-here-', 'x'.repeat(24), '";'),
+      j('ANTHROPIC_API_KEY=', 'sk', '-ant-', 'api03-', 'your-api-key-goes-here'),
+      j('"', 'sk', '-ant-', 'replace-with-your-own-key', '"'),
+    ];
+    assert.deepEqual(scanText(quiet.join('\n')), []);
+    const found = [
+      j('const k = "', 'sk', '-ant-', 'api03-', run(40), '";'),
+      j('"', 'sk', '-ant-', 'your-key-', run(24), '"'),
+    ];
+    assert.deepEqual(scanText(found.join('\n')).map((h) => [h.line, h.rule]), [[1, 'anthropic'], [2, 'anthropic']], 'a value with a digit is a key, whatever words it has');
+  });
+
+  await check('round 3: a Telegram bot token is found as an assignment and bare; a time or a port is not', () => {
+    const found = [
+      j('BOT', '_TOKEN', " = '", '123456789', ':', 'AA', 'F', run(32), "'"),
+      j('https://api.telegram.org/bot', '7012345678', ':', 'AA', 'H', run(32), '/sendMessage'),
+    ];
+    assert.deepEqual(scanText(found.join('\n')).map((h) => [h.line, h.rule]), [[1, 'telegram-bot'], [2, 'telegram-bot']]);
+    const [hit] = scanText(found[0]);
+    assert.deepEqual([hit.column, hit.endColumn], [13, 13 + 9 + 1 + 35], 'Open selects the token itself');
+    const quiet = ['<time>2026-11-05 12:30:45</time>', 'http://localhost:8080/index.html', 'id: 12345678:short', j('12345678', ':', run(34))];
+    assert.deepEqual(scanText(quiet.join('\n')), []);
+  });
+
+  await check('a long run of letters and dashes scans in linear time: four times the text takes about four times as long', () => {
+    // bounded name parts keep this linear; an unbounded `[\w.-]*` before a word made it quadratic, and a minified
+    // script is exactly such a run. Timing two sizes (best of three each) asks for growth, not for a fast machine
+    const text = (n: number) => j('ab-'.repeat(n), 'x-tok', 'en', '-', 'a.b'.repeat(n));
+    const best = (n: number): number => {
+      const t = text(n);
+      let min = Infinity;
+      for (let i = 0; i < 3; i++) {
+        const start = process.hrtime.bigint();
+        scanText(t);
+        min = Math.min(min, Number(process.hrtime.bigint() - start) / 1e6);
+      }
+      return min;
+    };
+    best(2_000); // warm the regex engine
+    const small = Math.max(best(10_000), 1);
+    const large = best(40_000);
+    assert.ok(large / small < 8, `4x the text took ${(large / small).toFixed(1)}x as long (${small.toFixed(1)} ms, ${large.toFixed(1)} ms); linear is ~4, quadratic ~16`);
   });
 
   // Mutation check: without each rule, its fixture goes unseen. Proves no rule is shadowed by another.

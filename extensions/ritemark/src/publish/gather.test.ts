@@ -13,7 +13,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { contentHashOf, gatherPage, kindOf } from './gather';
 import { GitCheckError, gitIgnored } from './gitIgnore';
-import { srcsetUrls } from './references';
+import { relTokens, srcsetUrls } from './references';
 import type { LeftOutReason, PublishPlan } from './types';
 
 const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'publish-gather-')));
@@ -218,7 +218,7 @@ for (const key of ['a','b']) {
     assert.deepEqual(goes(remote), ['remote.html'], 'a remote base makes every relative reference remote');
   });
 
-  await check('R3: a link to a document is "a link, not part of the page"; a stylesheet or icon <link> still goes', async () => {
+  await check("R3: a link to a document is 'a linked file, so its link won't work'; a stylesheet or icon <link> still goes", async () => {
     write('links/notes.md', '# notes');
     write('links/budget.xlsx', 'xlsx');
     write('links/report.pdf', 'pdf');
@@ -236,6 +236,24 @@ for (const key of ['a','b']) {
     ].join('\n'));
     assert.deepEqual(goes(plan), ['page.html', 'style.css', 'favicon.png', 'touch.png', 'map.png'], 'what the page uses goes; a picture it both shows and links goes');
     assert.deepEqual(left(plan).sort(), [['links/budget.xlsx', 'link'], ['links/feed.xml', 'link'], ['links/notes.md', 'link'], ['links/report.pdf', 'link']]);
+  });
+
+  await check('round 3: a prefetch or dns-prefetch <link> is a link, not a file the page uses; rel is read word by word', async () => {
+    write('hints/pre.md', '# pre');
+    write('hints/next.md', '# next');
+    write('hints/dns.md', '# dns');
+    write('hints/style.css', 'p { margin: 0 }');
+    write('hints/fav.png', 'ico');
+    const plan = await gather('hints/page.html', [
+      '<link rel="prefetch" href="pre.md">',
+      '<link rel="next prefetch" href="next.md">',
+      '<link rel="dns-prefetch" href="dns.md">',
+      '<link rel="Alternate  Stylesheet" href="style.css"><link rel="shortcut icon" href="fav.png">',
+    ].join('\n'));
+    assert.deepEqual(goes(plan), ['page.html', 'style.css', 'fav.png'], 'a stylesheet and an icon still go, whatever else rel says');
+    assert.deepEqual(left(plan).sort(), [['hints/dns.md', 'link'], ['hints/next.md', 'link'], ['hints/pre.md', 'link']]);
+    assert.deepEqual([...relTokens(' Shortcut\tICON ')], ['shortcut', 'icon'], 'rel splits on whitespace and lower-cases');
+    assert.deepEqual([...relTokens('dns-prefetch')], ['dns-prefetch'], 'a hyphenated word stays one word, so no shorter word matches inside it');
   });
 
   await check('a link that comes before the picture it links never keeps the picture back', async () => {
@@ -358,7 +376,7 @@ for (const key of ['a','b']) {
     assert.deepEqual(left(plan), [['gi7/logo.png', 'gitIgnored']]);
   });
 
-  await check('minor 6: a file behind a linked folder in the project is left out ("Git couldn\'t check it"); the rest still go', async () => {
+  await check('minor 6: a file behind a linked folder in the project is left out ("couldn\'t be checked"); the rest still go', async () => {
     write('gi6/real/a.png', 'a');
     write('gi6/b.png', 'b');
     fs.symlinkSync(path.join(project, 'gi6/real'), path.join(project, 'gi6/alias'));

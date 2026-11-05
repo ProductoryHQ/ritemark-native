@@ -38,7 +38,7 @@ const PLACEHOLDER_SHAPE = /^(?:x+|\*+|\.+|-+|<[^>]*>|\$\{[^}]*\}|\{\{[^}]*\}\})$
  * value, and a digit anywhere makes it a value (review of #669, minor 3).
  */
 const KEY_PREFIX = /^(?:sk-(?:ant-(?:api\d+-)?|proj-|svcacct-|admin-)?|(?:sk|pk|rk)_(?:live|test)_|gh[pousr]_|github_pat_|glpat-|hf_|xox[abposr]-|whsec_|gocspx-)/i;
-const PLACEHOLDER_WORD_LIST = /^(?:your|yours|my|our|the|an?|this|that|real|actual|own|new|example|sample|dummy|fake|mock|demo|placeholder|change|changeme|me|insert|replace|redacted|here|goes|put|enter|paste|api|app|key|keys|secret|client|access|auth|oauth|bearer|refresh|session|account|user|service|private|public|project|org|id|token|password|passwd|pass|word|value|string|test|todo|tbd|foo|bar|baz|x{3,}|\*{3,})+$/;
+const PLACEHOLDER_WORD_LIST = /^(?:your|yours|my|our|the|an?|this|that|real|actual|own|new|with|example|sample|dummy|fake|mock|demo|placeholder|change|changeme|me|insert|replace|redacted|here|goes|put|enter|paste|api|app|key|keys|secret|client|access|auth|oauth|bearer|refresh|session|account|user|service|private|public|project|org|id|token|password|passwd|pass|word|value|string|test|todo|tbd|foo|bar|baz|x{3,}|\*{3,})+$/;
 /** `YOUR_API_KEY`, `API_KEY_HERE`: capitals and underscores only, case-sensitive. */
 const CONSTANT_NAME = /^[A-Z][A-Z_]*_[A-Z_]*$/;
 
@@ -56,6 +56,11 @@ function placeholderValue(match: RegExpExecArray): boolean {
   return isPlaceholder(match.groups?.value ?? '');
 }
 
+/** For a rule whose whole match is the key (`sk-ant-…`): a key only when the match isn't plainly a placeholder. */
+function wholeMatchPlaceholder(match: RegExpExecArray): boolean {
+  return isPlaceholder(match[0]);
+}
+
 /**
  * The broad rules (a bare `token`, a `?token=`): a value is a key only when it mixes letters and digits and isn't a
  * placeholder, so prose, words and page numbers stay quiet.
@@ -71,7 +76,8 @@ function notKeyLike(match: RegExpExecArray): boolean {
  */
 export const RULES: readonly SecretRule[] = [
   { id: 'private-key', re: /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----/g },
-  { id: 'anthropic', re: /\bsk-ant-[A-Za-z0-9_-]{20,}/g },
+  // `sk-ant-your-key-here-xxxx…` is a placeholder: the same whole-phrase skip as the assignment rules (round 3 of #669)
+  { id: 'anthropic', re: /\bsk-ant-[A-Za-z0-9_-]{20,}/g, skip: wholeMatchPlaceholder },
   { id: 'openai', re: /\bsk-(?!ant-)(?:proj-|svcacct-|admin-)?(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{32,}/g },
   { id: 'google-api', re: /\bAIza[0-9A-Za-z_-]{35}(?![0-9A-Za-z_-])/g },
   { id: 'google-oauth-secret', re: /\bGOCSPX-[A-Za-z0-9_-]{28}(?![A-Za-z0-9_-])/g },
@@ -93,6 +99,9 @@ export const RULES: readonly SecretRule[] = [
   { id: 'query-token', re: /[?&](?:[a-z]+[_-])?token=(?<value>[A-Za-z0-9._~+/=-]{16,})(?=[&#\s"'<>]|$)/gi, skip: notKeyLike },
   // `token = "…"`, `"token": "…"`, `BOT_TOKEN = '…'`, `apiToken: "…"`; never `csrfToken` or `nextPageToken` (camel case
   // only with the prefixes that name a key), and only a long value that mixes letters and digits
+  // A Telegram bot token, `123456789:AAF…`: the bot's number, a colon and 35 base64url characters. Its colon is outside
+  // `token-assignment`'s value class, so it has its own rule and is found wherever it stands (round 3 of #669)
+  { id: 'telegram-bot', re: /(?<![\d:])\d{8,12}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/g },
   { id: 'token-assignment', re: /\b(?:(?:[A-Za-z0-9]{1,24}[_-]){0,4}token|(?:api|bot|bearer|refresh|session|personal|secret|private|github|gitlab|slack|discord|telegram|npm)token)["']?\s*[:=]\s*["'`](?<value>[A-Za-z0-9._~+/=-]{20,})["'`]/gi, skip: notKeyLike },
 ];
 

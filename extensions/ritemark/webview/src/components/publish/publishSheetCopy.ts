@@ -40,8 +40,8 @@ export function reasonWords(row: Pick<SheetLeftOutRow, 'reason' | 'count'>): str
     toolFolder: "a tool's folder",
     gitIgnored: 'Git ignores it',
     otherPage: "another page, so its link won't work",
-    link: 'a link, not part of the page',
-    gitUnchecked: "Git couldn't check it",
+    link: "a linked file, so its link won't work",
+    gitUnchecked: "couldn't be checked",
   }
   return words[row.reason]
 }

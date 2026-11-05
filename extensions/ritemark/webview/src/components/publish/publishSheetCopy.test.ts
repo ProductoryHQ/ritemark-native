@@ -43,7 +43,7 @@ assert.equal(WHO_CAN_SEE, "Anyone with the link can open the page. It isn't list
 
 // Left out, the five reasons (answer 3), a link (review of #669) and a path Git can't check (minor 6)
 const reasons = (['outside', 'hidden', 'toolFolder', 'gitIgnored', 'otherPage', 'link', 'gitUnchecked'] as const).map((reason) => leftOutReasonFor({ name: 'x', display: 'x', reason }))
-assert.deepEqual(reasons, ['outside this project', 'a hidden file', "a tool's folder", 'Git ignores it', "another page, so its link won't work", 'a link, not part of the page', "Git couldn't check it"])
+assert.deepEqual(reasons, ['outside this project', 'a hidden file', "a tool's folder", 'Git ignores it', "another page, so its link won't work", "a linked file, so its link won't work", "couldn't be checked"])
 const folded = { name: '', display: '', reason: 'otherPage' as const, count: 7 }
 assert.equal(leftOutName(folded), '7 other pages', 'A3 finding 3: folded')
 assert.equal(leftOutReasonFor(folded), "so their links won't work")
@@ -59,7 +59,7 @@ assert.equal(`${leftOutName(chart)} · ${leftOutReasonFor(chart)}`, "chart.js ·
 const notes = { name: 'notes.png', display: 'drafts/notes.png', reason: 'gitIgnored' as const }
 assert.equal(`${leftOutName(notes)} · ${leftOutReasonFor(notes)}`, 'notes.png · Git ignores it')
 const doc = { name: 'notes.md', display: 'notes.md', reason: 'link' as const }
-assert.equal(`${leftOutName(doc)} · ${leftOutReasonFor(doc)}`, 'notes.md · a link, not part of the page')
+assert.equal(`${leftOutName(doc)} · ${leftOutReasonFor(doc)}`, "notes.md · a linked file, so its link won't work")
 
 // The lead's change 1: no fold for "This page, one file" with nothing left out
 assert.equal(showsFileList(1, []), false, 'nothing to see beyond the line')

@@ -45,9 +45,26 @@ const NON_LOADING_HREF_TAGS = new Set(['base']);
 const LINK_TAGS = new Set(['a', 'area']);
 /**
  * `<link rel>` words that make the page load the file (a stylesheet, an icon, a preload, a manifest). Any other
- * `<link>` (`alternate`, `next`, `canonical`, `author`, `license`…, or none at all) only points somewhere.
+ * `<link>` (`alternate`, `next`, `canonical`, `author`, `license`…, or none at all) only points somewhere. `prefetch`
+ * and `dns-prefetch` are hints for a later visit, not a file this page uses, so a document behind one stays behind
+ * (round 3 of #669). `rel` is split into its words, as the HTML standard reads it, so `dns-prefetch` is one word and
+ * never matches a shorter one inside it.
  */
-const LOADING_LINK_RELS = /\b(?:stylesheet|icon|apple-touch-icon(?:-precomposed)?|mask-icon|manifest|preload|modulepreload|prefetch)\b/;
+const LOADING_LINK_RELS: ReadonlySet<string> = new Set([
+  'stylesheet',
+  'icon',
+  'apple-touch-icon',
+  'apple-touch-icon-precomposed',
+  'mask-icon',
+  'manifest',
+  'preload',
+  'modulepreload',
+]);
+
+/** A `rel` value's words, lower-cased (`"Shortcut Icon"` → `shortcut`, `icon`). */
+export function relTokens(rel: string): Set<string> {
+  return new Set(rel.toLowerCase().split(/\s+/).filter(Boolean));
+}
 
 function parsed(html: string): HTMLElement {
   return parse(html, {
@@ -118,7 +135,7 @@ export function pageReferences(html: string): PageReferences {
       continue;
     }
     if (attrs.style !== undefined) out.inlineCss.push(attrs.style);
-    const rel = (attrs.rel ?? '').toLowerCase();
+    const rel = relTokens(attrs.rel ?? '');
     for (const name of SINGLE_URL_ATTRIBUTES) {
       const value = attrs[name];
       if (value === undefined) continue;
@@ -127,9 +144,9 @@ export function pageReferences(html: string): PageReferences {
       if (looksBuilt(value)) out.builtAttribute = true;
       let as: Reference['as'] = 'any';
       if (tag === 'link' && name === 'href') {
-        if (/\bstylesheet\b/.test(rel)) as = 'style';
-        else if (/\bmodulepreload\b/.test(rel)) as = 'module';
-        else if (!LOADING_LINK_RELS.test(rel)) as = 'link';
+        if (rel.has('stylesheet')) as = 'style';
+        else if (rel.has('modulepreload')) as = 'module';
+        else if (![...rel].some((word) => LOADING_LINK_RELS.has(word))) as = 'link';
       } else if ((name === 'href' || name === 'xlink:href') && LINK_TAGS.has(tag)) {
         as = 'link';
       }
