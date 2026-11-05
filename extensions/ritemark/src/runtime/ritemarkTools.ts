@@ -30,7 +30,9 @@ import {
   browserSnapshot,
   browserType,
   formatActionResultForAgent,
+  BrowserTurnPage,
   type BrowserActionResult,
+  type BrowserActionTarget,
 } from '../browser/BrowserActionTools';
 import type { DynamicToolDefinition } from '../codex/codexProtocol';
 import { ACTOR_OF_RUNTIME, type BoardController } from '../taskBoard/BoardController';
@@ -45,6 +47,8 @@ export interface ToolResult {
 export interface ToolContext {
   /** The runtime that called the tool; the board writes it as the actor. */
   runtimeId: AgentId;
+  /** #658: the conversation's browser page; the browser tools act in it. Without it they have no page. */
+  browserPage?: BrowserTurnPage;
 }
 
 export interface RitemarkTool {
@@ -139,6 +143,44 @@ function browserText(result: BrowserActionResult): ToolResult {
   return { text: formatActionResultForAgent(result), ...(result.error ? { isError: true } : {}) };
 }
 
+/** #658: every browser tool takes the page it acts in; left out, the page the turn was given. */
+const pageIdInput = z
+  .string()
+  .optional()
+  .describe(
+    'The page to act in. Leave it out to act in the page the user had in front when they sent the message. Pass a page id only when a tool result gave you one (for example a page your click opened).',
+  );
+
+const NO_PAGE_ERROR =
+  'No browser page for this message: the user had no browser page in front when they sent it. Nothing was done. Ask the user to bring the page to the front and send the message again, or open an address with browser_navigate.';
+
+/**
+ * Runs a browser action in the turn's page (#658), or in the page the AI named
+ * with `page_id`. The page goes to patch 010 by id; it is never looked up again
+ * from the tab in front. With no page, only navigate to an address acts: in a
+ * new tab, which becomes the turn's page.
+ */
+async function onPage(
+  args: Record<string, unknown>,
+  context: ToolContext,
+  act: (actionArgs: Record<string, unknown>, target: BrowserActionTarget) => Promise<BrowserActionResult>,
+  options: { opensTab?: boolean } = {},
+): Promise<ToolResult> {
+  const { page_id: pageIdArg, ...actionArgs } = args;
+  const explicit = typeof pageIdArg === 'string' && pageIdArg.trim() ? pageIdArg.trim() : undefined;
+  const page = context.browserPage ?? new BrowserTurnPage();
+  const target = page.target(explicit);
+  if (!target) {
+    if (!options.opensTab) return { text: `Error: ${NO_PAGE_ERROR}`, isError: true };
+    const opened = await act(actionArgs, page.newTabTarget());
+    page.noteResult(opened, { adopt: true });
+    return browserText(opened);
+  }
+  const result = await act(actionArgs, target);
+  page.noteResult(result);
+  return browserText(result);
+}
+
 export const BROWSER_TOOL_GROUP: RitemarkToolGroup = {
   id: 'browser',
   server: 'ritemark_browser',
@@ -147,64 +189,72 @@ export const BROWSER_TOOL_GROUP: RitemarkToolGroup = {
     {
       name: 'browser_navigate',
       description:
-        'Open or navigate the integrated Ritemark browser. With type="url" + url: reuses the FIRST existing browser tab if any are open, otherwise creates a new tab — call this directly when the user says "open browser and go to X". With type="back"/"forward"/"reload": acts on the active tab (requires one to exist).\n\nIf the URL is ambiguous (e.g. the user says "go to my company website" with no exact URL), run a web search FIRST to resolve the exact URL, then call this tool with that URL. Do not guess — the tool will navigate to whatever you give it.\n\nReturns the updated ARIA page summary so you can observe the resulting page in one round trip.',
+        'Open or navigate the integrated Ritemark browser. With type="url" + url: loads the address in the page you were given (the browser page the user had in front when they sent the message); with no such page, opens a new tab — call this directly when the user says "open browser and go to X". With type="back"/"forward"/"reload": acts on the page you were given (requires one).\n\nIf the URL is ambiguous (e.g. the user says "go to my company website" with no exact URL), run a web search FIRST to resolve the exact URL, then call this tool with that URL. Do not guess — the tool will navigate to whatever you give it.\n\nReturns the updated ARIA page summary so you can observe the resulting page in one round trip.',
       input: {
         type: z.enum(['url', 'back', 'forward', 'reload']).optional().describe('Navigation kind (default "url").'),
         url: z.string().optional().describe('Target URL when type is "url". Must be a complete URL — resolve via web search first if the user gave an ambiguous name.'),
+        page_id: pageIdInput,
       },
-      run: async (args) => browserText(await browserNavigate(args as unknown as Parameters<typeof browserNavigate>[0])),
+      run: async (args, context) =>
+        onPage(args, context, (actionArgs, target) => browserNavigate(actionArgs as unknown as Parameters<typeof browserNavigate>[0], target), {
+          opensTab: (args.type ?? 'url') === 'url',
+        }),
     },
     {
       name: 'browser_click',
       description:
-        'Click an element in the active integrated browser tab. Prefer ARIA refs (e.g. "@e12") from the page summary; CSS selectors are a fallback. Use dblClick=true for double-click, button="right" for context menu.',
+        'Click an element in the browser page you were given (see page_id). Prefer ARIA refs (e.g. "@e12") from the page summary; CSS selectors are a fallback. Use dblClick=true for double-click, button="right" for context menu.',
       input: {
         ref: z.string().optional().describe('ARIA ref from the page summary, e.g. "@e12".'),
         selector: z.string().optional().describe('CSS selector. Use only if ref is not available.'),
         button: z.enum(['left', 'right', 'middle']).optional(),
         dblClick: z.boolean().optional(),
+        page_id: pageIdInput,
       },
-      run: async (args) => browserText(await browserClick(args as unknown as Parameters<typeof browserClick>[0])),
+      run: async (args, context) => onPage(args, context, (actionArgs, target) => browserClick(actionArgs as unknown as Parameters<typeof browserClick>[0], target)),
     },
     {
       name: 'browser_fill',
       description:
-        'Replace the value of an input/textarea/select in the active integrated browser tab. Calls Playwright fill() — clears the field before typing. For sending individual key events use browser_type.',
+        'Replace the value of an input/textarea/select in the browser page you were given (see page_id). Calls Playwright fill() — clears the field before typing. For sending individual key events use browser_type.',
       input: {
         ref: z.string().optional().describe('ARIA ref from the page summary.'),
         selector: z.string().optional().describe('CSS selector. Use only if ref is not available.'),
         value: z.string().describe('Value to write into the field.'),
+        page_id: pageIdInput,
       },
-      run: async (args) => browserText(await browserFill(args as unknown as Parameters<typeof browserFill>[0])),
+      run: async (args, context) => onPage(args, context, (actionArgs, target) => browserFill(actionArgs as unknown as Parameters<typeof browserFill>[0], target)),
     },
     {
       name: 'browser_type',
       description:
-        'Send keystrokes to the active integrated browser tab. Use "text" to type plain text into whatever has focus, or "key" to press a single named key (e.g. "Enter", "Tab", "Escape", "Control+A").',
+        'Send keystrokes to the browser page you were given (see page_id). Use "text" to type plain text into whatever has focus, or "key" to press a single named key (e.g. "Enter", "Tab", "Escape", "Control+A").',
       input: {
         text: z.string().optional().describe('Plain text to type via keyboard.'),
         key: z.string().optional().describe('Single key or key combo to press, e.g. "Enter", "Control+A".'),
+        page_id: pageIdInput,
       },
-      run: async (args) => browserText(await browserType(args as unknown as Parameters<typeof browserType>[0])),
+      run: async (args, context) => onPage(args, context, (actionArgs, target) => browserType(actionArgs as unknown as Parameters<typeof browserType>[0], target)),
     },
     {
       name: 'browser_scroll',
       description:
-        'Scroll the active integrated browser tab. direction: "up"/"down" scrolls by amount px (default 600); "top"/"bottom" jumps; "into-view" requires ref or selector and scrolls that element into view.',
+        'Scroll the browser page you were given (see page_id). direction: "up"/"down" scrolls by amount px (default 600); "top"/"bottom" jumps; "into-view" requires ref or selector and scrolls that element into view.',
       input: {
         direction: z.enum(['up', 'down', 'top', 'bottom', 'into-view']).optional(),
         amount: z.number().optional().describe('Scroll distance in px (default 600) for up/down directions.'),
         ref: z.string().optional(),
         selector: z.string().optional(),
+        page_id: pageIdInput,
       },
-      run: async (args) => browserText(await browserScroll(args as unknown as Parameters<typeof browserScroll>[0])),
+      run: async (args, context) => onPage(args, context, (actionArgs, target) => browserScroll(actionArgs as unknown as Parameters<typeof browserScroll>[0], target)),
     },
     {
       name: 'browser_snapshot',
       description:
-        'Return the current ARIA outline of the active integrated browser tab — URL, title, and full accessibility tree snapshot. Use this to re-observe page state after an action without calling browser_navigate again. Read-only: does not require browser control consent, but the tab must be shared with Ritemark AI by the user.',
-      input: {},
-      run: async () => browserText(await browserSnapshot()),
+        'Return the current ARIA outline of the browser page you were given (see page_id) — URL, title, and full accessibility tree snapshot. Use this to re-observe page state after an action without calling browser_navigate again. Read-only: does not require browser control consent, but the tab must be shared with Ritemark AI by the user.',
+      input: { page_id: pageIdInput },
+      run: async (args, context) => onPage(args, context, (_actionArgs, target) => browserSnapshot(target)),
     },
   ],
 };

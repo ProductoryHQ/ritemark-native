@@ -75,10 +75,16 @@
 #   RITEMARK_PLAYWRIGHT_SESSION ('ritemark'). Browser Recent's ephemeral flag
 #   covers every in-memory tab (private tabs and upstream's Agent storage).
 #
+# #658 (2026-11-05): getActiveSummary and captureActiveViewport take an optional
+#   { pageId } and read that page by id, so the turn's context is the summary of
+#   the page its metadata named, not of whichever tab is in front by then; a page
+#   that has gone is an error. Without pageId they read the active tab, as before.
+#
 # Created: 2026-05-11
 # Updated: 2026-10-12 (Sprint 131: navigation push for Browser Recent)
 # Updated: 2026-10-19 (Sprint 134: the share question on the AI's sheet)
 # Updated: 2026-10-19 (Sprint 135: rebased onto VS Code 1.142.0)
+# Updated: 2026-11-05 (#658: the context's reads by page id)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
 index 78cee5deca2..31466d78914 100644
@@ -252,10 +258,10 @@ index 7a69461a8f9..9d39a07860c 100644
  	const url = Object.entries(viewState ?? {}).find(([key]) => key === 'url')?.[1];
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts
 new file mode 100644
-index 00000000000..666e1e7bb25
+index 00000000000..6019704e168
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts
-@@ -0,0 +1,339 @@
+@@ -0,0 +1,361 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -273,7 +279,7 @@ index 00000000000..666e1e7bb25
 +import { ILogService } from '../../../../../platform/log/common/log.js';
 +import { IEditorService } from '../../../../services/editor/common/editorService.js';
 +import { BrowserActionCategory, BrowserActionGroup, BrowserEditor, BrowserEditorContribution } from '../browserEditor.js';
-+import { IBrowserViewModel } from '../../common/browserView.js';
++import { IBrowserViewModel, IBrowserViewWorkbenchService } from '../../common/browserView.js';
 +import { DisposableStore } from '../../../../../base/common/lifecycle.js';
 +
 +const CONTEXT_RITEMARK_BROWSER_ANNOTATION_MODE = new RawContextKey<boolean>(
@@ -311,6 +317,28 @@ index 00000000000..666e1e7bb25
 +function activeBrowserModel(accessor: ServicesAccessor): IBrowserViewModel | undefined {
 +	const editor = accessor.get(IEditorService).activeEditorPane;
 +	return editor instanceof BrowserEditor ? editor.model : undefined;
++}
++
++/**
++ * Ritemark (#658): the browser page with this id, open in a tab of this window, or undefined once its tab has closed.
++ * The AI's turn is given one page; the context's later reads find that page by its id (010's actions do too,
++ * in `common/ritemarkBrowserPageTarget.ts`), never again from the tab in front.
++ */
++function ritemarkBrowserModelById(browserViewWorkbenchService: IBrowserViewWorkbenchService, pageId: string): IBrowserViewModel | undefined {
++	return browserViewWorkbenchService.getKnownBrowserViews().get(pageId)?.model;
++}
++
++/** Ritemark (#658): a read about the page the turn was given; without `pageId`, the active browser tab. */
++interface IRitemarkPageArgs {
++	readonly pageId?: string;
++}
++
++const PAGE_GONE_ERROR = 'The page you were given is no longer open.';
++
++function turnBrowserModel(accessor: ServicesAccessor, args: IRitemarkPageArgs | undefined): IBrowserViewModel | undefined {
++	return typeof args?.pageId === 'string'
++		? ritemarkBrowserModelById(accessor.get(IBrowserViewWorkbenchService), args.pageId)
++		: activeBrowserModel(accessor);
 +}
 +
 +function dtoFromModel(model: IBrowserViewModel): IRitemarkBrowserContextDto {
@@ -458,10 +486,10 @@ index 00000000000..666e1e7bb25
 +		});
 +	}
 +
-+	async run(accessor: ServicesAccessor): Promise<IRitemarkBrowserContextDto> {
-+		const model = activeBrowserModel(accessor);
++	async run(accessor: ServicesAccessor, args?: IRitemarkPageArgs): Promise<IRitemarkBrowserContextDto> {
++		const model = turnBrowserModel(accessor, args);
 +		if (!model) {
-+			return { error: 'No active integrated browser tab.' };
++			return { error: typeof args?.pageId === 'string' ? PAGE_GONE_ERROR : 'No active integrated browser tab.' };
 +		}
 +		if (!model.ritemarkSharedWithAgent) {
 +			return { ...dtoFromModel(model), error: 'Browser page is not shared with Ritemark AI context.' };
@@ -483,10 +511,10 @@ index 00000000000..666e1e7bb25
 +		});
 +	}
 +
-+	async run(accessor: ServicesAccessor): Promise<IRitemarkBrowserContextDto> {
-+		const model = activeBrowserModel(accessor);
++	async run(accessor: ServicesAccessor, args?: IRitemarkPageArgs): Promise<IRitemarkBrowserContextDto> {
++		const model = turnBrowserModel(accessor, args);
 +		if (!model) {
-+			return { error: 'No active integrated browser tab.' };
++			return { error: typeof args?.pageId === 'string' ? PAGE_GONE_ERROR : 'No active integrated browser tab.' };
 +		}
 +		if (!model.annotationMode) {
 +			return { ...dtoFromModel(model), error: 'Annotation mode is not enabled for the active browser tab.' };

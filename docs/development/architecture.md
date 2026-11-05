@@ -422,6 +422,25 @@ extension  browser/browserNavigationRecorder.ts (no vscode import; every rule un
 - **One entry per page.** `historyKey` = normalized address without its `#fragment`; entries saved by earlier versions merge on the next visit. `openInIntegratedBrowser()` no longer writes to the store; the page is recorded when it loads, at the address it ends on.
 - **Pages loading in hidden tabs** are recorded when the tab is first shown, not while hidden. Deleted `file:` entries are pruned when Recent is shown (only `FileNotFound` removes one).
 
+### Which page the AI acts in (#658)
+
+A turn's browser actions go to the page the turn was given, found by its id, never to whichever tab is in front when the action runs. Before #658 the context was taken once per turn but every action looked up the active tab again, so a popup or another desk brought forward during the turn took the AI's clicks and keys, and navigate loaded an address into the first browser tab when a document was in front.
+
+```text
+UnifiedViewProvider (turn start)  browserTurnPageFor(conversationId).startTurn(page)
+    page = the page the turn's browser context came from, else BrowserContextStore.activePageId() (none with a document in front)
+ritemarkTools.ts  every browser tool: optional page_id; onPage() sends { pageId, requireShared?, knownPageIds? }, or { newTab } for navigate with no page
+    Claude: claudeMcpServers(groups, page)   Codex: codexToolCall(..., page)   OpenCode: handleIpc(..., page of the conversation prompted last)
+patch 010  resolveRitemarkPageTarget (common/ritemarkBrowserPageTarget.ts): by id, or the page-gone error; never the active tab instead
+    a page in a background tab is shown in its group first (preserveFocus); results carry pageIds and newPages
+patch 009  getActiveSummary / captureActiveViewport take { pageId }, so the context's summary is the page its metadata named
+```
+
+- **One holder per conversation** (`BrowserTurnPage`, `browser/BrowserActionTools.ts`). Claude keeps its session's first MCP server, so the tools read the holder when they run.
+- **A page the AI was not given** (a sign-in popup its click opened) is named in the next result: its id alone while it is not shared, title and address once it is. The AI acts in it only with `page_id`, and only once it is shared (`requireShared`); no action shares it. A popup does not inherit its opener's share (upstream: child views "do not implicitly inherit agent access"; seen live, 5 Nov).
+- **No page:** click, fill, type, scroll, snapshot, back, forward and reload return an error without reaching the browser; navigate with an address opens a new tab, which becomes the turn's page.
+- **OpenCode** gets no browser context, so its turn's page is the page in front when the turn starts. Its adapter's requests name no conversation: with two OpenCode conversations working at once, the last one prompted gives the page (one shared browser, D2).
+
 ### The share question (Sprint 134, #455)
 
 Whether to share a web page with the AI is asked on the AI's sheet, above the message box, not in a dialog. Upstream's "Share with Agent?" dialog was modal: it blocked the tab row until it was answered (#455). When and whether Ritemark asks did not change. Only where it asks did.
@@ -1140,7 +1159,7 @@ ritemarkTools.ts (one definition per tool, zod)
               the tools and forwards calls; OpenCode names them <server>_<tool>
 ```
 
-- **Names are a contract.** The browser tools keep their v1.13.0 names, descriptions and schemas byte for byte (tested against the old adapter's copy). Before Sprint 130 they existed three times (Claude zod, Codex JSON, adapter JSON) and the copies had drifted; `browserMcpServer.ts`, `codexBrowserTools.ts` and `BrowserToolsInjector.ts` are gone.
+- **Names are a contract.** The browser tools keep their v1.13.0 names and schemas (tested against the old adapter's copy); #658 added `page_id` to each and reworded the descriptions to say which page they act in. Before Sprint 130 they existed three times (Claude zod, Codex JSON, adapter JSON) and the copies had drifted; `browserMcpServer.ts`, `codexBrowserTools.ts` and `BrowserToolsInjector.ts` are gone.
 - **Approval.** Browser and board tools never ask, in any autonomy mode. OpenCode's `session/request_permission` for `ritemark_board_*` (and its `doom_loop` on a board tool) is allowed by `AcpRuntime`; documents still change only through each runtime's own gated file tools.
 - **Adding a tool** is a definition in the registry and a test; no runtime file changes.
 

@@ -22,6 +22,7 @@ import { RitemarkToolsInjector } from '../runtime/RitemarkToolsInjector';
 import { BOARD_TOOL_GROUP, toolGroupsFor } from '../runtime/ritemarkTools';
 import { isEnabled } from '../features';
 import type { AgentId } from '../agent/types';
+import type { BrowserTurnPage } from '../browser/BrowserActionTools';
 import type {
   RequestPermissionRequest,
   RequestPermissionResponse,
@@ -172,6 +173,7 @@ export class AcpSession implements RuntimeSession {
     }
     const config = this._config;
     this._dispatchAccepted = false;
+    this._runtime.noteBrowserPage(config.browserPage);
 
     config.onProgress({ type: 'init', message: 'Starting OpenCode…', timestamp: Date.now() });
 
@@ -496,6 +498,14 @@ export class AcpRuntime implements AgentRuntime {
    * Spawn the subprocess + browser IPC server once, on the first conversation.
    * Subsequent conversations open another ACP session on the same connection.
    */
+  /** #658: the browser page holder of the conversation prompted last; the browser tools act in its page. */
+  private _browserPage: BrowserTurnPage | undefined;
+
+  /** #658: a session prompts a turn; its conversation's browser page is the one OpenCode's browser tools act in. */
+  noteBrowserPage(page: BrowserTurnPage | undefined): void {
+    this._browserPage = page;
+  }
+
   private async _ensureManager(config: RuntimeSessionConfig): Promise<void> {
     if (this._manager) return;
 
@@ -517,7 +527,8 @@ export class AcpRuntime implements AgentRuntime {
     if (groups.length) {
       const ipcSessionId = crypto.randomUUID();
       const ipcServer = new RitemarkIpcServer(ipcSessionId);
-      await ipcServer.start((req) => _toolsInjector.handleIpc(req));
+      // #658: the requests name no conversation; the page is the last-prompted conversation's (one shared browser, D2).
+      await ipcServer.start((req) => _toolsInjector.handleIpc(req, 'opencode', this._browserPage));
       this._ipcServer = ipcServer;
       mcpServers = _toolsInjector.acpMcpServers(groups, ipcServer.socketPath);
       traceAcp('runtime', 'ipc-started', { socketPath: ipcServer.socketPath, groups: groups.map((group) => group.id) });

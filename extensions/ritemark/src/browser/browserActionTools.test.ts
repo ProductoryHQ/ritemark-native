@@ -67,7 +67,10 @@ const {
 const { BROWSER_TOOL_GROUP, codexDynamicTools, findCodexTool } = registry;
 const injector = new RitemarkToolsInjector();
 const isCodexBrowserToolCall = (name: string) => findCodexTool([BROWSER_TOOL_GROUP], name) !== null;
-const dispatchCodexBrowserToolCall = (name: string, args: Record<string, unknown>) => injector.codexToolCall([BROWSER_TOOL_GROUP], name, args);
+// #658: a Codex turn's tools act in the conversation's page; here the turn was given page p1.
+const codexPage = new actions.BrowserTurnPage();
+codexPage.startTurn('p1');
+const dispatchCodexBrowserToolCall = (name: string, args: Record<string, unknown>) => injector.codexToolCall([BROWSER_TOOL_GROUP], name, args, codexPage);
 /** The Codex names the model has seen since Sprint 69; the registry must keep them. */
 const CODEX_BROWSER_TOOL_NAMES = [
   'ritemark_browser_navigate',
@@ -170,6 +173,7 @@ async function runTests() {
   assert.equal(dispatched.success, true);
   assert.ok(dispatched.text.includes('after-click'));
   assert.equal(calls[0].command, 'workbench.action.browser.agentClick');
+  assert.equal((calls[0].args[0] as { pageId?: string }).pageId, 'p1', 'the click names the turn\'s page');
 
   // 8. dispatchCodexBrowserToolCall reports failure as success=false.
   resetCalls();

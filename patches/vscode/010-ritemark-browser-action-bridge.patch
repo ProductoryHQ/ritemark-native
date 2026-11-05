@@ -20,15 +20,30 @@
 #   empty tab's subtitle no longer points at it. Developer tools moves into ⋯
 #   (hidden by default, which the bar puts in its ⋯ menu), in sentence case.
 #
+# #658 (2026-11-05): the turn's page is the one source for every action. Each
+#   action takes the page by id (pageId) and acts in it, never again in the tab in
+#   front, so a popup or another desk brought forward during the turn no longer
+#   takes the AI's clicks and keys; a page that has gone is an error, never the
+#   active tab. Navigate with an address loads into the named page or opens a new
+#   tab (newTab); its fallbacks to the first visible browser pane and the first
+#   browser tab are gone. A page the AI names itself (requireShared) must be shared
+#   already: no action shares a page the AI was not given. Results list the
+#   window's page ids and the pages new since the caller's knownPageIds (title and
+#   address only when shared). A page in a background tab is shown in its group
+#   first (preserveFocus). The control question names the page. Logic in
+#   common/ritemarkBrowserPageTarget.ts, tested in test/common/.
+#
 # File(s): src/vs/platform/browserView/common/browserView.ts,
 #          src/vs/workbench/contrib/browserView/common/browserView.ts,
+#          src/vs/workbench/contrib/browserView/common/ritemarkBrowserPageTarget.ts,
+#          src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPageTarget.test.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts
 # Created: 2026-05-13
-# Updated: 2026-10-19 (Sprint 135: rebased onto VS Code 1.142.0)
+# Updated: 2026-11-05 (#658: actions act in the page named by id)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
 index 31466d78914..e7d9a1af46e 100644
@@ -130,6 +145,137 @@ index 8153d309eca..b8dea314834 100644
  	}
  
  	async setAnnotationMode(annotate: boolean): Promise<void> {
+diff --git a/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPageTarget.ts b/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPageTarget.ts
+new file mode 100644
+index 00000000000..22662ff787d
+--- /dev/null
++++ b/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPageTarget.ts
+@@ -0,0 +1,125 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/**
++ * Ritemark (#658): which browser page an AI action acts in.
++ *
++ * The extension names the page the AI's turn was given, and an action finds that page by its id. A tab or desk
++ * brought to the front during the turn (a popup, the person's own click) never moves the AI's actions, and a page
++ * that has gone is an error, never the active tab instead. Navigate with an address loads it into the named page, or
++ * opens a new tab; it never loads it into some other open tab. Without `pageId` (a caller that names no page), an
++ * action acts in the active browser tab, and navigate with an address opens a new tab when no browser tab is active.
++ *
++ * Pure: the action feature (`ritemarkBrowserActionFeature.ts`) passes the window's pages and the active one.
++ */
++
++export interface IRitemarkPageTarget {
++	/** The turn's page, or a page a tool result named. */
++	readonly pageId?: string;
++	/** The page is not the turn's (the AI named it from a tool result): it must be shared already; no action shares it. */
++	readonly requireShared?: boolean;
++	/** The page ids the caller knew after its last action, so a new page is named once. */
++	readonly knownPageIds?: readonly string[];
++	/** navigate with an address only: the turn has no page, so the address opens in a new tab. */
++	readonly newTab?: boolean;
++}
++
++/** What the target logic reads of a browser page (an `IBrowserViewModel`). */
++export interface IRitemarkTargetPage {
++	readonly id: string;
++	readonly url: string;
++	readonly title: string;
++	readonly ritemarkSharedWithAgent: boolean;
++}
++
++/** The window's browser pages by id (`IBrowserViewWorkbenchService.getKnownBrowserViews()`). */
++export interface IRitemarkKnownPages<M extends IRitemarkTargetPage> {
++	getKnownBrowserViews(): ReadonlyMap<string, { readonly model: M | undefined }>;
++}
++
++/** A browser page that opened since the caller last looked. Title and address only when it is shared. */
++export interface IRitemarkBrowserPageDto {
++	readonly pageId: string;
++	readonly shared: boolean;
++	readonly title?: string;
++	readonly url?: string;
++}
++
++/** The fields of an action's result that the target decides when it finds no page to act in. */
++export interface IRitemarkTargetError {
++	readonly pageId?: string;
++	readonly pageGone?: boolean;
++	readonly error: string;
++}
++
++export const RITEMARK_PAGE_GONE_ERROR = 'The page you were given is no longer open (its tab was closed). Nothing was done. Ask the user which page to use.';
++export const RITEMARK_PAGE_NOT_SHARED_ERROR = 'This page is not shared with you, so nothing was done. Ask the user to share it with the AI (bring it to the front and answer Share this page), then try again.';
++export const RITEMARK_NO_ACTIVE_PAGE_ERROR = 'No active integrated browser tab.';
++
++export type RitemarkPageResolution<M> =
++	| { readonly kind: 'page'; readonly model: M }
++	| { readonly kind: 'newTab' }
++	| { readonly kind: 'error'; readonly result: IRitemarkTargetError };
++
++/**
++ * The page an action acts in. `navigateToUrl`: the action is navigate with an address, which may open a new tab.
++ */
++export function resolveRitemarkPageTarget<M extends IRitemarkTargetPage>(
++	target: IRitemarkPageTarget,
++	pages: IRitemarkKnownPages<M>,
++	activeModel: M | undefined,
++	options: { readonly navigateToUrl: boolean },
++): RitemarkPageResolution<M> {
++	if (typeof target.pageId === 'string') {
++		const model = pages.getKnownBrowserViews().get(target.pageId)?.model;
++		if (!model) {
++			return { kind: 'error', result: { pageId: target.pageId, pageGone: true, error: RITEMARK_PAGE_GONE_ERROR } };
++		}
++		if (target.requireShared && !model.ritemarkSharedWithAgent) {
++			// Nothing about the page (address, title) goes back: it is not shared.
++			return { kind: 'error', result: { pageId: model.id, error: RITEMARK_PAGE_NOT_SHARED_ERROR } };
++		}
++		return { kind: 'page', model };
++	}
++	if (options.navigateToUrl && (target.newTab || !activeModel)) {
++		return { kind: 'newTab' };
++	}
++	return activeModel ? { kind: 'page', model: activeModel } : { kind: 'error', result: { error: RITEMARK_NO_ACTIVE_PAGE_ERROR } };
++}
++
++/**
++ * The window's pages after an action, by id, and the ones new to the caller: those not in its `knownPageIds`, or,
++ * when it sent none, not open when the action started (`before`). The page the action acted in is not new.
++ */
++export function ritemarkPagesReport<M extends IRitemarkTargetPage>(
++	pages: IRitemarkKnownPages<M>,
++	target: IRitemarkPageTarget,
++	before: ReadonlySet<string>,
++	actedPageId: string | undefined,
++): { pageIds: string[]; newPages: IRitemarkBrowserPageDto[] } {
++	const known = pages.getKnownBrowserViews();
++	const baseline = target.knownPageIds ? new Set(target.knownPageIds) : before;
++	const newPages: IRitemarkBrowserPageDto[] = [];
++	for (const [id, input] of known) {
++		if (baseline.has(id) || id === actedPageId) {
++			continue;
++		}
++		const model = input.model;
++		newPages.push(model?.ritemarkSharedWithAgent
++			? { pageId: id, shared: true, title: model.title, url: model.url }
++			: { pageId: id, shared: false });
++	}
++	return { pageIds: [...known.keys()], newPages };
++}
++
++/** The action's own arguments, without the page target, for the function that runs in the page. */
++export function ritemarkActionArgs<T extends IRitemarkPageTarget>(args: T | undefined): Omit<T, keyof IRitemarkPageTarget> {
++	const rest: Record<string, unknown> = { ...args };
++	delete rest.pageId;
++	delete rest.requireShared;
++	delete rest.knownPageIds;
++	delete rest.newTab;
++	return rest as Omit<T, keyof IRitemarkPageTarget>;
++}
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts b/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
 index 9d39a07860c..926afddea2a 100644
 --- a/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
@@ -289,10 +435,10 @@ index 62a4c272e93..20fb0cdb554 100644
  		this._widget = { location: BrowserWidgetLocation.ContentArea, element: this._container, order: 50 };
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
 new file mode 100644
-index 00000000000..e358a3e8a8c
+index 00000000000..e3604fbd199
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
-@@ -0,0 +1,489 @@
+@@ -0,0 +1,579 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -308,8 +454,8 @@ index 00000000000..e358a3e8a8c
 +import { ACTIVE_GROUP, IEditorService } from '../../../../services/editor/common/editorService.js';
 +import { BrowserActionCategory, BrowserEditor } from '../browserEditor.js';
 +import { RITEMARK_PLAYWRIGHT_SESSION } from './ritemarkBrowserContextFeature.js';
-+import { IBrowserViewModel } from '../../common/browserView.js';
-+import { Schemas } from '../../../../../base/common/network.js';
++import { IBrowserViewModel, IBrowserViewWorkbenchService } from '../../common/browserView.js';
++import { IRitemarkBrowserPageDto, IRitemarkPageTarget, resolveRitemarkPageTarget, ritemarkActionArgs, ritemarkPagesReport } from '../../common/ritemarkBrowserPageTarget.js';
 +import { generateUuid } from '../../../../../base/common/uuid.js';
 +
 +export interface IRitemarkBrowserActionResult {
@@ -318,15 +464,69 @@ index 00000000000..e358a3e8a8c
 +	readonly error?: string;
 +	readonly url?: string;
 +	readonly title?: string;
++	/** Ritemark (#658): the page named by `pageId` is no longer open; nothing was done. */
++	readonly pageGone?: boolean;
++	/** Ritemark (#658): every browser page open in this window, by id only. The caller passes them back as `knownPageIds`. */
++	readonly pageIds?: readonly string[];
++	/** Ritemark (#658): the pages that are not in the caller's `knownPageIds` (without them, that opened during this action). */
++	readonly newPages?: readonly IRitemarkBrowserPageDto[];
++}
++
++/** The page `target` names, or the active browser tab when it names none; otherwise the result to return (#658). */
++function targetModel(
++	target: IRitemarkPageTarget,
++	editorService: IEditorService,
++	browserViewWorkbenchService: IBrowserViewWorkbenchService,
++): IBrowserViewModel | IRitemarkBrowserActionResult {
++	const resolved = resolveRitemarkPageTarget(target, browserViewWorkbenchService, activeBrowserModelFromEditorService(editorService), { navigateToUrl: false });
++	return resolved.kind === 'page' ? resolved.model : resolved.kind === 'error' ? resolved.result : { error: 'No active integrated browser tab.' };
++}
++
++/**
++ * Ritemark (#658): the AI's page may sit in a background tab once another tab came to the front. Playwright waits for
++ * an element to be visible before it clicks (and times out in a hidden tab), and the person should see what the AI
++ * does, so an action first shows its page in the tab's own group. preserveFocus: the person's focus and active group
++ * stay where they are.
++ */
++async function showPage(model: IBrowserViewModel, editorService: IEditorService): Promise<void> {
++	if (model.visible) {
++		return;
++	}
++	const [found] = editorService.findEditors(BrowserViewUri.forId(model.id));
++	if (found) {
++		await editorService.openEditor(found.editor, { preserveFocus: true }, found.groupId);
++	}
++}
++
++function isModel(value: IBrowserViewModel | IRitemarkBrowserActionResult): value is IBrowserViewModel {
++	return typeof (value as IBrowserViewModel).loadURL === 'function';
++}
++
++/** Runs an action and adds the window's pages to its result (#658). */
++async function withPages(
++	browserViewWorkbenchService: IBrowserViewWorkbenchService,
++	target: IRitemarkPageTarget,
++	run: () => Promise<IRitemarkBrowserActionResult>,
++): Promise<IRitemarkBrowserActionResult> {
++	const before = new Set(browserViewWorkbenchService.getKnownBrowserViews().keys());
++	const result = await run();
++	try {
++		return { ...result, ...ritemarkPagesReport(browserViewWorkbenchService, target, before, result.pageId) };
++	} catch {
++		return result;
++	}
 +}
 +
 +async function ensureControlConsent(model: IBrowserViewModel, dialogService: IDialogService): Promise<boolean> {
 +	if (model.sharedWithAgentForControl) {
 +		return true;
 +	}
++	// Ritemark (#658): the AI's page may not be the tab in front, so the question names it.
 +	const result = await dialogService.confirm({
 +		type: 'warning',
-+		message: localize('ritemark.browser.controlConsent.message', "Allow AI to control this browser tab?"),
++		message: model.title
++			? localize('ritemark.browser.controlConsent.messageNamed', "Allow AI to control the browser tab \"{0}\"?", model.title)
++			: localize('ritemark.browser.controlConsent.message', "Allow AI to control this browser tab?"),
 +		detail: localize('ritemark.browser.controlConsent.detail', "The AI agent will be able to navigate, click elements, fill forms, and scroll in this browser tab. You will always see actions happening in real time.\n\nGrant control only for tabs where you trust the AI's actions."),
 +		primaryButton: localize('ritemark.browser.controlConsent.allow', "Allow Control"),
 +		cancelButton: localize('ritemark.browser.controlConsent.deny', "Deny"),
@@ -375,7 +575,7 @@ index 00000000000..e358a3e8a8c
 +	}
 +}
 +
-+interface IBrowserNavigateArgs {
++interface IBrowserNavigateArgs extends IRitemarkPageTarget {
 +	readonly url?: string;
 +	readonly type?: 'url' | 'back' | 'forward' | 'reload';
 +}
@@ -398,8 +598,11 @@ index 00000000000..e358a3e8a8c
 +		const dialogService = accessor.get(IDialogService);
 +		const editorService = accessor.get(IEditorService);
 +		const playwrightService = accessor.get(IPlaywrightService);
-+		const type = args.type ?? 'url';
-+		return runNavigateInternal({ args, type, dialogService, editorService, playwrightService });
++		const browserViewWorkbenchService = accessor.get(IBrowserViewWorkbenchService);
++		const safeArgs = args ?? {};
++		const type = safeArgs.type ?? 'url';
++		return withPages(browserViewWorkbenchService, safeArgs, () =>
++			runNavigateInternal({ args: safeArgs, type, dialogService, editorService, playwrightService, browserViewWorkbenchService }));
 +	}
 +}
 +
@@ -409,12 +612,19 @@ index 00000000000..e358a3e8a8c
 +	dialogService: IDialogService;
 +	editorService: IEditorService;
 +	playwrightService: IPlaywrightService;
++	browserViewWorkbenchService: IBrowserViewWorkbenchService;
 +}): Promise<IRitemarkBrowserActionResult> {
-+	const { args, type, dialogService, editorService, playwrightService } = ctx;
++	const { args, type, dialogService, editorService, playwrightService, browserViewWorkbenchService } = ctx;
 +	try {
-+		const model = type === 'url'
-+			? await getOrCreateBrowserModelFromEditorService(editorService, args.url)
-+			: activeBrowserModelFromEditorService(editorService);
++		if (type === 'url' && !args.url) {
++			return { error: 'navigate: url is required when type is "url".' };
++		}
++		// Ritemark (#658): the named page, or a new tab. Navigate never loads an address into some other open tab.
++		const resolved = resolveRitemarkPageTarget(args, browserViewWorkbenchService, activeBrowserModelFromEditorService(editorService), { navigateToUrl: type === 'url' });
++		if (resolved.kind === 'error') {
++			return resolved.result;
++		}
++		const model = resolved.kind === 'page' ? resolved.model : await openNewBrowserTab(editorService, args.url);
 +		if (!model) {
 +			return { error: 'No active integrated browser tab.' };
 +		}
@@ -422,12 +632,10 @@ index 00000000000..e358a3e8a8c
 +		if (!granted) {
 +			return { ...modelMeta(model), error: 'Browser control consent was not granted for this tab.' };
 +		}
++		await showPage(model, editorService);
 +		try {
 +			if (type === 'url') {
-+				if (!args.url) {
-+					return { ...modelMeta(model), error: 'navigate: url is required when type is "url".' };
-+				}
-+				if (model.url !== args.url) {
++				if (args.url && model.url !== args.url) {
 +					await model.loadURL(args.url);
 +				}
 +			} else if (type === 'back') {
@@ -463,28 +671,14 @@ index 00000000000..e358a3e8a8c
 +	return editor instanceof BrowserEditor ? editor.model : undefined;
 +}
 +
-+async function getOrCreateBrowserModelFromEditorService(
++/**
++ * Ritemark (#658): a new browser tab for the address. It used to fall back to the first visible browser pane, or to
++ * the first browser tab in tab order, and load the address there: into a page the AI was not given.
++ */
++async function openNewBrowserTab(
 +	editorService: IEditorService,
-+	urlForNewTab?: string,
++	urlForNewTab: string | undefined,
 +): Promise<IBrowserViewModel | undefined> {
-+	const activePane = editorService.activeEditorPane;
-+	if (activePane instanceof BrowserEditor) {
-+		return activePane.model;
-+	}
-+	for (const pane of editorService.visibleEditorPanes) {
-+		if (pane instanceof BrowserEditor) {
-+			return pane.model;
-+		}
-+	}
-+	const existingBrowserInput = editorService.editors.find((input) =>
-+		input.resource?.scheme === Schemas.vscodeBrowser,
-+	);
-+	if (existingBrowserInput) {
-+		const opened = await editorService.openEditor(existingBrowserInput);
-+		if (opened instanceof BrowserEditor) {
-+			return opened.model;
-+		}
-+	}
 +	if (!urlForNewTab) {
 +		return undefined;
 +	}
@@ -506,16 +700,33 @@ index 00000000000..e358a3e8a8c
 +	editorService: IEditorService;
 +	dialogService: IDialogService;
 +	playwrightService: IPlaywrightService;
++	browserViewWorkbenchService: IBrowserViewWorkbenchService;
++	target: IRitemarkPageTarget;
 +	validate: () => string | null;
 +	functionBody: string;
 +	invokeArgs: unknown[];
 +}): Promise<IRitemarkBrowserActionResult> {
-+	const { editorService, dialogService, playwrightService, validate, functionBody, invokeArgs } = ctx;
++	const { browserViewWorkbenchService, target } = ctx;
++	return withPages(browserViewWorkbenchService, target, () => invokeInTarget(ctx));
++}
++
++async function invokeInTarget(ctx: {
++	editorService: IEditorService;
++	dialogService: IDialogService;
++	playwrightService: IPlaywrightService;
++	browserViewWorkbenchService: IBrowserViewWorkbenchService;
++	target: IRitemarkPageTarget;
++	validate: () => string | null;
++	functionBody: string;
++	invokeArgs: unknown[];
++}): Promise<IRitemarkBrowserActionResult> {
++	const { editorService, dialogService, playwrightService, browserViewWorkbenchService, target, validate, functionBody, invokeArgs } = ctx;
 +	try {
-+		const model = activeBrowserModelFromEditorService(editorService);
-+		if (!model) {
-+			return { error: 'No active integrated browser tab.' };
++		const found = targetModel(target, editorService, browserViewWorkbenchService);
++		if (!isModel(found)) {
++			return found;
 +		}
++		const model = found;
 +		const granted = await ensureControlConsent(model, dialogService);
 +		if (!granted) {
 +			return { ...modelMeta(model), error: 'Browser control consent was not granted for this tab.' };
@@ -524,6 +735,7 @@ index 00000000000..e358a3e8a8c
 +		if (validationError) {
 +			return { ...modelMeta(model), error: validationError };
 +		}
++		await showPage(model, editorService);
 +		const result = await playwrightService.invokeFunction(RITEMARK_PLAYWRIGHT_SESSION, model.id, functionBody, invokeArgs);
 +		if (result.error) {
 +			return { ...modelMeta(model), summary: result.summary, error: result.error };
@@ -534,7 +746,7 @@ index 00000000000..e358a3e8a8c
 +	}
 +}
 +
-+interface IBrowserClickArgs {
++interface IBrowserClickArgs extends IRitemarkPageTarget {
 +	readonly ref?: string;
 +	readonly selector?: string;
 +	readonly button?: 'left' | 'right' | 'middle';
@@ -566,18 +778,21 @@ index 00000000000..e358a3e8a8c
 +		const editorService = accessor.get(IEditorService);
 +		const dialogService = accessor.get(IDialogService);
 +		const playwrightService = accessor.get(IPlaywrightService);
++		const browserViewWorkbenchService = accessor.get(IBrowserViewWorkbenchService);
 +		return runPlaywrightInvoke({
 +			editorService,
 +			dialogService,
 +			playwrightService,
++			browserViewWorkbenchService,
++			target: args ?? {},
 +			validate: () => (!args.ref && !args.selector) ? 'click: either "ref" or "selector" is required.' : null,
 +			functionBody: clickFunctionBody(),
-+			invokeArgs: [args],
++			invokeArgs: [ritemarkActionArgs(args)],
 +		});
 +	}
 +}
 +
-+interface IBrowserFillArgs {
++interface IBrowserFillArgs extends IRitemarkPageTarget {
 +	readonly ref?: string;
 +	readonly selector?: string;
 +	readonly value: string;
@@ -604,22 +819,25 @@ index 00000000000..e358a3e8a8c
 +		const editorService = accessor.get(IEditorService);
 +		const dialogService = accessor.get(IDialogService);
 +		const playwrightService = accessor.get(IPlaywrightService);
++		const browserViewWorkbenchService = accessor.get(IBrowserViewWorkbenchService);
 +		return runPlaywrightInvoke({
 +			editorService,
 +			dialogService,
 +			playwrightService,
++			browserViewWorkbenchService,
++			target: args ?? {},
 +			validate: () => {
 +				if (!args.ref && !args.selector) return 'fill: either "ref" or "selector" is required.';
 +				if (typeof args.value !== 'string') return 'fill: "value" must be a string.';
 +				return null;
 +			},
 +			functionBody: fillFunctionBody(),
-+			invokeArgs: [args],
++			invokeArgs: [ritemarkActionArgs(args)],
 +		});
 +	}
 +}
 +
-+interface IBrowserTypeArgs {
++interface IBrowserTypeArgs extends IRitemarkPageTarget {
 +	readonly text?: string;
 +	readonly key?: string;
 +}
@@ -665,18 +883,21 @@ index 00000000000..e358a3e8a8c
 +		const editorService = accessor.get(IEditorService);
 +		const dialogService = accessor.get(IDialogService);
 +		const playwrightService = accessor.get(IPlaywrightService);
++		const browserViewWorkbenchService = accessor.get(IBrowserViewWorkbenchService);
 +		return runPlaywrightInvoke({
 +			editorService,
 +			dialogService,
 +			playwrightService,
++			browserViewWorkbenchService,
++			target: args ?? {},
 +			validate: () => (typeof args.text !== 'string' && !args.key) ? 'type: either "text" or "key" is required.' : null,
 +			functionBody: typeFunctionBody(),
-+			invokeArgs: [args],
++			invokeArgs: [ritemarkActionArgs(args)],
 +		});
 +	}
 +}
 +
-+interface IBrowserScrollArgs {
++interface IBrowserScrollArgs extends IRitemarkPageTarget {
 +	readonly direction?: 'up' | 'down' | 'top' | 'bottom' | 'into-view';
 +	readonly amount?: number;
 +	readonly ref?: string;
@@ -719,15 +940,18 @@ index 00000000000..e358a3e8a8c
 +		const editorService = accessor.get(IEditorService);
 +		const dialogService = accessor.get(IDialogService);
 +		const playwrightService = accessor.get(IPlaywrightService);
++		const browserViewWorkbenchService = accessor.get(IBrowserViewWorkbenchService);
 +		return runPlaywrightInvoke({
 +			editorService,
 +			dialogService,
 +			playwrightService,
++			browserViewWorkbenchService,
++			target: args ?? {},
 +			validate: () => (args.direction === 'into-view' && !args.ref && !args.selector)
 +				? 'scroll: "ref" or "selector" required when direction is "into-view".'
 +				: null,
 +			functionBody: scrollFunctionBody(),
-+			invokeArgs: [args],
++			invokeArgs: [ritemarkActionArgs(args)],
 +		});
 +	}
 +}
@@ -746,14 +970,26 @@ index 00000000000..e358a3e8a8c
 +		});
 +	}
 +
-+	async run(accessor: ServicesAccessor): Promise<IRitemarkBrowserActionResult> {
++	async run(accessor: ServicesAccessor, args?: IRitemarkPageTarget): Promise<IRitemarkBrowserActionResult> {
 +		const editorService = accessor.get(IEditorService);
 +		const playwrightService = accessor.get(IPlaywrightService);
++		const browserViewWorkbenchService = accessor.get(IBrowserViewWorkbenchService);
++		const target = args ?? {};
++		return withPages(browserViewWorkbenchService, target, () => this.snapshot(target, editorService, playwrightService, browserViewWorkbenchService));
++	}
++
++	private async snapshot(
++		target: IRitemarkPageTarget,
++		editorService: IEditorService,
++		playwrightService: IPlaywrightService,
++		browserViewWorkbenchService: IBrowserViewWorkbenchService,
++	): Promise<IRitemarkBrowserActionResult> {
 +		try {
-+			const model = activeBrowserModelFromEditorService(editorService);
-+			if (!model) {
-+				return { error: 'No active integrated browser tab.' };
++			const found = targetModel(target, editorService, browserViewWorkbenchService);
++			if (!isModel(found)) {
++				return found;
 +			}
++			const model = found;
 +			// Snapshot is read-only — no control consent needed, but it must respect
 +			// the same read-consent gate as the GetActiveSummary bridge: never expose
 +			// URL, title, or page content for a tab the user has not shared with AI.
@@ -782,3 +1018,132 @@ index 00000000000..e358a3e8a8c
 +registerAction2(BrowserTypeAction);
 +registerAction2(BrowserScrollAction);
 +registerAction2(BrowserSnapshotAction);
+diff --git a/src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPageTarget.test.ts b/src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPageTarget.test.ts
+new file mode 100644
+index 00000000000..9c59b93d0a7
+--- /dev/null
++++ b/src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPageTarget.test.ts
+@@ -0,0 +1,123 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
++import { IRitemarkKnownPages, IRitemarkTargetPage, resolveRitemarkPageTarget, RITEMARK_NO_ACTIVE_PAGE_ERROR, RITEMARK_PAGE_GONE_ERROR, RITEMARK_PAGE_NOT_SHARED_ERROR, ritemarkActionArgs, ritemarkPagesReport } from '../../common/ritemarkBrowserPageTarget.js';
++
++/** Ritemark (#658): the page an AI action acts in is the one named by id, never the tab in front. */
++suite('Ritemark browser page target', () => {
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	function page(id: string, shared = true): IRitemarkTargetPage {
++		return { id, url: `http://127.0.0.1/${id}`, title: `Page ${id}`, ritemarkSharedWithAgent: shared };
++	}
++
++	function windowOf(...models: IRitemarkTargetPage[]): IRitemarkKnownPages<IRitemarkTargetPage> {
++		const views = new Map(models.map(model => [model.id, { model }] as const));
++		return { getKnownBrowserViews: () => views };
++	}
++
++	const a = page('a');
++	const b = page('b');
++	const c = page('c');
++	const threePages = windowOf(a, b, c);
++
++	test('three pages, another one active: an action acts in the turn\'s page', () => {
++		assert.deepStrictEqual(
++			[
++				resolveRitemarkPageTarget({ pageId: 'c' }, threePages, a, { navigateToUrl: false }),
++				resolveRitemarkPageTarget({ pageId: 'c' }, threePages, b, { navigateToUrl: false }),
++				resolveRitemarkPageTarget({ pageId: 'c' }, threePages, undefined, { navigateToUrl: false }),
++			],
++			[{ kind: 'page', model: c }, { kind: 'page', model: c }, { kind: 'page', model: c }],
++		);
++	});
++
++	test('a page that has gone is an error, never the active tab', () => {
++		assert.deepStrictEqual(
++			[
++				resolveRitemarkPageTarget({ pageId: 'gone' }, threePages, a, { navigateToUrl: false }),
++				resolveRitemarkPageTarget({ pageId: 'gone' }, threePages, a, { navigateToUrl: true }),
++				resolveRitemarkPageTarget({ pageId: 'gone', newTab: true }, threePages, a, { navigateToUrl: true }),
++			],
++			[
++				{ kind: 'error', result: { pageId: 'gone', pageGone: true, error: RITEMARK_PAGE_GONE_ERROR } },
++				{ kind: 'error', result: { pageId: 'gone', pageGone: true, error: RITEMARK_PAGE_GONE_ERROR } },
++				{ kind: 'error', result: { pageId: 'gone', pageGone: true, error: RITEMARK_PAGE_GONE_ERROR } },
++			],
++		);
++	});
++
++	test('navigate never loads an address into another open tab', () => {
++		assert.deepStrictEqual(
++			[
++				// The turn's page: the address loads there, whichever tab is in front.
++				resolveRitemarkPageTarget({ pageId: 'c' }, threePages, a, { navigateToUrl: true }),
++				// The turn has no page: a new tab, even with browser tabs open and one in front.
++				resolveRitemarkPageTarget({ newTab: true }, threePages, a, { navigateToUrl: true }),
++				// No page named and no browser tab in front (a document is): a new tab, not the first browser tab.
++				resolveRitemarkPageTarget({}, threePages, undefined, { navigateToUrl: true }),
++				// Back, forward and reload without a page and with no browser tab in front: nothing to act in.
++				resolveRitemarkPageTarget({}, threePages, undefined, { navigateToUrl: false }),
++			],
++			[
++				{ kind: 'page', model: c },
++				{ kind: 'newTab' },
++				{ kind: 'newTab' },
++				{ kind: 'error', result: { error: RITEMARK_NO_ACTIVE_PAGE_ERROR } },
++			],
++		);
++	});
++
++	test('a page the AI was not given must be shared already', () => {
++		const popup = page('popup', false);
++		const withPopup = windowOf(a, b, c, popup);
++		assert.deepStrictEqual(
++			[
++				resolveRitemarkPageTarget({ pageId: 'popup', requireShared: true }, withPopup, popup, { navigateToUrl: false }),
++				resolveRitemarkPageTarget({ pageId: 'b', requireShared: true }, withPopup, popup, { navigateToUrl: false }),
++				// The turn's own page keeps the control question, which shares it on Allow.
++				resolveRitemarkPageTarget({ pageId: 'popup' }, withPopup, a, { navigateToUrl: false }),
++			],
++			[
++				{ kind: 'error', result: { pageId: 'popup', error: RITEMARK_PAGE_NOT_SHARED_ERROR } },
++				{ kind: 'page', model: b },
++				{ kind: 'page', model: popup },
++			],
++		);
++	});
++
++	test('new pages are named once, a page not shared by its id alone', () => {
++		const popup = page('popup', false);
++		const shared = page('shared');
++		const after = windowOf(a, b, c, popup, shared);
++		assert.deepStrictEqual(
++			[
++				ritemarkPagesReport(after, {}, new Set(['a', 'b', 'c']), 'c'),
++				ritemarkPagesReport(after, { knownPageIds: ['a', 'b', 'c', 'popup', 'shared'] }, new Set(['a', 'b', 'c', 'popup', 'shared']), 'c'),
++				ritemarkPagesReport(after, { knownPageIds: ['a', 'b', 'c', 'popup'] }, new Set(['a', 'b', 'c', 'popup', 'shared']), 'c'),
++			],
++			[
++				{
++					pageIds: ['a', 'b', 'c', 'popup', 'shared'],
++					newPages: [
++						{ pageId: 'popup', shared: false },
++						{ pageId: 'shared', shared: true, title: 'Page shared', url: 'http://127.0.0.1/shared' },
++					],
++				},
++				{ pageIds: ['a', 'b', 'c', 'popup', 'shared'], newPages: [] },
++				{ pageIds: ['a', 'b', 'c', 'popup', 'shared'], newPages: [{ pageId: 'shared', shared: true, title: 'Page shared', url: 'http://127.0.0.1/shared' }] },
++			],
++		);
++	});
++
++	test('the page target does not reach the function that runs in the page', () => {
++		assert.deepStrictEqual(
++			ritemarkActionArgs({ selector: '#btn', pageId: 'c', requireShared: true, knownPageIds: ['a'], newTab: false }),
++			{ selector: '#btn' },
++		);
++	});
++});
