@@ -42,7 +42,7 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 import * as assert from 'assert';
 import { renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { AcpRuntime, AcpSession, buildAcpPromptText, isBoardToolPermission } = require('./AcpRuntime') as typeof import('./AcpRuntime');
+const { AcpRuntime, AcpSession, buildAcpPromptText, isBoardToolPermission, ENDED_OPENCODE_TURN_ERROR } = require('./AcpRuntime') as typeof import('./AcpRuntime');
 type AcpRuntime = import('./AcpRuntime').AcpRuntime;
 type AcpSession = import('./AcpRuntime').AcpSession;
 import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime';
@@ -581,7 +581,206 @@ async function run() {
     console.log('✓ Test 13: ACP provider evidence accepts dispatch once');
   }
 
-  console.log('\nAll 15 AcpRuntime tests passed!');
+  // #658: two OpenCode conversations mid-turn with different browser pages: its browser requests name no
+  // conversation, so a browser action is refused rather than landing in the wrong page.
+  {
+    const runtime = new AcpRuntime();
+    const { BrowserTurnPage } = require('../browser/BrowserActionTools') as typeof import('../browser/BrowserActionTools');
+    const releases: Array<() => void> = [];
+    const hanging = {
+      ...mockManager,
+      prompt: () => new Promise((resolve) => { releases.push(() => resolve({ stopReason: 'end_turn' })); }),
+    };
+    const pageA = new BrowserTurnPage();
+    pageA.startTurn('page-a');
+    const pageB = new BrowserTurnPage();
+    pageB.startTurn('page-b');
+    const request = { id: '1', op: 'call', group: 'browser', tool: 'browser_snapshot', params: {} } as const;
+
+    const first = addSession(runtime, 'conv-a', { ...dummyConfig, browserPage: pageA });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._manager = hanging;
+    const turnA = first.prompt({ prompt: 'a' });
+    await new Promise((r) => setImmediate(r));
+    assert.strictEqual(runtime.browserContested(), false, 'one conversation mid-turn: nothing contested');
+
+    const second = addSession(runtime, 'conv-b', { ...dummyConfig, browserPage: pageB });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._manager = hanging;
+    const turnB = second.prompt({ prompt: 'b' });
+    await new Promise((r) => setImmediate(r));
+    assert.strictEqual(runtime.browserContested(), true, 'two turns with different pages: contested');
+    const refused = await runtime.handleToolRequest(request);
+    assert.strictEqual(refused.isError, true);
+    assert.match(refused.text ?? '', /Another OpenCode conversation is using the browser right now/);
+    const other = await runtime.handleToolRequest({ id: '2', op: 'list', group: 'browser' });
+    assert.strictEqual(other.isError, undefined, 'listing the tools is not an action');
+
+    pageB.startTurn('page-a'); // both turns have the same page: nothing to confuse
+    assert.strictEqual(runtime.browserContested(), false, 'the same page in both turns is not contested');
+    pageB.startTurn('page-b');
+
+    releases.forEach((release) => release());
+    await Promise.all([turnA, turnB]);
+    assert.strictEqual(runtime.browserContested(), false, 'turns that ended contest nothing');
+    console.log('✓ Test 16: a second OpenCode conversation with another page is refused the browser');
+  }
+
+  // #658: two conversations mid-turn, one ends: the other's next browser call goes to its own page, never to the
+  // page of the turn that ended; with no turn left, the tools have no page.
+  {
+    const runtime = new AcpRuntime();
+    const { BrowserTurnPage } = require('../browser/BrowserActionTools') as typeof import('../browser/BrowserActionTools');
+    const releases = new Map<string, () => void>();
+    const hanging = {
+      ...mockManager,
+      prompt: (sessionId: string) => new Promise((resolve) => { releases.set(sessionId, () => resolve({ stopReason: 'end_turn' })); }),
+    };
+    const pageA = new BrowserTurnPage();
+    pageA.startTurn('page-a');
+    const pageB = new BrowserTurnPage();
+    pageB.startTurn('page-b');
+    const sent: Array<Record<string, unknown> | undefined> = [];
+    const originalExecute = vscodeMod.commands.executeCommand;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (vscodeMod.commands as any).executeCommand = async (_command: string, args?: Record<string, unknown>) => {
+      sent.push(args);
+      return { pageId: args?.pageId, summary: 'ok' };
+    };
+    try {
+      const first = addSession(runtime, 'conv-a', { ...dummyConfig, browserPage: pageA });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (runtime as any)._manager = hanging;
+      const turnA = first.prompt({ prompt: 'a' });
+      await new Promise((r) => setImmediate(r));
+      const second = addSession(runtime, 'conv-b', { ...dummyConfig, browserPage: pageB });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (runtime as any)._manager = hanging;
+      const turnB = second.prompt({ prompt: 'b' });
+      await new Promise((r) => setImmediate(r));
+      assert.strictEqual(runtime.browserContested(), true, 'both mid-turn with different pages');
+
+      releases.get(second.acpSessionId)!();
+      await turnB;
+      assert.strictEqual(runtime.browserContested(), false, 'B ended: only A is mid-turn');
+      const call = { id: '3', op: 'call', group: 'browser', tool: 'browser_snapshot', params: {} } as const;
+      const result = await runtime.handleToolRequest(call);
+      assert.strictEqual(result.isError, undefined, result.text);
+      assert.strictEqual(sent.at(-1)?.pageId, 'page-a', 'A\'s next call goes to A\'s page, not to the page of B\'s ended turn');
+
+      releases.get(first.acpSessionId)!();
+      await turnA;
+      const none = await runtime.handleToolRequest({ ...call, id: '4' });
+      assert.strictEqual(none.isError, true, 'no turn mid-way: the tools have no page');
+      assert.match(none.text ?? '', /No browser page was given to this turn/);
+      assert.strictEqual(sent.length, 1, 'nothing reached the browser without a turn');
+    } finally {
+      vscodeMod.commands.executeCommand = originalExecute;
+    }
+    console.log('✓ Test 17: when one of two OpenCode turns ends, the other keeps its own page');
+  }
+
+  // #658: the browser lock is taken only around the prompt, which the timeout bounds. A setModel that hangs (it has
+  // no timeout) holds nothing, so another conversation's browser actions are not refused because of it.
+  {
+    const runtime = new AcpRuntime();
+    const { BrowserTurnPage } = require('../browser/BrowserActionTools') as typeof import('../browser/BrowserActionTools');
+    let releaseModel: (() => void) | undefined;
+    let releasePrompt: (() => void) | undefined;
+    const manager = {
+      ...mockManager,
+      setModel: () => new Promise<void>((resolve) => { releaseModel = resolve; }),
+      prompt: () => new Promise((resolve) => { releasePrompt = () => resolve({ stopReason: 'end_turn' }); }),
+    };
+    const pageA = new BrowserTurnPage();
+    pageA.startTurn('page-a');
+    const pageB = new BrowserTurnPage();
+    pageB.startTurn('page-b');
+    const stuck = addSession(runtime, 'conv-stuck', { ...dummyConfig, model: 'opencode:some/model', browserPage: pageA });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._manager = manager;
+    const stuckTurn = stuck.prompt({ prompt: 'a' });
+    await new Promise((r) => setImmediate(r));
+    const other = addSession(runtime, 'conv-other', { ...dummyConfig, browserPage: pageB });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._manager = manager;
+    const otherTurn = other.prompt({ prompt: 'b' });
+    await new Promise((r) => setImmediate(r));
+    assert.ok(releaseModel, 'the first turn waits in setModel');
+    assert.strictEqual(runtime.browserContested(), false, 'a turn still in setModel holds no browser lock');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    assert.strictEqual((runtime as any)._browserPage, pageB, 'the conversation at its prompt has the browser');
+    releasePrompt!();
+    await otherTurn;
+    releaseModel!();
+    await new Promise((r) => setImmediate(r));
+    releasePrompt!();
+    await stuckTurn;
+    assert.strictEqual(runtime.browserContested(), false);
+    console.log('✓ Test 18: a turn waiting in setModel does not hold the browser');
+  }
+
+  // #658: an OpenCode turn times out while another conversation is mid-turn. The cancel is not awaited, so a browser
+  // call already on its way from the timed-out turn may still arrive: it names no conversation, and it must be refused,
+  // not sent to the other conversation's page. Once the timed-out prompt settles, the other turn has its page again.
+  {
+    const runtime = new AcpRuntime();
+    const { BrowserTurnPage } = require('../browser/BrowserActionTools') as typeof import('../browser/BrowserActionTools');
+    const releases = new Map<string, () => void>();
+    const hanging = {
+      ...mockManager,
+      prompt: (sessionId: string) => new Promise((resolve) => { releases.set(sessionId, () => resolve({ stopReason: 'cancelled' })); }),
+    };
+    const pageA = new BrowserTurnPage();
+    pageA.startTurn('page-a');
+    const pageB = new BrowserTurnPage();
+    pageB.startTurn('page-b');
+    const sent: Array<Record<string, unknown> | undefined> = [];
+    const originalExecute = vscodeMod.commands.executeCommand;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (vscodeMod.commands as any).executeCommand = async (_command: string, args?: Record<string, unknown>) => {
+      sent.push(args);
+      return { pageId: args?.pageId, summary: 'ok' };
+    };
+    try {
+      const other = addSession(runtime, 'conv-b', { ...dummyConfig, browserPage: pageB });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (runtime as any)._manager = hanging;
+      const turnB = other.prompt({ prompt: 'b' });
+      await new Promise((r) => setImmediate(r));
+      let reported: { status: string; error?: string } | undefined;
+      const timedOut = addSession(runtime, 'conv-a', {
+        ...dummyConfig,
+        browserPage: pageA,
+        onCodexComplete: (result: { status: string; error?: string }) => { reported = result; },
+      } as RuntimeSessionConfig);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (runtime as any)._manager = hanging;
+      await timedOut.prompt({ prompt: 'a', timeoutMinutes: 1 / 60000 });
+      assert.match(reported?.error ?? '', /did not respond/i, 'A timed out');
+      assert.strictEqual(runtime.browserContested(), false, 'A gave its turn up: only B is mid-turn');
+
+      const call = { id: '5', op: 'call', group: 'browser', tool: 'browser_click', params: { ref: 'e1' } } as const;
+      const late = await runtime.handleToolRequest(call);
+      assert.strictEqual(late.isError, true, 'a call that may be the timed-out turn\'s is refused');
+      assert.strictEqual(late.text, ENDED_OPENCODE_TURN_ERROR);
+      assert.strictEqual(sent.length, 0, 'nothing reached B\'s page, or any page');
+
+      releases.get(timedOut.acpSessionId)!(); // the timed-out prompt settles after the cancel
+      await new Promise((r) => setImmediate(r));
+      const after = await runtime.handleToolRequest({ ...call, id: '6' });
+      assert.strictEqual(after.isError, undefined, after.text);
+      assert.strictEqual(sent.at(-1)?.pageId, 'page-b', 'once A has settled, B\'s calls go to B\'s page');
+
+      releases.get(other.acpSessionId)!();
+      await turnB;
+    } finally {
+      vscodeMod.commands.executeCommand = originalExecute;
+    }
+    console.log('✓ Test 19: a timed-out OpenCode turn\'s late browser calls are refused until its prompt settles');
+  }
+
+  console.log('\nAll 19 AcpRuntime tests passed!');
 }
 
 run().then(

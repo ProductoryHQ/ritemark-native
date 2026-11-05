@@ -1,0 +1,351 @@
+/**
+ * #658: the AI's browser actions go to the page its turn was given, on every
+ * runtime (Claude's in-process MCP server, Codex's dynamic tools, OpenCode's
+ * IPC adapter), never to whichever tab is in front when the action runs.
+ *
+ * The vscode stub stands in for patch 010: it acts in the page an action names
+ * by id, in the active tab only when none is named, and answers a page that
+ * has gone with the error, as `ritemarkBrowserPageTarget.ts` does.
+ *
+ * Run: npx tsx src/browser/browserTurnPage.test.ts
+ */
+
+import { strict as assert } from 'node:assert';
+import Module from 'node:module';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+interface Page { url: string; title: string; shared: boolean }
+const pages = new Map<string, Page>();
+let active: string | undefined;
+let nextNewTab = 'p-new';
+const calls: Array<{ command: string; args: Record<string, unknown> }> = [];
+let navigateDelayMs = 0;
+/** Where each action landed, as patch 010 would act. */
+const landed: string[] = [];
+
+function shell(command: string, raw: unknown): unknown {
+  const args = (raw ?? {}) as Record<string, unknown>;
+  calls.push({ command, args });
+  const pageIds = [...pages.keys()];
+  const known = Array.isArray(args.knownPageIds) ? (args.knownPageIds as string[]) : null;
+  const newPages = known ? pageIds.filter((id) => !known.includes(id)).map((id) => ({ pageId: id, shared: pages.get(id)!.shared, ...(pages.get(id)!.shared ? { title: pages.get(id)!.title, url: pages.get(id)!.url } : {}) })) : [];
+  let id: string | undefined;
+  if (typeof args.pageId === 'string') {
+    if (!pages.has(args.pageId)) return { pageId: args.pageId, pageGone: true, error: 'The page you were given is no longer open (its tab was closed). Nothing was done. Ask the user which page to use.', pageIds, newPages };
+    if (args.requireShared && !pages.get(args.pageId)!.shared) return { pageId: args.pageId, error: 'This page is not shared with you, so nothing was done.', pageIds, newPages };
+    id = args.pageId;
+  } else if (command.endsWith('agentNavigate') && (args.newTab || !active)) {
+    id = nextNewTab;
+    pages.set(id, { url: String(args.url), title: 'New tab', shared: true });
+  } else {
+    id = active;
+  }
+  if (!id) return { error: 'No active integrated browser tab.' };
+  landed.push(id);
+  const page = pages.get(id)!;
+  return { pageId: id, url: page.url, title: page.title, summary: `summary of ${id}`, pageIds: [...pages.keys()], newPages: newPages.filter((p) => p.pageId !== id) };
+}
+
+const moduleAny = Module as unknown as { _load: (request: string, parent: unknown, isMain?: boolean) => unknown };
+const originalLoad = moduleAny._load.bind(Module);
+moduleAny._load = (request: string, parent: unknown, isMain?: boolean): unknown => {
+  if (request === 'vscode') {
+    return {
+      commands: {
+        executeCommand: async (command: string, args?: unknown) => {
+          // A navigate takes a moment, as a page load does: a second call started meanwhile must wait for it.
+          if (command.endsWith('agentNavigate') && navigateDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, navigateDelayMs));
+          return shell(command, args);
+        },
+      },
+    };
+  }
+  return originalLoad(request, parent, isMain);
+};
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const actions = require('./BrowserActionTools') as typeof import('./BrowserActionTools');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const registry = require('../runtime/ritemarkTools') as typeof import('../runtime/ritemarkTools');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { RitemarkToolsInjector } = require('../runtime/RitemarkToolsInjector') as typeof import('../runtime/RitemarkToolsInjector');
+
+const { BrowserTurnPage, browserTurnPageFor } = actions;
+const { BROWSER_TOOL_GROUP, runTool } = registry;
+const injector = new RitemarkToolsInjector();
+const tool = (name: string) => BROWSER_TOOL_GROUP.tools.find((item) => item.name === name)!;
+
+type Call = (name: string, args: Record<string, unknown>, page: InstanceType<typeof BrowserTurnPage>) => Promise<{ text: string; isError: boolean }>;
+
+/** One call per runtime, each the way that runtime reaches the registry. */
+async function runtimes(): Promise<Array<[string, Call]>> {
+  return [
+    ['claude-code', async (name, args, page) => {
+      // A session keeps the server of its first turn; the tool reads the holder when it runs.
+      const servers = (await injector.claudeMcpServers([BROWSER_TOOL_GROUP], page)) as Record<string, { instance: { _registeredTools: Record<string, { handler: (args: unknown, extra: unknown) => Promise<{ content: Array<{ text: string }>; isError?: boolean }> }> } }>;
+      const result = await servers.ritemark_browser.instance._registeredTools[name].handler(args, {});
+      return { text: result.content[0].text, isError: result.isError === true };
+    }],
+    ['codex', async (name, args, page) => {
+      const result = await injector.codexToolCall([BROWSER_TOOL_GROUP], `ritemark_${name}`, args, page);
+      return { text: result.text, isError: !result.success };
+    }],
+    ['opencode', async (name, args, page) => {
+      const result = await injector.handleIpc({ id: '1', op: 'call', group: 'browser', tool: name, params: args }, 'opencode', page);
+      return { text: result.text ?? '', isError: result.isError === true };
+    }],
+  ];
+}
+
+function reset(): void {
+  pages.clear();
+  pages.set('p-a', { url: 'http://127.0.0.1:18761/', title: 'Page A', shared: true });
+  pages.set('p-b', { url: 'http://127.0.0.1:18762/', title: 'Page B', shared: true });
+  pages.set('p-c', { url: 'http://127.0.0.1:18763/', title: 'Page C', shared: true });
+  active = 'p-a';
+  nextNewTab = 'p-new';
+  calls.length = 0;
+  landed.length = 0;
+}
+
+const ACTIONS: Array<[string, Record<string, unknown>]> = [
+  ['browser_click', { selector: '#btn' }],
+  ['browser_type', { key: 'Meta+e' }],
+  ['browser_fill', { selector: '#box', value: 'x' }],
+  ['browser_scroll', { direction: 'down' }],
+  ['browser_snapshot', {}],
+  ['browser_navigate', { type: 'reload' }],
+  ['browser_navigate', { type: 'url', url: 'http://127.0.0.1:18763/next' }],
+];
+
+async function main(): Promise<void> {
+  // ── Three pages, another one active: every action, on every runtime, lands in the turn's page ──
+  for (const [runtime, call] of await runtimes()) {
+    reset();
+    const page = new BrowserTurnPage();
+    page.startTurn('p-c'); // the turn's context came from Page C
+    for (const [name, args] of ACTIONS) {
+      const result = await call(name, args, page);
+      assert.equal(result.isError, false, `${runtime} ${name}: ${result.text}`);
+      assert.match(result.text, /Page id: p-c/, `${runtime} ${name} names the page it acted in`);
+    }
+    assert.deepEqual(landed, ACTIONS.map(() => 'p-c'), `${runtime}: every action landed in Page C, none in the active Page A`);
+    for (const entry of calls) {
+      assert.equal(entry.args.pageId, 'p-c', `${runtime} ${entry.command} carries the turn's page`);
+      assert.equal(entry.args.newTab, undefined, `${runtime} ${entry.command} opens no tab`);
+      assert.equal(entry.args.requireShared, undefined, `${runtime} ${entry.command}: the turn's own page`);
+      assert.equal('page_id' in entry.args, false, `${runtime}: page_id is not passed through to the page`);
+    }
+  }
+
+  // ── A page that has gone: the error, every time, never the active tab ──
+  for (const [runtime, call] of await runtimes()) {
+    reset();
+    const page = new BrowserTurnPage();
+    page.startTurn('p-c');
+    pages.delete('p-c'); // the person closed Page C during the turn
+    for (const [name, args] of [ACTIONS[0], ACTIONS[1], ACTIONS[6]]) {
+      const result = await call(name, args, page);
+      assert.equal(result.isError, true, `${runtime} ${name} fails`);
+      assert.match(result.text, /no longer open/);
+      assert.doesNotMatch(result.text, /Page id:/);
+    }
+    assert.deepEqual(landed, [], `${runtime}: nothing landed anywhere`);
+    assert.equal(page.pageId, 'p-c', `${runtime}: the gone page stays the turn's page; nothing falls back`);
+  }
+
+  // ── Navigate never retargets another tab: with no page, a new tab, which becomes the turn's page ──
+  for (const [runtime, call] of await runtimes()) {
+    reset();
+    active = undefined; // README.md is in front, Pages A to C behind it
+    const page = new BrowserTurnPage();
+    page.startTurn(undefined);
+    const opened = await call('browser_navigate', { url: 'http://127.0.0.1:18763/' }, page);
+    assert.equal(opened.isError, false, opened.text);
+    assert.equal(calls[0].args.newTab, true, `${runtime}: navigate asks for a new tab`);
+    assert.equal(calls[0].args.pageId, undefined);
+    assert.deepEqual(landed, ['p-new'], `${runtime}: the address loaded in a new tab, not in Page A`);
+    assert.equal(page.pageId, 'p-new', `${runtime}: the AI's new tab is the turn's page`);
+    await call('browser_click', { selector: '#btn' }, page);
+    assert.equal(calls[1].args.pageId, 'p-new', `${runtime}: later actions act in it`);
+
+    reset();
+    active = undefined;
+    const noPage = new BrowserTurnPage();
+    const refused = await call('browser_click', { selector: '#btn' }, noPage);
+    assert.equal(refused.isError, true);
+    assert.match(refused.text, /No browser page was given to this turn/);
+    assert.equal(calls.length, 0, `${runtime}: without a page, nothing reaches the browser`);
+    const back = await call('browser_navigate', { type: 'back' }, noPage);
+    assert.equal(back.isError, true, `${runtime}: back with no page is refused`);
+    assert.equal(calls.length, 0);
+  }
+
+  // ── A page the AI was not given: only named, and only acted in once shared ──
+  {
+    reset();
+    const page = new BrowserTurnPage();
+    page.startTurn('p-c');
+    // Page A opens a sign-in popup; it is not shared (upstream: a popup does not inherit its opener's share).
+    await runTool(tool('browser_click'), { selector: '#signin' }, { runtimeId: 'claude-code', browserPage: page });
+    pages.set('p-popup', { url: 'http://127.0.0.1:18762/?popup=1', title: 'Sign in', shared: false });
+    active = 'p-popup';
+    const next = await runTool(tool('browser_click'), { selector: '#btn' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.equal(landed.at(-1), 'p-c', 'the popup in front does not take the click');
+    assert.match(next.text, /A new browser page opened \(page id p-popup\)\. It is not shared with you/);
+    assert.doesNotMatch(next.text, /Sign in|popup=1/, 'nothing about a page not shared reaches the AI');
+    assert.deepEqual(calls.at(-1)!.args.knownPageIds, ['p-a', 'p-b', 'p-c'], 'the pages known after the last action go back');
+
+    const refused = await runTool(tool('browser_click'), { selector: '#btn', page_id: 'p-popup' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.equal(calls.at(-1)!.args.requireShared, true, 'a page the AI names itself must be shared already');
+    assert.equal(refused.isError, true);
+    assert.equal(landed.at(-1), 'p-c', 'nothing landed in the popup');
+
+    pages.get('p-popup')!.shared = true; // the person shares it on the AI's sheet
+    const shared = await runTool(tool('browser_click'), { selector: '#btn', page_id: 'p-popup' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.equal(shared.isError, undefined, shared.text);
+    assert.equal(landed.at(-1), 'p-popup');
+    const back = await runTool(tool('browser_type'), { key: 'Enter' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.equal(back.isError, undefined);
+    assert.equal(landed.at(-1), 'p-c', 'without page_id, actions are back in the turn\'s page');
+
+    await runTool(tool('browser_click'), { selector: '#btn', page_id: 'p-c' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.equal(calls.at(-1)!.args.requireShared, undefined, 'naming the turn\'s own page asks nothing more');
+  }
+
+  // ── #658 fix 3: a context dropped on purpose leaves the turn with no page; it never falls back to the page in front ──
+  {
+    reset(); // Page A is in front
+    const inFront = async () => active;
+    assert.equal(await actions.chooseTurnPage({ contextPageId: 'p-c', contextDropped: false, activePageId: inFront }), 'p-c', 'the context page wins');
+    assert.equal(await actions.chooseTurnPage({ contextPageId: undefined, contextDropped: false, activePageId: inFront }), 'p-a', 'no context at all: the page in front');
+    assert.equal(await actions.chooseTurnPage({ contextPageId: undefined, contextDropped: true, activePageId: inFront }), undefined, 'a comment task or share-wait mismatch: no page, not the page in front');
+
+    for (const [runtime, call] of await runtimes()) {
+      reset();
+      const page = new BrowserTurnPage();
+      page.startTurn(await actions.chooseTurnPage({ contextPageId: undefined, contextDropped: true, activePageId: inFront }));
+      const refused = await call('browser_click', { selector: '#btn' }, page);
+      assert.equal(refused.isError, true, `${runtime}: an action without page_id is refused`);
+      assert.match(refused.text, /No browser page was given to this turn/);
+      assert.equal(calls.length, 0, `${runtime}: nothing reached the browser, Page A got no click`);
+      const named = await call('browser_click', { selector: '#btn', page_id: 'p-b' }, page);
+      assert.equal(named.isError, false, named.text);
+      assert.equal(calls[0].args.pageId, 'p-b');
+      assert.equal(calls[0].args.requireShared, true, `${runtime}: an explicit page still goes through the share check`);
+    }
+  }
+
+  // ── #658 round 3: a page the person declined in the share wait is dropped; the turn never falls back to it ──
+  {
+    reset(); // Page A is in front: the page the share question asked about, and the person said Not now
+    const inFront = async () => active;
+    const declined = actions.pageAfterShareWait({ askedPageId: 'p-a', contextPageId: undefined, hasContext: false });
+    assert.deepEqual(declined, { useContext: false, dropped: true }, 'declined: no context, the page dropped on purpose');
+    assert.equal(await actions.chooseTurnPage({ contextPageId: undefined, contextDropped: declined.dropped, activePageId: inFront }), undefined, 'not the declined page in front');
+    assert.deepEqual(actions.pageAfterShareWait({ askedPageId: 'p-a', contextPageId: 'p-a', hasContext: true }), { useContext: true, dropped: false }, 'shared: the page asked about is the turn\'s');
+    assert.deepEqual(actions.pageAfterShareWait({ askedPageId: 'p-a', contextPageId: 'p-b', hasContext: true }), { useContext: false, dropped: true }, 'another page came forward meanwhile: dropped');
+    assert.deepEqual(actions.pageAfterShareWait({ askedPageId: undefined, contextPageId: undefined, hasContext: false }), { useContext: false, dropped: false }, 'no question: the page in front, as before');
+    assert.deepEqual(actions.pageAfterShareWait({ askedPageId: undefined, contextPageId: 'p-c', hasContext: true }), { useContext: true, dropped: false });
+    const page = new BrowserTurnPage();
+    page.startTurn(await actions.chooseTurnPage({ contextPageId: undefined, contextDropped: declined.dropped, activePageId: inFront }));
+    const refused = await runTool(tool('browser_click'), { selector: '#btn' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.equal(refused.isError, true);
+    assert.equal(calls.length, 0, 'no action reached the declined page');
+  }
+
+  // ── #658 round 4: the share-wait decision is all in contextAfterShareWait, and the turn's context comes only from it ──
+  {
+    const context = (pageId: string) => ({ snapshot: { pageId }, promptBlock: `page ${pageId}` });
+    const shared = context('p-a');
+    assert.deepEqual(actions.contextAfterShareWait('p-a', shared), { context: shared, dropped: false }, 'shared: the page asked about gives the context');
+    assert.deepEqual(actions.contextAfterShareWait('p-a', context('p-b')), { context: null, dropped: true }, 'another page came forward meanwhile: no context, dropped');
+    assert.deepEqual(actions.contextAfterShareWait('p-a', null), { context: null, dropped: true }, 'declined (Not now): dropped, never the page in front');
+    const inFront = context('p-c');
+    assert.deepEqual(actions.contextAfterShareWait(undefined, inFront), { context: inFront, dropped: false }, 'no question: the context as it is');
+    assert.deepEqual(actions.contextAfterShareWait(undefined, null), { context: null, dropped: false }, 'no question, no context: the page in front, as before');
+
+    // The call site: the turn's context is only what the helper returns, and nothing else decides about the wait's page.
+    // The old inline condition (`browserContext && (!shareWait?.pageId || …)`) dropped a declined page's turn back to the
+    // page in front; restoring it, or any other use of the wait's page, fails here.
+    const provider = readFileSync(join(__dirname, '..', 'views', 'UnifiedViewProvider.ts'), 'utf8');
+    const wiring = /const afterWait = contextAfterShareWait\(shareWait\?\.pageId, stoppedBeforeStart \? null : await BrowserContextStore\.instance\.buildTurnContext\(\{ includeScreenshot: true \}\)\);\s*const browserContext = afterWait\.context;\s*if \(browserContext\) \{/;
+    assert.match(provider, wiring, 'UnifiedViewProvider takes the turn\'s context from contextAfterShareWait alone');
+    assert.match(provider, /if \(afterWait\.dropped\) \{\s*turnHasNoPage = true;\s*\}/, 'a page dropped in the wait leaves the turn with no page');
+    assert.equal(provider.match(/shareWait\??\.pageId/g)?.length, 1, 'the wait\'s page is used once: as the helper\'s argument');
+    assert.equal(provider.match(/BrowserContextStore\.instance\.buildTurnContext\(/g)?.length, 1, 'the turn\'s context is built once: as the helper\'s argument');
+  }
+
+  // ── #658 fix 4: pages known from an earlier turn are forgotten; a tab opened between turns is never announced ──
+  {
+    reset();
+    const page = new BrowserTurnPage();
+    page.startTurn('p-c');
+    await runTool(tool('browser_click'), { selector: '#btn' }, { runtimeId: 'claude-code', browserPage: page });
+    await runTool(tool('browser_click'), { selector: '#btn' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.deepEqual(calls.at(-1)!.args.knownPageIds, ['p-a', 'p-b', 'p-c'], 'within a turn the known pages go back');
+    pages.set('p-between', { url: 'http://127.0.0.1:18764/', title: 'Opened between turns', shared: true });
+    page.startTurn('p-c'); // the next turn
+    await runTool(tool('browser_click'), { selector: '#btn' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.equal('knownPageIds' in calls.at(-1)!.args, false, 'the new turn sends no stale list, so patch 010 counts only pages opened from this action on');
+    const text = await runTool(tool('browser_click'), { selector: '#btn' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.doesNotMatch(text.text, /A new browser page opened/, 'the tab opened between turns is not announced');
+    pages.set('p-during', { url: 'http://127.0.0.1:18765/', title: 'Popup', shared: true });
+    const during = await runTool(tool('browser_click'), { selector: '#btn' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.match(during.text, /page id p-during/, 'a page opened during the turn is announced');
+  }
+
+  // ── A shared new page is named with its title and address ──
+  {
+    const text = actions.formatActionResultForAgent({
+      pageId: 'p-c', summary: 's',
+      newPages: [{ pageId: 'p-x', shared: true, title: 'Docs', url: 'https://example.com/' }],
+    });
+    assert.match(text, /A new browser page opened: "Docs" https:\/\/example\.com\/, page id p-x\. To act in it, pass page_id "p-x"/);
+  }
+
+  // ── Codex review on #660: two calls started together in a turn with no page. The first opens a tab; the second
+  //    acts in that tab, because reading the turn's page, acting and noting the opened tab are one step of the
+  //    browser queue. Every runtime goes through the same queue. ──
+  for (const [runtime, call] of await runtimes()) {
+    reset();
+    active = undefined; // a document is in front
+    navigateDelayMs = 20;
+    const page = new BrowserTurnPage();
+    page.startTurn(undefined);
+    const [first, second] = await Promise.all([
+      call('browser_navigate', { type: 'url', url: 'http://127.0.0.1:18764/one' }, page),
+      call('browser_navigate', { type: 'url', url: 'http://127.0.0.1:18764/two' }, page),
+    ]);
+    navigateDelayMs = 0;
+    assert.equal(first.isError, false, `${runtime} first: ${first.text}`);
+    assert.equal(second.isError, false, `${runtime} second: ${second.text}`);
+    assert.equal(calls.length, 2, `${runtime}: two navigates`);
+    assert.equal(calls[0].args.newTab, true, `${runtime}: the first call opens a tab`);
+    assert.equal(calls.filter((entry) => entry.args.newTab).length, 1, `${runtime}: only one tab is opened`);
+    assert.equal(calls[1].args.pageId, 'p-new', `${runtime}: the second call acts in the tab the first one opened`);
+    assert.match(first.text, /Page id: p-new/, `${runtime}: the first names the new tab`);
+    assert.match(second.text, /Page id: p-new/, `${runtime}: the second names the same tab`);
+    assert.deepEqual(landed, ['p-new', 'p-new'], `${runtime}: both landed in the new tab`);
+    assert.equal(page.pageId, 'p-new', `${runtime}: the new tab is the turn's page`);
+  }
+
+  // ── One holder per conversation, kept across turns ──
+  {
+    const first = browserTurnPageFor('conv-1');
+    assert.equal(browserTurnPageFor('conv-1'), first);
+    assert.notEqual(browserTurnPageFor('conv-2'), first);
+    first.startTurn('p-a');
+    first.startTurn('p-b');
+    assert.equal(first.pageId, 'p-b', 'each turn sets its page');
+    assert.equal(browserTurnPageFor('conv-2').pageId, undefined, 'another conversation keeps its own');
+  }
+
+  console.log('browser/browserTurnPage: all assertions passed');
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
