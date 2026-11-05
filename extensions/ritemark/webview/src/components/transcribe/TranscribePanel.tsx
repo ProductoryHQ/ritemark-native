@@ -479,7 +479,7 @@ export function PendingImportCard({
           {silence.recordedHere ? (
             <p className="min-w-0">
               No sound was recorded, so there's nothing to transcribe. Check the input in{' '}
-              <SoundSettingsLink soundSettings={state.soundSettings} textClass="text-[12px]" />, then record again.
+              <SoundSettingsLink soundSettings={state.soundSettings} textClass="text-[12px]" trailing="," /> then record again.
             </p>
           ) : (
             <p className="min-w-0">No sound in this file, so there's nothing to transcribe.</p>

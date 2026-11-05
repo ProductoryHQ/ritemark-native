@@ -66,19 +66,31 @@ export function RecordDot({ live = false, size = 'md' }: { live?: boolean; size?
  * `soundSettingsName` in `src/speech/silence.ts`); the words "your sound settings" where it has none to open.
  * The no-sound line and the pending card's note use the same link with the same tooltip.
  */
-export function SoundSettingsLink({ soundSettings, textClass }: { soundSettings: string | null; textClass: string }) {
-  if (!soundSettings) return <>your sound settings</>;
+export function SoundSettingsLink({
+  soundSettings,
+  textClass,
+  trailing,
+}: {
+  soundSettings: string | null;
+  textClass: string;
+  /** The punctuation after the name, kept on its line: a button can't wrap inside a sentence, so the two move together. */
+  trailing: string;
+}) {
+  if (!soundSettings) return <>your sound settings{trailing}</>;
   return (
-    <Tooltip side="top" label="Open the sound settings, where the input is chosen">
-      <Button
-        variant="link"
-        size="sm"
-        className={`h-auto px-0 py-0 ${textClass} font-semibold has-[>svg]:px-0`}
-        onClick={() => post({ type: 'transcribe:record/openSoundSettings' })}
-      >
-        {soundSettings}
-      </Button>
-    </Tooltip>
+    <span className="whitespace-nowrap">
+      <Tooltip side="top" label="Open the sound settings, where the input is chosen">
+        <Button
+          variant="link"
+          size="sm"
+          className={`h-auto px-0 py-0 ${textClass} font-semibold has-[>svg]:px-0`}
+          onClick={() => post({ type: 'transcribe:record/openSoundSettings' })}
+        >
+          {soundSettings}
+        </Button>
+      </Tooltip>
+      {trailing}
+    </span>
   );
 }
 
@@ -92,7 +104,8 @@ function NoSoundLine({ soundSettings }: { soundSettings: string | null }) {
     <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-[18px]">
       <Icon name="microphone-slash" size={14} tone="inherit" className="mt-0.5 shrink-0" />
       <span className="min-w-0">
-        No sound from the microphone. Check the input in <SoundSettingsLink soundSettings={soundSettings} textClass="text-[11px]" />.
+        No sound from the microphone. Check the input in{' '}
+        <SoundSettingsLink soundSettings={soundSettings} textClass="text-[11px]" trailing="." />
       </span>
     </p>
   );
