@@ -58,7 +58,7 @@ import {
   traceClaude,
 } from '../agent';
 import { BrowserContextStore, type ShareWaitResult } from '../browser/BrowserContextStore';
-import { browserTurnPageFor, chooseTurnPage, pageAfterShareWait } from '../browser/BrowserActionTools';
+import { browserTurnPageFor, chooseTurnPage, contextAfterShareWait } from '../browser/BrowserActionTools';
 import { decodeBrowserShareAnswer, type BrowserShareQuestionClearMessage, type BrowserShareQuestionMessage } from './agentSidebarProtocol';
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
@@ -1022,15 +1022,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             stoppedBeforeStart = shareWait?.outcome === 'stopped';
             // A long wait: the conversation may have been deleted or taken over meanwhile.
             if (!isCurrentRuntimeTurn()) break;
-            const browserContext = stoppedBeforeStart ? null : await BrowserContextStore.instance.buildTurnContext({ includeScreenshot: true });
             // After a wait, only the page asked about: a page brought to the front meanwhile was not the question, and
             // a page the person declined is dropped on purpose (#658), never the turn's page as the page in front.
-            const afterWait = pageAfterShareWait({
-              askedPageId: shareWait?.pageId,
-              contextPageId: browserContext?.snapshot.pageId,
-              hasContext: Boolean(browserContext),
-            });
-            if (browserContext && afterWait.useContext) {
+            // The whole decision is `contextAfterShareWait`'s; browserTurnPage.test.ts tests it and this call.
+            const afterWait = contextAfterShareWait(shareWait?.pageId, stoppedBeforeStart ? null : await BrowserContextStore.instance.buildTurnContext({ includeScreenshot: true }));
+            const browserContext = afterWait.context;
+            if (browserContext) {
               contextPageId = browserContext.snapshot.pageId;
               prompt = `${browserContext.promptBlock}\n\n---\n\n${prompt}`;
               if (browserContext.claudeAttachments.length > 0) {

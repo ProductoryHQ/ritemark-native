@@ -12,6 +12,8 @@
 
 import { strict as assert } from 'node:assert';
 import Module from 'node:module';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 interface Page { url: string; title: string; shared: boolean }
 const pages = new Map<string, Page>();
@@ -240,6 +242,28 @@ async function main(): Promise<void> {
     const refused = await runTool(tool('browser_click'), { selector: '#btn' }, { runtimeId: 'claude-code', browserPage: page });
     assert.equal(refused.isError, true);
     assert.equal(calls.length, 0, 'no action reached the declined page');
+  }
+
+  // ── #658 round 4: the share-wait decision is all in contextAfterShareWait, and the turn's context comes only from it ──
+  {
+    const context = (pageId: string) => ({ snapshot: { pageId }, promptBlock: `page ${pageId}` });
+    const shared = context('p-a');
+    assert.deepEqual(actions.contextAfterShareWait('p-a', shared), { context: shared, dropped: false }, 'shared: the page asked about gives the context');
+    assert.deepEqual(actions.contextAfterShareWait('p-a', context('p-b')), { context: null, dropped: true }, 'another page came forward meanwhile: no context, dropped');
+    assert.deepEqual(actions.contextAfterShareWait('p-a', null), { context: null, dropped: true }, 'declined (Not now): dropped, never the page in front');
+    const inFront = context('p-c');
+    assert.deepEqual(actions.contextAfterShareWait(undefined, inFront), { context: inFront, dropped: false }, 'no question: the context as it is');
+    assert.deepEqual(actions.contextAfterShareWait(undefined, null), { context: null, dropped: false }, 'no question, no context: the page in front, as before');
+
+    // The call site: the turn's context is only what the helper returns, and nothing else decides about the wait's page.
+    // The old inline condition (`browserContext && (!shareWait?.pageId || …)`) dropped a declined page's turn back to the
+    // page in front; restoring it, or any other use of the wait's page, fails here.
+    const provider = readFileSync(join(__dirname, '..', 'views', 'UnifiedViewProvider.ts'), 'utf8');
+    const wiring = /const afterWait = contextAfterShareWait\(shareWait\?\.pageId, stoppedBeforeStart \? null : await BrowserContextStore\.instance\.buildTurnContext\(\{ includeScreenshot: true \}\)\);\s*const browserContext = afterWait\.context;\s*if \(browserContext\) \{/;
+    assert.match(provider, wiring, 'UnifiedViewProvider takes the turn\'s context from contextAfterShareWait alone');
+    assert.match(provider, /if \(afterWait\.dropped\) \{\s*turnHasNoPage = true;\s*\}/, 'a page dropped in the wait leaves the turn with no page');
+    assert.equal(provider.match(/shareWait\??\.pageId/g)?.length, 1, 'the wait\'s page is used once: as the helper\'s argument');
+    assert.equal(provider.match(/BrowserContextStore\.instance\.buildTurnContext\(/g)?.length, 1, 'the turn\'s context is built once: as the helper\'s argument');
   }
 
   // ── #658 fix 4: pages known from an earlier turn are forgotten; a tab opened between turns is never announced ──

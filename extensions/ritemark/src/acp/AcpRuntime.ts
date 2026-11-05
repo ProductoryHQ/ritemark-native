@@ -58,6 +58,19 @@ export const ANOTHER_OPENCODE_CONVERSATION_ERROR =
   'Another OpenCode conversation is using the browser right now. Nothing was done. Try again when that conversation has finished.';
 
 /**
+ * #658: an OpenCode turn timed out and is still stopping. A browser call that arrives now may be that turn's, and the
+ * requests name no conversation, so it is refused rather than sent to another conversation's page.
+ */
+export const ENDED_OPENCODE_TURN_ERROR =
+  'An OpenCode turn that timed out is still stopping. Nothing was done in the browser. Try again in a moment.';
+
+/**
+ * #658: how long a timed-out turn's browser calls are refused at most, when its prompt never settles after the cancel
+ * (a provider that hangs for good): another conversation's browser actions are refused only that long because of it.
+ */
+export const ENDED_OPENCODE_TURN_HOLD_MS = 60_000;
+
+/**
  * A permission request for one of the board tools (Phase 0, P3). With
  * Ritemark's OpenCode permissions they never ask; this covers a user whose own
  * OpenCode config asks for everything, and OpenCode's `doom_loop` check on
@@ -254,9 +267,10 @@ export class AcpSession implements RuntimeSession {
       // Taken only around the prompt, which the timeout bounds: setModel and setThinkingEffort have no timeout of
       // their own, and a hang there must not hold the browser from another conversation.
       this._runtime.beginBrowserTurn(this, config.browserPage);
+      const prompted = manager.prompt(this.acpSessionId, promptText);
       try {
         const result = await Promise.race([
-          manager.prompt(this.acpSessionId, promptText),
+          prompted,
           new Promise<never>((_, reject) => {
             timer = setTimeout(() => {
               timedOut = true;
@@ -280,6 +294,8 @@ export class AcpSession implements RuntimeSession {
         // On timeout, stop the abandoned turn upstream so it does not keep
         // running against a session the user has already been told failed.
         if (timedOut) {
+          // #658: its browser calls still in flight are refused until its prompt settles, not sent to another page.
+          this._runtime.holdEndedBrowserTurn(this, prompted);
           void manager.cancel(this.acpSessionId).catch(() => { /* already failing */ });
         }
         throw err;
@@ -489,6 +505,7 @@ export class AcpRuntime implements AgentRuntime {
    * torn down only when the last session goes.
    */
   _forgetSession(session: AcpSession): void {
+    this._releaseEndedTurn(session);
     this._sessions.delete(session.conversationId);
     this._sessionsByAcpId.delete(session.acpSessionId);
     if (this._sessions.size === 0) {
@@ -537,8 +554,39 @@ export class AcpRuntime implements AgentRuntime {
     return this._turnPages.size > 1 && pageIds.size > 1;
   }
 
+  /** #658: the sessions whose turn timed out and whose prompt has not settled yet; see `holdEndedBrowserTurn`. */
+  private readonly _endedTurns = new Map<AcpSession, { timer?: ReturnType<typeof setTimeout> }>();
+
+  /**
+   * #658: a session's turn timed out. `endBrowserTurn` gives its page up at once, but the cancel is not awaited, and a
+   * browser call already on its way from that turn names no conversation: it would go to another conversation's page.
+   * So every browser call is refused until the timed-out prompt settles, the session is forgotten, or
+   * `ENDED_OPENCODE_TURN_HOLD_MS` passes.
+   */
+  holdEndedBrowserTurn(session: AcpSession, prompted: Promise<unknown>): void {
+    const hold: { timer?: ReturnType<typeof setTimeout> } = {};
+    this._releaseEndedTurn(session);
+    this._endedTurns.set(session, hold);
+    const release = () => {
+      if (this._endedTurns.get(session) === hold) this._releaseEndedTurn(session);
+    };
+    hold.timer = setTimeout(release, ENDED_OPENCODE_TURN_HOLD_MS);
+    hold.timer.unref?.();
+    prompted.then(release, release);
+  }
+
+  private _releaseEndedTurn(session: AcpSession): void {
+    const hold = this._endedTurns.get(session);
+    if (!hold) return;
+    if (hold.timer) clearTimeout(hold.timer);
+    this._endedTurns.delete(session);
+  }
+
   /** #658: an adapter's request, the browser's refused while another conversation's turn holds a different page. */
   async handleToolRequest(req: RitemarkIpcRequest): Promise<RitemarkIpcResult> {
+    if (req.op === 'call' && req.group === 'browser' && this._endedTurns.size) {
+      return { text: ENDED_OPENCODE_TURN_ERROR, isError: true };
+    }
     if (req.op === 'call' && req.group === 'browser' && this.browserContested()) {
       return { text: ANOTHER_OPENCODE_CONVERSATION_ERROR, isError: true };
     }

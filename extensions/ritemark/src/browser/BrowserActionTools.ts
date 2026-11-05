@@ -253,6 +253,18 @@ export function pageAfterShareWait(options: { askedPageId: string | undefined; c
   return { useContext: fromAsked, dropped: !fromAsked };
 }
 
+/**
+ * #658: the browser context a turn gets after its share wait, and whether its page was dropped on purpose. The whole
+ * decision is here: the caller passes the wait's page and the context it built, and uses only what comes back.
+ */
+export function contextAfterShareWait<T extends { snapshot: { pageId?: string } }>(
+  askedPageId: string | undefined,
+  context: T | null | undefined,
+): { context: T | null; dropped: boolean } {
+  const { useContext, dropped } = pageAfterShareWait({ askedPageId, contextPageId: context?.snapshot.pageId, hasContext: Boolean(context) });
+  return { context: useContext && context ? context : null, dropped };
+}
+
 const turnPages = new Map<string, BrowserTurnPage>();
 
 /** The conversation's page holder, the same object for every turn. */

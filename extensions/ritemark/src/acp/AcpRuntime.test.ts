@@ -42,7 +42,7 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 import * as assert from 'assert';
 import { renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { AcpRuntime, AcpSession, buildAcpPromptText, isBoardToolPermission } = require('./AcpRuntime') as typeof import('./AcpRuntime');
+const { AcpRuntime, AcpSession, buildAcpPromptText, isBoardToolPermission, ENDED_OPENCODE_TURN_ERROR } = require('./AcpRuntime') as typeof import('./AcpRuntime');
 type AcpRuntime = import('./AcpRuntime').AcpRuntime;
 type AcpSession = import('./AcpRuntime').AcpSession;
 import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime';
@@ -720,7 +720,67 @@ async function run() {
     console.log('✓ Test 18: a turn waiting in setModel does not hold the browser');
   }
 
-  console.log('\nAll 18 AcpRuntime tests passed!');
+  // #658: an OpenCode turn times out while another conversation is mid-turn. The cancel is not awaited, so a browser
+  // call already on its way from the timed-out turn may still arrive: it names no conversation, and it must be refused,
+  // not sent to the other conversation's page. Once the timed-out prompt settles, the other turn has its page again.
+  {
+    const runtime = new AcpRuntime();
+    const { BrowserTurnPage } = require('../browser/BrowserActionTools') as typeof import('../browser/BrowserActionTools');
+    const releases = new Map<string, () => void>();
+    const hanging = {
+      ...mockManager,
+      prompt: (sessionId: string) => new Promise((resolve) => { releases.set(sessionId, () => resolve({ stopReason: 'cancelled' })); }),
+    };
+    const pageA = new BrowserTurnPage();
+    pageA.startTurn('page-a');
+    const pageB = new BrowserTurnPage();
+    pageB.startTurn('page-b');
+    const sent: Array<Record<string, unknown> | undefined> = [];
+    const originalExecute = vscodeMod.commands.executeCommand;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (vscodeMod.commands as any).executeCommand = async (_command: string, args?: Record<string, unknown>) => {
+      sent.push(args);
+      return { pageId: args?.pageId, summary: 'ok' };
+    };
+    try {
+      const other = addSession(runtime, 'conv-b', { ...dummyConfig, browserPage: pageB });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (runtime as any)._manager = hanging;
+      const turnB = other.prompt({ prompt: 'b' });
+      await new Promise((r) => setImmediate(r));
+      let reported: { status: string; error?: string } | undefined;
+      const timedOut = addSession(runtime, 'conv-a', {
+        ...dummyConfig,
+        browserPage: pageA,
+        onCodexComplete: (result: { status: string; error?: string }) => { reported = result; },
+      } as RuntimeSessionConfig);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (runtime as any)._manager = hanging;
+      await timedOut.prompt({ prompt: 'a', timeoutMinutes: 1 / 60000 });
+      assert.match(reported?.error ?? '', /did not respond/i, 'A timed out');
+      assert.strictEqual(runtime.browserContested(), false, 'A gave its turn up: only B is mid-turn');
+
+      const call = { id: '5', op: 'call', group: 'browser', tool: 'browser_click', params: { ref: 'e1' } } as const;
+      const late = await runtime.handleToolRequest(call);
+      assert.strictEqual(late.isError, true, 'a call that may be the timed-out turn\'s is refused');
+      assert.strictEqual(late.text, ENDED_OPENCODE_TURN_ERROR);
+      assert.strictEqual(sent.length, 0, 'nothing reached B\'s page, or any page');
+
+      releases.get(timedOut.acpSessionId)!(); // the timed-out prompt settles after the cancel
+      await new Promise((r) => setImmediate(r));
+      const after = await runtime.handleToolRequest({ ...call, id: '6' });
+      assert.strictEqual(after.isError, undefined, after.text);
+      assert.strictEqual(sent.at(-1)?.pageId, 'page-b', 'once A has settled, B\'s calls go to B\'s page');
+
+      releases.get(other.acpSessionId)!();
+      await turnB;
+    } finally {
+      vscodeMod.commands.executeCommand = originalExecute;
+    }
+    console.log('✓ Test 19: a timed-out OpenCode turn\'s late browser calls are refused until its prompt settles');
+  }
+
+  console.log('\nAll 19 AcpRuntime tests passed!');
 }
 
 run().then(

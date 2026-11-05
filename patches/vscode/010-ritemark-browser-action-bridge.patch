@@ -449,10 +449,10 @@ index 62a4c272e93..20fb0cdb554 100644
  		this._widget = { location: BrowserWidgetLocation.ContentArea, element: this._container, order: 50 };
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
 new file mode 100644
-index 00000000000..36152d5f97d
+index 00000000000..ae9c58f7d67
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
-@@ -0,0 +1,629 @@
+@@ -0,0 +1,678 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -465,6 +465,7 @@ index 00000000000..36152d5f97d
 +import { ServicesAccessor } from '../../../../../platform/instantiation/common/instantiation.js';
 +import { IDialogService } from '../../../../../platform/dialogs/common/dialogs.js';
 +import { ACTIVE_GROUP, IEditorService } from '../../../../services/editor/common/editorService.js';
++import { IEditorGroup, IEditorGroupsService } from '../../../../services/editor/common/editorGroupsService.js';
 +import { BrowserViewUri } from '../../../../../platform/browserView/common/browserViewUri.js';
 +import { BrowserActionCategory, BrowserEditor } from '../browserEditor.js';
 +import { RITEMARK_PLAYWRIGHT_SESSION } from './ritemarkBrowserContextFeature.js';
@@ -528,17 +529,53 @@ index 00000000000..36152d5f97d
 +export const RITEMARK_PAGE_NOT_IN_FRONT_ERROR = 'The page isn\'t in front. Ask the person to bring its browser tab forward. Nothing was done.';
 +
 +/**
-+ * Ritemark (#658): a page is in front when its browser tab is the front tab of an editor group: of any desk, the
-+ * active one or not. A tab behind another editor is not. Judged from the editors, not from `model.visible`, which is
-+ * also false for a page that is in front but blank (the empty tab's welcome), whose load failed, or that a toast, menu,
-+ * quick pick or hover covers for a moment: the AI may act in those.
++ * Ritemark (#658): a page is in front when the person can see its browser tab. All three must hold:
++ * - the tab is its editor group's front tab (`visibleEditorPanes` holds each group's active pane): of any desk, the
++ *   active one or not. A tab behind another editor is not in front;
++ * - the pane is visible. When the AI column is maximized the editor area is hidden: the layout hides the editor part,
++ *   which hides each group's active pane (`EditorPart` → `EditorGroupView` → `EditorPane.setVisible(false)`), while
++ *   `visibleEditorPanes` still lists it;
++ * - no other desk is maximized. A maximized desk hides the others in the editor grid, but their panes keep
++ *   `isVisible()` true, so the group is checked against the part's maximized group.
++ * Judged from the editors, not from `model.visible`, which is also false for a page that is in front but blank (the
++ * empty tab's welcome), whose load failed, or that a toast, menu, quick pick or hover covers for a moment: the AI may
++ * act in those.
 + */
-+export function isPageInFront(model: { readonly id: string }, editorService: Pick<IEditorService, 'visibleEditorPanes'>): boolean {
-+	return editorService.visibleEditorPanes.some(pane => pane instanceof BrowserEditor && pane.model?.id === model.id);
++export function isPageInFront(
++	model: { readonly id: string },
++	editorService: Pick<IEditorService, 'visibleEditorPanes'>,
++	editorGroupsService: Pick<IEditorGroupsService, 'getPart'>,
++): boolean {
++	return editorService.visibleEditorPanes.some(pane =>
++		pane instanceof BrowserEditor
++		&& pane.model?.id === model.id
++		&& pane.group.activeEditorPane === pane
++		&& pane.isVisible()
++		&& isGroupShown(pane.group, editorGroupsService));
 +}
 +
-+export function pageNotInFrontError(model: { readonly id: string }, editorService: Pick<IEditorService, 'visibleEditorPanes'>): string | undefined {
-+	return isPageInFront(model, editorService) ? undefined : RITEMARK_PAGE_NOT_IN_FRONT_ERROR;
++/** Ritemark (#658): false when another group of the group's editor part is maximized (⌘K ⌘M), hiding this one. */
++function isGroupShown(group: IEditorGroup, editorGroupsService: Pick<IEditorGroupsService, 'getPart'>): boolean {
++	const part = editorGroupsService.getPart(group);
++	if (!part.hasMaximizedGroup()) {
++		return true;
++	}
++	// `EditorPart.isGroupMaximized` is not on `IEditorPart`. Without it, the maximized group is the active one: activating
++	// another group leaves the maximized layout (`EditorPart.doRestoreGroup`), as upstream's own telemetry assumes.
++	const isGroupMaximized = (part as unknown as { isGroupMaximized?(group: IEditorGroup): boolean }).isGroupMaximized;
++	try {
++		return typeof isGroupMaximized === 'function' ? isGroupMaximized.call(part, group) : part.activeGroup.id === group.id;
++	} catch {
++		return false;
++	}
++}
++
++export function pageNotInFrontError(
++	model: { readonly id: string },
++	editorService: Pick<IEditorService, 'visibleEditorPanes'>,
++	editorGroupsService: Pick<IEditorGroupsService, 'getPart'>,
++): string | undefined {
++	return isPageInFront(model, editorService, editorGroupsService) ? undefined : RITEMARK_PAGE_NOT_IN_FRONT_ERROR;
 +}
 +
 +export function isModel(value: IBrowserViewModel | IRitemarkBrowserActionResult): value is IBrowserViewModel {
@@ -649,12 +686,13 @@ index 00000000000..36152d5f97d
 +		// valid during the invocation of its target method".
 +		const dialogService = accessor.get(IDialogService);
 +		const editorService = accessor.get(IEditorService);
++		const editorGroupsService = accessor.get(IEditorGroupsService);
 +		const playwrightService = accessor.get(IPlaywrightService);
 +		const browserViewWorkbenchService = accessor.get(IBrowserViewWorkbenchService);
 +		const safeArgs = args ?? {};
 +		const type = safeArgs.type ?? 'url';
 +		return withPages(browserViewWorkbenchService, safeArgs, () =>
-+			runNavigateInternal({ args: safeArgs, type, dialogService, editorService, playwrightService, browserViewWorkbenchService }));
++			runNavigateInternal({ args: safeArgs, type, dialogService, editorService, editorGroupsService, playwrightService, browserViewWorkbenchService }));
 +	}
 +}
 +
@@ -663,10 +701,11 @@ index 00000000000..36152d5f97d
 +	type: 'url' | 'back' | 'forward' | 'reload';
 +	dialogService: IDialogService;
 +	editorService: IEditorService;
++	editorGroupsService: IEditorGroupsService;
 +	playwrightService: IPlaywrightService;
 +	browserViewWorkbenchService: IBrowserViewWorkbenchService;
 +}): Promise<IRitemarkBrowserActionResult> {
-+	const { args, type, dialogService, editorService, playwrightService, browserViewWorkbenchService } = ctx;
++	const { args, type, dialogService, editorService, editorGroupsService, playwrightService, browserViewWorkbenchService } = ctx;
 +	try {
 +		if (type === 'url' && !args.url) {
 +			return { error: 'navigate: url is required when type is "url".' };
@@ -681,7 +720,7 @@ index 00000000000..36152d5f97d
 +			return { error: 'No active integrated browser tab.' };
 +		}
 +		// An existing page must be in front (a new tab is); the control question is asked only about a page the person can see.
-+		const notInFront = resolved.kind === 'page' ? pageNotInFrontError(model, editorService) : undefined;
++		const notInFront = resolved.kind === 'page' ? pageNotInFrontError(model, editorService, editorGroupsService) : undefined;
 +		if (notInFront) {
 +			return refusal(model, notInFront);
 +		}
@@ -758,6 +797,7 @@ index 00000000000..36152d5f97d
 + */
 +async function runPlaywrightInvoke(ctx: {
 +	editorService: IEditorService;
++	editorGroupsService: IEditorGroupsService;
 +	dialogService: IDialogService;
 +	playwrightService: IPlaywrightService;
 +	browserViewWorkbenchService: IBrowserViewWorkbenchService;
@@ -772,6 +812,7 @@ index 00000000000..36152d5f97d
 +
 +export async function invokeInTarget(ctx: {
 +	editorService: IEditorService;
++	editorGroupsService: IEditorGroupsService;
 +	dialogService: IDialogService;
 +	playwrightService: IPlaywrightService;
 +	browserViewWorkbenchService: IBrowserViewWorkbenchService;
@@ -780,7 +821,7 @@ index 00000000000..36152d5f97d
 +	functionBody: string;
 +	invokeArgs: unknown[];
 +}): Promise<IRitemarkBrowserActionResult> {
-+	const { editorService, dialogService, playwrightService, browserViewWorkbenchService, target, validate, functionBody, invokeArgs } = ctx;
++	const { editorService, editorGroupsService, dialogService, playwrightService, browserViewWorkbenchService, target, validate, functionBody, invokeArgs } = ctx;
 +	try {
 +		const found = targetModel(target, editorService, browserViewWorkbenchService);
 +		if (!isModel(found)) {
@@ -792,7 +833,7 @@ index 00000000000..36152d5f97d
 +			return refusal(model, validationError);
 +		}
 +		// Being in front is decided first: the control question is never asked about a page that is not in front.
-+		const notInFront = pageNotInFrontError(model, editorService);
++		const notInFront = pageNotInFrontError(model, editorService, editorGroupsService);
 +		if (notInFront) {
 +			return refusal(model, notInFront);
 +		}
@@ -840,11 +881,13 @@ index 00000000000..36152d5f97d
 +
 +	async run(accessor: ServicesAccessor, args: IBrowserClickArgs): Promise<IRitemarkBrowserActionResult> {
 +		const editorService = accessor.get(IEditorService);
++		const editorGroupsService = accessor.get(IEditorGroupsService);
 +		const dialogService = accessor.get(IDialogService);
 +		const playwrightService = accessor.get(IPlaywrightService);
 +		const browserViewWorkbenchService = accessor.get(IBrowserViewWorkbenchService);
 +		return runPlaywrightInvoke({
 +			editorService,
++			editorGroupsService,
 +			dialogService,
 +			playwrightService,
 +			browserViewWorkbenchService,
@@ -881,11 +924,13 @@ index 00000000000..36152d5f97d
 +
 +	async run(accessor: ServicesAccessor, args: IBrowserFillArgs): Promise<IRitemarkBrowserActionResult> {
 +		const editorService = accessor.get(IEditorService);
++		const editorGroupsService = accessor.get(IEditorGroupsService);
 +		const dialogService = accessor.get(IDialogService);
 +		const playwrightService = accessor.get(IPlaywrightService);
 +		const browserViewWorkbenchService = accessor.get(IBrowserViewWorkbenchService);
 +		return runPlaywrightInvoke({
 +			editorService,
++			editorGroupsService,
 +			dialogService,
 +			playwrightService,
 +			browserViewWorkbenchService,
@@ -945,11 +990,13 @@ index 00000000000..36152d5f97d
 +
 +	async run(accessor: ServicesAccessor, args: IBrowserTypeArgs): Promise<IRitemarkBrowserActionResult> {
 +		const editorService = accessor.get(IEditorService);
++		const editorGroupsService = accessor.get(IEditorGroupsService);
 +		const dialogService = accessor.get(IDialogService);
 +		const playwrightService = accessor.get(IPlaywrightService);
 +		const browserViewWorkbenchService = accessor.get(IBrowserViewWorkbenchService);
 +		return runPlaywrightInvoke({
 +			editorService,
++			editorGroupsService,
 +			dialogService,
 +			playwrightService,
 +			browserViewWorkbenchService,
@@ -1002,11 +1049,13 @@ index 00000000000..36152d5f97d
 +
 +	async run(accessor: ServicesAccessor, args: IBrowserScrollArgs): Promise<IRitemarkBrowserActionResult> {
 +		const editorService = accessor.get(IEditorService);
++		const editorGroupsService = accessor.get(IEditorGroupsService);
 +		const dialogService = accessor.get(IDialogService);
 +		const playwrightService = accessor.get(IPlaywrightService);
 +		const browserViewWorkbenchService = accessor.get(IBrowserViewWorkbenchService);
 +		return runPlaywrightInvoke({
 +			editorService,
++			editorGroupsService,
 +			dialogService,
 +			playwrightService,
 +			browserViewWorkbenchService,
@@ -1213,10 +1262,10 @@ index 00000000000..9c59b93d0a7
 +});
 diff --git a/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts
 new file mode 100644
-index 00000000000..b020be66a40
+index 00000000000..dd63f850d69
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts
-@@ -0,0 +1,213 @@
+@@ -0,0 +1,270 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1228,6 +1277,7 @@ index 00000000000..b020be66a40
 +import { IDialogService } from '../../../../../../platform/dialogs/common/dialogs.js';
 +import { IPlaywrightService } from '../../../../../../platform/browserView/common/playwrightService.js';
 +import { IEditorService } from '../../../../../services/editor/common/editorService.js';
++import { IEditorGroupsService } from '../../../../../services/editor/common/editorGroupsService.js';
 +import { IBrowserViewModel, IBrowserViewWorkbenchService } from '../../../common/browserView.js';
 +import { RITEMARK_PAGE_GONE_ERROR } from '../../../common/ritemarkBrowserPageTarget.js';
 +import { BrowserEditor } from '../../../electron-browser/browserEditor.js';
@@ -1237,7 +1287,8 @@ index 00000000000..b020be66a40
 + * Ritemark (#658): the real action path (`targetModel`, `invokeInTarget`, `runNavigateInternal`), with a fake editor
 + * service whose active browser is another page. The AI's action goes to the turn's page by id; it never acts in the
 + * active tab, and it never brings a tab forward or asks about one the person cannot see. "In front" is the front tab
-+ * of an editor group (`visibleEditorPanes`), not the model's `visible`, which is false for a blank, failed or covered page.
++ * of an editor group (`visibleEditorPanes`), whose pane is visible (not under a maximized AI column) and whose group is
++ * not hidden by another maximized desk; not the model's `visible`, which is false for a blank, failed or covered page.
 + */
 +suite('Ritemark browser actions (#658)', () => {
 +	ensureNoDisposablesAreLeakedInTestSuite();
@@ -1245,6 +1296,10 @@ index 00000000000..b020be66a40
 +	interface IFakePage extends Pick<IBrowserViewModel, 'id' | 'url' | 'title' | 'visible' | 'error' | 'ritemarkSharedWithAgent' | 'sharedWithAgentForControl'> {
 +		/** The page's tab is the front tab of its group (any desk). */
 +		inFront: boolean;
++		/** The page's group (desk); 1 unless set. */
++		group?: number;
++		/** The pane is hidden with the editor area: the AI column is maximized (`EditorPane.isVisible()` is false). */
++		paneHidden?: boolean;
 +		loaded: string[];
 +		loadURL(url: string): Promise<void>;
 +		reload(): Promise<void>;
@@ -1266,10 +1321,21 @@ index 00000000000..b020be66a40
 +	function browserPane(model: IFakePage): BrowserEditor {
 +		const pane = createStubInstance(BrowserEditor);
 +		Object.defineProperty(pane, 'model', { value: model });
++		// The pane is its group's active pane, as `visibleEditorPanes` lists them.
++		Object.defineProperty(pane, 'group', { value: { id: model.group ?? 1, activeEditorPane: pane } });
++		pane.isVisible.returns(!model.paneHidden);
 +		return pane as unknown as BrowserEditor;
 +	}
 +
-+	function setup(opts: { pages: IFakePage[]; active: IFakePage | undefined; confirm?: boolean }) {
++	function setup(opts: {
++		pages: IFakePage[];
++		active: IFakePage | undefined;
++		confirm?: boolean;
++		/** The maximized desk (⌘K ⌘M), if any. */
++		maximizedGroup?: number;
++		/** The part has no `isGroupMaximized` (it is not on `IEditorPart`): the maximized desk is then the active group. */
++		noIsGroupMaximized?: boolean;
++	}) {
 +		const log = { openEditor: 0, confirm: 0, invoked: [] as string[], opened: [] as unknown[] };
 +		// The pane a new tab opens in (the one case where a tab comes forward).
 +		const newTab = page('new', true);
@@ -1283,6 +1349,12 @@ index 00000000000..b020be66a40
 +			findEditors: () => [],
 +			openEditor: async (...args: unknown[]) => { log.openEditor++; log.opened.push(args); return newPane; },
 +		} as unknown as IEditorService;
++		const part = {
++			hasMaximizedGroup: () => opts.maximizedGroup !== undefined,
++			activeGroup: { id: opts.maximizedGroup ?? 1 },
++			...(opts.noIsGroupMaximized ? {} : { isGroupMaximized: (group: { id: number }) => group.id === opts.maximizedGroup }),
++		};
++		const editorGroupsService = { getPart: () => part } as unknown as IEditorGroupsService;
 +		const views = new Map(opts.pages.map(p => [p.id, { model: p }] as const));
 +		const browserViewWorkbenchService = { getKnownBrowserViews: () => views } as unknown as IBrowserViewWorkbenchService;
 +		const dialogService = { confirm: async () => { log.confirm++; return { confirmed: opts.confirm ?? true }; } } as unknown as IDialogService;
@@ -1290,7 +1362,7 @@ index 00000000000..b020be66a40
 +			invokeFunction: async (_session: string, id: string) => { log.invoked.push(id); return { summary: `summary ${id}` }; },
 +			getSummary: async (_session: string, id: string) => `summary ${id}`,
 +		} as unknown as IPlaywrightService;
-+		return { log, editorService, browserViewWorkbenchService, dialogService, playwrightService, newTab };
++		return { log, editorService, editorGroupsService, browserViewWorkbenchService, dialogService, playwrightService, newTab };
 +	}
 +
 +	test('targetModel finds the turn\'s page by id, not the active browser tab', () => {
@@ -1396,6 +1468,40 @@ index 00000000000..b020be66a40
 +		const result = await invokeInTarget({ ...s, target: { pageId: 'c' }, validate: () => null, functionBody: '', invokeArgs: [] });
 +		assert.strictEqual(result.error, RITEMARK_PAGE_NOT_IN_FRONT_ERROR);
 +		assert.deepStrictEqual(s.log.invoked, []);
++	});
++
++	test('a maximized AI column hides the editor area: its front page is not in front, refused at once', async () => {
++		const c = page('c', true);
++		c.paneHidden = true;
++		const s = setup({ pages: [c], active: c });
++		const clicked = await invokeInTarget({ ...s, target: { pageId: 'c' }, validate: () => null, functionBody: '', invokeArgs: [] });
++		const navigated = await runNavigateInternal({ ...s, args: { pageId: 'c', url: 'http://127.0.0.1/next' }, type: 'url' });
++		assert.deepStrictEqual([clicked, navigated], [{ pageId: 'c', error: RITEMARK_PAGE_NOT_IN_FRONT_ERROR }, { pageId: 'c', error: RITEMARK_PAGE_NOT_IN_FRONT_ERROR }]);
++		assert.deepStrictEqual([s.log.invoked, c.loaded, s.log.confirm, s.log.openEditor], [[], [], 0, 0]);
++	});
++
++	test('another maximized desk hides this desk: its front page is not in front, refused at once', async () => {
++		for (const noIsGroupMaximized of [false, true]) {
++			const a = page('a', true); // desk 1, maximized
++			const c = page('c', true);
++			c.group = 2;
++			const s = setup({ pages: [a, c], active: a, maximizedGroup: 1, noIsGroupMaximized });
++			const result = await invokeInTarget({ ...s, target: { pageId: 'c' }, validate: () => null, functionBody: '', invokeArgs: [] });
++			assert.deepStrictEqual(result, { pageId: 'c', error: RITEMARK_PAGE_NOT_IN_FRONT_ERROR }, `noIsGroupMaximized=${noIsGroupMaximized}`);
++			assert.deepStrictEqual([s.log.invoked, s.log.confirm, s.log.openEditor], [[], 0, 0]);
++		}
++	});
++
++	test('the page\'s own maximized desk is in front: the action is done there', async () => {
++		for (const noIsGroupMaximized of [false, true]) {
++			const a = page('a', true);
++			const c = page('c', true);
++			c.group = 2;
++			const s = setup({ pages: [a, c], active: c, maximizedGroup: 2, noIsGroupMaximized });
++			const result = await invokeInTarget({ ...s, target: { pageId: 'c' }, validate: () => null, functionBody: '', invokeArgs: [] });
++			assert.strictEqual(result.error, undefined, `noIsGroupMaximized=${noIsGroupMaximized}`);
++			assert.deepStrictEqual([s.log.invoked, s.log.openEditor], [['c'], 0]);
++		}
 +	});
 +
 +	test('a refusal carries the page id and the error, never its address or title', async () => {
