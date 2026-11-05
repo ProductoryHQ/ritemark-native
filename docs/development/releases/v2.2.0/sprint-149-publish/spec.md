@@ -24,16 +24,16 @@ The drawing: ritemark-dev `product/design/experience/experiences/publish/` (expe
 - Any `.html`/`.htm` file opens as a desk tab in Ritemark's own browser, as today (patch 010's resolver). No new viewer.
 - The page's scripts run and CDN scripts load; the page can't reach the extension, the VS Code API, the workbench, `file://` reads by `fetch`, or open pop-ups (the spike's escape table, run live: A2).
 - **The session stays the browser's shared one** (Jarmo, decision 4: no private session). A page shares `workbench.browser.dataStorage`'s session with other tabs, as today; A2 records what that means, and nothing in 2.2 changes it.
-- **No address row for a local page** (the lead, answer 2): its bar is frame 1's, with the page's buttons at the right and nothing else. The tab's name says which file it is; `file:///…` is never shown.
-- **No back or forward:** a link to a website opens a new tab of Ritemark's browser; a link to another page in the project opens that page in its own tab. A page's tab always shows its file.
-- **The page reloads when its file changes** (for example after Claude changed it), as a document does. If that can't be built in this sprint, the reload button stays at the bar's left until it can.
+- **The page keeps the browser's bar** (Jarmo, 4 November; ritemark-dev 14e0d03, correcting the lead's answer 2): back, forward, reload and the address, `file:///…/Harbour programme.html`, as any browser shows a file. "`file:///` is the copy on this computer. The public one is `https://…workers.dev`"; a published page's tab keeps `file:///` too (05bc028).
+- **Links work as in a browser:** "A link to another page in the project, or to a website, opens in the same tab, and back returns to the page" (14e0d03). The bar's keys follow the address, so Open in browser and Publish leave on a website and come back with back.
+- **The page reloads when its file changes** (for example after Claude changed it), as a document does: upstream's auto-reload (`workbench.browser.autoReloadOnFileChange`, on by default) already does this for a `file:` page in front, and reload stays on the bar.
 - The text view stays reachable (`ritemark.browser.openAsText`, today's Explorer menu).
 - The browser's control consent and the share-with-AI question stay as they are.
 - Lands in **PR 2** (patch 010); A2 runs on PR 1.
 
 ### R2: The page's bar: Open in browser and Publish
 
-- **On the page's own bar, at its right end, as frame 1 draws them, never in the tab row** (the lead, answer 1). Patch 010 adds them to `MenuId.BrowserActionsToolbar` (PR 2).
+- **On the browser's bar, right of the address, as frame 1 (redrawn 4 November) draws them, never in the tab row** (the lead, answer 1, as corrected in 14e0d03): back, forward, reload; the address; Open in browser; Publish; the browser's ⋯ last. Patch 010 adds them to `MenuId.BrowserActionsToolbar` (PR 2).
 - **Open in browser** is an icon button (`arrow-square-out`), tooltip "Open in your browser". It opens the file in the system's default browser (`vscode.env.openExternal`) and shows for **every local `.html` page, inside the project or not**. Today's `ritemark.browser.openInBrowser` opens the *integrated* browser; its title and behaviour stay, and the new command is separate.
 - **Publish** is the outline button with the globe, and shows **only for a page inside the open project**: publishing is for project files. Once published, frame 4's chip "Published ⌄" and Copy link take its place.
 - Two workbench context keys, set from the tab's URL in patch 010: `ritemarkBrowserLocalPage` (`file:` and `.html?`) gates Open in browser; `ritemarkBrowserProjectPage` (also inside a workspace folder) gates Publish. The host checks the project boundary again by `realpath` before any publish.
@@ -92,7 +92,7 @@ Frame 3, one small sheet over the page:
 ### R7: Publish, Copy link, Update the page, Unpublish
 
 - **Publish** uploads the gathered files as one assets-only Worker named from the address, with `X-Robots-Tag: noindex` on `/*` (no `robots.txt` block) and `previews_enabled: false` (the spike's six calls, plain `fetch`, no new dependency). "Publishing…" while it runs; nothing else waits.
-- **Published:** the bar says Published with Copy link beside it; its menu holds Open the page (with its address), Update the page and Unpublish (frame 4).
+- **Published:** the bar says Published with Copy link beside it; its menu holds Open the page (with its address), Update the page and Unpublish (frame 4). The tab keeps its `file:///` address; **Open the page opens the public page in a new tab of Ritemark's browser beside it**, at its `https://…workers.dev` address, so the two show two addresses (Jarmo, 4 November, ritemark-dev 05bc028).
 - **Changed since publishing:** "Published · changed" when the hash of what would go differs from the last publish; Update the page is live, otherwise muted with "Up to date". Updating keeps the address; a file no longer used is gone from the page.
 - **Unpublish** (the lead, answer 7) asks once: title "Unpublish Harbour programme?", body "The link stops working for everyone who has it. The file stays in this project.", **Cancel** and **Unpublish** (destructive red). While it goes, the chip reads "Unpublishing…" with the kit's turning mark and nothing else on the bar can be pressed; after 10 s one line under the bar: "Cloudflare is still taking the page down." When the address has stopped answering (M9), the bar shows Publish again, with no toast; publishing again offers the old address first. If it fails: "Ritemark couldn't reach Cloudflare. The page is still online." with Try again. It never says the page is down until it is.
 - **Failed publish or update:** one line under the bar: "Ritemark couldn't reach Cloudflare. The page is still on this computer.", with Try again. Cloudflare's own error text is shown only with the token and account ID redacted.
@@ -114,7 +114,7 @@ A card like Google Docs', in Sprint 147's Sharing section, under Web pages (the 
 | Not set up | Where your web pages go. Not set up. The first Publish asks; Cloudflare is free. A muted line: "Have a Cloudflare token? Use it instead" | Set up |
 | Connected | Your Cloudflare. Connected as <the account's name>. Your pages end in pages-4821.workers.dev. | Disconnect |
 
-- **Published pages,** under the connected row, only when there are some: the file's name with its address muted under it, **Open** (the published page, in the system browser) and **Unpublish** (R7's question), including pages whose file has moved or gone.
+- **Published pages,** under the connected row, only when there are some: the file's name with its address muted under it, **Open** (the published page, in a new tab of Ritemark's browser, as Open the page does; 05bc028) and **Unpublish** (R7's question), including pages whose file has moved or gone.
 - **Disconnect asks once:** "Disconnect Cloudflare? Your published pages stay online. To take one down, unpublish it first." with Cancel and Disconnect.
 - **The token never passes through the webview** (the principle above). The page sends only `publish:connect`, `publish:startTokenEntry` (the host then opens Cloudflare's page and its own password box, R6), `publish:disconnect`, `publish:open` and `publish:unpublish`. No message from the page carries a token value, and no message to the page does.
 - **With the flag off** (sprint-plan.md, *Feature Flag Check*): the published-page list with Open and Unpublish stays; the row offers no Set up, Use a token or Connect.
