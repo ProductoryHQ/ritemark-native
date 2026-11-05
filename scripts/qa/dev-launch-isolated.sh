@@ -35,45 +35,64 @@ set +x
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 die() { echo "dev-launch-isolated: $*" >&2; exit 2; }
 
-stop_run() {
-	local run_dir=${1:-}
-	[[ -n $run_dir && -f $run_dir/run.env ]] || die "stop: no run.env in '${run_dir}'"
-	local pid
-	pid=$(sed -n 's/^PID=//p' "$run_dir/run.env")
-	# The instance's own tree (helpers, the extension host, the AI runtimes it started), gathered before the
-	# main process goes and its children are re-parented; then every process naming the run's profile.
-	# Never a pattern that matches this script's own command line, which names the run folder too.
-	local -a tree=()
-	local queue=("$pid") p kids
+# A process that is running (not gone, not a zombie waiting to be reaped).
+alive() {
+	local s
+	s=$(ps -o stat= -p "$1" 2>/dev/null || true)
+	[[ -n $s && $s != Z* ]]
+}
+
+# The given pids and all their descendants, one per line.
+descendants() {
+	local queue=("$@") p kids
 	while [[ ${#queue[@]} -gt 0 ]]; do
 		p=${queue[0]}; queue=("${queue[@]:1}")
 		[[ -n $p ]] || continue
-		tree+=("$p")
+		echo "$p"
 		kids=$(pgrep -P "$p" 2>/dev/null || true)
 		[[ -n $kids ]] && queue+=($kids)
 	done
-	if [[ -n $pid ]] && kill -0 "$pid" 2>/dev/null; then
+	return 0  # the loop's last `&&` may be false; under set -e a caller's $(...) would stop the script
+}
+
+stop_run() {
+	local run_dir=${1:-}
+	[[ -n $run_dir && -f $run_dir/run.env ]] || die "stop: no run.env in '${run_dir}'"
+	local profile="--user-data-dir=$run_dir/profile"
+	local pid cmdline=""
+	pid=$(sed -n 's/^PID=//p' "$run_dir/run.env")
+	# run.env's PID is used only while it is still this instance: a number, and a process whose command line
+	# names the run's profile. A PID the system has since given to another process is never walked or signalled.
+	[[ $pid =~ ^[0-9]+$ ]] && cmdline=$(ps -o command= -p "$pid" 2>/dev/null || true)
+	[[ $cmdline == *"$profile"* ]] || pid=""
+	# The instance's own tree (helpers, the extension host, the AI runtimes it started), gathered before the
+	# main process goes and its children are re-parented; then every process naming the run's profile.
+	# Never a pattern that matches this script's own command line, which names the run folder but not the profile flag.
+	local tree="" p
+	[[ -n $pid ]] && tree=$(descendants "$pid")
+	if [[ -n $pid ]] && alive "$pid"; then
 		kill -TERM "$pid" 2>/dev/null || true
 		for _ in 1 2 3 4 5 6 7 8 9 10; do
-			kill -0 "$pid" 2>/dev/null || break
+			alive "$pid" || break
 			sleep 0.5
 		done
 	fi
-	local -a all=("${tree[@]}")
-	local more
-	more=$(pgrep -f -- "--user-data-dir=$run_dir/profile" 2>/dev/null || true)
-	[[ -n $more ]] && all+=($more)
-	for p in "${all[@]}"; do
+	# Walk again just before the KILL pass: runtimes started during the grace period hang under a pid already seen.
+	local live="" more all
+	for p in $tree; do alive "$p" && live="$live $p"; done
+	more=$(pgrep -f -- "$profile" 2>/dev/null || true)
+	all=$(descendants $live $more | sort -u)
+	for p in $all; do
 		[[ $p == "$$" ]] && continue
 		kill -KILL "$p" 2>/dev/null || true
 	done
 	sleep 1
 	local left=0
-	for p in "${all[@]}"; do
+	for p in $all; do
 		[[ $p == "$$" ]] && continue
-		kill -0 "$p" 2>/dev/null && left=$((left + 1))
+		alive "$p" && left=$((left + 1))
 	done
-	more=$(pgrep -f -- "--user-data-dir=$run_dir/profile" 2>/dev/null || true)
+	more=$(pgrep -f -- "$profile" 2>/dev/null || true)
 	[[ -n $more ]] && left=$((left + $(wc -l <<< "$more")))
 	echo "LEFT=$left"
 	[[ $left == 0 ]]
@@ -179,19 +198,24 @@ start_run() {
 
 	local ready=0
 	for _ in $(seq 1 120); do
-		if ! kill -0 "$pid" 2>/dev/null; then
+		if ! alive "$pid"; then
 			echo "dev-launch-isolated: the instance exited; see $run_dir/stdout.log" >&2
 			cat "$run_dir/run.env"
 			exit 1
 		fi
 		local targets
 		targets=$(curl -s -m 1 "http://127.0.0.1:$port/json/list" 2>/dev/null || true)
-		# Ready = the workbench page has drawn the project: its title names the folder ("Home — project").
-		if python3 -I -c 'import json,sys
-name=sys.argv[1]
+		# Ready = the workbench page has drawn the project: one of its title's " — " parts is the folder's name
+		# ("Home — project"), compared whole and NFC-normalised, so a folder called Home or Ritemark can't match early.
+		if python3 -I -c 'import json,sys,unicodedata
+nfc=lambda s: unicodedata.normalize("NFC", s)
+name=nfc(sys.argv[1])
 try: targets=json.loads(sys.stdin.read() or "[]")
 except ValueError: sys.exit(1)
-sys.exit(0 if any(x.get("type")=="page" and "workbench" in x.get("url","") and name in x.get("title","") for x in targets) else 1)' "$(basename "$folder")" <<< "$targets"; then
+def ready(x):
+	parts=[p.strip() for p in nfc(x.get("title","")).split("—")]
+	return x.get("type")=="page" and "workbench" in x.get("url","") and len(parts)>1 and name in parts[1:]
+sys.exit(0 if any(ready(x) for x in targets) else 1)' "$(basename "$folder")" <<< "$targets"; then
 			ready=1
 			break
 		fi
