@@ -96,6 +96,9 @@ ritemarkTabMenu.ts, decides a permanent tab for both the menu and editorGroupVie
 It reads the frame's manifest when asked, so ritemarkPermanentTabs.test.ts gives the manifest Home and the Task board,
 as branding/product.json does: since Sprint 152 (PR 2) the view types come from product.json, which a unit test's
 product doesn't carry, and the suite's three refusal cases had failed since then for want of them.
+Sprint 154 (#650; the Experience lead's check of #649): the empty area also drops Editor Actions Position ▸, which can
+move or hide the desk's actions (RITEMARK_TAB_ROW_MENU_LEAVES_OUT, with its test). Its commands (Move Editor Actions to
+Tab Bar / to Title Bar, Hide and Show Editor Actions, layoutActions.ts) are f1 and stay in All commands.
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index ac63294495c..8717025e650 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.ts
@@ -1266,10 +1269,10 @@ index 00000000000..60fd89edea9
 +});
 diff --git a/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts b/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts
 new file mode 100644
-index 00000000000..06e01e40eb9
+index 00000000000..f137a077f0e
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/editor/ritemarkTabMenu.ts
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,120 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1336,10 +1339,14 @@ index 00000000000..06e01e40eb9
 + * commands stay in All commands (layoutActions.ts' AbstractSetShowTabsAction is f1, and Ritemark's palette filter names
 + * none of them), so the submenu goes (decision 4). Configure Tabs stays: its command (workbench.action.configureEditorTabs)
 + * is not in All commands, so the menu is its only way in.
++ * Editor Actions Position ▸ goes for the same reason (Sprint 154, #650; the Experience lead's check of #649): it can move
++ * or hide the desk's actions. Its commands stay in All commands (layoutActions.ts' Move Editor Actions to Tab Bar / to
++ * Title Bar, Hide and Show Editor Actions are f1, and the palette filter names none of them).
 + */
 +export const RITEMARK_TAB_ROW_MENU_LEAVES_OUT: ReadonlySet<string> = new Set([
 +	`submenuitem.${MenuId.EditorTabsBarShowTabsSubmenu.id}`,
 +	`submenuitem.${MenuId.EditorTabsBarShowTabsZenModeSubmenu.id}`,
++	`submenuitem.${MenuId.EditorActionsPositionSubmenu.id}`,
 +]);
 +
 +/** The tab row's empty area offers New tab (⌘T) and Reopen closed tab (⇧⌘T) first, as a browser's tab strip does. */
@@ -1358,7 +1365,7 @@ index 00000000000..06e01e40eb9
 +	return tidied(actions.filter(action => !RITEMARK_TAB_MENU_LEAVES_OUT.has(action.id) && !(permanent && RITEMARK_PERMANENT_TAB_MENU_LEAVES_OUT.has(action.id))));
 +}
 +
-+/** The tab row's empty area's menu as Ritemark shows it: no Tab Bar ▸, and no separator left stray. */
++/** The tab row's empty area's menu as Ritemark shows it: no Tab Bar ▸ or Editor Actions Position ▸, and no separator left stray. */
 +export function ritemarkTabRowMenuActions(actions: readonly IAction[]): IAction[] {
 +	return tidied(actions.filter(action => !RITEMARK_TAB_ROW_MENU_LEAVES_OUT.has(action.id)));
 +}
@@ -2405,10 +2412,10 @@ index 00000000000..79d6463bf76
 +});
 diff --git a/src/vs/workbench/test/browser/parts/editor/ritemarkTabMenu.test.ts b/src/vs/workbench/test/browser/parts/editor/ritemarkTabMenu.test.ts
 new file mode 100644
-index 00000000000..ae4d795927f
+index 00000000000..cfbb2a034d8
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/editor/ritemarkTabMenu.test.ts
-@@ -0,0 +1,102 @@
+@@ -0,0 +1,109 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2483,11 +2490,18 @@ index 00000000000..ae4d795927f
 +		assert.deepStrictEqual(shown(ritemarkTabMenuActions(document)), shown(document));
 +	});
 +
-+	test('the tab row\'s empty area offers New tab and Reopen closed tab first, and no Tab Bar (#634)', () => {
++	test('the tab row\'s empty area offers New tab and Reopen closed tab first, and no Tab Bar or Editor Actions Position (#634, #650)', () => {
 +		const first = MenuRegistry.getMenuItems(MenuId.EditorTabsBarContext).filter(item => item.group === '0_ritemark').map(item => 'command' in item ? [item.command.id, item.command.title] : []);
 +		assert.deepStrictEqual(first, [['ritemark.newTab', 'New tab'], ['workbench.action.reopenClosedEditor', 'Reopen closed tab']]);
 +		const row = menu([['ritemark.newTab', 'New tab'], ['workbench.action.reopenClosedEditor', 'Reopen closed tab'], '---', ['workbench.action.splitEditorRight', 'Split Right'], '---', ['submenuitem.EditorTabsBarShowTabsSubmenu', 'Tab Bar'], ['submenuitem.EditorActionsPositionSubmenu', 'Editor Actions Position'], '---', ['submenuitem.EditorTabsBarShowTabsZenModeSubmenu', 'Tab Bar'], '---', ['workbench.action.configureEditorTabs', 'Configure Tabs']]);
-+		assert.deepStrictEqual(shown(ritemarkTabRowMenuActions(row)), ['New tab', 'Reopen closed tab', '---', 'Split Right', '---', 'Editor Actions Position', '---', 'Configure Tabs']);
++		assert.deepStrictEqual(shown(ritemarkTabRowMenuActions(row)), ['New tab', 'Reopen closed tab', '---', 'Split Right', '---', 'Configure Tabs']);
++	});
++
++	test('Editor Actions Position leaves the empty area by its submenu\'s ID only: its commands stay in All commands (#650)', () => {
++		const row = menu([['ritemark.newTab', 'New tab'], '---', [`submenuitem.${MenuId.EditorActionsPositionSubmenu.id}`, 'Editor Actions Position'], '---', ['workbench.action.configureEditorTabs', 'Configure Tabs']]);
++		assert.deepStrictEqual(shown(ritemarkTabRowMenuActions(row)), ['New tab', '---', 'Configure Tabs']);
++		const commands = ['workbench.action.editorActionsDefault', 'workbench.action.editorActionsTitleBar', 'workbench.action.hideEditorActions', 'workbench.action.showEditorActions'];
++		assert.deepStrictEqual(shown(ritemarkTabRowMenuActions(menu(commands.map(id => [id, id])))), commands);
 +	});
 +
 +	test('a permanent tab is Home or the Task board by its view type, and only while pinned (#634)', () => {
