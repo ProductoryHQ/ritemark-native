@@ -46,7 +46,10 @@ The drawing: ritemark-dev `product/design/experience/experiences/publish/` (expe
 - **Never:** any path with a segment that starts with `.` (`.env`, `.git`, `.ritemark`, `.claude`, `.vscode`…), `node_modules`, and files Git ignores in the project (when Git is there). A reference to one is left out and named.
 - **Not followed:** links to other `.html` pages don't go up (one page per publish, *Decisions* below); they are named as left out.
 - Remote references (`https:`, `//cdn…`, `data:`) stay where they are and go nowhere.
-- References the gather can't see (built by a script at run time) are not guessed.
+- **A `../` that stays inside the project goes up** (A3, finding 1: `../tokens.css` from `slides/index.html`). The published tree is rooted at the deepest folder that holds the page and every gathered file, so each file keeps its path relative to the page. A reference that leaves the project as written is outside even when a symlink brings it back in.
+- `<base href>` is honoured as the browser honours it; a remote base makes every relative reference remote. `//cdn…` is a web address and stays one.
+- References the gather can't see (built by a script at run time) are not guessed; the sheet says so in one line (R5).
+- **Git fails closed:** when the project is in a Git repository and Ritemark can't ask Git what it ignores, nothing is gathered and nothing goes.
 - Free-plan limits are checked before anything goes: 25 MiB a file, 20,000 files. Over a limit: one plain line, nothing sent.
 - Lands in **PR 3**.
 
@@ -69,6 +72,8 @@ Frame 3, one small sheet over the page:
   - The line: "This page and its 2 pictures" when every file is one kind (pictures, styles, scripts, fonts); "This page and 4 files" when they're mixed; "This page, one file" when it uses nothing else. Under it, muted: "Nothing else from the project."
   - **See the files**, folded at first: each file's name and folder, as Search's rows show them (`harbour.jpg` · Pictures), the page first.
   - **Left out**, in the same fold, only when something is: "2 left out", each with its reason: "outside this project", "a hidden file", "a tool's folder" (`node_modules`), "Git ignores it", "another page, so its link won't work".
+  - Several other pages fold into one Left out row: "7 other pages, so their links won't work" (A3, finding 3).
+  - When the page builds file names in its script, one muted line under the count: "This page loads some files from its script. Ritemark can't see which, so they won't go." (A3, finding 2).
   - Nothing can be ticked or unticked: what goes follows from the page.
 - **Who can see it:** anyone with the link; it isn't listed or searchable; you can unpublish it any time.
 - **Publish** and **Cancel.** Cancel sends nothing.

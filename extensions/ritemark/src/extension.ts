@@ -65,6 +65,7 @@ import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
 import { findReplacedTextTab, findStuckMarkdownTabs } from './utils/stickyTabHealer';
 import { openControlCatalogueIfAsked } from './views/ControlCataloguePanel';
+import { openPublishSheetHarnessIfAsked } from './publish/devSheetHarness';
 import { registerProjectHeadCommands } from './views/projectHeadCommands';
 import { prepareWelcome, registerWelcome } from './welcome/welcomeHost';
 import { newDocumentFolder, nextUntitledPath } from './newDocumentLocation';
@@ -1100,6 +1101,12 @@ export function activate(context: vscode.ExtensionContext) {
     openControlCatalogueIfAsked(context);
   } catch (error) {
     console.warn('Ritemark: the control catalogue did not open', error);
+  }
+  // Sprint 149 (PR 3): the Publish sheet's dev harness, only in a development build started with its setting
+  try {
+    openPublishSheetHarnessIfAsked(context);
+  } catch (error) {
+    console.warn('Ritemark: the Publish sheet harness did not open', error);
   }
 
   // Sprint 93 R9: activate() reached its end with no synchronous throw —

@@ -15,6 +15,8 @@ Behaviour examples for [spec.md](spec.md). They are the manual QA list; `tasks.m
 ## What goes (R3, R4, R5)
 
 - **S7.** Given a page using `img/a.png`, `img/b.png` and `style.css` (which uses `fonts/x.woff2`), when Publish's sheet opens, then it reads "This page and 4 files" with "Nothing else from the project." under it, and See the files lists all four, the page first. A page using only two pictures reads "This page and its 2 pictures"; a page using nothing reads "This page, one file".
+- **S7a.** Given `slides/index.html` using `../tokens.css` (still in the project), then `tokens.css` goes, and the published tree keeps `slides/index.html` beside it (A3, finding 1).
+- **S7b.** Given a page that builds picture names in its script, then the sheet says "This page loads some files from its script. Ritemark can't see which, so they won't go." (A3, finding 2).
 - **S8 (negative).** Given `<img src="../../secrets/scan.png">` reaching outside the project, then that file is left out and named "outside this project".
 - **S9 (negative).** Given `<link href=".env">` or `<script src=".git/config">`, then each is left out and named "a hidden file".
 - **S10 (negative).** Given `img/logo.png` that is a symlink to `~/Pictures/logo.png`, then it is left out as outside the project.

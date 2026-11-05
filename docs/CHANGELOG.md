@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — 2.2.0
 
+### Sprint 149: Publish a web page (#590)
+
+#### Added
+- **What goes when a page is published, decided before anything is sent (PR 3; no way in until the Publish button arrives).** Ritemark reads the page and takes only the files it uses inside the project: pictures, styles, scripts and fonts, following stylesheets and module scripts. A file outside the project (by `../`, a full path, a drive letter, a network path or a shortcut that points out), a hidden file such as `.env`, anything in `node_modules`, a file Git ignores and another page are left out and named, with their reason. Before publishing, a sheet says "This page and its 2 pictures", lists every file, and names what was left out; nothing can be ticked or unticked. If a file that would go holds something that looks like a key or password, the sheet says where (file and line, never the value) with Open to go there, Cancel becomes the main button, and publishing needs a second press on "Publish anyway". Where each page was published is remembered on this computer, never in the project.
+
 ### Sprint 154: right-click menus lose items that don't belong to Ritemark
 
 #### Changed

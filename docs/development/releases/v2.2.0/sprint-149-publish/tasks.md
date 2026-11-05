@@ -32,10 +32,10 @@ Nothing here starts before the plan's approval (sprint-plan.md, *Approval*). Tic
 
 ## Phase 4: PR 3, what goes and the guard (W3; R3, R4, R5, R8)
 
-- [ ] Boundary and exclusion tests first, failing (S8–S13, Windows path cases included)
-- [ ] `src/publish/gather.ts`, `secretScan.ts` (fixtures assembled at run time), `publishRecords.ts`
-- [ ] `webview/components/publish/PublishSheet.tsx` on `ui/dialog.tsx`: the what-goes line, See the files, Left out with its five reasons (R5, S7–S13); the key warning in ink, Cancel main, Publish anyway, Open file at line (R4, S14); every button the shared Button with a tooltip; screenshots to the lead
-- [ ] `REVIEW.md`: `src/publish/` in the High row
+- [x] Boundary and exclusion tests over A3's corpus (S7–S13, S15; Windows drive and UNC references as written); each guard mutation-checked (28 mutations, each fails a test)
+- [x] `src/publish/gather.ts`, `secretScan.ts` (fixtures assembled at run time), `publishRecords.ts`
+- [x] `webview/components/publish/PublishSheet.tsx` on `ui/dialog.tsx`: the what-goes line, See the files, Left out with its five reasons (R5, S7–S13); the key warning in ink, Cancel main, Publish anyway, Open file at line (R4, S14); every button the shared Button with a tooltip; live captures (dev harness, `RITEMARK_PUBLISH_SHEET_HARNESS` in a dev build) for the lead
+- [x] `REVIEW.md`: `src/publish/` in the High row
 - [ ] Review (High, `/security-review`), Windows overlay, merge
 
 ## Phase 5: PR 4, Cloudflare (W4, W5, W6; R6, R7, R9)
