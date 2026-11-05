@@ -9,6 +9,7 @@
  * points out of it, or a `..` that climbs out, is outside. On Windows the comparison ignores case.
  */
 
+import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -20,7 +21,9 @@ export type PageTarget = string | { scheme: string; fsPath: string };
 export type PageLocation =
   | { kind: 'project'; realPath: string; projectFolder: string }
   | { kind: 'outside'; realPath: string }
-  | { kind: 'missing'; fsPath: string };
+  | { kind: 'missing'; fsPath: string }
+  /** The name is a page's, but the file it resolves to isn't one: a link or Finder alias to a program, or a folder (PR 2's review). */
+  | { kind: 'notAPage'; realPath: string };
 
 export function isPagePath(p: string): boolean {
   const ext = path.extname(p).toLowerCase();
@@ -54,7 +57,36 @@ export function localPagePath(target: PageTarget | undefined): string | undefine
 
 export interface LocateOptions {
   realpath?: (p: string) => Promise<string>;
+  /** Whether the resolved path is a regular file (default: `fs.promises.stat`). */
+  isFile?: (p: string) => Promise<boolean>;
+  /** Whether the resolved file is a Finder alias (default: `isFinderAlias`, macOS only). */
+  isAlias?: (p: string) => Promise<boolean>;
   platform?: NodeJS.Platform;
+}
+
+/** kIsAlias, in the Finder flags of `com.apple.FinderInfo` (bytes 8–9, big-endian). */
+const FINDER_IS_ALIAS = 0x8000;
+
+/** Whether `com.apple.FinderInfo`, as `xattr -px` prints it (hex pairs), has the alias bit set. */
+export function finderInfoIsAlias(hex: string): boolean {
+  const bytes = hex.replace(/\s+/g, '');
+  if (!/^[0-9a-fA-F]{20,}$/.test(bytes)) return false;
+  const flags = parseInt(bytes.slice(16, 20), 16);
+  return (flags & FINDER_IS_ALIAS) !== 0;
+}
+
+/**
+ * Whether a file is a Finder alias (macOS). An alias is a regular file that `realpath` doesn't follow, and the
+ * system's opener opens what it points to, so an alias named `index.html` could open a program. No attribute, no
+ * `xattr` or any other error: not an alias.
+ */
+export function isFinderAlias(p: string, platform: NodeJS.Platform = process.platform): Promise<boolean> {
+  if (platform !== 'darwin') return Promise.resolve(false);
+  return new Promise((resolve) => {
+    execFile('/usr/bin/xattr', ['-px', 'com.apple.FinderInfo', p], { timeout: 5000 }, (err, stdout) => {
+      resolve(!err && finderInfoIsAlias(String(stdout)));
+    });
+  });
 }
 
 /** Whether `child` is `parent` itself or below it (both real, absolute paths). */
@@ -83,6 +115,22 @@ export async function locatePage(
     realPath = await realpath(fsPath);
   } catch {
     return { kind: 'missing', fsPath };
+  }
+  // What opens or goes up is the resolved file, never the name: a `.html` that is a link to `run.command` would
+  // otherwise run in Terminal from Open in your browser (and a link to a folder would open the folder).
+  const isFile = options.isFile ?? (async (p: string) => (await fs.promises.stat(p)).isFile());
+  let regular = false;
+  try {
+    regular = await isFile(realPath);
+  } catch {
+    return { kind: 'missing', fsPath };
+  }
+  if (!regular || !isPagePath(realPath)) {
+    return { kind: 'notAPage', realPath };
+  }
+  const isAlias = options.isAlias ?? ((p: string) => isFinderAlias(p, platform));
+  if (await isAlias(realPath)) {
+    return { kind: 'notAPage', realPath }; // a Finder alias named .html opens what it points to
   }
   for (const folder of projectFolders) {
     let realFolder: string;

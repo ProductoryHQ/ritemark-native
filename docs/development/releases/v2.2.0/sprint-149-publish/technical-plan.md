@@ -72,8 +72,8 @@ The spike's list was kept with the manager's session; this is its reconstruction
 ### W2: The page's bar in patch 010 (R1, R2), PR 2
 
 - Two Ritemark actions at the right end of `MenuId.BrowserActionsToolbar`, calling the extension's commands: Open in browser when `ritemarkBrowserLocalPage`, Publish (and later the Published chip and Copy link) when `ritemarkBrowserProjectPage`. Both keys computed in the workbench from the model's URL and the workspace folders.
-- For local pages: no address row, no back or forward; a link to a website opens a new browser tab, a link to another local page opens that page in its own tab.
-- Reload on a file change through a file watcher on the page's file; if A1 finds no clean way, the reload button stays at the bar's left.
+- The rest of the bar stays the browser's (Jarmo, 4 November, ritemark-dev 14e0d03 and 05bc028): the address, back, forward and reload; links open in the same tab and back returns. No navigation handler.
+- Reload on a file change: upstream's `browserAutoReloadFeatures.ts` (VS Code 1.142, `workbench.browser.autoReloadOnFileChange`, on) already watches a `file:` page and reloads it while it is in front; nothing to build.
 - The session is unchanged (Jarmo, decision 4: no).
 
 ### W3: What goes and the guard (R3, R4, R5, R8), PR 3

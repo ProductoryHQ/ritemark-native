@@ -7,12 +7,14 @@
 
 import assert from 'node:assert/strict';
 import { CloudflareAccount, CONNECTION_SECRET_KEY, type SecretsLike } from './account';
-import { assetHash, buildManifest, cleanName, contentHash, MAX_FILE_BYTES, NOINDEX_HEADERS, siteAddress, siteNameFor, slug, suggestSubdomain } from './assets';
-import { CloudflareClient, CLOUDFLARE_API, type FetchLike } from './client';
-import { CloudflareHost, COULD_NOT_REACH_PUBLISH, COULD_NOT_REACH_UNPUBLISH } from './CloudflareHost';
+import { assetHash, buildManifest, cleanName, NOINDEX_HEADERS, siteAddress, siteNameFor, slug, suggestSubdomain } from './assets';
+import { CloudflareApiError, CloudflareClient, CLOUDFLARE_API, MAX_ANSWER_BYTES, SubdomainExistsError, type FetchLike } from './client';
+import { ADDRESS_TAKEN, CloudflareHost, COULD_NOT_REACH_PUBLISH, COULD_NOT_REACH_UNPUBLISH } from './CloudflareHost';
 import { redact } from './redact';
 import { FakeCloudflare } from './testing/fakeCloudflare';
-import { PublishError, type PublishAsset } from '../host';
+import { HARBOUR, testProject } from './testing/pages';
+import { isVerifiedUpload, PublishError, readVerifiedUpload, type UploadFile, type VerifiedUpload } from '../host';
+import { MAX_FILE_BYTES } from '../types';
 
 // Test tokens are made here, at run time, so no token-shaped string sits in the repo
 const TOKEN = `t${'0123456789abcdef'.repeat(2)}Xy_${Date.now().toString(36)}`;
@@ -51,14 +53,26 @@ async function setup(options: { log?: string[] } = {}) {
   return { fake, secrets, account, host, log };
 }
 
-function page(extra: PublishAsset[] = []): PublishAsset[] {
+/** PR 3's plan for a real page on disk, as bytes: the only kind of upload the host takes. */
+async function upload(files: Record<string, string | Uint8Array> = HARBOUR): Promise<VerifiedUpload> {
+  const project = await testProject(files);
+  try {
+    return await readVerifiedUpload(await project.gather());
+  } finally {
+    await project.cleanup();
+  }
+}
+
+function page(): UploadFile[] {
   return [
     { urlPath: '/index.html', bytes: Buffer.from('<h1>Harbour</h1><img src="img/a.png">') },
     { urlPath: '/img/a.png', bytes: Buffer.from([137, 80, 78, 71, 1, 2, 3]) },
     { urlPath: '/style.css', bytes: Buffer.from('body{color:#123}') },
-    ...extra,
   ];
 }
+
+const FIRST = { replacing: false };
+const AGAIN = { replacing: true };
 
 // ---------------------------------------------------------------- pure parts
 
@@ -77,8 +91,6 @@ test('the manifest: hashes are stable, over-limit files stop everything before a
   const { manifest } = buildManifest(page());
   assert.equal(Object.keys(manifest).length, 3);
   assert.equal(manifest['/index.html'].hash, assetHash(page()[0].bytes, '/index.html'));
-  assert.equal(contentHash(page()), contentHash([...page()].reverse()), 'the order of the files does not change the hash');
-  assert.notEqual(contentHash(page()), contentHash(page([{ urlPath: '/new.png', bytes: Buffer.from([1]) }])));
   assert.throws(() => buildManifest([{ urlPath: '/big.mp4', bytes: new Uint8Array(MAX_FILE_BYTES + 1) }]), (e: unknown) => e instanceof PublishError && e.code === 'too-big');
   assert.throws(() => buildManifest([{ urlPath: '/../x', bytes: new Uint8Array(1) }]), PublishError);
 });
@@ -172,7 +184,7 @@ test('the taken name: "This name is taken. Try another." and nothing changes; a 
     await account.connectWithToken(TOKEN);
     await assert.rejects(host.chooseSubdomain('pages-1111'), (e: unknown) => e instanceof PublishError && e.code === 'name-taken' && e.message === 'This name is taken. Try another.');
     assert.equal(account.snapshot().subdomain, null);
-    await assert.rejects(host.publish('harbour-programme-7f3a2c', { assets: page(), pageUrlPath: '/index.html' }), PublishError, 'Publish waits for the name');
+    await assert.rejects(host.publish('harbour-programme-7f3a2c', await upload(), FIRST), PublishError, 'Publish waits for the name');
     assert.equal(await host.chooseSubdomain('Pages 4821'), 'pages-4821');
     assert.equal(account.snapshot().subdomain, 'pages-4821');
   } finally { await fake.stop(); }
@@ -184,7 +196,7 @@ test('publish: the upload goes with the upload JWT, the deploy carries noindex, 
   const { fake, account, host } = await setup();
   try {
     await account.connectWithToken(TOKEN);
-    const site = await host.publish('harbour-programme-7f3a2c', { assets: page(), pageUrlPath: '/index.html' });
+    const site = await host.publish('harbour-programme-7f3a2c', await upload(), FIRST);
     assert.equal(site.address, 'https://harbour-programme-7f3a2c.pages-4821.workers.dev/');
     const script = fake.scripts.get('harbour-programme-7f3a2c')!;
     assert.equal(script.headers, NOINDEX_HEADERS);
@@ -209,7 +221,7 @@ test('Wrangler\'s single-file upload mode works too', async () => {
   try {
     fake.singleUploads = true;
     await account.connectWithToken(TOKEN);
-    await host.publish('harbour-programme-7f3a2c', { assets: page(), pageUrlPath: '/index.html' });
+    await host.publish('harbour-programme-7f3a2c', await upload(), FIRST);
     assert.equal(fake.requests.filter((r) => /\/workers\/assets\/upload\/[0-9a-f]{32}$/.test(r.path)).length, 3);
   } finally { await fake.stop(); }
 });
@@ -218,10 +230,10 @@ test('update keeps the address and sends only what changed; a file no longer use
   const { fake, account, host } = await setup();
   try {
     await account.connectWithToken(TOKEN);
-    await host.publish('harbour-programme-7f3a2c', { assets: page(), pageUrlPath: '/index.html' });
+    await host.publish('harbour-programme-7f3a2c', await upload(), FIRST);
     const before = fake.requests.length;
-    const changed = [{ urlPath: '/index.html', bytes: Buffer.from('<h1>Harbour, updated</h1>') }, page()[2]];
-    const site = await host.publish('harbour-programme-7f3a2c', { assets: changed, pageUrlPath: '/index.html' });
+    const changed = await upload({ 'Harbour programme.html': '<link rel="stylesheet" href="style.css"><h1>Harbour, updated</h1>', 'style.css': 'body{color:#123}' });
+    const site = await host.publish('harbour-programme-7f3a2c', changed, AGAIN);
     assert.equal(site.address, 'https://harbour-programme-7f3a2c.pages-4821.workers.dev/');
     const uploads = fake.requests.slice(before).filter((r) => r.path.includes('/workers/assets/upload'));
     assert.equal(uploads.length, 1, 'only the changed page goes up');
@@ -236,7 +248,7 @@ test('retries: a 429 and a 500 are tried again; a dropped upload is tried again'
     fake.failures.push({ path: /assets-upload-session$/, status: 429, times: 1 });
     fake.failures.push({ method: 'PUT', path: /\/scripts\/[a-z0-9-]+$/, status: 503, times: 2 });
     fake.failures.push({ path: /\/workers\/assets\/upload$/, drop: true, times: 1 });
-    await host.publish('harbour-programme-7f3a2c', { assets: page(), pageUrlPath: '/index.html' });
+    await host.publish('harbour-programme-7f3a2c', await upload(), FIRST);
     assert.ok(fake.scripts.has('harbour-programme-7f3a2c'));
   } finally { await fake.stop(); }
 });
@@ -247,12 +259,12 @@ test('a publish that keeps failing reads "…The page is still on this computer.
   try {
     await account.connectWithToken(TOKEN);
     fake.failures.push({ path: /assets-upload-session$/, status: 500, times: 10 });
-    await assert.rejects(host.publish('harbour-programme-7f3a2c', { assets: page(), pageUrlPath: '/index.html' }),
+    await assert.rejects(host.publish('harbour-programme-7f3a2c', await upload(), FIRST),
       (e: unknown) => e instanceof PublishError && e.message === COULD_NOT_REACH_PUBLISH);
     fake.failures.length = 0;
     // A refusal whose text echoes the Authorization header: the log must not hold the token
     fake.tokens.set(TOKEN, 'no-publish');
-    await assert.rejects(host.publish('harbour-programme-7f3a2c', { assets: page(), pageUrlPath: '/index.html' }), PublishError);
+    await assert.rejects(host.publish('harbour-programme-7f3a2c', await upload(), FIRST), PublishError);
     const all = log.join('\n');
     assert.ok(all.includes('Authentication error'), 'Cloudflare\'s own text reached the log');
     assert.ok(!all.includes(TOKEN), 'but never the token');
@@ -264,7 +276,7 @@ test('unpublish resolves only once the address stops answering; the 10 s line co
   const { fake, account, host } = await setup();
   try {
     await account.connectWithToken(TOKEN);
-    const site = await host.publish('harbour-programme-7f3a2c', { assets: page(), pageUrlPath: '/index.html' });
+    const site = await host.publish('harbour-programme-7f3a2c', await upload(), FIRST);
     fake.goneAfterChecks = 7; // still cached for 7 checks, 2 s apart
     let slow = 0;
     await host.unpublish(site.name, site.address, { onSlow: () => { slow++; } });
@@ -280,10 +292,10 @@ test('unpublish that never sees the page go says "…The page is still online.";
   const { fake, account, host } = await setup();
   try {
     await account.connectWithToken(TOKEN);
-    const site = await host.publish('harbour-programme-7f3a2c', { assets: page(), pageUrlPath: '/index.html' });
+    const site = await host.publish('harbour-programme-7f3a2c', await upload(), FIRST);
     fake.goneAfterChecks = 1_000;
     await assert.rejects(host.unpublish(site.name, site.address), (e: unknown) => e instanceof PublishError && e.code === 'still-online' && e.message === COULD_NOT_REACH_UNPUBLISH);
-    const second = await host.publish('appendix-111111', { assets: page(), pageUrlPath: '/index.html' });
+    const second = await host.publish('appendix-111111', await upload(), FIRST);
     fake.failures.push({ method: 'DELETE', path: /\/scripts\//, status: 500, times: 10 });
     await assert.rejects(host.unpublish(second.name, second.address), (e: unknown) => e instanceof PublishError && e.message === COULD_NOT_REACH_UNPUBLISH);
     assert.ok(fake.scripts.has(second.name), 'the page is still there, as the line says');
@@ -295,9 +307,9 @@ test('S21: across a connect, a publish, an update, a failure and an unpublish, t
   const { fake, account, host } = await setup({ log });
   try {
     await account.connectWithToken(TOKEN);
-    const site = await host.publish('harbour-programme-7f3a2c', { assets: page(), pageUrlPath: '/index.html' });
+    const site = await host.publish('harbour-programme-7f3a2c', await upload(), FIRST);
     fake.failures.push({ path: /assets-upload-session$/, status: 500, times: 1 });
-    await host.publish(site.name, { assets: page(), pageUrlPath: '/index.html' });
+    await host.publish(site.name, await upload(), AGAIN);
     await host.unpublish(site.name, site.address);
     assert.ok(!fake.allTraffic().includes(TOKEN), 'no URL, query or body carries the token');
     for (const r of fake.requests) {
@@ -305,6 +317,208 @@ test('S21: across a connect, a publish, an update, a failure and an unpublish, t
     }
     assert.ok(!log.join('\n').includes(TOKEN));
   } finally { await fake.stop(); }
+});
+
+// ---------------------------------------------------------------- Round 2: PR 3's plan as bytes
+
+test('bytes by hash: the upload is the gathered plan\'s files, read again by real path and matched to their sha256', async () => {
+  const project = await testProject();
+  try {
+    const plan = await project.gather();
+    const up = await readVerifiedUpload(plan);
+    assert.ok(isVerifiedUpload(up));
+    assert.equal(up.pageUrlPath, '/index.html', 'the page is its folder\'s index.html: the address is the site\'s own');
+    assert.equal(up.contentHash, plan.contentHash, 'one content hash: PR 3\'s');
+    assert.deepEqual(up.files.map((f) => f.urlPath).sort(), ['/img/a.png', '/index.html', '/style.css']);
+    assert.deepEqual(Buffer.from(up.files.find((f) => f.urlPath === '/style.css')!.bytes).toString(), 'body{color:#123}');
+    // A file changed after the sheet showed it: nothing goes, and the line names it
+    await project.write('style.css', 'body{color:#456}');
+    await assert.rejects(readVerifiedUpload(plan), (e: unknown) => e instanceof PublishError && e.code === 'changed' && e.message.startsWith('style.css changed') && e.message.includes('Nothing was sent'));
+    // The same bytes again: it goes again
+    await project.write('style.css', 'body{color:#123}');
+    assert.ok(isVerifiedUpload(await readVerifiedUpload(plan)));
+    // A file that is gone: stopped the same way
+    await project.write('img/a.png', new Uint8Array([9]));
+    await assert.rejects(readVerifiedUpload(plan), (e: unknown) => e instanceof PublishError && e.code === 'changed' && e.message.startsWith('a.png changed'));
+  } finally { await project.cleanup(); }
+});
+
+test('bytes by hash: a plan gatherPage didn\'t make, a copy of one, or a frozen one\'s mutation is refused', async () => {
+  const project = await testProject();
+  try {
+    const plan = await project.gather();
+    await assert.rejects(readVerifiedUpload({ ...plan } as never), (e: unknown) => e instanceof PublishError && e.code === 'failed', 'a copy');
+    await assert.rejects(readVerifiedUpload(JSON.parse(JSON.stringify(plan))), PublishError, 'a plan written by hand');
+    assert.throws(() => { (plan.files as unknown as unknown[]).push({ relPath: '.env' }); }, TypeError, 'the plan is frozen');
+    try { (plan.files[0] as { realPath: string }).realPath = '/etc/passwd'; } catch { /* strict mode throws */ }
+    assert.notEqual(plan.files[0].realPath, '/etc/passwd', 'a gathered file can\'t be pointed elsewhere');
+    assert.ok(Object.isFrozen(plan) && Object.isFrozen(plan.keyHits) && Object.isFrozen(plan.leftOut));
+  } finally { await project.cleanup(); }
+});
+
+test('the host takes only a verified upload: a hand-made one never reaches Cloudflare', async () => {
+  const { fake, account, host } = await setup();
+  try {
+    await account.connectWithToken(TOKEN);
+    const before = fake.requests.length;
+    const forged = { files: page(), pageUrlPath: '/index.html', contentHash: 'x' } as VerifiedUpload;
+    await assert.rejects(host.publish('harbour-programme-7f3a2c', forged, FIRST), PublishError);
+    assert.equal(fake.requests.length, before, 'no call at all');
+  } finally { await fake.stop(); }
+});
+
+test('a first publish never replaces a Worker already on the account; an update of its own does', async () => {
+  const { fake, account, host } = await setup();
+  try {
+    await account.connectWithToken(TOKEN);
+    await host.publish('harbour-programme-7f3a2c', await upload(), FIRST);
+    const before = fake.requests.length;
+    await assert.rejects(host.publish('harbour-programme-7f3a2c', await upload(), FIRST), (e: unknown) => e instanceof PublishError && e.code === 'address-taken' && e.message === ADDRESS_TAKEN);
+    assert.ok(!fake.requests.slice(before).some((r) => r.path.endsWith('/assets-upload-session') || r.method === 'PUT'), 'nothing deployed over it');
+    await host.publish('harbour-programme-7f3a2c', await upload(), AGAIN);
+  } finally { await fake.stop(); }
+});
+
+// ---------------------------------------------------------------- Round 2: the workers.dev name is never renamed
+
+test('subdomain guard: a name set since connecting (Cloudflare\'s dashboard) is kept; no PUT', async () => {
+  const { fake, account, host } = await setup();
+  try {
+    fake.subdomain = null;
+    await account.connectWithToken(TOKEN);
+    assert.equal(account.snapshot().subdomain, null);
+    fake.subdomain = 'mari-pages'; // set elsewhere after the connect
+    await assert.rejects(host.chooseSubdomain('pages-4821'), (e: unknown) => e instanceof SubdomainExistsError && e.existing === 'mari-pages');
+    assert.equal(fake.subdomain, 'mari-pages', 'not renamed');
+    assert.ok(!fake.requests.some((r) => r.method === 'PUT' && r.path.endsWith('/workers/subdomain')), 'no PUT was sent');
+    assert.equal(account.snapshot().subdomain, 'mari-pages', 'the account\'s own name is kept here');
+  } finally { await fake.stop(); }
+});
+
+test('subdomain guard: a read that fails, or answers without a name, is an error, never "no name"; no PUT', async () => {
+  const { fake, account, host } = await setup();
+  try {
+    fake.subdomain = null;
+    await account.connectWithToken(TOKEN);
+    fake.subdomain = 'mari-pages';
+    fake.failures.push({ method: 'GET', path: /\/workers\/subdomain$/, status: 500, times: 10 });
+    await assert.rejects(host.chooseSubdomain('pages-4821'), PublishError);
+    fake.failures.length = 0;
+    fake.failures.push({ method: 'GET', path: /\/workers\/subdomain$/, status: 403, code: 10000, times: 1 });
+    await assert.rejects(host.chooseSubdomain('pages-4821'), PublishError);
+    fake.failures.length = 0;
+    fake.failures.push({ method: 'GET', path: /\/workers\/subdomain$/, status: 404, code: 7003, times: 1 });
+    await assert.rejects(host.chooseSubdomain('pages-4821'), PublishError, 'a 404 without 10007 is not "no name"');
+    assert.ok(!fake.requests.some((r) => r.method === 'PUT' && r.path.endsWith('/workers/subdomain')), 'no PUT was sent');
+    assert.equal(fake.subdomain, 'mari-pages');
+    // An answer with no name in it
+    const client = new CloudflareClient({ fetch: async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ success: true, result: {} }) }), token: () => TOKEN, sleep: noSleep });
+    await assert.rejects(client.subdomain(ACCOUNT), CloudflareApiError);
+    await assert.rejects(client.registerSubdomain(ACCOUNT, 'pages-4821'), CloudflareApiError);
+  } finally { await fake.stop(); }
+});
+
+test('connect: a workers.dev read that fails stores nothing; only 10007 connects with no name', async () => {
+  const { fake, secrets, account } = await setup();
+  try {
+    fake.failures.push({ method: 'GET', path: /\/workers\/subdomain$/, status: 500, times: 10 });
+    assert.equal(await account.connectWithToken(TOKEN), 'unreachable');
+    fake.failures.length = 0;
+    fake.failures.push({ method: 'GET', path: /\/workers\/subdomain$/, status: 403, code: 10000, times: 1 });
+    assert.equal(await account.connectWithToken(TOKEN), 'cannot-publish');
+    fake.failures.length = 0;
+    fake.failures.push({ method: 'GET', path: /\/workers\/subdomain$/, status: 400, code: 7003, times: 1 });
+    assert.equal(await account.connectWithToken(TOKEN), 'refused');
+    assert.equal(secrets.map.size, 0, 'nothing stored on any of them');
+    fake.subdomain = null;
+    assert.equal(await account.connectWithToken(TOKEN), 'connected');
+    assert.equal(account.snapshot().subdomain, null);
+  } finally { await fake.stop(); }
+});
+
+test('refreshSubdomain: the name Cloudflare has now, kept; a failed read throws', async () => {
+  const { fake, account, host } = await setup();
+  try {
+    fake.subdomain = null;
+    await account.connectWithToken(TOKEN);
+    fake.subdomain = 'mari-pages';
+    assert.equal(await host.refreshSubdomain(), 'mari-pages');
+    assert.equal(account.snapshot().subdomain, 'mari-pages');
+    fake.failures.push({ method: 'GET', path: /\/workers\/subdomain$/, status: 500, times: 10 });
+    await assert.rejects(host.refreshSubdomain(), PublishError);
+    assert.equal(account.snapshot().subdomain, 'mari-pages', 'a failed read changes nothing');
+  } finally { await fake.stop(); }
+});
+
+// ---------------------------------------------------------------- Round 2: the transport
+
+test('redaction: an unreachable Cloudflare\'s error text never carries the token, to the person or the log', async () => {
+  const log: string[] = [];
+  const fetchThatEchoes: FetchLike = async (_url, init) => {
+    throw new Error(`connect ECONNREFUSED; request had Authorization: ${init?.headers?.Authorization} and ${TOKEN} and ${ACCOUNT}`);
+  };
+  const client = new CloudflareClient({ fetch: fetchThatEchoes, token: () => TOKEN, sleep: noSleep, retries: 2, log: (l) => log.push(l) });
+  let caught: unknown;
+  try { await client.subdomain(ACCOUNT); } catch (error) { caught = error; }
+  assert.ok(caught instanceof PublishError && caught.code === 'unreachable');
+  const said = `${(caught as Error).message}\n${log.join('\n')}`;
+  assert.ok(said.includes('ECONNREFUSED'), 'the transport\'s reason is kept');
+  assert.ok(!said.includes(TOKEN), 'never the token');
+  assert.ok(!said.includes(ACCOUNT), 'never the account ID');
+  assert.ok(!/Bearer\s+(?!<redacted>)\S/.test(said), 'no Bearer value');
+});
+
+test('deadline: a transport that ignores the abort, or an answer that never ends, is bounded by timeoutMs per try', async () => {
+  const hangs: FetchLike = () => new Promise(() => {});
+  const neverEnds: FetchLike = async () => ({ ok: true, status: 200, text: () => new Promise<string>(() => {}) });
+  for (const fetchLike of [hangs, neverEnds]) {
+    const client = new CloudflareClient({ fetch: fetchLike, token: () => TOKEN, sleep: noSleep, timeoutMs: 40, retries: 2 });
+    const started = Date.now();
+    await assert.rejects(client.accounts(), (e: unknown) => e instanceof PublishError && e.code === 'unreachable');
+    const took = Date.now() - started;
+    assert.ok(took >= 110 && took < 1_000, `three tries of 40 ms, bounded: ${took} ms`);
+  }
+  // The address check too: never longer than one try
+  const client = new CloudflareClient({ fetch: hangs, token: () => TOKEN, sleep: noSleep, timeoutMs: 40 });
+  const started = Date.now();
+  assert.equal(await client.addressAnswers('https://a-111111.pages-4821.workers.dev/'), 'unknown');
+  assert.ok(Date.now() - started < 1_000);
+});
+
+test('API calls never follow a redirect; the address check reads no body', async () => {
+  const seen: Array<{ url: string; redirect?: string }> = [];
+  let bodyRead = false;
+  const spy: FetchLike = async (url, init) => {
+    seen.push({ url, redirect: init?.redirect });
+    return { ok: true, status: 200, text: async () => { bodyRead = true; return JSON.stringify({ success: true, result: [] }); } };
+  };
+  const client = new CloudflareClient({ fetch: spy, token: () => TOKEN, sleep: noSleep });
+  await client.accounts();
+  await client.scriptExists(ACCOUNT, 'a-111111');
+  assert.ok(seen.every((s) => s.redirect === 'error'), JSON.stringify(seen));
+  bodyRead = false;
+  await client.addressAnswers('https://a-111111.pages-4821.workers.dev/');
+  assert.equal(seen.at(-1)!.redirect, 'manual');
+  assert.equal(bodyRead, false, 'the public page\'s body is never read');
+});
+
+test('an answer over the cap is refused once, not read whole and not retried', async () => {
+  let calls = 0;
+  const declared: FetchLike = async () => {
+    calls++;
+    return { ok: true, status: 200, headers: { get: (n: string) => (n.toLowerCase() === 'content-length' ? String(MAX_ANSWER_BYTES + 1) : null) }, text: async () => { throw new Error('read whole'); } };
+  };
+  await assert.rejects(new CloudflareClient({ fetch: declared, token: () => TOKEN, sleep: noSleep }).accounts(), CloudflareApiError);
+  assert.equal(calls, 1, 'not retried');
+  // No length given: streamed, and stopped once past the cap
+  let pulled = 0;
+  const streamed: FetchLike = async () => ({
+    ok: true, status: 200, headers: { get: () => null },
+    body: { getReader: () => ({ read: async () => { pulled++; return { done: false, value: new Uint8Array(1024 * 1024) }; }, cancel: async () => {} }) },
+    text: async () => { throw new Error('read whole'); },
+  });
+  await assert.rejects(new CloudflareClient({ fetch: streamed, token: () => TOKEN, sleep: noSleep }).accounts(), CloudflareApiError);
+  assert.ok(pulled <= 5, `stopped after ${pulled} MB`);
 });
 
 void (async () => {

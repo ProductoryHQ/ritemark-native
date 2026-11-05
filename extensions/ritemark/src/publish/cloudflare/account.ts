@@ -150,12 +150,14 @@ export class CloudflareAccount {
         continue;
       }
       if (!allowed) continue;
-      let subdomain: string | null = null;
+      // null only for Cloudflare's "no name yet" (10007); a read that fails is the token check's failure, never
+      // "no name", since "no name" leads to registering one (Opus review of b07e7c11)
+      let subdomain: string | null;
       try {
         subdomain = await probe.subdomain(account.id);
       } catch (error) {
-        if (failureOutcome(error) === 'unreachable') return 'unreachable';
-        subdomain = null;
+        if (error instanceof CloudflareApiError && error.status === 403) return 'cannot-publish';
+        return failureOutcome(error);
       }
       await this.persist({ v: 1, kind: 'token', token, accountId: account.id, accountName: account.name, subdomain, connectedAt: this.now() });
       return 'connected';
@@ -169,6 +171,18 @@ export class CloudflareAccount {
     await this.deps.secrets.delete(CONNECTION_SECRET_KEY);
     this.connection = null;
     this.emit();
+  }
+
+  /**
+   * The account's workers.dev name as Cloudflare has it now (it may have been set in Cloudflare's dashboard since
+   * connecting). Kept when it changed. null only for "no name yet"; a failed read throws.
+   */
+  async refreshSubdomain(): Promise<string | null> {
+    const id = this.accountId();
+    if (!this.connection || !id) throw new PublishError('not-connected', 'Connect Cloudflare first.');
+    const now = await this.client().subdomain(id);
+    if (this.connection && now !== this.connection.subdomain) await this.persist({ ...this.connection, subdomain: now });
+    return now;
   }
 
   async setSubdomain(subdomain: string): Promise<void> {

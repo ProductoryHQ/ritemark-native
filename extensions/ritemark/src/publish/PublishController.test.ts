@@ -1,49 +1,102 @@
 /**
- * Sprint 149, PR 4: the publish controller with the real Cloudflare host against the local fake server. Settings ▸
- * Sharing ▸ Web pages, the token box's three outcomes, the flag, the page's states, and S20a/S21: no message to or
- * from the page, no log line and no projection carries the token.
+ * Sprint 149, PR 4: the publish controller with the real Cloudflare host against the local fake server, PR 3's real
+ * gather on real files, and PR 3's record store. Settings ▸ Sharing ▸ Web pages, the token box's three outcomes,
+ * frame 2, the sheet's name row and address, the flag, the page's states, and S20a/S21: no message to or from the
+ * page, no log line and no projection carries the token.
  *
  * Run: npx tsx src/publish/PublishController.test.ts
  */
 
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { CloudflareAccount, CONNECTION_SECRET_KEY, type SecretsLike } from './cloudflare/account';
 import { CloudflareClient, type FetchLike } from './cloudflare/client';
 import { CloudflareHost, CONNECT_AGAIN, COULD_NOT_REACH_UNPUBLISH } from './cloudflare/CloudflareHost';
-import { SiteLedger } from './cloudflare/siteLedger';
 import { FakeCloudflare } from './cloudflare/testing/fakeCloudflare';
-import { contentHash } from './cloudflare/assets';
-import { NAME_TAKEN, OTHER_ACCOUNT, PublishController, SLOW_UNPUBLISH, TOKEN_BOX, TOKEN_TEMPLATE_URL, TOKEN_WORDS } from './PublishController';
+import { HARBOUR, testProject, type TestProject } from './cloudflare/testing/pages';
+import {
+  DISCONNECT_FAILED,
+  KEY_NEEDS_SHEET,
+  NAME_TAKEN,
+  OTHER_ACCOUNT,
+  PublishController,
+  SLOW_UNPUBLISH,
+  TOKEN_BOX,
+  TOKEN_TEMPLATE_URL,
+  TOKEN_WORDS,
+  UNPUBLISHED_LIST_STALE,
+  SHEET_HOST_COMMAND,
+  sheetHostAvailable,
+  type PublishUi,
+} from './PublishController';
+import { PublishRecordStore, RECORDS_FILE, RECORDS_FOLDER } from './publishRecords';
 import { decodeSettingsRequest, type WebPagesSettingsProjection } from './settingsProtocol';
-import type { PublishAsset } from './host';
+import type { SheetConfirm, SheetConfirmReply, SheetOptions } from './sheetModel';
+import type { GatheredPlan, PublishPlan } from './types';
+import { PublishError } from './host';
 
 const TOKEN = `t${'0123456789abcdef'.repeat(2)}Xy_${Date.now().toString(36)}`;
 const WEAK = `w${'fedcba9876543210'.repeat(2)}Zq_${Date.now().toString(36)}`;
 const ACCOUNT = 'a'.repeat(32);
+const RANDOM = () => Buffer.from([0x7f, 0x3a, 0x2c]);
 
 const tests: Array<[string, () => Promise<void>]> = [];
 const test = (name: string, fn: () => Promise<void>) => tests.push([name, fn]);
 
 class MemorySecrets implements SecretsLike {
   readonly map = new Map<string, string>();
+  failDelete = false;
   async get(key: string) { return this.map.get(key); }
   async store(key: string, value: string) { this.map.set(key, value); }
-  async delete(key: string) { this.map.delete(key); }
+  async delete(key: string) { if (this.failDelete) throw new Error('keychain locked'); this.map.delete(key); }
 }
 
 const realFetch: FetchLike = (url, init) => fetch(url, init as RequestInit);
 
-function assets(): PublishAsset[] {
-  return [
-    { urlPath: '/index.html', bytes: Buffer.from('<h1>Harbour</h1>') },
-    { urlPath: '/img/a.png', bytes: Buffer.from([1, 2, 3]) },
-  ];
+type SheetRequest = Parameters<PublishUi['showSheet']>[0];
+type SheetResult = Awaited<ReturnType<PublishUi['showSheet']>>;
+
+/** What a sheet showed, and what the host answered each press of Publish. */
+interface SheetSeen { plan: PublishPlan; options: SheetOptions; replies: SheetConfirmReply['kind'][] }
+
+/**
+ * The sheet, driven as a person would: frame 2's Set up when there is no plan, then each press in `presses` (the
+ * default: the address and name the sheet shows), until the host lets it close. `cancel` presses Cancel instead.
+ */
+function driveSheet(seen: SheetSeen[], presses: Array<Partial<SheetConfirm> | 'cancel'> = [{}]) {
+  return async (req: SheetRequest): Promise<SheetResult> => {
+    let plan = req.plan;
+    let options = req.options;
+    if (!plan) {
+      const r = await req.setup!.run();
+      if (!r || 'stop' in r) return { kind: 'cancel' };
+      plan = r.plan;
+      options = r.options;
+    }
+    const sheet: SheetSeen = { plan, options, replies: [] };
+    seen.push(sheet);
+    for (const press of presses) {
+      if (press === 'cancel') return { kind: 'cancel' };
+      const confirm: SheetConfirm = {
+        anyway: plan.keyHits.length > 0,
+        pagePart: options.address?.editable ? options.address.page : undefined,
+        subdomain: options.nameRow?.suggestion,
+        ...press,
+      };
+      const reply = await req.onConfirm(confirm);
+      sheet.replies.push(reply.kind);
+      if (reply.kind === 'update') { options = reply.options; sheet.options = options; continue; }
+      if (reply.kind === 'close') return { kind: plan.keyHits.length > 0 ? 'publishAnyway' : 'publish', pagePart: confirm.pagePart, plan };
+      if (reply.kind === 'stop') return { kind: 'cancel' };
+    }
+    return { kind: 'cancel' };
+  };
 }
 
-async function setup(options: { flag?: boolean; pasted?: string[]; goneAfterChecks?: number } = {}) {
+async function setup(options: { flag?: boolean; pasted?: string[]; goneAfterChecks?: number; files?: Record<string, string | Uint8Array> } = {}) {
   const fake = await new FakeCloudflare().start();
   fake.tokens.set(TOKEN, 'ok');
   fake.tokens.set(WEAK, 'no-publish');
@@ -56,46 +109,68 @@ async function setup(options: { flag?: boolean; pasted?: string[]; goneAfterChec
   });
   let clock = 0;
   const host = new CloudflareHost(account, { log: (l) => log.push(l), sleep: async (ms) => { clock += ms; }, now: () => clock, unpublishDeadlineMs: 60_000 });
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ritemark-publish-'));
-  const ledger = new SiteLedger(path.join(dir, 'publish', 'v1'));
+  const storage = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'ritemark-publish-')));
+  const records = new PublishRecordStore(storage);
+  const project = await testProject(options.files ?? HARBOUR);
   const posted: WebPagesSettingsProjection[] = [];
   const opened: string[] = [];
   const boxes: Array<{ title: string; prompt: string; lines: Array<string | null> }> = [];
   const ready: boolean[] = [];
   const pageEvents: string[] = [];
+  const failures: string[] = [];
+  const sheets: SheetSeen[] = [];
   const flag = { on: options.flag ?? true };
   const pasted = [...(options.pasted ?? [])];
+  const ui = {
+    openExternal: async (url: string) => { opened.push(url); return true; },
+    // The host's password box: each paste is checked; a line keeps the box open for the next paste
+    askToken: async ({ title, prompt, check }: Parameters<PublishUi['askToken']>[0]) => {
+      const box = { title, prompt, lines: [] as Array<string | null> };
+      boxes.push(box);
+      while (pasted.length) {
+        const line = await check(pasted.shift()!);
+        box.lines.push(line);
+        if (line === null) return;
+      }
+    },
+    showSheet: driveSheet(sheets) as PublishUi['showSheet'],
+    showFailure: (line: string) => { failures.push(line); },
+  };
   const controller = new PublishController({
     host,
-    ledger,
-    ui: {
-      openExternal: async (url) => { opened.push(url); return true; },
-      // The host's password box: each paste is checked; a line keeps the box open for the next paste
-      askToken: async ({ title, prompt, check }) => {
-        const box = { title, prompt, lines: [] as Array<string | null> };
-        boxes.push(box);
-        while (pasted.length) {
-          const line = await check(pasted.shift()!);
-          box.lines.push(line);
-          if (line === null) return;
-        }
-      },
-    },
+    records,
+    ui,
+    gather: (pagePath, folder) => (pagePath.startsWith(project.dir) ? project.gather(path.relative(project.dir, pagePath)) : Promise.reject(new Error(`not the test project: ${folder}`))),
     isFeatureEnabled: () => flag.on,
     postSettings: (p) => posted.push(p),
     setReady: (r) => ready.push(r),
     onPageState: (p) => pageEvents.push(p),
     log: (l) => log.push(l),
     now: () => 5_000,
+    random: RANDOM,
   });
-  const cleanup = async () => { await fake.stop(); await fs.rm(dir, { recursive: true, force: true }); };
-  return { fake, secrets, account, host, ledger, controller, posted, opened, boxes, ready, pageEvents, flag, log, cleanup, dir, pasted };
+  const page = { realPath: project.page(), projectFolder: project.dir };
+  const cleanup = async () => { await fake.stop(); await fs.rm(storage, { recursive: true, force: true }); await project.cleanup(); };
+  return { fake, secrets, account, host, records, controller, posted, opened, boxes, ready, pageEvents, failures, sheets, ui, flag, log, cleanup, storage, pasted, project, page };
 }
 
+type T = Awaited<ReturnType<typeof setup>>;
+
 /** Everything that left the host for the page, and every log line. */
-function everythingSaid(t: { posted: unknown[]; log: string[] }): string {
-  return JSON.stringify(t.posted) + '\n' + t.log.join('\n');
+function everythingSaid(t: { posted: unknown[]; log: string[]; sheets: unknown[]; failures: string[] }): string {
+  return JSON.stringify(t.posted) + '\n' + t.log.join('\n') + '\n' + JSON.stringify(t.sheets.map((s) => (s as SheetSeen).options)) + '\n' + t.failures.join('\n');
 }
+
+/** Connect, then publish the test page through the sheet. */
+async function publishedOnce(t: T) {
+  await t.controller.startTokenEntry();
+  await t.controller.publishFromBar(t.page);
+  const record = await t.records.get(t.page.realPath);
+  assert.ok(record, `published: ${t.failures.join(' | ')}`);
+  return record!;
+}
+
+const uploads = (t: T) => t.fake.requests.filter((r) => r.path.includes('/workers/assets/upload'));
 
 // ---------------------------------------------------------------- the protocol (R9, S20a)
 
@@ -111,7 +186,7 @@ test('the page can send five messages, by their exact fields; none can carry a t
 
 // ---------------------------------------------------------------- the token box (R6, S20)
 
-test('Use a token: Cloudflare\'s page and the host\'s own box at once, with the lead\'s words; a good token connects', async () => {
+test('Set up: Cloudflare\'s page and the host\'s own box at once, with the lead\'s words; a good token connects', async () => {
   const t = await setup({ pasted: [TOKEN] });
   try {
     await t.controller.handleSettingsMessage({ type: 'publish:startTokenEntry' });
@@ -153,36 +228,168 @@ test('with no OAuth client (2.2), Connect is the token path, and the card says O
   } finally { await t.cleanup(); }
 });
 
+// ---------------------------------------------------------------- the bar's Publish: frame 2, frame 3 (R5, R7)
+
+test('the first Publish with nothing set up: frame 2\'s Set up is the token path, then the sheet, then the page is online', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    await t.controller.publishFromBar(t.page);
+    assert.equal(t.boxes.length, 1, 'Set up opened the host\'s own box');
+    assert.deepEqual(t.opened, [TOKEN_TEMPLATE_URL], 'and Cloudflare\'s token page');
+    assert.equal(t.sheets.length, 1);
+    const shown = t.sheets[0].options;
+    assert.deepEqual(shown.destination, { name: 'Your Cloudflare', detail: 'Mari Tamm' });
+    assert.deepEqual(shown.address, { page: 'harbour-programme-7f3a2c', suffix: '.pages-4821.workers.dev', editable: true });
+    assert.equal(shown.nameRow, undefined, 'the account has a name: no name row');
+    const record = await t.records.get(t.page.realPath);
+    assert.equal(record?.address, 'https://harbour-programme-7f3a2c.pages-4821.workers.dev/');
+    assert.equal(t.failures.length, 0);
+    const res = await fetch(`${t.fake.base}/__site/harbour-programme-7f3a2c.pages-4821.workers.dev/`);
+    assert.match(await res.text(), /Harbour/);
+    assert.equal(res.headers.get('x-robots-tag'), 'noindex');
+  } finally { await t.cleanup(); }
+});
+
+test('the name row: once, while the account has none; "This name is taken. Try another." keeps the sheet open (S28a)', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    t.fake.subdomain = null;
+    await t.controller.startTokenEntry();
+    t.ui.showSheet = driveSheet(t.sheets, [{ subdomain: 'pages-1111' }, { subdomain: 'pages-4821' }]) as PublishUi['showSheet'];
+    await t.controller.publishFromBar(t.page);
+    assert.match(t.sheets[0].options.nameRow?.suggestion ?? '', /^pages-\d{4}$/);
+    assert.deepEqual(t.sheets[0].replies, ['refuse', 'close']);
+    assert.equal(t.fake.subdomain, 'pages-4821');
+    assert.equal((await t.records.get(t.page.realPath))?.address, 'https://harbour-programme-7f3a2c.pages-4821.workers.dev/');
+    assert.deepEqual(await t.controller.chooseSubdomain('pages-1111'), { existing: 'pages-4821' }, 'never renamed afterwards');
+    assert.equal(t.fake.subdomain, 'pages-4821');
+    assert.equal(NAME_TAKEN, 'This name is taken. Try another.');
+  } finally { await t.cleanup(); }
+});
+
+test('the name row, when the account got a name meanwhile: kept, the sheet shows the real address again; no PUT', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    t.fake.subdomain = null;
+    await t.controller.startTokenEntry();
+    // The name is set elsewhere between the sheet opening and the press
+    t.ui.showSheet = (async (req: SheetRequest) => {
+      t.fake.subdomain = 'mari-pages';
+      return driveSheet(t.sheets, [{}, {}])(req);
+    }) as PublishUi['showSheet'];
+    await t.controller.publishFromBar(t.page);
+    assert.deepEqual(t.sheets[0].replies, ['update', 'close']);
+    assert.equal(t.sheets[0].options.address?.suffix, '.mari-pages.workers.dev');
+    assert.equal(t.sheets[0].options.nameRow, undefined);
+    assert.ok(!t.fake.requests.some((r) => r.method === 'PUT' && r.path.endsWith('/workers/subdomain')));
+    assert.equal((await t.records.get(t.page.realPath))?.address, 'https://harbour-programme-7f3a2c.mari-pages.workers.dev/');
+  } finally { await t.cleanup(); }
+});
+
+test('the address field: an invalid page part, or one already on the account, keeps the sheet open', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    await t.controller.startTokenEntry();
+    t.fake.scripts.set('my-api-111111', { assets: new Map(), headers: '', enabled: true, previews: false });
+    t.ui.showSheet = driveSheet(t.sheets, [{ pagePart: 'harbour' }, { pagePart: 'my-api-111111' }, { pagePart: 'harbour-2026-7f3a2c' }]) as PublishUi['showSheet'];
+    await t.controller.publishFromBar(t.page);
+    assert.deepEqual(t.sheets[0].replies, ['refuse', 'refuse', 'close']);
+    assert.equal(t.fake.scripts.get('my-api-111111')?.assets.size, 0, 'the person\'s own Worker is untouched');
+    assert.equal((await t.records.get(t.page.realPath))?.siteName, 'harbour-2026-7f3a2c');
+  } finally { await t.cleanup(); }
+});
+
+test('Update: the same files and no key go straight up at the same address; a new file shows the sheet again', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    const first = await publishedOnce(t);
+    await t.project.write('style.css', 'body{color:#456}');
+    await t.controller.publishFromBar(t.page);
+    assert.equal(t.sheets.length, 1, 'no sheet for an update with the same list');
+    const second = (await t.records.get(t.page.realPath))!;
+    assert.equal(second.address, first.address, 'the address stays (M8)');
+    assert.notEqual(second.contentHash, first.contentHash);
+    await t.project.write('Harbour programme.html', '<link rel="stylesheet" href="style.css"><h1>Harbour</h1><img src="img/a.png"><img src="img/b.png">');
+    await t.project.write('img/b.png', new Uint8Array([1, 2]));
+    await t.controller.publishFromBar(t.page);
+    assert.equal(t.sheets.length, 2, 'S27: a new file shows the sheet');
+    assert.equal(t.sheets[1].options.address?.editable, false, 'an update keeps its address');
+  } finally { await t.cleanup(); }
+});
+
+// ---------------------------------------------------------------- publishPage takes only PR 3's plan (the guard)
+
+test('publishPage: only a plan gatherPage made; a key needs "Publish anyway"; an update without the sheet needs the same list', async () => {
+  const t = await setup({ pasted: [TOKEN], files: { ...HARBOUR, 'app.js': `const k = "${['sk', 'ant', 'api03', randomBytes(18).toString('hex')].join('-')}";` } });
+  try {
+    await t.controller.startTokenEntry();
+    const plain = await t.project.gather();
+    const events = t.pageEvents.length;
+    await assert.rejects(t.controller.publishPage({ plan: { ...plain } as GatheredPlan, consent: 'sheet', pagePart: 'a-7f3a2c' }), PublishError, 'a copy is not a gathered plan');
+    assert.equal(t.pageEvents.length, events, 'refused at the door: the page never shows Publishing…');
+    await assert.rejects(t.controller.publishPage({ plan: plain, consent: 'unchanged-update' }), PublishError, 'no record: the sheet first');
+    await assert.rejects(t.controller.publishPage({ plan: plain, consent: 'sheet', pagePart: 'harbour' }), (e: unknown) => e instanceof PublishError && e.code === 'name-invalid');
+    await t.project.write('Harbour programme.html', '<script src="app.js"></script><h1>Harbour</h1>');
+    const withKey = await t.project.gather();
+    assert.ok(withKey.keyHits.length > 0, 'the fixture holds a key-shaped value');
+    await assert.rejects(t.controller.publishPage({ plan: withKey, consent: 'sheet', pagePart: 'a-7f3a2c' }), (e: unknown) => e instanceof PublishError && e.message === KEY_NEEDS_SHEET);
+    assert.equal(uploads(t).length, 0, 'nothing was sent');
+    assert.equal(t.fake.requests.filter((r) => r.path.endsWith('/assets-upload-session')).length, 0);
+    await t.controller.publishPage({ plan: withKey, consent: 'sheet-anyway', pagePart: 'a-7f3a2c' });
+    assert.ok(t.fake.scripts.has('a-7f3a2c'), 'the second, explicit press publishes');
+  } finally { await t.cleanup(); }
+});
+
+test('bytes by hash, end to end: a file changed after the sheet stops the upload and says so; nothing reaches Cloudflare', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    await t.controller.startTokenEntry();
+    t.ui.showSheet = (async (req: SheetRequest) => {
+      const result = await driveSheet(t.sheets)(req);
+      await t.project.write('img/a.png', new Uint8Array([6, 6, 6])); // changed between the sheet and the upload
+      return result;
+    }) as PublishUi['showSheet'];
+    await t.controller.publishFromBar(t.page);
+    assert.equal(t.failures.length, 1);
+    assert.match(t.failures[0], /^a\.png changed after Ritemark checked it\. Nothing was sent\./);
+    assert.equal(t.fake.requests.filter((r) => r.path.endsWith('/assets-upload-session')).length, 0, 'not even the manifest');
+    assert.equal(await t.records.get(t.page.realPath), undefined);
+    assert.equal((await t.controller.pageState(t.page.realPath)).line, t.failures[0], 'the bar\'s line');
+  } finally { await t.cleanup(); }
+});
+
 // ---------------------------------------------------------------- the flag (S28b)
 
 test('flag off: no token box, no connect, no publish; the list, Open, Unpublish and Disconnect still work', async () => {
   const t = await setup({ pasted: [TOKEN] });
   try {
-    await t.controller.startTokenEntry();
-    const site = await t.controller.publishPage({ pagePath: '/p/Harbour programme.html', pageName: 'Harbour programme.html', request: { assets: assets(), pageUrlPath: '/index.html' }, siteName: 'harbour-programme-7f3a2c' });
+    const record = await publishedOnce(t);
     t.flag.on = false;
     t.pasted.push(TOKEN);
     await t.controller.handleSettingsMessage({ type: 'publish:startTokenEntry' });
     await t.controller.handleSettingsMessage({ type: 'publish:connect' });
     assert.equal(t.boxes.length, 1, 'no second box');
-    await assert.rejects(t.controller.publishPage({ pagePath: '/p/x.html', pageName: 'x.html', request: { assets: assets(), pageUrlPath: '/index.html' }, siteName: 'x-111111' }));
+    await assert.rejects(t.controller.publishPage({ plan: await t.project.gather(), consent: 'sheet', pagePart: 'x-111111' }));
+    const sheetsBefore = t.sheets.length;
+    await t.controller.publishFromBar(t.page);
+    assert.equal(t.sheets.length, sheetsBefore, 'the bar\'s Publish does nothing');
     const projection = await t.controller.settingsProjection();
     assert.equal(projection.enabled, false);
     assert.equal(projection.pages.length, 1, 'the page stays listed');
-    await t.controller.handleSettingsMessage({ type: 'publish:open', id: site.name });
-    assert.equal(t.opened.at(-1), site.address);
-    await t.controller.handleSettingsMessage({ type: 'publish:unpublish', id: site.name });
+    await t.controller.handleSettingsMessage({ type: 'publish:open', id: record.siteName });
+    assert.equal(t.opened.at(-1), record.address);
+    await t.controller.handleSettingsMessage({ type: 'publish:unpublish', id: record.siteName });
     assert.equal((await t.controller.settingsProjection()).pages.length, 0, 'Unpublish works with the flag off');
     await t.controller.handleSettingsMessage({ type: 'publish:disconnect' });
     assert.equal(t.secrets.map.size, 0, 'Disconnect works with the flag off');
   } finally { await t.cleanup(); }
 });
 
-test('ritemark.publish.ready: only with the flag on and the sheet registered (PR 3)', async () => {
+test('ritemark.publish.ready: only with the flag on and the whole-window sheet host there (PR 5)', async () => {
   const t = await setup();
   try {
     t.controller.refreshReady();
-    assert.equal(t.ready.at(-1), false, 'no sheet yet: Publish never shows');
+    assert.equal(t.ready.at(-1), false, 'no sheet host yet: Publish never shows');
     t.controller.setPublishEntryAvailable(true);
     assert.equal(t.ready.at(-1), true);
     t.flag.on = false;
@@ -191,100 +398,139 @@ test('ritemark.publish.ready: only with the flag on and the sheet registered (PR
   } finally { await t.cleanup(); }
 });
 
-// ---------------------------------------------------------------- Settings' list and the states (R7, R9)
-
-test('published pages are listed with Open and Unpublish; the record stays out of the project (S30, S32)', async () => {
-  const t = await setup({ pasted: [TOKEN] });
-  try {
-    await t.controller.startTokenEntry();
-    const site = await t.controller.publishPage({ pagePath: '/p/Harbour programme.html', pageName: 'Harbour programme.html', request: { assets: assets(), pageUrlPath: '/index.html' }, siteName: 'harbour-programme-7f3a2c' });
-    const p = await t.controller.settingsProjection();
-    assert.deepEqual(p.pages, [{ id: 'harbour-programme-7f3a2c', name: 'Harbour programme.html', address: site.address, status: 'online', slow: false, message: null }]);
-    const stored = await fs.readFile(path.join(t.dir, 'publish', 'v1', 'cloudflare-pages.json'), 'utf8');
-    assert.ok(!stored.includes(TOKEN), 'the record holds no token');
-    const state = await t.controller.pageState('/p/Harbour programme.html', contentHash(assets()));
-    assert.equal(state.kind, 'published');
-    assert.equal(state.changed, false);
-    const changed = await t.controller.pageState('/p/Harbour programme.html', 'another-hash');
-    assert.equal(changed.changed, true, 'Published · changed');
-  } finally { await t.cleanup(); }
+test('the sheet host check: only PR 5\'s _ritemark.webviewSheet makes Publish reachable; internal commands asked for', async () => {
+  assert.equal(SHEET_HOST_COMMAND, '_ritemark.webviewSheet');
+  const asked: boolean[] = [];
+  const commands = (list: string[]) => async (filterInternal: boolean) => { asked.push(filterInternal); return filterInternal ? list.filter((c) => !c.startsWith('_')) : list; };
+  assert.equal(await sheetHostAvailable(commands(['ritemark.page.publish', '_ritemark.feedbackSheet'])), false, 'today: no sheet host');
+  assert.equal(await sheetHostAvailable(commands(['_ritemark.webviewSheet'])), true, 'once PR 5 lands');
+  assert.ok(asked.every((a) => a === false), 'asked with the internal commands in');
+  assert.equal(await sheetHostAvailable(async () => { throw new Error('no'); }), false);
 });
 
-test('the workers.dev name: suggested once while the account has none; taken → the lead\'s line (S28a)', async () => {
+// ---------------------------------------------------------------- one record store, one content hash (R7, R8, R9)
+
+test('one record store: PR 3\'s publish/v1/records.json, its content hash; "Published · changed" from PR 3\'s hash', async () => {
   const t = await setup({ pasted: [TOKEN] });
   try {
-    t.fake.subdomain = null;
-    await t.controller.startTokenEntry();
-    const sheet = t.controller.sheetAccount();
-    assert.equal(sheet.accountName, 'Mari Tamm');
-    assert.match(sheet.suggestion ?? '', /^pages-\d{4}$/);
-    assert.deepEqual(await t.controller.chooseSubdomain('pages-1111'), { error: NAME_TAKEN });
-    assert.deepEqual(await t.controller.chooseSubdomain('pages-4821'), { name: 'pages-4821' });
-    assert.equal(t.controller.sheetAccount().suggestion, null, 'the row does not come back');
+    const record = await publishedOnce(t);
+    const p = await t.controller.settingsProjection();
+    assert.deepEqual(p.pages, [{ id: 'harbour-programme-7f3a2c', name: 'Harbour programme.html', address: record.address, status: 'online', slow: false, message: null }]);
+    const stored = await fs.readFile(path.join(t.storage, RECORDS_FOLDER, RECORDS_FILE), 'utf8');
+    assert.ok(!stored.includes(TOKEN), 'the record holds no token');
+    assert.deepEqual(await fs.readdir(path.join(t.storage, RECORDS_FOLDER)), [RECORDS_FILE], 'one store, nothing beside it');
+    const plan = await t.project.gather();
+    assert.equal(record.contentHash, plan.contentHash, 'the record keeps PR 3\'s contentHash');
+    assert.equal((await t.controller.pageState(t.page.realPath, plan.contentHash)).changed, false);
+    await t.project.write('style.css', 'body{color:#789}');
+    const now = await t.project.gather();
+    const state = await t.controller.pageState(t.page.realPath, now.contentHash);
+    assert.equal(state.kind, 'published');
+    assert.equal(state.changed, true, 'Published · changed');
   } finally { await t.cleanup(); }
 });
 
 test('Unpublish: the row waits, the 10 s line shows, and the page leaves the list only when its address is gone', async () => {
   const t = await setup({ pasted: [TOKEN], goneAfterChecks: 8 });
   try {
-    await t.controller.startTokenEntry();
-    const site = await t.controller.publishPage({ pagePath: '/p/Harbour programme.html', pageName: 'Harbour programme.html', request: { assets: assets(), pageUrlPath: '/index.html' }, siteName: 'harbour-programme-7f3a2c' });
+    const record = await publishedOnce(t);
     t.posted.length = 0;
-    await t.controller.handleSettingsMessage({ type: 'publish:unpublish', id: site.name });
+    await t.controller.handleSettingsMessage({ type: 'publish:unpublish', id: record.siteName });
     assert.equal(t.posted[0].pages[0].status, 'unpublishing');
     assert.ok(t.posted.some((p) => p.pages[0]?.slow), 'slow after 10 s');
     assert.equal(t.posted.at(-1)!.pages.length, 0);
     assert.equal(SLOW_UNPUBLISH, 'Cloudflare is still taking the page down.');
-    assert.equal((await t.controller.pageState('/p/Harbour programme.html')).kind, 'unpublished', 'the bar shows Publish again');
+    assert.equal((await t.controller.pageState(t.page.realPath)).kind, 'unpublished', 'the bar shows Publish again');
   } finally { await t.cleanup(); }
 });
 
 test('Unpublish that fails keeps the page listed with "…The page is still online."', async () => {
   const t = await setup({ pasted: [TOKEN] });
   try {
-    await t.controller.startTokenEntry();
-    const site = await t.controller.publishPage({ pagePath: '/p/a.html', pageName: 'a.html', request: { assets: assets(), pageUrlPath: '/index.html' }, siteName: 'a-111111' });
+    const record = await publishedOnce(t);
     t.fake.failures.push({ method: 'DELETE', path: /scripts/, status: 500, times: 10 });
-    await t.controller.unpublishSite(site.name);
+    await t.controller.unpublishSite(record.siteName);
     const row = (await t.controller.settingsProjection()).pages[0];
     assert.equal(row.status, 'online');
     assert.equal(row.message, COULD_NOT_REACH_UNPUBLISH);
   } finally { await t.cleanup(); }
 });
 
+test('Unpublish that went through, with the list not updated: the truth, never "still online"; Try again clears it', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    const record = await publishedOnce(t);
+    const remove = t.records.remove.bind(t.records);
+    t.records.remove = async () => { throw new Error('disk full'); };
+    await t.controller.unpublishSite(record.siteName);
+    assert.equal(t.fake.scripts.has(record.siteName), false, 'down on Cloudflare');
+    const row = (await t.controller.settingsProjection()).pages[0];
+    assert.equal(row.message, UNPUBLISHED_LIST_STALE);
+    assert.notEqual(row.message, COULD_NOT_REACH_UNPUBLISH);
+    assert.equal((await t.controller.pageState(t.page.realPath)).kind, 'unpublished', 'the bar doesn\'t say published');
+    t.records.remove = remove;
+    await t.controller.unpublishSite(record.siteName);
+    assert.equal((await t.controller.settingsProjection()).pages.length, 0, 'Try again: an already-deleted page counts as deleted');
+  } finally { await t.cleanup(); }
+});
+
 test('Disconnect: pages stay published; their tabs and rows say Connect again (S22); another account can\'t unpublish', async () => {
   const t = await setup({ pasted: [TOKEN] });
   try {
-    await t.controller.startTokenEntry();
-    const site = await t.controller.publishPage({ pagePath: '/p/a.html', pageName: 'a.html', request: { assets: assets(), pageUrlPath: '/index.html' }, siteName: 'a-111111' });
+    const record = await publishedOnce(t);
     await t.controller.handleSettingsMessage({ type: 'publish:disconnect' });
     assert.equal(t.secrets.map.has(CONNECTION_SECRET_KEY), false);
-    assert.ok(t.fake.scripts.has(site.name), 'still online');
-    assert.equal((await t.controller.pageState('/p/a.html')).signedOut, true);
-    await t.controller.unpublishSite(site.name);
+    assert.ok(t.fake.scripts.has(record.siteName), 'still online');
+    assert.equal((await t.controller.pageState(t.page.realPath)).signedOut, true);
+    await t.controller.unpublishSite(record.siteName);
     assert.equal((await t.controller.settingsProjection()).pages[0].message, CONNECT_AGAIN);
     // Connected to another account: the record's account is not this one
     t.fake.accounts = [{ id: 'b'.repeat(32), name: 'Someone else' }];
     t.pasted.push(TOKEN);
     await t.controller.startTokenEntry();
-    await t.controller.unpublishSite(site.name);
+    await t.controller.unpublishSite(record.siteName);
     assert.equal((await t.controller.settingsProjection()).pages[0].message, OTHER_ACCOUNT);
   } finally { await t.cleanup(); }
 });
 
-test('S21: through every flow above, nothing posted to the page and no log line holds the token or the account ID', async () => {
-  const t = await setup({ pasted: [`n${'9'.repeat(39)}`, WEAK, TOKEN] });
+test('Disconnect whose keychain delete fails: no throw, Settings drawn again with the line, still connected', async () => {
+  const t = await setup({ pasted: [TOKEN] });
   try {
     await t.controller.startTokenEntry();
+    t.secrets.failDelete = true;
+    t.posted.length = 0;
+    await t.controller.handleSettingsMessage({ type: 'publish:disconnect' });
+    assert.equal(t.posted.length, 1, 'Settings was drawn again');
+    assert.equal(t.posted[0].message, DISCONNECT_FAILED);
+    assert.equal(t.posted[0].state, 'connected', 'the truth: still connected');
+    t.secrets.failDelete = false;
+    await t.controller.handleSettingsMessage({ type: 'publish:disconnect' });
+    assert.equal(t.posted.at(-1)!.message, null);
+    assert.equal(t.posted.at(-1)!.state, 'disconnected');
+  } finally { await t.cleanup(); }
+});
+
+test('S21: through every flow above, nothing posted to the page or the sheet and no log line holds the token or the account ID', async () => {
+  const t = await setup({ pasted: [`n${'9'.repeat(39)}`, WEAK, TOKEN] });
+  try {
+    t.fake.subdomain = null;
+    t.ui.showSheet = driveSheet(t.sheets, [{ subdomain: 'pages-1111' }, {}]) as PublishUi['showSheet'];
     t.fake.failures.push({ path: /assets-upload-session$/, status: 500, times: 10 });
-    await assert.rejects(t.controller.publishPage({ pagePath: '/p/a.html', pageName: 'a.html', request: { assets: assets(), pageUrlPath: '/index.html' }, siteName: 'a-111111' }));
+    await t.controller.publishFromBar(t.page);
+    assert.equal(t.failures.length, 1, 'the failure line');
     t.fake.failures.length = 0;
-    const site = await t.controller.publishPage({ pagePath: '/p/a.html', pageName: 'a.html', request: { assets: assets(), pageUrlPath: '/index.html' }, siteName: 'a-111111' });
-    await t.controller.unpublishSite(site.name);
+    t.ui.showSheet = driveSheet(t.sheets) as PublishUi['showSheet'];
+    await t.controller.publishFromBar(t.page);
+    const record = (await t.records.get(t.page.realPath))!;
+    await t.controller.unpublishSite(record.siteName);
     await t.controller.handleSettingsMessage({ type: 'publish:disconnect' });
     const said = everythingSaid(t);
-    for (const secret of [TOKEN, WEAK, ACCOUNT]) assert.ok(!said.includes(secret), 'a secret reached the page or the log');
+    for (const secret of [TOKEN, WEAK, ACCOUNT]) assert.ok(!said.includes(secret), 'a secret reached the page, the sheet or the log');
     assert.ok(t.log.length > 0, 'there were log lines to search');
+    for (const r of t.fake.requests) {
+      if (r.authorization?.includes(TOKEN)) assert.ok(r.path.startsWith('/client/v4/') && !r.path.includes('/assets/upload'), `${r.path} carried the token`);
+    }
+    assert.ok(!t.fake.allTraffic().includes(TOKEN), 'no URL, query or body carries the token');
   } finally { await t.cleanup(); }
 });
 

@@ -8,11 +8,13 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { addressPreview, nameReady, NAME_ROW, webSafeName } from '../publish/workersDevName'
+import { addressHint, addressPreview, nameReady, NAME_ROW, pagePartReady, randomEndOf, refusalLine, SETUP_COPY, webSafeName, webSafePagePart } from '../publish/workersDevName'
+import { isValidPagePart } from '../../../../src/publish/sheetProtocol'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const card = readFileSync(join(HERE, 'WebPagesSettingsCard.tsx'), 'utf8')
 const row = readFileSync(join(HERE, '../publish/WorkersDevNameRow.tsx'), 'utf8')
+const sheet = readFileSync(join(HERE, '../publish/PublishSheet.tsx'), 'utf8')
 
 // The words, as the lead wrote them
 assert.match(card, /'Not set up\. The first Publish asks; Cloudflare is free\.'/)
@@ -50,5 +52,30 @@ assert.equal(nameReady('pages-4821'), true)
 assert.equal(nameReady('pages-'), false)
 assert.equal(nameReady(''), false)
 assert.equal(addressPreview('harbour-programme-7f3a2c', 'pages-4821'), 'harbour-programme-7f3a2c.pages-4821.workers.dev')
+
+// Round 2: frame 2 follows the token-only cut (the lead, 5 November)
+assert.equal(SETUP_COPY.title, 'Where should your web pages go?')
+assert.equal(SETUP_COPY.button, 'Set up', 'Sign in reads Set up')
+assert.equal(SETUP_COPY.line, 'Free. No account yet? You can make one on Cloudflare’s page.')
+assert.equal(SETUP_COPY.buttonTip, 'Opens Cloudflare’s token page and a box to paste the token in', 'the same as Settings\' Set up')
+assert.doesNotMatch(JSON.stringify(SETUP_COPY) + sheet, /Have an API token|Add it in Settings|Sign in|sign in/, 'the API-token line goes; no Sign in')
+assert.match(sheet, /type: 'publish:setUp' \}/, 'Set up sends no value')
+assert.doesNotMatch(sheet, /<button\b/)
+for (const b of sheet.match(/<Button\b/g) ?? []) assert.ok(b)
+const sheetButtons = [...sheet.matchAll(/<Tooltip\b[^>]*>\s*<Button\b/g)].length
+assert.ok(sheetButtons >= (sheet.match(/<Button\b/g) ?? []).length, 'every sheet button sits in a Tooltip')
+
+// Round 2: the name row and the address field in the sheet
+assert.match(sheet, /<WorkersDevNameRow\b/, 'the name row is drawn by the sheet')
+assert.match(sheet, /taken=\{nameRefused\}/)
+assert.equal(refusalLine('nameTaken', '-7f3a2c'), 'This name is taken. Try another.')
+assert.equal(refusalLine('addressTaken', '-7f3a2c'), 'This address is taken. Try another.')
+assert.equal(refusalLine('addressInvalid', '-7f3a2c'), addressHint('-7f3a2c'))
+assert.equal(webSafePagePart('Harbour Programme-7f3a2c'), 'harbour-programme-7f3a2c')
+assert.equal(randomEndOf('harbour-programme-7f3a2c'), '-7f3a2c')
+for (const [part, ok] of [['harbour-programme-7f3a2c', true], ['harbour-programme', false], ['harbour-7F3A2C', false], ['-7f3a2c', false], ['a'.repeat(57) + '-7f3a2c', false], ['a'.repeat(56) + '-7f3a2c', true]] as const) {
+  assert.equal(pagePartReady(part), ok, part)
+  assert.equal(pagePartReady(part), isValidPagePart(part), `the sheet and the host agree on ${part}`)
+}
 
 console.log('webPagesCard.test.ts: all assertions passed')

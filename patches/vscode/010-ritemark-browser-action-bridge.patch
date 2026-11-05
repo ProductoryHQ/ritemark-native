@@ -46,18 +46,75 @@
 #   and the error only; any other result names the address and title only once
 #   the page is shared (Sprint 67 D5).
 #
+# Sprint 149, PR 2 (2026-11-05): the page's bar (Publish a web page, R2). At the
+#   right end of the bar, after the address and the camera, as experience 39's
+#   frame 1 draws it (redrawn 4 November: the address, back, forward and reload
+#   stay the browser's own, Jarmo): Open in your browser, an icon button
+#   (Phosphor arrow-square-out), on every local .html page; a gap; Publish, the
+#   outline button with the globe, on a page inside the open project only. Two
+#   keys on the bar's scoped context, set from the tab's address and following
+#   every navigation and a change of the project's folders: ritemarkBrowserLocalPage
+#   and ritemarkBrowserProjectPage (logic in common/ritemarkBrowserPage.ts, tested
+#   in test/common/). Publish also needs ritemark.publish.ready, which only the
+#   extension sets once publishing works (PR 4), so it can't be pressed before.
+#   Both call the extension (ritemark.page.openInSystemBrowser,
+#   ritemark.page.publish) with the tab's address. The actions toolbar asks the
+#   editor's contributions for a view item, as the nav toolbar does, so Publish
+#   draws with its word; upstream's Open in External Browser (in the bar's menu)
+#   is hidden on a local page, which has its own button. Open in your browser
+#   goes only through the extension, which opens the file the name resolves to
+#   and only when that is a page itself (a .html link to a program would run it;
+#   security review): no fallback to the system opener. Publish takes the
+#   address field's height and its gap the kit's separator's, drawn without its
+#   line, so the bar keeps its height.
+#   No session change (decision 4); a page's file change reloads it through
+#   upstream's own auto-reload (workbench.browser.autoReloadOnFileChange).
+#   Round 2 of the reviews: no file on this computer reaches the system's opener
+#   from the browser. Upstream's Open in External Browser (All commands, a
+#   keybinding) sends a file: address to ritemark.page.openInSystemBrowser; a
+#   page's link menu offers Open Link in External Browser for websites only
+#   (electron-main/ritemarkLinkMenu.ts). Publish's when is also its
+#   precondition.
+#
+# Sprint 149, PR 4 (2026-11-06): the published states on the page's bar (R7,
+#   frame 4). A third key on the bar's scoped context, ritemarkBrowserPagePublish
+#   (unpublished, publishing, published, changed, unpublishing), from the
+#   extension's answer to _ritemark.publish.pageState for the tab's address,
+#   asked on every navigation and again whenever the extension runs
+#   _ritemark.browser.publishStateChanged (registered here). In Publish's place,
+#   in turn: "Publishing…" (not pressable), the chip "Published ⌄" or "Published
+#   · changed ⌄" with Copy link beside it, and "Unpublishing…" with the turning
+#   mark. The chip's menu: Open the page (the public https://…workers.dev page in
+#   a new tab of Ritemark's browser, through the browser's own Open command),
+#   Update the page (live only when changed; "Up to date" otherwise) and
+#   Unpublish; Copy link, Update and Unpublish call the extension's
+#   ritemark.page.copyLink, ritemark.page.publish and ritemark.page.unpublish
+#   with the tab's address. The chip and Copy link need no ritemark.publish.ready
+#   (taking a page down never waits for the flag); Publish shows unless a
+#   published state says otherwise, so a bar the extension hasn't answered shows
+#   Publish as PR 2's did. Only https addresses under workers.dev are opened.
+#
 # File(s): src/vs/platform/browserView/common/browserView.ts,
+#          src/vs/platform/browserView/electron-main/browserViewMainService.ts,
+#          src/vs/platform/browserView/electron-main/ritemarkLinkMenu.ts,
+#          src/vs/platform/browserView/test/electron-main/ritemarkLinkMenu.test.ts,
 #          src/vs/workbench/contrib/browserView/common/browserView.ts,
+#          src/vs/workbench/contrib/browserView/common/ritemarkBrowserPage.ts,
 #          src/vs/workbench/contrib/browserView/common/ritemarkBrowserPageTarget.ts,
+#          src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPage.test.ts,
 #          src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPageTarget.test.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts,
+#          src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts,
+#          src/vs/workbench/contrib/browserView/electron-browser/media/ritemarkBrowserPage.css,
 #          src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts,
+#          src/vs/workbench/contrib/browserView/electron-browser/features/browserNavigationFeatures.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts,
-#          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts
+#          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts,
+#          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
 # Created: 2026-05-13
-# Updated: 2026-11-05 (#658: actions act in the page named by id, never moving what the person sees)
+# Updated: 2026-11-06 (Sprint 149 PR 4: the Published chip, Copy link, Publishing… and Unpublishing…); 2026-11-05 (PR 2: the page's bar, Open in your browser and Publish; round 2: no file reaches the system's opener)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
 index 31466d78914..e7d9a1af46e 100644
@@ -79,6 +136,102 @@ index 31466d78914..e7d9a1af46e 100644
  	// Storage
  	ClearGlobalStorage = `${commandPrefix}.clearGlobalStorage`,
  	ClearWorkspaceStorage = `${commandPrefix}.clearWorkspaceStorage`,
+diff --git a/src/vs/platform/browserView/electron-main/browserViewMainService.ts b/src/vs/platform/browserView/electron-main/browserViewMainService.ts
+index 6071bc729a8..89da2aa64f0 100644
+--- a/src/vs/platform/browserView/electron-main/browserViewMainService.ts
++++ b/src/vs/platform/browserView/electron-main/browserViewMainService.ts
+@@ -20,6 +20,7 @@ import { IntegratedBrowserOpenSource, logBrowserOpen } from '../common/browserVi
+ import { ITelemetryService } from '../../telemetry/common/telemetry.js';
+ import { localize } from '../../../nls.js';
+ import { INativeHostMainService } from '../../native/electron-main/nativeHostMainService.js';
++import { ritemarkOpenLinkExternallyItem } from './ritemarkLinkMenu.js';
+ import { htmlAttributeEncodeValue } from '../../../base/common/strings.js';
+ import { BrowserViewInspectElementId } from './browserViewInspector.js';
+ import { equals } from '../../../base/common/objects.js';
+@@ -598,10 +599,11 @@ export class BrowserViewMainService extends Disposable implements IBrowserViewMa
+ 					}, { preserveFocus: true, background: true }, 'browserLinkBackground');
+ 				}
+ 			}));
+-			menu.append(new MenuItem({
+-				label: localize('browser.contextMenu.openLinkInExternalBrowser', 'Open Link in External Browser'),
+-				click: () => { void this.nativeHostMainService.openExternal(undefined, params.linkURL); }
+-			}));
++			// Ritemark (Sprint 149, PR 2): never for a file on this computer, which the system's opener would run
++			const openExternalItem = ritemarkOpenLinkExternallyItem(params.linkURL, localize('browser.contextMenu.openLinkInExternalBrowser', 'Open Link in External Browser'), url => this.nativeHostMainService.openExternal(undefined, url));
++			if (openExternalItem) {
++				menu.append(new MenuItem(openExternalItem));
++			}
+ 			menu.append(new MenuItem({ type: 'separator' }));
+ 			menu.append(new MenuItem({
+ 				label: localize('browser.contextMenu.copyLink', 'Copy Link'),
+diff --git a/src/vs/platform/browserView/electron-main/ritemarkLinkMenu.ts b/src/vs/platform/browserView/electron-main/ritemarkLinkMenu.ts
+new file mode 100644
+index 00000000000..9a7de3a389b
+--- /dev/null
++++ b/src/vs/platform/browserView/electron-main/ritemarkLinkMenu.ts
+@@ -0,0 +1,23 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/** One item of a page's link menu, as Electron's `MenuItem` takes it. */
++export interface IRitemarkLinkMenuItem {
++	readonly label: string;
++	readonly click: () => void;
++}
++
++/**
++ * Ritemark (Sprint 149, PR 2, round 2b): a page's link menu offers Open Link in External Browser for a website only.
++ * A link to a file on this computer (`file:`) would go to the system's opener as it is, which runs a program behind
++ * it (a page linking to `run.command`) or opens any other file in its own app. Such a link opens in a tab instead,
++ * where the page's own Open in your browser goes through the extension's guarded opener.
++ */
++export function ritemarkOpenLinkExternallyItem(linkURL: string, label: string, openExternal: (url: string) => unknown): IRitemarkLinkMenuItem | undefined {
++	if (/^\s*file:/i.test(linkURL)) {
++		return undefined;
++	}
++	return { label, click: () => { void openExternal(linkURL); } };
++}
+diff --git a/src/vs/platform/browserView/test/electron-main/ritemarkLinkMenu.test.ts b/src/vs/platform/browserView/test/electron-main/ritemarkLinkMenu.test.ts
+new file mode 100644
+index 00000000000..2b2b2183a95
+--- /dev/null
++++ b/src/vs/platform/browserView/test/electron-main/ritemarkLinkMenu.test.ts
+@@ -0,0 +1,33 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
++import { ritemarkOpenLinkExternallyItem } from '../../electron-main/ritemarkLinkMenu.js';
++
++/** Ritemark (Sprint 149, PR 2, round 2b): a page's link menu never hands a file on this computer to the system's opener. */
++suite('Ritemark page link menu', () => {
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	test('Open Link in External Browser is offered for a website only, and opens only that address', () => {
++		const links = {
++			program: 'file:///Users/mari/Leadership%20programme/run.command',
++			page: 'file:///Users/mari/Leadership%20programme/other.html',
++			upperCase: 'FILE:///Users/mari/run.command',
++			website: 'https://example.com/page.html',
++		};
++		const opened: string[] = [];
++		const menu: Record<string, string> = {};
++		for (const [name, url] of Object.entries(links)) {
++			const item = ritemarkOpenLinkExternallyItem(url, 'Open Link in External Browser', u => opened.push(u));
++			item?.click();
++			menu[name] = item ? item.label : '(not offered)';
++		}
++		assert.deepStrictEqual({ menu, opened }, {
++			menu: { program: '(not offered)', page: '(not offered)', upperCase: '(not offered)', website: 'Open Link in External Browser' },
++			opened: [links.website],
++		});
++	});
++});
 diff --git a/src/vs/workbench/contrib/browserView/common/browserView.ts b/src/vs/workbench/contrib/browserView/common/browserView.ts
 index 8153d309eca..b8dea314834 100644
 --- a/src/vs/workbench/contrib/browserView/common/browserView.ts
@@ -159,6 +312,186 @@ index 8153d309eca..b8dea314834 100644
  	}
  
  	async setAnnotationMode(annotate: boolean): Promise<void> {
+diff --git a/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPage.ts b/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPage.ts
+new file mode 100644
+index 00000000000..2d748a52feb
+--- /dev/null
++++ b/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPage.ts
+@@ -0,0 +1,174 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import { localize } from '../../../../nls.js';
++import { Schemas } from '../../../../base/common/network.js';
++import { URI } from '../../../../base/common/uri.js';
++import { ContextKeyExpr, RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
++
++/*
++ * Ritemark (Sprint 149, R2): what the page on the desk is, for its bar's Open in your browser and Publish.
++ *
++ * A browser tab's resource is `vscode-browser:`, never the file, so no `resourceExtname` clause can
++ * see a page. These two keys are set per tab, on the bar's own scoped context, from the address the
++ * tab shows (ritemarkBrowserPageFeature.ts), and they follow it: a link to a website in the same tab
++ * clears both, and back sets them again.
++ *
++ * Pure, so the rules are tested under node (test/common/ritemarkBrowserPage.test.ts).
++ */
++
++/** A `file:` address of a `.html`/`.htm` file, inside the project or not. Gates Open in your browser. */
++export const RITEMARK_BROWSER_LOCAL_PAGE = new RawContextKey<boolean>('ritemarkBrowserLocalPage', false, localize('ritemark.browserLocalPage', "Whether the browser tab shows a web page file from this computer"));
++
++/** A local page inside one of the open project's folders. Gates Publish. */
++export const RITEMARK_BROWSER_PROJECT_PAGE = new RawContextKey<boolean>('ritemarkBrowserProjectPage', false, localize('ritemark.browserProjectPage', "Whether the browser tab shows a web page file from the open project"));
++
++/** Set by the Ritemark extension once publishing works (Sprint 149, PR 4); until then Publish never shows. */
++export const RITEMARK_PUBLISH_READY_KEY = 'ritemark.publish.ready';
++
++/** Open in your browser: every local page. */
++export const RITEMARK_OPEN_PAGE_IN_BROWSER_WHEN = RITEMARK_BROWSER_LOCAL_PAGE.isEqualTo(true);
++
++/**
++ * Sprint 149, PR 4: where the page stands with publishing, on the bar's own scoped context, from the extension's
++ * answer to `_ritemark.publish.pageState` for the tab's address (`ritemarkPagePublishState`). Asked again on every
++ * navigation and whenever the extension says a page's state changed (`_ritemark.browser.publishStateChanged`).
++ */
++export const RITEMARK_BROWSER_PAGE_PUBLISH = new RawContextKey<string>('ritemarkBrowserPagePublish', 'unpublished', localize('ritemark.browserPagePublish', "Where the web page on the browser tab stands with publishing"));
++
++export type RitemarkPagePublishState = 'unpublished' | 'publishing' | 'published' | 'changed' | 'unpublishing';
++
++/**
++ * Publish: a project page, only once the extension says publishing is ready, and not while it is publishing, published
++ * or being taken down. Written as "none of those" so a bar the extension hasn't answered yet shows Publish, as PR 2's.
++ */
++export const RITEMARK_PUBLISH_PAGE_WHEN = ContextKeyExpr.and(
++	RITEMARK_BROWSER_PROJECT_PAGE.isEqualTo(true),
++	ContextKeyExpr.equals(RITEMARK_PUBLISH_READY_KEY, true),
++	RITEMARK_BROWSER_PAGE_PUBLISH.notEqualsTo('publishing'),
++	RITEMARK_BROWSER_PAGE_PUBLISH.notEqualsTo('published'),
++	RITEMARK_BROWSER_PAGE_PUBLISH.notEqualsTo('changed'),
++	RITEMARK_BROWSER_PAGE_PUBLISH.notEqualsTo('unpublishing'),
++);
++
++/** "Publishing…" in Publish's place, not pressable, while the upload runs (R7). */
++export const RITEMARK_PUBLISHING_WHEN = ContextKeyExpr.and(
++	RITEMARK_BROWSER_PROJECT_PAGE.isEqualTo(true),
++	RITEMARK_BROWSER_PAGE_PUBLISH.isEqualTo('publishing'),
++);
++
++/**
++ * Frame 4's chip, "Published ⌄" or "Published · changed ⌄", with its menu: Open the page, Update the page,
++ * Unpublish. Not gated on `ritemark.publish.ready`: taking a page down never waits for the flag (S28b).
++ */
++export const RITEMARK_PUBLISHED_WHEN = ContextKeyExpr.and(
++	RITEMARK_BROWSER_PROJECT_PAGE.isEqualTo(true),
++	RITEMARK_BROWSER_PAGE_PUBLISH.isEqualTo('published'),
++);
++export const RITEMARK_PUBLISHED_CHANGED_WHEN = ContextKeyExpr.and(
++	RITEMARK_BROWSER_PROJECT_PAGE.isEqualTo(true),
++	RITEMARK_BROWSER_PAGE_PUBLISH.isEqualTo('changed'),
++);
++
++/** "Unpublishing…", with the turning mark; nothing else on the bar's publishing end can be pressed (R7). */
++export const RITEMARK_UNPUBLISHING_WHEN = ContextKeyExpr.and(
++	RITEMARK_BROWSER_PROJECT_PAGE.isEqualTo(true),
++	RITEMARK_BROWSER_PAGE_PUBLISH.isEqualTo('unpublishing'),
++);
++
++/** Copy link, beside the chip while the page is online. */
++export const RITEMARK_COPY_LINK_WHEN = ContextKeyExpr.and(
++	RITEMARK_BROWSER_PROJECT_PAGE.isEqualTo(true),
++	ContextKeyExpr.or(RITEMARK_BROWSER_PAGE_PUBLISH.isEqualTo('published'), RITEMARK_BROWSER_PAGE_PUBLISH.isEqualTo('changed')),
++);
++
++/** Upstream's Open in External Browser (in the bar's ⋯): everything but a local page, which has its own button. */
++export const RITEMARK_UPSTREAM_OPEN_EXTERNAL_WHEN = RITEMARK_BROWSER_LOCAL_PAGE.negate();
++
++/** The extension's commands the two buttons call (extensions/ritemark/src/browser/pageCommands.ts). */
++export const RITEMARK_OPEN_PAGE_IN_SYSTEM_BROWSER_COMMAND = 'ritemark.page.openInSystemBrowser';
++export const RITEMARK_PUBLISH_PAGE_COMMAND = 'ritemark.page.publish';
++
++/** PR 4: the extension's side of the published states (extensions/ritemark/src/publish/vscodePublish.ts). */
++export const RITEMARK_PAGE_STATE_COMMAND = '_ritemark.publish.pageState';
++export const RITEMARK_COPY_LINK_COMMAND = 'ritemark.page.copyLink';
++export const RITEMARK_UNPUBLISH_PAGE_COMMAND = 'ritemark.page.unpublish';
++/** The workbench's: the extension tells the bars a page's state changed, with its address. */
++export const RITEMARK_PUBLISH_STATE_CHANGED_COMMAND = '_ritemark.browser.publishStateChanged';
++
++/** The extension's answer to `_ritemark.publish.pageState`, as the bar reads it. Anything else is "not published". */
++export function ritemarkPagePublishState(answer: unknown): RitemarkPagePublishState {
++	const a = answer as { kind?: unknown; changed?: unknown } | undefined;
++	switch (a?.kind) {
++		case 'publishing': return 'publishing';
++		case 'unpublishing': return 'unpublishing';
++		case 'published': return a.changed === true ? 'changed' : 'published';
++		default: return 'unpublished';
++	}
++}
++
++/** The public address in the extension's answer, only when it is a `https://…workers.dev/` page; else undefined. */
++export function ritemarkPublishedAddress(answer: unknown): string | undefined {
++	const address = (answer as { address?: unknown } | undefined)?.address;
++	if (typeof address !== 'string') {
++		return undefined;
++	}
++	let uri: URI;
++	try {
++		uri = URI.parse(address, true);
++	} catch {
++		return undefined;
++	}
++	return uri.scheme === Schemas.https && /^[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev$/.test(uri.authority) ? address : undefined;
++}
++
++/**
++ * Whether a tab's address is on this computer (`file:`), a page or any other file. Upstream's Open in External Browser
++ * (All commands) sends such an address to the extension's guarded opener, never to the system's opener as it is: a
++ * `.html` that is a link to `run.command` would run it, and any other file would open in its own app.
++ */
++export function ritemarkIsLocalAddress(url: string | undefined): boolean {
++	return !!url && /^\s*file:/i.test(url);
++}
++
++export interface IRitemarkBrowserPageKind {
++	readonly local: boolean;
++	readonly project: boolean;
++}
++
++const NOT_A_PAGE: IRitemarkBrowserPageKind = { local: false, project: false };
++
++/**
++ * The file a tab's address names, when it is a local page: `file:` and a `.html`/`.htm` path. The query
++ * and fragment are dropped (a page's `#section` is the same file).
++ */
++export function ritemarkLocalPageFile(url: string | undefined): URI | undefined {
++	if (!url) {
++		return undefined;
++	}
++	let uri: URI;
++	try {
++		uri = URI.parse(url, true);
++	} catch {
++		return undefined;
++	}
++	if (uri.scheme !== Schemas.file || !/\.html?$/i.test(uri.path)) {
++		return undefined;
++	}
++	return uri.with({ query: '', fragment: '' });
++}
++
++/**
++ * What a tab's address is: a local page, and a project page when `isInProject` says the file is inside
++ * the open project. The workbench answers that by the workspace's folders; the extension checks the
++ * boundary again by real path before anything is published (pageCommands.ts).
++ */
++export function ritemarkBrowserPageKind(url: string | undefined, isInProject: (file: URI) => boolean): IRitemarkBrowserPageKind {
++	const file = ritemarkLocalPageFile(url);
++	if (!file) {
++		return NOT_A_PAGE;
++	}
++	return { local: true, project: isInProject(file) };
++}
 diff --git a/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPageTarget.ts b/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPageTarget.ts
 new file mode 100644
 index 00000000000..22662ff787d
@@ -291,7 +624,7 @@ index 00000000000..22662ff787d
 +	return rest as Omit<T, keyof IRitemarkPageTarget>;
 +}
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts b/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
-index 9d39a07860c..926afddea2a 100644
+index 9d39a07860c..c146a8ab3e0 100644
 --- a/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
 @@ -21,6 +21,7 @@ import { BrowserViewWorkbenchService } from './browserViewWorkbenchService.js';
@@ -302,15 +635,16 @@ index 9d39a07860c..926afddea2a 100644
  
  // Register actions and browser features
  import './features/webContentsViewRendererFeature.js';
-@@ -41,6 +42,7 @@ import './features/browserSearchFeatures.js';
+@@ -41,6 +42,8 @@ import './features/browserSearchFeatures.js';
  import './features/browserTabManagementFeatures.js';
  import './features/browserRemoteFeatures.js';
  import './features/ritemarkBrowserContextFeature.js';
 +import './features/ritemarkBrowserActionFeature.js';
++import './features/ritemarkBrowserPageFeature.js';
  
  function getBrowserViewStateUrl(viewState: object | undefined): string | undefined {
  	const url = Object.entries(viewState ?? {}).find(([key]) => key === 'url')?.[1];
-@@ -70,6 +72,7 @@ class BrowserEditorResolverContribution implements IWorkbenchContribution {
+@@ -70,6 +73,7 @@ class BrowserEditorResolverContribution implements IWorkbenchContribution {
  		@IEditorResolverService editorResolverService: IEditorResolverService,
  		@IBrowserViewWorkbenchService browserViewWorkbenchService: IBrowserViewWorkbenchService,
  		@ITelemetryService telemetryService: ITelemetryService,
@@ -318,7 +652,7 @@ index 9d39a07860c..926afddea2a 100644
  	) {
  		editorResolverService.registerEditor(
  			`${Schemas.vscodeBrowser}:/**`,
-@@ -145,6 +148,57 @@ class BrowserEditorResolverContribution implements IWorkbenchContribution {
+@@ -145,6 +149,57 @@ class BrowserEditorResolverContribution implements IWorkbenchContribution {
  				}
  			);
  		}
@@ -415,6 +749,111 @@ index 079394d0068..b460413eaed 100644
  	isSplitButton: {
  		togglePrimaryAction: true,
  		primaryActionIds: [AddElementToChatAction.ID, AddElementCommentToChatAction.ID]
+diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/browserNavigationFeatures.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/browserNavigationFeatures.ts
+index 096492d974c..d9191008439 100644
+--- a/src/vs/workbench/contrib/browserView/electron-browser/features/browserNavigationFeatures.ts
++++ b/src/vs/workbench/contrib/browserView/electron-browser/features/browserNavigationFeatures.ts
+@@ -45,6 +45,11 @@ import {
+ 	IBrowserUrlSuggestionAction,
+ } from '../browserEditor.js';
+ import { BrowserUrlBarWidget, IBrowserUrlBarHost, IUrlPickerItem } from '../widgets/browserUrlBarWidget.js';
++import { IAction } from '../../../../../base/common/actions.js';
++import { IActionViewItem } from '../../../../../base/browser/ui/actionbar/actionbar.js';
++import { IActionViewItemOptions } from '../../../../../base/browser/ui/actionbar/actionViewItems.js';
++import { ICommandService } from '../../../../../platform/commands/common/commands.js';
++import { RITEMARK_OPEN_PAGE_IN_SYSTEM_BROWSER_COMMAND, RITEMARK_UPSTREAM_OPEN_EXTERNAL_WHEN, ritemarkIsLocalAddress } from '../../common/ritemarkBrowserPage.js';
+ 
+ const CONTEXT_BROWSER_CAN_GO_BACK = new RawContextKey<boolean>('browserCanGoBack', false, localize('browser.canGoBack', "Whether the browser can go back"));
+ const CONTEXT_BROWSER_CAN_GO_FORWARD = new RawContextKey<boolean>('browserCanGoForward', false, localize('browser.canGoForward', "Whether the browser can go forward"));
+@@ -58,6 +63,7 @@ class BrowserNavigationBar extends Disposable {
+ 	readonly element: HTMLElement;
+ 	private readonly _urlBar: BrowserUrlBarWidget;
+ 	private readonly _navToolbar: MenuWorkbenchToolBar;
++	private readonly _actionsToolbar: MenuWorkbenchToolBar; // Ritemark (Sprint 149): its items can be drawn by contributions too
+ 	private readonly _contributionListeners = this._register(new DisposableStore());
+ 	private _contributions: readonly BrowserEditorContribution[] = [];
+ 
+@@ -93,15 +99,7 @@ class BrowserNavigationBar extends Disposable {
+ 			{
+ 				hoverDelegate,
+ 				highlightToggledItems: true,
+-				actionViewItemProvider: (action, options) => {
+-					for (const contribution of this._contributions) {
+-						const viewItem = contribution.getActionViewItem(action, options, scopedInstantiationService);
+-						if (viewItem) {
+-							return viewItem;
+-						}
+-					}
+-					return undefined;
+-				},
++				actionViewItemProvider: (action, options) => this._contributionActionViewItem(action, options, scopedInstantiationService),
+ 				// Render all actions inline regardless of group.
+ 				toolbarOptions: { primaryGroup: () => true, useSeparatorsInPrimaryActions: true },
+ 				menuOptions: { shouldForwardArgs: true }
+@@ -121,13 +119,15 @@ class BrowserNavigationBar extends Disposable {
+ 		this._urlBar = this._register(instantiationService.createInstance(BrowserUrlBarWidget, urlBarHost));
+ 
+ 		const actionsContainer = $('.browser-actions-toolbar');
+-		const actionsToolbar = this._register(scopedInstantiationService.createInstance(
++		const actionsToolbar = this._actionsToolbar = this._register(scopedInstantiationService.createInstance(
+ 			MenuWorkbenchToolBar,
+ 			actionsContainer,
+ 			MenuId.BrowserActionsToolbar,
+ 			{
+ 				hoverDelegate,
+ 				highlightToggledItems: true,
++				// Ritemark (Sprint 149): as the nav toolbar's, so the page's Publish draws as an outline button with its word
++				actionViewItemProvider: (action, options) => this._contributionActionViewItem(action, options, scopedInstantiationService),
+ 				toolbarOptions: { primaryGroup: () => true, useSeparatorsInPrimaryActions: true },
+ 				menuOptions: { shouldForwardArgs: true },
+ 				responsiveBehavior: {
+@@ -154,6 +154,16 @@ class BrowserNavigationBar extends Disposable {
+ 		this.element.appendChild(actionsContainer);
+ 	}
+ 
++	private _contributionActionViewItem(action: IAction, options: IActionViewItemOptions, scopedInstantiationService: IInstantiationService): IActionViewItem | undefined {
++		for (const contribution of this._contributions) {
++			const viewItem = contribution.getActionViewItem(action, options, scopedInstantiationService);
++			if (viewItem) {
++				return viewItem;
++			}
++		}
++		return undefined;
++	}
++
+ 	refreshUrl(): void { this._urlBar.refreshUrl(); }
+ 	previewUrl(url: string): void { this._urlBar.previewUrl(url); }
+ 	focusUrlInput(): void { this._urlBar.focusUrlInput(); }
+@@ -167,6 +177,7 @@ class BrowserNavigationBar extends Disposable {
+ 			this._contributionListeners.add(contribution.onDidChangeActionViewItems(() => this._navToolbar.refresh()));
+ 		}
+ 		this._navToolbar.refresh();
++		this._actionsToolbar.refresh(); // Ritemark (Sprint 149): once, so its items are drawn with the contributions
+ 		this._urlBar.mountContributions(contributions);
+ 	}
+ 
+@@ -480,6 +491,8 @@ class OpenInExternalBrowserAction extends Action2 {
+ 				group: BrowserActionGroup.Tools,
+ 				order: 10,
+ 				isHiddenByDefault: true,
++				// Ritemark (Sprint 149): a page from this computer has Open in your browser on its bar; not twice
++				when: RITEMARK_UPSTREAM_OPEN_EXTERNAL_WHEN,
+ 			}
+ 		});
+ 	}
+@@ -488,6 +501,12 @@ class OpenInExternalBrowserAction extends Action2 {
+ 		if (browserEditor instanceof BrowserEditor) {
+ 			const url = browserEditor.model?.url;
+ 			if (url) {
++				// Ritemark (Sprint 149, PR 2 review): a file on this computer goes through the extension's guarded opener, which
++				// opens only a real `.html` file and refuses the rest; the system's opener would run a program behind the name
++				if (ritemarkIsLocalAddress(url)) {
++					await accessor.get(ICommandService).executeCommand(RITEMARK_OPEN_PAGE_IN_SYSTEM_BROWSER_COMMAND, url);
++					return;
++				}
+ 				const openerService = accessor.get(IOpenerService);
+ 				await openerService.open(url, {
+ 					// ensures that VS Code itself doesn't try to open the URL, even for non-"http(s):" scheme URLs.
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts
 index 62a4c272e93..20fb0cdb554 100644
 --- a/src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts
@@ -1131,6 +1570,712 @@ index 00000000000..ae9c58f7d67
 +registerAction2(BrowserTypeAction);
 +registerAction2(BrowserScrollAction);
 +registerAction2(BrowserSnapshotAction);
+diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts
+new file mode 100644
+index 00000000000..b3cbda6f6f2
+--- /dev/null
++++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts
+@@ -0,0 +1,434 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import '../media/ritemarkBrowserPage.css';
++import { localize, localize2 } from '../../../../../nls.js';
++import { $, getActiveElement, isHTMLElement, reset } from '../../../../../base/browser/dom.js';
++import { renderIcon } from '../../../../../base/browser/ui/iconLabel/iconLabels.js';
++import { Action, IAction, Separator } from '../../../../../base/common/actions.js';
++import { Codicon } from '../../../../../base/common/codicons.js';
++import { Emitter } from '../../../../../base/common/event.js';
++import { ThemeIcon } from '../../../../../base/common/themables.js';
++import { IActionViewItem } from '../../../../../base/browser/ui/actionbar/actionbar.js';
++import { IActionViewItemOptions } from '../../../../../base/browser/ui/actionbar/actionViewItems.js';
++import { DisposableStore } from '../../../../../base/common/lifecycle.js';
++import { URI } from '../../../../../base/common/uri.js';
++import { MenuEntryActionViewItem } from '../../../../../platform/actions/browser/menuEntryActionViewItem.js';
++import { Action2, MenuId, MenuItemAction, registerAction2 } from '../../../../../platform/actions/common/actions.js';
++import { BrowserViewCommandId } from '../../../../../platform/browserView/common/browserView.js';
++import { CommandsRegistry, ICommandService } from '../../../../../platform/commands/common/commands.js';
++import { IContextMenuService } from '../../../../../platform/contextview/browser/contextView.js';
++import { ContextKeyExpr, IContextKey, IContextKeyService } from '../../../../../platform/contextkey/common/contextkey.js';
++import { IInstantiationService, ServicesAccessor } from '../../../../../platform/instantiation/common/instantiation.js';
++import { getIconRegistry } from '../../../../../platform/theme/common/iconRegistry.js';
++import { IWorkspaceContextService } from '../../../../../platform/workspace/common/workspace.js';
++import { IEditorService } from '../../../../services/editor/common/editorService.js';
++import { IBrowserViewModel } from '../../common/browserView.js';
++import { BrowserEditorInput } from '../../common/browserEditorInput.js';
++import {
++	RITEMARK_BROWSER_LOCAL_PAGE,
++	RITEMARK_BROWSER_PAGE_PUBLISH,
++	RITEMARK_BROWSER_PROJECT_PAGE,
++	RITEMARK_COPY_LINK_COMMAND,
++	RITEMARK_COPY_LINK_WHEN,
++	RITEMARK_OPEN_PAGE_IN_BROWSER_WHEN,
++	RITEMARK_OPEN_PAGE_IN_SYSTEM_BROWSER_COMMAND,
++	RITEMARK_PAGE_STATE_COMMAND,
++	RITEMARK_PUBLISHED_CHANGED_WHEN,
++	RITEMARK_PUBLISHED_WHEN,
++	RITEMARK_PUBLISHING_WHEN,
++	RITEMARK_PUBLISH_PAGE_COMMAND,
++	RITEMARK_PUBLISH_PAGE_WHEN,
++	RITEMARK_PUBLISH_STATE_CHANGED_COMMAND,
++	RITEMARK_UNPUBLISHING_WHEN,
++	RITEMARK_UNPUBLISH_PAGE_COMMAND,
++	RitemarkPagePublishState,
++	ritemarkBrowserPageKind,
++	ritemarkLocalPageFile,
++	ritemarkPagePublishState,
++	ritemarkPublishedAddress,
++} from '../../common/ritemarkBrowserPage.js';
++import { BrowserActionCategory, BrowserActionGroup, BrowserEditor, BrowserEditorContribution } from '../browserEditor.js';
++
++/*
++ * Ritemark (Sprint 149, R2, PR 2): the page's bar. At the right end of the browser's bar, after the address and the
++ * camera, as the Experience lead drew it (experience 39, frame 1, redrawn 4 November with the address kept):
++ *   - Open in your browser, an icon button (Phosphor arrow-square-out), on every local page;
++ *   - Publish, the outline button with the globe, on a project page only, and only once the extension sets
++ *     `ritemark.publish.ready` (PR 4), so nobody can press it before it works.
++ * Both call the extension (extensions/ritemark/src/browser/pageCommands.ts) with the tab's address. The bar, the
++ * address, back, forward and reload stay the browser's own (Jarmo, 4 November); the session is unchanged (decision 4).
++ *
++ * PR 4 (frame 4, R7): once the page is published, Publish gives its place to the chip, "Published ⌄" or "Published ·
++ * changed ⌄", whose menu holds Open the page (the public page in a new tab of Ritemark's browser), Update the page
++ * (live only when the file changed) and Unpublish, and to Copy link beside it. "Publishing…" and "Unpublishing…"
++ * stand in their places while Cloudflare works, not pressable. The state is the extension's answer to
++ * `_ritemark.publish.pageState` for the tab's address, on the bar's own key `ritemarkBrowserPagePublish`.
++ */
++
++/** The extension says a page's publishing state changed: every page bar asks again (`_ritemark.browser.publishStateChanged`). */
++const onDidChangePublishState = new Emitter<string | undefined>();
++CommandsRegistry.registerCommand(RITEMARK_PUBLISH_STATE_CHANGED_COMMAND, (_accessor, url?: unknown) => {
++	onDidChangePublishState.fire(typeof url === 'string' ? url : undefined);
++});
++
++export const OPEN_PAGE_IN_BROWSER_ID = 'workbench.action.browser.ritemarkOpenPageInBrowser';
++export const PUBLISH_PAGE_ID = 'workbench.action.browser.ritemarkPublishPage';
++export const PUBLISHING_PAGE_ID = 'workbench.action.browser.ritemarkPublishingPage';
++export const PUBLISHED_PAGE_ID = 'workbench.action.browser.ritemarkPublishedPage';
++export const PUBLISHED_CHANGED_PAGE_ID = 'workbench.action.browser.ritemarkPublishedChangedPage';
++export const UNPUBLISHING_PAGE_ID = 'workbench.action.browser.ritemarkUnpublishingPage';
++export const COPY_LINK_PAGE_ID = 'workbench.action.browser.ritemarkCopyPageLink';
++
++/** The actions drawn as the kit's buttons with their words (the chip, Copy link, the states between). */
++const WORDED_ACTIONS = new Set([PUBLISH_PAGE_ID, PUBLISHING_PAGE_ID, PUBLISHED_PAGE_ID, PUBLISHED_CHANGED_PAGE_ID, UNPUBLISHING_PAGE_ID, COPY_LINK_PAGE_ID]);
++
++/** The bar's group for Publish: after the tools (camera, Open in your browser), so the gap of a separator stands before it. */
++const RITEMARK_PAGE_GROUP = '6_ritemark_page';
++
++// Phosphor 400 (Regular): the font patch 001 registers (iconRegistry.ts) and codicon.css declares, its definition
++// shared, not copied; the glyphs by code point
++const phosphorFont = { id: 'phosphor', definition: getIconRegistry().getIconFont('phosphor') ?? { weight: '400', src: [] } };
++const openPageIcon = getIconRegistry().registerIcon('ritemark-page-open-in-browser', { font: phosphorFont, fontCharacter: '\\e5de' }, localize('ritemark.page.openInBrowserIcon', "Icon of Open in your browser on a web page's bar (Phosphor arrow-square-out)."));
++const publishPageIcon = getIconRegistry().registerIcon('ritemark-page-publish', { font: phosphorFont, fontCharacter: '\\e28e' }, localize('ritemark.page.publishIcon', "Icon of Publish on a web page's bar (Phosphor globe-simple)."));
++const copyLinkIcon = getIconRegistry().registerIcon('ritemark-page-copy-link', { font: phosphorFont, fontCharacter: '\\e2e6' }, localize('ritemark.page.copyLinkIcon', "Icon of Copy link on a published web page's bar (Phosphor link-simple)."));
++const chipCaretIcon = getIconRegistry().registerIcon('ritemark-page-published-caret', { font: phosphorFont, fontCharacter: '\\e136' }, localize('ritemark.page.publishedCaretIcon', "The caret of the Published chip's menu (Phosphor caret-down)."));
++const workingIcon = ThemeIcon.modify(Codicon.loading, 'spin');
++
++/**
++ * Keeps the tab's two keys on the bar's own context: whether the address is a local page, and whether that page is in
++ * the open project. They follow every navigation and a change of the project's folders.
++ */
++export class RitemarkBrowserPageContribution extends BrowserEditorContribution {
++	private readonly _localPage: IContextKey<boolean>;
++	private readonly _projectPage: IContextKey<boolean>;
++	private readonly _publish: IContextKey<string>;
++	private _url: string | undefined;
++	private _project = false;
++	private _asked = 0;
++	private _address: string | undefined;
++
++	constructor(
++		editor: BrowserEditor,
++		@IContextKeyService contextKeyService: IContextKeyService,
++		@IWorkspaceContextService private readonly _workspaceContextService: IWorkspaceContextService,
++		@ICommandService private readonly _commandService: ICommandService,
++	) {
++		super(editor);
++		this._localPage = RITEMARK_BROWSER_LOCAL_PAGE.bindTo(contextKeyService);
++		this._projectPage = RITEMARK_BROWSER_PROJECT_PAGE.bindTo(contextKeyService);
++		this._publish = RITEMARK_BROWSER_PAGE_PUBLISH.bindTo(contextKeyService);
++		this._register(this._workspaceContextService.onDidChangeWorkspaceFolders(() => this._update(this.editor.model?.url ?? this.editor.input?.url)));
++		// The extension's word that a page's state changed: a project page asks again (cheap; the address may be spelt
++		// differently, by real path, so every project page asks)
++		this._register(onDidChangePublishState.event(() => { if (this._project) { void this._askPublishState(); } }));
++	}
++
++	/** The public address, while the page is published (frame 4's Open the page and Copy link). */
++	get publishedAddress(): string | undefined { return this._address; }
++
++	get publishState(): RitemarkPagePublishState { return this._publish.get() as RitemarkPagePublishState; }
++
++	/** Where the chip's menu opens when the pressed button can't be found: the tab's own pane. */
++	anchor(): HTMLElement | undefined { return this.editor.getContainer(); }
++
++	override prerenderInput(input: BrowserEditorInput): void {
++		this._update(input.url);
++	}
++
++	protected override onModelAttached(model: IBrowserViewModel, store: DisposableStore): void {
++		this._update(model.url);
++		store.add(model.onDidNavigate(event => {
++			if (this.editor.model === model) { // not a tab this pane showed before, navigating behind it
++				this._update(event.url);
++			}
++		}));
++	}
++
++	override onModelDetached(): void {
++		this._localPage.reset();
++		this._projectPage.reset();
++		this._resetPublish();
++	}
++
++	override getActionViewItem(action: IAction, options: IActionViewItemOptions, instantiationService: IInstantiationService): IActionViewItem | undefined {
++		if (WORDED_ACTIONS.has(action.id) && action instanceof MenuItemAction) {
++			return instantiationService.createInstance(RitemarkPublishActionViewItem, action, { hoverDelegate: options.hoverDelegate });
++		}
++		return undefined;
++	}
++
++	private _update(url: string | undefined): void {
++		const kind = ritemarkBrowserPageKind(url, file => !!this._workspaceContextService.getWorkspaceFolder(file));
++		this._localPage.set(kind.local);
++		this._projectPage.set(kind.project);
++		this._url = url;
++		this._project = kind.project;
++		if (kind.project) {
++			void this._askPublishState();
++		} else {
++			this._resetPublish();
++		}
++	}
++
++	private _resetPublish(): void {
++		this._asked++;
++		this._publish.reset();
++		this._address = undefined;
++	}
++
++	/** Asks the extension where the page stands; an older answer for an address the tab has left is dropped. */
++	private async _askPublishState(): Promise<void> {
++		const asked = ++this._asked;
++		const url = this._url;
++		let answer: unknown;
++		try {
++			answer = await this._commandService.executeCommand(RITEMARK_PAGE_STATE_COMMAND, url);
++		} catch {
++			answer = undefined; // no extension answer (an older extension, or none yet): the bar stays as it was drawn
++		}
++		if (asked !== this._asked || url !== this._url) {
++			return;
++		}
++		this._publish.set(ritemarkPagePublishState(answer));
++		this._address = ritemarkPublishedAddress(answer);
++	}
++}
++
++/**
++ * Publish as the lead drew it: an outline button with the globe and its word, not an icon alone. PR 4's chip ("Published
++ * ⌄", the ground's fill), Copy link (the kit's ghost button) and the states between ("Publishing…", "Unpublishing…",
++ * with the turning mark) draw the same way, each with its own look.
++ */
++class RitemarkPublishActionViewItem extends MenuEntryActionViewItem {
++	override render(container: HTMLElement): void {
++		this.options.label = true;
++		this.options.icon = false;
++		super.render(container);
++		const id = this._commandAction.id;
++		container.classList.add('ritemark-page-publish');
++		if (id === PUBLISHED_PAGE_ID || id === PUBLISHED_CHANGED_PAGE_ID || id === UNPUBLISHING_PAGE_ID) {
++			container.classList.add('ritemark-page-published-chip');
++		}
++		if (id === COPY_LINK_PAGE_ID) {
++			container.classList.add('ritemark-page-copy-link');
++		}
++	}
++
++	protected override updateLabel(): void {
++		if (!this.label) {
++			return;
++		}
++		const id = this._commandAction.id;
++		const words = $('span.ritemark-page-publish-label', undefined, this._commandAction.label);
++		if (id === PUBLISHING_PAGE_ID || id === UNPUBLISHING_PAGE_ID) {
++			reset(this.label, renderIcon(workingIcon), words);
++		} else if (id === PUBLISHED_PAGE_ID || id === PUBLISHED_CHANGED_PAGE_ID) {
++			reset(this.label, renderIcon(publishPageIcon), words, renderIcon(chipCaretIcon));
++		} else if (id === COPY_LINK_PAGE_ID) {
++			reset(this.label, renderIcon(copyLinkIcon), words);
++		} else {
++			reset(this.label, renderIcon(publishPageIcon), words);
++		}
++	}
++}
++
++/** The page bar's own contribution, for the tab the toolbar belongs to (else the browser tab in front). */
++function pageContribution(accessor: ServicesAccessor, browserEditor: unknown): RitemarkBrowserPageContribution | undefined {
++	const editor = browserEditor instanceof BrowserEditor ? browserEditor : accessor.get(IEditorService).activeEditorPane;
++	return editor instanceof BrowserEditor ? editor.getContribution(RitemarkBrowserPageContribution) ?? undefined : undefined;
++}
++
++/** The address of the tab the bar belongs to (the toolbar passes its editor), else of the browser tab in front. */
++function pageUrl(accessor: ServicesAccessor, browserEditor: unknown): string | undefined {
++	const editor = browserEditor instanceof BrowserEditor ? browserEditor : accessor.get(IEditorService).activeEditorPane;
++	return editor instanceof BrowserEditor ? editor.model?.url ?? editor.input?.url : undefined;
++}
++
++class RitemarkOpenPageInBrowserAction extends Action2 {
++	constructor() {
++		super({
++			id: OPEN_PAGE_IN_BROWSER_ID,
++			title: localize2('ritemark.page.openInBrowser', "Open in your browser"),
++			tooltip: localize('ritemark.page.openInBrowserTooltip', "Open in your browser"),
++			category: BrowserActionCategory,
++			icon: openPageIcon,
++			f1: false,
++			menu: {
++				id: MenuId.BrowserActionsToolbar,
++				group: BrowserActionGroup.Tools,
++				order: 4, // right of the camera (patch 009, order 3)
++				when: RITEMARK_OPEN_PAGE_IN_BROWSER_WHEN,
++			},
++		});
++	}
++
++	async run(accessor: ServicesAccessor, browserEditor?: unknown): Promise<void> {
++		const commandService = accessor.get(ICommandService);
++		const url = pageUrl(accessor, browserEditor);
++		if (ritemarkLocalPageFile(url)) {
++			// Only through the extension, which opens the file the name resolves to and only when that is a page itself: a
++			// `.html` that is a link to a program would run it (security review of PR 2). No fallback to the system opener.
++			await commandService.executeCommand(RITEMARK_OPEN_PAGE_IN_SYSTEM_BROWSER_COMMAND, url);
++		}
++	}
++}
++
++class RitemarkPublishPageAction extends Action2 {
++	constructor() {
++		super({
++			id: PUBLISH_PAGE_ID,
++			title: localize2('ritemark.page.publish', "Publish"),
++			tooltip: localize('ritemark.page.publishTooltip', "Get a link anyone can open"),
++			category: BrowserActionCategory,
++			icon: publishPageIcon,
++			f1: false,
++			// as its menu item's: a keybinding set in Keyboard Shortcuts can't reach it on another tab, or before PR 4
++			precondition: RITEMARK_PUBLISH_PAGE_WHEN,
++			menu: {
++				id: MenuId.BrowserActionsToolbar,
++				group: RITEMARK_PAGE_GROUP,
++				order: 1,
++				when: RITEMARK_PUBLISH_PAGE_WHEN,
++			},
++		});
++	}
++
++	async run(accessor: ServicesAccessor, browserEditor?: unknown): Promise<void> {
++		const commandService = accessor.get(ICommandService);
++		const url = pageUrl(accessor, browserEditor);
++		if (ritemarkLocalPageFile(url)) {
++			await commandService.executeCommand(RITEMARK_PUBLISH_PAGE_COMMAND, url);
++		}
++	}
++}
++
++/** "Publishing…" in Publish's place while the upload runs: shown, never pressable. */
++class RitemarkPublishingPageAction extends Action2 {
++	constructor() {
++		super({
++			id: PUBLISHING_PAGE_ID,
++			title: localize2('ritemark.page.publishing', "Publishing…"),
++			tooltip: localize('ritemark.page.publishingTooltip', "Ritemark is putting this page online"),
++			category: BrowserActionCategory,
++			f1: false,
++			precondition: ContextKeyExpr.false(),
++			menu: { id: MenuId.BrowserActionsToolbar, group: RITEMARK_PAGE_GROUP, order: 1, when: RITEMARK_PUBLISHING_WHEN },
++		});
++	}
++
++	async run(): Promise<void> { /* never pressable */ }
++}
++
++/** "Unpublishing…" in the chip's place: the chip's change is the confirmation (no toast). Never pressable. */
++class RitemarkUnpublishingPageAction extends Action2 {
++	constructor() {
++		super({
++			id: UNPUBLISHING_PAGE_ID,
++			title: localize2('ritemark.page.unpublishing', "Unpublishing…"),
++			tooltip: localize('ritemark.page.unpublishingTooltip', "Cloudflare is taking the page down"),
++			category: BrowserActionCategory,
++			f1: false,
++			precondition: ContextKeyExpr.false(),
++			menu: { id: MenuId.BrowserActionsToolbar, group: RITEMARK_PAGE_GROUP, order: 1, when: RITEMARK_UNPUBLISHING_WHEN },
++		});
++	}
++
++	async run(): Promise<void> { /* never pressable */ }
++}
++
++/**
++ * Frame 4's chip: its menu holds Open the page (the public page in a new tab of Ritemark's browser, so the two tabs
++ * show their two addresses), Update the page (live only when the file changed: "Up to date" otherwise) and Unpublish
++ * (the extension asks first).
++ */
++abstract class RitemarkPublishedChipAction extends Action2 {
++	async run(accessor: ServicesAccessor, browserEditor?: unknown): Promise<void> {
++		const commandService = accessor.get(ICommandService);
++		const contextMenuService = accessor.get(IContextMenuService);
++		const contribution = pageContribution(accessor, browserEditor);
++		const url = pageUrl(accessor, browserEditor);
++		const address = contribution?.publishedAddress;
++		if (!contribution || !ritemarkLocalPageFile(url)) {
++			return;
++		}
++		const changed = contribution.publishState === 'changed';
++		const host = address ? URI.parse(address).authority : '';
++		const actions: IAction[] = [
++			new Action('ritemark.page.openPublished', host ? localize('ritemark.page.openThePageAt', "Open the page ({0})", host) : localize('ritemark.page.openThePage', "Open the page"), undefined, !!address,
++				() => commandService.executeCommand(BrowserViewCommandId.Open, { url: address, reuseUrlFilter: address })),
++			new Action('ritemark.page.update', changed ? localize('ritemark.page.updateThePage', "Update the page") : localize('ritemark.page.upToDate', "Update the page · Up to date"), undefined, changed,
++				() => commandService.executeCommand(RITEMARK_PUBLISH_PAGE_COMMAND, url)),
++			new Separator(),
++			new Action('ritemark.page.unpublish', localize('ritemark.page.unpublish', "Unpublish"), undefined, true,
++				() => commandService.executeCommand(RITEMARK_UNPUBLISH_PAGE_COMMAND, url)),
++		];
++		const anchor = getActiveElement();
++		contextMenuService.showContextMenu({
++			getAnchor: () => (isHTMLElement(anchor) ? anchor : contribution.anchor() ?? { x: 0, y: 0 }),
++			getActions: () => actions,
++		});
++	}
++}
++
++class RitemarkPublishedPageAction extends RitemarkPublishedChipAction {
++	constructor() {
++		super({
++			id: PUBLISHED_PAGE_ID,
++			title: localize2('ritemark.page.published', "Published"),
++			tooltip: localize('ritemark.page.publishedTooltip', "Open the page, update it or unpublish it"),
++			category: BrowserActionCategory,
++			f1: false,
++			precondition: RITEMARK_PUBLISHED_WHEN,
++			menu: { id: MenuId.BrowserActionsToolbar, group: RITEMARK_PAGE_GROUP, order: 1, when: RITEMARK_PUBLISHED_WHEN },
++		});
++	}
++}
++
++class RitemarkPublishedChangedPageAction extends RitemarkPublishedChipAction {
++	constructor() {
++		super({
++			id: PUBLISHED_CHANGED_PAGE_ID,
++			title: localize2('ritemark.page.publishedChanged', "Published · changed"),
++			tooltip: localize('ritemark.page.publishedChangedTooltip', "The file changed since it was published. Update the page from here."),
++			category: BrowserActionCategory,
++			f1: false,
++			precondition: RITEMARK_PUBLISHED_CHANGED_WHEN,
++			menu: { id: MenuId.BrowserActionsToolbar, group: RITEMARK_PAGE_GROUP, order: 1, when: RITEMARK_PUBLISHED_CHANGED_WHEN },
++		});
++	}
++}
++
++/** Copy link, beside the chip: the public address on the clipboard, by the extension (it holds the record). */
++class RitemarkCopyPageLinkAction extends Action2 {
++	constructor() {
++		super({
++			id: COPY_LINK_PAGE_ID,
++			title: localize2('ritemark.page.copyLink', "Copy link"),
++			tooltip: localize('ritemark.page.copyLinkTooltip', "Copy the page's public address"),
++			category: BrowserActionCategory,
++			f1: false,
++			precondition: RITEMARK_COPY_LINK_WHEN,
++			menu: { id: MenuId.BrowserActionsToolbar, group: RITEMARK_PAGE_GROUP, order: 2, when: RITEMARK_COPY_LINK_WHEN },
++		});
++	}
++
++	async run(accessor: ServicesAccessor, browserEditor?: unknown): Promise<void> {
++		const commandService = accessor.get(ICommandService);
++		const url = pageUrl(accessor, browserEditor);
++		if (ritemarkLocalPageFile(url)) {
++			await commandService.executeCommand(RITEMARK_COPY_LINK_COMMAND, url);
++		}
++	}
++}
++
++BrowserEditor.registerContribution(RitemarkBrowserPageContribution);
++registerAction2(RitemarkOpenPageInBrowserAction);
++registerAction2(RitemarkPublishPageAction);
++registerAction2(RitemarkPublishingPageAction);
++registerAction2(RitemarkUnpublishingPageAction);
++registerAction2(RitemarkPublishedPageAction);
++registerAction2(RitemarkPublishedChangedPageAction);
++registerAction2(RitemarkCopyPageLinkAction);
+diff --git a/src/vs/workbench/contrib/browserView/electron-browser/media/ritemarkBrowserPage.css b/src/vs/workbench/contrib/browserView/electron-browser/media/ritemarkBrowserPage.css
+new file mode 100644
+index 00000000000..48c83fe7f72
+--- /dev/null
++++ b/src/vs/workbench/contrib/browserView/electron-browser/media/ritemarkBrowserPage.css
+@@ -0,0 +1,76 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/*
++ * Ritemark (Sprint 149, R2): Publish on a web page's bar, the kit's outline button (`.btn.ghost`): 10 in, radius 6,
++ * the input's hairline inside, the desk's fill, the globe at 14 and the word in 500 13. On this bar it takes the
++ * address field's height (25.5: its 1 border, 2 padding and 19.5 line, browser.css), so its edges line up with the
++ * address's, and its item gives back what it adds over the bar's 22 icons: the bar keeps its height and the page
++ * doesn't move when Publish comes or goes. Open in your browser is the bar's own icon button, as the camera beside it.
++ */
++.browser-actions-toolbar .action-item.ritemark-page-publish {
++	margin: -1.75px 0;
++	flex-shrink: 0; /* the toolbar lets its last item shrink; Publish moves into ⋯ whole when the bar is narrow, never clipped */
++}
++
++.browser-actions-toolbar .action-item.ritemark-page-publish > .action-label {
++	display: inline-flex;
++	align-items: center;
++	gap: 6px;
++	box-sizing: border-box;
++	height: 25.5px;
++	padding: 0 10px;
++	border-radius: 6px;
++	box-shadow: inset 0 0 0 1px var(--vscode-input-border, var(--vscode-widget-border, transparent));
++	background-color: var(--vscode-ritemark-desk, var(--vscode-editor-background));
++	color: var(--vscode-foreground);
++	font-size: 13px;
++	font-weight: 500;
++	line-height: 25.5px;
++	white-space: nowrap;
++}
++
++.browser-actions-toolbar .action-item.ritemark-page-publish > .action-label:hover {
++	background-color: var(--vscode-toolbar-hoverBackground);
++}
++
++.browser-actions-toolbar .action-item.ritemark-page-publish > .action-label > .codicon {
++	font-size: 14px;
++	color: inherit;
++}
++
++/* The gap before Publish, without its line (the Experience lead, Sprint 149 answers, PR 2): the separator keeps the kit's
++   footprint (`.docbar .sep`: 6 each side of 1, 16 high, so the bar is no taller) and draws nothing; other separators stay upstream's */
++.browser-actions-toolbar .monaco-action-bar .action-item:has(+ .action-item.ritemark-page-publish) > .action-label.separator {
++	margin: 0 6px !important; /* !important: actionbar.css sets every separator's margin with !important */
++	background-color: transparent;
++}
++
++/*
++ * PR 4 (frame 4): the Published chip, "Published ⌄" in the ground's fill with no hairline (`.pubchip`: 28 high, 10 in on
++ * the left and 8 on the right, the globe and the caret in body ink), and Copy link beside it, the kit's ghost button.
++ * "Publishing…" and "Unpublishing…" keep their words in muted ink with the turning mark, never greyed out to nothing.
++ */
++.browser-actions-toolbar .action-item.ritemark-page-published-chip > .action-label {
++	padding: 0 8px 0 10px;
++	box-shadow: none;
++	background-color: var(--vscode-ritemark-ground, var(--vscode-sideBar-background));
++}
++
++.browser-actions-toolbar .action-item.ritemark-page-published-chip > .action-label > .codicon:last-child:not(:first-child) {
++	font-size: 10px;
++	color: var(--vscode-descriptionForeground);
++}
++
++.browser-actions-toolbar .action-item.ritemark-page-copy-link > .action-label {
++	box-shadow: none;
++	background-color: transparent;
++}
++
++.browser-actions-toolbar .action-item.ritemark-page-publish > .action-label.disabled {
++	opacity: 1;
++	color: var(--vscode-descriptionForeground);
++	cursor: default;
++}
+diff --git a/src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPage.test.ts b/src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPage.test.ts
+new file mode 100644
+index 00000000000..f42085cc697
+--- /dev/null
++++ b/src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPage.test.ts
+@@ -0,0 +1,178 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { extUri } from '../../../../../base/common/resources.js';
++import { URI } from '../../../../../base/common/uri.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
++import { ContextKeyExpression, IContext } from '../../../../../platform/contextkey/common/contextkey.js';
++import {
++	RITEMARK_BROWSER_LOCAL_PAGE,
++	RITEMARK_BROWSER_PAGE_PUBLISH,
++	RITEMARK_BROWSER_PROJECT_PAGE,
++	RITEMARK_COPY_LINK_WHEN,
++	RITEMARK_OPEN_PAGE_IN_BROWSER_WHEN,
++	RITEMARK_PUBLISHED_CHANGED_WHEN,
++	RITEMARK_PUBLISHED_WHEN,
++	RITEMARK_PUBLISHING_WHEN,
++	RITEMARK_PUBLISH_PAGE_WHEN,
++	RITEMARK_PUBLISH_READY_KEY,
++	RITEMARK_UNPUBLISHING_WHEN,
++	RITEMARK_UPSTREAM_OPEN_EXTERNAL_WHEN,
++	ritemarkBrowserPageKind,
++	ritemarkLocalPageFile,
++	ritemarkPagePublishState,
++	ritemarkPublishedAddress,
++} from '../../common/ritemarkBrowserPage.js';
++
++/** Ritemark (Sprint 149, R2): the page's bar shows Open in your browser on a local page, Publish on a project page once ready. */
++suite('Ritemark browser page bar', () => {
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	const project = URI.file('/Users/mari/Leadership programme');
++	const inProject = (file: URI) => extUri.isEqualOrParent(file, project);
++
++	const addresses: Record<string, string> = {
++		projectPage: 'file:///Users/mari/Leadership%20programme/Harbour%20programme.html',
++		projectPageInFolder: 'file:///Users/mari/Leadership%20programme/pages/Index.HTM#part-2',
++		outsidePage: 'file:///Users/mari/Downloads/Elsewhere.html',
++		siblingFolderPage: 'file:///Users/mari/Leadership%20programme%20old/page.html',
++		projectNotAPage: 'file:///Users/mari/Leadership%20programme/brief.md',
++		projectFolderItself: 'file:///Users/mari/Leadership%20programme/',
++		website: 'https://example.com/page.html',
++		localServer: 'http://127.0.0.1:8080/index.html',
++		blank: '',
++	};
++
++	test('each address is a local page, a project page, or neither', () => {
++		const kinds: Record<string, string> = {};
++		for (const [name, url] of Object.entries(addresses)) {
++			const kind = ritemarkBrowserPageKind(url, inProject);
++			kinds[name] = kind.project ? 'project' : kind.local ? 'local' : 'neither';
++		}
++		assert.deepStrictEqual(kinds, {
++			projectPage: 'project',
++			projectPageInFolder: 'project',
++			outsidePage: 'local',
++			siblingFolderPage: 'local',
++			projectNotAPage: 'neither',
++			projectFolderItself: 'neither',
++			website: 'neither',
++			localServer: 'neither',
++			blank: 'neither',
++		});
++	});
++
++	test('the page\'s file drops the address\'s fragment and query', () => {
++		assert.deepStrictEqual(
++			[
++				ritemarkLocalPageFile(addresses.projectPageInFolder)?.toString(),
++				ritemarkLocalPageFile('file:///tmp/page.html?x=1')?.toString(),
++				ritemarkLocalPageFile(undefined),
++			],
++			['file:///Users/mari/Leadership%20programme/pages/Index.HTM', 'file:///tmp/page.html', undefined],
++		);
++	});
++
++	function context(values: Record<string, unknown>): IContext {
++		return { getValue: <T>(key: string) => values[key] as T };
++	}
++
++	function shown(when: ContextKeyExpression | undefined, values: Record<string, unknown>): boolean {
++		return !when || when.evaluate(context(values));
++	}
++
++	test('Open in your browser shows on every local page; Publish only on a project page once publishing is ready', () => {
++		const local = RITEMARK_BROWSER_LOCAL_PAGE.key;
++		const projectKey = RITEMARK_BROWSER_PROJECT_PAGE.key;
++		const states: Record<string, Record<string, unknown>> = {
++			'project page, publishing not ready (PR 2 alone)': { [local]: true, [projectKey]: true },
++			'project page, publishing ready': { [local]: true, [projectKey]: true, [RITEMARK_PUBLISH_READY_KEY]: true },
++			'page outside the project, publishing ready': { [local]: true, [projectKey]: false, [RITEMARK_PUBLISH_READY_KEY]: true },
++			'website, publishing ready': { [local]: false, [projectKey]: false, [RITEMARK_PUBLISH_READY_KEY]: true },
++			'a tab with no keys yet': {},
++		};
++		const bar: Record<string, string[]> = {};
++		for (const [name, values] of Object.entries(states)) {
++			bar[name] = [
++				...(shown(RITEMARK_OPEN_PAGE_IN_BROWSER_WHEN, values) ? ['Open in your browser'] : []),
++				...(shown(RITEMARK_PUBLISH_PAGE_WHEN, values) ? ['Publish'] : []),
++				// upstream's Open in External Browser, in ⋯, stays for everything but a local page
++				...(shown(RITEMARK_UPSTREAM_OPEN_EXTERNAL_WHEN, values) ? ['⋯ Open in External Browser'] : []),
++			];
++		}
++		assert.deepStrictEqual(bar, {
++			'project page, publishing not ready (PR 2 alone)': ['Open in your browser'],
++			'project page, publishing ready': ['Open in your browser', 'Publish'],
++			'page outside the project, publishing ready': ['Open in your browser'],
++			'website, publishing ready': ['⋯ Open in External Browser'],
++			'a tab with no keys yet': ['⋯ Open in External Browser'],
++		});
++	});
++
++	test('PR 4: the extension\'s answer as the bar\'s state; anything else is "not published"', () => {
++		assert.deepStrictEqual(
++			[
++				ritemarkPagePublishState({ kind: 'published', changed: false }),
++				ritemarkPagePublishState({ kind: 'published', changed: true }),
++				ritemarkPagePublishState({ kind: 'publishing' }),
++				ritemarkPagePublishState({ kind: 'unpublishing' }),
++				ritemarkPagePublishState({ kind: 'unpublished' }),
++				ritemarkPagePublishState(undefined),
++				ritemarkPagePublishState('published'),
++				ritemarkPagePublishState({ kind: 'published', changed: 'yes' }),
++			],
++			['published', 'changed', 'publishing', 'unpublishing', 'unpublished', 'unpublished', 'unpublished', 'published'],
++		);
++		assert.deepStrictEqual(
++			[
++				ritemarkPublishedAddress({ address: 'https://harbour-programme-7f3a2c.pages-4821.workers.dev/' }),
++				ritemarkPublishedAddress({ address: 'http://harbour-programme-7f3a2c.pages-4821.workers.dev/' }),
++				ritemarkPublishedAddress({ address: 'https://evil.example/' }),
++				ritemarkPublishedAddress({ address: 'file:///etc/passwd' }),
++				ritemarkPublishedAddress({ address: 'https://a.b.workers.dev.evil.example/' }),
++				ritemarkPublishedAddress({}),
++			],
++			['https://harbour-programme-7f3a2c.pages-4821.workers.dev/', undefined, undefined, undefined, undefined, undefined],
++		);
++	});
++
++	test('PR 4: Publish, Publishing…, the Published chip with Copy link, and Unpublishing… take the same place in turn', () => {
++		const page = { [RITEMARK_BROWSER_LOCAL_PAGE.key]: true, [RITEMARK_BROWSER_PROJECT_PAGE.key]: true };
++		const at = (state: string | undefined, ready: boolean) => ({ ...page, [RITEMARK_PUBLISH_READY_KEY]: ready, ...(state ? { [RITEMARK_BROWSER_PAGE_PUBLISH.key]: state } : {}) });
++		const bar = (values: Record<string, unknown>) => [
++			...(shown(RITEMARK_PUBLISH_PAGE_WHEN, values) ? ['Publish'] : []),
++			...(shown(RITEMARK_PUBLISHING_WHEN, values) ? ['Publishing…'] : []),
++			...(shown(RITEMARK_PUBLISHED_WHEN, values) ? ['Published ⌄'] : []),
++			...(shown(RITEMARK_PUBLISHED_CHANGED_WHEN, values) ? ['Published · changed ⌄'] : []),
++			...(shown(RITEMARK_UNPUBLISHING_WHEN, values) ? ['Unpublishing…'] : []),
++			...(shown(RITEMARK_COPY_LINK_WHEN, values) ? ['Copy link'] : []),
++		];
++		assert.deepStrictEqual(
++			{
++				'not asked yet, ready': bar(at(undefined, true)),
++				'unpublished, not ready (until PR 5)': bar(at('unpublished', false)),
++				'unpublished, ready': bar(at('unpublished', true)),
++				'publishing': bar(at('publishing', true)),
++				'published': bar(at('published', true)),
++				'published, flag off: taking it down stays': bar(at('published', false)),
++				'changed': bar(at('changed', true)),
++				'unpublishing': bar(at('unpublishing', true)),
++				'a page outside the project': bar({ [RITEMARK_BROWSER_LOCAL_PAGE.key]: true, [RITEMARK_BROWSER_PROJECT_PAGE.key]: false, [RITEMARK_PUBLISH_READY_KEY]: true, [RITEMARK_BROWSER_PAGE_PUBLISH.key]: 'published' }),
++			},
++			{
++				'not asked yet, ready': ['Publish'],
++				'unpublished, not ready (until PR 5)': [],
++				'unpublished, ready': ['Publish'],
++				'publishing': ['Publishing…'],
++				'published': ['Published ⌄', 'Copy link'],
++				'published, flag off: taking it down stays': ['Published ⌄', 'Copy link'],
++				'changed': ['Published · changed ⌄', 'Copy link'],
++				'unpublishing': ['Unpublishing…'],
++				'a page outside the project': [],
++			},
++		);
++	});
++});
 diff --git a/src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPageTarget.test.ts b/src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPageTarget.test.ts
 new file mode 100644
 index 00000000000..9c59b93d0a7
@@ -1534,5 +2679,133 @@ index 00000000000..dd63f850d69
 +			assert.strictEqual((result as { pageId: string }).pageId, 'c');
 +			assert.ok(!JSON.stringify(result).includes('127.0.0.1') && !JSON.stringify(result).includes('Page c'), JSON.stringify(result));
 +		}
++	});
++});
+diff --git a/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
+new file mode 100644
+index 00000000000..4ea064f3ff4
+--- /dev/null
++++ b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
+@@ -0,0 +1,122 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { createStubInstance } from 'sinon';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
++import { isIMenuItem, MenuId, MenuRegistry } from '../../../../../../platform/actions/common/actions.js';
++import { BrowserViewCommandId } from '../../../../../../platform/browserView/common/browserView.js';
++import { CommandsRegistry, ICommandService } from '../../../../../../platform/commands/common/commands.js';
++import { ContextKeyExpression, IContext } from '../../../../../../platform/contextkey/common/contextkey.js';
++import { ServicesAccessor } from '../../../../../../platform/instantiation/common/instantiation.js';
++import { IOpenerService } from '../../../../../../platform/opener/common/opener.js';
++import { IEditorService } from '../../../../../services/editor/common/editorService.js';
++import { IBrowserViewModel } from '../../../common/browserView.js';
++import {
++	RITEMARK_BROWSER_LOCAL_PAGE,
++	RITEMARK_BROWSER_PROJECT_PAGE,
++	RITEMARK_OPEN_PAGE_IN_SYSTEM_BROWSER_COMMAND,
++	RITEMARK_PUBLISH_READY_KEY,
++} from '../../../common/ritemarkBrowserPage.js';
++import { BrowserEditor } from '../../../electron-browser/browserEditor.js';
++import '../../../electron-browser/features/browserNavigationFeatures.js';
++import { OPEN_PAGE_IN_BROWSER_ID, PUBLISH_PAGE_ID } from '../../../electron-browser/features/ritemarkBrowserPageFeature.js';
++
++/**
++ * Ritemark (Sprint 149, PR 2, round 2): the page's bar and upstream's Open in External Browser, as they are registered.
++ * - Upstream's action, from All commands, never hands a `file:` address to the system's opener: it goes to the
++ *   extension's guarded `ritemark.page.openInSystemBrowser`, which opens a real `.html` file and refuses the rest.
++ * - The menu items' `when` and Publish's `precondition` are read from the registries, so deleting one fails here.
++ */
++suite('Ritemark browser page bar, as registered', () => {
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	function runOpenExternal(url: string) {
++		const log = { commands: [] as unknown[][], opened: [] as unknown[][] };
++		const commandService: Partial<ICommandService> = {
++			executeCommand: async (id: string, ...args: unknown[]) => { log.commands.push([id, ...args]); return undefined; },
++		};
++		const openerService: Partial<IOpenerService> = {
++			open: async (target, options) => { log.opened.push([String(target), options]); return true; },
++		};
++		const pane = createStubInstance(BrowserEditor);
++		Object.defineProperty(pane, 'model', { value: { url } as Partial<IBrowserViewModel> });
++		const services = new Map<unknown, unknown>([
++			[ICommandService, commandService],
++			[IOpenerService, openerService],
++			[IEditorService, { activeEditorPane: pane }],
++		]);
++		const accessor = { get: (id: unknown) => services.get(id) } as unknown as ServicesAccessor;
++		const command = CommandsRegistry.getCommand(BrowserViewCommandId.OpenExternal);
++		assert.ok(command, 'upstream\'s Open in External Browser is registered');
++		return { log, done: Promise.resolve(command.handler(accessor, pane)) };
++	}
++
++	test('Open in External Browser sends every file: address to the guarded opener, never to the system\'s', async () => {
++		const results: Record<string, { commands: unknown[][]; opened: string[] }> = {};
++		const addresses = {
++			page: 'file:///Users/mari/Leadership%20programme/index.html',
++			notAPage: 'file:///Users/mari/Leadership%20programme/run.command',
++			folder: 'file:///Users/mari/Leadership%20programme/',
++			upperCase: 'FILE:///Users/mari/page.html',
++			website: 'https://example.com/page.html',
++		};
++		for (const [name, url] of Object.entries(addresses)) {
++			const { log, done } = runOpenExternal(url);
++			await done;
++			results[name] = { commands: log.commands, opened: log.opened.map(o => o[0] as string) };
++		}
++		const guarded = (url: string) => ({ commands: [[RITEMARK_OPEN_PAGE_IN_SYSTEM_BROWSER_COMMAND, url]], opened: [] });
++		assert.deepStrictEqual(results, {
++			page: guarded(addresses.page),
++			notAPage: guarded(addresses.notAPage), // the extension refuses it: "This works on a web page file (.html) …"
++			folder: guarded(addresses.folder),
++			upperCase: guarded(addresses.upperCase),
++			website: { commands: [], opened: [addresses.website] },
++		});
++	});
++
++	function registered(commandId: string) {
++		const item = MenuRegistry.getMenuItems(MenuId.BrowserActionsToolbar).filter(isIMenuItem).find(i => i.command.id === commandId);
++		assert.ok(item, `${commandId} is on the bar`);
++		return item;
++	}
++
++	function shown(expr: ContextKeyExpression | undefined, values: Record<string, unknown>): boolean {
++		const context: IContext = { getValue: <T>(key: string) => values[key] as T };
++		return !expr || expr.evaluate(context);
++	}
++
++	test('the bar\'s registered items show where they should, and Publish can\'t run anywhere else', () => {
++		const local = RITEMARK_BROWSER_LOCAL_PAGE.key;
++		const project = RITEMARK_BROWSER_PROJECT_PAGE.key;
++		const states: Record<string, Record<string, unknown>> = {
++			'project page, publishing not ready': { [local]: true, [project]: true },
++			'project page, publishing ready': { [local]: true, [project]: true, [RITEMARK_PUBLISH_READY_KEY]: true },
++			'page outside the project, publishing ready': { [local]: true, [project]: false, [RITEMARK_PUBLISH_READY_KEY]: true },
++			'website, publishing ready': { [local]: false, [project]: false, [RITEMARK_PUBLISH_READY_KEY]: true },
++		};
++		const open = registered(OPEN_PAGE_IN_BROWSER_ID);
++		const publish = registered(PUBLISH_PAGE_ID);
++		const upstream = registered(BrowserViewCommandId.OpenExternal);
++		const bar: Record<string, string[]> = {};
++		for (const [name, values] of Object.entries(states)) {
++			bar[name] = [
++				...(shown(open.when, values) ? ['Open in your browser'] : []),
++				...(shown(publish.when, values) ? ['Publish'] : []),
++				...(shown(publish.command.precondition, values) ? ['Publish can run'] : []),
++				...(shown(upstream.when, values) ? ['⋯ Open in External Browser'] : []),
++			];
++		}
++		assert.deepStrictEqual(bar, {
++			'project page, publishing not ready': ['Open in your browser'],
++			'project page, publishing ready': ['Open in your browser', 'Publish', 'Publish can run'],
++			'page outside the project, publishing ready': ['Open in your browser'],
++			'website, publishing ready': ['⋯ Open in External Browser'],
++		});
++		assert.strictEqual(publish.command.tooltip, 'Get a link anyone can open');
++		assert.strictEqual(open.command.tooltip, 'Open in your browser');
 +	});
 +});

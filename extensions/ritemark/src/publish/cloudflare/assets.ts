@@ -5,15 +5,13 @@
  */
 
 import { createHash, randomBytes } from 'node:crypto';
-import type { PublishAsset } from '../host';
+import type { UploadFile } from '../host';
 import { PublishError } from '../host';
-
-/** Workers Free: 25 MiB a file, 20,000 files a version (spec R3). */
-export const MAX_FILE_BYTES = 25 * 1024 * 1024;
-export const MAX_FILES = 20_000;
+import { NAME_PATTERN } from '../sheetProtocol';
+import { MAX_FILE_BYTES, MAX_FILES } from '../types';
 
 /** A Worker's name, and a workers.dev name: lowercase letters, digits and dashes, 1–63, no dash at either end. */
-export const NAME_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+export const NAME_RE = NAME_PATTERN;
 
 /** Every response carries noindex (R7); no robots.txt block, so a search engine can see it (M7). */
 export const NOINDEX_HEADERS = '/*\n  X-Robots-Tag: noindex\n';
@@ -56,7 +54,7 @@ export interface ManifestEntry {
 }
 
 /** The manifest, after the free plan's limits: over a limit, nothing is sent (R3, S15). */
-export function buildManifest(assets: readonly PublishAsset[]): { manifest: Record<string, { hash: string; size: number }>; entries: ManifestEntry[] } {
+export function buildManifest(assets: readonly UploadFile[]): { manifest: Record<string, { hash: string; size: number }>; entries: ManifestEntry[] } {
   if (assets.length === 0) throw new PublishError('failed', 'There is nothing to publish.');
   if (assets.length > MAX_FILES) throw new PublishError('too-many', `This page uses ${assets.length} files. Cloudflare's free plan takes ${MAX_FILES}.`);
   const manifest: Record<string, { hash: string; size: number }> = {};
@@ -74,12 +72,6 @@ export function buildManifest(assets: readonly PublishAsset[]): { manifest: Reco
     entries.push({ urlPath: asset.urlPath, hash, size: asset.bytes.byteLength, contentType: contentTypeFor(asset.urlPath), bytes: asset.bytes });
   }
   return { manifest, entries };
-}
-
-/** One hash over everything that goes, for "Published · changed" (R7). */
-export function contentHash(assets: readonly PublishAsset[]): string {
-  const lines = assets.map((a) => `${a.urlPath}\0${assetHash(a.bytes, a.urlPath)}`).sort();
-  return createHash('sha256').update(lines.join('\n')).digest('hex');
 }
 
 /** The URL path a page is served at under `html_handling: auto-trailing-slash`. */

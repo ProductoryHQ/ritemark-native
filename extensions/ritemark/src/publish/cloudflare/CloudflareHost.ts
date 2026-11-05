@@ -3,15 +3,16 @@
  * turned into the plain lines of spec R7. Every message it throws is already redacted by the client.
  */
 
-import type { ConnectionSnapshot, PublishHost, PublishRequest, PublishedSite, TokenCheck } from '../host';
-import { PublishError } from '../host';
+import type { ConnectionSnapshot, PublishHost, PublishedSite, TokenCheck, VerifiedUpload } from '../host';
+import { isVerifiedUpload, PublishError } from '../host';
 import type { CloudflareAccount } from './account';
 import { buildManifest, cleanName, siteAddress } from './assets';
-import { CloudflareApiError } from './client';
+import { CloudflareApiError, SubdomainExistsError } from './client';
 
 export const COULD_NOT_REACH_PUBLISH = "Ritemark couldn't reach Cloudflare. The page is still on this computer.";
 export const COULD_NOT_REACH_UNPUBLISH = "Ritemark couldn't reach Cloudflare. The page is still online.";
 export const CONNECT_AGAIN = 'Connect again to update or unpublish.';
+export const ADDRESS_TAKEN = 'This address is taken. Try another.';
 
 export interface CloudflareHostOptions {
   log?: (line: string) => void;
@@ -51,6 +52,20 @@ export class CloudflareHost implements PublishHost {
     return this.account.disconnect();
   }
 
+  async refreshSubdomain(): Promise<string | null> {
+    this.requireAccount();
+    try {
+      return await this.account.refreshSubdomain();
+    } catch (error) {
+      throw this.plain(error, COULD_NOT_REACH_PUBLISH);
+    }
+  }
+
+  /**
+   * The name row's choice, registered only while the account has none: the client reads the name again right
+   * before the PUT and refuses when there is one. That one is then kept here (`name-exists` is thrown, so the sheet
+   * shows the address it really gets), and nothing is renamed.
+   */
   async chooseSubdomain(typed: string): Promise<string> {
     const name = cleanName(typed);
     if (!name) throw new PublishError('name-invalid', 'Use lowercase letters, digits and dashes.');
@@ -60,24 +75,41 @@ export class CloudflareHost implements PublishHost {
       await this.account.setSubdomain(chosen);
       return chosen;
     } catch (error) {
+      if (error instanceof SubdomainExistsError) {
+        await this.account.setSubdomain(error.existing);
+        throw error;
+      }
       throw this.plain(error, COULD_NOT_REACH_PUBLISH);
     }
   }
 
-  async publish(siteName: string, request: PublishRequest): Promise<PublishedSite> {
+  async siteExists(siteName: string): Promise<boolean> {
     const accountId = this.requireAccount();
+    try {
+      return await this.account.client().scriptExists(accountId, siteName);
+    } catch (error) {
+      throw this.plain(error, COULD_NOT_REACH_PUBLISH);
+    }
+  }
+
+  async publish(siteName: string, upload: VerifiedUpload, options: { replacing: boolean }): Promise<PublishedSite> {
+    const accountId = this.requireAccount();
+    // Only bytes read again and matched to the plan's hashes go (PR 3's blocking item)
+    if (!isVerifiedUpload(upload)) throw new PublishError('failed', 'Ritemark could not check what goes. Press Publish again.');
     const subdomain = this.account.snapshot().subdomain;
     if (!subdomain) throw new PublishError('failed', "Choose your pages' address first.");
-    if (!request.assets.some((a) => a.urlPath === request.pageUrlPath)) throw new PublishError('failed', 'The page itself is not among the files.');
+    if (!upload.files.some((a) => a.urlPath === upload.pageUrlPath)) throw new PublishError('failed', 'The page itself is not among the files.');
     // Over a limit, nothing is sent (R3, S15): the manifest is built before any call
-    const { manifest, entries } = buildManifest(request.assets);
+    const { manifest, entries } = buildManifest(upload.files);
+    // A first publish never replaces a Worker already on the account, the person's own or another page's
+    if (!options.replacing && (await this.siteExists(siteName))) throw new PublishError('address-taken', ADDRESS_TAKEN);
     try {
       const { uploaded } = await this.account.client().deploy(accountId, siteName, manifest, entries);
       this.options.log?.(`[publish] ${siteName}: deployed, ${uploaded} of ${entries.length} files uploaded`);
     } catch (error) {
       throw this.plain(error, COULD_NOT_REACH_PUBLISH);
     }
-    return { name: siteName, address: siteAddress(siteName, subdomain, request.pageUrlPath) };
+    return { name: siteName, address: siteAddress(siteName, subdomain, upload.pageUrlPath) };
   }
 
   async unpublish(siteName: string, address: string, options: { onSlow?: () => void } = {}): Promise<void> {

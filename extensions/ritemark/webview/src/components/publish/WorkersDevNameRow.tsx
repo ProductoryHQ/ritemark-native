@@ -3,7 +3,7 @@
  * first Publish sheet after connecting, only while the account has no workers.dev name. Pre-filled by the host with
  * "pages" and four digits, never the person's or the company's name.
  *
- * PR 3's sheet (`PublishSheet.tsx`) places it; until then nothing draws it. It holds no account data beyond the name.
+ * PR 3's sheet (`PublishSheet.tsx`) places it above Address. It holds no account data beyond the name.
  */
 
 import { Input } from '../ui/input'
@@ -20,7 +20,7 @@ export function WorkersDevNameRow({
   taken: boolean
 }) {
   return (
-    <div className="grid gap-1 py-2">
+    <div className="grid gap-1 border-t border-hairline py-3">
       <label htmlFor="publish-workers-dev-name" className="text-[13px] font-semibold leading-[18px] text-ink-strong">{NAME_ROW.label}</label>
       <div className="flex items-center gap-1 text-[13px] text-ink-body">
         <Input

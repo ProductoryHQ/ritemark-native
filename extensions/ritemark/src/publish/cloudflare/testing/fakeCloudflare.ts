@@ -31,6 +31,8 @@ export interface FakeFailure {
   method?: string;
   path: RegExp;
   status?: number;
+  /** Cloudflare's error code in the answer (10013 by default). */
+  code?: number;
   /** Drop the connection instead of answering. */
   drop?: boolean;
   times: number;
@@ -102,7 +104,7 @@ export class FakeCloudflare {
     if (failure) {
       failure.times--;
       if (failure.drop) { req.socket.destroy(); return; }
-      return this.send(res, failure.status ?? 500, { success: false, errors: [{ code: 10013, message: 'An unknown error has occurred' }] });
+      return this.send(res, failure.status ?? 500, { success: false, errors: [{ code: failure.code ?? 10013, message: 'An unknown error has occurred' }] });
     }
 
     try {

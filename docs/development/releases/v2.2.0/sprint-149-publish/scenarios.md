@@ -4,17 +4,19 @@ Behaviour examples for [spec.md](spec.md). They are the manual QA list; `tasks.m
 
 ## The page on the desk (R1, R2)
 
-- **S1.** Given `Harbour programme.html` in the project, when the person opens it from Documents, then it opens as a desk tab showing the page, with no address row, and Open in browser (icon) and Publish at the right end of the page's own bar, not in the tab row.
+- **S1.** Given `Harbour programme.html` in the project, when the person opens it from Documents, then it opens as a desk tab showing the page, with the browser's bar (back, forward, reload, the `file:///` address), and Open in browser (icon) and Publish right of the address, not in the tab row (4 November, 14e0d03).
 - **S2.** Given that tab, when the person presses Open in browser, then the file opens in the system's default browser and the tab stays.
 - **S3.** Given a web address open in Ritemark's browser, then the bar shows neither Open in browser nor Publish.
 - **S4.** Given an `.html` file outside the project (dragged from Downloads), then it opens as the page with Open in browser on its bar and no Publish (publishing is for project files).
-- **S4a.** Given a project page with a link to a website and a link to `appendix.html`, when the person clicks each, then the website opens in a new browser tab and `appendix.html` opens in its own tab; the page's tab still shows its file.
-- **S4b.** Given a project page open on the desk, when Claude changes the file, then the page reloads by itself (or, if not built this sprint, the reload button at the bar's left shows the change).
+- **S4a.** Given a project page with a link to a website and a link to `appendix.html`, when the person clicks each, then each opens in the same tab, as in a browser, and back returns to the page; on the website the bar has neither button, back on the page both are there again (4 November, 14e0d03).
+- **S4b.** Given a project page open on the desk, when Claude changes the file, then the page reloads by itself (upstream's auto-reload), and the reload button stays on the bar.
 - **S5 (negative, A2).** Given `hostile.html` from the spike in the project, when it opens, then the CDN script loads, and `acquireVsCodeApi`, `window.browserViewAPI`, `fetch('file:///etc/hostname')`, `window.open`, top navigation and reading another tab's storage all fail; the workbench is a different CDP target.
 
 ## What goes (R3, R4, R5)
 
 - **S7.** Given a page using `img/a.png`, `img/b.png` and `style.css` (which uses `fonts/x.woff2`), when Publish's sheet opens, then it reads "This page and 4 files" with "Nothing else from the project." under it, and See the files lists all four, the page first. A page using only two pictures reads "This page and its 2 pictures"; a page using nothing reads "This page, one file".
+- **S7a.** Given `slides/index.html` using `../tokens.css` (still in the project), then `tokens.css` goes, and the published tree keeps `slides/index.html` beside it (A3, finding 1).
+- **S7b.** Given a page that builds picture names in its script, then the sheet says "This page loads some files from its script. Ritemark can't see which, so they won't go." (A3, finding 2).
 - **S8 (negative).** Given `<img src="../../secrets/scan.png">` reaching outside the project, then that file is left out and named "outside this project".
 - **S9 (negative).** Given `<link href=".env">` or `<script src=".git/config">`, then each is left out and named "a hidden file".
 - **S10 (negative).** Given `img/logo.png` that is a symlink to `~/Pictures/logo.png`, then it is left out as outside the project.

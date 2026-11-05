@@ -9,8 +9,11 @@
  * 6. `POST /accounts/:a/workers/scripts/:n/subdomain`          the address on, previews off (M5)
  * and `DELETE /accounts/:a/workers/scripts/:n` to unpublish (M9).
  *
- * The token goes only to the API host, in the Authorization header, never in a URL. Every error's text goes through
- * `redact`. The address check after Unpublish asks the public address with no credentials at all.
+ * The token goes only to the API host, in the Authorization header, never in a URL, and never after a redirect
+ * (`redirect: 'error'`). Every error's text goes through `redact`. Every answer is read up to `MAX_ANSWER_BYTES`, and
+ * every call, its answer included, ends by `timeoutMs` whether or not the transport honours the abort, so a call's
+ * worst case is `(retries + 1) × timeoutMs` plus at most `retries × 10 s` of waiting. The address check after
+ * Unpublish asks the public address with no credentials at all, and reads no body.
  */
 
 import { PublishError } from '../host';
@@ -23,6 +26,8 @@ export interface FetchResponseLike {
   ok: boolean;
   status: number;
   headers?: { get(name: string): string | null };
+  /** Read in chunks when there, so an answer over the cap is never held whole. */
+  body?: { getReader(): { read(): Promise<{ done: boolean; value?: Uint8Array }>; cancel(): Promise<void> } } | null;
   text(): Promise<string>;
 }
 export type FetchLike = (url: string, init?: {
@@ -30,7 +35,7 @@ export type FetchLike = (url: string, init?: {
   headers?: Record<string, string>;
   body?: unknown;
   signal?: AbortSignal;
-  redirect?: 'manual' | 'follow';
+  redirect?: 'manual' | 'follow' | 'error';
 }) => Promise<FetchResponseLike>;
 
 export interface CloudflareClientDeps {
@@ -47,6 +52,22 @@ export interface CloudflareClientDeps {
   retries?: number;
   /** Receives redacted lines only. */
   log?: (line: string) => void;
+}
+
+/** The most of an API answer Ritemark reads (a list of an account's Workers is the largest). */
+export const MAX_ANSWER_BYTES = 4 * 1024 * 1024;
+
+/** The transport gave no answer in time, or none at all: retried, then `unreachable`. */
+class NoAnswer extends Error {}
+/** An answer over `MAX_ANSWER_BYTES`: never retried. */
+class AnswerTooLarge extends Error {}
+
+/** The account has a workers.dev name already; carries it, so the host keeps it instead of renaming it. */
+export class SubdomainExistsError extends PublishError {
+  constructor(readonly existing: string) {
+    super('name-exists', 'Your pages already have an address on Cloudflare.');
+    this.name = 'SubdomainExistsError';
+  }
 }
 
 /** A refused call, its text already redacted. */
@@ -120,20 +141,44 @@ export class CloudflareClient {
     }
   }
 
-  /** M2: the account's workers.dev name, or null when it has none yet. */
+  /**
+   * M2: the account's workers.dev name, or null **only** when Cloudflare answers 10007 (no name yet). Any other
+   * failure, or an answer without a name, is an error: "couldn't read" never reads as "has none", since the next
+   * step for "none" is registering one (Opus review of b07e7c11).
+   */
   async subdomain(accountId: string): Promise<string | null> {
+    let result: { subdomain?: unknown } | undefined;
     try {
-      const result = await this.call<{ subdomain?: unknown }>('GET', `/accounts/${this.account(accountId)}/workers/subdomain`, {}, [accountId]);
-      return typeof result?.subdomain === 'string' && result.subdomain ? result.subdomain : null;
+      result = await this.call<{ subdomain?: unknown }>('GET', `/accounts/${this.account(accountId)}/workers/subdomain`, {}, [accountId]);
     } catch (error) {
       if (error instanceof CloudflareApiError && error.codes.includes(NOT_FOUND)) return null;
       throw error;
     }
+    if (typeof result?.subdomain === 'string' && NAME_RE.test(result.subdomain)) return result.subdomain;
+    throw new CloudflareApiError(0, [], "Cloudflare's answer held no workers.dev name.");
   }
 
-  /** M2: registers the account's workers.dev name. A name Cloudflare refuses is `name-taken` (answer 5). */
+  /** The names of the account's Workers (the list `canPublish` reads, M10). */
+  async scriptNames(accountId: string): Promise<string[]> {
+    const result = await this.call<unknown>('GET', `/accounts/${this.account(accountId)}/workers/scripts`, {}, [accountId]);
+    if (!Array.isArray(result)) throw new CloudflareApiError(0, [], "Cloudflare's answer held no list of Workers.");
+    return result.map((s) => (s as { id?: unknown } | null)?.id).filter((id): id is string => typeof id === 'string');
+  }
+
+  /** Whether the account holds a Worker of this name: a first publish never replaces one. */
+  async scriptExists(accountId: string, name: string): Promise<boolean> {
+    return (await this.scriptNames(accountId)).includes(name);
+  }
+
+  /**
+   * M2: registers the account's workers.dev name, **only when it has none**. Cloudflare's PUT renames an existing
+   * name, which would move every page already published under it, so a fresh read goes right before it, and an
+   * existing name is refused (`SubdomainExistsError`, carrying it). A name Cloudflare refuses is `name-taken`.
+   */
   async registerSubdomain(accountId: string, name: string): Promise<string> {
     if (!NAME_RE.test(name)) throw new PublishError('name-invalid', 'Use lowercase letters, digits and dashes.');
+    const existing = await this.subdomain(accountId);
+    if (existing !== null) throw new SubdomainExistsError(existing);
     try {
       const result = await this.call<{ subdomain?: unknown }>('PUT', `/accounts/${this.account(accountId)}/workers/subdomain`, { json: { subdomain: name } }, [accountId]);
       return typeof result?.subdomain === 'string' && result.subdomain ? result.subdomain : name;
@@ -237,7 +282,7 @@ export class CloudflareClient {
     if (url.protocol !== 'https:' || !url.hostname.endsWith('.workers.dev')) return 'unknown';
     const target = this.deps.addressBase ? `${this.deps.addressBase}/__site/${url.hostname}${url.pathname}` : url.toString();
     try {
-      const res = await this.withDeadline(target, { method: 'GET', redirect: 'manual', headers: { 'Cache-Control': 'no-cache' } });
+      const res = await this.withDeadline(target, { method: 'GET', redirect: 'manual', headers: { 'Cache-Control': 'no-cache' } }, false);
       if (res.status === 404 || res.status === 410) return 'gone';
       if (res.status >= 200 && res.status < 400) return 'answers';
       return 'unknown';
@@ -258,13 +303,38 @@ export class CloudflareClient {
     return name;
   }
 
-  private async withDeadline(url: string, init: Parameters<FetchLike>[1]): Promise<{ status: number; ok: boolean; text: string; retryAfter: string | null }> {
+  /**
+   * One request and its answer, bounded by `timeoutMs` as a whole: the abort is sent, and the wait ends at the
+   * deadline even when a transport ignores it or an answer never finishes. Throws `NoAnswer` or `AnswerTooLarge`.
+   */
+  private async withDeadline(
+    url: string,
+    init: Parameters<FetchLike>[1],
+    readBody = true,
+  ): Promise<{ status: number; ok: boolean; text: string; retryAfter: string | null }> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-    try {
-      const res = await this.deps.fetch(url, { ...init, signal: controller.signal });
-      const text = await res.text();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => { controller.abort(); reject(new NoAnswer('no answer in time')); }, this.timeoutMs);
+    });
+    const exchange = (async () => {
+      let res: FetchResponseLike;
+      try {
+        res = await this.deps.fetch(url, { ...init, signal: controller.signal });
+      } catch (error) {
+        throw new NoAnswer(String((error as Error)?.message ?? error));
+      }
+      let text = '';
+      if (readBody) {
+        text = await readCapped(res, MAX_ANSWER_BYTES);
+      } else {
+        await res.body?.getReader().cancel().catch(() => undefined);
+      }
       return { status: res.status, ok: res.ok, text, retryAfter: res.headers?.get('retry-after') ?? null };
+    })();
+    exchange.catch(() => undefined); // its late failure, after the deadline, is not an unhandled one
+    try {
+      return await Promise.race([exchange, deadline]);
     } finally {
       clearTimeout(timer);
     }
@@ -298,8 +368,11 @@ export class CloudflareClient {
 
       let res: Awaited<ReturnType<CloudflareClient['withDeadline']>>;
       try {
-        res = await this.withDeadline(url.toString(), { method, headers, body });
+        res = await this.withDeadline(url.toString(), { method, headers, body, redirect: 'error' });
       } catch (error) {
+        if (error instanceof AnswerTooLarge) {
+          throw new CloudflareApiError(0, [], `Cloudflare's answer to ${method} ${url.pathname} was larger than Ritemark reads.`);
+        }
         if (attempt < this.retries) {
           this.deps.log?.(this.redact(`[publish] ${method} ${url.pathname}: no answer, trying again (${attempt + 1})`, extraSecrets));
           await this.sleep(backoff(attempt, null));
@@ -327,6 +400,35 @@ export class CloudflareClient {
       return (parsed.result ?? parsed) as T;
     }
   }
+}
+
+/** An answer's text, up to `cap` bytes; over it, `AnswerTooLarge`, with the rest never read. */
+async function readCapped(res: FetchResponseLike, cap: number): Promise<string> {
+  const declared = Number(res.headers?.get('content-length') ?? NaN);
+  if (Number.isFinite(declared) && declared > cap) {
+    await res.body?.getReader().cancel().catch(() => undefined);
+    throw new AnswerTooLarge();
+  }
+  if (res.body && typeof res.body.getReader === 'function') {
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > cap) {
+        await reader.cancel().catch(() => undefined);
+        throw new AnswerTooLarge();
+      }
+      chunks.push(value);
+    }
+    return Buffer.concat(chunks).toString('utf8');
+  }
+  const text = await res.text();
+  if (Buffer.byteLength(text, 'utf8') > cap) throw new AnswerTooLarge();
+  return text;
 }
 
 function backoff(attempt: number, retryAfter: string | null): number {
