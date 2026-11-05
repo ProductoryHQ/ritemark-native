@@ -57,6 +57,11 @@ descendants() {
 	return 0  # the loop's last `&&` may be false; under set -e a caller's $(...) would stop the script
 }
 
+# A digest of a checkout's patches/vscode/*.patch (empty when it has none).
+patch_digest() {
+	(cd "$1/patches/vscode" 2>/dev/null && find . -type f -name '*.patch' -print0 | sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -d" " -f1) || true
+}
+
 stop_run() {
 	local run_dir=${1:-}
 	[[ -n $run_dir && -f $run_dir/run.env ]] || die "stop: no run.env in '${run_dir}'"
@@ -149,6 +154,22 @@ start_run() {
 	fi
 	if [[ ( -z $pin || $built != "$pin" ) && ${RITEMARK_LAUNCH_ANY_BUILD:-} != 1 ]]; then
 		die "the dev build in $build_root/vscode is of VS Code ${built:-unknown}, not the pinned ${pin:-unknown (no vscode gitlink in $ROOT)}: rebuild it, or give this worktree its own vscode (RITEMARK_LAUNCH_ANY_BUILD=1 to run it anyway)"
+	fi
+	# HEAD alone doesn't prove the build is of this code: Ritemark's shell changes are patches on a fixed HEAD.
+	# (1) A fallback build must come from the same patch stack as this checkout's.
+	# (2) Every patched VS Code source must be older than its compiled out/ file (a dev transpile or a full build).
+	# Not proven: that the patches were re-applied after this checkout's patch files last changed (no marker for it).
+	if [[ ${RITEMARK_LAUNCH_ANY_BUILD:-} != 1 ]]; then
+		if [[ $build_root != "$ROOT" && $(patch_digest "$ROOT") != "$(patch_digest "$build_root")" ]]; then
+			die "the main checkout's patches/vscode differ from this checkout's, so its build is not of this code: give this worktree its own vscode (RITEMARK_LAUNCH_ANY_BUILD=1 to run it anyway)"
+		fi
+		local f js stale=""
+		while IFS= read -r f; do
+			[[ $f == src/*.ts && $f != *.d.ts && $f != */test/* ]] || continue
+			js="$build_root/vscode/out/${f#src/}"; js=${js%.ts}.js
+			if [[ ! -f $js || $js -ot $build_root/vscode/$f ]]; then stale=$f; break; fi
+		done < <(git -C "$build_root/vscode" diff --name-only HEAD 2>/dev/null || true; git -C "$build_root/vscode" ls-files --others --exclude-standard -- src 2>/dev/null || true)
+		[[ -z $stale ]] || die "the dev build is older than vscode/$stale: rebuild or transpile it first (RITEMARK_LAUNCH_ANY_BUILD=1 to run it anyway)"
 	fi
 
 	local tmp=${TMPDIR:-/private/tmp}
