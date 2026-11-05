@@ -18,10 +18,12 @@ import { AcpManager } from './acpManager';
 import { traceAcp } from './acpTrace';
 import { findBundledAgentRuntime, findBundledOpenCodePathEntries, readBundledRuntimeVersion } from '../utils/bundledAgentRuntime';
 import { RitemarkIpcServer } from '../runtime/RitemarkIpcServer';
+import type { RitemarkIpcRequest, RitemarkIpcResult } from '../runtime/RitemarkIpcServer';
 import { RitemarkToolsInjector } from '../runtime/RitemarkToolsInjector';
 import { BOARD_TOOL_GROUP, toolGroupsFor } from '../runtime/ritemarkTools';
 import { isEnabled } from '../features';
 import type { AgentId } from '../agent/types';
+import type { BrowserTurnPage } from '../browser/BrowserActionTools';
 import type {
   RequestPermissionRequest,
   RequestPermissionResponse,
@@ -50,6 +52,23 @@ import { noteOpenCodeModels } from '../ai/modelCatalog';
 type PendingApproval = (result: { approved: boolean; alwaysAllow: boolean }) => void;
 
 const _toolsInjector = new RitemarkToolsInjector();
+
+/** #658: OpenCode's browser requests name no conversation, so two conversations mid-turn cannot share the browser. */
+export const ANOTHER_OPENCODE_CONVERSATION_ERROR =
+  'Another OpenCode conversation is using the browser right now. Nothing was done. Try again when that conversation has finished.';
+
+/**
+ * #658: an OpenCode turn timed out and is still stopping. A browser call that arrives now may be that turn's, and the
+ * requests name no conversation, so it is refused rather than sent to another conversation's page.
+ */
+export const ENDED_OPENCODE_TURN_ERROR =
+  'An OpenCode turn that timed out is still stopping. Nothing was done in the browser. Try again in a moment.';
+
+/**
+ * #658: how long a timed-out turn's browser calls are refused at most, when its prompt never settles after the cancel
+ * (a provider that hangs for good): another conversation's browser actions are refused only that long because of it.
+ */
+export const ENDED_OPENCODE_TURN_HOLD_MS = 60_000;
 
 /**
  * A permission request for one of the board tools (Phase 0, P3). With
@@ -244,9 +263,14 @@ export class AcpSession implements RuntimeSession {
       const timeoutMs = (turn.timeoutMinutes ?? DEFAULT_ACP_TIMEOUT_MINUTES) * 60_000;
       let timedOut = false;
       let timer: ReturnType<typeof setTimeout> | undefined;
+      // #658: this session is mid-turn from here; its conversation's page is the one OpenCode's browser tools act in.
+      // Taken only around the prompt, which the timeout bounds: setModel and setThinkingEffort have no timeout of
+      // their own, and a hang there must not hold the browser from another conversation.
+      this._runtime.beginBrowserTurn(this, config.browserPage);
+      const prompted = manager.prompt(this.acpSessionId, promptText);
       try {
         const result = await Promise.race([
-          manager.prompt(this.acpSessionId, promptText),
+          prompted,
           new Promise<never>((_, reject) => {
             timer = setTimeout(() => {
               timedOut = true;
@@ -270,11 +294,14 @@ export class AcpSession implements RuntimeSession {
         // On timeout, stop the abandoned turn upstream so it does not keep
         // running against a session the user has already been told failed.
         if (timedOut) {
+          // #658: its browser calls still in flight are refused until its prompt settles, not sent to another page.
+          this._runtime.holdEndedBrowserTurn(this, prompted);
           void manager.cancel(this.acpSessionId).catch(() => { /* already failing */ });
         }
         throw err;
       } finally {
         if (timer) clearTimeout(timer);
+        this._runtime.endBrowserTurn(this);
       }
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
@@ -478,6 +505,7 @@ export class AcpRuntime implements AgentRuntime {
    * torn down only when the last session goes.
    */
   _forgetSession(session: AcpSession): void {
+    this._releaseEndedTurn(session);
     this._sessions.delete(session.conversationId);
     this._sessionsByAcpId.delete(session.acpSessionId);
     if (this._sessions.size === 0) {
@@ -490,6 +518,79 @@ export class AcpRuntime implements AgentRuntime {
   private _stopIpcServer(): void {
     this._ipcServer?.stop();
     this._ipcServer = null;
+  }
+
+  /**
+   * #658: the browser page holder the browser tools act in: that of the session mid-turn (the one that began last,
+   * when two are), or none when no session is mid-turn.
+   */
+  private _browserPage: BrowserTurnPage | undefined;
+
+  /** #658: the sessions mid-turn, with the browser page holder of each one's conversation. */
+  private readonly _turnPages = new Map<AcpSession, BrowserTurnPage | undefined>();
+
+  /** #658: a session starts a turn; its conversation's browser page is the one OpenCode's browser tools act in. */
+  beginBrowserTurn(session: AcpSession, page: BrowserTurnPage | undefined): void {
+    this._turnPages.set(session, page);
+    this._browserPage = page;
+  }
+
+  /**
+   * #658: a session's turn ended. The browser tools now act in the page of a session still mid-turn (the one that
+   * began last), or in none: never in the page of the turn that ended.
+   */
+  endBrowserTurn(session: AcpSession): void {
+    this._turnPages.delete(session);
+    const stillMidTurn = [...this._turnPages.values()];
+    this._browserPage = stillMidTurn.length ? stillMidTurn[stillMidTurn.length - 1] : undefined;
+  }
+
+  /**
+   * #658: OpenCode's browser requests name no conversation. While two sessions are mid-turn with different turn pages,
+   * which one asked cannot be told, so a browser action would land in the wrong conversation's page: refuse it.
+   */
+  browserContested(): boolean {
+    const pageIds = new Set([...this._turnPages.values()].map((page) => page?.pageId ?? ''));
+    return this._turnPages.size > 1 && pageIds.size > 1;
+  }
+
+  /** #658: the sessions whose turn timed out and whose prompt has not settled yet; see `holdEndedBrowserTurn`. */
+  private readonly _endedTurns = new Map<AcpSession, { timer?: ReturnType<typeof setTimeout> }>();
+
+  /**
+   * #658: a session's turn timed out. `endBrowserTurn` gives its page up at once, but the cancel is not awaited, and a
+   * browser call already on its way from that turn names no conversation: it would go to another conversation's page.
+   * So every browser call is refused until the timed-out prompt settles, the session is forgotten, or
+   * `ENDED_OPENCODE_TURN_HOLD_MS` passes.
+   */
+  holdEndedBrowserTurn(session: AcpSession, prompted: Promise<unknown>): void {
+    const hold: { timer?: ReturnType<typeof setTimeout> } = {};
+    this._releaseEndedTurn(session);
+    this._endedTurns.set(session, hold);
+    const release = () => {
+      if (this._endedTurns.get(session) === hold) this._releaseEndedTurn(session);
+    };
+    hold.timer = setTimeout(release, ENDED_OPENCODE_TURN_HOLD_MS);
+    hold.timer.unref?.();
+    prompted.then(release, release);
+  }
+
+  private _releaseEndedTurn(session: AcpSession): void {
+    const hold = this._endedTurns.get(session);
+    if (!hold) return;
+    if (hold.timer) clearTimeout(hold.timer);
+    this._endedTurns.delete(session);
+  }
+
+  /** #658: an adapter's request, the browser's refused while another conversation's turn holds a different page. */
+  async handleToolRequest(req: RitemarkIpcRequest): Promise<RitemarkIpcResult> {
+    if (req.op === 'call' && req.group === 'browser' && this._endedTurns.size) {
+      return { text: ENDED_OPENCODE_TURN_ERROR, isError: true };
+    }
+    if (req.op === 'call' && req.group === 'browser' && this.browserContested()) {
+      return { text: ANOTHER_OPENCODE_CONVERSATION_ERROR, isError: true };
+    }
+    return _toolsInjector.handleIpc(req, 'opencode', this._browserPage);
   }
 
   /**
@@ -517,7 +618,8 @@ export class AcpRuntime implements AgentRuntime {
     if (groups.length) {
       const ipcSessionId = crypto.randomUUID();
       const ipcServer = new RitemarkIpcServer(ipcSessionId);
-      await ipcServer.start((req) => _toolsInjector.handleIpc(req));
+      // #658: the requests name no conversation; the page is the last-prompted conversation's (one shared browser, D2).
+      await ipcServer.start((req) => this.handleToolRequest(req));
       this._ipcServer = ipcServer;
       mcpServers = _toolsInjector.acpMcpServers(groups, ipcServer.socketPath);
       traceAcp('runtime', 'ipc-started', { socketPath: ipcServer.socketPath, groups: groups.map((group) => group.id) });

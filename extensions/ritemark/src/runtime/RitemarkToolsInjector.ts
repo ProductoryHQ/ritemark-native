@@ -23,6 +23,7 @@
 
 import * as path from 'path';
 import type { AgentId } from '../agent/types';
+import type { BrowserTurnPage } from '../browser/BrowserActionTools';
 import type { DynamicToolDefinition } from '../codex/codexProtocol';
 import type { RitemarkIpcRequest, RitemarkIpcResult } from './RitemarkIpcServer';
 import {
@@ -43,10 +44,14 @@ function mcpContent(result: ToolResult): McpContent {
 }
 
 export class RitemarkToolsInjector {
-  /** New in-process SDK MCP servers, one per group, keyed by server name. */
-  async claudeMcpServers(groups: RitemarkToolGroup[]): Promise<Record<string, unknown> | undefined> {
+  /**
+   * New in-process SDK MCP servers, one per group, keyed by server name.
+   * `browserPage` (#658) is the conversation's page holder: the session keeps
+   * the servers of its first turn, so the tools read the holder at call time.
+   */
+  async claudeMcpServers(groups: RitemarkToolGroup[], browserPage?: BrowserTurnPage): Promise<Record<string, unknown> | undefined> {
     if (!groups.length) return undefined;
-    const entries = await Promise.all(groups.map(async (group) => [group.server, await createClaudeServer(group)] as const));
+    const entries = await Promise.all(groups.map(async (group) => [group.server, await createClaudeServer(group, browserPage)] as const));
     return Object.fromEntries(entries);
   }
 
@@ -61,10 +66,15 @@ export class RitemarkToolsInjector {
   }
 
   /** A Codex `item/tool/call`, routed by the tool's name. */
-  async codexToolCall(groups: RitemarkToolGroup[], name: string, args: Record<string, unknown>): Promise<{ text: string; success: boolean }> {
+  async codexToolCall(
+    groups: RitemarkToolGroup[],
+    name: string,
+    args: Record<string, unknown>,
+    browserPage?: BrowserTurnPage,
+  ): Promise<{ text: string; success: boolean }> {
     const found = findCodexTool(groups, name);
     if (!found) return { text: `Unknown tool: ${name}`, success: false };
-    const result = await runTool(found.tool, args, { runtimeId: 'codex' });
+    const result = await runTool(found.tool, args, { runtimeId: 'codex', ...(browserPage ? { browserPage } : {}) });
     return { text: result.text, success: !result.isError };
   }
 
@@ -89,20 +99,24 @@ export class RitemarkToolsInjector {
     }));
   }
 
-  /** An OpenCode adapter's request: a group's tools, or a call. */
-  async handleIpc(request: RitemarkIpcRequest, runtimeId: AgentId = 'opencode'): Promise<RitemarkIpcResult> {
+  /**
+   * An OpenCode adapter's request: a group's tools, or a call. OpenCode's
+   * sessions share one socket and its requests name no conversation, so the
+   * runtime passes the page holder of the conversation it prompted last (#658).
+   */
+  async handleIpc(request: RitemarkIpcRequest, runtimeId: AgentId = 'opencode', browserPage?: BrowserTurnPage): Promise<RitemarkIpcResult> {
     const group = toolGroupById(request.group);
     if (!group) return { text: `Unknown tool group: ${String(request.group)}`, isError: true };
     if (request.op === 'list') return { tools: group.tools.map(mcpToolDefinition) };
     const tool = group.tools.find((item) => item.name === request.tool);
     if (!tool) return { text: `Unknown tool: ${String(request.tool)}`, isError: true };
-    const result = await runTool(tool, request.params, { runtimeId });
+    const result = await runTool(tool, request.params, { runtimeId, ...(browserPage ? { browserPage } : {}) });
     return { text: result.text, ...(result.isError ? { isError: true } : {}) };
   }
 }
 
 /** The SDK is imported lazily, so the cost is paid only when Claude runs. */
-async function createClaudeServer(group: RitemarkToolGroup): Promise<unknown> {
+async function createClaudeServer(group: RitemarkToolGroup, browserPage?: BrowserTurnPage): Promise<unknown> {
   const dynamicImport = new Function('specifier', 'return import(specifier)') as (
     specifier: string,
   ) => Promise<typeof import('@anthropic-ai/claude-agent-sdk')>;
@@ -112,7 +126,7 @@ async function createClaudeServer(group: RitemarkToolGroup): Promise<unknown> {
     version: '0.2.0',
     tools: group.tools.map((tool) =>
       sdk.tool(tool.name, tool.description, tool.input, async (args: unknown) =>
-        mcpContent(await runTool(tool, args, { runtimeId: 'claude-code' })),
+        mcpContent(await runTool(tool, args, { runtimeId: 'claude-code', ...(browserPage ? { browserPage } : {}) })),
       ),
     ),
   });

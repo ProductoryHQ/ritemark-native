@@ -333,6 +333,19 @@ export class BrowserContextStore {
     return this.isControlConsented();
   }
 
+  /**
+   * #658: the id of the browser page in front now, or undefined (a document in front, no browser). Only the id: nothing
+   * about the page reaches the AI from here. A turn without browser context acts in this page.
+   */
+  public async activePageId(): Promise<string | undefined> {
+    try {
+      const result = await vscode.commands.executeCommand<unknown>(GET_ACTIVE_CONTEXT_COMMAND);
+      return isUsableSnapshot(result) && !result.error && typeof result.pageId === 'string' ? result.pageId : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   public async buildTurnContext(options: { includeScreenshot?: boolean } = {}): Promise<BrowserTurnContext | null> {
     const metadata = await this.refreshMetadata();
     if (!metadata?.url) return null;
@@ -347,7 +360,10 @@ export class BrowserContextStore {
 
     if (metadata.sharedWithAgent) {
       try {
-        const summaryResult = await vscode.commands.executeCommand<unknown>(GET_ACTIVE_SUMMARY_COMMAND);
+        // #658: the summary of the page the metadata named, not of whichever tab is in front by now.
+        const summaryResult = await vscode.commands.executeCommand<unknown>(GET_ACTIVE_SUMMARY_COMMAND, { pageId: metadata.pageId });
+        // The share went between the two reads: nothing about the page goes to the AI (Sprint 67 D5).
+        if (isUsableSnapshot(summaryResult) && summaryResult.sharedWithAgent === false) return null;
         if (isUsableSnapshot(summaryResult)) {
           snapshot = { ...snapshot, ...summaryResult };
         }
@@ -368,7 +384,7 @@ export class BrowserContextStore {
 
     if (options.includeScreenshot && snapshot.annotationMode) {
       try {
-        const screenshotResult = await vscode.commands.executeCommand<unknown>(CAPTURE_ACTIVE_VIEWPORT_COMMAND);
+        const screenshotResult = await vscode.commands.executeCommand<unknown>(CAPTURE_ACTIVE_VIEWPORT_COMMAND, { pageId: metadata.pageId });
         if (isUsableSnapshot(screenshotResult) && screenshotResult.screenshot) {
           snapshot = { ...snapshot, screenshot: screenshotResult.screenshot };
         }

@@ -238,7 +238,25 @@ async function main(): Promise<void> {
   // ── The browser tools keep their names, descriptions and schemas exactly ──
   {
     const generated = BROWSER_TOOL_GROUP.tools.map(mcpToolDefinition);
-    assert.deepEqual(generated, OLD_ADAPTER_TOOLS, 'the OpenCode adapter sees exactly the tools it had');
+    // #658: every browser tool also takes page_id, and the descriptions say which page they act in (the page the
+    // turn was given, not the tab in front). Names and every other part of the schemas are unchanged.
+    const pageId = {
+      type: 'string',
+      description:
+        'The page to act in. Leave it out to act in the page the user had in front when they sent the message. Pass a page id only when a tool result gave you one (for example a page your click opened).',
+    };
+    assert.deepEqual(
+      generated.map((tool) => ({ name: tool.name, inputSchema: tool.inputSchema })),
+      OLD_ADAPTER_TOOLS.map((tool) => ({
+        name: tool.name,
+        inputSchema: { ...tool.inputSchema, properties: { ...(tool.inputSchema.properties ?? {}), page_id: pageId } },
+      })),
+      'the OpenCode adapter sees the tools it had, each with page_id',
+    );
+    for (const tool of generated) {
+      assert.doesNotMatch(tool.description, /active (integrated browser )?tab|FIRST existing/, `${tool.name} no longer says it follows the tab in front`);
+      assert.match(tool.description, /page you were given/, `${tool.name} names the page it acts in`);
+    }
     assert.deepEqual(
       BROWSER_TOOL_GROUP.tools.map((tool) => claudeAllowName(BROWSER_TOOL_GROUP, tool)),
       ['navigate', 'click', 'fill', 'type', 'scroll', 'snapshot'].map((name) => `mcp__ritemark_browser__browser_${name}`),

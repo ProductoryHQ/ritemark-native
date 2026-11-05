@@ -12,6 +12,7 @@ import type {
 } from './thinkingEffort';
 import type { RuntimeFailureKind } from './runtimeErrorPresentation';
 import type { DynamicToolDefinition } from '../codex/codexProtocol';
+import type { BrowserTurnPage } from '../browser/BrowserActionTools';
 
 export type { AgentId };
 export type {
@@ -110,6 +111,12 @@ export interface RuntimeSessionConfig {
   excludedFolders?: string[];
   extraSystemPrompt?: string;
   mcpServers?: Record<string, unknown>;
+  /**
+   * #658: the conversation's browser page holder, the page its browser tools
+   * act in. Claude and Codex get it with their tools; OpenCode, whose adapter
+   * requests name no conversation, takes it from the turn it prompts.
+   */
+  browserPage?: BrowserTurnPage;
   /** Built-in tools exposed to the model. Omitted keeps the runtime default; [] removes them. */
   availableTools?: string[];
   /** Provider setting scopes to load. Omitted keeps defaults; [] loads none. */
