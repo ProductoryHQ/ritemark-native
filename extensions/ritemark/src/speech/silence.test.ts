@@ -132,6 +132,27 @@ async function run(): Promise<void> {
     unsized.writeUInt32LE(0, 40);
     assert.equal(await wavSound(file('unsized.wav', unsized)), 'sound', 'a data size of 0 means "to the end of the file"');
 
+    // A silent file is read to its end once: the panel and the job both ask, and the second answer is the first
+    // one's while the file's size and time are the same. A file that changes is read again.
+    {
+      const once = file('once.wav', wavBytes(Buffer.alloc(16_000 * 4)));
+      const atime = new Date('2026-11-05T18:00:00Z');
+      const mtime = new Date('2026-11-05T18:00:00Z');
+      fs.utimesSync(once, atime, mtime);
+      assert.equal(await wavSound(once), 'silent');
+      const loud = wavBytes(pcm16(16_000 * 2, () => 9000));
+      assert.equal(loud.length, fs.statSync(once).size);
+      fs.writeFileSync(once, loud);
+      fs.utimesSync(once, atime, mtime);
+      assert.equal(await wavSound(once), 'silent', 'same size and time: the answer already read, the file not read again');
+      fs.utimesSync(once, atime, new Date(mtime.getTime() + 5000));
+      assert.equal(await wavSound(once), 'sound', 'a new time: read again');
+      fs.writeFileSync(once, wavBytes(Buffer.alloc(16_000 * 6)));
+      assert.equal(await wavSound(once), 'silent', 'a new size: read again');
+      fs.rmSync(once);
+      assert.equal(await wavSound(once), 'unknown', 'a file that went is not answered from memory');
+    }
+
     // The words.
     assert.equal(soundSettingsName('darwin'), 'System Settings ▸ Sound');
     assert.equal(soundSettingsName('win32'), 'Settings ▸ System ▸ Sound');

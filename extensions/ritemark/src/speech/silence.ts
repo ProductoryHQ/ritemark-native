@@ -55,8 +55,33 @@ function magnitudeReader(audioFormat: number, bitsPerSample: number): Magnitude 
   return null;
 }
 
+/**
+ * Answers already read, by path, for the file's size and modification time: a silent file is read to its end, and
+ * the panel (when the file is staged) and the job (before any engine) both ask. A file that changes is read again.
+ */
+const checked = new Map<string, { size: number; mtimeMs: number; result: 'silent' | 'sound' }>();
+const CHECKED_MAX = 32;
+
 /** Whether a WAV file has any sound (see the file comment). Never throws. */
 export async function wavSound(filePath: string): Promise<SoundCheck> {
+  let stat: { size: number; mtimeMs: number };
+  try {
+    stat = await fsp.stat(filePath);
+  } catch {
+    return 'unknown';
+  }
+  const known = checked.get(filePath);
+  if (known && known.size === stat.size && known.mtimeMs === stat.mtimeMs) return known.result;
+  const result = await scanWav(filePath);
+  checked.delete(filePath);
+  if (result !== 'unknown') {
+    checked.set(filePath, { size: stat.size, mtimeMs: stat.mtimeMs, result });
+    if (checked.size > CHECKED_MAX) checked.delete(checked.keys().next().value as string);
+  }
+  return result;
+}
+
+async function scanWav(filePath: string): Promise<SoundCheck> {
   let handle: FileHandle | undefined;
   try {
     handle = await fsp.open(filePath, 'r');

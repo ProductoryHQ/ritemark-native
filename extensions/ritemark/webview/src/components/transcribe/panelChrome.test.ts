@@ -96,21 +96,17 @@ assert.ok(hostSource.includes(`case '${ATTENTION_ACTIONS.dismiss.message}':`), '
 assert.ok(panelSource.includes('refusal={refusalOf(engine.id)}'));
 assert.ok(hostSource.includes('cannotTakeOnDevice(path.extname(audioPath)'), 'the host decides it before anything starts');
 
-// #656: a file with no sound is said so on the pending card before anything starts, no engine is offered or started,
-// and the live card names the input and says when it hears nothing.
-const pendingCard = panelSource.slice(panelSource.indexOf('function PendingImportCard'), panelSource.indexOf('function EngineChoice'));
-assert.ok(pendingCard.includes('text-ritemark-warning-foreground">{silence}</p>'), 'the card says it in place of the engines');
-assert.ok(pendingCard.includes('{!silence && ('), 'no engine is offered for a silent file');
-assert.ok(pendingCard.includes("'This recording has no sound, so there is nothing to transcribe'"), 'the disabled Transcribe says why');
+// #656: the behaviour is rendered and clicked in pendingSilence.test.ts and TranscribeViewProvider.silence.test.ts;
+// here, the wiring between the files.
 assert.match(hostSource, /const silent = path\.extname\(audioPath\)\.toLowerCase\(\) === '\.wav' && \(await wavSound\(audioPath\)\) === 'silent'/);
-assert.ok(hostSource.includes('if (pending.silence || pending.estimates.some('), 'a stale page cannot start an engine on it');
-assert.ok(hostSource.includes("darwin: 'x-apple.systempreferences:com.apple.preference.sound?input'"), 'the no-sound line opens Sound ▸ Input');
+assert.ok(hostSource.includes('soundSettings: soundSettingsName(process.platform)'), 'the host names the settings, once');
+assert.ok(hostSource.includes("darwin: 'x-apple.systempreferences:com.apple.preference.sound?input'"), 'the link opens Sound ▸ Input');
+assert.ok(hostSource.includes("win32: 'ms-settings:sound'"), 'and Settings ▸ System ▸ Sound on Windows');
+assert.ok(panelSource.includes('soundSettings={state.soundSettings}\n            onStop'), 'the live card gets the name from the host');
+assert.ok(panelSource.includes('start: () => recordAgain((message) => vscode.postMessage(message), recording)'), 'Record again records');
 const cardsSource = readFileSync(fileURLToPath(new URL('./recording/RecordingCards.tsx', import.meta.url)), 'utf-8');
+assert.ok(!/'System Settings ▸ Sound'|'Settings ▸ System ▸ Sound'/.test(cardsSource + panelSource), 'the webview keeps no copy of the names');
 const liveCard = cardsSource.slice(cardsSource.indexOf('export function LiveRecordingCard'), cardsSource.indexOf('export function SavingCard'));
-assert.ok(liveCard.includes('{view.noSound && <NoSoundLine platform={platform} />}'));
-assert.ok(liveCard.includes('<span className="text-ink-body"> from {view.inputName}</span>'), 'Recording from <input>');
-assert.ok(panelSource.includes('platform={state.platform}\n            onStop'), 'the live card knows the platform for the settings name');
-const noSoundLine = cardsSource.slice(cardsSource.indexOf('function NoSoundLine'), cardsSource.indexOf('/** Where the live recording goes'));
-assert.ok(/<Tooltip [^>]*label=/.test(noSoundLine) && noSoundLine.includes('<Button') && !/\btitle=/.test(noSoundLine), 'its link is a Button with a tooltip, never a native title');
+assert.ok(liveCard.includes('{view.noSound && <NoSoundLine soundSettings={soundSettings} />}'));
 
 console.log('panelChrome tests passed');

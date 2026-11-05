@@ -62,39 +62,38 @@ export function RecordDot({ live = false, size = 'md' }: { live?: boolean; size?
 }
 
 /**
- * #656: where the sound input is chosen, by its name in the system's settings; null where Ritemark can't say
- * (and has no page to open). As `soundSettingsName` in `src/speech/silence.ts`.
+ * #656: the link that opens the system's sound settings, by their name there (`soundSettings`, from the host:
+ * `soundSettingsName` in `src/speech/silence.ts`); the words "your sound settings" where it has none to open.
+ * The no-sound line and the pending card's note use the same link with the same tooltip.
  */
-export function soundSettingsName(platform: string): string | null {
-  if (platform === 'darwin') return 'System Settings ▸ Sound';
-  if (platform === 'win32') return 'Settings ▸ System ▸ Sound';
-  return null;
+export function SoundSettingsLink({ soundSettings, textClass }: { soundSettings: string | null; textClass: string }) {
+  if (!soundSettings) return <>your sound settings</>;
+  return (
+    <Tooltip side="top" label="Open the sound settings, where the input is chosen">
+      <Button
+        variant="link"
+        size="sm"
+        className={`h-auto px-0 py-0 ${textClass} font-semibold has-[>svg]:px-0`}
+        onClick={() => post({ type: 'transcribe:record/openSoundSettings' })}
+      >
+        {soundSettings}
+      </Button>
+    </Tooltip>
+  );
 }
 
 /**
- * #656: the recorder heard nothing for a few seconds. One line in the card, the recording going on; the settings'
- * name is the link that opens them. It goes as soon as sound arrives.
+ * #656: the recorder heard nothing for a few seconds. One line in the card, in plain ink with a microphone-slash
+ * before it (the Experience lead, 5 Nov: the icon draws the eye of someone speaking, not watching); the recording
+ * goes on, and the line goes as soon as sound arrives.
  */
-function NoSoundLine({ platform }: { platform: string }) {
-  const where = soundSettingsName(platform);
+function NoSoundLine({ soundSettings }: { soundSettings: string | null }) {
   return (
-    <p className="mt-2 text-[11px] leading-relaxed text-ritemark-warning-foreground">
-      No sound from the microphone. Check the input in{' '}
-      {where ? (
-        <Tooltip side="top" label="Open the sound settings, where the input is chosen">
-          <Button
-            variant="link"
-            size="sm"
-            className="h-auto px-0 py-0 text-[11px] font-semibold has-[>svg]:px-0"
-            onClick={() => post({ type: 'transcribe:record/openSoundSettings' })}
-          >
-            {where}
-          </Button>
-        </Tooltip>
-      ) : (
-        'your sound settings'
-      )}
-      .
+    <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-[18px]">
+      <Icon name="microphone-slash" size={14} tone="inherit" className="mt-0.5 shrink-0" />
+      <span className="min-w-0">
+        No sound from the microphone. Check the input in <SoundSettingsLink soundSettings={soundSettings} textClass="text-[11px]" />.
+      </span>
     </p>
   );
 }
@@ -160,13 +159,14 @@ export function RecordPromptCard({ onStart, onCancel }: { onStart: () => void; o
 export function LiveRecordingCard({
   view,
   host,
-  platform,
+  soundSettings,
   onStop,
   onCancel,
 }: {
   view: CaptureView;
   host: RecordingProjection;
-  platform: string;
+  /** #656: where the input is chosen, by name, from the host (`TranscribeState.soundSettings`). */
+  soundSettings: string | null;
   onStop: () => void;
   onCancel: () => void;
 }) {
@@ -175,41 +175,35 @@ export function LiveRecordingCard({
   const cardRef = useRef<HTMLDivElement>(null);
   const where = host.sessionId === view.sessionId ? destination(host) : null;
   const elapsed = formatElapsed(view.savedSeconds);
-  const settings = soundSettingsName(platform);
 
   return (
     <Card label="Recording" containerRef={cardRef}>
-      {/* #656 (Jarmo, 4 Nov): the input is named from the first second, so a wrong one shows at once. The name
-          wraps rather than being cut: at sidebar width "MacBook Pro Mi…" would hide what the line is for. */}
-      <div className="flex items-start gap-2">
-        <span className="mt-[5px] flex shrink-0">
-          <RecordDot live />
-        </span>
-        {view.inputName ? (
-          <Tooltip
-            className="min-w-0"
-            side="top"
-            label={`Recording from ${view.inputName}.${settings ? ` The input is chosen in ${settings}.` : ''}`}
-          >
-            <span className="min-w-0 break-words text-xs leading-5">
-              <span className="font-semibold text-accent-deep">Recording</span>
-              <span className="text-ink-body"> from {view.inputName}</span>
-            </span>
-          </Tooltip>
-        ) : (
-          <span className="text-xs font-semibold leading-5 text-accent-deep">Recording</span>
-        )}
-        <span className="ml-auto shrink-0 text-sm font-semibold leading-5 tabular-nums" aria-label={`Recorded ${elapsed}`}>
+      {/* The status line, "Recording" and the time, stays one line whatever the input is called. */}
+      <div className="flex items-center gap-2">
+        <RecordDot live />
+        <span className="text-xs font-semibold text-accent-deep">Recording</span>
+        <span className="ml-auto text-sm font-semibold tabular-nums" aria-label={`Recorded ${elapsed}`}>
           {elapsed}
         </span>
       </div>
+      {/* #656 (Jarmo, 4 Nov; the Experience lead, 5 Nov): the input is named from the first second, so a wrong one
+          shows at once: a muted line of its own under the status, cut with an ellipsis, the whole name in its tooltip. */}
+      {view.inputName && (
+        <Tooltip
+          className="mt-1.5 flex min-w-0"
+          side="top"
+          label={`Recording from ${view.inputName}.${soundSettings ? ` The input is chosen in ${soundSettings}.` : ''}`}
+        >
+          <span className="truncate text-[11px] text-ink-muted">From {view.inputName}</span>
+        </Tooltip>
+      )}
       {where && (
-        <Tooltip className="mt-1.5 flex min-w-0" side="top" label={where.full}>
+        <Tooltip className={`${view.inputName ? 'mt-0.5' : 'mt-1.5'} flex min-w-0`} side="top" label={where.full}>
           <span className="truncate text-[11px] text-ink-muted">{where.short}</span>
         </Tooltip>
       )}
       <div className="mt-0.5 text-[11px] text-ink-muted">{formatSavedSize(view.savedSeconds)}</div>
-      {view.noSound && <NoSoundLine platform={platform} />}
+      {view.noSound && <NoSoundLine soundSettings={soundSettings} />}
       {host.warnLong && host.sessionId === view.sessionId && (
         <p className="mt-2 text-[11px] leading-relaxed text-ritemark-warning-foreground">
           This recording is over 2 hours. It stops and saves automatically at 4 hours.

@@ -20,7 +20,7 @@ import type { EngineRegistry } from '../speech/engineRegistry';
 import type { JobManager } from '../speech/JobManager';
 import type { SessionStore } from '../speech/SessionStore';
 import { AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, canConvertLocally, cannotTakeOnDevice, classifyInput } from '../speech/audioPrep';
-import { silentRecordingMessage, wavSound } from '../speech/silence';
+import { soundSettingsName, wavSound } from '../speech/silence';
 import { pickerFolder } from '../utils/dialogDefaults';
 import { probeDurationSec } from '../speech/durationProbe';
 import { sessionIdForPath } from '../speech/SessionStore';
@@ -57,8 +57,11 @@ interface PendingImport {
   durationSec: number | null;
   /** `refusal`: why this engine can't take this file on this computer (Sprint 143, #509). */
   estimates: Array<{ engineId: string; costUsd: number | null; refusal?: string }>;
-  /** #656: set when the file has no sound at all: what the card says, and no engine is started. */
-  silence?: string;
+  /**
+   * #656: set when the file has no sound at all, and no engine is started. `recordedHere`: recorded in this panel,
+   * so the card says where the input is chosen and offers Record again.
+   */
+  silence?: { recordedHere: boolean };
 }
 
 export class TranscribeViewProvider implements vscode.WebviewViewProvider {
@@ -365,7 +368,7 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
     });
 
     // #656: said before anything starts. Only a WAV is read here (Ritemark's own recordings are WAV); the job
-    // checks again before any engine runs.
+    // checks again before any engine runs, from the same reading while the file is unchanged (`wavSound`).
     const silent = path.extname(audioPath).toLowerCase() === '.wav' && (await wavSound(audioPath)) === 'silent';
 
     this._pending = {
@@ -373,7 +376,7 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
       audioName: path.basename(audioPath),
       durationSec,
       estimates,
-      ...(silent ? { silence: silentRecordingMessage({ recordedHere: this._recordedPaths.has(audioPath) }) } : {}),
+      ...(silent ? { silence: { recordedHere: this._recordedPaths.has(audioPath) } } : {}),
     };
     await this._pushState();
   }
@@ -573,6 +576,8 @@ export class TranscribeViewProvider implements vscode.WebviewViewProvider {
         pending: this._pending,
         preferredEngineId: preferred?.id ?? null,
         platform: process.platform,
+        // #656: where the sound input is chosen, by name; the one source of these words (`src/speech/silence.ts`).
+        soundSettings: soundSettingsName(process.platform),
         acceptedExtensions: AUDIO_EXTENSIONS,
         videoExtensions: VIDEO_EXTENSIONS,
         otherProjectCount: elsewhere.length,
