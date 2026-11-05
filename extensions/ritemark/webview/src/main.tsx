@@ -81,6 +81,10 @@ const SearchPanel = lazy(() =>
 const ControlCatalogue = lazy(() =>
   import('./components/catalogue/ControlCatalogue').then((m) => ({ default: m.ControlCatalogue }))
 )
+// The Publish sheet (Sprint 149, R4, R5): the page that shows what will be public (src/publish/PublishSheetPanel.ts)
+const PublishSheet = lazy(() =>
+  import('./components/publish/PublishSheet').then((m) => ({ default: m.PublishSheet }))
+)
 
 // Check if this is a flow editor instance
 const rootElement = document.getElementById('root')!
@@ -170,6 +174,10 @@ ReactDOM.createRoot(rootElement).render(
     ) : editorType === 'control-catalogue' ? (
       <Suspense fallback={null}>
         <ControlCatalogue />
+      </Suspense>
+    ) : editorType === 'publish-sheet' ? (
+      <Suspense fallback={null}>
+        <PublishSheet />
       </Suspense>
     ) : (
       <App />

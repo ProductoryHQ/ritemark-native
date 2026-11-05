@@ -1,0 +1,260 @@
+/**
+ * Sprint 149 (PR 3): the Publish sheet's host side and its dev harness.
+ * - The harness runs only in a development build (`VSCODE_DEV=1`) started with its setting.
+ * - The sheet shows over the whole window (PR 5: `_ritemark.webviewSheet`), never as a tab; a shell without it
+ *   answers cancel. The sheet gets the model and no real path; Cancel and closing the sheet answer cancel; a plain Publish never skips
+ *   a key warning, and nothing over a limit can be confirmed (decision 2, S14, S15, S16); Open script.js opens only a
+ *   hit of the plan's own list; anything else the page sends is ignored.
+ * - Open closes the sheet without publishing and opens the file's text (a page's too) as a tab on the sheet's desk,
+ *   with the key selected when its columns are known, else the caret at the line's start (the lead, 5 November).
+ *
+ * Run: npx tsx src/publish/devSheetHarness.test.ts
+ */
+
+import assert from 'node:assert/strict';
+import Module from 'node:module';
+
+type Listener = (m: unknown) => void;
+interface FakePanel {
+  posted: unknown[];
+  disposed: boolean;
+  html: string;
+  send(m: unknown): void;
+  /** The workbench closed the sheet (Escape): the view goes and the open command resolves. */
+  dispose(): void;
+}
+const panels: FakePanel[] = [];
+const opened: unknown[][] = [];
+const sheetCommands: string[] = [];
+
+// The workbench's sheet (patch 018) as far as the extension sees it: a webview view of the registered provider,
+// opened by `_ritemark.webviewSheet.open`, gone (onDidDispose) when it closes, the open command then resolving
+let provider: { resolveWebviewView(view: unknown): void } | undefined;
+let showing: { panel: FakePanel; close(outcome: string): void } | undefined;
+function openSheet(request: { viewType: string }): Promise<string> {
+  if (showing || !provider || request.viewType !== 'ritemark.publishSheet') return Promise.resolve('refused');
+  return new Promise<string>((resolveOpen) => {
+    let onMessage: Listener = () => {};
+    const onDispose: Array<() => void> = [];
+    const panel: FakePanel = {
+      posted: [],
+      disposed: false,
+      html: '',
+      send: (m) => onMessage(m),
+      dispose: () => close('escape'),
+    };
+    const close = (outcome: string) => {
+      if (panel.disposed) return;
+      panel.disposed = true;
+      showing = undefined;
+      for (const l of onDispose) l();
+      resolveOpen(outcome);
+    };
+    showing = { panel, close };
+    panels.push(panel);
+    provider!.resolveWebviewView({
+      webview: {
+        set html(value: string) { panel.html = value; },
+        options: {},
+        cspSource: 'vscode-resource:',
+        asWebviewUri: (uri: { path: string }) => `webview:${uri.path}`,
+        postMessage: async (m: unknown) => { panel.posted.push(m); return true; },
+        onDidReceiveMessage: (l: Listener) => { onMessage = l; return { dispose() {} }; },
+      },
+      onDidDispose: (l: () => void) => { onDispose.push(l); return { dispose() {} }; },
+    });
+  });
+}
+
+const vscodeStub = {
+  Uri: {
+    joinPath: (base: { path: string }, ...parts: string[]) => ({ path: [base.path, ...parts].join('/') }),
+    file: (p: string) => ({ fsPath: p, path: p }),
+  },
+  ViewColumn: { Active: -1, Beside: -2 },
+  Position: class { constructor(public line: number, public character: number) {} },
+  Range: class { constructor(public start: unknown, public end: unknown) {} },
+  commands: {
+    getCommands: async () => ['_ritemark.webviewSheet.open', '_ritemark.webviewSheet.close'],
+    executeCommand: async (...args: unknown[]) => {
+      if (args[0] === '_ritemark.webviewSheet.open') { sheetCommands.push('open'); return openSheet(args[1] as { viewType: string }); }
+      if (args[0] === '_ritemark.webviewSheet.close') {
+        sheetCommands.push('close');
+        if (!showing) return false;
+        showing.close('closed');
+        return true;
+      }
+      opened.push(args);
+    },
+  },
+  window: {
+    // the desk the sheet opens over: the active group
+    tabGroups: { activeTabGroup: { viewColumn: 2 } },
+    registerWebviewViewProvider: (viewType: string, p: { resolveWebviewView(view: unknown): void }) => {
+      assert.equal(viewType, 'ritemark.publishSheet');
+      assert.equal(provider, undefined, 'one provider for every sheet');
+      provider = p;
+      return { dispose() { provider = undefined; } };
+    },
+    createWebviewPanel: () => { throw new Error('the Publish sheet is never a tab'); },
+  },
+};
+const load = (Module as unknown as { _load: (request: string, ...rest: unknown[]) => unknown })._load;
+(Module as unknown as { _load: unknown })._load = (request: string, ...rest: unknown[]) => (request === 'vscode' ? vscodeStub : load(request, ...rest));
+
+type Plan = import('./types').PublishPlan;
+
+async function main(): Promise<void> {
+  const { harnessPages } = await import('./devSheetHarness');
+  const { showPublishSheet } = await import('./PublishSheetPanel');
+
+  // --- the harness runs only in a development build with its setting ---
+  assert.deepEqual(harnessPages({ RITEMARK_PUBLISH_SHEET_HARNESS: '/p/a.html' }), [], 'an installed Ritemark (no VSCODE_DEV) never opens it');
+  assert.deepEqual(harnessPages({ VSCODE_DEV: '1' }), []);
+  assert.deepEqual(harnessPages({ VSCODE_DEV: '1', RITEMARK_PUBLISH_SHEET_HARNESS: '/p/a.html:/p/b.html' }, ':'), ['/p/a.html', '/p/b.html']);
+
+  // --- the sheet's host side ---
+  const context = { extensionUri: { path: '/ext' }, subscriptions: [] as unknown[] } as never;
+  function plan(over: Partial<Plan> = {}): Plan {
+    return {
+      pagePath: '/Users/mari/Leadership programme/Harbour programme.html',
+      projectFolder: '/Users/mari/Leadership programme',
+      root: '/Users/mari/Leadership programme',
+      files: [{ relPath: 'Harbour programme.html', projectPath: 'Harbour programme.html', realPath: '/Users/mari/Leadership programme/Harbour programme.html', kind: 'page', size: 10, sha256: 'a' }],
+      leftOut: [],
+      scriptBuilt: false,
+      tooBig: [],
+      tooMany: false,
+      keyHits: [],
+      contentHash: 'h',
+      ...over,
+    };
+  }
+
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  async function shown(): Promise<FakePanel> {
+    await tick();
+    await tick();
+    const panel = panels.at(-1)!;
+    assert.ok(panel && !panel.disposed, 'the sheet shows');
+    return panel;
+  }
+
+  // Ready → the model, with no real path in it; the page is the sheet's (its own height, no background)
+  {
+    const answer = showPublishSheet(context, plan());
+    const panel = await shown();
+    assert.ok(panel.html.includes('data-editor-type="publish-sheet"'));
+    assert.ok(!/min-height:\s*100%/.test(panel.html), 'the page keeps its own height: the sheet is as tall as the page');
+    panel.send({ type: 'publish:sheetReady' });
+    assert.equal(panel.posted.length, 1);
+    assert.ok(!JSON.stringify(panel.posted).includes('/Users/mari'), 'no real path reaches the sheet');
+    panel.send({ type: 'publish:cancel' });
+    assert.deepEqual(await answer, { kind: 'cancel' }, 'S16: Cancel answers cancel');
+    assert.equal(panel.disposed, true);
+  }
+
+  // Closing the sheet (Escape in the workbench) is Cancel
+  {
+    const answer = showPublishSheet(context, plan());
+    (await shown()).dispose();
+    assert.deepEqual(await answer, { kind: 'cancel' });
+  }
+
+  // A shell without the sheet: no tab instead, the answer is cancel
+  {
+    const getCommands = vscodeStub.commands.getCommands;
+    vscodeStub.commands.getCommands = async () => [];
+    assert.deepEqual(await showPublishSheet(context, plan()), { kind: 'cancel' });
+    vscodeStub.commands.getCommands = getCommands;
+  }
+
+  type Opened = { selection: { start: { line: number; character: number }; end: { line: number; character: number } }; viewColumn: number; preview: boolean };
+  const keyHits = [
+    { projectPath: 'js/script.js', realPath: '/Users/mari/Leadership programme/js/script.js', line: 12, column: 11, endColumn: 59, rule: 'anthropic' },
+    { projectPath: 'Harbour programme.html', realPath: '/Users/mari/Leadership programme/Harbour programme.html', line: 3, rule: 'assignment' },
+  ];
+
+  // A key-shaped hit: a plain Publish is ignored; only "Publish anyway" answers
+  {
+    const answer = showPublishSheet(context, plan({ keyHits }));
+    const panel = await shown();
+    panel.send({ type: 'publish:confirm', anyway: false });
+    assert.equal(panel.disposed, false, 'decision 2: one press never publishes past a key warning');
+    panel.send({ type: 'publish:openHit', index: 5 });
+    panel.send({ type: 'publish:openHit', index: '/etc/passwd' });
+    panel.send({ type: 'openFile', path: '/etc/passwd' });
+    assert.equal(opened.length, 0, 'nothing but a hit of this plan can be opened');
+    assert.equal(panel.disposed, false);
+    panel.send({ type: 'publish:confirm', anyway: true });
+    assert.deepEqual(await answer, { kind: 'publishAnyway', pagePart: undefined });
+  }
+
+  // Open: closes the sheet without publishing; the file's text on the sheet's desk, the key selected as Find does
+  {
+    const answer = showPublishSheet(context, plan({ keyHits }));
+    const panel = await shown();
+    panel.send({ type: 'publish:openHit', index: 0 });
+    assert.deepEqual(await answer, { kind: 'cancel' }, 'Open answers cancel: nothing is published');
+    await tick();
+    assert.equal(panel.disposed, true, 'and the sheet is gone');
+    assert.deepEqual(sheetCommands.slice(-1), ['close'], 'closed before the file opens, so the file takes the focus');
+    panel.send({ type: 'publish:confirm', anyway: true });
+    await tick();
+    assert.equal(opened.length, 1);
+    assert.equal((opened[0][1] as { fsPath: string }).fsPath, '/Users/mari/Leadership programme/js/script.js');
+    assert.equal(opened[0][2], 'default', 'opened as text');
+    const o = opened[0][3] as Opened;
+    assert.deepEqual([o.selection.start.line, o.selection.start.character, o.selection.end.line, o.selection.end.character], [11, 11, 11, 59], 'the key selected on line 12');
+    assert.equal(o.viewColumn, 2, "on the desk the sheet opened over, not beside it");
+    assert.equal(o.preview, false, 'a tab of its own');
+  }
+
+  // Open on the page's own file: its text in the text editor (not the browser), the caret at the line's start
+  {
+    const answer = showPublishSheet(context, plan({ keyHits }));
+    (await shown()).send({ type: 'publish:openHit', index: 1 });
+    assert.deepEqual(await answer, { kind: 'cancel' });
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(opened.length, 2);
+    assert.equal((opened[1][1] as { fsPath: string }).fsPath, '/Users/mari/Leadership programme/Harbour programme.html');
+    assert.equal(opened[1][2], 'default', "the page's text, not the page");
+    const o = opened[1][3] as Opened;
+    assert.deepEqual([o.selection.start.line, o.selection.start.character, o.selection.end.character], [2, 0, 0], 'no columns: the caret at the line start');
+  }
+
+  // Over a limit: nothing can be confirmed
+  {
+    const answer = showPublishSheet(context, plan({ tooBig: [{ projectPath: 'clip.mp4', size: 30 * 1024 * 1024 }] }));
+    const panel = await shown();
+    panel.send({ type: 'publish:confirm', anyway: true });
+    panel.send({ type: 'publish:confirm', anyway: false });
+    assert.equal(panel.disposed, false, 'S15: nothing is sent over a limit');
+    panel.send({ type: 'publish:cancel' });
+    assert.deepEqual(await answer, { kind: 'cancel' });
+  }
+
+  // No hits: Publish answers publish
+  {
+    const answer = showPublishSheet(context, plan(), { address: { page: 'harbour-programme-7f3a2c', suffix: '.pages-4821.workers.dev' } });
+    (await shown()).send({ type: 'publish:confirm', anyway: false, pagePart: 'harbour-programme-7f3a2c' });
+    assert.deepEqual(await answer, { kind: 'publish', pagePart: 'harbour-programme-7f3a2c' });
+  }
+
+  console.log('devSheetHarness.test: passed');
+  finished = true;
+}
+
+// A sheet that never answers leaves a promise pending and Node would end quietly with 0: that is a failure here
+let finished = false;
+process.on('beforeExit', () => {
+  if (!finished) {
+    console.error('FAIL devSheetHarness.test: a sheet never answered');
+    process.exit(1);
+  }
+});
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -44,17 +44,20 @@ The drawing: ritemark-dev `product/design/experience/experiences/publish/` (expe
 - Ritemark reads the page and lists the **local files it points to**: `src`, `href` on `link`/`a` to a local file the page uses (stylesheet, icon, picture, script, font, video), `srcset`, `poster`, CSS `url()` and `@import` in `<style>`, `style=""` and linked stylesheets (recursively through linked CSS), and `<script type="module">` static imports of local files.
 - **Inside the project only.** Each reference is resolved against the page's folder, decoded, normalised and `realpath`ed; anything that lands outside the project folder (by `..`, an absolute path, a `file://` URL, a drive letter, a UNC path or a symlink) is **left out and named** in the sheet.
 - **Never:** any path with a segment that starts with `.` (`.env`, `.git`, `.ritemark`, `.claude`, `.vscode`…), `node_modules`, and files Git ignores in the project (when Git is there). A reference to one is left out and named.
-- **Not followed:** links to other `.html` pages don't go up (one page per publish, *Decisions* below); they are named as left out.
+- **Not followed:** links to other `.html` pages don't go up (one page per publish, *Decisions* below); they are named as left out. Nor does a file the page only links to (`<a href="notes.md">`, `<area>`, a `<link>` that loads nothing for this page, such as `rel="alternate"`, `rel="prefetch"` or `rel="dns-prefetch"`, its `rel` read word by word): it is left out as "a linked file, so its link won't work" (review of #669). A file the page both links and uses (`<a href="map.png"><img src="map.png">`) goes.
 - Remote references (`https:`, `//cdn…`, `data:`) stay where they are and go nowhere.
-- References the gather can't see (built by a script at run time) are not guessed.
+- **A `../` that stays inside the project goes up** (A3, finding 1: `../tokens.css` from `slides/index.html`). The published tree is rooted at the deepest folder that holds the page and every gathered file, so each file keeps its path relative to the page. A reference that leaves the project as written is outside even when a symlink brings it back in.
+- `<base href>` is honoured as the browser honours it; a remote base makes every relative reference remote. `//cdn…` is a web address and stays one.
+- References the gather can't see (built by a script at run time) are not guessed; the sheet says so in one line (R5).
+- **Git fails closed:** when the project is in a Git repository and Ritemark can't ask Git what it ignores, nothing is gathered and nothing goes. A single path Git refuses because it lies behind a linked folder is left out on its own ("couldn't be checked"); the rest of the page still goes. Git is asked with `LC_ALL=C`, so its messages read the same in every language.
 - Free-plan limits are checked before anything goes: 25 MiB a file, 20,000 files. Over a limit: one plain line, nothing sent.
 - Lands in **PR 3**.
 
 ### R4: The guard: things that look like keys
 
-- Every text file that would go up is scanned for things that look like keys or passwords: private-key blocks, the common key prefixes (Anthropic, OpenAI, Google, AWS, GitHub, Slack, Stripe, Cloudflare), `Bearer` headers, JWTs, and `password=`/`api_key=`-style assignments with long values.
+- Every text file that would go up is scanned for things that look like keys or passwords: private-key blocks, the common key prefixes (Anthropic, OpenAI, Google, AWS, GitHub, GitLab, Hugging Face, Slack, Stripe and its webhook secrets, Cloudflare, quoted or not), Telegram bot tokens (`123456789:AA…`), `Bearer` headers, JWTs, `password=`/`api_key=`/`token=`-style assignments with long values, and keys or tokens in a query. A value that is only placeholder words (`your-api-key-here`, `sk-ant-your-key-here-xxxx`) is not a key; a real one that contains such a word still is.
 - **A hit holds Publish** (Jarmo, decision 2; the lead, answer 4). A line in the sheet, above the "Anyone with the link" note, in ink with `shield-warning` (no amber, no red): "This looks like a key or password: script.js, line 12. Anyone with the link could read it and use it." With more than one: "3 things look like keys or passwords:", up to three places, then "and 2 more". The value itself is never shown.
-- **Open script.js** after the line opens the file at that line. Publishing again rescans.
+- **Open script.js** after the line closes the sheet without publishing and opens the file's text (a page's too, never the browser view) as a tab on the same desk, with the key selected as Find selects it, or the caret at the line's start. Publish on the bar rescans. With four places all four show: "and N more" starts at 2.
 - **Cancel becomes the sheet's main button; Publish reads "Publish anyway"**, the quiet button. Bar → Publish → Publish anyway is the second explicit press.
 - The scan runs again on every Update the page.
 - Lands in **PR 3**.
@@ -68,7 +71,10 @@ Frame 3, one small sheet over the page:
 - **What goes** (the lead, answer 3):
   - The line: "This page and its 2 pictures" when every file is one kind (pictures, styles, scripts, fonts); "This page and 4 files" when they're mixed; "This page, one file" when it uses nothing else. Under it, muted: "Nothing else from the project."
   - **See the files**, folded at first: each file's name and folder, as Search's rows show them (`harbour.jpg` · Pictures), the page first.
-  - **Left out**, in the same fold, only when something is: "2 left out", each with its reason: "outside this project", "a hidden file", "a tool's folder" (`node_modules`), "Git ignores it", "another page, so its link won't work".
+  - **Left out**, in the same fold, only when something is: "2 left out", each row starting with the file's name ("budget.png · outside this project"), the path in its tooltip (the lead, 5 November), with its reason: "outside this project", "a hidden file", "a tool's folder" (`node_modules`), "Git ignores it", "another page, so its link won't work", "a linked file, so its link won't work", "couldn't be checked".
+  - No See the files fold for "This page, one file" with nothing left out (the lead, 5 November).
+  - Several other pages fold into one Left out row: "7 other pages, so their links won't work" (A3, finding 3).
+  - When the page builds file names in its script, one muted line under the count: "This page loads some files from its script. Ritemark can't see which, so they won't go." (A3, finding 2).
   - Nothing can be ticked or unticked: what goes follows from the page.
 - **Who can see it:** anyone with the link; it isn't listed or searchable; you can unpublish it any time.
 - **Publish** and **Cancel.** Cancel sends nothing.
