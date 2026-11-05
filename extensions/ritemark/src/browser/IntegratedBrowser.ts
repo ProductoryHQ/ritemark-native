@@ -46,9 +46,19 @@ export async function reloadIntegratedBrowser(): Promise<void> {
   await vscode.commands.executeCommand(RELOAD_COMMAND);
 }
 
+/** The page's guarded opener (pageCommands.ts): a real `.html` file only, never a program behind the name. */
+const OPEN_PAGE_IN_SYSTEM_BROWSER_COMMAND = 'ritemark.page.openInSystemBrowser';
+
 export async function openIntegratedBrowserUrlExternally(raw?: string): Promise<void> {
   if (raw?.trim()) {
-    await vscode.env.openExternal(vscode.Uri.parse(normalizeBrowserUrl(raw)));
+    const url = normalizeBrowserUrl(raw);
+    if (/^file:/i.test(url)) {
+      // A file on this computer goes through the guarded opener, never to the system's opener as it is, which would
+      // run a program (Sprint 149, PR 2, round 2b)
+      await vscode.commands.executeCommand(OPEN_PAGE_IN_SYSTEM_BROWSER_COMMAND, url);
+      return;
+    }
+    await vscode.env.openExternal(vscode.Uri.parse(url));
     return;
   }
 
