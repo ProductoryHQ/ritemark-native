@@ -48,6 +48,10 @@ export async function openPageInSystemBrowser(arg?: unknown): Promise<boolean> {
     void vscode.window.showInformationMessage(MISSING_PAGE_MESSAGE);
     return false;
   }
+  if (location.kind === 'notAPage') {
+    void vscode.window.showInformationMessage(NOT_A_PAGE_MESSAGE);
+    return false;
+  }
   // The OS's handler for .html opens it (normally the default browser); to prove on Mac and
   // Windows before PR 2 puts the button on the bar.
   return vscode.env.openExternal(vscode.Uri.file(location.realPath));
@@ -72,6 +76,10 @@ export async function publishPage(arg?: unknown): Promise<PageLocation | undefin
   }
   if (location.kind === 'missing') {
     void vscode.window.showInformationMessage(MISSING_PAGE_MESSAGE);
+    return undefined;
+  }
+  if (location.kind === 'notAPage') {
+    void vscode.window.showInformationMessage(NOT_A_PAGE_MESSAGE);
     return undefined;
   }
   return location;

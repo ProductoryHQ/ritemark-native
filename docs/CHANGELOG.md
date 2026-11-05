@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Sprint 149: Publish a web page (#590)
 
 #### Added
-- **Open a web page in your own browser.** A web page file (`.html`) on the desk keeps the browser's bar, with its address, back, forward and reload, and now has **Open in your browser** at the right end, which opens the file in your computer's default browser. Pages in your project get **Publish** in the same place once publishing is ready later in 2.2; until then the button doesn't show. A website in Ritemark's browser keeps its bar as before.
+- **Open a web page in your own browser.** A web page file (`.html`) on the desk keeps the browser's bar, with its address, back, forward and reload, and now has **Open in your browser** at the right end, which opens the file in your computer's default browser. Pages in your project get **Publish** in the same place once publishing is ready later in 2.2; until then the button doesn't show. A website in Ritemark's browser keeps its bar as before. A file named `.html` that is really a link to a program is refused, so the button never runs anything.
 
 ### Sprint 154: right-click menus lose items that don't belong to Ritemark
 

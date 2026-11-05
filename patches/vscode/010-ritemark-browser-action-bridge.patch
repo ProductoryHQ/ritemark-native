@@ -61,7 +61,10 @@
 #   ritemark.page.publish) with the tab's address. The actions toolbar asks the
 #   editor's contributions for a view item, as the nav toolbar does, so Publish
 #   draws with its word; upstream's Open in External Browser (in the bar's menu)
-#   is hidden on a local page, which has its own button. Publish takes the
+#   is hidden on a local page, which has its own button. Open in your browser
+#   goes only through the extension, which opens the file the name resolves to
+#   and only when that is a page itself (a .html link to a program would run it;
+#   security review): no fallback to the system opener. Publish takes the
 #   address field's height and its line the kit's, so the bar keeps its height.
 #   No session change (decision 4); a page's file change reloads it through
 #   upstream's own auto-reload (workbench.browser.autoReloadOnFileChange).
@@ -186,10 +189,10 @@ index 8153d309eca..b8dea314834 100644
  	async setAnnotationMode(annotate: boolean): Promise<void> {
 diff --git a/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPage.ts b/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPage.ts
 new file mode 100644
-index 00000000000..cde065682b8
+index 00000000000..017331bb004
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPage.ts
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,85 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -228,6 +231,9 @@ index 00000000000..cde065682b8
 +	RITEMARK_BROWSER_PROJECT_PAGE.isEqualTo(true),
 +	ContextKeyExpr.equals(RITEMARK_PUBLISH_READY_KEY, true),
 +);
++
++/** Upstream's Open in External Browser (in the bar's ⋯): everything but a local page, which has its own button. */
++export const RITEMARK_UPSTREAM_OPEN_EXTERNAL_WHEN = RITEMARK_BROWSER_LOCAL_PAGE.negate();
 +
 +/** The extension's commands the two buttons call (extensions/ritemark/src/browser/pageCommands.ts). */
 +export const RITEMARK_OPEN_PAGE_IN_SYSTEM_BROWSER_COMMAND = 'ritemark.page.openInSystemBrowser';
@@ -530,7 +536,7 @@ index 079394d0068..b460413eaed 100644
  		togglePrimaryAction: true,
  		primaryActionIds: [AddElementToChatAction.ID, AddElementCommentToChatAction.ID]
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/browserNavigationFeatures.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/browserNavigationFeatures.ts
-index 096492d974c..79d50d81546 100644
+index 096492d974c..cc1a05f8cf1 100644
 --- a/src/vs/workbench/contrib/browserView/electron-browser/features/browserNavigationFeatures.ts
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/browserNavigationFeatures.ts
 @@ -45,6 +45,10 @@ import {
@@ -540,7 +546,7 @@ index 096492d974c..79d50d81546 100644
 +import { IAction } from '../../../../../base/common/actions.js';
 +import { IActionViewItem } from '../../../../../base/browser/ui/actionbar/actionbar.js';
 +import { IActionViewItemOptions } from '../../../../../base/browser/ui/actionbar/actionViewItems.js';
-+import { RITEMARK_BROWSER_LOCAL_PAGE } from '../../common/ritemarkBrowserPage.js';
++import { RITEMARK_UPSTREAM_OPEN_EXTERNAL_WHEN } from '../../common/ritemarkBrowserPage.js';
  
  const CONTEXT_BROWSER_CAN_GO_BACK = new RawContextKey<boolean>('browserCanGoBack', false, localize('browser.canGoBack', "Whether the browser can go back"));
  const CONTEXT_BROWSER_CAN_GO_FORWARD = new RawContextKey<boolean>('browserCanGoForward', false, localize('browser.canGoForward', "Whether the browser can go forward"));
@@ -603,27 +609,20 @@ index 096492d974c..79d50d81546 100644
  	refreshUrl(): void { this._urlBar.refreshUrl(); }
  	previewUrl(url: string): void { this._urlBar.previewUrl(url); }
  	focusUrlInput(): void { this._urlBar.focusUrlInput(); }
-@@ -164,9 +173,13 @@ class BrowserNavigationBar extends Disposable {
- 		this._contributions = contributions;
- 		this._contributionListeners.clear();
- 		for (const contribution of contributions) {
--			this._contributionListeners.add(contribution.onDidChangeActionViewItems(() => this._navToolbar.refresh()));
-+			this._contributionListeners.add(contribution.onDidChangeActionViewItems(() => {
-+				this._navToolbar.refresh();
-+				this._actionsToolbar.refresh();
-+			}));
+@@ -167,6 +176,7 @@ class BrowserNavigationBar extends Disposable {
+ 			this._contributionListeners.add(contribution.onDidChangeActionViewItems(() => this._navToolbar.refresh()));
  		}
  		this._navToolbar.refresh();
-+		this._actionsToolbar.refresh();
++		this._actionsToolbar.refresh(); // Ritemark (Sprint 149): once, so its items are drawn with the contributions
  		this._urlBar.mountContributions(contributions);
  	}
  
-@@ -480,6 +493,8 @@ class OpenInExternalBrowserAction extends Action2 {
+@@ -480,6 +490,8 @@ class OpenInExternalBrowserAction extends Action2 {
  				group: BrowserActionGroup.Tools,
  				order: 10,
  				isHiddenByDefault: true,
 +				// Ritemark (Sprint 149): a page from this computer has Open in your browser on its bar; not twice
-+				when: RITEMARK_BROWSER_LOCAL_PAGE.negate(),
++				when: RITEMARK_UPSTREAM_OPEN_EXTERNAL_WHEN,
  			}
  		});
  	}
@@ -1345,10 +1344,10 @@ index 00000000000..ae9c58f7d67
 +registerAction2(BrowserSnapshotAction);
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts
 new file mode 100644
-index 00000000000..cdc3c0c0a46
+index 00000000000..5211532772a
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts
-@@ -0,0 +1,185 @@
+@@ -0,0 +1,189 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1400,8 +1399,9 @@ index 00000000000..cdc3c0c0a46
 +/** The bar's group for Publish: after the tools (camera, Open in browser), so a separator stands before it. */
 +const RITEMARK_PAGE_GROUP = '6_ritemark_page';
 +
-+// Phosphor 400 (Regular), the font codicon.css declares (patch 001); its glyphs by code point
-+const phosphorFont = { id: 'phosphor', definition: { weight: '400', src: [] } };
++// Phosphor 400 (Regular): the font patch 001 registers (iconRegistry.ts) and codicon.css declares, its definition
++// shared, not copied; the glyphs by code point
++const phosphorFont = { id: 'phosphor', definition: getIconRegistry().getIconFont('phosphor') ?? { weight: '400', src: [] } };
 +const openPageIcon = getIconRegistry().registerIcon('ritemark-page-open-in-browser', { font: phosphorFont, fontCharacter: '\\e5de' }, localize('ritemark.page.openInBrowserIcon', "Icon of Open in your browser on a web page's bar (Phosphor arrow-square-out)."));
 +const publishPageIcon = getIconRegistry().registerIcon('ritemark-page-publish', { font: phosphorFont, fontCharacter: '\\e28e' }, localize('ritemark.page.publishIcon', "Icon of Publish on a web page's bar (Phosphor globe-simple)."));
 +
@@ -1412,7 +1412,6 @@ index 00000000000..cdc3c0c0a46
 +class RitemarkBrowserPageContribution extends BrowserEditorContribution {
 +	private readonly _localPage: IContextKey<boolean>;
 +	private readonly _projectPage: IContextKey<boolean>;
-+	private _model: IBrowserViewModel | undefined;
 +
 +	constructor(
 +		editor: BrowserEditor,
@@ -1422,7 +1421,7 @@ index 00000000000..cdc3c0c0a46
 +		super(editor);
 +		this._localPage = RITEMARK_BROWSER_LOCAL_PAGE.bindTo(contextKeyService);
 +		this._projectPage = RITEMARK_BROWSER_PROJECT_PAGE.bindTo(contextKeyService);
-+		this._register(this._workspaceContextService.onDidChangeWorkspaceFolders(() => this._update(this._model?.url)));
++		this._register(this._workspaceContextService.onDidChangeWorkspaceFolders(() => this._update(this.editor.model?.url ?? this.editor.input?.url)));
 +	}
 +
 +	override prerenderInput(input: BrowserEditorInput): void {
@@ -1430,13 +1429,15 @@ index 00000000000..cdc3c0c0a46
 +	}
 +
 +	protected override onModelAttached(model: IBrowserViewModel, store: DisposableStore): void {
-+		this._model = model;
 +		this._update(model.url);
-+		store.add(model.onDidNavigate(event => this._update(event.url)));
++		store.add(model.onDidNavigate(event => {
++			if (this.editor.model === model) { // not a tab this pane showed before, navigating behind it
++				this._update(event.url);
++			}
++		}));
 +	}
 +
 +	override onModelDetached(): void {
-+		this._model = undefined;
 +		this._localPage.reset();
 +		this._projectPage.reset();
 +	}
@@ -1499,6 +1500,8 @@ index 00000000000..cdc3c0c0a46
 +		const commandService = accessor.get(ICommandService);
 +		const url = pageUrl(accessor, browserEditor);
 +		if (ritemarkLocalPageFile(url)) {
++			// Only through the extension, which opens the file the name resolves to and only when that is a page itself: a
++			// `.html` that is a link to a program would run it (security review of PR 2). No fallback to the system opener.
 +			await commandService.executeCommand(RITEMARK_OPEN_PAGE_IN_SYSTEM_BROWSER_COMMAND, url);
 +		}
 +	}
@@ -1536,7 +1539,7 @@ index 00000000000..cdc3c0c0a46
 +registerAction2(RitemarkPublishPageAction);
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/media/ritemarkBrowserPage.css b/src/vs/workbench/contrib/browserView/electron-browser/media/ritemarkBrowserPage.css
 new file mode 100644
-index 00000000000..e84c88a4539
+index 00000000000..31c2a0ce9c9
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/media/ritemarkBrowserPage.css
 @@ -0,0 +1,47 @@
@@ -1554,6 +1557,7 @@ index 00000000000..e84c88a4539
 + */
 +.browser-actions-toolbar .action-item.ritemark-page-publish {
 +	margin: -1.75px 0;
++	flex-shrink: 0; /* the toolbar lets its last item shrink; Publish moves into ⋯ whole when the bar is narrow, never clipped */
 +}
 +
 +.browser-actions-toolbar .action-item.ritemark-page-publish > .action-label {
@@ -1571,7 +1575,6 @@ index 00000000000..e84c88a4539
 +	font-weight: 500;
 +	line-height: 25.5px;
 +	white-space: nowrap;
-+	cursor: pointer;
 +}
 +
 +.browser-actions-toolbar .action-item.ritemark-page-publish > .action-label:hover {
@@ -1583,16 +1586,16 @@ index 00000000000..e84c88a4539
 +	color: inherit;
 +}
 +
-+/* The line before Publish, as the kit's bar draws it (`.docbar .sep`: 16 high, 6 each side), so it doesn't make the bar taller either */
-+.browser-actions-toolbar .monaco-action-bar .action-item > .action-label.separator {
++/* The line before Publish, as the kit's bar draws it (`.docbar .sep`: 16 high, 6 each side), so it doesn't make the bar taller either; other separators stay upstream's */
++.browser-actions-toolbar .monaco-action-bar .action-item:has(+ .action-item.ritemark-page-publish) > .action-label.separator {
 +	margin: 0 6px !important; /* !important: actionbar.css sets every separator's margin with !important */
 +}
 diff --git a/src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPage.test.ts b/src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPage.test.ts
 new file mode 100644
-index 00000000000..8f008946624
+index 00000000000..4d5ac945e82
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPage.test.ts
-@@ -0,0 +1,105 @@
+@@ -0,0 +1,106 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1609,6 +1612,7 @@ index 00000000000..8f008946624
 +	RITEMARK_OPEN_PAGE_IN_BROWSER_WHEN,
 +	RITEMARK_PUBLISH_PAGE_WHEN,
 +	RITEMARK_PUBLISH_READY_KEY,
++	RITEMARK_UPSTREAM_OPEN_EXTERNAL_WHEN,
 +	ritemarkBrowserPageKind,
 +	ritemarkLocalPageFile,
 +} from '../../common/ritemarkBrowserPage.js';
@@ -1686,7 +1690,7 @@ index 00000000000..8f008946624
 +				...(shown(RITEMARK_OPEN_PAGE_IN_BROWSER_WHEN, values) ? ['Open in browser'] : []),
 +				...(shown(RITEMARK_PUBLISH_PAGE_WHEN, values) ? ['Publish'] : []),
 +				// upstream's Open in External Browser, in ⋯, stays for everything but a local page
-+				...(shown(RITEMARK_BROWSER_LOCAL_PAGE.negate(), values) ? ['⋯ Open in External Browser'] : []),
++				...(shown(RITEMARK_UPSTREAM_OPEN_EXTERNAL_WHEN, values) ? ['⋯ Open in External Browser'] : []),
 +			];
 +		}
 +		assert.deepStrictEqual(bar, {

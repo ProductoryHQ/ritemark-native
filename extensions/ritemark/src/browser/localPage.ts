@@ -20,7 +20,9 @@ export type PageTarget = string | { scheme: string; fsPath: string };
 export type PageLocation =
   | { kind: 'project'; realPath: string; projectFolder: string }
   | { kind: 'outside'; realPath: string }
-  | { kind: 'missing'; fsPath: string };
+  | { kind: 'missing'; fsPath: string }
+  /** The name is a page's, but the file it resolves to isn't one: a link to a program or a folder (PR 2's review). */
+  | { kind: 'notAPage'; realPath: string };
 
 export function isPagePath(p: string): boolean {
   const ext = path.extname(p).toLowerCase();
@@ -54,6 +56,8 @@ export function localPagePath(target: PageTarget | undefined): string | undefine
 
 export interface LocateOptions {
   realpath?: (p: string) => Promise<string>;
+  /** Whether the resolved path is a regular file (default: `fs.promises.stat`). */
+  isFile?: (p: string) => Promise<boolean>;
   platform?: NodeJS.Platform;
 }
 
@@ -83,6 +87,18 @@ export async function locatePage(
     realPath = await realpath(fsPath);
   } catch {
     return { kind: 'missing', fsPath };
+  }
+  // What opens or goes up is the resolved file, never the name: a `.html` that is a link to `run.command` would
+  // otherwise run in Terminal from Open in your browser (and a link to a folder would open the folder).
+  const isFile = options.isFile ?? (async (p: string) => (await fs.promises.stat(p)).isFile());
+  let regular = false;
+  try {
+    regular = await isFile(realPath);
+  } catch {
+    return { kind: 'missing', fsPath };
+  }
+  if (!regular || !isPagePath(realPath)) {
+    return { kind: 'notAPage', realPath };
   }
   for (const folder of projectFolders) {
     let realFolder: string;

@@ -78,6 +78,23 @@ async function main(): Promise<void> {
   const h = await locatePage(path.join(projectLink, 'pages', 'Harbour programme.html'), [projectLink]);
   assert.equal(h.kind, 'project');
 
+  // Security review of PR 2: a name that ends in .html but is a link to a program or a folder is no page. The
+  // system's opener would run the link's target (a .command in Terminal, a .bat on Windows) or open the folder.
+  const program = path.join(project, 'run.command');
+  fs.writeFileSync(program, '<!-- -->\necho ran\n', { mode: 0o755 });
+  const disguised = path.join(project, 'index.html');
+  fs.symlinkSync(program, disguised);
+  const i = await locatePage(disguised, [project]);
+  assert.equal(i.kind, 'notAPage', 'a .html link to a program is not a page');
+  const folderPage = path.join(project, 'folder.html');
+  fs.mkdirSync(folderPage);
+  const j = await locatePage(folderPage, [project]);
+  assert.equal(j.kind, 'notAPage', 'a folder named .html is not a page');
+  const pageLink = path.join(project, 'alias.html');
+  fs.symlinkSync(inPage, pageLink);
+  const k = await locatePage(pageLink, [project]);
+  assert.equal(k.kind === 'project' && k.realPath, inPage, 'a link to a page in the project is that page');
+
   // A file URL from the bar round-trips through localPagePath into locatePage.
   const fromBar = localPagePath(pathToFileURL(inPage).toString());
   assert.equal(fromBar, inPage);
