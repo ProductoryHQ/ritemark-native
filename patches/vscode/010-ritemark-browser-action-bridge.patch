@@ -50,7 +50,7 @@
 #   right end of the bar, after the address and the camera, as experience 39's
 #   frame 1 draws it (redrawn 4 November: the address, back, forward and reload
 #   stay the browser's own, Jarmo): Open in your browser, an icon button
-#   (Phosphor arrow-square-out), on every local .html page; a line; Publish, the
+#   (Phosphor arrow-square-out), on every local .html page; a gap; Publish, the
 #   outline button with the globe, on a page inside the open project only. Two
 #   keys on the bar's scoped context, set from the tab's address and following
 #   every navigation and a change of the project's folders: ritemarkBrowserLocalPage
@@ -65,11 +65,21 @@
 #   goes only through the extension, which opens the file the name resolves to
 #   and only when that is a page itself (a .html link to a program would run it;
 #   security review): no fallback to the system opener. Publish takes the
-#   address field's height and its line the kit's, so the bar keeps its height.
+#   address field's height and its gap the kit's separator's, drawn without its
+#   line, so the bar keeps its height.
 #   No session change (decision 4); a page's file change reloads it through
 #   upstream's own auto-reload (workbench.browser.autoReloadOnFileChange).
+#   Round 2 of the reviews: no file on this computer reaches the system's opener
+#   from the browser. Upstream's Open in External Browser (All commands, a
+#   keybinding) sends a file: address to ritemark.page.openInSystemBrowser; a
+#   page's link menu offers Open Link in External Browser for websites only
+#   (electron-main/ritemarkLinkMenu.ts). Publish's when is also its
+#   precondition.
 #
 # File(s): src/vs/platform/browserView/common/browserView.ts,
+#          src/vs/platform/browserView/electron-main/browserViewMainService.ts,
+#          src/vs/platform/browserView/electron-main/ritemarkLinkMenu.ts,
+#          src/vs/platform/browserView/test/electron-main/ritemarkLinkMenu.test.ts,
 #          src/vs/workbench/contrib/browserView/common/browserView.ts,
 #          src/vs/workbench/contrib/browserView/common/ritemarkBrowserPage.ts,
 #          src/vs/workbench/contrib/browserView/common/ritemarkBrowserPageTarget.ts,
@@ -83,9 +93,10 @@
 #          src/vs/workbench/contrib/browserView/electron-browser/features/browserDevToolsFeature.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/features/browserNavigationFeatures.ts,
 #          src/vs/workbench/contrib/browserView/electron-browser/features/browserWelcomeFeature.ts,
-#          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts
+#          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts,
+#          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
 # Created: 2026-05-13
-# Updated: 2026-11-05 (Sprint 149 PR 2: the page's bar, Open in your browser and Publish)
+# Updated: 2026-11-05 (Sprint 149 PR 2: the page's bar, Open in your browser and Publish; round 2: no file reaches the system's opener)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
 index 31466d78914..e7d9a1af46e 100644
@@ -107,6 +118,102 @@ index 31466d78914..e7d9a1af46e 100644
  	// Storage
  	ClearGlobalStorage = `${commandPrefix}.clearGlobalStorage`,
  	ClearWorkspaceStorage = `${commandPrefix}.clearWorkspaceStorage`,
+diff --git a/src/vs/platform/browserView/electron-main/browserViewMainService.ts b/src/vs/platform/browserView/electron-main/browserViewMainService.ts
+index 6071bc729a8..89da2aa64f0 100644
+--- a/src/vs/platform/browserView/electron-main/browserViewMainService.ts
++++ b/src/vs/platform/browserView/electron-main/browserViewMainService.ts
+@@ -20,6 +20,7 @@ import { IntegratedBrowserOpenSource, logBrowserOpen } from '../common/browserVi
+ import { ITelemetryService } from '../../telemetry/common/telemetry.js';
+ import { localize } from '../../../nls.js';
+ import { INativeHostMainService } from '../../native/electron-main/nativeHostMainService.js';
++import { ritemarkOpenLinkExternallyItem } from './ritemarkLinkMenu.js';
+ import { htmlAttributeEncodeValue } from '../../../base/common/strings.js';
+ import { BrowserViewInspectElementId } from './browserViewInspector.js';
+ import { equals } from '../../../base/common/objects.js';
+@@ -598,10 +599,11 @@ export class BrowserViewMainService extends Disposable implements IBrowserViewMa
+ 					}, { preserveFocus: true, background: true }, 'browserLinkBackground');
+ 				}
+ 			}));
+-			menu.append(new MenuItem({
+-				label: localize('browser.contextMenu.openLinkInExternalBrowser', 'Open Link in External Browser'),
+-				click: () => { void this.nativeHostMainService.openExternal(undefined, params.linkURL); }
+-			}));
++			// Ritemark (Sprint 149, PR 2): never for a file on this computer, which the system's opener would run
++			const openExternalItem = ritemarkOpenLinkExternallyItem(params.linkURL, localize('browser.contextMenu.openLinkInExternalBrowser', 'Open Link in External Browser'), url => this.nativeHostMainService.openExternal(undefined, url));
++			if (openExternalItem) {
++				menu.append(new MenuItem(openExternalItem));
++			}
+ 			menu.append(new MenuItem({ type: 'separator' }));
+ 			menu.append(new MenuItem({
+ 				label: localize('browser.contextMenu.copyLink', 'Copy Link'),
+diff --git a/src/vs/platform/browserView/electron-main/ritemarkLinkMenu.ts b/src/vs/platform/browserView/electron-main/ritemarkLinkMenu.ts
+new file mode 100644
+index 00000000000..9a7de3a389b
+--- /dev/null
++++ b/src/vs/platform/browserView/electron-main/ritemarkLinkMenu.ts
+@@ -0,0 +1,23 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++/** One item of a page's link menu, as Electron's `MenuItem` takes it. */
++export interface IRitemarkLinkMenuItem {
++	readonly label: string;
++	readonly click: () => void;
++}
++
++/**
++ * Ritemark (Sprint 149, PR 2, round 2b): a page's link menu offers Open Link in External Browser for a website only.
++ * A link to a file on this computer (`file:`) would go to the system's opener as it is, which runs a program behind
++ * it (a page linking to `run.command`) or opens any other file in its own app. Such a link opens in a tab instead,
++ * where the page's own Open in your browser goes through the extension's guarded opener.
++ */
++export function ritemarkOpenLinkExternallyItem(linkURL: string, label: string, openExternal: (url: string) => unknown): IRitemarkLinkMenuItem | undefined {
++	if (/^\s*file:/i.test(linkURL)) {
++		return undefined;
++	}
++	return { label, click: () => { void openExternal(linkURL); } };
++}
+diff --git a/src/vs/platform/browserView/test/electron-main/ritemarkLinkMenu.test.ts b/src/vs/platform/browserView/test/electron-main/ritemarkLinkMenu.test.ts
+new file mode 100644
+index 00000000000..2b2b2183a95
+--- /dev/null
++++ b/src/vs/platform/browserView/test/electron-main/ritemarkLinkMenu.test.ts
+@@ -0,0 +1,33 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
++import { ritemarkOpenLinkExternallyItem } from '../../electron-main/ritemarkLinkMenu.js';
++
++/** Ritemark (Sprint 149, PR 2, round 2b): a page's link menu never hands a file on this computer to the system's opener. */
++suite('Ritemark page link menu', () => {
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	test('Open Link in External Browser is offered for a website only, and opens only that address', () => {
++		const links = {
++			program: 'file:///Users/mari/Leadership%20programme/run.command',
++			page: 'file:///Users/mari/Leadership%20programme/other.html',
++			upperCase: 'FILE:///Users/mari/run.command',
++			website: 'https://example.com/page.html',
++		};
++		const opened: string[] = [];
++		const menu: Record<string, string> = {};
++		for (const [name, url] of Object.entries(links)) {
++			const item = ritemarkOpenLinkExternallyItem(url, 'Open Link in External Browser', u => opened.push(u));
++			item?.click();
++			menu[name] = item ? item.label : '(not offered)';
++		}
++		assert.deepStrictEqual({ menu, opened }, {
++			menu: { program: '(not offered)', page: '(not offered)', upperCase: '(not offered)', website: 'Open Link in External Browser' },
++			opened: [links.website],
++		});
++	});
++});
 diff --git a/src/vs/workbench/contrib/browserView/common/browserView.ts b/src/vs/workbench/contrib/browserView/common/browserView.ts
 index 8153d309eca..b8dea314834 100644
 --- a/src/vs/workbench/contrib/browserView/common/browserView.ts

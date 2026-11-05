@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Sprint 149: Publish a web page (#590)
 
 #### Added
-- **Open a web page in your own browser.** A web page file (`.html`) on the desk keeps the browser's bar, with its address, back, forward and reload. **Open in your browser**, at the right end of the page's bar, shows the page in Safari, Chrome or whichever browser you use. Pages in your project get **Publish** in the same place once publishing is ready later in 2.2; until then the button doesn't show. A website in Ritemark's browser keeps its bar as before. A file named `.html` that is really a link or a Finder alias to a program is refused, and the browser's Open in External Browser in All commands takes the same way for any file on your computer, so nothing in the page's bar or in All commands runs anything.
+- **Open a web page in your own browser.** A web page file (`.html`) on the desk keeps the browser's bar, with its address, back, forward and reload. **Open in your browser**, at the right end of the page's bar, shows the page in Safari, Chrome or whichever browser you use. Pages in your project get **Publish** in the same place once publishing is ready later in 2.2; until then the button doesn't show. A website in Ritemark's browser keeps its bar as before. A file named `.html` that is really a link or a Finder alias to a program is refused, the browser's Open in External Browser in All commands takes the same way for any file on your computer, and a page's right-click menu offers Open Link in External Browser for websites only, so nothing in the page's bar, its right-click menu or All commands runs anything.
 
 ### Sprint 154: right-click menus lose items that don't belong to Ritemark
 
