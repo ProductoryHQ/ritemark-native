@@ -19,6 +19,8 @@ const workbench = {
   /** An older shell (patch 009 before Sprint 134): the request opens its own modal and answers when the person does. */
   olderShell: false,
   modals: [] as ((shared: boolean) => void)[],
+  /** #658: the share goes between the turn's metadata read and its summary read. */
+  unshareBeforeSummary: false,
 };
 
 function dto(page: Page) {
@@ -34,6 +36,9 @@ const commands = {
       case 'workbench.action.browser.getActiveContext':
         return dto(page);
       case 'workbench.action.browser.getActiveSummary':
+        if (workbench.unshareBeforeSummary) page.shared = false;
+        // Patch 009's refusal names the page by id alone (#658).
+        if (!page.shared) return { pageId: page.pageId, sharedWithAgent: false, error: 'Browser page is not shared with Ritemark AI context.' };
         return { ...dto(page), summary: `The text of ${page.url}` };
       case 'workbench.action.browser.ensureActiveBrowserShared': {
         if (workbench.askDelay) await new Promise((resolve) => setTimeout(resolve, workbench.askDelay));
@@ -86,6 +91,7 @@ async function main(): Promise<void> {
     workbench.calls = [];
     workbench.olderShell = false;
     workbench.modals = [];
+    workbench.unshareBeforeSummary = false;
     return new BrowserContextStore();
   };
   const poll = async (store: InstanceType<typeof BrowserContextStore>) => {
@@ -328,6 +334,13 @@ async function main(): Promise<void> {
     workbench.askDelay = 0;
     await store.answerShareQuestion('p1', 'share', false);
     assert.deepEqual(await wait.done, { outcome: 'answered', pageId: 'p1' });
+  });
+
+  await test('#658: a share that goes between the two reads gives the AI nothing about the page', async () => {
+    const store = fresh();
+    workbench.front = { ...site(), shared: true };
+    workbench.unshareBeforeSummary = true;
+    assert.equal(await store.buildTurnContext(), null);
   });
 
   if (failures) {

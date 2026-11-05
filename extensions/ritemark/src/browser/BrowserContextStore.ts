@@ -362,6 +362,8 @@ export class BrowserContextStore {
       try {
         // #658: the summary of the page the metadata named, not of whichever tab is in front by now.
         const summaryResult = await vscode.commands.executeCommand<unknown>(GET_ACTIVE_SUMMARY_COMMAND, { pageId: metadata.pageId });
+        // The share went between the two reads: nothing about the page goes to the AI (Sprint 67 D5).
+        if (isUsableSnapshot(summaryResult) && summaryResult.sharedWithAgent === false) return null;
         if (isUsableSnapshot(summaryResult)) {
           snapshot = { ...snapshot, ...summaryResult };
         }

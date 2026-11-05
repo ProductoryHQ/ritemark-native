@@ -430,16 +430,18 @@ A turn's browser actions go to the page the turn was given, found by its id, nev
 UnifiedViewProvider (turn start)  browserTurnPageFor(conversationId).startTurn(page)
     page = the page the turn's browser context came from, else BrowserContextStore.activePageId() (none with a document in front)
 ritemarkTools.ts  every browser tool: optional page_id; onPage() sends { pageId, requireShared?, knownPageIds? }, or { newTab } for navigate with no page
-    Claude: claudeMcpServers(groups, page)   Codex: codexToolCall(..., page)   OpenCode: handleIpc(..., page of the conversation prompted last)
+    Claude: claudeMcpServers(groups, page)   Codex: codexToolCall(..., page)   OpenCode: handleIpc(..., page of the session mid-turn)
 patch 010  resolveRitemarkPageTarget (common/ritemarkBrowserPageTarget.ts): by id, or the page-gone error; never the active tab instead
-    a page in a background tab is shown in its group first (preserveFocus); results carry pageIds and newPages
+    no action brings a tab forward: an input action on a page whose tab is not the front tab of a group is refused at once
+    (judged from editorService.visibleEditorPanes, not model.visible); refusals carry the page id alone; results carry pageIds and newPages
 patch 009  getActiveSummary / captureActiveViewport take { pageId }, so the context's summary is the page its metadata named
 ```
 
 - **One holder per conversation** (`BrowserTurnPage`, `browser/BrowserActionTools.ts`). Claude keeps its session's first MCP server, so the tools read the holder when they run.
 - **A page the AI was not given** (a sign-in popup its click opened) is named in the next result: its id alone while it is not shared, title and address once it is. The AI acts in it only with `page_id`, and only once it is shared (`requireShared`); no action shares it. A popup does not inherit its opener's share (upstream: child views "do not implicitly inherit agent access"; seen live, 5 Nov).
 - **No page:** click, fill, type, scroll, snapshot, back, forward and reload return an error without reaching the browser; navigate with an address opens a new tab, which becomes the turn's page.
-- **OpenCode** gets no browser context, so its turn's page is the page in front when the turn starts. Its adapter's requests name no conversation: with two OpenCode conversations working at once, the last one prompted gives the page (one shared browser, D2).
+- **A declined page** (Not now in the share wait) is dropped on purpose (`pageAfterShareWait`): the turn has no page and never falls back to it as the page in front.
+- **OpenCode** gets no browser context, so its turn's page is the page in front when the turn starts. Its adapter's requests name no conversation: the page is that of the session mid-turn (taken around the prompt only, after setModel); two sessions mid-turn with different pages are refused the browser, and when one ends the other keeps its own page (one shared browser, D2).
 
 ### The share question (Sprint 134, #455)
 

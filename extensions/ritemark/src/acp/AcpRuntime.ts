@@ -196,8 +196,6 @@ export class AcpSession implements RuntimeSession {
       config.onProgress({ type: 'text', message: `Note: ${imageAttachmentCount} image attachment(s) converted to text (OpenCode BYOK does not support inline multimodal in this version).`, timestamp: Date.now() });
     }
 
-    // #658: this session is mid-turn from here; its conversation's page is the one OpenCode's browser tools act in.
-    this._runtime.beginBrowserTurn(this, config.browserPage);
     try {
       // Apply model for this turn (strip 'opencode:' composite prefix if present).
       // Must be inside try/catch — setModel throws if the model ID is invalid.
@@ -252,6 +250,10 @@ export class AcpSession implements RuntimeSession {
       const timeoutMs = (turn.timeoutMinutes ?? DEFAULT_ACP_TIMEOUT_MINUTES) * 60_000;
       let timedOut = false;
       let timer: ReturnType<typeof setTimeout> | undefined;
+      // #658: this session is mid-turn from here; its conversation's page is the one OpenCode's browser tools act in.
+      // Taken only around the prompt, which the timeout bounds: setModel and setThinkingEffort have no timeout of
+      // their own, and a hang there must not hold the browser from another conversation.
+      this._runtime.beginBrowserTurn(this, config.browserPage);
       try {
         const result = await Promise.race([
           manager.prompt(this.acpSessionId, promptText),
@@ -283,13 +285,12 @@ export class AcpSession implements RuntimeSession {
         throw err;
       } finally {
         if (timer) clearTimeout(timer);
+        this._runtime.endBrowserTurn(this);
       }
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       const errorCode = acpTurnErrorCode(err);
       config.onCodexComplete?.({ status: 'error', error: describeAcpTurnError(raw), ...(errorCode ? { errorCode } : {}) });
-    } finally {
-      this._runtime.endBrowserTurn(this);
     }
   }
 
@@ -503,10 +504,9 @@ export class AcpRuntime implements AgentRuntime {
   }
 
   /**
-   * Spawn the subprocess + browser IPC server once, on the first conversation.
-   * Subsequent conversations open another ACP session on the same connection.
+   * #658: the browser page holder the browser tools act in: that of the session mid-turn (the one that began last,
+   * when two are), or none when no session is mid-turn.
    */
-  /** #658: the browser page holder of the conversation prompted last; the browser tools act in its page. */
   private _browserPage: BrowserTurnPage | undefined;
 
   /** #658: the sessions mid-turn, with the browser page holder of each one's conversation. */
@@ -518,9 +518,14 @@ export class AcpRuntime implements AgentRuntime {
     this._browserPage = page;
   }
 
-  /** #658: a session's turn ended. */
+  /**
+   * #658: a session's turn ended. The browser tools now act in the page of a session still mid-turn (the one that
+   * began last), or in none: never in the page of the turn that ended.
+   */
   endBrowserTurn(session: AcpSession): void {
     this._turnPages.delete(session);
+    const stillMidTurn = [...this._turnPages.values()];
+    this._browserPage = stillMidTurn.length ? stillMidTurn[stillMidTurn.length - 1] : undefined;
   }
 
   /**
@@ -540,6 +545,10 @@ export class AcpRuntime implements AgentRuntime {
     return _toolsInjector.handleIpc(req, 'opencode', this._browserPage);
   }
 
+  /**
+   * Spawn the subprocess + browser IPC server once, on the first conversation.
+   * Subsequent conversations open another ACP session on the same connection.
+   */
   private async _ensureManager(config: RuntimeSessionConfig): Promise<void> {
     if (this._manager) return;
 

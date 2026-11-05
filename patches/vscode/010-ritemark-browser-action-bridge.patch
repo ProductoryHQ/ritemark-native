@@ -39,6 +39,12 @@
 #   of a new tab waits for the load and retries once. The control question
 #   names the page. Logic in common/ritemarkBrowserPageTarget.ts, tested in
 #   test/common/; the action path in test/electron-browser/features/.
+#   "In front" is the page's tab being the front tab of an editor group, of any
+#   desk (editorService.visibleEditorPanes), not model.visible, which is also
+#   false for a blank tab, a failed load, or a page under a toast or menu. A
+#   refusal (not in front, control declined, a bad argument) carries the page id
+#   and the error only; any other result names the address and title only once
+#   the page is shared (Sprint 67 D5).
 #
 # File(s): src/vs/platform/browserView/common/browserView.ts,
 #          src/vs/workbench/contrib/browserView/common/browserView.ts,
@@ -443,10 +449,10 @@ index 62a4c272e93..20fb0cdb554 100644
  		this._widget = { location: BrowserWidgetLocation.ContentArea, element: this._container, order: 50 };
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
 new file mode 100644
-index 00000000000..5c9411c2bf5
+index 00000000000..36152d5f97d
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserActionFeature.ts
-@@ -0,0 +1,610 @@
+@@ -0,0 +1,629 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -521,8 +527,18 @@ index 00000000000..5c9411c2bf5
 + */
 +export const RITEMARK_PAGE_NOT_IN_FRONT_ERROR = 'The page isn\'t in front. Ask the person to bring its browser tab forward. Nothing was done.';
 +
-+export function pageNotInFrontError(model: { readonly visible: boolean }): string | undefined {
-+	return model.visible ? undefined : RITEMARK_PAGE_NOT_IN_FRONT_ERROR;
++/**
++ * Ritemark (#658): a page is in front when its browser tab is the front tab of an editor group: of any desk, the
++ * active one or not. A tab behind another editor is not. Judged from the editors, not from `model.visible`, which is
++ * also false for a page that is in front but blank (the empty tab's welcome), whose load failed, or that a toast, menu,
++ * quick pick or hover covers for a moment: the AI may act in those.
++ */
++export function isPageInFront(model: { readonly id: string }, editorService: Pick<IEditorService, 'visibleEditorPanes'>): boolean {
++	return editorService.visibleEditorPanes.some(pane => pane instanceof BrowserEditor && pane.model?.id === model.id);
++}
++
++export function pageNotInFrontError(model: { readonly id: string }, editorService: Pick<IEditorService, 'visibleEditorPanes'>): string | undefined {
++	return isPageInFront(model, editorService) ? undefined : RITEMARK_PAGE_NOT_IN_FRONT_ERROR;
 +}
 +
 +export function isModel(value: IBrowserViewModel | IRitemarkBrowserActionResult): value is IBrowserViewModel {
@@ -564,8 +580,17 @@ index 00000000000..5c9411c2bf5
 +	return model.sharedWithAgentForControl;
 +}
 +
++/**
++ * What a result says about its page: the id, and the address and title only once the page is shared with the AI
++ * (Sprint 67 D5). Before that, the AI may learn the page's id and nothing else.
++ */
 +function modelMeta(model: IBrowserViewModel): Pick<IRitemarkBrowserActionResult, 'pageId' | 'url' | 'title'> {
-+	return { pageId: model.id, url: model.url, title: model.title };
++	return model.ritemarkSharedWithAgent ? { pageId: model.id, url: model.url, title: model.title } : { pageId: model.id };
++}
++
++/** Ritemark (#658): a refusal names its page by id alone, shared or not: nothing was done, and nothing about the page goes back. */
++function refusal(model: IBrowserViewModel, error: string): IRitemarkBrowserActionResult {
++	return { pageId: model.id, error };
 +}
 +
 +function isNavigationAbortError(err: unknown): boolean {
@@ -593,7 +618,7 @@ index 00000000000..5c9411c2bf5
 +		try {
 +			const granted = await ensureControlConsent(model, dialogService);
 +			if (!granted) {
-+				return { ...modelMeta(model), error: 'Browser control consent was not granted.' };
++				return refusal(model, 'Browser control consent was not granted.');
 +			}
 +			return { ...modelMeta(model) };
 +		} catch (err) {
@@ -656,13 +681,13 @@ index 00000000000..5c9411c2bf5
 +			return { error: 'No active integrated browser tab.' };
 +		}
 +		// An existing page must be in front (a new tab is); the control question is asked only about a page the person can see.
-+		const notInFront = resolved.kind === 'page' ? pageNotInFrontError(model) : undefined;
++		const notInFront = resolved.kind === 'page' ? pageNotInFrontError(model, editorService) : undefined;
 +		if (notInFront) {
-+			return { ...modelMeta(model), error: notInFront };
++			return refusal(model, notInFront);
 +		}
 +		const granted = await ensureControlConsent(model, dialogService);
 +		if (!granted) {
-+			return { ...modelMeta(model), error: 'Browser control consent was not granted for this tab.' };
++			return refusal(model, 'Browser control consent was not granted for this tab.');
 +		}
 +		try {
 +			if (type === 'url') {
@@ -676,7 +701,7 @@ index 00000000000..5c9411c2bf5
 +			} else if (type === 'reload') {
 +				await model.reload(false);
 +			} else {
-+				return { ...modelMeta(model), error: `navigate: unknown type "${type}".` };
++				return refusal(model, `navigate: unknown type "${type}".`);
 +			}
 +		} catch (err) {
 +			if (!isNavigationAbortError(err)) {
@@ -764,16 +789,16 @@ index 00000000000..5c9411c2bf5
 +		const model = found;
 +		const validationError = validate();
 +		if (validationError) {
-+			return { ...modelMeta(model), error: validationError };
++			return refusal(model, validationError);
 +		}
-+		// Visibility is decided first: the control question is never asked about a page that is not in front.
-+		const notInFront = pageNotInFrontError(model);
++		// Being in front is decided first: the control question is never asked about a page that is not in front.
++		const notInFront = pageNotInFrontError(model, editorService);
 +		if (notInFront) {
-+			return { ...modelMeta(model), error: notInFront };
++			return refusal(model, notInFront);
 +		}
 +		const granted = await ensureControlConsent(model, dialogService);
 +		if (!granted) {
-+			return { ...modelMeta(model), error: 'Browser control consent was not granted for this tab.' };
++			return refusal(model, 'Browser control consent was not granted for this tab.');
 +		}
 +		const result = await playwrightService.invokeFunction(RITEMARK_PLAYWRIGHT_SESSION, model.id, functionBody, invokeArgs);
 +		if (result.error) {
@@ -1188,10 +1213,10 @@ index 00000000000..9c59b93d0a7
 +});
 diff --git a/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts
 new file mode 100644
-index 00000000000..9e0dca03c18
+index 00000000000..b020be66a40
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts
-@@ -0,0 +1,142 @@
+@@ -0,0 +1,213 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1211,48 +1236,56 @@ index 00000000000..9e0dca03c18
 +/**
 + * Ritemark (#658): the real action path (`targetModel`, `invokeInTarget`, `runNavigateInternal`), with a fake editor
 + * service whose active browser is another page. The AI's action goes to the turn's page by id; it never acts in the
-+ * active tab, and it never brings a tab forward or asks about one the person cannot see.
++ * active tab, and it never brings a tab forward or asks about one the person cannot see. "In front" is the front tab
++ * of an editor group (`visibleEditorPanes`), not the model's `visible`, which is false for a blank, failed or covered page.
 + */
 +suite('Ritemark browser actions (#658)', () => {
 +	ensureNoDisposablesAreLeakedInTestSuite();
 +
-+	interface IFakePage extends Pick<IBrowserViewModel, 'id' | 'url' | 'title' | 'visible' | 'ritemarkSharedWithAgent' | 'sharedWithAgentForControl'> {
++	interface IFakePage extends Pick<IBrowserViewModel, 'id' | 'url' | 'title' | 'visible' | 'error' | 'ritemarkSharedWithAgent' | 'sharedWithAgentForControl'> {
++		/** The page's tab is the front tab of its group (any desk). */
++		inFront: boolean;
 +		loaded: string[];
 +		loadURL(url: string): Promise<void>;
++		reload(): Promise<void>;
 +		setSharedWithAgentForControl(shared: boolean): Promise<void>;
 +	}
 +
-+	function page(id: string, visible: boolean): IFakePage {
++	function page(id: string, inFront: boolean): IFakePage {
 +		const fake: IFakePage = {
-+			id, url: `http://127.0.0.1/${id}`, title: `Page ${id}`, visible,
++			id, url: `http://127.0.0.1/${id}`, title: `Page ${id}`, visible: inFront, error: undefined, inFront,
 +			ritemarkSharedWithAgent: true, sharedWithAgentForControl: true,
 +			loaded: [],
 +			async loadURL(url: string) { fake.loaded.push(url); },
++			async reload() { fake.loaded.push('(reload)'); },
 +			async setSharedWithAgentForControl(shared: boolean) { (fake as { sharedWithAgentForControl: boolean }).sharedWithAgentForControl = shared; },
 +		};
 +		return fake;
 +	}
 +
-+	function setup(opts: { pages: IFakePage[]; active: IFakePage | undefined; control?: boolean }) {
-+		const log = { openEditor: 0, confirm: 0, invoked: [] as string[], opened: [] as unknown[] };
++	function browserPane(model: IFakePage): BrowserEditor {
 +		const pane = createStubInstance(BrowserEditor);
-+		if (opts.active) {
-+			Object.defineProperty(pane, 'model', { value: opts.active });
-+		}
++		Object.defineProperty(pane, 'model', { value: model });
++		return pane as unknown as BrowserEditor;
++	}
++
++	function setup(opts: { pages: IFakePage[]; active: IFakePage | undefined; confirm?: boolean }) {
++		const log = { openEditor: 0, confirm: 0, invoked: [] as string[], opened: [] as unknown[] };
 +		// The pane a new tab opens in (the one case where a tab comes forward).
 +		const newTab = page('new', true);
 +		(newTab as { url: string }).url = 'about:blank';
 +		(newTab as { sharedWithAgentForControl: boolean }).sharedWithAgentForControl = false;
-+		const newPane = createStubInstance(BrowserEditor);
-+		Object.defineProperty(newPane, 'model', { value: newTab });
++		const newPane = browserPane(newTab);
 +		const editorService = {
-+			activeEditorPane: opts.active ? pane : undefined,
++			activeEditorPane: opts.active ? browserPane(opts.active) : undefined,
++			// The front tab of each group: the pages in front (a document in front of a page leaves it out).
++			get visibleEditorPanes() { return opts.pages.filter(p => p.inFront).map(browserPane); },
 +			findEditors: () => [],
 +			openEditor: async (...args: unknown[]) => { log.openEditor++; log.opened.push(args); return newPane; },
 +		} as unknown as IEditorService;
 +		const views = new Map(opts.pages.map(p => [p.id, { model: p }] as const));
 +		const browserViewWorkbenchService = { getKnownBrowserViews: () => views } as unknown as IBrowserViewWorkbenchService;
-+		const dialogService = { confirm: async () => { log.confirm++; return { confirmed: true }; } } as unknown as IDialogService;
++		const dialogService = { confirm: async () => { log.confirm++; return { confirmed: opts.confirm ?? true }; } } as unknown as IDialogService;
 +		const playwrightService = {
 +			invokeFunction: async (_session: string, id: string) => { log.invoked.push(id); return { summary: `summary ${id}` }; },
 +			getSummary: async (_session: string, id: string) => `summary ${id}`,
@@ -1332,5 +1365,68 @@ index 00000000000..9e0dca03c18
 +		assert.deepStrictEqual(s.newTab.loaded, ['http://127.0.0.1/new']);
 +		assert.strictEqual(s.log.openEditor, 1);
 +		assert.strictEqual(s.log.confirm, 1, 'the new tab is in front, so the control question is about a page the person sees');
++	});
++	test('a page in front whose model is not visible is still in front: blank, failed, or under an overlay', async () => {
++		const blank = page('blank', true);
++		Object.assign(blank, { url: '', visible: false }); // the empty tab's welcome
++		const failed = page('failed', true);
++		Object.assign(failed, { visible: false, error: { url: 'http://127.0.0.1/failed', errorCode: -105, errorDescription: 'ERR_NAME_NOT_RESOLVED' } });
++		const covered = page('covered', true);
++		Object.assign(covered, { visible: false }); // a toast, menu, quick pick or hover over it
++		const s = setup({ pages: [blank, failed, covered], active: covered });
++
++		const opened = await runNavigateInternal({ ...s, args: { pageId: 'blank', url: 'http://127.0.0.1/example' }, type: 'url' });
++		assert.strictEqual(opened.error, undefined, 'navigate with an address loads in the turn\'s blank tab');
++		assert.deepStrictEqual(blank.loaded, ['http://127.0.0.1/example']);
++
++		const reloaded = await runNavigateInternal({ ...s, args: { pageId: 'failed' }, type: 'reload' });
++		assert.strictEqual(reloaded.error, undefined, 'a page whose load failed can be reloaded');
++		assert.deepStrictEqual(failed.loaded, ['(reload)']);
++
++		const clicked = await invokeInTarget({ ...s, target: { pageId: 'covered' }, validate: () => null, functionBody: '', invokeArgs: [] });
++		assert.strictEqual(clicked.error, undefined, 'a page under an overlay is in front');
++		assert.deepStrictEqual(s.log.invoked, ['covered']);
++		assert.strictEqual(s.log.openEditor, 0, 'nothing is opened or brought forward');
++	});
++
++	test('a page behind another editor is not in front, even when its model says it is visible', async () => {
++		const c = page('c', false);
++		(c as { visible: boolean }).visible = true;
++		const s = setup({ pages: [c], active: undefined });
++		const result = await invokeInTarget({ ...s, target: { pageId: 'c' }, validate: () => null, functionBody: '', invokeArgs: [] });
++		assert.strictEqual(result.error, RITEMARK_PAGE_NOT_IN_FRONT_ERROR);
++		assert.deepStrictEqual(s.log.invoked, []);
++	});
++
++	test('a refusal carries the page id and the error, never its address or title', async () => {
++		const results: unknown[] = [];
++		// Not in front: a click, and navigate into the page.
++		{
++			const c = page('c', false);
++			const s = setup({ pages: [c, page('a', true)], active: undefined });
++			results.push(await invokeInTarget({ ...s, target: { pageId: 'c' }, validate: () => null, functionBody: '', invokeArgs: [] }));
++			results.push(await runNavigateInternal({ ...s, args: { pageId: 'c', url: 'http://127.0.0.1/next' }, type: 'url' }));
++		}
++		// In front, not shared, and the person says Deny to the control question.
++		{
++			const c = page('c', true);
++			Object.assign(c, { ritemarkSharedWithAgent: false, sharedWithAgentForControl: false });
++			const s = setup({ pages: [c], active: c, confirm: false });
++			results.push(await invokeInTarget({ ...s, target: { pageId: 'c' }, validate: () => null, functionBody: '', invokeArgs: [] }));
++			results.push(await runNavigateInternal({ ...s, args: { pageId: 'c' }, type: 'reload' }));
++		}
++		// An argument the action refuses.
++		{
++			const c = page('c', true);
++			Object.assign(c, { ritemarkSharedWithAgent: false });
++			const s = setup({ pages: [c], active: c });
++			results.push(await invokeInTarget({ ...s, target: { pageId: 'c' }, validate: () => 'click: either "ref" or "selector" is required.', functionBody: '', invokeArgs: [] }));
++		}
++		assert.strictEqual(results.length, 5);
++		for (const result of results) {
++			assert.deepStrictEqual(Object.keys(result as object).sort(), ['error', 'pageId'], JSON.stringify(result));
++			assert.strictEqual((result as { pageId: string }).pageId, 'c');
++			assert.ok(!JSON.stringify(result).includes('127.0.0.1') && !JSON.stringify(result).includes('Page c'), JSON.stringify(result));
++		}
 +	});
 +});

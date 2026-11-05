@@ -237,6 +237,22 @@ export async function chooseTurnPage(options: {
   return options.contextDropped ? undefined : options.activePageId();
 }
 
+/**
+ * #658: what a turn's share wait leaves it. `askedPageId`: the page the share question was about (none: no question
+ * waited on). `contextPageId`: the page the turn's browser context came from (none: no context). Without a question the
+ * context stands as it is. After one, only the page asked about may be the turn's, and only when it gave the context: a
+ * page brought to the front meanwhile was not the question, and a page the person declined (Not now) gives no context
+ * and is dropped, so the turn never falls back to it as the page in front.
+ */
+export function pageAfterShareWait(options: { askedPageId: string | undefined; contextPageId: string | undefined; hasContext: boolean }): {
+  useContext: boolean;
+  dropped: boolean;
+} {
+  if (!options.askedPageId) return { useContext: options.hasContext, dropped: false };
+  const fromAsked = options.hasContext && options.contextPageId === options.askedPageId;
+  return { useContext: fromAsked, dropped: !fromAsked };
+}
+
 const turnPages = new Map<string, BrowserTurnPage>();
 
 /** The conversation's page holder, the same object for every turn. */

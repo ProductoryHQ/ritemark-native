@@ -224,6 +224,24 @@ async function main(): Promise<void> {
     }
   }
 
+  // ── #658 round 3: a page the person declined in the share wait is dropped; the turn never falls back to it ──
+  {
+    reset(); // Page A is in front: the page the share question asked about, and the person said Not now
+    const inFront = async () => active;
+    const declined = actions.pageAfterShareWait({ askedPageId: 'p-a', contextPageId: undefined, hasContext: false });
+    assert.deepEqual(declined, { useContext: false, dropped: true }, 'declined: no context, the page dropped on purpose');
+    assert.equal(await actions.chooseTurnPage({ contextPageId: undefined, contextDropped: declined.dropped, activePageId: inFront }), undefined, 'not the declined page in front');
+    assert.deepEqual(actions.pageAfterShareWait({ askedPageId: 'p-a', contextPageId: 'p-a', hasContext: true }), { useContext: true, dropped: false }, 'shared: the page asked about is the turn\'s');
+    assert.deepEqual(actions.pageAfterShareWait({ askedPageId: 'p-a', contextPageId: 'p-b', hasContext: true }), { useContext: false, dropped: true }, 'another page came forward meanwhile: dropped');
+    assert.deepEqual(actions.pageAfterShareWait({ askedPageId: undefined, contextPageId: undefined, hasContext: false }), { useContext: false, dropped: false }, 'no question: the page in front, as before');
+    assert.deepEqual(actions.pageAfterShareWait({ askedPageId: undefined, contextPageId: 'p-c', hasContext: true }), { useContext: true, dropped: false });
+    const page = new BrowserTurnPage();
+    page.startTurn(await actions.chooseTurnPage({ contextPageId: undefined, contextDropped: declined.dropped, activePageId: inFront }));
+    const refused = await runTool(tool('browser_click'), { selector: '#btn' }, { runtimeId: 'claude-code', browserPage: page });
+    assert.equal(refused.isError, true);
+    assert.equal(calls.length, 0, 'no action reached the declined page');
+  }
+
   // ── #658 fix 4: pages known from an earlier turn are forgotten; a tab opened between turns is never announced ──
   {
     reset();

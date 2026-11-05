@@ -79,6 +79,8 @@
 #   { pageId } and read that page by id, so the turn's context is the summary of
 #   the page its metadata named, not of whichever tab is in front by then; a page
 #   that has gone is an error. Without pageId they read the active tab, as before.
+#   Their refusals (not shared, no annotation mode) name the page by id alone,
+#   never its address or title (Sprint 67 D5).
 #
 # Created: 2026-05-11
 # Updated: 2026-10-12 (Sprint 131: navigation push for Browser Recent)
@@ -258,10 +260,10 @@ index 7a69461a8f9..9d39a07860c 100644
  	const url = Object.entries(viewState ?? {}).find(([key]) => key === 'url')?.[1];
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts
 new file mode 100644
-index 00000000000..6019704e168
+index 00000000000..9dc353c8183
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserContextFeature.ts
-@@ -0,0 +1,361 @@
+@@ -0,0 +1,369 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -352,6 +354,14 @@ index 00000000000..6019704e168
 +		sharedWithAgent: model.ritemarkSharedWithAgent,
 +		annotationMode: model.annotationMode,
 +	};
++}
++
++/**
++ * Ritemark (#658): a refused read names its page by id alone (and says whether it is shared): the page may be one the
++ * person never shared, whose address and title the AI must not learn (Sprint 67 D5).
++ */
++function refusalFromModel(model: IBrowserViewModel, error: string): IRitemarkBrowserContextDto {
++	return { pageId: model.id, sharedWithAgent: model.ritemarkSharedWithAgent, annotationMode: model.annotationMode, error };
 +}
 +
 +function bytesToBase64(buffer: VSBuffer): string {
@@ -492,7 +502,7 @@ index 00000000000..6019704e168
 +			return { error: typeof args?.pageId === 'string' ? PAGE_GONE_ERROR : 'No active integrated browser tab.' };
 +		}
 +		if (!model.ritemarkSharedWithAgent) {
-+			return { ...dtoFromModel(model), error: 'Browser page is not shared with Ritemark AI context.' };
++			return refusalFromModel(model, 'Browser page is not shared with Ritemark AI context.');
 +		}
 +
 +		const playwrightService = accessor.get(IPlaywrightService);
@@ -517,7 +527,7 @@ index 00000000000..6019704e168
 +			return { error: typeof args?.pageId === 'string' ? PAGE_GONE_ERROR : 'No active integrated browser tab.' };
 +		}
 +		if (!model.annotationMode) {
-+			return { ...dtoFromModel(model), error: 'Annotation mode is not enabled for the active browser tab.' };
++			return refusalFromModel(model, 'Annotation mode is not enabled for the active browser tab.');
 +		}
 +
 +		const screenshot = await model.captureScreenshot({ quality: 90 });

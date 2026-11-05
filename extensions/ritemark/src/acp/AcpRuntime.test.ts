@@ -626,7 +626,101 @@ async function run() {
     console.log('✓ Test 16: a second OpenCode conversation with another page is refused the browser');
   }
 
-  console.log('\nAll 16 AcpRuntime tests passed!');
+  // #658: two conversations mid-turn, one ends: the other's next browser call goes to its own page, never to the
+  // page of the turn that ended; with no turn left, the tools have no page.
+  {
+    const runtime = new AcpRuntime();
+    const { BrowserTurnPage } = require('../browser/BrowserActionTools') as typeof import('../browser/BrowserActionTools');
+    const releases = new Map<string, () => void>();
+    const hanging = {
+      ...mockManager,
+      prompt: (sessionId: string) => new Promise((resolve) => { releases.set(sessionId, () => resolve({ stopReason: 'end_turn' })); }),
+    };
+    const pageA = new BrowserTurnPage();
+    pageA.startTurn('page-a');
+    const pageB = new BrowserTurnPage();
+    pageB.startTurn('page-b');
+    const sent: Array<Record<string, unknown> | undefined> = [];
+    const originalExecute = vscodeMod.commands.executeCommand;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (vscodeMod.commands as any).executeCommand = async (_command: string, args?: Record<string, unknown>) => {
+      sent.push(args);
+      return { pageId: args?.pageId, summary: 'ok' };
+    };
+    try {
+      const first = addSession(runtime, 'conv-a', { ...dummyConfig, browserPage: pageA });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (runtime as any)._manager = hanging;
+      const turnA = first.prompt({ prompt: 'a' });
+      await new Promise((r) => setImmediate(r));
+      const second = addSession(runtime, 'conv-b', { ...dummyConfig, browserPage: pageB });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (runtime as any)._manager = hanging;
+      const turnB = second.prompt({ prompt: 'b' });
+      await new Promise((r) => setImmediate(r));
+      assert.strictEqual(runtime.browserContested(), true, 'both mid-turn with different pages');
+
+      releases.get(second.acpSessionId)!();
+      await turnB;
+      assert.strictEqual(runtime.browserContested(), false, 'B ended: only A is mid-turn');
+      const call = { id: '3', op: 'call', group: 'browser', tool: 'browser_snapshot', params: {} } as const;
+      const result = await runtime.handleToolRequest(call);
+      assert.strictEqual(result.isError, undefined, result.text);
+      assert.strictEqual(sent.at(-1)?.pageId, 'page-a', 'A\'s next call goes to A\'s page, not to the page of B\'s ended turn');
+
+      releases.get(first.acpSessionId)!();
+      await turnA;
+      const none = await runtime.handleToolRequest({ ...call, id: '4' });
+      assert.strictEqual(none.isError, true, 'no turn mid-way: the tools have no page');
+      assert.match(none.text ?? '', /No browser page was given to this turn/);
+      assert.strictEqual(sent.length, 1, 'nothing reached the browser without a turn');
+    } finally {
+      vscodeMod.commands.executeCommand = originalExecute;
+    }
+    console.log('✓ Test 17: when one of two OpenCode turns ends, the other keeps its own page');
+  }
+
+  // #658: the browser lock is taken only around the prompt, which the timeout bounds. A setModel that hangs (it has
+  // no timeout) holds nothing, so another conversation's browser actions are not refused because of it.
+  {
+    const runtime = new AcpRuntime();
+    const { BrowserTurnPage } = require('../browser/BrowserActionTools') as typeof import('../browser/BrowserActionTools');
+    let releaseModel: (() => void) | undefined;
+    let releasePrompt: (() => void) | undefined;
+    const manager = {
+      ...mockManager,
+      setModel: () => new Promise<void>((resolve) => { releaseModel = resolve; }),
+      prompt: () => new Promise((resolve) => { releasePrompt = () => resolve({ stopReason: 'end_turn' }); }),
+    };
+    const pageA = new BrowserTurnPage();
+    pageA.startTurn('page-a');
+    const pageB = new BrowserTurnPage();
+    pageB.startTurn('page-b');
+    const stuck = addSession(runtime, 'conv-stuck', { ...dummyConfig, model: 'opencode:some/model', browserPage: pageA });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._manager = manager;
+    const stuckTurn = stuck.prompt({ prompt: 'a' });
+    await new Promise((r) => setImmediate(r));
+    const other = addSession(runtime, 'conv-other', { ...dummyConfig, browserPage: pageB });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._manager = manager;
+    const otherTurn = other.prompt({ prompt: 'b' });
+    await new Promise((r) => setImmediate(r));
+    assert.ok(releaseModel, 'the first turn waits in setModel');
+    assert.strictEqual(runtime.browserContested(), false, 'a turn still in setModel holds no browser lock');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    assert.strictEqual((runtime as any)._browserPage, pageB, 'the conversation at its prompt has the browser');
+    releasePrompt!();
+    await otherTurn;
+    releaseModel!();
+    await new Promise((r) => setImmediate(r));
+    releasePrompt!();
+    await stuckTurn;
+    assert.strictEqual(runtime.browserContested(), false);
+    console.log('✓ Test 18: a turn waiting in setModel does not hold the browser');
+  }
+
+  console.log('\nAll 18 AcpRuntime tests passed!');
 }
 
 run().then(
