@@ -65,6 +65,9 @@ patch_digest() {
 stop_run() {
 	local run_dir=${1:-}
 	[[ -n $run_dir && -f $run_dir/run.env ]] || die "stop: no run.env in '${run_dir}'"
+	# One spelling of the folder: the profile flag names it as start resolved it (pwd -P, e.g. /private/var/…), and
+	# a /var/… or …//… form of the same folder would match no process and report LEFT=0 with the instance running.
+	run_dir=$(cd "$run_dir" && pwd -P)
 	local profile="--user-data-dir=$run_dir/profile"
 	local pid cmdline=""
 	pid=$(sed -n 's/^PID=//p' "$run_dir/run.env")
