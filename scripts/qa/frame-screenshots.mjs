@@ -34,7 +34,7 @@
  * The set approved at merge 2 is the baseline for the later steps of 2.0 and for update-vscode.sh's checklist.
  *
  * Sprint 134 (E3) adds the project at the centre: Home with the projects list, the head's Switch project flyout, the
- * Tasks, Browser, Transcribe and Agents places with their heads, the foot of Ritemark Settings, and the share question
+ * Tasks, Browser, Transcribe and Agents places with their heads, the foot of Ritemark Settings (from Sprint 147 its Advanced section, More tools at its foot), and the share question
  * on the AI's sheet for a page this script serves itself. What moved needs a Ritemark 1 profile and is not a scene. A
  * project window now opens on Home, so the run first chooses Documents, where the base scene's document is opened.
  */
@@ -187,6 +187,15 @@ async function theme(name) {
  * text has `text`, and returns its value, or undefined when no frame has the text.
  */
 async function inWebview(text, expression = 'true') {
+	return inWebviewWhere(`d?.body?.innerText.includes(${JSON.stringify(text)})`, expression);
+}
+
+/** As inWebview, in the first frame whose document has an element matching `selector` (a page's own marker, not its words). */
+async function inWebviewWith(selector, expression = 'true') {
+	return inWebviewWhere(`!!d?.querySelector(${JSON.stringify(selector)})`, expression);
+}
+
+async function inWebviewWhere(match, expression) {
 	const targets = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).filter(target => target.type === 'iframe');
 	for (const target of targets) {
 		const frame = new WebSocket(target.webSocketDebuggerUrl);
@@ -194,7 +203,7 @@ async function inWebview(text, expression = 'true') {
 			await new Promise((resolve, reject) => { frame.addEventListener('open', resolve, { once: true }); frame.addEventListener('error', reject, { once: true }); });
 			const value = await new Promise(resolve => {
 				frame.addEventListener('message', event => { const message = JSON.parse(event.data); if (message.id === 1) { resolve(message.result?.result?.value); } });
-				frame.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { returnByValue: true, expression: `(() => { const doc = [document, ...[...document.querySelectorAll('iframe')].map(f => { try { return f.contentDocument; } catch { return null; } })].find(d => d?.body?.innerText.includes(${JSON.stringify(text)})); return doc ? (${expression}) : undefined; })()` } }));
+				frame.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { returnByValue: true, expression: `(() => { const doc = [document, ...[...document.querySelectorAll('iframe')].map(f => { try { return f.contentDocument; } catch { return null; } })].find(d => ${match}); return doc ? (${expression}) : undefined; })()` } }));
 				setTimeout(() => resolve(undefined), 1500);
 			});
 			if (value !== undefined) {
@@ -521,15 +530,28 @@ const SCENES = [
 	}]),
 	['settings-foot', async () => {
 		await key('Comma', MOD, ',');
-		// Wait for the page to be drawn whole, its components' readiness settled (no "Checking"), so its height is the
-		// same in every run; then scroll it to its foot, where Advanced settings is (R23)
+		// Ritemark Settings since Sprint 147 is one page of sections (settingsSections.ts): Advanced holds what the old
+		// page's foot held, More tools with All settings (I60). The page is found by its own marker, not by its words:
+		// its root's data-editor-type, the sections' data-settings-section, the rows' data-settings-row
+		const settings = '#root[data-editor-type="settings"] [data-settings-section="advanced"]';
+		let opened = false;
+		for (let wait = 0; wait < 30 && !opened; wait++) {
+			await sleep(500);
+			// Radix Tabs chooses a section on the trigger's mouse down
+			opened = await inWebviewWith(settings, `(() => { const tab = doc.querySelector('[data-settings-section="advanced"]'); if (tab.getAttribute('data-state') !== 'active') { tab.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 })); } return tab.getAttribute('data-state') === 'active'; })()`) === true;
+		}
+		if (!opened) {
+			throw new Error('Ritemark Settings did not open on Advanced (no [data-settings-section="advanced"] became active)');
+		}
+		// Wait for the section to be drawn whole, its parts' answers in (no waiting mark, nothing "Checking"), so its height
+		// is the same in every run
 		let settled = false;
 		for (let wait = 0; wait < 30 && !settled; wait++) {
 			await sleep(500);
-			settled = await inWebview('Advanced settings', `!doc.body.innerText.includes('Checking')`) === true;
+			settled = await inWebviewWith(settings, `!!doc.querySelector('[data-settings-row="I60"]') && !doc.querySelector('[data-waiting]') && !doc.body.innerText.includes('Checking')`) === true;
 		}
 		if (!settled) {
-			throw new Error('Ritemark Settings did not settle (Advanced settings drawn, nothing "Checking")');
+			throw new Error('Ritemark Settings did not settle (Advanced drawn with More tools, nothing waiting or "Checking")');
 		}
 		const centre = await evaluate(`(() => { const r = document.querySelector('.part.editor .editor-container').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
 		for (let i = 0; i < 12; i++) {
@@ -537,9 +559,9 @@ const SCENES = [
 			await sleep(100);
 		}
 		await sleep(800);
-		const inView = await inWebview('Advanced settings', `(() => { const link = [...doc.querySelectorAll('a, button')].find(element => element.textContent.trim() === 'Advanced settings'); const r = link?.getBoundingClientRect(); return !!r && r.bottom <= doc.defaultView.innerHeight && r.top >= 0; })()`);
+		const inView = await inWebviewWith(settings, `(() => { const r = doc.querySelector('[data-settings-row="I60"]')?.getBoundingClientRect(); return !!r && r.bottom <= doc.defaultView.innerHeight && r.top >= 0; })()`);
 		if (!inView) {
-			throw new Error('Advanced settings is not in view after scrolling Ritemark Settings to its foot');
+			throw new Error('More tools (All settings) is not in view after scrolling Ritemark Settings ▸ Advanced to its foot');
 		}
 		return closeFrontTab;
 	}],

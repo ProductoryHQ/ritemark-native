@@ -2,25 +2,27 @@
  * The Publish sheet's host side (Sprint 149, R4, R5, W3): shows a plan's sheet and waits for the person's answer.
  *
  * Sends nothing anywhere: it only asks. The answer is `cancel`, `publish`, or `publishAnyway` (the second, explicit
- * press past a key warning, decision 2); PR 4 does the publishing after it. Closing the sheet's tab is Cancel.
+ * press past a key warning, decision 2); PR 4 does the publishing after it. Closing the sheet (Escape, Cancel) is Cancel.
  *
  * The sheet gets names, folders, reasons and line numbers (`sheetModel.ts`); the only file it can ask to open is a
  * hit, by its index in this plan's own list (Open script.js). Open closes the sheet without publishing and opens the
  * file's text, a page's too, as a tab on the same desk, with the key selected as Find selects (the Experience lead,
  * 5 November). Publish on the bar then gathers and scans again. No token or value ever reaches the sheet.
  *
- * In PR 3 nothing in a menu reaches this: only the dev harness (`devSheetHarness.ts`) opens it, as a tab with the
- * sheet over a dimmed backdrop. The lead's place for it is over the whole window; that needs one command in patch 018
- * (`docs/development/releases/v2.2.0/sprint-149-publish/research/sheet-host.md`), built as its own shell PR.
+ * Where it shows (PR 5): over the whole window, centred, the window dimmed behind it, never a tab (the lead, 5
+ * November; publish.html frame 3). The workbench draws that frame (patch 018, `_ritemark.webviewSheet`); the page is
+ * this extension's webview view `ritemark.sheet.publish`, registered here once (`webviewSheet.ts`). A shell without the
+ * sheet answers cancel: Publish on the bar needs a 2.2 shell anyway.
  */
 
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { closeWebviewSheet, openWebviewSheet } from '../webviewSheet/webviewSheet';
 import { sheetModelOf } from './sheetModel';
 import { isSheetWebviewMessage, PublishSheetHostMessage, PublishSheetModel } from './sheetProtocol';
 import type { KeyHit, PublishPlan } from './types';
 
-export const PUBLISH_SHEET_VIEW_TYPE = 'ritemark.publishSheet';
+export const PUBLISH_SHEET_VIEW_TYPE = 'ritemark.sheet.publish';
 
 export type SheetAnswer = { kind: 'cancel' } | { kind: 'publish' | 'publishAnyway'; pagePart?: string };
 
@@ -30,67 +32,110 @@ export interface ShowSheetOptions {
   address?: PublishSheetModel['address'];
 }
 
+/** The view type's one provider: each sheet the workbench opens is handed to the request that asked for it. */
+class PublishSheetViews implements vscode.WebviewViewProvider {
+  next: ((view: vscode.WebviewView) => void) | undefined;
+  /** A request is open or opening: a second one is answered at once and never touches it (Codex on #672). */
+  busy = false;
+  resolveWebviewView(view: vscode.WebviewView): void {
+    const take = this.next;
+    this.next = undefined;
+    if (take) take(view);
+    else void closeWebviewSheet(PUBLISH_SHEET_VIEW_TYPE); // nobody asked: an empty sheet never stays
+  }
+}
+let views: PublishSheetViews | undefined;
+function publishSheetViews(context: vscode.ExtensionContext): PublishSheetViews {
+  if (!views) {
+    const created = new PublishSheetViews();
+    context.subscriptions.push(
+      vscode.window.registerWebviewViewProvider(PUBLISH_SHEET_VIEW_TYPE, created),
+      { dispose: () => { if (views === created) views = undefined; } },
+    );
+    views = created;
+  }
+  return views;
+}
+
 export function showPublishSheet(
   context: vscode.ExtensionContext,
   plan: PublishPlan,
   options: ShowSheetOptions = {},
 ): Promise<SheetAnswer> {
+  const sheets = publishSheetViews(context);
+  // One sheet at a time: a second request while one is open or opening (a quick double press) answers cancel at
+  // once, and the first keeps its resolver, its model and its sheet
+  if (sheets.busy) return Promise.resolve({ kind: 'cancel' });
   const projectName = path.basename(plan.projectFolder);
   const model: PublishSheetModel = { ...sheetModelOf(plan, projectName), ...options };
   const media = vscode.Uri.joinPath(context.extensionUri, 'media');
-  const panel = vscode.window.createWebviewPanel(
-    PUBLISH_SHEET_VIEW_TYPE,
-    `Publish ${model.title}`,
-    { viewColumn: vscode.ViewColumn.Active, preserveFocus: false },
-    { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [media] },
-  );
-  panel.webview.html = publishSheetHtml(panel.webview, context.extensionUri);
+  // The desk the sheet opened over: the sheet takes no group, so it is the active one, read before the sheet shows
+  const desk = vscode.window.tabGroups?.activeTabGroup?.viewColumn ?? vscode.ViewColumn.Active;
+  sheets.busy = true; // free again once this request has answered
 
   return new Promise<SheetAnswer>((resolve) => {
     let answered = false;
-    const answer = (a: SheetAnswer) => {
+    let shown = false;
+    const subscriptions: vscode.Disposable[] = [];
+    // The sheet closes first (when one showed: a shell without it has nothing to close), then the request is free and
+    // the answer goes, so the next request finds no sheet in its way
+    const answer = async (a: SheetAnswer): Promise<void> => {
       if (answered) return;
       answered = true;
-      resolve(a);
-      panel.dispose();
+      try {
+        if (shown) await closeWebviewSheet(PUBLISH_SHEET_VIEW_TYPE);
+      } finally {
+        sheets.busy = false;
+        resolve(a);
+      }
     };
-    const subscriptions: vscode.Disposable[] = [];
-    subscriptions.push(
-      panel.onDidDispose(() => {
-        for (const s of subscriptions) s.dispose();
-        if (!answered) {
-          answered = true;
-          resolve({ kind: 'cancel' });
-        }
-      }),
-      panel.webview.onDidReceiveMessage((message: unknown) => {
-        if (!isSheetWebviewMessage(message)) return;
-        switch (message.type) {
-          case 'publish:sheetReady': {
-            const out: PublishSheetHostMessage = { type: 'publish:sheet', model };
-            void panel.webview.postMessage(out);
-            break;
+
+    const take = (view: vscode.WebviewView): void => {
+      shown = true;
+      view.webview.options = { enableScripts: true, localResourceRoots: [media] };
+      view.webview.html = publishSheetHtml(view.webview, context.extensionUri);
+      subscriptions.push(
+        view.onDidDispose(() => {
+          for (const s of subscriptions) s.dispose();
+          void answer({ kind: 'cancel' });
+        }),
+        view.webview.onDidReceiveMessage((message: unknown) => {
+          if (!isSheetWebviewMessage(message)) return;
+          switch (message.type) {
+            case 'publish:sheetReady': {
+              const out: PublishSheetHostMessage = { type: 'publish:sheet', model };
+              void view.webview.postMessage(out);
+              break;
+            }
+            case 'publish:cancel':
+              void answer({ kind: 'cancel' });
+              break;
+            case 'publish:confirm':
+              // "Publish anyway" counts only when the plan has hits; a plain Publish never skips the warning
+              if (plan.keyHits.length > 0 && !message.anyway) return;
+              if (plan.tooBig.length > 0 || plan.tooMany) return;
+              void answer({ kind: plan.keyHits.length > 0 ? 'publishAnyway' : 'publish', pagePart: message.pagePart });
+              break;
+            case 'publish:openHit': {
+              const hit = plan.keyHits[message.index];
+              if (!hit) return;
+              // the sheet goes first (the focus back on the bar), then the file opens on that desk and takes the focus
+              void answer({ kind: 'cancel' }).then(() => openKeyPlace(hit, desk));
+              break;
+            }
           }
-          case 'publish:cancel':
-            answer({ kind: 'cancel' });
-            break;
-          case 'publish:confirm':
-            // "Publish anyway" counts only when the plan has hits; a plain Publish never skips the warning
-            if (plan.keyHits.length > 0 && !message.anyway) return;
-            if (plan.tooBig.length > 0 || plan.tooMany) return;
-            answer({ kind: plan.keyHits.length > 0 ? 'publishAnyway' : 'publish', pagePart: message.pagePart });
-            break;
-          case 'publish:openHit': {
-            const hit = plan.keyHits[message.index];
-            if (!hit) return;
-            // the desk the sheet is on, read before the sheet goes
-            const column = panel.viewColumn ?? vscode.ViewColumn.Active;
-            answer({ kind: 'cancel' });
-            void openKeyPlace(hit, column);
-            break;
-          }
-        }
-      }),
+        }),
+      );
+    };
+    sheets.next = take;
+
+    void openWebviewSheet({ viewType: PUBLISH_SHEET_VIEW_TYPE, title: `Publish ${model.title}` }).then(
+      (outcome) => {
+        if (sheets.next === take) sheets.next = undefined; // never shown (no sheet in this shell, or one already showing)
+        if (outcome !== 'escape' && outcome !== 'closed') console.log(`[publish] the sheet did not show: ${outcome}`);
+        void answer({ kind: 'cancel' });
+      },
+      () => void answer({ kind: 'cancel' }),
     );
   });
 }
@@ -128,8 +173,9 @@ export function publishSheetHtml(webview: vscode.Webview, extensionUri: vscode.U
   <title>Publish</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { min-height: 100%; }
-    body { color: var(--vscode-foreground); background: var(--vscode-editor-background); }
+    /* The workbench's sheet is as tall as this page and draws the desk's colour behind it (patch 018), so the page
+       keeps its own height (no 100%) and no background */
+    html body { color: var(--vscode-foreground); background: transparent; }
   </style>
 </head>
 <body>
