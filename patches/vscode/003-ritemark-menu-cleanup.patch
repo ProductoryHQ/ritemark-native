@@ -316,18 +316,10 @@ index 4794c30c9ec..8716b6de49f 100644
  MenuRegistry.appendMenuItem(MenuId.MenubarMainMenu, {
  	submenu: MenuId.MenubarHelpMenu,
 diff --git a/src/vs/workbench/contrib/chat/browser/actions/chatContextActions.ts b/src/vs/workbench/contrib/chat/browser/actions/chatContextActions.ts
-index 7f368a27ce9..dec03163872 100644
+index 7f368a27ce9..a7caceac03a 100644
 --- a/src/vs/workbench/contrib/chat/browser/actions/chatContextActions.ts
 +++ b/src/vs/workbench/contrib/chat/browser/actions/chatContextActions.ts
-@@ -37,7 +37,6 @@ import { EditorResourceAccessor, isEditorCommandsContext, isEditorInput, SideByS
- import { IEditorGroupsService } from '../../../../services/editor/common/editorGroupsService.js';
- import { IEditorService } from '../../../../services/editor/common/editorService.js';
- import { BrowserEditorInput } from '../../../browserView/common/browserEditorInput.js';
--import { ExplorerFolderContext } from '../../../files/common/files.js';
- import { CTX_INLINE_CHAT_V2_ENABLED } from '../../../inlineChat/common/inlineChat.js';
- import { AnythingQuickAccessProvider, type IAnythingQuickPickItem } from '../../../search/browser/anythingQuickAccess.js';
- import { isSearchTreeFileMatch, isSearchTreeMatch } from '../../../search/browser/searchTreeModel/searchTreeCommon.js';
-@@ -127,7 +126,10 @@ abstract class AttachResourceAction extends Action2 {
+@@ -127,7 +127,10 @@ abstract class AttachResourceAction extends Action2 {
  	}
  }
  
@@ -339,7 +331,7 @@ index 7f368a27ce9..dec03163872 100644
  
  	static readonly ID = 'workbench.action.chat.attachFile';
  
-@@ -140,23 +142,6 @@ class AttachFileToChatAction extends AttachResourceAction {
+@@ -140,23 +143,6 @@ class AttachFileToChatAction extends AttachResourceAction {
  			precondition: ChatContextKeys.enabled,
  			f1: true,
  			menu: [{
@@ -363,7 +355,7 @@ index 7f368a27ce9..dec03163872 100644
  				id: MenuId.EditorTitleContext,
  				group: '2_chat',
  				order: 1,
-@@ -167,20 +152,6 @@ class AttachFileToChatAction extends AttachResourceAction {
+@@ -167,20 +153,6 @@ class AttachFileToChatAction extends AttachResourceAction {
  						ResourceContextKey.Scheme.isEqualTo(Schemas.vscodeRemote)
  					)
  				),
@@ -384,41 +376,19 @@ index 7f368a27ce9..dec03163872 100644
  			}, {
  				id: MenuId.InlineChatEditorAffordance,
  				group: '0_chat',
-@@ -209,7 +180,10 @@ class AttachFileToChatAction extends AttachResourceAction {
+@@ -209,7 +181,10 @@ class AttachFileToChatAction extends AttachResourceAction {
  	}
  }
  
 -class AttachFolderToChatAction extends AttachResourceAction {
-+// Ritemark (Sprint 154, #650): no Add Folder to Chat in Documents' menu on a folder, for the same reason as Add File to
-+// Chat. Its menu was its only way in (upstream has f1: false), so it joins All commands (decision 4). Exported for its
-+// test (ritemarkChatMenus.test.ts).
++// Ritemark (Sprint 154, #650): Add Folder to Chat keeps Documents' folder menu: upstream keeps it out of All commands
++// (f1: false), and it needs a folder to act on, so the menu is its way in (decision 4). Exported for its test
++// (ritemarkChatMenus.test.ts).
 +export class AttachFolderToChatAction extends AttachResourceAction {
  
  	static readonly ID = 'workbench.action.chat.attachFolder';
  
-@@ -218,20 +192,7 @@ class AttachFolderToChatAction extends AttachResourceAction {
- 			id: AttachFolderToChatAction.ID,
- 			title: localize2('workbench.action.chat.attachFolder.label', "Add Folder to Chat"),
- 			category: CHAT_CATEGORY,
--			f1: false,
--			menu: {
--				id: MenuId.ExplorerContext,
--				group: '5_chat',
--				order: 1,
--				when: ContextKeyExpr.and(
--					ChatContextKeys.enabled,
--					ExplorerFolderContext,
--					ContextKeyExpr.or(
--						ResourceContextKey.Scheme.isEqualTo(Schemas.file),
--						ResourceContextKey.Scheme.isEqualTo(Schemas.vscodeRemote)
--					)
--				)
--			}
-+			f1: true,
- 		});
- 	}
- 
-@@ -295,7 +256,9 @@ class AttachPinnedEditorsToChatAction extends Action2 {
+@@ -295,7 +270,9 @@ class AttachPinnedEditorsToChatAction extends Action2 {
  	}
  }
  
@@ -429,7 +399,7 @@ index 7f368a27ce9..dec03163872 100644
  
  	static readonly ID = 'workbench.action.chat.attachSelection';
  
-@@ -308,20 +271,6 @@ class AttachSelectionToChatAction extends Action2 {
+@@ -308,20 +285,6 @@ class AttachSelectionToChatAction extends Action2 {
  			f1: true,
  			precondition: ChatContextKeys.enabled,
  			menu: [{
@@ -769,7 +739,7 @@ index 7e5d8f63136..6e14eb6c26c 100644
  				order: 3,
 diff --git a/src/vs/workbench/contrib/inlineChat/test/browser/ritemarkChatMenus.test.ts b/src/vs/workbench/contrib/inlineChat/test/browser/ritemarkChatMenus.test.ts
 new file mode 100644
-index 00000000000..ded5ccfd5e0
+index 00000000000..513c67b2350
 --- /dev/null
 +++ b/src/vs/workbench/contrib/inlineChat/test/browser/ritemarkChatMenus.test.ts
 @@ -0,0 +1,59 @@
@@ -792,11 +762,11 @@ index 00000000000..ded5ccfd5e0
 +}
 +
 +/**
-+ * Ritemark (Sprint 154, #650; the Experience lead's check of #649): Copilot's Add File to Chat, Add Folder to Chat, Add
-+ * Selection to Chat and Open Inline Chat leave the text editor's, Documents' and Search's context menus, where they handed
-+ * the file or selection to Copilot beside Ritemark's Send to AI Chat. Their commands are in All commands (Add Folder to
-+ * Chat joins it, decision 4), and their other places are unchanged. Each menu list is exact, so an entry that comes back
-+ * fails the test.
++ * Ritemark (Sprint 154, #650; the Experience lead's check of #649): Copilot's Add File to Chat, Add Selection to Chat and
++ * Open Inline Chat leave the text editor's, Documents' and Search's context menus, where they handed the file or selection
++ * to Copilot beside Ritemark's Send to AI Chat. Their commands stay in All commands (decision 4), and their other places
++ * are unchanged. Add Folder to Chat keeps Documents' folder menu: All commands can't reach it meaningfully. Each menu list
++ * is exact, so an entry that comes back, or goes, fails the test.
 + */
 +suite('Ritemark: no Copilot chat items in the editor\'s, Documents\' and Search\'s menus', () => {
 +
@@ -809,11 +779,11 @@ index 00000000000..ded5ccfd5e0
 +		assert.strictEqual(action.desc.f1, true);
 +	});
 +
-+	test('Add Folder to Chat is not in Documents\' menu and is in All commands', () => {
++	test('Add Folder to Chat keeps Documents\' folder menu, its only way in (upstream\'s f1: false)', () => {
 +		const action = new AttachFolderToChatAction();
 +		assert.strictEqual(action.desc.id, 'workbench.action.chat.attachFolder');
-+		assert.deepStrictEqual(menus(action), []);
-+		assert.strictEqual(action.desc.f1, true);
++		assert.deepStrictEqual(menus(action), [MenuId.ExplorerContext]);
++		assert.strictEqual(action.desc.f1, false);
 +	});
 +
 +	test('Add Selection to Chat is not in the editor\'s menu and stays in All commands', () => {
@@ -1042,10 +1012,10 @@ index e05b71bd72c..01e13f0a5fd 100644
  				iconClass: ThemeIcon.asClassName(Codicon.gear),
 diff --git a/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts b/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts
 new file mode 100644
-index 00000000000..a8c9cca23d6
+index 00000000000..27941a6b39a
 --- /dev/null
 +++ b/src/vs/workbench/contrib/quickaccess/test/browser/ritemarkPalettePolicy.test.ts
-@@ -0,0 +1,276 @@
+@@ -0,0 +1,275 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1252,7 +1222,6 @@ index 00000000000..a8c9cca23d6
 +			'workbench.action.showEditorActions',
 +			'workbench.action.chat.attachFile', // Add File to Chat (the text editor's, Documents' and Search's menus, 003)
 +			'workbench.action.chat.attachSelection', // Add Selection to Chat (the text editor's menu, 003)
-+			'workbench.action.chat.attachFolder', // Add Folder to Chat (Documents' folders, 003; f1 from Sprint 154)
 +			'inlineChat.start', // Open Inline Chat (the text editor's menu, 003)
 +		];
 +		assert.deepStrictEqual(kept.filter(id => isHiddenFromRitemarkPalette('ritemark', id)), []);
