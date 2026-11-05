@@ -15,6 +15,8 @@
 #     dialog, workspace trust off, no confirm before close;
 #   - the folder on the command line, so the window opens on that project (a sample project of three Markdown
 #     documents in the run folder when --folder is not given), visible, since a hidden window draws only the welcome;
+#   - extra Ritemark/Chromium flags after `--`, placed after the folder (a value-less flag such as
+#     --use-fake-ui-for-media-stream used to swallow the folder that followed it);
 #   - each --env pair in the instance's environment (e.g. RITEMARK_SETTINGS_TIMING=1); ELECTRON_RUN_AS_NODE unset.
 # HOME is never changed. It waits until the window has drawn the project (its title names the folder), then prints
 # RUN_DIR, PORT, PID and FOLDER lines (also in <run-dir>/run.env) and returns, leaving the instance running.
@@ -53,6 +55,11 @@ descendants() {
 		[[ -n $kids ]] && queue+=($kids)
 	done
 	return 0  # the loop's last `&&` may be false; under set -e a caller's $(...) would stop the script
+}
+
+# A digest of a checkout's patches/vscode/*.patch (empty when it has none).
+patch_digest() {
+	(cd "$1/patches/vscode" 2>/dev/null && find . -type f -name '*.patch' -print0 | sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -d" " -f1) || true
 }
 
 stop_run() {
@@ -136,6 +143,34 @@ start_run() {
 	done
 	[[ -n $build_root ]] || die "no dev build in $ROOT/vscode or the main checkout's (build it first: vscode-development skill)"
 	local app="$build_root/vscode/.build/electron/Ritemark.app/Contents/MacOS/Ritemark"
+	# The build must be of the VS Code this checkout pins: a stale dev build (the main checkout's can be months old,
+	# pre-2.0) opens a different app, and a run on it proves nothing. RITEMARK_LAUNCH_ANY_BUILD=1 skips the check.
+	local pin built="" top
+	pin=$(git -C "$ROOT" rev-parse --verify --quiet HEAD:vscode 2>/dev/null || true)
+	# Only vscode/'s own checkout counts: a copy that lost its gitfile would otherwise report the Ritemark commit.
+	top=$(git -C "$build_root/vscode" rev-parse --show-toplevel 2>/dev/null || true)
+	if [[ -n $top && $(cd "$top" && pwd -P) == $(cd "$build_root/vscode" && pwd -P) ]]; then
+		built=$(git -C "$build_root/vscode" rev-parse --verify --quiet HEAD 2>/dev/null || true)
+	fi
+	if [[ ( -z $pin || $built != "$pin" ) && ${RITEMARK_LAUNCH_ANY_BUILD:-} != 1 ]]; then
+		die "the dev build in $build_root/vscode is of VS Code ${built:-unknown}, not the pinned ${pin:-unknown (no vscode gitlink in $ROOT)}: rebuild it, or give this worktree its own vscode (RITEMARK_LAUNCH_ANY_BUILD=1 to run it anyway)"
+	fi
+	# HEAD alone doesn't prove the build is of this code: Ritemark's shell changes are patches on a fixed HEAD.
+	# (1) A fallback build must come from the same patch stack as this checkout's.
+	# (2) Every patched VS Code source must be older than its compiled out/ file (a dev transpile or a full build).
+	# Not proven: that the patches were re-applied after this checkout's patch files last changed (no marker for it).
+	if [[ ${RITEMARK_LAUNCH_ANY_BUILD:-} != 1 ]]; then
+		if [[ $build_root != "$ROOT" && $(patch_digest "$ROOT") != "$(patch_digest "$build_root")" ]]; then
+			die "the main checkout's patches/vscode differ from this checkout's, so its build is not of this code: give this worktree its own vscode (RITEMARK_LAUNCH_ANY_BUILD=1 to run it anyway)"
+		fi
+		local f js stale=""
+		while IFS= read -r f; do
+			[[ $f == src/*.ts && $f != *.d.ts && $f != */test/* ]] || continue
+			js="$build_root/vscode/out/${f#src/}"; js=${js%.ts}.js
+			if [[ ! -f $js || $js -ot $build_root/vscode/$f ]]; then stale=$f; break; fi
+		done < <(git -C "$build_root/vscode" diff --name-only HEAD 2>/dev/null || true; git -C "$build_root/vscode" ls-files --others --exclude-standard -- src 2>/dev/null || true)
+		[[ -z $stale ]] || die "the dev build is older than vscode/$stale: rebuild or transpile it first (RITEMARK_LAUNCH_ANY_BUILD=1 to run it anyway)"
+	fi
 
 	local tmp=${TMPDIR:-/private/tmp}
 	local run_dir
@@ -182,14 +217,15 @@ start_run() {
 		--shared-data-dir="$HOME/.ritemark-dev-shared"
 		--use-mock-keychain
 		--remote-debugging-port="$port"
-		"${extra[@]+"${extra[@]}"}"
 		"$folder"
+		"${extra[@]+"${extra[@]}"}"
 	)
 
 	if (( dry_run )); then
 		printf 'DRY_RUN '; printf '%q ' "${cmd[@]}"; echo
 		echo "RUN_DIR=$run_dir"
 		echo "BUILD_ROOT=$build_root"
+		echo "BUILD_VSCODE=$built"
 		return 0
 	fi
 
@@ -200,6 +236,7 @@ start_run() {
 	{
 		echo "RUN_DIR=$run_dir"
 		echo "BUILD_ROOT=$build_root"
+		echo "BUILD_VSCODE=$built"
 		echo "PORT=$port"
 		echo "PID=$pid"
 		echo "FOLDER=$folder"
