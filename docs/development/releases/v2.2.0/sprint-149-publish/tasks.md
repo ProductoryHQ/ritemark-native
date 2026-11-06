@@ -61,7 +61,7 @@ Nothing here starts before the plan's approval (sprint-plan.md, *Approval*). Tic
 - [x] The bar's states, Unpublish's question, "Unpublishing…", the 10 s line, the failure line (R7, S24–S29): patch 010's chip, Copy link, Publishing…, Unpublishing…; the failure line as a notification with Try again until the bar draws it
 - [x] `web-page-publishing` (registered in PR 1): gates creating, connecting, publishing and updating; the list, Unpublish and Disconnect stay with it off (S28b)
 - [x] **After A4:** `scripts/qa/cloudflare-contract.mjs` green live (12/12, 6 November; green against the fake too)
-- [x] **After A4:** M6's wait in `spec.md` R7 and the code: "Publishing…" until a new address answers, with "Your address is new. It can take a couple of minutes before the page opens."
+- [x] **After A4:** M6's wait in `spec.md` R7 and the code: "Publishing…" until a new address answers, with "Your address is new. It can take a couple of minutes before the page opens." (round 5: the lead's words naming the page, as a brief toast; the chip's tooltip; "<page title> is published." when the wait ends)
 - [ ] S17–S28b live on the Mac, connected (the app takes the token only from its own password box, so a connected run needs a person to paste it); S21's log search
 - [ ] Review (High, `/security-review`), Windows overlay (offline scenarios; live when the Windows vault exists), merge
 

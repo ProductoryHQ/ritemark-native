@@ -24,6 +24,7 @@ import { PublishRecordStore } from './publishRecords';
 import { PublishController, sheetHostAvailable, type PageBarState, type PublishUi } from './PublishController';
 import { showPublishSheet } from './PublishSheetPanel';
 import type { WebPagesSettingsProjection } from './settingsProtocol';
+import { showBriefToast } from '../feedback/feedbackSheet';
 
 export const PUBLISH_READY_CONTEXT = 'ritemark.publish.ready';
 export const UNPUBLISH_PAGE_COMMAND = 'ritemark.page.unpublish';
@@ -127,13 +128,15 @@ export function createPublishFeature(
       showFailure: (line, retry) => {
         void vscode.window.showWarningMessage(line, 'Try again').then((pick) => { if (pick === 'Try again') retry(); });
       },
-      // M6's wait: a line that stays while the new address warms up and closes by itself when the page answers
+      // The bar's Unpublish past 10 s: a line that stays while Cloudflare takes the page down, closed when it is down
       showWaiting: (line) => {
         let done: () => void = () => undefined;
         const finished = new Promise<void>((resolve) => { done = resolve; });
         void vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: line, cancellable: false }, () => finished);
         return done;
       },
+      // M6's wait and its end: patch 018's brief toast, which goes by itself (an ordinary message in a shell without it)
+      showBrief: (line) => { void showBriefToast(line); },
       // The bar's Unpublish signed out or on another account: Settings ▸ Sharing ▸ Web pages is where Cloudflare is connected
       showConnect: (line) => {
         void vscode.window.showWarningMessage(line, OPEN_SETTINGS).then((pick) => {

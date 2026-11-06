@@ -169,3 +169,13 @@ export function sheetButtons(hasKeyHits: boolean, overLimit: boolean): SheetButt
     cancelTip: 'Close without publishing. Nothing is sent.',
   }
 }
+
+/**
+ * The button that carries the default ring, the one Enter presses (the lead, PR 4 round 3): Cancel when it is the main
+ * button, Publish only while it can be pressed. A waiting Publish (the random end, a taken name, an invalid address, the
+ * host's check) is never ringed, so nothing in the sheet is, until Put it back or a good name and address free it.
+ */
+export function ringedButton(buttons: Pick<SheetButtons, 'main' | 'publishDisabled'>): 'publish' | 'cancel' | null {
+  if (buttons.main === 'cancel') return 'cancel'
+  return buttons.publishDisabled ? null : 'publish'
+}

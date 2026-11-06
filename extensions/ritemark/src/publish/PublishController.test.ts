@@ -21,7 +21,10 @@ import {
   DISCONNECT_FAILED,
   KEY_NEEDS_SHEET,
   NAME_TAKEN,
-  NEW_ADDRESS_WAIT,
+  NEW_ADDRESS_TIP,
+  newAddressWait,
+  pageTitleOf,
+  publishedBrief,
   OTHER_ACCOUNT,
   PublishController,
   SLOW_UNPUBLISH,
@@ -126,6 +129,8 @@ async function setup(options: { flag?: boolean; entry?: boolean; pasted?: string
   const connects: string[] = [];
   /** M6's waiting line: each one shown, and whether it was closed. */
   const waits: Array<{ line: string; closed: boolean }> = [];
+  /** Brief toasts (patch 018's): the new address's wait and its end (the lead, 6 November). */
+  const briefs: string[] = [];
   const sheets: SheetSeen[] = [];
   const flag = { on: options.flag ?? true };
   const pasted = [...(options.pasted ?? [])];
@@ -149,6 +154,7 @@ async function setup(options: { flag?: boolean; entry?: boolean; pasted?: string
       waits.push(wait);
       return () => { wait.closed = true; };
     },
+    showBrief: (line: string) => { briefs.push(line); },
   };
   const makeController = () => new PublishController({
     host,
@@ -168,7 +174,7 @@ async function setup(options: { flag?: boolean; entry?: boolean; pasted?: string
   if (options.entry ?? true) controller.setPublishEntryAvailable(true);
   const page = { realPath: project.page(), projectFolder: project.dir };
   const cleanup = async () => { await fake.stop(); await fs.rm(storage, { recursive: true, force: true }); await project.cleanup(); };
-  return { makeController, fake, secrets, account, host, records, controller, posted, opened, boxes, ready, pageEvents, failures, retries, connects, waits, sheets, ui, flag, log, cleanup, storage, pasted, project, page };
+  return { makeController, fake, secrets, account, host, records, controller, posted, opened, boxes, ready, pageEvents, failures, retries, connects, waits, briefs, sheets, ui, flag, log, cleanup, storage, pasted, project, page };
 }
 
 type T = Awaited<ReturnType<typeof setup>>;
@@ -682,7 +688,7 @@ function holdWait(t: T) {
   return held;
 }
 
-test('a first publish on a name registered in the sheet: "Publishing…" holds with the new-address line until the page answers (M6)', async () => {
+test('a first publish on a name registered in the sheet: "Publishing…" holds, the toast names the page, the chip\'s tooltip says why, and a toast says it is published (M6)', async () => {
   const t = await setup({ pasted: [TOKEN] });
   try {
     t.fake.subdomain = null; // a new account: the sheet registers its workers.dev name
@@ -691,34 +697,39 @@ test('a first publish on a name registered in the sheet: "Publishing…" holds w
     await t.controller.startTokenEntry();
     const going = t.controller.publishFromBar(t.page);
     await held.started;
-    assert.deepEqual(t.waits.map((w) => w.line), [NEW_ADDRESS_WAIT], 'the line at once: the name is new');
-    assert.equal(NEW_ADDRESS_WAIT, 'Your address is new. It can take a couple of minutes before the page opens.');
+    assert.deepEqual(t.briefs, ['The new address for Harbour programme can take a couple of minutes to open.'], 'a brief toast at once, naming the page (the name is new)');
+    assert.deepEqual(t.waits, [], 'no line that stays: the toast goes by itself');
     const during = await t.controller.pageState(t.page.realPath);
     assert.equal(during.kind, 'publishing', 'never Published before the page opens');
-    assert.equal(during.line, NEW_ADDRESS_WAIT);
+    assert.equal(during.tooltip, 'The new address can take a couple of minutes to open.', 'the chip\'s tooltip carries the short form for the whole wait');
+    assert.equal(during.line, null, 'no failure line under the bar');
     assert.match(during.address ?? '', /^https:\/\/[a-z0-9-]+\.pages-\d{4}\.workers\.dev\//, 'the record is written: the upload went through');
-    assert.equal(t.waits[0].closed, false);
     held.release();
     await going;
-    assert.equal(t.waits[0].closed, true, 'the line closes by itself when the page answers');
-    assert.equal(t.waits.length, 1, 'once');
+    assert.deepEqual(t.briefs, [newAddressWait('Harbour programme'), 'Harbour programme is published.'], 'the wait that showed the line ends with a brief toast');
     const after = await t.controller.pageState(t.page.realPath);
     assert.equal(after.kind, 'published');
     assert.equal(after.line, null);
+    assert.equal(after.tooltip, null, 'the tooltip goes with the wait');
     assert.deepEqual(t.failures, [], 'a slow new address is never a failure');
     assert.ok(t.log.some((l) => / the new address answers$/.test(l)));
   } finally { await t.cleanup(); }
 });
 
-test('a first publish on a name the account had: no line while the page answers at once; the line after 10 s when it doesn\'t', async () => {
+test('a first publish on a name the account had: neither line while the page answers within 10 s; both when it doesn\'t', async () => {
   const t = await setup({ pasted: [TOKEN] });
   try {
     await publishedOnce(t);
-    assert.deepEqual(t.waits, [], 'answered at once: nothing to say');
+    assert.deepEqual([t.waits, t.briefs], [[], []], 'answered at once: neither line, the chip turning to Published is enough');
+    await t.controller.unpublishSite((await t.records.get(t.page.realPath))!.siteName);
+    t.fake.answerAfterChecks = 4; // 8 s of silence: still within 10 s
+    await t.controller.publishFromBar(t.page);
+    assert.deepEqual([t.waits, t.briefs], [[], []], 'answered within 10 s: neither line');
     await t.controller.unpublishSite((await t.records.get(t.page.realPath))!.siteName);
     t.fake.answerAfterChecks = 8; // 16 s of silence
     await t.controller.publishFromBar(t.page);
-    assert.deepEqual(t.waits.map((w) => [w.line, w.closed]), [[NEW_ADDRESS_WAIT, true]], 'shown after 10 s, closed when it answered');
+    assert.deepEqual(t.briefs, [newAddressWait('Harbour programme'), publishedBrief('Harbour programme')], 'the toast after 10 s, and the published toast when it answered');
+    assert.deepEqual(t.waits, []);
     assert.equal((await t.controller.pageState(t.page.realPath)).kind, 'published');
     assert.deepEqual(t.failures, []);
   } finally { await t.cleanup(); }
@@ -729,8 +740,9 @@ test('the wait\'s cap: Published all the same, the line closed, no failure; an u
   try {
     t.fake.answerAfterChecks = 1_000_000;
     const record = await publishedOnce(t);
-    assert.deepEqual(t.waits.map((w) => w.closed), [true]);
+    assert.deepEqual(t.briefs, [newAddressWait('Harbour programme'), publishedBrief('Harbour programme')], 'at the cap the upload went through: published, said once');
     const state = await t.controller.pageState(t.page.realPath);
+    assert.equal(state.tooltip, null);
     assert.equal(state.kind, 'published', 'the upload went through: Published, never a failure');
     assert.deepEqual(t.failures, []);
     assert.ok(t.log.some((l) => /did not answer before the wait ended/.test(l)));
@@ -759,9 +771,25 @@ test('Unpublish from Settings during the wait ends it: the page is down, the lin
     held.release();
     await going;
     assert.ok(t.fake.requests.length - before <= 1, 'the wait stopped at once, not at its cap');
-    assert.equal(t.waits[0].closed, true);
+    assert.deepEqual(t.briefs, [newAddressWait('Harbour programme')], 'unpublished during the wait: never "is published"');
     assert.equal((await t.controller.pageState(t.page.realPath)).kind, 'unpublished');
     assert.ok(t.log.some((l) => /the wait for the new address was stopped/.test(l)));
+  } finally { await t.cleanup(); }
+});
+
+test('the toast names the page by its own title as its tab shows it, else by the file\'s name', async () => {
+  const file = (html: string) => ({ files: [{ urlPath: '/a.html', bytes: new TextEncoder().encode(html) }], pageUrlPath: '/a.html' });
+  assert.equal(pageTitleOf(file('<html><head><title>\n  Harbour   &amp; Bay\n</title></head></html>'), '/p/Harbour programme.html'), 'Harbour & Bay');
+  assert.equal(pageTitleOf(file('<title>Caf&#233; &#x2014; menu</title>'), '/p/x.html'), 'Café — menu');
+  assert.equal(pageTitleOf(file('<h1>No title</h1>'), '/p/Harbour programme.html'), 'Harbour programme');
+  assert.equal(pageTitleOf(file('<title>   </title>'), '/p/Clean page.htm'), 'Clean page');
+  assert.equal(pageTitleOf(null, '/p/Clean page.HTML'), 'Clean page');
+  const t = await setup({ pasted: [TOKEN], files: { ...HARBOUR, 'Harbour programme.html': '<title>Harbour programme 2027</title><h1>Harbour</h1>' } });
+  try {
+    t.fake.answerAfterChecks = 1_000_000;
+    await publishedOnce(t);
+    assert.deepEqual(t.briefs, ['The new address for Harbour programme 2027 can take a couple of minutes to open.', 'Harbour programme 2027 is published.']);
+    assert.equal(NEW_ADDRESS_TIP, 'The new address can take a couple of minutes to open.');
   } finally { await t.cleanup(); }
 });
 

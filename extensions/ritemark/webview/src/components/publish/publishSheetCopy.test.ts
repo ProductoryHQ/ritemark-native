@@ -17,6 +17,7 @@ import {
   leftOutTip,
   limitLine,
   openWords,
+  ringedButton,
   sheetButtons,
   showsFileList,
   whatGoesLine,
@@ -100,6 +101,14 @@ for (const b of [sheetButtons(false, false), sheetButtons(true, false), sheetBut
   assert.ok(b.publishTip.length > 0 && b.cancelTip.length > 0, 'every button has a tooltip')
 }
 
+// A waiting Publish isn't ringed (the lead, PR 4 round 3): Enter does nothing while Publish waits, so nothing is ringed;
+// the ring is back on Publish as soon as it can be pressed. Cancel, when it is the main button, keeps its ring.
+assert.equal(ringedButton(sheetButtons(false, false)), 'publish', 'Publish ready: ringed')
+assert.equal(ringedButton({ ...sheetButtons(false, false), publishDisabled: true }), null, 'Publish waiting (random end, taken name, invalid address, the check): nothing ringed')
+assert.equal(ringedButton({ main: 'publish', publishDisabled: false }), 'publish', 'after Put it back, or once name and address are fine: ringed again')
+assert.equal(ringedButton(sheetButtons(true, false)), 'cancel', 'a key found: Cancel ringed')
+assert.equal(ringedButton(sheetButtons(true, true)), 'cancel', 'over a limit: Cancel ringed, Enter closes')
+
 // Limits (R3, S15)
 assert.equal(limitLine([{ name: 'clip.mp4', size: 30 * 1024 * 1024 }], false), 'clip.mp4 is too big to publish (30 MB). A file can be up to 25 MB.')
 assert.equal(limitLine([], true), 'This page uses more than 20,000 files, too many to publish.')
@@ -116,7 +125,12 @@ assert.ok(!/<button\b/.test(source), 'no hand-rolled <button>')
 assert.ok(!/\stitle=/.test(source), 'no native title')
 assert.equal((source.match(/<Tooltip\b[^>]*>\s*<Button\b/g) ?? []).length, (source.match(/<Button\b/g) ?? []).length, 'every Button sits in a Tooltip')
 // The lead's sheet behaviour: the default button is ringed while the sheet holds the focus, and Enter presses it
-assert.ok(source.includes('group/sheet') && /className=\{buttons\.main === 'publish' \? DEFAULT_RING/.test(source) && /className=\{buttons\.main === 'cancel' \? DEFAULT_RING/.test(source), 'Publish, or Cancel when keys are found, is ringed')
+assert.ok(source.includes('group/sheet') && /const ringed = ringedButton\(buttons\)/.test(source), 'the ring follows the buttons as the sheet shows them, waiting Publish included')
+for (const which of ['publish', 'cancel']) {
+  assert.ok(new RegExp(`className=\\{ringed === '${which}' \\? DEFAULT_RING`).test(source), `${which}: ringed only when ringedButton says so`)
+  assert.ok(new RegExp(`data-default=\\{ringed === '${which}' \\? ''`).test(source), `${which}: data-default follows the ring`)
+}
+assert.ok(!/buttons\.main === '(?:publish|cancel)' \? DEFAULT_RING/.test(source), 'never ringed by the main button alone')
 assert.ok(/event\.key === 'Enter' && event\.target === event\.currentTarget/.test(source), 'Enter on the sheet presses the default button')
 assert.ok(/\{fold && \(/.test(source), 'See the files only when there is something to see')
 assert.ok(source.includes("name=\"shield-warning\""), 'the key warning carries shield-warning')

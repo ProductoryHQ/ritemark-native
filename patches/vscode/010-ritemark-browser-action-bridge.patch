@@ -97,6 +97,11 @@
 #   chip's address at once, before the bar asks, so the last page's chip and
 #   Open the page never stand for the new one; the same page asked again (a
 #   reload, the project's folders) keeps its chip until the answer.
+#   Round 5: "Publishing…" takes its tooltip from the extension's answer while
+#   one is given (the `tooltip` field, only with kind publishing, a short line:
+#   "The new address can take a couple of minutes to open." for a new
+#   address's wait), and shows it as it changes; the action's own tooltip
+#   otherwise. Another page resets it with the chip.
 #
 # File(s): src/vs/platform/browserView/common/browserView.ts,
 #          src/vs/platform/browserView/electron-main/browserViewMainService.ts,
@@ -118,7 +123,7 @@
 #          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts,
 #          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
 # Created: 2026-05-13
-# Updated: 2026-11-06 (Sprint 149 PR 4: the Published chip, Copy link, Publishing… and Unpublishing…; round 3: no chip carried to another page); 2026-11-05 (PR 2: the page's bar, Open in your browser and Publish; round 2: no file reaches the system's opener)
+# Updated: 2026-11-06 (Sprint 149 PR 4: the Published chip, Copy link, Publishing… and Unpublishing…; round 3: no chip carried to another page; round 5: Publishing…'s tooltip from the extension); 2026-11-05 (PR 2: the page's bar, Open in your browser and Publish; round 2: no file reaches the system's opener)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
 index 31466d78914..e7d9a1af46e 100644
@@ -318,10 +323,10 @@ index 8153d309eca..b8dea314834 100644
  	async setAnnotationMode(annotate: boolean): Promise<void> {
 diff --git a/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPage.ts b/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPage.ts
 new file mode 100644
-index 00000000000..2d748a52feb
+index 00000000000..d5184a451d1
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPage.ts
-@@ -0,0 +1,174 @@
+@@ -0,0 +1,188 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -431,6 +436,20 @@ index 00000000000..2d748a52feb
 +		case 'published': return a.changed === true ? 'changed' : 'published';
 +		default: return 'unpublished';
 +	}
++}
++
++/**
++ * "Publishing…"'s tooltip from the extension's answer (Sprint 149 PR 4, round 5): while a new address is awaited the
++ * extension says why ("The new address can take a couple of minutes to open."). Only while publishing, only a short
++ * line; else undefined, and the action's own tooltip stands.
++ */
++export function ritemarkPublishingTooltip(answer: unknown): string | undefined {
++	const a = answer as { kind?: unknown; tooltip?: unknown } | undefined;
++	if (a?.kind !== 'publishing' || typeof a.tooltip !== 'string') {
++		return undefined;
++	}
++	const tooltip = a.tooltip.trim();
++	return tooltip && tooltip.length <= 200 ? tooltip : undefined;
 +}
 +
 +/** The public address in the extension's answer, only when it is a `https://…workers.dev/` page; else undefined. */
@@ -1576,10 +1595,10 @@ index 00000000000..ae9c58f7d67
 +registerAction2(BrowserSnapshotAction);
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts
 new file mode 100644
-index 00000000000..f784b1a465b
+index 00000000000..5abeeb06718
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts
-@@ -0,0 +1,440 @@
+@@ -0,0 +1,475 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1631,6 +1650,7 @@ index 00000000000..f784b1a465b
 +	ritemarkLocalPageFile,
 +	ritemarkPagePublishState,
 +	ritemarkPublishedAddress,
++	ritemarkPublishingTooltip,
 +} from '../../common/ritemarkBrowserPage.js';
 +import { BrowserActionCategory, BrowserActionGroup, BrowserEditor, BrowserEditorContribution } from '../browserEditor.js';
 +
@@ -1691,6 +1711,10 @@ index 00000000000..f784b1a465b
 +	private _project = false;
 +	private _asked = 0;
 +	private _address: string | undefined;
++	private _publishingTooltip: string | undefined;
++	private readonly _onDidChangePublishingTooltip = this._register(new Emitter<void>());
++	/** Publishing…'s tooltip changed (round 5): its button shows the new one. */
++	readonly onDidChangePublishingTooltip = this._onDidChangePublishingTooltip.event;
 +
 +	constructor(
 +		editor: BrowserEditor,
@@ -1712,6 +1736,9 @@ index 00000000000..f784b1a465b
 +	get publishedAddress(): string | undefined { return this._address; }
 +
 +	get publishState(): RitemarkPagePublishState { return this._publish.get() as RitemarkPagePublishState; }
++
++	/** The extension's word on why Publishing… lasts (a new address's wait), while it does; else undefined. */
++	get publishingTooltip(): string | undefined { return this._publishingTooltip; }
 +
 +	/** Where the chip's menu opens when the pressed button can't be found: the tab's own pane. */
 +	anchor(): HTMLElement | undefined { return this.editor.getContainer(); }
@@ -1737,7 +1764,9 @@ index 00000000000..f784b1a465b
 +
 +	override getActionViewItem(action: IAction, options: IActionViewItemOptions, instantiationService: IInstantiationService): IActionViewItem | undefined {
 +		if (WORDED_ACTIONS.has(action.id) && action instanceof MenuItemAction) {
-+			return instantiationService.createInstance(RitemarkPublishActionViewItem, action, { hoverDelegate: options.hoverDelegate });
++			const item = instantiationService.createInstance(RitemarkPublishActionViewItem, action, { hoverDelegate: options.hoverDelegate });
++			item.followPage(this);
++			return item;
 +		}
 +		return undefined;
 +	}
@@ -1765,6 +1794,14 @@ index 00000000000..f784b1a465b
 +		this._asked++;
 +		this._publish.reset();
 +		this._address = undefined;
++		this._setPublishingTooltip(undefined);
++	}
++
++	private _setPublishingTooltip(tooltip: string | undefined): void {
++		if (tooltip !== this._publishingTooltip) {
++			this._publishingTooltip = tooltip;
++			this._onDidChangePublishingTooltip.fire();
++		}
 +	}
 +
 +	/** Asks the extension where the page stands; an older answer for an address the tab has left is dropped. */
@@ -1782,6 +1819,7 @@ index 00000000000..f784b1a465b
 +		}
 +		this._publish.set(ritemarkPagePublishState(answer));
 +		this._address = ritemarkPublishedAddress(answer);
++		this._setPublishingTooltip(ritemarkPublishingTooltip(answer));
 +	}
 +}
 +
@@ -1791,6 +1829,22 @@ index 00000000000..f784b1a465b
 + * with the turning mark) draw the same way, each with its own look.
 + */
 +class RitemarkPublishActionViewItem extends MenuEntryActionViewItem {
++	private _page: RitemarkBrowserPageContribution | undefined;
++
++	/** Publishing… takes the extension's tooltip while it gives one (a new address's wait), for as long as it does. */
++	followPage(page: RitemarkBrowserPageContribution): void {
++		this._page = page;
++		if (this._commandAction.id === PUBLISHING_PAGE_ID) {
++			this._register(page.onDidChangePublishingTooltip(() => this.updateTooltip()));
++			this.updateTooltip();
++		}
++	}
++
++	protected override getTooltip(): string {
++		const tooltip = this._commandAction.id === PUBLISHING_PAGE_ID ? this._page?.publishingTooltip : undefined;
++		return tooltip ?? super.getTooltip();
++	}
++
 +	override render(container: HTMLElement): void {
 +		this.options.label = true;
 +		this.options.icon = false;
@@ -2104,10 +2158,10 @@ index 00000000000..48c83fe7f72
 +}
 diff --git a/src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPage.test.ts b/src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPage.test.ts
 new file mode 100644
-index 00000000000..f42085cc697
+index 00000000000..b6a0173b22c
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/test/common/ritemarkBrowserPage.test.ts
-@@ -0,0 +1,178 @@
+@@ -0,0 +1,196 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2135,6 +2189,7 @@ index 00000000000..f42085cc697
 +	ritemarkLocalPageFile,
 +	ritemarkPagePublishState,
 +	ritemarkPublishedAddress,
++	ritemarkPublishingTooltip,
 +} from '../../common/ritemarkBrowserPage.js';
 +
 +/** Ritemark (Sprint 149, R2): the page's bar shows Open in your browser on a local page, Publish on a project page once ready. */
@@ -2246,6 +2301,23 @@ index 00000000000..f42085cc697
 +				ritemarkPublishedAddress({}),
 +			],
 +			['https://harbour-programme-7f3a2c.pages-4821.workers.dev/', undefined, undefined, undefined, undefined, undefined],
++		);
++	});
++
++	test('PR 4 round 5: Publishing…\'s tooltip from the extension, only while publishing and only a short line', () => {
++		const line = 'The new address can take a couple of minutes to open.';
++		assert.deepStrictEqual(
++			[
++				ritemarkPublishingTooltip({ kind: 'publishing', tooltip: line }),
++				ritemarkPublishingTooltip({ kind: 'publishing', tooltip: null }),
++				ritemarkPublishingTooltip({ kind: 'publishing' }),
++				ritemarkPublishingTooltip({ kind: 'published', tooltip: line }),
++				ritemarkPublishingTooltip({ kind: 'publishing', tooltip: '   ' }),
++				ritemarkPublishingTooltip({ kind: 'publishing', tooltip: 'x'.repeat(201) }),
++				ritemarkPublishingTooltip({ kind: 'publishing', tooltip: 42 }),
++				ritemarkPublishingTooltip(undefined),
++			],
++			[line, undefined, undefined, undefined, undefined, undefined, undefined, undefined],
 +		);
 +	});
 +
@@ -2693,10 +2765,10 @@ index 00000000000..dd63f850d69
 +});
 diff --git a/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
 new file mode 100644
-index 00000000000..3b1f6098073
+index 00000000000..acf6268584d
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
-@@ -0,0 +1,170 @@
+@@ -0,0 +1,209 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2863,6 +2935,45 @@ index 00000000000..3b1f6098073
 +			asked[4].answer({ kind: 'unpublished', address: null });
 +			await settle();
 +		} finally {
++			bar.dispose();
++		}
++	});
++
++	test('round 5: Publishing…\'s tooltip is the extension\'s while a new address is awaited, and goes with the wait or the page', async () => {
++		const asked: { url: unknown; answer: (value: unknown) => void }[] = [];
++		const commandService: Partial<ICommandService> = {
++			executeCommand: <T>(_id: string, url?: unknown) => new Promise<T>(resolve => { asked.push({ url, answer: resolve as (value: unknown) => void }); }),
++		};
++		const workspace: Partial<IWorkspaceContextService> = { onDidChangeWorkspaceFolders: Event.None, getWorkspaceFolder: () => ({}) as never };
++		const editor = { onDidChangeModel: Event.None } as unknown as BrowserEditor;
++		const bar = new RitemarkBrowserPageContribution(editor, new MockContextKeyService(), workspace as IWorkspaceContextService, commandService as ICommandService);
++		let changes = 0;
++		const listener = bar.onDidChangePublishingTooltip(() => changes++);
++		try {
++			const line = 'The new address can take a couple of minutes to open.';
++			const settle = () => new Promise(resolve => setTimeout(resolve, 0));
++			const pageA = 'file:///Users/mari/Harbour/programme.html';
++			bar.prerenderInput({ url: pageA } as BrowserEditorInput);
++			asked[0].answer({ kind: 'publishing', address: null, tooltip: null });
++			await settle();
++			assert.deepStrictEqual([bar.publishState, bar.publishingTooltip, changes], ['publishing', undefined, 0], 'uploading: the action\'s own tooltip');
++			bar.prerenderInput({ url: pageA } as BrowserEditorInput);
++			asked[1].answer({ kind: 'publishing', address: 'https://programme-7f3a2c.pages-4821.workers.dev/', tooltip: line });
++			await settle();
++			assert.deepStrictEqual([bar.publishState, bar.publishingTooltip, changes], ['publishing', line, 1], 'the wait: the extension\'s line, and the button told');
++			bar.prerenderInput({ url: pageA } as BrowserEditorInput);
++			asked[2].answer({ kind: 'published', address: 'https://programme-7f3a2c.pages-4821.workers.dev/', changed: false, tooltip: null });
++			await settle();
++			assert.deepStrictEqual([bar.publishState, bar.publishingTooltip, changes], ['published', undefined, 2], 'Published: the line goes');
++			bar.prerenderInput({ url: pageA } as BrowserEditorInput);
++			asked[3].answer({ kind: 'publishing', address: null, tooltip: line });
++			await settle();
++			bar.prerenderInput({ url: 'file:///Users/mari/Harbour/agenda.html' } as BrowserEditorInput);
++			assert.strictEqual(bar.publishingTooltip, undefined, 'another page: never the last page\'s line');
++			asked[4].answer({ kind: 'unpublished', address: null });
++			await settle();
++		} finally {
++			listener.dispose();
 +			bar.dispose();
 +		}
 +	});

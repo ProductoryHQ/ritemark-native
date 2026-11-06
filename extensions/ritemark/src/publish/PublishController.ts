@@ -54,10 +54,43 @@ export const TOKEN_WORDS = {
 export const NAME_TAKEN = 'This name is taken. Try another.';
 export const SLOW_UNPUBLISH = 'Cloudflare is still taking the page down.';
 /**
- * A first publish whose new address doesn't answer yet (A4, M6: 121 s on a brand-new workers.dev name). Shown at once
- * when the workers.dev name was registered in this publish, otherwise after 10 s; it closes when the page answers.
+ * A first publish whose new address doesn't answer yet (A4, M6: 121 s on a brand-new workers.dev name), the lead's
+ * words (6 November). A brief toast that names the page, since the person may be on another tab by then; shown at once
+ * when the workers.dev name was registered in this publish, otherwise after 10 s.
  */
-export const NEW_ADDRESS_WAIT = 'Your address is new. It can take a couple of minutes before the page opens.';
+export function newAddressWait(pageTitle: string): string {
+  return `The new address for ${pageTitle} can take a couple of minutes to open.`;
+}
+/** The Publishing… chip's tooltip for the whole wait, where the page is already in view (patch 010). */
+export const NEW_ADDRESS_TIP = 'The new address can take a couple of minutes to open.';
+/** A wait that showed the line ended: a brief toast, as the bar may show another page by then. */
+export function publishedBrief(pageTitle: string): string {
+  return `${pageTitle} is published.`;
+}
+
+/**
+ * The page's title as its tab shows it: the page's own `<title>`, its spaces folded, else the file's name without
+ * `.html`. Read from the bytes that went, so it is the title of what was published.
+ */
+export function pageTitleOf(upload: { files: readonly { urlPath: string; bytes: Uint8Array }[]; pageUrlPath: string } | null, pagePath: string): string {
+  const fallback = path.basename(pagePath).replace(/\.html?$/i, '');
+  const page = upload?.files.find((f) => f.urlPath === upload.pageUrlPath);
+  if (!page) return fallback;
+  const head = Buffer.from(page.bytes.subarray(0, 65_536)).toString('utf8');
+  const match = /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i.exec(head);
+  if (!match) return fallback;
+  const text = match[1]
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => safeChar(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => safeChar(parseInt(d, 10)))
+    .replace(/&(amp|lt|gt|quot|apos|nbsp);/g, (_, n) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' } as Record<string, string>)[n])
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text || fallback;
+}
+
+function safeChar(code: number): string {
+  return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
+}
 export const OTHER_ACCOUNT = 'This page is on another Cloudflare account. Connect that account to unpublish it.';
 export const OTHER_ACCOUNT_UPDATE = 'This page is on another Cloudflare account. Connect that account to update it.';
 export const SWITCHED_OFF = 'Publishing is switched off in this version.';
@@ -115,11 +148,10 @@ export interface PublishUi {
   }): Promise<{ kind: 'cancel' } | { kind: 'publish' | 'publishAnyway'; pagePart?: string; plan: PublishPlan }>;
   /** A failure line for the page, with Try again (R7). */
   showFailure(line: string, retry: () => void): void;
-  /**
-   * A line that stays while something waits: a new address's first answer (M6), and the bar's Unpublish past 10 s.
-   * The returned function closes it.
-   */
+  /** A line that stays while something waits: the bar's Unpublish past 10 s. The returned function closes it. */
   showWaiting(line: string): () => void;
+  /** A toast that goes by itself (patch 018's brief toast): a new address's wait (M6), and its end. */
+  showBrief(line: string): void;
   /** A line whose way on is connecting (again) in Settings ▸ Sharing: the bar's Unpublish signed out or on another account. */
   showConnect(line: string): void;
 }
@@ -136,6 +168,8 @@ export interface PageBarState {
   slow: boolean;
   /** The failure line under the bar, with Try again. */
   line: string | null;
+  /** Publishing…'s tooltip while a new address is awaited (patch 010 shows it in place of its own); else null. */
+  tooltip: string | null;
 }
 
 /** A project page, as `pageCommands.publishPage` found it by real path. */
@@ -604,7 +638,7 @@ export class PublishController {
         this.pageLines.set(pagePath, PUBLISHED_NOT_NOTED);
       }
       await this.post();
-      if (!record) await this.waitForFirstAnswer(pagePath, site, input.newName === true);
+      if (!record) await this.waitForFirstAnswer(pagePath, site, input.newName === true, pageTitleOf(upload, pagePath));
       return site;
     } catch (error) {
       const line = error instanceof PublishError
@@ -618,32 +652,38 @@ export class PublishController {
     }
   }
 
-  /** "Publishing…" until a new address answers (M6), with its line; never a failure, whatever the wait's end. */
-  private async waitForFirstAnswer(pagePath: string, site: PublishedSite, newName: boolean): Promise<void> {
-    let close: (() => void) | null = null;
+  /**
+   * "Publishing…" until a new address answers (M6); never a failure, whatever the wait's end. Once the wait is known to
+   * be long, a brief toast names the page and Publishing…'s tooltip says why for the rest of the wait; when that wait
+   * ends with the page online (or at the cap, the upload having gone through), a brief toast says it is published.
+   */
+  private async waitForFirstAnswer(pagePath: string, site: PublishedSite, newName: boolean, title: string): Promise<void> {
+    let shown = false;
+    const brief = (line: string) => {
+      try { this.deps.ui.showBrief(line); } catch { /* a toast that can't show changes nothing */ }
+    };
     const showLine = () => {
-      if (close) return;
-      this.waiting.set(pagePath, NEW_ADDRESS_WAIT);
-      try {
-        close = this.deps.ui.showWaiting(NEW_ADDRESS_WAIT);
-      } catch {
-        close = () => undefined;
-      }
+      if (shown) return;
+      shown = true;
+      this.waiting.set(pagePath, NEW_ADDRESS_TIP);
+      brief(newAddressWait(title));
       this.deps.onPageState?.(pagePath);
     };
     const wait = { stopped: false };
     this.waitingSites.set(site.name, wait);
     if (newName) showLine();
+    let published = false;
     try {
       const end = await this.deps.host.waitUntilOnline(site.address, { onSlow: showLine, stop: () => wait.stopped });
       this.deps.log(`[publish] ${site.name}: ${end === 'online' ? 'the new address answers' : end === 'stopped' ? 'the wait for the new address was stopped' : 'the new address has not answered yet'}`);
+      published = end !== 'stopped';
     } catch {
       this.deps.log('[publish] the wait for the new address ended early');
     } finally {
       this.waiting.delete(pagePath);
       if (this.waitingSites.get(site.name) === wait) this.waitingSites.delete(site.name);
-      try { (close as (() => void) | null)?.(); } catch { /* a closed line stays closed */ }
     }
+    if (shown && published) brief(publishedBrief(title));
   }
 
   /** The bar's state for a page. `currentHash` is PR 3's `contentHash` of what would go now, when known. */
@@ -652,9 +692,9 @@ export class PublishController {
     const record = stored && !stored.unpublished && !this.gone.has(stored.siteName) ? stored : undefined;
     const line = this.pageLines.get(pagePath) ?? (stored ? this.siteLines.get(stored.siteName) ?? null : null);
     if (this.publishing.has(pagePath)) {
-      return { kind: 'publishing', address: record?.address ?? null, changed: false, signedOut: false, slow: false, line: this.waiting.get(pagePath) ?? null };
+      return { kind: 'publishing', address: record?.address ?? null, changed: false, signedOut: false, slow: false, line: null, tooltip: this.waiting.get(pagePath) ?? null };
     }
-    if (!record) return { kind: 'unpublished', address: null, changed: false, signedOut: false, slow: false, line };
+    if (!record) return { kind: 'unpublished', address: null, changed: false, signedOut: false, slow: false, line, tooltip: null };
     const going = this.unpublishing.get(record.siteName);
     const connected = this.deps.host.accountId();
     return {
@@ -664,6 +704,7 @@ export class PublishController {
       signedOut: connected !== record.accountId,
       slow: going?.slow ?? false,
       line: going?.slow ? SLOW_UNPUBLISH : line,
+      tooltip: null,
     };
   }
 

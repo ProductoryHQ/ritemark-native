@@ -16,7 +16,8 @@
  *
  * As a dialog (the lead, 5 November): focus moves into the sheet when it opens and the default button is ringed:
  * Publish, or Cancel when something looks like a key. Enter presses it; Esc and Cancel close the sheet. The ring
- * shows while the sheet itself holds the focus, and the focus ring takes over once Tab moves to a button.
+ * shows while the sheet itself holds the focus, and the focus ring takes over once Tab moves to a button. A waiting
+ * Publish isn't ringed (round 3): while it can't be pressed, nothing is (`ringedButton`).
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -42,6 +43,7 @@ import {
   leftOutTip,
   limitLine,
   openWords,
+  ringedButton,
   sheetButtons,
   showsFileList,
   whatGoesLine,
@@ -138,6 +140,7 @@ export function PublishSheetView({
     if (buttons.main === 'cancel') onAnswer({ type: 'publish:cancel' })
     else if (!buttons.publishDisabled) confirm()
   }
+  const ringed = ringedButton(buttons)
   const nameRefused = refusal?.reason === 'nameTaken'
   const addressRefused = refusal && refusal.reason !== 'nameTaken' ? refusalLine(refusal.reason, randomEnd) : null
   // The lead's Put it back (PR 4, round 2): while the random end is missing, a link restores the one suggested
@@ -152,8 +155,8 @@ export function PublishSheetView({
       <Button
         variant={buttons.main === 'cancel' ? 'default' : 'ghost'}
         size="sm"
-        className={buttons.main === 'cancel' ? DEFAULT_RING : undefined}
-        data-default={buttons.main === 'cancel' ? '' : undefined}
+        className={ringed === 'cancel' ? DEFAULT_RING : undefined}
+        data-default={ringed === 'cancel' ? '' : undefined}
         onClick={() => onAnswer({ type: 'publish:cancel' })}
       >
         Cancel
@@ -165,8 +168,8 @@ export function PublishSheetView({
       <Button
         variant={buttons.main === 'publish' ? 'default' : 'ghost'}
         size="sm"
-        className={buttons.main === 'publish' ? DEFAULT_RING : undefined}
-        data-default={buttons.main === 'publish' ? '' : undefined}
+        className={ringed === 'publish' ? DEFAULT_RING : undefined}
+        data-default={ringed === 'publish' ? '' : undefined}
         disabled={buttons.publishDisabled}
         onClick={confirm}
       >
