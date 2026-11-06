@@ -34,10 +34,32 @@ export class CloudflareHost implements PublishHost {
   readonly id = 'cloudflare' as const;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly now: () => number;
+  /** Set by `dispose` (the extension deactivating): the polls stop, and none starts. */
+  private disposed = false;
+  /** The default sleeps still running, each ended early (its timer cleared) by `dispose`. */
+  private readonly sleeping = new Set<() => void>();
 
   constructor(private readonly account: CloudflareAccount, private readonly options: CloudflareHostOptions = {}) {
-    this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.sleep = options.sleep ?? ((ms) => this.timerSleep(ms));
     this.now = options.now ?? Date.now;
+  }
+
+  /**
+   * The extension deactivating: a first publish's wait for its new address (up to 5 minutes) and Unpublish's check
+   * stop at once, their timers cleared, rather than polling Cloudflare from a host that is going away.
+   */
+  dispose(): void {
+    this.disposed = true;
+    for (const wake of [...this.sleeping]) wake();
+  }
+
+  private timerSleep(ms: number): Promise<void> {
+    if (this.disposed) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const wake = () => { clearTimeout(timer); this.sleeping.delete(wake); resolve(); };
+      const timer = setTimeout(wake, ms);
+      this.sleeping.add(wake);
+    });
   }
 
   snapshot(): ConnectionSnapshot {
@@ -136,6 +158,7 @@ export class CloudflareHost implements PublishHost {
     }
     // "Unpublished" only once the address has stopped answering (R7, M9)
     for (;;) {
+      if (this.disposed) throw new PublishError('still-online', COULD_NOT_REACH_UNPUBLISH);
       checkSlow();
       if (await client.addressAnswers(address) === 'gone') return;
       if (this.now() - started >= deadline) throw new PublishError('still-online', COULD_NOT_REACH_UNPUBLISH);
@@ -156,9 +179,9 @@ export class CloudflareHost implements PublishHost {
       return 'not-yet'; // signed out meanwhile: the upload went through, so it is published all the same
     }
     for (;;) {
-      if (options.stop?.()) return 'stopped';
+      if (this.disposed || options.stop?.()) return 'stopped';
       if (await client.addressAnswers(address) === 'answers') return 'online';
-      if (options.stop?.()) return 'stopped';
+      if (this.disposed || options.stop?.()) return 'stopped';
       if (!slowShown && this.now() - started >= slowAfter) { slowShown = true; options.onSlow?.(); }
       if (this.now() - started >= deadline) {
         this.options.log?.('[publish] the new address did not answer before the wait ended; shown as published');

@@ -31,6 +31,7 @@ import { SubdomainExistsError } from './cloudflare/client';
 import { recordFor, sheetNeeded, type PublishRecord, type PublishRecordStore } from './publishRecords';
 import { decodeSettingsRequest, type WebPageRow, type WebPagesSettingsProjection } from './settingsProtocol';
 import { isValidPagePart } from './sheetProtocol';
+import { plainLine, plainPart } from './plainText';
 import type { SheetConfirm, SheetConfirmReply, SheetOptions, SheetSetupResult } from './sheetModel';
 import type { GatheredPlan, PublishPlan } from './types';
 
@@ -73,7 +74,8 @@ export function publishedBrief(pageTitle: string): string {
  * `.html`. Read from the bytes that went, so it is the title of what was published.
  */
 export function pageTitleOf(upload: { files: readonly { urlPath: string; bytes: Uint8Array }[]; pageUrlPath: string } | null, pagePath: string): string {
-  const fallback = path.basename(pagePath).replace(/\.html?$/i, '');
+  // The page's and the file's words are not ours: no link syntax, one line, 80 at most (plainText.ts)
+  const fallback = plainPart(path.basename(pagePath).replace(/\.html?$/i, '')) || UNTITLED_PAGE;
   const page = upload?.files.find((f) => f.urlPath === upload.pageUrlPath);
   if (!page) return fallback;
   const head = Buffer.from(page.bytes.subarray(0, 65_536)).toString('utf8');
@@ -85,7 +87,27 @@ export function pageTitleOf(upload: { files: readonly { urlPath: string; bytes: 
     .replace(/&(amp|lt|gt|quot|apos|nbsp);/g, (_, n) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' } as Record<string, string>)[n])
     .replace(/\s+/g, ' ')
     .trim();
-  return text || fallback;
+  return plainPart(text) || fallback;
+}
+
+/** A page whose title and file name are both empty once cleaned. */
+export const UNTITLED_PAGE = 'Untitled page';
+
+/**
+ * The adapter's lines, each made plain on its way out (plainText.ts): a failure, a wait, a toast and a connect line
+ * carry a page's title, a file's name or a host's error text, and a notification would turn link syntax in them into a
+ * command link.
+ */
+export function plainUi(ui: PublishUi): PublishUi {
+  return {
+    openExternal: (url) => ui.openExternal(url),
+    askToken: (options) => ui.askToken(options),
+    showSheet: (request) => ui.showSheet(request),
+    showFailure: (line, retry) => ui.showFailure(plainLine(line), retry),
+    showWaiting: (line) => ui.showWaiting(plainLine(line)),
+    showBrief: (line) => ui.showBrief(plainLine(line)),
+    showConnect: (line) => ui.showConnect(plainLine(line)),
+  };
 }
 
 function safeChar(code: number): string {
@@ -214,8 +236,11 @@ export class PublishController {
   private readonly waitingSites = new Map<string, { stopped: boolean }>();
   private readonly now: () => number;
   private readonly readUpload: (plan: GatheredPlan) => Promise<VerifiedUpload>;
+  /** `deps.ui`, its lines made plain: the only way this controller reaches a notification. */
+  private readonly ui: PublishUi;
 
   constructor(private readonly deps: PublishControllerDeps) {
+    this.ui = plainUi(deps.ui);
     this.now = deps.now ?? Date.now;
     this.readUpload = deps.readUpload ?? ((plan) => readVerifiedUpload(plan));
   }
@@ -312,8 +337,8 @@ export class PublishController {
     this.message = null;
     await this.post();
     try {
-      void this.deps.ui.openExternal(TOKEN_TEMPLATE_URL).then(undefined, () => false);
-      await this.deps.ui.askToken({
+      void this.ui.openExternal(TOKEN_TEMPLATE_URL).then(undefined, () => false);
+      await this.ui.askToken({
         ...TOKEN_BOX,
         check: async (value) => {
           const outcome = await this.deps.host.connectWithToken(value);
@@ -374,7 +399,7 @@ export class PublishController {
   async openSite(id: string): Promise<void> {
     const record = await this.bySite(id);
     if (!record || record.unpublished || this.gone.has(id) || !/^https:\/\/[a-z0-9.-]+\.workers\.dev\//.test(record.address)) return;
-    await this.deps.ui.openExternal(record.address);
+    await this.ui.openExternal(record.address);
   }
 
   /**
@@ -396,7 +421,7 @@ export class PublishController {
       const line = connected ? OTHER_ACCOUNT : CONNECT_AGAIN;
       this.siteLines.set(id, line);
       await this.post();
-      if (fromBar) this.deps.ui.showConnect(line);
+      if (fromBar) this.ui.showConnect(line);
       return;
     }
     let closeSlow: (() => void) | null = null;
@@ -416,7 +441,7 @@ export class PublishController {
             this.deps.onPageState?.(record.pagePath);
             if (fromBar && !closeSlow) {
               try {
-                closeSlow = this.deps.ui.showWaiting(SLOW_UNPUBLISH);
+                closeSlow = this.ui.showWaiting(SLOW_UNPUBLISH);
               } catch {
                 closeSlow = () => undefined;
               }
@@ -449,7 +474,7 @@ export class PublishController {
       this.deps.onPageState?.(record.pagePath);
     }
     // After the state is back, so Try again starts afresh
-    if (fromBar && failure) this.deps.ui.showFailure(failure, () => { void this.unpublishSite(id, { fromBar: true }); });
+    if (fromBar && failure) this.ui.showFailure(failure, () => { void this.unpublishSite(id, { fromBar: true }); });
   }
 
   // ------------------------------------------------------------------ the bar's Publish (R5, R7)
@@ -486,7 +511,7 @@ export class PublishController {
       }
       if (!chosen) {
         let current = prepared;
-        const answer = await this.deps.ui.showSheet({
+        const answer = await this.ui.showSheet({
           plan: current?.plan ?? null,
           options: current?.options ?? {},
           setup: current ? undefined : {
@@ -524,7 +549,7 @@ export class PublishController {
   private fail(pagePath: string, line: string, page: ProjectPage): void {
     this.pageLines.set(pagePath, line);
     this.deps.onPageState?.(pagePath);
-    this.deps.ui.showFailure(line, () => { void this.publishFromBar(page); });
+    this.ui.showFailure(line, () => { void this.publishFromBar(page); });
   }
 
   /** The account's name read again, the gather and scan, and the sheet's rows (R5, answer 5). */
@@ -660,7 +685,7 @@ export class PublishController {
   private async waitForFirstAnswer(pagePath: string, site: PublishedSite, newName: boolean, title: string): Promise<void> {
     let shown = false;
     const brief = (line: string) => {
-      try { this.deps.ui.showBrief(line); } catch { /* a toast that can't show changes nothing */ }
+      try { this.ui.showBrief(line); } catch { /* a toast that can't show changes nothing */ }
     };
     const showLine = () => {
       if (shown) return;

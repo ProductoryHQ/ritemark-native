@@ -21,7 +21,8 @@ import { CloudflareHost } from './cloudflare/CloudflareHost';
 import { openExternalStubbed } from './devSheetHarness';
 import { gatherPage } from './gather';
 import { PublishRecordStore } from './publishRecords';
-import { PublishController, sheetHostAvailable, type PageBarState, type PublishUi } from './PublishController';
+import { PublishController, sheetHostAvailable, UNTITLED_PAGE, type PageBarState, type PublishUi } from './PublishController';
+import { plainLine, plainPart } from './plainText';
 import { showPublishSheet } from './PublishSheetPanel';
 import type { WebPagesSettingsProjection } from './settingsProtocol';
 import { showBriefToast } from '../feedback/feedbackSheet';
@@ -126,20 +127,20 @@ export function createPublishFeature(
         return answer;
       },
       showFailure: (line, retry) => {
-        void vscode.window.showWarningMessage(line, 'Try again').then((pick) => { if (pick === 'Try again') retry(); });
+        void vscode.window.showWarningMessage(plainLine(line), 'Try again').then((pick) => { if (pick === 'Try again') retry(); });
       },
       // The bar's Unpublish past 10 s: a line that stays while Cloudflare takes the page down, closed when it is down
       showWaiting: (line) => {
         let done: () => void = () => undefined;
         const finished = new Promise<void>((resolve) => { done = resolve; });
-        void vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: line, cancellable: false }, () => finished);
+        void vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: plainLine(line), cancellable: false }, () => finished);
         return done;
       },
       // M6's wait and its end: patch 018's brief toast, which goes by itself (an ordinary message in a shell without it)
-      showBrief: (line) => { void showBriefToast(line); },
+      showBrief: (line) => { void showBriefToast(plainLine(line)); },
       // The bar's Unpublish signed out or on another account: Settings ▸ Sharing ▸ Web pages is where Cloudflare is connected
       showConnect: (line) => {
-        void vscode.window.showWarningMessage(line, OPEN_SETTINGS).then((pick) => {
+        void vscode.window.showWarningMessage(plainLine(line), OPEN_SETTINGS).then((pick) => {
           if (pick === OPEN_SETTINGS) void vscode.commands.executeCommand('ritemark.aiSettings', 'web-pages');
         });
       },
@@ -157,6 +158,8 @@ export function createPublishFeature(
 
   context.subscriptions.push(
     { dispose: () => setPublishHandler(null) },
+    // A first publish's wait for its new address, and Unpublish's check, stop with the extension
+    { dispose: () => host.dispose() },
     // Another window connected or disconnected: read the entry again, then redraw Settings and the bars (Codex's
     // review of #668). Only the event's name is read here.
     context.secrets.onDidChange((event) => {
@@ -168,7 +171,7 @@ export function createPublishFeature(
       const record = await controller.recordFor(pagePath);
       if (!record) return;
       const answer = await vscode.window.showWarningMessage(
-        `Unpublish ${path.basename(record.pagePath).replace(/\.html?$/i, '')}?`,
+        `Unpublish ${plainPart(path.basename(record.pagePath).replace(/\.html?$/i, '')) || UNTITLED_PAGE}?`,
         { modal: true, detail: 'The link stops working for everyone who has it. The file stays in this project.' },
         'Unpublish',
       );

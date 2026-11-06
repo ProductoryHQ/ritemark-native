@@ -24,6 +24,7 @@ import {
   NEW_ADDRESS_TIP,
   newAddressWait,
   pageTitleOf,
+  plainUi,
   publishedBrief,
   OTHER_ACCOUNT,
   PublishController,
@@ -41,7 +42,9 @@ import { PublishRecordStore, RECORDS_FILE, RECORDS_FOLDER } from './publishRecor
 import { decodeSettingsRequest, offersSetUp, showsWebPagesCard, type WebPagesSettingsProjection } from './settingsProtocol';
 import type { SheetConfirm, SheetConfirmReply, SheetOptions } from './sheetModel';
 import type { GatheredPlan, PublishPlan } from './types';
-import { PublishError } from './host';
+import { FILE_CHANGED, PublishError } from './host';
+import { buildManifest } from './cloudflare/assets';
+import { hasLinkSyntax, PART_MAX } from './plainText';
 
 const TOKEN = `t${'0123456789abcdef'.repeat(2)}Xy_${Date.now().toString(36)}`;
 const WEAK = `w${'fedcba9876543210'.repeat(2)}Zq_${Date.now().toString(36)}`;
@@ -791,6 +794,108 @@ test('the toast names the page by its own title as its tab shows it, else by the
     assert.deepEqual(t.briefs, ['The new address for Harbour programme 2027 can take a couple of minutes to open.', 'Harbour programme 2027 is published.']);
     assert.equal(NEW_ADDRESS_TIP, 'The new address can take a couple of minutes to open.');
   } finally { await t.cleanup(); }
+});
+
+// ---------------------------------------------------------------- title injection (the security review of #668)
+
+/** A command link, as VS Code's notifications would draw it and run it with `allowCommands: true`. */
+const COMMAND_LINK = '[Open details](command:workbench.action.terminal.sendSequence?%7B%7D)';
+const COMMAND_LINK_PLAIN = 'Open details command:workbench.action.terminal.sendSequence?%7B%7D';
+
+/** Every line that went to a notification: failures, toasts, connect lines and waits. */
+function everyNotice(t: T): string[] {
+  return [...t.failures, ...t.briefs, ...t.connects, ...t.waits.map((w) => w.line)];
+}
+
+test('title injection: a page\'s <title> with a command link reaches the toast as plain words, no link syntax', async () => {
+  const file = (html: string) => ({ files: [{ urlPath: '/a.html', bytes: new TextEncoder().encode(html) }], pageUrlPath: '/a.html' });
+  assert.equal(pageTitleOf(file(`<title>${COMMAND_LINK}</title>`), '/p/x.html'), COMMAND_LINK_PLAIN);
+  assert.equal(pageTitleOf(file('<title>&#91;Open&#93;&#40;command:x&#41; `code`</title>'), '/p/x.html'), 'Open command:x code', 'entities decoded first, then made plain');
+  assert.equal(pageTitleOf(file('<title>Harbour\u202e\u0000 programme</title>'), '/p/x.html'), 'Harbour programme', 'no control or bidi characters');
+  const long = pageTitleOf(file(`<title>${'Harbour programme '.repeat(10)}</title>`), '/p/x.html');
+  assert.ok(Array.from(long).length <= PART_MAX && long.endsWith('…'), `capped at ${PART_MAX}: ${long}`);
+  assert.equal(pageTitleOf(file('<title>[]()``</title>'), '/p/Clean page.html'), 'Clean page', 'nothing left: the file\'s name');
+  assert.equal(pageTitleOf(file('<title>()</title>'), '/p/[].html'), 'Untitled page', 'neither: a plain name');
+  const t = await setup({ pasted: [TOKEN], files: { ...HARBOUR, 'Harbour programme.html': `<title>${COMMAND_LINK}</title><h1>Harbour</h1>` } });
+  try {
+    t.fake.subdomain = null; // a new name: the wait's toast at once
+    t.fake.answerAfterChecks = 1_000_000;
+    await publishedOnce(t);
+    assert.deepEqual(t.briefs, [newAddressWait(COMMAND_LINK_PLAIN), publishedBrief(COMMAND_LINK_PLAIN)]);
+    for (const line of everyNotice(t)) assert.equal(hasLinkSyntax(line), false, `no link syntax: ${line}`);
+  } finally { await t.cleanup(); }
+});
+
+test('title injection: a file\'s name with a command link reaches the toast and the failure line as plain words', async () => {
+  const name = `${COMMAND_LINK}.html`;
+  const t = await setup({ pasted: [TOKEN], files: { [name]: '<h1>Harbour</h1><img src="img/a.png">', 'img/a.png': HARBOUR['img/a.png'] } });
+  try {
+    t.fake.answerAfterChecks = 1_000_000; // no <title>: the toasts name the page by its file
+    await publishedOnce(t);
+    assert.deepEqual(t.briefs, [newAddressWait(COMMAND_LINK_PLAIN), publishedBrief(COMMAND_LINK_PLAIN)]);
+    await t.controller.unpublishSite((await t.records.get(t.page.realPath))!.siteName);
+    // The page changed between the sheet and the upload: the failure names it by its file
+    t.ui.showSheet = (async (req: SheetRequest) => {
+      const result = await driveSheet(t.sheets)(req);
+      await t.project.write(name, '<h1>Changed</h1>');
+      return result;
+    }) as PublishUi['showSheet'];
+    await t.controller.publishFromBar(t.page);
+    assert.equal(t.failures.length, 1);
+    assert.equal(t.failures[0], `${COMMAND_LINK_PLAIN} .html changed after Ritemark checked it. Nothing was sent. Press Publish again to see what goes.`);
+    for (const line of everyNotice(t)) assert.equal(hasLinkSyntax(line), false, `no link syntax: ${line}`);
+  } finally { await t.cleanup(); }
+});
+
+test('title injection: a server\'s error text with a command link never reaches a notification as a link', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    // Cloudflare's own error text (a hostile or compromised answer) goes to the log only, never to the person
+    t.fake.failures.push({ path: /assets-upload-session$/, status: 500, message: COMMAND_LINK, times: 10 });
+    await t.controller.startTokenEntry();
+    await t.controller.publishFromBar(t.page);
+    assert.equal(t.failures.length, 1, 'the failure line');
+    assert.equal(hasLinkSyntax(t.failures[0]), false, t.failures[0]);
+    t.fake.failures.length = 0;
+    // A host whose error carries a server's text through (any host, now or later): made plain on its way out
+    t.host.publish = async () => { throw new PublishError('failed', `Cloudflare said: ${COMMAND_LINK}`); };
+    t.failures.length = 0;
+    await t.controller.publishFromBar(t.page);
+    assert.deepEqual(t.failures, [`Cloudflare said: ${COMMAND_LINK_PLAIN}`]);
+    // And the bar's Unpublish: its failure and connect lines go the same way
+    t.host.publish = CloudflareHost.prototype.publish.bind(t.host);
+    const record = await publishedOnce(t);
+    t.host.unpublish = async () => { throw new PublishError('failed', COMMAND_LINK); };
+    t.failures.length = 0;
+    await t.controller.unpublishPage(record.pagePath);
+    assert.deepEqual(t.failures, [COMMAND_LINK_PLAIN]);
+    for (const line of everyNotice(t)) assert.equal(hasLinkSyntax(line), false, `no link syntax: ${line}`);
+  } finally { await t.cleanup(); }
+});
+
+test('title injection: every way to a notification makes its line plain, and every line naming a file names it plainly', async () => {
+  const said: string[] = [];
+  const raw: PublishUi = {
+    openExternal: async () => true,
+    askToken: async () => undefined,
+    showSheet: async () => ({ kind: 'cancel' }),
+    showFailure: (line) => { said.push(line); },
+    showWaiting: (line) => { said.push(line); return () => undefined; },
+    showBrief: (line) => { said.push(line); },
+    showConnect: (line) => { said.push(line); },
+  };
+  const ui = plainUi(raw);
+  ui.showFailure(COMMAND_LINK, () => undefined);
+  ui.showWaiting(COMMAND_LINK)();
+  ui.showBrief(COMMAND_LINK);
+  ui.showConnect(COMMAND_LINK);
+  assert.deepEqual(said, [COMMAND_LINK_PLAIN, COMMAND_LINK_PLAIN, COMMAND_LINK_PLAIN, COMMAND_LINK_PLAIN], 'failure, wait, toast and connect');
+  assert.equal(hasLinkSyntax(FILE_CHANGED(`${COMMAND_LINK}.png`)), false, 'a changed file');
+  assert.throws(
+    () => buildManifest([{ urlPath: `/${COMMAND_LINK}.png`, bytes: new Uint8Array(26 * 1024 * 1024) }]),
+    (e: unknown) => e instanceof PublishError && e.code === 'too-big' && !hasLinkSyntax(e.message),
+    'a file too big',
+  );
 });
 
 // ---------------------------------------------------------------- Codex's review of #668

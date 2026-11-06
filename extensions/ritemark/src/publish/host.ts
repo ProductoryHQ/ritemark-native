@@ -16,6 +16,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { contentHashOf, isGatheredPlan } from './gather';
 import { MAX_FILE_BYTES, MAX_FILES, type GatheredPlan } from './types';
+import { plainPart } from './plainText';
 
 /** One file that goes up, at the path it is served from (`/index.html`, `/img/a.png`), with its checked bytes. */
 export interface UploadFile {
@@ -131,7 +132,7 @@ export function pageUrlPathOf(relPath: string): string {
 }
 
 export const FILE_CHANGED = (name: string) =>
-  `${name} changed after Ritemark checked it. Nothing was sent. Press Publish again to see what goes.`;
+  `${plainPart(name)} changed after Ritemark checked it. Nothing was sent. Press Publish again to see what goes.`;
 
 export interface ReadFileDeps {
   stat?: (p: string) => Promise<{ size: number }>;
@@ -150,7 +151,7 @@ export async function readVerifiedUpload(plan: GatheredPlan, deps: ReadFileDeps 
     throw new PublishError('too-many', `This page uses ${plan.files.length} files. Cloudflare's free plan takes ${MAX_FILES}.`);
   }
   if (plan.tooBig.length > 0) {
-    throw new PublishError('too-big', `${path.posix.basename(plan.tooBig[0].projectPath)} is larger than 25 MB, too big to publish.`);
+    throw new PublishError('too-big', `${plainPart(path.posix.basename(plan.tooBig[0].projectPath))} is larger than 25 MB, too big to publish.`);
   }
   if (plan.files.length === 0) throw new PublishError('failed', 'There is nothing to publish.');
   if (contentHashOf(plan.files) !== plan.contentHash) throw new PublishError('failed', 'Ritemark could not check what goes. Press Publish again.');
@@ -160,7 +161,7 @@ export async function readVerifiedUpload(plan: GatheredPlan, deps: ReadFileDeps 
   const files: UploadFile[] = [];
   for (const file of plan.files) {
     const name = path.posix.basename(file.projectPath);
-    if (!file.sha256) throw new PublishError('too-big', `${name} is larger than 25 MB, too big to publish.`);
+    if (!file.sha256) throw new PublishError('too-big', `${plainPart(name)} is larger than 25 MB, too big to publish.`);
     let bytes: Uint8Array;
     try {
       // The size first, so a file that grew past the limit is never read whole

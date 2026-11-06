@@ -8,6 +8,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { UploadFile } from '../host';
 import { PublishError } from '../host';
 import { NAME_PATTERN } from '../sheetProtocol';
+import { plainPart } from '../plainText';
 import { MAX_FILE_BYTES, MAX_FILES } from '../types';
 
 /** A Worker's name, and a workers.dev name: lowercase letters, digits and dashes, 1–63, no dash at either end. */
@@ -65,7 +66,7 @@ export function buildManifest(assets: readonly UploadFile[]): { manifest: Record
     }
     if (asset.bytes.byteLength > MAX_FILE_BYTES) {
       const name = asset.urlPath.slice(asset.urlPath.lastIndexOf('/') + 1);
-      throw new PublishError('too-big', `${name} is larger than 25 MB, too big to publish.`);
+      throw new PublishError('too-big', `${plainPart(name)} is larger than 25 MB, too big to publish.`);
     }
     const hash = assetHash(asset.bytes, asset.urlPath);
     manifest[asset.urlPath] = { hash, size: asset.bytes.byteLength };

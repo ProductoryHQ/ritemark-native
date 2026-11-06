@@ -340,6 +340,31 @@ test('a new address that answers at once: no slow line; the wait\'s cap is "not 
   } finally { await fake.stop(); }
 });
 
+test('dispose: a first publish\'s wait and Unpublish\'s check stop at once, their timers cleared, and none starts after', async () => {
+  // The real timers (no `sleep` option), a minute between checks: only dispose can end these waits within the test
+  let checks = 0;
+  const silentAccount = {
+    accountId: () => ACCOUNT,
+    client: () => ({ addressAnswers: async () => { checks++; return 'unknown' as const; }, deleteScript: async () => undefined }),
+  } as unknown as CloudflareAccount;
+  const host = new CloudflareHost(silentAccount, { pollMs: 60_000, slowAfterMs: 60_000, unpublishDeadlineMs: 600_000 });
+  const within = <V>(p: Promise<V>, ms: number) => Promise.race([
+    p,
+    new Promise<never>((_, reject) => { setTimeout(() => reject(new Error(`still polling after ${ms} ms`)), ms).unref(); }),
+  ]);
+  const waiting = host.waitUntilOnline('https://harbour-programme-7f3a2c.pages-4821.workers.dev/');
+  const unpublishing = host.unpublish('appendix-111111', 'https://appendix-111111.pages-4821.workers.dev/').then(() => 'down', (e: unknown) => e);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(checks, 2, 'each asked once, then sleeps a minute');
+  host.dispose();
+  assert.equal(await within(waiting, 1_000), 'stopped', 'the first publish\'s wait ends: never "online", never a failure');
+  const ended = await within(unpublishing, 1_000);
+  assert.ok(ended instanceof PublishError && ended.message === COULD_NOT_REACH_UNPUBLISH, 'Unpublish\'s check ends: never "unpublished" unseen');
+  assert.equal(checks, 2, 'no check after dispose');
+  assert.equal(await within(host.waitUntilOnline('https://x-111111.pages-4821.workers.dev/'), 1_000), 'stopped', 'and none starts after');
+  assert.equal(checks, 2);
+});
+
 test('S21: across a connect, a publish, an update, a failure and an unpublish, the token is only ever in the API\'s Authorization header', async () => {
   const log: string[] = [];
   const { fake, account, host } = await setup({ log });

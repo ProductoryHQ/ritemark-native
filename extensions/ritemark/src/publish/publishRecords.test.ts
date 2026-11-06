@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { execFile } from 'node:child_process';
-import { changedSincePublish, type PublishRecord, PublishRecordStore, recordFor, RECORDS_FILE, RECORDS_FOLDER, sheetNeeded } from './publishRecords';
+import { changedSincePublish, LOCK_STALE_MS, LOCK_WAIT_MS, type PublishRecord, PublishRecordStore, recordFor, RECORDS_FILE, RECORDS_FOLDER, sheetNeeded } from './publishRecords';
 import { isSheetWebviewMessage } from './sheetProtocol';
 import { sheetModelOf } from './sheetModel';
 import type { PublishPlan } from './types';
@@ -119,6 +119,33 @@ async function crossHostWrites(record: PublishRecord): Promise<void> {
   }
 }
 
+/**
+ * The security review of #668 (minor): a dead host's lock that is not yet stale when a `put` starts must still be
+ * taken over within the wait, never a failed `put` after a publish that went through. The wait outlasts the staleness.
+ */
+async function deadHostLockMidWait(record: PublishRecord): Promise<void> {
+  assert.ok(LOCK_WAIT_MS > LOCK_STALE_MS, `the wait (${LOCK_WAIT_MS} ms) outlasts the staleness (${LOCK_STALE_MS} ms)`);
+  const shared = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-records-deadlock-'));
+  try {
+    const store = new PublishRecordStore(shared, 'darwin');
+    await store.list(); // the folder
+    fs.mkdirSync(path.join(shared, RECORDS_FOLDER), { recursive: true });
+    const lock = path.join(shared, RECORDS_FOLDER, `${RECORDS_FILE}.lock`);
+    // Left by a host that died 4 s ago: stale only 6 s into this put (longer than the old 5 s wait)
+    fs.writeFileSync(lock, 'dead host');
+    const left = new Date(Date.now() - (LOCK_STALE_MS - 6_000));
+    fs.utimesSync(lock, left, left);
+    const started = Date.now();
+    await store.put({ ...record, pagePath: '/p/after-a-dead-host.html' });
+    assert.ok(Date.now() - started >= 5_000, 'it waited for the lock to go stale');
+    assert.ok(await store.get('/p/after-a-dead-host.html'), 'the record is written: the dead host\'s lock was taken over');
+    assert.equal(fs.existsSync(lock), false, 'and no lock is left');
+    console.log('publishRecords.test: a dead host\'s lock that goes stale during the wait passed');
+  } finally {
+    fs.rmSync(shared, { recursive: true, force: true });
+  }
+}
+
 async function main(): Promise<void> {
   const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-records-'));
   try {
@@ -142,6 +169,7 @@ async function main(): Promise<void> {
     assert.equal((await store.list()).length, 3);
 
     await crossHostWrites(record);
+    await deadHostLockMidWait(record);
 
     // Windows keys ignore case
     const win = new PublishRecordStore(fs.mkdtempSync(path.join(os.tmpdir(), 'publish-records-win-')), 'win32');

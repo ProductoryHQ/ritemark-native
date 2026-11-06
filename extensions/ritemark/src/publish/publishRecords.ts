@@ -63,8 +63,12 @@ function isRecord(value: unknown): value is PublishRecord {
   );
 }
 
-/** How long a host waits for another host's lock before giving up, and when a lock counts as left by a dead host. */
-export const LOCK_WAIT_MS = 5_000;
+/**
+ * How long a host waits for another host's lock before giving up, and when a lock counts as left by a dead host. The
+ * wait is longer than the staleness, so a lock a dead host has just left is always taken over within the wait, never
+ * a failed `put` after a publish that went through (the security review of #668).
+ */
+export const LOCK_WAIT_MS = 15_000;
 export const LOCK_STALE_MS = 10_000;
 
 export class PublishRecordStore {
