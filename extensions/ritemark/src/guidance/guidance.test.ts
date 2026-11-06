@@ -57,7 +57,7 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
     icon: 'folder-simple',
     heading: 'Nothing in this folder was moved or changed',
     body: 'Claude works only inside it. 144 files: 61 Word documents, 38 PDFs, 22 spreadsheets, 9 text documents and 14 others.',
-    button: 'Ask Claude what is here',
+    button: 'Ask Claude what it can do here',
     note: 'Reads the names first.',
     hide: 'Hide this in Training work',
     busy: null,
@@ -84,7 +84,7 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
     hide: 'Hide this in Leadership programme',
     busy: { button: 'Giving it to OpenCode…', note: 'It shows in Doing in a moment.' },
   });
-  assert.equal(READY_REQUEST_TEXT.files, 'What is here? Look at the names first, read only the five newest documents, and end with two things you could do next.', 'frame 2 redrawn');
+  assert.equal(READY_REQUEST_TEXT.files, 'What can you do here? Look at the names first, read only the five newest documents, say in a paragraph what is here, and end with two things you could do next.', 'frame 2 redrawn, then led by what the AI can do (6 November)');
   // Frame 3 redrawn: the person's sentence after "This project is for ", then the card's promise on the next line
   assert.equal(READY_REQUEST_TEXT.empty, 'This project is for \nThen write About this project from it, and a first outline as a document.');
   assert.equal(READY_REQUEST_CURSOR_EMPTY, 'This project is for '.length);
