@@ -1,10 +1,22 @@
-<!-- Draft for the 2.2.0 candidate, written with the `release-notes` skill. Sources: docs/CHANGELOG.md (2.2.0) and sprint-145-loose-ends/notes/release-notes-draft.md. The last section ships in parts, by Sprint 149's PRs: see the markers in it. Only if PR 4 (Publish) merges does the headline become "You can now share your ideas as a web page. Make it yourself or with AI." and that section move to the top. -->
+<!-- Written with the `release-notes` skill. Sources: docs/CHANGELOG.md (2.2.0), sprint-145-loose-ends/notes/release-notes-draft.md, and Sprint 149's merged PRs (#654, #670, #669, #672, #668) with A4's measurements. -->
 
 # Ritemark 2.2.0
 
-You can now search your whole project from Documents.
+You can now share your ideas as a web page. Make it yourself or with AI.
 
-Type a few words, and Ritemark finds them in your documents, chats and tasks. 2.2 also brings a simpler Settings, and your words stay when an AI saves the same document.
+Publish a page from your project, and anyone with the link can open it. 2.2 also searches your whole project, brings a simpler Settings and keeps your words when an AI saves.
+
+## Share your ideas as a web page
+
+- **Open a web page on the desk.** Any web page file in your project opens as the page, not as code.
+- **Open it in your own browser.** **Open in your browser**, on the page's bar, shows the page in Safari, Chrome or whichever browser you use.
+- **Put it online.** **Publish** puts the page online in your own Cloudflare account. A free account is enough. Anyone with the link can open it.
+- **Connect once.** The first time, **Set up** opens Cloudflare's page. You copy one code from there into Ritemark.
+- **See exactly what goes.** Before anything leaves your computer, Ritemark lists the page and the files it uses. Nothing else from the project goes.
+- **Ritemark warns you about keys and passwords.** If a file looks like it holds one, Publish waits until you choose **Publish anyway**.
+- **A new address takes a moment.** Your first page on a new address can take a couple of minutes to open. Ritemark tells you while you wait.
+- **Share, change, take it down.** Use **Copy link**, **Update the page** after a change, or **Unpublish** to remove it.
+- **Kept out of search engines, not secret.** Search engines are asked not to list the page. Anyone who has the link can still open it.
 
 ## Find anything in your project
 
@@ -39,6 +51,7 @@ Type a few words, and Ritemark finds them in your documents, chats and tasks. 2.
 - **Right-click menus are shorter.** Items that sent your text to Copilot instead of Ritemark's AI are gone.
 - **No sparkle beside selected text in the text editor.** ⌘I (Ctrl+I) still opens Copilot's Inline Chat where Copilot is set up.
 - **Comments stand out from search.** Words you find in a document are marked in grey now. Amber always means a comment.
+- **Mistakes in a box show in red.** When a box can't take what you typed, its edge turns red, not amber.
 - **Your saved keys stay out of the Settings page.** Settings shows that a key is saved, not the key. Press the eye to see it.
 - **Transcribe tells you when the microphone is silent.** It names the microphone and says when it hears nothing.
 - **A Flow step without its key says which key it needs.** One click opens that key in Settings.
@@ -73,21 +86,3 @@ Type a few words, and Ritemark finds them in your documents, chats and tasks. 2.
 - **If your project is in OneDrive on Windows, search finds its files by name only.**
 - **Files kept only online are found by name.** Search doesn't download them.
 - **Windows may warn about the new installer** until Microsoft knows it better. Installing from the Microsoft Store avoids this. [Read more](https://github.com/ProductoryHQ/ritemark-native/blob/main/docs/user/windows-smart-app-control.md).
-
-<!-- MANAGER, Sprint 149: this section ships in parts. Each part below has its own marker.
-     PR 2 merged (the page's bar)  -> keep the section, its heading and the two "Open" lines.
-     PR 2 not merged               -> delete the whole section, this comment to the end of the file.
-     PR 4 not merged (Publish)     -> delete the Publish block (between its two markers) and rename the heading to "## Open web pages on the desk". The headline stays on search.
-     PR 4 merged                   -> keep everything, move this section to the top, and make the headline "You can now share your ideas as a web page. Make it yourself or with AI." -->
-
-## Share your ideas as a web page
-
-- **Open a web page on the desk.** Any web page file in your project opens as the page, not as code.
-- **Open it in your own browser.** **Open in your browser**, on the page's bar, shows the page in Safari, Chrome or whichever browser you use.
-<!-- 149 PR 4 (Publish) START: delete from here to "PR 4 END" if PR 4 has not merged -->
-- **Publish it with one press.** **Publish** puts the page online in your own Cloudflare account. Anyone with the link can open it.
-- **See exactly what goes.** Before anything leaves your computer, Ritemark lists the page and the files it uses. Nothing else from the project goes.
-- **Ritemark warns you about keys and passwords.** If a file looks like it holds one, Publish waits until you choose **Publish anyway**.
-- **Share, change, take it down.** Use **Copy link**, **Update the page** after a change, or **Unpublish** to remove it.
-- **Kept out of search engines.** Search engines are asked not to list it.
-<!-- 149 PR 4 (Publish) END -->
