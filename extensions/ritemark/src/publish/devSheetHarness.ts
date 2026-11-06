@@ -11,6 +11,11 @@
  * rows show a labelled stand-in, since the account arrives in PR 4. Whatever is answered, nothing is sent: the answer
  * goes to the log (never a value), and the next page's sheet opens.
  *
+ * PR 4: with `RITEMARK_PUBLISH_SHEET_HARNESS_FIRST=1` too, each page goes the first Publish's way instead: frame 2
+ * (Set up, here a stand-in that connects nothing and opens no box), then the sheet with the workers.dev name row
+ * ("pages-4821") and frame 3's address field. The first press with the suggested name is answered "This name is
+ * taken. Try another.", as Cloudflare would answer a taken one, so the line can be seen; nothing is sent.
+ *
  * With `RITEMARK_PUBLISH_SHEET_HARNESS_TRIGGER` also naming a file (PR 5), the pages are shown each time that file
  * changes, not at the start, so a test run can first put the focus where it wants it back.
  */
@@ -24,7 +29,18 @@ import { gatherPage } from './gather';
 import { showPublishSheet } from './PublishSheetPanel';
 
 export const HARNESS_SETTING = 'RITEMARK_PUBLISH_SHEET_HARNESS';
+export const HARNESS_FIRST_SETTING = 'RITEMARK_PUBLISH_SHEET_HARNESS_FIRST';
 export const HARNESS_TRIGGER_SETTING = 'RITEMARK_PUBLISH_SHEET_HARNESS_TRIGGER';
+
+/**
+ * A test run's stand-in for the system browser (merge with PR 5): with `RITEMARK_PUBLISH_STUB_OPEN_EXTERNAL=1` in a
+ * development build, what Publish would open outside (Cloudflare's token page, a published address) is logged, never
+ * opened, so a run on Jarmo's computer opens nothing on his screen. Pure, tested: never in an installed Ritemark.
+ */
+export const STUB_OPEN_EXTERNAL_SETTING = 'RITEMARK_PUBLISH_STUB_OPEN_EXTERNAL';
+export function openExternalStubbed(env: Record<string, string | undefined>): boolean {
+  return env.VSCODE_DEV === '1' && env[STUB_OPEN_EXTERNAL_SETTING] === '1';
+}
 
 /** The pages a launch asked for (pure, tested): none outside a development build. */
 export function harnessPages(env: Record<string, string | undefined>, delimiter: string = path.delimiter): string[] {
@@ -57,10 +73,26 @@ export function openPublishSheetHarnessIfAsked(
           const plan = await gatherPage(location.realPath, location.projectFolder);
           const title = path.basename(location.realPath).replace(/\.html?$/i, '');
           const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'page';
-          const answer = await showPublishSheet(context, plan, {
-            destination: { name: 'Your Cloudflare', detail: 'Test account (preview: nothing is sent)' },
-            address: { page: `${slug}-7f3a2c`, suffix: '.pages-4821.workers.dev' },
-          });
+          const destination = { name: 'Your Cloudflare', detail: 'Test account (preview: nothing is sent)' };
+          let presses = 0;
+          const answer = env[HARNESS_FIRST_SETTING] === '1'
+            ? await showPublishSheet(context, null, {
+                setup: {
+                  title,
+                  run: async () => ({
+                    plan,
+                    options: {
+                      destination,
+                      address: { page: `${slug}-7f3a2c`, suffix: '.pages-4821.workers.dev', editable: true },
+                      nameRow: { suggestion: 'pages-4821' },
+                    },
+                  }),
+                },
+                onConfirm: async (confirm) => (presses++ === 0 && confirm.subdomain === 'pages-4821'
+                  ? { kind: 'refuse', reason: 'nameTaken' }
+                  : { kind: 'close' }),
+              })
+            : await showPublishSheet(context, plan, { destination, address: { page: `${slug}-7f3a2c`, suffix: '.pages-4821.workers.dev' } });
           console.log(
             `[publish-harness] ${path.basename(page)}: ${plan.files.length} file(s), ${plan.leftOut.length} left out, ` +
               `${plan.keyHits.length} key-shaped place(s); answered ${answer.kind}; nothing sent`,

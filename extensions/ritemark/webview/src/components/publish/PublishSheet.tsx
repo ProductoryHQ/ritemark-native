@@ -9,18 +9,27 @@
  * It shows only what the host sent: names, folders, reasons, line numbers. It holds no value, path or token, and it
  * answers with `publish:cancel`, `publish:confirm` or `publish:openHit` (an index into the host's own list).
  *
+ * PR 4 adds frame 2 (`SetupSheetView`: Set up, the token path, before the first publish), the workers.dev name row
+ * (only while the account has none) and frame 3's address field, whose page part is made web-safe as typed and keeps
+ * its random end. Publish waits while either isn't ready, and while the host checks the press; a host refusal
+ * ("This name is taken. Try another.") shows under its field until that field is edited.
+ *
  * As a dialog (the lead, 5 November): focus moves into the sheet when it opens and the default button is ringed:
  * Publish, or Cancel when something looks like a key. Enter presses it; Esc and Cancel close the sheet. The ring
- * shows while the sheet itself holds the focus, and the focus ring takes over once Tab moves to a button.
+ * shows while the sheet itself holds the focus, and the focus ring takes over once Tab moves to a button. A waiting
+ * Publish isn't ringed (round 3): while it can't be pressed, nothing is (`ringedButton`).
  */
 
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '../ui/dialog'
 import { Icon } from '../ui/Icon'
+import { Input } from '../ui/input'
 import { Tooltip } from '../ui/tooltip'
 import { vscode } from '../../lib/vscode'
-import type { PublishSheetHostMessage, PublishSheetModel, PublishSheetWebviewMessage } from '../../../../src/publish/sheetProtocol'
+import type { PublishSetupModel, PublishSheetHostMessage, PublishSheetModel, PublishSheetWebviewMessage, SheetRefusal } from '../../../../src/publish/sheetProtocol'
+import { WorkersDevNameRow } from './WorkersDevNameRow'
+import { addressHint, nameReady, pagePartReady, PUT_IT_BACK, randomEndOf, refusalLine, SETUP_COPY, webSafePagePart, withRandomEnd } from './workersDevName'
 import {
   NOTHING_ELSE,
   SCRIPT_BUILT_LINE,
@@ -34,6 +43,7 @@ import {
   leftOutTip,
   limitLine,
   openWords,
+  ringedButton,
   sheetButtons,
   showsFileList,
   whatGoesLine,
@@ -41,6 +51,28 @@ import {
 
 /** The default button's ring while the sheet itself has the focus: the focus ring's look (`rm-focus-ring`). */
 const DEFAULT_RING = 'group-focus/sheet:outline group-focus/sheet:outline-2 group-focus/sheet:outline-offset-2 group-focus/sheet:outline-[color:var(--r-focus-ring)]'
+
+/** The dialog lies in the page's flow inside the workbench's sheet (PR 5): no dim, corners, border or shadow of its own. */
+const IN_SHEET = 'group/sheet static w-full max-w-none max-h-none translate-x-0 translate-y-0 rounded-none border-0 bg-transparent shadow-none data-[state=open]:animate-none'
+
+/**
+ * The page comes into a sheet over the whole window (PR 5), which gives it the focus once it has drawn (round 3): when
+ * its window gets the focus with nothing in the sheet focused, the sheet itself takes it, so the default button is
+ * ringed and Enter presses it, as when the dialog opened (Radix focuses it then, which a window without the focus
+ * doesn't show). A control in the sheet that has the focus keeps it. Frame 2 and frame 3 both use it.
+ */
+function useSheetFocus() {
+  const sheetRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const onWindowFocus = () => {
+      const sheet = sheetRef.current
+      if (sheet && !sheet.contains(document.activeElement)) sheet.focus()
+    }
+    window.addEventListener('focus', onWindowFocus)
+    return () => window.removeEventListener('focus', onWindowFocus)
+  }, [])
+  return sheetRef
+}
 
 function send(message: PublishSheetWebviewMessage): void {
   vscode.postMessage(message)
@@ -55,30 +87,67 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   )
 }
 
-export function PublishSheetView({ model, onAnswer }: { model: PublishSheetModel; onAnswer: (m: PublishSheetWebviewMessage) => void }) {
+export function PublishSheetView({
+  model,
+  onAnswer,
+  refusal = null,
+  onEdit,
+}: {
+  model: PublishSheetModel
+  onAnswer: (m: PublishSheetWebviewMessage) => void
+  /** The host's last refusal of a press of Publish; cleared by `onEdit`. */
+  refusal?: { reason: SheetRefusal } | null
+  onEdit?: () => void
+}) {
   const [open, setOpen] = useState(false)
-  const sheetRef = useRef<HTMLDivElement>(null)
-  // The page comes into a sheet over the whole window (PR 5), which gives it the focus once it has drawn (round 3): when
-  // its window gets the focus with nothing in the sheet focused, the sheet itself takes it, so the default button is
-  // ringed and Enter presses it, as when the dialog opened (Radix focuses it then, which a window without the focus
-  // doesn't show). A control in the sheet that has the focus keeps it.
-  useEffect(() => {
-    const onWindowFocus = () => {
-      const sheet = sheetRef.current
-      if (sheet && !sheet.contains(document.activeElement)) sheet.focus()
-    }
-    window.addEventListener('focus', onWindowFocus)
-    return () => window.removeEventListener('focus', onWindowFocus)
-  }, [])
+  const [pagePart, setPagePart] = useState(model.address?.page ?? '')
+  const [name, setName] = useState(model.nameRow?.suggestion ?? '')
+  const [waiting, setWaiting] = useState(false)
+  // A refusal or a new model ends the wait for the host's check
+  useEffect(() => { setWaiting(false) }, [refusal, model])
+  const sheetRef = useSheetFocus()
   const warning = keyWarning(model.keyHits)
   const limit = limitLine(model.tooBig, model.tooMany)
-  const buttons = sheetButtons(model.keyHits.length > 0, limit !== null)
+  const base = sheetButtons(model.keyHits.length > 0, limit !== null)
   const left = leftOutCount(model.leftOut)
   const fold = showsFileList(model.files.length, model.leftOut)
-  const confirm = () => onAnswer({ type: 'publish:confirm', anyway: model.keyHits.length > 0, pagePart: model.address?.page })
+  const randomEnd = randomEndOf(model.address?.page ?? '')
+  const editable = model.address?.editable === true
+  const addressReady = !editable || pagePartReady(pagePart)
+  const nameOk = !model.nameRow || nameReady(name)
+  const blocked = !addressReady || !nameOk || waiting || refusal !== null
+  const buttons = blocked && !base.publishDisabled
+    ? {
+        ...base,
+        publishDisabled: true,
+        publishTip: waiting
+          ? 'Ritemark is checking the address with Cloudflare'
+          : !nameOk ? "Choose your pages' name first" : !addressReady ? addressHint(randomEnd) : 'Change the name or the address first',
+      }
+    : base
+  const suffix = model.nameRow ? `.${name || 'pages'}.workers.dev` : model.address?.suffix ?? ''
+  const confirm = () => {
+    if (buttons.publishDisabled) return
+    setWaiting(true)
+    onAnswer({
+      type: 'publish:confirm',
+      anyway: model.keyHits.length > 0,
+      pagePart: editable ? pagePart : undefined,
+      subdomain: model.nameRow ? name : undefined,
+    })
+  }
   const pressDefault = () => {
     if (buttons.main === 'cancel') onAnswer({ type: 'publish:cancel' })
     else if (!buttons.publishDisabled) confirm()
+  }
+  const ringed = ringedButton(buttons)
+  const nameRefused = refusal?.reason === 'nameTaken'
+  const addressRefused = refusal && refusal.reason !== 'nameTaken' ? refusalLine(refusal.reason, randomEnd) : null
+  // The lead's Put it back (PR 4, round 2): while the random end is missing, a link restores the one suggested
+  const canPutBack = editable && randomEnd !== '' && !pagePartReady(pagePart)
+  const putBack = () => {
+    setPagePart(withRandomEnd(pagePart, randomEnd, model.address?.page ?? ''))
+    onEdit?.()
   }
 
   const cancel = (
@@ -86,8 +155,8 @@ export function PublishSheetView({ model, onAnswer }: { model: PublishSheetModel
       <Button
         variant={buttons.main === 'cancel' ? 'default' : 'ghost'}
         size="sm"
-        className={buttons.main === 'cancel' ? DEFAULT_RING : undefined}
-        data-default={buttons.main === 'cancel' ? '' : undefined}
+        className={ringed === 'cancel' ? DEFAULT_RING : undefined}
+        data-default={ringed === 'cancel' ? '' : undefined}
         onClick={() => onAnswer({ type: 'publish:cancel' })}
       >
         Cancel
@@ -99,8 +168,8 @@ export function PublishSheetView({ model, onAnswer }: { model: PublishSheetModel
       <Button
         variant={buttons.main === 'publish' ? 'default' : 'ghost'}
         size="sm"
-        className={buttons.main === 'publish' ? DEFAULT_RING : undefined}
-        data-default={buttons.main === 'publish' ? '' : undefined}
+        className={ringed === 'publish' ? DEFAULT_RING : undefined}
+        data-default={ringed === 'publish' ? '' : undefined}
         disabled={buttons.publishDisabled}
         onClick={confirm}
       >
@@ -118,7 +187,7 @@ export function PublishSheetView({ model, onAnswer }: { model: PublishSheetModel
       <DialogContent
         ref={sheetRef}
         overlayClassName="hidden"
-        className="group/sheet static w-full max-w-none max-h-none translate-x-0 translate-y-0 rounded-none border-0 bg-transparent shadow-none data-[state=open]:animate-none"
+        className={IN_SHEET}
         aria-describedby="publish-sheet-subtitle"
         onKeyDown={(event) => {
           // Enter on the sheet itself presses the default button; on a button or link, that control's own press
@@ -139,13 +208,56 @@ export function PublishSheetView({ model, onAnswer }: { model: PublishSheetModel
               <span className="block text-[12px] leading-4 text-ink-muted">{model.destination.detail}</span>
             </Row>
           )}
+          {model.nameRow && (
+            // Answer 5: once, in the first sheet, while the account has no workers.dev name
+            <WorkersDevNameRow
+              value={name}
+              onChange={(next) => { setName(next); onEdit?.() }}
+              taken={nameRefused}
+            />
+          )}
           {model.address && (
-            // Shown as it will read; PR 4 makes the page's part editable, with the account's name row (R5)
             <Row label="Address">
-              <span className="block truncate">
-                {model.address.page}
-                <span className="text-ink-muted">{model.address.suffix}</span>
-              </span>
+              {editable ? (
+                // Frame 3's field: the whole page part, made web-safe as typed, the account's end after it
+                <>
+                  <span className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1">
+                    <Input
+                      aria-label="The page's part of the address"
+                      aria-invalid={addressRefused !== null || !addressReady || undefined}
+                      aria-describedby="publish-address-line"
+                      value={pagePart}
+                      onChange={(event) => { setPagePart(webSafePagePart(event.target.value)); onEdit?.() }}
+                      spellCheck={false}
+                      autoComplete="off"
+                      // as wide as what it holds, so the random end always shows; the account's end wraps, never clipped
+                      style={{ fieldSizing: 'content' } as React.CSSProperties}
+                      className="h-7 w-auto min-w-[96px] max-w-full flex-none"
+                    />
+                    <span className="text-ink-muted">{suffix}</span>
+                  </span>
+                  {(addressRefused || !addressReady) && (
+                    <span id="publish-address-line" role="alert" className="mt-1 block text-[12px] leading-4 text-ink-strong">
+                      {addressRefused ?? addressHint(randomEnd)}
+                      {canPutBack && (
+                        <>
+                          {' '}
+                          <Tooltip label={PUT_IT_BACK.tip}>
+                            <Button variant="link" size="sm" className="h-auto p-0 text-[12px] leading-4" onClick={putBack}>
+                              {PUT_IT_BACK.label}
+                            </Button>
+                          </Tooltip>
+                        </>
+                      )}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="block truncate">
+                  {model.address.page}
+                  <span className="text-ink-muted">{suffix}</span>
+                </span>
+              )}
             </Row>
           )}
           <Row label="What goes">
@@ -263,17 +375,81 @@ function OpenHit({ hit, onAnswer, short = false }: { hit: { index: number; fileN
   )
 }
 
-/** The sheet's page: waits for the host's model, then shows the sheet. */
+/**
+ * Frame 2: the first Publish with nothing set up (the lead, 5 November). Set up sends no value; the host opens
+ * Cloudflare's token page and its own password box, and the sheet becomes frame 3 once connected.
+ */
+export function SetupSheetView({ setup, onAnswer }: { setup: PublishSetupModel; onAnswer: (m: PublishSheetWebviewMessage) => void }) {
+  const sheetRef = useSheetFocus()
+  return (
+    <Dialog open onOpenChange={(next) => { if (!next) onAnswer({ type: 'publish:cancel' }) }}>
+      {/* In the workbench's sheet over the whole window, as frame 3 (PR 5) */}
+      <DialogContent
+        ref={sheetRef}
+        overlayClassName="hidden"
+        className={IN_SHEET}
+        aria-describedby="publish-setup-lede"
+        onKeyDown={(event) => {
+          // Enter on the sheet itself presses Set up, the default button; on a button, that control's own press
+          if (event.key === 'Enter' && event.target === event.currentTarget && !event.nativeEvent.isComposing) {
+            event.preventDefault()
+            if (!setup.waiting) onAnswer({ type: 'publish:setUp' })
+          }
+        }}
+      >
+        <div className="px-5 pt-4 pb-1">
+          <DialogTitle className="text-[15px] font-semibold leading-5">{SETUP_COPY.title}</DialogTitle>
+          <DialogDescription id="publish-setup-lede" className="mt-1 text-[13px] leading-[18px]">{SETUP_COPY.lede}</DialogDescription>
+        </div>
+        <div className="px-5 pb-1">
+          <div className="mt-2 flex items-center gap-3 rounded-md border border-hairline px-3 py-2.5">
+            <Icon name="cloud" size={20} tone="inherit" className="flex-none text-ink-body" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-semibold leading-[18px] text-ink-strong">{SETUP_COPY.host}</span>
+              <span className="block text-[12px] leading-4 text-ink-muted">{setup.waiting ? SETUP_COPY.waiting : SETUP_COPY.line}</span>
+            </span>
+            <Tooltip label={setup.waiting ? SETUP_COPY.waitingTip : SETUP_COPY.buttonTip} className="inline-flex flex-none">
+              <Button
+                variant="default"
+                size="sm"
+                className={DEFAULT_RING}
+                data-default=""
+                disabled={setup.waiting}
+                onClick={() => onAnswer({ type: 'publish:setUp' })}
+              >
+                {SETUP_COPY.button}
+              </Button>
+            </Tooltip>
+          </div>
+          {setup.line && <p role="alert" className="mt-2 text-[12px] leading-4 text-ink-strong">{setup.line}</p>}
+        </div>
+        <DialogFooter className="border-t-0 pt-3 pb-4">
+          <Tooltip label={SETUP_COPY.cancelTip}>
+            <Button variant="ghost" size="sm" onClick={() => onAnswer({ type: 'publish:cancel' })}>Cancel</Button>
+          </Tooltip>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** The sheet's page: waits for the host's model, then shows frame 2 or the sheet. */
 export function PublishSheet() {
   const [model, setModel] = useState<PublishSheetModel | null>(null)
+  const [setup, setSetup] = useState<PublishSetupModel | null>(null)
+  const [refusal, setRefusal] = useState<{ reason: SheetRefusal } | null>(null)
   useEffect(() => {
     const onMessage = (event: MessageEvent<PublishSheetHostMessage>) => {
-      if (event.data?.type === 'publish:sheet') setModel(event.data.model)
+      const data = event.data
+      if (data?.type === 'publish:sheet') { setModel(data.model); setRefusal(null) }
+      else if (data?.type === 'publish:setup') setSetup(data.setup)
+      else if (data?.type === 'publish:refused') setRefusal({ reason: data.reason })
     }
     window.addEventListener('message', onMessage)
     send({ type: 'publish:sheetReady' })
     return () => window.removeEventListener('message', onMessage)
   }, [])
-  if (!model) return null
-  return <PublishSheetView model={model} onAnswer={send} />
+  if (model) return <PublishSheetView model={model} onAnswer={send} refusal={refusal} onEdit={() => setRefusal(null)} />
+  if (setup) return <SetupSheetView setup={setup} onAnswer={send} />
+  return null
 }

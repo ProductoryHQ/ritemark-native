@@ -14,7 +14,8 @@ Nothing here starts before the plan's approval (sprint-plan.md, *Approval*). Tic
 - [x] A1 `research/page-bar.md`: what patch 010 needs for the lead's bar (the right end of `MenuId.BrowserActionsToolbar`, hiding the address row and back/forward, links into new tabs, reload on a file change)
 - [ ] A2 `research/page-sandbox-live.md` (code side written in PR 1; the live run still to do): `page-sandbox.md`'s live steps with `hostile.html` and a decoy server; the session today (Global) and after W2
 - [x] A3 `research/gather-corpus.md` (R3 and R5 changes proposed there, for `spec.md` before PR 3): ten real pages and what each references; R3 changed in `spec.md` first if needed
-- [ ] A4 `research/cloudflare-measurements.md`: M1–M11 (needs decision 1), M12–M14 (needs decision 6's private client); R6/R7 changed in `spec.md` first if needed
+- [x] A4 `research/cloudflare-measurements.md`: M1–M11 (needs decision 1; 12/12 PASS on 6 November, M10's template link and M11 read in Cloudflare's dashboard by Jarmo); R7 changed in `spec.md` first (M6: 121 s to a new address's first answer)
+- [ ] A4's M12–M14 (needs decision 6's private client)
 
 ## Phase 2: PR 1, the vault script and the bar (W0, W1; R2, E3)
 
@@ -46,20 +47,22 @@ Nothing here starts before the plan's approval (sprint-plan.md, *Approval*). Tic
 ## Phase 5: PR 4, Cloudflare (W4, W5, W6; R6, R7, R9)
 
 **Blocking for PR 4 (#668), which merges after PR 3 (#669):**
-- [ ] **Upload exactly the bytes the plan hashed.** For each `GatheredFile`, read `realPath`, check its `sha256` against the plan, and upload those bytes, not a second read. On a mismatch (the file changed between the sheet and the upload), stop and gather again. Nothing goes that wasn't scanned.
-- [ ] **One content hash.** PR 3's `contentHashOf` (`src/publish/gather.ts:334`, sha256 over sorted `relPath\0sha256` lines) or #668's `assets.ts:80`: keep one, and use it for both "changed since publishing" and the upload manifest.
-- [ ] **One record store.** PR 3's `publishRecords.ts` (`globalStorage/publish/v1/records.json`) or #668's `siteLedger.ts`: keep one, with its tests, before the bar's states read it.
-- [ ] **Validate `pagePart`.** `PublishSheetPanel.ts:79` passes the sheet's `pagePart` through unchecked. PR 4 checks it on the host (web-safe, length, the random end per decision 3) before it names a Worker, and refuses anything else.
-- [ ] **Where the sheet shows:** over the whole window, once the shell PR from `research/sheet-host.md` lands. Until then, the harness's tab.
+- [x] **Upload exactly the bytes the plan hashed.** (PR 4 round 2: `host.ts` `readVerifiedUpload`; the host takes only its result) For each `GatheredFile`, read `realPath`, check its `sha256` against the plan, and upload those bytes, not a second read. On a mismatch (the file changed between the sheet and the upload), stop and gather again. Nothing goes that wasn't scanned.
+- [x] **One content hash.** (PR 4 round 2: PR 3's `contentHashOf`; `assets.ts`'s is gone) PR 3's `contentHashOf` (`src/publish/gather.ts:334`, sha256 over sorted `relPath\0sha256` lines) or #668's `assets.ts:80`: keep one, and use it for both "changed since publishing" and the upload manifest.
+- [x] **One record store.** (PR 4 round 2: PR 3's `publishRecords.ts`; `siteLedger.ts` is gone) PR 3's `publishRecords.ts` (`globalStorage/publish/v1/records.json`) or #668's `siteLedger.ts`: keep one, with its tests, before the bar's states read it.
+- [x] **Validate `pagePart`.** (PR 4 round 2: `isValidPagePart`, in the panel and again in `publishPage`) `PublishSheetPanel.ts:79` passes the sheet's `pagePart` through unchecked. PR 4 checks it on the host (web-safe, length, the random end per decision 3) before it names a Worker, and refuses anything else.
+- [ ] **Where the sheet shows:** (PR 4 round 2: `ritemark.publish.ready` waits for `_ritemark.webviewSheet`, PR 5) over the whole window, once the shell PR from `research/sheet-host.md` lands. Until then, the harness's tab.
 
-- [ ] `setApiKey` allowlist with its failing-first test (`RitemarkSettingsProvider.ts:382–389`)
-- [ ] `src/publish/host.ts`; `cloudflare/client.ts` against a fake server; `redact()` on every error
+- [x] `setApiKey` allowlist with its failing-first test (`RitemarkSettingsProvider.ts:382–389`): the list landed in Sprint 147 PR 3; PR 4 moves the write into `applyApiKeyMessage` and adds `settingsKeys.test.ts`, mutation-checked
+- [x] `src/publish/host.ts`; `cloudflare/client.ts` against a fake server; `redact()` on every error
 - [ ] `cloudflare/oauth.ts`, `config.ts` (the esbuild define), `account.ts` (SecretStorage, refresh, Disconnect); the token path: `publish:startTokenEntry` (no value) → Cloudflare's page + the host's password box with the lead's words and three outcomes (R6, S20, S20a)
-- [ ] The workers.dev name row in the first sheet (R5, S28a)
-- [ ] Settings ▸ Sharing ▸ Web pages: the card's two states, the published pages with Open and Unpublish, Disconnect's question (R9, S22, S30)
-- [ ] The bar's states, Unpublish's question, "Unpublishing…", the 10 s line, the failure line (R7, S24–S29)
-- [ ] `web-page-publishing` (registered in PR 1): gates creating, connecting, publishing and updating; the list, Unpublish and Disconnect stay with it off (S28b)
-- [ ] **After A4:** `scripts/qa/cloudflare-contract.mjs` green; S17–S28b live on the Mac; S21's log search
+- [x] The workers.dev name row in the first sheet (R5, S28a); frame 2's Set up (the lead, 5 November); frame 3's address field
+- [x] Settings ▸ Sharing ▸ Web pages: the card's two states, the published pages with Open and Unpublish, Disconnect's question (R9, S22, S30)
+- [x] The bar's states, Unpublish's question, "Unpublishing…", the 10 s line, the failure line (R7, S24–S29): patch 010's chip, Copy link, Publishing…, Unpublishing…; the failure line as a notification with Try again until the bar draws it
+- [x] `web-page-publishing` (registered in PR 1): gates creating, connecting, publishing and updating; the list, Unpublish and Disconnect stay with it off (S28b)
+- [x] **After A4:** `scripts/qa/cloudflare-contract.mjs` green live (12/12, 6 November; green against the fake too)
+- [x] **After A4:** M6's wait in `spec.md` R7 and the code: "Publishing…" until a new address answers, with "Your address is new. It can take a couple of minutes before the page opens." (round 5: the lead's words naming the page, as a brief toast; the chip's tooltip; "<page title> is published." when the wait ends)
+- [ ] S17–S28b live on the Mac, connected (the app takes the token only from its own password box, so a connected run needs a person to paste it); S21's log search
 - [ ] Review (High, `/security-review`), Windows overlay (offline scenarios; live when the Windows vault exists), merge
 
 ## Phase 6: QA and closeout

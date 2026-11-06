@@ -7,7 +7,8 @@ import { strict as assert } from 'node:assert';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { changedSincePublish, PublishRecordStore, recordFor, RECORDS_FILE, RECORDS_FOLDER, sheetNeeded } from './publishRecords';
+import { execFile } from 'node:child_process';
+import { changedSincePublish, LOCK_STALE_MS, LOCK_WAIT_MS, type PublishRecord, PublishRecordStore, recordFor, RECORDS_FILE, RECORDS_FOLDER, sheetNeeded } from './publishRecords';
 import { isSheetWebviewMessage } from './sheetProtocol';
 import { sheetModelOf } from './sheetModel';
 import type { PublishPlan } from './types';
@@ -32,6 +33,119 @@ function plan(files: [string, string][], extra: Partial<PublishPlan> = {}): Publ
 
 const site = { accountId: 'acc', siteName: 'harbour-programme-7f3a2c', address: 'https://harbour-programme-7f3a2c.pages-4821.workers.dev' };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Codex's review of #668, finding 3: two project windows are two extension hosts, each with its own store over the one
+ * `records.json` in global storage. Their writes must not drop each other's records (the last rename used to win).
+ */
+async function crossHostWrites(record: PublishRecord): Promise<void> {
+  const shared = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-records-hosts-'));
+  const folder = path.join(shared, RECORDS_FOLDER);
+  try {
+    const a = new PublishRecordStore(shared, 'darwin');
+    const b = new PublishRecordStore(shared, 'darwin');
+    const page = (i: number) => ({ ...record, pagePath: `/p/w${i}.html`, siteName: `page-w${i}-7f3a2c` });
+
+    // Two stores writing at once, on the same file: every page's record stays
+    await Promise.all(Array.from({ length: 24 }, (_, i) => (i % 2 ? a : b).put(page(i))));
+    assert.equal((await a.list()).length, 24, 'two hosts publishing at once: no record lost');
+    assert.equal((await b.list()).length, 24);
+    await Promise.all([
+      ...Array.from({ length: 8 }, (_, i) => (i % 2 ? b : a).remove(page(i).pagePath)),
+      ...Array.from({ length: 8 }, (_, i) => (i % 2 ? a : b).put(page(100 + i))),
+      a.markUnpublished(page(20).pagePath),
+    ]);
+    const after = await b.list();
+    assert.equal(after.length, 24, 'removes, puts and a mark at once, from both hosts');
+    assert.equal(after.find((r) => r.pagePath === page(20).pagePath)?.unpublished, true, 'the mark stayed');
+    assert.deepEqual(fs.readdirSync(folder).sort(), [RECORDS_FILE], 'no lock or temporary file left');
+
+    // The same page published from both windows at once: both Workers keep their records, the newest is the page's
+    const one = { ...record, pagePath: '/p/same.html', siteName: 'same-111111', publishedAt: '2026-11-06T06:00:00.000Z' };
+    const two = { ...record, pagePath: '/p/same.html', siteName: 'same-222222', publishedAt: '2026-11-06T06:00:01.000Z' };
+    await Promise.all([a.put(one), b.put(two)]);
+    assert.deepEqual((await a.list()).filter((r) => r.pagePath === one.pagePath).map((r) => r.siteName).sort(), ['same-111111', 'same-222222'],
+      'an online Worker\'s record is never dropped by another site\'s put for the same page');
+    assert.equal((await b.get(one.pagePath))?.siteName, 'same-222222', 'the bar shows the newest');
+    assert.equal(await a.remove(one.pagePath, 'same-222222'), true, 'Unpublish removes that site\'s record only');
+    assert.equal((await b.get(one.pagePath))?.siteName, 'same-111111', 'the other site\'s record is still there to unpublish');
+    // An update (the same site) replaces; a record already marked unpublished goes when the page is published again
+    await b.put({ ...one, contentHash: 'updated' });
+    assert.deepEqual((await a.list()).filter((r) => r.pagePath === one.pagePath).map((r) => r.contentHash), ['updated']);
+    await a.markUnpublished(one.pagePath, 'same-111111');
+    await b.put({ ...two, siteName: 'same-333333' });
+    assert.deepEqual((await a.list()).filter((r) => r.pagePath === one.pagePath).map((r) => r.siteName), ['same-333333']);
+
+    // A lock left by a host that died is taken over once stale; a live host's lock is waited for, never stolen
+    const lock = path.join(folder, `${RECORDS_FILE}.lock`);
+    fs.writeFileSync(lock, 'dead host');
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(lock, old, old);
+    await a.put(page(200));
+    assert.ok(await b.get(page(200).pagePath), 'a stale lock doesn\'t block publishing');
+    assert.equal(fs.existsSync(lock), false, 'and is gone');
+    fs.writeFileSync(lock, 'live host');
+    let done = false;
+    const waiting = b.put(page(201)).then(() => { done = true; });
+    await sleep(150);
+    assert.equal(done, false, 'a fresh lock is waited for');
+    assert.equal(fs.readFileSync(lock, 'utf8'), 'live host', 'and not taken');
+    fs.unlinkSync(lock);
+    await waiting;
+    assert.ok(await a.get(page(201).pagePath));
+
+    // Two real processes, each its own store, publishing at once
+    const script = path.join(shared, 'writer.ts');
+    fs.writeFileSync(script, [
+      `import { PublishRecordStore } from ${JSON.stringify(path.join(__dirname, 'publishRecords'))};`,
+      'const [storage, tag] = process.argv.slice(2);',
+      'const store = new PublishRecordStore(storage, "darwin");',
+      `const base = ${JSON.stringify(record)};`,
+      'void Promise.all(Array.from({ length: 15 }, (_, i) => store.put({ ...base, pagePath: `/p/${tag}${i}.html`, siteName: `${tag}-${i}` })));',
+    ].join('\n'));
+    const tsx = require.resolve('tsx/cli');
+    const run = (tag: string) => new Promise<number>((resolve) => {
+      execFile(process.execPath, [tsx, script, shared, tag], (error) => resolve(error ? 1 : 0));
+    });
+    assert.deepEqual(await Promise.all([run('x'), run('y')]), [0, 0]);
+    const both = await a.list();
+    for (const tag of ['x', 'y']) {
+      assert.equal(both.filter((r) => r.siteName.startsWith(`${tag}-`)).length, 15, `two processes at once: all of ${tag}'s records`);
+    }
+    console.log('publishRecords.test: two hosts on one file passed');
+  } finally {
+    fs.rmSync(shared, { recursive: true, force: true });
+  }
+}
+
+/**
+ * The security review of #668 (minor): a dead host's lock that is not yet stale when a `put` starts must still be
+ * taken over within the wait, never a failed `put` after a publish that went through. The wait outlasts the staleness.
+ */
+async function deadHostLockMidWait(record: PublishRecord): Promise<void> {
+  assert.ok(LOCK_WAIT_MS > LOCK_STALE_MS, `the wait (${LOCK_WAIT_MS} ms) outlasts the staleness (${LOCK_STALE_MS} ms)`);
+  const shared = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-records-deadlock-'));
+  try {
+    const store = new PublishRecordStore(shared, 'darwin');
+    await store.list(); // the folder
+    fs.mkdirSync(path.join(shared, RECORDS_FOLDER), { recursive: true });
+    const lock = path.join(shared, RECORDS_FOLDER, `${RECORDS_FILE}.lock`);
+    // Left by a host that died 4 s ago: stale only 6 s into this put (longer than the old 5 s wait)
+    fs.writeFileSync(lock, 'dead host');
+    const left = new Date(Date.now() - (LOCK_STALE_MS - 6_000));
+    fs.utimesSync(lock, left, left);
+    const started = Date.now();
+    await store.put({ ...record, pagePath: '/p/after-a-dead-host.html' });
+    assert.ok(Date.now() - started >= 5_000, 'it waited for the lock to go stale');
+    assert.ok(await store.get('/p/after-a-dead-host.html'), 'the record is written: the dead host\'s lock was taken over');
+    assert.equal(fs.existsSync(lock), false, 'and no lock is left');
+    console.log('publishRecords.test: a dead host\'s lock that goes stale during the wait passed');
+  } finally {
+    fs.rmSync(shared, { recursive: true, force: true });
+  }
+}
+
 async function main(): Promise<void> {
   const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-records-'));
   try {
@@ -53,6 +167,9 @@ async function main(): Promise<void> {
     assert.equal(await store.remove('/p/x.html'), true);
     assert.equal(await store.remove('/p/x.html'), false);
     assert.equal((await store.list()).length, 3);
+
+    await crossHostWrites(record);
+    await deadHostLockMidWait(record);
 
     // Windows keys ignore case
     const win = new PublishRecordStore(fs.mkdtempSync(path.join(os.tmpdir(), 'publish-records-win-')), 'win32');

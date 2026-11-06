@@ -5,9 +5,10 @@
  *   the system's default browser (`vscode.env.openExternal`). Today's `ritemark.browser.openInBrowser`
  *   (the integrated browser) is separate and unchanged.
  * - `ritemark.page.publish`: the way in for Publish. It refuses a page outside the open project by
- *   real path, before anything else. PR 4 adds the sheet behind it; until then no menu, button or
- *   palette entry reaches it (`package.json` hides both commands from the palette, and patch 010's
- *   bar arrives in PR 2, its Publish button gated on `ritemark.publish.ready`, which PR 4 sets).
+ *   real path, before anything else, then hands the project page to PR 4's publish flow
+ *   (`setPublishHandler`: the sheet, the gather and the upload). `package.json` hides both commands
+ *   from the palette, and patch 010's Publish shows only once `ritemark.publish.ready` is set, which
+ *   needs the whole-window sheet host (PR 5).
  *
  * Both take the page as a `vscode.Uri` or a `file:` URL string (the bar passes the tab's URL).
  */
@@ -23,6 +24,14 @@ export const NOT_A_PAGE_MESSAGE = 'This works on a web page file (.html) on this
 export const OUTSIDE_PROJECT_MESSAGE =
   'Only pages in this project can be published. Move the page into the project folder to publish it.';
 export const MISSING_PAGE_MESSAGE = "This page's file can't be found. It may have been moved or deleted.";
+
+type PublishHandler = (page: { realPath: string; projectFolder: string }) => Promise<void>;
+let publishHandler: PublishHandler | null = null;
+
+/** PR 4: what Publish does with a project page once the boundary check passed (`PublishController.publishFromBar`). */
+export function setPublishHandler(handler: PublishHandler | null): void {
+  publishHandler = handler;
+}
 
 function targetOf(arg: unknown): PageTarget | undefined {
   if (arg === undefined) return vscode.window.activeTextEditor?.document.uri;
@@ -90,6 +99,7 @@ export async function publishPage(arg?: unknown): Promise<PageLocation | undefin
       void vscode.window.showInformationMessage(NOT_A_PAGE_MESSAGE);
       return undefined;
     case 'project':
+      if (publishHandler) void publishHandler({ realPath: location.realPath, projectFolder: location.projectFolder });
       return location;
     default:
       return unhandledLocation(location);

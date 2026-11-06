@@ -79,6 +79,14 @@ export interface PublishPlan {
   contentHash: string;
 }
 
+declare const gatheredBrand: unique symbol;
+
+/**
+ * A plan as `gatherPage` made it, frozen there and remembered (`isGatheredPlan`). The only kind PR 4's `publishPage`
+ * takes, so no caller can hand the upload a list that skipped the gather and the key scan.
+ */
+export type GatheredPlan = PublishPlan & { readonly [gatheredBrand]: true };
+
 /** The free plan's limits (R3). */
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
 export const MAX_FILES = 20_000;

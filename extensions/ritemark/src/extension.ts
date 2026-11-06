@@ -28,6 +28,7 @@ import { registerProjects, type ProjectsHost } from './projects/projectsHost';
 import { registerProjectSearch } from './search/SearchHost';
 import { buildCommentTaskPrompt } from './commentTasks/commentTaskPrompt';
 import { createGoogleDocsFeature, type GoogleDocsFeature } from './googleDocs/vscodeGoogleDocs';
+import { createPublishFeature, type PublishFeature } from './publish/vscodePublish';
 import { AgentLibraryViewProvider } from './views/AgentLibraryViewProvider';
 import { FlowEditorProvider } from './flows/FlowEditorProvider';
 import { FlowStorage } from './flows/FlowStorage';
@@ -89,6 +90,8 @@ export let commentTaskController: CommentTaskController | undefined;
  * circular import at load time.
  */
 export let googleDocs: GoogleDocsFeature | undefined;
+/** Sprint 149, PR 4: web-page publishing (the Cloudflare connection, Settings ▸ Sharing ▸ Web pages). */
+export let publish: PublishFeature | undefined;
 /** The task board (Sprint 130): the Ritemark editor asks it which documents are card pages. */
 export let taskBoard: TaskBoardHost | undefined;
 
@@ -508,6 +511,15 @@ export function activate(context: vscode.ExtensionContext) {
   googleDocs = createGoogleDocsFeature(
     context,
     () => isEnabled('google-docs-publishing'),
+    (message) => console.log(message),
+  );
+
+  // ── Web-page publishing (Sprint 149, PR 4) ─────────────────────────────────
+  // Always composed: with `web-page-publishing` off nothing offers to connect or publish, but Settings still lists
+  // the published pages with Open and Unpublish, and Disconnect works (S28b). Log lines are redacted at the source.
+  publish = createPublishFeature(
+    context,
+    () => isEnabled('web-page-publishing'),
     (message) => console.log(message),
   );
 

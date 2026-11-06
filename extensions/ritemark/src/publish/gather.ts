@@ -28,6 +28,7 @@ import { isText, scanText } from './secretScan';
 import {
   FileKind,
   GatheredFile,
+  GatheredPlan,
   KeyHit,
   LeftOut,
   LeftOutReason,
@@ -134,7 +135,25 @@ function commonFolder(paths: string[], p: typeof path.posix | typeof path.win32)
   return common;
 }
 
-export async function gatherPage(pagePath: string, projectFolder: string, options: GatherOptions = {}): Promise<PublishPlan> {
+/** Every plan `gatherPage` made, by identity. A plan written by hand, or copied, is not among them. */
+const gatheredPlans = new WeakSet<object>();
+
+/** Whether a plan is one `gatherPage` made (and froze), so PR 4's upload can refuse anything else. */
+export function isGatheredPlan(plan: unknown): plan is GatheredPlan {
+  return typeof plan === 'object' && plan !== null && gatheredPlans.has(plan);
+}
+
+function frozenPlan(plan: PublishPlan): GatheredPlan {
+  for (const list of [plan.files, plan.leftOut, plan.tooBig, plan.keyHits] as object[][]) {
+    for (const item of list) Object.freeze(item);
+    Object.freeze(list);
+  }
+  Object.freeze(plan);
+  gatheredPlans.add(plan);
+  return plan as GatheredPlan;
+}
+
+export async function gatherPage(pagePath: string, projectFolder: string, options: GatherOptions = {}): Promise<GatheredPlan> {
   const platform = options.platform ?? process.platform;
   const p = platform === 'win32' ? path.win32 : path.posix;
   const realpath = options.realpath ?? ((x: string) => fs.promises.realpath(x));
@@ -322,7 +341,8 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     files.push(file);
   }
 
-  return {
+  // Frozen and remembered: what the sheet showed is exactly what the upload reads (PR 4)
+  return frozenPlan({
     pagePath,
     projectFolder,
     root,
@@ -333,7 +353,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     tooMany: files.length > MAX_FILES,
     keyHits,
     contentHash: contentHashOf(files),
-  };
+  });
 }
 
 /** sha256 over each file's published path and hash, sorted: equal exactly when the same bytes go to the same places. */

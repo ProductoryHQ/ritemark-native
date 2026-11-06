@@ -318,12 +318,20 @@ assert.equal(checkNowLine({ ...payload().updateCenter, lastSuccessfulCheckAt: 0 
 assert.equal(whenText(0), 'never')
 assert.match(whenText(Date.now()), /^today at /)
 
-// I61: today's five names land on the new places, each on a row the page draws
-assert.deepEqual(Object.keys(LEGACY_SECTION_LANDINGS).sort(), ['google-ai-key', 'google-docs', 'openai-api-key', 'transcription', 'usage-data'])
+// I61: today's five names land on the new places, each on a row the page draws (and Web pages', Sprint 149 PR 4)
+assert.deepEqual(Object.keys(LEGACY_SECTION_LANDINGS).sort(), ['google-ai-key', 'google-docs', 'openai-api-key', 'transcription', 'usage-data', 'web-pages'])
 for (const [name, landing] of Object.entries(LEGACY_SECTION_LANDINGS)) {
   if (!landing.anchor) continue
   // A key's way in opens the API keys sheet at its row
-  const where = landing.keyRow ? keysSheet() : draw(landing.section)
+  // Web pages: its card shows while a page is published (the case its way in is for: Connect again to unpublish it)
+  const signedOutWithAPage = payload({
+    webPages: {
+      enabled: true, entryAvailable: true, state: 'disconnected', accountName: null, subdomain: null, enteringToken: false, oauthAvailable: false,
+      pages: [{ id: 'harbour-programme-7f3a2c', name: 'Harbour programme.html', address: 'https://harbour-programme-7f3a2c.pages-4821.workers.dev/', status: 'online', slow: false, message: null }],
+      message: null,
+    },
+  })
+  const where = landing.keyRow ? keysSheet() : draw(landing.section, name === 'web-pages' ? signedOutWithAPage : payload())
   assert.ok(where.includes(`id="${landing.anchor}"`), `${name} lands on #${landing.anchor} in ${landing.keyRow ? 'the API keys sheet' : landing.section}`)
 }
 assert.match(readFileSync(join(HERE, 'RitemarkSettings.tsx'), 'utf8'), /if \(landing\.keyRow\) \{[\s\S]*?setKeys\(\{ open: true, focus: landing\.keyRow/)
@@ -334,6 +342,7 @@ assert.deepEqual(landingFor('nonsense'), { section: 'ai-accounts' })
 // The page moves only for a name it knows (as the old page: an unknown name moved nothing)
 assert.equal(isKnownLanding('transcription'), true)
 assert.equal(isKnownLanding('advanced'), true)
+assert.deepEqual(landingFor('web-pages'), { section: 'sharing', anchor: 'settings-section-web-pages' }, "the bar's Connect again lands on the Web pages card (Codex's review of #668)")
 assert.equal(isKnownLanding('nonsense'), false)
 assert.equal(isKnownLanding(undefined), false)
 assert.match(readFileSync(join(HERE, 'RitemarkSettings.tsx'), 'utf8'), /if \(!isKnownLanding\(message\.section\)\) break;/)

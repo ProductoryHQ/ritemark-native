@@ -41,13 +41,18 @@ export interface SettingsLanding {
   keyRow?: 'google-ai-key' | 'openai-api-key'
 }
 
-/** Today's five names (`SettingsSection` in `src/settings/RitemarkSettingsProvider.ts`) and their new places (I61). */
+/**
+ * Today's five names (`SettingsSection` in `src/settings/RitemarkSettingsProvider.ts`) and their new places (I61), and
+ * Web pages' (Sprint 149, PR 4).
+ */
 export const LEGACY_SECTION_LANDINGS: Readonly<Record<string, SettingsLanding>> = {
   'google-docs': { section: 'sharing', anchor: 'settings-section-google-docs' },
   transcription: { section: 'advanced', anchor: 'settings-section-transcription' },
   'usage-data': { section: 'usage-data' },
   'google-ai-key': { section: 'ai-accounts', anchor: 'settings-section-google-ai-key', keyRow: 'google-ai-key' },
   'openai-api-key': { section: 'ai-accounts', anchor: 'settings-section-openai-api-key', keyRow: 'openai-api-key' },
+  // Sprint 149, PR 4 (Codex's review of #668): the bar's Unpublish asking to connect Cloudflare again
+  'web-pages': { section: 'sharing', anchor: 'settings-section-web-pages' },
 }
 
 /** Whether a way in names a place: one of today's five names, or a section's id. Anything else is ignored. */

@@ -161,6 +161,7 @@ async function main(): Promise<void> {
     assert.equal(stepKeyCopy('gemini'), GOOGLE_AI_KEY_NEEDED);
     assert.equal(isSettingsSection('openai-api-key'), true, "ritemark.aiSettings accepts the OpenAI key's section");
     assert.equal(isSettingsSection('google-ai-key'), true);
+    assert.equal(isSettingsSection('web-pages'), true, "the bar's Unpublish asking to connect Cloudflare again opens Web pages (Codex's review of #668)");
     assert.equal(isSettingsSection('anthropic-api-key'), false, 'only the sections the page has');
   });
 

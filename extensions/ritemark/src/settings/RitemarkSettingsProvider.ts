@@ -33,7 +33,8 @@ import { geminiHeaders, geminiUrl } from '../ai/geminiRequest';
 import { runProcess } from '../utils/runProcess';
 import { setUsageData, usageDataState } from '../analytics/posthog';
 import { settingsTimed, settingsTimingEnabled, settingsTimingMark, settingsTimingPage, settingsTimingStart } from './settingsTiming';
-import { SETTINGS_KEY_NAMES, isSettingsKeyName, settingsKeyAllowed, type SettingsKeyFlags, type SettingsKeyName } from './settingsKeys';
+import { SETTINGS_KEY_NAMES, applyApiKeyMessage, isSettingsKeyName, settingsKeyAllowed, type SettingsKeyFlags, type SettingsKeyName } from './settingsKeys';
+import { PUBLISH_PREFIX } from '../publish/settingsProtocol';
 import {
   ALL_PARTS,
   RECHECK_PARTS,
@@ -162,14 +163,16 @@ const RITEMARK_THEMES = [
 ];
 
 /** Settings sections other features can open the page at. */
-export type SettingsSection = 'google-docs' | 'transcription' | 'usage-data' | 'google-ai-key' | 'openai-api-key';
+export type SettingsSection = 'google-docs' | 'transcription' | 'usage-data' | 'google-ai-key' | 'openai-api-key' | 'web-pages';
 
 export function isSettingsSection(value: unknown): value is SettingsSection {
   return value === 'google-docs' || value === 'transcription' || value === 'usage-data'
     // Sprint 144: a Google image step's "Add it in Settings"
     || value === 'google-ai-key'
     // Sprint 145 R5 (#580): an OpenAI step's "Add it in Settings"
-    || value === 'openai-api-key';
+    || value === 'openai-api-key'
+    // Sprint 149, PR 4 (Codex's review of #668): the bar's Unpublish asking to connect Cloudflare again
+    || value === 'web-pages';
 }
 
 export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
@@ -346,6 +349,13 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       return;
     }
 
+    // Sprint 149, PR 4: Settings ▸ Sharing ▸ Web pages. The publish controller decodes each message by its exact
+    // fields; none carries a token (the token comes in through the host's own password box).
+    if (typeof message.type === 'string' && message.type.startsWith(PUBLISH_PREFIX)) {
+      await RitemarkSettingsProvider.publishFeature()?.controller.handleSettingsMessage(message);
+      return;
+    }
+
     switch (message.type) {
       // Sprint 147, A1: the page's timing marks (sent only when timing is on)
       case 'settings:timing':
@@ -427,17 +437,13 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         // Sprint 147, PR 3: only the five keys, each with its row's flag on (`settingsKeys.ts`); it saved any secret
         // name it was sent before (Sprint 149's audit). The OpenRouter key stays inert while opencode-integration is
         // off (Sprint 76 R3a/R7), ElevenLabs' while transcription-workbench is (Sprint 108 R4).
-        if (!settingsKeyAllowed(message.key, this.keyFlags())) {
-          break;
-        }
-        if (typeof message.value === 'string') {
-          if (message.value.trim()) {
-            await this.context.secrets.store(message.key, message.value.trim());
-          } else {
-            await this.context.secrets.delete(message.key);
-          }
-          if (message.key === 'anthropic-api-key') {
-            setAnthropicKeyAvailable(Boolean(message.value.trim()));
+        // Sprint 149, PR 4: the write itself is `applyApiKeyMessage`, which holds the list; its test fails if a name
+        // off the list (`ritemark.publish.cloudflare.v1`, Google's) is ever stored or deleted.
+        {
+          const applied = await applyApiKeyMessage(message, this.keyFlags(), this.context.secrets);
+          if (!applied) break;
+          if (applied.key === 'anthropic-api-key') {
+            setAnthropicKeyAvailable(applied.action === 'stored');
             emitClaudeStatusInvalidated('settings-updated');
           }
           // The secrets listener redraws which keys are saved; this covers a store that reports no change
@@ -445,7 +451,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
           // Show confirmation
           vscode.window.showInformationMessage(
-            message.value.trim()
+            applied.action === 'stored'
               ? `API key saved successfully`
               : `API key removed`
           );
@@ -580,6 +586,12 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     };
   }
 
+  /** Sprint 149, PR 4: web-page publishing, by the same lazy require. */
+  private static publishFeature() {
+    const ext = require('../extension') as typeof import('../extension');
+    return ext.publish;
+  }
+
   /** Lazy require avoids a load-time circular import with ../extension. */
   private static googleDocsFeature() {
     const ext = require('../extension') as typeof import('../extension');
@@ -597,6 +609,9 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     this.clearQueue();
     RitemarkSettingsProvider.googleDocsFeature()?.setSettingsListener((projection) => {
       panel.webview.postMessage({ type: 'google-docs/settings', projection }).then(undefined, () => {});
+    });
+    RitemarkSettingsProvider.publishFeature()?.setSettingsListener((projection) => {
+      panel.webview.postMessage({ type: 'publish:settings', projection }).then(undefined, () => {});
     });
     // Sprint 147 (experience 15, frames 2–7): the tab reads Settings, with the gear, as You's menu does
     panel.title = 'Settings';
@@ -661,6 +676,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
       if (RitemarkSettingsProvider.panel === panel) {
         RitemarkSettingsProvider.panel = undefined;
         RitemarkSettingsProvider.googleDocsFeature()?.setSettingsListener(null);
+        RitemarkSettingsProvider.publishFeature()?.setSettingsListener(null);
         this.probes = null;
         this.lastParts.clear();
         this.lastCodexAuth = null;
@@ -768,6 +784,9 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     // The update state as it stands (no network); a first-ever check is a probe of its own
     const updateCenter = await settingsTimed('update-snapshot', this.updateService.getStatusSnapshot())
       .catch((error: unknown) => ({ ...this.updateFallback(), error: error instanceof Error ? error.message : 'Unknown update status error' }));
+    // Sprint 149, PR 4: Web pages, the host's projection (no token, no account ID)
+    const webPages = await (RitemarkSettingsProvider.publishFeature()?.controller.settingsProjection() ?? Promise.resolve(null))
+      .catch(() => null);
     if (sequence !== this.baseSequence) return;
 
     await webview.postMessage({
@@ -824,6 +843,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
         // Sprint 119: Google Docs publishing card (redacted projection only).
         googleDocs: RitemarkSettingsProvider.googleDocsFeature()?.controller.settingsProjection() ?? null,
+        // Sprint 149, PR 4: Settings ▸ Sharing ▸ Web pages
+        webPages,
       },
     }).then(undefined, () => false);
     if (!this.drawnMs && this.panelOrigin) this.drawnMs = Date.now() - this.panelOrigin;
