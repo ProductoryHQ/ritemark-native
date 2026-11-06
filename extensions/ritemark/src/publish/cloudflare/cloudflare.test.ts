@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { CloudflareAccount, CONNECTION_SECRET_KEY, type SecretsLike } from './account';
 import { assetHash, buildManifest, cleanName, NOINDEX_HEADERS, siteAddress, siteNameFor, slug, suggestSubdomain } from './assets';
 import { CloudflareApiError, CloudflareClient, CLOUDFLARE_API, MAX_ANSWER_BYTES, SubdomainExistsError, type FetchLike } from './client';
-import { ADDRESS_TAKEN, CloudflareHost, COULD_NOT_REACH_PUBLISH, COULD_NOT_REACH_UNPUBLISH } from './CloudflareHost';
+import { ADDRESS_TAKEN, CloudflareHost, COULD_NOT_REACH_PUBLISH, COULD_NOT_REACH_UNPUBLISH, FIRST_ANSWER_DEADLINE_MS } from './CloudflareHost';
 import { redact } from './redact';
 import { FakeCloudflare } from './testing/fakeCloudflare';
 import { HARBOUR, testProject } from './testing/pages';
@@ -299,6 +299,44 @@ test('unpublish that never sees the page go says "…The page is still online.";
     fake.failures.push({ method: 'DELETE', path: /\/scripts\//, status: 500, times: 10 });
     await assert.rejects(host.unpublish(second.name, second.address), (e: unknown) => e instanceof PublishError && e.message === COULD_NOT_REACH_UNPUBLISH);
     assert.ok(fake.scripts.has(second.name), 'the page is still there, as the line says');
+  } finally { await fake.stop(); }
+});
+
+test('a new address: the first answer is waited for, a check every 2 s, the slow line once after 10 s (A4, M6)', async () => {
+  const { fake, account, host } = await setup();
+  try {
+    await account.connectWithToken(TOKEN);
+    fake.answerAfterChecks = 8; // a new address stays silent for 8 checks, as a new workers.dev name does
+    const site = await host.publish('harbour-programme-7f3a2c', await upload(), FIRST);
+    let slow = 0;
+    assert.equal(await host.waitUntilOnline(site.address, { onSlow: () => { slow++; } }), 'online');
+    assert.equal(slow, 1, 'the line once, after 10 s');
+    const checks = fake.requests.filter((r) => r.path.startsWith('/__site/'));
+    assert.equal(checks.length, 9, 'until the first answer, and not one more');
+    for (const c of checks) assert.equal(c.authorization, null, 'the address check carries no credentials');
+    // An update keeps an address that already answers: no warm-up
+    await host.publish(site.name, await upload(), AGAIN);
+    assert.equal(await host.waitUntilOnline(site.address), 'online');
+  } finally { await fake.stop(); }
+});
+
+test('a new address that answers at once: no slow line; the wait\'s cap is "not yet", never an error; stop ends it', async () => {
+  const { fake, account, host } = await setup();
+  try {
+    await account.connectWithToken(TOKEN);
+    const quick = await host.publish('harbour-programme-7f3a2c', await upload(), FIRST);
+    let slow = 0;
+    assert.equal(await host.waitUntilOnline(quick.address, { onSlow: () => { slow++; } }), 'online');
+    assert.equal(slow, 0);
+    fake.answerAfterChecks = 1_000_000;
+    const silent = await host.publish('appendix-111111', await upload(), FIRST);
+    const before = fake.requests.length;
+    assert.equal(await host.waitUntilOnline(silent.address), 'not-yet', 'the cap is not a failure: the upload went through');
+    const made = fake.requests.length - before;
+    assert.equal(made, FIRST_ANSWER_DEADLINE_MS / 2_000 + 1, 'every 2 s up to 5 minutes');
+    assert.ok(FIRST_ANSWER_DEADLINE_MS >= 2 * 121_083, 'the cap allows over twice M6\'s 121 s');
+    let asked = 0;
+    assert.equal(await host.waitUntilOnline(silent.address, { stop: () => ++asked > 3 }), 'stopped', 'unpublished meanwhile: the wait ends');
   } finally { await fake.stop(); }
 });
 

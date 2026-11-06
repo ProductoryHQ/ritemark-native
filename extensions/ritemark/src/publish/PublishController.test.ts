@@ -21,6 +21,7 @@ import {
   DISCONNECT_FAILED,
   KEY_NEEDS_SHEET,
   NAME_TAKEN,
+  NEW_ADDRESS_WAIT,
   OTHER_ACCOUNT,
   PublishController,
   SLOW_UNPUBLISH,
@@ -119,6 +120,8 @@ async function setup(options: { flag?: boolean; entry?: boolean; pasted?: string
   const ready: boolean[] = [];
   const pageEvents: string[] = [];
   const failures: string[] = [];
+  /** M6's waiting line: each one shown, and whether it was closed. */
+  const waits: Array<{ line: string; closed: boolean }> = [];
   const sheets: SheetSeen[] = [];
   const flag = { on: options.flag ?? true };
   const pasted = [...(options.pasted ?? [])];
@@ -136,6 +139,11 @@ async function setup(options: { flag?: boolean; entry?: boolean; pasted?: string
     },
     showSheet: driveSheet(sheets) as PublishUi['showSheet'],
     showFailure: (line: string) => { failures.push(line); },
+    showWaiting: (line: string) => {
+      const wait = { line, closed: false };
+      waits.push(wait);
+      return () => { wait.closed = true; };
+    },
   };
   const makeController = () => new PublishController({
     host,
@@ -155,7 +163,7 @@ async function setup(options: { flag?: boolean; entry?: boolean; pasted?: string
   if (options.entry ?? true) controller.setPublishEntryAvailable(true);
   const page = { realPath: project.page(), projectFolder: project.dir };
   const cleanup = async () => { await fake.stop(); await fs.rm(storage, { recursive: true, force: true }); await project.cleanup(); };
-  return { makeController, fake, secrets, account, host, records, controller, posted, opened, boxes, ready, pageEvents, failures, sheets, ui, flag, log, cleanup, storage, pasted, project, page };
+  return { makeController, fake, secrets, account, host, records, controller, posted, opened, boxes, ready, pageEvents, failures, waits, sheets, ui, flag, log, cleanup, storage, pasted, project, page };
 }
 
 type T = Awaited<ReturnType<typeof setup>>;
@@ -643,6 +651,112 @@ test('the sheet answering for another plan than the one prepared publishes nothi
     assert.equal(await t.records.get(t.page.realPath), undefined, 'not published');
     assert.equal(t.fake.requests.filter((r) => r.path.endsWith('/assets-upload-session')).length, 0, 'nothing sent');
     assert.equal(t.fake.scripts.size, 0);
+  } finally { await t.cleanup(); }
+});
+
+// ---------------------------------------------------------------- a new address's first answer (A4, M6)
+
+/** Holds the host's wait for a new address until `release`, counting the waits; the real wait runs after. */
+function holdWait(t: T) {
+  const original = t.host.waitUntilOnline.bind(t.host);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const held = { calls: 0, release, started: Promise.resolve() };
+  let started!: () => void;
+  // A publish that never waits fails here, rather than hanging the run
+  held.started = Promise.race([
+    new Promise<void>((resolve) => { started = resolve; }),
+    new Promise<void>((_, reject) => { setTimeout(() => reject(new Error('the publish never waited for its new address')), 5_000).unref(); }),
+  ]);
+  t.host.waitUntilOnline = async (address, options) => {
+    held.calls++;
+    started();
+    await gate;
+    return original(address, options);
+  };
+  return held;
+}
+
+test('a first publish on a name registered in the sheet: "Publishing…" holds with the new-address line until the page answers (M6)', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    t.fake.subdomain = null; // a new account: the sheet registers its workers.dev name
+    t.fake.answerAfterChecks = 6; // and its first page stays silent for a while, as M6 measured (121 s)
+    const held = holdWait(t);
+    await t.controller.startTokenEntry();
+    const going = t.controller.publishFromBar(t.page);
+    await held.started;
+    assert.deepEqual(t.waits.map((w) => w.line), [NEW_ADDRESS_WAIT], 'the line at once: the name is new');
+    assert.equal(NEW_ADDRESS_WAIT, 'Your address is new. It can take a couple of minutes before the page opens.');
+    const during = await t.controller.pageState(t.page.realPath);
+    assert.equal(during.kind, 'publishing', 'never Published before the page opens');
+    assert.equal(during.line, NEW_ADDRESS_WAIT);
+    assert.match(during.address ?? '', /^https:\/\/[a-z0-9-]+\.pages-\d{4}\.workers\.dev\//, 'the record is written: the upload went through');
+    assert.equal(t.waits[0].closed, false);
+    held.release();
+    await going;
+    assert.equal(t.waits[0].closed, true, 'the line closes by itself when the page answers');
+    assert.equal(t.waits.length, 1, 'once');
+    const after = await t.controller.pageState(t.page.realPath);
+    assert.equal(after.kind, 'published');
+    assert.equal(after.line, null);
+    assert.deepEqual(t.failures, [], 'a slow new address is never a failure');
+    assert.ok(t.log.some((l) => / the new address answers$/.test(l)));
+  } finally { await t.cleanup(); }
+});
+
+test('a first publish on a name the account had: no line while the page answers at once; the line after 10 s when it doesn\'t', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    await publishedOnce(t);
+    assert.deepEqual(t.waits, [], 'answered at once: nothing to say');
+    await t.controller.unpublishSite((await t.records.get(t.page.realPath))!.siteName);
+    t.fake.answerAfterChecks = 8; // 16 s of silence
+    await t.controller.publishFromBar(t.page);
+    assert.deepEqual(t.waits.map((w) => [w.line, w.closed]), [[NEW_ADDRESS_WAIT, true]], 'shown after 10 s, closed when it answered');
+    assert.equal((await t.controller.pageState(t.page.realPath)).kind, 'published');
+    assert.deepEqual(t.failures, []);
+  } finally { await t.cleanup(); }
+});
+
+test('the wait\'s cap: Published all the same, the line closed, no failure; an update never waits', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    t.fake.answerAfterChecks = 1_000_000;
+    const record = await publishedOnce(t);
+    assert.deepEqual(t.waits.map((w) => w.closed), [true]);
+    const state = await t.controller.pageState(t.page.realPath);
+    assert.equal(state.kind, 'published', 'the upload went through: Published, never a failure');
+    assert.deepEqual(t.failures, []);
+    assert.ok(t.log.some((l) => /did not answer before the wait ended/.test(l)));
+    // Update the page, with the same files: straight up, and no wait for an address that already answers (M8)
+    const held = holdWait(t);
+    held.release();
+    await t.controller.publishFromBar(t.page);
+    assert.equal(held.calls, 0, 'an update never waits');
+    assert.equal((await t.records.get(t.page.realPath))?.siteName, record.siteName);
+  } finally { await t.cleanup(); }
+});
+
+test('Unpublish from Settings during the wait ends it: the page is down, the line closed, the bar shows Publish', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    t.fake.subdomain = null;
+    t.fake.answerAfterChecks = 1_000_000;
+    const held = holdWait(t);
+    await t.controller.startTokenEntry();
+    const going = t.controller.publishFromBar(t.page);
+    await held.started;
+    const record = (await t.records.get(t.page.realPath))!;
+    t.fake.answerAfterChecks = 0;
+    await t.controller.unpublishSite(record.siteName);
+    const before = t.fake.requests.length;
+    held.release();
+    await going;
+    assert.ok(t.fake.requests.length - before <= 1, 'the wait stopped at once, not at its cap');
+    assert.equal(t.waits[0].closed, true);
+    assert.equal((await t.controller.pageState(t.page.realPath)).kind, 'unpublished');
+    assert.ok(t.log.some((l) => /the wait for the new address was stopped/.test(l)));
   } finally { await t.cleanup(); }
 });
 

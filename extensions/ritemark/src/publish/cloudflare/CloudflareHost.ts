@@ -3,7 +3,7 @@
  * turned into the plain lines of spec R7. Every message it throws is already redacted by the client.
  */
 
-import type { ConnectionSnapshot, PublishHost, PublishedSite, TokenCheck, VerifiedUpload } from '../host';
+import type { ConnectionSnapshot, FirstAnswer, PublishHost, PublishedSite, TokenCheck, VerifiedUpload } from '../host';
 import { isVerifiedUpload, PublishError } from '../host';
 import type { CloudflareAccount } from './account';
 import { buildManifest, cleanName, siteAddress } from './assets';
@@ -23,7 +23,12 @@ export interface CloudflareHostOptions {
   /** When "Cloudflare is still taking the page down." shows (the lead, answer 7). */
   slowAfterMs?: number;
   pollMs?: number;
+  /** How long a first publish waits for its new address to answer (M6: 121 s on a new workers.dev name). */
+  firstAnswerDeadlineMs?: number;
 }
+
+/** M6 measured 121 s on a brand-new workers.dev name; the wait allows well over twice that. */
+export const FIRST_ANSWER_DEADLINE_MS = 300_000;
 
 export class CloudflareHost implements PublishHost {
   readonly id = 'cloudflare' as const;
@@ -134,6 +139,31 @@ export class CloudflareHost implements PublishHost {
       checkSlow();
       if (await client.addressAnswers(address) === 'gone') return;
       if (this.now() - started >= deadline) throw new PublishError('still-online', COULD_NOT_REACH_UNPUBLISH);
+      await this.sleep(poll);
+    }
+  }
+
+  async waitUntilOnline(address: string, options: { onSlow?: () => void; stop?: () => boolean } = {}): Promise<FirstAnswer> {
+    const started = this.now();
+    const deadline = this.options.firstAnswerDeadlineMs ?? FIRST_ANSWER_DEADLINE_MS;
+    const slowAfter = this.options.slowAfterMs ?? 10_000;
+    const poll = this.options.pollMs ?? 2_000;
+    let slowShown = false;
+    let client: ReturnType<CloudflareAccount['client']>;
+    try {
+      client = this.account.client();
+    } catch {
+      return 'not-yet'; // signed out meanwhile: the upload went through, so it is published all the same
+    }
+    for (;;) {
+      if (options.stop?.()) return 'stopped';
+      if (await client.addressAnswers(address) === 'answers') return 'online';
+      if (options.stop?.()) return 'stopped';
+      if (!slowShown && this.now() - started >= slowAfter) { slowShown = true; options.onSlow?.(); }
+      if (this.now() - started >= deadline) {
+        this.options.log?.('[publish] the new address did not answer before the wait ended; shown as published');
+        return 'not-yet';
+      }
       await this.sleep(poll);
     }
   }

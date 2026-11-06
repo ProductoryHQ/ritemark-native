@@ -126,6 +126,13 @@ export function createPublishFeature(
       showFailure: (line, retry) => {
         void vscode.window.showWarningMessage(line, 'Try again').then((pick) => { if (pick === 'Try again') retry(); });
       },
+      // M6's wait: a line that stays while the new address warms up and closes by itself when the page answers
+      showWaiting: (line) => {
+        let done: () => void = () => undefined;
+        const finished = new Promise<void>((resolve) => { done = resolve; });
+        void vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: line, cancellable: false }, () => finished);
+        return done;
+      },
     },
     isFeatureEnabled,
     postSettings: (projection) => settingsListener?.(projection),

@@ -100,7 +100,16 @@ export interface PublishHost {
   publish(siteName: string, upload: VerifiedUpload, options: { replacing: boolean }): Promise<PublishedSite>;
   /** Unpublish; resolves only after the address has stopped answering (R7, M9). */
   unpublish(siteName: string, address: string, options?: { onSlow?: () => void }): Promise<void>;
+  /**
+   * After a first publish: checks the address until it answers (A4, M6: 121 s on a brand-new workers.dev name), up
+   * to a cap. `onSlow` once the wait has gone on for a while; `stop` ends it early (the page was taken down). Never
+   * throws: a check that fails is "not yet".
+   */
+  waitUntilOnline(address: string, options?: { onSlow?: () => void; stop?: () => boolean }): Promise<FirstAnswer>;
 }
+
+/** How the wait for a new address ended: it answered, the cap came first, or it was stopped. */
+export type FirstAnswer = 'online' | 'not-yet' | 'stopped';
 
 // ------------------------------------------------------------------ the plan, as bytes
 

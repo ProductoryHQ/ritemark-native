@@ -49,12 +49,15 @@ export class FakeCloudflare {
   readonly failures: FakeFailure[] = [];
   /** How many address checks a deleted page keeps answering for (propagation). */
   goneAfterChecks = 0;
+  /** How many address checks a new page's address stays silent for after its first deploy (M6: a new name warms up). */
+  answerAfterChecks = 0;
   /** Upload sessions answer with Wrangler's single-file mode. */
   singleUploads = false;
   /** Files per bucket, so a page with several files needs several uploads. */
   bucketSize = 2;
   private readonly sessions = new Map<string, Session>();
   private readonly fading = new Map<string, number>();
+  private readonly warming = new Map<string, number>();
   private server: http.Server | null = null;
   port = 0;
 
@@ -192,6 +195,7 @@ export class FakeCloudflare {
         const assets = new Map<string, { hash: string; bytes: Buffer }>();
         for (const [p, m] of Object.entries(session.manifest)) assets.set(p, { hash: m.hash, bytes: this.blobs.get(m.hash)! });
         const previous = this.scripts.get(script);
+        if (!previous && this.answerAfterChecks > 0) this.warming.set(script, this.answerAfterChecks);
         this.scripts.set(script, { assets, headers: metadata.assets?.config?._headers ?? '', enabled: previous?.enabled ?? false, previews: previous?.previews ?? null });
         this.fading.delete(script);
         return this.ok(res, { id: script });
@@ -241,6 +245,13 @@ export class FakeCloudflare {
   private site(url: URL, r: FakeRequest, res: http.ServerResponse): void {
     const [, , host, ...rest] = url.pathname.split('/');
     const [script, sub] = (host ?? '').split('.');
+    const warm = this.warming.get(script ?? '');
+    if (warm !== undefined && warm > 0) {
+      this.warming.set(script!, warm - 1);
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('There is nothing here yet');
+      return;
+    }
     let entry = sub === this.subdomain ? this.scripts.get(script ?? '') : undefined;
     if (!entry && this.fading.has(script ?? '')) {
       const left = this.fading.get(script!)!;

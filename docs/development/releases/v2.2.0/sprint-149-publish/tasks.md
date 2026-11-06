@@ -14,7 +14,8 @@ Nothing here starts before the plan's approval (sprint-plan.md, *Approval*). Tic
 - [x] A1 `research/page-bar.md`: what patch 010 needs for the lead's bar (the right end of `MenuId.BrowserActionsToolbar`, hiding the address row and back/forward, links into new tabs, reload on a file change)
 - [ ] A2 `research/page-sandbox-live.md` (code side written in PR 1; the live run still to do): `page-sandbox.md`'s live steps with `hostile.html` and a decoy server; the session today (Global) and after W2
 - [x] A3 `research/gather-corpus.md` (R3 and R5 changes proposed there, for `spec.md` before PR 3): ten real pages and what each references; R3 changed in `spec.md` first if needed
-- [ ] A4 `research/cloudflare-measurements.md`: M1–M11 (needs decision 1), M12–M14 (needs decision 6's private client); R6/R7 changed in `spec.md` first if needed
+- [x] A4 `research/cloudflare-measurements.md`: M1–M11 (needs decision 1; 12/12 PASS on 6 November, M10's template link and M11 read in Cloudflare's dashboard by Jarmo); R7 changed in `spec.md` first (M6: 121 s to a new address's first answer)
+- [ ] A4's M12–M14 (needs decision 6's private client)
 
 ## Phase 2: PR 1, the vault script and the bar (W0, W1; R2, E3)
 
@@ -59,7 +60,9 @@ Nothing here starts before the plan's approval (sprint-plan.md, *Approval*). Tic
 - [x] Settings ▸ Sharing ▸ Web pages: the card's two states, the published pages with Open and Unpublish, Disconnect's question (R9, S22, S30)
 - [x] The bar's states, Unpublish's question, "Unpublishing…", the 10 s line, the failure line (R7, S24–S29): patch 010's chip, Copy link, Publishing…, Unpublishing…; the failure line as a notification with Try again until the bar draws it
 - [x] `web-page-publishing` (registered in PR 1): gates creating, connecting, publishing and updating; the list, Unpublish and Disconnect stay with it off (S28b)
-- [ ] **After A4:** `scripts/qa/cloudflare-contract.mjs` green (written in PR 4 round 2, green against the fake); S17–S28b live on the Mac; S21's log search
+- [x] **After A4:** `scripts/qa/cloudflare-contract.mjs` green live (12/12, 6 November; green against the fake too)
+- [x] **After A4:** M6's wait in `spec.md` R7 and the code: "Publishing…" until a new address answers, with "Your address is new. It can take a couple of minutes before the page opens."
+- [ ] S17–S28b live on the Mac, connected (the app takes the token only from its own password box, so a connected run needs a person to paste it); S21's log search
 - [ ] Review (High, `/security-review`), Windows overlay (offline scenarios; live when the Windows vault exists), merge
 
 ## Phase 6: QA and closeout

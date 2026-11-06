@@ -53,6 +53,11 @@ export const TOKEN_WORDS = {
 
 export const NAME_TAKEN = 'This name is taken. Try another.';
 export const SLOW_UNPUBLISH = 'Cloudflare is still taking the page down.';
+/**
+ * A first publish whose new address doesn't answer yet (A4, M6: 121 s on a brand-new workers.dev name). Shown at once
+ * when the workers.dev name was registered in this publish, otherwise after 10 s; it closes when the page answers.
+ */
+export const NEW_ADDRESS_WAIT = 'Your address is new. It can take a couple of minutes before the page opens.';
 export const OTHER_ACCOUNT = 'This page is on another Cloudflare account. Connect that account to unpublish it.';
 export const OTHER_ACCOUNT_UPDATE = 'This page is on another Cloudflare account. Connect that account to update it.';
 export const SWITCHED_OFF = 'Publishing is switched off in this version.';
@@ -110,6 +115,8 @@ export interface PublishUi {
   }): Promise<{ kind: 'cancel' } | { kind: 'publish' | 'publishAnyway'; pagePart?: string; plan: PublishPlan }>;
   /** A failure line for the page, with Try again (R7). */
   showFailure(line: string, retry: () => void): void;
+  /** A line that stays while a new address waits for its first answer (M6); the returned function closes it. */
+  showWaiting(line: string): () => void;
 }
 
 /** The page's bar, as patch 010 draws it (spec R7, frame 4), through `_ritemark.publish.pageState`. */
@@ -162,6 +169,10 @@ export class PublishController {
   private readonly publishing = new Set<string>();
   private readonly sheets = new Set<string>();
   private readonly pageLines = new Map<string, string>();
+  /** First publishes waiting for their new address to answer, with the line shown (M6). */
+  private readonly waiting = new Map<string, string>();
+  /** The same waits by site name: Unpublish (from Settings) during one ends it. */
+  private readonly waitingSites = new Map<string, { stopped: boolean }>();
   private readonly now: () => number;
   private readonly readUpload: (plan: GatheredPlan) => Promise<VerifiedUpload>;
 
@@ -322,6 +333,8 @@ export class PublishController {
       return;
     }
     this.unpublishing.set(id, { slow: false });
+    const wait = this.waitingSites.get(id);
+    if (wait) wait.stopped = true;
     await this.post();
     this.deps.onPageState?.(record.pagePath);
     try {
@@ -370,7 +383,7 @@ export class PublishController {
     const key = page.realPath;
     if (this.publishing.has(key) || this.sheets.has(key)) return;
     this.sheets.add(key);
-    let chosen: { plan: GatheredPlan; consent: PublishConsent; pagePart?: string } | null = null;
+    let chosen: { plan: GatheredPlan; consent: PublishConsent; pagePart?: string; newName?: boolean } | null = null;
     try {
       const title = path.basename(key).replace(/\.html?$/i, '');
       let prepared: Prepared | null = null;
@@ -414,7 +427,7 @@ export class PublishController {
         if (stopLine) return this.fail(key, stopLine, page);
         if (answer.kind === 'cancel' || !current) return;
         if (answer.plan !== current.plan) return; // never another plan than the one prepared here
-        chosen = { plan: current.plan, consent: answer.kind === 'publishAnyway' ? 'sheet-anyway' : 'sheet', pagePart: answer.pagePart };
+        chosen = { plan: current.plan, consent: answer.kind === 'publishAnyway' ? 'sheet-anyway' : 'sheet', pagePart: answer.pagePart, newName: current.newName };
       }
     } finally {
       this.sheets.delete(key);
@@ -474,6 +487,7 @@ export class PublishController {
         return { kind: 'stop' };
       }
       prepared.options = { ...prepared.options, nameRow: undefined, address: { ...prepared.options.address!, suffix: `.${result.name}.workers.dev` } };
+      prepared.newName = true; // registered now: its first page takes a while to answer (M6)
     }
     if (!prepared.record) {
       try {
@@ -503,8 +517,12 @@ export class PublishController {
    * `gatherPage` didn't make is refused, a key-shaped hit needs the sheet's "Publish anyway", and an update without
    * the sheet needs `sheetNeeded` to be false. Update keeps the record's site name, so the address stays (M8); a new
    * page's part of the address is checked again here.
+   *
+   * A first publish then waits, still "Publishing…", until its new address answers or the host's cap (A4, M6: 121 s
+   * on a brand-new workers.dev name), with `NEW_ADDRESS_WAIT` shown at once when `newName` (the name was registered
+   * in this publish), otherwise once the wait is slow. The record is written before the wait: the page is online.
    */
-  async publishPage(input: { plan: GatheredPlan; consent: PublishConsent; pagePart?: string }): Promise<PublishedSite> {
+  async publishPage(input: { plan: GatheredPlan; consent: PublishConsent; pagePart?: string; newName?: boolean }): Promise<PublishedSite> {
     if (!this.canPublish()) throw new PublishError('failed', SWITCHED_OFF);
     const { plan, consent } = input;
     if (!isGatheredPlan(plan)) throw new PublishError('failed', 'Ritemark could not check what goes. Press Publish again.');
@@ -539,6 +557,7 @@ export class PublishController {
         this.pageLines.set(pagePath, PUBLISHED_NOT_NOTED);
       }
       await this.post();
+      if (!record) await this.waitForFirstAnswer(pagePath, site, input.newName === true);
       return site;
     } catch (error) {
       const line = error instanceof PublishError
@@ -552,13 +571,41 @@ export class PublishController {
     }
   }
 
+  /** "Publishing…" until a new address answers (M6), with its line; never a failure, whatever the wait's end. */
+  private async waitForFirstAnswer(pagePath: string, site: PublishedSite, newName: boolean): Promise<void> {
+    let close: (() => void) | null = null;
+    const showLine = () => {
+      if (close) return;
+      this.waiting.set(pagePath, NEW_ADDRESS_WAIT);
+      try {
+        close = this.deps.ui.showWaiting(NEW_ADDRESS_WAIT);
+      } catch {
+        close = () => undefined;
+      }
+      this.deps.onPageState?.(pagePath);
+    };
+    const wait = { stopped: false };
+    this.waitingSites.set(site.name, wait);
+    if (newName) showLine();
+    try {
+      const end = await this.deps.host.waitUntilOnline(site.address, { onSlow: showLine, stop: () => wait.stopped });
+      this.deps.log(`[publish] ${site.name}: ${end === 'online' ? 'the new address answers' : end === 'stopped' ? 'the wait for the new address was stopped' : 'the new address has not answered yet'}`);
+    } catch {
+      this.deps.log('[publish] the wait for the new address ended early');
+    } finally {
+      this.waiting.delete(pagePath);
+      if (this.waitingSites.get(site.name) === wait) this.waitingSites.delete(site.name);
+      try { (close as (() => void) | null)?.(); } catch { /* a closed line stays closed */ }
+    }
+  }
+
   /** The bar's state for a page. `currentHash` is PR 3's `contentHash` of what would go now, when known. */
   async pageState(pagePath: string, currentHash?: string): Promise<PageBarState> {
     const stored = await this.deps.records.get(pagePath);
     const record = stored && !stored.unpublished && !this.gone.has(stored.siteName) ? stored : undefined;
     const line = this.pageLines.get(pagePath) ?? (stored ? this.siteLines.get(stored.siteName) ?? null : null);
     if (this.publishing.has(pagePath)) {
-      return { kind: 'publishing', address: record?.address ?? null, changed: false, signedOut: false, slow: false, line: null };
+      return { kind: 'publishing', address: record?.address ?? null, changed: false, signedOut: false, slow: false, line: this.waiting.get(pagePath) ?? null };
     }
     if (!record) return { kind: 'unpublished', address: null, changed: false, signedOut: false, slow: false, line };
     const going = this.unpublishing.get(record.siteName);
@@ -599,4 +646,6 @@ interface Prepared {
   plan: GatheredPlan;
   options: SheetOptions;
   record: PublishRecord | undefined;
+  /** The workers.dev name was registered in this sheet (M6: its first page takes a while to answer). */
+  newName?: boolean;
 }

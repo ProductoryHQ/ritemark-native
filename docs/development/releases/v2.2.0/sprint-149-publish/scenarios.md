@@ -40,7 +40,7 @@ Behaviour examples for [spec.md](spec.md). They are the manual QA list; `tasks.m
 
 ## Publish, Update, Unpublish (R7, R8)
 
-- **S24 (live, M2–M7).** Given the sheet, when the person presses Publish, then "Publishing…" shows, then Published with Copy link; the address answers with the page within M6's time; the response carries `X-Robots-Tag: noindex` on `/`, on a picture and on a 404.
+- **S24 (live, M2–M7).** Given the sheet, when the person presses Publish, then "Publishing…" shows, then Published with Copy link; the address answers with the page within M6's time (on a new workers.dev name, "Your address is new. It can take a couple of minutes before the page opens." shows while Publishing… waits, and closes when the page answers); the response carries `X-Robots-Tag: noindex` on `/`, on a picture and on a 404.
 - **S25.** Given Published, when the person presses Copy link, then the address is on the clipboard.
 - **S26 (live, M8).** Given the person changes the page, then the chip reads "Published · changed"; Update the page sends only the changed files and keeps the address; a picture no longer used is gone from the page.
 - **S27.** Given the page has a new local picture since the last publish, when the person presses Update the page, then the sheet shows again with the new file named.
