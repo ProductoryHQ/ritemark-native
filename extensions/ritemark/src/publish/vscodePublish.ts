@@ -33,6 +33,7 @@ export const OPEN_PUBLISHED_COMMAND = 'ritemark.page.openPublished';
 export const PAGE_STATE_COMMAND = '_ritemark.publish.pageState';
 /** Patch 010's: the bar asks `PAGE_STATE_COMMAND` again for this page's URL. */
 export const BAR_REFRESH_COMMAND = '_ritemark.browser.publishStateChanged';
+const OPEN_SETTINGS = 'Open Settings';
 
 export interface PublishFeature {
   controller: PublishController;
@@ -133,6 +134,12 @@ export function createPublishFeature(
         void vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: line, cancellable: false }, () => finished);
         return done;
       },
+      // The bar's Unpublish signed out or on another account: Settings ▸ Sharing ▸ Web pages is where Cloudflare is connected
+      showConnect: (line) => {
+        void vscode.window.showWarningMessage(line, OPEN_SETTINGS).then((pick) => {
+          if (pick === OPEN_SETTINGS) void vscode.commands.executeCommand('ritemark.aiSettings', 'web-pages');
+        });
+      },
     },
     isFeatureEnabled,
     postSettings: (projection) => settingsListener?.(projection),
@@ -147,9 +154,10 @@ export function createPublishFeature(
 
   context.subscriptions.push(
     { dispose: () => setPublishHandler(null) },
-    // Another window connected or disconnected: read the entry again. Only the event's name is read here.
+    // Another window connected or disconnected: read the entry again, then redraw Settings and the bars (Codex's
+    // review of #668). Only the event's name is read here.
     context.secrets.onDidChange((event) => {
-      if (event.key === CONNECTION_SECRET_KEY) void account.reload().then(() => controller.refreshReady());
+      if (event.key === CONNECTION_SECRET_KEY) void controller.connectionChanged(() => account.reload());
     }),
     vscode.commands.registerCommand(UNPUBLISH_PAGE_COMMAND, async (arg?: unknown) => {
       const pagePath = await pagePathOf(arg);

@@ -120,6 +120,10 @@ async function setup(options: { flag?: boolean; entry?: boolean; pasted?: string
   const ready: boolean[] = [];
   const pageEvents: string[] = [];
   const failures: string[] = [];
+  /** Each failure's Try again, beside its line. */
+  const retries: Array<() => void> = [];
+  /** Lines whose way on is connecting in Settings ▸ Sharing (Codex's review of #668). */
+  const connects: string[] = [];
   /** M6's waiting line: each one shown, and whether it was closed. */
   const waits: Array<{ line: string; closed: boolean }> = [];
   const sheets: SheetSeen[] = [];
@@ -138,7 +142,8 @@ async function setup(options: { flag?: boolean; entry?: boolean; pasted?: string
       }
     },
     showSheet: driveSheet(sheets) as PublishUi['showSheet'],
-    showFailure: (line: string) => { failures.push(line); },
+    showFailure: (line: string, retry: () => void) => { failures.push(line); retries.push(retry); },
+    showConnect: (line: string) => { connects.push(line); },
     showWaiting: (line: string) => {
       const wait = { line, closed: false };
       waits.push(wait);
@@ -163,7 +168,7 @@ async function setup(options: { flag?: boolean; entry?: boolean; pasted?: string
   if (options.entry ?? true) controller.setPublishEntryAvailable(true);
   const page = { realPath: project.page(), projectFolder: project.dir };
   const cleanup = async () => { await fake.stop(); await fs.rm(storage, { recursive: true, force: true }); await project.cleanup(); };
-  return { makeController, fake, secrets, account, host, records, controller, posted, opened, boxes, ready, pageEvents, failures, waits, sheets, ui, flag, log, cleanup, storage, pasted, project, page };
+  return { makeController, fake, secrets, account, host, records, controller, posted, opened, boxes, ready, pageEvents, failures, retries, connects, waits, sheets, ui, flag, log, cleanup, storage, pasted, project, page };
 }
 
 type T = Awaited<ReturnType<typeof setup>>;
@@ -757,6 +762,108 @@ test('Unpublish from Settings during the wait ends it: the page is down, the lin
     assert.equal(t.waits[0].closed, true);
     assert.equal((await t.controller.pageState(t.page.realPath)).kind, 'unpublished');
     assert.ok(t.log.some((l) => /the wait for the new address was stopped/.test(l)));
+  } finally { await t.cleanup(); }
+});
+
+// ---------------------------------------------------------------- Codex's review of #668
+
+test('the bar\'s Unpublish says what happened (Codex 1): the 10 s line while it waits, closed at the end, and no spinner left', async () => {
+  const t = await setup({ pasted: [TOKEN], goneAfterChecks: 8 });
+  try {
+    await publishedOnce(t);
+    const waitsBefore = t.waits.length;
+    await t.controller.unpublishPage(t.page.realPath);
+    const shown = t.waits.slice(waitsBefore);
+    assert.deepEqual(shown.map((w) => w.line), [SLOW_UNPUBLISH], '"Cloudflare is still taking the page down." shown once');
+    assert.equal(shown[0].closed, true, 'and closed when the page is down');
+    assert.equal((await t.controller.pageState(t.page.realPath)).kind, 'unpublished');
+    assert.deepEqual(t.failures, []);
+  } finally { await t.cleanup(); }
+});
+
+test('the bar\'s Unpublish that fails (Codex 1): "…still online." with Try again, and the bar back on Published, not spinning', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    const record = await publishedOnce(t);
+    t.fake.failures.push({ method: 'DELETE', path: /scripts/, status: 500, times: 10 });
+    await t.controller.unpublishPage(t.page.realPath);
+    assert.deepEqual(t.failures, [COULD_NOT_REACH_UNPUBLISH]);
+    assert.equal((await t.controller.pageState(t.page.realPath)).kind, 'published', 'the truth: still online');
+    assert.ok(t.fake.scripts.has(record.siteName));
+    t.fake.failures.length = 0;
+    t.retries.at(-1)!();
+    for (let i = 0; i < 200 && t.fake.scripts.has(record.siteName); i++) await new Promise((r) => setTimeout(r, 5));
+    for (let i = 0; i < 200 && (await t.controller.pageState(t.page.realPath)).kind !== 'unpublished'; i++) await new Promise((r) => setTimeout(r, 5));
+    assert.equal((await t.controller.pageState(t.page.realPath)).kind, 'unpublished', 'Try again took it down');
+  } finally { await t.cleanup(); }
+});
+
+test('the bar\'s Unpublish whose list update fails (Codex 1): the truth, never "still online"', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    await publishedOnce(t);
+    t.records.remove = async () => { throw new Error('disk full'); };
+    await t.controller.unpublishPage(t.page.realPath);
+    assert.deepEqual(t.failures, [UNPUBLISHED_LIST_STALE]);
+    assert.equal((await t.controller.pageState(t.page.realPath)).kind, 'unpublished');
+  } finally { await t.cleanup(); }
+});
+
+test('the bar\'s Unpublish signed out or on another account (Codex 1): Connect again, shown, with nothing sent', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    const record = await publishedOnce(t);
+    await t.controller.disconnect();
+    const before = t.fake.requests.length;
+    await t.controller.unpublishPage(t.page.realPath);
+    assert.deepEqual(t.connects, [CONNECT_AGAIN]);
+    assert.equal(t.fake.requests.length, before, 'nothing sent');
+    assert.equal((await t.controller.pageState(t.page.realPath)).kind, 'published');
+    t.fake.accounts = [{ id: 'b'.repeat(32), name: 'Someone else' }];
+    t.pasted.push(TOKEN);
+    await t.controller.startTokenEntry();
+    await t.controller.unpublishPage(t.page.realPath);
+    assert.deepEqual(t.connects, [CONNECT_AGAIN, OTHER_ACCOUNT]);
+    assert.ok(t.fake.scripts.has(record.siteName));
+  } finally { await t.cleanup(); }
+});
+
+test('Unpublish from Settings shows its lines in the row only, as before (Codex 1 changes only the bar\'s)', async () => {
+  const t = await setup({ pasted: [TOKEN], goneAfterChecks: 8 });
+  try {
+    const record = await publishedOnce(t);
+    const waitsBefore = t.waits.length;
+    await t.controller.handleSettingsMessage({ type: 'publish:unpublish', id: record.siteName });
+    assert.equal(t.waits.length, waitsBefore);
+    assert.deepEqual([t.failures, t.connects], [[], []]);
+  } finally { await t.cleanup(); }
+});
+
+test('another window connects or disconnects (Codex 2): Settings drawn again and every page bar asks again', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    await publishedOnce(t);
+    const stored = t.secrets.map.get(CONNECTION_SECRET_KEY)!;
+    // The other window's Disconnect: only the shared keychain entry changed
+    t.secrets.map.delete(CONNECTION_SECRET_KEY);
+    t.posted.length = 0;
+    t.pageEvents.length = 0;
+    await t.controller.connectionChanged(() => t.account.reload());
+    assert.equal(t.posted.at(-1)?.state, 'disconnected', 'an open Settings page shows it');
+    assert.deepEqual(t.pageEvents, [t.page.realPath], 'the page\'s bar asks again');
+    assert.equal((await t.controller.pageState(t.page.realPath)).signedOut, true);
+    // The other window's Set up
+    t.secrets.map.set(CONNECTION_SECRET_KEY, stored);
+    t.posted.length = 0;
+    t.pageEvents.length = 0;
+    await t.controller.connectionChanged(() => t.account.reload());
+    assert.equal(t.posted.at(-1)?.state, 'connected');
+    assert.deepEqual(t.pageEvents, [t.page.realPath]);
+    assert.equal((await t.controller.pageState(t.page.realPath)).signedOut, false);
+    // A reload that fails still draws what is known, and says nothing of the entry
+    t.posted.length = 0;
+    await t.controller.connectionChanged(async () => { throw new Error('keychain locked'); });
+    assert.equal(t.posted.length, 1);
   } finally { await t.cleanup(); }
 });
 

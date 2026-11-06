@@ -115,8 +115,13 @@ export interface PublishUi {
   }): Promise<{ kind: 'cancel' } | { kind: 'publish' | 'publishAnyway'; pagePart?: string; plan: PublishPlan }>;
   /** A failure line for the page, with Try again (R7). */
   showFailure(line: string, retry: () => void): void;
-  /** A line that stays while a new address waits for its first answer (M6); the returned function closes it. */
+  /**
+   * A line that stays while something waits: a new address's first answer (M6), and the bar's Unpublish past 10 s.
+   * The returned function closes it.
+   */
   showWaiting(line: string): () => void;
+  /** A line whose way on is connecting (again) in Settings ▸ Sharing: the bar's Unpublish signed out or on another account. */
+  showConnect(line: string): void;
 }
 
 /** The page's bar, as patch 010 draws it (spec R7, frame 4), through `_ritemark.publish.pageState`. */
@@ -303,7 +308,29 @@ export class PublishController {
       this.message = DISCONNECT_FAILED;
     }
     await this.post();
-    for (const r of await this.deps.records.list().catch(() => [] as PublishRecord[])) this.deps.onPageState?.(r.pagePath);
+    await this.askBarsAgain();
+  }
+
+  /**
+   * Another window connected or disconnected (the shared keychain entry changed): read it again, then draw an open
+   * Settings page again and have every page bar ask for its state, as this window's own Set up and Disconnect do
+   * (Codex's review of #668). A failed read still draws what is known.
+   */
+  async connectionChanged(reload: () => Promise<void>): Promise<void> {
+    try {
+      await reload();
+    } catch {
+      this.deps.log('[publish] could not read the stored Cloudflare connection again');
+    }
+    this.refreshReady();
+    await this.post();
+    await this.askBarsAgain();
+  }
+
+  /** Every published page's bar asks for its state again. */
+  private async askBarsAgain(): Promise<void> {
+    const pages = new Set((await this.deps.records.list().catch(() => [] as PublishRecord[])).map((r) => r.pagePath));
+    for (const pagePath of pages) this.deps.onPageState?.(pagePath);
   }
 
   private async bySite(siteName: string): Promise<PublishRecord | undefined> {
@@ -316,22 +343,30 @@ export class PublishController {
     await this.deps.ui.openExternal(record.address);
   }
 
-  /** Unpublish (R7): the page asked its question first. Never gated by the flag (S28b). */
-  async unpublishSite(id: string): Promise<void> {
+  /**
+   * Unpublish (R7): the page asked its question first. Never gated by the flag (S28b).
+   *
+   * Settings shows each outcome in the page's row. The bar draws only its chip and its spinner (patch 010 reads the
+   * state's kind), so an Unpublish started from the bar (`fromBar`) also says it out loud (Codex's review of #668):
+   * "Cloudflare is still taking the page down." past 10 s, closed when it ends; a failure, or a page down with the list
+   * behind, with Try again; and Connect again when signed out or on another account. The bar asks for its state again
+   * at the end either way, so no spinner is left.
+   */
+  async unpublishSite(id: string, options: { fromBar?: boolean } = {}): Promise<void> {
     const record = await this.bySite(id);
     if (!record || this.unpublishing.has(id)) return;
+    const fromBar = options.fromBar === true;
     this.siteLines.delete(id);
     const connected = this.deps.host.accountId();
-    if (!connected) {
-      this.siteLines.set(id, CONNECT_AGAIN);
+    if (!connected || connected !== record.accountId) {
+      const line = connected ? OTHER_ACCOUNT : CONNECT_AGAIN;
+      this.siteLines.set(id, line);
       await this.post();
+      if (fromBar) this.deps.ui.showConnect(line);
       return;
     }
-    if (connected !== record.accountId) {
-      this.siteLines.set(id, OTHER_ACCOUNT);
-      await this.post();
-      return;
-    }
+    let closeSlow: (() => void) | null = null;
+    let failure: string | null = null;
     this.unpublishing.set(id, { slow: false });
     const wait = this.waitingSites.get(id);
     if (wait) wait.stopped = true;
@@ -345,10 +380,17 @@ export class PublishController {
             this.unpublishing.set(id, { slow: true });
             void this.post();
             this.deps.onPageState?.(record.pagePath);
+            if (fromBar && !closeSlow) {
+              try {
+                closeSlow = this.deps.ui.showWaiting(SLOW_UNPUBLISH);
+              } catch {
+                closeSlow = () => undefined;
+              }
+            }
           },
         });
         down = true;
-        await this.deps.records.remove(record.pagePath);
+        await this.deps.records.remove(record.pagePath, record.siteName);
         this.gone.delete(id);
       } catch (error) {
         if (down) {
@@ -356,19 +398,24 @@ export class PublishController {
           // record, so a restart doesn't show it as published either
           this.gone.add(id);
           this.siteLines.set(id, UNPUBLISHED_LIST_STALE);
+          failure = UNPUBLISHED_LIST_STALE;
           this.deps.log('[publish] unpublished, but the record could not be removed');
-          await this.deps.records.markUnpublished(record.pagePath).catch(() => {
+          await this.deps.records.markUnpublished(record.pagePath, record.siteName).catch(() => {
             this.deps.log('[publish] unpublished, and the record could not be marked either');
           });
         } else {
-          this.siteLines.set(id, error instanceof PublishError ? error.message : COULD_NOT_REACH_UNPUBLISH);
+          failure = error instanceof PublishError ? error.message : COULD_NOT_REACH_UNPUBLISH;
+          this.siteLines.set(id, failure);
         }
       }
     } finally {
       this.unpublishing.delete(id);
+      try { (closeSlow as (() => void) | null)?.(); } catch { /* a closed line stays closed */ }
       await this.post();
       this.deps.onPageState?.(record.pagePath);
     }
+    // After the state is back, so Try again starts afresh
+    if (fromBar && failure) this.deps.ui.showFailure(failure, () => { void this.unpublishSite(id, { fromBar: true }); });
   }
 
   // ------------------------------------------------------------------ the bar's Publish (R5, R7)
@@ -638,7 +685,7 @@ export class PublishController {
   /** The bar's Unpublish, after its question. */
   async unpublishPage(pagePath: string): Promise<void> {
     const record = await this.liveRecord(pagePath);
-    if (record) await this.unpublishSite(record.siteName);
+    if (record) await this.unpublishSite(record.siteName, { fromBar: true });
   }
 }
 
