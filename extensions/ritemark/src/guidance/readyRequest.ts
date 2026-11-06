@@ -28,7 +28,8 @@ const EMPTY_LEAD = 'This project is for ';
 
 export const READY_REQUEST_TEXT = {
   // Experience 35, frame 2 redrawn (26 October): the two offers are in the answer's words, so the request asks for them.
-  files: 'What is here? Look at the names first, read only the five newest documents, and end with two things you could do next.',
+  // Jarmo, 6 November: the request leads with what the AI can do; what is here is now the paragraph it asks for.
+  files: 'What can you do here? Look at the names first, read only the five newest documents, say in a paragraph what is here, and end with two things you could do next.',
   // Experience 35, frame 3 redrawn (26 October): the card's promise is in what is sent, on a second line the person sees
   // and can change; the person's sentence goes where the cursor waits.
   empty: `${EMPTY_LEAD}\nThen write About this project from it, and a first outline as a document.`,
@@ -74,7 +75,8 @@ export function readyRequestWords(kind: ReadyKind, ai: AiName, projectName: stri
         icon: 'folder-simple',
         heading: 'Nothing in this folder was moved or changed',
         body: counts ? `${ai} works only inside it. ${counts}` : `${ai} works only inside it.`,
-        button: `Ask ${ai} what is here`,
+        // Jarmo, 6 November: the person knows what is in their own folder; the value is what the AI can do with it
+        button: `Ask ${ai} what it can do here`,
         // The note is true for the AI chosen: the names, and the five newest only where the spike says it reads them
         note: FIRST_LOOK_READS_DOCUMENTS[ai] ? 'Reads the names, then the five newest documents.' : 'Reads the names first.',
         hide,

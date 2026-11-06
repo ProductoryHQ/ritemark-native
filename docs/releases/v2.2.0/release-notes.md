@@ -44,6 +44,7 @@ Publish a page from your project, and anyone with the link can open it. 2.2 also
 ## Smaller changes
 
 - **See where the keyboard is.** A clear indigo ring shows which button the keyboard is on. A mouse click shows no ring.
+- **Home's first card asks what the AI can do here.** The answer says in a paragraph what is in your folder, then offers two things the AI could do next.
 - **Narrow buttons show their icon.** When a button is too narrow for its words, you see its icon. Its words are in its tooltip.
 - **Tooltips look the same everywhere.**
 - **File changes speaks plainly without Git.** It says what is missing, and offers **Set up Git here** where it can.
