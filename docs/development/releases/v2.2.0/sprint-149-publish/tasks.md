@@ -12,7 +12,7 @@ Nothing here starts before the plan's approval (sprint-plan.md, *Approval*). Tic
 ## Phase 1: Audits (each in `research/`, before its code)
 
 - [x] A1 `research/page-bar.md`: what patch 010 needs for the lead's bar (the right end of `MenuId.BrowserActionsToolbar`, hiding the address row and back/forward, links into new tabs, reload on a file change)
-- [ ] A2 `research/page-sandbox-live.md` (code side written in PR 1; the live run still to do): `page-sandbox.md`'s live steps with `hostile.html` and a decoy server; the session today (Global) and after W2
+- [ ] **Moved to Gate 1 (6 Nov, the manager):** A2 `research/page-sandbox-live.md` (code side written in PR 1; the live run still to do): `page-sandbox.md`'s live steps with `hostile.html` and a decoy server; the session today (Global) and after W2
 - [x] A3 `research/gather-corpus.md` (R3 and R5 changes proposed there, for `spec.md` before PR 3): ten real pages and what each references; R3 changed in `spec.md` first if needed
 - [x] A4 `research/cloudflare-measurements.md`: M1–M11 (needs decision 1; 12/12 PASS on 6 November, M10's template link and M11 read in Cloudflare's dashboard by Jarmo); R7 changed in `spec.md` first (M6: 121 s to a new address's first answer)
 - [ ] A4's M12–M14 (needs decision 6's private client)
@@ -62,10 +62,12 @@ Nothing here starts before the plan's approval (sprint-plan.md, *Approval*). Tic
 - [x] `web-page-publishing` (registered in PR 1): gates creating, connecting, publishing and updating; the list, Unpublish and Disconnect stay with it off (S28b)
 - [x] **After A4:** `scripts/qa/cloudflare-contract.mjs` green live (12/12, 6 November; green against the fake too)
 - [x] **After A4:** M6's wait in `spec.md` R7 and the code: "Publishing…" until a new address answers, with "Your address is new. It can take a couple of minutes before the page opens." (round 5: the lead's words naming the page, as a brief toast; the chip's tooltip; "<page title> is published." when the wait ends)
-- [ ] S17–S28b live on the Mac, connected (the app takes the token only from its own password box, so a connected run needs a person to paste it); S21's log search
+- [ ] **Moved to Gate 1 (Jarmo, 6 Nov: connected states at Gate 1):** S17–S28b live on the Mac, connected (the app takes the token only from its own password box, so a connected run needs a person to paste it); S21's log search
 - [ ] Review (High, `/security-review`), Windows overlay (offline scenarios; live when the Windows vault exists), merge
 
 ## Phase 6: QA and closeout
+
+These run at and after Gate 1 on the release candidate (6 Nov); the sprint's code is merged, its acceptance is not yet recorded.
 
 - [ ] Every scenario S1–S32 in `qa-evidence.md` with its result, or why it couldn't run
 - [ ] Every Worker the runs created is deleted (the contract script's list is empty)
