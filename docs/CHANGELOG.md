@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — 2.2.0
 
+### Home: the first-day card asks what the AI can do (experience 35, #678)
+
+#### Changed
+- **Home's ready request asks what the AI can do here.** In a folder with files, the card's button reads "Ask <AI> what it can do here" (it was "Ask <AI> what is here"), and the request it sends leads with that question: "What can you do here? Look at the names first, read only the five newest documents, say in a paragraph what is here, and end with two things you could do next." The note, the `what_is_here` event kind and the AI sheet's "What is here?" starting point are unchanged. Jarmo, 6 November: the person knows what is in their own folder; the value is what the AI can do with it.
+
 ### Sprint 149: Publish a web page (#590)
 
 #### Added
