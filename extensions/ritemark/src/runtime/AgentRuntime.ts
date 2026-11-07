@@ -179,6 +179,11 @@ export interface RuntimeSessionConfig {
     errorCode?: string;
     /** The HTTP status that came with the code, when there was one. */
     errorHttpStatus?: number;
+    /**
+     * Sprint 155: the workspace files the turn changed, never the ones it read
+     * (Codex: completed `fileChange` items; OpenCode: completed `edit` tool calls).
+     */
+    filesModified?: string[];
   }) => void;
   /** Codex approval policy (passed to threadStart) */
   codexApprovalPolicy?: string;

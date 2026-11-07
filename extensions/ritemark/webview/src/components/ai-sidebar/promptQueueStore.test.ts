@@ -198,23 +198,40 @@ function enqueue(conversationId: string, text: string, over: Record<string, unkn
 }
 
 // ── 6. a destination this sidebar does not hold is reported, not redirected ──
+// Sprint 155: it is looked up in history first; history doesn't hold it either.
 {
   resetAll();
   seed('claude-a', {});
   useAISidebarStore.setState({ activeConversationId: 'claude-a' });
 
+  // Outside a webview the bridge logs its conversation requests instead of posting them.
+  const requests: Array<Record<string, unknown>> = [];
+  const log = console.log;
+  console.log = (...args: unknown[]) => {
+    if (args[0] === '[Bridge] Would send conversation request:') requests.push(args[1] as Record<string, unknown>);
+    else log(...args);
+  };
+  try {
+    useAISidebarStore.getState().handleExtensionMessage({
+      type: 'comment-task/enqueue',
+      taskId: 'task-6',
+      conversationId: 'gone-9',
+      conversationTurnId: 'turn-host-6',
+      runtimeId: 'claude-code',
+      prompt: 'p',
+      displayText: 'p',
+      modelId: null,
+      autonomy: 'auto',
+      thinkingEffort: 'auto',
+      sourceDisplayPath: 'notes/release.md',
+    } as never);
+  } finally {
+    console.log = log;
+  }
+  const lookup = requests.find((m) => m.type === 'conversation/get' && m.conversationId === 'gone-9');
+  assert.ok(lookup, 'the chat is looked up in history');
   useAISidebarStore.getState().handleExtensionMessage({
-    type: 'comment-task/enqueue',
-    taskId: 'task-6',
-    conversationId: 'gone-9',
-    conversationTurnId: 'turn-host-6',
-    runtimeId: 'claude-code',
-    prompt: 'p',
-    displayText: 'p',
-    modelId: null,
-    autonomy: 'auto',
-    thinkingEffort: 'auto',
-    sourceDisplayPath: 'notes/release.md',
+    type: 'conversation/result', requestId: lookup!.requestId, operation: 'conversation/get', ok: true, data: { conversation: null },
   } as never);
 
   assert.equal(

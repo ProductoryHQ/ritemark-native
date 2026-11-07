@@ -277,6 +277,25 @@ async function run() {
     console.log('✓ Test 6: prompt() calls setModel and normalizes end_turn to completed');
   }
 
+  // Sprint 155: the completion carries the turn's changed files, workspace files only.
+  {
+    const runtime = new AcpRuntime();
+    let filesModified: string[] | undefined;
+    const session = addSession(runtime, 'conv-files', {
+      ...dummyConfig,
+      workspacePath: '/ws',
+      onCodexComplete: (result) => { filesModified = result.filesModified; },
+    });
+    (mockManager as unknown as { turnFilesModified: (sessionId: string) => string[] }).turnFilesModified = () => ['/ws/Module 2.md', '/elsewhere/plan.md'];
+    try {
+      await session.prompt({ prompt: 'Edit' });
+    } finally {
+      delete (mockManager as unknown as { turnFilesModified?: unknown }).turnFilesModified;
+    }
+    assert.deepStrictEqual(filesModified, ['/ws/Module 2.md'], 'the turn reports its workspace changes');
+    console.log('✓ Test 6b: Sprint 155 — OpenCode reports the files its edits changed');
+  }
+
   // The shared result contract calls a user cancellation `interrupted`.
   {
     const runtime = new AcpRuntime();

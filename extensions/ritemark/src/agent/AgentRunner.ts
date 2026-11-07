@@ -35,6 +35,7 @@ import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import { standaloneClaudeAuthenticationError } from '../runtime/runtimeErrorPresentation';
 import * as path from 'path';
 import { traceClaude } from './agentTrace';
+import { claudeChangedFile, workspaceFilesOnly } from '../runtime/turnFiles';
 import {
   createBackgroundTaskState,
   isBackgroundedCard,
@@ -1806,13 +1807,8 @@ export class AgentSession {
    * report either form.
    */
   private _workspaceFilesModified(files: string[] = this._turnFilesModified): string[] {
-    const roots = new Set<string>([this._workspacePath]);
-    try {
-      roots.add(require('fs').realpathSync(this._workspacePath));
-    } catch { /* workspace gone — keep the raw root */ }
-    const prefixes = Array.from(roots).map((r) => (r.endsWith(path.sep) ? r : r + path.sep));
-    return Array.from(new Set(files))
-      .filter((f) => prefixes.some((p) => f.startsWith(p)));
+    // Sprint 155: the one rule every runtime uses (`runtime/turnFiles.ts`).
+    return workspaceFilesOnly(files, this._workspacePath);
   }
 
   private _clearPendingQuestion(message = 'Question cancelled') {
@@ -1856,7 +1852,7 @@ type ExtendedProgressEmitter = (
 /**
  * Parse assistant message content blocks for tool usage and thinking
  */
-function processAssistantMessage(
+export function processAssistantMessage(
   message: SDKMessage,
   filesModified: string[],
   emitProgress: ExtendedProgressEmitter,
@@ -1868,6 +1864,11 @@ function processAssistantMessage(
   if (!Array.isArray(content)) return;
 
   for (const block of content) {
+    // Sprint 155: a change, never a read (Write, Edit, MultiEdit, NotebookEdit).
+    if (block.type === 'tool_use') {
+      const changed = claudeChangedFile(block.name ?? '', block.input);
+      if (changed) filesModified.push(changed);
+    }
     if (block.type === 'text' && block.text) {
       if (planModeActive && !parentToolUseId) {
         emitProgress('plan_text', block.text);
@@ -1916,10 +1917,8 @@ function processAssistantMessage(
         continue;
       } else if (block.name === 'Write' && input?.file_path) {
         toolMessage = `Writing: ${input.file_path.split('/').pop()}`;
-        filesModified.push(input.file_path);
-      } else if (block.name === 'Edit' && input?.file_path) {
+      } else if ((block.name === 'Edit' || block.name === 'MultiEdit') && input?.file_path) {
         toolMessage = `Editing: ${input.file_path.split('/').pop()}`;
-        filesModified.push(input.file_path);
       } else if (block.name === 'Read' && input?.file_path) {
         toolMessage = `Reading: ${input.file_path.split('/').pop()}`;
       } else if (block.name === 'Bash' && input?.command) {

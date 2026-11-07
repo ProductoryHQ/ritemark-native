@@ -879,8 +879,15 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     // conversation of its own. It joins the open set (the rail shows it while
     // it works) without becoming the open one, so the user's conversation and
     // focus stay where they are.
+    // Sprint 155: a comment's new chat comes with the id the host chose, so a
+    // second comment on the same document joins it before its first turn.
     if (message.newConversation) {
-      const conversation = createConversationState(generateId(), {
+      const hostId = message.newConversation.conversationId;
+      if (hostId && get().conversations[hostId]) {
+        queueCommentTask(message, hostId, answer);
+        return;
+      }
+      const conversation = createConversationState(hostId || generateId(), {
         selectedAgent: message.runtimeId,
         pendingRuntime: { runtimeId: message.runtimeId, modelId: message.modelId ?? '', mode: message.autonomy === 'ask' ? 'ask' : 'auto' },
       });
@@ -896,9 +903,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     }
     // Sprint 130 (P1): a card's conversation is usually only in history after
     // a restart. Load it in the background (no switch, no focus) and queue
-    // there. A comment's destination that this sidebar does not hold is still
-    // reported honestly rather than redirected (R1).
-    if (message.sourceKind === 'card' && get().conversationRolloutMode !== 'legacy') {
+    // there. Sprint 155: a comment's too — its task goes to its document's
+    // chat, which may be one the rail no longer holds. A chat that is not in
+    // history either is still reported honestly rather than redirected (R1).
+    if (get().conversationRolloutMode !== 'legacy') {
       loadConversationInBackground(message.conversationId, (loaded) => {
         if (loaded) queueCommentTask(message, message.conversationId, answer);
         else answer('no-conversation');
@@ -2452,6 +2460,18 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             thinkingEffortNotices[message.conversationId] = thinkingEffortNotices[message.clientConversationId];
             delete thinkingEffortNotices[message.clientConversationId];
           }
+          // Sprint 155: prompts already waiting under the client id (a second
+          // comment on the same document, sent before the first turn began)
+          // move with the chat, or they would wait under an id nobody drains.
+          const promptQueues = { ...current.promptQueues };
+          const waiting = promptQueues[message.clientConversationId];
+          if (waiting) {
+            promptQueues[message.conversationId] = [
+              ...(promptQueues[message.conversationId] ?? []),
+              ...waiting.map((item) => ({ ...item, conversationId: message.conversationId })),
+            ];
+            delete promptQueues[message.clientConversationId];
+          }
           set({
             conversations,
             activeConversationId: current.activeConversationId === message.clientConversationId
@@ -2460,6 +2480,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             pinnedConversationIds: current.pinnedConversationIds.map((id) => id === message.clientConversationId ? message.conversationId : id),
             thinkingEffortCapabilities,
             thinkingEffortNotices,
+            promptQueues,
           });
           break;
         }

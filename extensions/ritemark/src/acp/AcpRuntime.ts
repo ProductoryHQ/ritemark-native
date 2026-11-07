@@ -48,6 +48,7 @@ import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import { thinkingEffortLabel } from '../runtime/thinkingEffort';
 import { acpTurnErrorCode } from '../runtime/runtimeErrorPresentation';
 import { noteOpenCodeModels } from '../ai/modelCatalog';
+import { workspaceFilesOnly } from '../runtime/turnFiles';
 
 type PendingApproval = (result: { approved: boolean; alwaysAllow: boolean }) => void;
 
@@ -289,7 +290,13 @@ export class AcpSession implements RuntimeSession {
             ? 'interrupted'
             : result.stopReason;
         const lastAgentMessage = manager.lastAgentMessage(this.acpSessionId);
-        config.onCodexComplete?.({ status, ...(lastAgentMessage ? { lastAgentMessage } : {}) });
+        // Sprint 155: the files its completed edits changed, workspace files only.
+        const filesModified = workspaceFilesOnly(manager.turnFilesModified?.(this.acpSessionId) ?? [], config.workspacePath);
+        config.onCodexComplete?.({
+          status,
+          ...(lastAgentMessage ? { lastAgentMessage } : {}),
+          ...(filesModified.length ? { filesModified } : {}),
+        });
       } catch (err) {
         // On timeout, stop the abandoned turn upstream so it does not keep
         // running against a session the user has already been told failed.

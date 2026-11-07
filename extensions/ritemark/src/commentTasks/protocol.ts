@@ -49,6 +49,8 @@ export type CommentTaskErrorCode =
   | 'runtime-unavailable'
   | 'destination-not-found'
   | 'queue-full'
+  /** Sprint 155: no room for one more working chat (the card's capacity rule). */
+  | 'capacity'
   | 'sidebar-unreachable'
   // task lookup
   | 'unknown-task'
@@ -171,11 +173,20 @@ export interface CommentTaskEnqueueMessage {
    * of `conversationId`, titled `title`, without making it the open one. The
    * answer carries the id the sidebar gave it.
    */
-  newConversation?: { title: string };
+  newConversation?: {
+    title: string;
+    /**
+     * Sprint 155: the id the host chose for the new chat, so a second comment on
+     * the same document can find it before its first turn starts. Absent: the
+     * sidebar makes one (a card's chat).
+     */
+    conversationId?: string;
+  };
   /**
-   * Sprint 130: who asked. `card` items show the board's icon in the queue and,
-   * for a conversation the sidebar does not hold, are loaded from history in
-   * the background instead of being refused (P1).
+   * Sprint 130: who asked. `card` items show the board's icon in the queue.
+   * A conversation the sidebar does not hold is loaded from history in the
+   * background instead of being refused (P1; for comments too since Sprint 155,
+   * which sends a comment to its document's chat, open or not).
    */
   sourceKind?: 'comment' | 'card';
 }
@@ -369,6 +380,7 @@ export function decodeCommentTaskSidebarMessage(value: unknown): CommentTaskSide
 const RETRYABLE: ReadonlySet<CommentTaskErrorCode> = new Set([
   'document-not-synced',
   'queue-full',
+  'capacity',
   'sidebar-unreachable',
   'store-degraded',
   'runtime-unavailable',
@@ -378,6 +390,7 @@ const RECOVERY: Partial<Record<CommentTaskErrorCode, CommentTaskRecovery>> = {
   'document-not-file': 'save-document',
   'document-not-synced': 'retry',
   'queue-full': 'retry',
+  capacity: 'retry',
   'sidebar-unreachable': 'retry',
   'store-degraded': 'retry',
 };

@@ -17,9 +17,14 @@
  *   research/protocol-and-storage-decisions.md (D5, D6, D7)
  */
 
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import type { ProjectScopeDescriptorV1 } from '../conversations/types';
 import { CommentTaskStore, CommentTaskStoreError } from './CommentTaskStore';
+import {
+  chatNameFromComment,
+  pickCommentTaskDestination,
+  type DestinationChatFacts,
+} from './commentTaskDestination';
 import {
   ALIAS_TO_RUNTIME_ID,
   projectCommentTask,
@@ -81,6 +86,38 @@ export interface CommentTaskDestination {
   runtimeId?: string | null;
 }
 
+/**
+ * Sprint 155: what the destination rules read (`pickCommentTaskDestination`).
+ * Gathered by the host, so the controller stays testable without VS Code.
+ */
+export interface CommentTaskRoutingFacts {
+  /** The comment's document as a file path, in the form `changedFiles` uses. */
+  documentPath: string;
+  /** This project's chats and the files each one changed. */
+  chats: DestinationChatFacts[];
+  /** A comment task's document URI as a file path, or null when it is not a file. */
+  pathOfUri(documentUri: string): string | null;
+  /** The file still exists. A gone file never counts as a chat's change. */
+  exists(file: string): boolean;
+  samePath?(a: string, b: string): boolean;
+}
+
+/** Sprint 155: where a task goes, and whether that is the chat open on the sheet. */
+interface RoutedDestination {
+  destination: CommentTaskDestination;
+  /** The chat open on the AI's sheet: no toast, the old path. */
+  isOpen: boolean;
+  /** Rule 3: a new chat, made for this task. */
+  newChat: boolean;
+}
+
+/** The toast's words when a task goes to a chat that isn't open (Sprint 155). */
+export function sentToastText(routed: { newChat: boolean; title: string }): string {
+  const title = routed.title.trim();
+  if (routed.newChat) return title ? `Sent to a new chat, “${title}”` : 'Sent to a new chat';
+  return `Sent to “${title || 'New conversation'}”`;
+}
+
 export interface CommentTaskAvailability {
   usable: boolean;
   message?: string;
@@ -105,6 +142,24 @@ export interface CommentTaskControllerDependencies {
    * none (D5). Returns null when the sidebar cannot be reached at all.
    */
   resolveOpenConversation(runtimeId: string): Promise<CommentTaskDestination | null>;
+  /**
+   * Sprint 155: the facts the three destination rules read. Without it, every
+   * task goes to the open chat, as before Sprint 155.
+   */
+  routingFacts?(document: CommentTaskDocument): Promise<CommentTaskRoutingFacts>;
+  /** Sprint 155: the chat open on the AI's sheet right now, without revealing or waiting. */
+  openConversationId?(): string | null;
+  /** Sprint 155: a chat the rules picked, as a destination; null when it is gone. */
+  conversationDestination?(conversationId: string): Promise<CommentTaskDestination | null>;
+  /**
+   * Sprint 155: room for one more working chat — the card's check (`_canAttachRuntime`).
+   * Null asks for a new chat. Asked only for a chat that isn't the open one.
+   */
+  canAttach?(conversationId: string | null): Promise<boolean>;
+  /** Sprint 155: the "Sent to …" toast, when a task goes to a chat that isn't open. */
+  notifySent?(text: string): void;
+  /** Sprint 155: name a chat made for a comment, once it has a record. */
+  setConversationTitle?(conversationId: string, title: string): Promise<void>;
   /** Normalized runtime availability — the same policy the Composer uses, so
    *  the comment path cannot invent a stricter or looser gate (audit F19). */
   checkAvailability(runtimeId: string): Promise<CommentTaskAvailability>;
@@ -112,8 +167,9 @@ export interface CommentTaskControllerDependencies {
   runtimeSettings(conversationId: string, runtimeId: string): CommentTaskRuntimeSettings;
   /** One prompt builder for both surfaces, given the REAL document label. */
   buildPrompt(document: CommentTaskDocument, comments: CommentTaskCommentV1[]): string;
-  /** Hand the accepted task to the sidebar queue and wait for its verdict. */
-  enqueue(message: CommentTaskEnqueueMessage): Promise<CommentTaskEnqueueOutcome>;
+  /** Hand the accepted task to the sidebar queue and wait for its verdict.
+   *  Sprint 155: the answer may name the chat it was queued in. */
+  enqueue(message: CommentTaskEnqueueMessage): Promise<CommentTaskEnqueueOutcome | { outcome: CommentTaskEnqueueOutcome; conversationId?: string }>;
   /** Bring a conversation into view. */
   revealConversation(conversationId: string): Promise<void>;
   /** Ask the runtime to stop a turn this task owns. */
@@ -204,7 +260,7 @@ export class CommentTaskController {
         case 'comment-task/accept':
           return await this.accept(request, document);
         case 'comment-task/destination-preview':
-          return await this.previewDestination(request.requestId);
+          return await this.previewDestination(request.requestId, document);
         case 'comment-task/refresh': {
           // The webview asking for what it may have missed. Answering with the
           // projection rather than data in the result keeps ONE shape for task
@@ -309,9 +365,21 @@ export class CommentTaskController {
       );
     }
 
-    const destination = await this.dependencies.resolveOpenConversation(runtimeId);
-    if (!destination) {
+    const routed = await this.resolveDestination(
+      runtimeId,
+      document,
+      request.comments.map((comment) => comment.instruction).join(' '),
+      false,
+    );
+    if (!routed) {
       return reject(commentTaskError('sidebar-unreachable', 'The AI sidebar is not responding. Try again.'));
+    }
+    const destination = routed.destination;
+    // Sprint 155: a chat that isn't open must have room to work, as a card's
+    // task must (Phase 0, P1): refused before anything is recorded.
+    if (!routed.isOpen && this.dependencies.canAttach
+      && !(await this.dependencies.canAttach(routed.newChat ? null : destination.conversationId))) {
+      return reject(commentTaskError('capacity', CAPACITY_MESSAGE));
     }
 
     const settings = this.dependencies.runtimeSettings(destination.conversationId, runtimeId);
@@ -357,7 +425,7 @@ export class CommentTaskController {
     // it between the editor's "Sent" and any real dispatch.
     await this.dependencies.store.create(record);
 
-    const outcome = await this.dependencies.enqueue({
+    const outcome = enqueueOutcome(await this.dependencies.enqueue({
       type: 'comment-task/enqueue',
       taskId: record.taskId,
       conversationId: record.destination.conversationId,
@@ -369,7 +437,10 @@ export class CommentTaskController {
       autonomy: settings.approvalMode,
       thinkingEffort: settings.thinkingEffort,
       sourceDisplayPath: document.displayPath,
-    });
+      ...(routed.newChat
+        ? { newConversation: { title: destination.title, conversationId: destination.conversationId } }
+        : {}),
+    }));
 
     if (outcome !== 'queued') {
       const error =
@@ -393,6 +464,7 @@ export class CommentTaskController {
       since: this.timestamp(),
     });
     await this.publish(queued.source.documentUri);
+    if (!routed.isOpen) this.dependencies.notifySent?.(sentToastText({ newChat: routed.newChat, title: destination.title }));
 
     return commentTaskSuccess(request.requestId, request.type, {
       taskId: queued.taskId,
@@ -405,14 +477,102 @@ export class CommentTaskController {
     });
   }
 
-  /** The caption on the Send surface: which conversation is open right now. */
-  private async previewDestination(requestId: string): Promise<CommentTaskResultMessage> {
-    const destination = await this.dependencies.resolveOpenConversation('claude-code').catch(() => null);
+  /**
+   * The caption on the Send surface: where the task will go. Sprint 155: the
+   * same rules as the send (`resolveDestination`), so the two cannot disagree.
+   * A new chat has no name yet here: the caption says "→ New conversation".
+   */
+  private async previewDestination(requestId: string, document: CommentTaskDocument | null): Promise<CommentTaskResultMessage> {
+    const routed = await this.resolveDestination('claude-code', document, '', true).catch(() => null);
+    const destination = routed && !routed.newChat ? routed.destination : null;
     return commentTaskSuccess(requestId, 'comment-task/destination-preview', {
       runtimeId: destination?.runtimeId ?? null,
       conversationId: destination?.conversationId ?? null,
       title: destination?.title ?? null,
     });
+  }
+
+  /**
+   * Sprint 155: the three rules (`pickCommentTaskDestination`), asked at
+   * preview, at send and when a retried task's chat is gone. Returns null only
+   * when the sidebar cannot be reached and the open chat was needed.
+   */
+  private async resolveDestination(
+    runtimeId: string,
+    document: CommentTaskDocument | null,
+    commentText: string,
+    preview: boolean,
+    /** Retry: the task itself, and its chat that is gone, never count. */
+    exclude: { taskId?: string; conversationId?: string } = {},
+  ): Promise<RoutedDestination | null> {
+    const openNow = this.dependencies.openConversationId?.() ?? null;
+    const facts = document && this.dependencies.routingFacts
+      ? await this.dependencies.routingFacts(document).catch(() => null)
+      : null;
+    const openChat = async (): Promise<RoutedDestination | null> => {
+      const destination = await this.dependencies.resolveOpenConversation(runtimeId);
+      return destination ? { destination, isOpen: true, newChat: false } : null;
+    };
+    if (!facts) return openChat();
+
+    const unfinished = (await this.dependencies.store.listUnfinished())
+      .filter((task) => task.taskId !== exclude.taskId);
+    const pending = unfinished.flatMap((task) => {
+      const path = facts.pathOfUri(task.source.documentUri);
+      return path ? [{ conversationId: task.destination.conversationId, document: path, at: task.createdAt }] : [];
+    });
+    // A chat the index names can be gone (deleted meanwhile): the rules then
+    // pick again without it.
+    const gone = new Set<string>(exclude.conversationId ? [exclude.conversationId] : []);
+    const pick = (openConversationId: string | null) => pickCommentTaskDestination({
+      document: facts.documentPath,
+      chats: facts.chats.filter((chat) => !gone.has(chat.conversationId)),
+      pending: pending.filter((item) => !gone.has(item.conversationId)),
+      openConversationId,
+      exists: (file) => facts.exists(file),
+      ...(facts.samePath ? { samePath: (a: string, b: string) => facts.samePath!(a, b) } : {}),
+    });
+
+    // 1. The chat that last changed the document (the open chat is not needed).
+    for (let choice = pick(null); choice.rule === 'changed'; choice = pick(null)) {
+      const conversationId = choice.conversationId;
+      const known = await this.dependencies.conversationDestination?.(conversationId).catch(() => null) ?? null;
+      // A chat a waiting task made has no record until its first turn starts.
+      const task = unfinished.find((candidate) => candidate.destination.conversationId === conversationId);
+      const destination: CommentTaskDestination | null = known
+        ?? (task
+          ? {
+              conversationId,
+              bindingGeneration: task.destination.bindingGeneration,
+              title: task.destination.titleSnapshot,
+              created: false,
+              runtimeId: task.assignment.runtimeId,
+            }
+          : null);
+      if (destination) {
+        return { destination: { ...destination, created: false }, isOpen: conversationId === openNow, newChat: false };
+      }
+      gone.add(conversationId);
+    }
+
+    // 2. The open chat, if it hasn't changed another document. The sidebar may
+    // have to report it first.
+    const open = await this.dependencies.resolveOpenConversation(runtimeId).catch(() => null);
+    if (!open) return null;
+    if (pick(open.conversationId).rule === 'open') return { destination: open, isOpen: true, newChat: false };
+
+    // Rule 3: a new chat, named from the comment.
+    return {
+      destination: {
+        conversationId: preview ? '' : this.newConversationId(),
+        bindingGeneration: 0,
+        title: chatNameFromComment(commentText),
+        created: true,
+        runtimeId: null,
+      },
+      isOpen: false,
+      newChat: true,
+    };
   }
 
   private async openConversation(requestId: string, taskId: string): Promise<CommentTaskResultMessage> {
@@ -453,9 +613,12 @@ export class CommentTaskController {
 
     let retried = await this.dependencies.store.retry(taskId, this.randomId());
 
-    const dispatch = async (record: CommentTaskRecordV1): Promise<CommentTaskEnqueueOutcome> => {
+    const dispatch = async (
+      record: CommentTaskRecordV1,
+      newConversation?: { title: string; conversationId: string },
+    ): Promise<CommentTaskEnqueueOutcome> => {
       const settings = this.dependencies.runtimeSettings(record.destination.conversationId, record.assignment.runtimeId);
-      return this.dependencies.enqueue({
+      return enqueueOutcome(await this.dependencies.enqueue({
         type: 'comment-task/enqueue',
         taskId: record.taskId,
         conversationId: record.destination.conversationId,
@@ -467,7 +630,8 @@ export class CommentTaskController {
         autonomy: settings.approvalMode,
         thinkingEffort: settings.thinkingEffort,
         sourceDisplayPath: document?.displayPath ?? record.source.displayPath,
-      });
+        ...(newConversation ? { newConversation } : {}),
+      }));
     };
 
     let outcome = await dispatch(retried);
@@ -479,15 +643,46 @@ export class CommentTaskController {
     // same rule as a fresh send and goes to the conversation open in the
     // sidebar. A task that is merely RUNNING still never retargets (R3) — only
     // this deliberate second attempt does.
+    //
+    // Sprint 155: retry keeps the card's own chat (above). Only when that chat
+    // is gone do the three rules pick again — the document's chat, the open
+    // chat, or a new one — as a fresh send would.
     if (outcome === 'no-conversation') {
-      const fallback = await this.dependencies.resolveOpenConversation(retried.assignment.runtimeId);
+      const goneChat = retried.destination.conversationId;
+      const routed = await this.resolveDestination(
+        retried.assignment.runtimeId,
+        document ?? this.documentOf(retried),
+        retried.comments.map((comment) => comment.instruction).join(' '),
+        false,
+        { taskId: retried.taskId, conversationId: goneChat },
+      );
+      const fallback = routed && routed.destination.conversationId !== goneChat ? routed : null;
+      if (fallback && !fallback.isOpen && this.dependencies.canAttach
+        && !(await this.dependencies.canAttach(fallback.newChat ? null : fallback.destination.conversationId))) {
+        const error = commentTaskError('capacity', CAPACITY_MESSAGE);
+        await this.transitionQuietly(retried.taskId, retried.bindingGeneration, {
+          state: 'failed',
+          since: this.timestamp(),
+          safeMessage: error.message.slice(0, MAX_SAFE_MESSAGE_CHARS),
+        });
+        await this.publish(retried.source.documentUri);
+        return commentTaskFailure(requestId, 'comment-task/retry', error);
+      }
       if (fallback) {
         retried = await this.dependencies.store.rebindDestination(retried.taskId, {
-          conversationId: fallback.conversationId,
-          bindingGeneration: fallback.bindingGeneration,
-          title: fallback.title,
+          conversationId: fallback.destination.conversationId,
+          bindingGeneration: fallback.destination.bindingGeneration,
+          title: fallback.destination.title,
         });
-        outcome = await dispatch(retried);
+        outcome = await dispatch(
+          retried,
+          fallback.newChat
+            ? { title: fallback.destination.title, conversationId: fallback.destination.conversationId }
+            : undefined,
+        );
+        if (outcome === 'queued' && !fallback.isOpen) {
+          this.dependencies.notifySent?.(sentToastText({ newChat: fallback.newChat, title: fallback.destination.title }));
+        }
       }
     }
 
@@ -581,7 +776,7 @@ export class CommentTaskController {
     await this.applyTurnEvent(conversationId, conversationTurnId, () => ({
       state: 'running',
       since: this.timestamp(),
-    }));
+    }), true);
   }
 
   async applyTurnAttention(
@@ -688,11 +883,21 @@ export class CommentTaskController {
     conversationId: string,
     conversationTurnId: string,
     lifecycle: () => CommentTaskLifecycleV1,
+    started = false,
   ): Promise<void> {
     const record = await this.dependencies.store.findByTurn(conversationTurnId);
     // No task owns this turn: it is an ordinary Composer turn. Doing nothing is
     // the whole fix for the bulk finalization bug (audit F22).
     if (!record) return;
+
+    // Sprint 155: a chat made for this comment gets the comment's name once its
+    // record exists (its first turn), as a card's chat gets the card's title.
+    // A rename always wins over the AI's title. Only the first attempt names it.
+    if (started && record.destination.created && record.destination.titleSnapshot
+      && record.bindingGeneration === 1
+      && (record.lifecycle.state === 'accepting' || record.lifecycle.state === 'queued')) {
+      await this.dependencies.setConversationTitle?.(conversationId, record.destination.titleSnapshot).catch(() => undefined);
+    }
 
     // The conversation a task was accepted into can be renamed by the store:
     // the sidebar hands us the client-side id of a conversation it just made,
@@ -746,4 +951,30 @@ export class CommentTaskController {
   private timestamp(): string {
     return this.now().toISOString();
   }
+
+  /** Sprint 155: a new chat's id, chosen here so a second comment can find the first one's chat. */
+  private newConversationId(): string {
+    return randomUUID();
+  }
+
+  /** Sprint 155: the task's document as the routing needs it, when no editor sent it. */
+  private documentOf(record: CommentTaskRecordV1): CommentTaskDocument {
+    return {
+      uri: record.source.documentUri,
+      scopeId: record.source.scopeId,
+      scope: record.source.scope,
+      displayPath: record.source.displayPath,
+      version: record.source.documentVersion,
+      text: '',
+    };
+  }
+}
+
+/** Sprint 155: the card's words when five chats are already working (CardHandoffLedger). */
+const CAPACITY_MESSAGE = 'Five conversations are already working or waiting for you.';
+
+function enqueueOutcome(
+  answer: CommentTaskEnqueueOutcome | { outcome: CommentTaskEnqueueOutcome; conversationId?: string },
+): CommentTaskEnqueueOutcome {
+  return typeof answer === 'string' ? answer : answer.outcome;
 }

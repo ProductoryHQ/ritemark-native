@@ -360,6 +360,41 @@ async function run() {
     console.log('✓ Test 7b: G4 — completion carries the last assistant message');
   }
 
+  // ── Test 7c: Sprint 155 — the turn reports the files its completed file
+  // changes changed (the bundled app-server's `fileChange` item), never a
+  // command's, a declined patch's or a read's.
+  {
+    const { runtime, mock } = makeRuntime(['thread-a']);
+    let completed: { status: string; filesModified?: string[] } | null = null;
+    await openTurn(runtime, 'conv-a', { ...dummyConfig, workspacePath: '/tmp/test', onCodexComplete: (result) => { completed = result; } });
+    mock.emit('turn/started', { threadId: 'thread-a', turn: { id: 'turn-f' } });
+    // Read with a command: never a change.
+    mock.emit('item/completed', { threadId: 'thread-a', item: { type: 'commandExecution', id: 'c1', command: 'cat /tmp/test/Module 2.md', status: 'completed', commandActions: [{ type: 'read', path: '/tmp/test/Module 2.md' }] } });
+    // A patch that applied: two files, one moved.
+    mock.emit('item/started', { threadId: 'thread-a', turnId: 'turn-f', item: { type: 'fileChange', id: 'f1', changes: [{ path: '/tmp/test/Module 2.md', kind: { type: 'update', move_path: null }, diff: '' }], status: 'inProgress' } });
+    mock.emit('item/completed', { threadId: 'thread-a', item: { type: 'fileChange', id: 'f1', status: 'completed', changes: [
+      { path: '/tmp/test/Module 2.md', kind: { type: 'update', move_path: null }, diff: '@@' },
+      { path: '/tmp/test/old.md', kind: { type: 'update', move_path: '/tmp/test/new.md' }, diff: '@@' },
+      { path: '/tmp/test/added.md', kind: { type: 'add' }, diff: '+x' },
+    ] } });
+    // A declined patch, and one outside the workspace.
+    mock.emit('item/completed', { threadId: 'thread-a', item: { type: 'fileChange', id: 'f2', status: 'declined', changes: [{ path: '/tmp/test/declined.md', kind: { type: 'add' }, diff: '' }] } });
+    mock.emit('item/completed', { threadId: 'thread-a', item: { type: 'fileChange', id: 'f3', status: 'completed', changes: [{ path: '/etc/elsewhere.md', kind: { type: 'add' }, diff: '' }] } });
+    mock.emit('turn/completed', { threadId: 'thread-a', turn: { id: 'turn-f', status: 'completed', error: null } });
+    assert.deepStrictEqual(
+      completed?.filesModified,
+      ['/tmp/test/Module 2.md', '/tmp/test/new.md', '/tmp/test/added.md'],
+      `changed, not read: got ${JSON.stringify(completed)}`,
+    );
+
+    // The next turn starts from nothing.
+    completed = null;
+    mock.emit('turn/started', { threadId: 'thread-a', turn: { id: 'turn-g' } });
+    mock.emit('turn/completed', { threadId: 'thread-a', turn: { id: 'turn-g', status: 'completed', error: null } });
+    assert.strictEqual(completed?.filesModified, undefined, 'a turn that changed nothing reports nothing');
+    console.log('✓ Test 7c: Sprint 155 — completed file changes, not commands or reads');
+  }
+
   // ── Test 8: B1 REGRESSION — switching approval mode in one conversation must
   // not reset another's thread. `_threadApprovalKey` and the browser-tools
   // state were adapter scalars, so chat B switching Auto→Ask (or toggling

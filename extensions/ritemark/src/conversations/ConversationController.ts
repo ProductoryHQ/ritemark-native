@@ -12,6 +12,8 @@ import {
 import { ConversationStore, ConversationStoreError } from './ConversationStore';
 import {
   withSavedModel,
+  lastChatToChange,
+  type ConversationSummaryV1,
   type ConversationCheckpointV1,
   type ConversationRecordV1,
   type DispatchReceiptStateV1,
@@ -269,6 +271,28 @@ export class ConversationController {
     return record;
   }
 
+  /**
+   * Sprint 155: the current project's chats with the files each one changed,
+   * from the index (no record is opened). The comment task's routing asks this.
+   */
+  async changedFilesByChat(): Promise<Array<Pick<ConversationSummaryV1, 'conversationId' | 'title' | 'bindingGeneration' | 'changedFiles'>>> {
+    if (this.disposed) throw new Error('Conversation controller is disposed');
+    const summaries = await this.dependencies.store.list(this.dependencies.currentScope().scopeId);
+    return summaries
+      .filter((summary) => summary.integrity === 'verified')
+      .map((summary) => ({
+        conversationId: summary.conversationId,
+        title: summary.title,
+        bindingGeneration: summary.bindingGeneration,
+        ...(summary.changedFiles ? { changedFiles: summary.changedFiles.map((entry) => ({ ...entry })) } : {}),
+      }));
+  }
+
+  /** Sprint 155: which chat in this project last changed `file`, and when. */
+  async lastChatToChange(file: string, samePath?: (stored: string, file: string) => boolean): Promise<{ conversationId: string; changedAt: string } | null> {
+    return lastChatToChange(await this.changedFilesByChat(), file, samePath);
+  }
+
   async runtimeConversation(conversationId: string): Promise<ConversationRecordV1> {
     if (this.disposed) throw new Error('Conversation controller is disposed');
     return this.requireCurrentScope(conversationId);
@@ -486,9 +510,13 @@ export class ConversationController {
     appliedThinkingEffort?: import('../runtime/thinkingEffort').ExplicitThinkingEffort | null;
     /** Sprint 136 (#488): the turn's working time, kept so a restored chat shows it. */
     activeDurationMs?: number;
+    /** Sprint 155: the workspace files the turn changed (never the ones it read). */
+    filesModified?: readonly string[];
     turnId?: string;
     generateTitle?: (request: FirstResponseTitleRequest) => Promise<string | null>;
   }): Promise<ConversationRecordV1> {
+    const filesModified = Array.from(new Set((input.filesModified ?? []).filter((file) => typeof file === 'string' && file.length > 0)));
+    const changed = filesModified.length ? { filesModified } : {};
     const initial = await this.requireCurrentScope(input.conversationId);
     const firstUserMessage = initial.events.find((event) => event.kind === 'user-message');
     const turnId = input.turnId ?? (
@@ -527,6 +555,7 @@ export class ConversationController {
               ...(input.error && input.errorKind && input.errorDetail ? { errorDetail: input.errorDetail } : {}),
               appliedThinkingEffort: input.appliedThinkingEffort ?? null,
               ...(input.activeDurationMs === undefined ? {} : { activeDurationMs: input.activeDurationMs }),
+              ...changed,
             }]
           : [{
               kind: 'boundary' as const,
@@ -540,6 +569,7 @@ export class ConversationController {
               ...(input.failureKind ? { failureKind: input.failureKind } : {}),
               ...(input.error && input.errorKind ? { errorKind: input.errorKind } : {}),
               ...(input.error && input.errorKind && input.errorDetail ? { errorDetail: input.errorDetail } : {}),
+              ...changed,
             }];
         const assistantEvent = appendEvents[0];
         const currentDescriptor = current.continuations?.[input.runtimeId];
