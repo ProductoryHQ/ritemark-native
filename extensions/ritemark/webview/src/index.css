@@ -861,3 +861,15 @@ body.vscode-dark .rm-step-chip.action, body.ritemark-dark .rm-step-chip.action, 
 .rm-flow-props textarea:focus-visible,
 :where(:root:not([data-input-mode="pointer"])) .rm-flow-props button[role='combobox']:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--r-accent); }
 .rm-flow-props textarea { min-height: 120px; }
+
+/* Sprint 155 (PR 2): a chat's document icon is a CSS mask in the text colour (ChatDocumentIcon.tsx). Under forced
+   colors the system would drop that background and the icon would paint invisibly: it keeps its own colour, and that
+   colour is the system's text colour. */
+.chat-file-icon {
+  forced-color-adjust: none;
+}
+@media (forced-colors: active) {
+  .chat-file-icon {
+    background-color: CanvasText !important;
+  }
+}

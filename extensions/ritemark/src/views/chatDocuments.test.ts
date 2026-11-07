@@ -16,9 +16,14 @@ import {
   bringDocumentForward,
   chatDocumentOf,
   chatDocumentsFor,
+  ChatDocumentsPublisher,
+  LanguageLookup,
   planBringForward,
+  RealPathCache,
   resolveFileIcon,
   type BringForwardDeps,
+  type ChatDocumentsMessage,
+  type ChatDocumentView,
   type FileIconTheme,
   type TabGroupFact,
 } from './chatDocuments';
@@ -34,14 +39,14 @@ const theme = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'filei
     { path: '/p/Module 3.md', changedAt: '2026-11-07T10:02:00Z' },
     { path: '/p/Advokatuur.md', changedAt: '2026-11-07T10:01:00Z' },
   ];
-  assert.deepEqual(chatDocumentOf(changed, real), { path: '/p/Module 2.md', name: 'Module 2.md', more: 2 }, 'several: the newest, and the rest counted');
-  assert.deepEqual(chatDocumentOf([changed[2]], real), { path: '/p/Advokatuur.md', name: 'Advokatuur.md', more: 0 }, 'one file');
+  assert.deepEqual(chatDocumentOf(changed, real), { path: '/p/Module 2.md', openPath: '/p/Module 2.md', name: 'Module 2.md', more: 2 }, 'several: the newest, and the rest counted');
+  assert.deepEqual(chatDocumentOf([changed[2]], real), { path: '/p/Advokatuur.md', openPath: '/p/Advokatuur.md', name: 'Advokatuur.md', more: 0 }, 'one file');
   assert.equal(chatDocumentOf(undefined, real), null, 'a chat that changed nothing has no document');
   assert.equal(chatDocumentOf([], real), null, 'an empty list is nothing');
 
   // A gone file is skipped, and never counted in "and N more"
   existing.delete('/p/Module 2.md');
-  assert.deepEqual(chatDocumentOf(changed, real), { path: '/p/Module 3.md', name: 'Module 3.md', more: 1 }, 'the newest that still exists');
+  assert.deepEqual(chatDocumentOf(changed, real), { path: '/p/Module 3.md', openPath: '/p/Module 3.md', name: 'Module 3.md', more: 1 }, 'the newest that still exists');
   existing.clear();
   assert.equal(chatDocumentOf(changed, real), null, 'every file gone: no icon');
 
@@ -51,7 +56,13 @@ const theme = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'filei
     { path: '/p/b.md', changedAt: '2026-11-07T09:00:00Z' },
     { path: '/link/a.md', changedAt: '2026-11-07T11:00:00Z' },
     { path: '/p/a.md', changedAt: '2026-11-07T10:00:00Z' },
-  ], links), { path: '/p/a.md', name: 'a.md', more: 1 }, 'newest first whatever the order; one real file counts once');
+  ], links), { path: '/p/a.md', openPath: '/link/a.md', name: 'a.md', more: 1 }, 'newest first whatever the order; one real file counts once');
+
+  // Review finding 2: a closed document opens at the path the project uses, never at its realpath (`/private/...`)
+  const privateReal = (file: string) => (file.startsWith('/var/') ? `/private${file}` : file);
+  const document = chatDocumentOf([{ path: '/var/ws/Plan.md', changedAt: '2026-11-07T10:00:00Z' }], privateReal);
+  assert.equal(document?.openPath, '/var/ws/Plan.md', 'finding 2: the stored path is what opens');
+  assert.equal(document?.path, '/private/var/ws/Plan.md', 'finding 2: the realpath stays the comparison key');
 }
 
 // ── the theme: fileNames, then fileExtensions, then languageIds, then the default ──
@@ -82,7 +93,48 @@ const theme = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'filei
     { conversationId: 'c', changedFiles: [{ path: '/gone/x.md', changedAt: '2026-11-07T10:00:00Z' }] },
   ], real, (file) => `icon:${path.basename(file)}`);
   assert.deepEqual(Object.keys(documents), ['a'], 'only chats with a document that exists');
-  assert.deepEqual(documents.a, { path: '/p/Advokatuur.md', name: 'Advokatuur.md', more: 0, iconUri: 'icon:Advokatuur.md' });
+  assert.deepEqual(documents.a, { path: '/p/Advokatuur.md', openPath: '/p/Advokatuur.md', name: 'Advokatuur.md', more: 0, iconUri: 'icon:Advokatuur.md' });
+}
+
+// ── review finding 4: a file's language from the installed extensions' contributes.languages ──
+{
+  const fakeExtensions = [
+    { id: 'markdown', extensions: ['.md', '.mkd', '.mdwn', '.mdown', '.markdown'] },
+    { id: 'json', extensions: ['.json'], filenames: ['.babelrc'] },
+    { id: 'flow', extensions: ['.flow.json'] },
+    { id: 'yaml', filenames: ['Pipfile.lock.yaml'] },
+    { extensions: ['.nothing'] }, // no id: ignored
+  ];
+  const languages = new LanguageLookup(fakeExtensions);
+  assert.equal(languages.languageOf('/p/Notes.mdown'), 'markdown', 'finding 4: .mdown is markdown');
+  assert.equal(languages.languageOf('/p/Notes.MKD'), 'markdown', 'finding 4: .mkd, case-insensitively');
+  assert.equal(languages.languageOf('/p/.babelrc'), 'json', 'a file name');
+  assert.equal(languages.languageOf('/p/Course.flow.json'), 'flow', 'the longest extension first');
+  assert.equal(languages.languageOf('/p/notes.txt'), undefined, 'no language');
+  // Keep the theme lookup's order: the language comes in only after names and extensions
+  assert.equal(resolveFileIcon(theme, '/p/Notes.mdown', { kind: 'light', languageId: languages.languageOf('/p/Notes.mdown') }), './icons/file-text.svg', 'finding 4: .mdown gets markdown\'s icon');
+  assert.equal(resolveFileIcon(theme, '/p/Notes.mkd', { kind: 'dark', languageId: languages.languageOf('/p/Notes.mkd') }), './icons/dark/file-text.svg', 'finding 4: .mkd (dark)');
+}
+
+// ── review finding 6: a second update with no file events reads nothing from disk ──
+{
+  let calls = 0;
+  const cache = new RealPathCache((file) => { calls += 1; return file.startsWith('/gone/') ? null : file; });
+  const chats = Array.from({ length: 20 }, (_, chat) => ({
+    conversationId: `c${chat}`,
+    changedFiles: Array.from({ length: 50 }, (_, n) => ({ path: n === 0 ? `/gone/${chat}.md` : `/p/${chat}-${n}.md`, changedAt: `2026-11-07T10:${String(n).padStart(2, '0')}:00Z` })),
+  }));
+  chatDocumentsFor(chats, (file) => cache.get(file), () => 'icon');
+  const first = calls;
+  assert.equal(first, 1000, 'the first update reads each file once');
+  chatDocumentsFor(chats, (file) => cache.get(file), () => 'icon');
+  assert.equal(calls, first, 'finding 6: no file events, no new fs calls');
+  cache.forgetMissing();
+  chatDocumentsFor(chats, (file) => cache.get(file), () => 'icon');
+  assert.equal(calls, first + 20, 'a chat change asks only the gone files again');
+  cache.clear();
+  chatDocumentsFor(chats, (file) => cache.get(file), () => 'icon');
+  assert.equal(calls, first * 2 + 20, 'a file event reads them again');
 }
 
 // ── the click: bring the tab forward in its own group, or open it at the row's end ──
@@ -100,6 +152,14 @@ const groups: TabGroupFact[] = [
   ];
   assert.deepEqual(planBringForward(both, '/p/x.md'), { kind: 'reveal', group: 1, tab: 0 }, 'open in two groups: the active group first');
   assert.deepEqual(planBringForward(groups, '/p/module 2.md', (a, b) => a.toLowerCase() === b.toLowerCase()), { kind: 'reveal', group: 1, tab: 0 }, 'the host compares paths its own way');
+  // Review finding 3: a diff tab (File changes, Review) is not the document's tab
+  const diffOnly: TabGroupFact[] = [{ viewColumn: 1, isActive: true, tabs: [{ path: '/p/Home', isActive: true }, { path: '/p/x.md', isActive: false, isDiff: true }] }];
+  assert.deepEqual(planBringForward(diffOnly, '/p/x.md'), { kind: 'open' }, 'finding 3: only a diff tab shows it: the document opens');
+  const diffAndTab: TabGroupFact[] = [
+    { viewColumn: 1, isActive: true, tabs: [{ path: '/p/x.md', isActive: true, isDiff: true }] },
+    { viewColumn: 2, isActive: false, tabs: [{ path: '/p/x.md', isActive: false }] },
+  ];
+  assert.deepEqual(planBringForward(diffAndTab, '/p/x.md'), { kind: 'reveal', group: 1, tab: 0 }, 'finding 3: the document\'s own tab, not the diff in front');
 }
 
 function fakeDeps(start: TabGroupFact[]): { deps: BringForwardDeps; calls: string[]; groups: TabGroupFact[] } {
@@ -155,8 +215,61 @@ async function clicks(): Promise<void> {
     const run = fakeDeps([{ viewColumn: 1, isActive: true, tabs: [{ path: '/p/a.md', isActive: true }, { path: '/p/c.md', isActive: false }] }]);
     run.deps.open = async (file) => { run.calls.push(`open ${file}`); };
     assert.equal(await bringDocumentForward('/p/b.md', run.deps), 'opened');
-    assert.deepEqual(run.calls, ['open /p/b.md'], 'never moves a tab that isn\'t the document');
+    run.deps.tabWaitMs = 20;
+    run.deps.onDidChangeTabs = () => ({ dispose() {} });
+    run.calls.length = 0;
+    assert.equal(await bringDocumentForward('/p/b.md', run.deps), 'opened');
+    assert.deepEqual(run.calls, ['open /p/b.md'], 'waiting for a tab that never comes ends, and moves nothing');
+  }
+  {
+    // Review finding 2: the click opens the stored path; the realpath only finds the tab
+    const run = fakeDeps([{ viewColumn: 1, isActive: true, tabs: [{ path: '/p/a.md', isActive: true }] }]);
+    assert.equal(await bringDocumentForward('/private/var/ws/Plan.md', run.deps, '/var/ws/Plan.md'), 'opened');
+    assert.deepEqual(run.calls, ['open /var/ws/Plan.md'], 'finding 2: opens /var/..., never /private/var/...');
+  }
+  {
+    // Review finding 7: a custom editor's tab shows up after `vscode.open` resolved; the move waits for it
+    const run = fakeDeps([{ viewColumn: 1, isActive: true, tabs: [{ path: '/p/Home', isActive: true }, { path: '/p/a.md', isActive: false }] }]);
+    const listeners = new Set<() => void>();
+    const instantOpen = run.deps.open;
+    run.deps.open = async (file) => {
+      setTimeout(() => { void instantOpen(file).then(() => listeners.forEach((listener) => listener())); }, 30);
+    };
+    run.deps.onDidChangeTabs = (listener) => { listeners.add(listener); return { dispose: () => { listeners.delete(listener); } }; };
+    assert.equal(await bringDocumentForward('/p/Closed.md', run.deps), 'opened');
+    assert.deepEqual(run.calls, ['open /p/Closed.md', 'move to end'], 'finding 7: the late tab still goes to the row\'s end');
+    assert.deepEqual(run.groups[0].tabs.map((t) => t.path), ['/p/Home', '/p/a.md', '/p/Closed.md']);
+    assert.equal(listeners.size, 0, 'the wait lets go of the event');
   }
 }
 
-clicks().then(() => console.log('chatDocuments.test.ts: all passed'), (error) => { console.error(error); process.exit(1); });
+// ── review finding 1: a sheet resolved again gets the icons and the order again ──
+async function publisher(): Promise<void> {
+  const documents: Record<string, ChatDocumentView> = { a: { path: '/p/a.md', openPath: '/p/a.md', name: 'a.md', more: 0, iconUri: 'icon' } };
+  let view: { id: number } | undefined = { id: 1 };
+  const posts: { view: number; message: ChatDocumentsMessage }[] = [];
+  const sender = new ChatDocumentsPublisher<{ id: number }>({
+    view: () => view,
+    documents: async () => documents,
+    front: () => '/p/a.md',
+    post: async (target, message) => { posts.push({ view: target.id, message }); return true; },
+  });
+  assert.equal(await sender.send(), true, 'the first send posts');
+  assert.equal(await sender.send(), false, 'nothing changed: nothing posts');
+  // The view is resolved again (moved, Reload Webviews, process restart): its bootstrap resets, then sends
+  view = { id: 2 };
+  sender.reset();
+  assert.equal(await sender.send(), true, 'finding 1: after a second resolve, the next send posts again');
+  assert.equal(posts.length, 2);
+  assert.equal(posts[1].view, 2, 'to the new view');
+  assert.deepEqual(posts[1].message, { type: 'chat-documents', documents, front: '/p/a.md' });
+
+  // The host glue: the bootstrap branch resets before it schedules the send
+  const host = fs.readFileSync(path.join(__dirname, 'UnifiedViewProvider.ts'), 'utf8');
+  const bootstrap = host.slice(host.indexOf("case 'agent:bootstrap/request': {"));
+  const reset = bootstrap.indexOf('this._chatDocumentsPublisher.reset()');
+  const schedule = bootstrap.indexOf('this._scheduleChatDocuments()');
+  assert.ok(reset >= 0 && reset < schedule, 'finding 1: the bootstrap clears the sent copy before it schedules');
+}
+
+clicks().then(publisher).then(() => console.log('chatDocuments.test.ts: all passed'), (error) => { console.error(error); process.exit(1); });

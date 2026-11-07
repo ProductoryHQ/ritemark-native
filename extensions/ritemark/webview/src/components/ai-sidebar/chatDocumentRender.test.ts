@@ -75,6 +75,16 @@ setStore({
   assert.match(button, /hover:bg-\[var\(--r-accent-soft\)\]/, 'hover: the soft accent fill');
   assert.match(button, /hover:text-\[var\(--r-accent\)\]/, 'hover: the icon in accent');
   assert.match(markup, /class="m-0 min-w-0 flex-1 truncate/, 'a long name keeps its ellipsis');
+  // Experience lead: a press never reads weaker than hover: the accent icon on the soft fill, as on hover
+  assert.doesNotMatch(button, /active:text-\[var\(--r-accent-deep\)\]/, 'experience fix: no deeper ink on press');
+  assert.match(button, /active:bg-\[var\(--r-accent-soft\)\]/, 'the press keeps the soft fill');
+  assert.match(button, /active:text-\[var\(--r-accent\)\]/, 'and the accent icon');
+  assert.match(button, /focus-visible:!outline-offset-\[-2px\]/, 'the inset focus ring stays');
+  // Review finding 5: under forced colors the mask paints in CanvasText, never in a colour the system dropped
+  assert.match(markup, /<span[^>]*class="[^"]*\bchat-file-icon\b[^"]*"[^>]*data-file-icon=""|<span[^>]*data-file-icon=""[^>]*class="[^"]*\bchat-file-icon\b/, 'finding 5: the mask carries its forced-colors class');
+  const css = (await import('node:fs')).readFileSync(new URL('../../index.css', import.meta.url), 'utf8');
+  assert.match(css, /\.chat-file-icon\s*\{[^}]*forced-color-adjust:\s*none/, 'finding 5: forced-color-adjust: none');
+  assert.match(css, /@media \(forced-colors: active\)\s*\{\s*\.chat-file-icon\s*\{[^}]*background-color:\s*CanvasText/, 'finding 5: the mask is CanvasText under forced colors');
 }
 {
   setStore({ activeConversationId: 'which' });

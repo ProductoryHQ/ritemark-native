@@ -27,14 +27,15 @@ export function FileIconMask({ iconUri, size }: { iconUri: string; size: number 
     WebkitMaskSize: 'contain',
     maskSize: 'contain',
   };
-  return <span aria-hidden="true" data-file-icon="" className="block shrink-0" style={style} />;
+  // `chat-file-icon` (index.css): under forced colors the mask paints in CanvasText, not in a colour the system dropped
+  return <span aria-hidden="true" data-file-icon="" className="chat-file-icon block shrink-0" style={style} />;
 }
 
 /**
  * The head's icon: 16 in a 24 square, 8 from the sheet's left edge (the head's
  * 12 less 4), the name 6 later (the head's gap of 8 less 2). Hover is the soft
  * accent fill with the icon in accent; keyboard focus draws the ring and opens
- * the tooltip; a press deepens the accent. The ring sits inside the square (the
+ * the tooltip; a press looks like hover (the accent icon on the soft fill), never weaker, as the rail's chat buttons do. The ring sits inside the square (the
  * prototype's -2 offset), so it never runs into the name 6 later or the sheet's edge.
  */
 export function ChatDocumentButton({ document, onBringForward }: { document: ChatDocumentView; onBringForward: () => void }) {
@@ -46,7 +47,7 @@ export function ChatDocumentButton({ document, onBringForward }: { document: Cha
         aria-label={chatDocumentLabel(document)}
         data-chat-document=""
         onClick={onBringForward}
-        className="size-6 shrink-0 rounded-[6px] p-0 text-[var(--r-ink-muted)] hover:bg-[var(--r-accent-soft)] hover:text-[var(--r-accent)] focus-visible:text-[var(--r-accent)] focus-visible:!outline-offset-[-2px] active:bg-[var(--r-accent-soft)] active:text-[var(--r-accent-deep)]"
+        className="size-6 shrink-0 rounded-[6px] p-0 text-[var(--r-ink-muted)] hover:bg-[var(--r-accent-soft)] hover:text-[var(--r-accent)] focus-visible:text-[var(--r-accent)] focus-visible:!outline-offset-[-2px] active:bg-[var(--r-accent-soft)] active:text-[var(--r-accent)]"
       >
         <FileIconMask iconUri={document.iconUri} size={16} />
       </Button>

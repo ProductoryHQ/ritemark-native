@@ -95,9 +95,13 @@ import { showBriefToast } from '../feedback/feedbackSheet';
 import {
   bringDocumentForward,
   chatDocumentsFor,
+  ChatDocumentsPublisher,
+  LanguageLookup,
+  RealPathCache,
   resolveFileIcon,
   type ChatDocumentView,
   type FileIconTheme,
+  type LanguageContribution,
   type TabGroupFact,
 } from './chatDocuments';
 import type { CommentTaskEnqueueMessage, CommentTaskEnqueueOutcome } from '../commentTasks/protocol';
@@ -145,7 +149,7 @@ import {
   AgentSidebarBootstrapError,
 } from './agentSidebarBootstrap';
 import { versionedWebviewAssetUri } from './webviewAssetUri';
-import { sameFile } from '../utils/pathIdentity';
+import { sameFile, samePath } from '../utils/pathIdentity';
 import {
   chatLinkMessage,
   clickActionFor,
@@ -441,7 +445,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       stopConversation: (conversationId) => this._stopConversationSessions(conversationId),
       emit: (event) => {
         void this._view?.webview.postMessage(event);
-        // Sprint 155 (PR 2): a chat's changed files may have moved on; its document icon follows
+        // Sprint 155 (PR 2): a chat's changed files may have moved on; its document icon follows. A turn may make a
+        // gone file again without a workspace event, so the gone ones are asked again.
+        this._chatRealPaths.forgetMissing();
         this._scheduleChatDocuments();
       },
       rolloutMode: () => conversationCutover.resolve(isEnabled('durableAgentConversations')),
@@ -560,6 +566,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           if (!delivered || !this._isCurrentSidebarView(webviewView.webview, viewGeneration)) break;
           this._sendChatFontSize();
           this._sendActiveFile();
+          // Sprint 155 (PR 2): a sheet resolved again (moved, Reload Webviews, its process restarted) lost its copy
+          this._chatDocumentsPublisher.reset();
           this._scheduleChatDocuments();
           BrowserContextStore.instance.sheetReloaded(); // a waiting share question is shown again
           void this._sendActiveBrowserContext();
@@ -1855,14 +1863,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           this._disposeRuntimeSessions(message.conversationId ?? DEFAULT_CONVERSATION_ID);
           break;
 
-        // Sprint 76 R3a: return provider-configured booleans (never key values)
-        // for the webview model-picker filter + setup prompt.
         // Sprint 155 (PR 2): the person clicked (or pressed) the head's document icon. The host looks the chat's
         // document up again itself, so only a file that exists now, and that this chat changed, comes forward.
         case 'chat-document:bring-forward':
           if (typeof message.conversationId === 'string') await this._bringChatDocumentForward(message.conversationId);
           break;
 
+        // Sprint 76 R3a: return provider-configured booleans (never key values)
+        // for the webview model-picker filter + setup prompt.
         case 'acp-get-providers':
           await this._sendAcpProviders();
           break;
@@ -1898,13 +1906,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const deleteWatcher = vscode.workspace.createFileSystemWatcher('**/*', true, true, false);
     const activeFileListeners = [
       deleteWatcher,
-      deleteWatcher.onDidDelete(() => this._scheduleActiveFile()),
+      // Sprint 155 (PR 2): a file event clears the chats' cached real paths (`_chatRealPaths`) first
+      deleteWatcher.onDidDelete(() => { this._chatRealPaths.clear(); this._scheduleActiveFile(); }),
       vscode.window.tabGroups.onDidChangeTabGroups(() => this._scheduleActiveFile()),
-      vscode.workspace.onDidDeleteFiles(() => this._scheduleActiveFile()),
-      vscode.workspace.onDidRenameFiles(() => this._scheduleActiveFile()),
-      // Sprint 155 (PR 2): a file made again can be a chat's document again; the icon's image follows the theme
-      vscode.workspace.onDidCreateFiles(() => this._scheduleChatDocuments()),
+      vscode.workspace.onDidDeleteFiles(() => { this._chatRealPaths.clear(); this._scheduleActiveFile(); }),
+      vscode.workspace.onDidRenameFiles(() => { this._chatRealPaths.clear(); this._scheduleActiveFile(); }),
+      // Sprint 155 (PR 2): a file made again can be a chat's document again; the icon's image follows the theme, and
+      // its language follows the installed extensions
+      vscode.workspace.onDidCreateFiles(() => { this._chatRealPaths.clear(); this._scheduleChatDocuments(); }),
       vscode.window.onDidChangeActiveColorTheme(() => this._scheduleChatDocuments()),
+      vscode.extensions.onDidChange(() => { this._languageLookup = undefined; this._scheduleChatDocuments(); }),
       vscode.workspace.onDidChangeTextDocument((event) => {
         const activeInput = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
         const activeUri = activeInput && typeof activeInput === 'object' && 'uri' in activeInput
@@ -3632,9 +3643,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   // ── Sprint 155 (PR 2): each chat shows its document (experience 45; `chatDocuments.ts`) ──
 
   private _chatDocumentsTimer: ReturnType<typeof setTimeout> | undefined;
-  private _chatDocumentsSequence = 0;
-  private _chatDocumentsSent: { documents: Record<string, ChatDocumentView>; front: string | null } | undefined;
   private _fileIconTheme: FileIconTheme | null | undefined;
+  private _languageLookup: LanguageLookup | undefined;
+  /** The documents the last update worked out, for the front document's key. */
+  private _chatDocumentsPublisherLast: Record<string, ChatDocumentView> = {};
+  /** Real paths, cached between the workspace's file events: a tab change never reads every chat's files again. */
+  private readonly _chatRealPaths = new RealPathCache((file) => UnifiedViewProvider._realPathOrNull(file));
+  private readonly _chatDocumentsPublisher = new ChatDocumentsPublisher<vscode.WebviewView>({
+    view: () => this._view,
+    documents: (view) => this._chatDocuments(view.webview),
+    front: () => this._frontDocumentPath(),
+    post: (view, message) => view.webview.postMessage(message),
+  });
 
   /** One send for a burst of changes. Nothing here moves a tab or the chat: it only redraws the icons and the order. */
   private _scheduleChatDocuments() {
@@ -3662,19 +3682,51 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const theme = this._iconTheme();
     const kind = vscode.window.activeColorTheme.kind;
     const light = kind === vscode.ColorThemeKind.Light || kind === vscode.ColorThemeKind.HighContrastLight;
-    const languageId = vscode.workspace.textDocuments.find((document) => document.uri.scheme === 'file' && document.uri.fsPath === file)?.languageId;
+    // An open document's language first (the person may have set it), else the language its name gets
+    const languageId = vscode.workspace.textDocuments.find((document) => document.uri.scheme === 'file' && samePath(document.uri.fsPath, file))?.languageId
+      ?? this._languages().languageOf(file);
     const iconPath = theme ? resolveFileIcon(theme, file, { kind: light ? 'light' : 'dark', ...(languageId ? { languageId } : {}) }) : undefined;
     const relative = (iconPath ?? './icons/file.svg').replace(/^\.\//, '');
     return webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'fileicons', ...relative.split('/'))).toString();
   }
 
-  /** The file a tab shows, if it is a file on disk. */
-  private static _tabFileUri(tab: vscode.Tab | undefined): vscode.Uri | undefined {
+  /** Which language each file name gets, from the installed extensions' `contributes.languages`; built once. */
+  private _languages(): LanguageLookup {
+    if (!this._languageLookup) {
+      const languages: LanguageContribution[] = [];
+      for (const extension of vscode.extensions.all) {
+        const contributed = (extension.packageJSON as { contributes?: { languages?: unknown } } | undefined)?.contributes?.languages;
+        if (Array.isArray(contributed)) languages.push(...(contributed as LanguageContribution[]));
+      }
+      this._languageLookup = new LanguageLookup(languages);
+    }
+    return this._languageLookup;
+  }
+
+  /**
+   * The file a tab shows, if it is a file on disk, and whether the tab is a diff (File changes, Review): a diff
+   * shows the file but is not its tab.
+   */
+  private static _tabFile(tab: vscode.Tab | undefined): { uri: vscode.Uri; isDiff: boolean } | undefined {
     const input = tab?.input;
-    const uri = input instanceof vscode.TabInputTextDiff
-      ? input.modified
+    const isDiff = input instanceof vscode.TabInputTextDiff || input instanceof vscode.TabInputNotebookDiff;
+    const uri = isDiff
+      ? (input as vscode.TabInputTextDiff | vscode.TabInputNotebookDiff).modified
       : input && typeof input === 'object' && 'uri' in input ? (input as { uri: unknown }).uri : undefined;
-    return uri instanceof vscode.Uri && uri.scheme === 'file' ? uri : undefined;
+    return uri instanceof vscode.Uri && uri.scheme === 'file' ? { uri, isDiff } : undefined;
+  }
+
+  /**
+   * The document in front, as its real path. When it is a chat's document, that document's own key, compared the
+   * platform's way (`samePath`), so All chats' order never misses it over a drive letter's case.
+   */
+  private _frontDocumentPath(): string | null {
+    const front = UnifiedViewProvider._tabFile(vscode.window.tabGroups.activeTabGroup.activeTab);
+    const real = front ? this._chatRealPaths.get(front.uri.fsPath) : null;
+    if (!real) return null;
+    const documents = this._chatDocumentsPublisherLast;
+    for (const document of Object.values(documents)) if (samePath(document.path, real)) return document.path;
+    return real;
   }
 
   /** A real path, or null when the file is gone. */
@@ -3689,29 +3741,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   /** Every chat's document in this project, read from the index (no record is opened). */
   private async _chatDocuments(webview: vscode.Webview): Promise<Record<string, ChatDocumentView>> {
     const chats = await this._conversationController.changedFilesByChat();
-    const real = new Map<string, string | null>();
-    const realPath = (file: string): string | null => {
-      if (!real.has(file)) real.set(file, UnifiedViewProvider._realPathOrNull(file));
-      return real.get(file) ?? null;
-    };
-    return chatDocumentsFor(chats, realPath, (file) => this._fileIconUri(file, webview));
+    const documents = chatDocumentsFor(chats, (file) => this._chatRealPaths.get(file), (file) => this._fileIconUri(file, webview));
+    this._chatDocumentsPublisherLast = documents;
+    return documents;
   }
 
+  /**
+   * Sends overlap (a conversation change and a tab change a moment apart): only the newest one posts, and it reads
+   * the tab in front after its await, so an older send can never put a stale order back (`ChatDocumentsPublisher`).
+   */
   private async _sendChatDocuments(): Promise<void> {
-    const view = this._view;
-    if (!view) return;
-    // Sends overlap (a conversation change and a tab change a moment apart): only the newest one posts, and it reads
-    // the tab in front after its await, so an older send can never put a stale order back.
-    const sequence = ++this._chatDocumentsSequence;
-    const documents = await this._chatDocuments(view.webview);
-    if (sequence !== this._chatDocumentsSequence || view !== this._view) return;
-    const frontUri = UnifiedViewProvider._tabFileUri(vscode.window.tabGroups.activeTabGroup.activeTab);
-    const front = frontUri ? UnifiedViewProvider._realPathOrNull(frontUri.fsPath) : null;
-    const sent = this._chatDocumentsSent;
-    if (sent && sent.front === front && JSON.stringify(sent.documents) === JSON.stringify(documents)) return;
-    this._chatDocumentsSent = { documents, front };
-    const delivered = await view.webview.postMessage({ type: 'chat-documents', documents, front });
-    if (delivered === false) this._chatDocumentsSent = undefined;
+    await this._chatDocumentsPublisher.send();
   }
 
   /**
@@ -3722,7 +3762,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const view = this._view;
     if (!view) return;
     const document = (await this._chatDocuments(view.webview))[conversationId];
-    if (!document) {
+    // The cache may not have seen the file go yet: the click asks the disk once
+    if (document && !fs.existsSync(document.openPath)) this._chatRealPaths.clear();
+    if (!document || !fs.existsSync(document.openPath)) {
       // The file went between the drawing and the click: the icon goes too
       this._scheduleChatDocuments();
       return;
@@ -3732,8 +3774,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       viewColumn: group.viewColumn,
       isActive: group.isActive,
       tabs: group.tabs.map((tab) => {
-        const uri = UnifiedViewProvider._tabFileUri(tab);
-        return { path: uri ? UnifiedViewProvider._realPathOrNull(uri.fsPath) : null, isActive: tab.isActive };
+        const file = UnifiedViewProvider._tabFile(tab);
+        return { path: file ? this._chatRealPaths.get(file.uri.fsPath) : null, isActive: tab.isActive, isDiff: file?.isDiff ?? false };
       }),
     }));
     await bringDocumentForward(document.path, {
@@ -3741,8 +3783,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       reveal: async (groupIndex, tabIndex) => {
         const group = groups()[groupIndex];
         const tab = group?.tabs[tabIndex];
-        const uri = UnifiedViewProvider._tabFileUri(tab);
-        if (!group || !tab || !uri) return;
+        const file = UnifiedViewProvider._tabFile(tab);
+        if (!group || !tab || !file || file.isDiff) return;
+        const uri = file.uri;
         const options = { viewColumn: group.viewColumn };
         // The tab's own editor, so the open finds this tab and never opens the file a second time in another one
         const input = tab.input;
@@ -3754,7 +3797,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       // `vscode.open` routes through the editor associations: a .md opens in Ritemark's editor
       open: async (file) => { await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(file), { preview: false }); },
       moveActiveToEnd: async () => { await vscode.commands.executeCommand('moveActiveEditor', { to: 'last', by: 'tab' }); },
-    });
+      // Both sides are real paths; compared the platform's way
+      samePath: (a, b) => samePath(a, b),
+      // A custom editor's tab (Ritemark's .md) may show after `vscode.open` resolved: the move waits for it
+      onDidChangeTabs: (listener) => vscode.window.tabGroups.onDidChangeTabs(listener),
+    }, document.openPath);
   }
 
   /**
