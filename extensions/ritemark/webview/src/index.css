@@ -741,6 +741,8 @@ body {
   font-weight: 600;
   font-family: var(--ritemark-ui-font-family);
 }
+/* punctuation right after the pill ("@opencode, list") sits against it */
+.rm-mention-tight { padding-right: 1px; margin-right: -1px; }
 
 /* ── Sprint 117 (#292): comment task projection — marker dot, status line,
    destination, and the bounded completion reply. Tone is colour ONLY; every

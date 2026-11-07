@@ -81,6 +81,31 @@ export function parseCommentBody(raw: string): ParsedCommentBody {
  *  Exported so the rail highlights exactly the mentions that assign. */
 export const MENTION_SOURCE = `@(${COMMENT_AGENT_ALIASES.join('|')})(?=$|[\\s:,])`
 
+/** One run of a note's text: a mention pill or plain text. `tight` marks a pill
+ *  followed straight away by punctuation ("@opencode, list …"), which then sits
+ *  against the pill with no gap (Experience lead, 8 Nov 2026, experience 45). */
+export interface MentionSegment {
+  text: string
+  mention: boolean
+  tight: boolean
+}
+
+/** Split a note into plain text and the mentions that assign, in order. */
+export function mentionSegments(note: string): MentionSegment[] {
+  const re = new RegExp(MENTION_SOURCE, 'gi')
+  const out: MentionSegment[] = []
+  let last = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(note)) !== null) {
+    if (m.index > last) out.push({ text: note.slice(last, m.index), mention: false, tight: false })
+    const end = m.index + m[0].length
+    out.push({ text: m[0], mention: true, tight: /^[.,;:!?…)]/u.test(note.slice(end)) })
+    last = end
+  }
+  if (last < note.length || !out.length) out.push({ text: note.slice(last), mention: false, tight: false })
+  return out
+}
+
 export function detectAgentAlias(body: string): CommentAgentAlias | null {
   const m = new RegExp(MENTION_SOURCE, 'i').exec(body)
   return m ? (m[1].toLowerCase() as CommentAgentAlias) : null
