@@ -34,6 +34,7 @@ import { runProcess } from '../utils/runProcess';
 import { setUsageData, usageDataState } from '../analytics/posthog';
 import { settingsTimed, settingsTimingEnabled, settingsTimingMark, settingsTimingPage, settingsTimingStart } from './settingsTiming';
 import { SETTINGS_KEY_NAMES, applyApiKeyMessage, isSettingsKeyName, settingsKeyAllowed, type SettingsKeyFlags, type SettingsKeyName } from './settingsKeys';
+import { keysFromTestEnvironment, readProviderKey, redactTestKey } from '../ai/providerKeys';
 import { PUBLISH_PREFIX } from '../publish/settingsProtocol';
 import {
   ALL_PARTS,
@@ -837,6 +838,9 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         // both disappear when the feature flag is off.
         transcriptionEnabled: flags.transcription,
         elevenlabsKeyConfigured: saved['elevenlabs-api-key'],
+        // Sprint 155: in the test channel only, which keys not saved come from the test environment (booleans; the
+        // value stays in the host, and the eye still answers only a saved key)
+        testEnvironmentKeys: keysFromTestEnvironment(saved, (name) => settingsKeyAllowed(name, flags)),
 
         // The voice model: a file's size on this computer, no probe
         voiceModel: this.voiceModelStatus(),
@@ -989,7 +993,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
   /** Claude's part: its setup status (cached until an event says it changed). */
   private async probeClaude() {
-    const anthropicKey = await this.context.secrets.get('anthropic-api-key');
+    const anthropicKey = await readProviderKey(this.context.secrets, 'anthropic-api-key');
     setAnthropicKeyAvailable(Boolean(anthropicKey));
     const claudeStatus = await getSetupStatus();
     return {
@@ -1348,7 +1352,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
    * Test OpenAI API key
    */
   private async testOpenAIKey(webview: vscode.Webview): Promise<void> {
-    const key = await this.context.secrets.get('openai-api-key');
+    const key = await readProviderKey(this.context.secrets, 'openai-api-key');
     if (!key) {
       webview.postMessage({ type: 'testResult', key: 'openai', success: false, error: 'No API key configured' });
       return;
@@ -1367,7 +1371,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         type: 'testResult',
         key: 'openai',
         success: false,
-        error: err instanceof Error ? err.message : 'Unknown error'
+        error: redactTestKey(err instanceof Error ? err.message : 'Unknown error', 'openai-api-key')
       });
     }
   }
@@ -1376,7 +1380,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
    * Test Google AI API key
    */
   private async testGoogleAIKey(webview: vscode.Webview): Promise<void> {
-    const key = await this.context.secrets.get('google-ai-key');
+    const key = await readProviderKey(this.context.secrets, 'google-ai-key');
     if (!key) {
       webview.postMessage({ type: 'testResult', key: 'google', success: false, error: 'No API key configured' });
       return;
@@ -1398,7 +1402,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         type: 'testResult',
         key: 'google',
         success: false,
-        error: err instanceof Error ? err.message : 'Unknown error'
+        error: redactTestKey(err instanceof Error ? err.message : 'Unknown error', 'google-ai-key')
       });
     }
   }
@@ -1407,7 +1411,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
    * Test Anthropic API key
    */
   private async testAnthropicKey(webview: vscode.Webview): Promise<void> {
-    const key = await this.context.secrets.get('anthropic-api-key');
+    const key = await readProviderKey(this.context.secrets, 'anthropic-api-key');
     if (!key) {
       webview.postMessage({ type: 'testResult', key: 'anthropic', success: false, error: 'No API key configured' });
       return;
@@ -1439,7 +1443,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         type: 'testResult',
         key: 'anthropic',
         success: false,
-        error: err instanceof Error ? err.message : 'Unknown error',
+        error: redactTestKey(err instanceof Error ? err.message : 'Unknown error', 'anthropic-api-key'),
       });
     }
   }
@@ -1455,7 +1459,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
    * transcribe cannot read: Microsoft's certification of 2.0.0 got "rejected" for a working key.
    */
   private async testElevenLabsKey(webview: vscode.Webview): Promise<void> {
-    const key = await this.context.secrets.get('elevenlabs-api-key');
+    const key = await readProviderKey(this.context.secrets, 'elevenlabs-api-key');
     if (!key) {
       webview.postMessage({ type: 'testResult', key: 'elevenlabs', success: false, error: 'No API key configured' });
       return;
@@ -1484,7 +1488,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         type: 'testResult',
         key: 'elevenlabs',
         success: false,
-        error: err instanceof Error ? err.message : 'Unknown error',
+        error: redactTestKey(err instanceof Error ? err.message : 'Unknown error', 'elevenlabs-api-key'),
       });
     }
   }
@@ -1530,7 +1534,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
   }
 
   private async testOpenRouterKey(webview: vscode.Webview): Promise<void> {
-    const key = await this.context.secrets.get('openrouter-api-key');
+    const key = await readProviderKey(this.context.secrets, 'openrouter-api-key');
     if (!key) {
       webview.postMessage({ type: 'testResult', key: 'openrouter', success: false, error: 'No API key configured' });
       return;
@@ -1553,7 +1557,7 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         type: 'testResult',
         key: 'openrouter',
         success: false,
-        error: err instanceof Error ? err.message : 'Unknown error',
+        error: redactTestKey(err instanceof Error ? err.message : 'Unknown error', 'openrouter-api-key'),
       });
     }
   }

@@ -71,6 +71,7 @@ import { openPublishSheetHarnessIfAsked } from './publish/devSheetHarness';
 import { registerProjectHeadCommands } from './views/projectHeadCommands';
 import { prepareWelcome, registerWelcome } from './welcome/welcomeHost';
 import { newDocumentFolder, nextUntitledPath } from './newDocumentLocation';
+import { readProviderKey, snapshotTestKeys } from './ai/providerKeys';
 // Feature flags: view visibility controlled by 'when' clauses in package.json
 
 // Export unified view provider for editor access
@@ -273,6 +274,11 @@ function copyRecursive(src: string, dest: string): void {
 }
 
 export function activate(context: vscode.ExtensionContext) {
+  // Sprint 155 (test keys): first, before anything reads a key or starts a process. In the test channel only, the
+  // RITEMARK_TEST_KEY_* variables move from this process's environment into providerKeys.ts, so no child (Claude
+  // Code, Codex, git, MCP servers) inherits them; a key reaches an agent only through the BYOK env.
+  snapshotTestKeys();
+
   // === Theme & branding: fresh install, version upgrade, or design-foundation migration ===
   const currentVersion = context.extension.packageJSON.version as string;
 
@@ -538,14 +544,14 @@ export function activate(context: vscode.ExtensionContext) {
     // runtime's own list plus the models the catalog declares to it (R1).
     results.anthropic = await discoverAnthropic({
       apiKey: claudeSetup.authMethod === 'api-key'
-        ? (await context.secrets.get('anthropic-api-key')) ?? null
+        ? (await readProviderKey(context.secrets, 'anthropic-api-key')) ?? null
         : null,
       workspacePath,
       binaryPath: claudeSetup.binaryPath,
       declarations: modelCatalog.getClaudeRuntimeDeclarations(),
     });
-    results.openai = await discoverOpenAI((await context.secrets.get('openai-api-key')) ?? null);
-    results.gemini = await discoverGemini((await context.secrets.get('google-ai-key')) ?? null);
+    results.openai = await discoverOpenAI((await readProviderKey(context.secrets, 'openai-api-key')) ?? null);
+    results.gemini = await discoverGemini((await readProviderKey(context.secrets, 'google-ai-key')) ?? null);
     return results;
   });
   void modelCatalog.activate(context).catch((err) => console.warn('[modelCatalog] activate failed', err));
