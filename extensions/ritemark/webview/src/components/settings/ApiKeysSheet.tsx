@@ -77,7 +77,13 @@ export const API_KEY_ROWS: readonly ApiKeyRow[] = [
 ]
 
 /** The row's state line: Saved · it works after a passing Test, Not added before a key is saved. */
-export function keyStateLine(saved: boolean, result: TestResult | undefined): string {
+export function keyStateLine(saved: boolean, result: TestResult | undefined, fromTestEnvironment = false): string {
+  if (!saved && fromTestEnvironment) {
+    // Sprint 155: a test launch's key, from its environment, never saved and never shown
+    if (result?.success) return 'From the test environment · it works'
+    if (result && !result.success) return "From the test environment · it didn't work"
+    return 'From the test environment'
+  }
   if (!saved) return 'Not added'
   if (result?.success) return 'Saved · it works'
   if (result && !result.success) return "Saved · it didn't work"
@@ -118,6 +124,7 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, hide
   onEditing?: (name: ApiKeyRow['name'], editing: boolean) => void
 }) {
   const saved = Boolean(settings[row.configured])
+  const fromTestEnvironment = !saved && Boolean(settings.testEnvironmentKeys?.[row.name])
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [show, setShow] = useState(false)
@@ -204,7 +211,7 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, hide
       <div className="flex items-center gap-4">
         <div className="w-[84px] shrink-0 text-[12px] leading-4 text-ink-muted">{row.label}</div>
         <div className="grid min-w-0 flex-1">
-          <span className="text-[13px] leading-[18px] text-ink-strong">{keyStateLine(saved, result)}</span>
+          <span className="text-[13px] leading-[18px] text-ink-strong">{keyStateLine(saved, result, fromTestEnvironment)}</span>
           <span className="text-[12px] leading-4 text-ink-muted">{usedFor}</span>
           {result && !result.success && result.error ? <span className="text-[12px] leading-4 text-ritemark-error [overflow-wrap:anywhere]">{result.error}</span> : null}
           {result?.success && result.message ? <span className="text-[12px] leading-4 text-ink-muted">{result.message}</span> : null}
@@ -220,6 +227,11 @@ function KeyRow({ row, settings, testing, result, onSave, onTest, onReveal, hide
               </>
             ) : (
               <>
+                {fromTestEnvironment ? (
+                  <TipButton tip="Asks the service whether the test environment's key works" variant="ghost" size="sm" disabled={testing} aria-busy={testing || undefined} onClick={() => onTest(row.name)}>
+                    {testing ? <><Icon name="circle-notch" size={14} className="animate-spin" />Trying…</> : 'Test'}
+                  </TipButton>
+                ) : null}
                 <ExternalLink url={row.url} tip={`Opens ${row.label}'s page for API keys in your browser`} className="px-2">
                   Get a key <Icon name="arrow-square-out" size={12} />
                 </ExternalLink>
