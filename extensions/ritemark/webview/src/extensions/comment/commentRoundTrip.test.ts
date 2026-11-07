@@ -14,7 +14,6 @@ import {
   parseCommentBody,
   hasCommentTerminator,
   detectAgentAlias,
-  mentionSegments,
   stripAgentMentions,
 } from './commentModel'
 
@@ -149,19 +148,6 @@ assert.equal(detectAgentAlias('@opencode, list three outcomes as bullets'), 'ope
 assert.equal(stripAgentMentions('@opencode, list three outcomes as bullets'), 'list three outcomes as bullets', 'the comma after the mention is stripped for the prompt')
 assert.equal(stripAgentMentions('Please, @codex, tighten the intro'), 'Please, tighten the intro', 'a mid-note mention takes its comma with it')
 assert.equal(detectAgentAlias('see @codex. later'), null, 'a period after the mention still does NOT assign')
-// Experience lead, 8 Nov (experience 45, cc48948): punctuation right after the pill sits against it (no gap)
-assert.deepEqual(
-  mentionSegments('@opencode, list three'),
-  [{ text: '@opencode', mention: true, tight: true }, { text: ', list three', mention: false, tight: false }],
-  'a pill followed by a comma is tight',
-)
-assert.deepEqual(
-  mentionSegments('fix this @claude please'),
-  [{ text: 'fix this ', mention: false, tight: false }, { text: '@claude', mention: true, tight: false }, { text: ' please', mention: false, tight: false }],
-  'a pill followed by a space keeps its padding',
-)
-assert.deepEqual(mentionSegments('@claude: fix').map((x) => x.tight), [true, false], 'a colon after the pill is tight too')
-assert.deepEqual(mentionSegments('plain note'), [{ text: 'plain note', mention: false, tight: false }], 'no mention, one plain segment')
 assert.equal(detectAgentAlias('plain note'), null, 'no mention → not assigned')
 assert.equal(stripAgentMentions('@claude: rewrite this'), 'rewrite this', 'leading mention stripped for the prompt')
 assert.equal(stripAgentMentions('Väike kommentaar siia! @claude'), 'Väike kommentaar siia!', 'trailing mention stripped for the prompt')

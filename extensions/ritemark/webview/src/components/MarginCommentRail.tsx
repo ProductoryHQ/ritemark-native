@@ -27,7 +27,7 @@ import {
   hasCommentTerminator,
   detectAgentAlias,
   ALIAS_LABEL,
-  mentionSegments,
+  MENTION_SOURCE,
   type CommentAgentAlias,
 } from '../extensions/comment/commentModel'
 import { assignMissingCommentIds } from '../extensions/comment/commentIds'
@@ -269,17 +269,22 @@ const SendIcon = () => (
  * assignment lives in the text, not in extra chrome.
  */
 function renderNoteWithMentions(note: string): ReactNode {
-  const segments = mentionSegments(note)
-  if (!segments.some((segment) => segment.mention)) return note
-  return segments.map((segment, i) =>
-    segment.mention ? (
-      <span key={i} className={segment.tight ? 'rm-mention rm-mention-tight' : 'rm-mention'}>
-        {segment.text}
-      </span>
-    ) : (
-      segment.text
-    ),
-  )
+  const re = new RegExp(MENTION_SOURCE, 'gi')
+  const out: ReactNode[] = []
+  let last = 0
+  let i = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(note)) !== null) {
+    if (m.index > last) out.push(note.slice(last, m.index))
+    out.push(
+      <span key={i++} className="rm-mention">
+        {m[0]}
+      </span>,
+    )
+    last = m.index + m[0].length
+  }
+  if (last < note.length) out.push(note.slice(last))
+  return out.length ? out : note
 }
 
 /** Compose bubble — used to create a new comment and to edit an existing one. */
