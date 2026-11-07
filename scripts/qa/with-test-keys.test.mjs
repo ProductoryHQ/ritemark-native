@@ -266,3 +266,70 @@ test('a value never reaches security’s arguments, and tracing is off first', {
   assert.equal(src.split('\n')[1], 'set +o xtrace; unset BASH_XTRACEFD BASH_ENV');
   assert.ok(!/echo\s+"?\$value/.test(src) && !/printf[^\n]*\$value/.test(src));
 });
+
+// Second security review of #681 (findings 3 and 5): the profile guard's gaps.
+test('refuses VSCODE_PORTABLE and VSCODE_APPDATA, before reading the vault', { skip }, () => {
+  // VS Code reads both before --user-data-dir: either would put the profile somewhere the guard never saw
+  for (const name of ['VSCODE_PORTABLE', 'VSCODE_APPDATA']) {
+    for (const value of [path.join(os.tmpdir(), 'wtk-elsewhere'), '']) {
+      const w = makeWorld(FAKE);
+      const r = run(w, ['--only', 'cloudflare', '--', ...launch(w)], { [name]: value });
+      assert.equal(r.status, 64, `${name}=${JSON.stringify(value)}: ${r.out}`);
+      assert.match(r.out, new RegExp(`refused: ${name}`), r.out);
+      assert.ok(!fs.existsSync(w.callLog), 'security was called before the guard');
+      assert.ok(!fs.existsSync(w.marker), 'the command ran');
+    }
+  }
+});
+
+test('refuses a --shared-data-dir that is, or sits under, ~/.ritemark-shared', { skip }, () => {
+  const fakeHome = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'wtk-home-')));
+  try {
+    const shared = path.join(fakeHome, '.ritemark-shared');
+    const st = (extra) => {
+      const w = makeWorld(FAKE);
+      const r = run(w, ['--only', 'cloudflare', '--', ...launch(w), ...extra], { HOME: fakeHome });
+      return { ...r, ran: fs.existsSync(w.marker), read: fs.existsSync(w.callLog) };
+    };
+    const refused = (extra, why) => {
+      const r = st(extra);
+      assert.equal(r.status, 64, `${why}: ${r.out}`);
+      assert.match(r.out, /refused: the command's --shared-data-dir/, `${why}: ${r.out}`);
+      assert.ok(!r.ran && !r.read, `${why}: the command ran or the vault was read`);
+    };
+    // Not made yet: still refused
+    refused([`--shared-data-dir=${shared}`], 'the folder itself, before it exists');
+    fs.mkdirSync(shared);
+    refused([`--shared-data-dir=${shared}`], 'the folder itself');
+    refused([`--shared-data-dir=${shared}/`], 'with a trailing slash');
+    refused(['--shared-data-dir', shared], 'the two-word form');
+    refused([`--shared-data-dir=${path.join(shared, 'sub')}`], 'a folder under it');
+    refused([`--shared-data-dir=${fakeHome}/x/../.ritemark-shared`], '.. into it');
+    refused([`--shared-data-dir=${fakeHome}/.ritemark-dev-shared`, `--shared-data-dir=${shared}`], 'the last one wins in VS Code');
+    refused(['--shared-data-dir'], 'a dangling flag');
+    refused(['--shared-data-dir='], 'an empty value');
+    const link = path.join(fakeHome, 'link-to-shared');
+    fs.symlinkSync(shared, link);
+    refused([`--shared-data-dir=${link}`], 'a link to it');
+    if (process.platform === 'darwin') refused([`--shared-data-dir=${path.join(fakeHome, '.Ritemark-Shared')}`], 'another case (a case-insensitive disk)');
+    // The dev builds' own folder, and no --shared-data-dir at all (the Cloudflare contract script is no app launch)
+    const dev = st([`--shared-data-dir=${path.join(fakeHome, '.ritemark-dev-shared')}`]);
+    assert.equal(dev.status, 0, dev.out);
+    const none = st([]);
+    assert.equal(none.status, 0, none.out);
+  } finally {
+    fs.rmSync(fakeHome, { recursive: true, force: true });
+  }
+});
+
+test('a test profile path with whitespace is refused', { skip }, () => {
+  const w = makeWorld(FAKE);
+  for (const name of ['pro file', 'profile ', 'pro\tfile']) {
+    const p = path.join(w.root, name);
+    fs.mkdirSync(p);
+    const r = run(w, ['--only', 'cloudflare', '--', process.execPath, w.child, '{}', `--user-data-dir=${p}`], { RITEMARK_TEST_PROFILE: p });
+    assert.equal(r.status, 64, `${JSON.stringify(name)}: ${r.out}`);
+    assert.match(r.out, /must not contain whitespace/, r.out);
+  }
+  assert.ok(!fs.existsSync(w.callLog), 'security was called before the guard');
+});

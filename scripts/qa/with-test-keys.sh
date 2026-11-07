@@ -19,8 +19,15 @@ set +o xtrace; unset BASH_XTRACEFD BASH_ENV
 #   - RITEMARK_TEST_PROFILE names the run's own profile folder, under /private/tmp or /tmp, or
 #     under $TMPDIR when $TMPDIR has at least 3 path segments; never Ritemark's real profile or
 #     ~/.ritemark-shared.
+#   - RITEMARK_TEST_PROFILE has no whitespace in it.
+#   - neither VSCODE_PORTABLE nor VSCODE_APPDATA is set, not even empty: VS Code reads both before
+#     --user-data-dir, so either would move the profile or the shared data past this check.
 #   - the command carries exactly one --user-data-dir, equal to RITEMARK_TEST_PROFILE, and is not
 #     a shell or a wrapper (bash -c, env, sudo…) that could launch something else.
+#   - every --shared-data-dir the command carries is neither ~/.ritemark-shared nor inside it (by
+#     its physical path). A --shared-data-dir isn't required: the Cloudflare contract script is no
+#     app launch, and scripts/qa/dev-launch-isolated.sh sets its own (~/.ritemark-dev-shared) and
+#     refuses one among its extra arguments.
 #
 # --require <names>: those vault entries must be there, or the script stops and names each
 # missing one with the command that adds it.
@@ -34,7 +41,10 @@ set +o xtrace; unset BASH_XTRACEFD BASH_ENV
 # once at activation, in the test channel only, deletes them from its own environment, and hands a
 # key to an agent only under the name that agent expects (extensions/ritemark/src/ai/providerKeys.ts).
 # What still inherits the RITEMARK_TEST_KEY_* names: Ritemark's main process and what it starts
-# besides the extension host, terminals among them. So an agent, or anyone driving the test window,
+# besides the extension host, terminals among them; and, in the extension host itself, every
+# process started before Ritemark's `activate` runs, such as the built-in git extension's git and
+# the git hooks it runs. Nothing reads these names by itself, so none of them uses a key; they can
+# only show it. So an agent, or anyone driving the test window,
 # must never echo them: no `env`, `printenv` or `echo $RITEMARK_TEST_KEY_…` in a terminal or an
 # agent's shell tool; `env | grep -c RITEMARK_TEST_KEY` (a count) at most.
 # Cloudflare's two keep their names (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID): only
@@ -103,16 +113,20 @@ done
 [ "${RITEMARK_BUILD_CHANNEL:-}" = "test" ] \
   || refuse "refused: set RITEMARK_BUILD_CHANNEL=test (test keys are for test runs only)"
 
+# VS Code's own profile variables, read before --user-data-dir (test-profile-guard.sh)
+GUARD="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/test-profile-guard.sh"
+[ -f "$GUARD" ] || refuse "refused: $GUARD is missing"
+. "$GUARD"
+VSCODE_VAR="$(test_profile_env_check)" || refuse "refused: $VSCODE_VAR is set; VS Code would take the profile from it, not from --user-data-dir (unset it)"
+
 PROFILE="${RITEMARK_TEST_PROFILE:-}"
 [ -n "$PROFILE" ] || refuse "refused: set RITEMARK_TEST_PROFILE to the run's own profile folder under /private/tmp"
 
 # Where a test profile may be: the rule dev-launch-isolated.sh's --user-data-dir shares (test-profile-guard.sh)
-GUARD="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/test-profile-guard.sh"
-[ -f "$GUARD" ] || refuse "refused: $GUARD is missing"
-. "$GUARD"
 REAL_PROFILE="$(test_profile_check "$PROFILE")" || refuse "refused: RITEMARK_TEST_PROFILE $REAL_PROFILE"
 
-# The command itself: not a shell or a wrapper, and exactly one --user-data-dir, this profile.
+# The command itself: not a shell or a wrapper, exactly one --user-data-dir, this profile, and no
+# --shared-data-dir into ~/.ritemark-shared (VS Code takes the last one given, so each is checked).
 case "$(basename "$1")" in
   sh|bash|zsh|dash|ksh|fish|env|sudo|xargs|nohup|exec|eval|command|osascript|script)
     refuse "refused: run the launch command directly, not through $(basename "$1")" ;;
@@ -130,9 +144,17 @@ for arg in "$@"; do
     [ -n "$dir" ] || refuse "refused: the command's --user-data-dir is empty"
     [ "${dir%/}" = "${PROFILE%/}" ] || refuse "refused: the command's --user-data-dir isn't RITEMARK_TEST_PROFILE"
   fi
+  shared_found=0
+  shared=""
+  case "$arg" in --shared-data-dir=*) shared="${arg#--shared-data-dir=}"; shared_found=1 ;; esac
+  if [ "$prev" = "--shared-data-dir" ]; then shared="$arg"; shared_found=1; fi
+  if [ "$shared_found" = 1 ]; then
+    why="$(test_shared_data_dir_check "$shared")" || refuse "refused: the command's --shared-data-dir $why"
+  fi
   prev="$arg"
 done
 [ "$prev" != "--user-data-dir" ] || refuse "refused: the command's --user-data-dir has no value"
+[ "$prev" != "--shared-data-dir" ] || refuse "refused: the command's --shared-data-dir has no value"
 [ "$DIR_COUNT" = 1 ] || refuse "refused: the command needs exactly one --user-data-dir=\$RITEMARK_TEST_PROFILE (found $DIR_COUNT)"
 
 [ -x "$SECURITY_BIN" ] || refuse "the macOS 'security' tool isn't there; the Mac vault is the Keychain (Windows: with-test-keys.ps1, not written yet)"

@@ -144,6 +144,34 @@ async function main(): Promise<void> {
     assert.ok(!/error: [^\n]*err instanceof Error \? err\.message/.test(run), 'no raw message posted');
   });
 
+  await test("the image model list: OpenAI's 401 reaches the panel and the log as [test key]", async () => {
+    requests.length = 0;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { FlowEditorProvider } = require('./FlowEditorProvider') as typeof import('./FlowEditorProvider');
+    const provider = new FlowEditorProvider(extensionContext) as unknown as {
+      fetchModels(provider: 'openai' | 'gemini', modelType: 'llm' | 'image', webview: vscode.Webview): Promise<void>;
+    };
+    const posted: Array<Record<string, unknown>> = [];
+    const webview = { postMessage: async (message: Record<string, unknown>) => { posted.push(message); return true; } } as unknown as vscode.Webview;
+    const logged: string[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => { logged.push(args.map((a) => (a instanceof Error ? `${a.message}\n${a.stack ?? ''}` : String(a))).join(' ')); };
+    try {
+      await provider.fetchModels('openai', 'image', webview);
+    } finally {
+      console.error = originalError;
+    }
+    assert.ok(requests.length > 0, 'the list was asked for with the test key');
+    const answer = posted.find((m) => m.type === 'flow:models');
+    assert.ok(answer, 'the panel got an answer');
+    const error = String(answer.error ?? '');
+    assertNoKey(new Error(error));
+    for (const line of logged) {
+      assert.ok(!line.includes(KEY), 'the key itself in the log');
+      assert.ok(!line.includes(MASKED) && !new RegExp(`\\*{3,}${TAIL}`).test(line), `the masked key in the log: ${line.slice(0, 200)}`);
+    }
+  });
+
   fs.rmSync(workspace, { recursive: true, force: true });
   if (failures > 0) {
     console.error(`flowTestKeyErrors: ${failures} failed`);

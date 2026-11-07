@@ -26,6 +26,7 @@
 #
 # Jarmo's rule (2 and 3 Nov): no test window while he is at the keyboard. From 08:00 to 18:00 Tallinn time
 # `start` refuses unless RITEMARK_LAUNCH_DAYTIME_OK=1, which a run sets only after he has said yes in chat.
+# What a launch may not change: see "What is guarded" in start_run.
 # Test keys: this script loads none. A run that needs one uses scripts/qa/with-test-keys.sh around the launch, which
 # wants the profile on the command line it runs: give it here as --user-data-dir=$RITEMARK_TEST_PROFILE (a new or empty
 # folder, used instead of <run-dir>/profile and named in run.env as PROFILE), e.g.
@@ -144,17 +145,36 @@ start_run() {
 		esac
 	done
 	[[ $name =~ ^[A-Za-z0-9._-]+$ ]] || die "--name must be letters, digits, dot, dash or underscore"
-	# A caller's profile is a test profile, whoever calls: with-test-keys.sh's rule (test-profile-guard.sh), so a
-	# direct call can't write into Ritemark's real profile or ~/.ritemark-shared either. Checked before anything runs.
+	# What is guarded, before anything runs (second security review of #681), whoever calls:
+	#   - a caller's --user-data-dir must pass with-test-keys.sh's rule (test_profile_check, test-profile-guard.sh):
+	#     under a temp root, no whitespace, never Ritemark's real profile or ~/.ritemark-shared, nor inside them;
+	#     without one, the profile is <run-dir>/profile, under $TMPDIR, which must have no whitespace either;
+	#   - --shared-data-dir is always this script's own, ~/.ritemark-dev-shared;
+	#   - VSCODE_PORTABLE and VSCODE_APPDATA, which VS Code reads before --user-data-dir, may not be set, in this
+	#     script's environment or through --env;
+	#   - the extra arguments after `--` may not name --user-data-dir or --shared-data-dir (VS Code takes the last
+	#     one given, which would replace the two above).
+	# Not guarded: what the launched instance itself writes elsewhere (HOME is unchanged), and any VS Code variable
+	# or flag besides these.
 	if [[ -n $profile_arg ]]; then
 		local why
 		if ! why=$(test_profile_check "$profile_arg"); then die "refused: --user-data-dir $why"; fi
+	fi
+	local vscode_var
+	if ! vscode_var=$(test_profile_env_check); then
+		die "refused: $vscode_var is set; VS Code would take the profile from it, not from --user-data-dir (unset it)"
 	fi
 	local pair
 	for pair in "${envs[@]+"${envs[@]}"}"; do
 		[[ $pair =~ ^[A-Z_][A-Z0-9_]*=.*$ ]] || die "--env takes KEY=VALUE, got '$pair'"
 		case ${pair%%=*} in
-			HOME|CLAUDE_CONFIG_DIR|CODEX_HOME|XDG_*|ELECTRON_RUN_AS_NODE) die "--env may not set ${pair%%=*}" ;;
+			HOME|CLAUDE_CONFIG_DIR|CODEX_HOME|XDG_*|ELECTRON_RUN_AS_NODE|VSCODE_PORTABLE|VSCODE_APPDATA) die "--env may not set ${pair%%=*}" ;;
+		esac
+	done
+	local x
+	for x in "${extra[@]+"${extra[@]}"}"; do
+		case $x in
+			-*user-data-dir*|-*shared-data-dir*) die "refused: the extra arguments may not name --user-data-dir or --shared-data-dir (got '${x%%=*}')" ;;
 		esac
 	done
 
@@ -203,6 +223,8 @@ start_run() {
 	fi
 
 	local tmp=${TMPDIR:-/private/tmp}
+	# stop matches the profile flag up to a space: a run folder with whitespace could match another run's
+	[[ $tmp != *[[:space:]]* ]] || die "refused: TMPDIR must not contain whitespace"
 	local run_dir
 	run_dir=$(mktemp -d "${tmp%/}/rm-${name}.XXXX")
 	run_dir=$(cd "$run_dir" && pwd -P)

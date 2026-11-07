@@ -18,6 +18,7 @@ import { join } from 'node:path';
 import {
   TEST_KEY_ENV,
   claudeApiKey,
+  insightsAnthropicKey,
   keysFromTestEnvironment,
   readByokKeys,
   readProviderKey,
@@ -160,6 +161,25 @@ async function main() {
   assert.ok(!Object.values(planEnv).includes(FAKE), "a plan-signed-in Claude Code's env holds no key value");
   assert.equal(claudeRuntimeOptions(claudeApiKey('api-key', byok.anthropic), undefined).env?.ANTHROPIC_API_KEY, FAKE, 'API-key Claude Code gets it');
 
+  // ── Transcribe Insights (second review, finding 2): main's behaviour outside the test channel ─
+  // A saved key goes to Insights whatever the sign-in method, and no `claude auth status` runs for it; only a key
+  // from the test environment waits on the sign-in method (claudeApiKey).
+  {
+    let statusCalls = 0;
+    const authMethod = (method: string | null) => async () => { statusCalls++; return method; };
+    // Outside the test channel (no snapshot), a saved key and a plan sign-in: the saved key, as on main
+    assert.equal(await insightsAnthropicKey(new FakeSecrets({ 'anthropic-api-key': SAVED }), authMethod('claude-oauth'), NONE), SAVED, 'Insights: a saved key with a plan sign-in, outside the test channel');
+    assert.equal(await insightsAnthropicKey(new FakeSecrets(), authMethod('claude-oauth'), NONE), undefined, 'Insights: no key, outside the test channel');
+    assert.equal(await insightsAnthropicKey(new FakeSecrets({ 'anthropic-api-key': '' }), authMethod('api-key'), NONE), '', 'Insights: an empty saved value is returned as on main');
+    // The test channel with a saved key: still the saved key, still no sign-in check
+    assert.equal(await insightsAnthropicKey(new FakeSecrets({ 'anthropic-api-key': SAVED }), authMethod('claude-oauth'), ALL_FAKE), SAVED, 'Insights: a saved key wins in the test channel too');
+    assert.equal(statusCalls, 0, 'Insights: no claude auth status when no test-environment key is involved');
+    // The test channel, only the env key: a plan sign-in gets none, an API-key sign-in gets it
+    assert.equal(await insightsAnthropicKey(new FakeSecrets(), authMethod('claude-oauth'), ALL_FAKE), undefined, 'Insights: an env key with a plan sign-in gets no key');
+    assert.equal(await insightsAnthropicKey(new FakeSecrets(), authMethod('api-key'), ALL_FAKE), FAKE, 'Insights: an env key with an API-key sign-in');
+    assert.equal(statusCalls, 2, 'Insights: the sign-in is checked only for the env key');
+  }
+
   // OpenCode: its spawn env gets the Google key under the names it reads, and no test-key variable
   const onlyGemini = keysOf({ 'google-ai-key': FAKE });
   const opencode = new AcpManager({
@@ -286,7 +306,7 @@ async function main() {
       'keysFromTestEnvironment(',
     ],
     'extension.ts': ["readProviderKey(context.secrets, 'openai-api-key')", "readProviderKey(context.secrets, 'google-ai-key')", "readProviderKey(context.secrets, 'anthropic-api-key')"],
-    'transcriptWorkbenchProvider.ts': ["readProviderKey(this._context.secrets, 'anthropic-api-key')", 'claudeApiKey('],
+    'transcriptWorkbenchProvider.ts': ['insightsAnthropicKey(this._context.secrets, async () => (await getSetupStatus()).authMethod)'],
     'speech/index.ts': ["readProviderKey(context.secrets, 'elevenlabs-api-key')"],
     'ai/apiKeyManager.ts': ['readProviderKey(this.secrets, API_KEY_ID)'],
     'flows/FlowEditorProvider.ts': ['readProviderKey(this.context.secrets, stepKeySecret(provider))', 'readProviderKey(this.context.secrets, STEP_KEY_SECRETS.gemini)'],

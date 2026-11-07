@@ -13,7 +13,8 @@
  * module's private map and deletes them from the extension host's `process.env`, so no process the extension host
  * starts inherits them. Outside the test channel it neither reads nor deletes them, and every reader here answers as
  * if there were none. (The main process and the processes it starts, terminals among them, still hold the
- * `RITEMARK_TEST_KEY_*` names: see the script.)
+ * `RITEMARK_TEST_KEY_*` names, and so do processes the extension host started before `activate`, such as the built-in
+ * git extension's git and its hooks; nothing reads those names by itself: see the script.)
  *
  * A key reaches an agent only through the BYOK env (`buildByokEnv`, from `readByokKeys`), under the name that agent
  * reads: OpenCode's provider names; Claude Code's `ANTHROPIC_API_KEY` only when it runs on an API key
@@ -145,4 +146,22 @@ export async function readByokKeys(secrets: SecretReader, keys: TestKeys = snaps
  */
 export function claudeApiKey(authMethod: string | null | undefined, anthropicKey: string | undefined): string | undefined {
   return authMethod === 'api-key' ? anthropicKey : undefined;
+}
+
+/**
+ * The Anthropic key Transcribe Insights gets (second review of #681, finding 2). A saved key goes to Insights
+ * whatever the sign-in method, exactly as on main, and no sign-in check runs for it. Only when nothing is saved and
+ * the test environment has a key (the test channel) does the sign-in method decide (`claudeApiKey`): a plan-signed-in
+ * Claude Code is never switched to a test key. `authMethod` is asked only then.
+ */
+export async function insightsAnthropicKey(
+  secrets: SecretReader,
+  authMethod: () => PromiseLike<string | null | undefined>,
+  keys: TestKeys = snapshot,
+): Promise<string | undefined> {
+  const saved = await secrets.get('anthropic-api-key');
+  if (saved) return saved;
+  const fromEnvironment = testEnvironmentKey('anthropic-api-key', keys);
+  if (!fromEnvironment) return saved;
+  return claudeApiKey(await authMethod(), fromEnvironment);
 }

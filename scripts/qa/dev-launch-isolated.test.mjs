@@ -129,3 +129,87 @@ test('start --user-data-dir refuses anything but a test profile, and makes no fo
     fs.rmSync(homeDir, { recursive: true, force: true });
   }
 });
+
+// Second security review of #681 (findings 3 and 5): the profile guard's gaps.
+function startWith(args, envOver = {}) {
+  const env = {
+    PATH: process.env.PATH,
+    HOME: process.env.HOME,
+    TMPDIR: os.tmpdir(),
+    RITEMARK_LAUNCH_ANY_BUILD: '1',
+    ...envOver,
+  };
+  const r = spawnSync('bash', [SCRIPT, 'start', '--name', 'dli-test', '--dry-run', ...args], { env, encoding: 'utf8' });
+  const runDir = /^RUN_DIR=(.+)$/m.exec(r.stdout)?.[1];
+  if (runDir && runDir.includes('rm-dli-test.')) fs.rmSync(runDir, { recursive: true, force: true });
+  return { status: r.status, out: `${r.stdout}${r.stderr}`, stdout: r.stdout };
+}
+
+test('start refuses VSCODE_PORTABLE and VSCODE_APPDATA, in its environment and in --env', { skip }, () => {
+  // VS Code reads both before --user-data-dir: either would put the profile somewhere the guard never saw
+  for (const name of ['VSCODE_PORTABLE', 'VSCODE_APPDATA']) {
+    const env = startWith([], { [name]: path.join(TMP_ROOT, 'dli-elsewhere') });
+    assert.equal(env.status, 2, `${name} in the environment: ${env.out}`);
+    assert.match(env.out, new RegExp(`refused: ${name}`), env.out);
+    const empty = startWith([], { [name]: '' });
+    assert.equal(empty.status, 2, `${name} set but empty: ${empty.out}`);
+    const viaEnv = startWith(['--env', `${name}=${path.join(TMP_ROOT, 'dli-elsewhere')}`]);
+    assert.equal(viaEnv.status, 2, `--env ${name}: ${viaEnv.out}`);
+    assert.match(viaEnv.out, new RegExp(`--env may not set ${name}`), viaEnv.out);
+  }
+});
+
+test('start refuses --user-data-dir and --shared-data-dir among the extra arguments after --', { skip }, () => {
+  // VS Code takes the last one given, so an extra one would replace the checked profile or the dev-shared folder
+  const elsewhere = path.join(TMP_ROOT, 'dli-elsewhere');
+  const shared = path.join(os.homedir(), '.ritemark-shared');
+  for (const extra of [
+    [`--user-data-dir=${elsewhere}`],
+    ['--user-data-dir', elsewhere],
+    [`--shared-data-dir=${shared}`],
+    ['--shared-data-dir', shared],
+    ['--use-fake-ui-for-media-stream', `--shared-data-dir=${shared}`],
+  ]) {
+    const r = startWith(['--', ...extra]);
+    assert.equal(r.status, 2, `${extra.join(' ')}: ${r.out}`);
+    assert.match(r.out, /refused: the extra arguments may not name/, r.out);
+  }
+  // A harmless extra flag still goes through the guard
+  const ok = startWith(['--', '--use-fake-ui-for-media-stream']);
+  assert.doesNotMatch(ok.out, /refused/, ok.out);
+});
+
+test('start sets its own --shared-data-dir, the dev builds\' folder, exactly once', { skip }, (t) => {
+  const r = startWith([]);
+  if (/no dev build/.test(r.out)) { t.skip('no dev build in this checkout'); return; }
+  assert.equal(r.status, 0, r.out);
+  const line = r.stdout.split('\n').find((l) => l.startsWith('DRY_RUN ')) ?? '';
+  const shared = line.match(/--shared-data-dir=\S+/g) ?? [];
+  assert.equal(shared.length, 1, line);
+  assert.equal(shared[0], `--shared-data-dir=${process.env.HOME}/.ritemark-dev-shared`);
+  assert.equal((line.match(/--user-data-dir=/g) ?? []).length, 1, line);
+});
+
+test('a test profile path with whitespace is refused (stop matches the flag up to a space)', { skip }, () => {
+  const base = fs.realpathSync(fs.mkdtempSync(path.join(TMP_ROOT, 'dli-ws-')));
+  try {
+    for (const p of [path.join(base, 'pro file'), `${path.join(base, 'profile')} `, path.join(base, 'pro\tfile'), `${path.join(base, 'profile')}\n`]) {
+      const r = startWith([`--user-data-dir=${p}`]);
+      assert.equal(r.status, 2, `${JSON.stringify(p)}: ${r.out}`);
+      assert.match(r.out, /refused: --user-data-dir must not contain whitespace/, r.out);
+      assert.ok(!fs.existsSync(p), 'a refused profile folder was made');
+    }
+    // The guard itself, sourced as both scripts source it
+    const guard = path.join(path.dirname(SCRIPT), 'test-profile-guard.sh');
+    const g = spawnSync('bash', ['-c', '. "$1"; test_profile_check "$2"', '_', guard, path.join(base, 'a b')], { encoding: 'utf8' });
+    assert.equal(g.status, 1, g.stdout);
+    assert.match(g.stdout, /must not contain whitespace/);
+    // A folder that only resolves to a path with a space (a link to it) is refused too
+    fs.mkdirSync(path.join(base, 'real dir'));
+    fs.symlinkSync(path.join(base, 'real dir'), path.join(base, 'link'));
+    const l = spawnSync('bash', ['-c', '. "$1"; test_profile_check "$2"', '_', guard, path.join(base, 'link')], { encoding: 'utf8' });
+    assert.equal(l.status, 1, l.stdout);
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});

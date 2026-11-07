@@ -807,13 +807,16 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         webview.postMessage({ type: 'flow:models', provider, modelType, models: [], ...stepKeyAnswer(err.copy) });
         return;
       }
-      console.error(`[FlowEditorProvider] Failed to fetch ${provider} ${modelType} models:`, err);
+      // Sprint 155: the provider's answer may quote the test key (OpenAI's 401 masks it): redacted for the log and
+      // the panel alike, as the steps do. Outside the test channel the text is unchanged.
+      const message = err instanceof Error ? redactTestKeys(err.message) : 'Failed to fetch models';
+      console.error(`[FlowEditorProvider] Failed to fetch ${provider} ${modelType} models:`, redactTestKeys(err instanceof Error ? err.stack ?? err.message : String(err)));
       webview.postMessage({
         type: 'flow:models',
         provider,
         modelType,
         models: [],
-        error: err instanceof Error ? err.message : 'Failed to fetch models'
+        error: message
       });
     }
   }

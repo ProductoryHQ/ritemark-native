@@ -40,7 +40,7 @@ import {
 } from './speech/insightsMarkdown';
 import { normalizeSpeakerLabel } from './speech/speakerNames';
 import { pickerFolder } from './utils/dialogDefaults';
-import { claudeApiKey, readProviderKey } from './ai/providerKeys';
+import { insightsAnthropicKey } from './ai/providerKeys';
 import {
   parseTranscriptWorkbenchRequest,
   type InsightsDocumentResult,
@@ -317,11 +317,9 @@ export class TranscriptWorkbenchProvider implements vscode.CustomReadonlyEditorP
           selected: selectedLanguage,
           resolved: resolveInsightsLanguage(selectedLanguage, session.language),
         },
-        // Only a Claude Code on an API key gets it (Sprint 155): a plan sign-in is never switched to the key
-        anthropicApiKey: claudeApiKey(
-          (await getSetupStatus()).authMethod,
-          await readProviderKey(this._context.secrets, 'anthropic-api-key'),
-        ),
+        // A saved key as on main, whatever the sign-in; a test-environment key only for a Claude Code on an API key
+        // (Sprint 155): `claude auth status` runs only then
+        anthropicApiKey: await insightsAnthropicKey(this._context.secrets, async () => (await getSetupStatus()).authMethod),
         signal: controller.signal,
       });
 

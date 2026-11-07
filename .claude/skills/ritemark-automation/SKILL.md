@@ -91,12 +91,18 @@ scripts/qa/dev-launch-isolated.sh stop <RUN_DIR>; rm -rf "$PROFILE"   # test pro
   an API key, Codex none. OpenCode counts as set up, and Settings shows the row as **From the test environment** with
   Test, never the value. Outside the test channel the variables are neither read nor removed.
 - **Terminals still inherit the names.** Ritemark's main process keeps them, and so does everything it starts besides
-  the extension host, terminals included. In a test window's terminal, or an agent's shell tool, never run `env`,
-  `printenv` or `echo $RITEMARK_TEST_KEY_…`. To check, print a count only: `env | grep -c RITEMARK_TEST_KEY`.
+  the extension host, terminals included. In the extension host too, processes started before Ritemark's `activate`
+  runs inherit them, such as the built-in git extension's git and the git hooks it runs. Nothing reads these names by
+  itself, so none of them uses a key, but each could show one. In a test window's terminal, or an agent's shell tool,
+  never run `env`, `printenv` or `echo $RITEMARK_TEST_KEY_…`. To check, print a count only:
+  `env | grep -c RITEMARK_TEST_KEY`.
 - Never pass a key with `--env` or any other argument: arguments show in `ps`. The keys travel only in the environment.
 - `dev-launch-isolated.sh start --user-data-dir` takes only a test profile: under `/private/tmp` or `/tmp` (or a deep
-  enough `$TMPDIR`), never Ritemark's real profile or `~/.ritemark-shared`. This is `with-test-keys.sh`'s rule, from
-  the shared `scripts/qa/test-profile-guard.sh`.
+  enough `$TMPDIR`), with no whitespace, never Ritemark's real profile or `~/.ritemark-shared`. This is
+  `with-test-keys.sh`'s rule, from the shared `scripts/qa/test-profile-guard.sh`. Both scripts refuse to run while
+  `VSCODE_PORTABLE` or `VSCODE_APPDATA` is set (VS Code reads them before `--user-data-dir`); `with-test-keys.sh`
+  refuses a `--shared-data-dir` into `~/.ritemark-shared`, and `dev-launch-isolated.sh` sets its own
+  (`~/.ritemark-dev-shared`) and refuses `--user-data-dir` or `--shared-data-dir` after `--`.
 
 There is exactly one correct way to launch Ritemark for automation. Memorize the shape:
 
