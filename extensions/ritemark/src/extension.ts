@@ -71,7 +71,7 @@ import { openPublishSheetHarnessIfAsked } from './publish/devSheetHarness';
 import { registerProjectHeadCommands } from './views/projectHeadCommands';
 import { prepareWelcome, registerWelcome } from './welcome/welcomeHost';
 import { newDocumentFolder, nextUntitledPath } from './newDocumentLocation';
-import { readProviderKey } from './ai/providerKeys';
+import { readProviderKey, snapshotTestKeys } from './ai/providerKeys';
 // Feature flags: view visibility controlled by 'when' clauses in package.json
 
 // Export unified view provider for editor access
@@ -274,6 +274,11 @@ function copyRecursive(src: string, dest: string): void {
 }
 
 export function activate(context: vscode.ExtensionContext) {
+  // Sprint 155 (test keys): first, before anything reads a key or starts a process. In the test channel only, the
+  // RITEMARK_TEST_KEY_* variables move from this process's environment into providerKeys.ts, so no child (Claude
+  // Code, Codex, git, MCP servers) inherits them; a key reaches an agent only through the BYOK env.
+  snapshotTestKeys();
+
   // === Theme & branding: fresh install, version upgrade, or design-foundation migration ===
   const currentVersion = context.extension.packageJSON.version as string;
 

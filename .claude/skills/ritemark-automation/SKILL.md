@@ -81,11 +81,22 @@ scripts/qa/dev-launch-isolated.sh stop <RUN_DIR>; rm -rf "$PROFILE"   # test pro
 
 - The script refuses without `RITEMARK_BUILD_CHANNEL=test` and a test profile under `/private/tmp` (or `$TMPDIR`),
   and the launch command must carry exactly that `--user-data-dir`. It prints only the names it loaded.
-- Ritemark reads a provider key from its environment variable only in the test channel, and only when no key is saved
-  (`extensions/ritemark/src/ai/providerKeys.ts`): OpenCode counts as set up, its process gets the key, and Settings
-  shows the row as **From the test environment** with Test, never the value. Outside the test channel the variables are
-  ignored.
+- The keys travel under Ritemark-only names, `RITEMARK_TEST_KEY_GOOGLE`, `_OPENAI`, `_ANTHROPIC`, `_OPENROUTER` and
+  `_ELEVENLABS`, never `OPENAI_API_KEY` and the like, which Claude Code, Codex, git hooks and MCP servers would pick up
+  by themselves.
+- Ritemark uses a test key only in the test channel, and only when no key is saved
+  (`extensions/ritemark/src/ai/providerKeys.ts`). At activation the extension host copies the variables and deletes
+  them from its own environment, so nothing it starts inherits them. An agent gets a key only under the name it
+  expects: OpenCode `GOOGLE_GENERATIVE_AI_API_KEY` and the rest, Claude Code `ANTHROPIC_API_KEY` only when it runs on
+  an API key, Codex none. OpenCode counts as set up, and Settings shows the row as **From the test environment** with
+  Test, never the value. Outside the test channel the variables are neither read nor removed.
+- **Terminals still inherit the names.** Ritemark's main process keeps them, and so does everything it starts besides
+  the extension host, terminals included. In a test window's terminal, or an agent's shell tool, never run `env`,
+  `printenv` or `echo $RITEMARK_TEST_KEY_…`. To check, print a count only: `env | grep -c RITEMARK_TEST_KEY`.
 - Never pass a key with `--env` or any other argument: arguments show in `ps`. The keys travel only in the environment.
+- `dev-launch-isolated.sh start --user-data-dir` takes only a test profile: under `/private/tmp` or `/tmp` (or a deep
+  enough `$TMPDIR`), never Ritemark's real profile or `~/.ritemark-shared`. This is `with-test-keys.sh`'s rule, from
+  the shared `scripts/qa/test-profile-guard.sh`.
 
 There is exactly one correct way to launch Ritemark for automation. Memorize the shape:
 

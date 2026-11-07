@@ -27,6 +27,20 @@ set +o xtrace; unset BASH_XTRACEFD BASH_ENV
 # --only <names>: also load these when present; a missing one is named and skipped.
 # Nothing else is read from the vault.
 #
+# Names (security review of #681): the five provider keys travel under Ritemark-only names,
+# RITEMARK_TEST_KEY_<PROVIDER>, never the provider's standard name (OPENAI_API_KEY…), which every
+# tool in the launched tree picks up by itself: Claude Code (a plan sign-in would switch to the API
+# key), Codex, git hooks, MCP servers, a terminal's `env`. Ritemark's extension host reads them
+# once at activation, in the test channel only, deletes them from its own environment, and hands a
+# key to an agent only under the name that agent expects (extensions/ritemark/src/ai/providerKeys.ts).
+# What still inherits the RITEMARK_TEST_KEY_* names: Ritemark's main process and what it starts
+# besides the extension host, terminals among them. So an agent, or anyone driving the test window,
+# must never echo them: no `env`, `printenv` or `echo $RITEMARK_TEST_KEY_…` in a terminal or an
+# agent's shell tool; `env | grep -c RITEMARK_TEST_KEY` (a count) at most.
+# Cloudflare's two keep their names (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID): only
+# scripts/qa/cloudflare-contract.mjs reads them, run directly by this script; Ritemark never does.
+# Don't load them into a Ritemark launch (wrangler, in a terminal, would pick the token up).
+#
 # Sprint 149 (W0, E3). Its tests: scripts/qa/with-test-keys.test.mjs (a fake `security`, used only
 # when RITEMARK_TEST_KEYS_FAKE=1 is set too).
 
@@ -38,17 +52,19 @@ if [ "${RITEMARK_TEST_KEYS_FAKE:-}" = "1" ] && [ -n "${RITEMARK_SECURITY_BIN:-}"
   SECURITY_BIN="$RITEMARK_SECURITY_BIN"
 fi
 
-# vault name → environment variable (test-keys.md's registry, plus Sprint 149's two Cloudflare rows)
+# vault name → environment variable (test-keys.md's registry, plus Sprint 149's two Cloudflare rows).
+# The provider keys' names are Ritemark-only (see *Names* above); keep them in step with TEST_KEY_ENV in
+# extensions/ritemark/src/ai/providerKeys.ts.
 VAULT_NAMES=(cloudflare cloudflare-account-id elevenlabs gemini openai anthropic openrouter)
 env_name_for() {
   case "$1" in
     cloudflare) echo CLOUDFLARE_API_TOKEN ;;
     cloudflare-account-id) echo CLOUDFLARE_ACCOUNT_ID ;;
-    elevenlabs) echo ELEVENLABS_API_KEY ;;
-    gemini) echo GOOGLE_GENERATIVE_AI_API_KEY ;;
-    openai) echo OPENAI_API_KEY ;;
-    anthropic) echo ANTHROPIC_API_KEY ;;
-    openrouter) echo OPENROUTER_API_KEY ;;
+    elevenlabs) echo RITEMARK_TEST_KEY_ELEVENLABS ;;
+    gemini) echo RITEMARK_TEST_KEY_GOOGLE ;;
+    openai) echo RITEMARK_TEST_KEY_OPENAI ;;
+    anthropic) echo RITEMARK_TEST_KEY_ANTHROPIC ;;
+    openrouter) echo RITEMARK_TEST_KEY_OPENROUTER ;;
     *) return 1 ;;
   esac
 }
@@ -89,39 +105,12 @@ done
 
 PROFILE="${RITEMARK_TEST_PROFILE:-}"
 [ -n "$PROFILE" ] || refuse "refused: set RITEMARK_TEST_PROFILE to the run's own profile folder under /private/tmp"
-case "$PROFILE" in /*) ;; *) refuse "refused: RITEMARK_TEST_PROFILE must be an absolute path" ;; esac
 
-resolve_dir() { # the folder's physical path, or the parent's when the folder isn't made yet
-  if [ -d "$1" ]; then (cd -P "$1" 2>/dev/null && pwd -P)
-  else local parent; parent="$(dirname "$1")"; [ -d "$parent" ] || return 1
-    printf '%s/%s\n' "$(cd -P "$parent" 2>/dev/null && pwd -P)" "$(basename "$1")"; fi
-}
-REAL_PROFILE="$(resolve_dir "$PROFILE")" || refuse "refused: RITEMARK_TEST_PROFILE's folder doesn't exist"
-case "/$REAL_PROFILE/" in */../*|*/./*) refuse "refused: RITEMARK_TEST_PROFILE must not contain . or .. segments" ;; esac
-
-under() { case "$1/" in "$2"/*) [ "$1" != "$2" ] ;; *) return 1 ;; esac; }
-segments() { local s="${1#/}"; s="${s%/}"; [ -z "$s" ] && { echo 0; return; }; local IFS=/; set -- $s; echo $#; }
-
-ROOTS=(/private/tmp /tmp)
-if [ -n "${TMPDIR:-}" ]; then
-  real_tmp="$( (cd -P "$TMPDIR" 2>/dev/null && pwd -P) )"
-  if [ -n "$real_tmp" ] && [ "$(segments "$real_tmp")" -ge 3 ]; then ROOTS+=("$real_tmp"); fi
-fi
-ALLOWED=0
-for root in "${ROOTS[@]}"; do
-  real_root="$( (cd -P "$root" 2>/dev/null && pwd -P) )" || continue
-  [ -n "$real_root" ] || continue
-  if under "$REAL_PROFILE" "${real_root%/}"; then ALLOWED=1; fi
-done
-[ "$ALLOWED" = 1 ] || refuse "refused: RITEMARK_TEST_PROFILE must be under /private/tmp or /tmp (or a TMPDIR of 3+ segments), never a real profile"
-
-for real in "${HOME:-/nonexistent}/Library/Application Support/Ritemark" "${HOME:-/nonexistent}/.ritemark-shared"; do
-  r="$( (cd -P "$real" 2>/dev/null && pwd -P) )" || continue
-  [ -n "$r" ] || continue
-  if [ "$REAL_PROFILE" = "$r" ] || under "$REAL_PROFILE" "$r"; then
-    refuse "refused: RITEMARK_TEST_PROFILE points into Ritemark's real profile"
-  fi
-done
+# Where a test profile may be: the rule dev-launch-isolated.sh's --user-data-dir shares (test-profile-guard.sh)
+GUARD="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/test-profile-guard.sh"
+[ -f "$GUARD" ] || refuse "refused: $GUARD is missing"
+. "$GUARD"
+REAL_PROFILE="$(test_profile_check "$PROFILE")" || refuse "refused: RITEMARK_TEST_PROFILE $REAL_PROFILE"
 
 # The command itself: not a shell or a wrapper, and exactly one --user-data-dir, this profile.
 case "$(basename "$1")" in

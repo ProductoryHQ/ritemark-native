@@ -65,7 +65,7 @@ import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
 // Sprint 76 R3a/R4/R5/R6: ACP + OpenCode BYOK runtime
 import { byokProviderFlags, buildByokEnv, BYOK_SECRET_KEYS, type ByokKeys, type ByokProviderFlags } from '../acp';
-import { readByokKeys, readProviderKey } from '../ai/providerKeys';
+import { claudeApiKey, readByokKeys, readProviderKey } from '../ai/providerKeys';
 import { TRANSCRIPT_WORKBENCH_VIEW_TYPE, transcriptDocumentFor } from '../speech/activeTranscript';
 // Sprint 79: runtime adapter wrappers + registry (registry created here; dispatch wired in W2)
 import { RuntimeRegistry } from '../runtime/RuntimeRegistry';
@@ -1078,10 +1078,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           if (isClaudeCode) {
             excludedFolders = aiConfig.get<string[]>('excludedFolders');
             const claudeStatus = await getSetupStatus();
-            // API-key auth reuses the same secret the BYOK Settings card writes.
-            if (claudeStatus.authMethod === 'api-key') {
-              anthropicApiKey = byokKeys.anthropic;
-            }
+            // API-key auth reuses the same secret the BYOK Settings card writes; a plan sign-in gets no key.
+            anthropicApiKey = claudeApiKey(claudeStatus.authMethod, byokKeys.anthropic);
           }
           // Codex approval is sandbox-gated: 'workspace-write' pre-approves in-workspace
           // edits regardless of policy. So Ask must use a read-only sandbox + 'untrusted'
@@ -2231,7 +2229,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     if (runtimeId === 'claude-code') {
       const model = this._reconciledClaudeModel();
       const claudeModelDeclaration = modelCatalog.getClaudeSessionDeclaration(model);
-      const anthropicApiKey = (await getSetupStatus()).authMethod === 'api-key' ? byokKeys.anthropic : undefined;
+      const anthropicApiKey = claudeApiKey((await getSetupStatus()).authMethod, byokKeys.anthropic);
       return {
         workspacePath,
         model,

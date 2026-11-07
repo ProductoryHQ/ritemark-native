@@ -19,7 +19,7 @@ import { geminiHeaders, geminiUrl } from '../../ai/geminiRequest';
 import { ensureProjectSubfolder } from '../../projects/projectFolderGuard';
 import type { FlowNode, ExecutionContext } from '../types';
 import { GOOGLE_AI_KEY_NEEDED, OPENAI_KEY_NEEDED, STEP_KEY_SECRETS, StepNeedsKeyError } from '../flowModelDefaults';
-import { readProviderKey } from '../../ai/providerKeys';
+import { readProviderKey, redactTestKeys } from '../../ai/providerKeys';
 
 /**
  * Write a file via VS Code's filesystem API so the explorer model is
@@ -486,6 +486,26 @@ export async function executeImageNode(
     ? await resolveImageSources(data.inputImages, context)
     : [];
 
+  try {
+    return await generateImage(data, prompt, inputImages, imagesDir);
+  } catch (err) {
+    // Sprint 155: a provider's answer about the test key (OpenAI's "sk-proj-****abcd") goes on without it, to the
+    // editor, a scheduled run's last error and the run history alike. Ritemark's own sentences pass unchanged.
+    if (err instanceof Error) {
+      const message = redactTestKeys(err.message);
+      if (message !== err.message) throw new Error(message);
+      throw err;
+    }
+    throw new Error(redactTestKeys(String(err)));
+  }
+}
+
+async function generateImage(
+  data: ImageNodeData,
+  prompt: string,
+  inputImages: string[],
+  imagesDir: string,
+): Promise<ImageResult> {
   // Generate based on provider
   switch (data.provider || 'openai') {
     case 'openai':

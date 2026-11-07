@@ -24,6 +24,13 @@ const FAKE = {
   'cloudflare-account-id': ['acct', '0123456789abcdef'].join('-'),
   elevenlabs: ['fake', 'el', 'Z9y8'].join('-'),
 };
+// The other four provider keys, in the vault only for the test that loads all five
+const PROVIDERS = {
+  gemini: ['fake', 'gm', 'Q7r6'].join('-'),
+  openai: ['fake', 'oa', 'P5o4'].join('-'),
+  anthropic: ['fake', 'an', 'N3m2'].join('-'),
+  openrouter: ['fake', 'or', 'L1k0'].join('-'),
+};
 
 function makeWorld(vault) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wtk-'));
@@ -48,8 +55,8 @@ cat "$f"; echo
   fs.chmodSync(security, 0o755);
   const profile = path.join(root, 'profile');
   fs.mkdirSync(profile);
-  // The child proves it got each key by comparing, and prints only yes/no. It also touches a
-  // marker so a test can tell whether it ran.
+  // The child proves it got each key by comparing, and prints only yes/no (or "unset"). It also
+  // touches a marker so a test can tell whether it ran.
   const child = path.join(root, 'child.mjs');
   const marker = path.join(root, 'ran');
   fs.writeFileSync(
@@ -57,7 +64,7 @@ cat "$f"; echo
     `import fs from 'node:fs';
 fs.writeFileSync(${JSON.stringify(marker)}, '');
 const want = JSON.parse(process.argv[2] || '{}');
-for (const [k, v] of Object.entries(want)) console.log(k + '=' + (process.env[k] === v ? 'yes' : 'no'));
+for (const [k, v] of Object.entries(want)) console.log(k + '=' + (process.env[k] === undefined ? 'unset' : process.env[k] === v ? 'yes' : 'no'));
 `,
   );
   return { root, security, profile, callLog, child, marker };
@@ -83,7 +90,7 @@ function run(world, args, envOver = {}) {
 }
 
 function assertNoValue(text) {
-  for (const v of Object.values(FAKE)) assert.ok(!text.includes(v), 'a key value reached the output');
+  for (const v of [...Object.values(FAKE), ...Object.values(PROVIDERS)]) assert.ok(!text.includes(v), 'a key value reached the output');
 }
 
 test('refuses without RITEMARK_BUILD_CHANNEL=test, before reading the vault', { skip }, () => {
@@ -157,18 +164,55 @@ test('loads only the named keys and prints names only', { skip }, () => {
   const want = {
     CLOUDFLARE_API_TOKEN: FAKE.cloudflare,
     CLOUDFLARE_ACCOUNT_ID: FAKE['cloudflare-account-id'],
-    ELEVENLABS_API_KEY: FAKE.elevenlabs,
+    RITEMARK_TEST_KEY_ELEVENLABS: FAKE.elevenlabs,
   };
   const r = run(w, ['--require', 'cloudflare,cloudflare-account-id', '--only', 'openai', '--', ...launch(w, want)]);
   assert.equal(r.status, 0, r.out);
   assert.match(r.stdout, /CLOUDFLARE_API_TOKEN=yes/);
   assert.match(r.stdout, /CLOUDFLARE_ACCOUNT_ID=yes/);
-  assert.match(r.stdout, /ELEVENLABS_API_KEY=no/, 'a key nobody named was loaded');
+  assert.match(r.stdout, /RITEMARK_TEST_KEY_ELEVENLABS=unset/, 'a key nobody named was loaded');
   assert.match(r.stderr, /loaded: .*cloudflare→CLOUDFLARE_API_TOKEN/);
   assert.match(r.stderr, /not in the vault \(skipped\): openai/);
   const calls = fs.readFileSync(w.callLog, 'utf8');
   assert.ok(!/-a elevenlabs/.test(calls) && !/-a gemini/.test(calls), 'the vault was read beyond the named keys');
   assertNoValue(r.out);
+});
+
+// Security review of #681 (finding 1): a provider key under its standard name (OPENAI_API_KEY…) is picked up by
+// every tool in the launched tree by itself — Claude Code, Codex, git hooks, MCP servers, a terminal's `env` — so the
+// five provider keys travel under Ritemark-only names, which only Ritemark's extension host reads (and removes).
+test('the provider keys travel under Ritemark-only names, never the standard ones', { skip }, () => {
+  const w = makeWorld({ ...FAKE, ...PROVIDERS });
+  const want = {
+    RITEMARK_TEST_KEY_GOOGLE: PROVIDERS.gemini,
+    RITEMARK_TEST_KEY_OPENAI: PROVIDERS.openai,
+    RITEMARK_TEST_KEY_ANTHROPIC: PROVIDERS.anthropic,
+    RITEMARK_TEST_KEY_OPENROUTER: PROVIDERS.openrouter,
+    RITEMARK_TEST_KEY_ELEVENLABS: FAKE.elevenlabs,
+    GOOGLE_GENERATIVE_AI_API_KEY: '',
+    GEMINI_API_KEY: '',
+    OPENAI_API_KEY: '',
+    ANTHROPIC_API_KEY: '',
+    OPENROUTER_API_KEY: '',
+    ELEVENLABS_API_KEY: '',
+  };
+  const r = run(w, ['--only', 'gemini,openai,anthropic,openrouter,elevenlabs', '--', ...launch(w, want)]);
+  assert.equal(r.status, 0, r.out);
+  for (const name of ['GOOGLE', 'OPENAI', 'ANTHROPIC', 'OPENROUTER', 'ELEVENLABS']) {
+    assert.match(r.stdout, new RegExp(`RITEMARK_TEST_KEY_${name}=yes`), `RITEMARK_TEST_KEY_${name} loaded`);
+  }
+  for (const name of ['GOOGLE_GENERATIVE_AI_API_KEY', 'GEMINI_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', 'ELEVENLABS_API_KEY']) {
+    assert.match(r.stdout, new RegExp(`${name}=unset`), `${name} must not be set`);
+  }
+  assert.match(r.stderr, /loaded: .*gemini→RITEMARK_TEST_KEY_GOOGLE/);
+  assertNoValue(r.out);
+  // Cloudflare's two keep their names: only scripts/qa/cloudflare-contract.mjs reads them, never Ritemark
+  const cf = run(w, ['--require', 'cloudflare,cloudflare-account-id', '--', ...launch(w, { CLOUDFLARE_API_TOKEN: FAKE.cloudflare })]);
+  assert.match(cf.stdout, /CLOUDFLARE_API_TOKEN=yes/);
+  // The script says what still inherits the names and that nobody echoes them
+  const src = fs.readFileSync(SCRIPT, 'utf8');
+  assert.match(src, /terminal/i, 'the script documents that terminals inherit the names');
+  assert.match(src, /never echo|must not echo/i, 'and that agents must not echo them');
 });
 
 test('naming no keys is refused', { skip }, () => {

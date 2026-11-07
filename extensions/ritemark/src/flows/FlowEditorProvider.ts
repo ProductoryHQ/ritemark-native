@@ -25,7 +25,7 @@ import {
 import * as modelCatalog from '../ai/modelCatalog';
 import { pickerFolder } from '../utils/dialogDefaults';
 import { listGeminiModels } from '../ai/geminiRequest';
-import { readProviderKey } from '../ai/providerKeys';
+import { readProviderKey, redactTestKeys } from '../ai/providerKeys';
 import { flowModelDefaults, flowModelRequestType, GOOGLE_AI_KEY_NEEDED, OPENAI_KEY_NEEDED, STEP_KEY_SECRETS, stepKeyAnswer, stepKeyCopy, stepKeySecret, StepNeedsKeyError } from './flowModelDefaults';
 
 /**
@@ -589,17 +589,19 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
               : output ? JSON.stringify(output) : null,
           });
         } catch (err) {
+          // Sprint 155: never a test key, not even masked, on the page (the steps redact too)
+          const message = redactTestKeys(err instanceof Error ? err.message : String(err));
           // Signal step error
           webview.postMessage({
             type: 'flow:stepError',
             nodeId: node.id,
-            error: err instanceof Error ? err.message : String(err),
+            error: message,
           });
 
           // Signal overall flow error
           webview.postMessage({
             type: 'flow:error',
-            error: `Failed at "${label}": ${err instanceof Error ? err.message : String(err)}`,
+            error: `Failed at "${label}": ${message}`,
           });
           return;
         }

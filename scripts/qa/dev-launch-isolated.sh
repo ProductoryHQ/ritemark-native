@@ -42,6 +42,12 @@ set +x
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 die() { echo "dev-launch-isolated: $*" >&2; exit 2; }
+# test_profile_check: where a test profile may be, the rule with-test-keys.sh uses for RITEMARK_TEST_PROFILE
+# shellcheck source=test-profile-guard.sh
+. "$ROOT/scripts/qa/test-profile-guard.sh"
+
+# The text, with every extended-regular-expression character taken literally (for pgrep -f).
+ere_escape() { printf '%s' "$1" | sed 's/[][\\.*^$+?(){}|]/\\&/g'; }
 
 # A process that is running (not gone, not a zombie waiting to be reaped).
 alive() {
@@ -78,12 +84,16 @@ stop_run() {
 	profile_dir=$(sed -n 's/^PROFILE=//p' "$run_dir/run.env")
 	[[ -n $profile_dir ]] || profile_dir="$run_dir/profile"
 	local profile="--user-data-dir=$profile_dir"
+	# The flag matched whole: the exact value, after the start of the line or a space and before a space or the end,
+	# and literally (a `.` in the folder is a dot). A run on …/rm-a.b/profile2 or …/rm-aXb/profile is another run's.
+	local profile_re
+	profile_re="(^| )$(ere_escape "$profile")( |\$)"
 	local pid cmdline=""
 	pid=$(sed -n 's/^PID=//p' "$run_dir/run.env")
 	# run.env's PID is used only while it is still this instance: a number, and a process whose command line
 	# names the run's profile. A PID the system has since given to another process is never walked or signalled.
 	[[ $pid =~ ^[0-9]+$ ]] && cmdline=$(ps -o command= -p "$pid" 2>/dev/null || true)
-	[[ $cmdline == *"$profile"* ]] || pid=""
+	[[ " $cmdline " == *" $profile "* ]] || pid=""
 	# The instance's own tree (helpers, the extension host, the AI runtimes it started), gathered before the
 	# main process goes and its children are re-parented; then every process naming the run's profile.
 	# Never a pattern that matches this script's own command line, which names the run folder but not the profile flag.
@@ -99,7 +109,7 @@ stop_run() {
 	# Walk again just before the KILL pass: runtimes started during the grace period hang under a pid already seen.
 	local live="" more all
 	for p in $tree; do alive "$p" && live="$live $p"; done
-	more=$(pgrep -f -- "$profile" 2>/dev/null || true)
+	more=$(pgrep -f -- "$profile_re" 2>/dev/null || true)
 	all=$(descendants $live $more | sort -u)
 	for p in $all; do
 		[[ $p == "$$" ]] && continue
@@ -111,7 +121,7 @@ stop_run() {
 		[[ $p == "$$" ]] && continue
 		alive "$p" && left=$((left + 1))
 	done
-	more=$(pgrep -f -- "$profile" 2>/dev/null || true)
+	more=$(pgrep -f -- "$profile_re" 2>/dev/null || true)
 	[[ -n $more ]] && left=$((left + $(wc -l <<< "$more")))
 	echo "LEFT=$left"
 	[[ $left == 0 ]]
@@ -134,6 +144,12 @@ start_run() {
 		esac
 	done
 	[[ $name =~ ^[A-Za-z0-9._-]+$ ]] || die "--name must be letters, digits, dot, dash or underscore"
+	# A caller's profile is a test profile, whoever calls: with-test-keys.sh's rule (test-profile-guard.sh), so a
+	# direct call can't write into Ritemark's real profile or ~/.ritemark-shared either. Checked before anything runs.
+	if [[ -n $profile_arg ]]; then
+		local why
+		if ! why=$(test_profile_check "$profile_arg"); then die "refused: --user-data-dir $why"; fi
+	fi
 	local pair
 	for pair in "${envs[@]+"${envs[@]}"}"; do
 		[[ $pair =~ ^[A-Z_][A-Z0-9_]*=.*$ ]] || die "--env takes KEY=VALUE, got '$pair'"
@@ -192,8 +208,7 @@ start_run() {
 	run_dir=$(cd "$run_dir" && pwd -P)
 	local profile_dir="$run_dir/profile"
 	if [[ -n $profile_arg ]]; then
-		# A profile of the caller's (with-test-keys.sh checks it is the run's own test profile): new or empty, never reused
-		[[ $profile_arg == /* ]] || die "--user-data-dir must be an absolute path"
+		# A profile of the caller's (a test profile, checked above): new or empty, never reused
 		if [[ -e $profile_arg ]]; then
 			[[ -d $profile_arg && -z $(ls -A "$profile_arg") ]] || die "--user-data-dir '$profile_arg' must be a new or empty folder"
 		fi
