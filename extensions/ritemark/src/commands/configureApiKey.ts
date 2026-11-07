@@ -12,7 +12,7 @@ import { getAPIKeyManager } from '../ai/apiKeyManager';
 export function registerConfigureApiKeyCommand(context: vscode.ExtensionContext): vscode.Disposable {
   return vscode.commands.registerCommand('ritemark.configureApiKey', async () => {
     const apiKeyManager = getAPIKeyManager();
-    const hasKey = await apiKeyManager.hasAPIKey();
+    const hasKey = await apiKeyManager.hasSavedAPIKey();
 
     // Show options if key already exists
     if (hasKey) {

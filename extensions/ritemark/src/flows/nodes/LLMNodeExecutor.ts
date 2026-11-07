@@ -16,6 +16,7 @@ import { geminiHeaders, geminiUrl } from '../../ai/geminiRequest';
 import { FlowStepError, geminiAnswerText, geminiStepFailure } from './geminiStep';
 import { GOOGLE_AI_KEY_NEEDED, OPENAI_KEY_NEEDED, STEP_KEY_SECRETS, StepNeedsKeyError } from '../flowModelDefaults';
 import type { FlowNode, ExecutionContext } from '../types';
+import { readProviderKey, redactTestKeys } from '../../ai/providerKeys';
 
 /**
  * Text file extensions that can be read and included in prompts
@@ -265,7 +266,7 @@ async function executeWithGemini(
     throw new Error('Extension context not initialized');
   }
 
-  const apiKey = await extensionContext.secrets.get(STEP_KEY_SECRETS.gemini);
+  const apiKey = await readProviderKey(extensionContext.secrets, STEP_KEY_SECRETS.gemini);
 
   if (!apiKey) {
     // Sprint 145 R5 (#580): the step panel's sentence, as plain text
@@ -349,18 +350,21 @@ export async function executeLLMNode(
     // Sprint 141 R5: a sentence written for the person passes through unchanged (Sprint 145 R5: a missing key's too).
     if (err instanceof FlowStepError || err instanceof StepNeedsKeyError) throw err;
     if (err instanceof Error) {
+      // Sprint 155: a provider's answer about the test key (OpenAI's "sk-proj-****abcd") goes on without it, to the
+      // editor, a scheduled run's last error and the run history alike
+      const message = redactTestKeys(err.message);
       // Handle specific errors
-      if (err.message.includes('rate_limit')) {
+      if (message.includes('rate_limit')) {
         throw new Error('API rate limit exceeded. Please wait and try again.');
       }
-      if (err.message.includes('invalid_api_key') || err.message.includes('API_KEY_INVALID')) {
+      if (message.includes('invalid_api_key') || message.includes('API_KEY_INVALID')) {
         throw new Error('Invalid API key. Please check your settings.');
       }
-      if (err.message.includes('insufficient_quota')) {
+      if (message.includes('insufficient_quota')) {
         throw new Error('API quota exceeded. Please check your billing.');
       }
-      throw new Error(`LLM error: ${err.message}`);
+      throw new Error(`LLM error: ${message}`);
     }
-    throw new Error(`LLM node execution failed: ${String(err)}`);
+    throw new Error(`LLM node execution failed: ${redactTestKeys(String(err))}`);
   }
 }

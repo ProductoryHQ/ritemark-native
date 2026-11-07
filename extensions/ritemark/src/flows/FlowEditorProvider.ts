@@ -25,6 +25,7 @@ import {
 import * as modelCatalog from '../ai/modelCatalog';
 import { pickerFolder } from '../utils/dialogDefaults';
 import { listGeminiModels } from '../ai/geminiRequest';
+import { readProviderKey, redactTestKeys } from '../ai/providerKeys';
 import { flowModelDefaults, flowModelRequestType, GOOGLE_AI_KEY_NEEDED, OPENAI_KEY_NEEDED, STEP_KEY_SECRETS, stepKeyAnswer, stepKeyCopy, stepKeySecret, StepNeedsKeyError } from './flowModelDefaults';
 
 /**
@@ -588,17 +589,19 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
               : output ? JSON.stringify(output) : null,
           });
         } catch (err) {
+          // Sprint 155: never a test key, not even masked, on the page (the steps redact too)
+          const message = redactTestKeys(err instanceof Error ? err.message : String(err));
           // Signal step error
           webview.postMessage({
             type: 'flow:stepError',
             nodeId: node.id,
-            error: err instanceof Error ? err.message : String(err),
+            error: message,
           });
 
           // Signal overall flow error
           webview.postMessage({
             type: 'flow:error',
-            error: `Failed at "${label}": ${err instanceof Error ? err.message : String(err)}`,
+            error: `Failed at "${label}": ${message}`,
           });
           return;
         }
@@ -804,13 +807,16 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         webview.postMessage({ type: 'flow:models', provider, modelType, models: [], ...stepKeyAnswer(err.copy) });
         return;
       }
-      console.error(`[FlowEditorProvider] Failed to fetch ${provider} ${modelType} models:`, err);
+      // Sprint 155: the provider's answer may quote the test key (OpenAI's 401 masks it): redacted for the log and
+      // the panel alike, as the steps do. Outside the test channel the text is unchanged.
+      const message = err instanceof Error ? redactTestKeys(err.message) : 'Failed to fetch models';
+      console.error(`[FlowEditorProvider] Failed to fetch ${provider} ${modelType} models:`, redactTestKeys(err instanceof Error ? err.stack ?? err.message : String(err)));
       webview.postMessage({
         type: 'flow:models',
         provider,
         modelType,
         models: [],
-        error: err instanceof Error ? err.message : 'Failed to fetch models'
+        error: message
       });
     }
   }
@@ -883,7 +889,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
 
   /** Whether the provider's key is stored (Sprint 145 R5). Its value is not kept or passed on. */
   private async hasProviderKey(provider: 'openai' | 'gemini'): Promise<boolean> {
-    return Boolean(await this.context.secrets.get(stepKeySecret(provider)));
+    return Boolean(await readProviderKey(this.context.secrets, stepKeySecret(provider)));
   }
 
   // fetchOpenAIModels() removed in Sprint 89 (GH #109) — OpenAI LLM lists now
@@ -932,7 +938,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
    * Fetch Gemini Image models
    */
   private async fetchGeminiImageModels(): Promise<Array<{ id: string; name: string }>> {
-    const apiKey = await this.context.secrets.get(STEP_KEY_SECRETS.gemini);
+    const apiKey = await readProviderKey(this.context.secrets, STEP_KEY_SECRETS.gemini);
 
     if (!apiKey) {
       throw new StepNeedsKeyError(GOOGLE_AI_KEY_NEEDED);

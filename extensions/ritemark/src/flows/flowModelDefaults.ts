@@ -71,7 +71,7 @@ export function stepKeyCopy(provider: 'openai' | 'gemini'): StepKeyCopy {
  */
 export const STEP_KEY_SECRETS = { openai: 'openai-api-key', gemini: 'google-ai-key' } as const;
 
-export function stepKeySecret(provider: 'openai' | 'gemini'): string {
+export function stepKeySecret(provider: 'openai' | 'gemini'): (typeof STEP_KEY_SECRETS)[keyof typeof STEP_KEY_SECRETS] {
   return provider === 'gemini' ? STEP_KEY_SECRETS.gemini : STEP_KEY_SECRETS.openai;
 }
 
