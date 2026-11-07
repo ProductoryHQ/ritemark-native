@@ -496,3 +496,52 @@ export type CodexServerNotification =
 // session event stream. These arrive as JSON-RPC notifications with method
 // "codex/event" and a params.type field.
 export type CodexEvent = CodexServerNotification;
+
+// ============================================================================
+// Sprint 155: a completed file change (app-server v2 `ThreadItem::FileChange`)
+// ============================================================================
+
+/**
+ * `item/started` / `item/completed` carry a `ThreadItem`. The file-change one,
+ * as the bundled app-server (0.160–0.164) serializes it: `{ type: 'fileChange',
+ * id, changes: FileUpdateChange[], status: PatchApplyStatus }`. A shell command
+ * that writes a file is a `commandExecution` item instead, and never counts.
+ */
+export interface FileChangeThreadItem {
+  type: 'fileChange';
+  id: string;
+  changes: FileUpdateChange[];
+  status: PatchApplyStatus;
+}
+
+export interface FileUpdateChange {
+  path: string;
+  kind: PatchChangeKind;
+  diff: string;
+}
+
+export type PatchChangeKind =
+  | { type: 'add' }
+  | { type: 'delete' }
+  | { type: 'update'; move_path: string | null };
+
+export type PatchApplyStatus = 'inProgress' | 'completed' | 'failed' | 'declined';
+
+/**
+ * The files a completed item changed: a `fileChange` whose patch applied. A
+ * moved file counts at its new path. Anything else (a command, a read, a
+ * failed or declined patch) changed nothing here.
+ */
+export function changedFilesOfCodexItem(item: unknown): string[] {
+  if (!item || typeof item !== 'object') return [];
+  const candidate = item as Partial<FileChangeThreadItem>;
+  if (candidate.type !== 'fileChange' || candidate.status !== 'completed' || !Array.isArray(candidate.changes)) return [];
+  const files: string[] = [];
+  for (const change of candidate.changes) {
+    if (!change || typeof change !== 'object' || typeof change.path !== 'string' || !change.path) continue;
+    const kind = change.kind as Partial<{ type: string; move_path: string | null }> | undefined;
+    const movedTo = kind?.type === 'update' && typeof kind.move_path === 'string' && kind.move_path ? kind.move_path : null;
+    files.push(movedTo ?? change.path);
+  }
+  return files;
+}

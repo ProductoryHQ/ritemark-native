@@ -120,7 +120,13 @@ export interface CommentTaskDestinationV1 {
 }
 
 export type CommentTaskLifecycleV1 =
-  | { state: 'accepting'; since: string }
+  /**
+   * Sprint 155: `waitFor: 'capacity'` — accepted, but not yet handed to the AI
+   * sidebar because five chats are already working or waiting (the card's rule,
+   * `_canAttachRuntime`). It is handed over when a turn ends and there is room.
+   * An older build reads it as a plain `accepting`.
+   */
+  | { state: 'accepting'; since: string; waitFor?: 'capacity' }
   | { state: 'queued'; since: string }
   | { state: 'running'; since: string }
   | { state: 'needs-user'; since: string; attentionKind: CommentTaskAttentionKind }
@@ -216,6 +222,8 @@ export interface CommentTaskProjectionV1 {
   summary?: string;
   safeMessage?: string;
   interruptReason?: CommentTaskInterruptReason;
+  /** Sprint 155: an accepted task waiting for room for one more working chat. */
+  waitFor?: 'capacity';
   destination: { conversationId: string; title: string };
 }
 
@@ -265,6 +273,7 @@ export function projectCommentTask(record: CommentTaskRecordV1): CommentTaskProj
     // cannot show a provider payload in a margin.
     ...(lifecycle.state === 'failed' ? { safeMessage: safeFailureMessage(lifecycle.safeMessage) } : {}),
     ...(lifecycle.state === 'interrupted' ? { interruptReason: lifecycle.reason } : {}),
+    ...(lifecycle.state === 'accepting' && lifecycle.waitFor ? { waitFor: lifecycle.waitFor } : {}),
     destination: {
       conversationId: record.destination.conversationId,
       title: record.destination.titleSnapshot,
@@ -459,6 +468,8 @@ export function decodeCommentTaskLifecycleV1(value: unknown, path = 'lifecycle')
           'runtime-exited',
         ] as const),
       };
+    case 'accepting':
+      return input.waitFor === 'capacity' ? { state, since, waitFor: 'capacity' } : { state, since };
     default:
       return { state, since };
   }

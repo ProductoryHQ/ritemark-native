@@ -171,11 +171,20 @@ export interface CommentTaskEnqueueMessage {
    * of `conversationId`, titled `title`, without making it the open one. The
    * answer carries the id the sidebar gave it.
    */
-  newConversation?: { title: string };
+  newConversation?: {
+    title: string;
+    /**
+     * Sprint 155: the id the host chose for the new chat, so a second comment on
+     * the same document can find it before its first turn starts. Absent: the
+     * sidebar makes one (a card's chat).
+     */
+    conversationId?: string;
+  };
   /**
-   * Sprint 130: who asked. `card` items show the board's icon in the queue and,
-   * for a conversation the sidebar does not hold, are loaded from history in
-   * the background instead of being refused (P1).
+   * Sprint 130: who asked. `card` items show the board's icon in the queue.
+   * A conversation the sidebar does not hold is loaded from history in the
+   * background instead of being refused (P1; for comments too since Sprint 155,
+   * which sends a comment to its document's chat, open or not).
    */
   sourceKind?: 'comment' | 'card';
 }

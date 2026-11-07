@@ -464,6 +464,12 @@ export function activate(context: vscode.ExtensionContext) {
     publishProjection: (documentUri, tasks) => {
       RitemarkEditorProvider.publishCommentTaskProjection(documentUri, tasks);
     },
+    // Sprint 155: a turn ended; an open Send surface asks for its caption again.
+    notifyDestinationStale: () => {
+      for (const documentUri of RitemarkEditorProvider.openDocumentUris()) {
+        RitemarkEditorProvider.postToDocumentEditors(documentUri, { type: 'comment-task/destination-stale' });
+      }
+    },
     // Task and turn ids must be UUIDs — the record codec rejects anything else.
     randomId: () => randomUUID(),
     ...unifiedViewProvider.commentTaskHostDependencies(),

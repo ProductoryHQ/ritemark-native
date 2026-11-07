@@ -82,6 +82,8 @@ export function applyCommentTaskProjection(message: { documentUri?: unknown; tas
 export function resetCommentTaskState(): void {
   snapshot = EMPTY_SNAPSHOT
   destination = null
+  openSurfaces = 0
+  latestPreviewRequestId = null
   pending.clear()
   notify()
 }
@@ -92,6 +94,10 @@ interface PendingRequest {
 }
 
 const pending = new Map<string, PendingRequest>()
+
+/** Review 2: the generation of destination previews; only the newest answer counts. */
+let previewGeneration = 0
+let latestPreviewRequestId: string | null = null
 
 function ensureSubscribed(): void {
   if (subscribed) return
@@ -107,6 +113,13 @@ function ensureSubscribed(): void {
   onMessage((message: { type?: string } & Record<string, unknown>) => {
     if (message.type === 'comment-task/projection') {
       applyCommentTaskProjection(message as { documentUri?: unknown; tasks?: unknown })
+      // Sprint 155: a task moved on, so the next comment's chat may have changed.
+      refreshIfSurfaceOpen()
+      return
+    }
+    if (message.type === 'comment-task/destination-stale') {
+      // Sprint 155: a turn ended somewhere; the caption must agree with the send.
+      refreshIfSurfaceOpen()
       return
     }
     if (message.type !== 'comment-task/result') return
@@ -117,7 +130,9 @@ function ensureSubscribed(): void {
     clearTimeout(entry.timer)
     if (message.ok === true) {
       const data = (message.data ?? {}) as Record<string, unknown>
-      if (message.operation === 'comment-task/destination-preview') {
+      // Review 2: only the newest preview's answer sets the caption; an older
+      // one that comes back late is superseded.
+      if (message.operation === 'comment-task/destination-preview' && requestId === latestPreviewRequestId) {
         destination = {
           conversationId: typeof data.conversationId === 'string' ? data.conversationId : null,
           title: typeof data.title === 'string' ? data.title : null,
@@ -214,12 +229,42 @@ export function requestCommentTask(
 
 /** Ask the host which conversation a task would go to (D5). Read-only. */
 export async function refreshCommentTaskDestination(): Promise<void> {
-  const outcome = await requestCommentTask('comment-task/destination-preview')
-  if (outcome.ok) return
+  previewGeneration += 1
+  const requestId = `${newCommentTaskRequestId()}-preview-${previewGeneration}`
+  latestPreviewRequestId = requestId
+  const outcome = await requestCommentTask('comment-task/destination-preview', {}, { requestId })
+  if (outcome.ok || requestId !== latestPreviewRequestId) return
   // A failed preview must not block sending: the caption simply falls back to
   // "New conversation" rather than asserting a destination that may be wrong.
   destination = null
   notify()
+}
+
+/** Sprint 155: how many Send surfaces are open right now. */
+let openSurfaces = 0
+
+function refreshIfSurfaceOpen(): void {
+  if (openSurfaces > 0) void refreshCommentTaskDestination()
+}
+
+/**
+ * Sprint 155: a Send surface opened or closed. While one is open, the caption
+ * is asked again on every projection and every turn's end, so it names the
+ * chat the send would pick now.
+ */
+export function setCommentTaskDestinationSurface(active: boolean): void {
+  ensureSubscribed()
+  if (active) {
+    openSurfaces += 1
+    void refreshCommentTaskDestination()
+  } else {
+    openSurfaces = Math.max(0, openSurfaces - 1)
+  }
+}
+
+/** The caption's current destination. Exported for tests. */
+export function getCommentTaskDestination(): CommentTaskDestinationPreview | null {
+  return destination
 }
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
@@ -243,10 +288,11 @@ export function useCommentTaskProjection(
  * stays quiet otherwise.
  */
 export function useCommentTaskDestination(active: boolean): CommentTaskDestinationPreview | null {
-  const value = useSyncExternalStore(subscribe, () => destination)
+  const value = useSyncExternalStore(subscribe, getCommentTaskDestination)
   useEffect(() => {
     if (!active) return
-    void refreshCommentTaskDestination()
+    setCommentTaskDestinationSurface(true)
+    return () => setCommentTaskDestinationSurface(false)
   }, [active])
   return value
 }

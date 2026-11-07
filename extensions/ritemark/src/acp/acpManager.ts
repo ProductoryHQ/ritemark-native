@@ -32,6 +32,7 @@ import type {
 import { AcpClient, type AcpClientHandlers } from './acpClient';
 import { AcpFsProxy, type AcpFsBackend, type AcpWriteApproval } from './acpFsProxy';
 import { traceAcp } from './acpTrace';
+import { AcpTurnChanges } from './acpTurnChanges';
 import type { ExplicitThinkingEffort, ThinkingEffortCapability } from '../runtime/thinkingEffort';
 import { isExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import * as path from 'path';
@@ -105,6 +106,8 @@ interface AcpSessionState {
    * conclusion, which a task shows as its result.
    */
   lastMessage: { id: string | null; text: string };
+  /** Sprint 155: the files this turn's completed `edit` tool calls changed. */
+  turnChanges: AcpTurnChanges;
   /** Full live option set returned by ACP session setup / config mutation. */
   configOptions: SessionConfigOption[];
   /** Original provider selection used when Composer returns to Auto. */
@@ -204,6 +207,7 @@ export class AcpManager {
       thoughtBuffer: '',
       cancelRequested: false,
       lastMessage: { id: null, text: '' },
+      turnChanges: new AcpTurnChanges(),
       configOptions: session.configOptions ?? [],
       initialThoughtLevel: thoughtLevelCurrent(session.configOptions ?? []),
       currentModel: null,
@@ -224,6 +228,7 @@ export class AcpManager {
       thoughtBuffer: '',
       cancelRequested: false,
       lastMessage: { id: null, text: '' },
+      turnChanges: new AcpTurnChanges(),
       configOptions: session.configOptions ?? [],
       initialThoughtLevel: thoughtLevelCurrent(session.configOptions ?? []),
       currentModel: null,
@@ -345,12 +350,18 @@ export class AcpManager {
     return this.sessions.get(sessionId)?.lastMessage.text.trim() ?? '';
   }
 
+  /** Sprint 155: the files the turn's completed edits changed (never its reads). */
+  turnFilesModified(sessionId: string): string[] {
+    return this.sessions.get(sessionId)?.turnChanges.files() ?? [];
+  }
+
   async prompt(sessionId: string, text: string): Promise<PromptResponse> {
     const { client, state } = this.requireSession(sessionId);
 
     state.sawContentThisTurn = false;
     state.cancelRequested = false;
     state.lastMessage = { id: null, text: '' };
+    state.turnChanges.reset();
 
     let result: PromptResponse;
     try {
@@ -526,6 +537,7 @@ export class AcpManager {
       }
       case 'tool_call': {
         traceAcp('manager', 'update:tool_call', { sessionId, title: update.title, kind: update.kind });
+        state.turnChanges.note(update);
         state.sawContentThisTurn = true;
         this.emit(sessionId, 'tool_use', update.title, {
           tool: update.title,
@@ -547,8 +559,15 @@ export class AcpManager {
         );
         break;
       }
+      case 'tool_call_update': {
+        // Not surfaced in the baseline UI, but a completed edit is how the
+        // turn's changed files are known (Sprint 155).
+        state.turnChanges.note(update);
+        traceAcp('manager', 'update:tool_call_update', { sessionId, status: update.status, kind: update.kind });
+        break;
+      }
       default:
-        // tool_call_update, available_commands_update, usage_update, etc. —
+        // available_commands_update, usage_update, etc. —
         // not surfaced in the baseline UI.
         traceAcp('manager', 'session-update:ignored', { sessionId, type: update.sessionUpdate });
         break;

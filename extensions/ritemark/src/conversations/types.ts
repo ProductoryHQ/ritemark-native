@@ -112,6 +112,13 @@ export interface AssistantMessageEventV1 extends ConversationEventBaseV1 {
    * as the live one. Absent in older records and when the runtime reported none.
    */
   activeDurationMs?: number;
+  /**
+   * Sprint 155: the workspace files this turn changed (written or edited, never
+   * read), as absolute paths. Absent in older records and when the turn changed
+   * nothing. Read leniently: a malformed value is dropped, never a reason to
+   * quarantine the chat, and an older build simply ignores it.
+   */
+  filesModified?: string[];
 }
 
 export interface ActivityEventV1 extends ConversationEventBaseV1 {
@@ -139,6 +146,8 @@ export interface BoundaryEventV1 extends ConversationEventBaseV1 {
   /** Sprint 139 (E1, E2): as on an assistant message. */
   errorKind?: RuntimeErrorKind;
   errorDetail?: RuntimeErrorDetail;
+  /** Sprint 155: a turn that failed or was stopped may still have changed files; as on an assistant message. */
+  filesModified?: string[];
 }
 
 export type DispatchReceiptStateV1 = 'not-sent' | 'ambiguous' | 'accepted';
@@ -233,7 +242,26 @@ export interface ConversationSummaryV1 {
   lastReplyAt?: string;
   /** Sprint 134 (R3): the title is still the chat's first message (no AI title, no rename), so Home quotes it. */
   titleIsFirstMessage?: true;
+  /**
+   * Sprint 155: the files this chat's turns changed, newest change first, one
+   * entry per file (see {@link changedFilesOf}). Absent when the chat changed
+   * nothing, or was last written before Sprint 155. The comment task's routing
+   * and All chats read it from the index, without opening each record.
+   */
+  changedFiles?: ConversationChangedFileV1[];
 }
+
+/** Sprint 155: one file a chat changed, and when its newest change finished. */
+export interface ConversationChangedFileV1 {
+  path: string;
+  changedAt: string;
+}
+
+/** Sprint 155: the summary keeps this many changed files per chat; older ones fall off. */
+export const MAX_SUMMARY_CHANGED_FILES = 50;
+
+/** Sprint 155: one turn's event keeps at most this many changed files, as the summary does. */
+export const MAX_TURN_CHANGED_FILES = MAX_SUMMARY_CHANGED_FILES;
 
 export interface ConversationIndexV1 {
   schemaVersion: typeof CONVERSATION_INDEX_VERSION;
@@ -492,6 +520,7 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
       ...lenientErrorFields(input),
       appliedThinkingEffort,
       ...(input.activeDurationMs === undefined ? {} : { activeDurationMs: integerAt(input.activeDurationMs, `${path}.activeDurationMs`) }),
+      ...lenientFilesModified(input),
     };
   }
   if (kind === 'activity') {
@@ -531,7 +560,67 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
       failureKind: enumAt(input.failureKind, `${path}.failureKind`, ['authentication', 'api-key-authentication'] as const),
     }),
     ...lenientErrorFields(input),
+    ...lenientFilesModified(input),
   };
+}
+
+/**
+ * Sprint 155: a turn's changed files, kept only when they are a list of
+ * non-empty strings. Like the error fields, nothing here can fail a record.
+ */
+export function lenientFilesModified(input: Record<string, unknown>): { filesModified?: string[] } {
+  const value = input.filesModified;
+  if (!Array.isArray(value)) return {};
+  const files = Array.from(new Set(value.filter((item): item is string => typeof item === 'string' && item.length > 0)))
+    .slice(0, MAX_TURN_CHANGED_FILES);
+  return files.length ? { filesModified: files } : {};
+}
+
+/**
+ * Sprint 155: the files a chat's turns changed, newest change first, each file
+ * once (at its newest change). Only finished turns' terminal events carry them.
+ */
+export function changedFilesOf(events: readonly ConversationEventV1[]): ConversationChangedFileV1[] {
+  const newest = new Map<string, string>();
+  for (const event of events) {
+    if (event.kind !== 'assistant-message' && event.kind !== 'boundary') continue;
+    for (const file of event.filesModified ?? []) {
+      const before = newest.get(file);
+      if (!before || before <= event.occurredAt) newest.set(file, event.occurredAt);
+    }
+  }
+  return [...newest.entries()]
+    .map(([file, changedAt]) => ({ path: file, changedAt }))
+    .sort((a, b) => (a.changedAt === b.changedAt ? 0 : a.changedAt < b.changedAt ? 1 : -1))
+    .slice(0, MAX_SUMMARY_CHANGED_FILES);
+}
+
+/** Sprint 155: the summary's changed files, read leniently from an index entry. */
+export function decodeChangedFiles(value: unknown): ConversationChangedFileV1[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const files = value.filter((item): item is ConversationChangedFileV1 => (
+    Boolean(item) && typeof item === 'object'
+    && typeof (item as ConversationChangedFileV1).path === 'string' && (item as ConversationChangedFileV1).path.length > 0
+    && typeof (item as ConversationChangedFileV1).changedAt === 'string'
+  )).map((item) => ({ path: item.path, changedAt: item.changedAt }));
+  return files.length ? files.slice(0, MAX_SUMMARY_CHANGED_FILES) : undefined;
+}
+
+/**
+ * Sprint 155: which chat last changed this file, and when. `samePath` decides
+ * whether a stored path names the file (the host compares real paths).
+ */
+export function lastChatToChange(
+  summaries: readonly Pick<ConversationSummaryV1, 'conversationId' | 'changedFiles'>[],
+  file: string,
+  samePath: (stored: string, file: string) => boolean = (a, b) => a === b,
+): { conversationId: string; changedAt: string } | null {
+  let best: { conversationId: string; changedAt: string } | null = null;
+  for (const summary of summaries) {
+    const hit = summary.changedFiles?.find((entry) => samePath(entry.path, file));
+    if (hit && (!best || hit.changedAt > best.changedAt)) best = { conversationId: summary.conversationId, changedAt: hit.changedAt };
+  }
+  return best;
 }
 
 /**
@@ -823,6 +912,7 @@ export function summarizeConversationRecord(record: ConversationRecordV1, verifi
   const lastReplyAt = lastReplyAtOf(record.events);
   const firstMessage = record.events.find((event): event is UserMessageEventV1 => event.kind === 'user-message')?.text;
   const titleIsFirstMessage = Boolean(firstMessage?.trim()) && record.title === fallbackTitleFromPrompt(firstMessage!);
+  const changedFiles = changedFilesOf(record.events);
   return {
     conversationId: record.conversationId,
     scopeId: record.scopeId,
@@ -839,5 +929,6 @@ export function summarizeConversationRecord(record: ConversationRecordV1, verifi
     ...(record.readAt ? { readAt: record.readAt } : {}),
     ...(lastReplyAt ? { lastReplyAt } : {}),
     ...(titleIsFirstMessage ? { titleIsFirstMessage: true as const } : {}),
+    ...(changedFiles.length ? { changedFiles } : {}),
   };
 }

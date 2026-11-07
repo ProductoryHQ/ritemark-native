@@ -19,6 +19,7 @@ import {
   summarizeConversationRecord,
   withSavedModel,
   lastReplyAtOf,
+  decodeChangedFiles,
   hasUnreadReply,
   type ConversationCheckpointV1,
   type ConversationCreateInputV1,
@@ -165,6 +166,10 @@ function decodeIndex(value: unknown): ConversationIndexV1 {
       ...(typeof entry.readAt === 'string' ? { readAt: entry.readAt } : {}),
       ...(typeof entry.lastReplyAt === 'string' ? { lastReplyAt: entry.lastReplyAt } : {}),
       ...(entry.titleIsFirstMessage === true ? { titleIsFirstMessage: true as const } : {}),
+      ...(() => {
+        const changedFiles = decodeChangedFiles(entry.changedFiles);
+        return changedFiles ? { changedFiles } : {};
+      })(),
     };
   });
   return {

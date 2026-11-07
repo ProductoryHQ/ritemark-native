@@ -262,4 +262,12 @@ const ALL_STATES: CommentTaskState[] = [
   )
 }
 
+// Sprint 155 review, finding 4: a task waiting for room says what a card says.
+{
+  const p = presentCommentTask(projection({ state: 'accepting', waitFor: 'capacity' } as Partial<CommentTaskProjectionV1>))
+  assert.equal(p.statusLine, 'Starts when the AI sidebar has room', 'the card’s words')
+  assert.equal(p.busy, false, 'it is not “Sending…”')
+  assert.equal(p.destinationLine, 'In “Release note review”')
+}
+
 console.log('commentTaskCopy: all assertions passed')
