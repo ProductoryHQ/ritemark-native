@@ -48,9 +48,10 @@ Both PRs: shadcn `Button` and `ui/tooltip.tsx` (never a native `title`), the glo
 
 ## Rules decided here (small, the manager's)
 
-- **A file that is gone** (deleted or moved): the icon shows the newest changed file that still exists; if none does, there is no icon. Renames are not followed.
-- **The task's chat is working:** the task waits in that chat's queue, as a card's task does today. If there is no room for one more working chat, it does the same as a card's task does now; PR 1 checks what that is first and keeps it.
-- **A comment assigned to another AI** than the chat's last one still lands in the document's chat, and the Send surface says so first, as today.
+- **A file that is gone** (deleted or moved): the icon shows the newest changed file that still exists; if none does, there is no icon. Renames are not followed. The tooltip's "and N more" counts only files that still exist, the same set the icon draws from, so it never names a file a click can't reach (the Experience lead, 7 November).
+- **The task's chat is working:** the task waits in that chat's queue, as a card's task does today. The card uses today's words, "Queued for Claude" with "In “<chat>”" and Open conversation; the "Sent to “…”" toast still shows, because the task has been handed over. If there is no room for one more working chat, it does the same as a card's task does now; PR 1 checks what that is first and keeps it.
+- **A comment assigned to another AI** than the chat's last one still lands in the document's chat, with today's caption first: "→ <chat> · Codex takes over". One chat per document.
+- **Chats from before the build** have no icon and route as if they changed nothing: for them it is the same as today (the Experience lead agreed, ritemark-dev `f7f5c31`).
 - **No new counts.** The User lead's numbers are not part of this sprint.
 
 ## Proof plan
