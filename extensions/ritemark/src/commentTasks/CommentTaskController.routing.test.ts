@@ -59,6 +59,8 @@ interface World {
   existing: Set<string>;
   canAttach: boolean;
   enqueueAnswers: CommentTaskEnqueueOutcome[];
+  /** The sheet gave no verdict (timeout, not ready): the host says so. */
+  unreachable?: boolean;
 }
 
 function harness(world: Partial<World> = {}) {
@@ -76,8 +78,11 @@ function harness(world: Partial<World> = {}) {
   const titled: Array<[string, string]> = [];
   const attachAsked: Array<string | null> = [];
   let counter = 0;
+  let clock = Date.parse('2026-11-07T12:00:00.000Z');
+  /** Move the clock on, so a later comment is accepted later. */
+  const tick = (ms = 1000) => { clock += ms; };
   const store = new CommentTaskStore(commentTaskStoreDir(fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-route-'))), {
-    now: () => new Date('2026-11-07T12:00:00.000Z'),
+    now: () => new Date(clock),
   });
   const dependencies: CommentTaskControllerDependencies = {
     store,
@@ -101,14 +106,18 @@ function harness(world: Partial<World> = {}) {
     enqueue: async (message) => {
       enqueued.push(message);
       const outcome = w.enqueueAnswers.shift() ?? 'queued';
-      return { outcome, ...(outcome === 'queued' ? { conversationId: message.conversationId } : {}) };
+      return {
+        outcome,
+        ...(outcome === 'queued' ? { conversationId: message.conversationId } : {}),
+        ...(outcome === 'no-conversation' && w.unreachable ? { unreachable: true as const } : {}),
+      };
     },
     revealConversation: async () => undefined,
     publishProjection: () => undefined,
-    now: () => new Date('2026-11-07T12:00:00.000Z'),
+    now: () => new Date(clock),
     randomId: () => `00000000-0000-4000-8000-${(counter += 1).toString().padStart(12, '0')}`,
   };
-  return { controller: new CommentTaskController(dependencies), store, world: w, enqueued, toasts, titled, attachAsked };
+  return { controller: new CommentTaskController(dependencies), store, world: w, enqueued, toasts, titled, attachAsked, tick };
 }
 
 type Ok = Extract<CommentTaskResultMessage, { ok: true }>;
@@ -125,6 +134,18 @@ async function preview(h: ReturnType<typeof harness>) {
 }
 
 const DRAFT: CommentTaskDestination = { conversationId: 'conv-draft', bindingGeneration: 2, title: 'Draft Module 2 and 3', created: false, runtimeId: 'claude-code' };
+
+const failures: string[] = [];
+/** Each check runs on its own, so one failure does not hide the others. */
+async function check(name: string, body: () => Promise<void>): Promise<void> {
+  try {
+    await body();
+    console.log(`✓ ${name}`);
+  } catch (error) {
+    failures.push(name);
+    console.error(`✗ ${name}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
 
 async function main(): Promise<void> {
   // ── Rule 1: the chat that changed the document, while another chat is open ──
@@ -229,20 +250,70 @@ async function main(): Promise<void> {
     console.log('✓ a comment for another AI lands in the document’s chat');
   }
 
-  // ── No room for one more working chat: refused as a card is, nothing queued ──
-  {
+  await check("No room for one more working chat: it waits, as a card's task does, and starts when there is room", async () => {
     const h = harness({
       chats: [{ conversationId: 'conv-draft', changedFiles: [{ path: DOC, changedAt: '2026-11-07T08:00:00Z' }] }],
       records: new Map([['conv-draft', DRAFT]]),
       canAttach: false,
     });
     const result = await h.controller.handleRequest(accept('r1', [[C1, 'Shorter please']]), doc());
-    assert.ok(!result.ok && result.error.code === 'capacity', 'refused with the capacity error');
-    assert.ok(!result.ok && result.error.message === 'Five conversations are already working or waiting for you.');
-    assert.equal(h.enqueued.length, 0);
-    assert.deepEqual(await h.store.listForDocument(DOC_URI), [], 'no task recorded');
-    console.log('✓ no room: refused like a card’s task');
-  }
+    assert.ok(result.ok, `accepted, not refused (got ${result.ok ? '' : result.error.code})`);
+    assert.equal(h.enqueued.length, 0, 'nothing handed to the sidebar yet');
+    const [waiting] = await h.store.listForDocument(DOC_URI);
+    assert.equal(waiting?.lifecycle.state, 'accepting');
+    assert.equal((waiting?.lifecycle as { waitFor?: string } | undefined)?.waitFor, 'capacity', 'it waits for room, with the card’s words');
+    assert.deepEqual(h.toasts, [], 'no “Sent to” until it is handed over');
+    // Another chat's turn ends: now there is room.
+    h.world.canAttach = true;
+    await h.controller.applyTurnTerminal('conv-other', '99999999-9999-4999-8999-999999999999', { status: 'completed', text: 'Done' });
+    assert.equal(h.enqueued.length, 1, 'it starts when there is room');
+    assert.equal(h.enqueued[0].conversationId, 'conv-draft');
+    const [started] = await h.store.listForDocument(DOC_URI);
+    assert.equal(started?.lifecycle.state, 'queued');
+    assert.equal((started?.lifecycle as { waitFor?: string }).waitFor, undefined);
+    assert.deepEqual(h.toasts, ['Sent to “Draft Module 2 and 3”']);
+    });
+
+  await check('Finding 1: the permanent id is minted between the second and the third comment', async () => {
+    const h = harness({ chats: [{ conversationId: 'conv-open', changedFiles: [{ path: OTHER, changedAt: '2026-11-07T09:00:00Z' }] }] });
+    const a = destinationOf(await h.controller.handleRequest(accept('r1', [[C1, 'Shorter please']]), doc()));
+    h.tick();
+    const b = destinationOf(await h.controller.handleRequest(accept('r2', [[C2, 'Add a table']]), doc()));
+    assert.equal(b.conversationId, a.conversationId, 'B joins A’s new chat');
+    // A's turn starts: the store mints the permanent id and the sidebar is told.
+    const permanent = 'conv-permanent';
+    await (h.controller as unknown as { applyConversationCanonicalId?(from: string, to: string): Promise<void> })
+      .applyConversationCanonicalId?.(a.conversationId, permanent);
+    await h.controller.applyTurnStarted(permanent, h.enqueued[0].conversationTurnId);
+    h.world.records.set(permanent, { conversationId: permanent, bindingGeneration: 1, title: 'Shorter please', created: false, runtimeId: 'claude-code' });
+    h.tick();
+    const c = destinationOf(await h.controller.handleRequest(accept('r3', [[C3, 'Fix the title']]), doc()));
+    assert.equal(c.conversationId, permanent, 'the third comment goes to the permanent id');
+    assert.equal(h.enqueued[2].conversationId, permanent);
+    const ids = new Set((await h.store.listForDocument(DOC_URI)).map((task) => task.destination.conversationId));
+    assert.deepEqual([...ids], [permanent], 'all three tasks name one chat');
+    });
+
+  await check('Finding 2: two comments sent at once make one chat', async () => {
+    const h = harness({ chats: [{ conversationId: 'conv-open', changedFiles: [{ path: OTHER, changedAt: '2026-11-07T09:00:00Z' }] }] });
+    const [first, second] = await Promise.all([
+      h.controller.handleRequest(accept('r1', [[C1, 'Shorter please']]), doc()),
+      h.controller.handleRequest(accept('r2', [[C2, 'Add a table']]), doc()),
+    ]);
+    assert.equal(destinationOf(first).conversationId, destinationOf(second).conversationId, 'one chat');
+    assert.equal(h.enqueued.filter((m) => m.newConversation).length, 1, 'only one new chat is made');
+    });
+
+  await check("Finding 8: another project's pending task is ignored", async () => {
+    const other = resolveProjectScope({ folderUris: ['file:///q'], platform: 'darwin' });
+    const h = harness({ chats: [{ conversationId: 'conv-open' }] });
+    // A task in another project, for a file at the same path, waiting in that project's chat.
+    h.world.open = { conversationId: 'conv-elsewhere', bindingGeneration: 1, title: 'Elsewhere', created: false, runtimeId: 'claude-code' };
+    destinationOf(await h.controller.handleRequest(accept('x1', [[C1, 'Elsewhere']]), { ...doc(), scopeId: other.scopeId, scope: other.descriptor }));
+    h.world.open = { conversationId: 'conv-open', bindingGeneration: 1, title: 'Shorten the Bar proposal', created: false, runtimeId: 'claude-code' };
+    const dest = destinationOf(await h.controller.handleRequest(accept('r1', [[C2, 'Shorter please']]), doc()));
+    assert.equal(dest.conversationId, 'conv-open', 'the other project’s task is not this document’s chat');
+    });
 
   // ── Retry keeps the card's chat, even when the rules would now pick another ──
   {
@@ -287,6 +358,49 @@ async function main(): Promise<void> {
     console.log('✓ retry picks again only when the chat is gone');
   }
 
+  await check("Finding 5a: retry to the card's own chat that isn't open: room check and toast", async () => {
+    const h = harness({
+      chats: [{ conversationId: 'conv-draft', changedFiles: [{ path: DOC, changedAt: '2026-11-07T08:00:00Z' }] }],
+      records: new Map([['conv-draft', DRAFT]]),
+    });
+    destinationOf(await h.controller.handleRequest(accept('r1', [[C1, 'Shorter please']]), doc()));
+    const taskId = (await h.store.listForDocument(DOC_URI))[0].taskId;
+    await h.controller.applyTurnStarted('conv-draft', h.enqueued[0].conversationTurnId);
+    await h.controller.applyTurnTerminal('conv-draft', h.enqueued[0].conversationTurnId, { status: 'failed', error: 'Network' });
+    h.toasts.length = 0;
+    h.attachAsked.length = 0;
+    ok(await h.controller.handleRequest({ type: 'comment-task/retry', requestId: 'rt1', taskId }, doc()), 'retry');
+    assert.deepEqual(h.attachAsked, ['conv-draft'], 'room is checked for the card’s chat that isn’t open');
+    assert.deepEqual(h.toasts, ['Sent to “Draft Module 2 and 3”'], 'and the toast says where it went');
+    });
+
+  await check('Finding 5b: an unreachable sheet, or a chat that still exists, is not a gone chat', async () => {
+    for (const unreachable of [true, false]) {
+      const h = harness({
+        chats: [{ conversationId: 'conv-draft', changedFiles: [{ path: DOC, changedAt: '2026-11-07T08:00:00Z' }] }],
+        records: new Map([['conv-draft', DRAFT]]),
+      });
+      destinationOf(await h.controller.handleRequest(accept('r1', [[C1, 'Shorter please']]), doc()));
+      const taskId = (await h.store.listForDocument(DOC_URI))[0].taskId;
+      await h.controller.applyTurnStarted('conv-draft', h.enqueued[0].conversationTurnId);
+      await h.controller.applyTurnTerminal('conv-draft', h.enqueued[0].conversationTurnId, { status: 'failed', error: 'Network' });
+      // The rules would now pick a new chat (the open chat changed another document).
+      h.world.chats = [{ conversationId: 'conv-open', changedFiles: [{ path: OTHER, changedAt: '2026-11-07T09:00:00Z' }] }];
+      // unreachable: the sheet timed out. Otherwise: "no-conversation", but the chat's record still exists.
+      h.world.unreachable = unreachable;
+      h.world.enqueueAnswers = ['no-conversation', 'queued'];
+      const result = await h.controller.handleRequest({ type: 'comment-task/retry', requestId: 'rt1', taskId }, doc());
+      assert.ok(!result.ok, 'the retry fails honestly');
+      assert.equal(h.enqueued.length, 2, 'no second dispatch');
+      assert.ok(!h.enqueued.some((m) => m.newConversation), 'no new chat while the original exists');
+      assert.equal((await h.store.get(taskId))?.destination.conversationId, 'conv-draft', 'the card keeps its chat');
+    }
+  });
+
+  if (failures.length) {
+    console.error(`CommentTaskController routing tests: ${failures.length} FAILED: ${failures.join('; ')}`);
+    process.exit(1);
+  }
   console.log('CommentTaskController routing tests: all assertions passed');
 }
 

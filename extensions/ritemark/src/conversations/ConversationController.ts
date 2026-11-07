@@ -13,6 +13,7 @@ import { ConversationStore, ConversationStoreError } from './ConversationStore';
 import {
   withSavedModel,
   lastChatToChange,
+  MAX_TURN_CHANGED_FILES,
   type ConversationSummaryV1,
   type ConversationCheckpointV1,
   type ConversationRecordV1,
@@ -515,7 +516,8 @@ export class ConversationController {
     turnId?: string;
     generateTitle?: (request: FirstResponseTitleRequest) => Promise<string | null>;
   }): Promise<ConversationRecordV1> {
-    const filesModified = Array.from(new Set((input.filesModified ?? []).filter((file) => typeof file === 'string' && file.length > 0)));
+    const filesModified = Array.from(new Set((input.filesModified ?? []).filter((file) => typeof file === 'string' && file.length > 0)))
+      .slice(0, MAX_TURN_CHANGED_FILES);
     const changed = filesModified.length ? { filesModified } : {};
     const initial = await this.requireCurrentScope(input.conversationId);
     const firstUserMessage = initial.events.find((event) => event.kind === 'user-message');

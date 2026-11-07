@@ -185,6 +185,8 @@ export interface AgentTaskListener {
   applyDequeued?(taskId: string): Promise<void> | void;
   applyDispatchFailed?(taskId: string, message: string): Promise<void> | void;
   applyTurnStarted(conversationId: string, conversationTurnId: string): Promise<void> | void;
+  /** Sprint 155: a new chat's client id became its permanent id (`conversation/canonical-id`). */
+  applyConversationCanonicalId?(clientConversationId: string, conversationId: string): Promise<void> | void;
   applyTurnAttention(
     conversationId: string,
     conversationTurnId: string,
@@ -961,6 +963,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               conversationId,
               bindingGeneration,
             });
+            // Sprint 155: tasks still naming the client id follow the chat.
+            this._forEachTaskListener((listener) => listener.applyConversationCanonicalId?.(clientConversationId, conversationId));
           }
           let terminalCheckpointWritten = false;
           let streamedResponseText = '';
@@ -2411,29 +2415,32 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * its open chat never changes, and the answer names the conversation the task
    * was queued in (a new one, or one loaded from history).
    */
-  private _enqueueCardTask(enqueueMessage: CommentTaskEnqueueMessage): Promise<{ outcome: CommentTaskEnqueueOutcome; conversationId?: string }> {
+  private _enqueueCardTask(enqueueMessage: CommentTaskEnqueueMessage): Promise<{ outcome: CommentTaskEnqueueOutcome; conversationId?: string; unreachable?: true }> {
     return new Promise((resolve) => {
       let settled = false;
-      const settle = (outcome: CommentTaskEnqueueOutcome, conversationId?: string): void => {
+      const settle = (outcome: CommentTaskEnqueueOutcome, conversationId?: string, unreachable = false): void => {
         if (settled) return;
         settled = true;
         this._commentTaskEnqueueWaiters.delete(enqueueMessage.taskId);
         clearTimeout(timer);
-        resolve({ outcome, ...(conversationId ? { conversationId } : {}) });
+        resolve({ outcome, ...(conversationId ? { conversationId } : {}), ...(unreachable ? { unreachable: true as const } : {}) });
       };
-      const timer = setTimeout(() => settle('no-conversation'), 15_000);
+      // Sprint 155: no verdict from the sheet (timeout, not ready, not
+      // delivered) is "unreachable", never "Conversation no longer available".
+      const unreachable = (): void => settle('no-conversation', undefined, true);
+      const timer = setTimeout(unreachable, 15_000);
       this._commentTaskEnqueueWaiters.set(enqueueMessage.taskId, settle);
       void this._awaitActiveConversation(5000, true).then((ready) => {
         const view = this._view;
         if (!ready || !view) {
-          settle('no-conversation');
+          unreachable();
           return;
         }
         this.show();
         void view.webview.postMessage(enqueueMessage).then((delivered) => {
-          if (delivered === false) settle('no-conversation');
-        }, () => settle('no-conversation'));
-      }, () => settle('no-conversation'));
+          if (delivered === false) unreachable();
+        }, unreachable);
+      }, unreachable);
     });
   }
 

@@ -508,6 +508,8 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
           sawRegularAssistant = true;
           processAssistantMessage(message, filesModified, emitProgress, message.parent_tool_use_id);
         }
+      } else if (message.type === 'user') {
+        processToolResultMessage(message, filesModified);
       } else if (message.type === 'tool_progress' || (message.type === 'system' && message.subtype === 'task_notification')) {
         processSystemMessage(message, emitProgress);
       } else if (message.type === 'result') {
@@ -1450,6 +1452,7 @@ export class AgentSession {
           this._handleTaskMessage(message);
         } else if (message.type === 'user') {
           this._handleUserMessage(message);
+          processToolResultMessage(message, this._runtimeTurn ? this._runtimeTurn.filesModified : this._turnFilesModified);
         } else if (message.type === 'system' && message.subtype === 'status' && (message as any).status === 'compacting') {
           traceClaude('sdk', 'system:status', { status: (message as any).status });
           this._emitProgress?.('compacting', 'Vestlus on pikaks läinud — teen varasemast kokkuvõtte...');
@@ -1850,6 +1853,42 @@ type ExtendedProgressEmitter = (
 ) => void;
 
 /**
+ * Sprint 155: a turn's changes waiting for their tool's result, keyed by the
+ * turn's own `filesModified` list (so each turn, and the one-shot runner, keep
+ * their own), then by `tool_use_id`.
+ */
+const pendingChanges = new WeakMap<string[], Map<string, string>>();
+
+function pendingChangesOf(filesModified: string[]): Map<string, string> {
+  let pending = pendingChanges.get(filesModified);
+  if (!pending) {
+    pending = new Map();
+    pendingChanges.set(filesModified, pending);
+  }
+  return pending;
+}
+
+/**
+ * Sprint 155: a change counts only once its tool ran without error. A declined
+ * permission (ask mode) and a failed edit both come back as a `tool_result`
+ * with `is_error: true` — the bundled CLI (0.3.310) answers a denied tool_use
+ * that way, with `toolDenialKind` "user-rejected" — so neither counts.
+ */
+export function processToolResultMessage(message: SDKMessage, filesModified: string[]): void {
+  const content = (message.message as { content?: unknown } | undefined)?.content;
+  if (!Array.isArray(content)) return;
+  const pending = pendingChanges.get(filesModified);
+  if (!pending) return;
+  for (const block of content as Array<{ type?: string; tool_use_id?: string; is_error?: boolean }>) {
+    if (block.type !== 'tool_result' || !block.tool_use_id) continue;
+    const file = pending.get(block.tool_use_id);
+    if (file === undefined) continue;
+    pending.delete(block.tool_use_id);
+    if (block.is_error !== true) filesModified.push(file);
+  }
+}
+
+/**
  * Parse assistant message content blocks for tool usage and thinking
  */
 export function processAssistantMessage(
@@ -1865,9 +1904,10 @@ export function processAssistantMessage(
 
   for (const block of content) {
     // Sprint 155: a change, never a read (Write, Edit, MultiEdit, NotebookEdit).
+    // Held by its tool_use id until the tool has run (`processToolResultMessage`).
     if (block.type === 'tool_use') {
       const changed = claudeChangedFile(block.name ?? '', block.input);
-      if (changed) filesModified.push(changed);
+      if (changed && block.id) pendingChangesOf(filesModified).set(block.id, changed);
     }
     if (block.type === 'text' && block.text) {
       if (planModeActive && !parentToolUseId) {

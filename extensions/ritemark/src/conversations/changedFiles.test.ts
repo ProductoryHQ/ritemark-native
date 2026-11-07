@@ -63,6 +63,16 @@ async function run(): Promise<void> {
   assert.equal(boundary?.kind, 'boundary');
   assert.deepEqual(boundary?.kind === 'boundary' ? boundary.filesModified : null, ['/p/Advokatuur.md']);
 
+  // A turn's list is capped, as the summary is (Sprint 155 review, finding 6).
+  const many = Array.from({ length: 80 }, (_, index) => `/p/generated/file-${index}.md`);
+  const big = await turn(undefined, 'codex', many);
+  const bigEvent = big.events.at(-1);
+  assert.equal(bigEvent?.kind === 'assistant-message' ? bigEvent.filesModified?.length : null, 50, 'one turn keeps at most 50 changed files');
+  const oversized = JSON.parse(JSON.stringify(big)) as Record<string, unknown> & { events: Array<Record<string, unknown>> };
+  (oversized.events.at(-1) as Record<string, unknown>).filesModified = many;
+  const readBig = decodeConversationRecordV1(oversized).events.at(-1);
+  assert.equal(readBig?.kind === 'assistant-message' ? readBig.filesModified?.length : null, 50, 'and reads back at most 50');
+
   // A turn that changed nothing writes no field.
   const cases = await turn(undefined, 'claude-code', []);
   assert.equal(cases.events.at(-1)?.kind === 'assistant-message' && 'filesModified' in cases.events.at(-1)!, false);
@@ -106,7 +116,7 @@ async function run(): Promise<void> {
   fs.writeFileSync(indexFile, JSON.stringify(index));
   const olderIndexStore = new ConversationStore(temp, { randomId, now });
   const listed = await olderIndexStore.list(scope.scopeId);
-  assert.equal(listed.length, 3, 'every chat is still listed');
+  assert.equal(listed.length, 4, 'every chat is still listed');
   assert.ok(listed.every((entry) => entry.integrity === 'verified'), 'and none is quarantined');
 
   console.log('changedFiles tests: all assertions passed');

@@ -237,6 +237,56 @@ export class CommentTaskStore {
     });
   }
 
+  /**
+   * Sprint 155: a new chat's client id became its permanent one. Every
+   * unfinished task still naming the client id follows it, so a later comment
+   * routed through such a task finds the chat that exists. Returns the moved tasks.
+   */
+  rebindConversation(fromConversationId: string, toConversationId: string): Promise<CommentTaskRecordV1[]> {
+    return this.serialized(async () => {
+      await this.ensureInitialized();
+      if (fromConversationId === toConversationId) return [];
+      const { index } = await this.reconcile();
+      const moved: CommentTaskRecordV1[] = [];
+      for (const entry of index.entries.filter((candidate) => !isTerminalCommentTaskState(candidate.state))) {
+        const record = await this.readRecord(entry.taskId);
+        if (!record || record.destination.conversationId !== fromConversationId) continue;
+        const next = this.validate({
+          ...record,
+          updatedAt: this.timestamp(),
+          destination: { ...record.destination, conversationId: toConversationId },
+        });
+        await this.writeRecord(next);
+        moved.push(next);
+      }
+      if (moved.length) await this.updateIndexBestEffort();
+      return moved;
+    });
+  }
+
+  /**
+   * Sprint 155: mark an `accepting` task as waiting for room for one more
+   * working chat, or clear the mark. Not a transition: the task has not been
+   * handed to the sidebar either way, so the history does not grow.
+   */
+  setWaitingForRoom(taskId: string, bindingGeneration: number, waiting: boolean): Promise<CommentTaskRecordV1> {
+    return this.serialized(async () => {
+      await this.ensureInitialized();
+      const current = await this.requireRecord(taskId);
+      if (current.bindingGeneration !== bindingGeneration || current.lifecycle.state !== 'accepting') return current;
+      const next = this.validate({
+        ...current,
+        updatedAt: this.timestamp(),
+        lifecycle: waiting
+          ? { state: 'accepting', since: current.lifecycle.since, waitFor: 'capacity' }
+          : { state: 'accepting', since: current.lifecycle.since },
+      });
+      await this.writeRecord(next);
+      await this.updateIndexBestEffort();
+      return next;
+    });
+  }
+
   /** Every non-terminal task, for the activation sweep that turns work
    *  abandoned by a crash into an honest `interrupted` (R5). */
   listUnfinished(): Promise<CommentTaskRecordV1[]> {

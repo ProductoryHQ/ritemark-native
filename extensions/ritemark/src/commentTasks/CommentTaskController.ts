@@ -160,6 +160,11 @@ export interface CommentTaskControllerDependencies {
   notifySent?(text: string): void;
   /** Sprint 155: name a chat made for a comment, once it has a record. */
   setConversationTitle?(conversationId: string, title: string): Promise<void>;
+  /**
+   * Sprint 155: a turn ended, so the caption a Send surface shows may be out of
+   * date (a chat may now have changed the document). The editors ask again.
+   */
+  notifyDestinationStale?(): void;
   /** Normalized runtime availability — the same policy the Composer uses, so
    *  the comment path cannot invent a stricter or looser gate (audit F19). */
   checkAvailability(runtimeId: string): Promise<CommentTaskAvailability>;
@@ -168,8 +173,10 @@ export interface CommentTaskControllerDependencies {
   /** One prompt builder for both surfaces, given the REAL document label. */
   buildPrompt(document: CommentTaskDocument, comments: CommentTaskCommentV1[]): string;
   /** Hand the accepted task to the sidebar queue and wait for its verdict.
-   *  Sprint 155: the answer may name the chat it was queued in. */
-  enqueue(message: CommentTaskEnqueueMessage): Promise<CommentTaskEnqueueOutcome | { outcome: CommentTaskEnqueueOutcome; conversationId?: string }>;
+   *  Sprint 155: the answer may name the chat it was queued in, and says
+   *  `unreachable` when the sheet gave no verdict at all (not ready, not
+   *  delivered, timed out) — which is not the same as a chat that is gone. */
+  enqueue(message: CommentTaskEnqueueMessage): Promise<CommentTaskEnqueueOutcome | EnqueueAnswer>;
   /** Bring a conversation into view. */
   revealConversation(conversationId: string): Promise<void>;
   /** Ask the runtime to stop a turn this task owns. */
@@ -215,9 +222,26 @@ export function summarizeTerminalText(text: string): string {
   return `${(wordEnd > 60 ? window.slice(0, wordEnd) : window.slice(0, MAX_SUMMARY_CHARS - 1)).trimEnd()}…`;
 }
 
+/** Sprint 155: the sidebar's verdict on an enqueue, as the host reports it. */
+export interface EnqueueAnswer {
+  outcome: CommentTaskEnqueueOutcome;
+  conversationId?: string;
+  /** The sheet gave no verdict (not ready, not delivered, timed out). */
+  unreachable?: true;
+}
+
 export class CommentTaskController {
   private readonly now: () => Date;
   private readonly randomId: () => string;
+  /** Sprint 155: routing and hand-over run one at a time per document, so two
+   *  comments sent at once cannot both pick "a new chat". */
+  private readonly documentTails = new Map<string, Promise<void>>();
+  /** Sprint 155: a new chat's client id → its permanent id, from the moment the host mints it. */
+  private readonly conversationAliases = new Map<string, string>();
+  /** Sprint 155: waiting tasks that will make a new chat when there is room (the chat's name). */
+  private readonly waitingNewChats = new Set<string>();
+  /** Sprint 155: one pass at a time over the tasks waiting for room. */
+  private waitingTail: Promise<void> = Promise.resolve();
 
   constructor(private readonly dependencies: CommentTaskControllerDependencies) {
     this.now = dependencies.now ?? (() => new Date());
@@ -365,115 +389,114 @@ export class CommentTaskController {
       );
     }
 
-    const routed = await this.resolveDestination(
-      runtimeId,
-      document,
-      request.comments.map((comment) => comment.instruction).join(' '),
-      false,
-    );
-    if (!routed) {
-      return reject(commentTaskError('sidebar-unreachable', 'The AI sidebar is not responding. Try again.'));
-    }
-    const destination = routed.destination;
-    // Sprint 155: a chat that isn't open must have room to work, as a card's
-    // task must (Phase 0, P1): refused before anything is recorded.
-    if (!routed.isOpen && this.dependencies.canAttach
-      && !(await this.dependencies.canAttach(routed.newChat ? null : destination.conversationId))) {
-      return reject(commentTaskError('capacity', CAPACITY_MESSAGE));
-    }
+    // Sprint 155: pick the chat and record the task one comment at a time per
+    // document, so a second comment sent at once sees the first one's chat.
+    return this.serializeDocument(document.uri, async () => {
+      const routed = await this.resolveDestination(
+        runtimeId,
+        document,
+        request.comments.map((comment) => comment.instruction).join(' '),
+        false,
+      );
+      if (!routed) {
+        return reject(commentTaskError('sidebar-unreachable', 'The AI sidebar is not responding. Try again.'));
+      }
+      const destination = routed.destination;
+      // Sprint 155: a chat that isn't open needs room to work. Without it the
+      // task waits, as a card's task does, and starts when there is room.
+      const room = await this.hasRoom(destination.conversationId, routed.newChat, routed.isOpen);
 
-    const settings = this.dependencies.runtimeSettings(destination.conversationId, runtimeId);
-    const prompt = this.dependencies.buildPrompt(document, request.comments);
-    const at = this.timestamp();
-    const record: CommentTaskRecordV1 = {
-      schemaVersion: 1,
-      taskId: this.randomId(),
-      bindingGeneration: 1,
-      requestId: request.requestId,
-      createdAt: at,
-      updatedAt: at,
-      source: {
-        documentUri: document.uri,
-        scopeId: document.scopeId,
-        scope: document.scope,
-        displayPath: document.displayPath,
-        documentVersion: document.version,
-        contentSha256: sha256(document.text),
-      },
-      comments: request.comments,
-      assignment: { alias: request.alias, runtimeId, surface: request.surface },
-      runtime: {
-        modelId: settings.modelId,
-        approvalMode: settings.approvalMode,
-        planFirst: false,
-        thinkingEffort: settings.thinkingEffort as CommentTaskRecordV1['runtime']['thinkingEffort'],
-      },
-      destination: {
-        conversationId: destination.conversationId,
-        bindingGeneration: destination.bindingGeneration,
-        titleSnapshot: destination.title,
-        created: destination.created,
-      },
-      turn: { conversationTurnId: this.randomId() },
-      prompt: { text: prompt, sha256: sha256(prompt) },
-      lifecycle: { state: 'accepting', since: at },
-      history: [{ state: 'accepting', at, generation: 1 }],
-    };
+      const settings = this.dependencies.runtimeSettings(destination.conversationId, runtimeId);
+      const prompt = this.dependencies.buildPrompt(document, request.comments);
+      const at = this.timestamp();
+      const record: CommentTaskRecordV1 = {
+        schemaVersion: 1,
+        taskId: this.randomId(),
+        bindingGeneration: 1,
+        requestId: request.requestId,
+        createdAt: at,
+        updatedAt: at,
+        source: {
+          documentUri: document.uri,
+          scopeId: document.scopeId,
+          scope: document.scope,
+          displayPath: document.displayPath,
+          documentVersion: document.version,
+          contentSha256: sha256(document.text),
+        },
+        comments: request.comments,
+        assignment: { alias: request.alias, runtimeId, surface: request.surface },
+        runtime: {
+          modelId: settings.modelId,
+          approvalMode: settings.approvalMode,
+          planFirst: false,
+          thinkingEffort: settings.thinkingEffort as CommentTaskRecordV1['runtime']['thinkingEffort'],
+        },
+        destination: {
+          conversationId: destination.conversationId,
+          bindingGeneration: destination.bindingGeneration,
+          titleSnapshot: destination.title,
+          created: destination.created,
+        },
+        turn: { conversationTurnId: this.randomId() },
+        prompt: { text: prompt, sha256: sha256(prompt) },
+        lifecycle: room ? { state: 'accepting', since: at } : { state: 'accepting', since: at, waitFor: 'capacity' },
+        history: [{ state: 'accepting', at, generation: 1 }],
+      };
 
-    // Persist BEFORE the sidebar hears about it. If the process dies here the
-    // task restores as interrupted and actionable; the old path would have lost
-    // it between the editor's "Sent" and any real dispatch.
-    await this.dependencies.store.create(record);
+      // Persist BEFORE the sidebar hears about it. If the process dies here the
+      // task restores as interrupted and actionable; the old path would have lost
+      // it between the editor's "Sent" and any real dispatch.
+      await this.dependencies.store.create(record);
 
-    const outcome = enqueueOutcome(await this.dependencies.enqueue({
-      type: 'comment-task/enqueue',
-      taskId: record.taskId,
-      conversationId: record.destination.conversationId,
-      conversationTurnId: record.turn.conversationTurnId,
-      runtimeId: runtimeId as CommentTaskEnqueueMessage['runtimeId'],
-      prompt,
-      displayText: request.comments.map((comment) => comment.instruction).join('\n'),
-      modelId: settings.modelId,
-      autonomy: settings.approvalMode,
-      thinkingEffort: settings.thinkingEffort,
-      sourceDisplayPath: document.displayPath,
-      ...(routed.newChat
-        ? { newConversation: { title: destination.title, conversationId: destination.conversationId } }
-        : {}),
-    }));
-
-    if (outcome !== 'queued') {
-      const error =
-        outcome === 'full'
-          ? commentTaskError(
-              'queue-full',
-              'That conversation already has ten prompts waiting. Let one finish and try again.',
-            )
-          : commentTaskError('destination-not-found', 'That conversation is no longer available.');
-      await this.transitionQuietly(record.taskId, 1, {
-        state: 'failed',
-        since: this.timestamp(),
-        safeMessage: error.message.slice(0, MAX_SAFE_MESSAGE_CHARS),
+      const accepted = (current: CommentTaskRecordV1): CommentTaskResultMessage => commentTaskSuccess(request.requestId, request.type, {
+        taskId: current.taskId,
+        state: 'queued',
+        destination: {
+          conversationId: current.destination.conversationId,
+          title: current.destination.titleSnapshot,
+          created: current.destination.created,
+        },
       });
-      await this.publish(record.source.documentUri);
-      return reject(error);
-    }
 
-    const queued = await this.dependencies.store.transition(record.taskId, 1, {
-      state: 'queued',
-      since: this.timestamp(),
-    });
-    await this.publish(queued.source.documentUri);
-    if (!routed.isOpen) this.dependencies.notifySent?.(sentToastText({ newChat: routed.newChat, title: destination.title }));
+      if (!room) {
+        if (routed.newChat) this.waitingNewChats.add(record.taskId);
+        await this.publish(record.source.documentUri);
+        return accepted(record);
+      }
 
-    return commentTaskSuccess(request.requestId, request.type, {
-      taskId: queued.taskId,
-      state: 'queued',
-      destination: {
-        conversationId: queued.destination.conversationId,
-        title: queued.destination.titleSnapshot,
-        created: queued.destination.created,
-      },
+      const answer = await this.enqueueRecord(
+        record,
+        document.displayPath,
+        routed.newChat ? { title: destination.title, conversationId: destination.conversationId } : undefined,
+      );
+
+      if (answer.outcome !== 'queued') {
+        const error =
+          answer.outcome === 'full'
+            ? commentTaskError(
+                'queue-full',
+                'That conversation already has ten prompts waiting. Let one finish and try again.',
+              )
+            : answer.unreachable
+              ? commentTaskError('sidebar-unreachable', 'The AI sidebar is not responding. Try again.')
+              : commentTaskError('destination-not-found', 'That conversation is no longer available.');
+        await this.transitionQuietly(record.taskId, 1, {
+          state: 'failed',
+          since: this.timestamp(),
+          safeMessage: error.message.slice(0, MAX_SAFE_MESSAGE_CHARS),
+        });
+        await this.publish(record.source.documentUri);
+        return reject(error);
+      }
+
+      const queued = await this.dependencies.store.transition(record.taskId, 1, {
+        state: 'queued',
+        since: this.timestamp(),
+      });
+      await this.publish(queued.source.documentUri);
+      if (!routed.isOpen) this.dependencies.notifySent?.(sentToastText({ newChat: routed.newChat, title: destination.title }));
+      return accepted(queued);
     });
   }
 
@@ -515,11 +538,12 @@ export class CommentTaskController {
     };
     if (!facts) return openChat();
 
+    // Only this project's tasks: the store is shared by every window (finding 8).
     const unfinished = (await this.dependencies.store.listUnfinished())
-      .filter((task) => task.taskId !== exclude.taskId);
+      .filter((task) => task.taskId !== exclude.taskId && (!document || task.source.scopeId === document.scopeId));
     const pending = unfinished.flatMap((task) => {
       const path = facts.pathOfUri(task.source.documentUri);
-      return path ? [{ conversationId: task.destination.conversationId, document: path, at: task.createdAt }] : [];
+      return path ? [{ conversationId: this.permanentId(task.destination.conversationId), document: path, at: task.createdAt }] : [];
     });
     // A chat the index names can be gone (deleted meanwhile): the rules then
     // pick again without it.
@@ -538,7 +562,7 @@ export class CommentTaskController {
       const conversationId = choice.conversationId;
       const known = await this.dependencies.conversationDestination?.(conversationId).catch(() => null) ?? null;
       // A chat a waiting task made has no record until its first turn starts.
-      const task = unfinished.find((candidate) => candidate.destination.conversationId === conversationId);
+      const task = unfinished.find((candidate) => this.permanentId(candidate.destination.conversationId) === conversationId);
       const destination: CommentTaskDestination | null = known
         ?? (task
           ? {
@@ -611,55 +635,10 @@ export class CommentTaskController {
       );
     }
 
-    let retried = await this.dependencies.store.retry(taskId, this.randomId());
-
-    const dispatch = async (
-      record: CommentTaskRecordV1,
-      newConversation?: { title: string; conversationId: string },
-    ): Promise<CommentTaskEnqueueOutcome> => {
-      const settings = this.dependencies.runtimeSettings(record.destination.conversationId, record.assignment.runtimeId);
-      return enqueueOutcome(await this.dependencies.enqueue({
-        type: 'comment-task/enqueue',
-        taskId: record.taskId,
-        conversationId: record.destination.conversationId,
-        conversationTurnId: record.turn.conversationTurnId,
-        runtimeId: record.assignment.runtimeId as CommentTaskEnqueueMessage['runtimeId'],
-        prompt: record.prompt.text,
-        displayText: record.comments.map((comment) => comment.instruction).join('\n'),
-        modelId: settings.modelId,
-        autonomy: settings.approvalMode,
-        thinkingEffort: settings.thinkingEffort,
-        sourceDisplayPath: document?.displayPath ?? record.source.displayPath,
-        ...(newConversation ? { newConversation } : {}),
-      }));
-    };
-
-    let outcome = await dispatch(retried);
-
-    // The conversation a task was bound to can be gone by the time the user
-    // retries: Ritemark restarted, or they deleted it. Failing forever with
-    // "that conversation is no longer available" leaves a comment that can
-    // never be run again. A retry is an explicit user action, so it follows the
-    // same rule as a fresh send and goes to the conversation open in the
-    // sidebar. A task that is merely RUNNING still never retargets (R3) — only
-    // this deliberate second attempt does.
-    //
-    // Sprint 155: retry keeps the card's own chat (above). Only when that chat
-    // is gone do the three rules pick again — the document's chat, the open
-    // chat, or a new one — as a fresh send would.
-    if (outcome === 'no-conversation') {
-      const goneChat = retried.destination.conversationId;
-      const routed = await this.resolveDestination(
-        retried.assignment.runtimeId,
-        document ?? this.documentOf(retried),
-        retried.comments.map((comment) => comment.instruction).join(' '),
-        false,
-        { taskId: retried.taskId, conversationId: goneChat },
-      );
-      const fallback = routed && routed.destination.conversationId !== goneChat ? routed : null;
-      if (fallback && !fallback.isOpen && this.dependencies.canAttach
-        && !(await this.dependencies.canAttach(fallback.newChat ? null : fallback.destination.conversationId))) {
-        const error = commentTaskError('capacity', CAPACITY_MESSAGE);
+    // Sprint 155: one comment at a time per document, as at send.
+    return this.serializeDocument(record.source.documentUri, async () => {
+      let retried = await this.dependencies.store.retry(taskId, this.randomId());
+      const fail = async (error: CommentTaskError): Promise<CommentTaskResultMessage> => {
         await this.transitionQuietly(retried.taskId, retried.bindingGeneration, {
           state: 'failed',
           since: this.timestamp(),
@@ -667,45 +646,81 @@ export class CommentTaskController {
         });
         await this.publish(retried.source.documentUri);
         return commentTaskFailure(requestId, 'comment-task/retry', error);
-      }
-      if (fallback) {
-        retried = await this.dependencies.store.rebindDestination(retried.taskId, {
-          conversationId: fallback.destination.conversationId,
-          bindingGeneration: fallback.destination.bindingGeneration,
-          title: fallback.destination.title,
-        });
-        outcome = await dispatch(
-          retried,
-          fallback.newChat
-            ? { title: fallback.destination.title, conversationId: fallback.destination.conversationId }
-            : undefined,
-        );
-        if (outcome === 'queued' && !fallback.isOpen) {
-          this.dependencies.notifySent?.(sentToastText({ newChat: fallback.newChat, title: fallback.destination.title }));
-        }
-      }
-    }
+      };
+      const wait = async (newChat: boolean): Promise<CommentTaskResultMessage> => {
+        retried = await this.dependencies.store.setWaitingForRoom(retried.taskId, retried.bindingGeneration, true);
+        if (newChat) this.waitingNewChats.add(retried.taskId);
+        await this.publish(retried.source.documentUri);
+        return commentTaskSuccess(requestId, 'comment-task/retry', { taskId });
+      };
 
-    if (outcome !== 'queued') {
-      const error =
-        outcome === 'full'
-          ? commentTaskError('queue-full', 'That conversation already has ten prompts waiting.')
-          : commentTaskError('destination-not-found', 'That conversation is no longer available.');
-      await this.transitionQuietly(retried.taskId, retried.bindingGeneration, {
-        state: 'failed',
+      // Retry keeps the card's own chat. Sprint 155: a chat that isn't open
+      // gets the same room check and toast as any send to it.
+      const ownChat = retried.destination.conversationId;
+      let sent = { isOpen: ownChat === (this.dependencies.openConversationId?.() ?? null), newChat: false, title: retried.destination.titleSnapshot };
+      if (!(await this.hasRoom(ownChat, false, sent.isOpen))) return wait(false);
+      let answer = await this.enqueueRecord(retried, document?.displayPath);
+
+      // The conversation a task was bound to can be gone by the time the user
+      // retries: Ritemark restarted, or they deleted it. Failing forever with
+      // "that conversation is no longer available" leaves a comment that can
+      // never be run again. A retry is an explicit user action, so it follows the
+      // same rules as a fresh send. A task that is merely RUNNING still never
+      // retargets (R3) — only this deliberate second attempt does.
+      //
+      // Sprint 155: only a chat that is really gone — the sheet answered
+      // "Conversation no longer available" and the chat has no record — is
+      // picked again. A sheet that gave no verdict, or a chat that still
+      // exists, fails honestly instead of making a second chat.
+      if (answer.outcome === 'no-conversation' && !answer.unreachable && !(await this.chatStillExists(ownChat))) {
+        const routed = await this.resolveDestination(
+          retried.assignment.runtimeId,
+          document ?? this.documentOf(retried),
+          retried.comments.map((comment) => comment.instruction).join(' '),
+          false,
+          { taskId: retried.taskId, conversationId: ownChat },
+        );
+        const fallback = routed && routed.destination.conversationId !== ownChat ? routed : null;
+        if (fallback) {
+          retried = await this.dependencies.store.rebindDestination(retried.taskId, {
+            conversationId: fallback.destination.conversationId,
+            bindingGeneration: fallback.destination.bindingGeneration,
+            title: fallback.destination.title,
+          });
+          if (!(await this.hasRoom(fallback.destination.conversationId, fallback.newChat, fallback.isOpen))) {
+            return wait(fallback.newChat);
+          }
+          sent = { isOpen: fallback.isOpen, newChat: fallback.newChat, title: fallback.destination.title };
+          answer = await this.enqueueRecord(
+            retried,
+            document?.displayPath,
+            fallback.newChat
+              ? { title: fallback.destination.title, conversationId: fallback.destination.conversationId }
+              : undefined,
+          );
+        }
+      } else if (answer.outcome === 'no-conversation') {
+        return fail(commentTaskError('sidebar-unreachable', 'The AI sidebar is not responding. Try again.'));
+      }
+
+      if (answer.outcome !== 'queued') {
+        return fail(
+          answer.outcome === 'full'
+            ? commentTaskError('queue-full', 'That conversation already has ten prompts waiting.')
+            : answer.unreachable
+              ? commentTaskError('sidebar-unreachable', 'The AI sidebar is not responding. Try again.')
+              : commentTaskError('destination-not-found', 'That conversation is no longer available.'),
+        );
+      }
+
+      await this.dependencies.store.transition(retried.taskId, retried.bindingGeneration, {
+        state: 'queued',
         since: this.timestamp(),
-        safeMessage: error.message.slice(0, MAX_SAFE_MESSAGE_CHARS),
       });
       await this.publish(retried.source.documentUri);
-      return commentTaskFailure(requestId, 'comment-task/retry', error);
-    }
-
-    await this.dependencies.store.transition(retried.taskId, retried.bindingGeneration, {
-      state: 'queued',
-      since: this.timestamp(),
+      if (!sent.isOpen) this.dependencies.notifySent?.(sentToastText(sent));
+      return commentTaskSuccess(requestId, 'comment-task/retry', { taskId });
     });
-    await this.publish(retried.source.documentUri);
-    return commentTaskSuccess(requestId, 'comment-task/retry', { taskId });
   }
 
   private async cancel(requestId: string, taskId: string): Promise<CommentTaskResultMessage> {
@@ -755,6 +770,7 @@ export class CommentTaskController {
       since: this.timestamp(),
     });
     await this.publish(record.source.documentUri);
+    await this.startWaitingTasks();
   }
 
   /**
@@ -770,6 +786,19 @@ export class CommentTaskController {
       safeMessage: safeFailureMessage(message),
     });
     await this.publish(record.source.documentUri);
+  }
+
+  /**
+   * Sprint 155: the conversation store minted a new chat's permanent id, and the
+   * sheet moved the chat (and its waiting prompts) to it. Every unfinished task
+   * still naming the client id follows, so the next comment routed through one
+   * of them reaches the chat that exists.
+   */
+  async applyConversationCanonicalId(clientConversationId: string, conversationId: string): Promise<void> {
+    if (!clientConversationId || clientConversationId === conversationId) return;
+    this.conversationAliases.set(clientConversationId, conversationId);
+    const moved = await this.dependencies.store.rebindConversation(clientConversationId, conversationId);
+    for (const documentUri of new Set(moved.map((record) => record.source.documentUri))) await this.publish(documentUri);
   }
 
   async applyTurnStarted(conversationId: string, conversationTurnId: string): Promise<void> {
@@ -829,6 +858,10 @@ export class CommentTaskController {
           };
       }
     });
+    // Sprint 155: any turn's end can free room for a task that waits, and can
+    // change which chat last changed a document (the Send surface's caption).
+    this.dependencies.notifyDestinationStale?.();
+    await this.startWaitingTasks();
   }
 
   /**
@@ -968,13 +1001,124 @@ export class CommentTaskController {
       text: '',
     };
   }
-}
 
-/** Sprint 155: the card's words when five chats are already working (CardHandoffLedger). */
-const CAPACITY_MESSAGE = 'Five conversations are already working or waiting for you.';
+  /** Sprint 155: run `work` after every earlier routing for the same document. */
+  private serializeDocument<T>(documentUri: string, work: () => Promise<T>): Promise<T> {
+    const previous = this.documentTails.get(documentUri) ?? Promise.resolve();
+    const run = previous.then(work, work);
+    const tail = run.then(() => undefined, () => undefined);
+    this.documentTails.set(documentUri, tail);
+    void tail.then(() => {
+      if (this.documentTails.get(documentUri) === tail) this.documentTails.delete(documentUri);
+    });
+    return run;
+  }
 
-function enqueueOutcome(
-  answer: CommentTaskEnqueueOutcome | { outcome: CommentTaskEnqueueOutcome; conversationId?: string },
-): CommentTaskEnqueueOutcome {
-  return typeof answer === 'string' ? answer : answer.outcome;
+  /** Sprint 155: a chat's permanent id, when the id a task names was a new chat's client id. */
+  private permanentId(conversationId: string): string {
+    return this.conversationAliases.get(conversationId) ?? conversationId;
+  }
+
+  /**
+   * Sprint 155: room for this task's chat to work — the card's check
+   * (`canAttach`, i.e. `_canAttachRuntime`). The open chat always has room, and
+   * so does a chat that already holds one of these tasks, handed over and
+   * waiting or working: the new task queues behind it in the same chat.
+   */
+  private async hasRoom(conversationId: string, newChat: boolean, isOpen: boolean): Promise<boolean> {
+    if (isOpen || !this.dependencies.canAttach) return true;
+    if (!newChat) {
+      const target = this.permanentId(conversationId);
+      const handedOver = (await this.dependencies.store.listUnfinished()).some((task) => (
+        this.permanentId(task.destination.conversationId) === target && task.lifecycle.state !== 'accepting'
+      ));
+      if (handedOver) return true;
+    }
+    return this.dependencies.canAttach(newChat ? null : conversationId);
+  }
+
+  /** Sprint 155: the chat still has a record, so "no-conversation" from the sheet does not mean it is gone. */
+  private async chatStillExists(conversationId: string): Promise<boolean> {
+    if (!this.dependencies.conversationDestination) return false;
+    return (await this.dependencies.conversationDestination(conversationId).catch(() => null)) !== null;
+  }
+
+  /** Hand one recorded task to the sidebar's queue, and normalise its answer. */
+  private async enqueueRecord(
+    record: CommentTaskRecordV1,
+    displayPath: string | undefined,
+    newConversation?: { title: string; conversationId: string },
+  ): Promise<EnqueueAnswer> {
+    const settings = this.dependencies.runtimeSettings(record.destination.conversationId, record.assignment.runtimeId);
+    const answer = await this.dependencies.enqueue({
+      type: 'comment-task/enqueue',
+      taskId: record.taskId,
+      conversationId: record.destination.conversationId,
+      conversationTurnId: record.turn.conversationTurnId,
+      runtimeId: record.assignment.runtimeId as CommentTaskEnqueueMessage['runtimeId'],
+      prompt: record.prompt.text,
+      displayText: record.comments.map((comment) => comment.instruction).join('\n'),
+      modelId: settings.modelId,
+      autonomy: settings.approvalMode,
+      thinkingEffort: settings.thinkingEffort,
+      sourceDisplayPath: displayPath ?? record.source.displayPath,
+      ...(newConversation ? { newConversation } : {}),
+    });
+    return typeof answer === 'string' ? { outcome: answer } : answer;
+  }
+
+  /**
+   * Sprint 155: tasks that waited for room start when there is room, oldest
+   * first — as a card that waited starts when another card's turn ends. A task
+   * whose chat has an older task still waiting keeps waiting behind it.
+   */
+  private startWaitingTasks(): Promise<void> {
+    const pass = async (): Promise<void> => {
+      if (!this.dependencies.canAttach) return;
+      const waiting = (await this.dependencies.store.listUnfinished())
+        .filter((task) => task.lifecycle.state === 'accepting' && task.lifecycle.waitFor === 'capacity')
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.updatedAt.localeCompare(b.updatedAt));
+      const blocked = new Set<string>();
+      for (const task of waiting) {
+        const chat = this.permanentId(task.destination.conversationId);
+        if (blocked.has(chat)) continue;
+        const started = await this.serializeDocument(task.source.documentUri, () => this.startWaitingTask(task.taskId));
+        if (!started) blocked.add(chat);
+      }
+    };
+    this.waitingTail = this.waitingTail.then(pass, pass).catch(() => undefined);
+    return this.waitingTail;
+  }
+
+  /** One waiting task, if there is room now. False when it still waits. */
+  private async startWaitingTask(taskId: string): Promise<boolean> {
+    const current = await this.dependencies.store.get(taskId);
+    if (!current || current.lifecycle.state !== 'accepting' || current.lifecycle.waitFor !== 'capacity') return true;
+    const newChat = this.waitingNewChats.has(taskId);
+    const isOpen = !newChat && current.destination.conversationId === (this.dependencies.openConversationId?.() ?? null);
+    if (!(await this.hasRoom(current.destination.conversationId, newChat, isOpen))) return false;
+    this.waitingNewChats.delete(taskId);
+    const handing = await this.dependencies.store.setWaitingForRoom(taskId, current.bindingGeneration, false);
+    const answer = await this.enqueueRecord(
+      handing,
+      undefined,
+      newChat ? { title: handing.destination.titleSnapshot, conversationId: handing.destination.conversationId } : undefined,
+    );
+    if (answer.outcome !== 'queued') {
+      await this.transitionQuietly(taskId, handing.bindingGeneration, {
+        state: 'failed',
+        since: this.timestamp(),
+        safeMessage: answer.outcome === 'full'
+          ? 'That conversation already has ten prompts waiting.'
+          : answer.unreachable
+            ? 'The AI sidebar is not responding. Try again.'
+            : 'That conversation is no longer available.',
+      });
+    } else {
+      await this.transitionQuietly(taskId, handing.bindingGeneration, { state: 'queued', since: this.timestamp() });
+      if (!isOpen) this.dependencies.notifySent?.(sentToastText({ newChat, title: handing.destination.titleSnapshot }));
+    }
+    await this.publish(handing.source.documentUri);
+    return true;
+  }
 }

@@ -49,8 +49,6 @@ export type CommentTaskErrorCode =
   | 'runtime-unavailable'
   | 'destination-not-found'
   | 'queue-full'
-  /** Sprint 155: no room for one more working chat (the card's capacity rule). */
-  | 'capacity'
   | 'sidebar-unreachable'
   // task lookup
   | 'unknown-task'
@@ -380,7 +378,6 @@ export function decodeCommentTaskSidebarMessage(value: unknown): CommentTaskSide
 const RETRYABLE: ReadonlySet<CommentTaskErrorCode> = new Set([
   'document-not-synced',
   'queue-full',
-  'capacity',
   'sidebar-unreachable',
   'store-degraded',
   'runtime-unavailable',
@@ -390,7 +387,6 @@ const RECOVERY: Partial<Record<CommentTaskErrorCode, CommentTaskRecovery>> = {
   'document-not-file': 'save-document',
   'document-not-synced': 'retry',
   'queue-full': 'retry',
-  capacity: 'retry',
   'sidebar-unreachable': 'retry',
   'store-degraded': 'retry',
 };

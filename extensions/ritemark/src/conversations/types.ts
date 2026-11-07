@@ -260,6 +260,9 @@ export interface ConversationChangedFileV1 {
 /** Sprint 155: the summary keeps this many changed files per chat; older ones fall off. */
 export const MAX_SUMMARY_CHANGED_FILES = 50;
 
+/** Sprint 155: one turn's event keeps at most this many changed files, as the summary does. */
+export const MAX_TURN_CHANGED_FILES = MAX_SUMMARY_CHANGED_FILES;
+
 export interface ConversationIndexV1 {
   schemaVersion: typeof CONVERSATION_INDEX_VERSION;
   updatedAt: string;
@@ -568,7 +571,8 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
 export function lenientFilesModified(input: Record<string, unknown>): { filesModified?: string[] } {
   const value = input.filesModified;
   if (!Array.isArray(value)) return {};
-  const files = Array.from(new Set(value.filter((item): item is string => typeof item === 'string' && item.length > 0)));
+  const files = Array.from(new Set(value.filter((item): item is string => typeof item === 'string' && item.length > 0)))
+    .slice(0, MAX_TURN_CHANGED_FILES);
   return files.length ? { filesModified: files } : {};
 }
 

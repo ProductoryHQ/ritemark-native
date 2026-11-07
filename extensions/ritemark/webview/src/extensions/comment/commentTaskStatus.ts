@@ -82,6 +82,7 @@ export function applyCommentTaskProjection(message: { documentUri?: unknown; tas
 export function resetCommentTaskState(): void {
   snapshot = EMPTY_SNAPSHOT
   destination = null
+  openSurfaces = 0
   pending.clear()
   notify()
 }
@@ -107,6 +108,13 @@ function ensureSubscribed(): void {
   onMessage((message: { type?: string } & Record<string, unknown>) => {
     if (message.type === 'comment-task/projection') {
       applyCommentTaskProjection(message as { documentUri?: unknown; tasks?: unknown })
+      // Sprint 155: a task moved on, so the next comment's chat may have changed.
+      refreshIfSurfaceOpen()
+      return
+    }
+    if (message.type === 'comment-task/destination-stale') {
+      // Sprint 155: a turn ended somewhere; the caption must agree with the send.
+      refreshIfSurfaceOpen()
       return
     }
     if (message.type !== 'comment-task/result') return
@@ -222,6 +230,28 @@ export async function refreshCommentTaskDestination(): Promise<void> {
   notify()
 }
 
+/** Sprint 155: how many Send surfaces are open right now. */
+let openSurfaces = 0
+
+function refreshIfSurfaceOpen(): void {
+  if (openSurfaces > 0) void refreshCommentTaskDestination()
+}
+
+/**
+ * Sprint 155: a Send surface opened or closed. While one is open, the caption
+ * is asked again on every projection and every turn's end, so it names the
+ * chat the send would pick now.
+ */
+export function setCommentTaskDestinationSurface(active: boolean): void {
+  ensureSubscribed()
+  if (active) {
+    openSurfaces += 1
+    void refreshCommentTaskDestination()
+  } else {
+    openSurfaces = Math.max(0, openSurfaces - 1)
+  }
+}
+
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
 export function useCommentTaskSnapshot(): CommentTaskSnapshot {
@@ -246,7 +276,8 @@ export function useCommentTaskDestination(active: boolean): CommentTaskDestinati
   const value = useSyncExternalStore(subscribe, () => destination)
   useEffect(() => {
     if (!active) return
-    void refreshCommentTaskDestination()
+    setCommentTaskDestinationSurface(true)
+    return () => setCommentTaskDestinationSurface(false)
   }, [active])
   return value
 }
