@@ -21,6 +21,8 @@ The experience is [experience 45](https://github.com/ProductoryHQ/ritemark-dev/b
    2. if no chat has, the open chat, but only if it hasn't changed another document;
    3. otherwise, a new chat, named from the comment.
 
+   A chat holding a comment's task for the document, waiting or working, counts as having changed it, as its newest change. So a second comment on the same document, or comments sent together, go into the first one's chat instead of a new chat each. Retry keeps its chat: it sends the task again to the chat its card names, and the rules pick again only when that chat is gone ("Conversation no longer available"). Both were added by the Experience lead (ritemark-dev `a9b53ca`; the prototype's version 2 queues a second comment that way).
+
    The comment says where its task goes, before and after sending, with today's words: "→ Draft Module 2 and 3" or "→ New conversation", then "In “Draft Module 2 and 3”" and Open conversation. When the task goes to a chat that isn't open, a short toast says so: "Sent to “Draft Module 2 and 3”" or "Sent to a new chat, “Shorter please”". That chat's place on the rail shows that it is working. The sheet stays on the chat you had open.
 2. **The document's icon before the chat's name** in the AI's sheet's head. It shows the document the chat changed last. Pointing at it says "Changed Advokatuur.md", or "Changed Module 2.md and 2 more". A click brings that tab forward, or opens the document in a new tab if it is closed. A chat that changed nothing has no icon.
 3. **All chats shows the same icon and the file name**, muted, before the time: "Module 2.md · 1 h ago · Current". The chats whose icon is the document in front come first, and the order follows as you change tabs.
@@ -30,7 +32,7 @@ The experience is [experience 45](https://github.com/ProductoryHQ/ritemark-dev/b
 
 | Fact | Where | What it means for the build |
 |---|---|---|
-| The comment task's destination is always the open chat | `UnifiedViewProvider._resolveOpenConversation` (the only `resolveOpenConversation` the controller has); `CommentTaskController` asks it at preview, at send and at retry | The three rules replace this one resolver. Preview, send and retry keep asking one place, so the caption and the send agree |
+| The comment task's destination is always the open chat | `UnifiedViewProvider._resolveOpenConversation` (the only `resolveOpenConversation` the controller has); `CommentTaskController` asks it at preview, at send and at retry | The three rules replace this one resolver. Preview and send keep asking one place, so the caption and the send agree. Retry no longer asks it: it goes to the card's own chat, and asks the rules only when that chat is gone (otherwise rule 3 would make a new chat on every retry of a task that failed before it changed anything) |
 | Today's caption and receipt words exist | `webview/src/components/comment/commentTaskCopy.ts` ("→ …", "→ New conversation", "In “…”") | Reused as they are |
 | A turn can run in a chat that isn't open | `_runtimeSessions` is per conversation; `parallelChats` is `stable`; `_enqueueCardTask` already queues a task board card's task in a new chat or one loaded from history; `ThreadRail.tsx` marks a working chat | The comment task uses the same path, without changing the sheet's chat |
 | **What a chat changed is not kept** | `ActivityEventV1.fileReferences` is defined and parsed (`conversations/types.ts`), but no production code writes an activity event. A turn's changed files reach the live sheet (`agent-result.filesModified`) and the comment task's terminal, but `completeRuntimeTurn` does not store them | This is new work: each finished turn records the files it changed, in the conversation's record. Earlier chats have no such record, so they show no icon and count as "changed nothing" until they change a file again |
@@ -59,15 +61,17 @@ Both PRs: shadcn `Button` and `ui/tooltip.tsx` (never a native `title`), the glo
 Each PR has `proof-155-N.txt` in its worktree (not committed), PASS/FAIL lines, and screenshots for the Experience lead before the merge.
 
 **PR 1**
-- Unit tests, written to fail first on `main`: the three rules (each case, the open chat that changed another document, an old chat with no record, a gone file); preview and send pick the same chat; the new chat's name from the comment's words.
+- Unit tests, written to fail first on `main`: the three rules (each case, the open chat that changed another document, an old chat with no record, a gone file); a pending task counts as its chat's change (two comments on one document in a row make one chat; a batch makes one chat); retry keeps the card's chat and picks again only when it is gone; preview and send pick the same chat; the new chat's name from the comment's words.
 - The record: a turn's changed files are stored and read back; an old record without them still parses.
 - Runtimes: Claude Code counts Write and Edit, not Read; Codex counts completed file changes from its protocol at the bundled version, not commands; OpenCode counts completed `edit` calls, not `read`.
 - Live, in a hidden, isolated dev instance with a test key from the vault: two chats change two documents; a comment on the first document goes to its chat while the second chat stays open; the toast shows; the sheet does not switch; no tab comes forward.
+- Shots for the Experience lead, Light and Dark: the caption in each case ("→ <the document's chat>", "→ New conversation", "· Codex takes over"); the "Sent to …" toast (`_ritemark.briefToast`, bottom right, 4 s); the rail's working mark on a chat that isn't open; the card's Queued, working and Completed states; the sheet still on the chat that was open.
 - The pre-commit hook passes.
 
 **PR 2**
 - Unit tests: the tooltip's words (one file, several), no icon for a chat that changed nothing, the order of All chats as the front document changes.
-- Live: the icon's hover, focus and click (a tab in another group comes forward there; a closed document opens at the row's end); All chats' meta line and order; Light and Dark shots of the head and All chats.
+- Live: the icon's hover, focus and click (a tab in another group comes forward there; a closed document opens at the row's end); All chats' meta line and order.
+- Shots for the Experience lead, Light and Dark: the icon at rest, on hover, with keyboard focus and pressed; the tooltip for one file and for several; a long chat name (the name keeps its ellipsis, the icon never shrinks); a chat with no icon, its name where it is today; All chats' meta line, and its order before and after a tab change.
 
 **Not run, and why:** Windows (the Windows rows go into Gate 2 of the new candidate). Live checks wait for Jarmo's word on the screen (his 6 November rule: no screen use while he trains); the unit tests do not.
 
