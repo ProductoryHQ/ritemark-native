@@ -2,8 +2,8 @@
 
 Track: Standard (two extension PRs in series, one review round and one proof each)<br>
 Release tier: extension. `src/` and `webview/src/` only. The file icons already ship in `fileicons/`; nothing under `binaries/`, `patches/` or `vscode` changes.<br>
-**Status:** Proposed. Waiting for Jarmo's approval of this plan.<br>
-**Approval:** Jarmo's, in the Development manager's session. The 1 November delegation ran until 2.2's release candidate, which was built on 6 November, so this plan is his to approve. A lead's message is not an approval.<br>
+**Status:** Approved. PR 1 in progress.<br>
+**Approval:** Jarmo approved this plan on 7 November 2026, in the Development manager's session: "kinnitan, alusta". The 1 November delegation ran until 2.2's release candidate, built on 6 November, so the plan was his to approve. He also allowed dev windows for the live checks ("aknaid võid avada").<br>
 **Release:** [v2.2.0](../release-plan.md). The 6 November candidate (`4f5e80e3`) does not ship (Jarmo, 7 November: "me ei tee mingit 2.2.1 - 2.2 sees on veel vaja parandusi teha"), so this sprint goes into a new 2.2.0 candidate.
 
 ## Why
