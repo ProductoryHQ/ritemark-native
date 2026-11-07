@@ -23,6 +23,7 @@ const host = (data: Record<string, unknown>) => target.dispatchEvent(new Message
 
 async function main(): Promise<void> {
   const status = await import('./commentTaskStatus')
+  const { destinationCaption } = await import('../../components/comment/commentTaskCopy')
   const surface = (status as unknown as { setCommentTaskDestinationSurface?: (active: boolean) => void })
     .setCommentTaskDestinationSurface
   assert.equal(typeof surface, 'function', 'the module tracks whether a Send surface is open')
@@ -62,6 +63,14 @@ async function main(): Promise<void> {
   answer(older.requestId, 'First')
   await tick()
   assert.equal(status.getCommentTaskDestination()?.title, 'Second', 'the newest request’s caption wins')
+  // Live check 8 Nov: the chat's runtime must survive into the store, or the
+  // caption can never say that another AI takes over (it was dropped since Sprint 117).
+  assert.equal(status.getCommentTaskDestination()?.runtimeId, 'claude-code', 'the preview keeps the chat’s runtime')
+  assert.equal(
+    destinationCaption(status.getCommentTaskDestination()!.title, { alias: 'codex', conversationRuntimeId: status.getCommentTaskDestination()!.runtimeId }),
+    '→ Second · ChatGPT takes over',
+    'a comment for another AI says that AI takes over the document’s chat',
+  )
   surface!(false)
 
   console.log('commentTaskStatus: all assertions passed')

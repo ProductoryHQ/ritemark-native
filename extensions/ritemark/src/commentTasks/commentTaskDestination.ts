@@ -99,9 +99,11 @@ export const COMMENT_CHAT_NAME_WORDS = 6;
  */
 export function chatNameFromComment(text: string): string {
   const words = text
-    .replace(/(^|\s)@[A-Za-z][\w-]*/g, ' ')
+    // the mention and the punctuation that follows it ("@opencode, list …")
+    .replace(/(^|\s)@[A-Za-z][\w-]*[.,;:!?…]*/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+    .replace(/^[.,;:!?…–—-]+\s*/u, '')
     .split(' ')
     .filter(Boolean)
     .slice(0, COMMENT_CHAT_NAME_WORDS);
