@@ -83,6 +83,7 @@ export function resetCommentTaskState(): void {
   snapshot = EMPTY_SNAPSHOT
   destination = null
   openSurfaces = 0
+  latestPreviewRequestId = null
   pending.clear()
   notify()
 }
@@ -93,6 +94,10 @@ interface PendingRequest {
 }
 
 const pending = new Map<string, PendingRequest>()
+
+/** Review 2: the generation of destination previews; only the newest answer counts. */
+let previewGeneration = 0
+let latestPreviewRequestId: string | null = null
 
 function ensureSubscribed(): void {
   if (subscribed) return
@@ -125,7 +130,9 @@ function ensureSubscribed(): void {
     clearTimeout(entry.timer)
     if (message.ok === true) {
       const data = (message.data ?? {}) as Record<string, unknown>
-      if (message.operation === 'comment-task/destination-preview') {
+      // Review 2: only the newest preview's answer sets the caption; an older
+      // one that comes back late is superseded.
+      if (message.operation === 'comment-task/destination-preview' && requestId === latestPreviewRequestId) {
         destination = {
           conversationId: typeof data.conversationId === 'string' ? data.conversationId : null,
           title: typeof data.title === 'string' ? data.title : null,
@@ -222,8 +229,11 @@ export function requestCommentTask(
 
 /** Ask the host which conversation a task would go to (D5). Read-only. */
 export async function refreshCommentTaskDestination(): Promise<void> {
-  const outcome = await requestCommentTask('comment-task/destination-preview')
-  if (outcome.ok) return
+  previewGeneration += 1
+  const requestId = `${newCommentTaskRequestId()}-preview-${previewGeneration}`
+  latestPreviewRequestId = requestId
+  const outcome = await requestCommentTask('comment-task/destination-preview', {}, { requestId })
+  if (outcome.ok || requestId !== latestPreviewRequestId) return
   // A failed preview must not block sending: the caption simply falls back to
   // "New conversation" rather than asserting a destination that may be wrong.
   destination = null
@@ -252,6 +262,11 @@ export function setCommentTaskDestinationSurface(active: boolean): void {
   }
 }
 
+/** The caption's current destination. Exported for tests. */
+export function getCommentTaskDestination(): CommentTaskDestinationPreview | null {
+  return destination
+}
+
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
 export function useCommentTaskSnapshot(): CommentTaskSnapshot {
@@ -273,7 +288,7 @@ export function useCommentTaskProjection(
  * stays quiet otherwise.
  */
 export function useCommentTaskDestination(active: boolean): CommentTaskDestinationPreview | null {
-  const value = useSyncExternalStore(subscribe, () => destination)
+  const value = useSyncExternalStore(subscribe, getCommentTaskDestination)
   useEffect(() => {
     if (!active) return
     setCommentTaskDestinationSurface(true)

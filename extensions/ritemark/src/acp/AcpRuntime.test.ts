@@ -40,6 +40,8 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 
 // ── Now safe to import vscode-dependent modules ──────────────────────────────
 import * as assert from 'assert';
+import * as os from 'os';
+import * as path from 'path';
 import { renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { AcpRuntime, AcpSession, buildAcpPromptText, isBoardToolPermission, ENDED_OPENCODE_TURN_ERROR } = require('./AcpRuntime') as typeof import('./AcpRuntime');
@@ -279,20 +281,22 @@ async function run() {
 
   // Sprint 155: the completion carries the turn's changed files, workspace files only.
   {
+    // Portable: the workspace is under the platform's temp folder.
+    const ws = path.join(os.tmpdir(), 'ritemark-155-acp');
     const runtime = new AcpRuntime();
     let filesModified: string[] | undefined;
     const session = addSession(runtime, 'conv-files', {
       ...dummyConfig,
-      workspacePath: '/ws',
+      workspacePath: ws,
       onCodexComplete: (result) => { filesModified = result.filesModified; },
     });
-    (mockManager as unknown as { turnFilesModified: (sessionId: string) => string[] }).turnFilesModified = () => ['/ws/Module 2.md', '/elsewhere/plan.md'];
+    (mockManager as unknown as { turnFilesModified: (sessionId: string) => string[] }).turnFilesModified = () => [path.join(ws, 'Module 2.md'), path.join(os.tmpdir(), 'ritemark-155-elsewhere', 'plan.md')];
     try {
       await session.prompt({ prompt: 'Edit' });
     } finally {
       delete (mockManager as unknown as { turnFilesModified?: unknown }).turnFilesModified;
     }
-    assert.deepStrictEqual(filesModified, ['/ws/Module 2.md'], 'the turn reports its workspace changes');
+    assert.deepStrictEqual(filesModified, [path.join(ws, 'Module 2.md')], 'the turn reports its workspace changes');
     console.log('✓ Test 6b: Sprint 155 — OpenCode reports the files its edits changed');
   }
 

@@ -6,6 +6,8 @@
  * Run: npx tsx src/runtime/turnFiles.test.ts
  */
 import assert from 'node:assert/strict';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import * as runner from '../agent/AgentRunner';
 import { processAssistantMessage } from '../agent/AgentRunner';
 import { claudeChangedFile, workspaceFilesOnly } from './turnFiles';
@@ -75,14 +77,45 @@ const toolResults = (runner as unknown as {
 
 // ── The workspace rule ──
 {
-  const realpath = (file: string) => (file === '/tmp/ws' ? '/private/tmp/ws' : file);
+  // Portable: the workspace is under the platform's temp folder, and its
+  // "realpath" a second spelling of it (macOS's /tmp → /private/tmp).
+  const ws = path.join(os.tmpdir(), 'ritemark-155-ws');
+  const wsReal = path.join(os.tmpdir(), 'ritemark-155-real', 'ws');
+  const realpath = (file: string) => (file === ws ? wsReal : file);
+  const outside = path.join(os.tmpdir(), 'ritemark-155-home', '.claude', 'plans', 'p.md');
   assert.deepEqual(
-    workspaceFilesOnly(['/tmp/ws/a.md', '/private/tmp/ws/b.md', 'docs/c.md', '/Users/me/.claude/plans/p.md', '/tmp/ws/a.md', '/tmp/wsx/d.md'], '/tmp/ws', realpath),
-    ['/tmp/ws/a.md', '/private/tmp/ws/b.md', '/tmp/ws/docs/c.md'],
+    workspaceFilesOnly([path.join(ws, 'a.md'), path.join(wsReal, 'b.md'), path.join('docs', 'c.md'), outside, path.join(ws, 'a.md'), path.join(`${ws}x`, 'd.md')], ws, realpath),
+    [path.join(ws, 'a.md'), path.join(wsReal, 'b.md'), path.join(ws, 'docs', 'c.md')],
     'workspace files only, once each; a relative path is read against the workspace',
   );
-  assert.deepEqual(workspaceFilesOnly(['/a.md'], ''), [], 'no workspace, no files');
+  assert.deepEqual(workspaceFilesOnly([path.join(os.tmpdir(), 'a.md')], ''), [], 'no workspace, no files');
   console.log('✓ workspace files only');
+}
+
+// ── The workspace rule on Windows (path.win32, runs on any platform) ──
+{
+  const ws = 'C:\\Users\\me\\ws';
+  const noLink = (file: string) => file;
+  const keep = (files: string[], root = ws) => workspaceFilesOnly(files, root, noLink, path.win32);
+  assert.deepEqual(keep(['C:\\Users\\me\\ws\\docs\\doc.md']), ['C:\\Users\\me\\ws\\docs\\doc.md'], 'win32: same spelling');
+  assert.deepEqual(keep(['c:\\Users\\me\\ws\\docs\\doc.md']), ['c:\\Users\\me\\ws\\docs\\doc.md'], 'win32: a lowercase drive letter is the same drive');
+  assert.deepEqual(keep(['C:/Users/me/ws/docs/doc.md']), ['C:/Users/me/ws/docs/doc.md'], 'win32: forward slashes are the same path');
+  assert.deepEqual(keep(['C:\\Users\\me\\ws\\docs\\doc.md'], 'c:\\Users\\me\\ws'), ['C:\\Users\\me\\ws\\docs\\doc.md'], 'win32: a lowercase-drive workspace keeps an uppercase-drive file');
+  assert.deepEqual(keep(['C:\\Users\\Me\\WS\\Doc.md']), ['C:\\Users\\Me\\WS\\Doc.md'], 'win32: NTFS names are case-insensitive');
+  assert.deepEqual(keep(['C:\\Users\\me\\wsx\\d.md', 'c:/users/me/wsx/d.md']), [], 'win32: the sibling folder wsx is outside');
+  assert.deepEqual(keep(['C:\\Users\\me\\.claude\\plans\\p.md', 'D:\\Users\\me\\ws\\a.md']), [], 'win32: files outside the workspace are dropped');
+  assert.deepEqual(keep(['docs\\c.md', 'docs/e.md']), ['C:\\Users\\me\\ws\\docs\\c.md', 'C:\\Users\\me\\ws\\docs\\e.md'], 'win32: a relative path is read against the workspace');
+  assert.deepEqual(keep(['C:\\Users\\me\\ws\\a.md', 'c:/users/me/ws/A.md']), ['C:\\Users\\me\\ws\\a.md'], 'win32: one file in two spellings counts once');
+  console.log('✓ workspace files only, win32 drive case and slashes');
+}
+
+// ── The workspace rule on macOS and Linux is unchanged (path.posix) ──
+{
+  const noLink = (file: string) => file;
+  const keep = (files: string[]) => workspaceFilesOnly(files, '/Users/me/ws', noLink, path.posix);
+  assert.deepEqual(keep(['/Users/me/ws/a.md', '/Users/me/WS/b.md', '/users/me/ws/c.md', '/Users/me/wsx/d.md']), ['/Users/me/ws/a.md'], 'posix: case is not folded; wsx is outside');
+  assert.deepEqual(keep(['docs/c.md']), ['/Users/me/ws/docs/c.md'], 'posix: a relative path is read against the workspace');
+  console.log('✓ workspace files only, posix unchanged');
 }
 
 console.log('turnFiles tests: all assertions passed');

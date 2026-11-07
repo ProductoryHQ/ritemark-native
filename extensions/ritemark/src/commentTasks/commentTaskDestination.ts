@@ -19,6 +19,8 @@
  * cannot disagree.
  */
 
+import { samePath } from '../utils/pathIdentity';
+
 export interface DestinationChatFacts {
   conversationId: string;
   /** Files the chat's finished turns changed, newest first (the conversation summary's `changedFiles`). */
@@ -48,7 +50,7 @@ export function pickCommentTaskDestination(input: {
   exists: (file: string) => boolean;
   samePath?: (a: string, b: string) => boolean;
 }): DestinationChoice {
-  const same = input.samePath ?? ((a: string, b: string) => a === b);
+  const same = input.samePath ?? ((a: string, b: string) => samePath(a, b));
   const changes = new Map<string, Array<{ path: string; changedAt: string }>>();
   const add = (conversationId: string, path: string, changedAt: string) => {
     const list = changes.get(conversationId) ?? [];

@@ -391,7 +391,8 @@ export class CommentTaskController {
 
     // Sprint 155: pick the chat and record the task one comment at a time per
     // document, so a second comment sent at once sees the first one's chat.
-    return this.serializeDocument(document.uri, async () => {
+    let storedWaiting = false;
+    const result = await this.serializeDocument(document.uri, async () => {
       const routed = await this.resolveDestination(
         runtimeId,
         document,
@@ -461,6 +462,7 @@ export class CommentTaskController {
 
       if (!room) {
         if (routed.newChat) this.waitingNewChats.add(record.taskId);
+        storedWaiting = true;
         await this.publish(record.source.documentUri);
         return accepted(record);
       }
@@ -498,6 +500,12 @@ export class CommentTaskController {
       if (!routed.isOpen) this.dependencies.notifySent?.(sentToastText({ newChat: routed.newChat, title: destination.title }));
       return accepted(queued);
     });
+    // Review 2: room may have freed between the room check and the store
+    // write, and that turn's pass ran before this task existed. Look again,
+    // after this document's chain, never inside it (it serializes on the same
+    // document).
+    if (storedWaiting) void this.startWaitingTasks();
+    return result;
   }
 
   /**
@@ -636,7 +644,8 @@ export class CommentTaskController {
     }
 
     // Sprint 155: one comment at a time per document, as at send.
-    return this.serializeDocument(record.source.documentUri, async () => {
+    let storedWaiting = false;
+    const result = await this.serializeDocument(record.source.documentUri, async () => {
       let retried = await this.dependencies.store.retry(taskId, this.randomId());
       const fail = async (error: CommentTaskError): Promise<CommentTaskResultMessage> => {
         await this.transitionQuietly(retried.taskId, retried.bindingGeneration, {
@@ -650,6 +659,7 @@ export class CommentTaskController {
       const wait = async (newChat: boolean): Promise<CommentTaskResultMessage> => {
         retried = await this.dependencies.store.setWaitingForRoom(retried.taskId, retried.bindingGeneration, true);
         if (newChat) this.waitingNewChats.add(retried.taskId);
+        storedWaiting = true;
         await this.publish(retried.source.documentUri);
         return commentTaskSuccess(requestId, 'comment-task/retry', { taskId });
       };
@@ -721,6 +731,9 @@ export class CommentTaskController {
       if (!sent.isOpen) this.dependencies.notifySent?.(sentToastText(sent));
       return commentTaskSuccess(requestId, 'comment-task/retry', { taskId });
     });
+    // Review 2: as at send, room may have freed before the wait was stored.
+    if (storedWaiting) void this.startWaitingTasks();
+    return result;
   }
 
   private async cancel(requestId: string, taskId: string): Promise<CommentTaskResultMessage> {
@@ -1049,7 +1062,9 @@ export class CommentTaskController {
     displayPath: string | undefined,
     newConversation?: { title: string; conversationId: string },
   ): Promise<EnqueueAnswer> {
-    const settings = this.dependencies.runtimeSettings(record.destination.conversationId, record.assignment.runtimeId);
+    // Review 2: the settings frozen at acceptance. Asking again would read the
+    // sidebar's one-entry cache after it emptied, and answer "auto".
+    const settings = record.runtime;
     const answer = await this.dependencies.enqueue({
       type: 'comment-task/enqueue',
       taskId: record.taskId,

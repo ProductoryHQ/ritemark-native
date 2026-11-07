@@ -13,6 +13,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { isInside, normalizeForCompare, type PathModule } from '../utils/pathIdentity';
 
 /**
  * Sprint 103 R7 (audit F11), shared since Sprint 155: only workspace files
@@ -21,26 +22,35 @@ import * as path from 'path';
  *
  * Both the raw and the realpath-resolved workspace roots are accepted: on
  * macOS `/tmp` (and some user dirs) are symlinks, and the model may report
- * either form. A relative path is read against the workspace.
+ * either form. A relative path is read against the workspace. On Windows the
+ * drive letter's case and the slash direction do not matter (`isInside`), and
+ * one file in two spellings counts once; macOS and Linux compare as written.
+ * `pathModule` is the platform's own unless a test passes `path.win32` or
+ * `path.posix`.
  */
 export function workspaceFilesOnly(
   files: Iterable<string>,
   workspacePath: string,
   realpath: (file: string) => string = (file) => fs.realpathSync(file),
+  pathModule: PathModule & Pick<typeof path, 'isAbsolute' | 'join'> = path,
 ): string[] {
   if (!workspacePath) return [];
   const roots = new Set<string>([workspacePath]);
   try {
     roots.add(realpath(workspacePath));
   } catch { /* workspace gone — keep the raw root */ }
-  const prefixes = Array.from(roots).map((root) => (root.endsWith(path.sep) ? root : root + path.sep));
-  const out = new Set<string>();
+  const seen = new Set<string>();
+  const out: string[] = [];
   for (const file of files) {
     if (typeof file !== 'string' || !file) continue;
-    const absolute = path.isAbsolute(file) ? file : path.join(workspacePath, file);
-    if (prefixes.some((prefix) => absolute.startsWith(prefix))) out.add(absolute);
+    const absolute = pathModule.isAbsolute(file) ? file : pathModule.join(workspacePath, file);
+    if (!Array.from(roots).some((root) => isInside(absolute, root, pathModule))) continue;
+    const key = normalizeForCompare(absolute, pathModule);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(absolute);
   }
-  return Array.from(out);
+  return out;
 }
 
 /** Claude Code's tools that change a file, and the input field naming it. */

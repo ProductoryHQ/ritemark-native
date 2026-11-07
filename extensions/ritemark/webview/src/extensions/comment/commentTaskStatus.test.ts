@@ -44,6 +44,26 @@ async function main(): Promise<void> {
   await tick()
   assert.equal(previews(), 3, 'no surface open: nothing is asked')
 
+  // Review 2, finding 3: two previews overlap and answer in reverse order.
+  // The older answer must not overwrite the newer caption.
+  const sent = () => posted.filter((message) => message.type === 'comment-task/destination-preview') as Array<{ requestId?: string }>
+  const answer = (requestId: string | undefined, title: string) => host({
+    type: 'comment-task/result',
+    requestId,
+    ok: true,
+    operation: 'comment-task/destination-preview',
+    data: { runtimeId: 'claude-code', conversationId: `conv-${title}`, title },
+  })
+  surface!(true)
+  host({ type: 'comment-task/destination-stale' })
+  await tick()
+  const [older, newer] = sent().slice(-2)
+  answer(newer.requestId, 'Second')
+  answer(older.requestId, 'First')
+  await tick()
+  assert.equal(status.getCommentTaskDestination()?.title, 'Second', 'the newest request’s caption wins')
+  surface!(false)
+
   console.log('commentTaskStatus: all assertions passed')
 }
 
