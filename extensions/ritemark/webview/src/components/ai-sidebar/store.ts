@@ -35,6 +35,7 @@ import type {
 } from '../../../../src/conversations/protocol';
 import { sendConversationRequest } from '../../bridge';
 import type { ConversationSummaryV1 } from '../../../../src/conversations/types';
+import type { ChatDocumentView } from './chatDocument';
 import type {
   CommentTaskEnqueueMessage,
   CommentTaskEnqueueOutcome,
@@ -366,6 +367,15 @@ interface AISidebarState {
   earlierConversations: ConversationSummaryV1[];
   pinnedConversationIds: string[];
   conversationStoreNotice: string | null;
+  /**
+   * Sprint 155 (PR 2): each chat's document (the newest file it changed that still exists) and its icon, from the
+   * host's `chat-documents`; a chat without one is absent. `frontDocumentPath` is the document in front, as the
+   * host compares it, which All chats orders by.
+   */
+  chatDocuments: Record<string, ChatDocumentView>;
+  frontDocumentPath: string | null;
+  /** Sprint 155 (PR 2): the person's click on the head's icon; the host brings the chat's document forward. */
+  bringChatDocumentForward: (conversationId: string) => void;
 
   // ── Composer state, keyed per thread (Sprint 99 R14 / E5) ──
   /**
@@ -1098,6 +1108,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     earlierConversations: [],
     pinnedConversationIds: [],
     conversationStoreNotice: null,
+    chatDocuments: {},
+    frontDocumentPath: null,
 
     promptQueues: {},
     composerDrafts: {},
@@ -2351,6 +2363,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       set({ pinnedConversationIds: unique });
     },
 
+    bringChatDocumentForward: (conversationId) => {
+      vscode.postMessage({ type: 'chat-document:bring-forward', conversationId });
+    },
+
     pinConversation: (id) => {
       const state = get();
       if (state.pinnedConversationIds.includes(id) || state.pinnedConversationIds.length >= MAX_PINNED_CONVERSATIONS) return;
@@ -3014,6 +3030,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
         case 'active-file-changed':
           set({ activeFilePath: message.path, activeFileLabel: message.label ?? null });
+          break;
+
+        case 'chat-documents':
+          set({ chatDocuments: message.documents ?? {}, frontDocumentPath: message.front ?? null });
           break;
 
         case 'active-browser-changed':

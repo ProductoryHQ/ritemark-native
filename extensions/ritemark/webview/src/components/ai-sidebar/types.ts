@@ -5,6 +5,7 @@
  */
 
 import type { AgentSidebarProtocolMessage } from '../../../../src/views/agentSidebarProtocol';
+import type { ChatDocumentView } from '../../../../src/views/chatDocuments';
 import type { RuntimeErrorDetail, RuntimeErrorKind } from '../../../../src/runtime/turnFailureCopy';
 
 export type { RuntimeErrorDetail, RuntimeErrorKind } from '../../../../src/runtime/turnFailureCopy';
@@ -497,6 +498,8 @@ export type ExtensionMessage =
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string; activeFileLabel?: string | null }
   /** `label`: a task card's title, shown in the chip instead of its file (#477). */
   | { type: 'active-file-changed'; path: string | null; label?: string | null }
+  // Sprint 155 (PR 2): each chat's document and its icon, and the document in front (All chats' order)
+  | { type: 'chat-documents'; documents: Record<string, ChatDocumentView>; front: string | null }
   | { type: 'active-browser-changed'; context: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; error?: string } | null }
   // Sprint 134 (R20): the browser's share question on this sheet
   | { type: 'browser:share-question'; pageId: string; title: string }
