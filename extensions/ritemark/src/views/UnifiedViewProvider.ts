@@ -1903,11 +1903,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // file closed, renamed or deleted (also from outside Ritemark) leaves it.
     // #477: a card's title edit renames its chip. One debounced send, so a
     // checkout that deletes a thousand files sends one message, not a thousand.
-    const deleteWatcher = vscode.workspace.createFileSystemWatcher('**/*', true, true, false);
+    const deleteWatcher = vscode.workspace.createFileSystemWatcher('**/*', false, true, false);
     const activeFileListeners = [
       deleteWatcher,
       // Sprint 155 (PR 2): a file event clears the chats' cached real paths (`_chatRealPaths`) first
       deleteWatcher.onDidDelete(() => { this._chatRealPaths.clear(); this._scheduleActiveFile(); }),
+      // Codex (#682): a file made again on disk (git, a terminal, an agent's command) never fires
+      // `onDidCreateFiles`; only the misses are forgotten, and the send is debounced
+      deleteWatcher.onDidCreate(() => { this._chatRealPaths.forgetMissing(); this._scheduleChatDocuments(); }),
       vscode.window.tabGroups.onDidChangeTabGroups(() => this._scheduleActiveFile()),
       vscode.workspace.onDidDeleteFiles(() => { this._chatRealPaths.clear(); this._scheduleActiveFile(); }),
       vscode.workspace.onDidRenameFiles(() => { this._chatRealPaths.clear(); this._scheduleActiveFile(); }),

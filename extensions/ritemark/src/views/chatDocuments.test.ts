@@ -270,6 +270,13 @@ async function publisher(): Promise<void> {
   const reset = bootstrap.indexOf('this._chatDocumentsPublisher.reset()');
   const schedule = bootstrap.indexOf('this._scheduleChatDocuments()');
   assert.ok(reset >= 0 && reset < schedule, 'finding 1: the bootstrap clears the sent copy before it schedules');
+
+  // Codex (#682): a file made again on disk (git, a terminal, an agent's command) never fires
+  // `workspace.onDidCreateFiles`, so the disk watcher must report creates and forget the cached misses
+  const watcher = host.match(/const deleteWatcher = vscode\.workspace\.createFileSystemWatcher\('\*\*\/\*', (true|false), true, false\);/);
+  assert.equal(watcher?.[1], 'false', 'Codex: the disk watcher reports creates');
+  assert.ok(/deleteWatcher\.onDidCreate\(\(\) => \{ this\._chatRealPaths\.forgetMissing\(\); this\._scheduleChatDocuments\(\); \}\)/.test(host),
+    'Codex: a create on disk forgets the missing files and sends again');
 }
 
 clicks().then(publisher).then(() => console.log('chatDocuments.test.ts: all passed'), (error) => { console.error(error); process.exit(1); });
