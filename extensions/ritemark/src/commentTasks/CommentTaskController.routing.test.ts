@@ -63,7 +63,7 @@ interface World {
   unreachable?: boolean;
 }
 
-function harness(world: Partial<World> = {}) {
+function harness(world: Partial<World> = {}, overrides: Partial<CommentTaskControllerDependencies> = {}) {
   const w: World = {
     chats: [],
     records: new Map(),
@@ -116,6 +116,7 @@ function harness(world: Partial<World> = {}) {
     publishProjection: () => undefined,
     now: () => new Date(clock),
     randomId: () => `00000000-0000-4000-8000-${(counter += 1).toString().padStart(12, '0')}`,
+    ...overrides,
   };
   return { controller: new CommentTaskController(dependencies), store, world: w, enqueued, toasts, titled, attachAsked, tick };
 }
@@ -395,6 +396,62 @@ async function main(): Promise<void> {
       assert.ok(!h.enqueued.some((m) => m.newConversation), 'no new chat while the original exists');
       assert.equal((await h.store.get(taskId))?.destination.conversationId, 'conv-draft', 'the card keeps its chat');
     }
+  });
+
+  await check('Review 2, finding 1: room frees between the room check and the stored waiting task, and the task still starts', async () => {
+    let h!: ReturnType<typeof harness>;
+    let checked = false;
+    h = harness({
+      chats: [{ conversationId: 'conv-draft', changedFiles: [{ path: DOC, changedAt: '2026-11-07T08:00:00Z' }] }],
+      records: new Map([['conv-draft', DRAFT]]),
+      canAttach: false,
+    }, {
+      canAttach: async () => {
+        if (checked) return h.world.canAttach;
+        checked = true;
+        // The turn holding the last slot ends right after this check says
+        // "no room" and before the waiting task is stored: its pass finds nothing.
+        h.world.canAttach = true;
+        await h.controller.applyTurnTerminal('conv-other', '99999999-9999-4999-8999-999999999999', { status: 'completed', text: 'Done' });
+        return false;
+      },
+    });
+    const result = await h.controller.handleRequest(accept('r1', [[C1, 'Shorter please']]), doc());
+    assert.ok(result.ok, 'accepted');
+    for (let i = 0; i < 100 && h.enqueued.length === 0; i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(h.enqueued.length, 1, 'the waiting task starts: room was free by the time it was stored');
+    for (let i = 0; i < 100 && (await h.store.listForDocument(DOC_URI))[0]?.lifecycle.state !== 'queued'; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    const [started] = await h.store.listForDocument(DOC_URI);
+    assert.equal(started?.lifecycle.state, 'queued');
+  });
+
+  await check("Review 2, finding 2: the task is dispatched with its frozen runtime settings, not asked again", async () => {
+    // The sidebar's one-entry cache empties when it is read, so a second read
+    // answers "auto" (UnifiedViewProvider._commentTaskRuntimeSettings).
+    const settings = (reads: { n: number }) => () => {
+      reads.n += 1;
+      return { modelId: 'model-x', approvalMode: 'ask' as const, thinkingEffort: reads.n === 1 ? 'high' : 'auto' };
+    };
+    const now = harness({}, { runtimeSettings: settings({ n: 0 }) });
+    ok(await now.controller.handleRequest(accept('r1', [[C1, 'Shorter please']]), doc()), 'accept');
+    assert.equal(now.enqueued[0]?.thinkingEffort, 'high', 'first dispatch keeps the saved effort');
+    assert.equal(now.enqueued[0]?.autonomy, 'ask');
+    const taskId = (await now.store.listForDocument(DOC_URI))[0].taskId;
+    await now.controller.applyTurnStarted(now.enqueued[0].conversationId, now.enqueued[0].conversationTurnId);
+    await now.controller.applyTurnTerminal(now.enqueued[0].conversationId, now.enqueued[0].conversationTurnId, { status: 'failed', error: 'Network' });
+    ok(await now.controller.handleRequest({ type: 'comment-task/retry', requestId: 'rt1', taskId }, doc()), 'retry');
+    assert.equal(now.enqueued[1]?.thinkingEffort, 'high', 'a retry keeps the saved effort');
+    const later = harness({
+      chats: [{ conversationId: 'conv-draft', changedFiles: [{ path: DOC, changedAt: '2026-11-07T08:00:00Z' }] }],
+      records: new Map([['conv-draft', DRAFT]]),
+      canAttach: false,
+    }, { runtimeSettings: settings({ n: 0 }) });
+    ok(await later.controller.handleRequest(accept('r1', [[C1, 'Shorter please']]), doc()), 'accept');
+    later.world.canAttach = true;
+    await later.controller.applyTurnTerminal('conv-other', '99999999-9999-4999-8999-999999999999', { status: 'completed', text: 'Done' });
+    assert.equal(later.enqueued[0]?.thinkingEffort, 'high', 'a waiting task starts with the saved effort');
   });
 
   if (failures.length) {
