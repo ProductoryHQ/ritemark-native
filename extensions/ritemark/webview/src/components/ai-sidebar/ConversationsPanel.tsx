@@ -8,6 +8,8 @@ import { useConversationDialogs } from './ConversationDialogs';
 import { conversationPinState, conversationStatusLabel, type ConversationPinState } from './conversationActionsModel';
 import { useActiveConversation, useAISidebarStore } from './store';
 import { StartingPoints } from './StartingPoints';
+import { FileIconMask } from './ChatDocumentIcon';
+import { orderByFrontDocument, type ChatDocumentView } from './chatDocument';
 
 function relativeTime(value: string): string {
   const timestamp = Date.parse(value);
@@ -25,6 +27,8 @@ function lifecycleCopy(summary: ConversationSummaryV1): string {
 
 interface ConversationRowProps {
   summary: ConversationSummaryV1;
+  /** Sprint 155 (PR 2): the chat's document, shown in the meta line before the time. */
+  document?: ChatDocumentView;
   pin: ConversationPinState;
   current: boolean;
   onOpen: () => void;
@@ -98,6 +102,8 @@ function RowMenus({ className, title, actions, children }: { className: string; 
 
 interface ConversationRowProps {
   summary: ConversationSummaryV1;
+  /** Sprint 155 (PR 2): the chat's document, shown in the meta line before the time. */
+  document?: ChatDocumentView;
   pin: ConversationPinState;
   current: boolean;
   onOpen: () => void;
@@ -108,6 +114,7 @@ interface ConversationRowProps {
 
 export function ConversationRow({
   summary,
+  document,
   pin,
   current,
   onOpen,
@@ -132,6 +139,12 @@ export function ConversationRow({
       <div className="pointer-events-none relative min-w-0 flex-1">
         <div className={ROW_TITLE}>{summary.title}</div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-[var(--r-ink-muted)]">
+          {/* Sprint 155 (PR 2): the file icon at 11, the file name (muted), a middle dot, then the time or status */}
+          {document && (
+            <span className="flex min-w-0 max-w-full items-center gap-1.5">
+              <span className="flex min-w-0 items-center gap-1"><FileIconMask iconUri={document.iconUri} size={11} /><span className="min-w-0 truncate">{document.name}</span></span><span aria-hidden="true">·</span>
+            </span>
+          )}
           <span className="whitespace-nowrap">{lifecycleCopy(summary)}</span>
           {current && <span className="flex items-center gap-1.5 whitespace-nowrap"><span aria-hidden="true">·</span><span>Current</span></span>}
         </div>
@@ -201,18 +214,21 @@ export function ConversationsPanel() {
   const selectedAgent = useActiveConversation().selectedAgent;
   const aiName = selectedAgent === 'codex' ? 'ChatGPT' : selectedAgent === 'opencode' ? 'OpenCode' : 'Claude';
   const notice = useAISidebarStore((state) => state.conversationStoreNotice);
+  const documents = useAISidebarStore((state) => state.chatDocuments);
+  const front = useAISidebarStore((state) => state.frontDocumentPath);
   const { requestRename, requestDelete, dialogs } = useConversationDialogs();
 
   const ordered = useMemo(
     () => [...summaries].sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt) || a.conversationId.localeCompare(b.conversationId)),
     [summaries],
   );
-  const pinned = ordered.filter((summary) => pinnedIds.includes(summary.conversationId));
+  // Sprint 155 (PR 2): in each part, the chats whose document is the one in front come first
+  const pinned = orderByFrontDocument(ordered.filter((summary) => pinnedIds.includes(summary.conversationId)), documents, front);
   // Sprint 140 (R9; experience 29, frame 3): with no conversations the panel ends above the message box, so
   // "Start one below" has a box below it; with a list it covers the sheet as in 2.0.
   const empty = ordered.length === 0 && !notice;
   const composerSpace = useComposerSpace(empty);
-  const activeRecent = ordered.filter((summary) => !pinnedIds.includes(summary.conversationId));
+  const activeRecent = orderByFrontDocument(ordered.filter((summary) => !pinnedIds.includes(summary.conversationId)), documents, front);
 
   const renderRows = (rows: ConversationSummaryV1[]) => rows.map((summary) => {
     const pinState = conversationPinState(summary.conversationId, summary.title, pinnedIds);
@@ -220,6 +236,7 @@ export function ConversationsPanel() {
       <ConversationRow
         key={summary.conversationId}
         summary={summary}
+        document={documents[summary.conversationId]}
         pin={pinState}
         current={summary.conversationId === activeId}
         onOpen={() => openConversations[summary.conversationId] ? switchConversation(summary.conversationId) : open(summary.conversationId)}

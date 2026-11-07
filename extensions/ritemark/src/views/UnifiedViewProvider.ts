@@ -92,6 +92,14 @@ import type {
   CommentTaskRuntimeSettings,
 } from '../commentTasks/CommentTaskController';
 import { showBriefToast } from '../feedback/feedbackSheet';
+import {
+  bringDocumentForward,
+  chatDocumentsFor,
+  resolveFileIcon,
+  type ChatDocumentView,
+  type FileIconTheme,
+  type TabGroupFact,
+} from './chatDocuments';
 import type { CommentTaskEnqueueMessage, CommentTaskEnqueueOutcome } from '../commentTasks/protocol';
 import type { CardTaskSidebar } from '../taskBoard/CardHandoffLedger';
 import { decodeCommentTaskSidebarMessage } from '../commentTasks/protocol';
@@ -430,7 +438,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         platform: process.platform,
       }),
       stopConversation: (conversationId) => this._stopConversationSessions(conversationId),
-      emit: (event) => { void this._view?.webview.postMessage(event); },
+      emit: (event) => {
+        void this._view?.webview.postMessage(event);
+        // Sprint 155 (PR 2): a chat's changed files may have moved on; its document icon follows
+        this._scheduleChatDocuments();
+      },
       rolloutMode: () => conversationCutover.resolve(isEnabled('durableAgentConversations')),
       markHostAuthority: () => conversationCutover.establishHostAuthority(),
       migrator: new LegacyConversationMigrator(conversationStore),
@@ -547,6 +559,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           if (!delivered || !this._isCurrentSidebarView(webviewView.webview, viewGeneration)) break;
           this._sendChatFontSize();
           this._sendActiveFile();
+          this._scheduleChatDocuments();
           BrowserContextStore.instance.sheetReloaded(); // a waiting share question is shown again
           void this._sendActiveBrowserContext();
           this._sendConnectivityStatus();
@@ -1843,6 +1856,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
         // Sprint 76 R3a: return provider-configured booleans (never key values)
         // for the webview model-picker filter + setup prompt.
+        // Sprint 155 (PR 2): the person clicked (or pressed) the head's document icon. The host looks the chat's
+        // document up again itself, so only a file that exists now, and that this chat changed, comes forward.
+        case 'chat-document:bring-forward':
+          if (typeof message.conversationId === 'string') await this._bringChatDocumentForward(message.conversationId);
+          break;
+
         case 'acp-get-providers':
           await this._sendAcpProviders();
           break;
@@ -1882,6 +1901,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       vscode.window.tabGroups.onDidChangeTabGroups(() => this._scheduleActiveFile()),
       vscode.workspace.onDidDeleteFiles(() => this._scheduleActiveFile()),
       vscode.workspace.onDidRenameFiles(() => this._scheduleActiveFile()),
+      // Sprint 155 (PR 2): a file made again can be a chat's document again; the icon's image follows the theme
+      vscode.workspace.onDidCreateFiles(() => this._scheduleChatDocuments()),
+      vscode.window.onDidChangeActiveColorTheme(() => this._scheduleChatDocuments()),
       vscode.workspace.onDidChangeTextDocument((event) => {
         const activeInput = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
         const activeUri = activeInput && typeof activeInput === 'object' && 'uri' in activeInput
@@ -3598,6 +3620,137 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       type: 'active-file-changed',
       path: activeFile?.path ?? null,
       label: activeFile?.label ?? null,
+    });
+    // Sprint 155 (PR 2): All chats' order follows the document in front. The active file is sent on every tab change
+    // and on a file closed, renamed or deleted, which may also take a chat's document away.
+    this._scheduleChatDocuments();
+  }
+
+  // ── Sprint 155 (PR 2): each chat shows its document (experience 45; `chatDocuments.ts`) ──
+
+  private _chatDocumentsTimer: ReturnType<typeof setTimeout> | undefined;
+  private _chatDocumentsSequence = 0;
+  private _chatDocumentsSent: { documents: Record<string, ChatDocumentView>; front: string | null } | undefined;
+  private _fileIconTheme: FileIconTheme | null | undefined;
+
+  /** One send for a burst of changes. Nothing here moves a tab or the chat: it only redraws the icons and the order. */
+  private _scheduleChatDocuments() {
+    if (this._chatDocumentsTimer) clearTimeout(this._chatDocumentsTimer);
+    this._chatDocumentsTimer = setTimeout(() => {
+      this._chatDocumentsTimer = undefined;
+      void this._sendChatDocuments().catch(() => { /* the icons wait for the next change */ });
+    }, 100);
+  }
+
+  /** Ritemark's own file icon theme, read once from the extension (bundle-safe: from the extension's URI). */
+  private _iconTheme(): FileIconTheme | null {
+    if (this._fileIconTheme !== undefined) return this._fileIconTheme;
+    try {
+      const file = vscode.Uri.joinPath(this._extensionUri, 'fileicons', 'ritemark-icon-theme.json').fsPath;
+      this._fileIconTheme = JSON.parse(fs.readFileSync(file, 'utf8')) as FileIconTheme;
+    } catch {
+      this._fileIconTheme = null;
+    }
+    return this._fileIconTheme;
+  }
+
+  /** A file's icon as a webview URI, from Ritemark's theme; the theme's default file icon when nothing matches. */
+  private _fileIconUri(file: string, webview: vscode.Webview): string {
+    const theme = this._iconTheme();
+    const kind = vscode.window.activeColorTheme.kind;
+    const light = kind === vscode.ColorThemeKind.Light || kind === vscode.ColorThemeKind.HighContrastLight;
+    const languageId = vscode.workspace.textDocuments.find((document) => document.uri.scheme === 'file' && document.uri.fsPath === file)?.languageId;
+    const iconPath = theme ? resolveFileIcon(theme, file, { kind: light ? 'light' : 'dark', ...(languageId ? { languageId } : {}) }) : undefined;
+    const relative = (iconPath ?? './icons/file.svg').replace(/^\.\//, '');
+    return webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'fileicons', ...relative.split('/'))).toString();
+  }
+
+  /** The file a tab shows, if it is a file on disk. */
+  private static _tabFileUri(tab: vscode.Tab | undefined): vscode.Uri | undefined {
+    const input = tab?.input;
+    const uri = input instanceof vscode.TabInputTextDiff
+      ? input.modified
+      : input && typeof input === 'object' && 'uri' in input ? (input as { uri: unknown }).uri : undefined;
+    return uri instanceof vscode.Uri && uri.scheme === 'file' ? uri : undefined;
+  }
+
+  /** A real path, or null when the file is gone. */
+  private static _realPathOrNull(file: string): string | null {
+    try {
+      return fs.realpathSync.native(file);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Every chat's document in this project, read from the index (no record is opened). */
+  private async _chatDocuments(webview: vscode.Webview): Promise<Record<string, ChatDocumentView>> {
+    const chats = await this._conversationController.changedFilesByChat();
+    const real = new Map<string, string | null>();
+    const realPath = (file: string): string | null => {
+      if (!real.has(file)) real.set(file, UnifiedViewProvider._realPathOrNull(file));
+      return real.get(file) ?? null;
+    };
+    return chatDocumentsFor(chats, realPath, (file) => this._fileIconUri(file, webview));
+  }
+
+  private async _sendChatDocuments(): Promise<void> {
+    const view = this._view;
+    if (!view) return;
+    // Sends overlap (a conversation change and a tab change a moment apart): only the newest one posts, and it reads
+    // the tab in front after its await, so an older send can never put a stale order back.
+    const sequence = ++this._chatDocumentsSequence;
+    const documents = await this._chatDocuments(view.webview);
+    if (sequence !== this._chatDocumentsSequence || view !== this._view) return;
+    const frontUri = UnifiedViewProvider._tabFileUri(vscode.window.tabGroups.activeTabGroup.activeTab);
+    const front = frontUri ? UnifiedViewProvider._realPathOrNull(frontUri.fsPath) : null;
+    const sent = this._chatDocumentsSent;
+    if (sent && sent.front === front && JSON.stringify(sent.documents) === JSON.stringify(documents)) return;
+    this._chatDocumentsSent = { documents, front };
+    const delivered = await view.webview.postMessage({ type: 'chat-documents', documents, front });
+    if (delivered === false) this._chatDocumentsSent = undefined;
+  }
+
+  /**
+   * The person's click on the head's icon: the chat's document comes forward — its open tab in its own group, or a
+   * new tab at the row's end. Runs only from that click; never from a tab change, a chat change or the AI.
+   */
+  private async _bringChatDocumentForward(conversationId: string): Promise<void> {
+    const view = this._view;
+    if (!view) return;
+    const document = (await this._chatDocuments(view.webview))[conversationId];
+    if (!document) {
+      // The file went between the drawing and the click: the icon goes too
+      this._scheduleChatDocuments();
+      return;
+    }
+    const groups = (): vscode.TabGroup[] => [...vscode.window.tabGroups.all];
+    const facts = (): TabGroupFact[] => groups().map((group) => ({
+      viewColumn: group.viewColumn,
+      isActive: group.isActive,
+      tabs: group.tabs.map((tab) => {
+        const uri = UnifiedViewProvider._tabFileUri(tab);
+        return { path: uri ? UnifiedViewProvider._realPathOrNull(uri.fsPath) : null, isActive: tab.isActive };
+      }),
+    }));
+    await bringDocumentForward(document.path, {
+      groups: facts,
+      reveal: async (groupIndex, tabIndex) => {
+        const group = groups()[groupIndex];
+        const tab = group?.tabs[tabIndex];
+        const uri = UnifiedViewProvider._tabFileUri(tab);
+        if (!group || !tab || !uri) return;
+        const options = { viewColumn: group.viewColumn };
+        // The tab's own editor, so the open finds this tab and never opens the file a second time in another one
+        const input = tab.input;
+        if (input instanceof vscode.TabInputCustom) await vscode.commands.executeCommand('vscode.openWith', uri, input.viewType, options);
+        else if (input instanceof vscode.TabInputNotebook) await vscode.commands.executeCommand('vscode.openWith', uri, input.notebookType, options);
+        else if (input instanceof vscode.TabInputText) await vscode.commands.executeCommand('vscode.openWith', uri, 'default', options);
+        else await vscode.commands.executeCommand('vscode.open', uri, options);
+      },
+      // `vscode.open` routes through the editor associations: a .md opens in Ritemark's editor
+      open: async (file) => { await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(file), { preview: false }); },
+      moveActiveToEnd: async () => { await vscode.commands.executeCommand('moveActiveEditor', { to: 'last', by: 'tab' }); },
     });
   }
 
