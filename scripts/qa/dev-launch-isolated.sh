@@ -2,7 +2,7 @@
 # dev-launch-isolated.sh — start one Ritemark dev instance for a test run, isolated, and stop it again.
 #
 #   scripts/qa/dev-launch-isolated.sh start --name <run> [--folder <dir>] [--port <n>] [--env KEY=VALUE]...
-#                                           [--dry-run] [-- <extra Ritemark args>]
+#                                           [--user-data-dir=<new empty dir>] [--dry-run] [-- <extra Ritemark args>]
 #   scripts/qa/dev-launch-isolated.sh stop <run-dir>
 #
 # `start` launches the dev build (vscode/.build/electron, built with the patches applied) of this checkout, or of the
@@ -26,7 +26,13 @@
 #
 # Jarmo's rule (2 and 3 Nov): no test window while he is at the keyboard. From 08:00 to 18:00 Tallinn time
 # `start` refuses unless RITEMARK_LAUNCH_DAYTIME_OK=1, which a run sets only after he has said yes in chat.
-# Test keys: this script loads none. A run that needs one uses scripts/qa/with-test-keys.sh around the launch.
+# Test keys: this script loads none. A run that needs one uses scripts/qa/with-test-keys.sh around the launch, which
+# wants the profile on the command line it runs: give it here as --user-data-dir=$RITEMARK_TEST_PROFILE (a new or empty
+# folder, used instead of <run-dir>/profile and named in run.env as PROFILE), e.g.
+#   RITEMARK_BUILD_CHANNEL=test RITEMARK_TEST_PROFILE=/private/tmp/rm-tk-profile \
+#     scripts/qa/with-test-keys.sh --only gemini -- scripts/qa/dev-launch-isolated.sh start --name tk \
+#       --user-data-dir=/private/tmp/rm-tk-profile
+# The keys reach the instance only through its inherited environment; --env never carries one (it would be an argument).
 #
 # Model routing (ritemark-dev governance/model-routing.md, §2): a launch follows this script, so any model can
 # run it the same way.
@@ -68,7 +74,10 @@ stop_run() {
 	# One spelling of the folder: the profile flag names it as start resolved it (pwd -P, e.g. /private/var/…), and
 	# a /var/… or …//… form of the same folder would match no process and report LEFT=0 with the instance running.
 	run_dir=$(cd "$run_dir" && pwd -P)
-	local profile="--user-data-dir=$run_dir/profile"
+	local profile_dir
+	profile_dir=$(sed -n 's/^PROFILE=//p' "$run_dir/run.env")
+	[[ -n $profile_dir ]] || profile_dir="$run_dir/profile"
+	local profile="--user-data-dir=$profile_dir"
 	local pid cmdline=""
 	pid=$(sed -n 's/^PID=//p' "$run_dir/run.env")
 	# run.env's PID is used only while it is still this instance: a number, and a process whose command line
@@ -109,7 +118,7 @@ stop_run() {
 }
 
 start_run() {
-	local name="" folder="" port="" dry_run=0
+	local name="" folder="" port="" dry_run=0 profile_arg=""
 	local -a envs=() extra=()
 	while [[ $# -gt 0 ]]; do
 		case $1 in
@@ -117,6 +126,8 @@ start_run() {
 			--folder) folder=${2:-}; shift 2 ;;
 			--port) port=${2:-}; shift 2 ;;
 			--env) envs+=("${2:-}"); shift 2 ;;
+			--user-data-dir=*) profile_arg=${1#--user-data-dir=}; shift ;;
+			--user-data-dir) profile_arg=${2:-}; shift 2 ;;
 			--dry-run) dry_run=1; shift ;;
 			--) shift; extra=("$@"); break ;;
 			*) die "unknown option '$1'" ;;
@@ -179,8 +190,18 @@ start_run() {
 	local run_dir
 	run_dir=$(mktemp -d "${tmp%/}/rm-${name}.XXXX")
 	run_dir=$(cd "$run_dir" && pwd -P)
-	mkdir -p "$run_dir"/{profile/User,extensions,claude,codex,xdg/config,xdg/data,xdg/state,xdg/cache}
-	cat > "$run_dir/profile/User/settings.json" <<-'JSON'
+	local profile_dir="$run_dir/profile"
+	if [[ -n $profile_arg ]]; then
+		# A profile of the caller's (with-test-keys.sh checks it is the run's own test profile): new or empty, never reused
+		[[ $profile_arg == /* ]] || die "--user-data-dir must be an absolute path"
+		if [[ -e $profile_arg ]]; then
+			[[ -d $profile_arg && -z $(ls -A "$profile_arg") ]] || die "--user-data-dir '$profile_arg' must be a new or empty folder"
+		fi
+		mkdir -p "$profile_arg"
+		profile_dir=$(cd "$profile_arg" && pwd -P)
+	fi
+	mkdir -p "$run_dir"/{extensions,claude,codex,xdg/config,xdg/data,xdg/state,xdg/cache} "$profile_dir/User"
+	cat > "$profile_dir/User/settings.json" <<-'JSON'
 	{
 		"files.simpleDialog.enable": true,
 		"security.workspace.trust.enabled": false,
@@ -215,7 +236,7 @@ start_run() {
 		"${envs[@]+"${envs[@]}"}"
 		arch -arm64 "$app" .
 		--disable-extension=vscode.vscode-api-tests
-		--user-data-dir="$run_dir/profile"
+		--user-data-dir="$profile_dir"
 		--extensions-dir="$run_dir/extensions"
 		--shared-data-dir="$HOME/.ritemark-dev-shared"
 		--use-mock-keychain
@@ -243,6 +264,7 @@ start_run() {
 		echo "PORT=$port"
 		echo "PID=$pid"
 		echo "FOLDER=$folder"
+		echo "PROFILE=$profile_dir"
 	} > "$run_dir/run.env"
 
 	local ready=0

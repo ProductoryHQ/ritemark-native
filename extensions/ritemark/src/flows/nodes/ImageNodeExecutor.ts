@@ -19,6 +19,7 @@ import { geminiHeaders, geminiUrl } from '../../ai/geminiRequest';
 import { ensureProjectSubfolder } from '../../projects/projectFolderGuard';
 import type { FlowNode, ExecutionContext } from '../types';
 import { GOOGLE_AI_KEY_NEEDED, OPENAI_KEY_NEEDED, STEP_KEY_SECRETS, StepNeedsKeyError } from '../flowModelDefaults';
+import { readProviderKey } from '../../ai/providerKeys';
 
 /**
  * Write a file via VS Code's filesystem API so the explorer model is
@@ -357,7 +358,7 @@ async function generateWithGemini(
     throw new Error('Extension context not initialized');
   }
 
-  const apiKey = await extensionContext.secrets.get(STEP_KEY_SECRETS.gemini);
+  const apiKey = await readProviderKey(extensionContext.secrets, STEP_KEY_SECRETS.gemini);
 
   if (!apiKey) {
     // Sprint 144: the step panel's sentence, as plain text ("This step needs a Google AI API key to run. Add it in

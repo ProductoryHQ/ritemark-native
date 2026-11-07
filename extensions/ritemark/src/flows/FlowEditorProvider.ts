@@ -25,6 +25,7 @@ import {
 import * as modelCatalog from '../ai/modelCatalog';
 import { pickerFolder } from '../utils/dialogDefaults';
 import { listGeminiModels } from '../ai/geminiRequest';
+import { readProviderKey } from '../ai/providerKeys';
 import { flowModelDefaults, flowModelRequestType, GOOGLE_AI_KEY_NEEDED, OPENAI_KEY_NEEDED, STEP_KEY_SECRETS, stepKeyAnswer, stepKeyCopy, stepKeySecret, StepNeedsKeyError } from './flowModelDefaults';
 
 /**
@@ -883,7 +884,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
 
   /** Whether the provider's key is stored (Sprint 145 R5). Its value is not kept or passed on. */
   private async hasProviderKey(provider: 'openai' | 'gemini'): Promise<boolean> {
-    return Boolean(await this.context.secrets.get(stepKeySecret(provider)));
+    return Boolean(await readProviderKey(this.context.secrets, stepKeySecret(provider)));
   }
 
   // fetchOpenAIModels() removed in Sprint 89 (GH #109) — OpenAI LLM lists now
@@ -932,7 +933,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
    * Fetch Gemini Image models
    */
   private async fetchGeminiImageModels(): Promise<Array<{ id: string; name: string }>> {
-    const apiKey = await this.context.secrets.get(STEP_KEY_SECRETS.gemini);
+    const apiKey = await readProviderKey(this.context.secrets, STEP_KEY_SECRETS.gemini);
 
     if (!apiKey) {
       throw new StepNeedsKeyError(GOOGLE_AI_KEY_NEEDED);

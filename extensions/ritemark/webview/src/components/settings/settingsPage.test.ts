@@ -209,6 +209,17 @@ assert.equal(keyStateLine(true, { key: 'openai', success: false, error: 'Invalid
 assert.equal(keyStateLine(true, undefined), 'Saved')
 assert.match(keysSheet(payload({ anthropicKeyConfigured: true }), { results: { anthropic: { key: 'anthropic', success: false, error: 'Invalid key' } } }), /Invalid key/)
 assert.match(keysSheet(payload({ googleKeyConfigured: true }), { testing: { google: true } }), /aria-busy="true"/)
+// Sprint 155: a test launch's key from its environment says so, offers Test and Add, and is never drawn
+const testEnvKeys = keysSheet(payload({ testEnvironmentKeys: { 'google-ai-key': true } }), { results: { google: { key: 'google', success: true } } })
+assert.match(testEnvKeys, /From the test environment · it works/)
+assert.equal((testEnvKeys.match(/>Test</g) ?? []).length, 1, 'Test on the test environment row only')
+assert.equal((testEnvKeys.match(/>Not added</g) ?? []).length, 4)
+assert.equal((testEnvKeys.match(/>Add</g) ?? []).length, 5, 'a key can still be saved over it')
+assert.doesNotMatch(testEnvKeys, /test-not-a-key|AIza/, 'no key value on the page')
+assert.equal(keyStateLine(false, undefined, true), 'From the test environment')
+assert.equal(keyStateLine(false, { key: 'google', success: false, error: 'x' }, true), "From the test environment · it didn't work")
+assert.equal(keyStateLine(true, undefined, true), 'Saved', 'a saved key wins')
+assert.match(keysSheet(payload({ googleKeyConfigured: true, testEnvironmentKeys: { 'google-ai-key': true } })), />Saved</)
 // The flags hide the same rows as before; OpenCode's Set up says what it needs
 const keysOff = keysSheet(payload({ openrouterEnabled: false, transcriptionEnabled: false }))
 assert.ok(!keysOff.includes('settings-section-openrouter-api-key') && !keysOff.includes('settings-section-elevenlabs-api-key'))

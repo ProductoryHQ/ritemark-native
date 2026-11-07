@@ -13,6 +13,7 @@ import { WhisperLocalEngine } from './engines/whisperLocalEngine';
 import { ElevenLabsEngine } from './engines/elevenLabsEngine';
 import { sessionStoreDir, speechWorkDir } from './paths';
 import { getModelPath, getWhisperBinaryPath } from '../voiceDictation/whisperCpp';
+import { readProviderKey } from '../ai/providerKeys';
 
 export interface SpeechSubsystem {
   registry: EngineRegistry;
@@ -37,7 +38,8 @@ export function createSpeechSubsystem(context: vscode.ExtensionContext): SpeechS
     new ElevenLabsEngine({
       // `secrets.get` returns a Thenable, not a Promise — awaited here so the
       // engine's contract stays a plain Promise.
-      getApiKey: async () => context.secrets.get('elevenlabs-api-key'),
+      // Sprint 155: in the test channel only, a key not saved comes from the test environment.
+      getApiKey: async () => readProviderKey(context.secrets, 'elevenlabs-api-key'),
     }),
   );
 

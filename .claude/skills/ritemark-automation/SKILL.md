@@ -62,6 +62,31 @@ worktree its own vscode. Flags after `--` go after the folder. `scripts/qa/dev-l
 whole process tree and prints `LEFT=0`. From 08:00 to 18:00 Tallinn time it refuses unless Jarmo said yes in chat.
 The hand-written shape below is what the script does, for when you need to depart from it.
 
+### With test keys (AI and providers in an isolated window)
+
+An isolated window has no saved keys. For a run that needs an AI provider (OpenCode on Gemini, Flows, Transcribe with
+ElevenLabs, a Settings Test), load the test keys from the Mac vault with `scripts/qa/with-test-keys.sh` around the
+launch. Name only the keys the run needs with `--only` (a missing one is skipped) or `--require` (a missing one stops
+the run); the vault names are `gemini`, `openai`, `anthropic`, `openrouter`, `elevenlabs` (ritemark-dev
+`governance/test-keys.md`). Nobody types a key, and you never read, print or echo one.
+
+```bash
+PROFILE=$(mktemp -d /private/tmp/rm-tk-profile.XXXX)
+RITEMARK_BUILD_CHANNEL=test RITEMARK_TEST_PROFILE="$PROFILE" \
+  scripts/qa/with-test-keys.sh --only gemini -- \
+  scripts/qa/dev-launch-isolated.sh start --name tk --user-data-dir="$PROFILE"
+# … the run …
+scripts/qa/dev-launch-isolated.sh stop <RUN_DIR>; rm -rf "$PROFILE"   # test profiles go after the run
+```
+
+- The script refuses without `RITEMARK_BUILD_CHANNEL=test` and a test profile under `/private/tmp` (or `$TMPDIR`),
+  and the launch command must carry exactly that `--user-data-dir`. It prints only the names it loaded.
+- Ritemark reads a provider key from its environment variable only in the test channel, and only when no key is saved
+  (`extensions/ritemark/src/ai/providerKeys.ts`): OpenCode counts as set up, its process gets the key, and Settings
+  shows the row as **From the test environment** with Test, never the value. Outside the test channel the variables are
+  ignored.
+- Never pass a key with `--env` or any other argument: arguments show in `ps`. The keys travel only in the environment.
+
 There is exactly one correct way to launch Ritemark for automation. Memorize the shape:
 
 ```bash

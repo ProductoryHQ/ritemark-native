@@ -51,6 +51,8 @@ export interface SettingsData {
   // Sprint 108 R4/R12: transcription key + stored-transcript footprint.
   transcriptionEnabled: boolean;
   elevenlabsKeyConfigured: boolean;
+  /** Sprint 155: a test launch only — keys not saved that come from the test environment. Never a value. */
+  testEnvironmentKeys?: Partial<Record<'openai-api-key' | 'google-ai-key' | 'anthropic-api-key' | 'openrouter-api-key' | 'elevenlabs-api-key', boolean>>;
   transcriptionStorageBytes: number;
   chatFontSize: number;
   // Sprint 119: Google Docs publishing account (null when the feature is off).

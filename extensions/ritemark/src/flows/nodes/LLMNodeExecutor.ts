@@ -16,6 +16,7 @@ import { geminiHeaders, geminiUrl } from '../../ai/geminiRequest';
 import { FlowStepError, geminiAnswerText, geminiStepFailure } from './geminiStep';
 import { GOOGLE_AI_KEY_NEEDED, OPENAI_KEY_NEEDED, STEP_KEY_SECRETS, StepNeedsKeyError } from '../flowModelDefaults';
 import type { FlowNode, ExecutionContext } from '../types';
+import { readProviderKey } from '../../ai/providerKeys';
 
 /**
  * Text file extensions that can be read and included in prompts
@@ -265,7 +266,7 @@ async function executeWithGemini(
     throw new Error('Extension context not initialized');
   }
 
-  const apiKey = await extensionContext.secrets.get(STEP_KEY_SECRETS.gemini);
+  const apiKey = await readProviderKey(extensionContext.secrets, STEP_KEY_SECRETS.gemini);
 
   if (!apiKey) {
     // Sprint 145 R5 (#580): the step panel's sentence, as plain text
