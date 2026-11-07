@@ -137,6 +137,7 @@ import {
   AgentSidebarBootstrapError,
 } from './agentSidebarBootstrap';
 import { versionedWebviewAssetUri } from './webviewAssetUri';
+import { sameFile } from '../utils/pathIdentity';
 import {
   chatLinkMessage,
   clickActionFor,
@@ -2350,7 +2351,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       chats: chats.map((chat) => ({ conversationId: chat.conversationId, ...(chat.changedFiles ? { changedFiles: chat.changedFiles } : {}) })),
       pathOfUri,
       exists: (file) => fs.existsSync(file),
-      samePath: (a, b) => a === b || realPath(a) === realPath(b),
+      // Real paths first; then, also for a file that is gone, Windows' drive
+      // case and slash direction do not matter (`sameFile`).
+      samePath: (a, b) => sameFile(a, b, realPath),
     };
   }
 

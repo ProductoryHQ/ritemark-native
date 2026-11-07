@@ -45,6 +45,8 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 
 // ── Now safe to import vscode-dependent modules ──────────────────────────────
 import * as assert from 'assert';
+import * as os from 'os';
+import * as path from 'path';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { CodexRuntime, CodexSession, buildCodexBaseInstructions, isCodexSignInFailure } = require('./CodexRuntime') as typeof import('./CodexRuntime');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -364,26 +366,29 @@ async function run() {
   // changes changed (the bundled app-server's `fileChange` item), never a
   // command's, a declined patch's or a read's.
   {
+    // Portable: the workspace is under the platform's temp folder.
+    const ws = path.join(os.tmpdir(), 'ritemark-155-codex');
+    const at = (name: string) => path.join(ws, name);
     const { runtime, mock } = makeRuntime(['thread-a']);
     let completed: { status: string; filesModified?: string[] } | null = null;
-    await openTurn(runtime, 'conv-a', { ...dummyConfig, workspacePath: '/tmp/test', onCodexComplete: (result) => { completed = result; } });
+    await openTurn(runtime, 'conv-a', { ...dummyConfig, workspacePath: ws, onCodexComplete: (result) => { completed = result; } });
     mock.emit('turn/started', { threadId: 'thread-a', turn: { id: 'turn-f' } });
     // Read with a command: never a change.
-    mock.emit('item/completed', { threadId: 'thread-a', item: { type: 'commandExecution', id: 'c1', command: 'cat /tmp/test/Module 2.md', status: 'completed', commandActions: [{ type: 'read', path: '/tmp/test/Module 2.md' }] } });
+    mock.emit('item/completed', { threadId: 'thread-a', item: { type: 'commandExecution', id: 'c1', command: `cat "${at('Module 2.md')}"`, status: 'completed', commandActions: [{ type: 'read', path: at('Module 2.md') }] } });
     // A patch that applied: two files, one moved.
-    mock.emit('item/started', { threadId: 'thread-a', turnId: 'turn-f', item: { type: 'fileChange', id: 'f1', changes: [{ path: '/tmp/test/Module 2.md', kind: { type: 'update', move_path: null }, diff: '' }], status: 'inProgress' } });
+    mock.emit('item/started', { threadId: 'thread-a', turnId: 'turn-f', item: { type: 'fileChange', id: 'f1', changes: [{ path: at('Module 2.md'), kind: { type: 'update', move_path: null }, diff: '' }], status: 'inProgress' } });
     mock.emit('item/completed', { threadId: 'thread-a', item: { type: 'fileChange', id: 'f1', status: 'completed', changes: [
-      { path: '/tmp/test/Module 2.md', kind: { type: 'update', move_path: null }, diff: '@@' },
-      { path: '/tmp/test/old.md', kind: { type: 'update', move_path: '/tmp/test/new.md' }, diff: '@@' },
-      { path: '/tmp/test/added.md', kind: { type: 'add' }, diff: '+x' },
+      { path: at('Module 2.md'), kind: { type: 'update', move_path: null }, diff: '@@' },
+      { path: at('old.md'), kind: { type: 'update', move_path: at('new.md') }, diff: '@@' },
+      { path: at('added.md'), kind: { type: 'add' }, diff: '+x' },
     ] } });
     // A declined patch, and one outside the workspace.
-    mock.emit('item/completed', { threadId: 'thread-a', item: { type: 'fileChange', id: 'f2', status: 'declined', changes: [{ path: '/tmp/test/declined.md', kind: { type: 'add' }, diff: '' }] } });
-    mock.emit('item/completed', { threadId: 'thread-a', item: { type: 'fileChange', id: 'f3', status: 'completed', changes: [{ path: '/etc/elsewhere.md', kind: { type: 'add' }, diff: '' }] } });
+    mock.emit('item/completed', { threadId: 'thread-a', item: { type: 'fileChange', id: 'f2', status: 'declined', changes: [{ path: at('declined.md'), kind: { type: 'add' }, diff: '' }] } });
+    mock.emit('item/completed', { threadId: 'thread-a', item: { type: 'fileChange', id: 'f3', status: 'completed', changes: [{ path: path.join(os.tmpdir(), 'ritemark-155-elsewhere', 'elsewhere.md'), kind: { type: 'add' }, diff: '' }] } });
     mock.emit('turn/completed', { threadId: 'thread-a', turn: { id: 'turn-f', status: 'completed', error: null } });
     assert.deepStrictEqual(
       completed?.filesModified,
-      ['/tmp/test/Module 2.md', '/tmp/test/new.md', '/tmp/test/added.md'],
+      [at('Module 2.md'), at('new.md'), at('added.md')],
       `changed, not read: got ${JSON.stringify(completed)}`,
     );
 
