@@ -169,7 +169,7 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
         />
         {waiting && (
           <Tooltip label={stopWaitingTip(provider)}>
-            <Button variant="ghost" size="sm" className="rh-quiet" onClick={() => send({ type: 'home/cancel-sign-in' })}>{COPY.cancel}</Button>
+            <Button variant="ghost" size="compact" className="rh-quiet" onClick={() => send({ type: 'home/cancel-sign-in' })}>{COPY.cancel}</Button>
           </Tooltip>
         )}
         <span className="rh-guide-note" role={busy || waiting ? 'status' : undefined}>{waiting ? browserOpened(provider) : busy ? busy.note : card.note}</span>
@@ -177,7 +177,7 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
       {waiting && (
         <div className="rh-guide-go">
           <Tooltip label={reopenTip(provider)}>
-            <Button variant="ghost" size="sm" className="rh-quiet" onClick={() => send({ type: 'home/reopen-sign-in' })}>{COPY.reopen}</Button>
+            <Button variant="ghost" size="compact" className="rh-quiet" onClick={() => send({ type: 'home/reopen-sign-in' })}>{COPY.reopen}</Button>
           </Tooltip>
         </div>
       )}
@@ -219,17 +219,17 @@ export function FeedbackCard({ card }: { card: FeedbackCardState }) {
       {card.problem && <p className="rh-guide-problem rh-ask-problem" role="alert">{card.problem}</p>}
       <div className="rh-ask-acts">
         <Tooltip label={empty ? 'Write a line first' : 'Sends this line to the people who make Ritemark'}>
-          <Button size="sm" disabled={empty || card.sending} onClick={() => send({ type: 'home/feedback-send', text })}>
+          <Button size="compact" disabled={empty || card.sending} onClick={() => send({ type: 'home/feedback-send', text })}>
             {card.sending ? 'Sending…' : card.problem ? 'Try again' : 'Send'}
           </Button>
         </Tooltip>
         {card.problem && (
           <Tooltip label="Opens your e-mail app with this line, to send it yourself">
-            <Button variant="ghost" size="sm" className="rh-quiet" disabled={empty} onClick={() => send({ type: 'home/feedback-mail', text })}>Open in e-mail</Button>
+            <Button variant="ghost" size="compact" className="rh-quiet" disabled={empty} onClick={() => send({ type: 'home/feedback-mail', text })}>Open in e-mail</Button>
           </Tooltip>
         )}
         <Tooltip label="Close this question for this release">
-          <Button variant="ghost" size="sm" className="rh-quiet" disabled={card.sending} onClick={() => send({ type: 'home/feedback-not-now' })}>Not now</Button>
+          <Button variant="ghost" size="compact" className="rh-quiet" disabled={card.sending} onClick={() => send({ type: 'home/feedback-not-now' })}>Not now</Button>
         </Tooltip>
       </div>
     </section>

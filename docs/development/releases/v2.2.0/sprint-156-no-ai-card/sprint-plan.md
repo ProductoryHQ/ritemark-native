@@ -26,7 +26,9 @@ In the first 2.0 week, 6 of 11 fresh installs opened a project with no AI ready,
 
 ## PRs
 
-### PR A, Standard tier: the card (branch `sprint-156-no-ai-card`)
+### PR A, High tier: the card (branch `sprint-156-no-ai-card`, #694)
+
+High, not Standard as first planned: it changes `src/settings/RitemarkSettingsProvider.ts` (the Claude and ChatGPT sign-outs clear the AI last seen ready), and that path is High (review round 1, finding 9).
 
 - `src/guidance/readyRequest.ts`: `leadAi` (the lead rule) and `canSignInHere` (which AI can be signed in to here); `cardAi` returns the lead when no AI is ready; `readyRequestWords` takes a `ready` flag, and with no AI ready changes only the button (`signInWords`) and the note (the host's copy of the welcome's `PLAN_LINES`, kept equal by a test).
 - `src/guidance/guidanceStore.ts`: the last ready AI in its own global-state key, `ritemark.guidance.lastReadyAi` (only an AI's id), apart from `ritemark.guidance.v1` so one window can't undo another's record; `noteLastReadyAi`, `clearLastReadyAi` (only when it is the AI signed out), `readLastReadyAi` (bad values ignored), and the test seed.
@@ -34,8 +36,16 @@ In the first 2.0 week, 6 of 11 fresh installs opened a project with no AI ready,
 - Set where an AI is seen usable: the status bar's AI (`ai/aiStatusItem.ts`, the AI in question only), Home's sign-in, and the welcome's `providerReadyFromWelcome`. Cleared only after a successful sign-out pressed in Ritemark: Settings' Claude and ChatGPT sign-outs, and the AI sheet's ChatGPT sign-out.
 - `src/projects/protocol.ts`: the card's `aiName` and `signingIn`; `home/cancel-sign-in` and `home/reopen-sign-in`. `src/views/HomePanel.ts` routes them.
 - `webview/src/components/home/GuidanceCards.tsx`: the main part always sends `home/ready-request` (Set up OpenCode opens the key sheet), with the sign-in icon and its tooltip; the name from the host; the waiting state from the card's own parts and the welcome's words (`welcomeCopy.ts`: `browserOpened`, `COPY.reopen`, `COPY.cancel`, and the frame 2 tooltips `stopWaitingTip` and `reopenTip`, which the welcome now shares). `SplitButton` is unchanged.
+- **Review round 1's fixes** (#694):
+  - **A ChatGPT sign-in from Home settles however the news comes.** The AI sheet's `login-started` listener restarts the login's poll with its own callback, and a finished login stops the poll, so the first caller's callback never heard the end. `CodexRuntime.listenToLoginPoll` keeps a sign-in's listeners across a restart until the poll stops (the welcome's ChatGPT timeout line, lost the same way, comes back); Home also settles from Claude's and ChatGPT's status events when the AI reads usable, as the welcome's recheck does, and gives up on its own after the welcome's 2 minutes (`CODEX_LOGIN_TIMEOUT_MS`).
+  - **The failure line** stays until the next press, which is the retry and takes it away (the Experience lead, ritemark-dev f85e188); it shows only while the card names the AI that failed and asks it to sign in, and a sign-in that makes it ready clears it.
+  - **The waiting card** applies only with no AI ready; with one ready, Ask with's sign-ins run as before and the ready request stays usable.
+  - **Claude:** a login that can't start says "couldn't start"; a Claude login Home joins gives it the page's address (`claudeLogin.ts` keeps it), and "Open the page again" with no page to open says so in the welcome's words.
+  - **OpenCode** leads only when it is on; otherwise ChatGPT, whose press opens AI Settings.
+  - **Key changes** redraw Home only for the AI keys.
+  - **`ui/button` gains a 28 px size, `compact`,** for the card's Cancel and "Open the page again" and the feedback card's buttons; Home's two local restyles of the button are gone, and the controls catalogue has the new size's row.
 - **The test seed** (approved by the Experience lead): `RITEMARK_TEST_LAST_READY_AI`, read only in the test channel (`RITEMARK_BUILD_CHANNEL=test`, as #681's test keys), so a lapsed Claude can be staged for screenshots.
-- Docs: `architecture.md`, the CHANGELOG, the 2.2 test checklist. The release-notes line is the Experience lead's to write.
+- Docs: `architecture.md`, the CHANGELOG, the 2.2 test checklist, and the release notes' line in the Experience lead's words.
 
 ### PR B, High tier: the three counts (`src/analytics/`), stacked on PR A
 
@@ -55,6 +65,8 @@ Every field is a fixed choice or a yes/no: no words, names, paths or models. The
   - the card's words for three cards × the leads, the note equal to the welcome's `PLAN_LINES`;
   - the last ready AI: its own key, cleared only when it matches, bad stored values ignored; the seed ignored outside the test channel;
   - the status item storing only a usable AI (`src/ai/aiStatusItem.test.ts`);
+  - the sign-in's life on the host (`src/guidance/GuidanceHost.test.ts`): the press signs in; it settles on success through the AI sheet's restart of the poll and from a status event alone, and nothing is sent; Home's own give-up and its line, taken away by the next press; Cancel; the readiness check; Claude's failure, its "couldn't start" and "Open the page again" with no page; the waiting card only with no AI ready; Ask with as the host builds it;
+  - the poll's listeners surviving the sheet's restart, hearing ready and the give-up, and going with a stopped poll (`src/codex/CodexRuntime.test.ts`, test 20);
   - Home drawing the sign-in with no AI ready, its press sending `home/ready-request`, the waiting state (Signing in…, Cancel, the line under the row) and a failure's line (`webview/src/components/home/home.test.ts`);
   - PR B: the three counts and their fields, and the held skip event (sent on yes, dropped on no).
 - **Live, in an isolated test window** (the Development manager), with throwaway AI homes and no real accounts:

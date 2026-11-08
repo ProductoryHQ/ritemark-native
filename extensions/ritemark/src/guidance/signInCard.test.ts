@@ -37,6 +37,8 @@ assert.equal(leadAi({ lastReady: 'opencode', states: signedOut, canSignIn: both 
 assert.equal(leadAi({ lastReady: 'codex', states: signedOut, canSignIn: { ...both, codex: false } }), 'claude-code', 'a lapsed ChatGPT that can no longer sign in here does not lead');
 assert.equal(leadAi({ lastReady: undefined, states: signedOut, canSignIn: { ...both, codex: false } }), 'claude-code', 'ChatGPT can\'t sign in here: Claude leads');
 assert.equal(leadAi({ lastReady: undefined, states: { opencode: 'set-up' }, canSignIn: {} }), 'opencode', 'neither can: Set up OpenCode leads');
+assert.equal(leadAi({ lastReady: undefined, states: {}, canSignIn: {} }), 'codex', 'OpenCode off too: ChatGPT, whose press opens AI Settings (review finding 7)');
+assert.equal(leadAi({ lastReady: undefined, states: { 'claude-code': 'set-up', codex: 'set-up' }, canSignIn: canSignInHere({ 'claude-code': 'set-up', codex: 'set-up' }, 'bundled') }), 'codex', 'OpenCode with no state never leads');
 
 // Whether Ritemark can sign in to each AI here (ChatGPT: a build without it, the computer's own runtime, its flag off)
 assert.deepEqual(canSignInHere(signedOut, 'bundled'), { 'claude-code': true, codex: true, opencode: false });

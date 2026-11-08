@@ -190,7 +190,7 @@ export function canSignInHere(states: Partial<Record<AgentId, AiState>>, runtime
  * Sprint 156 (experience 35, "With no AI ready"): the AI the card signs in to when none is ready. ChatGPT, because any
  * plan works. The AI last seen ready instead, when its sign-in has lapsed (no AI ready, and it waits for a sign-in);
  * in practice only Claude, since OpenCode is set up, not signed in to. Claude when ChatGPT can't sign in here; Set up
- * OpenCode when neither can.
+ * OpenCode when neither can and OpenCode is on; with OpenCode off too, ChatGPT, whose press opens AI Settings.
  */
 export function leadAi(input: {
   /** The AI last seen ready on this profile (`ritemark.guidance.lastReadyAi`). */
@@ -203,7 +203,8 @@ export function leadAi(input: {
   if (noneReady && lastReady && canSignIn[lastReady] && (states[lastReady] === 'sign-in' || states[lastReady] === 'signing-in')) return lastReady;
   if (canSignIn.codex) return 'codex';
   if (canSignIn['claude-code']) return 'claude-code';
-  return 'opencode';
+  // OpenCode only when it is on here (it has a state); else ChatGPT, whose press opens AI Settings
+  return states.opencode !== undefined ? 'opencode' : 'codex';
 }
 
 /**

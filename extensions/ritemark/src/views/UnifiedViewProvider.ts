@@ -2152,10 +2152,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     if (status.state === 'broken-install' || status.state === 'disabled') return null;
     rt.setLoginInProgress(true);
     this._postCodexSidebarStatus({ ...status, state: 'auth-in-progress', error: null });
-    rt.startLoginPolling((next) => {
-      this._postCodexSidebarStatus(next);
-      onStatus(next.state);
-    });
+    // The sheet's own poll callback, which its `login-started` listener restarts; the caller hears every poll until the
+    // sign-in stops, through that restart too (Sprint 156, #694)
+    rt.startLoginPolling((next) => this._postCodexSidebarStatus(next));
+    rt.listenToLoginPoll((next) => onStatus(next.state));
     try {
       const authUrl = await rt.beginLogin();
       emitCodexStatusInvalidated('login-started');

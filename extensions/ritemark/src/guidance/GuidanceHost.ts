@@ -19,11 +19,11 @@
 import { promises as fsp } from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import type { AgentId } from '../agent/types';
+import type { AgentId, SetupStatus } from '../agent/types';
 import { beginClaudeLogin, cancelClaudeLogin } from '../agent/claudeLogin';
 import { onClaudeStatusInvalidated } from '../agent/claudeStatusEvents';
 import { getSetupStatus } from '../agent/setup';
-import { onCodexStatusInvalidated } from '../codex/codexStatusEvents';
+import { CODEX_LOGIN_TIMEOUT_MS, onCodexStatusInvalidated } from '../codex/codexStatusEvents';
 import { trackEvent } from '../analytics/posthog';
 import type { WelcomeProvider } from '../analytics/events';
 import { normalizeProjectUri, resolveProjectScope } from '../conversations/projectScope';
@@ -54,13 +54,28 @@ const SKIP_DIRS = /[\\/](\.git|node_modules|\.ritemark)[\\/]/;
 /** How Home's sign-in ended: ready, stopped by the person (no line), or one of the welcome's reasons. */
 type SignInOutcome = 'ready' | 'stopped' | SignInProblem;
 
-/** Sprint 156: the sign-in Home runs, one at a time, and how it settles. */
+/** Sprint 156: a sign-in Home runs (one per AI), and how it settles. */
 interface HomeSignIn {
   ai: AgentId;
   /** `starting` until its page is open (ChatGPT: after VS Code's "open the website?" question), then `waiting`. */
   phase: 'starting' | 'waiting';
   settle(outcome: SignInOutcome): void;
+  /** Home's own give-up (ChatGPT: the welcome's 2 minutes), whoever else is polling the sign-in. */
+  timer?: ReturnType<typeof setTimeout>;
 }
+
+/** The welcome's Claude sign-in, as Home uses it; a test passes its own. */
+export interface ClaudeSignIn {
+  setupStatus(): Promise<Pick<SetupStatus, 'runnable' | 'binaryPath' | 'authenticated'>>;
+  begin: typeof beginClaudeLogin;
+  cancel: typeof cancelClaudeLogin;
+}
+
+const CLAUDE_SIGN_IN: ClaudeSignIn = {
+  setupStatus: () => getSetupStatus({ refresh: true }),
+  begin: beginClaudeLogin,
+  cancel: cancelClaudeLogin,
+};
 
 export interface GuidanceDependencies {
   context: vscode.ExtensionContext;
@@ -77,6 +92,8 @@ export interface GuidanceDependencies {
   onChatOrigin(listener: (origin: ChatOrigin) => void): vscode.Disposable;
   /** Sprint 142 (R5b): open a chat on the AI's sheet by its id. */
   openConversation?(conversationId: string): Promise<void>;
+  /** Sprint 156: Claude's sign-in, the welcome's own functions unless a test passes its own. */
+  claudeSignIn?: ClaudeSignIn;
 }
 
 /** What Home's host read for its own state, passed in so nothing is read twice. */
@@ -100,13 +117,19 @@ export class GuidanceHost implements vscode.Disposable {
   /** Fires when Home's card may have changed: a sign-in, a press, a send. */
   readonly onDidChange = this.changed.event;
   private readonly origins = new Map<string, ChatOrigin>();
-  /** Sprint 156: the sign-in running from Home (the card's press or Ask with), null when none. */
-  private signing: HomeSignIn | null = null;
+  /** Sprint 156: the sign-ins running from Home (the card's press or Ask with), by AI. */
+  private readonly signings = new Map<AgentId, HomeSignIn>();
   /** Each AI's sign-in page, kept for "Open the page again", as the welcome keeps it. */
   private readonly signInPages: Partial<Record<AgentId, string>> = {};
+  /** Sprint 156: "Open the page again" had no page to open, or it didn't open: the welcome's line, while it waits. */
+  private reopenProblem: string | null = null;
   private aiCache: { at: number; states: Partial<Record<AgentId, AiState>> } | null = null;
   private readyProblem: string | null = null;
-  /** Sprint 156: why Home's last sign-in ended (the welcome's reason), shown on the problem line until that AI is ready. */
+  /**
+   * Sprint 156: why Home's last sign-in to an AI ended (the welcome's reason). On the card's problem line while the card
+   * names that AI and asks it to sign in; the next press, or a sign-in that makes it ready, takes it away (the Experience
+   * lead, ritemark-dev f85e188).
+   */
   private signInFailure: { ai: AgentId; line: string } | null = null;
   /** Sprint 142 (R5b): when the folder's request was last sent from Home. */
   private filesPressedAt: number | null = null;
@@ -120,15 +143,22 @@ export class GuidanceHost implements vscode.Disposable {
     this.store = new GuidanceStore(deps.context.globalState, version);
     // Sprint 156: a test launch can stage a lapsed sign-in (test channel only; no effect anywhere else)
     void seedLastReadyAiForTest(deps.context.globalState);
-    // Sprint 156: a sign-in or sign-out anywhere (the AI's sheet, Settings, a terminal) or a key saved: Home's card
-    // reads the AIs again, so it never offers a second sign-in
-    const forgetAis = () => {
+    // Sprint 156: a sign-in or sign-out anywhere (the AI's sheet, Settings, a terminal) or an AI's key saved: Home's
+    // card reads the AIs again, so it never offers a second sign-in. A sign-in Home runs settles here too when its AI
+    // reads usable, as the welcome's recheck does: the login's poll can be restarted by the AI's sheet, and a finished
+    // ChatGPT login stops it, so the poll alone can't be relied on (#694)
+    const statusChanged = (ai: AgentId) => (event: { reason: string }) => {
       this.aiCache = null;
+      if (event.reason !== 'login-started') void this.settleIfReady(ai, event.reason === 'login-finished');
       this.changed.fire();
     };
-    const offClaude = onClaudeStatusInvalidated(forgetAis);
-    const offCodex = onCodexStatusInvalidated(forgetAis);
-    this.disposables.push({ dispose: offClaude }, { dispose: offCodex }, deps.context.secrets.onDidChange(forgetAis));
+    const offClaude = onClaudeStatusInvalidated(statusChanged('claude-code'));
+    const offCodex = onCodexStatusInvalidated(statusChanged('codex'));
+    this.disposables.push({ dispose: offClaude }, { dispose: offCodex }, deps.context.secrets.onDidChange((event) => {
+      if (!KEY_NAMES.includes(event.key as HomeKeyName)) return;
+      this.aiCache = null;
+      this.changed.fire();
+    }));
     madeSomething.setSink((how, afterReadyRequest) => {
       void trackEvent('made_something', { how, after_ready_request: afterReadyRequest });
     });
@@ -202,6 +232,10 @@ export class GuidanceHost implements vscode.Disposable {
     await this.store.noteReadyShown(today);
     const states = await this.aiStates();
     const chosen = this.cardAiOf(record, states);
+    // The card waits only for a sign-in to the AI it names, with no AI ready (answer 1); with one ready it stays usable
+    const signing = chosen.ready ? undefined : this.signings.get(chosen.ai);
+    // A failure line belongs to the card that names that AI; once that AI is ready it has nothing to say
+    if (chosen.ready && this.signInFailure?.ai === chosen.ai) this.signInFailure = null;
     const counts = kind === 'files' ? await this.countsOf(input.folderPath, input.skipAtRoot) : null;
     const words = readyRequestWords(kind, AI_NAMES[chosen.ai], input.projectName, counts, chosen.ready);
     // Ask with keeps every AI in today's order, the leading one too, each with its state (the Experience lead, answer 5)
@@ -213,26 +247,30 @@ export class GuidanceHost implements vscode.Disposable {
       ai: chosen.ai,
       aiName: AI_NAMES[chosen.ai],
       aiReady: chosen.ready,
-      signingIn: this.signing?.ai === chosen.ai ? this.signing.phase : null,
+      signingIn: signing?.phase ?? null,
       ais,
       keysSet: await this.keysSet(),
-      problem: this.readyProblem ?? (this.signInFailure && states[this.signInFailure.ai] !== 'ready' ? this.signInFailure.line : null),
+      problem: this.readyProblem
+        ?? (signing ? (signing.phase === 'waiting' ? this.reopenProblem : null)
+          : !chosen.ready && this.signInFailure?.ai === chosen.ai ? this.signInFailure.line : null),
     };
   }
 
   /**
-   * The AI the card names (R4): while Home signs in to one, that one, waiting; else `cardAi`, which with no AI ready
-   * is the AI the card signs in to (Sprint 156, `leadAi`).
+   * The AI the card names (R4): `cardAi`, which with no AI ready is the AI the card signs in to (Sprint 156,
+   * `leadAi`); with no AI ready and Home signing in to one (the card's press or Ask with), that one.
    */
   private cardAiOf(record: ReadyRecord, states: Partial<Record<AgentId, AiState>>): { ai: AgentId; ready: boolean } {
-    if (this.signing) return { ai: this.signing.ai, ready: false };
-    return cardAi({
+    const named = cardAi({
       chosen: record.ai,
       sheetAi: sheetAi(),
       states,
       lastReady: readLastReadyAi(this.deps.context.globalState),
       canSignIn: canSignInHere(states, readAgentRuntimePreference()),
     });
+    if (named.ready) return named;
+    const signing = this.signings.has(named.ai) ? named.ai : this.signings.keys().next().value;
+    return signing ? { ai: signing, ready: false } : named;
   }
 
   /**
@@ -246,13 +284,14 @@ export class GuidanceHost implements vscode.Disposable {
     const kind: ReadyKind = readyKindOf({ empty: input.empty, sample: await isSample(input.folderPath) });
     const states = await this.aiStates();
     const chosen = this.cardAiOf(record, states);
+    // The press is the retry: the last failure's line goes with it, and comes back only if this try fails too
+    this.signInFailure = null;
     if (!chosen.ready) {
       // OpenCode's Set up opens its key sheet on the page, as Ask with does; a press that reaches here goes to Settings
       await this.signIn(input.folderUri, chosen.ai);
       return;
     }
     this.readyProblem = null;
-    this.signInFailure = null;
     const provider = PROVIDER[chosen.ai];
     // Sprint 142 (R5b): a second press opens the chat the first one started; the button is never disabled for it
     const press = readyPressAction({
@@ -326,9 +365,10 @@ export class GuidanceHost implements vscode.Disposable {
 
   /**
    * Sign in (Claude, ChatGPT) through the welcome's own entry points; the AI is chosen once it is ready (R4).
-   * Sprint 156: one at a time, from the card's press or Ask with. The card waits while it runs; Cancel, or a declined
-   * "open the website?", puts it back as it was; a failure or a timeout puts it back with the welcome's reason on its
-   * problem line, and pressing again retries.
+   * Sprint 156: one sign-in per AI, from the card's press or Ask with. With no AI ready the card waits while it runs;
+   * Cancel, or a declined "open the website?", puts it back as it was; a failure or a timeout puts it back with the
+   * welcome's reason on its problem line, and pressing again retries. It settles from the login's own callbacks, from
+   * the AI's status events when the AI reads usable, or from Home's own give-up timer, whichever comes first.
    */
   async signIn(folderUri: string, ai: AgentId): Promise<void> {
     if (ai === 'opencode') {
@@ -336,13 +376,15 @@ export class GuidanceHost implements vscode.Disposable {
       await vscode.commands.executeCommand('ritemark.aiSettings');
       return;
     }
-    if (this.signing) return;
+    if (this.signings.has(ai)) return;
     const signing: HomeSignIn = {
       ai,
       phase: 'starting',
       settle: (outcome) => {
-        if (this.signing !== signing) return;
-        this.signing = null;
+        if (this.signings.get(ai) !== signing) return;
+        this.signings.delete(ai);
+        if (signing.timer) clearTimeout(signing.timer);
+        this.reopenProblem = null;
         this.aiCache = null;
         if (outcome === 'ready') {
           void this.readyFromHome(folderUri, ai);
@@ -352,50 +394,62 @@ export class GuidanceHost implements vscode.Disposable {
         this.changed.fire();
       },
     };
-    this.signing = signing;
-    this.readyProblem = null;
+    this.signings.set(ai, signing);
+    // A new try: the last failure's line goes with it (the Experience lead, f85e188)
     this.signInFailure = null;
+    this.reopenProblem = null;
     delete this.signInPages[ai];
     this.changed.fire();
+    const current = () => this.signings.get(ai) === signing;
     const toSettings = async () => {
       signing.settle('stopped');
       await vscode.commands.executeCommand('ritemark.aiSettings');
     };
     if (ai === 'claude-code') {
-      const status = await getSetupStatus({ refresh: true }).catch(() => null);
+      const claude = this.deps.claudeSignIn ?? CLAUDE_SIGN_IN;
+      const status = await claude.setupStatus().catch(() => null);
+      if (!current()) return;
       if (!status?.runnable || !status.binaryPath) return toSettings();
       if (status.authenticated) return signing.settle('ready');
       // Claude's own CLI opens the browser: the card waits at once, as the welcome's does
       signing.phase = 'waiting';
       this.changed.fire();
-      const started = beginClaudeLogin(status.binaryPath, {
+      // A login that can't start reports its error before it returns: that is "couldn't start", not "didn't finish"
+      let launching = true;
+      const started = claude.begin(status.binaryPath, {
         onUrl: (url) => { this.signInPages[ai] = url; },
         onComplete: () => signing.settle('ready'),
-        onError: () => signing.settle('failed'),
+        onError: () => { if (!launching) signing.settle('failed'); },
         onTimeout: () => signing.settle('timed-out'),
         onCancel: () => signing.settle('stopped'),
       });
+      launching = false;
       if (started === 'failed-to-start') signing.settle('could-not-start');
       return;
     }
     try {
       // Signed in already (on the AI's sheet, in Settings, in another window): nothing to start, the card just redraws
       const availability = await this.deps.runtimeAvailability('codex').catch(() => null);
+      if (!current()) return;
       if (availability?.usable) return signing.settle('ready');
       const page = await this.deps.startCodexSignIn((state) => {
         if (state === 'ready') signing.settle('ready');
-        // The sign-in's polling gave up (2 minutes) without a sign-in
+        // The sign-in's poll gave up (2 minutes) without a sign-in
         else if (state === 'needs-auth') signing.settle('timed-out');
       });
+      if (!current()) return;
       if (!page) return toSettings();
       this.signInPages[ai] = page;
+      // Home's own give-up, the welcome's 2 minutes, in case the poll that would have said so was stopped or restarted
+      signing.timer = setTimeout(() => signing.settle('timed-out'), CODEX_LOGIN_TIMEOUT_MS);
       if (!(await vscode.env.openExternal(vscode.Uri.parse(page)))) {
         // The "open the website?" question was answered with Cancel, or nothing could open the page: stop Codex's
         // listener, and the card is back as it was, with no line (the Experience lead, answer 2)
+        if (!current()) return;
         await this.deps.stopCodexSignIn().catch(() => undefined);
         return signing.settle('stopped');
       }
-      if (this.signing !== signing) return;
+      if (!current()) return;
       signing.phase = 'waiting';
       this.changed.fire();
     } catch {
@@ -403,30 +457,61 @@ export class GuidanceHost implements vscode.Disposable {
     }
   }
 
+  /**
+   * Sprint 156 (#694): a sign-in Home runs is ready once its AI reads usable, however the news came. Right after a
+   * ChatGPT login finishes its runtime restarts, so a read that misses it is made once more.
+   */
+  private async settleIfReady(ai: AgentId, readAgain: boolean): Promise<void> {
+    const signing = this.signings.get(ai);
+    if (!signing) return;
+    const usable = async () => (await this.deps.runtimeAvailability(ai).catch(() => null))?.usable === true;
+    if (await usable()) return signing.settle('ready');
+    if (!readAgain) return;
+    setTimeout(() => {
+      void (async () => {
+        if (this.signings.get(ai) === signing && await usable()) signing.settle('ready');
+      })();
+    }, 1500);
+  }
+
+  /** The sign-in the card shows: the one to the AI it names (with no AI ready, Home runs at most one). */
+  private cardSigning(): HomeSignIn | undefined {
+    return this.signings.values().next().value;
+  }
+
   /** Sprint 156: the card's Cancel stops waiting, as the welcome's does; the card is back as it was, with no line. */
   async cancelSignIn(): Promise<void> {
-    const signing = this.signing;
+    const signing = this.cardSigning();
     if (!signing) return;
     if (signing.ai === 'claude-code') {
-      if (!cancelClaudeLogin()) signing.settle('stopped');
+      if (!(this.deps.claudeSignIn ?? CLAUDE_SIGN_IN).cancel()) signing.settle('stopped');
       return;
     }
     await this.deps.stopCodexSignIn().catch(() => undefined);
     signing.settle('stopped');
   }
 
-  /** Sprint 156: "Open the page again" opens the sign-in's page again, as the welcome's does. */
+  /**
+   * Sprint 156: "Open the page again" opens the sign-in's page again, as the welcome's does. Never silent (#694): with
+   * no page to open, or a page that didn't open, the welcome's line says so under the row.
+   */
   async reopenSignIn(): Promise<void> {
-    const page = this.signing ? this.signInPages[this.signing.ai] : undefined;
-    if (page) await vscode.env.openExternal(vscode.Uri.parse(page));
+    const signing = this.cardSigning();
+    if (!signing) return;
+    const page = this.signInPages[signing.ai];
+    const opened = page ? await Promise.resolve(vscode.env.openExternal(vscode.Uri.parse(page))).catch(() => false) : false;
+    if (this.cardSigning() !== signing) return;
+    this.reopenProblem = opened ? null : signInProblem(PROVIDER[signing.ai], 'not-opened');
+    this.changed.fire();
   }
 
   /**
    * Sprint 156: an AI made ready from Home is chosen on the card (R4), is the AI last seen ready, and becomes the AI
    * for new chats, as the welcome's choice does, so the status bar names it; a chat that is open keeps its AI (the
-   * Experience lead, answer 8).
+   * Experience lead, answer 8). Any failure line has done its job.
    */
   private async readyFromHome(folderUri: string, ai: AgentId): Promise<void> {
+    this.signInFailure = null;
     this.aiCache = null;
     const states = await this.aiStates();
     if (states[ai] === 'ready') {
@@ -564,13 +649,13 @@ export class GuidanceHost implements vscode.Disposable {
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   private async aiStates(): Promise<Partial<Record<AgentId, AiState>>> {
-    if (this.aiCache && Date.now() - this.aiCache.at < AI_CACHE_MS && !this.signing) return this.aiCache.states;
+    if (this.aiCache && Date.now() - this.aiCache.at < AI_CACHE_MS && this.signings.size === 0) return this.aiCache.states;
     const states: Partial<Record<AgentId, AiState>> = {};
     await Promise.all(AI_ORDER.map(async (id) => {
       const availability = await this.deps.runtimeAvailability(id).catch(() => null);
       if (!availability || availability.state === 'disabled') return;
       states[id] = availability.usable ? 'ready'
-        : this.signing?.ai === id || availability.state === 'auth-in-progress' ? 'signing-in'
+        : this.signings.has(id) || availability.state === 'auth-in-progress' ? 'signing-in'
         : availability.state === 'checking' ? 'checking'
         : id === 'opencode' || availability.state !== 'needs-auth' ? 'set-up'
         : 'sign-in';
@@ -613,6 +698,7 @@ export class GuidanceHost implements vscode.Disposable {
 
   dispose(): void {
     if (this.placeTimer) clearTimeout(this.placeTimer);
+    for (const signing of this.signings.values()) if (signing.timer) clearTimeout(signing.timer);
     madeSomething.setSink(null);
     this.changed.dispose();
     this.disposables.forEach((disposable) => disposable.dispose());

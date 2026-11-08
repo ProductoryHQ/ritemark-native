@@ -150,7 +150,7 @@ function buttonCells(variant: ButtonVariant): CatalogueCell[] {
   if (variant === 'toolbar') cells.splice(6, 0, t('on', () => b({ on: true })))
   return cells
 }
-function sizeCells(size: 'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'): CatalogueCell[] {
+function sizeCells(size: 'default' | 'sm' | 'compact' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'): CatalogueCell[] {
   const iconOnly = size === 'icon' || size === 'icon-sm' || size === 'icon-lg'
   const b = () => (
     <Button data-target variant="outline" size={size} aria-label={iconOnly ? 'Ask Claude' : undefined}>
@@ -359,7 +359,7 @@ export const CATALOGUE: CatalogueRow[] = [
     covers: ['Button'],
     variants: [
       ...BUTTON_VARIANTS.map((variant) => ({ id: variant, label: variant, cells: buttonCells(variant) })),
-      ...(['default', 'sm', 'lg', 'icon', 'icon-sm', 'icon-lg'] as const).map((size) => ({ id: `size-${size}`, label: `size ${size}`, cells: sizeCells(size) })),
+      ...(['default', 'sm', 'compact', 'lg', 'icon', 'icon-sm', 'icon-lg'] as const).map((size) => ({ id: `size-${size}`, label: `size ${size}`, cells: sizeCells(size) })),
     ],
   },
   {

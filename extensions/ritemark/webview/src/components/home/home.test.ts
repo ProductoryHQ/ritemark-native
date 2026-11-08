@@ -388,8 +388,7 @@ pressMain(ready({ kind: 'sample' }) as never, page)
 assert.equal(page.pressing, 1, 'a ready sample still waits for the board')
 posted.splice(before)
 
-// Ask with is unchanged: every AI in today's order, the leading one too, each with its state (answer 5)
-assert.deepEqual(noAiStates.map((ai) => ai.name), ['Claude', 'ChatGPT', 'OpenCode'])
+// Ask with is unchanged (answer 5): the host's list is asserted where the host builds it (src/guidance/GuidanceHost.test.ts)
 
 // Signing in, before the page is open (VS Code may ask "open the website?" first): the button waits, nothing else yet
 const starting = parse(render(home({ guidance: noAi({ signingIn: 'starting' }) }))).querySelector('.rh-guide')!

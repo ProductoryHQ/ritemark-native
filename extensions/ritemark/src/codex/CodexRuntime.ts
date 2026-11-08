@@ -25,7 +25,7 @@ import { changedFilesOfCodexItem, type ToolRequestUserInputAnswer } from './code
 import { workspaceFilesOnly } from '../runtime/turnFiles';
 import { routeApprovalRequest, threadIdOf } from './codexApproval';
 import { traceCodex } from './codexTrace';
-import { emitCodexStatusInvalidated } from './codexStatusEvents';
+import { CODEX_LOGIN_POLL_ATTEMPTS, CODEX_LOGIN_POLL_MS, emitCodexStatusInvalidated } from './codexStatusEvents';
 import { CODEX_MODEL_IDS } from '../ai/modelConfig';
 import { isEnabled } from '../features';
 import type { AgentId } from '../agent/types';
@@ -529,6 +529,8 @@ export class CodexRuntime implements AgentRuntime {
   private _auth: CodexAuth | null = null;
   private _loginInProgress = false;
   private _loginPoll: ReturnType<typeof setInterval> | null = null;
+  /** Sprint 156 (#694): who hears the sign-in's polls until it stops, whoever (re)starts the poll (`listenToLoginPoll`). */
+  private readonly _loginPollListeners = new Set<(status: CodexSidebarStatus) => void>();
 
   /** One session per conversation, all sharing the single app-server process. */
   private readonly _sessions = new Map<string, CodexSession>();
@@ -604,33 +606,54 @@ export class CodexRuntime implements AgentRuntime {
 
   isLoginInProgress(): boolean { return this._loginInProgress; }
 
+  /** Stop the sign-in's poll; its listeners go with it. */
   stopLoginPolling(): void {
+    this._clearLoginPoll();
+    this._loginPollListeners.clear();
+  }
+
+  private _clearLoginPoll(): void {
     if (this._loginPoll) {
       clearInterval(this._loginPoll);
       this._loginPoll = null;
     }
   }
 
+  /**
+   * Sprint 156 (#694): hear every poll of this sign-in, its last one included (ready, or the give-up after 2 minutes),
+   * until the poll stops. A later `startLoginPolling` (the AI sheet's own, on `login-started`) restarts the poll with
+   * its callback and keeps these listeners, where it used to drop the first caller's (the welcome's and Home's
+   * ChatGPT sign-in, whose timeout never came).
+   */
+  listenToLoginPoll(listener: (status: CodexSidebarStatus) => void): void {
+    this._loginPollListeners.add(listener);
+  }
+
   startLoginPolling(onStatus: (status: CodexSidebarStatus) => void): void {
-    this.stopLoginPolling();
+    this._clearLoginPoll();
     let attempts = 0;
+    const notify = (status: CodexSidebarStatus, listeners = [...this._loginPollListeners]) => {
+      onStatus(status);
+      for (const listener of listeners) listener(status);
+    };
     this._loginPoll = setInterval(() => {
       attempts += 1;
       void (async () => {
         const status = await this.getCodexSidebarStatus();
-        onStatus(status);
+        const listeners = [...this._loginPollListeners];
+        notify(status, listeners);
         if (status.state === 'ready') {
           this._loginInProgress = false;
           this.stopLoginPolling();
           return;
         }
-        if (attempts >= 60) {
+        if (attempts >= CODEX_LOGIN_POLL_ATTEMPTS) {
           this._loginInProgress = false;
           this.stopLoginPolling();
-          onStatus(await this.getCodexSidebarStatus());
+          notify(await this.getCodexSidebarStatus(), listeners);
         }
       })();
-    }, 2000);
+    }, CODEX_LOGIN_POLL_MS);
   }
 
   /**

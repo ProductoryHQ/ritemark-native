@@ -540,9 +540,6 @@ body.vscode-dark .rp-row:not(.missing) .rp-mini, body[data-vscode-theme-kind='vs
 .rh-ask .rh-ask-in::placeholder { color: var(--r-ink-faint); }
 .rh-ask .rh-ask-in:focus { box-shadow: inset 0 0 0 1px var(--r-accent), 0 0 0 3px var(--r-ring-color, rgba(67, 56, 202, 0.1)); }
 .rh-ask .rh-ask-acts { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0 24px; }
-.rh-ask .rh-ask-acts button { height: 28px; padding: 0 10px; border-radius: 6px; font: 500 13px/28px var(--ritemark-ui-font-family); }
 .rh-guide .rh-quiet { color: var(--r-ink-body); }
-/* Sprint 156: while the card signs in, its Cancel and "Open the page again" are quiet, at the split button's height (the
-   feedback card's buttons above; the welcome's quiet ones, welcome.css), and the second line sits under the row */
-.rh-guide .rh-guide-go .rh-quiet { height: 28px; padding: 0 8px; border-radius: 6px; font: 500 13px/28px var(--ritemark-ui-font-family); }
+/* Sprint 156: while the card signs in, "Open the page again" is a second row, under the button's */
 .rh-guide .rh-guide-go + .rh-guide-go { margin-top: 8px; }
