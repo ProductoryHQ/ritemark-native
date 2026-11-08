@@ -79,6 +79,21 @@ export function browserOpened(id: WelcomeProviderId): string {
   return id === 'opencode' ? 'Checking your keys…' : `Your browser opened ${PROVIDER_NAMES[id]}’s sign-in page.`
 }
 
+/**
+ * Frame 2's tooltips, shared with Home's card while it signs in (Sprint 156): Cancel's, and "Open the page again"'s.
+ * The welcome adds the key to Cancel's, where Escape cancels.
+ */
+export function stopWaitingTip(id: WelcomeProviderId): string {
+  return `Stop waiting for ${PROVIDER_NAMES[id]}’s sign-in`
+}
+
+export function reopenTip(id: WelcomeProviderId): string {
+  return `Open ${PROVIDER_NAMES[id]}’s sign-in page again`
+}
+
+/** OpenCode's Set up, which opens the key sheet (step 1's card, the update sheet's row, Home's card). */
+export const OPENCODE_SET_UP_TIP = 'Add an API key of your own for OpenCode'
+
 /** The line above step 2's question. */
 export function readyLine(id: WelcomeProviderId): string {
   return id === 'opencode' ? 'OpenCode is set up' : `Signed in to ${PROVIDER_NAMES[id]}`

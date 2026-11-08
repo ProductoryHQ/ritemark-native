@@ -80,11 +80,25 @@ import {
   type WelcomeState,
 } from './protocol';
 import { WELCOME_VIEW_TYPE, welcomeHtml } from './welcomePanel';
+import { noteLastReadyAi } from '../guidance/guidanceStore';
 import { HOME_PLACE_ID } from '../frameIdentifiers';
 import { isShellPageSignal } from '../shellPageSignals';
 
 /** The workbench draws the welcome alone while this is true (patch 018, `ritemarkWelcomeAlone.ts`). */
 export const WELCOME_ALONE_CONTEXT_KEY = 'ritemark.welcomeAlone';
+
+/**
+ * The AI new chats start with (`ritemark.ai.selectedAgent`), saved as the welcome's choice saves it (Sprint 143, #551,
+ * R2), so the status bar names it. Sprint 156: a sign-in from Home's card saves it the same way (the Experience lead,
+ * answer 8); a chat that is open keeps its AI.
+ */
+export async function saveAiForNewChats(agent: AgentId): Promise<void> {
+  try {
+    await vscode.workspace.getConfiguration('ritemark.ai').update('selectedAgent', agent, vscode.ConfigurationTarget.Global);
+  } catch (error) {
+    console.warn('[ritemark] Could not save the AI for new chats:', error);
+  }
+}
 
 /** The AI sheet's host, as far as the welcome needs it. */
 export interface WelcomeAiSheet {
@@ -553,6 +567,8 @@ class WelcomeController implements vscode.Disposable {
   /** A provider became ready from the welcome: the event (held until the answer), and step 2 (R3). */
   private providerReadyFromWelcome(id: WelcomeProviderId, method: 'account' | 'api_key'): void {
     this.memories[id].problem = null;
+    // Sprint 156: the AI last seen ready, so Home's card can lead with it if its sign-in lapses
+    void noteLastReadyAi(this.context.globalState, runtimeOfProvider(id));
     void trackWelcomeEvent('ai_signed_in', { provider: id, method });
     const next = afterProviderReady({ kind: this.kind, step: this.step, readyProvider: this.readyProvider }, id);
     this.step = next.step;
@@ -964,13 +980,7 @@ class WelcomeController implements vscode.Disposable {
     // Sprint 143 (#551, R2): the chosen AI is the one new chats start with, saved before the reload, so the
     // project's first chat is on it even if the landing never applies. The landing itself writes the same.
     const agent = selectedAgentOnLeave(this.readyProvider);
-    if (agent) {
-      try {
-        await vscode.workspace.getConfiguration('ritemark.ai').update('selectedAgent', agent, vscode.ConfigurationTarget.Global);
-      } catch (error) {
-        console.warn('[welcome] Could not save the chosen AI:', error);
-      }
-    }
+    if (agent) await saveAiForNewChats(agent);
     try {
       await vscode.commands.executeCommand('vscode.openFolder', folder, { forceNewWindow: false });
     } catch {

@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AccountProviderId, WelcomeMessage, WelcomeState } from '../../../../src/welcome/protocol'
 import { CHECK_TIMEOUT_MS, projectLine, signInAnswered, startSignIn, updateRows, withStartingSignIn, type StartingSignIn } from '../../../../src/welcome/welcomeState'
 import { Icon } from '../ui/Icon'
-import { COPY, PROVIDER_NAMES, missingToolLine, readyLine, spokenState } from './welcomeCopy'
+import { COPY, missingToolLine, readyLine, reopenTip, spokenState } from './welcomeCopy'
 import {
   ChoiceRow,
   KeySheet,
@@ -196,7 +196,7 @@ function AiChoices({ view, signingIn, onKeys, onSignIn, skip = true }: { view: W
         <div className="rw-links">
           <SheetButton
             label={COPY.reopen}
-            tooltip={`Open ${PROVIDER_NAMES[signingIn as 'claude' | 'chatgpt']}’s sign-in page again`}
+            tooltip={reopenTip(signingIn as 'claude' | 'chatgpt')}
             onClick={() => send({ type: 'welcome/reopen-sign-in', provider: signingIn as 'claude' | 'chatgpt' })}
           />
         </div>

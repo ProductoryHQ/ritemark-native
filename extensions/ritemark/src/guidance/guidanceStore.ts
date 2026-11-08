@@ -6,10 +6,16 @@
  * Per project (by its folder's normalized URI): the ready request's record.
  * Per release (major.minor): the days a document was saved, and the feedback
  * card's answer. And the last day the ready request showed on Home (D1).
+ *
+ * Sprint 156: the AI last seen ready on this profile, in a key of its own,
+ * `ritemark.guidance.lastReadyAi`, holding only the AI's id. It is kept apart
+ * from `ritemark.guidance.v1`, which a window rewrites whole, so one window's
+ * write can't undo another's record.
  * No `vscode` import: it takes a Memento-shaped store.
  */
 
 import type { AgentId } from '../agent/types';
+import { testChannelRequested } from '../analytics/consent';
 import { releaseOf, withSavedDay } from './guidanceState';
 import type { ReadyGone, ReadyRecord } from './readyRequest';
 
@@ -107,4 +113,48 @@ export class GuidanceStore {
     const state = this.read();
     await this.memento.update(GUIDANCE_KEY, { ...state, release: { ...this.release(), feedback: answer } });
   }
+}
+
+// ── The AI last seen ready (Sprint 156; experience 35, "With no AI ready") ──
+
+export const LAST_READY_AI_KEY = 'ritemark.guidance.lastReadyAi';
+
+/**
+ * A test launch's stand-in for the AI last seen ready, so a lapsed Claude can be staged for screenshots (the
+ * Experience lead's approval, #690). Read only in the test channel (`RITEMARK_BUILD_CHANNEL=test`, as #681's test keys
+ * in `ai/providerKeys.ts`); in every other channel it is never read.
+ */
+export const TEST_LAST_READY_AI_ENV = 'RITEMARK_TEST_LAST_READY_AI';
+
+const isAgentId = (value: unknown): value is AgentId => AGENTS.includes(value as AgentId);
+
+/** The AI last seen ready; anything else stored is ignored. */
+export function readLastReadyAi(memento: MementoLike): AgentId | undefined {
+  const value = memento.get<unknown>(LAST_READY_AI_KEY);
+  return isAgentId(value) ? value : undefined;
+}
+
+/** An AI was seen usable (the status bar's AI, a sign-in from Home, the welcome): remember it, writing only a change. */
+export async function noteLastReadyAi(memento: MementoLike, ai: AgentId): Promise<void> {
+  if (readLastReadyAi(memento) === ai) return;
+  await memento.update(LAST_READY_AI_KEY, ai);
+}
+
+/**
+ * A sign-out pressed in Ritemark succeeded: forget the AI last seen ready, only when it is the one signed out. Any
+ * other sign-out (in a terminal, a token that ended) counts as lapsed, because Ritemark can't tell them apart.
+ */
+export async function clearLastReadyAi(memento: MementoLike, signedOut: AgentId): Promise<boolean> {
+  if (readLastReadyAi(memento) !== signedOut) return false;
+  await memento.update(LAST_READY_AI_KEY, undefined);
+  return true;
+}
+
+/** In the test channel only: `RITEMARK_TEST_LAST_READY_AI` (an AI's id) becomes the AI last seen ready. */
+export async function seedLastReadyAiForTest(memento: MementoLike, env: Record<string, string | undefined> = process.env): Promise<boolean> {
+  if (!testChannelRequested(env)) return false;
+  const value = env[TEST_LAST_READY_AI_ENV]?.trim();
+  if (!isAgentId(value)) return false;
+  await memento.update(LAST_READY_AI_KEY, value);
+  return true;
 }

@@ -12,7 +12,7 @@ import { Tooltip } from '../ui/tooltip'
 import { Icon } from '../ui/Icon'
 import { Dialog, DialogContent, DialogTitle } from '../ui/dialog'
 import type { ProjectView, ProviderView, WelcomeKeyName, WelcomeProviderId } from '../../../../src/welcome/protocol'
-import { COPY, PLAN_LINES, PROVIDER_NAMES, browserOpened } from './welcomeCopy'
+import { COPY, OPENCODE_SET_UP_TIP, PLAN_LINES, PROVIDER_NAMES, browserOpened, stopWaitingTip } from './welcomeCopy'
 import { send } from './welcomeClient'
 
 export function Spinner() {
@@ -95,7 +95,7 @@ export function ProviderCard({
             <span style={{ marginLeft: 'auto' }}>
               <SheetButton
                 label={COPY.cancel}
-                tooltip={`Stop waiting for ${name}’s sign-in (Escape)`}
+                tooltip={`${stopWaitingTip(view.id)} (Escape)`}
                 ariaLabel={`${COPY.cancel} ${name} sign-in`}
                 ariaDescribedBy={describedBy}
                 small
@@ -137,7 +137,7 @@ export function ProviderCard({
           <>
             <SheetButton
               label={isOpenCode ? COPY.setUp : COPY.signIn}
-              tooltip={isOpenCode ? 'Add an API key of your own for OpenCode' : `Sign in to ${name} in your browser`}
+              tooltip={isOpenCode ? OPENCODE_SET_UP_TIP : `Sign in to ${name} in your browser`}
               ariaLabel={isOpenCode ? `${COPY.setUp} ${name}` : `${COPY.signIn} to ${name}`}
               ariaDescribedBy={describedBy}
               primary
@@ -188,7 +188,7 @@ export function ProviderRow({ view, onSetUp, onSignIn }: { view: ProviderView; o
       {view.phase === 'signing-in' && !isOpenCode && (
         <span className="rw-state quiet">
           <Spinner />{COPY.finishThere}
-          <SheetButton label={COPY.cancel} tooltip={`Stop waiting for ${name}’s sign-in (Escape)`} ariaLabel={`${COPY.cancel} ${name} sign-in`} ariaDescribedBy={wordsId} small onClick={() => send({ type: 'welcome/cancel-sign-in', provider: view.id as 'claude' | 'chatgpt' })} />
+          <SheetButton label={COPY.cancel} tooltip={`${stopWaitingTip(view.id)} (Escape)`} ariaLabel={`${COPY.cancel} ${name} sign-in`} ariaDescribedBy={wordsId} small onClick={() => send({ type: 'welcome/cancel-sign-in', provider: view.id as 'claude' | 'chatgpt' })} />
         </span>
       )}
       {view.phase === 'unavailable' && (
@@ -199,7 +199,7 @@ export function ProviderRow({ view, onSetUp, onSignIn }: { view: ProviderView; o
           {view.retry && <ProviderState view={view} />}
           <SheetButton
             label={isOpenCode ? COPY.setUp : COPY.signIn}
-            tooltip={isOpenCode ? 'Add an API key of your own for OpenCode' : `Sign in to ${name} in your browser`}
+            tooltip={isOpenCode ? OPENCODE_SET_UP_TIP : `Sign in to ${name} in your browser`}
             ariaLabel={isOpenCode ? `${COPY.setUp} ${name}` : `${COPY.signIn} to ${name}`}
             ariaDescribedBy={view.reason ? wordsId : undefined}
             primary

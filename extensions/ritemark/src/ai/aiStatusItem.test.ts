@@ -4,6 +4,8 @@
  * the default AI changes; it probes only the AI in question when that AI is ready, and the others cheapest first when
  * it isn't; a sign-in or repair that has only started re-reads nothing; "ready" waits for the internet's first answer;
  * and it is one item, its words only (no dot in 2.1).
+ * Sprint 156: it remembers the AI in question as the AI last seen ready only when that AI is usable, never another
+ * AI its probes found ready.
  *
  * Time is mocked (node:test's mock timers), so the 300 ms debounce and the 15 s reuse are stepped exactly.
  *
@@ -89,8 +91,12 @@ async function main(): Promise<void> {
   const internet = { online: true, answered: false };
   const internetChanged = () => { for (const l of internetListeners) l(); };
 
+  // Sprint 156: the profile's global state, where the AI last seen ready is kept
+  const state = new Map<string, unknown>();
+  const globalState = { get: (key: string) => state.get(key), update: async (key: string, value: unknown) => { state.set(key, value); } };
+  const lastReady = () => state.get('ritemark.guidance.lastReadyAi');
   initAiStatusItem(
-    { subscriptions: [], secrets: { onDidChange: (l: Listener<unknown>) => { secretListeners.push(l); return { dispose() {} }; } } } as never,
+    { subscriptions: [], globalState, secrets: { onDidChange: (l: Listener<unknown>) => { secretListeners.push(l); return { dispose() {} }; } } } as never,
     {
       runtimeAvailability: async (id) => {
         probes.push(id);
@@ -117,6 +123,7 @@ async function main(): Promise<void> {
   await flush();
   assert.equal(words.shown, false, 'no "Claude ready" before the internet has answered once');
   assert.deepEqual(probes, ['claude-code'], 'a ready AI: only it is probed');
+  assert.equal(lastReady(), 'claude-code', 'Sprint 156: a usable default AI is remembered as the last ready');
 
   // The internet answers.
   internet.answered = true;
@@ -138,6 +145,7 @@ async function main(): Promise<void> {
   mock.timers.tick(1);
   await flush();
   assert.equal(words.text, 'ChatGPT ready', 'the open chat names its AI');
+  assert.equal(lastReady(), 'codex', 'Sprint 156: the open chat\'s usable AI is remembered');
 
   // Its last turn failed on sign-in.
   openChat = { agentId: 'codex', signInEnded: true };
@@ -157,12 +165,14 @@ async function main(): Promise<void> {
   // probed cheapest first (OpenCode, then ChatGPT), stopping at the first that can take a turn.
   openChat = null;
   usable['claude-code'] = false;
+  state.delete('ritemark.guidance.lastReadyAi');
   for (const l of openChatListeners) l();
   emitClaudeStatusInvalidated('logout');
   await settle();
   assert.equal(words.text, 'Claude: sign in');
   assert.equal(words.tooltip, 'Sign in to Claude to work with it here');
   assert.deepEqual(probes, ['claude-code', 'opencode', 'codex'], 'the target, then the others cheapest first');
+  assert.equal(lastReady(), undefined, 'Sprint 156: an AI that can\'t take a turn is never stored, and ChatGPT found ready by the others\' probe isn\'t either');
 
   // ChatGPT signs out too: nothing is ready.
   usable.codex = false;
@@ -170,6 +180,7 @@ async function main(): Promise<void> {
   await settle();
   assert.equal(words.text, 'No AI yet');
   assert.equal(words.tooltip, 'Sign in to an AI to work with it here');
+  assert.equal(lastReady(), undefined, 'Sprint 156: nothing usable, nothing stored');
 
   // The internet goes: Offline comes first; and back.
   internet.online = false;
@@ -188,6 +199,7 @@ async function main(): Promise<void> {
   for (const l of configListeners) l({ affectsConfiguration: (key) => key === 'ritemark.ai.selectedAgent' });
   await settle();
   assert.equal(words.text, 'OpenCode ready');
+  assert.equal(lastReady(), 'opencode');
 
   // OpenCode's model list changes: OpenCode is probed again, once even when two changes arrive together.
   usable.opencode = false;
@@ -197,6 +209,7 @@ async function main(): Promise<void> {
   await settle();
   assert.equal(words.text, 'No AI yet', 'the new list is read');
   assert.equal(probes.filter((id) => id === 'opencode').length, 1, 'one probe for one burst');
+  assert.equal(lastReady(), 'opencode', 'Sprint 156: OpenCode no longer usable stays the last seen ready');
 
   // The click opens the AI's sheet.
   await commands.get('ritemark.aiStatus.open')?.();

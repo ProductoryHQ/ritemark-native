@@ -161,6 +161,7 @@ import {
   type ChatLocalTarget,
 } from './chatLinkTargets';
 import { aiColumnShownSince, aiStartingMarkBody, aiStartingMarkHead, shellLookSince } from './aiStartingMark';
+import { clearLastReadyAi, type MementoLike } from '../guidance/guidanceStore';
 
 const _toolsInjector = new RitemarkToolsInjector();
 
@@ -405,6 +406,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     private readonly _workspacePath: string | undefined,
     private readonly _secrets: vscode.SecretStorage | undefined,
     globalStorageUri: vscode.Uri,
+    /** Sprint 156: the profile's global state, where a sign-out from the sheet forgets the AI last seen ready. */
+    private readonly _globalState?: MementoLike,
   ) {
     this._disposeCodexStatusListener = onCodexStatusInvalidated((event) => {
       void this._handleExternalCodexStatusInvalidation(event.reason);
@@ -3307,6 +3310,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       const status = await rt.getCodexSidebarStatus();
       if (status.state === 'broken-install') { this._postCodexSidebarStatus(status); return; }
       await rt.logout();
+      // Sprint 156: a sign-out pressed in Ritemark forgets ChatGPT as the AI last seen ready (only if it was ChatGPT)
+      if (this._globalState) await clearLastReadyAi(this._globalState, 'codex').catch(() => false);
       emitCodexStatusInvalidated('logout');
     } catch (error) {
       vscode.window.showErrorMessage(`ChatGPT sign-out failed: ${error instanceof Error ? error.message : String(error)}`);

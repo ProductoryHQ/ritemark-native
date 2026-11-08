@@ -82,14 +82,26 @@ export type HomeGuidance =
       button: string;
       note: string;
       hide: string;
-      /** The AI the button names. */
+      /** The AI the button names: with no AI ready, the one the card signs in to (Sprint 156, `leadAi`). */
       ai: HomeAiId;
-      /** False: no AI is ready, so the button opens Ask with (D3). */
+      /** That AI by the name people know, from the host. */
+      aiName: AiName;
+      /**
+       * False: no AI is ready, so the main part signs in to `ai` (Sprint 156; experience 35, "With no AI ready"): its
+       * button and note say so, and a press sends `home/ready-request`, which signs in through the welcome's own flows.
+       * OpenCode's Set up opens its key sheet on the page instead, as Ask with does.
+       */
       aiReady: boolean;
+      /**
+       * Sprint 156: Home's sign-in to `ai` is running, so the card waits (the welcome's frame 2 in the card's parts).
+       * `starting` until its page is open (ChatGPT: after VS Code's "open the website?" question); `waiting` while the
+       * browser has it, with Cancel and "Open the page again".
+       */
+      signingIn: 'starting' | 'waiting' | null;
       ais: HomeAi[];
       /** OpenCode's keys already saved, for its Set up sheet. */
       keysSet: Record<HomeKeyName, boolean>;
-      /** One line when a press did not start (a board that can't give the card, say). */
+      /** One line when a press did not start (a board that can't give the card, say), or a sign-in's reason it ended. */
       problem: string | null;
       /** The sample's hand-over while the board starts it: the button's words, with a spinner, and the note. */
       busy: { button: string; note: string } | null;
@@ -161,6 +173,9 @@ export type HomeRequest =
   | { type: 'home/ready-request-ai'; ai: HomeAiId }
   | { type: 'home/ready-request-hide' }
   | { type: 'home/sign-in'; ai: HomeAiId }
+  // Sprint 156: the card's sign-in, waiting: its Cancel and "Open the page again"
+  | { type: 'home/cancel-sign-in' }
+  | { type: 'home/reopen-sign-in' }
   | { type: 'home/save-keys'; keys: Partial<Record<HomeKeyName, string>> }
   | { type: 'home/feedback-send'; text: string }
   | { type: 'home/feedback-mail'; text: string }
@@ -239,6 +254,8 @@ export function decodeHomeRequest(raw: unknown): Decoded<HomeRequest> {
     case 'home/dismiss-notice':
     case 'home/ready-request':
     case 'home/ready-request-hide':
+    case 'home/cancel-sign-in':
+    case 'home/reopen-sign-in':
     case 'home/feedback-not-now':
       problem = check([]);
       return problem ? fail(problem) : { ok: true, request: { type: raw.type } };

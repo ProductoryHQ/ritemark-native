@@ -36,6 +36,7 @@ import { settingsTimed, settingsTimingEnabled, settingsTimingMark, settingsTimin
 import { SETTINGS_KEY_NAMES, applyApiKeyMessage, isSettingsKeyName, settingsKeyAllowed, type SettingsKeyFlags, type SettingsKeyName } from './settingsKeys';
 import { keysFromTestEnvironment, readProviderKey, redactTestKey } from '../ai/providerKeys';
 import { PUBLISH_PREFIX } from '../publish/settingsProtocol';
+import { clearLastReadyAi } from '../guidance/guidanceStore';
 import {
   ALL_PARTS,
   RECHECK_PARTS,
@@ -1299,6 +1300,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     try {
       await logoutClaude(status.binaryPath);
       setClaudeLoginInProgress(false);
+      // Sprint 156: a sign-out pressed in Ritemark forgets Claude as the AI last seen ready (only if it was Claude)
+      await clearLastReadyAi(this.context.globalState, 'claude-code').catch(() => false);
       emitClaudeStatusInvalidated('logout');
       vscode.window.showInformationMessage('Signed out from Claude.ai.');
     } catch (error) {
@@ -1655,6 +1658,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
     try {
       await this.codexAuth.logout();
+      // Sprint 156: a sign-out pressed in Ritemark forgets ChatGPT as the AI last seen ready (only if it was ChatGPT)
+      await clearLastReadyAi(this.context.globalState, 'codex').catch(() => false);
       emitCodexStatusInvalidated('logout');
       vscode.window.showInformationMessage('Signed out from ChatGPT');
     } catch (error) {
