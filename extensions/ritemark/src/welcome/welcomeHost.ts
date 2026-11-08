@@ -329,7 +329,8 @@ class WelcomeController implements vscode.Disposable {
     // A fresh welcome the person never finished opens on its project step, where the form is, as Skip for now
     // would take it: they asked to start a project, not to pick an AI (S25)
     if (this.kind === 'fresh' && this.step === 1) {
-      this.countSkip('new_project');
+      // Sprint 156 (PR B): a skip only when the person saw step 1; a welcome that opens on the form skipped nothing
+      if (wasOpen) this.countSkip('new_project');
       this.step = afterSkip({ kind: this.kind, step: this.step, readyProvider: this.readyProvider }).step;
       void this.refreshMissingTool();
     }
@@ -594,12 +595,11 @@ class WelcomeController implements vscode.Disposable {
   }
 
   /**
-   * Sprint 156 (PR B): the AI step skipped, by Skip for now (`button`) or by Start a new project while on it
-   * (`new_project`, S25). `welcome_ai_skipped` is held like the welcome's other events: sent at the yes, dropped at a
-   * no or when the welcome closes.
+   * Sprint 156 (PR B): the AI step skipped, by Skip for now (`button`) or by Start a new project while the welcome shows
+   * it (`new_project`, S25). `welcome_ai_skipped` is held like the welcome's other events: sent at the yes, dropped at
+   * a no or when the welcome closes. Only step 1 calls it, and step 1 never comes back, so no other skip is waiting.
    */
   private countSkip(how: WelcomeSkipHow): void {
-    this.countPendingSkip(true);
     this.skipToCount = how;
     this.countPendingSkip();
   }

@@ -4,7 +4,8 @@
  *
  * - Skip for now on the fresh welcome's step 1 counts once, `how: 'button'`, through the held path; a second press on
  *   step 2 counts nothing.
- * - Start a new project while step 1 is open (S25) counts once, `how: 'new_project'`.
+ * - Start a new project while the welcome shows step 1 (S25) counts once, `how: 'new_project'`; from a window where the
+ *   welcome isn't open it counts nothing: the welcome opens on the project form, and no step 1 was seen.
  * - `ai_ready` is the welcome's own answer: false with no AI ready, true with one; a check still running is waited for
  *   (each answers within 20 s), so a quick skip isn't counted as "no AI" before the welcome knows.
  * - The welcome closing before then drops it, as it drops the welcome's other held events; leaving for a project
@@ -230,7 +231,7 @@ async function main(): Promise<void> {
     w.dispose();
   }
 
-  // ── Start a new project from the projects list while step 1 is open (S25): how 'new_project' ──
+  // ── Start a new project from the projects list while the welcome shows step 1 (S25): how 'new_project' ──
   {
     const w = welcome();
     await flush();
@@ -244,7 +245,7 @@ async function main(): Promise<void> {
     w.dispose();
   }
   {
-    // In a project window the welcome isn't open yet: its checks run when it opens, and the skip waits for them
+    // In a project window the welcome isn't open: Start a new project opens it on the form, and step 1 was never seen
     workspaceFolders = [{ uri: uri(`file://${storage}`) }];
     const w = welcome({ ready: 'codex' });
     await flush();
@@ -252,7 +253,10 @@ async function main(): Promise<void> {
     counts.splice(0);
     await registered.get('ritemark.welcome.newProject')?.();
     await flush();
-    assert.deepEqual(skips(), [skipped('new_project', true)], 'ChatGPT ready, by the checks the opened welcome ran');
+    assert.ok(onMessage, 'the welcome opened, on the project form');
+    mock.timers.tick(20_000);
+    await flush();
+    assert.deepEqual(skips(), [], 'nothing counted: the person skipped no step they saw');
     w.dispose();
     workspaceFolders = undefined;
   }

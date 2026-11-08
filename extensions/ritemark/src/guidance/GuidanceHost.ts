@@ -54,16 +54,20 @@ const SKIP_DIRS = /[\\/](\.git|node_modules|\.ritemark)[\\/]/;
 /** How Home's sign-in ended: ready, stopped by the person (no line), or one of the welcome's reasons. */
 type SignInOutcome = 'ready' | 'stopped' | SignInProblem;
 
-/** Sprint 156: a sign-in Home runs (one per AI), and how it settles. */
-interface HomeSignIn {
+/** Sprint 156 (PR B): a sign-in's two counts: its AI, where on Home it was pressed, and whether it has started. */
+interface SignInCount {
   ai: AgentId;
-  /** Sprint 156 (PR B): where on Home it was pressed, the card's main part or Ask with, for its two counts. */
+  /** The card's main part (`home_card`) or Ask with (`home_menu`). */
   from: SignInFrom;
   /**
-   * Sprint 156 (PR B): `ai_signin_started` was sent, because Claude's login started or ChatGPT's page was asked to open.
-   * Only then does a ready end send `ai_signin_finished`; an AI found ready before anything started sends neither.
+   * `ai_signin_started` was sent: Claude's login started, ChatGPT's page opened, or OpenCode's keys were saved. Only then
+   * does the sign-in's ready send `ai_signin_finished`; an AI found ready before anything started sends neither.
    */
-  counted: boolean;
+  started: boolean;
+}
+
+/** Sprint 156: a sign-in Home runs (one per AI), and how it settles. */
+interface HomeSignIn extends SignInCount {
   /** `starting` until its page is open (ChatGPT: after VS Code's "open the website?" question), then `waiting`. */
   phase: 'starting' | 'waiting';
   settle(outcome: SignInOutcome): void;
@@ -393,7 +397,7 @@ export class GuidanceHost implements vscode.Disposable {
     const signing: HomeSignIn = {
       ai,
       from,
-      counted: false,
+      started: false,
       phase: 'starting',
       settle: (outcome) => {
         if (this.signings.get(ai) !== signing) return;
@@ -402,7 +406,9 @@ export class GuidanceHost implements vscode.Disposable {
         this.reopenProblem = null;
         this.aiCache = null;
         if (outcome === 'ready') {
-          void this.readyFromHome(folderUri, ai, signing.counted ? signing.from : null);
+          // Sprint 156 (PR B): the sign-in settled ready, once (this settle runs once): its finish, if it started
+          this.countFinished(signing);
+          void this.readyFromHome(folderUri, ai);
           return;
         }
         if (outcome !== 'stopped') this.signInFailure = { ai, line: signInProblem(PROVIDER[ai], outcome) };
@@ -461,16 +467,17 @@ export class GuidanceHost implements vscode.Disposable {
       if (!page) return toSettings();
       this.signInPages[ai] = page;
       wait.arm();
-      // ChatGPT's page is asked to open: the sign-in counts as started, whatever "open the website?" is answered
-      this.countStarted(signing);
       if (!(await vscode.env.openExternal(vscode.Uri.parse(page)))) {
         // The "open the website?" question was answered with Cancel, or nothing could open the page: stop Codex's
-        // listener, and the card is back as it was, with no line (the Experience lead, answer 2)
+        // listener, and the card is back as it was, with no line (the Experience lead, answer 2). Not a start (#690)
         if (!current()) return;
         await this.deps.stopCodexSignIn().catch(() => undefined);
         return signing.settle('stopped');
       }
+      // A sign-in that ended while the question was open (ready elsewhere, a sign-out) isn't Home's: neither count
       if (!current()) return;
+      // ChatGPT's page opened: the sign-in counts as started
+      this.countStarted(signing);
       signing.phase = 'waiting';
       this.changed.fire();
     } catch {
@@ -495,11 +502,16 @@ export class GuidanceHost implements vscode.Disposable {
     }, 1500);
   }
 
-  /** Sprint 156 (PR B): a sign-in Home runs has really started: `ai_signin_started`, once, with where it was pressed. */
-  private countStarted(signing: HomeSignIn): void {
-    if (signing.counted) return;
-    signing.counted = true;
-    void trackEvent('ai_signin_started', { provider: PROVIDER[signing.ai], from: signing.from });
+  /** Sprint 156 (PR B): a sign-in from Home has really started: `ai_signin_started`, with where it was pressed. */
+  private countStarted(count: SignInCount): void {
+    count.started = true;
+    void trackEvent('ai_signin_started', { provider: PROVIDER[count.ai], from: count.from });
+  }
+
+  /** Sprint 156 (PR B): a sign-in from Home ended ready: `ai_signin_finished`, only when it sent its start. */
+  private countFinished(count: SignInCount): void {
+    if (!count.started) return;
+    void trackEvent('ai_signin_finished', { provider: PROVIDER[count.ai], from: count.from });
   }
 
   /** The sign-in the card shows: the one to the AI it names (round 2, N3). */
@@ -536,11 +548,9 @@ export class GuidanceHost implements vscode.Disposable {
   /**
    * Sprint 156: an AI made ready from Home is chosen on the card (R4), is the AI last seen ready, and becomes the AI
    * for new chats, as the welcome's choice does, so the status bar names it; a chat that is open keeps its AI (the
-   * Experience lead, answer 8). Any failure line has done its job.
-   * Sprint 156 (PR B): `counted` is where a sign-in that sent `ai_signin_started` was pressed; that sign-in sends
-   * `ai_signin_finished` here, once, when its AI reads ready. Null for an AI that was ready before anything started.
+   * Experience lead, answer 8). Any failure line has done its job. Says whether the AI read ready (OpenCode's finish).
    */
-  private async readyFromHome(folderUri: string, ai: AgentId, counted: SignInFrom | null): Promise<void> {
+  private async readyFromHome(folderUri: string, ai: AgentId): Promise<boolean> {
     this.signInFailure = null;
     this.aiCache = null;
     let states = await this.aiStates();
@@ -550,13 +560,14 @@ export class GuidanceHost implements vscode.Disposable {
       this.aiCache = null;
       states = await this.aiStates();
     }
-    if (states[ai] === 'ready') {
-      if (counted) void trackEvent('ai_signin_finished', { provider: PROVIDER[ai], from: counted });
+    const ready = states[ai] === 'ready';
+    if (ready) {
       await noteLastReadyAi(this.deps.context.globalState, ai);
       await saveAiForNewChats(ai);
       await this.chooseAi(folderUri, ai);
     }
     this.changed.fire();
+    return ready;
   }
 
   /**
@@ -567,11 +578,12 @@ export class GuidanceHost implements vscode.Disposable {
     const entries = Object.entries(keys).map(([name, value]) => [name, (value ?? '').trim()] as const).filter(([, value]) => value);
     if (entries.length === 0 && !Object.values(await this.keysSet()).some(Boolean)) return { ok: false, message: 'Add at least one key to use OpenCode.' };
     for (const [name, value] of entries) await this.deps.context.secrets.store(name, value);
-    // OpenCode is set up, not signed in: keys saved from Home are its sign-in's start (a Save that stored none isn't)
-    const counted = entries.length > 0 ? from : null;
-    if (counted) void trackEvent('ai_signin_started', { provider: PROVIDER.opencode, from: counted });
+    // OpenCode is set up, not signed in: keys saved from Home are its sign-in's start (a Save that stored none isn't),
+    // and OpenCode reading ready after the save is its finish (it has no login to settle)
+    const count: SignInCount = { ai: 'opencode', from, started: false };
+    if (entries.length > 0) this.countStarted(count);
     // OpenCode set up from Home is ready from Home, as a sign-in is (Sprint 156)
-    await this.readyFromHome(folderUri, 'opencode', counted);
+    if (await this.readyFromHome(folderUri, 'opencode')) this.countFinished(count);
     return { ok: true, message: null };
   }
 

@@ -104,7 +104,8 @@ for (const [event, keys] of Object.entries(SPRINT_139_EVENT_KEYS)) {
 // Sprint 156 (PR B; experience 35, "With no AI ready"): the no-AI card's three counts. Exactly these fields, and each one
 // a fixed choice or a yes/no, so no field can carry words, a name, a path, a model, an address or an error. The values'
 // lists are the ones Home's protocol checks (`SIGN_IN_FROM`) and the skip's two ways (`WELCOME_SKIP_HOW`); the type
-// side is `events.ts`'s `SignInCountsAreClosed`, which fails `npm run compile` if a field could take free text.
+// side is `events.ts`'s `SignInCountsAreClosed`, an allow-list that fails `npm run compile` unless every field is a
+// boolean, `WelcomeProvider`, `SignInFrom` or `WelcomeSkipHow`.
 const SPRINT_156_EVENT_KEYS: Record<string, string[]> = {
   welcome_ai_skipped: ['how', 'ai_ready'],
   ai_signin_started: ['provider', 'from'],

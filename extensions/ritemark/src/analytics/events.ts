@@ -145,8 +145,9 @@ export interface EventPayloads {
    * or a yes/no: no words, name, path, model, address or error. The skip comes before the person has answered usage
    * data, so it is held like the welcome's other events (`HeldEventName`); `ai_ready` says whether the welcome had
    * found an AI ready. The two sign-in counts are Home's, sent only after a yes: started when Claude's login starts,
-   * ChatGPT's page is asked to open or OpenCode's keys are saved; finished once, when that sign-in leaves its AI ready.
-   * A failure, a timeout or a cancel sends nothing, so failures are started minus finished.
+   * ChatGPT's page opens or OpenCode's keys are saved; finished once, when that sign-in settles ready (for OpenCode,
+   * when it reads ready after the save). A failure, a timeout or a cancel sends nothing, so failures are started minus
+   * finished.
    */
   welcome_ai_skipped: {
     how: WelcomeSkipHow;
@@ -162,10 +163,15 @@ export interface EventPayloads {
   };
 }
 
-/** The fields of `T` that could carry free text (a plain string or number); `never` when there are none. */
-type OpenFields<T> = { [K in keyof T]-?: string extends T[K] ? K : number extends T[K] ? K : never }[keyof T];
+/** The only types a field of the no-AI card's counts may have: a yes/no, or one of these fixed choices. */
+type ClosedField = boolean | WelcomeProvider | SignInFrom | WelcomeSkipHow;
+/** The fields of `T` whose type isn't one of those (a string, number, array, object, template literal…); `never` when none. */
+type OpenFields<T> = { [K in keyof T]-?: T[K] extends ClosedField ? never : K }[keyof T];
 type Closed<T extends true> = T;
-/** Sprint 156 (PR B): fails to compile if one of the no-AI card's counts gains a field that could carry free text. */
+/**
+ * Sprint 156 (PR B): an allow-list. Fails to compile unless every field of the no-AI card's three counts is a boolean,
+ * a `WelcomeProvider`, a `SignInFrom` or a `WelcomeSkipHow`.
+ */
 export type SignInCountsAreClosed = Closed<
   [OpenFields<EventPayloads['welcome_ai_skipped']>, OpenFields<EventPayloads['ai_signin_started']>, OpenFields<EventPayloads['ai_signin_finished']>] extends [never, never, never]
     ? true

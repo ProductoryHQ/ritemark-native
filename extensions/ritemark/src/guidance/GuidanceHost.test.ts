@@ -15,11 +15,11 @@
  * - Round 2: a login Codex reports as failed says "didn't finish" at once, and a stopped poll puts the card back; a
  *   card naming a ready AI drops an old failure line for good; the sample's line shows only on the ready request;
  *   Cancel acts on the AI the card names; Home asks a running Claude login for the page it missed.
- * - PR B, the counts: `ai_signin_started` when Claude's login starts, ChatGPT's page is asked to open or OpenCode's keys
- *   are saved, `from: 'home_card'` for the card's press and `'home_menu'` for Ask with; `ai_signin_finished` once, when
- *   that sign-in leaves its AI ready. A failure, a timeout, a Cancel, a declined "open the website?" and a login that
- *   can't start send no finished (a login that can't start no started either); an AI already ready sends neither, and a
- *   sign-in made elsewhere isn't Home's. Only provider and from, nothing else.
+ * - PR B, the counts: `ai_signin_started` when Claude's login starts, ChatGPT's page opens or OpenCode's keys are saved,
+ *   `from: 'home_card'` for the card's press and `'home_menu'` for Ask with; `ai_signin_finished` once, when that
+ *   sign-in settles ready (OpenCode: when it reads ready after the save), whatever a later read says. A failure, a
+ *   timeout and a Cancel send no finished; a declined "open the website?" and a login that can't start aren't starts;
+ *   an AI already ready sends neither, and a sign-in made elsewhere isn't Home's. Only provider and from.
  *
  * Run: npx tsx src/guidance/GuidanceHost.test.ts
  */
@@ -295,7 +295,7 @@ async function main(): Promise<void> {
   shown = await card();
   assert.equal(shown.signingIn, null);
   assert.equal(shown.problem, null);
-  assert.deepEqual(signInCounts(), [started('chatgpt', 'home_card')], 'PR B: the page was asked to open, so it started; the No finishes nothing');
+  assert.deepEqual(signInCounts(), [], 'PR B: a declined "open the website?" isn\'t a start, so it sends neither (#690)');
 
   // ── ChatGPT signed in elsewhere, with the card's AIs not read again yet: the press doesn't start a second sign-in ──
   await card(); // reads the AIs: ChatGPT signs in
@@ -461,6 +461,19 @@ async function main(): Promise<void> {
   await flush();
   assert.equal((await card()).aiReady, true);
   assert.deepEqual(signInCounts(), [finished('claude', 'home_menu')], 'finished once, though the callback and the status event both said so');
+
+  // ── PR B: finished follows the sign-in's own ready, not a later read of the AI ──
+  usable['claude-code'] = false;
+  emitClaudeStatusInvalidated('logout');
+  await flush();
+  signInCounts();
+  await host.signIn(input.folderUri, 'claude-code', 'home_card');
+  await flush();
+  assert.deepEqual(signInCounts(), [started('claude', 'home_card')]);
+  (claudeLogin as ClaudeCalls | null)?.onComplete?.(); // the login says it finished; Claude doesn't read usable yet
+  await flush();
+  assert.deepEqual(signInCounts(), [finished('claude', 'home_card')], 'finished on the login\'s ready settle');
+  assert.equal((await card()).aiReady, false, 'though the card waits for Claude to read ready');
 
   // ── PR B: OpenCode is set up, not signed in: its keys saved from Home are the start ──
   usable['claude-code'] = false;
