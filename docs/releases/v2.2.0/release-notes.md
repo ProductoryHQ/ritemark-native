@@ -70,6 +70,7 @@ Publish a page from your project, and anyone with the link can open it. 2.2 also
 - **Coming from Ritemark 1? The welcome shows first.** This is on Windows, at the first start after the update. A terminal you had open waits behind it.
 - **No more "Git not found" message.**
 - **No green check on a failed answer.**
+- **One comment box at a time.** Starting a new comment while another was open left two boxes. Now an empty one closes, and one with words you haven't saved comes back with the cursor in it.
 
 ## Updating from 2.1
 

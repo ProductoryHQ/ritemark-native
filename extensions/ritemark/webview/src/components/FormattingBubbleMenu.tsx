@@ -11,7 +11,7 @@ import {
   requestWorkspaceFileSearch,
   type WorkspaceFileLinkResult,
 } from '../lib/workspaceFileSearch'
-import { newCommentId } from '../extensions/comment/CommentMark'
+import { startComment } from '../extensions/comment/CommentNode'
 import { isEquationNodeSelection } from '../extensions/math/mathNodes'
 import { formattingToolbarShows } from './formattingToolbar'
 import { Tooltip } from './ui/tooltip'
@@ -460,9 +460,8 @@ export function FormattingBubbleMenu({
               <Tooltip label="Add comment">
                 <button
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() =>
-                    editor.chain().focus().setCommentMark({ id: newCommentId(), note: '', agentAlias: null }).run()
-                  }
+                  // The one door for a new comment (#687): one box at a time.
+                  onClick={() => startComment(editor)}
                   className="px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center gap-1.5"
                   aria-label="Add comment"
                 >
