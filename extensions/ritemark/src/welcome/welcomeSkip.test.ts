@@ -7,7 +7,8 @@
  * - Start a new project while the welcome shows step 1 (S25) counts once, `how: 'new_project'`; from a window where the
  *   welcome isn't open it counts nothing: the welcome opens on the project form, and no step 1 was seen.
  * - `ai_ready` is the welcome's own answer: false with no AI ready, true with one; a check still running is waited for
- *   (each answers within 20 s), so a quick skip isn't counted as "no AI" before the welcome knows.
+ *   (each answers within 20 s), so a quick skip isn't counted as "no AI" before the welcome knows. A recheck of an AI
+ *   that had answered (a status event, a sign-in finished) is waited for too, not its old answer (#697, Codex P2).
  * - The welcome closing before then drops it, as it drops the welcome's other held events; leaving for a project
  *   counts it at once, before the yes, so it goes with that yes.
  * - The update welcome has no skip: nothing is counted.
@@ -111,6 +112,7 @@ const SIGNED_OUT: Availability = { state: 'needs-auth', usable: false, detail: n
 async function main(): Promise<void> {
   mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: 1_000_000 });
   const { registerWelcome } = await import('./welcomeHost');
+  const { emitCodexStatusInvalidated } = await import('../codex/codexStatusEvents');
   const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-welcome-skip-'));
   // A ChatGPT home of the run's own, with no sign-in ever made, so this computer's own plays no part
   process.env.CODEX_HOME = storage;
@@ -202,6 +204,24 @@ async function main(): Promise<void> {
     mock.timers.tick(20_000);
     await flush();
     assert.deepEqual(skips(), [skipped('button', false)], 'counted when the check timed out');
+    w.dispose();
+  }
+
+  // ── #697 (Codex P2): ChatGPT answered not ready, then a recheck runs (a status event); a skip during it waits for it ──
+  {
+    const options: { ready?: 'codex'; held?: string[] } = {};
+    const w = welcome(options);
+    await flush();
+    options.held = ['codex'];
+    emitCodexStatusInvalidated('status-refresh'); // ChatGPT's status changed: the welcome checks it again
+    await flush();
+    counts.splice(0);
+    await w.send({ type: 'welcome/skip' });
+    assert.deepEqual(skips(), [], 'not counted from ChatGPT\'s old answer while its recheck runs');
+    options.ready = 'codex';
+    await w.answer('codex');
+    await w.send({ type: 'welcome/open-folder' });
+    assert.deepEqual(skips(), [skipped('button', true), { event: 'usage-data:yes' }], 'the recheck said ready, so the skip, sent at the yes, says so');
     w.dispose();
   }
 

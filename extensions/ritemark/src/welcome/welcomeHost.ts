@@ -218,6 +218,11 @@ class WelcomeController implements vscode.Disposable {
    * within 20 s), so `welcome_ai_skipped.ai_ready` is the welcome's own answer, not a check still running.
    */
   private skipToCount: WelcomeSkipHow | null = null;
+  /**
+   * Sprint 156 (#697): each AI's check still running, by its token. A recheck keeps the last answer on the card while it
+   * runs, so the skip waits for these, not only for a `pending` card.
+   */
+  private readonly checksRunning = new Map<WelcomeProviderId, number>();
   /** The sheet is alone on the ground with both columns closed (R1); false for Help ▸ Welcome in a project window. */
   private alone = false;
   /** Set while the welcome itself replaces or closes its panel, so that is not read as the person closing it. */
@@ -513,7 +518,10 @@ class WelcomeController implements vscode.Disposable {
 
   private markOffline(): void {
     for (const id of PROVIDER_ORDER) {
-      if (!this.memories[id].signingIn) this.memories[id].check = { kind: 'offline' };
+      if (!this.memories[id].signingIn) {
+        this.memories[id].check = { kind: 'offline' };
+        this.checksRunning.delete(id);
+      }
     }
     this.countPendingSkip();
     this.push();
@@ -527,6 +535,7 @@ class WelcomeController implements vscode.Disposable {
   private check(id: WelcomeProviderId): void {
     if (this.offline) {
       this.memories[id].check = { kind: 'offline' };
+      this.checksRunning.delete(id);
       this.countPendingSkip();
       this.push();
       return;
@@ -534,13 +543,17 @@ class WelcomeController implements vscode.Disposable {
     const token = ++this.checkTokens[id];
     const memory = this.memories[id];
     if (memory.check.kind !== 'answered') memory.check = { kind: 'pending' };
+    this.checksRunning.set(id, token);
     this.push();
     const timer = setTimeout(() => {
-      if (this.checkTokens[id] === token && memory.check.kind === 'pending') {
+      if (this.checkTokens[id] !== token) return;
+      // A skip waits no longer than the card does (20 s), a recheck of an answered card included
+      this.checkEnded(id, token);
+      if (memory.check.kind === 'pending') {
         memory.check = { kind: 'timed-out' };
-        this.countPendingSkip();
         this.push();
       }
+      this.countPendingSkip();
     }, CHECK_TIMEOUT_MS);
     void (async () => {
       let availability: RuntimeAvailability;
@@ -561,6 +574,7 @@ class WelcomeController implements vscode.Disposable {
       const method = availability.state === 'ready' ? await this.methodOf(id) : null;
       const signInEnded = availability.state === 'needs-auth' && id === 'chatgpt' && codexSignInWasThere();
       memory.check = { kind: 'answered', availability, method, signInEnded };
+      this.checkEnded(id, token);
       this.countPendingSkip();
       // Ready after a sign-in or a key saved from the welcome: step 2 (R3). A key for a provider that was
       // already ready (Claude signed in, then an Anthropic key) also goes on, as the key's method.
@@ -604,11 +618,17 @@ class WelcomeController implements vscode.Disposable {
     this.countPendingSkip();
   }
 
+  /** Sprint 156 (#697): that check is no longer running, unless a later check of the same AI has taken over. */
+  private checkEnded(id: WelcomeProviderId, token: number): void {
+    if (this.checksRunning.get(id) === token) this.checksRunning.delete(id);
+  }
+
   /** Sends the skip waiting to be counted once no AI's check is still running, or at once with `now`. */
   private countPendingSkip(now = false): void {
     const how = this.skipToCount;
     if (!how) return;
-    if (!now && PROVIDER_ORDER.some((id) => this.memories[id].check.kind === 'pending')) return;
+    // A card still `pending` has had no check yet (the welcome's first moment); a running one may be a recheck
+    if (!now && (this.checksRunning.size > 0 || PROVIDER_ORDER.some((id) => this.memories[id].check.kind === 'pending'))) return;
     this.skipToCount = null;
     void trackWelcomeEvent('welcome_ai_skipped', { how, ai_ready: aiFoundReady(PROVIDER_ORDER.map((id) => this.memories[id])) });
   }
