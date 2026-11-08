@@ -947,15 +947,18 @@ export function MarginCommentRail({
       if (key === composeKey) return
       // Another comment opens only once the open box gives way (#687): a clean
       // one closes, one with unsaved words comes forward and this one stays shut.
-      if (boxOpen && editor && !yieldOpenBox(editor)) return
+      const empty = markers.find((marker) => marker.key === key)?.note === ''
+      // The key comes back moved when closing the box shifted an id-less comment.
+      const target = boxOpen && editor ? yieldOpenBox(editor, key) : key
+      if (!target) return
       cancelClose()
-      setOpenKey(key)
+      setOpenKey(target)
       // An empty comment opens as its box; a saved one latches its bubble open.
-      if (markers.find((marker) => marker.key === key)?.note === '') {
-        setComposeKey(key)
+      if (empty) {
+        setComposeKey(target)
         return
       }
-      setPinnedKey((current) => (current === key ? null : key))
+      setPinnedKey((current) => (current === target ? null : target))
     }
 
     const onOut = (event: MouseEvent) => {
@@ -1194,20 +1197,23 @@ export function MarginCommentRail({
             onTogglePin={() => {
               // A click opens another comment only once the open box gives
               // way (#687); one with unsaved words comes forward instead.
-              if (boxOpen && editor && !yieldOpenBox(editor)) return
+              // The key comes back moved when closing the box shifted an id-less comment.
+              const target = boxOpen && editor ? yieldOpenBox(editor, m.key) : m.key
+              if (!target) return
               cancelClose()
-              setOpenKey(m.key)
+              setOpenKey(target)
               // An empty comment's marker opens as its box.
               if (m.note === '') {
-                setComposeKey(m.key)
+                setComposeKey(target)
                 return
               }
-              setPinnedKey((k) => (k === m.key ? null : m.key))
+              setPinnedKey((k) => (k === target ? null : target))
             }}
             onEdit={() => {
-              if (boxOpen && editor && !yieldOpenBox(editor)) return
-              setOpenKey(m.key)
-              setComposeKey(m.key)
+              const target = boxOpen && editor ? yieldOpenBox(editor, m.key) : m.key
+              if (!target) return
+              setOpenKey(target)
+              setComposeKey(target)
             }}
             onRemove={() => remove(m)}
             onSave={(text) => {

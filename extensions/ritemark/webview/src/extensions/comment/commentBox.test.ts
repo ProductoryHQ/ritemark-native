@@ -358,26 +358,59 @@ const cursorBeforeText = (doc: PMNode) => TextSelection.create(doc, rangeOf(doc,
 {
   const clean = openBox({ key: `c:${OLD}`, commentId: OLD, kind: 'new', anchor: 'node', dirty: false })
   const t = fakeEditor(noteDoc(), cursorBeforeText, clean.box)
-  assert.equal(yieldOpenBox(t.editor), true, 'a clean box gives way')
+  assert.equal(yieldOpenBox(t.editor, `c:${SAVED}`), `c:${SAVED}`, 'a clean box gives way, and an id key stays')
   assert.equal(t.transactions.length, 1, 'its empty note is removed, as Cancel removes it')
   assert.deepEqual(blocks(t.state().doc), ['Intro.', 'Body text here.'])
   assert.equal(clean.calls.close, 1)
 
   const dirty = openBox({ key: `c:${OLD}`, commentId: OLD, kind: 'new', anchor: 'node', dirty: true })
   const d = fakeEditor(noteDoc(), cursorBeforeText, dirty.box)
-  assert.equal(yieldOpenBox(d.editor), false, 'a dirty box does not give way')
+  assert.equal(yieldOpenBox(d.editor, `c:${SAVED}`), null, 'a dirty box does not give way')
   assert.equal(d.transactions.length, 0)
   assert.equal(dirty.calls.bringForward, 1, 'it comes forward instead')
 
   const edit = openBox({ key: `c:${SAVED}`, commentId: SAVED, kind: 'edit', anchor: 'mark', dirty: false })
   const e = fakeEditor(noteDoc(), cursorBeforeText, edit.box)
-  assert.equal(yieldOpenBox(e.editor), true, 'a clean Edit gives way')
+  assert.equal(yieldOpenBox(e.editor, 'm:3-9'), 'm:3-9', 'a clean Edit gives way, with no transaction to move a key')
   assert.equal(e.transactions.length, 0, 'in the rail’s state only')
   assert.equal(edit.calls.close, 1)
 
   const none = fakeEditor(noteDoc(), cursorBeforeText, null)
-  assert.equal(yieldOpenBox(none.editor), true, 'with no box, anything may open')
+  assert.equal(yieldOpenBox(none.editor, 'n:4'), 'n:4', 'with no box, anything may open')
   assert.equal(none.transactions.length, 0)
+}
+
+// ── An id-less comment below the closed box keeps its key (Codex P2 on #689) ──
+// Comments written before Sprint 117 have no id, so the rail keys them by
+// position. Removing the empty margin note above moves that position; the key
+// yieldOpenBox hands back must name the same comment in the new document.
+{
+  const legacyDoc = () =>
+    schema.node('doc', null, [
+      para(schema.text('Intro.')),
+      schema.node('commentNode', { id: OLD, note: '', agentAlias: null }),
+      para(schema.text('Body '), commented('legacy words', { id: null, note: 'An old note' }), schema.text(' here.')),
+      schema.node('commentNode', { id: null, note: 'An old margin note', agentAlias: null }),
+    ])
+  const keysOf = (doc: PMNode) => {
+    const r = rangeOf(doc, 'legacy words')
+    let notePos = -1
+    doc.descendants((node, pos) => {
+      if (node.type.name === 'commentNode' && node.attrs.note) notePos = pos
+    })
+    return { mark: `m:${r.from}-${r.to}`, note: `n:${notePos}` }
+  }
+  const before = keysOf(legacyDoc())
+  const clean = openBox({ key: `c:${OLD}`, commentId: OLD, kind: 'new', anchor: 'node', dirty: false })
+  const atIntro = (doc: PMNode) => TextSelection.create(doc, 1)
+  const t = fakeEditor(legacyDoc(), atIntro, clean.box)
+  const markKey = yieldOpenBox(t.editor, before.mark)
+  const after = keysOf(t.state().doc)
+  assert.notEqual(after.mark, before.mark, 'the removal moved the id-less comment')
+  assert.equal(markKey, after.mark, 'the anchored comment is asked for at its new place')
+
+  const n = fakeEditor(legacyDoc(), atIntro, openBox({ key: `c:${OLD}`, commentId: OLD, kind: 'new', anchor: 'node', dirty: false }).box)
+  assert.equal(yieldOpenBox(n.editor, before.note), keysOf(n.state().doc).note, 'so is the id-less margin note')
 }
 
 // ── Mixed kinds: a margin-note box gives way to an anchored comment ──────────

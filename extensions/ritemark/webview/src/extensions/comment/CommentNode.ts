@@ -425,24 +425,38 @@ export function nextRailBox(input: {
 
 /**
  * The same rule for the rail's own ways of opening another comment: Edit, and a
- * click on a highlight or a marker. Returns true when the caller may open it: no
- * box was open, or a clean one closed (an empty new comment is removed in a
- * transaction of its own, as Cancel removes it). Returns false when the open box
- * holds words that aren't saved: it comes forward instead.
+ * click on a highlight or a marker. `key` is the marker the caller wants to open.
+ * Returns that marker's key once the caller may open it: no box was open, or a
+ * clean one closed (an empty new comment is removed in a transaction of its own,
+ * as Cancel removes it). Returns null when the open box holds words that aren't
+ * saved: it comes forward instead.
+ *
+ * A comment without an id (written before Sprint 117) is keyed by its position,
+ * and removing an empty margin note above it moves that position, so the key
+ * comes back mapped through the removal: the rescan finds the comment under it.
  */
-export function yieldOpenBox(editor: Editor): boolean {
+export function yieldOpenBox(editor: Editor, key: string): string | null {
   const box = commentBoxStorage(editor)?.openBox ?? null
   const decision = decideNewBox(box)
-  if (!box || decision === 'open') return true
+  if (!box || decision === 'open') return key
   if (decision === 'bring-forward') {
     box.bringForward()
-    return false
+    return null
   }
   const tr = editor.state.tr
   removeEmptyComment(tr, box)
   if (tr.docChanged) editor.view.dispatch(tr)
   box.close()
-  return true
+  return remapMarkerKey(key, tr.mapping)
+}
+
+/** A rail marker's key after `mapping`: `c:<id>` stays; `m:<from>-<to>` and `n:<pos>` move with the document. */
+export function remapMarkerKey(key: string, mapping: Transaction['mapping']): string {
+  const mark = /^m:(\d+)-(\d+)$/.exec(key)
+  if (mark) return `m:${mapping.map(Number(mark[1]), 1)}-${mapping.map(Number(mark[2]), -1)}`
+  const note = /^n:(\d+)$/.exec(key)
+  if (note) return `n:${mapping.map(Number(note[1]), 1)}`
+  return key
 }
 
 declare module '@tiptap/core' {
