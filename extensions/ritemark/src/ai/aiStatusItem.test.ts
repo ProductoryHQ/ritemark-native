@@ -83,6 +83,8 @@ async function main(): Promise<void> {
   const { emitCodexStatusInvalidated } = await import('../codex/codexStatusEvents');
 
   const usable: Record<string, boolean> = { 'claude-code': true, codex: true, opencode: false };
+  // A probe can be held open, to answer after a newer request has started (Codex P2 on #694)
+  const gates: Record<string, Promise<void> | undefined> = {};
   const probes: string[] = [];
   let openChat: { agentId: 'claude-code' | 'codex' | 'opencode'; signInEnded: boolean } | null = null;
   const openChatListeners: Array<() => void> = [];
@@ -100,6 +102,7 @@ async function main(): Promise<void> {
     {
       runtimeAvailability: async (id) => {
         probes.push(id);
+        await gates[id];
         return { state: usable[id] ? 'ready' : 'needs-auth', usable: usable[id], detail: null };
       },
       openChat: () => openChat,
@@ -210,6 +213,32 @@ async function main(): Promise<void> {
   assert.equal(words.text, 'No AI yet', 'the new list is read');
   assert.equal(probes.filter((id) => id === 'opencode').length, 1, 'one probe for one burst');
   assert.equal(lastReady(), 'opencode', 'Sprint 156: OpenCode no longer usable stays the last seen ready');
+
+  // Codex P2 on #694: an older probe that answers after a newer request started never records its AI. Claude is
+  // the open chat's AI and its probe is held; the open chat moves to ChatGPT, which answers at once and is
+  // recorded; then Claude's old answer arrives. It must not overwrite ChatGPT.
+  let releaseClaude: () => void = () => {};
+  gates['claude-code'] = new Promise<void>((resolve) => { releaseClaude = resolve; });
+  usable['claude-code'] = true;
+  usable.codex = true;
+  state.delete('ritemark.guidance.lastReadyAi');
+  openChat = { agentId: 'claude-code', signInEnded: false };
+  for (const l of openChatListeners) l();
+  emitClaudeStatusInvalidated('logout');
+  await settle();
+  assert.equal(lastReady(), undefined, 'Claude\'s probe is still out');
+  openChat = { agentId: 'codex', signInEnded: false };
+  for (const l of openChatListeners) l();
+  emitCodexStatusInvalidated('logout');
+  await settle();
+  assert.equal(lastReady(), 'codex', 'the newer request records ChatGPT');
+  releaseClaude();
+  gates['claude-code'] = undefined;
+  await flush();
+  assert.equal(lastReady(), 'codex', 'Codex P2 on #694: Claude\'s older, slower answer does not overwrite it');
+  openChat = null;
+  for (const l of openChatListeners) l();
+  await settle();
 
   // The click opens the AI's sheet.
   await commands.get('ritemark.aiStatus.open')?.();

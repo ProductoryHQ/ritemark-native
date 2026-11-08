@@ -145,8 +145,10 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
       } catch {
         usable = false;
       }
-      // Only the AI in question, and only when it can take a turn: the others' probes say nothing about it
-      if (usable) void noteLastReadyAi(context.globalState, target);
+      // Only the AI in question, and only when it can take a turn: the others' probes say nothing about it. And
+      // only while this is still the newest request (Codex P2 on #694): an older, slower answer for an AI that is no
+      // longer the one in question must not overwrite what a newer request recorded.
+      if (usable && mine === generation) void noteLastReadyAi(context.globalState, target);
       let anyUsable = usable;
       if (!usable) {
         for (const other of BY_PROBE_COST.filter((id) => id !== target)) {
