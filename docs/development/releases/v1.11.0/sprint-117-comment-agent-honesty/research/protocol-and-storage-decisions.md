@@ -14,7 +14,7 @@ Every decision below names the evidence it rests on (file and line on `main`) an
 | D2 | `CommentTaskRecordV1` | Shape, bounds, and transition table in §3 | Jarmo |
 | D3 | Stable IDs for every comment kind | Standalone carrier `<!-- {id:<uuid>} body -->`; legacy IDs minted in one undoable transaction at dispatch; duplicate IDs re-minted | Jarmo |
 | D4 | Source binding, rename, deletion, retention | Canonical `file:` URI + project `scopeId`; in-app renames follow; no relink flow; 30-day terminal retention, 500-record cap | Jarmo |
-| D5 | Destination | The conversation open in the AI sidebar, a fresh empty one included; no confirmation, no picker; the Send surface names it | decided by Jarmo 2026-09-14 |
+| D5 | Destination | The conversation open in the AI sidebar, a fresh empty one included; no confirmation, no picker; the Send surface names it. **Replaced in Sprint 155** (see §6) | decided by Jarmo 2026-09-14 |
 | D6 | Acceptance protocol and atomicity | Persist `accepting` → sidebar enqueue ack → `queued` → editor result; bounded waits; per-group bulk results | engineering |
 | D7 | Lifecycle derivation | Derived from the host conversation record by exact `(conversationId, conversationTurnId)`; cancel normalised above adapters | engineering |
 | D8 | Capture and prompt | One collector (`commentIndex.ts`), one host prompt builder, `stripAssignmentMention` everywhere, runtime context from the record, never from the active tab | engineering |
