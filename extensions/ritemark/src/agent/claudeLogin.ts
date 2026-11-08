@@ -8,6 +8,11 @@ import { clearSetupCache, setClaudeLoginInProgress } from './setup';
 
 export interface ClaudeLoginOptions extends ClaudeLoginSubprocessOptions {
   onCancel?: () => void;
+  /**
+   * Sprint 156 (#694): a surface that joins a login already running gets the page's address it missed, for its own
+   * "Open the page again" (Home's card). Off by default, so Settings and the AI's sheet behave as before (one toast).
+   */
+  replayUrl?: boolean;
 }
 
 export type ClaudeLoginStartResult = 'started' | 'already-running' | 'failed-to-start';
@@ -61,8 +66,8 @@ export function beginClaudeLogin(
     // The OAuth process is shared, but every surface that joined it still
     // needs the terminal callback so its own busy/error state can settle.
     activeLogin.subscribers.push(options);
-    // Sprint 156 (#694): and the page's address, printed before it joined, for its "Open the page again"
-    if (activeLogin.url) notifySubscribers([options], (subscriber) => subscriber.onUrl?.(activeLogin!.url!));
+    // Sprint 156 (#694): and, when it asks, the page's address printed before it joined, for its "Open the page again"
+    if (options.replayUrl && activeLogin.url) notifySubscribers([options], (subscriber) => subscriber.onUrl?.(activeLogin!.url!));
     return 'already-running';
   }
 

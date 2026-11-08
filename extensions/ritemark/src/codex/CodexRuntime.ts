@@ -25,7 +25,7 @@ import { changedFilesOfCodexItem, type ToolRequestUserInputAnswer } from './code
 import { workspaceFilesOnly } from '../runtime/turnFiles';
 import { routeApprovalRequest, threadIdOf } from './codexApproval';
 import { traceCodex } from './codexTrace';
-import { CODEX_LOGIN_POLL_ATTEMPTS, CODEX_LOGIN_POLL_MS, emitCodexStatusInvalidated } from './codexStatusEvents';
+import { CODEX_LOGIN_POLL_ATTEMPTS, CODEX_LOGIN_POLL_MS, emitCodexStatusInvalidated, type LoginPollEnd } from './codexStatusEvents';
 import { CODEX_MODEL_IDS } from '../ai/modelConfig';
 import { isEnabled } from '../features';
 import type { AgentId } from '../agent/types';
@@ -530,7 +530,7 @@ export class CodexRuntime implements AgentRuntime {
   private _loginInProgress = false;
   private _loginPoll: ReturnType<typeof setInterval> | null = null;
   /** Sprint 156 (#694): who hears the sign-in's polls until it stops, whoever (re)starts the poll (`listenToLoginPoll`). */
-  private readonly _loginPollListeners = new Set<(status: CodexSidebarStatus) => void>();
+  private readonly _loginPollListeners = new Set<{ onStatus(status: CodexSidebarStatus): void; onEnd?(end: LoginPollEnd): void }>();
 
   /** One session per conversation, all sharing the single app-server process. */
   private readonly _sessions = new Map<string, CodexSession>();
@@ -606,10 +606,15 @@ export class CodexRuntime implements AgentRuntime {
 
   isLoginInProgress(): boolean { return this._loginInProgress; }
 
-  /** Stop the sign-in's poll; its listeners go with it. */
-  stopLoginPolling(): void {
+  /**
+   * Stop the sign-in's poll; its listeners go with it, each told how it ended (Sprint 156: a failed login, or a stop
+   * that isn't a restart, no longer leaves the welcome or Home waiting).
+   */
+  stopLoginPolling(end: LoginPollEnd = 'stopped'): void {
+    const listeners = [...this._loginPollListeners];
     this._clearLoginPoll();
     this._loginPollListeners.clear();
+    for (const listener of listeners) listener.onEnd?.(end);
   }
 
   private _clearLoginPoll(): void {
@@ -625,8 +630,8 @@ export class CodexRuntime implements AgentRuntime {
    * its callback and keeps these listeners, where it used to drop the first caller's (the welcome's and Home's
    * ChatGPT sign-in, whose timeout never came).
    */
-  listenToLoginPoll(listener: (status: CodexSidebarStatus) => void): void {
-    this._loginPollListeners.add(listener);
+  listenToLoginPoll(onStatus: (status: CodexSidebarStatus) => void, onEnd?: (end: LoginPollEnd) => void): void {
+    this._loginPollListeners.add({ onStatus, onEnd });
   }
 
   startLoginPolling(onStatus: (status: CodexSidebarStatus) => void): void {
@@ -634,7 +639,7 @@ export class CodexRuntime implements AgentRuntime {
     let attempts = 0;
     const notify = (status: CodexSidebarStatus, listeners = [...this._loginPollListeners]) => {
       onStatus(status);
-      for (const listener of listeners) listener(status);
+      for (const listener of listeners) listener.onStatus(status);
     };
     this._loginPoll = setInterval(() => {
       attempts += 1;
@@ -644,13 +649,15 @@ export class CodexRuntime implements AgentRuntime {
         notify(status, listeners);
         if (status.state === 'ready') {
           this._loginInProgress = false;
-          this.stopLoginPolling();
+          this.stopLoginPolling('ready');
           return;
         }
         if (attempts >= CODEX_LOGIN_POLL_ATTEMPTS) {
           this._loginInProgress = false;
-          this.stopLoginPolling();
+          this._clearLoginPoll();
+          this._loginPollListeners.clear();
           notify(await this.getCodexSidebarStatus(), listeners);
+          for (const listener of listeners) listener.onEnd?.('gave-up');
         }
       })();
     }, CODEX_LOGIN_POLL_MS);
@@ -851,7 +858,7 @@ export class CodexRuntime implements AgentRuntime {
     });
     this._auth.on('loginComplete', (event: { success: boolean }) => {
       this._loginInProgress = false;
-      this.stopLoginPolling();
+      this.stopLoginPolling(event.success ? 'ready' : 'failed');
       emitCodexStatusInvalidated(event.success ? 'login-finished' : 'status-refresh');
     });
     this._setupEventListeners();

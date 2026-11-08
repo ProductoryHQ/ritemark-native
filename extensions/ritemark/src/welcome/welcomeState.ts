@@ -40,7 +40,8 @@ export function initialMemory(): ProviderMemory {
 /** The card or row for one provider. */
 export function providerView(id: WelcomeProviderId, memory: ProviderMemory): ProviderView {
   const base = { id, reason: null, retry: false, method: null } satisfies Partial<ProviderView>;
-  if (memory.signingIn) return { ...base, phase: 'signing-in' };
+  // Sprint 156 (#694): "Open the page again" that opened nothing says so in the waiting card's line
+  if (memory.signingIn) return { ...base, phase: 'signing-in', reason: memory.problem ? signInProblem(id, memory.problem) : null };
   if (memory.starting || memory.keySaved) return { ...base, phase: 'checking' };
   const problem = memory.problem ? signInProblem(id, memory.problem) : null;
   const check = memory.check;

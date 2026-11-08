@@ -63,6 +63,7 @@ import { decodeBrowserShareAnswer, type BrowserShareQuestionClearMessage, type B
 import { isEnabled } from '../features';
 import { discoverAgents, discoverCommands } from '../agent/discovery';
 import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, onCodexStatusInvalidated, emitCodexStatusInvalidated, traceCodex } from '../codex';
+import type { LoginPollEnd } from '../codex/codexStatusEvents';
 // Sprint 76 R3a/R4/R5/R6: ACP + OpenCode BYOK runtime
 import { byokProviderFlags, buildByokEnv, BYOK_SECRET_KEYS, type ByokKeys, type ByokProviderFlags } from '../acp';
 import { claudeApiKey, readByokKeys, readProviderKey } from '../ai/providerKeys';
@@ -2146,18 +2147,19 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * chat runs on the account that was just signed in. `onStatus` hears every
    * poll; it returns the page to open, or null when Codex cannot start.
    */
-  public async startCodexSignIn(onStatus: (state: CodexSidebarStatus['state']) => void): Promise<string | null> {
+  public async startCodexSignIn(onStatus: (state: CodexSidebarStatus['state']) => void, onEnd?: (end: LoginPollEnd) => void): Promise<string | null> {
     const rt = this._runtimeRegistry.get('codex') as CodexRuntime;
     const status = await rt.getCodexSidebarStatus();
     if (status.state === 'broken-install' || status.state === 'disabled') return null;
     rt.setLoginInProgress(true);
     this._postCodexSidebarStatus({ ...status, state: 'auth-in-progress', error: null });
-    // The sheet's own poll callback, which its `login-started` listener restarts; the caller hears every poll until the
-    // sign-in stops, through that restart too (Sprint 156, #694)
+    // The sheet's own poll callback, which its `login-started` listener restarts
     rt.startLoginPolling((next) => this._postCodexSidebarStatus(next));
-    rt.listenToLoginPoll((next) => onStatus(next.state));
     try {
       const authUrl = await rt.beginLogin();
+      // The caller hears every poll until the sign-in stops, through that restart too, and how it ended (Sprint 156,
+      // #694); registered once the login has started, so a login that couldn't start ends only by its throw
+      rt.listenToLoginPoll((next) => onStatus(next.state), onEnd);
       emitCodexStatusInvalidated('login-started');
       return authUrl;
     } catch (error) {
@@ -3128,7 +3130,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       rt.setLoginInProgress(true);
       rt.startLoginPolling((s) => this._postCodexSidebarStatus(s));
     } else if (reason === 'logout' || reason === 'login-finished') {
-      rt.stopLoginPolling();
+      rt.stopLoginPolling(reason === 'login-finished' ? 'ready' : 'stopped');
       await this._releaseRuntimeSessionsForAgent('codex');
       rt.dispose();
     }

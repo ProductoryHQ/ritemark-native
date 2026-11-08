@@ -177,9 +177,11 @@ export function readyGoneNow(input: { kind: ReadyKind; ownChats: number; request
 export type AiState = 'ready' | 'sign-in' | 'set-up' | 'checking' | 'signing-in';
 
 /**
- * Sprint 156: whether Ritemark can sign in to an AI here. Claude and ChatGPT, while each is turned on and can start
- * (any state but Set up); ChatGPT not when its runtime is the computer's own (`ritemark.agentRuntime.preference`
- * `system`), whose sign-in is that install's. OpenCode is set up with a key, never signed in to.
+ * Sprint 156: whether ChatGPT or Claude should lead the card's sign-in here. Claude and ChatGPT, while each is turned
+ * on and can start (any state but Set up); ChatGPT not when its runtime is the computer's own
+ * (`ritemark.agentRuntime.preference` `system`), so the card leads with an AI Ritemark ships. That is the lead only:
+ * a ChatGPT sign-in pressed anyway (Ask with, or the last fallback below) runs the same login, which with the
+ * computer's own runtime signs in that install's Codex. OpenCode is set up with a key, never signed in to.
  */
 export function canSignInHere(states: Partial<Record<AgentId, AiState>>, runtimePreference: 'bundled' | 'system'): Partial<Record<AgentId, boolean>> {
   const can = (id: AgentId) => states[id] !== undefined && states[id] !== 'set-up';
@@ -190,7 +192,9 @@ export function canSignInHere(states: Partial<Record<AgentId, AiState>>, runtime
  * Sprint 156 (experience 35, "With no AI ready"): the AI the card signs in to when none is ready. ChatGPT, because any
  * plan works. The AI last seen ready instead, when its sign-in has lapsed (no AI ready, and it waits for a sign-in);
  * in practice only Claude, since OpenCode is set up, not signed in to. Claude when ChatGPT can't sign in here; Set up
- * OpenCode when neither can and OpenCode is on; with OpenCode off too, ChatGPT, whose press opens AI Settings.
+ * OpenCode when neither can and OpenCode is on; with OpenCode off too, ChatGPT. Its press runs ChatGPT's sign-in as
+ * Ask with's does: AI Settings when ChatGPT is off or can't start, else the login (the computer's own Codex's, with
+ * `agentRuntime.preference` `system`).
  */
 export function leadAi(input: {
   /** The AI last seen ready on this profile (`ritemark.guidance.lastReadyAi`). */
@@ -203,7 +207,8 @@ export function leadAi(input: {
   if (noneReady && lastReady && canSignIn[lastReady] && (states[lastReady] === 'sign-in' || states[lastReady] === 'signing-in')) return lastReady;
   if (canSignIn.codex) return 'codex';
   if (canSignIn['claude-code']) return 'claude-code';
-  // OpenCode only when it is on here (it has a state); else ChatGPT, whose press opens AI Settings
+  // OpenCode only when it is on here (it has a state); else ChatGPT, whose press runs ChatGPT's sign-in as Ask with's
+  // does (AI Settings when ChatGPT is off or can't start; the computer's own Codex's login with `system`)
   return states.opencode !== undefined ? 'opencode' : 'codex';
 }
 

@@ -25,6 +25,7 @@ import { beginClaudeLogin, cancelClaudeLogin } from '../agent/claudeLogin';
 import { getAgentEnvironmentStatus, getSetupStatus, setAnthropicKeyAvailable } from '../agent/setup';
 import { emitClaudeStatusInvalidated, onClaudeStatusInvalidated } from '../agent/claudeStatusEvents';
 import { onCodexStatusInvalidated } from '../codex';
+import { waitForCodexSignIn, type CodexSignInWait, type LoginPollEnd } from '../codex/codexStatusEvents';
 import { connectivityChanged, isOnline } from '../ai/connectivity';
 import { isEnabled } from '../features';
 import * as modelCatalog from '../ai/modelCatalog';
@@ -103,7 +104,7 @@ export async function saveAiForNewChats(agent: AgentId): Promise<void> {
 /** The AI sheet's host, as far as the welcome needs it. */
 export interface WelcomeAiSheet {
   runtimeAvailability(runtimeId: AgentId): Promise<RuntimeAvailability>;
-  startCodexSignIn(onStatus: (state: CodexSidebarStatus['state']) => void): Promise<string | null>;
+  startCodexSignIn(onStatus: (state: CodexSidebarStatus['state']) => void, onEnd?: (end: LoginPollEnd) => void): Promise<string | null>;
   stopCodexSignIn(): Promise<void>;
   /** Whether ChatGPT's sign-in works as a turn will use it, beyond what auth.json says. */
   verifyCodexSignIn(): Promise<boolean>;
@@ -191,6 +192,8 @@ class WelcomeController implements vscode.Disposable {
   };
   private readonly checkTokens: Record<WelcomeProviderId, number> = { claude: 0, chatgpt: 0, opencode: 0 };
   private readonly signInPages: Partial<Record<AccountProviderId, string>> = {};
+  /** Sprint 156 (#694): the ChatGPT sign-in this welcome waits for, shared with Home's card (`waitForCodexSignIn`). */
+  private codexWait: CodexSignInWait | null = null;
   private offline = !isOnline();
   private projects: ProjectRow[] = [];
   private projectsParent: string | null = null;
@@ -599,8 +602,14 @@ class WelcomeController implements vscode.Disposable {
       case 'welcome/cancel-sign-in':
         return this.cancelSignIn(request.provider);
       case 'welcome/reopen-sign-in': {
+        // Never silent (Sprint 156, #694): with no page to open, or a page that didn't open, the card says so in the
+        // line Home's card uses ("…sign-in page didn't open…")
         const page = this.signInPages[request.provider];
-        if (page) await vscode.env.openExternal(vscode.Uri.parse(page));
+        const opened = page ? await Promise.resolve(vscode.env.openExternal(vscode.Uri.parse(page))).catch(() => false) : false;
+        const memory = this.memories[request.provider];
+        if (!memory.signingIn) return;
+        memory.problem = opened ? null : 'not-opened';
+        this.push();
         return;
       }
       case 'welcome/retry-check':
@@ -701,6 +710,7 @@ class WelcomeController implements vscode.Disposable {
       },
       onCancel: () => {
         memory.signingIn = false;
+        memory.problem = null;
         this.check('claude');
       },
     });
@@ -720,29 +730,42 @@ class WelcomeController implements vscode.Disposable {
     // the card must not say the browser opened before it has (the Windows round).
     memory.starting = true;
     this.push();
+    // Sprint 156 (#694): the sign-in's end, however it comes, through the wait Home's card shares: ready; a failed
+    // login ("didn't finish"); the poll's give-up or our own after 2 minutes ("wasn't finished in time"), for a poll the
+    // AI's sheet restarted; or a stop (Cancel elsewhere, a sign-out), so the card never stays on "Signing in…".
+    const wait = waitForCodexSignIn((outcome) => {
+      if (this.codexWait !== wait) return;
+      this.codexWait = null;
+      // Ready: still signing in until the check says so; then step 2
+      if (outcome === 'ready') return this.check('chatgpt');
+      memory.starting = false;
+      memory.signingIn = false;
+      memory.problem = outcome === 'stopped' ? null : outcome;
+      this.check('chatgpt');
+    });
+    this.codexWait = wait;
+    const stopWaiting = () => {
+      wait.cancel();
+      if (this.codexWait === wait) this.codexWait = null;
+    };
     try {
-      const page = await this.aiSheet.startCodexSignIn((state) => {
-        if (!memory.signingIn) return;
-        if (state === 'ready') {
-          this.check('chatgpt');
-        } else if (state === 'needs-auth') {
-          // The sidebar's polling gave up (2 minutes) without a sign-in.
-          memory.signingIn = false;
-          memory.problem = 'timed-out';
-          this.check('chatgpt');
-        }
-      });
+      const page = await this.aiSheet.startCodexSignIn(wait.onStatus, wait.onEnd);
+      if (this.codexWait !== wait) return;
       if (!page) {
+        stopWaiting();
         memory.starting = false;
         memory.problem = 'not-ready';
         this.push();
         return;
       }
       this.signInPages.chatgpt = page;
+      wait.arm();
       const opened = await vscode.env.openExternal(vscode.Uri.parse(page));
+      if (this.codexWait !== wait) return;
       memory.starting = false;
       if (!opened) {
         // The question was answered with Cancel (or Copy), or nothing could open the page: stop Codex's listener.
+        stopWaiting();
         await this.aiSheet.stopCodexSignIn();
         memory.problem = 'not-opened';
         this.push();
@@ -751,6 +774,7 @@ class WelcomeController implements vscode.Disposable {
       memory.signingIn = true;
       this.push();
     } catch {
+      stopWaiting();
       memory.starting = false;
       memory.signingIn = false;
       memory.problem = 'could-not-start';
@@ -763,7 +787,11 @@ class WelcomeController implements vscode.Disposable {
     memory.signingIn = false;
     memory.problem = null;
     if (provider === 'claude') cancelClaudeLogin();
-    else await this.aiSheet.stopCodexSignIn();
+    else {
+      this.codexWait?.cancel();
+      this.codexWait = null;
+      await this.aiSheet.stopCodexSignIn();
+    }
     this.check(provider);
   }
 

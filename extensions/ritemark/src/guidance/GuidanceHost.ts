@@ -23,7 +23,7 @@ import type { AgentId, SetupStatus } from '../agent/types';
 import { beginClaudeLogin, cancelClaudeLogin } from '../agent/claudeLogin';
 import { onClaudeStatusInvalidated } from '../agent/claudeStatusEvents';
 import { getSetupStatus } from '../agent/setup';
-import { CODEX_LOGIN_TIMEOUT_MS, onCodexStatusInvalidated } from '../codex/codexStatusEvents';
+import { onCodexStatusInvalidated, waitForCodexSignIn, type CodexSignInWait, type LoginPollEnd } from '../codex/codexStatusEvents';
 import { trackEvent } from '../analytics/posthog';
 import type { WelcomeProvider } from '../analytics/events';
 import { normalizeProjectUri, resolveProjectScope } from '../conversations/projectScope';
@@ -60,8 +60,8 @@ interface HomeSignIn {
   /** `starting` until its page is open (ChatGPT: after VS Code's "open the website?" question), then `waiting`. */
   phase: 'starting' | 'waiting';
   settle(outcome: SignInOutcome): void;
-  /** Home's own give-up (ChatGPT: the welcome's 2 minutes), whoever else is polling the sign-in. */
-  timer?: ReturnType<typeof setTimeout>;
+  /** ChatGPT: the wait the welcome shares (`waitForCodexSignIn`), with Home's own give-up after 2 minutes. */
+  wait?: CodexSignInWait;
 }
 
 /** The welcome's Claude sign-in, as Home uses it; a test passes its own. */
@@ -82,7 +82,7 @@ export interface GuidanceDependencies {
   folder: vscode.WorkspaceFolder | undefined;
   runtimeAvailability(runtimeId: AgentId): Promise<RuntimeAvailability>;
   startChat(request: ChatStartRequest): Promise<void>;
-  startCodexSignIn(onStatus: (state: string) => void): Promise<string | null>;
+  startCodexSignIn(onStatus: (state: string) => void, onEnd?: (end: LoginPollEnd) => void): Promise<string | null>;
   stopCodexSignIn(): Promise<void>;
   /** The board's Give, for the sample's card; null without a board. */
   give(cardId: string, runtimeId: AgentId): Promise<{ ok: boolean; message?: string } | null>;
@@ -123,6 +123,8 @@ export class GuidanceHost implements vscode.Disposable {
   private readonly signInPages: Partial<Record<AgentId, string>> = {};
   /** Sprint 156: "Open the page again" had no page to open, or it didn't open: the welcome's line, while it waits. */
   private reopenProblem: string | null = null;
+  /** Sprint 156: the AI the card last named while it waited, so its Cancel and "Open the page again" act on that one. */
+  private cardSigningAi: AgentId | null = null;
   private aiCache: { at: number; states: Partial<Record<AgentId, AiState>> } | null = null;
   private readyProblem: string | null = null;
   /**
@@ -234,8 +236,10 @@ export class GuidanceHost implements vscode.Disposable {
     const chosen = this.cardAiOf(record, states);
     // The card waits only for a sign-in to the AI it names, with no AI ready (answer 1); with one ready it stays usable
     const signing = chosen.ready ? undefined : this.signings.get(chosen.ai);
-    // A failure line belongs to the card that names that AI; once that AI is ready it has nothing to say
-    if (chosen.ready && this.signInFailure?.ai === chosen.ai) this.signInFailure = null;
+    this.cardSigningAi = signing ? chosen.ai : null;
+    // A failure line belongs to the card that asks an AI to sign in; a card naming a ready AI has no use for it, and it
+    // doesn't come back if that AI stops being ready (round 2, N1)
+    if (chosen.ready) this.signInFailure = null;
     const counts = kind === 'files' ? await this.countsOf(input.folderPath, input.skipAtRoot) : null;
     const words = readyRequestWords(kind, AI_NAMES[chosen.ai], input.projectName, counts, chosen.ready);
     // Ask with keeps every AI in today's order, the leading one too, each with its state (the Experience lead, answer 5)
@@ -250,9 +254,10 @@ export class GuidanceHost implements vscode.Disposable {
       signingIn: signing?.phase ?? null,
       ais,
       keysSet: await this.keysSet(),
-      problem: this.readyProblem
-        ?? (signing ? (signing.phase === 'waiting' ? this.reopenProblem : null)
-          : !chosen.ready && this.signInFailure?.ai === chosen.ai ? this.signInFailure.line : null),
+      // The sample's hand-over line belongs to the ready request; a card that signs in shows only its sign-in's line
+      problem: chosen.ready ? this.readyProblem
+        : signing ? (signing.phase === 'waiting' ? this.reopenProblem : null)
+        : this.signInFailure?.ai === chosen.ai ? this.signInFailure.line : null,
     };
   }
 
@@ -383,7 +388,7 @@ export class GuidanceHost implements vscode.Disposable {
       settle: (outcome) => {
         if (this.signings.get(ai) !== signing) return;
         this.signings.delete(ai);
-        if (signing.timer) clearTimeout(signing.timer);
+        signing.wait?.cancel();
         this.reopenProblem = null;
         this.aiCache = null;
         if (outcome === 'ready') {
@@ -395,8 +400,9 @@ export class GuidanceHost implements vscode.Disposable {
       },
     };
     this.signings.set(ai, signing);
-    // A new try: the last failure's line goes with it (the Experience lead, f85e188)
+    // A new try: the last failure's line goes with it (the Experience lead, f85e188), and the sample's, as before
     this.signInFailure = null;
+    this.readyProblem = null;
     this.reopenProblem = null;
     delete this.signInPages[ai];
     this.changed.fire();
@@ -417,6 +423,8 @@ export class GuidanceHost implements vscode.Disposable {
       // A login that can't start reports its error before it returns: that is "couldn't start", not "didn't finish"
       let launching = true;
       const started = claude.begin(status.binaryPath, {
+        // Joining a login already running (Settings', the sheet's), Home asks for the page it missed
+        replayUrl: true,
         onUrl: (url) => { this.signInPages[ai] = url; },
         onComplete: () => signing.settle('ready'),
         onError: () => { if (!launching) signing.settle('failed'); },
@@ -432,16 +440,15 @@ export class GuidanceHost implements vscode.Disposable {
       const availability = await this.deps.runtimeAvailability('codex').catch(() => null);
       if (!current()) return;
       if (availability?.usable) return signing.settle('ready');
-      const page = await this.deps.startCodexSignIn((state) => {
-        if (state === 'ready') signing.settle('ready');
-        // The sign-in's poll gave up (2 minutes) without a sign-in
-        else if (state === 'needs-auth') signing.settle('timed-out');
-      });
+      // The welcome's wait, shared: the poll's ready, its end (a failed login says "didn't finish" at once, round 2 N6;
+      // the give-up; a stop), or Home's own give-up after 2 minutes for a poll the sheet restarted
+      const wait = waitForCodexSignIn((outcome) => signing.settle(outcome));
+      signing.wait = wait;
+      const page = await this.deps.startCodexSignIn(wait.onStatus, wait.onEnd);
       if (!current()) return;
       if (!page) return toSettings();
       this.signInPages[ai] = page;
-      // Home's own give-up, the welcome's 2 minutes, in case the poll that would have said so was stopped or restarted
-      signing.timer = setTimeout(() => signing.settle('timed-out'), CODEX_LOGIN_TIMEOUT_MS);
+      wait.arm();
       if (!(await vscode.env.openExternal(vscode.Uri.parse(page)))) {
         // The "open the website?" question was answered with Cancel, or nothing could open the page: stop Codex's
         // listener, and the card is back as it was, with no line (the Experience lead, answer 2)
@@ -474,9 +481,9 @@ export class GuidanceHost implements vscode.Disposable {
     }, 1500);
   }
 
-  /** The sign-in the card shows: the one to the AI it names (with no AI ready, Home runs at most one). */
+  /** The sign-in the card shows: the one to the AI it names (round 2, N3). */
   private cardSigning(): HomeSignIn | undefined {
-    return this.signings.values().next().value;
+    return this.cardSigningAi ? this.signings.get(this.cardSigningAi) : undefined;
   }
 
   /** Sprint 156: the card's Cancel stops waiting, as the welcome's does; the card is back as it was, with no line. */
@@ -513,7 +520,13 @@ export class GuidanceHost implements vscode.Disposable {
   private async readyFromHome(folderUri: string, ai: AgentId): Promise<void> {
     this.signInFailure = null;
     this.aiCache = null;
-    const states = await this.aiStates();
+    let states = await this.aiStates();
+    if (states[ai] !== 'ready' && ai === 'codex') {
+      // A ChatGPT login that just finished restarts its runtime; read once more before giving up on it
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      this.aiCache = null;
+      states = await this.aiStates();
+    }
     if (states[ai] === 'ready') {
       await noteLastReadyAi(this.deps.context.globalState, ai);
       await saveAiForNewChats(ai);
@@ -698,7 +711,7 @@ export class GuidanceHost implements vscode.Disposable {
 
   dispose(): void {
     if (this.placeTimer) clearTimeout(this.placeTimer);
-    for (const signing of this.signings.values()) if (signing.timer) clearTimeout(signing.timer);
+    for (const signing of this.signings.values()) signing.wait?.cancel();
     madeSomething.setSink(null);
     this.changed.dispose();
     this.disposables.forEach((disposable) => disposable.dispose());

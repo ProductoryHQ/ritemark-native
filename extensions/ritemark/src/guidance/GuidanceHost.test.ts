@@ -12,6 +12,9 @@
  *   again" with no page says so.
  * - With an AI ready, Ask with's sign-in leaves the ready request as it is; a failure line shows only on the card that
  *   names that AI.
+ * - Round 2: a login Codex reports as failed says "didn't finish" at once, and a stopped poll puts the card back; a
+ *   card naming a ready AI drops an old failure line for good; the sample's line shows only on the ready request;
+ *   Cancel acts on the AI the card names; Home asks a running Claude login for the page it missed.
  *
  * Run: npx tsx src/guidance/GuidanceHost.test.ts
  */
@@ -95,13 +98,16 @@ async function main(): Promise<void> {
   (codex as any).getCodexSidebarStatus = async () => ({ state: usable.codex ? 'ready' : codex.isLoginInProgress() ? 'auth-in-progress' : 'needs-auth' });
   let codexStarts = 0;
   let codexStops = 0;
-  const startCodexSignIn = async (onStatus: (state: string) => void) => {
+  const startCodexSignIn = async (onStatus: (state: string) => void, onEnd?: (end: 'ready' | 'failed' | 'gave-up' | 'stopped') => void) => {
     codexStarts += 1;
     codex.setLoginInProgress(true);
     codex.startLoginPolling(() => {});
-    codex.listenToLoginPoll((next) => onStatus(next.state));
+    codex.listenToLoginPoll((next) => onStatus(next.state), onEnd);
     return 'https://auth.openai.com/sign-in';
   };
+  // A poll that went quiet: no tick, no end, nobody told (what the AI sheet's restart used to leave behind)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const quietPoll = () => { (codex as any)._clearLoginPoll(); (codex as any)._loginPollListeners.clear(); };
   const stopCodexSignIn = async () => {
     codexStops += 1;
     codex.stopLoginPolling();
@@ -109,7 +115,7 @@ async function main(): Promise<void> {
   };
 
   // Claude's login, faked: each begin is recorded with its callbacks
-  type ClaudeCalls = { onUrl?(url: string): void; onComplete?(): void; onError?(error: string): void; onTimeout?(): void; onCancel?(): void };
+  type ClaudeCalls = { onUrl?(url: string): void; onComplete?(): void; onError?(error: string): void; onTimeout?(): void; onCancel?(): void; replayUrl?: boolean };
   let claudeLogin: ClaudeCalls | null = null;
   let claudeBegin: (options: ClaudeCalls) => 'started' | 'already-running' | 'failed-to-start' = (options) => { claudeLogin = options; return 'started'; };
   const claudeSignIn = {
@@ -195,7 +201,7 @@ async function main(): Promise<void> {
   await flush();
   await press();
   assert.equal(codexStarts, 2);
-  codex.stopLoginPolling(); // `loginComplete`: the poll stops, no callback runs
+  quietPoll();
   usable.codex = true;
   emitCodexStatusInvalidated('login-finished');
   await flush();
@@ -209,7 +215,7 @@ async function main(): Promise<void> {
   emitCodexStatusInvalidated('logout');
   await flush();
   await press();
-  codex.stopLoginPolling(); // a poll that will never say so
+  quietPoll(); // a poll that will never say so
   mock.timers.tick(120_000);
   await flush();
   shown = await card();
@@ -220,6 +226,26 @@ async function main(): Promise<void> {
   shown = await card();
   assert.equal(shown.signingIn, 'waiting', 'pressing again is the retry');
   assert.equal(shown.problem, null, 'the press takes the line away (the Experience lead, f85e188)');
+
+  // ── Round 2, N6: a login Codex reports as failed (`loginComplete` false) says "didn't finish" at once ──
+  await host.cancelSignIn();
+  await flush();
+  await press();
+  assert.equal((await card()).signingIn, 'waiting');
+  codex.stopLoginPolling('failed'); // what `loginComplete` with success false does
+  await flush();
+  shown = await card();
+  assert.equal(shown.signingIn, null, 'no 2-minute wait');
+  assert.equal(shown.problem, 'The sign-in to ChatGPT didn’t finish. Sign in again when you’re ready.');
+  // A poll stopped elsewhere (a sign-out on the AI's sheet): back as it was, with no line
+  await press();
+  codex.stopLoginPolling();
+  await flush();
+  shown = await card();
+  assert.equal(shown.signingIn, null, 'a stopped poll never leaves the card on "Signing in…"');
+  assert.equal(shown.problem, null);
+  await press();
+  assert.equal((await card()).signingIn, 'waiting', 'the card shows the sign-in its Cancel stops');
 
   // ── Cancel: back as it was, with no line ──
   const stopsBefore = codexStops;
@@ -259,6 +285,7 @@ async function main(): Promise<void> {
   await press();
   shown = await card();
   assert.equal(shown.signingIn, 'waiting');
+  assert.equal((claudeLogin as ClaudeCalls | null)?.replayUrl, true, 'Home asks a running login for the page it missed (round 2, N4)');
   // "Open the page again" before Claude's CLI printed its page: never silent (finding 6)
   await host.reopenSignIn();
   shown = await card();
@@ -295,8 +322,95 @@ async function main(): Promise<void> {
   assert.equal(shown.ai, 'claude-code');
   assert.equal(shown.signingIn, null);
   assert.equal(shown.ais.find((ai) => ai.id === 'codex')?.state, 'signing-in', 'Ask with shows it signing in, as before');
+  codex.stopLoginPolling();
+  await flush();
+
+  // ── Round 2, N1: a card naming a ready AI drops an old failure line; it doesn't come back with no new try ──
+  usable['claude-code'] = false;
+  await noteLastReadyAi(globalState, 'codex');
+  emitClaudeStatusInvalidated('logout');
+  await flush();
+  await press(); // ChatGPT leads
+  codex.stopLoginPolling('failed');
+  await flush();
+  assert.equal((await card()).problem, 'The sign-in to ChatGPT didn’t finish. Sign in again when you’re ready.');
+  usable.opencode = true; // another AI becomes ready
+  emitCodexStatusInvalidated('status-refresh');
+  await flush();
+  shown = await card();
+  assert.equal(shown.aiReady, true);
+  assert.equal(shown.problem, null);
+  usable.opencode = false; // and not ready again
+  emitCodexStatusInvalidated('status-refresh');
+  await flush();
+  shown = await card();
+  assert.equal(shown.ai, 'codex');
+  assert.equal(shown.problem, null, 'the old line doesn\'t return without a new try');
+
+  // ── Round 2, N2: the sample's line belongs to the ready request; a sign-in start clears it ──
+  const sample = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-guidance-sample-'));
+  fs.mkdirSync(path.join(sample, '.ritemark', 'tasks'), { recursive: true });
+  fs.writeFileSync(path.join(sample, '.ritemark', 'tasks', 'm4d7r2.md'), '---\nstage: todo\n---\nDraft Module 4\n');
+  fs.writeFileSync(path.join(sample, 'Brief.md'), 'x');
+  const sampleInput = { ...input, folderUri: `file://${sample}`, folderPath: sample, projectName: 'Leadership programme' };
+  const sampleCard = async () => {
+    const guidance = await host.homeGuidance(sampleInput);
+    assert.ok(guidance && guidance.card === 'ready-request');
+    return guidance;
+  };
+  usable['claude-code'] = true;
+  emitClaudeStatusInvalidated('login-finished');
+  await flush();
+  await host.pressReadyRequest(sampleInput); // no board in this window: the hand-over can't start
+  await flush();
+  shown = await sampleCard();
+  assert.equal(shown.kind, 'sample');
+  assert.match(shown.problem ?? '', /task board is not open/, 'the sample\'s line on its ready request');
+  usable['claude-code'] = false;
+  emitClaudeStatusInvalidated('logout');
+  await flush();
+  shown = await sampleCard();
+  assert.equal(shown.aiReady, false);
+  assert.equal(shown.problem, null, 'not on the card that signs in');
+  await host.pressReadyRequest(sampleInput);
+  await flush();
+  shown = await sampleCard();
+  assert.equal(shown.signingIn, 'waiting');
+  assert.equal(shown.problem, null, 'and not under "Signing in…"');
+  codex.stopLoginPolling();
+  await flush();
+  usable['claude-code'] = true;
+  emitClaudeStatusInvalidated('login-finished');
+  await flush();
+  assert.equal((await sampleCard()).problem, null, 'the sign-in\'s start cleared it');
+  fs.rmSync(sample, { recursive: true, force: true });
+
+  // ── Round 2, N3: with two sign-ins running, Cancel acts on the AI the card names ──
+  usable.opencode = true; // an AI ready: Ask with's sign-ins run beside the ready request
+  usable['claude-code'] = false;
+  emitClaudeStatusInvalidated('logout');
+  await flush();
+  claudeLogin = null;
+  await host.signIn(input.folderUri, 'claude-code'); // started first
+  await host.signIn(input.folderUri, 'codex');
+  await flush();
+  usable.opencode = false; // no AI ready now: the card names ChatGPT, the lead, waiting
+  emitCodexStatusInvalidated('status-refresh');
+  await flush();
+  shown = await card();
+  assert.equal(shown.ai, 'codex');
+  assert.equal(shown.signingIn, 'waiting');
+  const stops = codexStops;
   await host.cancelSignIn();
   await flush();
+  assert.equal(codexStops, stops + 1, 'Cancel stopped ChatGPT\'s sign-in, the one the card named');
+  assert.ok(claudeLogin, 'and left Claude\'s running');
+  shown = await card();
+  assert.equal(shown.ai, 'claude-code', 'the card now names the sign-in still running');
+  assert.equal(shown.signingIn, 'waiting');
+  await host.cancelSignIn();
+  await flush();
+  assert.equal(claudeLogin, null, 'Cancel on that card stops Claude\'s');
 
   assert.deepEqual(chats, [], 'no sign-in ever sent a message');
   host.dispose();

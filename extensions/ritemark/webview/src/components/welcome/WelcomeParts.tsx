@@ -87,7 +87,7 @@ export function ProviderCard({
     return (
       <section className="rw-choice wait" aria-labelledby={titleId} aria-busy="true">
         <span className="name" id={titleId}>{name}</span>
-        <span className="line" id={`${titleId}-line`}>{browserOpened(view.id)}</span>
+        <span className="line" id={`${titleId}-line`}>{view.reason ?? browserOpened(view.id)}</span>
         <span className="w">
           <Spinner />
           <span id={`${titleId}-state`}>{isOpenCode ? COPY.checking : COPY.finishThere}</span>
@@ -179,7 +179,7 @@ export function ProviderRow({ view, onSetUp, onSignIn }: { view: ProviderView; o
     <div className="rw-airow" role="listitem">
       <span className="t">
         <b>{name}</b>
-        {view.phase === 'signing-in' && <span id={wordsId}>{browserOpened(view.id)}</span>}
+        {view.phase === 'signing-in' && <span id={wordsId}>{view.reason ?? browserOpened(view.id)}</span>}
         {view.reason && view.phase !== 'signing-in' && <span id={wordsId}>{view.reason}</span>}
       </span>
       {view.phase === 'ready' && <span className="rw-state"><Icon name="check-circle" size={14} tone="inherit" />{isOpenCode ? COPY.setUpDone : COPY.signedIn}</span>}
