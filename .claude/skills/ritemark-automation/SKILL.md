@@ -101,8 +101,10 @@ scripts/qa/dev-launch-isolated.sh stop <RUN_DIR>; rm -rf "$PROFILE"   # test pro
   enough `$TMPDIR`), with no whitespace, never Ritemark's real profile or `~/.ritemark-shared`. This is
   `with-test-keys.sh`'s rule, from the shared `scripts/qa/test-profile-guard.sh`. Both scripts refuse to run while
   `VSCODE_PORTABLE` or `VSCODE_APPDATA` is set (VS Code reads them before `--user-data-dir`); `with-test-keys.sh`
-  refuses a `--shared-data-dir` into `~/.ritemark-shared`, and `dev-launch-isolated.sh` sets its own
-  (`~/.ritemark-dev-shared`) and refuses `--user-data-dir` or `--shared-data-dir` after `--`.
+  refuses a `--shared-data-dir` into `~/.ritemark-shared`, and `dev-launch-isolated.sh` gives each run its
+  own, new and empty (`<run-dir>/shared`), and refuses `--user-data-dir` or `--shared-data-dir` after `--`. Never a
+  folder that outlives the run, `~/.ritemark-dev-shared` included: its Open Recent fills a fresh profile's Projects
+  list (`src/projects/firstFill.ts`), and the window then reads those folders' files.
 
 There is exactly one correct way to launch Ritemark for automation. Memorize the shape:
 
