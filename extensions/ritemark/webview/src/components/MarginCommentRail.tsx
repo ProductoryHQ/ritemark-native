@@ -35,6 +35,7 @@ import {
   commentBoxStorage,
   commentRangesById,
   composerIsDirty,
+  nextRailBox,
   yieldOpenBox,
   type OpenCommentBox,
 } from '../extensions/comment/CommentNode'
@@ -476,6 +477,8 @@ function RailItem({
   onRecovery,
   boxHandle,
   onDirtyChange,
+  reveal,
+  onRevealed,
 }: {
   marker: RailMarker
   density: RailDensity
@@ -497,7 +500,18 @@ function RailItem({
   onRecovery: (recovery: CommentTaskError['recovery'], alias: CommentAgentAlias | null) => void
   boxHandle: { current: ComposeBoxHandle | null }
   onDirtyChange: (dirty: boolean) => void
+  /** Opened latched by the door (#687): scroll the least it takes to show it, once. */
+  reveal: boolean
+  onRevealed: () => void
 }) {
+  const itemRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!reveal) return
+    const item = itemRef.current
+    const target = item?.querySelector<HTMLElement>('.rm-bubble') ?? item
+    target?.scrollIntoView({ block: 'nearest' })
+    onRevealed()
+  }, [reveal, onRevealed])
   const projection = useCommentTaskProjection(marker.commentId)
   const alias = detectAgentAlias(marker.note)
   const presentation = projection ? presentCommentTask(projection) : null
@@ -534,6 +548,7 @@ function RailItem({
 
   return (
     <div
+      ref={itemRef}
       className={`rm-rail-item${pinned ? ' rm-rail-item-pinned' : ''}`}
       // Open bubble / compose sits ON TOP of neighbouring markers.
       style={{ top: marker.top, zIndex: open || composing ? 30 : 1 }}
@@ -797,38 +812,53 @@ export function MarginCommentRail({
     }
   }, [editor, container, rescan])
 
+  /** A saved comment the door opened latched, to scroll the least it takes into view once. */
+  const [revealKey, setRevealKey] = useState<string | null>(null)
+
   /**
-   * Which marker is the box (#687). A new comment's id, asked for by
-   * `startComment`, wins once its marker appears. The first scan that shows
-   * comments opens only the first empty one in document order (an old file, or
-   * a run of undos, can hold several); the rest stay plain markers that open on
-   * a click. A box whose comment is gone closes.
+   * Which marker is the box (#687), by `nextRailBox`: a request from the door
+   * wins once its marker is there (a new comment's box, or a saved comment
+   * opened latched); the first scan opens only the first empty comment; a box
+   * whose comment is gone closes; nothing becomes a box by itself.
    */
   useEffect(() => {
     const storage = commentBoxStorage(editor)
-    const requested = storage?.openRequest
-    if (storage && requested) {
-      const target = markers.find((m) => m.commentId === requested)
-      if (target) {
-        storage.openRequest = null
-        firstShown.current = true
-        setComposeKey(target.key)
-        return
-      }
+    const next = nextRailBox({
+      current: composeKey,
+      markers,
+      request: storage?.openRequest ?? null,
+      firstShown: firstShown.current,
+    })
+    firstShown.current = next.firstShown
+    if (next.tookRequest && storage) storage.openRequest = null
+    if (next.composeKey !== composeKey) setComposeKey(next.composeKey)
+    if (next.latch) {
+      cancelClose()
+      setOpenKey(next.latch)
+      setPinnedKey(next.latch)
+      setRevealKey(next.latch)
     }
-    if (!firstShown.current && markers.length) {
-      firstShown.current = true
-      const docPos = (m: RailMarker) => m.from ?? m.nodePos ?? 0
-      const first = markers
-        .filter((m) => m.note === '')
-        .reduce<RailMarker | null>((a, b) => (!a || docPos(b) < docPos(a) ? b : a), null)
-      if (first) {
-        setComposeKey(first.key)
-        return
-      }
+  }, [editor, markers, composeKey, cancelClose])
+
+  // The door asks to open a saved comment without changing the document, so it
+  // wakes the rail itself: a rescan runs the rule above.
+  useEffect(() => {
+    const storage = commentBoxStorage(editor)
+    if (!storage) return
+    storage.notifyRail = rescan
+    return () => {
+      if (storage.notifyRail === rescan) storage.notifyRail = null
     }
-    setComposeKey((key) => (key && !markers.some((m) => m.key === key) ? null : key))
-  }, [editor, markers])
+  }, [editor, rescan])
+
+  // A box that opens by any path (⌘/ on a keyboard selection too) leaves no
+  // other bubble open beside it: a hover-opened one closes, and so does a
+  // latched one that isn't the box's own comment.
+  useEffect(() => {
+    if (!composeKey) return
+    setOpenKey((k) => (k === composeKey ? k : null))
+    setPinnedKey((k) => (k === composeKey ? k : null))
+  }, [composeKey])
 
   const boxMarker = composeKey ? markers.find((m) => m.key === composeKey) : undefined
   /** A box is open: hover opens nothing, and every other way of opening asks it first (#687). */
@@ -863,6 +893,7 @@ export function MarginCommentRail({
   const onBoxDirtyChange = useCallback((dirty: boolean) => {
     boxDirty.current = dirty
   }, [])
+  const onRevealed = useCallback(() => setRevealKey(null), [])
 
   /**
    * Hovering the highlighted text opens that comment, the same way hovering its
@@ -921,7 +952,6 @@ export function MarginCommentRail({
       setOpenKey(key)
       // An empty comment opens as its box; a saved one latches its bubble open.
       if (markers.find((marker) => marker.key === key)?.note === '') {
-        setPinnedKey(null)
         setComposeKey(key)
         return
       }
@@ -1169,7 +1199,6 @@ export function MarginCommentRail({
               setOpenKey(m.key)
               // An empty comment's marker opens as its box.
               if (m.note === '') {
-                setPinnedKey(null)
                 setComposeKey(m.key)
                 return
               }
@@ -1195,6 +1224,8 @@ export function MarginCommentRail({
             onRecovery={onRecovery}
             boxHandle={boxHandle}
             onDirtyChange={onBoxDirtyChange}
+            reveal={revealKey === m.key}
+            onRevealed={onRevealed}
           />
         )
       })}

@@ -18,7 +18,7 @@ import assert from 'node:assert/strict'
 import { getSchema, type Editor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
-import { EditorState, TextSelection, type Transaction } from '@tiptap/pm/state'
+import { AllSelection, EditorState, TextSelection, type Selection, type Transaction } from '@tiptap/pm/state'
 import { history, undo } from '@tiptap/pm/history'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { CommentMark } from './CommentMark'
@@ -26,8 +26,11 @@ import {
   CommentNode,
   composerIsDirty,
   decideNewBox,
+  liftCommentLine,
+  nextRailBox,
   startComment,
   yieldOpenBox,
+  type ComposeCandidate,
   type CommentNodeStorage,
   type OpenCommentBox,
 } from './CommentNode'
@@ -39,12 +42,27 @@ const link = schema.marks.link
 const UUID = /^[0-9a-fA-F-]{36}$|^c-[a-z0-9]+-[a-z0-9]+$/
 const OLD = '11111111-1111-4111-8111-111111111111'
 const SAVED = '22222222-2222-4222-8222-222222222222'
+const LATER = '33333333-3333-4333-8333-333333333333'
 
-/** A fake editor exposing what `startComment` and `yieldOpenBox` use. */
-function fakeEditor(doc: PMNode, select: (doc: PMNode) => TextSelection, openBox: OpenCommentBox | null) {
+/** The id of the new comment whose box the door asked the rail to open. */
+function boxRequestId(storage: CommentNodeStorage): string {
+  const request = storage.openRequest
+  assert.ok(request && request.as === 'box' && request.key.startsWith('c:'), 'a new box is asked for by its id')
+  return request.key.slice(2)
+}
+
+/** A fake editor exposing what the door (`startComment`, `liftCommentLine`, `yieldOpenBox`) uses. */
+function fakeEditor(doc: PMNode, select: (doc: PMNode) => Selection, openBox: OpenCommentBox | null) {
   let state = EditorState.create({ schema, doc, selection: select(doc), plugins: [history()] })
   const transactions: Transaction[] = []
-  const storage: CommentNodeStorage = { openBox, openRequest: null }
+  const woken = { count: 0 }
+  const storage: CommentNodeStorage = {
+    openBox,
+    openRequest: null,
+    notifyRail: () => {
+      woken.count++
+    },
+  }
   const editor = {
     get state() {
       return state
@@ -61,6 +79,7 @@ function fakeEditor(doc: PMNode, select: (doc: PMNode) => TextSelection, openBox
     editor,
     transactions,
     storage,
+    woken,
     state: () => state,
     undo: () =>
       undo(state, (tr) => {
@@ -189,8 +208,8 @@ const selectPhrase = (doc: PMNode) => {
   )
   assert.equal(after.textContent, doc.textContent, "A's text stays: only its mark goes")
   const onPhrase = marksOver(after, phrase.from, phrase.to)
-  const newId = t.storage.openRequest
-  assert.ok(newId && UUID.test(newId) && newId !== OLD, 'B gets a new id, and its box is asked for by that id')
+  const newId = boxRequestId(t.storage)
+  assert.ok(UUID.test(newId) && newId !== OLD, 'B gets a new id, and its box is asked for by that id')
   assert.deepEqual(onPhrase, [{ id: newId, note: '' }], 'B has an empty comment mark over exactly its text')
   assert.equal(t.state().selection.from, phrase.from, 'the selection is kept on B')
   assert.equal(t.state().selection.to, phrase.to, 'the selection is kept on B')
@@ -239,8 +258,8 @@ const cursorBeforeText = (doc: PMNode) => TextSelection.create(doc, rangeOf(doc,
 
   assert.equal(startComment(t.editor), true)
   assert.equal(t.transactions.length, 1, 'deleting A and inserting the new note is ONE transaction')
-  const newId = t.storage.openRequest
-  assert.ok(newId && UUID.test(newId) && newId !== OLD, 'the new note has a new id')
+  const newId = boxRequestId(t.storage)
+  assert.ok(UUID.test(newId) && newId !== OLD, 'the new note has a new id')
   assert.deepEqual(
     blocks(t.state().doc),
     ['Intro.', 'Body ', `[note ${newId}|]`, 'text here.'],
@@ -278,7 +297,7 @@ const cursorBeforeText = (doc: PMNode) => TextSelection.create(doc, rangeOf(doc,
   assert.equal(startComment(t.editor), true)
   assert.equal(t.transactions.length, 1)
   const phrase = rangeOf(t.state().doc, 'this phrase')
-  assert.deepEqual(marksOver(t.state().doc, phrase.from, phrase.to), [{ id: t.storage.openRequest, note: '' }])
+  assert.deepEqual(marksOver(t.state().doc, phrase.from, phrase.to), [{ id: boxRequestId(t.storage), note: '' }])
   assert.equal(markFragments(t.state().doc).filter((f) => f.startsWith(`${OLD}|`)).length, 3, 'nothing else is touched')
 }
 {
@@ -287,7 +306,7 @@ const cursorBeforeText = (doc: PMNode) => TextSelection.create(doc, rangeOf(doc,
   assert.equal(startComment(t.editor), true)
   assert.deepEqual(
     blocks(t.state().doc),
-    ['Only text.', `[note ${t.storage.openRequest}|]`],
+    ['Only text.', `[note ${boxRequestId(t.storage)}|]`],
     'as insertContent did, the note takes an empty paragraph’s place',
   )
 }
@@ -304,7 +323,7 @@ const cursorBeforeText = (doc: PMNode) => TextSelection.create(doc, rangeOf(doc,
   assert.equal(t.transactions.length, 1)
   assert.deepEqual(
     markFragments(t.state().doc),
-    [`${SAVED}|Check the figures`, `${t.storage.openRequest}|`],
+    [`${SAVED}|Check the figures`, `${boxRequestId(t.storage)}|`],
     'the saved comment keeps its note; the new comment is made',
   )
   assert.equal(calls.close, 1, 'the Edit closes back to the saved comment')
@@ -320,7 +339,7 @@ const cursorBeforeText = (doc: PMNode) => TextSelection.create(doc, rangeOf(doc,
   const fields = { key: `m:${legacy.from}-${legacy.to}`, kind: 'new', anchor: 'mark', ...legacy } as const
   const t = fakeEditor(doc, selectPhrase, openBox({ ...fields, dirty: false }).box)
   assert.equal(startComment(t.editor), true)
-  assert.deepEqual(markFragments(t.state().doc), [`${t.storage.openRequest}|`], 'the id-less empty mark is removed')
+  assert.deepEqual(markFragments(t.state().doc), [`${boxRequestId(t.storage)}|`], 'the id-less empty mark is removed')
 
   const saved = schema.node('doc', null, [
     para(schema.text('Old '), commented('legacy words', { id: null, note: 'A saved note' })),
@@ -359,6 +378,242 @@ const cursorBeforeText = (doc: PMNode) => TextSelection.create(doc, rangeOf(doc,
   const none = fakeEditor(noteDoc(), cursorBeforeText, null)
   assert.equal(yieldOpenBox(none.editor), true, 'with no box, anything may open')
   assert.equal(none.transactions.length, 0)
+}
+
+// ── Mixed kinds: a margin-note box gives way to an anchored comment ──────────
+// The note sits before the selection, so the selection must be mapped through
+// its deletion to keep covering the same words.
+{
+  const doc = noteDoc()
+  const { box, calls } = openBox({ key: `c:${OLD}`, commentId: OLD, kind: 'new', anchor: 'node', dirty: false })
+  const t = fakeEditor(doc, (d) => TextSelection.create(d, rangeOf(d, 'text').from, rangeOf(d, 'text').to), box)
+  assert.equal(startComment(t.editor), true)
+  assert.equal(t.transactions.length, 1, 'one transaction')
+  assert.deepEqual(blocks(t.state().doc), ['Intro.', 'Body text here.'], 'the empty note is gone')
+  const word = rangeOf(t.state().doc, 'text')
+  assert.deepEqual(marksOver(t.state().doc, word.from, word.to), [{ id: boxRequestId(t.storage), note: '' }])
+  assert.equal(t.state().selection.from, word.from, 'the selection still covers the same words')
+  assert.equal(t.state().selection.to, word.to)
+  assert.equal(calls.close, 1)
+}
+
+// ── Mixed kinds: an anchored box gives way to a margin note ──────────────────
+{
+  const doc = anchoredDoc()
+  const { box, calls } = openBox({ key: `c:${OLD}`, commentId: OLD, kind: 'new', anchor: 'mark', dirty: false })
+  const t = fakeEditor(doc, (d) => TextSelection.create(d, rangeOf(d, 'this phrase').from), box)
+  assert.equal(startComment(t.editor), true)
+  assert.equal(t.transactions.length, 1, 'one transaction')
+  assert.deepEqual(markFragments(t.state().doc), [], "the empty anchored comment's mark is gone everywhere")
+  assert.deepEqual(
+    blocks(t.state().doc),
+    ['Alpha first linked words', 'and its second paragraph', 'Pick ', `[note ${boxRequestId(t.storage)}|]`, 'this phrase here.'],
+    'the new empty note sits at the cursor',
+  )
+  assert.equal(calls.close, 1)
+}
+
+// ── A note deleted AFTER the cursor leaves the cursor where it was ────────────
+{
+  const doc = schema.node('doc', null, [
+    para(schema.text('Body text here.')),
+    schema.node('commentNode', { id: OLD, note: '', agentAlias: null }),
+    para(schema.text('End.')),
+  ])
+  const { box } = openBox({ key: `c:${OLD}`, commentId: OLD, kind: 'new', anchor: 'node', dirty: false })
+  const t = fakeEditor(doc, cursorBeforeText, box)
+  assert.equal(startComment(t.editor), true)
+  assert.equal(t.transactions.length, 1)
+  assert.deepEqual(blocks(t.state().doc), ['Body ', `[note ${boxRequestId(t.storage)}|]`, 'text here.', 'End.'])
+}
+
+// ── The `///` lift goes through the same door ────────────────────────────────
+const liftDoc = (line: string) =>
+  schema.node('doc', null, [
+    para(schema.text('Intro.')),
+    schema.node('commentNode', { id: OLD, note: '', agentAlias: null }),
+    para(schema.text(line)),
+    para(schema.text('After.')),
+  ])
+const cursorAtLineEnd = (line: string) => (doc: PMNode) => TextSelection.create(doc, rangeOf(doc, line).to)
+
+{
+  // A clean box: the old empty note goes in the SAME transaction as the lift.
+  const { box, calls } = openBox({ key: `c:${OLD}`, commentId: OLD, kind: 'new', anchor: 'node', dirty: false })
+  const t = fakeEditor(liftDoc('///'), cursorAtLineEnd('///'), box)
+  assert.equal(liftCommentLine(t.editor), true)
+  assert.equal(t.transactions.length, 1, 'one transaction')
+  assert.deepEqual(
+    blocks(t.state().doc),
+    ['Intro.', `[note ${boxRequestId(t.storage)}|]`, 'After.'],
+    'the old empty note is gone, and the line became the new empty note, whose box opens',
+  )
+  assert.equal(calls.close, 1)
+  assert.equal(t.undo(), true)
+  assert.deepEqual(blocks(t.state().doc), ['Intro.', `[note ${OLD}|]`, '///', 'After.'], 'one undo restores both')
+}
+{
+  // A dirty box: the line stays as typed, nothing else happens, the box comes forward.
+  const doc = liftDoc('///')
+  const { box, calls } = openBox({ key: `c:${OLD}`, commentId: OLD, kind: 'new', anchor: 'node', dirty: true })
+  const t = fakeEditor(doc, cursorAtLineEnd('///'), box)
+  assert.equal(liftCommentLine(t.editor), true, 'Enter is handled: it does nothing else')
+  assert.equal(t.transactions.length, 0, 'no transaction')
+  assert.ok(t.state().doc.eq(doc), 'the `///` line stays as typed')
+  assert.equal(calls.bringForward, 1)
+  assert.equal(t.storage.openRequest, null)
+}
+{
+  // With text, the lift makes a saved note and leaves the open box alone.
+  const { box, calls } = openBox({ key: `c:${OLD}`, commentId: OLD, kind: 'new', anchor: 'node', dirty: false })
+  const t = fakeEditor(liftDoc('/// Check the dates'), cursorAtLineEnd('/// Check the dates'), box)
+  assert.equal(liftCommentLine(t.editor), true)
+  assert.equal(t.transactions.length, 1)
+  const notes = blocks(t.state().doc).filter((b) => b.startsWith('[note'))
+  assert.equal(notes.length, 2, 'the open box is untouched')
+  assert.ok(notes[1].endsWith('|Check the dates]'), 'the line became a saved note')
+  assert.equal(t.storage.openRequest, null, 'a saved note opens no box')
+  assert.equal(calls.close, 0)
+}
+{
+  // A line holding `-->` can't be a comment: it isn't lifted, and Enter works normally.
+  const line = '/// keep these words --> and these'
+  const doc = liftDoc(line)
+  const t = fakeEditor(doc, cursorAtLineEnd(line), null)
+  assert.equal(liftCommentLine(t.editor), false, 'not handled, so normal Enter runs')
+  assert.equal(t.transactions.length, 0)
+  assert.ok(t.state().doc.eq(doc), 'the words stay as text')
+}
+
+// ── A selection that touches a saved comment opens it instead (the lead's option A) ──
+const savedDoc = () =>
+  schema.node('doc', null, [
+    para(schema.text('Start '), commented('saved words', { id: SAVED, note: 'Check the figures' }), schema.text(' tail end.')),
+    para(schema.text('Pick this phrase here.')),
+  ])
+const select = (needleFrom: string, needleTo: string) => (doc: PMNode) =>
+  TextSelection.create(doc, rangeOf(doc, needleFrom).from, rangeOf(doc, needleTo).to)
+
+{
+  // Overlap: one character in common is enough.
+  const doc = savedDoc()
+  const t = fakeEditor(doc, select('words', ' tail'), null)
+  const before = t.state().selection
+  assert.equal(startComment(t.editor), true)
+  assert.equal(t.transactions.length, 0, 'no transaction')
+  assert.ok(t.state().doc.eq(doc), 'the document is unchanged')
+  assert.ok(t.state().selection.eq(before), 'the selection stays as it was')
+  assert.deepEqual(t.storage.openRequest, { key: `c:${SAVED}`, as: 'latched' }, 'the saved comment opens latched')
+  assert.equal(t.woken.count, 1, 'the rail is told, since the document did not change')
+}
+{
+  // Meeting the highlight only at its edge isn't touching it: a new comment, as before.
+  const after = fakeEditor(savedDoc(), select(' tail', ' tail'), null)
+  assert.equal(startComment(after.editor), true)
+  assert.equal(after.transactions.length, 1, 'starting where the highlight ends makes a new comment')
+  boxRequestId(after.storage)
+
+  const before = fakeEditor(savedDoc(), select('Start ', 'Start '), null)
+  assert.equal(startComment(before.editor), true)
+  assert.equal(before.transactions.length, 1, 'ending where the highlight starts makes a new comment')
+  assert.deepEqual(
+    markFragments(before.state().doc),
+    [`${boxRequestId(before.storage)}|`, `${SAVED}|Check the figures`],
+    'the saved comment keeps its note',
+  )
+}
+{
+  // ⌘A over two saved comments: the first in document order opens.
+  const doc = schema.node('doc', null, [
+    para(schema.text('One '), commented('first saved', { id: LATER, note: 'Earlier in the text' })),
+    para(schema.text('Two '), commented('second saved', { id: SAVED, note: 'Later in the text' })),
+  ])
+  const t = fakeEditor(doc, (d) => new AllSelection(d), null)
+  assert.equal(startComment(t.editor), true)
+  assert.equal(t.transactions.length, 0)
+  assert.deepEqual(t.storage.openRequest, { key: `c:${LATER}`, as: 'latched' }, 'document order, not id order')
+}
+{
+  // A saved comment without an id is asked for by the rail's range key.
+  const doc = schema.node('doc', null, [para(schema.text('Old '), commented('legacy words', { id: null, note: 'Kept' }))])
+  const legacy = rangeOf(doc, 'legacy words')
+  const t = fakeEditor(doc, select('words', 'words'), null)
+  assert.equal(startComment(t.editor), true)
+  assert.deepEqual(t.storage.openRequest, { key: `m:${legacy.from}-${legacy.to}`, as: 'latched' })
+}
+{
+  // The one-box rule runs first: a dirty box comes forward, and nothing opens.
+  const doc = savedDoc()
+  const { box, calls } = openBox({ key: `c:${OLD}`, commentId: OLD, kind: 'new', anchor: 'mark', dirty: true })
+  const t = fakeEditor(doc, select('words', ' tail'), box)
+  assert.equal(startComment(t.editor), true)
+  assert.equal(t.transactions.length, 0)
+  assert.equal(calls.bringForward, 1)
+  assert.equal(t.storage.openRequest, null, 'the saved comment does not open')
+}
+{
+  // A clean empty box closes in one transaction, and then the saved comment opens.
+  const doc = schema.node('doc', null, [
+    para(schema.text('Start '), commented('saved words', { id: SAVED, note: 'Check the figures' }), schema.text(' tail end.')),
+    para(schema.text('An '), commented('empty one', { id: OLD, note: '' })),
+  ])
+  const { box, calls } = openBox({ key: `c:${OLD}`, commentId: OLD, kind: 'new', anchor: 'mark', dirty: false })
+  const t = fakeEditor(doc, select('words', ' tail'), box)
+  assert.equal(startComment(t.editor), true)
+  assert.equal(t.transactions.length, 1, 'one transaction removes the empty box')
+  assert.deepEqual(markFragments(t.state().doc), [`${SAVED}|Check the figures`], 'and makes no new comment')
+  assert.deepEqual(t.storage.openRequest, { key: `c:${SAVED}`, as: 'latched' })
+  assert.equal(calls.close, 1)
+}
+{
+  // Unchanged: a cursor still makes a margin note, and a selection over no saved comment a new comment.
+  const note = fakeEditor(savedDoc(), (d) => TextSelection.create(d, rangeOf(d, 'this phrase').from), null)
+  assert.equal(startComment(note.editor), true)
+  assert.ok(blocks(note.state().doc).some((b) => b === `[note ${boxRequestId(note.storage)}|]`))
+  const all = fakeEditor(schema.node('doc', null, [para(schema.text('No comments at all.'))]), (d) => new AllSelection(d), null)
+  assert.equal(startComment(all.editor), true)
+  assert.equal(all.transactions.length, 1, '⌘A in a file with no comments makes a new comment')
+  boxRequestId(all.storage)
+}
+
+// ── The rail's rule for which marker is its box (`nextRailBox`) ───────────────
+{
+  const saved: ComposeCandidate = { key: `c:${SAVED}`, note: 'Check the figures', from: 1 }
+  const emptyLate: ComposeCandidate = { key: 'c:empty-late', note: '', from: 30 }
+  const emptyEarly: ComposeCandidate = { key: 'n:10', note: '', nodePos: 10 }
+  const markers = [saved, emptyLate, emptyEarly]
+
+  const load = nextRailBox({ current: null, markers, request: null, firstShown: false })
+  assert.equal(load.composeKey, 'n:10', 'on load, only the first empty comment in document order is a box')
+  assert.equal(load.firstShown, true)
+
+  const none = nextRailBox({ current: null, markers: [saved], request: null, firstShown: false })
+  assert.deepEqual([none.composeKey, none.firstShown], [null, true], 'no empty comment, no box; the first scan is done')
+
+  const mount = nextRailBox({ current: null, markers: [], request: null, firstShown: false })
+  assert.equal(mount.firstShown, false, 'a scan with no comments yet is not the first scan')
+
+  const closed = nextRailBox({ current: null, markers, request: null, firstShown: true })
+  assert.equal(closed.composeKey, null, 'after a box closes, no other empty comment opens by itself')
+
+  const undone = nextRailBox({ current: 'c:gone', markers, request: null, firstShown: true })
+  assert.equal(undone.composeKey, null, 'after an undo takes the box away, none opens by itself, and the key clears')
+
+  const stays = nextRailBox({ current: 'c:empty-late', markers, request: null, firstShown: true })
+  assert.equal(stays.composeKey, 'c:empty-late', 'a box whose comment is still there stays open')
+
+  const waiting = nextRailBox({ current: null, markers, request: { key: 'c:not-yet', as: 'box' }, firstShown: true })
+  assert.deepEqual([waiting.composeKey, waiting.tookRequest], [null, false], 'a request waits for its marker')
+
+  const box = nextRailBox({ current: null, markers, request: { key: 'c:empty-late', as: 'box' }, firstShown: true })
+  assert.deepEqual([box.composeKey, box.latch, box.tookRequest], ['c:empty-late', null, true], 'a box request opens that box')
+
+  const latched = nextRailBox({ current: null, markers, request: { key: `c:${SAVED}`, as: 'latched' }, firstShown: true })
+  assert.deepEqual(
+    [latched.composeKey, latched.latch, latched.tookRequest],
+    [null, `c:${SAVED}`, true],
+    'a latched request opens the saved comment, with no box',
+  )
 }
 
 console.log('commentBox.test.ts — all assertions passed')
