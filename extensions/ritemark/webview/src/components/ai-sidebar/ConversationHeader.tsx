@@ -12,10 +12,16 @@
  * there is nothing to rename, pin or delete: the header shows its provisional
  * title and no menu. A long title truncates on screen; the heading keeps the
  * whole string, so a screen reader reads it in full, and the tooltip shows it.
+ *
+ * Sprint 155 (PR 2, experience 45): the chat's document icon before the name —
+ * the document the chat changed last that still exists. A click brings its tab
+ * forward (the host's `chat-document:bring-forward`); nothing else does. A chat
+ * that changed nothing has none, and its name starts where it always did.
  */
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, MoreActionsTrigger } from '../ui/dropdown-menu';
 import { Icon } from '../ui/Icon';
 import { Tooltip } from '../ui/tooltip';
+import { ChatDocumentButton } from './ChatDocumentIcon';
 import { useConversationDialogs } from './ConversationDialogs';
 import { conversationPinState, headerStatusLabel } from './conversationActionsModel';
 import { useAISidebarStore } from './store';
@@ -30,6 +36,8 @@ export function ConversationHeader() {
   );
   const pin = useAISidebarStore((state) => state.pinConversation);
   const unpin = useAISidebarStore((state) => state.unpinConversation);
+  const document = useAISidebarStore((state) => (state.activeConversationId ? state.chatDocuments[state.activeConversationId] : undefined));
+  const bringForward = useAISidebarStore((state) => state.bringChatDocumentForward);
   const { requestRename, requestDelete, dialogs } = useConversationDialogs();
 
   const summary = activeId ? summaries.find((item) => item.conversationId === activeId) ?? null : null;
@@ -44,6 +52,8 @@ export function ConversationHeader() {
       aria-label="Current conversation"
       className="flex min-h-[40px] shrink-0 items-center gap-2 bg-transparent py-1 pl-3 pr-1.5"
     >
+      {document && activeId && <ChatDocumentButton document={document} onBringForward={() => bringForward(activeId)} />}
+
       <Tooltip label={title} className="min-w-0 flex-1">
         <h2 className="m-0 min-w-0 flex-1 truncate font-ui text-[13px] font-semibold leading-[1.35] text-[var(--r-ink-strong)]">
           {title}
