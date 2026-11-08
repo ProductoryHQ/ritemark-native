@@ -137,6 +137,11 @@ export function presentCommentTask(projection: CommentTaskProjectionV1): Comment
 
   switch (projection.state) {
     case 'accepting':
+      // Sprint 155: no room for one more working chat yet — the card's words
+      // (taskCopy.ts); it starts by itself when there is room.
+      if (projection.waitFor === 'capacity') {
+        return { ...base, statusLine: 'Starts when the AI sidebar has room', detail: '', actions: [] }
+      }
       return { ...base, statusLine: 'Sending task…', detail: '', actions: [], busy: true }
     case 'queued':
       return { ...base, statusLine: `Queued for ${who}`, detail: '', actions: [OPEN_CONVERSATION] }

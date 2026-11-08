@@ -144,6 +144,8 @@ Rejected requests never create a record. Sample records: [fixtures/records/](./f
 
 ## 6. D5 — Destination
 
+> **Replaced in Sprint 155 (7 November 2026, approved by Jarmo):** a comment's task now goes to the document's own chat, by three rules (the chat that last changed the document; else the open chat if it hasn't changed another document; else a new chat named from the comment). See [Sprint 155's plan](../../../v2.2.0/sprint-155-chat-document/sprint-plan.md) and `docs/development/architecture.md` ## Comment tasks.
+
 **Observed.** The sidebar picks a destination with no user visibility (`webview/src/components/ai-sidebar/store.ts:802-818`): first ready conversation of the runtime, else the newest, else a new background one. The margin rail flashes "Sent" immediately (`MarginCommentRail.tsx:397-399`); the menu shows "Queued N tasks" right after posting (`CommentsMenuButton.tsx:90-93`).
 
 **Decided by Jarmo, 2026-09-14.** The task goes to the conversation that is open in the AI sidebar at the moment of sending. A fresh empty conversation counts and simply starts with the task. No confirmation dialog, no picker, no "prefer a ready conversation" logic.

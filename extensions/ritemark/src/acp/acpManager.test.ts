@@ -52,6 +52,22 @@ rl.on('line',(line)=>{
       result(msg.id,{stopReason:'end_turn',usage:{inputTokens:5,outputTokens:3,totalTokens:8}});
       return;
     }
+    if(process.env.AGENT_EDITS==='1'){
+      // Sprint 155: OpenCode's shape — announced pending, filled in running, ended completed.
+      const ws=process.env.AGENT_WS;
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call',toolCallId:'r1',title:'read',status:'pending',kind:'read',locations:[]}});
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call_update',toolCallId:'r1',status:'completed',kind:'read',locations:[{path:ws+'/Advokatuur.md'}]}});
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call',toolCallId:'e1',title:'edit',status:'pending',kind:'edit',locations:[]}});
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call_update',toolCallId:'e1',status:'in_progress',kind:'edit',locations:[{path:ws+'/Module 2.md'}]}});
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call_update',toolCallId:'e1',status:'completed',content:[{type:'diff',path:ws+'/Module 2.md',oldText:'a',newText:'b'}]}});
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call',toolCallId:'w1',title:'write',status:'pending',kind:'edit',locations:[{path:ws+'/New.md'}]}});
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call_update',toolCallId:'w1',status:'completed'}});
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call',toolCallId:'e2',title:'edit',status:'pending',kind:'edit',locations:[{path:ws+'/Failed.md'}]}});
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call_update',toolCallId:'e2',status:'failed'}});
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Edited.'}}});
+      result(msg.id,{stopReason:'end_turn',usage:{inputTokens:5,outputTokens:3,totalTokens:8}});
+      return;
+    }
     if(process.env.AGENT_EMPTY==='1'){
       // Bad-key style empty turn: no content, 0 tokens.
       result(msg.id,{stopReason:'end_turn',usage:{inputTokens:0,outputTokens:0,totalTokens:0}});
@@ -188,6 +204,17 @@ async function run() {
     await plain.prompt(plainSid, 'do it');
     assert.strictEqual(plain.lastAgentMessage(plainSid), 'Done', 'without message ids, the streamed text');
     plain.dispose();
+  }
+
+  // ── Sprint 155: the turn's changed files are its completed edits, never its reads ──
+  {
+    const events: AgentProgress[] = [];
+    const mgr = makeManager(events, { AGENT_EDITS: '1', AGENT_WS: '/ws' });
+    const sid = await mgr.start();
+    await mgr.prompt(sid, 'edit it');
+    assert.deepStrictEqual(mgr.turnFilesModified(sid), ['/ws/Module 2.md', '/ws/New.md'], 'completed edits only: not the read, not the failed edit');
+    mgr.dispose();
+    console.log('✓ Sprint 155: OpenCode counts completed edit calls, not read');
   }
 
   // ── 0-token end_turn with empty content → soft error (audit R-1) ──

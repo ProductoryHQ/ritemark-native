@@ -38,11 +38,13 @@ export const ALIAS_LABEL: Record<CommentAgentAlias, string> = {
 
 // A note assigned to an agent starts with `@alias`; the colon is optional so
 // both `@claude: fix this` and `@claude fix this` assign (matches the compose
-// placeholder "… or @claude to assign"). Case-insensitive. The `(?=$|[\s:])`
-// lookahead requires the alias to end at a space/colon/end — so `@claudex` and
-// `@codex.com` do NOT assign (audit L-A).
+// placeholder "… or @claude to assign"), and so does `@claude, fix this`: a
+// comma is how people address someone (Experience lead, 8 Nov 2026, experience
+// 45). Case-insensitive. The `(?=$|[\s:,])` lookahead requires the alias to end
+// at a space/colon/comma/end — so `@claudex` and `@codex.com` do NOT assign
+// (audit L-A).
 const ALIAS_PATTERN = new RegExp(
-  `^@(${COMMENT_AGENT_ALIASES.join('|')})(?=$|[\\s:])\\s*:?\\s*([\\s\\S]*)$`,
+  `^@(${COMMENT_AGENT_ALIASES.join('|')})(?=$|[\\s:,])\\s*[:,]?\\s*([\\s\\S]*)$`,
   'i',
 )
 
@@ -73,10 +75,11 @@ export function parseCommentBody(raw: string): ParsedCommentBody {
  * prefix. This drives the assigned state + the Send-to-AI action, so writing
  * `@claude` mid-note (or after editing) also assigns it.
  */
-/** Matches an `@agent` mention followed by end/whitespace/colon — so `@codex.com`
- *  (a domain) does not count, but `@claude`, `@claude ` and `@claude:` do.
+/** Matches an `@agent` mention followed by end/whitespace/colon/comma — so
+ *  `@codex.com` (a domain) does not count, but `@claude`, `@claude `, `@claude:`
+ *  and `@claude,` do.
  *  Exported so the rail highlights exactly the mentions that assign. */
-export const MENTION_SOURCE = `@(${COMMENT_AGENT_ALIASES.join('|')})(?=$|[\\s:])`
+export const MENTION_SOURCE = `@(${COMMENT_AGENT_ALIASES.join('|')})(?=$|[\\s:,])`
 
 export function detectAgentAlias(body: string): CommentAgentAlias | null {
   const m = new RegExp(MENTION_SOURCE, 'i').exec(body)
@@ -90,7 +93,7 @@ export function detectAgentAlias(body: string): CommentAgentAlias | null {
  */
 export function stripAssignmentMention(body: string, alias: CommentAgentAlias): string {
   return body
-    .replace(new RegExp(`@(${alias})(?=$|[\\s:])\\s*:?`, 'i'), '')
+    .replace(new RegExp(`@(${alias})(?=$|[\\s:,])\\s*[:,]?`, 'i'), '')
     .replace(/\s{2,}/g, ' ')
     .trim()
 }
@@ -98,7 +101,7 @@ export function stripAssignmentMention(body: string, alias: CommentAgentAlias): 
 /** Strip recognized `@agent` mentions from a note to build a clean AI prompt. */
 export function stripAgentMentions(body: string): string {
   return body
-    .replace(new RegExp(`${MENTION_SOURCE}\\s*:?`, 'gi'), '')
+    .replace(new RegExp(`${MENTION_SOURCE}\\s*[:,]?`, 'gi'), '')
     .replace(/\s{2,}/g, ' ')
     .trim()
 }

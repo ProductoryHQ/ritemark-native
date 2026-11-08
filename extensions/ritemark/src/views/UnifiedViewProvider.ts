@@ -89,8 +89,10 @@ import type {
   CommentTaskController,
   CommentTaskControllerDependencies,
   CommentTaskDestination,
+  CommentTaskRoutingFacts,
   CommentTaskRuntimeSettings,
 } from '../commentTasks/CommentTaskController';
+import { showBriefToast } from '../feedback/feedbackSheet';
 import type { CommentTaskEnqueueMessage, CommentTaskEnqueueOutcome } from '../commentTasks/protocol';
 import type { CardTaskSidebar } from '../taskBoard/CardHandoffLedger';
 import { decodeCommentTaskSidebarMessage } from '../commentTasks/protocol';
@@ -136,6 +138,7 @@ import {
   AgentSidebarBootstrapError,
 } from './agentSidebarBootstrap';
 import { versionedWebviewAssetUri } from './webviewAssetUri';
+import { sameFile } from '../utils/pathIdentity';
 import {
   chatLinkMessage,
   clickActionFor,
@@ -184,6 +187,8 @@ export interface AgentTaskListener {
   applyDequeued?(taskId: string): Promise<void> | void;
   applyDispatchFailed?(taskId: string, message: string): Promise<void> | void;
   applyTurnStarted(conversationId: string, conversationTurnId: string): Promise<void> | void;
+  /** Sprint 155: a new chat's client id became its permanent id (`conversation/canonical-id`). */
+  applyConversationCanonicalId?(clientConversationId: string, conversationId: string): Promise<void> | void;
   applyTurnAttention(
     conversationId: string,
     conversationTurnId: string,
@@ -960,6 +965,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               conversationId,
               bindingGeneration,
             });
+            // Sprint 155: tasks still naming the client id follow the chat.
+            this._forEachTaskListener((listener) => listener.applyConversationCanonicalId?.(clientConversationId, conversationId));
           }
           let terminalCheckpointWritten = false;
           let streamedResponseText = '';
@@ -1385,6 +1392,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   ...(status === 'failed' && errorDetail ? { errorDetail } : {}),
                   appliedThinkingEffort,
                   activeDurationMs: turnActiveDurationMs(result.metrics),
+                  filesModified: result.filesModified ?? [],
                   generateTitle: titleGeneration,
                 }), hostConversationEnabled);
                 this._applyCommentTaskTerminal(conversationId, conversationTurnId, {
@@ -1441,7 +1449,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 ...(errorDetail ? { errorDetail } : {}),
                 ...(rawError ? { rawError } : {}),
               });
-              this._refreshExplorerForAgentWrites(undefined);
+              this._refreshExplorerForAgentWrites(result.filesModified);
               if (!terminalCheckpointWritten) {
                 terminalCheckpointWritten = true;
                 const runtimeCompleted = !result.error && !/error|failed|cancelled/i.test(result.status);
@@ -1465,6 +1473,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   ...(status === 'failed' && errorKind ? { errorKind } : {}),
                   ...(status === 'failed' && errorDetail ? { errorDetail } : {}),
                   appliedThinkingEffort,
+                  // Sprint 155: Codex's completed file changes, OpenCode's completed edits.
+                  filesModified: result.filesModified ?? [],
                   generateTitle: titleGeneration,
                 }), hostConversationEnabled);
                 this._applyCommentTaskTerminal(conversationId, conversationTurnId, {
@@ -1474,6 +1484,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   // transcript above keeps the whole stream.
                   text: result.lastAgentMessage ?? streamedResponseText,
                   error,
+                  filesModified: result.filesModified ?? [],
                 });
                 if (!runtimeCompleted) this._disposeRuntimeSession(conversationId, agentId as AgentId);
               }
@@ -2182,6 +2193,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     CommentTaskControllerDependencies,
     | 'areDurableConversationsEnabled'
     | 'resolveOpenConversation'
+    | 'routingFacts'
+    | 'openConversationId'
+    | 'conversationDestination'
+    | 'canAttach'
+    | 'notifySent'
+    | 'setConversationTitle'
     | 'checkAvailability'
     | 'runtimeSettings'
     | 'enqueue'
@@ -2194,11 +2211,20 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         (await this._conversationController.currentRolloutMode()) !== 'legacy'
       ),
       resolveOpenConversation: (runtimeId) => this._resolveOpenConversation(runtimeId),
+      // Sprint 155: a comment's task goes to its document's chat (the three rules).
+      routingFacts: (document) => this._commentTaskRoutingFacts(document.uri),
+      openConversationId: () => this._activeConversationId,
+      conversationDestination: (conversationId) => this._conversationDestination(conversationId),
+      canAttach: (conversationId) => this._canAttachRuntime(conversationId),
+      notifySent: (text) => { void showBriefToast(text); },
+      setConversationTitle: (conversationId, title) => this._setConversationTitle(conversationId, title),
       checkAvailability: (runtimeId) => this._checkRuntimeAvailability(runtimeId as AgentId),
       runtimeSettings: (conversationId, runtimeId) => (
         this._commentTaskRuntimeSettings(conversationId, runtimeId as AgentId)
       ),
-      enqueue: (enqueueMessage) => this._enqueueCommentTask(enqueueMessage),
+      // Sprint 155: the card's path — the sheet is shown without focus, and its
+      // open chat never changes; the task may go to a chat that isn't open.
+      enqueue: (enqueueMessage) => this._enqueueCardTask(enqueueMessage),
       revealConversation: (conversationId) => this._revealConversation(conversationId),
       cancelTurn: (conversationId, conversationTurnId) => this._cancelCommentTaskTurn(conversationId, conversationTurnId),
       // A conversation created for a comment task starts untitled and is named
@@ -2278,17 +2304,83 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           return null;
         }
       },
-      setConversationTitle: async (conversationId, title) => {
-        const record = await this._conversationController.runtimeConversation(conversationId);
-        if (record.title === title) return;
-        await this._conversationController.handle({
-          type: 'conversation/rename',
-          requestId: `card-title-${Date.now().toString(36)}`,
-          conversationId,
-          bindingGeneration: record.bindingGeneration,
-          title,
-        });
-      },
+      setConversationTitle: (conversationId, title) => this._setConversationTitle(conversationId, title),
+    };
+  }
+
+  /** A chat's title, as a rename sets it (a card's chat, a comment's new chat). */
+  private async _setConversationTitle(conversationId: string, title: string): Promise<void> {
+    const record = await this._conversationController.runtimeConversation(conversationId);
+    if (record.title === title) return;
+    await this._conversationController.handle({
+      type: 'conversation/rename',
+      requestId: `card-title-${Date.now().toString(36)}`,
+      conversationId,
+      bindingGeneration: record.bindingGeneration,
+      title,
+    });
+  }
+
+  /**
+   * Sprint 155: what the comment task's three rules read — this project's chats
+   * and the files each one changed (from the index), compared as real paths, and
+   * only files that still exist.
+   */
+  private async _commentTaskRoutingFacts(documentUri: string): Promise<CommentTaskRoutingFacts> {
+    const real = new Map<string, string>();
+    const realPath = (file: string): string => {
+      const known = real.get(file);
+      if (known !== undefined) return known;
+      let resolved = file;
+      try { resolved = fs.realpathSync.native(file); } catch { /* gone: compare as written */ }
+      real.set(file, resolved);
+      return resolved;
+    };
+    const pathOfUri = (uri: string): string | null => {
+      try {
+        const parsed = vscode.Uri.parse(uri);
+        return parsed.scheme === 'file' ? parsed.fsPath : null;
+      } catch {
+        return null;
+      }
+    };
+    const chats = await this._conversationController.changedFilesByChat();
+    return {
+      documentPath: pathOfUri(documentUri) ?? documentUri,
+      chats: chats.map((chat) => ({ conversationId: chat.conversationId, ...(chat.changedFiles ? { changedFiles: chat.changedFiles } : {}) })),
+      pathOfUri,
+      exists: (file) => fs.existsSync(file),
+      // Real paths first; then, also for a file that is gone, Windows' drive
+      // case and slash direction do not matter (`sameFile`).
+      samePath: (a, b) => sameFile(a, b, realPath),
+    };
+  }
+
+  /** Sprint 155: a chat the rules picked, as a comment task's destination; null when it is gone. */
+  private async _conversationDestination(conversationId: string): Promise<CommentTaskDestination | null> {
+    try {
+      const record = await this._conversationController.runtimeConversation(conversationId);
+      return this._destinationFromRecord(record);
+    } catch {
+      return null;
+    }
+  }
+
+  private _destinationFromRecord(record: ConversationRecordV1): CommentTaskDestination {
+    // One entry only: the cache exists to bridge this call and the
+    // synchronous `runtimeSettings()` that follows it, nothing more.
+    this._commentTaskDestinationCache.clear();
+    this._commentTaskDestinationCache.set(record.conversationId, record);
+    return {
+      conversationId: record.conversationId,
+      bindingGeneration: record.bindingGeneration,
+      title: record.title,
+      created: false,
+      // The agent that answered last. A comment assigned to another one still
+      // lands here; the Send surface just says so first.
+      runtimeId: [...record.events].reverse().find((event) => event.kind === 'assistant-message')?.runtimeId
+        ?? [...record.events].reverse().find((event) => event.kind === 'user-message')?.runtimeId
+        ?? null,
     };
   }
 
@@ -2319,33 +2411,38 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * The card variant of `_enqueueCommentTask`: the same handshake, but the
-   * sidebar is shown without focus, and the answer names the conversation the
-   * task was queued in (a new one, or one loaded from history).
+   * Hand an accepted task (a card's, and since Sprint 155 a comment's) to the
+   * sidebar's queue and wait for its verdict. The answer — including `full` —
+   * IS the acceptance result (audit F17). The sidebar is shown without focus,
+   * its open chat never changes, and the answer names the conversation the task
+   * was queued in (a new one, or one loaded from history).
    */
-  private _enqueueCardTask(enqueueMessage: CommentTaskEnqueueMessage): Promise<{ outcome: CommentTaskEnqueueOutcome; conversationId?: string }> {
+  private _enqueueCardTask(enqueueMessage: CommentTaskEnqueueMessage): Promise<{ outcome: CommentTaskEnqueueOutcome; conversationId?: string; unreachable?: true }> {
     return new Promise((resolve) => {
       let settled = false;
-      const settle = (outcome: CommentTaskEnqueueOutcome, conversationId?: string): void => {
+      const settle = (outcome: CommentTaskEnqueueOutcome, conversationId?: string, unreachable = false): void => {
         if (settled) return;
         settled = true;
         this._commentTaskEnqueueWaiters.delete(enqueueMessage.taskId);
         clearTimeout(timer);
-        resolve({ outcome, ...(conversationId ? { conversationId } : {}) });
+        resolve({ outcome, ...(conversationId ? { conversationId } : {}), ...(unreachable ? { unreachable: true as const } : {}) });
       };
-      const timer = setTimeout(() => settle('no-conversation'), 15_000);
+      // Sprint 155: no verdict from the sheet (timeout, not ready, not
+      // delivered) is "unreachable", never "Conversation no longer available".
+      const unreachable = (): void => settle('no-conversation', undefined, true);
+      const timer = setTimeout(unreachable, 15_000);
       this._commentTaskEnqueueWaiters.set(enqueueMessage.taskId, settle);
       void this._awaitActiveConversation(5000, true).then((ready) => {
         const view = this._view;
         if (!ready || !view) {
-          settle('no-conversation');
+          unreachable();
           return;
         }
         this.show();
         void view.webview.postMessage(enqueueMessage).then((delivered) => {
-          if (delivered === false) settle('no-conversation');
-        }, () => settle('no-conversation'));
-      }, () => settle('no-conversation'));
+          if (delivered === false) unreachable();
+        }, unreachable);
+      }, unreachable);
     });
   }
 
@@ -2425,21 +2522,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // starts it — so it is reported as created rather than refused.
     try {
       const record = await this._conversationController.runtimeConversation(conversationId);
-      // One entry only: the cache exists to bridge this call and the
-      // synchronous `runtimeSettings()` that follows it, nothing more.
-      this._commentTaskDestinationCache.clear();
-      this._commentTaskDestinationCache.set(conversationId, record);
-      return {
-        conversationId: record.conversationId,
-        bindingGeneration: record.bindingGeneration,
-        title: record.title,
-        created: false,
-        // The agent that answered last. A comment assigned to another one still
-        // lands here; the Send surface just says so first.
-        runtimeId: [...record.events].reverse().find((event) => event.kind === 'assistant-message')?.runtimeId
-          ?? [...record.events].reverse().find((event) => event.kind === 'user-message')?.runtimeId
-          ?? null,
-      };
+      return this._destinationFromRecord(record);
     } catch {
       return { conversationId, bindingGeneration: 0, title: '', created: true, runtimeId: null };
     }
@@ -2534,42 +2617,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       approvalMode: 'auto',
       thinkingEffort: isEnabled('composer-thinking-effort') && preference ? preference : 'auto',
     };
-  }
-
-  /**
-   * Hand an accepted task to the sidebar's queue and wait for its verdict. The
-   * answer — including `full` — IS the acceptance result; the path this
-   * replaces dropped `enqueuePrompt`'s `full` on the floor and told the editor
-   * the work was queued (audit F17).
-   */
-  private _enqueueCommentTask(enqueueMessage: CommentTaskEnqueueMessage): Promise<CommentTaskEnqueueOutcome> {
-    return new Promise<CommentTaskEnqueueOutcome>((resolve) => {
-      let settled = false;
-      const settle = (outcome: CommentTaskEnqueueOutcome): void => {
-        if (settled) return;
-        settled = true;
-        this._commentTaskEnqueueWaiters.delete(enqueueMessage.taskId);
-        clearTimeout(timer);
-        resolve(outcome);
-      };
-      const timer = setTimeout(() => settle('no-conversation'), 10_000);
-      this._commentTaskEnqueueWaiters.set(enqueueMessage.taskId, settle);
-
-      // A webview that has not reported its open conversation yet has not
-      // hydrated its store either, and a message posted into it would simply be
-      // dropped — which is exactly how the old 400 ms dispatch lost work (F25).
-      void this._awaitActiveConversation().then((conversationId) => {
-        const view = this._view;
-        if (!conversationId || !view) {
-          settle('no-conversation');
-          return;
-        }
-        this.show();
-        void view.webview.postMessage(enqueueMessage).then((delivered) => {
-          if (delivered === false) settle('no-conversation');
-        }, () => settle('no-conversation'));
-      }, () => settle('no-conversation'));
-    });
   }
 
   /** Open the EXACT conversation a task was bound to, whatever is visible. */
@@ -3975,6 +4022,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           ...(status === 'failed' && errorKind ? { errorKind } : {}),
           ...(status === 'failed' && errorDetail ? { errorDetail } : {}),
           activeDurationMs: turnActiveDurationMs(result.metrics),
+          filesModified: result.filesModified ?? [],
         }), hostConversationEnabled);
         if (failureKind === 'authentication' || failureKind === 'api-key-authentication') {
           this._disposeRuntimeSessionsForAgent('claude-code');

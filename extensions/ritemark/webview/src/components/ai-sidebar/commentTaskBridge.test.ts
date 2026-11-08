@@ -161,13 +161,29 @@ function deliver(message: Record<string, unknown>): void {
 }
 
 // ── 3. An unknown destination is reported, never redirected (R1) ──
+// Sprint 155: it is looked up in history first (a comment's task goes to its
+// document's chat, open or not); history doesn't hold it either.
 {
   resetAll();
   seed('visible');
   useAISidebarStore.setState({ activeConversationId: 'visible' });
   posted.length = 0;
 
-  deliver(enqueueMessage({ taskId: 'task-lost', conversationId: 'gone-conversation' }));
+  // Outside a webview the bridge logs its conversation requests instead of posting them.
+  const requests: Array<Record<string, unknown>> = [];
+  const log = console.log;
+  console.log = (...args: unknown[]) => {
+    if (args[0] === '[Bridge] Would send conversation request:') requests.push(args[1] as Record<string, unknown>);
+    else log(...args);
+  };
+  try {
+    deliver(enqueueMessage({ taskId: 'task-lost', conversationId: 'gone-conversation' }));
+  } finally {
+    console.log = log;
+  }
+  const lookup = requests.find((m) => m.type === 'conversation/get' && m.conversationId === 'gone-conversation');
+  assert.ok(lookup, 'the chat is looked up in history');
+  deliver({ type: 'conversation/result', requestId: lookup!.requestId, operation: 'conversation/get', ok: true, data: { conversation: null } });
 
   assert.deepEqual(
     postedOf('comment-task/enqueue-result')[0],
@@ -470,6 +486,53 @@ for (const [label, error] of [['stopped', 'Execution cancelled'], ['failed', 'us
   assert.deepEqual(queueFor(useAISidebarStore.getState().promptQueues, 'dest').map((item) => item.taskId), ['task-other']);
   assert.deepEqual(postedOf('comment-task/enqueue-result'), [{ type: 'comment-task/enqueue-result', taskId: 'task-late', outcome: 'queued', conversationId: 'dest' }]);
   assert.deepEqual(postedOf('comment-task/dequeued'), [{ type: 'comment-task/dequeued', taskId: 'task-late' }]);
+}
+
+// ── 12. Sprint 155: a comment's new chat has the id the host chose, the open
+// chat stays open, and a second comment on the document joins the same chat ──
+{
+  resetAll();
+  seed('visible');
+  useAISidebarStore.setState({ activeConversationId: 'visible' });
+  posted.length = 0;
+
+  deliver(enqueueMessage({
+    taskId: 'task-new-1',
+    conversationId: 'host-new-chat',
+    conversationTurnId: 'host-turn-n1',
+    newConversation: { title: 'Shorter please', conversationId: 'host-new-chat' },
+  }));
+  deliver(enqueueMessage({
+    taskId: 'task-new-2',
+    conversationId: 'host-new-chat',
+    conversationTurnId: 'host-turn-n2',
+    newConversation: { title: 'Shorter please', conversationId: 'host-new-chat' },
+  }));
+  deliver(enqueueMessage({ taskId: 'task-new-3', conversationId: 'host-new-chat', conversationTurnId: 'host-turn-n3' }));
+
+  const state = useAISidebarStore.getState();
+  assert.equal(state.activeConversationId, 'visible', 'the sheet stays on the chat that was open');
+  assert.ok(state.conversations['host-new-chat'], 'the new chat has the id the host chose');
+  const ids = Object.keys(state.conversations).filter((id) => id !== 'visible' && id !== initialState.activeConversationId);
+  assert.deepEqual(ids, ['host-new-chat'], 'one new chat, not one per comment');
+  const queued = queueFor(state.promptQueues, 'host-new-chat').length + state.conversations['host-new-chat'].agentConversation.length;
+  assert.ok(queued >= 1, 'the tasks are in that chat');
+  assert.deepEqual(
+    postedOf('comment-task/enqueue-result').map((m) => [m.taskId, m.outcome, m.conversationId]),
+    [['task-new-1', 'queued', 'host-new-chat'], ['task-new-2', 'queued', 'host-new-chat'], ['task-new-3', 'queued', 'host-new-chat']],
+  );
+
+  // The first turn gives the chat its canonical id: the waiting prompts move with it.
+  const waitingBefore = queueFor(useAISidebarStore.getState().promptQueues, 'host-new-chat').map((item) => item.taskId);
+  assert.ok(waitingBefore.length >= 1, 'later comments wait behind the first');
+  deliver({ type: 'conversation/canonical-id', clientConversationId: 'host-new-chat', conversationId: 'canonical-new-chat' });
+  assert.equal(queueFor(useAISidebarStore.getState().promptQueues, 'host-new-chat').length, 0);
+  assert.deepEqual(
+    queueFor(useAISidebarStore.getState().promptQueues, 'canonical-new-chat').map((item) => [item.taskId, item.conversationId]),
+    waitingBefore.map((taskId) => [taskId, 'canonical-new-chat']),
+    'no prompt is left under the client id',
+  );
+  assert.equal(useAISidebarStore.getState().activeConversationId, 'visible');
 }
 
 console.log('commentTaskBridge tests: all assertions passed');

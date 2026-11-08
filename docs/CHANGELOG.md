@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — 2.2.0
 
+### Sprint 155: each chat shows its document (experience 45)
+
+#### Fixed
+- **A comment's task goes to the document's own chat (PR 1).** It goes to the chat that last changed that document; if none has, to the open chat, unless that chat changed another document; otherwise to a new chat named from the comment's words ("Shorter please"). A second comment on the same document, or several sent together, join the first one's chat. The comment's caption says where before you send ("→ Draft Module 2 and 3", "→ New conversation"), and when the task goes to a chat that isn't open, a short toast says "Sent to “Draft Module 2 and 3”" or "Sent to a new chat, “Shorter please”"; the chat you had open stays open and no tab comes forward. Retry sends the task again to its own chat, and picks again only when that chat is gone. Claude Code, ChatGPT and OpenCode now all remember which files each chat changed (never the ones it only read), which this needs; chats from before the update count as having changed nothing.
+
 ### Home: the first-day card asks what the AI can do (experience 35, #678)
 
 #### Changed
