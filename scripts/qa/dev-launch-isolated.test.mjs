@@ -131,7 +131,7 @@ test('start --user-data-dir refuses anything but a test profile, and makes no fo
 });
 
 // Second security review of #681 (findings 3 and 5): the profile guard's gaps.
-function startWith(args, envOver = {}) {
+function startWith(args, envOver = {}, { keep = false } = {}) {
   const env = {
     PATH: process.env.PATH,
     HOME: process.env.HOME,
@@ -141,8 +141,8 @@ function startWith(args, envOver = {}) {
   };
   const r = spawnSync('bash', [SCRIPT, 'start', '--name', 'dli-test', '--dry-run', ...args], { env, encoding: 'utf8' });
   const runDir = /^RUN_DIR=(.+)$/m.exec(r.stdout)?.[1];
-  if (runDir && runDir.includes('rm-dli-test.')) fs.rmSync(runDir, { recursive: true, force: true });
-  return { status: r.status, out: `${r.stdout}${r.stderr}`, stdout: r.stdout };
+  if (!keep && runDir && runDir.includes('rm-dli-test.')) fs.rmSync(runDir, { recursive: true, force: true });
+  return { status: r.status, out: `${r.stdout}${r.stderr}`, stdout: r.stdout, runDir };
 }
 
 test('start refuses VSCODE_PORTABLE and VSCODE_APPDATA, in its environment and in --env', { skip }, () => {
@@ -160,7 +160,7 @@ test('start refuses VSCODE_PORTABLE and VSCODE_APPDATA, in its environment and i
 });
 
 test('start refuses --user-data-dir and --shared-data-dir among the extra arguments after --', { skip }, () => {
-  // VS Code takes the last one given, so an extra one would replace the checked profile or the dev-shared folder
+  // VS Code takes the last one given, so an extra one would replace the checked profile or the run's shared folder
   const elsewhere = path.join(TMP_ROOT, 'dli-elsewhere');
   const shared = path.join(os.homedir(), '.ritemark-shared');
   for (const extra of [
@@ -179,15 +179,27 @@ test('start refuses --user-data-dir and --shared-data-dir among the extra argume
   assert.doesNotMatch(ok.out, /refused/, ok.out);
 });
 
-test('start sets its own --shared-data-dir, the dev builds\' folder, exactly once', { skip }, (t) => {
-  const r = startWith([]);
-  if (/no dev build/.test(r.out)) { t.skip('no dev build in this checkout'); return; }
-  assert.equal(r.status, 0, r.out);
-  const line = r.stdout.split('\n').find((l) => l.startsWith('DRY_RUN ')) ?? '';
-  const shared = line.match(/--shared-data-dir=\S+/g) ?? [];
-  assert.equal(shared.length, 1, line);
-  assert.equal(shared[0], `--shared-data-dir=${process.env.HOME}/.ritemark-dev-shared`);
-  assert.equal((line.match(/--user-data-dir=/g) ?? []).length, 1, line);
+test('start gives each run its own --shared-data-dir, a new empty folder in the run folder, exactly once', { skip }, (t) => {
+  // 8 Nov: a shared ~/.ritemark-dev-shared carried Open Recent between runs, so a fresh profile's Projects list
+  // filled with the person's real folders (src/projects/firstFill.ts) and the window read their files.
+  const r = startWith([], {}, { keep: true });
+  const { out, runDir } = r;
+  try {
+    if (/no dev build/.test(out)) { t.skip('no dev build in this checkout'); return; }
+    assert.equal(r.status, 0, out);
+    assert.ok(runDir && runDir.includes('rm-dli-test.'), out);
+    const line = r.stdout.split('\n').find((l) => l.startsWith('DRY_RUN ')) ?? '';
+    const shared = line.match(/--shared-data-dir=\S+/g) ?? [];
+    assert.equal(shared.length, 1, line);
+    assert.equal(shared[0], `--shared-data-dir=${runDir}/shared`, line);
+    assert.doesNotMatch(line, /\.ritemark-dev-shared|\.ritemark-shared/, line);
+    const dir = path.join(runDir, 'shared');
+    assert.ok(fs.statSync(dir).isDirectory(), 'the run\'s shared folder exists');
+    assert.deepEqual(fs.readdirSync(dir), [], 'and starts empty');
+    assert.equal((line.match(/--user-data-dir=/g) ?? []).length, 1, line);
+  } finally {
+    if (runDir && runDir.includes('rm-dli-test.')) fs.rmSync(runDir, { recursive: true, force: true });
+  }
 });
 
 test('a test profile path with whitespace is refused (stop matches the flag up to a space)', { skip }, () => {

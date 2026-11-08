@@ -9,7 +9,9 @@
 # main checkout when this is a light worktree with an empty vscode/ (BUILD_ROOT says which), the way scripts/code.sh does, with everything a test run needs and nothing of the person's own:
 #   - a new run folder under $TMPDIR (rm-<run>.XXXX) holding a fresh profile (--user-data-dir), a fresh
 #     --extensions-dir, and throwaway AI homes: CLAUDE_CONFIG_DIR, CODEX_HOME and XDG_CONFIG/DATA/STATE/CACHE_HOME;
-#   - --shared-data-dir ~/.ritemark-dev-shared (the dev builds' own, never ~/.ritemark-shared), --use-mock-keychain;
+#   - its own --shared-data-dir, <run-dir>/shared, new and empty (never ~/.ritemark-shared, and since 8 Nov never the
+#     dev builds' ~/.ritemark-dev-shared either: its Open Recent filled a fresh profile's Projects list with the person's
+#     real folders, src/projects/firstFill.ts, and the window then read their files), and --use-mock-keychain;
 #   - a free --remote-debugging-port (or --port), printed for the CDP scripts in scripts/qa;
 #   - the profile's settings seeded so no native dialog or trust question can stop the run: the simple file
 #     dialog, workspace trust off, no confirm before close;
@@ -149,7 +151,7 @@ start_run() {
 	#   - a caller's --user-data-dir must pass with-test-keys.sh's rule (test_profile_check, test-profile-guard.sh):
 	#     under a temp root, no whitespace, never Ritemark's real profile or ~/.ritemark-shared, nor inside them;
 	#     without one, the profile is <run-dir>/profile, under $TMPDIR, which must have no whitespace either;
-	#   - --shared-data-dir is always this script's own, ~/.ritemark-dev-shared;
+	#   - --shared-data-dir is always this run's own, <run-dir>/shared;
 	#   - VSCODE_PORTABLE and VSCODE_APPDATA, which VS Code reads before --user-data-dir, may not be set, in this
 	#     script's environment or through --env;
 	#   - the extra arguments after `--` may not name --user-data-dir or --shared-data-dir (VS Code takes the last
@@ -237,7 +239,7 @@ start_run() {
 		mkdir -p "$profile_arg"
 		profile_dir=$(cd "$profile_arg" && pwd -P)
 	fi
-	mkdir -p "$run_dir"/{extensions,claude,codex,xdg/config,xdg/data,xdg/state,xdg/cache} "$profile_dir/User"
+	mkdir -p "$run_dir"/{extensions,shared,claude,codex,xdg/config,xdg/data,xdg/state,xdg/cache} "$profile_dir/User"
 	cat > "$profile_dir/User/settings.json" <<-'JSON'
 	{
 		"files.simpleDialog.enable": true,
@@ -275,7 +277,7 @@ start_run() {
 		--disable-extension=vscode.vscode-api-tests
 		--user-data-dir="$profile_dir"
 		--extensions-dir="$run_dir/extensions"
-		--shared-data-dir="$HOME/.ritemark-dev-shared"
+		--shared-data-dir="$run_dir/shared"
 		--use-mock-keychain
 		--remote-debugging-port="$port"
 		"$folder"

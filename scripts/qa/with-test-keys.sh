@@ -26,7 +26,7 @@ set +o xtrace; unset BASH_XTRACEFD BASH_ENV
 #     a shell or a wrapper (bash -c, env, sudo…) that could launch something else.
 #   - every --shared-data-dir the command carries is neither ~/.ritemark-shared nor inside it (by
 #     its physical path). A --shared-data-dir isn't required: the Cloudflare contract script is no
-#     app launch, and scripts/qa/dev-launch-isolated.sh sets its own (~/.ritemark-dev-shared) and
+#     app launch, and scripts/qa/dev-launch-isolated.sh sets the run's own (<run-dir>/shared) and
 #     refuses one among its extra arguments.
 #
 # --require <names>: those vault entries must be there, or the script stops and names each
