@@ -123,7 +123,7 @@ function requestWords(kind: ReadyKind, ai: AiName, projectName: string, counts: 
       return {
         icon: 'check-square',
         heading: `${ai} can draft Module 4`,
-        body: `It reads the brief and the interviews with shift leaders, then writes Module 4 like Modules 1 to 3. It's the task on the board for ${ai}.`,
+        body: `It reads the brief and the interviews with shift leaders, then writes Module 4 like Modules 1 to 3. It’s the task on the board for ${ai}.`,
         button: `Ask ${ai} to draft Module 4`,
         note: 'Reads two documents, writes a new one.',
         hide,

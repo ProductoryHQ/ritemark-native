@@ -78,7 +78,7 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
   assert.deepEqual(readyRequestWords('sample', 'OpenCode', 'Leadership programme', null), {
     icon: 'check-square',
     heading: 'OpenCode can draft Module 4',
-    body: "It reads the brief and the interviews with shift leaders, then writes Module 4 like Modules 1 to 3. It's the task on the board for OpenCode.",
+    body: "It reads the brief and the interviews with shift leaders, then writes Module 4 like Modules 1 to 3. It’s the task on the board for OpenCode.",
     button: 'Ask OpenCode to draft Module 4',
     note: 'Reads two documents, writes a new one.',
     hide: 'Hide this in Leadership programme',

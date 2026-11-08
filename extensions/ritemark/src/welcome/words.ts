@@ -25,6 +25,15 @@ export function signInProblem(provider: WelcomeProviderId, problem: SignInProble
   }
 }
 
+/**
+ * Home's card (Sprint 156, #694; the Experience lead, experience 35): "Open the page again" found no page to open while
+ * the sign-in still waits. Its main part is busy, so the line names the control that can be pressed. The welcome keeps
+ * `signInProblem(…, 'not-opened')`: its line comes after its sign-in has stopped, so "Sign in again" is true there.
+ */
+export function homeReopenNotOpened(provider: WelcomeProviderId): string {
+  return `${PROVIDER_NAMES[provider]}’s sign-in page didn’t open. Cancel, then sign in again.`;
+}
+
 /** A sign-in that ended (experience 32, frame 3). */
 export function signInEnded(provider: WelcomeProviderId): string {
   return `Your sign-in has ended. Sign in again to use ${PROVIDER_NAMES[provider]} here.`;

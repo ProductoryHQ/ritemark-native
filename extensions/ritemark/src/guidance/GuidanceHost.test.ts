@@ -289,7 +289,7 @@ async function main(): Promise<void> {
   // "Open the page again" before Claude's CLI printed its page: never silent (finding 6)
   await host.reopenSignIn();
   shown = await card();
-  assert.equal(shown.problem, 'Claude’s sign-in page didn’t open. Sign in again to open it.');
+  assert.equal(shown.problem, 'Claude’s sign-in page didn’t open. Cancel, then sign in again.');
   (claudeLogin as ClaudeCalls | null)?.onUrl?.('https://claude.com/cai/oauth/authorize?x=1');
   await host.reopenSignIn();
   assert.equal(opened[opened.length - 1], 'https://claude.com/cai/oauth/authorize?x=1', 'with its page, it opens it again');

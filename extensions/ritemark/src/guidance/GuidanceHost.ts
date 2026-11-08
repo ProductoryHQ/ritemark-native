@@ -38,7 +38,7 @@ import type { CardHandoffRecordV1 } from '../taskBoard/CardTaskStore';
 import { readAgentRuntimePreference } from '../utils/bundledAgentRuntime';
 import type { AcceptedTurn, ChatOrigin, ChatStartRequest } from '../views/UnifiedViewProvider';
 import { saveAiForNewChats } from '../welcome/welcomeHost';
-import { signInProblem, type SignInProblem } from '../welcome/words';
+import { homeReopenNotOpened, signInProblem, type SignInProblem } from '../welcome/words';
 import { countsLine, listFileNames } from './folderCounts';
 import { feedbackDue, guidanceCard, localDay } from './guidanceState';
 import { GuidanceStore, noteLastReadyAi, readLastReadyAi, seedLastReadyAiForTest } from './guidanceStore';
@@ -508,7 +508,7 @@ export class GuidanceHost implements vscode.Disposable {
     const page = this.signInPages[signing.ai];
     const opened = page ? await Promise.resolve(vscode.env.openExternal(vscode.Uri.parse(page))).catch(() => false) : false;
     if (this.cardSigning() !== signing) return;
-    this.reopenProblem = opened ? null : signInProblem(PROVIDER[signing.ai], 'not-opened');
+    this.reopenProblem = opened ? null : homeReopenNotOpened(PROVIDER[signing.ai]);
     this.changed.fire();
   }
 
