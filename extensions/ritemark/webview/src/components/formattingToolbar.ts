@@ -27,3 +27,16 @@ export function formattingToolbarShows(input: {
   if (input.equationSelected) return false
   return true
 }
+
+/**
+ * #687: the toolbar's focus rule, checked again right after a click on one of
+ * its buttons. TipTap 2.27's BubbleMenu ignores the editor's next blur after a
+ * press on the toolbar (`preventHide`, which keeps it up for its own buttons
+ * and the link dialog) and checks `shouldShow` again only when the selection
+ * or the document changes. So a button that moved the focus away without an
+ * edit (Comment, bringing an open box forward) left the toolbar over the text.
+ * True when neither the editor nor the toolbar has the focus: it hides.
+ */
+export function toolbarHidesAfterClick(input: { editorHasFocus: boolean; focusInToolbar: boolean }): boolean {
+  return !input.editorHasFocus && !input.focusInToolbar
+}
