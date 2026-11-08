@@ -43,6 +43,7 @@ Publish a page from your project, and anyone with the link can open it. 2.2 also
 
 ## Smaller changes
 
+- **Each chat shows its document.** Click the icon before a chat's name to bring forward the document it changed last; **All chats** shows the file name too.
 - **See where the keyboard is.** A clear indigo ring shows which button the keyboard is on. A mouse click shows no ring.
 - **Home's first card asks what the AI can do here.** The answer says in a paragraph what is in your folder, then offers two things the AI could do next.
 - **Narrow buttons show their icon.** When a button is too narrow for its words, you see its icon. Its words are in its tooltip.
@@ -60,6 +61,7 @@ Publish a page from your project, and anyone with the link can open it. 2.2 also
 
 ## Fixes
 
+- **A comment's task goes to its document's chat.** Before, it went to whichever chat was open, even one about another document. Now it goes to the chat that last changed that document, and the comment says which chat that is.
 - **Switching projects opens on Home.** The AI is beside it at once. Before, your last document showed first, then the page moved.
 - **The window opens in its final shape.** Nothing moves while Ritemark starts, and the AI column shows once, with no flicker.
 - **The AI column you closed stays closed.**
@@ -70,6 +72,8 @@ Publish a page from your project, and anyone with the link can open it. 2.2 also
 - **Coming from Ritemark 1? The welcome shows first.** This is on Windows, at the first start after the update. A terminal you had open waits behind it.
 - **No more "Git not found" message.**
 - **No green check on a failed answer.**
+- **One comment box at a time.** Starting a new comment while another was open left two boxes. Now an empty one closes, and one with words you haven't saved comes back with the cursor in it.
+- **In Ritemark Dark, the cursor's line is no longer a black bar.** This was in code files and Advanced search.
 
 ## Updating from 2.1
 
@@ -77,6 +81,7 @@ Publish a page from your project, and anyone with the link can open it. 2.2 also
 - **On Windows,** a version installed from our download does the same. A version from the Microsoft Store updates from the Store.
 - **Your projects, chats and settings stay.**
 - **Your ChatGPT chats go on.** This is for chats from before the update. Their history stays on screen. ChatGPT itself starts its side of each chat afresh, once.
+- **Chats from before the update show no document** until they change one again.
 - **Copilot's quick actions are off.** This is in the text editor. Modify and Review no longer appear beside selected text, and Fix and Explain no longer appear on a problem. To turn them back on, open **All settings** and search for **Copilot code actions**. Under GitHub Copilot Chat, turn on **Enable Code Actions**.
 - **The first search reads your project once.** Results come while it reads. After that, search starts quickly.
 

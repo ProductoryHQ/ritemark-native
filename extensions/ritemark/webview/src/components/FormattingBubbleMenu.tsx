@@ -11,9 +11,11 @@ import {
   requestWorkspaceFileSearch,
   type WorkspaceFileLinkResult,
 } from '../lib/workspaceFileSearch'
-import { newCommentId } from '../extensions/comment/CommentMark'
+import { commentBoxStorage, startComment } from '../extensions/comment/CommentNode'
+import type { Selection } from '@tiptap/pm/state'
 import { isEquationNodeSelection } from '../extensions/math/mathNodes'
-import { formattingToolbarShows } from './formattingToolbar'
+import type { Instance as TippyInstance } from 'tippy.js'
+import { formattingToolbarShows, toolbarHidesAfterClick } from './formattingToolbar'
 import { Tooltip } from './ui/tooltip'
 
 /**
@@ -53,6 +55,31 @@ export function FormattingBubbleMenu({
   const [fileSearchLoading, setFileSearchLoading] = useState(false)
   const [selectedFileIndex, setSelectedFileIndex] = useState(0)
   const linkInputRef = useRef<HTMLInputElement>(null)
+  // The toolbar's tippy instance, for the re-check after a click (#687).
+  const toolbarTippy = useRef<TippyInstance | null>(null)
+  // The selection the toolbar was hidden for when the comment door opened a
+  // saved comment latched (#687). It stays hidden until the selection changes
+  // or the editor gets the focus again.
+  const hiddenFor = useRef<Selection | null>(null)
+
+  useEffect(() => {
+    if (!editor) return
+    const storage = commentBoxStorage(editor)
+    if (!storage) return
+    const hide = () => {
+      hiddenFor.current = editor.state.selection
+      toolbarTippy.current?.hide()
+    }
+    const release = () => {
+      hiddenFor.current = null
+    }
+    storage.hideToolbar = hide
+    editor.on('focus', release)
+    return () => {
+      if (storage.hideToolbar === hide) storage.hideToolbar = null
+      editor.off('focus', release)
+    }
+  }, [editor])
   // The address of the link the person clicked (#502): the edit applies to that
   // link's whole range, even from a click at its edge.
   const clickedHrefRef = useRef<string | undefined>(undefined)
@@ -267,9 +294,18 @@ export function FormattingBubbleMenu({
         editor={editor}
         tippyOptions={{
           maxWidth: 'none', // Remove default max-width constraint
+          onCreate: (instance) => {
+            toolbarTippy.current = instance
+          },
         }}
-        shouldShow={({ editor, state, view, element }) =>
-          formattingToolbarShows({
+        shouldShow={({ editor, state, view, element }) => {
+          // #687: hidden for a comment the door opened latched, until the
+          // selection changes (or the editor's focus comes back, see above).
+          if (hiddenFor.current) {
+            if (state.selection.eq(hiddenFor.current)) return false
+            hiddenFor.current = null
+          }
+          return formattingToolbarShows({
             empty: state.selection.empty,
             inCodeBlock: editor.isActive('codeBlock'),
             // Sprint 138 (experience 38): a selected equation shows its focus ring
@@ -279,7 +315,7 @@ export function FormattingBubbleMenu({
             editorHasFocus: view.hasFocus(),
             focusInToolbar: element.contains(element.ownerDocument.activeElement),
           })
-        }
+        }}
       >
         {/* The toolbar is an always-white floating pill, so its interactive
             surface token must stay light too — otherwise the theme-aware
@@ -288,6 +324,18 @@ export function FormattingBubbleMenu({
         <div
           className="flex items-center gap-1 bg-surface border border-hairline-strong rounded shadow-lg p-2"
           style={{ '--r-surface-soft': 'var(--ritemark-surface-soft)' } as React.CSSProperties}
+          // After any button's own click (#687): if the focus left both the editor
+          // and the toolbar with no edit, as when Comment brings an open box
+          // forward, hide now. TipTap ignored that blur and won't check again.
+          onClick={() => {
+            const tip = toolbarTippy.current
+            if (!tip) return
+            const leftFocus = toolbarHidesAfterClick({
+              editorHasFocus: editor.view.hasFocus(),
+              focusInToolbar: tip.popper.contains(document.activeElement),
+            })
+            if (leftFocus) tip.hide()
+          }}
         >
           {/* Bold Button - Keyboard: Ctrl+B / Cmd+B */}
           <Tooltip label="Bold (Ctrl+B)">
@@ -460,9 +508,8 @@ export function FormattingBubbleMenu({
               <Tooltip label="Add comment">
                 <button
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() =>
-                    editor.chain().focus().setCommentMark({ id: newCommentId(), note: '', agentAlias: null }).run()
-                  }
+                  // The one door for a new comment (#687): one box at a time.
+                  onClick={() => startComment(editor)}
                   className="px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center gap-1.5"
                   aria-label="Add comment"
                 >
