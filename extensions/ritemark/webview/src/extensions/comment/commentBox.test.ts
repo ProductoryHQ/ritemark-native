@@ -26,6 +26,7 @@ import {
   CommentNode,
   composerIsDirty,
   decideNewBox,
+  leastScrollDelta,
   liftCommentLine,
   nextRailBox,
   startComment,
@@ -646,6 +647,49 @@ const select = (needleFrom: string, needleTo: string) => (doc: PMNode) =>
     [latched.composeKey, latched.latch, latched.tookRequest],
     [null, `c:${SAVED}`, true],
     'a latched request opens the saved comment, with no box',
+  )
+}
+
+// ── The least scroll shows the box and the line it is about (experience 11) ──
+// A view 0–600 px. Below the `wide` rail the box opens under its marker, so the
+// highlighted line sits just above the box.
+{
+  const view = { top: 0, bottom: 600 }
+
+  assert.equal(
+    leastScrollDelta(view, { top: 300, bottom: 420 }, { top: 270, bottom: 290 }),
+    0,
+    'both in view: no scroll at all',
+  )
+  assert.equal(
+    leastScrollDelta(view, { top: 640, bottom: 760 }, { top: 610, bottom: 630 }),
+    160,
+    'box below the view: scroll down just until the box’s bottom shows (the line is above it, in view too)',
+  )
+  assert.equal(
+    leastScrollDelta(view, { top: 40, bottom: 160 }, { top: -30, bottom: -10 }),
+    -30,
+    'the line above the view with the box in it: scroll up just until the line shows',
+  )
+  assert.equal(
+    leastScrollDelta(view, { top: -100, bottom: 20 }, { top: -130, bottom: -110 }),
+    -130,
+    'both above: scroll up until the line, the higher of the two, shows',
+  )
+  assert.equal(
+    leastScrollDelta(view, { top: 700, bottom: 1250 }, { top: 60, bottom: 80 }),
+    1250 - 600,
+    'too tall together: the box wins, scrolled the least that shows it whole',
+  )
+  assert.equal(
+    leastScrollDelta(view, { top: 640, bottom: 760 }, null),
+    160,
+    'no line found: the box alone, as `nearest`',
+  )
+  assert.equal(
+    leastScrollDelta(view, { top: -50, bottom: 650 }, null),
+    0,
+    'a box that already spans the whole view does not move',
   )
 }
 

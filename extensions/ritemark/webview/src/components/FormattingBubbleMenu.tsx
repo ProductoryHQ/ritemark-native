@@ -13,7 +13,8 @@ import {
 } from '../lib/workspaceFileSearch'
 import { startComment } from '../extensions/comment/CommentNode'
 import { isEquationNodeSelection } from '../extensions/math/mathNodes'
-import { formattingToolbarShows } from './formattingToolbar'
+import type { Instance as TippyInstance } from 'tippy.js'
+import { formattingToolbarShows, toolbarHidesAfterClick } from './formattingToolbar'
 import { Tooltip } from './ui/tooltip'
 
 /**
@@ -53,6 +54,8 @@ export function FormattingBubbleMenu({
   const [fileSearchLoading, setFileSearchLoading] = useState(false)
   const [selectedFileIndex, setSelectedFileIndex] = useState(0)
   const linkInputRef = useRef<HTMLInputElement>(null)
+  // The toolbar's tippy instance, for the re-check after a click (#687).
+  const toolbarTippy = useRef<TippyInstance | null>(null)
   // The address of the link the person clicked (#502): the edit applies to that
   // link's whole range, even from a click at its edge.
   const clickedHrefRef = useRef<string | undefined>(undefined)
@@ -267,6 +270,9 @@ export function FormattingBubbleMenu({
         editor={editor}
         tippyOptions={{
           maxWidth: 'none', // Remove default max-width constraint
+          onCreate: (instance) => {
+            toolbarTippy.current = instance
+          },
         }}
         shouldShow={({ editor, state, view, element }) =>
           formattingToolbarShows({
@@ -288,6 +294,18 @@ export function FormattingBubbleMenu({
         <div
           className="flex items-center gap-1 bg-surface border border-hairline-strong rounded shadow-lg p-2"
           style={{ '--r-surface-soft': 'var(--ritemark-surface-soft)' } as React.CSSProperties}
+          // After any button's own click (#687): if the focus left both the editor
+          // and the toolbar with no edit, as when Comment brings an open box
+          // forward, hide now. TipTap ignored that blur and won't check again.
+          onClick={() => {
+            const tip = toolbarTippy.current
+            if (!tip) return
+            const leftFocus = toolbarHidesAfterClick({
+              editorHasFocus: editor.view.hasFocus(),
+              focusInToolbar: tip.popper.contains(document.activeElement),
+            })
+            if (leftFocus) tip.hide()
+          }}
         >
           {/* Bold Button - Keyboard: Ctrl+B / Cmd+B */}
           <Tooltip label="Bold (Ctrl+B)">

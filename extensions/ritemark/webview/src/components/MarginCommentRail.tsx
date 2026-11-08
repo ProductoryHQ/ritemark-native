@@ -35,9 +35,11 @@ import {
   commentBoxStorage,
   commentRangesById,
   composerIsDirty,
+  leastScrollDelta,
   nextRailBox,
   yieldOpenBox,
   type OpenCommentBox,
+  type ScreenSpan,
 } from '../extensions/comment/CommentNode'
 import { collectDocumentComments, type MinimalNode } from '../extensions/comment/commentIndex'
 import {
@@ -248,6 +250,36 @@ function scan(editor: TipTapEditor, container: HTMLElement): RailMarker[] {
   return list
 }
 
+/**
+ * The line a comment is about, on screen (#687, experience 11): the first line
+ * of its highlighted words, or, for a margin note (no words in the text), its
+ * marker's line in the rail. `item` is the comment's `.rm-rail-item`, whose top
+ * is the marker's line.
+ */
+function commentLine(marker: RailMarker, item: Element | null): ScreenSpan | null {
+  if (marker.kind === 'mark' && marker.el.isConnected) {
+    const first = marker.el.getClientRects()[0]
+    if (first) return { top: first.top, bottom: first.bottom }
+  }
+  if (!item) return null
+  const top = item.getBoundingClientRect().top
+  return { top, bottom: top + MARKER_HEIGHT }
+}
+
+/** Scroll the least it takes to show `box` and the line it is about (`leastScrollDelta`). */
+function revealBoxAndLine(container: HTMLElement | null, box: HTMLElement | null, line: ScreenSpan | null) {
+  if (!box) return
+  if (!container) {
+    box.scrollIntoView({ block: 'nearest' })
+    return
+  }
+  const rect = container.getBoundingClientRect()
+  const top = rect.top + container.clientTop
+  const b = box.getBoundingClientRect()
+  const delta = leastScrollDelta({ top, bottom: top + container.clientHeight }, { top: b.top, bottom: b.bottom }, line)
+  if (delta) container.scrollTop += delta
+}
+
 const CommentIcon = ({ size = 13 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
     strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -286,9 +318,12 @@ function renderNoteWithMentions(note: string): ReactNode {
   return out.length ? out : note
 }
 
-/** How the rail brings its one open box forward (#687). */
+/** What the rail needs to bring its one open box forward (#687). */
 interface ComposeBoxHandle {
-  bringForward: () => void
+  /** The box itself, to scroll into view with the line it is about. */
+  box: () => HTMLElement | null
+  /** The caret at the end of the box's text. */
+  focusEnd: () => void
 }
 
 /** Compose bubble — used to create a new comment and to edit an existing one. */
@@ -324,12 +359,12 @@ function ComposeBubble({
     onDirtyChange(dirty)
   }, [dirty, onDirtyChange])
 
-  // Coming forward (#687): the least scroll that shows the whole box, then the
-  // caret at the end of its text. The field's own focus ring is the only signal.
+  // Coming forward (#687): the rail scrolls the box in, then the caret goes to
+  // the end of its text. The field's own focus ring is the only signal.
   useEffect(() => {
     const handle: ComposeBoxHandle = {
-      bringForward: () => {
-        boxRef.current?.scrollIntoView({ block: 'nearest' })
+      box: () => boxRef.current,
+      focusEnd: () => {
         const el = ref.current
         if (!el) return
         el.focus({ preventScroll: true })
@@ -500,17 +535,13 @@ function RailItem({
   onRecovery: (recovery: CommentTaskError['recovery'], alias: CommentAgentAlias | null) => void
   boxHandle: { current: ComposeBoxHandle | null }
   onDirtyChange: (dirty: boolean) => void
-  /** Opened latched by the door (#687): scroll the least it takes to show it, once. */
+  /** Opened latched by the door (#687): the rail scrolls it in once, given this item. */
   reveal: boolean
-  onRevealed: () => void
+  onRevealed: (item: HTMLElement) => void
 }) {
   const itemRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (!reveal) return
-    const item = itemRef.current
-    const target = item?.querySelector<HTMLElement>('.rm-bubble') ?? item
-    target?.scrollIntoView({ block: 'nearest' })
-    onRevealed()
+    if (reveal && itemRef.current) onRevealed(itemRef.current)
   }, [reveal, onRevealed])
   const projection = useCommentTaskProjection(marker.commentId)
   const alias = detectAgentAlias(marker.note)
@@ -881,19 +912,36 @@ export function MarginCommentRail({
       get dirty() {
         return boxDirty.current
       },
-      bringForward: () => boxHandle.current?.bringForward(),
+      // The least scroll that shows the whole box and the line it is about
+      // (experience 11), then the caret at the end of its text.
+      bringForward: () => {
+        const handle = boxHandle.current
+        const box = handle?.box() ?? null
+        revealBoxAndLine(container, box, commentLine(boxMarker, box?.closest('.rm-rail-item') ?? null))
+        handle?.focusEnd()
+      },
       close: () => setComposeKey((k) => (k === key ? null : k)),
     }
     storage.openBox = entry
     return () => {
       if (storage.openBox === entry) storage.openBox = null
     }
-  }, [editor, boxMarker])
+  }, [editor, container, boxMarker])
 
   const onBoxDirtyChange = useCallback((dirty: boolean) => {
     boxDirty.current = dirty
   }, [])
-  const onRevealed = useCallback(() => setRevealKey(null), [])
+  // A saved comment opened latched: the least scroll that shows its bubble and
+  // the line it is about, once.
+  const onRevealed = useCallback(
+    (item: HTMLElement) => {
+      const marker = markers.find((m) => m.key === revealKey)
+      setRevealKey(null)
+      if (!marker) return
+      revealBoxAndLine(container, item.querySelector<HTMLElement>('.rm-bubble') ?? item, commentLine(marker, item))
+    },
+    [container, markers, revealKey],
+  )
 
   /**
    * Hovering the highlighted text opens that comment, the same way hovering its

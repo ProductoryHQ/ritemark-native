@@ -423,6 +423,39 @@ export function nextRailBox(input: {
   }
 }
 
+/** A vertical span on screen, in CSS px (top edge above bottom edge). */
+export interface ScreenSpan {
+  top: number
+  bottom: number
+}
+
+/** How far `block: 'nearest'` would scroll `view` to show `target` (CSSOM): positive scrolls down. */
+function nearestDelta(view: ScreenSpan, target: ScreenSpan): number {
+  const above = target.top < view.top
+  const below = target.bottom > view.bottom
+  if (above === below) return 0 // already in view, or it already spans the whole view
+  const taller = target.bottom - target.top > view.bottom - view.top
+  return (above && !taller) || (below && taller) ? target.top - view.top : target.bottom - view.bottom
+}
+
+/**
+ * The least scroll that shows a comment's box together with the line it is
+ * about (#687; the Experience lead, experience 11): the first line of its
+ * highlighted words, or a margin note's marker line. Below the `wide` rail the
+ * box opens under its marker, and showing the box alone could leave those
+ * words just out of view.
+ *
+ * When the box and the line fit in the view together, it scrolls as
+ * `block: 'nearest'` would on both; when they don't, the box wins. Nothing
+ * scrolls when both are in view already. Returns the change to the scroll
+ * container's `scrollTop`.
+ */
+export function leastScrollDelta(view: ScreenSpan, box: ScreenSpan, line: ScreenSpan | null): number {
+  const both = line ? { top: Math.min(box.top, line.top), bottom: Math.max(box.bottom, line.bottom) } : box
+  const fits = both.bottom - both.top <= view.bottom - view.top
+  return nearestDelta(view, fits ? both : box)
+}
+
 /**
  * The same rule for the rail's own ways of opening another comment: Edit, and a
  * click on a highlight or a marker. `key` is the marker the caller wants to open.
