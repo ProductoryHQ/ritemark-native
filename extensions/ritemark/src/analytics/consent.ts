@@ -124,8 +124,12 @@ export interface ConsentDeps {
 /** Feedback's events, which the person sends themselves (G3). */
 export type FeedbackEvent = { name: 'feedback_sent'; properties: EventPayloads['feedback_sent'] };
 
-/** The welcome's events, held in memory until the person answers (R8; Jarmo, 18 October). */
-export type HeldEventName = 'welcome_shown' | 'ai_signed_in';
+/**
+ * The welcome's events, held in memory until the person answers (R8; Jarmo, 18 October). Sprint 156 (PR B): the skip of
+ * its AI step too. A list as well as a type, so the gate holds nothing else.
+ */
+export const HELD_EVENT_NAMES = ['welcome_shown', 'ai_signed_in', 'welcome_ai_skipped'] as const;
+export type HeldEventName = (typeof HELD_EVENT_NAMES)[number];
 interface HeldEvent<T extends HeldEventName = HeldEventName> {
   name: T;
   properties: EventPayloads[T];
@@ -194,6 +198,8 @@ export class ConsentGate {
    * there is no answer, dropped after a no. Nothing is written to disk.
    */
   async trackWelcome<T extends HeldEventName>(name: T, properties: EventPayloads[T]): Promise<'sent' | 'held' | 'dropped'> {
+    // Only the welcome's own events wait for the answer (Sprint 156): anything else goes through `track`, after a yes
+    if (!(HELD_EVENT_NAMES as readonly string[]).includes(name)) return 'dropped';
     if (this.maySend()) return (await this.track(name, properties)) ? 'sent' : 'dropped';
     if (this.answer() === 'unknown' && this.deps.analyticsAllowed()) {
       this.held.push({ name, properties } as HeldEvent);

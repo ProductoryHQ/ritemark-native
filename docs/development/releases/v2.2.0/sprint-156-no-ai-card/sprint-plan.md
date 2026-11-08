@@ -2,7 +2,7 @@
 
 Track: Lightweight (one card's behaviour, two stacked PRs, no new surface)<br>
 Release tier: extension. Everything is under `src/` and `webview/src/`, so it ships in `out/**/*.js` and `media/webview.js`; the sign-in icon is already in the bundle. No patches, no `vscode`, no `product.json`, no binaries.<br>
-**Status:** Approved. PR A in progress.<br>
+**Status:** Done. PR A merged as `0a89046c` (#694), PR B (#697) merged with this commit, 9 November 2026. Live checks: #694 66 PASS, #697 6 scenarios PASS at a local usage-data stand-in. Not staged live (no OpenAI or Anthropic test key): a real sign-in finishing, which comes back at Gate 1.<br>
 **Approval:** the Development manager (shape, tier and risk) and the Experience lead (looks and feel), under Jarmo's 8 November 2026 delegation; recorded in ritemark-dev `decisions/log.md` (bfcdf0b). The Experience lead's nine answers (ritemark-dev 7cb2f5e, experience 35, "With no AI ready") amend the plan and are merged in below. Release approval stays Jarmo's.<br>
 **Release:** [v2.2.0](../release-plan.md), 2.2's new release candidate (the Experience lead placed it there on 8 November, on Jarmo's word "las experience lead otsustab", ritemark-dev d7c6fa1).<br>
 **Plan and answers:** [#690](https://github.com/ProductoryHQ/ritemark-native/issues/690).<br>
@@ -58,6 +58,14 @@ High, not Standard as first planned: it changes `src/settings/RitemarkSettingsPr
 
 Every field is a fixed choice or a yes/no: no words, names, paths or models. The review is `/code-review` at high plus `/security-review`. Before 2.2 publishes, ritemark.app's privacy page lists the three counts (a ritemark-web change for Jarmo's publish gate).
 
+As built (branch `sprint-156-signin-counts`):
+
+- `src/analytics/events.ts`: the three events; `SIGN_IN_FROM` (`home_card`, `home_menu`) and `WELCOME_SKIP_HOW` (`button`, `new_project`) as lists and types; `SignInCountsAreClosed`, an allow-list that fails `npm run compile` unless every field of the three is a `boolean`, `WelcomeProvider`, `SignInFrom` or `WelcomeSkipHow` (a string, number, array, object or template literal fails). The provider is the existing `WelcomeProvider`, mapped from the AI's id by `GuidanceHost`'s `PROVIDER`.
+- `src/analytics/consent.ts`: `welcome_ai_skipped` joins the held events (`HELD_EVENT_NAMES`, a list as well as a type), and the gate holds nothing else: any other name given to `trackWelcome` is dropped, so Home's counts can only go through `track`, after a yes.
+- `src/welcome/welcomeHost.ts`: Skip for now on the fresh welcome's step 1 (`how: button`) and Start a new project while the welcome shows step 1 (`how: new_project`, S25), once per skip; from a window where the welcome isn't open it opens on the project form and nothing is counted. `ai_ready` is the welcome's own answer (`welcomeState.aiFoundReady`): a skip made while a check still runs waits for it, a recheck of an AI that had answered too (#697), each answering within 20 s; leaving for a project counts it at once, before the yes; the welcome closing drops it with its other held events.
+- `src/guidance/GuidanceHost.ts`: `signIn(folderUri, ai, from)`, `home_card` from the card's press and `home_menu` from Ask with (`HomePanel`); `ai_signin_started` when Claude's login starts (or Home joins one running), ChatGPT's page opened (a declined "open the website?" isn't a start), or OpenCode's keys are saved (`saveKeys(…, from)`; a Save that stores no key isn't a start); `ai_signin_finished` once, from the sign-in's own `ready` settle (`countFinished`), only for a sign-in that sent its start; OpenCode, with no login to settle, finishes when it reads ready after the save. An AI found ready before anything started sends neither.
+- `src/projects/protocol.ts`: `home/save-keys` carries `from` (checked against `SIGN_IN_FROM`); `GuidanceCards.tsx` remembers where OpenCode's key sheet was opened, the only webview change.
+
 ## Proof
 
 - **Unit tests first, each failing on `main`:**
@@ -69,7 +77,7 @@ Every field is a fixed choice or a yes/no: no words, names, paths or models. The
   - the sign-in's life on the host (`src/guidance/GuidanceHost.test.ts`): the press signs in; it settles on success through the AI sheet's restart of the poll and from a status event alone, and nothing is sent; Home's own give-up and its line, taken away by the next press; Cancel; the readiness check; Claude's failure, its "couldn't start" and "Open the page again" with no page; the waiting card only with no AI ready; Ask with as the host builds it;
   - the poll's listeners surviving the sheet's restart, hearing ready and the give-up, and going with a stopped poll (`src/codex/CodexRuntime.test.ts`, test 20);
   - Home drawing the sign-in with no AI ready, its press sending `home/ready-request`, the waiting state (Signing in…, Cancel, the line under the row) and a failure's line (`webview/src/components/home/home.test.ts`);
-  - PR B: the three counts and their fields, and the held skip event (sent on yes, dropped on no).
+  - PR B: the three counts and their fields, and the held skip event (sent on yes, dropped on no) (`src/analytics/analytics.test.ts`, `consent.test.ts`); the counts on the host (`GuidanceHost.test.ts`: from the card and from Ask with, finished once, finished on the sign-in's own ready settle, nothing finished after a failure, a timeout or a Cancel, no start for a declined "open the website?" or a login that can't start, OpenCode's keys); the skip (new `src/welcome/welcomeSkip.test.ts`: once per skip, each `how` (`new_project` only with the welcome open), `ai_ready` waiting for the checks, dropped when the welcome closes, counted before the yes); `home/save-keys`'s `from` (`src/projects/protocol.test.ts`). Each fails on `main`'s sources; eleven mutations of the fire points are each caught (review round 1).
 - **Live, in an isolated test window** (the Development manager), with throwaway AI homes and no real accounts:
   - **No AI:** the card on a folder with files, on an empty project and on the sample, in Light and Dark, with the caret open.
   - **Signing in,** and **a failure line**.

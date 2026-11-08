@@ -24,6 +24,14 @@ assert.deepEqual(decodeHomeRequest({ type: 'home/drop-files', uris: ['file:///Us
 assert.equal(decodeHomeRequest({ type: 'home/drop-files', uris: [] }).ok, false);
 assert.equal(decodeHomeRequest({ type: 'home/drop-files', uris: ['https://example.com/x'] }).ok, false);
 assert.equal(decodeHomeRequest({ type: 'home/drop-files', uris: Array(201).fill('file:///a') }).ok, false);
+// Sprint 156 (PR B): OpenCode's keys say where on Home their sheet was opened, the card or Ask with, for the counts
+assert.deepEqual(decodeHomeRequest({ type: 'home/save-keys', keys: { 'openrouter-api-key': 'k' }, from: 'home_card' }), { ok: true, request: { type: 'home/save-keys', keys: { 'openrouter-api-key': 'k' }, from: 'home_card' } });
+assert.deepEqual(decodeHomeRequest({ type: 'home/save-keys', keys: {}, from: 'home_menu' }), { ok: true, request: { type: 'home/save-keys', keys: {}, from: 'home_menu' } });
+assert.equal(decodeHomeRequest({ type: 'home/save-keys', keys: {} }).ok, false, 'from is required');
+for (const from of ['home', 'settings', 'Home_card', '', 1, null]) {
+  assert.equal(decodeHomeRequest({ type: 'home/save-keys', keys: {}, from }).ok, false, `from ${JSON.stringify(from)} is refused: only the two places`);
+}
+assert.equal(decodeHomeRequest({ type: 'home/save-keys', keys: { 'not-a-key': 'k' }, from: 'home_card' }).ok, false, 'the keys are still checked');
 assert.equal(decodeHomeRequest({ type: 'home/nope' }).ok, false);
 assert.equal(decodeHomeRequest(null).ok, false);
 assert.equal(decodeHomeRequest(['home/ready']).ok, false);

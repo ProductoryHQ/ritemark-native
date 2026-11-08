@@ -8,7 +8,7 @@
  */
 
 import assert from 'node:assert/strict';
-import type { EventName, EventPayloads } from './events';
+import { SIGN_IN_FROM, WELCOME_SKIP_HOW, type EventName, type EventPayloads } from './events';
 
 // ── 1. Event type coverage ──────────────────────────────────
 
@@ -28,6 +28,9 @@ const ALL_EVENT_NAMES: EventName[] = [
   'first_reply',
   'voice_captured',
   'voice_note_edited',
+  'welcome_ai_skipped',
+  'ai_signin_started',
+  'ai_signin_finished',
 ];
 
 // Verify every event name is a valid string (compile-time + runtime)
@@ -54,6 +57,9 @@ const _payloadCheck: {
   first_reply: { provider: 'chatgpt', outcome: 'provider_error' },
   voice_captured: { source: 'transcribe', input: 'recorded' },
   voice_note_edited: { source: 'dictation', days_since_capture: 3 },
+  welcome_ai_skipped: { how: 'button', ai_ready: false },
+  ai_signin_started: { provider: 'chatgpt', from: 'home_card' },
+  ai_signin_finished: { provider: 'claude', from: 'home_menu' },
 };
 
 assert.ok(_payloadCheck, 'All payload shapes should be valid');
@@ -93,6 +99,42 @@ for (const [event, keys] of Object.entries(SPRINT_139_EVENT_KEYS)) {
   for (const key of keys) {
     assert.doesNotMatch(key, /path|name|file|message|account|email|folder|model|text|project|language|length/i, `${event}.${key} names nothing personal`);
   }
+}
+
+// Sprint 156 (PR B; experience 35, "With no AI ready"): the no-AI card's three counts. Exactly these fields, and each one
+// a fixed choice or a yes/no, so no field can carry words, a name, a path, a model, an address or an error. The values'
+// lists are the ones Home's protocol checks (`SIGN_IN_FROM`) and the skip's two ways (`WELCOME_SKIP_HOW`); the type
+// side is `events.ts`'s `SignInCountsAreClosed`, an allow-list that fails `npm run compile` unless every field is a
+// boolean, `WelcomeProvider`, `SignInFrom` or `WelcomeSkipHow`.
+const SPRINT_156_EVENT_KEYS: Record<string, string[]> = {
+  welcome_ai_skipped: ['how', 'ai_ready'],
+  ai_signin_started: ['provider', 'from'],
+  ai_signin_finished: ['provider', 'from'],
+};
+for (const [event, keys] of Object.entries(SPRINT_156_EVENT_KEYS)) {
+  assert.deepEqual(Object.keys(_payloadCheck[event as EventName]).sort(), [...keys].sort(), `${event} has only ${keys.join(', ')}`);
+  for (const key of keys) {
+    assert.doesNotMatch(key, /path|name|file|message|account|email|folder|model|text|project|error|url|reason/i, `${event}.${key} names nothing personal`);
+  }
+}
+assert.deepEqual([...SIGN_IN_FROM], ['home_card', 'home_menu'], 'a sign-in starts from the card or its Ask with, nothing else');
+assert.deepEqual([...WELCOME_SKIP_HOW], ['button', 'new_project'], 'a skip is Skip for now or a new project, nothing else');
+const CLOSED_VALUES: Record<string, ReadonlyArray<string | boolean>> = {
+  'welcome_ai_skipped.how': WELCOME_SKIP_HOW,
+  'welcome_ai_skipped.ai_ready': [true, false],
+  'ai_signin_started.provider': ['claude', 'chatgpt', 'opencode'],
+  'ai_signin_started.from': SIGN_IN_FROM,
+  'ai_signin_finished.provider': ['claude', 'chatgpt', 'opencode'],
+  'ai_signin_finished.from': SIGN_IN_FROM,
+};
+for (const [field, values] of Object.entries(CLOSED_VALUES)) {
+  assert.ok(values.length > 0 && values.length <= 3, `${field} is a short, fixed list`);
+  for (const value of values) {
+    assert.ok(typeof value === 'boolean' || /^[a-z]+(_[a-z]+)*$/.test(value), `${field}: ${String(value)} is a fixed word, never text`);
+  }
+  const [event, key] = field.split('.');
+  const sample = (_payloadCheck[event as EventName] as unknown as Record<string, unknown>)[key];
+  assert.ok((values as ReadonlyArray<unknown>).includes(sample), `${field}: the sample is one of its values`);
 }
 
 // ── 2. Setting and kill switch (the gate itself is tested in consent.test.ts) ──

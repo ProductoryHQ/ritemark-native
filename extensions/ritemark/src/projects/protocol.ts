@@ -9,6 +9,8 @@
  * webview imports the types.
  */
 
+import { SIGN_IN_FROM, type SignInFrom } from '../analytics/events';
+
 export type HomePlatform = 'darwin' | 'win32' | 'linux';
 export type AiName = 'Claude' | 'ChatGPT' | 'OpenCode';
 
@@ -176,7 +178,8 @@ export type HomeRequest =
   // Sprint 156: the card's sign-in, waiting: its Cancel and "Open the page again"
   | { type: 'home/cancel-sign-in' }
   | { type: 'home/reopen-sign-in' }
-  | { type: 'home/save-keys'; keys: Partial<Record<HomeKeyName, string>> }
+  // Sprint 156 (PR B): `from` is where the key sheet was opened, the card's main part or Ask with, for the sign-in's counts
+  | { type: 'home/save-keys'; keys: Partial<Record<HomeKeyName, string>>; from: SignInFrom }
   | { type: 'home/feedback-send'; text: string }
   | { type: 'home/feedback-mail'; text: string }
   | { type: 'home/feedback-not-now' };
@@ -266,8 +269,9 @@ export function decodeHomeRequest(raw: unknown): Decoded<HomeRequest> {
       if (!HOME_AI_IDS.includes(raw.ai as HomeAiId)) return fail('ai must be claude-code, codex or opencode');
       return { ok: true, request: { type: raw.type, ai: raw.ai as HomeAiId } };
     case 'home/save-keys': {
-      problem = check(['keys']);
+      problem = check(['keys', 'from']);
       if (problem) return fail(problem);
+      if (!(SIGN_IN_FROM as readonly unknown[]).includes(raw.from)) return fail('from must be home_card or home_menu');
       if (!isObject(raw.keys)) return fail('keys must be an object');
       const keys: Partial<Record<HomeKeyName, string>> = {};
       for (const [name, value] of Object.entries(raw.keys)) {
@@ -275,7 +279,7 @@ export function decodeHomeRequest(raw: unknown): Decoded<HomeRequest> {
         if (typeof value !== 'string' || value.length > 512) return fail('a key must be text');
         keys[name as HomeKeyName] = value;
       }
-      return { ok: true, request: { type: 'home/save-keys', keys } };
+      return { ok: true, request: { type: 'home/save-keys', keys, from: raw.from as SignInFrom } };
     }
     case 'home/feedback-send':
     case 'home/feedback-mail':

@@ -347,7 +347,8 @@ export class HomeHost implements vscode.Disposable {
         await this.deps.guidance?.hide(folder.uri.toString());
         return;
       case 'home/sign-in':
-        await this.deps.guidance?.signIn(folder.uri.toString(), request.ai);
+        // Sprint 156 (PR B): Ask with's sign-in; the card's own press comes through home/ready-request
+        await this.deps.guidance?.signIn(folder.uri.toString(), request.ai, 'home_menu');
         return;
       // Sprint 156: the card's sign-in, waiting
       case 'home/cancel-sign-in':
@@ -357,7 +358,7 @@ export class HomeHost implements vscode.Disposable {
         await this.deps.guidance?.reopenSignIn();
         return;
       case 'home/save-keys': {
-        const result = await this.deps.guidance?.saveKeys(folder.uri.toString(), request.keys) ?? { ok: false, message: null };
+        const result = await this.deps.guidance?.saveKeys(folder.uri.toString(), request.keys, request.from) ?? { ok: false, message: null };
         await this.panel?.webview.postMessage({ type: 'home/keys-saved', ...result });
         return;
       }
