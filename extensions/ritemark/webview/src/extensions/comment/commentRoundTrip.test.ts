@@ -135,6 +135,7 @@ assert.equal(parseCommentBody('@claude: fix').alias, 'claude', 'colon form assig
 assert.equal(parseCommentBody('@codex fix').alias, 'codex', 'no-colon form assigns')
 assert.equal(parseCommentBody('@Claude fix').alias, 'claude', 'capitalized alias assigns (case-insensitive)')
 assert.equal(parseCommentBody('@codex.com is our site').alias, null, '@codex.com is NOT an alias (audit L-A)')
+assert.deepEqual(parseCommentBody('@opencode, list three'), { alias: 'opencode', text: 'list three' }, 'comma form assigns, and the comma goes with the mention')
 assert.equal(parseCommentBody('ask @claude ok').alias, null, 'a mid-sentence mention is not an assignment')
 
 // ---- agent detection (mention anywhere in the note assigns) ----
@@ -142,6 +143,11 @@ assert.equal(detectAgentAlias('@claude: fix'), 'claude', 'leading mention assign
 assert.equal(detectAgentAlias('Väike kommentaar siia! @claude'), 'claude', 'a trailing mention assigns too')
 assert.equal(detectAgentAlias('note @Codex here'), 'codex', 'a mid-note capitalized mention assigns')
 assert.equal(detectAgentAlias('see @codex.com'), null, '@codex.com (a domain) does NOT assign')
+// Experience lead, 8 Nov (experience 45): a comma assigns as a colon does ("@opencode, list …"), and goes with the mention
+assert.equal(detectAgentAlias('@opencode, list three outcomes as bullets'), 'opencode', 'a mention followed by a comma assigns')
+assert.equal(stripAgentMentions('@opencode, list three outcomes as bullets'), 'list three outcomes as bullets', 'the comma after the mention is stripped for the prompt')
+assert.equal(stripAgentMentions('Please, @codex, tighten the intro'), 'Please, tighten the intro', 'a mid-note mention takes its comma with it')
+assert.equal(detectAgentAlias('see @codex. later'), null, 'a period after the mention still does NOT assign')
 assert.equal(detectAgentAlias('plain note'), null, 'no mention → not assigned')
 assert.equal(stripAgentMentions('@claude: rewrite this'), 'rewrite this', 'leading mention stripped for the prompt')
 assert.equal(stripAgentMentions('Väike kommentaar siia! @claude'), 'Väike kommentaar siia!', 'trailing mention stripped for the prompt')

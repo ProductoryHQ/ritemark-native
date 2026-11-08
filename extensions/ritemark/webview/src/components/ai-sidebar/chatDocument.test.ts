@@ -7,8 +7,8 @@
 import assert from 'node:assert/strict';
 import { chatDocumentLabel, chatDocumentTooltip, orderByFrontDocument, type ChatDocumentView } from './chatDocument';
 
-const one: ChatDocumentView = { path: '/p/Advokatuur.md', name: 'Advokatuur.md', more: 0, iconUri: 'x' };
-const several: ChatDocumentView = { path: '/p/Module 2.md', name: 'Module 2.md', more: 2, iconUri: 'y' };
+const one: ChatDocumentView = { path: '/p/Advokatuur.md', openPath: '/p/Advokatuur.md', name: 'Advokatuur.md', more: 0, iconUri: 'x' };
+const several: ChatDocumentView = { path: '/p/Module 2.md', openPath: '/p/Module 2.md', name: 'Module 2.md', more: 2, iconUri: 'y' };
 
 assert.equal(chatDocumentTooltip(one), 'Changed Advokatuur.md');
 assert.equal(chatDocumentTooltip(several), 'Changed Module 2.md and 2 more');

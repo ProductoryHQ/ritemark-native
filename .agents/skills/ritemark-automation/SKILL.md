@@ -88,6 +88,118 @@ done
 
 **`PATH=...v22.21.1...`** forces the arm64 Node. The system default `node` is x86_64 under Rosetta — esbuild and tsx blow up with arch-mismatch errors. v22.21.1 is the documented dev-mode Node (see `.claude/skills/vscode-development/SKILL.md`).
 
+### With test keys (AI and providers in an isolated window)
+
+An isolated window has no saved keys. For a run that needs an AI provider (OpenCode on Gemini, Flows, Transcribe with
+ElevenLabs, a Settings Test), load the test keys from the Mac vault with `scripts/qa/with-test-keys.sh` around the
+launch. Name only the keys the run needs with `--only` (a missing one is skipped) or `--require` (a missing one stops
+the run); the vault names are `gemini`, `openai`, `anthropic`, `openrouter`, `elevenlabs` (ritemark-dev
+`governance/test-keys.md`). Nobody types a key, and you never read, print or echo one.
+
+```bash
+PROFILE=$(mktemp -d /private/tmp/rm-tk-profile.XXXX)
+RITEMARK_BUILD_CHANNEL=test RITEMARK_TEST_PROFILE="$PROFILE" \
+  scripts/qa/with-test-keys.sh --only gemini -- \
+  scripts/qa/dev-launch-isolated.sh start --name tk --user-data-dir="$PROFILE"
+# … the run …
+scripts/qa/dev-launch-isolated.sh stop <RUN_DIR>; rm -rf "$PROFILE"   # test profiles go after the run
+```
+
+- The script refuses without `RITEMARK_BUILD_CHANNEL=test` and a test profile under `/private/tmp` (or `$TMPDIR`),
+  and the launch command must carry exactly that `--user-data-dir`. It prints only the names it loaded.
+- The keys travel under Ritemark-only names, `RITEMARK_TEST_KEY_GOOGLE`, `_OPENAI`, `_ANTHROPIC`, `_OPENROUTER` and
+  `_ELEVENLABS`, never `OPENAI_API_KEY` and the like, which Claude Code, Codex, git hooks and MCP servers would pick up
+  by themselves.
+- Ritemark uses a test key only in the test channel, and only when no key is saved
+  (`extensions/ritemark/src/ai/providerKeys.ts`). At activation the extension host copies the variables and deletes
+  them from its own environment, so nothing it starts inherits them. An agent gets a key only under the name it
+  expects: OpenCode `GOOGLE_GENERATIVE_AI_API_KEY` and the rest, Claude Code `ANTHROPIC_API_KEY` only when it runs on
+  an API key, Codex none. OpenCode counts as set up, and Settings shows the row as **From the test environment** with
+  Test, never the value. Outside the test channel the variables are neither read nor removed.
+- **Terminals still inherit the names.** Ritemark's main process keeps them, and so does everything it starts besides
+  the extension host, terminals included. In the extension host too, processes started before Ritemark's `activate`
+  runs inherit them, such as the built-in git extension's git and the git hooks it runs. Nothing reads these names by
+  itself, so none of them uses a key, but each could show one. In a test window's terminal, or an agent's shell tool,
+  never run `env`, `printenv` or `echo $RITEMARK_TEST_KEY_…`. To check, print a count only:
+  `env | grep -c RITEMARK_TEST_KEY`.
+- Never pass a key with `--env` or any other argument: arguments show in `ps`. The keys travel only in the environment.
+- `dev-launch-isolated.sh start --user-data-dir` takes only a test profile: under `/private/tmp` or `/tmp` (or a deep
+  enough `$TMPDIR`), with no whitespace, never Ritemark's real profile or `~/.ritemark-shared`. This is
+  `with-test-keys.sh`'s rule, from the shared `scripts/qa/test-profile-guard.sh`. Both scripts refuse to run while
+  `VSCODE_PORTABLE` or `VSCODE_APPDATA` is set (VS Code reads them before `--user-data-dir`); `with-test-keys.sh`
+  refuses a `--shared-data-dir` into `~/.ritemark-shared`, and `dev-launch-isolated.sh` sets its own
+  (`~/.ritemark-dev-shared`) and refuses `--user-data-dir` or `--shared-data-dir` after `--`.
+
+There is exactly one correct way to launch Ritemark for automation. Memorize the shape:
+
+```bash
+REPO_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+
+# Pick a fresh user-data-dir for each automation run so prior consent dialogs,
+# auto-share state, and feature-flag toggles don't leak between runs.
+USERDATA="/tmp/ritemark-automation-userdata"
+SHAREDDATA="/tmp/ritemark-automation-shared"
+WORKSPACE="/tmp/ritemark-automation-workspace"
+SCREENSHOT_DIR="/tmp/ritemark-screenshots/$(date +%Y-%m-%dT%H-%M-%S)"
+mkdir -p "$WORKSPACE" "$SCREENSHOT_DIR"
+[ -f "$WORKSPACE/README.md" ] || echo "# Automation Workspace" > "$WORKSPACE/README.md"
+
+cd "$REPO_ROOT/vscode"
+
+# Launch in background. The three knobs that matter:
+#   --remote-debugging-port=9224       — enables CDP (the whole point)
+#   --user-data-dir=$USERDATA          — isolates from your daily Ritemark profile
+#   --use-mock-keychain                — an unsigned dev Electron otherwise asks the
+#                                        keychain at start: a password prompt lands on
+#                                        Jarmo's screen and blocks the main process (CDP hangs)
+#   --shared-data-dir=$SHAREDDATA      — VS Code 1.142 keeps the recent folders in a
+#                                        folder every build shares (~/.ritemark-shared);
+#                                        without this, test folders land in the installed
+#                                        app's Open Recent and projects list (#475)
+#   $WORKSPACE (positional)            — gives Ritemark a workspace folder
+#                                        WITHOUT THIS, agent execution blocks with
+#                                        "No workspace folder open. Please open a folder first."
+#                                        and you'll waste a debugging session.
+VSCODE_SKIP_PRELAUNCH=1 \
+  PATH=/Users/jarmotuisk/.nvm/versions/node/v24.18.0/bin:$PATH \
+  ./scripts/code.sh \
+    --remote-debugging-port=9224 \
+    --user-data-dir=$USERDATA \
+    --shared-data-dir=$SHAREDDATA \
+    --use-mock-keychain \
+    $WORKSPACE &
+
+# Connect with retry — first launch is slow.
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  if npx --no-install --prefix "$REPO_ROOT/vscode" \
+       agent-browser connect 9224 2>/dev/null; then
+    echo "Connected on try $i"; break
+  fi
+  sleep 3
+done
+```
+
+**`VSCODE_SKIP_PRELAUNCH=1`** skips the `preLaunch.ts` step that checks/installs node_modules and runs Electron build. After your first launch it's safe to skip; if the launch fails saying Electron is missing, remove the env var for one launch and add it back.
+
+**`PATH=...v24.18.0...`** forces the arm64 Node. The system default `node` is x86_64 under Rosetta — esbuild and tsx blow up with arch-mismatch errors. v24.18.0 is the documented dev-mode Node (see `.claude/skills/vscode-development/SKILL.md`).
+
+### Launching an installed build (a release candidate, or the installed app)
+
+The same isolation, plus one more rule: an installed build reports usage data as `prod`, so a test run would count as a person (#480). Mark every test launch with `RITEMARK_BUILD_CHANNEL=test`; such a run reports `build_channel: test` and, like a dev run, sends only to a key given for it. `open` passes the shell's environment to the new instance:
+
+```bash
+S=/private/tmp/claude-501/rc1          # short: the IPC socket path has a length limit
+mkdir -p "$S/ud/User" "$S/ext" "$S/shared"
+RITEMARK_BUILD_CHANNEL=test open -n -g -a /Applications/Ritemark.app --args \
+  --remote-debugging-port=9411 \
+  --user-data-dir="$S/ud" --extensions-dir="$S/ext" --shared-data-dir="$S/shared" \
+  --use-mock-keychain --new-window "$WORKSPACE"
+```
+
+- A run that does not test usage data can also turn it off before the first start: `{ "ritemark.features.analytics": false }` in `$S/ud/User/settings.json`.
+- A run that checks the events' payloads sends them to a local stand-in instead: `RITEMARK_POSTHOG_PROJECT_KEY=<any> RITEMARK_POSTHOG_HOST=http://127.0.0.1:<port>`.
+- Pick a port other than 9224, and quit only your own instance (its command line names your `--user-data-dir`).
+
 ## After-launch UI gotchas — handle these first
 
 ### 1. Workspace trust dialog

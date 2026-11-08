@@ -7,6 +7,7 @@
  */
 
 import * as vscode from 'vscode';
+import { readProviderKey } from './providerKeys';
 
 const API_KEY_ID = 'openai-api-key';
 
@@ -40,20 +41,25 @@ export class APIKeyManager {
   }
 
   /**
-   * Retrieve OpenAI API key
+   * Retrieve OpenAI API key: the saved one, or (test channel only, Sprint 155) the test environment's
    * @returns API key or undefined if not found
    */
   async getAPIKey(): Promise<string | undefined> {
-    return this.secrets.get(API_KEY_ID);
+    return readProviderKey(this.secrets, API_KEY_ID);
   }
 
   /**
-   * Check if API key exists
+   * Check if an API key can be used (saved, or in the test channel the test environment's)
    * @returns true if key exists
    */
   async hasAPIKey(): Promise<boolean> {
-    const key = await this.secrets.get(API_KEY_ID);
+    const key = await this.getAPIKey();
     return !!key;
+  }
+
+  /** Whether a key is saved: what updating or deleting it acts on. */
+  async hasSavedAPIKey(): Promise<boolean> {
+    return !!(await this.secrets.get(API_KEY_ID));
   }
 
   /**
@@ -69,7 +75,8 @@ export class APIKeyManager {
    * @returns Masked key or null if not found
    */
   async getMaskedKey(): Promise<string | null> {
-    const apiKey = await this.getAPIKey();
+    // The saved key only: a test environment's key is never shown, not even masked
+    const apiKey = await this.secrets.get(API_KEY_ID);
 
     if (!apiKey) {
       return null;

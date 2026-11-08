@@ -2,7 +2,7 @@
 # dev-launch-isolated.sh — start one Ritemark dev instance for a test run, isolated, and stop it again.
 #
 #   scripts/qa/dev-launch-isolated.sh start --name <run> [--folder <dir>] [--port <n>] [--env KEY=VALUE]...
-#                                           [--dry-run] [-- <extra Ritemark args>]
+#                                           [--user-data-dir=<new empty dir>] [--dry-run] [-- <extra Ritemark args>]
 #   scripts/qa/dev-launch-isolated.sh stop <run-dir>
 #
 # `start` launches the dev build (vscode/.build/electron, built with the patches applied) of this checkout, or of the
@@ -26,7 +26,14 @@
 #
 # Jarmo's rule (2 and 3 Nov): no test window while he is at the keyboard. From 08:00 to 18:00 Tallinn time
 # `start` refuses unless RITEMARK_LAUNCH_DAYTIME_OK=1, which a run sets only after he has said yes in chat.
-# Test keys: this script loads none. A run that needs one uses scripts/qa/with-test-keys.sh around the launch.
+# What a launch may not change: see "What is guarded" in start_run.
+# Test keys: this script loads none. A run that needs one uses scripts/qa/with-test-keys.sh around the launch, which
+# wants the profile on the command line it runs: give it here as --user-data-dir=$RITEMARK_TEST_PROFILE (a new or empty
+# folder, used instead of <run-dir>/profile and named in run.env as PROFILE), e.g.
+#   RITEMARK_BUILD_CHANNEL=test RITEMARK_TEST_PROFILE=/private/tmp/rm-tk-profile \
+#     scripts/qa/with-test-keys.sh --only gemini -- scripts/qa/dev-launch-isolated.sh start --name tk \
+#       --user-data-dir=/private/tmp/rm-tk-profile
+# The keys reach the instance only through its inherited environment; --env never carries one (it would be an argument).
 #
 # Model routing (ritemark-dev governance/model-routing.md, §2): a launch follows this script, so any model can
 # run it the same way.
@@ -36,6 +43,12 @@ set +x
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 die() { echo "dev-launch-isolated: $*" >&2; exit 2; }
+# test_profile_check: where a test profile may be, the rule with-test-keys.sh uses for RITEMARK_TEST_PROFILE
+# shellcheck source=test-profile-guard.sh
+. "$ROOT/scripts/qa/test-profile-guard.sh"
+
+# The text, with every extended-regular-expression character taken literally (for pgrep -f).
+ere_escape() { printf '%s' "$1" | sed 's/[][\\.*^$+?(){}|]/\\&/g'; }
 
 # A process that is running (not gone, not a zombie waiting to be reaped).
 alive() {
@@ -68,13 +81,20 @@ stop_run() {
 	# One spelling of the folder: the profile flag names it as start resolved it (pwd -P, e.g. /private/var/…), and
 	# a /var/… or …//… form of the same folder would match no process and report LEFT=0 with the instance running.
 	run_dir=$(cd "$run_dir" && pwd -P)
-	local profile="--user-data-dir=$run_dir/profile"
+	local profile_dir
+	profile_dir=$(sed -n 's/^PROFILE=//p' "$run_dir/run.env")
+	[[ -n $profile_dir ]] || profile_dir="$run_dir/profile"
+	local profile="--user-data-dir=$profile_dir"
+	# The flag matched whole: the exact value, after the start of the line or a space and before a space or the end,
+	# and literally (a `.` in the folder is a dot). A run on …/rm-a.b/profile2 or …/rm-aXb/profile is another run's.
+	local profile_re
+	profile_re="(^| )$(ere_escape "$profile")( |\$)"
 	local pid cmdline=""
 	pid=$(sed -n 's/^PID=//p' "$run_dir/run.env")
 	# run.env's PID is used only while it is still this instance: a number, and a process whose command line
 	# names the run's profile. A PID the system has since given to another process is never walked or signalled.
 	[[ $pid =~ ^[0-9]+$ ]] && cmdline=$(ps -o command= -p "$pid" 2>/dev/null || true)
-	[[ $cmdline == *"$profile"* ]] || pid=""
+	[[ " $cmdline " == *" $profile "* ]] || pid=""
 	# The instance's own tree (helpers, the extension host, the AI runtimes it started), gathered before the
 	# main process goes and its children are re-parented; then every process naming the run's profile.
 	# Never a pattern that matches this script's own command line, which names the run folder but not the profile flag.
@@ -90,7 +110,7 @@ stop_run() {
 	# Walk again just before the KILL pass: runtimes started during the grace period hang under a pid already seen.
 	local live="" more all
 	for p in $tree; do alive "$p" && live="$live $p"; done
-	more=$(pgrep -f -- "$profile" 2>/dev/null || true)
+	more=$(pgrep -f -- "$profile_re" 2>/dev/null || true)
 	all=$(descendants $live $more | sort -u)
 	for p in $all; do
 		[[ $p == "$$" ]] && continue
@@ -102,14 +122,14 @@ stop_run() {
 		[[ $p == "$$" ]] && continue
 		alive "$p" && left=$((left + 1))
 	done
-	more=$(pgrep -f -- "$profile" 2>/dev/null || true)
+	more=$(pgrep -f -- "$profile_re" 2>/dev/null || true)
 	[[ -n $more ]] && left=$((left + $(wc -l <<< "$more")))
 	echo "LEFT=$left"
 	[[ $left == 0 ]]
 }
 
 start_run() {
-	local name="" folder="" port="" dry_run=0
+	local name="" folder="" port="" dry_run=0 profile_arg=""
 	local -a envs=() extra=()
 	while [[ $# -gt 0 ]]; do
 		case $1 in
@@ -117,17 +137,44 @@ start_run() {
 			--folder) folder=${2:-}; shift 2 ;;
 			--port) port=${2:-}; shift 2 ;;
 			--env) envs+=("${2:-}"); shift 2 ;;
+			--user-data-dir=*) profile_arg=${1#--user-data-dir=}; shift ;;
+			--user-data-dir) profile_arg=${2:-}; shift 2 ;;
 			--dry-run) dry_run=1; shift ;;
 			--) shift; extra=("$@"); break ;;
 			*) die "unknown option '$1'" ;;
 		esac
 	done
 	[[ $name =~ ^[A-Za-z0-9._-]+$ ]] || die "--name must be letters, digits, dot, dash or underscore"
+	# What is guarded, before anything runs (second security review of #681), whoever calls:
+	#   - a caller's --user-data-dir must pass with-test-keys.sh's rule (test_profile_check, test-profile-guard.sh):
+	#     under a temp root, no whitespace, never Ritemark's real profile or ~/.ritemark-shared, nor inside them;
+	#     without one, the profile is <run-dir>/profile, under $TMPDIR, which must have no whitespace either;
+	#   - --shared-data-dir is always this script's own, ~/.ritemark-dev-shared;
+	#   - VSCODE_PORTABLE and VSCODE_APPDATA, which VS Code reads before --user-data-dir, may not be set, in this
+	#     script's environment or through --env;
+	#   - the extra arguments after `--` may not name --user-data-dir or --shared-data-dir (VS Code takes the last
+	#     one given, which would replace the two above).
+	# Not guarded: what the launched instance itself writes elsewhere (HOME is unchanged), and any VS Code variable
+	# or flag besides these.
+	if [[ -n $profile_arg ]]; then
+		local why
+		if ! why=$(test_profile_check "$profile_arg"); then die "refused: --user-data-dir $why"; fi
+	fi
+	local vscode_var
+	if ! vscode_var=$(test_profile_env_check); then
+		die "refused: $vscode_var is set; VS Code would take the profile from it, not from --user-data-dir (unset it)"
+	fi
 	local pair
 	for pair in "${envs[@]+"${envs[@]}"}"; do
 		[[ $pair =~ ^[A-Z_][A-Z0-9_]*=.*$ ]] || die "--env takes KEY=VALUE, got '$pair'"
 		case ${pair%%=*} in
-			HOME|CLAUDE_CONFIG_DIR|CODEX_HOME|XDG_*|ELECTRON_RUN_AS_NODE) die "--env may not set ${pair%%=*}" ;;
+			HOME|CLAUDE_CONFIG_DIR|CODEX_HOME|XDG_*|ELECTRON_RUN_AS_NODE|VSCODE_PORTABLE|VSCODE_APPDATA) die "--env may not set ${pair%%=*}" ;;
+		esac
+	done
+	local x
+	for x in "${extra[@]+"${extra[@]}"}"; do
+		case $x in
+			-*user-data-dir*|-*shared-data-dir*) die "refused: the extra arguments may not name --user-data-dir or --shared-data-dir (got '${x%%=*}')" ;;
 		esac
 	done
 
@@ -176,11 +223,22 @@ start_run() {
 	fi
 
 	local tmp=${TMPDIR:-/private/tmp}
+	# stop matches the profile flag up to a space: a run folder with whitespace could match another run's
+	[[ $tmp != *[[:space:]]* ]] || die "refused: TMPDIR must not contain whitespace"
 	local run_dir
 	run_dir=$(mktemp -d "${tmp%/}/rm-${name}.XXXX")
 	run_dir=$(cd "$run_dir" && pwd -P)
-	mkdir -p "$run_dir"/{profile/User,extensions,claude,codex,xdg/config,xdg/data,xdg/state,xdg/cache}
-	cat > "$run_dir/profile/User/settings.json" <<-'JSON'
+	local profile_dir="$run_dir/profile"
+	if [[ -n $profile_arg ]]; then
+		# A profile of the caller's (a test profile, checked above): new or empty, never reused
+		if [[ -e $profile_arg ]]; then
+			[[ -d $profile_arg && -z $(ls -A "$profile_arg") ]] || die "--user-data-dir '$profile_arg' must be a new or empty folder"
+		fi
+		mkdir -p "$profile_arg"
+		profile_dir=$(cd "$profile_arg" && pwd -P)
+	fi
+	mkdir -p "$run_dir"/{extensions,claude,codex,xdg/config,xdg/data,xdg/state,xdg/cache} "$profile_dir/User"
+	cat > "$profile_dir/User/settings.json" <<-'JSON'
 	{
 		"files.simpleDialog.enable": true,
 		"security.workspace.trust.enabled": false,
@@ -215,7 +273,7 @@ start_run() {
 		"${envs[@]+"${envs[@]}"}"
 		arch -arm64 "$app" .
 		--disable-extension=vscode.vscode-api-tests
-		--user-data-dir="$run_dir/profile"
+		--user-data-dir="$profile_dir"
 		--extensions-dir="$run_dir/extensions"
 		--shared-data-dir="$HOME/.ritemark-dev-shared"
 		--use-mock-keychain
@@ -243,6 +301,7 @@ start_run() {
 		echo "PORT=$port"
 		echo "PID=$pid"
 		echo "FOLDER=$folder"
+		echo "PROFILE=$profile_dir"
 	} > "$run_dir/run.env"
 
 	local ready=0

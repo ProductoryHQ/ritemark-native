@@ -116,5 +116,9 @@ assert.equal(chatNameFromComment('@claude make this much shorter please, thanks 
 assert.equal(chatNameFromComment('Rewrite the intro for lawyers. @codex'), 'Rewrite the intro for lawyers');
 assert.equal(chatNameFromComment('  @opencode   '), '');
 assert.equal(chatNameFromComment('fix   the\ntable'), 'Fix the table');
+// Live check 8 Nov: punctuation right after the mention made a chat named ", list three outcomes as bullets"
+assert.equal(chatNameFromComment('@opencode, list three outcomes as bullets'), 'List three outcomes as bullets');
+assert.equal(chatNameFromComment('@claude: shorter please'), 'Shorter please');
+assert.equal(chatNameFromComment('Please, @codex, tighten the intro'), 'Please, tighten the intro');
 
 console.log('commentTaskDestination tests: all assertions passed');

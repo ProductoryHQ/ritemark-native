@@ -14,7 +14,16 @@
 
 import * as path from 'path';
 
-export type PathModule = Pick<path.PlatformPath, 'resolve' | 'normalize' | 'sep'>;
+/**
+ * The three members used here, written out rather than `Pick<path.PlatformPath, …>`: the webview
+ * type-checks this file too (through `chatDocuments.ts`'s types), and its Node types have no
+ * `PlatformPath`. `path`, `path.win32` and `path.posix` all fit.
+ */
+export interface PathModule {
+  resolve(...paths: string[]): string;
+  normalize(p: string): string;
+  readonly sep: string;
+}
 
 function isWin32(p: PathModule): boolean {
   return p.sep === '\\';

@@ -136,6 +136,9 @@ function ensureSubscribed(): void {
         destination = {
           conversationId: typeof data.conversationId === 'string' ? data.conversationId : null,
           title: typeof data.title === 'string' ? data.title : null,
+          // The chat's own AI: the caption compares it with the comment's AI
+          // ("· ChatGPT takes over"). Dropped here before the 8 Nov live check.
+          runtimeId: typeof data.runtimeId === 'string' ? data.runtimeId : null,
         }
         notify()
       }
