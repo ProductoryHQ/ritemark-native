@@ -2,7 +2,7 @@
 
 Track: Lightweight (one card's behaviour, two stacked PRs, no new surface)<br>
 Release tier: extension. Everything is under `src/` and `webview/src/`, so it ships in `out/**/*.js` and `media/webview.js`; the sign-in icon is already in the bundle. No patches, no `vscode`, no `product.json`, no binaries.<br>
-**Status:** Approved. PR A merged (#694); PR B in review.<br>
+**Status:** Done. PR A merged as `0a89046c` (#694), PR B (#697) merged with this commit, 9 November 2026. Live checks: #694 66 PASS, #697 6 scenarios PASS at a local usage-data stand-in. Not staged live (no OpenAI or Anthropic test key): a real sign-in finishing, which comes back at Gate 1.<br>
 **Approval:** the Development manager (shape, tier and risk) and the Experience lead (looks and feel), under Jarmo's 8 November 2026 delegation; recorded in ritemark-dev `decisions/log.md` (bfcdf0b). The Experience lead's nine answers (ritemark-dev 7cb2f5e, experience 35, "With no AI ready") amend the plan and are merged in below. Release approval stays Jarmo's.<br>
 **Release:** [v2.2.0](../release-plan.md), 2.2's new release candidate (the Experience lead placed it there on 8 November, on Jarmo's word "las experience lead otsustab", ritemark-dev d7c6fa1).<br>
 **Plan and answers:** [#690](https://github.com/ProductoryHQ/ritemark-native/issues/690).<br>
