@@ -131,7 +131,7 @@ test('start --user-data-dir refuses anything but a test profile, and makes no fo
 });
 
 // Second security review of #681 (findings 3 and 5): the profile guard's gaps.
-function startWith(args, envOver = {}) {
+function startWith(args, envOver = {}, { keep = false } = {}) {
   const env = {
     PATH: process.env.PATH,
     HOME: process.env.HOME,
@@ -141,8 +141,8 @@ function startWith(args, envOver = {}) {
   };
   const r = spawnSync('bash', [SCRIPT, 'start', '--name', 'dli-test', '--dry-run', ...args], { env, encoding: 'utf8' });
   const runDir = /^RUN_DIR=(.+)$/m.exec(r.stdout)?.[1];
-  if (runDir && runDir.includes('rm-dli-test.')) fs.rmSync(runDir, { recursive: true, force: true });
-  return { status: r.status, out: `${r.stdout}${r.stderr}`, stdout: r.stdout };
+  if (!keep && runDir && runDir.includes('rm-dli-test.')) fs.rmSync(runDir, { recursive: true, force: true });
+  return { status: r.status, out: `${r.stdout}${r.stderr}`, stdout: r.stdout, runDir };
 }
 
 test('start refuses VSCODE_PORTABLE and VSCODE_APPDATA, in its environment and in --env', { skip }, () => {
@@ -182,12 +182,10 @@ test('start refuses --user-data-dir and --shared-data-dir among the extra argume
 test('start gives each run its own --shared-data-dir, a new empty folder in the run folder, exactly once', { skip }, (t) => {
   // 8 Nov: a shared ~/.ritemark-dev-shared carried Open Recent between runs, so a fresh profile's Projects list
   // filled with the person's real folders (src/projects/firstFill.ts) and the window read their files.
-  const env = { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: os.tmpdir(), RITEMARK_LAUNCH_ANY_BUILD: '1' };
-  const r = spawnSync('bash', [SCRIPT, 'start', '--name', 'dli-test', '--dry-run'], { env, encoding: 'utf8' });
-  const out = `${r.stdout}${r.stderr}`;
-  if (/no dev build/.test(out)) { t.skip('no dev build in this checkout'); return; }
-  const runDir = /^RUN_DIR=(.+)$/m.exec(r.stdout)?.[1];
+  const r = startWith([], {}, { keep: true });
+  const { out, runDir } = r;
   try {
+    if (/no dev build/.test(out)) { t.skip('no dev build in this checkout'); return; }
     assert.equal(r.status, 0, out);
     assert.ok(runDir && runDir.includes('rm-dli-test.'), out);
     const line = r.stdout.split('\n').find((l) => l.startsWith('DRY_RUN ')) ?? '';

@@ -140,7 +140,7 @@ REPO_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
 # Pick a fresh user-data-dir for each automation run so prior consent dialogs,
 # auto-share state, and feature-flag toggles don't leak between runs.
 USERDATA="/tmp/ritemark-automation-userdata"
-SHAREDDATA="/tmp/ritemark-automation-shared"
+SHAREDDATA="$(mktemp -d /tmp/ritemark-automation-shared.XXXX)"   # new and empty each run: a reused one fills the Projects list
 WORKSPACE="/tmp/ritemark-automation-workspace"
 SCREENSHOT_DIR="/tmp/ritemark-screenshots/$(date +%Y-%m-%dT%H-%M-%S)"
 mkdir -p "$WORKSPACE" "$SCREENSHOT_DIR"
