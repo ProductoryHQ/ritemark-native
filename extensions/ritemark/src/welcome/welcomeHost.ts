@@ -40,6 +40,7 @@ import {
   usageDataState,
 } from '../analytics/posthog';
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL, readOneXAnswer, type RecordedAnswer } from '../analytics/consent';
+import type { WelcomeSkipHow } from '../analytics/events';
 import {
   WELCOME_FINISHED_KEY,
   WELCOME_KIND_KEY,
@@ -58,6 +59,7 @@ import {
   PROVIDER_ORDER,
   afterProviderReady,
   afterSkip,
+  aiFoundReady,
   initialMemory,
   providerView,
   runtimeOfProvider,
@@ -211,6 +213,11 @@ class WelcomeController implements vscode.Disposable {
     'openrouter-api-key': false,
   };
   private shownCounted = false;
+  /**
+   * Sprint 156 (PR B): a skip of the AI step waiting to be counted until every AI's check has answered (each does
+   * within 20 s), so `welcome_ai_skipped.ai_ready` is the welcome's own answer, not a check still running.
+   */
+  private skipToCount: WelcomeSkipHow | null = null;
   /** The sheet is alone on the ground with both columns closed (R1); false for Help ▸ Welcome in a project window. */
   private alone = false;
   /** Set while the welcome itself replaces or closes its panel, so that is not read as the person closing it. */
@@ -322,6 +329,7 @@ class WelcomeController implements vscode.Disposable {
     // A fresh welcome the person never finished opens on its project step, where the form is, as Skip for now
     // would take it: they asked to start a project, not to pick an AI (S25)
     if (this.kind === 'fresh' && this.step === 1) {
+      this.countSkip('new_project');
       this.step = afterSkip({ kind: this.kind, step: this.step, readyProvider: this.readyProvider }).step;
       void this.refreshMissingTool();
     }
@@ -403,7 +411,8 @@ class WelcomeController implements vscode.Disposable {
     const wasAlone = this.alone;
     this.alone = false;
     void vscode.commands.executeCommand('setContext', WELCOME_ALONE_CONTEXT_KEY, false);
-    // Leaving the welcome without a yes is a no for its held events (R8).
+    // Leaving the welcome without a yes is a no for its held events (R8), and for a skip not counted yet.
+    this.skipToCount = null;
     dropHeldWelcomeEvents();
     if (wasAlone && !this.closingQuietly && !this.opening) {
       // Closed by the person, or stepped aside for a document: the columns come back, the AI's sheet with its own sign-ins.
@@ -505,6 +514,7 @@ class WelcomeController implements vscode.Disposable {
     for (const id of PROVIDER_ORDER) {
       if (!this.memories[id].signingIn) this.memories[id].check = { kind: 'offline' };
     }
+    this.countPendingSkip();
     this.push();
   }
 
@@ -516,6 +526,7 @@ class WelcomeController implements vscode.Disposable {
   private check(id: WelcomeProviderId): void {
     if (this.offline) {
       this.memories[id].check = { kind: 'offline' };
+      this.countPendingSkip();
       this.push();
       return;
     }
@@ -526,6 +537,7 @@ class WelcomeController implements vscode.Disposable {
     const timer = setTimeout(() => {
       if (this.checkTokens[id] === token && memory.check.kind === 'pending') {
         memory.check = { kind: 'timed-out' };
+        this.countPendingSkip();
         this.push();
       }
     }, CHECK_TIMEOUT_MS);
@@ -548,6 +560,7 @@ class WelcomeController implements vscode.Disposable {
       const method = availability.state === 'ready' ? await this.methodOf(id) : null;
       const signInEnded = availability.state === 'needs-auth' && id === 'chatgpt' && codexSignInWasThere();
       memory.check = { kind: 'answered', availability, method, signInEnded };
+      this.countPendingSkip();
       // Ready after a sign-in or a key saved from the welcome: step 2 (R3). A key for a provider that was
       // already ready (Claude signed in, then an Anthropic key) also goes on, as the key's method.
       if (availability.state === 'ready' && (memory.signingIn || memory.keySaved)) {
@@ -578,6 +591,26 @@ class WelcomeController implements vscode.Disposable {
     this.readyProvider = next.readyProvider;
     if (this.step === 2) void this.refreshMissingTool();
     this.push();
+  }
+
+  /**
+   * Sprint 156 (PR B): the AI step skipped, by Skip for now (`button`) or by Start a new project while on it
+   * (`new_project`, S25). `welcome_ai_skipped` is held like the welcome's other events: sent at the yes, dropped at a
+   * no or when the welcome closes.
+   */
+  private countSkip(how: WelcomeSkipHow): void {
+    this.countPendingSkip(true);
+    this.skipToCount = how;
+    this.countPendingSkip();
+  }
+
+  /** Sends the skip waiting to be counted once no AI's check is still running, or at once with `now`. */
+  private countPendingSkip(now = false): void {
+    const how = this.skipToCount;
+    if (!how) return;
+    if (!now && PROVIDER_ORDER.some((id) => this.memories[id].check.kind === 'pending')) return;
+    this.skipToCount = null;
+    void trackWelcomeEvent('welcome_ai_skipped', { how, ai_ready: aiFoundReady(PROVIDER_ORDER.map((id) => this.memories[id])) });
   }
 
   // ── Requests from the page ────────────────────────────────────────────────
@@ -628,6 +661,8 @@ class WelcomeController implements vscode.Disposable {
       case 'welcome/save-keys':
         return this.saveKeys(request.target, request.keys);
       case 'welcome/skip': {
+        // Sprint 156 (PR B): the fresh welcome's step 1 → step 2 with no AI, once per skip
+        if (this.kind === 'fresh' && this.step === 1) this.countSkip('button');
         const next = afterSkip({ kind: this.kind, step: this.step, readyProvider: this.readyProvider });
         this.step = next.step;
         this.readyProvider = next.readyProvider;
@@ -980,6 +1015,8 @@ class WelcomeController implements vscode.Disposable {
   }
 
   private async finish(): Promise<void> {
+    // A skip still waiting for a check is counted with what the welcome knows now, so it goes with the answer below
+    this.countPendingSkip(true);
     // Leaving for a project with the switch on answers yes: the session start and the held welcome events go now,
     // before the window reloads (a slow network waits 3 s at most)
     if (usageAnswerOnLeave(this.kind, usageDataState().answer, this.pendingUsage) === 'yes') {

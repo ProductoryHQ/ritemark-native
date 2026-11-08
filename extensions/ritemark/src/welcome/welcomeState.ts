@@ -121,6 +121,14 @@ export function afterSkip(state: StepInput): StepInput {
 }
 
 /**
+ * Sprint 156 (PR B): whether the welcome had found an AI ready, by its own checks, as its cards show it
+ * (`welcome_ai_skipped.ai_ready`). A check still running, timed out or offline is not ready.
+ */
+export function aiFoundReady(memories: readonly ProviderMemory[]): boolean {
+  return memories.some((memory) => memory.check.kind === 'answered' && memory.check.availability.state === 'ready');
+}
+
+/**
  * A Sign in the page sent that the host has not answered yet (R15, #401): on a busy first start the host can take
  * seconds, so the card shows Checking… at once instead of a button that seems to do nothing. The host's next word
  * about that AI (any change to its card) ends the page's guess.

@@ -20,7 +20,10 @@ export type EventName =
   | 'feedback_opened'
   | 'first_reply'
   | 'voice_captured'
-  | 'voice_note_edited';
+  | 'voice_note_edited'
+  | 'welcome_ai_skipped'
+  | 'ai_signin_started'
+  | 'ai_signin_finished';
 
 /**
  * Sprint 139 (R8): how a turn ended, from the one classifier's kinds. No text,
@@ -43,6 +46,17 @@ export type VoiceSource = 'dictation' | 'transcribe';
 
 /** The welcome's providers, by the names people know (ChatGPT, never Codex). */
 export type WelcomeProvider = 'claude' | 'chatgpt' | 'opencode';
+
+/**
+ * Sprint 156 (PR B; experience 35, "With no AI ready"): where on Home a sign-in started: the card's main part, or its
+ * Ask with menu. A list as well as a type, so Home's protocol can check what the page sends.
+ */
+export const SIGN_IN_FROM = ['home_card', 'home_menu'] as const;
+export type SignInFrom = (typeof SIGN_IN_FROM)[number];
+
+/** Sprint 156 (PR B): how the welcome's AI step was skipped: Skip for now, or Start a new project while on it (S25). */
+export const WELCOME_SKIP_HOW = ['button', 'new_project'] as const;
+export type WelcomeSkipHow = (typeof WELCOME_SKIP_HOW)[number];
 
 /**
  * Sprint 133 (R8): the welcome's four events. They carry no path, folder or
@@ -126,7 +140,37 @@ export interface EventPayloads {
     /** Sprint 140 (D11): which question the message answers; only the first-week card's send carries it. */
     asked?: 'made_this_week';
   };
+  /**
+   * Sprint 156 (PR B; experience 35, "With no AI ready"): the no-AI card's three counts. Each field is a fixed choice
+   * or a yes/no: no words, name, path, model, address or error. The skip comes before the person has answered usage
+   * data, so it is held like the welcome's other events (`HeldEventName`); `ai_ready` says whether the welcome had
+   * found an AI ready. The two sign-in counts are Home's, sent only after a yes: started when Claude's login starts,
+   * ChatGPT's page is asked to open or OpenCode's keys are saved; finished once, when that sign-in leaves its AI ready.
+   * A failure, a timeout or a cancel sends nothing, so failures are started minus finished.
+   */
+  welcome_ai_skipped: {
+    how: WelcomeSkipHow;
+    ai_ready: boolean;
+  };
+  ai_signin_started: {
+    provider: WelcomeProvider;
+    from: SignInFrom;
+  };
+  ai_signin_finished: {
+    provider: WelcomeProvider;
+    from: SignInFrom;
+  };
 }
+
+/** The fields of `T` that could carry free text (a plain string or number); `never` when there are none. */
+type OpenFields<T> = { [K in keyof T]-?: string extends T[K] ? K : number extends T[K] ? K : never }[keyof T];
+type Closed<T extends true> = T;
+/** Sprint 156 (PR B): fails to compile if one of the no-AI card's counts gains a field that could carry free text. */
+export type SignInCountsAreClosed = Closed<
+  [OpenFields<EventPayloads['welcome_ai_skipped']>, OpenFields<EventPayloads['ai_signin_started']>, OpenFields<EventPayloads['ai_signin_finished']>] extends [never, never, never]
+    ? true
+    : false
+>;
 
 /**
  * Type-safe event helper — ensures payload matches event name.

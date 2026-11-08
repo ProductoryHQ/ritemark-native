@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { HomeAi, HomeAiId, HomeGuidance } from '../../../../src/projects/protocol'
+import type { HomeAi, HomeAiId, HomeGuidance, HomeRequest } from '../../../../src/projects/protocol'
 import type { WelcomeProviderId } from '../../../../src/welcome/protocol'
 import { Button } from '../ui/button'
 import { DropdownMenuItem } from '../ui/dropdown-menu'
@@ -27,6 +27,8 @@ import { send } from './homeClient'
 
 type ReadyRequest = Extract<HomeGuidance, { card: 'ready-request' }>
 type FeedbackCardState = Extract<HomeGuidance, { card: 'feedback' }>
+/** Sprint 156 (PR B): where OpenCode's key sheet was opened, the card's main part or Ask with; its save says so. */
+type KeySheetFrom = Extract<HomeRequest, { type: 'home/save-keys' }>['from']
 
 /** Experience 19's AI icons: Claude's C, ChatGPT's logo, OpenCode's cube. */
 function AiMark({ id }: { id: HomeAiId }) {
@@ -73,7 +75,7 @@ export function pressMain(card: ReadyRequest, page: { openKeySheet(): void; star
 
 export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: ReadyRequest; keysResult: { ok: boolean; message: string | null } | null; onKeysClosed: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const [keySheet, setKeySheet] = useState(false)
+  const [keySheet, setKeySheet] = useState<KeySheetFrom | null>(null)
   // Ask with opens under the whole split button, its left edge on the main button's (experience 35, frame 1)
   // The sample's hand-over takes some seconds before the board shows it in Doing: the whole button waits, caret too,
   // and is not pressed twice. The other two kinds never wait: a second press opens the chat the first one started
@@ -103,7 +105,7 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
   }
   const choose = (ai: HomeAi) => {
     if (ai.state === 'ready') send({ type: 'home/ready-request-ai', ai: ai.id })
-    else if (ai.id === 'opencode' && ai.state === 'set-up') setKeySheet(true)
+    else if (ai.id === 'opencode' && ai.state === 'set-up') setKeySheet('home_menu')
     else if (ai.state === 'sign-in' || ai.state === 'set-up') send({ type: 'home/sign-in', ai: ai.id })
   }
   return (
@@ -130,7 +132,7 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
             // alone (experience 3, b7fef7b; #566)
             tooltip: mainTip(card),
             className: 'rh-split-main',
-            onClick: () => pressMain(card, { openKeySheet: () => setKeySheet(true), startPressing: () => setPressing(true) }),
+            onClick: () => pressMain(card, { openKeySheet: () => setKeySheet('home_card'), startPressing: () => setPressing(true) }),
           }}
           menu={{
             label: 'Ask with',
@@ -187,10 +189,10 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
         keysSet={card.keysSet}
         result={keysResult}
         onClose={() => {
-          setKeySheet(false)
+          setKeySheet(null)
           onKeysClosed()
         }}
-        onSave={(_target, keys) => send({ type: 'home/save-keys', keys })}
+        onSave={(_target, keys) => send({ type: 'home/save-keys', keys, from: keySheet ?? 'home_menu' })}
       />
     </section>
   )

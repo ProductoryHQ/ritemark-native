@@ -10,6 +10,7 @@ import { decodeWelcomeRequest } from './protocol';
 import {
   afterProviderReady,
   afterSkip,
+  aiFoundReady,
   initialMemory,
   projectLine,
   providerOfRuntime,
@@ -79,6 +80,11 @@ assert.equal(signInAnswered([signedOut[0], providerView('claude', { ...answered(
 assert.deepEqual(afterProviderReady({ kind: 'fresh', step: 1, readyProvider: null }, 'claude'), { kind: 'fresh', step: 2, readyProvider: 'claude' }, 'S8');
 assert.deepEqual(afterProviderReady({ kind: 'update', step: 1, readyProvider: null }, 'chatgpt'), { kind: 'update', step: 1, readyProvider: 'chatgpt' });
 assert.deepEqual(afterSkip({ kind: 'fresh', step: 1, readyProvider: null }), { kind: 'fresh', step: 2, readyProvider: null }, 'S6');
+// Sprint 156 (PR B): `welcome_ai_skipped.ai_ready` is what the welcome's own checks found, as its cards show it
+assert.equal(aiFoundReady([answered('needs-auth'), answered('needs-configuration'), initialMemory()]), false, 'no AI ready');
+assert.equal(aiFoundReady([answered('needs-auth'), answered('ready')]), true, 'one AI ready');
+assert.equal(aiFoundReady([initialMemory(), { ...initialMemory(), check: { kind: 'timed-out' } }, { ...initialMemory(), check: { kind: 'offline' } }]), false, 'a check running, timed out or offline is not ready');
+assert.equal(aiFoundReady([answered('auth-in-progress'), answered('checking'), answered('broken')]), false);
 assert.equal(projectLine('claude'), 'A project is a folder on this computer. Claude works only inside it.');
 assert.equal(projectLine(null), 'A project is a folder on this computer. Your AI works only inside it.', 'S6: no AI named');
 

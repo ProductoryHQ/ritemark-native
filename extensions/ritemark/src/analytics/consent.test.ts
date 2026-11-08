@@ -8,7 +8,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { ConsentGate, buildChannel, readOneXAnswer, usageAnswer, type CaptureClient, type ConsentDeps } from './consent';
+import { ConsentGate, HELD_EVENT_NAMES, buildChannel, readOneXAnswer, usageAnswer, type CaptureClient, type ConsentDeps } from './consent';
 
 interface Sent { event: string; properties: Record<string, unknown>; distinctId: string }
 
@@ -277,6 +277,70 @@ async function main(): Promise<void> {
     const off = harness({ setting: false });
     assert.equal(await off.gate.sendFeedback([{ name: 'feedback_sent', properties: { message: 'Nice' } }]), true);
     assert.ok(off.sent.every((s) => s.properties.$geoip_disable === true));
+  }
+
+  // ── Sprint 156 (PR B): the welcome's AI skip is held like its other events; Home's sign-in counts never are ──
+  {
+    assert.deepEqual([...HELD_EVENT_NAMES], ['welcome_shown', 'ai_signed_in', 'welcome_ai_skipped'], 'the held events: the welcome\'s three');
+    // No answer yet: held in memory, nothing sent, no client
+    const h = harness();
+    await h.gate.refresh();
+    assert.equal(await h.gate.trackWelcome('welcome_ai_skipped', { how: 'button', ai_ready: false }), 'held');
+    assert.equal(h.gate.heldCount(), 1);
+    assert.equal(h.sent.length, 0, 'nothing leaves before the answer');
+    assert.equal(h.clientsCreated, 0);
+    // Yes: sent once, with its two fields and nothing else of its own
+    h.state.setting = true;
+    await h.gate.refresh();
+    assert.deepEqual(h.sent.map((s) => s.event), ['app_session_start', 'welcome_ai_skipped']);
+    const { how, ai_ready, ...rest } = h.sent[1].properties;
+    assert.deepEqual({ how, ai_ready }, { how: 'button', ai_ready: false });
+    assert.deepEqual(Object.keys(rest).sort(), ['$geoip_disable', '$process_person_profile', 'app_version', 'build_channel', 'product_area'], 'only the shared properties beside it');
+    await h.gate.refresh();
+    assert.equal(h.sent.length, 2, 'once');
+
+    // No: dropped, and it never comes back
+    const no = harness();
+    await no.gate.refresh();
+    await no.gate.trackWelcome('welcome_ai_skipped', { how: 'new_project', ai_ready: true });
+    no.state.setting = false;
+    await no.gate.refresh();
+    assert.equal(no.gate.heldCount(), 0, 'a no drops the held skip');
+    assert.equal(await no.gate.trackWelcome('welcome_ai_skipped', { how: 'button', ai_ready: false }), 'dropped', 'and one after the no');
+    no.state.setting = true;
+    await no.gate.refresh();
+    assert.deepEqual(no.sent.map((s) => s.event), ['app_session_start'], 'a dropped skip is never sent later');
+
+    // The welcome closed without a yes: dropped with the rest
+    const closed = harness();
+    await closed.gate.trackWelcome('welcome_ai_skipped', { how: 'button', ai_ready: true });
+    closed.gate.dropHeld();
+    closed.state.setting = true;
+    await closed.gate.refresh();
+    assert.deepEqual(closed.sent.map((s) => s.event), ['app_session_start']);
+
+    // Home's sign-in counts are not the welcome's: never held, sent only after a yes
+    const home = harness();
+    await home.gate.refresh();
+    const notHeld = (name: string) => home.gate.trackWelcome(name as 'welcome_shown', { provider: 'chatgpt', from: 'home_card' } as never);
+    assert.equal(await notHeld('ai_signin_started'), 'dropped', 'the gate holds only the welcome\'s events');
+    assert.equal(await notHeld('ai_signin_finished'), 'dropped');
+    assert.equal(home.gate.heldCount(), 0);
+    assert.equal(await home.gate.track('ai_signin_started', { provider: 'chatgpt', from: 'home_card' }), false, 'before a yes, nothing');
+    assert.equal(home.sent.length, 0);
+    home.state.setting = true;
+    await home.gate.refresh();
+    assert.deepEqual(home.sent.map((s) => s.event), ['app_session_start'], 'nothing was waiting');
+    assert.equal(await home.gate.track('ai_signin_started', { provider: 'chatgpt', from: 'home_card' }), true);
+    assert.equal(await home.gate.track('ai_signin_finished', { provider: 'chatgpt', from: 'home_card' }), true);
+    assert.deepEqual(home.sent.slice(1).map((s) => [s.event, s.properties.provider, s.properties.from]), [
+      ['ai_signin_started', 'chatgpt', 'home_card'],
+      ['ai_signin_finished', 'chatgpt', 'home_card'],
+    ]);
+    // The kill switch stops the held skip too
+    const killed = harness({ allowed: false });
+    assert.equal(await killed.gate.trackWelcome('welcome_ai_skipped', { how: 'button', ai_ready: false }), 'dropped');
+    assert.equal(killed.gate.heldCount(), 0);
   }
 
   assert.equal(buildChannel('2.0.0-0', false), 'prod', 'the bundled, floored version');
