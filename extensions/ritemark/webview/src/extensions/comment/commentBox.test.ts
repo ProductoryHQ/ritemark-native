@@ -57,11 +57,15 @@ function fakeEditor(doc: PMNode, select: (doc: PMNode) => Selection, openBox: Op
   let state = EditorState.create({ schema, doc, selection: select(doc), plugins: [history()] })
   const transactions: Transaction[] = []
   const woken = { count: 0 }
+  const toolbarHidden = { count: 0 }
   const storage: CommentNodeStorage = {
     openBox,
     openRequest: null,
     notifyRail: () => {
       woken.count++
+    },
+    hideToolbar: () => {
+      toolbarHidden.count++
     },
   }
   const editor = {
@@ -81,6 +85,7 @@ function fakeEditor(doc: PMNode, select: (doc: PMNode) => Selection, openBox: Op
     transactions,
     storage,
     woken,
+    toolbarHidden,
     state: () => state,
     undo: () =>
       undo(state, (tr) => {
@@ -648,6 +653,45 @@ const select = (needleFrom: string, needleTo: string) => (doc: PMNode) =>
     [null, `c:${SAVED}`, true],
     'a latched request opens the saved comment, with no box',
   )
+}
+
+// ── Opening a saved comment latched hides the formatting toolbar, once ──────
+// The selection and the editor's focus stay, so nothing else would hide it. A
+// new box's own focus and edit already hide it, so that path doesn't call it.
+{
+  const latched = fakeEditor(savedDoc(), select('words', ' tail'), null)
+  startComment(latched.editor)
+  assert.equal(latched.storage.openRequest?.as, 'latched')
+  assert.equal(latched.toolbarHidden.count, 1, 'a saved comment opened latched hides the toolbar exactly once')
+
+  const doc = schema.node('doc', null, [
+    para(schema.text('Start '), commented('saved words', { id: SAVED, note: 'Check the figures' }), schema.text(' tail end.')),
+    para(schema.text('An '), commented('empty one', { id: OLD, note: '' })),
+  ])
+  const clean = openBox({ key: `c:${OLD}`, commentId: OLD, kind: 'new', anchor: 'mark', dirty: false })
+  const replaced = fakeEditor(doc, select('words', ' tail'), clean.box)
+  startComment(replaced.editor)
+  assert.equal(replaced.transactions.length, 1)
+  assert.equal(replaced.toolbarHidden.count, 1, 'also when a clean box closes in the same step')
+
+  const fresh = fakeEditor(anchoredDoc(), selectPhrase, null)
+  startComment(fresh.editor)
+  assert.equal(fresh.transactions.length, 1, 'a new comment is made as before')
+  boxRequestId(fresh.storage)
+  assert.equal(fresh.toolbarHidden.count, 0, 'a new box leaves the toolbar to its own rules')
+
+  const note = fakeEditor(noteDoc(), cursorBeforeText, null)
+  startComment(note.editor)
+  assert.equal(note.toolbarHidden.count, 0, 'so does a margin note')
+
+  const dirty = openBox({ key: `c:${OLD}`, commentId: OLD, kind: 'new', anchor: 'mark', dirty: true })
+  const forward = fakeEditor(savedDoc(), select('words', ' tail'), dirty.box)
+  startComment(forward.editor)
+  assert.equal(forward.toolbarHidden.count, 0, 'a dirty box coming forward opens nothing, so nothing here')
+
+  const lift = fakeEditor(liftDoc('///'), cursorAtLineEnd('///'), null)
+  liftCommentLine(lift.editor)
+  assert.equal(lift.toolbarHidden.count, 0, 'nor the `///` lift')
 }
 
 // ── The least scroll shows the box and the line it is about (experience 11) ──

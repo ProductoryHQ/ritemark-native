@@ -11,7 +11,8 @@ import {
   requestWorkspaceFileSearch,
   type WorkspaceFileLinkResult,
 } from '../lib/workspaceFileSearch'
-import { startComment } from '../extensions/comment/CommentNode'
+import { commentBoxStorage, startComment } from '../extensions/comment/CommentNode'
+import type { Selection } from '@tiptap/pm/state'
 import { isEquationNodeSelection } from '../extensions/math/mathNodes'
 import type { Instance as TippyInstance } from 'tippy.js'
 import { formattingToolbarShows, toolbarHidesAfterClick } from './formattingToolbar'
@@ -56,6 +57,29 @@ export function FormattingBubbleMenu({
   const linkInputRef = useRef<HTMLInputElement>(null)
   // The toolbar's tippy instance, for the re-check after a click (#687).
   const toolbarTippy = useRef<TippyInstance | null>(null)
+  // The selection the toolbar was hidden for when the comment door opened a
+  // saved comment latched (#687). It stays hidden until the selection changes
+  // or the editor gets the focus again.
+  const hiddenFor = useRef<Selection | null>(null)
+
+  useEffect(() => {
+    if (!editor) return
+    const storage = commentBoxStorage(editor)
+    if (!storage) return
+    const hide = () => {
+      hiddenFor.current = editor.state.selection
+      toolbarTippy.current?.hide()
+    }
+    const release = () => {
+      hiddenFor.current = null
+    }
+    storage.hideToolbar = hide
+    editor.on('focus', release)
+    return () => {
+      if (storage.hideToolbar === hide) storage.hideToolbar = null
+      editor.off('focus', release)
+    }
+  }, [editor])
   // The address of the link the person clicked (#502): the edit applies to that
   // link's whole range, even from a click at its edge.
   const clickedHrefRef = useRef<string | undefined>(undefined)
@@ -274,8 +298,14 @@ export function FormattingBubbleMenu({
             toolbarTippy.current = instance
           },
         }}
-        shouldShow={({ editor, state, view, element }) =>
-          formattingToolbarShows({
+        shouldShow={({ editor, state, view, element }) => {
+          // #687: hidden for a comment the door opened latched, until the
+          // selection changes (or the editor's focus comes back, see above).
+          if (hiddenFor.current) {
+            if (state.selection.eq(hiddenFor.current)) return false
+            hiddenFor.current = null
+          }
+          return formattingToolbarShows({
             empty: state.selection.empty,
             inCodeBlock: editor.isActive('codeBlock'),
             // Sprint 138 (experience 38): a selected equation shows its focus ring
@@ -285,7 +315,7 @@ export function FormattingBubbleMenu({
             editorHasFocus: view.hasFocus(),
             focusInToolbar: element.contains(element.ownerDocument.activeElement),
           })
-        }
+        }}
       >
         {/* The toolbar is an always-white floating pill, so its interactive
             surface token must stay light too — otherwise the theme-aware

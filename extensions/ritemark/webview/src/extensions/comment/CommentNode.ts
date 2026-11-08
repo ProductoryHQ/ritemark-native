@@ -85,6 +85,13 @@ export interface CommentNodeStorage {
    * so would not start a rescan by itself.
    */
   notifyRail: (() => void) | null
+  /**
+   * Set by the formatting toolbar: hide it, until the next selection change or
+   * editor focus. The door calls it when it opens a saved comment latched: the
+   * selection and the editor's focus stay, so the toolbar would otherwise stay
+   * up and cover the bubble.
+   */
+  hideToolbar: (() => void) | null
 }
 
 /** A comment for the rail to open (#687), by its marker key. */
@@ -281,6 +288,11 @@ function finishStart(
   if (storage && request) storage.openRequest = request
   if (tr.docChanged) editor.view.dispatch(tr)
   if (box) box.close()
+  // A saved comment opens latched while the selection and the editor's focus
+  // stay, so the formatting toolbar would stay up over its bubble: hide it
+  // (after the dispatch, so the hide holds for the selection as it now is).
+  // A new box needs nothing: its focus and its edit already hide the toolbar.
+  if (request?.as === 'latched') storage?.hideToolbar?.()
   if (request) storage?.notifyRail?.()
 }
 
@@ -511,7 +523,7 @@ export const CommentNode = Node.create<Record<string, never>, CommentNodeStorage
   selectable: true,
 
   addStorage() {
-    return { openBox: null, openRequest: null, notifyRail: null }
+    return { openBox: null, openRequest: null, notifyRail: null, hideToolbar: null }
   },
 
   addAttributes() {
