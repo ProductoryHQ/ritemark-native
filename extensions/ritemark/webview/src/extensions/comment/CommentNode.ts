@@ -458,14 +458,25 @@ function nearestDelta(view: ScreenSpan, target: ScreenSpan): number {
  * words just out of view.
  *
  * When the box and the line fit in the view together, it scrolls as
- * `block: 'nearest'` would on both; when they don't, the box wins. Nothing
- * scrolls when both are in view already. Returns the change to the scroll
- * container's `scrollTop`.
+ * `block: 'nearest'` would on both, keeping `room` (one text line) above the
+ * line so the line before it shows as context instead of sitting flush under
+ * the document's head. When space is short, the room goes first, then the
+ * line: the box always wins. Nothing scrolls when the box and the line are in
+ * view already. Returns the change to the scroll container's `scrollTop`.
  */
-export function leastScrollDelta(view: ScreenSpan, box: ScreenSpan, line: ScreenSpan | null): number {
-  const both = line ? { top: Math.min(box.top, line.top), bottom: Math.max(box.bottom, line.bottom) } : box
-  const fits = both.bottom - both.top <= view.bottom - view.top
-  return nearestDelta(view, fits ? both : box)
+export function leastScrollDelta(view: ScreenSpan, box: ScreenSpan, line: ScreenSpan | null, room = 0): number {
+  if (!line) return nearestDelta(view, box)
+  const inView = (span: ScreenSpan) => span.top >= view.top && span.bottom <= view.bottom
+  if (inView(box) && inView(line)) return 0
+  const height = view.bottom - view.top
+  const withLine = (lineTop: number): ScreenSpan => ({
+    top: Math.min(box.top, lineTop),
+    bottom: Math.max(box.bottom, line.bottom),
+  })
+  for (const target of [withLine(line.top - room), withLine(line.top)]) {
+    if (target.bottom - target.top <= height) return nearestDelta(view, target)
+  }
+  return nearestDelta(view, box)
 }
 
 /**

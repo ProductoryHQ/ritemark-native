@@ -276,7 +276,12 @@ function revealBoxAndLine(container: HTMLElement | null, box: HTMLElement | null
   const rect = container.getBoundingClientRect()
   const top = rect.top + container.clientTop
   const b = box.getBoundingClientRect()
-  const delta = leastScrollDelta({ top, bottom: top + container.clientHeight }, { top: b.top, bottom: b.bottom }, line)
+  // One text line of room above the line (the Experience lead, experience 11):
+  // the line before it shows as context, not flush under the document's head.
+  const text = container.querySelector('.ProseMirror p') ?? container.querySelector('.ProseMirror')
+  const lineHeight = text ? parseFloat(getComputedStyle(text).lineHeight) : NaN
+  const room = Number.isFinite(lineHeight) ? lineHeight : 0
+  const delta = leastScrollDelta({ top, bottom: top + container.clientHeight }, { top: b.top, bottom: b.bottom }, line, room)
   if (delta) container.scrollTop += delta
 }
 

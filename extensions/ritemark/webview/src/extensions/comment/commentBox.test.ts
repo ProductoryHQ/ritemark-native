@@ -735,6 +735,29 @@ const select = (needleFrom: string, needleTo: string) => (doc: PMNode) =>
     0,
     'a box that already spans the whole view does not move',
   )
+
+  // One text line of room above the line (the Experience lead, experience 11).
+  const room = 31
+  assert.equal(
+    leastScrollDelta(view, { top: 40, bottom: 160 }, { top: -30, bottom: -10 }, room),
+    -61,
+    'the line above the view: scroll up until a line of room shows above it',
+  )
+  assert.equal(
+    leastScrollDelta(view, { top: 300, bottom: 420 }, { top: 0, bottom: 20 }, room),
+    0,
+    'the line already in view, flush at the top: nothing changes',
+  )
+  assert.equal(
+    leastScrollDelta(view, { top: 30, bottom: 605 }, { top: 10, bottom: 28 }, room),
+    5,
+    'space is short: the room goes first and the line stays',
+  )
+  assert.equal(
+    leastScrollDelta(view, { top: 40, bottom: 610 }, { top: -100, bottom: -80 }, room),
+    10,
+    'shorter still: the line goes too, and the box wins',
+  )
 }
 
 console.log('commentBox.test.ts — all assertions passed')
