@@ -709,7 +709,80 @@ async function run() {
     console.log('✓ Test 19: stderr is read by whole lines, every line');
   }
 
-  console.log('\nAll 19 CodexRuntime tests passed!');
+  // ── Test 20 (Sprint 156, #694): a sign-in's poll listener survives a later startLoginPolling ──
+  // The AI sheet's `login-started` listener restarts the poll with its own callback. That used to drop the first
+  // caller's (the welcome's and Home's ChatGPT sign-in): Home never settled, and the welcome's timeout never came.
+  {
+    const { mock } = await import('node:test');
+    mock.timers.enable({ apis: ['setInterval'] });
+    try {
+      const rt = new CodexRuntime();
+      let ready = false;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (rt as any).getCodexSidebarStatus = async () => ({ state: ready ? 'ready' : rt.isLoginInProgress() ? 'auth-in-progress' : 'needs-auth' });
+      const flush = async () => { for (let i = 0; i < 6; i++) await new Promise((resolve) => setImmediate(resolve)); };
+      const tick = async () => { mock.timers.tick(2000); await flush(); };
+
+      const first: string[] = [];
+      const sheet: string[] = [];
+      const caller: string[] = [];
+      const ends: string[] = [];
+      rt.setLoginInProgress(true);
+      rt.startLoginPolling((status) => first.push(status.state));
+      rt.listenToLoginPoll((status) => caller.push(status.state), (end) => ends.push(end));
+      rt.startLoginPolling((status) => sheet.push(status.state)); // the sheet's restart
+      await tick();
+      assert.deepStrictEqual(first, [], 'the replaced callback hears nothing more, as before');
+      assert.deepStrictEqual(sheet, ['auth-in-progress'], "the sheet's own callback is unchanged");
+      assert.deepStrictEqual(caller, ['auth-in-progress'], 'the listener hears the restarted poll');
+      ready = true;
+      await tick();
+      assert.deepStrictEqual(caller, ['auth-in-progress', 'ready'], 'and the sign-in that finished');
+      assert.deepStrictEqual(ends, ['ready'], 'and how the poll ended');
+      await tick();
+      assert.deepStrictEqual(caller, ['auth-in-progress', 'ready'], 'the poll stopped at ready, and its listener with it');
+
+      // The give-up after 60 polls reaches a listener through a restart too (the welcome's timeout line)
+      ready = false;
+      const late: string[] = [];
+      const lateEnds: string[] = [];
+      rt.setLoginInProgress(true);
+      rt.startLoginPolling(() => {});
+      rt.listenToLoginPoll((status) => late.push(status.state), (end) => lateEnds.push(end));
+      rt.startLoginPolling(() => {});
+      for (let i = 0; i < 60; i++) await tick();
+      assert.strictEqual(late.length, 61, 'each poll, then the last status');
+      assert.strictEqual(late[late.length - 1], 'needs-auth', 'the give-up is heard');
+      assert.deepStrictEqual(lateEnds, ['gave-up'], 'as the give-up');
+
+      // Round 2 (N6, P2): a poll stopped, not restarted, tells its listeners how: a failed login, or a stop
+      const stopped: string[] = [];
+      rt.startLoginPolling(() => {});
+      rt.listenToLoginPoll(() => {}, (end) => stopped.push(end));
+      rt.stopLoginPolling('failed'); // loginComplete with success false
+      rt.startLoginPolling(() => {});
+      rt.listenToLoginPoll(() => {}, (end) => stopped.push(end));
+      rt.stopLoginPolling(); // Cancel, a sign-out
+      rt.stopLoginPolling('failed');
+      assert.deepStrictEqual(stopped, ['failed', 'stopped'], 'each listener hears its poll\'s end once');
+
+      // A stopped poll (Cancel, a finished login, a sign-out) drops its listeners
+      const gone: string[] = [];
+      rt.setLoginInProgress(true);
+      rt.startLoginPolling(() => {});
+      rt.listenToLoginPoll((status) => gone.push(status.state));
+      rt.stopLoginPolling();
+      rt.startLoginPolling(() => {});
+      await tick();
+      assert.deepStrictEqual(gone, [], 'a cancelled sign-in hears nothing more');
+      rt.stopLoginPolling();
+    } finally {
+      mock.timers.reset();
+    }
+    console.log('✓ Test 20: a sign-in\'s poll listener survives the sheet\'s restart, hears ready and the give-up');
+  }
+
+  console.log('\nAll 20 CodexRuntime tests passed!');
 }
 
 run().then(

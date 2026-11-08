@@ -66,8 +66,35 @@ export function readyKindOf(project: { empty: boolean; sample: boolean }): Ready
   return project.empty ? 'empty' : 'files';
 }
 
-/** The card's words (experience 35, frames 1, 3 and 4), the AI's name following Ask with. */
-export function readyRequestWords(kind: ReadyKind, ai: AiName, projectName: string, counts: string | null): ReadyRequestWords {
+/**
+ * Sprint 156 (experience 35, "With no AI ready"): which plans work, in the welcome's own words. The webview's
+ * `welcomeCopy.ts` holds the welcome's copy (`PLAN_LINES`); this is the host's, for Home's card, and a test keeps the
+ * two equal.
+ */
+export const PLAN_LINES: Record<'chatgpt' | 'claude' | 'opencode', string> = {
+  chatgpt: 'Any plan works, free included.',
+  claude: 'Needs a paid plan, such as Pro or Max.',
+  opencode: 'Open models, with an API key of your own.',
+};
+
+const PLAN_KEY: Record<AiName, keyof typeof PLAN_LINES> = { ChatGPT: 'chatgpt', Claude: 'claude', OpenCode: 'opencode' };
+
+/** Sprint 156: the main part with no AI ready, in the AI's sheet's own words ("Sign in with Claude", not Claude.ai). */
+export function signInWords(ai: AiName): string {
+  return ai === 'OpenCode' ? 'Set up OpenCode' : `Sign in with ${ai}`;
+}
+
+/**
+ * The card's words (experience 35, frames 1, 3 and 4), the AI's name following Ask with. Sprint 156: with no AI ready
+ * (`ready` false) only the button and the note change: the button signs in to that AI, and the note says which plans
+ * work. The heading and the body stay, and the body already names the AI.
+ */
+export function readyRequestWords(kind: ReadyKind, ai: AiName, projectName: string, counts: string | null, ready = true): ReadyRequestWords {
+  const words = requestWords(kind, ai, projectName, counts);
+  return ready ? words : { ...words, button: signInWords(ai), note: PLAN_LINES[PLAN_KEY[ai]] };
+}
+
+function requestWords(kind: ReadyKind, ai: AiName, projectName: string, counts: string | null): ReadyRequestWords {
   const hide = `Hide this in ${projectName}`;
   switch (kind) {
     case 'files':
@@ -96,7 +123,7 @@ export function readyRequestWords(kind: ReadyKind, ai: AiName, projectName: stri
       return {
         icon: 'check-square',
         heading: `${ai} can draft Module 4`,
-        body: `It reads the brief and the interviews with shift leaders, then writes Module 4 like Modules 1 to 3. It's the task on the board for ${ai}.`,
+        body: `It reads the brief and the interviews with shift leaders, then writes Module 4 like Modules 1 to 3. It’s the task on the board for ${ai}.`,
         button: `Ask ${ai} to draft Module 4`,
         note: 'Reads two documents, writes a new one.',
         hide,
@@ -150,17 +177,60 @@ export function readyGoneNow(input: { kind: ReadyKind; ownChats: number; request
 export type AiState = 'ready' | 'sign-in' | 'set-up' | 'checking' | 'signing-in';
 
 /**
+ * Sprint 156: whether ChatGPT or Claude should lead the card's sign-in here. Claude and ChatGPT, while each is turned
+ * on and can start (any state but Set up); ChatGPT not when its runtime is the computer's own
+ * (`ritemark.agentRuntime.preference` `system`), so the card leads with an AI Ritemark ships. That is the lead only:
+ * a ChatGPT sign-in pressed anyway (Ask with, or the last fallback below) runs the same login, which with the
+ * computer's own runtime signs in that install's Codex. OpenCode is set up with a key, never signed in to.
+ */
+export function canSignInHere(states: Partial<Record<AgentId, AiState>>, runtimePreference: 'bundled' | 'system'): Partial<Record<AgentId, boolean>> {
+  const can = (id: AgentId) => states[id] !== undefined && states[id] !== 'set-up';
+  return { 'claude-code': can('claude-code'), codex: can('codex') && runtimePreference !== 'system', opencode: false };
+}
+
+/**
+ * Sprint 156 (experience 35, "With no AI ready"): the AI the card signs in to when none is ready. ChatGPT, because any
+ * plan works. The AI last seen ready instead, when its sign-in has lapsed (no AI ready, and it waits for a sign-in);
+ * in practice only Claude, since OpenCode is set up, not signed in to. Claude when ChatGPT can't sign in here; Set up
+ * OpenCode when neither can and OpenCode is on; with OpenCode off too, ChatGPT. Its press runs ChatGPT's sign-in as
+ * Ask with's does: AI Settings when ChatGPT is off or can't start, else the login (the computer's own Codex's, with
+ * `agentRuntime.preference` `system`).
+ */
+export function leadAi(input: {
+  /** The AI last seen ready on this profile (`ritemark.guidance.lastReadyAi`). */
+  lastReady: AgentId | undefined;
+  states: Partial<Record<AgentId, AiState>>;
+  canSignIn: Partial<Record<AgentId, boolean>>;
+}): AgentId {
+  const { lastReady, states, canSignIn } = input;
+  const noneReady = AI_ORDER.every((id) => states[id] !== 'ready');
+  if (noneReady && lastReady && canSignIn[lastReady] && (states[lastReady] === 'sign-in' || states[lastReady] === 'signing-in')) return lastReady;
+  if (canSignIn.codex) return 'codex';
+  if (canSignIn['claude-code']) return 'claude-code';
+  // OpenCode only when it is on here (it has a state); else ChatGPT, whose press runs ChatGPT's sign-in as Ask with's
+  // does (AI Settings when ChatGPT is off or can't start; the computer's own Codex's login with `system`)
+  return states.opencode !== undefined ? 'opencode' : 'codex';
+}
+
+/**
  * The AI the card names (R4): the one chosen on the card when it is ready; else
  * the sheet's AI for new chats when it is ready; else the first ready AI in the
- * order Claude, ChatGPT, OpenCode; with none ready, the sheet's AI, else Claude.
+ * order Claude, ChatGPT, OpenCode. With none ready, the AI the card signs in to
+ * (`leadAi`, Sprint 156).
  */
-export function cardAi(input: { chosen: AgentId | undefined; sheetAi: AgentId | undefined; states: Partial<Record<AgentId, AiState>> }): { ai: AgentId; ready: boolean } {
+export function cardAi(input: {
+  chosen: AgentId | undefined;
+  sheetAi: AgentId | undefined;
+  states: Partial<Record<AgentId, AiState>>;
+  lastReady: AgentId | undefined;
+  canSignIn: Partial<Record<AgentId, boolean>>;
+}): { ai: AgentId; ready: boolean } {
   const ready = (id: AgentId | undefined): id is AgentId => Boolean(id && input.states[id] === 'ready');
   if (ready(input.chosen)) return { ai: input.chosen, ready: true };
   if (ready(input.sheetAi)) return { ai: input.sheetAi, ready: true };
   const first = AI_ORDER.find((id) => ready(id));
   if (first) return { ai: first, ready: true };
-  return { ai: 'claude-code', ready: false };
+  return { ai: leadAi(input), ready: false };
 }
 
 /** Sprint 142 (R5b): a press this soon after the folder's request was sent waits for its chat rather than send again. */

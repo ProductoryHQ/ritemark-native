@@ -78,7 +78,7 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
   assert.deepEqual(readyRequestWords('sample', 'OpenCode', 'Leadership programme', null), {
     icon: 'check-square',
     heading: 'OpenCode can draft Module 4',
-    body: "It reads the brief and the interviews with shift leaders, then writes Module 4 like Modules 1 to 3. It's the task on the board for OpenCode.",
+    body: "It reads the brief and the interviews with shift leaders, then writes Module 4 like Modules 1 to 3. It’s the task on the board for OpenCode.",
     button: 'Ask OpenCode to draft Module 4',
     note: 'Reads two documents, writes a new one.',
     hide: 'Hide this in Leadership programme',
@@ -108,11 +108,13 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
 
   // ── The AI it names (R4, S16, S19) ──
 
-  assert.deepEqual(cardAi({ chosen: undefined, sheetAi: 'codex', states: { 'claude-code': 'ready', codex: 'ready' } }), { ai: 'codex', ready: true }, 'the sheet\'s AI for new chats');
-  assert.deepEqual(cardAi({ chosen: 'opencode', sheetAi: 'codex', states: { codex: 'ready', opencode: 'ready' } }), { ai: 'opencode', ready: true }, 'chosen on the card');
-  assert.deepEqual(cardAi({ chosen: 'opencode', sheetAi: 'codex', states: { codex: 'ready', opencode: 'set-up' } }), { ai: 'codex', ready: true }, 'a chosen AI no longer ready falls back');
-  assert.deepEqual(cardAi({ chosen: undefined, sheetAi: 'claude-code', states: { 'claude-code': 'sign-in', codex: 'sign-in', opencode: 'ready' } }), { ai: 'opencode', ready: true }, 'the first ready in the order');
-  assert.deepEqual(cardAi({ chosen: undefined, sheetAi: 'codex', states: { 'claude-code': 'sign-in', codex: 'sign-in', opencode: 'set-up' } }), { ai: 'claude-code', ready: false }, 'S19: none ready names Claude');
+  const lead = { lastReady: undefined, canSignIn: { 'claude-code': true, codex: true } };
+  assert.deepEqual(cardAi({ ...lead, chosen: undefined, sheetAi: 'codex', states: { 'claude-code': 'ready', codex: 'ready' } }), { ai: 'codex', ready: true }, 'the sheet\'s AI for new chats');
+  assert.deepEqual(cardAi({ ...lead, chosen: 'opencode', sheetAi: 'codex', states: { codex: 'ready', opencode: 'ready' } }), { ai: 'opencode', ready: true }, 'chosen on the card');
+  assert.deepEqual(cardAi({ ...lead, chosen: 'opencode', sheetAi: 'codex', states: { codex: 'ready', opencode: 'set-up' } }), { ai: 'codex', ready: true }, 'a chosen AI no longer ready falls back');
+  assert.deepEqual(cardAi({ ...lead, chosen: undefined, sheetAi: 'claude-code', states: { 'claude-code': 'sign-in', codex: 'sign-in', opencode: 'ready' } }), { ai: 'opencode', ready: true }, 'the first ready in the order');
+  // Sprint 156: with none ready the card signs in, and ChatGPT leads (it named Claude until 2.2; signInCard.test.ts has the rest)
+  assert.deepEqual(cardAi({ ...lead, chosen: undefined, sheetAi: 'codex', states: { 'claude-code': 'sign-in', codex: 'sign-in', opencode: 'set-up' } }), { ai: 'codex', ready: false }, 'S19: none ready leads with ChatGPT');
 
   // ── Home's one card (R2, R14, D1; S7, S8, S61–S63) ──
 

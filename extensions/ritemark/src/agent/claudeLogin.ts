@@ -8,6 +8,11 @@ import { clearSetupCache, setClaudeLoginInProgress } from './setup';
 
 export interface ClaudeLoginOptions extends ClaudeLoginSubprocessOptions {
   onCancel?: () => void;
+  /**
+   * Sprint 156 (#694): a surface that joins a login already running gets the page's address it missed, for its own
+   * "Open the page again" (Home's card). Off by default, so Settings and the AI's sheet behave as before (one toast).
+   */
+  replayUrl?: boolean;
 }
 
 export type ClaudeLoginStartResult = 'started' | 'already-running' | 'failed-to-start';
@@ -15,6 +20,8 @@ export type ClaudeLoginStartResult = 'started' | 'already-running' | 'failed-to-
 interface ActiveClaudeLogin {
   handle: ClaudeLoginSubprocessHandle | null;
   subscribers: ClaudeLoginOptions[];
+  /** The sign-in page's address, once the CLI has printed it: a surface that joins later gets it too (Sprint 156). */
+  url: string | null;
 }
 
 let activeLogin: ActiveClaudeLogin | null = null;
@@ -59,6 +66,8 @@ export function beginClaudeLogin(
     // The OAuth process is shared, but every surface that joined it still
     // needs the terminal callback so its own busy/error state can settle.
     activeLogin.subscribers.push(options);
+    // Sprint 156 (#694): and, when it asks, the page's address printed before it joined, for its "Open the page again"
+    if (options.replayUrl && activeLogin.url) notifySubscribers([options], (subscriber) => subscriber.onUrl?.(activeLogin!.url!));
     return 'already-running';
   }
 
@@ -66,11 +75,12 @@ export function beginClaudeLogin(
   clearSetupCache();
   emitClaudeStatusInvalidated('login-started');
 
-  const login: ActiveClaudeLogin = { handle: null, subscribers: [options] };
+  const login: ActiveClaudeLogin = { handle: null, subscribers: [options], url: null };
   activeLogin = login;
   try {
     login.handle = startClaudeLoginSubprocess(binaryPath, {
       onUrl: (url) => {
+        login.url = url;
         notifySubscribers(login.subscribers, (subscriber) => subscriber.onUrl?.(url));
       },
       onComplete: () => settle(login, 'login-finished', (subscriber) => subscriber.onComplete?.()),

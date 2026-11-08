@@ -428,7 +428,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register Unified View Provider (Primary Sidebar / left)
   const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  unifiedViewProvider = new UnifiedViewProvider(context.extensionUri, workspacePath, context.secrets, context.globalStorageUri);
+  unifiedViewProvider = new UnifiedViewProvider(context.extensionUri, workspacePath, context.secrets, context.globalStorageUri, context.globalState);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(UnifiedViewProvider.viewType, unifiedViewProvider, {
       webviewOptions: { retainContextWhenHidden: true }
@@ -580,7 +580,7 @@ export function activate(context: vscode.ExtensionContext) {
     folder: guidanceFolder,
     runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
     startChat: (request) => unifiedViewProvider.startChat(request),
-    startCodexSignIn: (onStatus) => unifiedViewProvider.startCodexSignIn(onStatus),
+    startCodexSignIn: (onStatus, onEnd) => unifiedViewProvider.startCodexSignIn(onStatus, onEnd),
     stopCodexSignIn: () => unifiedViewProvider.stopCodexSignIn(),
     give: async (cardId, runtimeId) => {
       const board = isEnabled('task-board') ? taskBoard?.controller ?? null : null;
@@ -825,7 +825,7 @@ export function activate(context: vscode.ExtensionContext) {
   // landing after it reloads into a folder. Its checks and sign-ins are the AI sheet's.
   registerWelcome(context, welcomeProfileKind, {
     runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
-    startCodexSignIn: (onStatus) => unifiedViewProvider.startCodexSignIn(onStatus),
+    startCodexSignIn: (onStatus, onEnd) => unifiedViewProvider.startCodexSignIn(onStatus, onEnd),
     stopCodexSignIn: () => unifiedViewProvider.stopCodexSignIn(),
     verifyCodexSignIn: () => unifiedViewProvider.verifyCodexSignIn(),
     openLandingChat: (runtimeId, placeholder) => unifiedViewProvider.openLandingChat(runtimeId, placeholder),

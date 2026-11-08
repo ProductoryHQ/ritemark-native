@@ -11,6 +11,9 @@
  *   Claude's or ChatGPT's status changes, when an OpenCode key changes, and when the open chat or the default AI does;
  * - a sign-in that ended: the open chat's last turn on that AI failed on sign-in, as the sheet reports it.
  *
+ * Sprint 156: the AI in question, when it is usable, is remembered as the AI last seen ready on this profile
+ * (`guidanceStore.ts`, `ritemark.guidance.lastReadyAi`), so Home's card can lead with it when its sign-in lapses.
+ *
  * Probing costs something (ChatGPT's probe starts its app server), so only the AI in question is probed, and results
  * are reused for 15 s. Only when that AI can't take a turn are the others probed, because "No AI yet" and
  * "Claude: sign in" differ by whether another AI can; the cheapest first (OpenCode reads its keys, Claude its CLI's
@@ -28,6 +31,7 @@ import type { AgentId } from '../agent/types';
 import { onClaudeStatusInvalidated } from '../agent/claudeStatusEvents';
 import { onCodexStatusInvalidated } from '../codex/codexStatusEvents';
 import { RUNTIME_LABELS, type RuntimeAvailability } from '../runtime/availability';
+import { noteLastReadyAi } from '../guidance/guidanceStore';
 import { connectivityChanged, hasInternetAnswered, internetAnswered, isOnline, whenFirstConnectivityRound } from './connectivity';
 import { describeAiStatus, type AiStatusView } from './aiStatusPolicy';
 
@@ -141,6 +145,10 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
       } catch {
         usable = false;
       }
+      // Only the AI in question, and only when it can take a turn: the others' probes say nothing about it. And
+      // only while this is still the newest request (Codex P2 on #694): an older, slower answer for an AI that is no
+      // longer the one in question must not overwrite what a newer request recorded.
+      if (usable && mine === generation) void noteLastReadyAi(context.globalState, target);
       let anyUsable = usable;
       if (!usable) {
         for (const other of BY_PROBE_COST.filter((id) => id !== target)) {

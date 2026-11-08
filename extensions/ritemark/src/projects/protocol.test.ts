@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { decodeHomeRequest, decodeProjectsRequest } from './protocol';
 
 // ── Home ──
-for (const type of ['home/ready', 'home/open-documents', 'home/change-cover', 'home/what-moved-seen', 'home/go-back', 'home/dismiss-switched', 'home/dismiss-missing', 'home/add-files', 'home/dismiss-notice']) {
+for (const type of ['home/ready', 'home/open-documents', 'home/change-cover', 'home/what-moved-seen', 'home/go-back', 'home/dismiss-switched', 'home/dismiss-missing', 'home/add-files', 'home/dismiss-notice', 'home/cancel-sign-in', 'home/reopen-sign-in']) {
   assert.deepEqual(decodeHomeRequest({ type }), { ok: true, request: { type } });
   assert.equal(decodeHomeRequest({ type, extra: 1 }).ok, false, `${type} refuses an extra field`);
 }

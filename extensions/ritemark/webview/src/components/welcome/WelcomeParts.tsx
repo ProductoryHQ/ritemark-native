@@ -12,7 +12,7 @@ import { Tooltip } from '../ui/tooltip'
 import { Icon } from '../ui/Icon'
 import { Dialog, DialogContent, DialogTitle } from '../ui/dialog'
 import type { ProjectView, ProviderView, WelcomeKeyName, WelcomeProviderId } from '../../../../src/welcome/protocol'
-import { COPY, PLAN_LINES, PROVIDER_NAMES, browserOpened } from './welcomeCopy'
+import { COPY, OPENCODE_SET_UP_TIP, PLAN_LINES, PROVIDER_NAMES, browserOpened, stopWaitingTip } from './welcomeCopy'
 import { send } from './welcomeClient'
 
 export function Spinner() {
@@ -87,7 +87,7 @@ export function ProviderCard({
     return (
       <section className="rw-choice wait" aria-labelledby={titleId} aria-busy="true">
         <span className="name" id={titleId}>{name}</span>
-        <span className="line" id={`${titleId}-line`}>{browserOpened(view.id)}</span>
+        <span className="line" id={`${titleId}-line`}>{view.reason ?? browserOpened(view.id)}</span>
         <span className="w">
           <Spinner />
           <span id={`${titleId}-state`}>{isOpenCode ? COPY.checking : COPY.finishThere}</span>
@@ -95,7 +95,7 @@ export function ProviderCard({
             <span style={{ marginLeft: 'auto' }}>
               <SheetButton
                 label={COPY.cancel}
-                tooltip={`Stop waiting for ${name}’s sign-in (Escape)`}
+                tooltip={`${stopWaitingTip(view.id)} (Escape)`}
                 ariaLabel={`${COPY.cancel} ${name} sign-in`}
                 ariaDescribedBy={describedBy}
                 small
@@ -137,7 +137,7 @@ export function ProviderCard({
           <>
             <SheetButton
               label={isOpenCode ? COPY.setUp : COPY.signIn}
-              tooltip={isOpenCode ? 'Add an API key of your own for OpenCode' : `Sign in to ${name} in your browser`}
+              tooltip={isOpenCode ? OPENCODE_SET_UP_TIP : `Sign in to ${name} in your browser`}
               ariaLabel={isOpenCode ? `${COPY.setUp} ${name}` : `${COPY.signIn} to ${name}`}
               ariaDescribedBy={describedBy}
               primary
@@ -179,7 +179,7 @@ export function ProviderRow({ view, onSetUp, onSignIn }: { view: ProviderView; o
     <div className="rw-airow" role="listitem">
       <span className="t">
         <b>{name}</b>
-        {view.phase === 'signing-in' && <span id={wordsId}>{browserOpened(view.id)}</span>}
+        {view.phase === 'signing-in' && <span id={wordsId}>{view.reason ?? browserOpened(view.id)}</span>}
         {view.reason && view.phase !== 'signing-in' && <span id={wordsId}>{view.reason}</span>}
       </span>
       {view.phase === 'ready' && <span className="rw-state"><Icon name="check-circle" size={14} tone="inherit" />{isOpenCode ? COPY.setUpDone : COPY.signedIn}</span>}
@@ -188,7 +188,7 @@ export function ProviderRow({ view, onSetUp, onSignIn }: { view: ProviderView; o
       {view.phase === 'signing-in' && !isOpenCode && (
         <span className="rw-state quiet">
           <Spinner />{COPY.finishThere}
-          <SheetButton label={COPY.cancel} tooltip={`Stop waiting for ${name}’s sign-in (Escape)`} ariaLabel={`${COPY.cancel} ${name} sign-in`} ariaDescribedBy={wordsId} small onClick={() => send({ type: 'welcome/cancel-sign-in', provider: view.id as 'claude' | 'chatgpt' })} />
+          <SheetButton label={COPY.cancel} tooltip={`${stopWaitingTip(view.id)} (Escape)`} ariaLabel={`${COPY.cancel} ${name} sign-in`} ariaDescribedBy={wordsId} small onClick={() => send({ type: 'welcome/cancel-sign-in', provider: view.id as 'claude' | 'chatgpt' })} />
         </span>
       )}
       {view.phase === 'unavailable' && (
@@ -199,7 +199,7 @@ export function ProviderRow({ view, onSetUp, onSignIn }: { view: ProviderView; o
           {view.retry && <ProviderState view={view} />}
           <SheetButton
             label={isOpenCode ? COPY.setUp : COPY.signIn}
-            tooltip={isOpenCode ? 'Add an API key of your own for OpenCode' : `Sign in to ${name} in your browser`}
+            tooltip={isOpenCode ? OPENCODE_SET_UP_TIP : `Sign in to ${name} in your browser`}
             ariaLabel={isOpenCode ? `${COPY.setUp} ${name}` : `${COPY.signIn} to ${name}`}
             ariaDescribedBy={view.reason ? wordsId : undefined}
             primary

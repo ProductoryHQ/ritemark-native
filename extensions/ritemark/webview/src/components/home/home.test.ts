@@ -30,6 +30,8 @@ const { parse } = await import('node-html-parser')
 const { HomeView } = await import('./HomePage')
 const { ProjectsListView, filterProjects } = await import('./ProjectsList')
 const { middleCut, noteEndsOn, placeParts, quoteWords, QUOTE_LIMIT, SWITCH_NOTE_MS } = await import('./homeWords')
+const { mainTip, pressMain } = await import('./GuidanceCards')
+const { Icon } = await import('../ui/Icon')
 
 const now = new Date(2026, 9, 19, 12, 0).getTime()
 const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString()
@@ -319,7 +321,9 @@ const ready = (overrides: Record<string, unknown> = {}): HomeState['guidance'] =
   note: 'Reads the names, then the five newest documents.',
   hide: 'Hide this in Training work',
   ai: 'claude-code',
+  aiName: 'Claude',
   aiReady: true,
+  signingIn: null,
   ais: [...ais],
   keysSet,
   problem: null,
@@ -335,9 +339,83 @@ assert.equal(words(guide.querySelector('.rh-split-main')!), 'Ask Claude what is 
 assert.equal(words(guide.querySelector('.rh-guide-note')!), 'Reads the names, then the five newest documents.')
 assert.deepEqual(guide.querySelectorAll('button').map((button) => button.getAttribute('aria-label') ?? words(button)), ['Hide this in Training work', 'Ask Claude what is here', 'Ask with'], 'S15: the ×, the button and its caret, all named')
 assert.equal(withCard.querySelectorAll('.rh-moved').length, 0, 'one card at a time')
-// S19: no AI ready: the card still shows and names Claude
+// ── Sprint 156 (experience 35, "With no AI ready"; the Experience lead's answers 1–3, 5): with no AI ready the card signs in ──
 // (its words are in two parts since #566, the first word apart, so they are read as text, not matched in the markup)
-assert.equal(words(parse(render(home({ guidance: ready({ aiReady: false }) }))).querySelector('.rh-split-main')!), 'Ask Claude what is here')
+const noAiStates = [
+  { id: 'claude-code', name: 'Claude', state: 'sign-in' },
+  { id: 'codex', name: 'ChatGPT', state: 'sign-in' },
+  { id: 'opencode', name: 'OpenCode', state: 'set-up' },
+] as const
+const noAi = (overrides: Record<string, unknown> = {}) => ready({
+  body: 'ChatGPT works only inside it. 37 files: 20 Word documents, 10 PDFs, 4 spreadsheets and 3 text documents.',
+  button: 'Sign in with ChatGPT',
+  note: 'Any plan works, free included.',
+  ai: 'codex',
+  aiName: 'ChatGPT',
+  aiReady: false,
+  ais: [...noAiStates],
+  ...overrides,
+})
+const signInCard = parse(render(home({ guidance: noAi() }))).querySelector('.rh-guide')!
+assert.equal(words(signInCard.querySelector('.rh-guide-hd')!), 'Nothing in this folder was moved or changed', 'the heading stays')
+assert.equal(words(signInCard.querySelector('.rh-guide-body')!), 'ChatGPT works only inside it. 37 files: 20 Word documents, 10 PDFs, 4 spreadsheets and 3 text documents.', 'the body names the AI')
+assert.equal(words(signInCard.querySelector('.rh-split-main')!), 'Sign in with ChatGPT', 'the main part is the sign-in')
+assert.equal(words(signInCard.querySelector('.rh-guide-note')!), 'Any plan works, free included.', 'the note says which plans work')
+const iconMarkup = (name: 'sign-in' | 'chat-circle') => renderToStaticMarkup(createElement(Icon, { name, size: 14, tone: 'inherit' }))
+assert.ok(signInCard.querySelector('.rh-split-main')!.innerHTML.includes(iconMarkup('sign-in')), 'the sign-in icon')
+assert.ok(!signInCard.querySelector('.rh-split-main')!.innerHTML.includes(iconMarkup('chat-circle')), 'not the request\'s icon')
+assert.ok(guide.querySelector('.rh-split-main')!.innerHTML.includes(iconMarkup('chat-circle')), 'a ready card keeps the request\'s icon')
+assert.equal(signInCard.querySelector('.rm-split')!.hasAttribute('data-busy'), false, 'not waiting before the press')
+assert.deepEqual(signInCard.querySelectorAll('button').map((button) => button.getAttribute('aria-label') ?? words(button)), ['Hide this in Training work', 'Sign in with ChatGPT', 'Ask with'], 'no Cancel or second line before the press')
+assert.equal(signInCard.querySelector('.rh-guide-problem'), null)
+assert.equal(mainTip(noAi() as never), 'Opens ChatGPT’s sign-in in your browser', 'answer 3: what the press opens')
+assert.equal(mainTip(noAi({ ai: 'claude-code', aiName: 'Claude' }) as never), 'Opens Claude’s sign-in in your browser', 'Claude\'s, when Claude leads')
+assert.equal(mainTip(noAi({ ai: 'opencode', aiName: 'OpenCode' }) as never), 'Add an API key of your own for OpenCode', 'OpenCode\'s Set up, in the welcome\'s words')
+assert.equal(mainTip(ready({ ai: 'codex', aiName: 'ChatGPT' }) as never), 'Sends this request in a new chat with ChatGPT', 'the name comes from the host, never a fallback to Claude')
+assert.equal(words(parse(render(home({ guidance: noAi({ ai: 'claude-code', aiName: 'Claude', button: 'Sign in with Claude', note: 'Needs a paid plan, such as Pro or Max.' }) }))).querySelector('.rh-split-main')!), 'Sign in with Claude', 'a lapsed Claude leads')
+
+// A press of the main part with no AI ready goes to the host (it opened Ask with until 2.2); Set up OpenCode opens the key sheet
+const page = { sheet: 0, pressing: 0, openKeySheet() { this.sheet += 1 }, startPressing() { this.pressing += 1 } }
+const before = posted.length
+pressMain(noAi() as never, page)
+assert.deepEqual(posted.slice(before), [{ type: 'home/ready-request' }], 'the press sends home/ready-request, which signs in')
+pressMain(noAi({ kind: 'sample' }) as never, page)
+assert.equal(page.pressing, 0, 'a sample\'s card with no AI ready signs in; it isn\'t the board\'s hand-over')
+pressMain(noAi({ ai: 'opencode', aiName: 'OpenCode' }) as never, page)
+assert.equal(page.sheet, 1, 'Set up OpenCode opens the key sheet, as Ask with does')
+assert.deepEqual(posted.slice(before), [{ type: 'home/ready-request' }, { type: 'home/ready-request' }], 'and sends nothing')
+pressMain(ready({ kind: 'sample' }) as never, page)
+assert.equal(page.pressing, 1, 'a ready sample still waits for the board')
+posted.splice(before)
+
+// Ask with is unchanged (answer 5): the host's list is asserted where the host builds it (src/guidance/GuidanceHost.test.ts)
+
+// Signing in, before the page is open (VS Code may ask "open the website?" first): the button waits, nothing else yet
+const starting = parse(render(home({ guidance: noAi({ signingIn: 'starting' }) }))).querySelector('.rh-guide')!
+assert.equal(words(starting.querySelector('.rh-split-main')!), 'Signing in…')
+assert.ok(starting.querySelector('.rm-split')!.hasAttribute('data-busy'), 'the whole button waits, caret too')
+assert.equal(words(starting.querySelector('.rh-guide-note')!), 'Any plan works, free included.', 'it doesn\'t say the browser opened before it has')
+assert.deepEqual(starting.querySelectorAll('button').map((button) => button.getAttribute('aria-label') ?? words(button)), ['Hide this in Training work', 'Signing in…', 'Ask with'])
+
+// Signing in, the page open: the welcome's frame 2 in the card's own parts (answer 1)
+const waiting = parse(render(home({ guidance: noAi({ signingIn: 'waiting' }) }))).querySelector('.rh-guide')!
+assert.equal(words(waiting.querySelector('.rh-split-main')!), 'Signing in…', 'the main part waits with the spinner')
+assert.ok(waiting.querySelector('.rm-split')!.hasAttribute('data-busy'))
+assert.ok(waiting.querySelector('.rh-split-main')!.hasAttribute('disabled') && waiting.querySelector('.rm-split-more')!.hasAttribute('disabled'), 'a second press can\'t start another (answer 7)')
+assert.equal(words(waiting.querySelector('.rh-guide-note')!), 'Your browser opened ChatGPT’s sign-in page.', 'the note is the welcome\'s')
+assert.deepEqual(waiting.querySelectorAll('button').map((button) => button.getAttribute('aria-label') ?? words(button)),
+  ['Hide this in Training work', 'Signing in…', 'Ask with', 'Cancel', 'Did nothing open? Open the page again'], 'Cancel follows the button; the line under the row re-opens the page')
+const waitRows = waiting.querySelectorAll('.rh-guide-go')
+assert.equal(waitRows.length, 2, 'the reopen line is its own row, under the button\'s')
+assert.ok(waitRows[0].querySelector('.rh-split') && words(waitRows[0].querySelectorAll('button')[2]) === 'Cancel', 'Cancel is in the button\'s row')
+assert.equal(words(waitRows[1]), 'Did nothing open? Open the page again')
+assert.match(render(home({ guidance: noAi({ signingIn: 'waiting', ai: 'claude-code', aiName: 'Claude' }) })), /Your browser opened Claude’s sign-in page\./, 'Claude\'s, when Claude leads')
+
+// A failure or a timeout: back as it was, with the welcome's reason on the card's problem line; pressing again retries
+const failedSignIn = parse(render(home({ guidance: noAi({ problem: 'The sign-in page wasn’t finished in time. Sign in again when you’re ready.' }) }))).querySelector('.rh-guide')!
+assert.equal(words(failedSignIn.querySelector('.rh-guide-problem')!), 'The sign-in page wasn’t finished in time. Sign in again when you’re ready.')
+assert.equal(words(failedSignIn.querySelector('.rh-split-main')!), 'Sign in with ChatGPT', 'the card is back as it was: its press is the retry')
+assert.deepEqual(failedSignIn.querySelectorAll('button').map((button) => button.getAttribute('aria-label') ?? words(button)), ['Hide this in Training work', 'Sign in with ChatGPT', 'Ask with'], 'no Try again button')
 // A press that did not start says so on the card
 assert.match(render(home({ guidance: ready({ problem: 'That card is no longer on the board.' }) })), /role="status">That card is no longer on the board\./)
 
