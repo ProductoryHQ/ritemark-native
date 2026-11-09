@@ -103,6 +103,21 @@
 #   address's wait), and shows it as it changes; the action's own tooltip
 #   otherwise. Another page resets it with the chip.
 #
+# 2.2 (2026-11-09, Jarmo testing Publish): the chip's menu drops from the chip
+#   itself, left edges lined up, just below it, like the bar's other dropdowns
+#   (the menu motion class). It opened where the keyboard focus was (the chat
+#   box) or over the whole pane: the action anchored on getActiveElement(). Now
+#   the chip's view item hands its drawn box to the page's contribution
+#   (setChip, given back when the view item goes) and the action anchors on it,
+#   for a click, Enter or Space alike; while a narrow bar has folded the chip
+#   into its ⋯, the menu drops under the bar's right end. Its items, text only:
+#   See online (the public page in a new tab of Ritemark's browser, as Open the
+#   page did; no host in parentheses), Update the page only while the file has
+#   changed (the greyed "Update the page · Up to date" row is gone), a line, and
+#   Unpublish. The chip's tooltip: "See it online or unpublish it". Its look
+#   and the "changed" chip's tooltip are unchanged. Tested in
+#   test/electron-browser/features/ritemarkBrowserPageFeature.test.ts.
+#
 # File(s): src/vs/platform/browserView/common/browserView.ts,
 #          src/vs/platform/browserView/electron-main/browserViewMainService.ts,
 #          src/vs/platform/browserView/electron-main/ritemarkLinkMenu.ts,
@@ -123,7 +138,7 @@
 #          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts,
 #          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
 # Created: 2026-05-13
-# Updated: 2026-11-06 (Sprint 149 PR 4: the Published chip, Copy link, Publishing… and Unpublishing…; round 3: no chip carried to another page; round 5: Publishing…'s tooltip from the extension); 2026-11-05 (PR 2: the page's bar, Open in your browser and Publish; round 2: no file reaches the system's opener)
+# Updated: 2026-11-09 (2.2: the Published chip's menu drops from the chip; See online, Update the page only while changed, Unpublish); 2026-11-06 (Sprint 149 PR 4: the Published chip, Copy link, Publishing… and Unpublishing…; round 3: no chip carried to another page; round 5: Publishing…'s tooltip from the extension); 2026-11-05 (PR 2: the page's bar, Open in your browser and Publish; round 2: no file reaches the system's opener)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
 index 31466d78914..e7d9a1af46e 100644
@@ -323,7 +338,7 @@ index 8153d309eca..b8dea314834 100644
  	async setAnnotationMode(annotate: boolean): Promise<void> {
 diff --git a/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPage.ts b/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPage.ts
 new file mode 100644
-index 00000000000..d5184a451d1
+index 00000000000..3e40c043661
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/common/ritemarkBrowserPage.ts
 @@ -0,0 +1,188 @@
@@ -389,8 +404,8 @@ index 00000000000..d5184a451d1
 +);
 +
 +/**
-+ * Frame 4's chip, "Published ⌄" or "Published · changed ⌄", with its menu: Open the page, Update the page,
-+ * Unpublish. Not gated on `ritemark.publish.ready`: taking a page down never waits for the flag (S28b).
++ * Frame 4's chip, "Published ⌄" or "Published · changed ⌄", with its menu: See online, Update the page (only while
++ * changed), Unpublish. Not gated on `ritemark.publish.ready`: taking a page down never waits for the flag (S28b).
 + */
 +export const RITEMARK_PUBLISHED_WHEN = ContextKeyExpr.and(
 +	RITEMARK_BROWSER_PROJECT_PAGE.isEqualTo(true),
@@ -1595,10 +1610,10 @@ index 00000000000..ae9c58f7d67
 +registerAction2(BrowserSnapshotAction);
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts
 new file mode 100644
-index 00000000000..5abeeb06718
+index 00000000000..dd89effe99a
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts
-@@ -0,0 +1,475 @@
+@@ -0,0 +1,514 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1606,16 +1621,16 @@ index 00000000000..5abeeb06718
 +
 +import '../media/ritemarkBrowserPage.css';
 +import { localize, localize2 } from '../../../../../nls.js';
-+import { $, getActiveElement, isHTMLElement, reset } from '../../../../../base/browser/dom.js';
++import { $, reset } from '../../../../../base/browser/dom.js';
 +import { renderIcon } from '../../../../../base/browser/ui/iconLabel/iconLabels.js';
-+import { Action, IAction, Separator } from '../../../../../base/common/actions.js';
++import { IAction, Separator, toAction } from '../../../../../base/common/actions.js';
 +import { Codicon } from '../../../../../base/common/codicons.js';
 +import { Emitter } from '../../../../../base/common/event.js';
 +import { ThemeIcon } from '../../../../../base/common/themables.js';
 +import { IActionViewItem } from '../../../../../base/browser/ui/actionbar/actionbar.js';
 +import { IActionViewItemOptions } from '../../../../../base/browser/ui/actionbar/actionViewItems.js';
-+import { DisposableStore } from '../../../../../base/common/lifecycle.js';
-+import { URI } from '../../../../../base/common/uri.js';
++import { AnchorAlignment } from '../../../../../base/browser/ui/contextview/contextview.js';
++import { DisposableStore, IDisposable, toDisposable } from '../../../../../base/common/lifecycle.js';
 +import { MenuEntryActionViewItem } from '../../../../../platform/actions/browser/menuEntryActionViewItem.js';
 +import { Action2, MenuId, MenuItemAction, registerAction2 } from '../../../../../platform/actions/common/actions.js';
 +import { BrowserViewCommandId } from '../../../../../platform/browserView/common/browserView.js';
@@ -1625,6 +1640,7 @@ index 00000000000..5abeeb06718
 +import { IInstantiationService, ServicesAccessor } from '../../../../../platform/instantiation/common/instantiation.js';
 +import { getIconRegistry } from '../../../../../platform/theme/common/iconRegistry.js';
 +import { IWorkspaceContextService } from '../../../../../platform/workspace/common/workspace.js';
++import { WORKBENCH_MENU_MOTION_CLASS, workbenchMenuCloseAnimation } from '../../../../browser/actions/menuMotion.js';
 +import { IEditorService } from '../../../../services/editor/common/editorService.js';
 +import { IBrowserViewModel } from '../../common/browserView.js';
 +import { BrowserEditorInput } from '../../common/browserEditorInput.js';
@@ -1664,10 +1680,10 @@ index 00000000000..5abeeb06718
 + * address, back, forward and reload stay the browser's own (Jarmo, 4 November); the session is unchanged (decision 4).
 + *
 + * PR 4 (frame 4, R7): once the page is published, Publish gives its place to the chip, "Published ⌄" or "Published ·
-+ * changed ⌄", whose menu holds Open the page (the public page in a new tab of Ritemark's browser), Update the page
-+ * (live only when the file changed) and Unpublish, and to Copy link beside it. "Publishing…" and "Unpublishing…"
-+ * stand in their places while Cloudflare works, not pressable. The state is the extension's answer to
-+ * `_ritemark.publish.pageState` for the tab's address, on the bar's own key `ritemarkBrowserPagePublish`.
++ * changed ⌄", and to Copy link beside it. The chip's menu drops from the chip (2.2, Jarmo, 9 November): See online (the
++ * public page in a new tab of Ritemark's browser), Update the page (only while the file has changed) and Unpublish.
++ * "Publishing…" and "Unpublishing…" stand in their places while Cloudflare works, not pressable. The state is the
++ * extension's answer to `_ritemark.publish.pageState` for the tab's address, on the bar's own key `ritemarkBrowserPagePublish`.
 + */
 +
 +/** The extension says a page's publishing state changed: every page bar asks again (`_ritemark.browser.publishStateChanged`). */
@@ -1712,6 +1728,7 @@ index 00000000000..5abeeb06718
 +	private _asked = 0;
 +	private _address: string | undefined;
 +	private _publishingTooltip: string | undefined;
++	private _chip: HTMLElement | undefined;
 +	private readonly _onDidChangePublishingTooltip = this._register(new Emitter<void>());
 +	/** Publishing…'s tooltip changed (round 5): its button shows the new one. */
 +	readonly onDidChangePublishingTooltip = this._onDidChangePublishingTooltip.event;
@@ -1732,7 +1749,7 @@ index 00000000000..5abeeb06718
 +		this._register(onDidChangePublishState.event(() => { if (this._project) { void this._askPublishState(); } }));
 +	}
 +
-+	/** The public address, while the page is published (frame 4's Open the page and Copy link). */
++	/** The public address, while the page is published (the chip's See online and Copy link). */
 +	get publishedAddress(): string | undefined { return this._address; }
 +
 +	get publishState(): RitemarkPagePublishState { return this._publish.get() as RitemarkPagePublishState; }
@@ -1740,8 +1757,31 @@ index 00000000000..5abeeb06718
 +	/** The extension's word on why Publishing… lasts (a new address's wait), while it does; else undefined. */
 +	get publishingTooltip(): string | undefined { return this._publishingTooltip; }
 +
-+	/** Where the chip's menu opens when the pressed button can't be found: the tab's own pane. */
-+	anchor(): HTMLElement | undefined { return this.editor.getContainer(); }
++	/**
++	 * The chip's view item hands over the box it draws while it is on the bar, and takes it back when it goes, so the
++	 * chip's menu drops from the chip, never from whatever has the focus (the chat box, Jarmo, 9 November).
++	 */
++	setChip(chip: HTMLElement): IDisposable {
++		this._chip = chip;
++		return toDisposable(() => {
++			if (this._chip === chip) {
++				this._chip = undefined;
++			}
++		});
++	}
++
++	/**
++	 * Where the chip's menu drops: from the chip, left edges lined up, just below it, like the bar's other dropdowns.
++	 * While a narrow bar has folded the chip into its ⋯, under the bar's right end, where ⋯ is: the point's right edge is
++	 * the page's (an anchor point is 1 wide), so the menu doesn't overhang it.
++	 */
++	chipMenuAnchor(): { anchor: HTMLElement | { x: number; y: number }; alignment: AnchorAlignment } {
++		if (this._chip?.isConnected) {
++			return { anchor: this._chip, alignment: AnchorAlignment.LEFT };
++		}
++		const page = this.editor.browserContainer.getBoundingClientRect();
++		return { anchor: { x: page.right - 1, y: page.top }, alignment: AnchorAlignment.RIGHT };
++	}
 +
 +	override prerenderInput(input: BrowserEditorInput): void {
 +		this._update(input.url);
@@ -1853,6 +1893,13 @@ index 00000000000..5abeeb06718
 +		container.classList.add('ritemark-page-publish');
 +		if (id === PUBLISHED_PAGE_ID || id === PUBLISHED_CHANGED_PAGE_ID || id === UNPUBLISHING_PAGE_ID) {
 +			container.classList.add('ritemark-page-published-chip');
++		}
++		if ((id === PUBLISHED_PAGE_ID || id === PUBLISHED_CHANGED_PAGE_ID) && this.label) {
++			// The chip's menu drops from the box it draws (its label, the ground's fill), as the bar's dropdowns do
++			this.label.setAttribute('aria-haspopup', 'menu');
++			if (this._page) {
++				this._register(this._page.setChip(this.label));
++			}
 +		}
 +		if (id === COPY_LINK_PAGE_ID) {
 +			container.classList.add('ritemark-page-copy-link');
@@ -1982,9 +2029,9 @@ index 00000000000..5abeeb06718
 +}
 +
 +/**
-+ * Frame 4's chip: its menu holds Open the page (the public page in a new tab of Ritemark's browser, so the two tabs
-+ * show their two addresses), Update the page (live only when the file changed: "Up to date" otherwise) and Unpublish
-+ * (the extension asks first).
++ * Frame 4's chip: its menu drops from the chip and holds See online (the public page in a new tab of Ritemark's browser,
++ * so the two tabs show their two addresses), Update the page (only while the file has changed since publishing, when
++ * the chip reads "Published · changed") and, after a line, Unpublish (the extension asks first). Text only.
 + */
 +abstract class RitemarkPublishedChipAction extends Action2 {
 +	async run(accessor: ServicesAccessor, browserEditor?: unknown): Promise<void> {
@@ -1996,21 +2043,28 @@ index 00000000000..5abeeb06718
 +		if (!contribution || !ritemarkLocalPageFile(url)) {
 +			return;
 +		}
-+		const changed = contribution.publishState === 'changed';
-+		const host = address ? URI.parse(address).authority : '';
 +		const actions: IAction[] = [
-+			new Action('ritemark.page.openPublished', host ? localize('ritemark.page.openThePageAt', "Open the page ({0})", host) : localize('ritemark.page.openThePage', "Open the page"), undefined, !!address,
-+				() => commandService.executeCommand(BrowserViewCommandId.Open, { url: address, reuseUrlFilter: address })),
-+			new Action('ritemark.page.update', changed ? localize('ritemark.page.updateThePage', "Update the page") : localize('ritemark.page.upToDate', "Update the page · Up to date"), undefined, changed,
-+				() => commandService.executeCommand(RITEMARK_PUBLISH_PAGE_COMMAND, url)),
++			toAction({
++				id: 'ritemark.page.seeOnline', label: localize('ritemark.page.seeOnline', "See online"), enabled: !!address,
++				run: () => commandService.executeCommand(BrowserViewCommandId.Open, { url: address, reuseUrlFilter: address }),
++			}),
++			...(contribution.publishState === 'changed' ? [toAction({
++				id: 'ritemark.page.update', label: localize('ritemark.page.updateThePage', "Update the page"),
++				run: () => commandService.executeCommand(RITEMARK_PUBLISH_PAGE_COMMAND, url),
++			})] : []),
 +			new Separator(),
-+			new Action('ritemark.page.unpublish', localize('ritemark.page.unpublish', "Unpublish"), undefined, true,
-+				() => commandService.executeCommand(RITEMARK_UNPUBLISH_PAGE_COMMAND, url)),
++			toAction({
++				id: 'ritemark.page.unpublish', label: localize('ritemark.page.unpublish', "Unpublish"),
++				run: () => commandService.executeCommand(RITEMARK_UNPUBLISH_PAGE_COMMAND, url),
++			}),
 +		];
-+		const anchor = getActiveElement();
++		const { anchor, alignment } = contribution.chipMenuAnchor();
 +		contextMenuService.showContextMenu({
-+			getAnchor: () => (isHTMLElement(anchor) ? anchor : contribution.anchor() ?? { x: 0, y: 0 }),
++			getAnchor: () => anchor,
++			anchorAlignment: alignment,
 +			getActions: () => actions,
++			getMenuClassName: () => WORKBENCH_MENU_MOTION_CLASS,
++			closeAnimation: workbenchMenuCloseAnimation,
 +		});
 +	}
 +}
@@ -2020,7 +2074,7 @@ index 00000000000..5abeeb06718
 +		super({
 +			id: PUBLISHED_PAGE_ID,
 +			title: localize2('ritemark.page.published', "Published"),
-+			tooltip: localize('ritemark.page.publishedTooltip', "Open the page, update it or unpublish it"),
++			tooltip: localize('ritemark.page.publishedTooltip', "See it online or unpublish it"),
 +			category: BrowserActionCategory,
 +			f1: false,
 +			precondition: RITEMARK_PUBLISHED_WHEN,
@@ -2765,10 +2819,10 @@ index 00000000000..dd63f850d69
 +});
 diff --git a/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
 new file mode 100644
-index 00000000000..acf6268584d
+index 00000000000..aac2f1ec354
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
-@@ -0,0 +1,209 @@
+@@ -0,0 +1,309 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2776,12 +2830,17 @@ index 00000000000..acf6268584d
 +
 +import assert from 'assert';
 +import { createStubInstance } from 'sinon';
++import { IContextMenuDelegate } from '../../../../../../base/browser/contextmenu.js';
++import { AnchorAlignment } from '../../../../../../base/browser/ui/contextview/contextview.js';
++import { mainWindow } from '../../../../../../base/browser/window.js';
++import { Separator } from '../../../../../../base/common/actions.js';
 +import { Event } from '../../../../../../base/common/event.js';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
 +import { isIMenuItem, MenuId, MenuRegistry } from '../../../../../../platform/actions/common/actions.js';
 +import { BrowserViewCommandId } from '../../../../../../platform/browserView/common/browserView.js';
 +import { CommandsRegistry, ICommandService } from '../../../../../../platform/commands/common/commands.js';
 +import { ContextKeyExpression, IContext } from '../../../../../../platform/contextkey/common/contextkey.js';
++import { IContextMenuService } from '../../../../../../platform/contextview/browser/contextView.js';
 +import { ServicesAccessor } from '../../../../../../platform/instantiation/common/instantiation.js';
 +import { MockContextKeyService } from '../../../../../../platform/keybinding/test/common/mockKeybindingService.js';
 +import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
@@ -2793,17 +2852,22 @@ index 00000000000..acf6268584d
 +	RITEMARK_BROWSER_LOCAL_PAGE,
 +	RITEMARK_BROWSER_PROJECT_PAGE,
 +	RITEMARK_OPEN_PAGE_IN_SYSTEM_BROWSER_COMMAND,
++	RITEMARK_PAGE_STATE_COMMAND,
++	RITEMARK_PUBLISH_PAGE_COMMAND,
 +	RITEMARK_PUBLISH_READY_KEY,
++	RITEMARK_UNPUBLISH_PAGE_COMMAND,
 +} from '../../../common/ritemarkBrowserPage.js';
 +import { BrowserEditor } from '../../../electron-browser/browserEditor.js';
 +import '../../../electron-browser/features/browserNavigationFeatures.js';
-+import { OPEN_PAGE_IN_BROWSER_ID, PUBLISH_PAGE_ID, RitemarkBrowserPageContribution } from '../../../electron-browser/features/ritemarkBrowserPageFeature.js';
++import { OPEN_PAGE_IN_BROWSER_ID, PUBLISHED_CHANGED_PAGE_ID, PUBLISHED_PAGE_ID, PUBLISH_PAGE_ID, RitemarkBrowserPageContribution } from '../../../electron-browser/features/ritemarkBrowserPageFeature.js';
 +
 +/**
 + * Ritemark (Sprint 149, PR 2, round 2): the page's bar and upstream's Open in External Browser, as they are registered.
 + * - Upstream's action, from All commands, never hands a `file:` address to the system's opener: it goes to the
 + *   extension's guarded `ritemark.page.openInSystemBrowser`, which opens a real `.html` file and refuses the rest.
 + * - The menu items' `when` and Publish's `precondition` are read from the registries, so deleting one fails here.
++ * - 2.2 (Jarmo, 9 November): the Published chip's menu drops from the chip, never from the focused chat box, and holds
++ *   See online, Update the page (only while changed) and Unpublish.
 + */
 +suite('Ritemark browser page bar, as registered', () => {
 +	ensureNoDisposablesAreLeakedInTestSuite();
@@ -2975,6 +3039,96 @@ index 00000000000..acf6268584d
 +		} finally {
 +			listener.dispose();
 +			bar.dispose();
++		}
++	});
++
++	test('2.2: the chip\'s menu drops from the chip even with the chat box focused, and offers Update the page only while changed', async () => {
++		const page = 'file:///Users/mari/Harbour/programme.html';
++		const address = 'https://programme-7f3a2c.pages-4821.workers.dev/';
++		let answer: unknown = { kind: 'published', address, changed: false };
++		const ran: unknown[][] = [];
++		const commandService: Partial<ICommandService> = {
++			executeCommand: async <T>(id: string, ...args: unknown[]) => {
++				if (id === RITEMARK_PAGE_STATE_COMMAND) {
++					return answer as T;
++				}
++				ran.push([id, ...args]);
++				return undefined;
++			},
++		};
++		const menus: IContextMenuDelegate[] = [];
++		const contextMenuService: Partial<IContextMenuService> = { showContextMenu: delegate => { menus.push(delegate as IContextMenuDelegate); } };
++		const doc = mainWindow.document;
++		const pageArea = doc.body.appendChild(doc.createElement('div'));
++		const chatBox = doc.body.appendChild(doc.createElement('textarea'));
++		const chip = doc.body.appendChild(doc.createElement('a'));
++		const workspace: Partial<IWorkspaceContextService> = { onDidChangeWorkspaceFolders: Event.None, getWorkspaceFolder: () => ({}) as never };
++		const editor = { onDidChangeModel: Event.None, browserContainer: pageArea } as unknown as BrowserEditor;
++		const bar = new RitemarkBrowserPageContribution(editor, new MockContextKeyService(), workspace as IWorkspaceContextService, commandService as ICommandService);
++		const chipOnBar = bar.setChip(chip);
++		const pane = createStubInstance(BrowserEditor);
++		Object.defineProperty(pane, 'model', { value: { url: page } as Partial<IBrowserViewModel> });
++		pane.getContribution.returns(bar);
++		const services = new Map<unknown, unknown>([
++			[ICommandService, commandService],
++			[IContextMenuService, contextMenuService],
++			[IEditorService, { activeEditorPane: pane }],
++		]);
++		const accessor = { get: (id: unknown) => services.get(id) } as unknown as ServicesAccessor;
++		const settle = () => new Promise(resolve => setTimeout(resolve, 0));
++		const press = async (chipId: string) => {
++			chatBox.focus(); // where the focus was when Jarmo pressed the chip
++			await CommandsRegistry.getCommand(chipId)?.handler(accessor, pane);
++			return menus.pop()!;
++		};
++		const look = (menu: IContextMenuDelegate) => {
++			const anchor = menu.getAnchor();
++			const area = pageArea.getBoundingClientRect();
++			return {
++				from: anchor === chip ? 'the chip' : anchor === chatBox ? 'the chat box' : JSON.stringify(anchor) === JSON.stringify({ x: area.right - 1, y: area.top }) ? 'the page\'s top right' : 'elsewhere',
++				edges: menu.anchorAlignment === AnchorAlignment.LEFT ? 'left' : 'right',
++				items: menu.getActions().map(a => a.id === Separator.ID ? '──' : a.enabled ? a.label : `${a.label} (greyed)`),
++			};
++		};
++		try {
++			bar.prerenderInput({ url: page } as BrowserEditorInput);
++			await settle();
++			const published = look(await press(PUBLISHED_PAGE_ID));
++
++			answer = { kind: 'published', address, changed: true };
++			bar.prerenderInput({ url: page } as BrowserEditorInput);
++			await settle();
++			const changedMenu = await press(PUBLISHED_CHANGED_PAGE_ID);
++			for (const label of ['See online', 'Update the page', 'Unpublish']) {
++				await changedMenu.getActions().find(a => a.label === label)?.run();
++			}
++
++			chipOnBar.dispose(); // a narrow bar folds the chip into its ⋯
++			const folded = look(await press(PUBLISHED_CHANGED_PAGE_ID));
++
++			assert.deepStrictEqual({
++				tooltips: [registered(PUBLISHED_PAGE_ID).command.tooltip, registered(PUBLISHED_CHANGED_PAGE_ID).command.tooltip],
++				published,
++				changed: look(changedMenu),
++				folded,
++				ran,
++			}, {
++				tooltips: ['See it online or unpublish it', 'The file changed since it was published. Update the page from here.'],
++				published: { from: 'the chip', edges: 'left', items: ['See online', '──', 'Unpublish'] },
++				changed: { from: 'the chip', edges: 'left', items: ['See online', 'Update the page', '──', 'Unpublish'] },
++				folded: { from: 'the page\'s top right', edges: 'right', items: ['See online', 'Update the page', '──', 'Unpublish'] },
++				ran: [
++					[BrowserViewCommandId.Open, { url: address, reuseUrlFilter: address }],
++					[RITEMARK_PUBLISH_PAGE_COMMAND, page],
++					[RITEMARK_UNPUBLISH_PAGE_COMMAND, page],
++				],
++			});
++		} finally {
++			chipOnBar.dispose();
++			bar.dispose();
++			pageArea.remove();
++			chatBox.remove();
++			chip.remove();
 +		}
 +	});
 +});

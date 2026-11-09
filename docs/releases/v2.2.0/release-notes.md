@@ -15,7 +15,7 @@ Publish a page from your project, and anyone with the link can open it. 2.2 also
 - **See exactly what goes.** Before anything leaves your computer, Ritemark lists the page and the files it uses. Nothing else from the project goes.
 - **Ritemark warns you about keys and passwords.** If a file looks like it holds one, Publish waits until you choose **Publish anyway**.
 - **A new address takes a moment.** Your first page on a new address can take a couple of minutes to open. Ritemark tells you while you wait.
-- **Share, change, take it down.** Use **Copy link**, **Update the page** after a change, or **Unpublish** to remove it.
+- **Share, change, take it down.** Use **Copy link**, **See online**, **Update the page** after a change, or **Unpublish** to remove it.
 - **Kept out of search engines, not secret.** Search engines are asked not to list the page. Anyone who has the link can still open it.
 
 ## Find anything in your project
