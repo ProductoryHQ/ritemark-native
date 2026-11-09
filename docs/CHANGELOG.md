@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — 2.2.0
 
+### 2.2: the Published chip's menu (Jarmo's test, 9 November)
+
+#### Fixed
+- **The Published chip's menu drops from the chip.** Pressing **Published ⌄** on a page's bar opened its menu where the keyboard focus was, often at the window's bottom right over the AI's chat box; it now drops from the chip itself, just below it with their left edges lined up, as the bar's other menus do, whether you click it or press Enter on it. Its items read **See online** (the page in a new tab of Ritemark's browser), **Update the page** (only while the chip reads **Published · changed ⌄**; the greyed "Up to date" row is gone) and, after a line, **Unpublish**. The chip's tooltip reads "See it online or unpublish it".
+
 ### Sprint 156: with no AI ready, Home's first card signs in (experience 35)
 
 #### Changed
