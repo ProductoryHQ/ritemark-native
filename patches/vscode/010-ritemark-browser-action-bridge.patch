@@ -1610,10 +1610,10 @@ index 00000000000..ae9c58f7d67
 +registerAction2(BrowserSnapshotAction);
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts
 new file mode 100644
-index 00000000000..eb14bed68e5
+index 00000000000..dd89effe99a
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/features/ritemarkBrowserPageFeature.ts
-@@ -0,0 +1,513 @@
+@@ -0,0 +1,514 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1772,14 +1772,15 @@ index 00000000000..eb14bed68e5
 +
 +	/**
 +	 * Where the chip's menu drops: from the chip, left edges lined up, just below it, like the bar's other dropdowns.
-+	 * While a narrow bar has folded the chip into its ⋯, under the bar's right end, where ⋯ is.
++	 * While a narrow bar has folded the chip into its ⋯, under the bar's right end, where ⋯ is: the point's right edge is
++	 * the page's (an anchor point is 1 wide), so the menu doesn't overhang it.
 +	 */
 +	chipMenuAnchor(): { anchor: HTMLElement | { x: number; y: number }; alignment: AnchorAlignment } {
 +		if (this._chip?.isConnected) {
 +			return { anchor: this._chip, alignment: AnchorAlignment.LEFT };
 +		}
 +		const page = this.editor.browserContainer.getBoundingClientRect();
-+		return { anchor: { x: page.right, y: page.top }, alignment: AnchorAlignment.RIGHT };
++		return { anchor: { x: page.right - 1, y: page.top }, alignment: AnchorAlignment.RIGHT };
 +	}
 +
 +	override prerenderInput(input: BrowserEditorInput): void {
@@ -2818,7 +2819,7 @@ index 00000000000..dd63f850d69
 +});
 diff --git a/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
 new file mode 100644
-index 00000000000..edc0d312255
+index 00000000000..aac2f1ec354
 --- /dev/null
 +++ b/src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
 @@ -0,0 +1,309 @@
@@ -3084,7 +3085,7 @@ index 00000000000..edc0d312255
 +			const anchor = menu.getAnchor();
 +			const area = pageArea.getBoundingClientRect();
 +			return {
-+				from: anchor === chip ? 'the chip' : anchor === chatBox ? 'the chat box' : JSON.stringify(anchor) === JSON.stringify({ x: area.right, y: area.top }) ? 'the page\'s top right' : 'elsewhere',
++				from: anchor === chip ? 'the chip' : anchor === chatBox ? 'the chat box' : JSON.stringify(anchor) === JSON.stringify({ x: area.right - 1, y: area.top }) ? 'the page\'s top right' : 'elsewhere',
 +				edges: menu.anchorAlignment === AnchorAlignment.LEFT ? 'left' : 'right',
 +				items: menu.getActions().map(a => a.id === Separator.ID ? '──' : a.enabled ? a.label : `${a.label} (greyed)`),
 +			};
