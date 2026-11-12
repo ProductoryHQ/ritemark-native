@@ -330,7 +330,7 @@ export class GoogleDocsPublisher {
       }
 
       if (plan.tables.length) {
-        const cells = tableCellRequests(await client.getDocument(docId), plan.tables);
+        const cells = tableCellRequests(await client.getDocument(docId), plan.tables, plan.tableLinks);
         if (cells.length) await client.batchUpdate(docId, cells);
       }
     }
