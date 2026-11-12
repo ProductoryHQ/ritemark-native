@@ -194,6 +194,39 @@ const cellInserts = cells.filter((c) => c.insertText).map((c) => c.insertText.lo
 assert.deepEqual(cellInserts, [17, 14, 12], 'filled from the last cell backwards; an empty cell is skipped');
 assert.ok(cells.some((c) => c.updateTextStyle?.textStyle?.bold), 'the header row is bold');
 
+// ── #702: a link inside a table cell keeps its address ────────────────────────
+{
+  const linkedHtml = `<table><tbody>
+<tr><th><p>Name</p></th><th><p>Where</p></th></tr>
+<tr><td><p>  Docs   at <a href="https://example.com/a">the  site</a> and <a href="mailto:a@example.com">mail</a></p></td><td><p><a href="javascript:alert(1)">no</a> <a href="https://example.com/b"><strong>all</strong> of it</a></p></td></tr>
+</tbody></table>`;
+  const linkedTable = htmlToBlocks(linkedHtml).find((b) => b.kind === 'table')!;
+  assert.deepEqual(linkedTable.rows, [['Name', 'Where'], ['Docs at the site and mail', 'no all of it']],
+    'the cell text is unchanged by the links');
+  assert.deepEqual(linkedTable.cellLinks, [
+    [[], []],
+    [
+      [{ start: 8, end: 16, url: 'https://example.com/a' }, { start: 21, end: 25, url: 'mailto:a@example.com' }],
+      [{ start: 3, end: 12, url: 'https://example.com/b' }],
+    ],
+  ], 'ranges follow the cell text after its whitespace is collapsed; an unsafe address is no link');
+  assert.equal(table?.cellLinks, undefined,
+    'a table with no links carries none');
+
+  const linkedPlan = buildPublishPlan(htmlToBlocks(linkedHtml), { spacing: true });
+  assert.deepEqual(linkedPlan.tableLinks, [linkedTable.cellLinks]);
+  const linkedCells = tableCellRequests(docWithTable, linkedPlan.tables, linkedPlan.tableLinks) as Record<string, any>[];
+  const linkStyles = linkedCells.filter((c) => c.updateTextStyle?.fields === 'link').map((c) => c.updateTextStyle);
+  assert.deepEqual(linkStyles, [
+    { range: { startIndex: 19 + 3, endIndex: 19 + 12 }, textStyle: { link: { url: 'https://example.com/b' } }, fields: 'link' },
+    { range: { startIndex: 17 + 8, endIndex: 17 + 16 }, textStyle: { link: { url: 'https://example.com/a' } }, fields: 'link' },
+    { range: { startIndex: 17 + 21, endIndex: 17 + 25 }, textStyle: { link: { url: 'mailto:a@example.com' } }, fields: 'link' },
+  ], 'each link is styled over its own words, counted from its cell');
+  const order = linkedCells.map((c) => (c.insertText ? `text@${c.insertText.location.index}` : `${c.updateTextStyle.fields}@${c.updateTextStyle.range.startIndex}`));
+  assert.ok(order.indexOf('text@19') < order.indexOf('link@22') && order.indexOf('link@22') < order.indexOf('text@17'),
+    'a cell is linked right after it is filled, before an earlier cell moves it');
+}
+
 // ── Clearing a body for Sync or a template copy ───────────────────────────────
 
 assert.deepEqual(bodyClearRange({ ...docWithTokens, body: { content: [{ endIndex: 1 }, { startIndex: 1, endIndex: 2 }] } }), null,

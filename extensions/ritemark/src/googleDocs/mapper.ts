@@ -37,6 +37,13 @@ export interface Run {
   link?: string;
 }
 
+/** A link inside a table cell: a range in the cell's text (UTF-16 units, as Docs counts). */
+export interface CellLink {
+  start: number;
+  end: number;
+  url: string;
+}
+
 export type BlockKind = 'heading' | 'paragraph' | 'listItem' | 'code' | 'quote' | 'rule' | 'table' | 'image';
 
 export interface Block {
@@ -48,6 +55,11 @@ export interface Block {
   ordered?: boolean;
   checkbox?: 'none' | 'unchecked' | 'checked';
   rows?: string[][];
+  /**
+   * #702: the links inside each cell, as ranges in that cell's text. Same
+   * shape as `rows` (row, then column); absent when no cell has a link.
+   */
+  cellLinks?: CellLink[][][];
   /** Image source as the editor wrote it; `title` carries TipTap's original path. */
   src?: string;
   title?: string;
@@ -138,21 +150,67 @@ function mathImageBlock(math: ExportMathElement, picture: NonNullable<ExportMath
   };
 }
 
-/** A cell's text: a table cell is filled with text, so its equations go as their source. */
-function cellText(node: Node, counts: { math: number; typos: number }): string {
-  let text = '';
+interface CellOut { text: string; links: CellLink[] }
+
+/**
+ * A cell's text: a table cell is filled with text, so its equations go as their
+ * source. Its links are kept as ranges in that text (#702), with the same
+ * `http(s):` / `mailto:` rule as links in prose.
+ */
+function cellInto(node: Node, counts: { math: number; typos: number }, out: CellOut, url?: string): void {
+  const add = (text: string): void => {
+    if (!text) return;
+    const start = out.text.length;
+    out.text += text;
+    if (!url) return;
+    const last = out.links[out.links.length - 1];
+    if (last && last.url === url && last.end === start) last.end = out.text.length;
+    else out.links.push({ start, end: out.text.length, url });
+  };
   for (const child of (node.childNodes ?? []) as Node[]) {
-    if (child.nodeType === 3) { text += decodeEntities(child.rawText ?? ''); continue; }
+    if (child.nodeType === 3) { add(decodeEntities(child.rawText ?? '')); continue; }
     const math = readMath(child);
     if (math) {
-      text += math.source;
+      add(math.source);
       counts.math++;
       if (math.typo) counts.typos++;
       continue;
     }
-    text += cellText(child, counts);
+    let next = url;
+    if (tagOf(child) === 'a') {
+      const href = child.getAttribute('href') ?? '';
+      if (/^(https?:|mailto:)/i.test(href)) next = href;
+    }
+    cellInto(child, counts, out, next);
   }
-  return text;
+}
+
+/**
+ * A cell as it is written into the Doc: runs of whitespace become one space and
+ * the ends are trimmed. The links' ranges are moved to match, and a link left
+ * with no text is dropped.
+ */
+function normaliseCell(raw: CellOut): CellOut {
+  const at: number[] = [];
+  let text = '';
+  for (let i = 0; i < raw.text.length; i++) {
+    at.push(text.length);
+    const ch = raw.text[i];
+    if (/\s/.test(ch)) {
+      if (text && !text.endsWith(' ')) text += ' ';
+    } else text += ch;
+  }
+  at.push(text.length);
+  if (text.endsWith(' ')) text = text.slice(0, -1);
+  const links: CellLink[] = [];
+  for (const link of raw.links) {
+    let start = Math.min(at[link.start], text.length);
+    let end = Math.min(at[link.end], text.length);
+    while (start < end && text[start] === ' ') start++;
+    while (end > start && text[end - 1] === ' ') end--;
+    if (end > start) links.push({ start, end, url: link.url });
+  }
+  return { text, links };
 }
 
 interface InlineOut { text: string; runs: Run[]; images?: Placeholder[]; typos?: number }
@@ -321,17 +379,26 @@ function blocksFrom(node: Node, depth = 0): Block[] {
   }
   if (tag === 'table') {
     const rows: string[][] = [];
+    const links: CellLink[][][] = [];
     const counts = { math: 0, typos: 0 };
     for (const tr of node.querySelectorAll('tr') as Node[]) {
-      rows.push((tr.querySelectorAll('th,td') as Node[]).map((cell) => cellText(cell, counts).replace(/\s+/g, ' ').trim()));
+      const cells = (tr.querySelectorAll('th,td') as Node[]).map((cell) => {
+        const raw: CellOut = { text: '', links: [] };
+        cellInto(cell, counts, raw);
+        return normaliseCell(raw);
+      });
+      rows.push(cells.map((cell) => cell.text));
+      links.push(cells.map((cell) => cell.links));
     }
     const width = Math.max(0, ...rows.map((r) => r.length));
     if (!rows.length || !width) return [];
+    const hasLinks = links.some((row) => row.some((cell) => cell.length));
     return [{
       kind: 'table',
       text: '',
       runs: [],
       rows: rows.map((r) => [...r, ...Array(width - r.length).fill('')]),
+      ...(hasLinks ? { cellLinks: links } : {}),
       ...(counts.math ? { mathAsSource: counts.math } : {}),
       ...(counts.typos ? { mathTypos: counts.typos } : {}),
     }];
@@ -402,6 +469,8 @@ export interface PublishPlan {
   requests: unknown[];
   placeholders: Placeholder[];
   tables: string[][][];
+  /** #702: each table's cell links, in step with `tables` (table, row, column). */
+  tableLinks: CellLink[][][][];
   images: Block[];
 }
 
@@ -552,6 +621,7 @@ export function buildPublishPlan(blocks: Block[], options: PlanOptions): Publish
     requests,
     placeholders,
     tables: placeholders.filter((p) => p.block.kind === 'table').map((p) => p.block.rows ?? []),
+    tableLinks: placeholders.filter((p) => p.block.kind === 'table').map((p) => p.block.cellLinks ?? []),
     images: placeholders.filter((p) => p.block.kind === 'image').map((p) => p.block),
   };
 }
@@ -633,8 +703,12 @@ export function placeholderRequests(located: LocatedPlaceholder[], imageUris: Ma
   return { requests, skipped };
 }
 
-/** Fill table cells from a fresh read, last table, last row, last cell first. */
-export function tableCellRequests(doc: DocsDocument, tables: string[][][]): unknown[] {
+/**
+ * Fill table cells from a fresh read, last table, last row, last cell first.
+ * A cell's links (#702) are styled right after its text goes in, over ranges
+ * counted from that cell's start.
+ */
+export function tableCellRequests(doc: DocsDocument, tables: string[][][], tableLinks: CellLink[][][][] = []): unknown[] {
   const docTables = doc.body.content.filter((el) => el.table);
   const requests: unknown[] = [];
   for (let t = docTables.length - 1; t >= 0; t--) {
@@ -649,6 +723,10 @@ export function tableCellRequests(doc: DocsDocument, tables: string[][][]): unkn
         if (!value || typeof at !== 'number') continue;
         requests.push({ insertText: { location: { index: at }, text: value } });
         if (r === 0) requests.push({ updateTextStyle: { range: { startIndex: at, endIndex: at + value.length }, textStyle: { bold: true }, fields: 'bold' } });
+        for (const link of tableLinks[t]?.[r]?.[c] ?? []) {
+          if (link.end > value.length || link.end <= link.start) continue;
+          requests.push({ updateTextStyle: { range: { startIndex: at + link.start, endIndex: at + link.end }, textStyle: { link: { url: link.url } }, fields: 'link' } });
+        }
       }
     }
   }
