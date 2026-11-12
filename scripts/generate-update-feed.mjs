@@ -110,7 +110,7 @@ async function fetchExistingFeed(feedUrl) {
   }
 }
 
-function getNotesSummary(args, existingRelease) {
+export function getNotesSummary(args, existingRelease) {
   if (typeof args['notes-summary'] === 'string' && args['notes-summary'].trim()) {
     return args['notes-summary'].trim();
   }

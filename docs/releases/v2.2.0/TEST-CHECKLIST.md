@@ -202,7 +202,7 @@ Ctrl replaces ⌘. File, Edit, View and Help are behind the menu button at the s
 
 ### Settings, keys and the AI
 
-105. [ ] **Settings opens at once.** Open Settings on a lived-in, signed-in profile. It draws at once; the window's console (Help ▸ Toggle Developer Tools, or CDP) has a line `[Extension Host] settings: drawn <ms>, filled <ms>, slowest <step> <ms>`; record it. A built app writes the extension host's `console.log` to the window's console only, never to `exthost.log` (2.1 took about 13 s). **AI** <sub>147 tasks, #657, #593</sub>
+105. [ ] **Settings opens at once.** Open Settings on a lived-in, signed-in profile. It draws at once; the window's console (Help ▸ Toggle Developer Tools, or CDP) has a line `[Extension Host] settings: drawn <ms>, filled <ms>, slowest <step> <ms>`; record it (2.1 took about 13 s). A built app writes the extension host's `console.log` to the window's console only, never to `exthost.log`. **AI** <sub>147 tasks, #657, #593</sub>
 106. [ ] **API keys, the round trip** for one key: Add, the eye, Test, Change, Remove key. **Key** <sub>#657</sub>
 107. [ ] **Each AI answers.** A Claude turn; a ChatGPT turn whose sandbox commands run; OpenCode's permission gate (Deny writes nothing, Allow writes). **AI: Claude, ChatGPT; Key: OpenCode** <sub>release plan, Gates</sub>
 
