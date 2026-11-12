@@ -240,7 +240,7 @@ export function CommentsMenuButton({ getEditor }: { getEditor: () => TipTapEdito
 
           {summary.byAgent.length === 0 ? (
             <p className="mt-2 text-[11px] text-[var(--r-ink-muted)]">
-              No comments are assigned to an agent yet. Assign one with <code>@claude</code>, <code>@codex</code>, or <code>@opencode</code> in the comment text.
+              No comments are assigned to an agent yet. Assign one with <code>@claude</code>, <code>@chatgpt</code>, or <code>@opencode</code> in the comment text.
             </p>
           ) : (
             <>

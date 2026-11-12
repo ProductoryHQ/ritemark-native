@@ -15,6 +15,7 @@ import {
   hasCommentTerminator,
   detectAgentAlias,
   stripAgentMentions,
+  stripAssignmentMention,
 } from './commentModel'
 
 // The editor's own pipeline with the flag on: the comment tokenizer on
@@ -149,6 +150,19 @@ assert.equal(stripAgentMentions('@opencode, list three outcomes as bullets'), 'l
 assert.equal(stripAgentMentions('Please, @codex, tighten the intro'), 'Please, tighten the intro', 'a mid-note mention takes its comma with it')
 assert.equal(detectAgentAlias('see @codex. later'), null, 'a period after the mention still does NOT assign')
 assert.equal(detectAgentAlias('plain note'), null, 'no mention → not assigned')
+
+// #685: `@chatgpt` assigns to ChatGPT (the alias `codex`), in every form `@codex` does.
+assert.deepEqual(parseCommentBody('@chatgpt, tighten this'), { alias: 'codex', text: 'tighten this' }, '@chatgpt, … assigns')
+assert.deepEqual(parseCommentBody('@chatgpt: tighten this'), { alias: 'codex', text: 'tighten this' }, '@chatgpt: … assigns')
+assert.deepEqual(parseCommentBody('@chatgpt tighten this'), { alias: 'codex', text: 'tighten this' }, '@chatgpt … assigns')
+assert.equal(parseCommentBody('@ChatGPT tighten this').alias, 'codex', 'case-insensitive')
+assert.equal(detectAgentAlias('tighten this @chatgpt'), 'codex', 'a trailing @chatgpt assigns')
+assert.equal(detectAgentAlias('@chatgptx tighten this'), null, '@chatgptx does NOT assign')
+assert.equal(detectAgentAlias('see @chatgpt.com'), null, '@chatgpt.com (a domain) does NOT assign')
+assert.equal(detectAgentAlias('@codex: an old comment'), 'codex', 'an old @codex comment still assigns')
+assert.equal(stripAgentMentions('@chatgpt, tighten the intro'), 'tighten the intro', '@chatgpt is stripped for the prompt')
+assert.equal(stripAssignmentMention('@chatgpt: compare with @claude notes', 'codex'), 'compare with @claude notes', 'the assigned @chatgpt is stripped, another agent stays')
+assert.equal(stripAssignmentMention('@codex tighten', 'codex'), 'tighten', 'the assigned @codex is stripped as before')
 assert.equal(stripAgentMentions('@claude: rewrite this'), 'rewrite this', 'leading mention stripped for the prompt')
 assert.equal(stripAgentMentions('Väike kommentaar siia! @claude'), 'Väike kommentaar siia!', 'trailing mention stripped for the prompt')
 

@@ -36,15 +36,43 @@ export const ALIAS_LABEL: Record<CommentAgentAlias, string> = {
   opencode: 'OpenCode',
 }
 
+/**
+ * How an alias is written in a comment (#685). Ritemark calls the Codex runtime
+ * ChatGPT everywhere a person reads it, so `@chatgpt` is the spelling offered
+ * and `@codex` keeps working for comments already in people's files. Both
+ * resolve to the one alias `codex`: the stored body is the only thing that
+ * differs, and the host's alias list, the protocol and task records are
+ * unchanged.
+ */
+export const ALIAS_MENTION: Record<CommentAgentAlias, string> = {
+  claude: 'claude',
+  codex: 'chatgpt',
+  opencode: 'opencode',
+}
+
+/** Every spelling that assigns, and the alias it stands for. */
+const SPELLING_TO_ALIAS: Record<string, CommentAgentAlias> = {
+  claude: 'claude',
+  chatgpt: 'codex',
+  codex: 'codex',
+  opencode: 'opencode',
+}
+
+const SPELLINGS = Object.keys(SPELLING_TO_ALIAS)
+
+function aliasOf(spelling: string): CommentAgentAlias {
+  return SPELLING_TO_ALIAS[spelling.toLowerCase()]
+}
+
 // A note assigned to an agent starts with `@alias`; the colon is optional so
 // both `@claude: fix this` and `@claude fix this` assign (matches the compose
 // placeholder "… or @claude to assign"), and so does `@claude, fix this`: a
 // comma is how people address someone (Experience lead, 8 Nov 2026, experience
 // 45). Case-insensitive. The `(?=$|[\s:,])` lookahead requires the alias to end
-// at a space/colon/comma/end — so `@claudex` and `@codex.com` do NOT assign
-// (audit L-A).
+// at a space/colon/comma/end — so `@claudex`, `@chatgptx` and `@codex.com` do
+// NOT assign (audit L-A).
 const ALIAS_PATTERN = new RegExp(
-  `^@(${COMMENT_AGENT_ALIASES.join('|')})(?=$|[\\s:,])\\s*[:,]?\\s*([\\s\\S]*)$`,
+  `^@(${SPELLINGS.join('|')})(?=$|[\\s:,])\\s*[:,]?\\s*([\\s\\S]*)$`,
   'i',
 )
 
@@ -64,14 +92,14 @@ export function parseCommentBody(raw: string): ParsedCommentBody {
   const body = raw.trim()
   const m = ALIAS_PATTERN.exec(body)
   if (m) {
-    return { alias: m[1].toLowerCase() as CommentAgentAlias, text: m[2].trim() }
+    return { alias: aliasOf(m[1]), text: m[2].trim() }
   }
   return { alias: null, text: body }
 }
 
 /**
- * Detect which agent a comment is assigned to — the first `@claude`/`@codex`/
- * `@opencode` mention ANYWHERE in the body (case-insensitive), not just a leading
+ * Detect which agent a comment is assigned to — the first `@claude`/`@chatgpt`/
+ * `@codex`/`@opencode` mention ANYWHERE in the body (case-insensitive), not just a leading
  * prefix. This drives the assigned state + the Send-to-AI action, so writing
  * `@claude` mid-note (or after editing) also assigns it.
  */
@@ -79,21 +107,23 @@ export function parseCommentBody(raw: string): ParsedCommentBody {
  *  `@codex.com` (a domain) does not count, but `@claude`, `@claude `, `@claude:`
  *  and `@claude,` do.
  *  Exported so the rail highlights exactly the mentions that assign. */
-export const MENTION_SOURCE = `@(${COMMENT_AGENT_ALIASES.join('|')})(?=$|[\\s:,])`
+export const MENTION_SOURCE = `@(${SPELLINGS.join('|')})(?=$|[\\s:,])`
 
 export function detectAgentAlias(body: string): CommentAgentAlias | null {
   const m = new RegExp(MENTION_SOURCE, 'i').exec(body)
-  return m ? (m[1].toLowerCase() as CommentAgentAlias) : null
+  return m ? aliasOf(m[1]) : null
 }
 
 /**
  * Strip only the FIRST mention of the ASSIGNED agent (Codex review, PR #184) —
  * other mentions ("@claude compare with @codex notes") are meaningful context
- * for the task prompt and must survive.
+ * for the task prompt and must survive. Either spelling of the assigned agent
+ * counts (`@chatgpt` or `@codex`).
  */
 export function stripAssignmentMention(body: string, alias: CommentAgentAlias): string {
+  const spellings = SPELLINGS.filter((spelling) => SPELLING_TO_ALIAS[spelling] === alias)
   return body
-    .replace(new RegExp(`@(${alias})(?=$|[\\s:,])\\s*[:,]?`, 'i'), '')
+    .replace(new RegExp(`@(${spellings.join('|')})(?=$|[\\s:,])\\s*[:,]?`, 'i'), '')
     .replace(/\s{2,}/g, ' ')
     .trim()
 }

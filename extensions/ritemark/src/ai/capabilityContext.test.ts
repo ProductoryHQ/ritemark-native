@@ -46,7 +46,7 @@ test('names the on-disk comment carriers', () => {
     assert.ok(text.includes('<!-- note text -->'), 'standalone HTML comment carrier');
     assert.ok(text.includes('<!-- {id:…} note text -->'), 'the identity-carrying form of the same carrier');
     assert.ok(text.includes('<mark data-comment='), 'anchored mark carrier');
-    assert.ok(text.includes('@claude') && text.includes('@codex') && text.includes('@opencode'), 'assignment aliases');
+    assert.ok(text.includes('@claude') && text.includes('@chatgpt') && text.includes('@codex') && text.includes('@opencode'), 'assignment aliases');
   }
 });
 

@@ -24,7 +24,7 @@ import { COMMENT_AGENT_ALIASES, detectAgentAlias } from '../../extensions/commen
   )
   for (const option of AGENT_MENTION_OPTIONS) {
     assert.ok(option.label.trim().length > 0, `${option.alias} has a display name`)
-    const inserted = insertMention('', { start: 0, query: '' }, option.alias).text
+    const inserted = insertMention('', { start: 0, query: '' }, option.mention).text
     assert.equal(detectAgentAlias(inserted), option.alias, 'the inserted mention assigns')
   }
 }
@@ -52,6 +52,11 @@ import { COMMENT_AGENT_ALIASES, detectAgentAlias } from '../../extensions/commen
 {
   assert.equal(filterAgentOptions('').length, 3)
   assert.deepEqual(filterAgentOptions('c').map((o) => o.alias), ['claude', 'codex'])
+  // #685: ChatGPT is offered and inserted as `@chatgpt`; `@co…` still finds it.
+  assert.deepEqual(AGENT_MENTION_OPTIONS.map((o) => o.mention), ['claude', 'chatgpt', 'opencode'])
+  assert.deepEqual(filterAgentOptions('ch').map((o) => o.mention), ['chatgpt'])
+  assert.deepEqual(filterAgentOptions('chatgpt').map((o) => o.alias), ['codex'])
+  assert.deepEqual(filterAgentOptions('cod').map((o) => o.mention), ['chatgpt'])
   assert.deepEqual(filterAgentOptions('cla').map((o) => o.alias), ['claude'])
   assert.deepEqual(filterAgentOptions('CO').map((o) => o.alias), ['codex'])
   assert.deepEqual(filterAgentOptions('open').map((o) => o.alias), ['opencode'])
