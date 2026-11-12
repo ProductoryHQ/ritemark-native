@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] — 2.2.0
+## [2.2.0] — 2026-11-11
 
 ### 2.2: the Published chip's menu (Jarmo's test, 9 November)
 
@@ -133,7 +133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Security
 - **Electron 43.8.6, with Node.js 24.22.1 (#515).** The app moves from Electron 43.8.3 (Node 24.22.0) to the newest release of its line, which carries Node.js's security fixes of 21 October 2026, Chromium security fixes for everything Ritemark shows (the editor, previews and the built-in browser), and Electron's own fixes to file access checks and archive handling. Patch 020 has the new target, Electron's own checksums and the notices; nothing else changes.
 
-## [Unreleased] — 2.1.0
+## [2.1.0] — 2026-10-27
 
 ### Sprint 144, part 2: polish from the 2.1 smoke test (#569)
 
