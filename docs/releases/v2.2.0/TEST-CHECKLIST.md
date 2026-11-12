@@ -1,6 +1,8 @@
 # Ritemark 2.2.0 Test Checklist
 
-> **RC1, not built yet.** Written on 6 November 2026 for 2.2's first release candidate, from the [release plan](../../development/releases/v2.2.0/release-plan.md), the Gate rows, done lists and scenarios of Sprints 145–149 and 152–154, the review and merge records on 2.2's merged PRs, and the [release notes](release-notes.md). **Gate 1** is Jarmo on the signed, un-notarized arm64 Mac DMG. **Gate 2** is the x64 Mac DMG and the Windows installer. Results go into `evidence/` beside this file, and the sign-off table at the end records each gate in Jarmo's words. `main` is frozen from the version bump until publication, so this file and its record go into the closeout PR.
+> **Published on 11 November 2026** from the candidate built on 9 November at `d08d0c53` (Gate 1 passed 10 November, Gate 2 passed 11 November, published 19:02 UTC). Its record is the sign-off table at the end, the deferrals in Jarmo's words, and `evidence/` (`closeout.md`, `gate-results.md`).
+>
+> Written on 6 November 2026 for 2.2's first release candidate, from the [release plan](../../development/releases/v2.2.0/release-plan.md), the Gate rows, done lists and scenarios of Sprints 145–149 and 152–154, the review and merge records on 2.2's merged PRs, and the [release notes](release-notes.md). **Gate 1** is Jarmo on the signed, un-notarized arm64 Mac DMG. **Gate 2** is the x64 Mac DMG and the Windows installer. Results go into `evidence/` beside this file, and the sign-off table at the end records each gate in Jarmo's words. `main` is frozen from the version bump until publication, so this file and its record go into the closeout PR.
 
 Release: Ritemark 2.2 ([release plan](../../development/releases/v2.2.0/release-plan.md)). **Shell-tier:** a full app release on VS Code 1.142.0 with Electron 43.8.6 / Node 24.22.1 (patch 020, #620), with Claude Code 2.1.310 / Agent SDK 0.3.310, Codex 0.164.0 and OpenCode 1.19.4 bundled ([runtime review](runtime-review.md)). Notarization comes after the gates and the 60-minute hardening window; publication is for all three platforms at once, with the Store update.
 
@@ -8,15 +10,15 @@ Release: Ritemark 2.2 ([release plan](../../development/releases/v2.2.0/release-
 
 | | |
 |---|---|
-| Source commit (`origin/main`, the version bump's merge) | |
-| Release worktree | `.worktrees/release-<commit>` (new, from `create-release-worktree.sh`; RELEASE SOURCE VERIFIED) |
-| Publish (Sprint 149 PR 4, #668) | merged before the candidate: yes / no. If no, skip every row marked **PR 4** |
+| Source commit (`origin/main`, the version bump's merge) | `d08d0c53110dccb7e2ee480f4c2771ef5ac89e2e` (#698's merge, after the version bump #677) |
+| Release worktree | `.worktrees/release-d08d0c53110d` (new, from `create-release-worktree.sh`; RELEASE SOURCE VERIFIED) |
+| Publish (Sprint 149 PR 4, #668) | merged before the candidate: **yes** |
 
 | Platform | File in the release worktree's `dist/` | SHA-256 as tested (un-notarized) | DMG built | Notarize no earlier than | SHA-256 as published |
 |---|---|---|---|---|---|
-| macOS arm64 | `Ritemark-2.2.0-darwin-arm64.dmg` | | | | |
-| macOS x64 | `Ritemark-2.2.0-darwin-x64.dmg` | | | | |
-| Windows x64 | `Ritemark-Setup.exe` (from CI) | | CI | n/a | |
+| macOS arm64 | `Ritemark-2.2.0-darwin-arm64.dmg` | `ff32aca08b9f16ac2a29308509e84fa2322e003b4368580dc615aacf826e1d9e` | 9 Nov 11:27 EET | 9 Nov 12:27 EET (notarized 10 Nov) | `a1fd99cbea0b27186bf22758f635d4ad28db877a5ba3dc5db4f85370f821c8a1` |
+| macOS x64 | `Ritemark-2.2.0-darwin-x64.dmg` | `b36d4c415142866be743ab5ea0080d6c74dbcab5da18a8e5f84936312ec85a7d` | 10 Nov 18:53 EET | 10 Nov 19:53 EET (notarized 11 Nov) | `8d3f205d5eed9a4a5d93dae9c9f0dd089a29353eb9253b3799e099420b612c46` |
+| Windows x64 | `Ritemark-Setup.exe` (from CI) | `3b290edda8f2e34ba346289551967e35eb7216fa826aefc092e375b14647464e` | CI run 42585270616 | n/a | `3b290edda8f2e34ba346289551967e35eb7216fa826aefc092e375b14647464e` |
 
 2.1's closeout couldn't recover the hashes of the DMGs that passed its gates, so this time each un-notarized hash is written above when its gate starts.
 
@@ -194,19 +196,19 @@ Ctrl replaces ⌘. File, Edit, View and Help are behind the menu button at the s
 
 100. [ ] **Both changes stay, ten times.** Row 21 with a PowerShell write, ten times: both changes kept every time, no silent loss; row 23's shared paragraph raises Review changes. **AI**, or a PowerShell write <sub>145-S1, S56, #605</sub>
 101. [ ] **The Task board.** A card file locked by another program: Try again and Remove, the question and the result say Recycle Bin. A dragged card moves at once. <sub>145 R2, R3, #610</sub>
-102. [ ] **Search.** The Search box, the results in the tree's place and back, at 100%, 125% and 150%. Markdown, Word and PDF results open at the passage. Tooltips show Windows paths (`c:\…`). <sub>148 PR 3 Gate 2, #636, #641, #646</sub>
+102. [ ] **Search.** The Search box, the results in the tree's place and back, at 100%, 125% and 150%. Markdown, Word and PDF results open at the passage. Tooltips show the file's place in the project (`Docs/Brief.md`, as seen on Windows on 10 November), not a `c:\…` path. <sub>148 PR 3 Gate 2, #636, #641, #646</sub>
 103. [ ] **OneDrive.** In a OneDrive project, search a word inside a file and its name. Files are found by name only, and nothing downloads. **OneDrive** <sub>148 tasks; release-notes.md, Known issues</sub>
 104. [ ] **Comments and find marks**, Light and Dark: grey find marks, amber comments. <sub>#648</sub>
 
 ### Settings, keys and the AI
 
-105. [ ] **Settings opens at once.** Open Settings on a lived-in, signed-in profile. It draws at once; `exthost.log` has a line `settings: drawn <ms>, filled <ms>, slowest <step> <ms>`; record it (2.1 took about 13 s). **AI** <sub>147 tasks, #657, #593</sub>
+105. [ ] **Settings opens at once.** Open Settings on a lived-in, signed-in profile. It draws at once; the window's console (Help ▸ Toggle Developer Tools, or CDP) has a line `[Extension Host] settings: drawn <ms>, filled <ms>, slowest <step> <ms>`; record it (2.1 took about 13 s). A built app writes the extension host's `console.log` to the window's console only, never to `exthost.log`. **AI** <sub>147 tasks, #657, #593</sub>
 106. [ ] **API keys, the round trip** for one key: Add, the eye, Test, Change, Remove key. **Key** <sub>#657</sub>
 107. [ ] **Each AI answers.** A Claude turn; a ChatGPT turn whose sandbox commands run; OpenCode's permission gate (Deny writes nothing, Allow writes). **AI: Claude, ChatGPT; Key: OpenCode** <sub>release plan, Gates</sub>
 
 ### Transcribe
 
-108. [ ] **The silent microphone.** Record with a muted input. The line says "Settings ▸ System ▸ Sound", and the link opens Sound settings. **Mic** <sub>#661</sub>
+108. [ ] **The silent microphone.** In **Transcribe**, record with a muted input (voice dictation's "Ritemark Heard Nothing" is a different message). The line says "Settings ▸ System ▸ Sound", and the link opens Sound settings. **Mic** <sub>#661</sub>
 
 ### Publish a web page
 
@@ -248,16 +250,22 @@ Ctrl replaces ⌘. File, Edit, View and Help are behind the menu button at the s
 
 | Row | Why | Jarmo's words, date |
 |---|---|---|
-| | | |
+| 5–10 (release session, arm64: frame baseline retake, compare, first frame, control states, project switch, logs) | Not run; Gate 1 passed on Jarmo's own testing | "lükka edasi", 11 Nov 2026 |
+| 85 (x64 installed into `/Applications`) | Ran instead from the signed app in an isolated background window under Rosetta, `/Applications` untouched (`evidence/gate-results.md`) | "lükka edasi", 11 Nov 2026 |
+| 86, 87, 88, 89's search, 90's Open in your browser (x64) | About, AI turns, OpenCode's gate, search and the outside browser not run in the isolated window | "lükka edasi", 11 Nov 2026 |
+| 96, 115, 117, 98's Open Recent and switch steps (Windows) | Need a person at the PC (a 1.14.0 downgrade, real mouse and keyboard); Jarmo didn't want hand testing | "lükka edasi", 11 Nov 2026 |
+| 99, 106's Test, 107's ChatGPT and OpenCode turns (Windows) | No ChatGPT sign-in and no provider key on the PC | "lükka edasi", 11 Nov 2026 |
+| 103, 104, 112, 113, 114, 116, 118, 102's PDF, 101's dragged card (Windows) | Dropped as covered on the Mac, or not reached (103 would download OneDrive files if it failed) | "lükka edasi", 11 Nov 2026 |
+| 108's muted recording, 109's Open in your browser, 110's file list, 111 (Windows) | The PC's microphone was live; the outside browser would open on Jarmo's screen; no Cloudflare set up or Windows vault | "lükka edasi", 11 Nov 2026 |
 
 ## Sign-off
 
 | Gate | Platform | Artifact (SHA-256 as tested) | Technical (agent) | Jarmo | Notarized + stapled |
 |---|---|---|---|---|---|
-| Gate 1 | macOS arm64 | | | | |
-| Gate 2 | macOS x64 | | | | |
-| Gate 2 | Windows x64 | | | | n/a |
-| Publish | All three, one publication | | | | — |
+| Gate 1 | macOS arm64 | `ff32aca0…1e9e` | Rows 1–4a PASS (release session) | "Gate 1 passed", 10 Nov 2026 | Yes, 10 Nov (`a1fd99cb…`) |
+| Gate 2 | macOS x64 | `b36d4c41…5a7d` | 84a PASS; isolated run under Rosetta, no FAIL | "Gate 2 passed", 11 Nov 2026 | Yes, 11 Nov (`8d3f205d…`) |
+| Gate 2 | Windows x64 | `3b290edd…464e` | Windows session, no FAIL among rows run | "Gate 2 passed", 11 Nov 2026 | n/a |
+| Publish | All three, one publication | as published above | 10.1: published = built, every diff empty | "jah, lähme live'i", 11 Nov 2026 | — |
 
-**Gate 1 verdict:**
-**Gate 2 verdict:**
+**Gate 1 verdict:** passed. Jarmo, 10 November 2026: "Gate 1 passed".
+**Gate 2 verdict:** passed. Jarmo, 11 November 2026: "Gate 2 passed, lükka edasi, pane issue (2.3 not 2.2.1) ja merge privacy".

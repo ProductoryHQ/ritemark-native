@@ -110,13 +110,16 @@ async function fetchExistingFeed(feedUrl) {
   }
 }
 
-function getNotesSummary(args, existingRelease) {
+export function getNotesSummary(args, existingRelease) {
   if (typeof args['notes-summary'] === 'string' && args['notes-summary'].trim()) {
     return args['notes-summary'].trim();
   }
 
   if (typeof args['notes-file'] === 'string' && fs.existsSync(args['notes-file'])) {
+    // An HTML comment (the release-notes skill's source line at the top of the notes) is never the summary: 2.2.0's
+    // first feed took it as the line the app's update notice shows (caught before upload, 11 Nov 2026).
     const firstContentLine = fs.readFileSync(args['notes-file'], 'utf-8')
+      .replace(/<!--[\s\S]*?-->/g, '')
       .split(/\r?\n/)
       .map(line => line.trim())
       .find(line => line && !line.startsWith('#'));
