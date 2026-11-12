@@ -300,7 +300,7 @@ const SendIcon = () => (
 )
 
 /**
- * Render a note's text with any `@claude`/`@codex`/`@opencode` mention shown
+ * Render a note's text with any `@claude`/`@chatgpt`/`@codex`/`@opencode` mention shown
  * inline with a light-background chip (instead of a separate agent badge) — the
  * assignment lives in the text, not in extra chrome.
  */
@@ -441,7 +441,7 @@ function ComposeBubble({
             if (action.kind !== 'ignore') {
               e.preventDefault()
               if (action.kind === 'move') setActiveIndex(action.index)
-              else if (action.kind === 'insert') choose(options[action.index].alias)
+              else if (action.kind === 'insert') choose(options[action.index].mention)
               else setDismissedStart(mention ? mention.start : null)
               return
             }
@@ -472,7 +472,7 @@ function ComposeBubble({
               options={options}
               activeIndex={activeIndex}
               listId={listId}
-              onChoose={(option) => choose(option.alias)}
+              onChoose={(option) => choose(option.mention)}
               onActiveIndexChange={setActiveIndex}
             />
           ) : null
@@ -1180,7 +1180,7 @@ export function MarginCommentRail({
         return
       }
       if (!indexed.alias) {
-        localFailure('Assign an agent with @claude, @codex, or @opencode before sending.', {
+        localFailure('Assign an agent with @claude, @chatgpt, or @opencode before sending.', {
           code: 'unsupported-alias',
         })
         return

@@ -2,8 +2,9 @@
  * AgentMentionPicker — Sprint 117 R10 (#281): typing `@` in a comment offers
  * the agents that can actually be assigned.
  *
- * The list is built from `COMMENT_AGENT_ALIASES`, so what the picker inserts is
- * exactly what `detectAgentAlias` recognises: picker and collector share one
+ * The list is built from `COMMENT_AGENT_ALIASES`, and each row inserts that
+ * alias's written form (`ALIAS_MENTION`: `@chatgpt` for ChatGPT, #685), so what
+ * the picker inserts is exactly what `detectAgentAlias` recognises: picker and collector share one
  * vocabulary and a comment can never be "assigned" to something dispatch will
  * not see. No availability hint is shown — the editor webview does not receive
  * runtime status, and availability is decided at acceptance with a specific
@@ -15,18 +16,22 @@
 import { useEffect, useRef } from 'react'
 import {
   ALIAS_LABEL,
+  ALIAS_MENTION,
   COMMENT_AGENT_ALIASES,
   type CommentAgentAlias,
 } from '../../extensions/comment/commentModel'
 
 export interface AgentMentionOption {
   alias: CommentAgentAlias
+  /** What the row shows and inserts after the `@`. */
+  mention: string
   label: string
 }
 
 /** Every assignable agent, in the collector's own order. */
 export const AGENT_MENTION_OPTIONS: AgentMentionOption[] = COMMENT_AGENT_ALIASES.map((alias) => ({
   alias,
+  mention: ALIAS_MENTION[alias],
   label: ALIAS_LABEL[alias],
 }))
 
@@ -59,7 +64,11 @@ export function findMentionQuery(text: string, caret: number): MentionQuery | nu
   return { start: index, query: text.slice(index + 1, caret) }
 }
 
-/** Prefix filter on alias and display name; an empty query offers everything. */
+/**
+ * Prefix filter on the written mention, the alias and the display name; an
+ * empty query offers everything. The alias stays in, so typing `@co…` still
+ * finds ChatGPT for someone used to `@codex`.
+ */
 export function filterAgentOptions(
   query: string,
   options: readonly AgentMentionOption[] = AGENT_MENTION_OPTIONS,
@@ -67,7 +76,10 @@ export function filterAgentOptions(
   const needle = query.trim().toLowerCase()
   if (!needle) return [...options]
   return options.filter(
-    (option) => option.alias.startsWith(needle) || option.label.toLowerCase().startsWith(needle),
+    (option) =>
+      option.mention.startsWith(needle) ||
+      option.alias.startsWith(needle) ||
+      option.label.toLowerCase().startsWith(needle),
   )
 }
 
@@ -173,7 +185,7 @@ export function AgentMentionPicker({
           }}
           onMouseEnter={() => onActiveIndexChange(index)}
         >
-          <span className="rm-mention-opt-alias">@{option.alias}</span>
+          <span className="rm-mention-opt-alias">@{option.mention}</span>
           <span className="rm-mention-opt-label">{option.label}</span>
         </li>
       ))}
