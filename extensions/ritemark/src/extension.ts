@@ -65,6 +65,7 @@ import { BrowserNavigationRecorder, DID_NAVIGATE_COMMAND } from './browser/brows
 import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
 import { findReplacedTextTab, findStuckMarkdownTabs } from './utils/stickyTabHealer';
+import { firstRunThemeWrites } from './firstRunThemeSettings';
 import { openControlCatalogueIfAsked } from './views/ControlCataloguePanel';
 import { registerWebviewSheetDemoIfAsked } from './webviewSheet/devSheetDemo';
 import { openPublishSheetHarnessIfAsked } from './publish/devSheetHarness';
@@ -316,12 +317,12 @@ export function activate(context: vscode.ExtensionContext) {
   const lastDesignThemeMigration = context.globalState.get<string>('ritemark.designFoundationsThemeMigration');
   if (lastDesignThemeMigration !== designFoundationsThemeMigration) {
     setTimeout(async () => {
-      const wb = vscode.workspace.getConfiguration('workbench');
-      const win = vscode.workspace.getConfiguration('window');
-      await win.update('autoDetectColorScheme', true, vscode.ConfigurationTarget.Global);
-      await wb.update('iconTheme', 'ritemark-icons', vscode.ConfigurationTarget.Global);
-      await wb.update('preferredLightColorTheme', 'ritemark-light', vscode.ConfigurationTarget.Global);
-      await wb.update('preferredDarkColorTheme', 'ritemark-dark', vscode.ConfigurationTarget.Global);
+      // #461: only what the person hasn't set. A value already in settings.json before the first start
+      // (the person's, or an admin's) is kept.
+      const writes = firstRunThemeWrites((section, key) => vscode.workspace.getConfiguration(section).inspect(key)?.globalValue);
+      for (const setting of writes) {
+        await vscode.workspace.getConfiguration(setting.section).update(setting.key, setting.value, vscode.ConfigurationTarget.Global);
+      }
       context.globalState.update('ritemark.themeAppliedVersion', currentVersion);
       context.globalState.update('ritemark.designFoundationsThemeMigration', designFoundationsThemeMigration);
     }, 1500);
