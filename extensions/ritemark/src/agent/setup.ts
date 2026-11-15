@@ -502,24 +502,24 @@ function describeUnusableAuthCheck(unusable: ClaudeAuthCheckUnusable): string {
  * evidence (`probeClaudeAuth`).
  *
  * 1. The CLI says signed in: its own method. A Claude.ai sign-in still wins over a saved key.
- * 2. A key saved in Ritemark: `api-key`, also when the CLI says signed out (#541).
- * 3. The CLI says signed out: signed out.
- * 4. The CLI gave no usable answer: on macOS, Claude Code's Keychain item counts as a Claude.ai sign-in. On Windows
- *    nothing does: cmdkey's listing names its filter in its header, so it read as signed in on every PC (#703).
- *    Then `ANTHROPIC_API_KEY` in the environment, the weakest signal; else signed out.
+ * 2. The CLI says signed out: a key saved in Ritemark makes it `api-key` (#541); else signed out.
+ * 3. The CLI gave no usable answer (the reason is logged):
+ *    - on macOS, Claude Code's Keychain item counts as a Claude.ai sign-in, ahead of a saved key, so a person with a
+ *      plan isn't billed on their API key without being told (the Development manager, 16 November). On Windows
+ *      nothing does: cmdkey's listing names its filter in its header, so it read as signed in on every PC (#703);
+ *    - then a key saved in Ritemark: `api-key`;
+ *    - then `ANTHROPIC_API_KEY` in the environment, the weakest signal; else signed out.
  */
 export function detectClaudeAuthMethod(evidence: ClaudeAuthEvidence): ClaudeAuthMethod {
-  if ('method' in evidence.cli && evidence.cli.method !== null) {
-    return evidence.cli.method;
-  }
-  if (evidence.keySaved) {
-    return 'api-key';
-  }
   if ('method' in evidence.cli) {
-    return null;
+    if (evidence.cli.method !== null) return evidence.cli.method;
+    return evidence.keySaved ? 'api-key' : null;
   }
   if (evidence.platform === 'darwin' && evidence.keychainSignedIn) {
     return 'claude-oauth';
+  }
+  if (evidence.keySaved) {
+    return 'api-key';
   }
   if (evidence.envApiKey) {
     return 'api-key';
@@ -527,9 +527,9 @@ export function detectClaudeAuthMethod(evidence: ClaudeAuthEvidence): ClaudeAuth
   return null;
 }
 
-/** The decision reads the Keychain only on macOS, after an unusable CLI answer, with no key saved. */
-function needsKeychainCheck(platform: NodeJS.Platform, cli: ClaudeAuthCheck, keySaved: boolean): boolean {
-  return platform === 'darwin' && !keySaved && !('method' in cli);
+/** The decision reads the Keychain only on macOS, after an unusable CLI answer. */
+function needsKeychainCheck(platform: NodeJS.Platform, cli: ClaudeAuthCheck): boolean {
+  return platform === 'darwin' && !('method' in cli);
 }
 
 interface ClaudeAuthProbe {
@@ -548,7 +548,7 @@ async function probeClaudeAuth(platform: NodeJS.Platform, binaryPath: string): P
     diagnostics.push(line);
   }
 
-  const keychainSignedIn = needsKeychainCheck(platform, cli, key.saved) ? await keychainCheck() : undefined;
+  const keychainSignedIn = needsKeychainCheck(platform, cli) ? await keychainCheck() : undefined;
   const authMethod = detectClaudeAuthMethod({
     platform,
     cli,

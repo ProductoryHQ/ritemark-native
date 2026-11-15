@@ -166,7 +166,9 @@ const {
     ['#541: the same on Windows', { platform: 'win32', cli: said(null), keySaved: true }, 'api-key'],
     ['CLI signed out, no key: the Keychain and the environment do not count', { platform: 'darwin', cli: said(null), keychainSignedIn: true, envApiKey: true }, null],
     ['no CLI answer + saved key', { platform: 'win32', cli: unusable, keySaved: true }, 'api-key'],
-    ['no CLI answer + saved key on macOS: the key before the Keychain', { platform: 'darwin', cli: unusable, keySaved: true, keychainSignedIn: true }, 'api-key'],
+    ['no CLI answer + saved key on macOS: the Keychain item (a plan) before the key', { platform: 'darwin', cli: unusable, keySaved: true, keychainSignedIn: true }, 'claude-oauth'],
+    ['no CLI answer + saved key on macOS, no Keychain item: the key', { platform: 'darwin', cli: unusable, keySaved: true, keychainSignedIn: false }, 'api-key'],
+    ['no CLI answer + saved key + ANTHROPIC_API_KEY: the saved key', { platform: 'win32', cli: unusable, keySaved: true, envApiKey: true }, 'api-key'],
     ['no CLI answer on macOS: the Keychain item', { platform: 'darwin', cli: unusable, keychainSignedIn: true }, 'claude-oauth'],
     ['#703: no CLI answer on Windows, no key: signed out (cmdkey no longer counts)', { platform: 'win32', cli: unusable, keychainSignedIn: true }, null],
     ['no CLI answer, ANTHROPIC_API_KEY in the environment', { platform: 'win32', cli: unusable, envApiKey: true }, 'api-key'],
@@ -636,11 +638,17 @@ async function testSetupStatusProbe() {
     assert.ok(fromKeychain.result.diagnostics.includes(keychainLine));
     assert.ok(fromKeychain.warnings.includes(`[ritemark] ${keychainLine}`));
 
-    // With a key saved, the key decides and the Keychain isn't read.
+    // With a key saved too, the Keychain item still wins: a Claude.ai sign-in before the key, and the diagnostics say so.
     registerAnthropicKeyReader(async () => PLACEHOLDER_KEY);
     const keychainBefore = keychainCalls;
+    const keychainOverKey = (await captureWarnings(() => getSetupStatus())).result;
+    assert.strictEqual(keychainOverKey.authMethod, 'claude-oauth', 'no CLI answer + Keychain item + a saved key');
+    assert.ok(keychainOverKey.diagnostics.includes('Anthropic API key is configured, but Claude.ai credentials are active and take precedence.'));
+    assert.strictEqual(keychainCalls, keychainBefore + 1, 'the Keychain is read with a key saved too');
+    // With no Keychain item, the saved key.
+    keychainAnswer = false;
+    clearSetupCache();
     assert.strictEqual((await captureWarnings(() => getSetupStatus())).result.authMethod, 'api-key', 'no CLI answer + a saved key');
-    assert.strictEqual(keychainCalls, keychainBefore);
     registerAnthropicKeyReader(null);
 
     // ANTHROPIC_API_KEY in the environment is the last resort.

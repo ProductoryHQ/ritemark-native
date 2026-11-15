@@ -173,6 +173,8 @@ cli gave no usable answer:
    else                  -> null
 ```
 
+**Changed after PR A's review (the Development manager, 16 November):** when the CLI gives no usable answer, the macOS Keychain item comes before a saved key (decision 4: a Claude.ai sign-in wins over a saved key; billing a plan holder's API key unawares is the worse mistake). That branch is now: log why; macOS Keychain item → `claude-oauth`; saved Ritemark key → `api-key`; `ANTHROPIC_API_KEY` → `api-key`; else `null`. The CLI's own answers are unchanged.
+
 ## 3. Security points (PR A)
 - The key is read only on the host. It is never logged and never sent to the webview.
 - The Flow runner puts it in the CLI child's environment, as chats do.
