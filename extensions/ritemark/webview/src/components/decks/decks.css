@@ -18,7 +18,7 @@
 .deck-desk { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 
 .deck-strip { position: absolute; left: 0; top: 0; bottom: 0; width: var(--deck-strip); border-right: 1px solid var(--r-hairline); overflow-y: auto; overflow-x: hidden; padding: 6px 0 40px; box-sizing: border-box; outline: none; }
-.deck-thumb { position: relative; height: 62px; display: flex; align-items: flex-start; gap: 6px; padding: 3px 10px 0 6px; cursor: pointer; }
+.deck-thumb { position: relative; height: 62px; display: flex; align-items: flex-start; gap: 6px; padding: 3px 10px 0 6px; }
 .deck-thumb .deck-thumb-no { width: 18px; margin-top: 3px; text-align: right; font-size: 11px; font-weight: 500; line-height: 14px; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
 .deck-thumb .deck-thumb-slide { position: relative; width: 96px; height: 54px; border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline); }
 .deck-thumb:hover .deck-thumb-slide { box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 6px -2px rgba(30, 27, 75, 0.25); }
@@ -112,7 +112,6 @@
 .deck-sl .ic { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); margin-bottom: 18px; }
 .deck-sl .ic svg { width: 28px; height: 28px; }
 .deck-sl .ic.sm svg { width: 18px; height: 18px; }
-.deck-sl .pickic { cursor: pointer; }
 .deck-sl .pickic:hover, .deck-sl .pickic:focus-visible { outline: 0; box-shadow: 0 0 0 3px var(--s-foc, rgba(242,181,68,.6)); }
 .deck-sl .noic { background: transparent; box-shadow: inset 0 0 0 2px var(--s-accl, rgba(242,181,68,.35)); color: var(--s-acct, rgba(242,181,68,.6)); }
 .deck-sl .picbox { position: absolute; border-radius: var(--s-r2, 10px); overflow: hidden; display: grid; place-items: center; background: var(--s-pic, rgba(255,255,255,.05)); }

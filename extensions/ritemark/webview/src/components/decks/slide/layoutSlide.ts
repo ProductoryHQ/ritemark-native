@@ -112,6 +112,8 @@ function pickTier<T>(tiers: T[], fits: (tier: T) => boolean, step: number): T {
 }
 
 const KNOWN = new Set(['title', 'section', 'points', 'boxes', 'columns', 'statement', 'exercise', 'picture', 'table'])
+/** The kinds whose words are a list of items. */
+const ITEM_KINDS = new Set(['points', 'boxes', 'columns', 'exercise'])
 
 /** Lay a slide out. `editing` draws the places for words not yet written and for icons not yet chosen. */
 export function layoutSlide(kind: string, data: SlideData, options: { editing?: boolean; step?: number } = {}): SlideLayout {
@@ -121,7 +123,11 @@ export function layoutSlide(kind: string, data: SlideData, options: { editing?: 
   const known = KNOWN.has(kind)
   const title = data.title ?? ''
   const subtitle = data.subtitle ?? ''
-  const items: SlideItem[] = data.items ?? []
+  // On the stage an item kind with no items yet offers the first one to type in (two for Columns).
+  const placeholderItems = editing && (data.items ?? []).length === 0
+    ? kind === 'columns' ? [{ heading: '' }, { heading: '' }] : ITEM_KINDS.has(kind) ? [{ heading: '' }] : []
+    : []
+  const items: SlideItem[] = data.items?.length ? data.items : placeholderItems
   const n = Math.max(items.length, 1)
   const picture = known && kind !== 'picture' ? data.picture ?? 'none' : 'none'
 

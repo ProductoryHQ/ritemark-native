@@ -135,6 +135,7 @@ export function DeckView({
   const [current, setCurrent] = useState(0)
   const [stripWanted, setStripWanted] = useState(true)
   const [handoutWanted, setHandoutWanted] = useState(true)
+  const [notesOpen, setNotesOpen] = useState(false)
   const [ratio, setRatio] = useState(DEFAULT_RATIO)
   const [deskWidth, setDeskWidth] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -434,6 +435,8 @@ export function DeckView({
                 assets={assets}
                 width={bigWidth}
                 onWriting={onWriting}
+                notesOpen={notesOpen}
+                onNotesOpen={setNotesOpen}
               />
             ) : null}
           </div>

@@ -131,4 +131,11 @@ assert.equal(slideIcon('list-checks')?.phosphor, 'list-checks')
 assert.equal(slideIcon('chat')?.name, 'message-square')
 assert.equal(slideIcon('nope'), null)
 
+// An item kind with no items offers the first one on the stage (review of PR 2), but draws none on a thumbnail.
+for (const kind of ['points', 'boxes', 'exercise']) {
+  assert.ok(textBoxes(layoutSlide(kind, { title: 'T' }, { editing: true })).some(box => box.path === 'items.0.heading'), kind)
+  assert.ok(!textBoxes(layoutSlide(kind, { title: 'T' })).some(box => box.path === 'items.0.heading'), kind)
+}
+assert.deepEqual(textBoxes(layoutSlide('columns', { title: 'T' }, { editing: true })).map(box => box.path), ['title', 'items.0.heading', 'items.0.text', 'items.1.heading', 'items.1.text'])
+
 console.log('layoutSlide: passed')

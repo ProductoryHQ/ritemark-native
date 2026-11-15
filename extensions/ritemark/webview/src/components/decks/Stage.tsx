@@ -10,7 +10,7 @@
  * Every change is one transaction on the slide's node in the handout's editor, so it saves, merges and undoes as the
  * rest of the deck does; Cmd+Z on the stage runs the editor's undo.
  */
-import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { parseFrom, writeSlideBody, type SlideData } from '../../../../src/decks/deckFormat'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
@@ -32,6 +32,9 @@ interface StageProps {
   width: number
   /** The person is writing on this slide: the handout keeps it the current one. */
   onWriting: () => void
+  /** The speaker notes fold, open or closed for the whole deck (as the prototype keeps it). */
+  notesOpen: boolean
+  onNotesOpen: (open: boolean) => void
 }
 
 /** The library's topic or the deck a copy came from, for the quiet line under the slide. */
@@ -49,9 +52,8 @@ function notesPreview(notes: string | null): string {
   return text.length > 30 ? `${text.slice(0, 30)}…` : text
 }
 
-export function Stage({ editor, slide, theme, borderless, assets, width, onWriting }: StageProps) {
+export function Stage({ editor, slide, theme, borderless, assets, width, onWriting, notesOpen, onNotesOpen }: StageProps) {
   const [focusPath, setFocusPath] = useState<string | null>(null)
-  const [notesOpen, setNotesOpen] = useState(false)
   const notesRef = useRef<HTMLDivElement>(null)
 
   /** Change this slide's data (and its notes) in one transaction, from the editor's document as it is now. */
@@ -102,9 +104,11 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
     const data = slide.data
     const cell = cellPath(path)
     if (cell && (event.key === 'Tab' || (event.key === 'Enter' && !event.shiftKey))) {
-      const move = nextCell(data, path, event.key === 'Enter' ? 'enter' : event.shiftKey ? 'shift-tab' : 'tab')
+      const key = event.key === 'Enter' ? 'enter' : event.shiftKey ? 'shift-tab' : 'tab'
+      const move = nextCell(data, path, key)
       if (!move) return event.key === 'Tab'
-      if (move.data !== data) write(() => move.data, move.path)
+      // The rows come from the document as it is now, so the words just typed are kept.
+      if (move.data !== data) write(current => nextCell(current, path, key)?.data ?? current, move.path)
       else setFocusPath(move.path)
       return true
     }
@@ -134,16 +138,19 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
     return false
   }
 
-  const editing: SlideEditing = {
+  // One editing object per slide, words and caret target, so the stage's canvas redraws only when they change.
+  const onKeyRef = useRef(onKey)
+  onKeyRef.current = onKey
+  const editing: SlideEditing = useMemo(() => ({
     onText: (path, value) => {
       onWriting()
       write(current => setPath(current, path, value))
     },
-    onKey,
+    onKey: (path, event) => onKeyRef.current(path, event),
     onSetIcon: (index, name) => write(current => setIcon(current, index, name)),
     focusPath,
     onFocused: () => setFocusPath(null),
-  }
+  }), [onWriting, write, focusPath])
 
   // The notes, uncontrolled while they have the caret, as the slide's words are.
   useLayoutEffect(() => {
@@ -182,7 +189,7 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
             variant="ghost"
             className={`deck-notes-toggle${notesOpen ? ' is-open' : ''}`}
             aria-expanded={notesOpen}
-            onClick={() => setNotesOpen(open => !open)}
+            onClick={() => onNotesOpen(!notesOpen)}
           >
             <Icon name="caret-right" size={12} tone="inherit" />
             <span className="deck-notes-label">Speaker notes{preview ? ` · ${preview}` : ''}</span>
