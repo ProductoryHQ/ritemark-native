@@ -6,6 +6,7 @@ import {
   classifyRuntimeError,
   isGoogleModelRefusal,
   codexTurnErrorCode,
+  googleRetryDelaySeconds,
   isClaudeAuthenticationError,
   presentRuntimeError,
   serviceRetryAt,
@@ -474,4 +475,127 @@ console.log('runtimeErrorPresentation: Sprint 139 card copy passes');
   assert.equal(retryingOffersAlternative(60_000), false);
   assert.equal(retryingOffersAlternative(undefined), false);
   console.log('runtimeErrorPresentation: Sprint 143 busy card and waiting line pass');
+}
+
+// ── Sprint 160 (#686): Google's 429 with a time to retry is the model's usage limit, not "Add credits" ──
+{
+  // The 429 body the Gemini API sends for a used-up quota: google.rpc.Status with QuotaFailure, Help and
+  // RetryInfo (Google's error model, AIP-193), its message ending "Please retry in …". Google's own pages
+  // name `429 RESOURCE_EXHAUSTED` without showing a body; this is its shape in public reports.
+  const googleBody = (withTime: boolean) => JSON.stringify({
+    error: {
+      code: 429,
+      message: 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. \n'
+        + '* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 10, model: gemini-3.8-flash'
+        + (withTime ? '\nPlease retry in 41.143481245s.' : ''),
+      status: 'RESOURCE_EXHAUSTED',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+          violations: [{
+            quotaMetric: 'generativelanguage.googleapis.com/generate_content_free_tier_requests',
+            quotaId: 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier',
+            quotaDimensions: { location: 'global', model: 'gemini-3.8-flash' },
+            quotaValue: '10',
+          }],
+        },
+        { '@type': 'type.googleapis.com/google.rpc.Help', links: [{ description: 'Learn more about Gemini API quotas', url: 'https://ai.google.dev/gemini-api/docs/rate-limits' }] },
+        ...(withTime ? [{ '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '41s' }] : []),
+      ],
+    },
+  });
+  const names = { label: (id: string) => (id === 'google/gemini-3.8-flash' ? 'Gemini 3.8 Flash' : undefined) };
+  const hints = { turnModel: 'opencode:google/gemini-3.8-flash', names };
+
+  // With the time: a usage limit, the model named, the time kept.
+  const before = Date.now();
+  const timed = classifyRuntimeError('opencode', googleBody(true), hints);
+  assert.equal(timed?.kind, 'limit');
+  assert.equal(timed?.detail?.limit, 'plan', 'a usage limit, not a quota to pay for');
+  assert.equal(timed?.detail?.billing, undefined, 'no billing page');
+  assert.equal(timed?.detail?.model, 'google/gemini-3.8-flash');
+  const retryAt = Date.parse(timed?.detail?.retryAt ?? '');
+  assert.ok(retryAt - before >= 41_000 && retryAt - before < 47_000, 'forty-two seconds from now');
+  assert.equal(timed?.sentence, "You've used Gemini 3.8 Flash's limit for now. It can answer again in a minute. Until then, use another model.");
+  assert.doesNotMatch(timed?.sentence ?? '', /credits|AI Studio|RESOURCE_EXHAUSTED|429/);
+  // Through OpenCode's ACP wrapper, and as the message alone or the RetryInfo alone.
+  assert.equal(classifyRuntimeError('opencode', `Internal error: ${googleBody(true)}`, hints)?.detail?.limit, 'plan');
+  assert.equal(classifyRuntimeError('opencode', 'You exceeded your current quota, please check your plan and billing details. Please retry in 41s.', hints)?.detail?.limit, 'plan');
+  assert.equal(classifyRuntimeError('opencode', '{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED","details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"7s"}]}}', hints)?.detail?.limit, 'plan');
+
+  // Without the time: the quota card, as before.
+  assert.deepEqual(classifyRuntimeError('opencode', googleBody(false), hints)?.detail, { billing: 'google', limit: 'quota' });
+  // Google's spent credits stay a billing message, whatever else the text says.
+  assert.deepEqual(
+    classifyRuntimeError('opencode', 'Internal error: Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing. Please retry in 41s.', hints)?.detail,
+    { billing: 'google', limit: 'credits' },
+  );
+  // Only Google's: OpenAI's quota is billing, with or without a time; ChatGPT's 429 is still busy.
+  assert.deepEqual(
+    classifyRuntimeError('opencode', '{"error":{"message":"You exceeded your current quota, please check your plan and billing details. Please retry in 20s.","type":"insufficient_quota","code":"insufficient_quota"}}', { turnModel: 'openai/gpt-5.6' })?.detail,
+    { billing: 'openai', limit: 'quota' },
+  );
+  assert.deepEqual(classifyRuntimeError('codex', 'Rate limit reached', { code: 'rateLimitExceeded' })?.detail, { limit: 'busy' });
+
+  // Google's duration words.
+  assert.equal(googleRetryDelaySeconds('Please retry in 41.143481245s.'), 41.143481245);
+  assert.equal(googleRetryDelaySeconds('Please retry in 1m3s.'), 63);
+  assert.equal(googleRetryDelaySeconds('Please retry in 250ms.'), 0.25);
+  assert.equal(googleRetryDelaySeconds('{\\"retryDelay\\": \\"12s\\"}'), 12, 'a detail quoted inside a message');
+  assert.equal(googleRetryDelaySeconds('Please retry later.'), undefined);
+  assert.equal(googleRetryDelaySeconds('retry in 5 minutes'), undefined, "not Google's words");
+  // More than a day away: still the model's limit, with no time.
+  const far = classifyRuntimeError('opencode', 'You exceeded your current quota. Please retry in 90000s.', hints);
+  assert.deepEqual(far?.detail, { limit: 'plan', model: 'google/gemini-3.8-flash' });
+  assert.equal(far?.sentence, "You've used Gemini 3.8 Flash's limit for now. Try again later, or use another model.");
+
+  // The card (the Experience lead's words, 15 November).
+  const now = Date.parse('2026-11-16T13:00:00.000Z');
+  const formatTime = () => '3:12 PM';
+  const card = (detail: Record<string, unknown>, extra: Partial<Parameters<typeof turnFailureCard>[0]> = {}) => turnFailureCard({
+    runtimeId: 'opencode', kind: 'limit', detail, sentence: '', names, now, formatTime, ...extra,
+  });
+  const model = 'google/gemini-3.8-flash';
+  assert.deepEqual(card({ limit: 'plan', model, retryAt: '2026-11-16T13:12:00.000Z' }), {
+    title: "You've used Gemini 3.8 Flash's limit for now",
+    message: 'It can answer again after 3:12 PM. Until then, use another model.',
+  }, "with a time, in the person's own format; no other model and no other AI: no button");
+  assert.equal(card({ limit: 'plan', model, retryAt: '2026-11-16T13:00:41.000Z' })?.message,
+    'It can answer again in a minute. Until then, use another model.', 'under two minutes');
+  assert.equal(card({ limit: 'plan', model, retryAt: '2026-11-16T13:01:59.000Z' })?.message,
+    'It can answer again in a minute. Until then, use another model.');
+  assert.equal(card({ limit: 'plan', model, retryAt: '2026-11-16T13:02:00.000Z' })?.message,
+    'It can answer again after 3:12 PM. Until then, use another model.', 'two minutes is a time');
+  assert.equal(card({ limit: 'plan', model, retryAt: '2026-11-16T12:59:00.000Z' })?.message,
+    'It can answer again after 3:12 PM. Until then, use another model.', 'a time already past is never "in a minute"');
+  assert.equal(card({ limit: 'plan', model })?.message, 'Try again later, or use another model.', 'no time');
+  assert.equal(card({ limit: 'plan', model: 'google/gemini-unlisted' })?.title, "You've used this model's limit for now", 'the label unknown');
+  assert.equal(card({ limit: 'plan' })?.title, "You've used this model's limit for now", 'no model');
+  // The model card's Use <model> beside it; with no other model, another ready AI.
+  const twoNames = { label: (id: string) => ({ [model]: 'Gemini 3.8 Flash', 'google/gemini-3.8-pro': 'Gemini 3.8 Pro' } as Record<string, string>)[id] };
+  assert.deepEqual(card({ limit: 'plan', model, retryAt: '2026-11-16T13:00:41.000Z' }, { fallbackModel: 'google/gemini-3.8-pro', names: twoNames })?.action, {
+    kind: 'use-model',
+    label: 'Use Gemini 3.8 Pro',
+    tooltip: "Switch this chat to Gemini 3.8 Pro. You'll need to send your message again.",
+    modelId: 'google/gemini-3.8-pro',
+  });
+  assert.equal(card({ limit: 'plan', model }, { fallbackModel: model })?.action, undefined, 'never the model at its limit');
+  assert.deepEqual(card({ limit: 'plan', model }, { readyAlternative: 'claude-code' })?.action, {
+    kind: 'use-runtime', label: 'Continue with Claude', tooltip: 'Continue this chat with Claude.', runtimeId: 'claude-code',
+  });
+  assert.equal(card({ limit: 'plan', model }, { fallbackModel: 'google/gemini-3.8-pro', readyAlternative: 'claude-code' })?.action?.kind, 'use-model', 'another model first');
+  assert.deepEqual(card({ limit: 'plan', model }, { fallbackModel: 'google/gemini-3.8-pro', switchedTo: 'google/gemini-3.8-pro', names: twoNames }), {
+    title: 'Now using Gemini 3.8 Pro', message: "Send your message again when you're ready.", done: true,
+  }, 'after the switch it says so, as the model card does');
+  // ChatGPT's and Claude's plan cards keep their words.
+  assert.equal(turnFailureCard({ runtimeId: 'codex', kind: 'limit', detail: { limit: 'plan' }, sentence: '' })?.title, "You've used ChatGPT's limit for now");
+  assert.equal(failureSilencesStatusLine('opencode', 'limit', { limit: 'plan' }), true, 'the card speaks; the status line stays silent');
+  // The sentence the record keeps reads as the card does.
+  assert.equal(
+    failureSentence({ runtimeId: 'opencode', kind: 'limit', detail: { limit: 'plan', model, retryAt: '2026-11-16T13:12:00.000Z' }, providerSentence: '', names, now, formatTime }),
+    "You've used Gemini 3.8 Flash's limit for now. It can answer again after 3:12 PM. Until then, use another model.",
+  );
+  // A record keeps the detail.
+  assert.deepEqual(decodeRuntimeErrorDetail({ limit: 'plan', model, retryAt: '2026-11-16T13:12:00.000Z' }), { limit: 'plan', model, retryAt: '2026-11-16T13:12:00.000Z' });
+  console.log('runtimeErrorPresentation: Sprint 160 usage limit passes');
 }

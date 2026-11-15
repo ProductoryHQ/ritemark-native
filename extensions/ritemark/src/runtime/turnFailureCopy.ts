@@ -42,6 +42,10 @@ export type LimitKind = 'credits' | 'quota' | 'plan' | 'busy';
 
 const LIMIT_KINDS: readonly LimitKind[] = ['credits', 'quota', 'plan', 'busy'];
 
+export function isLimitKind(value: unknown): value is LimitKind {
+  return typeof value === 'string' && (LIMIT_KINDS as readonly string[]).includes(value);
+}
+
 /** What a card needs beyond the kind. Every field is optional and checked when read. */
 export interface RuntimeErrorDetail {
   /** `model`: the model id the AI refused. */
@@ -69,7 +73,7 @@ export function decodeRuntimeErrorDetail(value: unknown): RuntimeErrorDetail | u
   if (typeof input.billing === 'string' && (BILLING_PROVIDERS as readonly string[]).includes(input.billing)) {
     detail.billing = input.billing as BillingProvider;
   }
-  if (typeof input.limit === 'string' && (LIMIT_KINDS as readonly string[]).includes(input.limit)) detail.limit = input.limit as LimitKind;
+  if (isLimitKind(input.limit)) detail.limit = input.limit;
   if (typeof input.resetsAt === 'string' && input.resetsAt.trim() && input.resetsAt.length <= 64) detail.resetsAt = input.resetsAt.trim();
   if (typeof input.retryAt === 'string' && input.retryAt.length <= 64 && Number.isFinite(Date.parse(input.retryAt))) detail.retryAt = input.retryAt;
   if (input.exited === true) detail.exited = true;
@@ -232,6 +236,25 @@ export function continueWithAction(alternative: AgentId, where: 'waiting' | 'car
   };
 }
 
+// ── Sprint 160 (#686): a model's usage limit on OpenCode (the Experience lead, 15 November) ──
+
+/** "You've used Gemini 3.8 Flash's limit for now", or "this model's" when the catalog has no label for it. */
+function modelLimitTitle(names: ModelNames | undefined, modelId: string | undefined): string {
+  const label = modelId ? names?.label(modelId) : undefined;
+  return `You've used ${label ? `${label}'s` : "this model's"} limit for now`;
+}
+
+/**
+ * When the model can answer again: after the time the service gave, in the person's own format; "in a
+ * minute" when that is under two minutes away; with no time, "Try again later".
+ */
+function modelLimitBody(retryAt: string | undefined, now: number, formatTime: (iso: string) => string): string {
+  if (!retryAt) return 'Try again later, or use another model.';
+  const msLeft = Date.parse(retryAt) - now;
+  if (msLeft > 0 && msLeft < 120_000) return 'It can answer again in a minute. Until then, use another model.';
+  return `It can answer again after ${formatTime(retryAt)}. Until then, use another model.`;
+}
+
 /** The provider's own sentence, ending in a stop, or '' when it is only our fallback. */
 function providerWords(name: string, providerSentence: string): string {
   const said = providerSentence.trim();
@@ -258,6 +281,9 @@ export function failureSentence(input: {
   detail?: RuntimeErrorDetail;
   providerSentence: string;
   names?: ModelNames;
+  /** Sprint 160: the time now, and how a time of day is written (tests pass fixed ones). */
+  now?: number;
+  formatTime?: (iso: string) => string;
 }): string {
   const name = aiName(input.runtimeId);
   const detail = input.detail ?? {};
@@ -273,6 +299,9 @@ export function failureSentence(input: {
         : `${name} couldn't use ${failed}. It isn't available in Ritemark right now.`;
     }
     case 'limit': {
+      if (detail.limit === 'plan' && input.runtimeId === 'opencode') {
+        return `${modelLimitTitle(input.names, detail.model)}. ${modelLimitBody(detail.retryAt, input.now ?? Date.now(), input.formatTime ?? personTime)}`;
+      }
       if (detail.limit === 'plan') {
         return `You've used ${name}'s limit for now. ${detail.resetsAt ? `It resets ${detail.resetsAt}.` : 'Try again later.'}`;
       }
@@ -329,6 +358,8 @@ export function turnFailureCard(input: {
   readyAlternative?: AgentId;
   /** Sprint 143: how a time of day is written; the person's own format by default (tests pass a fixed one). */
   formatTime?: (iso: string) => string;
+  /** Sprint 160: the time now, for "in a minute" (tests pass a fixed one). */
+  now?: number;
 }): TurnFailureCardCopy | null {
   const name = aiName(input.runtimeId);
   const detail = input.detail ?? {};
@@ -380,6 +411,36 @@ export function turnFailureCard(input: {
             ? `It turned this request away several times. Send your message again after ${(input.formatTime ?? personTime)(detail.retryAt)}.`
             : BUSY_BODY,
           ...(alternative ? { action: { kind: 'use-runtime' as const, ...continueWithAction(alternative, 'card'), runtimeId: alternative, carryMessage: true } } : {}),
+        };
+      }
+      if (detail.limit === 'plan' && input.runtimeId === 'opencode') {
+        // Sprint 160 (#686): the model's limit, with when it can answer again and another model to use now:
+        // the model card's Use <model> (which then says so, as on the model card), or, with no other model,
+        // another AI that is ready.
+        if (input.switchedTo) {
+          return { title: `Now using ${modelLabel(input.names, input.switchedTo)}`, message: "Send your message again when you're ready.", done: true };
+        }
+        const fallback = input.fallbackModel && input.fallbackModel !== detail.model ? input.fallbackModel : undefined;
+        const alternative = input.readyAlternative && input.readyAlternative !== input.runtimeId ? input.readyAlternative : undefined;
+        const fallbackLabel = fallback ? modelLabel(input.names, fallback) : undefined;
+        return {
+          title: modelLimitTitle(input.names, detail.model),
+          message: modelLimitBody(detail.retryAt, input.now ?? Date.now(), input.formatTime ?? personTime),
+          ...(fallback && fallbackLabel ? {
+            action: {
+              kind: 'use-model' as const,
+              label: `Use ${fallbackLabel}`,
+              tooltip: `Switch this chat to ${fallbackLabel}. You'll need to send your message again.`,
+              modelId: fallback,
+            },
+          } : alternative ? {
+            action: {
+              kind: 'use-runtime' as const,
+              label: `Continue with ${aiName(alternative)}`,
+              tooltip: `Continue this chat with ${aiName(alternative)}.`,
+              runtimeId: alternative,
+            },
+          } : {}),
         };
       }
       if (detail.limit === 'plan') {
