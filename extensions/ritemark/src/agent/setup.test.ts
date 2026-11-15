@@ -575,27 +575,27 @@ async function testSetupStatusProbe() {
     assert.strictEqual(oauthWithKey.authMethod, 'claude-oauth');
     assert.ok(oauthWithKey.diagnostics.includes('Anthropic API key is configured, but Claude.ai credentials are active and take precedence.'));
 
-    // The saved key changed (SecretStorage's onDidChange, this window or another): a status decided with the other
-    // answer is dropped and every surface hears it; the same answer keeps it and says nothing.
+    // The saved key changed (SecretStorage's onDidChange, this window or another): the cached status is dropped, with
+    // no event, and a probe still running then caches nothing.
     const heard: string[] = [];
     const stopListening = onClaudeStatusInvalidated((event) => { heard.push(event.reason); });
     try {
-      // This status was decided with a key saved: the same answer says nothing and keeps it.
       set({ calls: '' });
-      await anthropicKeyChanged();
-      assert.deepStrictEqual(heard, [], 'the same answer: nothing to say');
-      assert.strictEqual(await getSetupStatus(), oauthWithKey, 'and the cached status stays');
-      assert.deepStrictEqual(calls(), []);
-      // The key removed, e.g. in another window: the other answer.
-      let keyNow: string | undefined = PLACEHOLDER_KEY;
-      registerAnthropicKeyReader(async () => keyNow);
-      const decided = await getSetupStatus();
-      set({ calls: '' });
-      keyNow = undefined;
-      await anthropicKeyChanged();
-      assert.deepStrictEqual(heard, ['settings-updated'], 'the other answer: every surface hears it');
-      assert.notStrictEqual(await getSetupStatus(), decided, 'and the next check probes again');
+      anthropicKeyChanged();
+      const afterChange = await getSetupStatus();
+      assert.notStrictEqual(afterChange, oauthWithKey, 'the next check probes again');
       assert.deepStrictEqual(calls(), ['--version', 'auth status --json']);
+
+      set({ 'auth-delay': '0.5', calls: '' });
+      clearSetupCache();
+      const inFlight = getSetupStatus();
+      await waitFor(() => calls().includes('auth status --json'), 'the auth check never started');
+      anthropicKeyChanged(); // e.g. the key removed in another window while this probe read it
+      await inFlight;
+      set({ 'auth-delay': '0', calls: '' });
+      await getSetupStatus();
+      assert.deepStrictEqual(calls(), ['--version', 'auth status --json'], 'the probe that was running kept nothing');
+      assert.deepStrictEqual(heard, [], 'no event: a sign-in still running is not ended by a key change');
     } finally {
       stopListening();
     }

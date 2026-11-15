@@ -282,12 +282,12 @@ export function activate(context: vscode.ExtensionContext) {
   snapshotTestKeys();
   // Sprint 160 (#541): one reader of the saved Anthropic key, for Claude's readiness (every check; only true or false
   // comes back from setup.ts) and for a Flow's Claude step, which runs on the key. A key saved or removed anywhere,
-  // another window included, re-decides a status that was decided with the other answer.
+  // another window included, drops the cached status, so the next check reads it again.
   const readAnthropicKey = () => readProviderKey(context.secrets, 'anthropic-api-key');
   registerAnthropicKeyReader(readAnthropicKey);
   setClaudeCodeNodeKeyReader(readAnthropicKey);
   context.subscriptions.push(context.secrets.onDidChange((event) => {
-    if (event.key === 'anthropic-api-key') void anthropicKeyChanged();
+    if (event.key === 'anthropic-api-key') anthropicKeyChanged();
   }));
 
   // === Theme & branding: fresh install, version upgrade, or design-foundation migration ===

@@ -16,7 +16,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { getCurrentPlatform } from '../utils/platform';
 import { findBundledAgentRuntime, isBundledAgentRuntimePath, readAgentRuntimePreference, readBundledRuntimeVersion, type AgentRuntimePreference } from '../utils/bundledAgentRuntime';
-import { emitClaudeStatusInvalidated, onClaudeStatusInvalidated } from './claudeStatusEvents';
+import { onClaudeStatusInvalidated } from './claudeStatusEvents';
 import { runProcess, type ProcessResult } from '../utils/runProcess';
 import type {
   AgentEnvironmentStatus,
@@ -29,8 +29,6 @@ import type {
 } from './types';
 
 let cachedStatus: SetupStatus | null = null;
-// Whether the cached status was decided with a saved Anthropic key (null: no key was read for it).
-let cachedKeySaved: boolean | null = null;
 // Written only by the shared sign-in owner, claudeLogin.ts (Sprint 160, #696): a poll, a re-check or a saved key
 // never ends a sign-in that is still running.
 let claudeLoginInProgress = false;
@@ -44,7 +42,6 @@ let inflightStatus: { epoch: number; promise: Promise<SetupStatus> } | null = nu
 
 function invalidateStatus(): void {
   cachedStatus = null;
-  cachedKeySaved = null;
   statusEpoch += 1;
 }
 
@@ -621,17 +618,13 @@ export function deriveClaudeSetupStatus(input: ClaudeStatusInput): SetupStatus {
 }
 
 /**
- * The saved Anthropic key changed (SecretStorage's onDidChange, from this window or another; `extension.ts` listens).
- * When the cached status was decided with the other answer, every surface hears it ('settings-updated'), which drops
- * the cache. A save in this window has already said so itself, so it finds no cached answer, or the same one.
+ * The saved Anthropic key changed (SecretStorage's onDidChange, from this window or another, any writer; `extension.ts`
+ * listens). The cached status is dropped, and a probe still running caches nothing, so the next check reads the key
+ * again. No event: a save in Ritemark's own surfaces says 'settings-updated' itself, and an event here would end a
+ * sign-in that still runs on Home or the welcome (a key makes Claude usable) or stop its polls.
  */
-export async function anthropicKeyChanged(): Promise<void> {
-  if (cachedKeySaved === null) return;
-  const decidedWith = cachedKeySaved;
-  const { saved } = await readAnthropicKeySaved();
-  if (cachedKeySaved === decidedWith && saved !== decidedWith) {
-    emitClaudeStatusInvalidated('settings-updated');
-  }
+export function anthropicKeyChanged(): void {
+  invalidateStatus();
 }
 
 /** Only `claudeLogin.ts`, the shared sign-in owner, calls this (Sprint 160, #696; `claudeLogin.test.ts` checks). */
@@ -656,7 +649,7 @@ export function clearSetupCache(): void {
   invalidateStatus();
 }
 
-async function probeSetupStatus(epoch: number): Promise<{ status: SetupStatus; keySaved: boolean | null }> {
+async function probeSetupStatus(epoch: number): Promise<SetupStatus> {
   const binary = await inspectClaudeBinary();
   // Not clearClaudePendingReload(): that would invalidate this very probe. A
   // probe overtaken by an invalidation leaves the flags to the newer one.
@@ -667,7 +660,7 @@ async function probeSetupStatus(epoch: number): Promise<{ status: SetupStatus; k
 
   const authCheckPath = binary.authCheckPath ?? binary.path;
   const auth = binary.runnable && authCheckPath ? await probeClaudeAuth(getCurrentPlatform(), authCheckPath) : null;
-  const status = deriveClaudeSetupStatus({
+  return deriveClaudeSetupStatus({
     binary,
     authMethod: auth?.authMethod ?? null,
     keySaved: auth?.keySaved ?? false,
@@ -676,16 +669,14 @@ async function probeSetupStatus(epoch: number): Promise<{ status: SetupStatus; k
     pendingReload: claudePendingReload,
     pendingReloadDiagnostics: claudePendingReloadDiagnostics,
   });
-  return { status, keySaved: auth ? auth.keySaved : null };
 }
 
 function startSetupStatusProbe(): Promise<SetupStatus> {
   const epoch = statusEpoch;
-  const promise = probeSetupStatus(epoch).then(({ status, keySaved }) => {
+  const promise = probeSetupStatus(epoch).then((status) => {
     // A probe that started before an invalidation must not replace newer state.
     if (epoch === statusEpoch) {
       cachedStatus = status;
-      cachedKeySaved = keySaved;
     }
     return status;
   });

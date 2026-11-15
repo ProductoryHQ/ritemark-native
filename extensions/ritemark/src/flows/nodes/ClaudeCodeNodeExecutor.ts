@@ -7,16 +7,17 @@
 
 import type { FlowNode, ExecutionContext, ProgressCallback } from '../types';
 import { getSetupStatus, runAgent, type AgentExecutionOptions, type AgentResult, type SetupStatus } from '../../agent';
+import type { AnthropicKeyReader } from '../../agent/setup';
 import { claudeApiKey } from '../../ai/providerKeys';
 import { interpolateVariables } from './interpolate';
 
-let anthropicKeyReader: (() => PromiseLike<string | undefined>) | null = null;
+let anthropicKeyReader: AnthropicKeyReader | null = null;
 
 /**
  * At activation: the reader of the Anthropic key saved in Ritemark (Sprint 160, #541), the same one Claude's
  * readiness asks (`registerAnthropicKeyReader`), so the key the step runs on is the key that made Claude ready.
  */
-export function setClaudeCodeNodeKeyReader(reader: () => PromiseLike<string | undefined>): void {
+export function setClaudeCodeNodeKeyReader(reader: AnthropicKeyReader): void {
   anthropicKeyReader = reader;
 }
 
@@ -24,7 +25,7 @@ export function setClaudeCodeNodeKeyReader(reader: () => PromiseLike<string | un
 export interface ClaudeCodeNodeDependencies {
   getSetupStatus: (options?: { refresh?: boolean }) => Promise<SetupStatus>;
   runAgent: (options: AgentExecutionOptions) => Promise<AgentResult>;
-  readAnthropicKey: () => PromiseLike<string | undefined>;
+  readAnthropicKey: AnthropicKeyReader;
 }
 
 const hostDependencies: ClaudeCodeNodeDependencies = {
@@ -85,7 +86,15 @@ export async function executeClaudeCodeNode(
   }
 
   // #541: a Claude that runs on the key saved in Ritemark gets it, as a chat does; a Claude.ai sign-in gets none.
-  const savedKey = setupStatus.authMethod === 'api-key' ? await dependencies.readAnthropicKey() : undefined;
+  let savedKey: string | undefined;
+  if (setupStatus.authMethod === 'api-key') {
+    try {
+      savedKey = await dependencies.readAnthropicKey();
+    } catch (error) {
+      // As Claude's readiness counts it (setup.ts): a key that can't be read is none. Claude Code may run on its own.
+      console.warn(`[ClaudeCode] The saved Anthropic key could not be read, so the step runs without it (${error instanceof Error ? error.message : String(error)})`);
+    }
+  }
 
   const result = await dependencies.runAgent({
     prompt: interpolatedPrompt,

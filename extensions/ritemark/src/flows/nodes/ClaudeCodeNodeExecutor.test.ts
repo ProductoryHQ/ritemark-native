@@ -214,7 +214,10 @@ function claudeStatus(authMethod: SetupStatus['authMethod'], state: SetupStatus[
 }
 
 /** Run the step against a fake host: what runAgent got, and how often the key was read. */
-async function runStep(status: SetupStatus): Promise<{ runs: AgentExecutionOptions[]; keyReads: number; error?: string }> {
+async function runStep(
+  status: SetupStatus,
+  readKey: () => Promise<string | undefined> = async () => PLACEHOLDER_KEY,
+): Promise<{ runs: AgentExecutionOptions[]; keyReads: number; error?: string }> {
   const runs: AgentExecutionOptions[] = [];
   let keyReads = 0;
   const node: FlowNode = { id: 'claude-1', type: 'claude-code', position: { x: 0, y: 0 }, data: { label: 'Claude', prompt: 'Tidy the notes', timeout: 1 } };
@@ -222,7 +225,7 @@ async function runStep(status: SetupStatus): Promise<{ runs: AgentExecutionOptio
     await executeClaudeCodeNode(node, createTestContext(), undefined, undefined, {
       getSetupStatus: async () => status,
       runAgent: async (options) => { runs.push(options); return { text: 'done', filesModified: [], metrics: { durationMs: 0, costUsd: null, model: null } }; },
-      readAnthropicKey: async () => { keyReads += 1; return PLACEHOLDER_KEY; },
+      readAnthropicKey: async () => { keyReads += 1; return readKey(); },
     });
   } catch (error) {
     return { runs, keyReads, error: error instanceof Error ? error.message : String(error) };
@@ -242,6 +245,14 @@ async function testStepKey(): Promise<void> {
   assert.strictEqual(signedIn.runs.length, 1);
   assert.strictEqual(signedIn.runs[0].anthropicApiKey, undefined, 'a Claude.ai sign-in gets no key');
   assert.strictEqual(signedIn.keyReads, 0, 'and the key is not even read');
+
+  // A key that can't be read counts as none, as Claude's readiness counts it: the step runs on Claude Code's own.
+  const quiet = console.warn;
+  console.warn = () => undefined;
+  const unreadable = await runStep(claudeStatus('api-key'), async () => { throw new Error('secret store locked'); }).finally(() => { console.warn = quiet; });
+  assert.strictEqual(unreadable.error, undefined, 'the step does not fail on the read');
+  assert.strictEqual(unreadable.runs.length, 1);
+  assert.strictEqual(unreadable.runs[0].anthropicApiKey, undefined);
 
   const signedOut = await runStep(claudeStatus(null));
   assert.strictEqual(signedOut.runs.length, 0, 'a signed-out Claude does not run');
