@@ -94,7 +94,7 @@ export function readScalar(raw: string): string {
 /** YAML's one-letter escapes in a double-quoted scalar. */
 const SIMPLE_ESCAPES: Record<string, string> = {
   '0': '\u0000', a: '\u0007', b: '\b', t: '\t', '\t': '\t', n: '\n', v: '\u000b', f: '\f', r: '\r', e: '\u001b',
-  ' ': ' ', '"': '"', '/': '/', '\\': '\\', N: '\u0085', _: ' ', L: ' ', P: ' ',
+  ' ': ' ', '"': '"', '/': '/', '\\': '\\', N: '\u0085', _: ' ', L: '\u2028', P: '\u2029',
 };
 
 /**

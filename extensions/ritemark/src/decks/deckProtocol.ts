@@ -11,12 +11,16 @@ const MAX_PATH_LENGTH = 1024;
 
 export type DeckRequest =
   /** The webview URIs of the slides' pictures, by the paths the slides name (relative to the deck's folder). */
-  { type: 'deck/assets'; paths: string[] };
+  | { type: 'deck/assets'; paths: string[] }
+  /** The text of the theme file the deck names (project-relative). */
+  | { type: 'deck/theme'; path: string };
 
 /** The host's answers. */
 export type DeckHostMessage =
   /** Each path the host could resolve to a picture beside the deck, mapped to its webview URI. */
-  { type: 'deck/assets'; assets: Record<string, string> };
+  | { type: 'deck/assets'; assets: Record<string, string> }
+  /** The theme file's text, or null when the deck names none the project has (the view draws the built-in theme). */
+  | { type: 'deck/theme'; path: string; text: string | null };
 
 export class DeckProtocolError extends Error {}
 
@@ -39,6 +43,11 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
         return path;
       });
       return { type: 'deck/assets', paths };
+    }
+    case 'deck/theme': {
+      exactKeys(input, ['type', 'path']);
+      if (typeof input.path !== 'string' || input.path.length === 0 || input.path.length > MAX_PATH_LENGTH) throw new DeckProtocolError('path must be a string');
+      return { type: 'deck/theme', path: input.path };
     }
     default:
       throw new DeckProtocolError('Unknown deck request');
