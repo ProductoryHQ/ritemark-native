@@ -551,7 +551,13 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
           const { host: current, library: project } = library();
           const copy = await project.slideOf(deck, String(args.slide_id));
           const write = await project.updateLibrarySlide(deck, copy);
-          await project.setFrom(deck, String(args.slide_id), write.from, current.viewSetFrom?.(deck));
+          try {
+            await project.setFrom(deck, String(args.slide_id), write.from, current.viewSetFrom?.(deck));
+          } catch (error) {
+            // The copy couldn't be linked: the library is put back, so a second try doesn't leave a second slide there.
+            const undone = await project.undoWrite(write).catch(() => false);
+            throw new Error(`${error instanceof Error ? error.message : String(error)} ${undone ? 'The library is back as it was; nothing changed.' : 'The library could not be put back: it was changed meanwhile.'}`);
+          }
           return { text: `Updated the slide in ${deckName(write.path)}. Other decks that use it will offer the new version.` };
         },
       },
@@ -569,7 +575,13 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
           const { host: current, library: project } = library();
           const copy = await project.slideOf(deck, String(args.slide_id));
           const write = await project.addToLibrary(deck, String(args.topic), copy);
-          await project.setFrom(deck, String(args.slide_id), write.from, current.viewSetFrom?.(deck));
+          try {
+            await project.setFrom(deck, String(args.slide_id), write.from, current.viewSetFrom?.(deck));
+          } catch (error) {
+            // The copy couldn't be linked: the library is put back, so a second try doesn't leave a second slide there.
+            const undone = await project.undoWrite(write).catch(() => false);
+            throw new Error(`${error instanceof Error ? error.message : String(error)} ${undone ? 'The library is back as it was; nothing changed.' : 'The library could not be put back: it was changed meanwhile.'}`);
+          }
           return { text: `Added the slide to the library under ${deckName(write.path)}${write.previous === null ? ' (a new topic)' : ''}.` };
         },
       },

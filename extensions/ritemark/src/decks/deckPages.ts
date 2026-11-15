@@ -120,21 +120,37 @@ export class DeckPages implements vscode.Disposable {
   } | null {
     const view = [...this.views].find(entry => path.normalize(entry.document.uri.fsPath) === path.normalize(fsPath));
     if (!view) return null;
+    const slideCount = () => slidesOfText(view.document.getText()).length;
     return {
-      insert: (parts, after) => this.ask(view, requestId => ({ type: 'deck/insert', after, parts, requestId })),
-      setFrom: (id, from) => this.ask(view, requestId => ({ type: 'deck/set-from', id, from, requestId })),
+      insert: async (parts, after) => {
+        const before = slideCount();
+        return this.ask(view, requestId => ({ type: 'deck/insert', after, parts, requestId }), () => slideCount() >= before + parts.length);
+      },
+      setFrom: (id, from) => this.ask(view, requestId => ({ type: 'deck/set-from', id, from, requestId }),
+        () => slidesOfText(view.document.getText()).find(slide => slide.data.id === id)?.data.from === from),
     };
   }
 
-  /** Send the view a change and wait for its answer (false when it doesn't answer in time). */
-  private async ask(view: DeckView, message: (requestId: string) => DeckHostMessage): Promise<boolean> {
+  /**
+   * Send the view a change and wait for its answer, then for the document to hold the change (the view's edit reaches
+   * the document a moment after the view has made it): false when either doesn't come in time.
+   */
+  private async ask(view: DeckView, message: (requestId: string) => DeckHostMessage, settled: () => boolean): Promise<boolean> {
     const requestId = `r${++this.requests}`;
     const answer = new Promise<boolean>(resolve => {
       const timer = setTimeout(() => { this.waiting.delete(requestId); resolve(false); }, VIEW_ANSWER_MS);
       this.waiting.set(requestId, ok => { clearTimeout(timer); this.waiting.delete(requestId); resolve(ok); });
     });
     if (!(await this.post(view.panel.webview, message(requestId)))) this.waiting.get(requestId)?.(false);
-    return answer;
+    if (!(await answer)) return false;
+    if (settled()) return true;
+    return new Promise<boolean>(resolve => {
+      const done = (ok: boolean) => { clearTimeout(timer); subscription.dispose(); resolve(ok); };
+      const subscription = vscode.workspace.onDidChangeTextDocument(event => {
+        if (event.document === view.document && settled()) done(true);
+      });
+      const timer = setTimeout(() => done(settled()), VIEW_ANSWER_MS);
+    });
   }
 
   private activeView(): DeckView | null {

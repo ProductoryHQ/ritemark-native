@@ -487,6 +487,17 @@ async function main(): Promise<void> {
     assert.deepEqual(ipcList.tools?.map((item) => item.name), deckGroup.tools.map((item) => item.name));
     const ipcCall = await injector.handleIpc({ id: '2', op: 'call', group: 'deck', tool: 'list_decks', params: { where: 'library' } });
     assert.match(ipcCall.text ?? "", /Slide library\/Agents\.deck\.md/);
+    // A copy that can't be linked: the library write is undone, so nothing is left behind.
+    const agentsBefore = files['Slide library/Agents.deck.md'];
+    const unlinked = tools.createDeckToolGroup(() => ({
+      library: () => library,
+      viewInsert: () => undefined,
+      viewSetFrom: () => async () => false,
+    }));
+    const failedAdd = await runTool(unlinked.tools.find((item) => item.name === 'add_to_library')!, { deck: 'Clients/Harbour.deck.md', slide_id: 't1', topic: 'Agents' }, context);
+    assert.equal(failedAdd.isError, true);
+    assert.match(failedAdd.text, /The library is back as it was/);
+    assert.equal(files['Slide library/Agents.deck.md'], agentsBefore);
     // Only decks inside the project.
     assert.equal((await runTool(tool('read_deck'), { deck: 'notes.md' }, context)).isError, true);
     assert.equal((await runTool(tool('read_deck'), { deck: '../outside.deck.md' }, context)).isError, true);
