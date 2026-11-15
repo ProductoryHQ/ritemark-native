@@ -35,6 +35,8 @@ assert.match(text(0, '_-* #,##0.00 €_-;-* #,##0.00 €_-;_-* "-"?? €_-;_-@_-
   // one in the middle stays a space
   assert.equal(text(7, '0_x"a"'), '7 a')
   assert.deepEqual(formatCellValue(7, '0'), { text: '7' })
+  // the marker in the cell's own text is text, not a pad
+  assert.deepEqual(formatCellValue('\uE000x icon', acc), { text: ' \uE000x icon ' })
 }
 // General keeps up to 11 significant characters, as Excel does
 assert.equal(text(0.1 + 0.2, 'General'), '0.3')

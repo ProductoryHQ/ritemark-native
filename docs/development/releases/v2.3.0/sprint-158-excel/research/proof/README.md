@@ -78,7 +78,7 @@ With Arial standing in for Calibri, the training budget's totals E9 and E23:G23 
 
 The grid follows the Excel of the computer it runs on: on Windows it keeps Windows' widths (E is 87 px, and the 12-point bold totals show `####` there).
 
-**The inset and `_-`:** measured the same way (ink edge to gridline, in points), text in Excel starts 2.5–3.5 pt from the cell's left edge and Ritemark's started 2.25–2.6 pt in at 2 px; the inset is now 3 px. A format's `_-` now leaves a gap as wide as "-" instead of a space. On the right of an accounting cell, Excel's gap is 6.5 pt and Ritemark's is now about 4.9 pt. The 1.6 pt left over is close to what a downscaled JPEG can resolve, so it is reported here, not tuned.
+**The inset and `_-`:** measured the same way (ink edge to gridline, in points), text in Excel starts 2.5–3.5 pt from the cell's left edge and Ritemark's started 2.25–2.6 pt in at 2 px. The inset is now 3 px on a Mac; Windows keeps 2 px, because its 64 px default column holds eight Calibri digits only at 2. A format's `_-` now leaves a gap as wide as "-" instead of a space. On the right of an accounting cell, Excel's gap is 6.5 pt and Ritemark's is now about 4.9 pt. The 1.6 pt left over is close to what a downscaled JPEG can resolve, so it is reported here, not tuned.
 
 Shots: `pr4-budget.png`, `pr4-budget-totals.png` (every total in full), `pr4-timesheet.png` ("8:15" clear of "Müük"). PR 3's fix found on the way: `pr3-frozen-scrolled-before.png` and `pr3-frozen-scrolled.png`.
 

@@ -18,7 +18,7 @@ import { writeClipboard, readClipboard } from '../../lib/clipboard'
 import { compareCells } from '../sheetSort'
 import { installFontFallbacks, installOfficeFontAliases, isOfficeFontMissing } from '../viewers/docx/officeFonts'
 import { cellKey, type CellModel, type SheetModel, type WorkbookModel } from './readWorkbook'
-import { CELL_PADDING, GRID_SANS, GRID_SERIF, buildLayout, fontCss, fontShorthand, indexAt, mergeIndex, setFontTwins, sortRefusal, sortedRows, styleIndexOf, styleOf, type SheetLayout } from './sheetLayout'
+import { GRID_SANS, cellPadding, GRID_SERIF, buildLayout, fontCss, fontShorthand, indexAt, mergeIndex, setFontTwins, sortRefusal, sortedRows, styleIndexOf, styleOf, type SheetLayout } from './sheetLayout'
 import { columnScale, type ExcelGeometry } from './columnWidth'
 import { isMac } from '../../hooks/usePlatform'
 import type { CellStyle } from './excelStyles'
@@ -57,10 +57,11 @@ const OVERSCAN = 3
 type RegionKind = 'corner' | 'top' | 'left' | 'body'
 
 let measureContext: CanvasRenderingContext2D | null = null
-/** Text widths, kept while the fonts are the same: scrolling measures the same cells again and again. */
-/** Column widths as the Excel on this computer lays them out (columnWidth.ts). */
+/** Column widths and the cell inset as the Excel on this computer lays them out (columnWidth.ts). */
 const GEOMETRY: ExcelGeometry = isMac ? 'mac' : 'windows'
+const CELL_PADDING = cellPadding(GEOMETRY)
 
+/** Text widths, kept while the fonts are the same: scrolling measures the same cells again and again. */
 const measured = new Map<string, number>()
 function measure(text: string, font: string): number {
   const key = `${font}\u0000${text}`

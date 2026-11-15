@@ -7,7 +7,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readWorkbook, cellKey } from './readWorkbook'
-import { GRID_SANS, GRID_SERIF, buildLayout, fontCss, fontShorthand, indexAt, mergeIndex, setFontTwins, sortRefusal, sortedRows, styleIndexOf, styleOf } from './sheetLayout'
+import { GRID_SANS, GRID_SERIF, buildLayout, cellPadding, fontCss, fontShorthand, indexAt, mergeIndex, setFontTwins, sortRefusal, sortedRows, styleIndexOf, styleOf } from './sheetLayout'
 import { applyTint, colorOf, readTheme } from './excelStyles'
 import { columnPixels, columnScale, maxDigitWidth } from './columnWidth'
 import { compareCells } from '../sheetSort'
@@ -43,6 +43,10 @@ async function main() {
     const narrow = columnScale({ name: 'Aptos Narrow', size: 11 }, 'mac')
     for (const [chars, points] of [[11.5, 69], [5.5, 33], [46, 276]]) assert.equal(narrow.pixels(chars), Math.round((points * 4) / 3), `${chars} characters`)
     assert.equal(win.pixels(12.5), 87)
+    // eight Calibri digits (7.43 px each) fit Windows' 64 px default column only with its 2 px inset
+    assert.equal(cellPadding('windows'), 2)
+    assert.ok(8 * 7.43 + 2 * cellPadding('windows') <= 64.5)
+    assert.equal(cellPadding('mac'), 3)
     assert.equal(win.defaultPixels(undefined, 8), 64)
   }
 

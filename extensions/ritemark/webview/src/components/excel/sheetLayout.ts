@@ -7,15 +7,19 @@
  * are 0 px, as in Excel.
  */
 import { columnScale, defaultRowPoints, pointsToPixels, type ExcelGeometry } from './columnWidth'
+export type { ExcelGeometry }
 import type { CellStyle, FontStyle, WorkbookStyles } from './excelStyles'
 import { cellKey, type SheetModel } from './readWorkbook'
 
 /** Header row height and the frame's look (experience 47, decision 9). */
 export const HEADER_HEIGHT = 22
-/** Cell text inset each side, in pixels: Excel for Mac's at 100 %. Measured on the training budget against Excel's
- *  window, text starts 0.25–0.9 pt further in there than at 2 px (Sprint 158 PR 4); 1 px ran "8:15" into "Müük"
- *  (the Experience lead, 15 November). */
-export const CELL_PADDING = 3
+/** Cell text inset each side, in pixels, by the Excel the widths follow (columnWidth.ts). Excel for Mac's: measured
+ *  on the training budget against its window, text starts 0.25–0.9 pt further in than at 2 px (Sprint 158 PR 4).
+ *  Excel for Windows keeps 2: its 64 px default column holds eight Calibri digits only at 2 (review of #725).
+ *  1 px ran "8:15" into "Müük" (the Experience lead, 15 November). */
+export function cellPadding(geometry: ExcelGeometry): number {
+  return geometry === 'mac' ? 3 : 2
+}
 
 export interface SheetLayout {
   /** Drawn rows and columns. */

@@ -61,6 +61,15 @@ export interface FormattedValue {
   pad?: [string, string]
 }
 
+/** numfmt's output with the `_x` marks read: a value or a format that holds the marker itself (a private-use
+ *  character) is formatted without marks, so none of its own characters is taken for a pad (review of #725). */
+function format(code: string, value: number | string): Pick<FormattedValue, 'text' | 'pad'> | null {
+  const own = code.includes(SKIP) || (typeof value === 'string' && value.includes(SKIP))
+  const out = numfmt.format(code, value, own ? OPTIONS : PAD_OPTIONS)
+  if (typeof out !== 'string') return null
+  return own ? { text: out } : withPads(out)
+}
+
 /** A `_x` at either end becomes a pad of x's width; one in the middle a space, as numfmt writes it otherwise. */
 function withPads(out: string): Pick<FormattedValue, 'text' | 'pad'> {
   if (!out.includes(SKIP)) return { text: out }
@@ -86,15 +95,13 @@ export function formatCellValue(value: CellValue | boolean, code: string, date19
   if (typeof value === 'string') {
     // a text section (`…;…;…;@`) applies to text; any other format leaves it as it is
     if (code !== 'General' && code.includes('@')) {
-      const out = numfmt.format(code, value, PAD_OPTIONS)
-      return typeof out === 'string' ? withPads(out) : { text: value }
+      return format(code, value) ?? { text: value }
     }
     return { text: value }
   }
   const isDate = numfmt.isDateFormat(code)
   const v = isDate && date1904 ? value + DATE_1904_OFFSET : value
-  const out = numfmt.format(code, v, PAD_OPTIONS)
-  const formatted = typeof out === 'string' ? withPads(out) : { text: String(value) }
+  const formatted = format(code, v) ?? { text: String(value) }
   const colour = /\[(red|blue|green|black|white|yellow|magenta|cyan|color\s*\d+)\]/i.test(code)
     ? numfmt.formatColor(code, v, OPTIONS)
     : null
