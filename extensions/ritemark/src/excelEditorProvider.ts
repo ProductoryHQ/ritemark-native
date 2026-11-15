@@ -110,6 +110,10 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
     webviewPanel.webview.html = this.getHtml(webviewPanel.webview, scriptUri);
 
     this.webviewPanels.set(document.uri.toString(), webviewPanel);
+    // A document restored from a hot-exit backup comes with unsaved edits: a refresh asks before dropping them
+    if (document.isDirty) {
+      this.dirtyDocuments.add(document.uri.toString());
+    }
 
     // Create file watcher for external changes
     this.createFileWatcher(document, webviewPanel.webview);
