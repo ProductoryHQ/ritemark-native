@@ -202,6 +202,8 @@ test('the fence is sized past any backticks in the body', () => {
   // A kind that isn't one word can't break the fence line (review round 1 of PR 1).
   assert.equal(writeSlideBlock('x\n```\n# injected', 'id: a'), '```slide points\nid: a\n```');
   assert.equal(writeSlideBlock('', 'id: a'), '```slide\nid: a\n```');
+  assert.equal(writeSlideBlock('gamma.v2', 'id: a'), '```slide gamma.v2\nid: a\n```', 'an unknown kind is kept as written');
+  assert.equal(writeSlideBlock('a`b', 'id: a'), '```slide points\nid: a\n```', 'a backtick would end the info string');
   const deck = parseDeck(writeSlideBlock('points', 'a\n````b', 'n'));
   assert.equal(deck.slides[0].body, 'a\n````b');
   assert.equal(deck.slides[0].notes, 'n');

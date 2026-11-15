@@ -423,9 +423,12 @@ export function fenceFor(body: string): string {
 }
 
 /** A slide block's text, with its notes block after it when it has notes. */
-/** A kind as the fence's info string may carry it: one word of letters, digits, `-` and `_`, or null. */
+/**
+ * A kind as a backtick fence's info string can carry it: one word with no space and no backtick, or null. Unknown
+ * kinds a person or another app wrote (`gamma.v2`) pass, so they are kept as written.
+ */
 export function cleanKind(kind: string | null | undefined): string | null {
-  return typeof kind === 'string' && /^[A-Za-z0-9_-]{0,40}$/.test(kind) ? kind : null;
+  return typeof kind === 'string' && /^[^\s`]{0,200}$/.test(kind) ? kind : null;
 }
 
 export function writeSlideBlock(kind: string, body: string, notes?: string | null): string {
