@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-11-15 (Sprint 158: the Excel editor saves only the edited cells (`src/excel/`, the `cellEdit` message), behind the kill switch `excel-editing`, and draws a workbook as Excel does (`webview/src/components/excel/`); Sprint 156: with no AI ready, Home's first card signs in, and the AI last seen ready in its own key, with its three counts; Sprint 155: test keys in the test channel, `ai/providerKeys.ts`; Sprint 152: the shell's startup contract, the frame drawn from one description and one loading look in every slot; Sprint 137: the editor's Markdown pipeline, files as written, a refused save goes to Ritemark first; Sprint 139: the AI you chose keeps working — one failure classifier and card, a chat's model kept, the turn counts; Sprint 140: the first day's guidance and the feedback door; Sprint 138: equations, typeset, edited in place and exported)
+**Last updated:** 2026-11-16 (Sprint 160, PR A: Claude's readiness has one source per state: one sign-in decision in `agent/setup.ts`, the saved key read on every check, `claudeLogin.ts` the only writer of signing-in; Sprint 158: the Excel editor saves only the edited cells (`src/excel/`, the `cellEdit` message), behind the kill switch `excel-editing`, and draws a workbook as Excel does (`webview/src/components/excel/`); Sprint 156: with no AI ready, Home's first card signs in, and the AI last seen ready in its own key, with its three counts; Sprint 155: test keys in the test channel, `ai/providerKeys.ts`; Sprint 152: the shell's startup contract, the frame drawn from one description and one loading look in every slot; Sprint 137: the editor's Markdown pipeline, files as written, a refused save goes to Ritemark first; Sprint 139: the AI you chose keeps working — one failure classifier and card, a chat's model kept, the turn counts; Sprint 140: the first day's guidance and the feedback door; Sprint 138: equations, typeset, edited in place and exported)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -932,10 +932,16 @@ model-discovery probe while authentication is unavailable. Starting or
 finishing sign-in also releases stale Claude sessions so a process holding the
 old token cannot survive the browser flow and race the new credential. Settings,
 commands, onboarding, and the chat recovery card use one app-global login
-coordinator; a second surface joins the already-open flow instead of spawning a
-competing login process. The coordinator fans completion, failure, timeout, and
-cancellation back to every joined surface so none can retain a stale busy state.
-No credential or token crosses into the webview.
+coordinator (`agent/claudeLogin.ts`); a second surface joins the already-open flow
+instead of spawning a competing login process. The coordinator fans completion,
+failure, timeout, and cancellation back to every joined surface so none can retain
+a stale busy state. It is also the only writer of Claude's signing-in state
+(`setClaudeLoginInProgress`, Sprint 160, #696; `claudeLogin.test.ts` checks): the
+AI sheet's and Settings' 2-minute polls and status handlers refresh the status but
+never end a sign-in that is still running, so a Re-check, a saved key or Settings
+can't bring a second Sign in back early; a poll calls the sign-in finished only when
+Claude reads signed in with Claude.ai, not ready on a saved key. No credential or
+token crosses into the webview.
 
 Runtime availability is normalized separately from probe lifecycle. The
 webview's `runtimeHydration` records only whether each independent status probe
@@ -950,6 +956,31 @@ hydrated availability snapshot, never a status-probe trigger: bootstrap,
 explicit recheck, and account/runtime invalidation own probes. This prevents a
 stalled background `account/read` from replacing a known-ready fallback with a
 blocking `Checking ...` Composer immediately after the user selects it.
+
+**Claude's input to it (Sprint 160, #703, #541).** `agent/setup.ts` decides
+Claude's sign-in method with one pure function, `detectClaudeAuthMethod`, from
+evidence the probe gathers (`probeClaudeAuth`): the CLI's own `claude auth status
+--json` answer, whether an Anthropic key is saved in Ritemark, the macOS Keychain
+item, and `ANTHROPIC_API_KEY`. The order: the CLI says signed in → its method (a
+Claude.ai sign-in still wins over a saved key); the CLI says signed out → a saved
+key makes it `api-key`, else signed out; the CLI gave no usable answer → on macOS
+the Keychain item (`claude-oauth`, logged when used), ahead of a saved key so a
+person with a plan isn't billed on their key unawares, on Windows nothing (cmdkey's
+listing repeats its filter in the header, so it read as signed in on every PC), then
+a saved key (`api-key`), then `ANTHROPIC_API_KEY`, else signed out. An unusable
+answer is recorded as `timeout`, `too-much-output`, `spawn-error:<code>` or `no-json` with its exit
+status, time and output sizes, never the output, in a `[ritemark]` warning and in
+`SetupStatus.diagnostics`. The saved key comes from one reader `extension.ts`
+registers at activation (`readProviderKey`), asked on every probe
+(`registerAnthropicKeyReader`); only true or false leaves `setup.ts`. A change to the
+key, in this window or another, by any writer (`context.secrets.onDidChange` →
+`anthropicKeyChanged`), drops the cached status, and a probe still running caches
+nothing; it emits no event, so it can't end a sign-in still running on Home or the
+welcome (Ritemark's own key saves emit `settings-updated` themselves). A Claude on the saved key gets it wherever it
+runs: chats through `claudeApiKey`, and the Flow's Claude step, which gets the same
+reader (`setClaudeCodeNodeKeyReader`), through `AgentExecutionOptions.anthropicApiKey`,
+which `runAgent` passes to `claudeRuntimeOptions` (`ANTHROPIC_API_KEY` in the CLI's
+environment).
 
 Account failures are provider-scoped, not application-scoped. If the selected
 runtime is unavailable while another is ready, the transcript, Composer, and
@@ -1784,6 +1815,7 @@ The decisions that define the system. Changing any of these is an architecture-l
 
 | Date | Sprint | Changes |
 |---|---|---|
+| 2026-11-16 | Sprint 160, PR A (#703, #541, #696) | **Claude's readiness has one source per state.** `agent/setup.ts`: `detectClaudeAuthMethod` is the pure decision of the technical plan's §2 over `ClaudeAuthEvidence` (`probeClaudeAuth` gathers it), with the macOS Keychain item ahead of a saved key when the CLI gives no usable answer (the Development manager, after review); `checkClaudeAuthStatus` returns `ClaudeAuthCheck`, an unusable answer as `timeout`, `too-much-output`, `spawn-error:<code>` or `no-json` with its measurements, logged and in `SetupStatus.diagnostics`; `checkWindowsAuth` (cmdkey) and the uncalled `hasCliOAuth` deleted; `registerAnthropicKeyReader` replaces the `hasAnthropicKeyInSecrets` flag and `setAnthropicKeyAvailable` (deleted with its callers' key reads in the sheet, Settings and the welcome); `anthropicKeyChanged` (follows `secrets.onDidChange`) drops the cached status without an event; the Flow step counts an unreadable key as none, as readiness does; `__testOnly` injects the Keychain check and the check's time limit. `extension.ts` registers one key reader for setup and the Flow step (`setClaudeCodeNodeKeyReader`). The sheet's and Settings' sign-in polls call a sign-in finished only on a Claude.ai sign-in. `AgentExecutionOptions.anthropicApiKey`, passed by `runAgent` and by the Flow's Claude step (`claudeApiKey`). Only `claudeLogin.ts` calls `setClaudeLoginInProgress`: its calls in `UnifiedViewProvider` and `RitemarkSettingsProvider` are gone, and `agent/index.ts` no longer exports it. Extension tier, High review; no flag, no patch. |
 | 2026-11-08 | Sprint 156, PR B (#690) | **The no-AI card's three counts.** `analytics/events.ts`: `welcome_ai_skipped`, `ai_signin_started`, `ai_signin_finished`; `SIGN_IN_FROM`, `WELCOME_SKIP_HOW`; the compile-time `SignInCountsAreClosed`. `analytics/consent.ts`: `HELD_EVENT_NAMES` (the skip joins the held events; the gate holds no other). `welcomeHost`: `countSkip`/`countPendingSkip` (Skip for now, Start a new project while the welcome shows step 1), with `welcomeState.aiFoundReady`. `GuidanceHost`: `signIn`'s and `saveKeys`' `from`, `SignInCount`, `countStarted` (ChatGPT once its page opened), `countFinished` on the sign-in's `ready` settle; `readyFromHome` says whether the AI read ready. `home/save-keys` gains `from`; `GuidanceCards` remembers where OpenCode's key sheet opened. New test `welcome/welcomeSkip.test.ts`. Extension tier, High review; no flag, no patch. |
 | 2026-11-08 | Sprint 156, PR A (#690) | **With no AI ready, Home's first card signs in.** `guidance/readyRequest.ts`: `leadAi`, `canSignInHere`, `signInWords`, `PLAN_LINES`; `cardAi` takes `lastReady` and `canSignIn`; `readyRequestWords` a `ready` flag. `guidance/guidanceStore.ts`: `ritemark.guidance.lastReadyAi` and its helpers, the test-channel seed. `GuidanceHost`: the press signs in, `cancelSignIn`, `reopenSignIn`, `readyFromHome`, status and key listeners. `HomeGuidance` gains `aiName` and `signingIn`; new `home/cancel-sign-in`, `home/reopen-sign-in`. `welcomeHost.saveAiForNewChats` (the welcome's save of `ritemark.ai.selectedAgent`, shared); `welcomeCopy.ts` shares `stopWaitingTip`, `reopenTip`, `OPENCODE_SET_UP_TIP`. `aiStatusItem` notes a usable AI; Settings' and the sheet's sign-outs clear it; `UnifiedViewProvider` takes `globalState`. Review round 1: `CodexRuntime.listenToLoginPoll` (a sign-in's poll listeners survive the sheet's restart; the welcome's ChatGPT timeout line comes back), `CODEX_LOGIN_POLL_MS`/`_ATTEMPTS`/`TIMEOUT_MS` in `codexStatusEvents.ts`, `claudeLogin.ts` replays the page's address to a joining surface, `GuidanceDependencies.claudeSignIn` (a test seam), `ui/button.tsx` size `compact` (28 px) with its catalogue row, Home's local button restyles removed. Extension tier, High review; no flag, no patch. |
 | 2026-11-07 | Sprint 155, #681 | **Test keys in the test channel.** New `ai/providerKeys.ts` routes every provider-key reader (sidebar BYOK, model discovery, Flows, Transcribe, Settings' Test buttons): saved key first, then, in the test channel only, a key from `RITEMARK_TEST_KEY_*`, snapshotted and removed from the extension host's environment at activation. Settings payload gains `testEnvironmentKeys` (booleans). `scripts/qa/test-profile-guard.sh` shared by `with-test-keys.sh` and `dev-launch-isolated.sh` (`--user-data-dir`). No flag, no patch, no change outside the test channel. |

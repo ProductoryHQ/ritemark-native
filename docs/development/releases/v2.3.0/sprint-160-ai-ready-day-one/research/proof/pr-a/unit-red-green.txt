@@ -1,0 +1,19 @@
+Sprint 160 PR A: red-green.ts, the same script on both trees (macOS arm64, Node v24.18.0, 2026-11-15T22:56Z)
+
+== origin/main 5cc64df5 (an export of extensions/ritemark/src) ==
+FAIL  #541 signed-out CLI + saved key: expected ready/api-key, got needs-auth/null
+FAIL  #703 Windows: no usable answer, cmdkey "* NONE *": expected needs-auth/null, got ready/claude-oauth
+FAIL  #703 Windows: cmdkey asked: expected no, got yes
+FAIL  #703 the reason in the diagnostics: expected no-json, got none
+FAIL  #696 writers of the signing-in flag: expected agent/claudeLogin.ts, got agent/claudeLogin.ts, settings/RitemarkSettingsProvider.ts, views/UnifiedViewProvider.ts
+FAIL  #541 runAgent passes a key to claudeRuntimeOptions: expected yes, got no
+FAIL  #541 the Flow step passes anthropicApiKey: expected yes, got no
+
+== branch sprint-160-pr-a-claude-readiness at f2af9751 + working tree ==
+PASS  #541 signed-out CLI + saved key: expected ready/api-key, got ready/api-key
+PASS  #703 Windows: no usable answer, cmdkey "* NONE *": expected needs-auth/null, got needs-auth/null
+PASS  #703 Windows: cmdkey asked: expected no, got no
+PASS  #703 the reason in the diagnostics: expected no-json, got no-json
+PASS  #696 writers of the signing-in flag: expected agent/claudeLogin.ts, got agent/claudeLogin.ts
+PASS  #541 runAgent passes a key to claudeRuntimeOptions: expected yes, got yes
+PASS  #541 the Flow step passes anthropicApiKey: expected yes, got yes
