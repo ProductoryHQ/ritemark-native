@@ -32,7 +32,7 @@
 
 .wall-grid { position: absolute; z-index: 2; inset: 0; display: flex; align-items: safe center; justify-content: center; padding: 72px 80px 120px; overflow: auto; background: #0E0C24; }
 .wall-grid-list { display: grid; gap: 28px; }
-.wall-grid-item { position: relative; cursor: pointer; }
+.wall-grid-item { position: relative; }
 .wall-grid-slide { position: relative; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px rgba(248, 250, 252, 0.12); }
 .wall-grid-slide.is-borderless { background: #fff; }
 .wall-grid-item.is-picked .wall-grid-slide { box-shadow: 0 0 0 2px #0E0C24, 0 0 0 5px #818CF8; }

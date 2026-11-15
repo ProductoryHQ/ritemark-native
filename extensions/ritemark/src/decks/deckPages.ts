@@ -371,7 +371,7 @@ const MAX_THEME_BYTES = 64 * 1024;
  * The text of the theme file a deck names, or null. The path is project-relative (`Slide library/Themes/…`), so it is
  * read from the deck's project folder, or the deck's own folder when it has none, and never from outside it.
  */
-async function readTheme(document: vscode.TextDocument, themePath: string): Promise<string | null> {
+export async function readTheme(document: vscode.TextDocument, themePath: string): Promise<string | null> {
   return readProjectTheme(vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath ?? path.dirname(document.uri.fsPath), themePath);
 }
 

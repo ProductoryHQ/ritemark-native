@@ -31,8 +31,9 @@ assert.deepEqual(goToKey('4', { key: 'ArrowRight' }), { digits: null, handled: f
 assert.deepEqual(goToKey('4', { key: 'Enter', metaKey: true }), { digits: '4', handled: false })
 
 // ---- n of N
-assert.equal(countLabel(3, 6), '3 of 6')
-assert.equal(countLabel(null, 6), 'Skipped slide')
+assert.equal(countLabel(3, 6, false), '3 of 6')
+assert.equal(countLabel(null, 6, true), 'Skipped slide')
+assert.equal(countLabel(null, 6, false), '– of 6', 'a slide deleted while on the wall is not called skipped')
 
 // ---- The slide at 16:9, as large as fits, with bands
 assert.deepEqual(wallSlideSize(1440, 900), { width: 1440, height: 810, left: 0, top: 45 }, '16:10: bands above and below')

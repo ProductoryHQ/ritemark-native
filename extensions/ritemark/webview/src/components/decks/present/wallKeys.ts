@@ -81,9 +81,13 @@ export function goToKey(digits: string | null, event: KeyInput): GoToStep {
   }
 }
 
-/** n of N on the wall's bar; a skipped slide reached by its number has no place among the slides shown. */
-export function countLabel(position: number | null, count: number): string {
-  return position === null ? 'Skipped slide' : `${position} of ${count}`
+/**
+ * n of N on the wall's bar. A skipped slide reached by its number has no place among the slides shown; a slide deleted
+ * in the editor while it is on the wall has none either, until the next move.
+ */
+export function countLabel(position: number | null, count: number, skipped: boolean): string {
+  if (skipped) return 'Skipped slide'
+  return position === null ? `– of ${count}` : `${position} of ${count}`
 }
 
 /**

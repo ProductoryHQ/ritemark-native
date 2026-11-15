@@ -23,7 +23,7 @@ import { isShellPageSignal } from '../../shellPageSignals';
 import { resolveDocumentResourceRoots } from '../../webviewResourceRoots';
 import { parseDeck } from '../deckFormat';
 import { BUILT_IN_THEME, parseTheme, type DeckTheme } from '../deckTheme';
-import { readProjectTheme, resolveAssetsIn } from '../deckPages';
+import { readTheme, resolveAssetsIn } from '../deckPages';
 import { DECK_WALL_VIEW_TYPE, decodeWallRequest, wallPicturePaths, wallStateOf, type DeckPresentRequest, type WallHostMessage, type WallRequest } from './presentProtocol';
 import { deckLookOf, PresentSession, PresentStartError, presentTitleOf, type PresentMove } from './presentSession';
 
@@ -41,18 +41,25 @@ interface Running {
   subscriptions: vscode.Disposable[];
   /** The theme, read once per theme path (a move reads the front matter again). */
   theme: { path: string | null; value: DeckTheme };
+  /** The pictures' URIs, for the document version they were resolved at (a move that changed nothing reuses them). */
+  assets: { version: number; paths: string; value: Record<string, string> } | null;
   ended: boolean;
-  /** The wall answered a focus check: its window has the focus. */
-  focused: () => void;
+  /** The wall answered a focus check: its window has the focus (and whether it is full screen already). */
+  focused: (fullScreen: boolean) => void;
 }
 
 /** VS Code's commands for a window of its own (`workbench.action.*`), as an older shell has them too. */
 const MOVE_TO_NEW_WINDOW = 'workbench.action.moveEditorToNewWindow';
 const COMPACT_WINDOW = 'workbench.action.enableCompactAuxiliaryWindow';
 const TOGGLE_FULL_SCREEN = 'workbench.action.toggleFullScreen';
-/** How long the host waits for the wall's window to take the focus after the move, and how often it asks. */
-const FOCUS_WAIT_MS = 3000;
+const LOCK_GROUP = 'workbench.action.lockEditorGroup';
+/**
+ * How long the host waits for the wall's window to take the focus after the move (the wall loads the bundle again in
+ * its new window), and how often it asks; how long it waits for the new panel to be the active editor before the move.
+ */
+const FOCUS_WAIT_MS = 10_000;
 const FOCUS_CHECK_MS = 150;
+const ACTIVE_WAIT_MS = 3000;
 
 /** The dev-only windowed mode: honoured only in a dev build. */
 export function presentWindowed(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -81,7 +88,8 @@ export class DeckPresenter implements vscode.Disposable {
       { viewColumn: vscode.ViewColumn.Active, preserveFocus: false },
       {
         enableScripts: true,
-        retainContextWhenHidden: false,
+        // Kept while hidden: the go-to box and the grid survive anything shown over the wall for a moment.
+        retainContextWhenHidden: true,
         localResourceRoots: resolveDocumentResourceRoots({
           mediaPath: vscode.Uri.joinPath(this.extensionUri, 'media').fsPath,
           documentPath: origin.document.uri.fsPath,
@@ -91,7 +99,7 @@ export class DeckPresenter implements vscode.Disposable {
       },
     );
     wall.webview.html = wallHtml(wall.webview, this.extensionUri);
-    const running: Running = { session, origin, wall, subscriptions: [], theme: { path: null, value: BUILT_IN_THEME }, ended: false, focused: () => {} };
+    const running: Running = { session, origin, wall, subscriptions: [], theme: { path: null, value: BUILT_IN_THEME }, assets: null, ended: false, focused: () => {} };
     this.running = running;
     running.subscriptions.push(
       wall.webview.onDidReceiveMessage(message => { void this.receive(running, message); }),
@@ -116,7 +124,7 @@ export class DeckPresenter implements vscode.Disposable {
         await this.show(running);
         return;
       case 'present/focus':
-        running.focused();
+        running.focused(request.fullScreen);
         return;
       case 'present/stop':
         running.wall.dispose();
@@ -141,13 +149,18 @@ export class DeckPresenter implements vscode.Disposable {
     const view = running.session.view();
     const themePath = parseDeck(text).theme;
     if (running.theme.path !== themePath) {
-      const root = workspaceFolderOf(running.origin.document) ?? path.dirname(running.origin.document.uri.fsPath);
-      const themeText = themePath ? await readProjectTheme(root, themePath) : null;
+      // The deck view's own reading of the theme file, from the same project folder.
+      const themeText = themePath ? await readTheme(running.origin.document, themePath) : null;
       running.theme = { path: themePath, value: themeText === null ? BUILT_IN_THEME : parseTheme(themeText) };
     }
-    const assets = resolveAssetsIn(path.dirname(running.origin.document.uri.fsPath), running.wall.webview, wallPicturePaths(view));
+    // The pictures are looked up on disk only when the document or the slides shown changed since the last move.
+    const paths = wallPicturePaths(view);
+    const version = running.origin.document.version;
+    if (!running.assets || running.assets.version !== version || running.assets.paths !== paths.join('\n')) {
+      running.assets = { version, paths: paths.join('\n'), value: resolveAssetsIn(path.dirname(running.origin.document.uri.fsPath), running.wall.webview, paths) };
+    }
     if (running.ended) return;
-    await post(running.wall.webview, wallStateOf(view, { borderless: deckLookOf(text) === 'borderless', theme: running.theme.value }, assets));
+    await post(running.wall.webview, wallStateOf(view, { borderless: deckLookOf(text) === 'borderless', theme: running.theme.value }, running.assets.value));
   }
 
   /**
@@ -179,31 +192,52 @@ function moveOf(request: Exclude<WallRequest, { type: 'present/ready' | 'present
 }
 
 /**
- * The wall, now the active editor of the main window, goes into a window of its own, then that window is made compact
- * and full screen (in a dev build's windowed mode it stays a compact window).
+ * The wall goes into a window of its own, then that window is made compact, its group locked and the window made full
+ * screen (in a dev build's windowed mode it stays a compact window).
  *
- * VS Code's compact and full-screen commands act on the window that has the focus, and when no window has it they act
- * on the main window. A new window takes the focus a moment after the move, and making it compact moves the focus
- * inside it. So before each of the two commands the host asks the wall (now in its own window) until it says its
- * window has the focus. Without that answer (Ritemark in the background) nothing more is done: the main window is never
- * made full screen by mistake, and the wall stays a window of its own.
+ *  - The panel is moved only once the main window reports it as the active editor: the move takes whatever editor is
+ *    active, and it must never be the deck.
+ *  - VS Code's compact, lock and full-screen commands act on the window that has the focus, and on the main window when
+ *    none has it. A new window takes the focus a moment after the move, so before each step the host asks the wall
+ *    (now in its own window) until it says its window has the focus. Without that answer nothing more is done: the
+ *    main window is never made full screen by mistake, and the wall stays a window of its own.
+ *  - The locked group keeps anything opened during the talk (a link, a file the AI opens) off the wall: it opens in
+ *    the main window instead.
+ *  - Full screen is a toggle, so it is sent only when the wall says its window is not full screen already.
  */
 async function placeWall(running: Running): Promise<void> {
+  if (!(await wallIsActive(running))) return;
   await vscode.commands.executeCommand(MOVE_TO_NEW_WINDOW);
-  if (!(await wallHasFocus(running))) return;
+  if (running.ended || !(await wallHasFocus(running))) return;
   await vscode.commands.executeCommand(COMPACT_WINDOW);
-  if (presentWindowed() || !(await wallHasFocus(running))) return;
-  await vscode.commands.executeCommand(TOGGLE_FULL_SCREEN);
+  await vscode.commands.executeCommand(LOCK_GROUP);
+  if (presentWindowed() || running.ended) return;
+  const focus = await wallHasFocus(running);
+  if (focus && !focus.fullScreen) await vscode.commands.executeCommand(TOGGLE_FULL_SCREEN);
 }
 
-/** Ask the wall until it says its window has the focus: true, or false after a while or when the wall is gone. */
-function wallHasFocus(running: Running): Promise<boolean> {
-  return new Promise<boolean>(resolve => {
+/** Wait until the main window reports the wall as the active editor; false after a while or when the wall is gone. */
+async function wallIsActive(running: Running): Promise<boolean> {
+  const started = Date.now();
+  while (!running.ended && Date.now() - started < ACTIVE_WAIT_MS) {
+    const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+    if (input instanceof vscode.TabInputWebview && input.viewType.endsWith(DECK_WALL_VIEW_TYPE)) return true;
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  return false;
+}
+
+/**
+ * Ask the wall until it says its window has the focus: its answer (whether the window is full screen already), or
+ * null after a while or when the wall is gone.
+ */
+function wallHasFocus(running: Running): Promise<{ fullScreen: boolean } | null> {
+  return new Promise(resolve => {
     const started = Date.now();
-    const finish = (value: boolean) => { clearInterval(timer); running.focused = () => {}; resolve(value); };
+    const finish = (value: { fullScreen: boolean } | null) => { clearInterval(timer); running.focused = () => {}; resolve(value); };
     const ask = () => {
       if (running.ended || Date.now() - started > FOCUS_WAIT_MS) {
-        finish(false);
+        finish(null);
         return;
       }
       // The wall's window can have the focus with nothing inside it focused: revealing the panel puts it in the wall.
@@ -211,7 +245,7 @@ function wallHasFocus(running: Running): Promise<boolean> {
       void post(running.wall.webview, { type: 'present/focus-check' });
     };
     const timer = setInterval(ask, FOCUS_CHECK_MS);
-    running.focused = () => finish(true);
+    running.focused = fullScreen => finish({ fullScreen });
     ask();
   });
 }

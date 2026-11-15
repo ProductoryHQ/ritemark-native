@@ -80,7 +80,8 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   session.move(TEXT, { type: 'next' });
   const state = wallStateOf(session.view(), look, {});
-  assert.deepEqual(Object.keys(state).sort(), ['assets', 'borderless', 'count', 'position', 'slide', 'slides', 'theme', 'type']);
+  assert.deepEqual(Object.keys(state).sort(), ['assets', 'borderless', 'count', 'position', 'skipped', 'slide', 'slides', 'theme', 'type']);
+  assert.equal(state.skipped, false);
   assert.deepEqual(Object.keys(state.slide).sort(), ['data', 'kind', 'number', 'title']);
   assert.deepEqual(state.slide, {
     number: 3,
@@ -101,15 +102,19 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const bytes = JSON.stringify(wallStateOf(session.view(), look, {}));
   assert.ok(bytes.includes('SKIPPEDWORD'), 'asked for by its number, it is shown');
   assert.equal(wallStateOf(session.view(), look, {}).position, null);
+  assert.equal(wallStateOf(session.view(), look, {}).skipped, true);
   for (const word of ['NOTESWORD', 'SKIPPEDNOTESWORD', 'SECONDNOTESWORD']) assert.ok(!bytes.includes(word), `${word} reached the wall`);
 }
 
 // ---- The wall's requests, with exact fields
 {
-  for (const type of ['present/ready', 'present/focus', 'present/next', 'present/back', 'present/first', 'present/last', 'present/stop'] as const) {
+  for (const type of ['present/ready', 'present/next', 'present/back', 'present/first', 'present/last', 'present/stop'] as const) {
     assert.deepEqual(decodeWallRequest({ type }), { type });
     assert.equal(decodeWallRequest({ type, extra: 1 }), null);
   }
+  assert.deepEqual(decodeWallRequest({ type: 'present/focus', fullScreen: false }), { type: 'present/focus', fullScreen: false });
+  assert.equal(decodeWallRequest({ type: 'present/focus' }), null);
+  assert.equal(decodeWallRequest({ type: 'present/focus', fullScreen: 'no' }), null);
   assert.deepEqual(decodeWallRequest({ type: 'present/go', number: 4 }), { type: 'present/go', number: 4 });
   assert.deepEqual(decodeWallRequest({ type: 'present/peek', number: 12 }), { type: 'present/peek', number: 12 });
   assert.equal(decodeWallRequest({ type: 'present/go' }), null);

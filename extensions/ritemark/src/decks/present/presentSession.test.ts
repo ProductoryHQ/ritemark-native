@@ -38,6 +38,7 @@ const titleOf = (session: PresentSession) => session.view().current.data.title;
   assert.equal(deckLookOf(TEXT), 'borderless');
   assert.equal(deckLookOf(deck(A)).toString(), 'borderless', 'the front matter is the same');
   assert.equal(deckLookOf(A), 'card', 'no front matter: Card');
+  assert.equal(deckLookOf('---\nlook: Borderless\n---\n'), 'card', "the deck view's exact rule: Borderless only as written");
   assert.equal(frontMatterValue(TEXT, 'ritemark-length'), '45');
   assert.equal(frontMatterValue(TEXT, 'missing'), null);
 }

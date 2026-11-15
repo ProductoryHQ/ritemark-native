@@ -85,9 +85,12 @@ export function frontMatterValue(text: string, key: string): string | null {
   return null;
 }
 
-/** Card or Borderless, the deck's own choice in its front matter (`look: borderless`); Card when it says nothing. */
+/**
+ * Card or Borderless, the deck's own choice in its front matter (`look: borderless`); Card otherwise. The deck view's
+ * own rule (`properties.look === 'borderless'`), so the wall never shows a look the stage doesn't.
+ */
 export function deckLookOf(text: string): 'card' | 'borderless' {
-  return frontMatterValue(text, 'look')?.trim().toLowerCase() === 'borderless' ? 'borderless' : 'card';
+  return frontMatterValue(text, 'look') === 'borderless' ? 'borderless' : 'card';
 }
 
 /** Why a presentation can't start: the deck has no slide to show. */

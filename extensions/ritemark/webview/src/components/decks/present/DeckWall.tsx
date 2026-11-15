@@ -85,8 +85,11 @@ export function DeckWall() {
       setPeeked({ number: message.number, title: typeof message.title === 'string' ? message.title : null })
       return
     }
-    // After the move into its own window, the host asks until this window has the focus, then makes it full screen.
-    if (message.type === 'present/focus-check' && document.hasFocus()) sendToExtension('present/focus')
+    // After the move into its own window, the host asks until this window has the focus, then makes it full screen
+    // (a toggle, so it is told whether the window fills its screen already).
+    if (message.type === 'present/focus-check' && document.hasFocus()) {
+      sendToExtension('present/focus', { fullScreen: window.outerWidth >= window.screen.width && window.outerHeight >= window.screen.height })
+    }
   }), [])
 
   useEffect(() => {
@@ -200,7 +203,7 @@ export function DeckWall() {
       onPointerMove={showBar}
       onClick={onWallClick}
     >
-      <div className="wall-frame" style={{ left: frame.left, top: frame.top, width: frame.width, height: frame.height }} aria-live="polite" aria-label={`Slide ${countLabel(state.position, state.count)}: ${state.slide.title}`}>
+      <div className="wall-frame" style={{ left: frame.left, top: frame.top, width: frame.width, height: frame.height }} aria-live="polite" aria-label={`Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}>
         {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`) : null}
         {layer(state.slide, leaving ? 'is-entering' : '', `slide-${serial}`)}
       </div>
@@ -225,7 +228,7 @@ export function DeckWall() {
             <Icon name="caret-left" size={16} tone="inherit" />
           </Button>
         </Tooltip>
-        <span className="wall-count">{countLabel(state.position, state.count)}</span>
+        <span className="wall-count">{countLabel(state.position, state.count, state.skipped)}</span>
         <Tooltip label="Next (→)">
           <Button variant="ghost" size="icon-sm" aria-label="Next" onClick={() => send('present/next')}>
             <Icon name="caret-right" size={16} tone="inherit" />

@@ -22,8 +22,10 @@ export function usePresentKeys(onPresent: (from: PresentFrom) => void, enabled: 
     const onKey = (event: KeyboardEvent) => {
       const from = presentKeyOf(event, isMac)
       if (!from || event.isComposing) return
-      // A dialog or sheet over the deck keeps its own keys.
+      // A dialog or sheet over the deck, and a field of its own (a sheet's name box), keep their keys. The handout
+      // and the slide's words don't: in a deck, ⌘↩ presents (sprint plan, decision 5), and ⇧↩ stays the line break.
       if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return
+      if ((event.target as Element | null)?.closest?.('input, textarea, select')) return
       event.preventDefault()
       event.stopPropagation()
       if (!event.repeat) onPresent(from)

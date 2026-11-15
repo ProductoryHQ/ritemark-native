@@ -29,9 +29,11 @@ export interface WallState {
   type: 'present/wall';
   /** The slide on the wall now. */
   slide: WallSlide;
-  /** n of N: its place among the slides shown, or null when it is a skipped slide reached by its number. */
+  /** n of N: its place among the slides shown, or null when it is skipped (reached by its number) or deleted. */
   position: number | null;
   count: number;
+  /** The slide on the wall is a skipped one, reached by its number. */
+  skipped: boolean;
   /** The slides shown, in order, for the grid of all slides. */
   slides: WallSlide[];
   borderless: boolean;
@@ -57,8 +59,11 @@ export type WallHostMessage = WallState | WallPeeked | WallFocusCheck;
 /** The wall's requests. */
 export type WallRequest =
   | { type: 'present/ready' }
-  /** The answer to a focus check: the wall's window has the focus, so the host may make it compact and full screen. */
-  | { type: 'present/focus' }
+  /**
+   * The answer to a focus check: the wall's window has the focus, so the host may make it compact and full screen;
+   * `fullScreen` says whether that window is full screen already (full screen is a toggle).
+   */
+  | { type: 'present/focus'; fullScreen: boolean }
   | { type: 'present/next' }
   | { type: 'present/back' }
   | { type: 'present/first' }
@@ -114,6 +119,7 @@ export function wallStateOf(view: PresentView, look: { borderless: boolean; them
     slide: wallSlideOf(view.current),
     position: view.position,
     count: view.count,
+    skipped: view.current.skip,
     slides: view.shown.map(wallSlideOf),
     borderless: look.borderless,
     theme: look.theme,
@@ -134,8 +140,9 @@ export function decodeWallRequest(value: unknown): WallRequest | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const input = value as Record<string, unknown>;
   switch (input.type) {
-    case 'present/ready':
     case 'present/focus':
+      return exactKeys(input, ['type', 'fullScreen']) && typeof input.fullScreen === 'boolean' ? { type: 'present/focus', fullScreen: input.fullScreen } : null;
+    case 'present/ready':
     case 'present/next':
     case 'present/back':
     case 'present/first':
