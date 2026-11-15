@@ -92,6 +92,10 @@ const PublishSheet = lazy(() =>
 const DeckWall = lazy(() =>
   import('./components/decks/present/DeckWall').then((m) => ({ default: m.DeckWall }))
 )
+// The presenter view (Sprint 159, PR 6): the slide now and next, the notes and the clock, on the laptop
+const DeckPresenterView = lazy(() =>
+  import('./components/decks/present/DeckPresenterView').then((m) => ({ default: m.DeckPresenterView }))
+)
 
 // Check if this is a flow editor instance
 const rootElement = document.getElementById('root')!
@@ -194,6 +198,10 @@ ReactDOM.createRoot(rootElement).render(
     ) : editorType === 'deck-wall' ? (
       <Suspense fallback={null}>
         <DeckWall />
+      </Suspense>
+    ) : editorType === 'deck-presenter' ? (
+      <Suspense fallback={null}>
+        <DeckPresenterView />
       </Suspense>
     ) : (
       <App />

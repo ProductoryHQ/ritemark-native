@@ -1,11 +1,13 @@
 /**
- * Sprint 159 (PR 5; experience 17 frame 1, as corrected on 15 November): Present on the deck's bar. The button
- * presents from the current slide (⌘↩); its menu has From the start (⇧⌘↩). The keys work anywhere in the deck view,
- * caught before the handout's editor (`usePresentKeys`), so ⇧↩ stays a line break in the handout.
+ * Sprint 159 (experience 17 frame 1, as corrected on 15 November): Present on the deck's bar. The button presents from
+ * the current slide (⌘↩); its menu has From the start (⇧⌘↩) and Presenter view (PR 6), which comes on by itself with
+ * a second display and names it ("Slides on Projector, notes here"). The keys work anywhere in the deck view, caught
+ * before the handout's editor (`usePresentKeys`), so ⇧↩ stays a line break in the handout.
  */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { isMac } from '../../../hooks/usePlatform'
-import { DropdownMenuItem } from '../../ui/dropdown-menu'
+import { onMessage, sendToExtension } from '../../../bridge'
+import { DropdownMenuItem, DropdownMenuSeparator } from '../../ui/dropdown-menu'
 import { Icon } from '../../ui/Icon'
 import { SplitButton } from '../../ui/split-button'
 import { presentKeyOf } from './wallKeys'
@@ -14,6 +16,13 @@ export type PresentFrom = 'here' | 'start'
 
 const HERE_KEYS = isMac ? '⌘↩' : 'Ctrl+Enter'
 const START_KEYS = isMac ? '⇧⌘↩' : 'Shift+Ctrl+Enter'
+
+/** The host's answer for the menu's Presenter view (`deck/present-options`). */
+interface PresentOptions {
+  available: boolean
+  on: boolean
+  wallDisplay: string | null
+}
 
 /** ⌘↩ and ⇧⌘↩ in the deck view, while it has slides and no dialog is open. */
 export function usePresentKeys(onPresent: (from: PresentFrom) => void, enabled: boolean): void {
@@ -35,6 +44,13 @@ export function usePresentKeys(onPresent: (from: PresentFrom) => void, enabled: 
   }, [onPresent, enabled])
 }
 
+/** The menu's Presenter view line under its name. */
+function presenterLine(options: PresentOptions | null): string {
+  if (!options) return 'Looking for a second display…'
+  if (!options.available) return 'Comes on with a second display'
+  return options.wallDisplay ? `Slides on ${options.wallDisplay}, notes here` : 'Slides and notes, each in a window'
+}
+
 export function PresentButton({ slideNumber, startNumber, onPresent }: {
   /** The current slide's number, or null when the deck has no slides. */
   slideNumber: number | null
@@ -43,6 +59,13 @@ export function PresentButton({ slideNumber, startNumber, onPresent }: {
   onPresent: (from: PresentFrom) => void
 }) {
   const disabled = slideNumber === null
+  const [options, setOptions] = useState<PresentOptions | null>(null)
+
+  useEffect(() => onMessage(message => {
+    if (message.type !== 'deck/present-options') return
+    setOptions({ available: message.available === true, on: message.on === true, wallDisplay: typeof message.wallDisplay === 'string' ? message.wallDisplay : null })
+  }), [])
+
   return (
     <SplitButton
       tone="outline"
@@ -58,15 +81,35 @@ export function PresentButton({ slideNumber, startNumber, onPresent }: {
         label: 'More ways to present',
         tooltip: 'More ways to present',
         align: 'end',
+        // The displays are asked each time the menu opens: a projector may have been plugged in since.
+        onOpenChange: open => { if (open) sendToExtension('deck/present-options') },
         content: (
-          <DropdownMenuItem disabled={startNumber === null} onSelect={() => onPresent('start')}>
-            <Icon name="play" size={14} tone="inherit" />
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span>From the start</span>
-              <span className="text-[12px] leading-4 text-ink-muted">{startNumber === null ? 'Every slide is skipped' : `Slide ${startNumber}, full screen`}</span>
-            </span>
-            <span className="pl-4 text-[12px] text-ink-muted">{START_KEYS}</span>
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem disabled={startNumber === null} onSelect={() => onPresent('start')}>
+              <Icon name="play" size={14} tone="inherit" />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span>From the start</span>
+                <span className="text-[12px] leading-4 text-ink-muted">{startNumber === null ? 'Every slide is skipped' : `Slide ${startNumber}, full screen`}</span>
+              </span>
+              <span className="pl-4 text-[12px] text-ink-muted">{START_KEYS}</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={!options?.available}
+              onSelect={event => {
+                // The menu stays open, so the check is seen to change.
+                event.preventDefault()
+                if (options) sendToExtension('deck/present-presenter', { on: !options.on })
+              }}
+            >
+              <Icon name="monitor" size={14} tone="inherit" />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span>Presenter view</span>
+                <span className="text-[12px] leading-4 text-ink-muted">{presenterLine(options)}</span>
+              </span>
+              {options?.on ? <Icon name="check" size={14} tone="inherit" /> : <span className="w-[14px]" aria-hidden="true" />}
+            </DropdownMenuItem>
+          </>
         ),
       }}
     />

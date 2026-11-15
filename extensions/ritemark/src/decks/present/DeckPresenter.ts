@@ -1,20 +1,29 @@
 /**
- * Presenting a deck (Sprint 159, PR 5; experience 17 frame 2): the wall.
+ * Presenting a deck (Sprint 159; experience 17): the wall (PR 5) and the presenter view (PR 6).
  *
  * Present on a deck's bar (or ⌘↩, ⇧⌘↩ from the start) asks the host here. The wall is a webview panel,
- * `ritemark.deckWall`, drawn with the deck view's own `SlideCanvas` from the shared `webview.js`. It opens in the main
- * window's active group and moves at once into a window of its own, which is made compact (no title row, no tab row)
- * and then full screen: VS Code's own three commands, as patch 010's browser opens a compact auxiliary window. The main
- * window, with its AI column, notices and toasts, stays behind it.
+ * `ritemark.deckWall`, drawn with the deck view's own `SlideCanvas` from the shared `webview.js`; the presenter view is
+ * another, `ritemark.deckPresenter`, in Ritemark Dark: the slide now and the next one, the notes, the row of slides,
+ * the clock, Next, Swap displays.
+ *
+ * Where they go:
+ *  - With the shell's `_ritemark.present.*` commands (patch 018, `ritemarkPresent.ts`): the wall goes full screen on the
+ *    second display (the one that isn't built in) and the presenter view on the laptop's, each in a window of its own
+ *    with nothing of Ritemark around it. The presenter view comes on by itself with two displays; the menu turns it off.
+ *  - Without them (an older shell): the PR 5 path, VS Code's own commands. The wall moves into a window of its own,
+ *    compact, its group locked, then full screen, each step only once the wall says its window has the focus. No
+ *    presenter view.
  *
  * The host is the only source of state. The session (`presentSession.ts`) holds the current slide by its key and reads
- * the deck's open document again at every move, so an edit made in the editor reaches the wall at the next move. The
- * wall's state is built field by field (`presentProtocol.ts`) and never carries the speaker notes.
+ * the deck's open document again at every move, so an edit reaches the wall at the next move; the presenter view's
+ * next slide and row follow edits as they come. The wall's state is built field by field and never carries the notes;
+ * only the presenter view's panel gets them.
  *
- * Stopping (Esc on the wall, or the wall's window closed) returns the deck view to the slide the presenter ended on.
+ * Stopping (Esc in either window, Stop, or the wall's window closed) closes both and returns the deck view to the slide
+ * the presenter ended on.
  *
- * `RITEMARK_PRESENT_WINDOWED=1` keeps the wall in its compact window instead of full screen, only in a dev build
- * (`VSCODE_DEV`), so a hidden test run never takes over the screen.
+ * `RITEMARK_PRESENT_WINDOWED=1` keeps both in windows instead of full screen, and offers the presenter view on one
+ * display, only in a dev build (`VSCODE_DEV`), so a hidden test run never takes over the screen.
  */
 import * as os from 'os';
 import * as path from 'path';
@@ -24,8 +33,25 @@ import { resolveDocumentResourceRoots } from '../../webviewResourceRoots';
 import { parseDeck } from '../deckFormat';
 import { BUILT_IN_THEME, parseTheme, type DeckTheme } from '../deckTheme';
 import { readTheme, resolveAssetsIn } from '../deckPages';
-import { DECK_WALL_VIEW_TYPE, decodeWallRequest, wallPicturePaths, wallStateOf, type DeckPresentRequest, type WallHostMessage, type WallRequest } from './presentProtocol';
-import { deckLookOf, PresentSession, PresentStartError, presentTitleOf, type PresentMove } from './presentSession';
+import {
+  DECK_PRESENTER_VIEW_TYPE,
+  DECK_WALL_VIEW_TYPE,
+  decodeWallRequest,
+  frontMatterEdit,
+  lengthMinutesOf,
+  MAX_LENGTH_MINUTES,
+  presenterPicturePaths,
+  presenterStateOf,
+  wallPicturePaths,
+  wallStateOf,
+  chooseDisplays,
+  type DeckPresentOptions,
+  type DeckPresentRequest,
+  type PresentDisplay,
+  type WallHostMessage,
+  type WallRequest,
+} from './presentProtocol';
+import { deckLookOf, frontMatterValue, PresentSession, PresentStartError, presentTitleOf, type PresentMove } from './presentSession';
 
 /** Where the presentation was started from: the deck's document, and its view to return to. */
 interface DeckOrigin {
@@ -33,33 +59,60 @@ interface DeckOrigin {
   panel: vscode.WebviewPanel;
 }
 
-/** One presentation: its session, the wall's panel and the deck view it returns to. */
+/** One window of the presentation: its panel, its page's loads, and the pictures resolved for it. */
+interface Screen {
+  panel: vscode.WebviewPanel;
+  /** The page as made for it, set again when a move leaves the panel without its page. */
+  html: string;
+  /** How many times the page has loaded and said so (`present/ready`), and a wait for the next load. */
+  loads: number;
+  loaded: Array<() => void>;
+  assets: { version: number; paths: string; value: Record<string, string> } | null;
+}
+
+/** One presentation. */
 interface Running {
   session: PresentSession;
   origin: DeckOrigin;
-  wall: vscode.WebviewPanel;
+  wall: Screen;
+  presenter: Screen | null;
   subscriptions: vscode.Disposable[];
   /** The theme, read once per theme path (a move reads the front matter again). */
   theme: { path: string | null; value: DeckTheme };
-  /** The pictures' URIs, for the document version they were resolved at (a move that changed nothing reuses them). */
-  assets: { version: number; paths: string; value: Record<string, string> } | null;
+  /** The shell places the windows (`_ritemark.present.place`), and the displays it reported. */
+  shell: boolean;
+  displays: PresentDisplay[];
+  /** The displays the wall and the presenter view are on, by their index in `displays`. */
+  wallDisplay: number;
+  presenterDisplay: number;
+  startedAt: number;
   ended: boolean;
-  /** The wall answered a focus check: its window has the focus (and whether it is full screen already). */
+  /** The wall answered a focus check (the PR 5 path): its window has the focus (and whether it is full screen). */
   focused: (fullScreen: boolean) => void;
 }
 
-/** VS Code's commands for a window of its own (`workbench.action.*`), as an older shell has them too. */
+/** The shell's commands (patch 018), and VS Code's own for a window of its own (the path without them). */
+const DISPLAYS_COMMAND = '_ritemark.present.displays';
+const PLACE_COMMAND = '_ritemark.present.place';
 const MOVE_TO_NEW_WINDOW = 'workbench.action.moveEditorToNewWindow';
 const COMPACT_WINDOW = 'workbench.action.enableCompactAuxiliaryWindow';
 const TOGGLE_FULL_SCREEN = 'workbench.action.toggleFullScreen';
 const LOCK_GROUP = 'workbench.action.lockEditorGroup';
 /**
  * How long the host waits for the wall's window to take the focus after the move (the wall loads the bundle again in
- * its new window), and how often it asks; how long it waits for the new panel to be the active editor before the move.
+ * its new window), and how often it asks; how long it waits for a new panel to be an editor before it is moved.
  */
 const FOCUS_WAIT_MS = 10_000;
 const FOCUS_CHECK_MS = 150;
 const ACTIVE_WAIT_MS = 3000;
+/** How long a page may take to load (the bundle is large): before a panel is moved, and again after. */
+const LOAD_WAIT_MS = 8000;
+const RELOAD_WAIT_MS = 4000;
+/** Presenter view on or off, as the person last chose in the menu (on by default, with two displays). */
+const PRESENTER_KEY = 'ritemark.present.presenterView';
+/** The dev windowed mode's windows, on the one display: the wall left, the presenter view right. */
+const WINDOWED_WALL = { x: 24, y: 64, width: 800, height: 450 };
+const WINDOWED_PRESENTER = { x: 840, y: 64, width: 864, height: 540 };
 
 /** The dev-only windowed mode: honoured only in a dev build. */
 export function presentWindowed(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -69,9 +122,34 @@ export function presentWindowed(env: NodeJS.ProcessEnv = process.env): boolean {
 export class DeckPresenter implements vscode.Disposable {
   private running: Running | null = null;
 
-  constructor(private readonly extensionUri: vscode.Uri) {}
+  constructor(private readonly extensionUri: vscode.Uri, private readonly state: vscode.Memento) {}
 
-  /** Present on the wall, from the deck view's current slide or from the start. A second Present ends the first. */
+  /** The Present menu's Presenter view: available with two displays and the shell's commands; on unless turned off. */
+  async options(): Promise<DeckPresentOptions> {
+    const shell = await hasShellPlacement();
+    const displays = shell ? await readDisplays() : [];
+    const available = shell && (displays.length > 1 || presentWindowed());
+    const chosen = chooseDisplays(displays);
+    return {
+      type: 'deck/present-options',
+      available,
+      on: available && this.presenterWanted(),
+      wallDisplay: available && displays.length > 1 ? displays[chosen.wall].name : null,
+    };
+  }
+
+  /** Presenter view on or off, kept for the next presentation (and this one, while it runs). */
+  async setPresenter(on: boolean): Promise<void> {
+    await this.state.update(PRESENTER_KEY, on);
+    const running = this.running;
+    if (running && running.shell && !running.ended) await this.togglePresenter(running, on);
+  }
+
+  private presenterWanted(): boolean {
+    return this.state.get<boolean>(PRESENTER_KEY, true);
+  }
+
+  /** Present, from the deck view's current slide or from the start. A second Present ends the first. */
   async start(origin: DeckOrigin, request: DeckPresentRequest): Promise<void> {
     this.stop();
     let session: PresentSession;
@@ -82,96 +160,259 @@ export class DeckPresenter implements vscode.Disposable {
       await post(origin.panel.webview, { type: 'deck/present-failed', message: error.message });
       return;
     }
-    const wall = vscode.window.createWebviewPanel(
-      DECK_WALL_VIEW_TYPE,
-      deckTitle(origin.document),
+    const shell = await hasShellPlacement();
+    const displays = shell ? await readDisplays() : [];
+    const chosen = chooseDisplays(displays);
+    const running: Running = {
+      session,
+      origin,
+      wall: this.createScreen(origin.document, DECK_WALL_VIEW_TYPE),
+      presenter: null,
+      subscriptions: [],
+      theme: { path: null, value: BUILT_IN_THEME },
+      shell,
+      displays,
+      wallDisplay: chosen.wall,
+      presenterDisplay: chosen.presenter,
+      startedAt: Date.now(),
+      ended: false,
+      focused: () => {},
+    };
+    this.running = running;
+    this.listen(running, running.wall);
+    running.subscriptions.push(
+      // The deck's view closed: there is nothing to return to, and the presentation goes too.
+      origin.panel.onDidDispose(() => { if (this.running === running) this.stop(); }),
+      // The presenter view's next slide and row follow edits as they come (the wall waits for the next move).
+      vscode.workspace.onDidChangeTextDocument(event => {
+        if (event.document === origin.document && running.presenter) void this.showPresenter(running);
+      }),
+    );
+    if (!shell) {
+      await placeWithoutShell(running);
+      return;
+    }
+    // Both panels are made in the main window first, then each is placed: the wall on its display, then the presenter
+    // view on the laptop's, which keeps the focus (the presenter's keys and clicker work there).
+    const withPresenter = this.presenterAvailable(running) && this.presenterWanted();
+    if (withPresenter) this.addPresenter(running);
+    await this.place(running, running.wall, DECK_WALL_VIEW_TYPE, running.wallDisplay, WINDOWED_WALL);
+    if (withPresenter && running.presenter) await this.place(running, running.presenter, DECK_PRESENTER_VIEW_TYPE, running.presenterDisplay, WINDOWED_PRESENTER);
+    // The keys go to the window placed last: the focus inside its page, not only on its window.
+    const focused = (running.presenter ?? running.wall).panel;
+    if (!running.ended) focused.reveal(focused.viewColumn, false);
+  }
+
+  /** Stop the presentation: both windows close and the deck view returns to the slide the presenter ended on. */
+  stop(): void {
+    const running = this.running;
+    if (!running) return;
+    running.presenter?.panel.dispose();
+    running.wall.panel.dispose();
+  }
+
+  private presenterAvailable(running: Running): boolean {
+    return running.shell && (running.displays.length > 1 || presentWindowed());
+  }
+
+  private createScreen(document: vscode.TextDocument, viewType: string): Screen {
+    const panel = vscode.window.createWebviewPanel(
+      viewType,
+      deckTitle(document),
       { viewColumn: vscode.ViewColumn.Active, preserveFocus: false },
       {
         enableScripts: true,
-        // Kept while hidden: the go-to box and the grid survive anything shown over the wall for a moment.
+        // Kept while hidden: the go-to box, the grid and the clock survive anything shown over them for a moment.
         retainContextWhenHidden: true,
         localResourceRoots: resolveDocumentResourceRoots({
           mediaPath: vscode.Uri.joinPath(this.extensionUri, 'media').fsPath,
-          documentPath: origin.document.uri.fsPath,
-          workspaceFolderPath: workspaceFolderOf(origin.document),
+          documentPath: document.uri.fsPath,
+          workspaceFolderPath: workspaceFolderOf(document),
           homeDir: os.homedir(),
         }).map(root => vscode.Uri.file(root)),
       },
     );
-    wall.webview.html = wallHtml(wall.webview, this.extensionUri);
-    const running: Running = { session, origin, wall, subscriptions: [], theme: { path: null, value: BUILT_IN_THEME }, assets: null, ended: false, focused: () => {} };
-    this.running = running;
+    const html = presentHtml(panel.webview, this.extensionUri, viewType === DECK_WALL_VIEW_TYPE ? 'deck-wall' : 'deck-presenter');
+    panel.webview.html = html;
+    return { panel, html, loads: 0, loaded: [], assets: null };
+  }
+
+  private listen(running: Running, screen: Screen): void {
     running.subscriptions.push(
-      wall.webview.onDidReceiveMessage(message => { void this.receive(running, message); }),
-      wall.onDidDispose(() => { void this.end(running); }),
-      // The deck's view closed: there is nothing to return to, and the wall goes too.
-      origin.panel.onDidDispose(() => { if (this.running === running) wall.dispose(); }),
+      screen.panel.webview.onDidReceiveMessage(message => { void this.receive(running, screen, message); }),
+      screen.panel.onDidDispose(() => {
+        if (screen === running.wall) void this.end(running);
+        else if (running.presenter === screen) {
+          running.presenter = null;
+          void this.showWall(running);
+        }
+      }),
     );
-    await placeWall(running);
   }
 
-  /** Stop the presentation: the wall closes and the deck view returns to the slide the presenter ended on. */
-  stop(): void {
-    this.running?.wall.dispose();
+  /** The presenter view's panel, made in the main window (placed by the caller). */
+  private addPresenter(running: Running): void {
+    const screen = this.createScreen(running.origin.document, DECK_PRESENTER_VIEW_TYPE);
+    running.presenter = screen;
+    this.listen(running, screen);
   }
 
-  private async receive(running: Running, raw: unknown): Promise<void> {
+  private async togglePresenter(running: Running, on: boolean): Promise<void> {
+    if (on && !running.presenter && this.presenterAvailable(running)) {
+      this.addPresenter(running);
+      if (running.presenter) await this.place(running, running.presenter, DECK_PRESENTER_VIEW_TYPE, running.presenterDisplay, WINDOWED_PRESENTER);
+    } else if (!on && running.presenter) {
+      running.presenter.panel.dispose();
+    }
+    await this.showWall(running);
+  }
+
+  /**
+   * The shell places a panel in a window of its own on a display, once the panel is an editor it can find and its page
+   * has loaded. The window it places last has the focus. A webview moved between windows loads its page again; when it
+   * doesn't (a panel moved while its first page was still on its way), the page is set again.
+   */
+  private async place(running: Running, screen: Screen, viewType: string, display: number, windowed: { x: number; y: number; width: number; height: number }): Promise<void> {
+    if (!(await panelIsOpen(running, viewType))) return;
+    if (screen.loads === 0) await nextLoad(screen, LOAD_WAIT_MS);
+    if (running.ended) return;
+    const fullScreen = !presentWindowed();
+    const reloaded = nextLoad(screen, RELOAD_WAIT_MS);
+    await vscode.commands.executeCommand(PLACE_COMMAND, { viewType, display, fullScreen, ...(fullScreen ? {} : { windowed }) });
+    if (!(await reloaded) && !running.ended) screen.panel.webview.html = `${screen.html}<!-- ${Date.now()} -->`;
+  }
+
+  /** Swap displays: the wall goes where the presenter view is, and the presenter view where the wall was. */
+  private async swap(running: Running): Promise<void> {
+    if (!running.shell || running.displays.length < 2) return;
+    [running.wallDisplay, running.presenterDisplay] = [running.presenterDisplay, running.wallDisplay];
+    await this.place(running, running.wall, DECK_WALL_VIEW_TYPE, running.wallDisplay, WINDOWED_WALL);
+    if (running.presenter) await this.place(running, running.presenter, DECK_PRESENTER_VIEW_TYPE, running.presenterDisplay, WINDOWED_PRESENTER);
+    await this.showPresenter(running);
+  }
+
+  /** The presenter view's clock: the session's length, asked and kept in the deck's front matter (`ritemark-length`). */
+  private async setLength(running: Running): Promise<void> {
+    const document = running.origin.document;
+    const now = lengthMinutesOf(frontMatterValue(document.getText(), 'ritemark-length'));
+    const answer = await vscode.window.showInputBox({
+      title: 'How long is the session?',
+      prompt: 'In minutes. It is kept in the deck, so the clock shows it the next time too.',
+      value: now ? String(now) : '',
+      placeHolder: '45',
+      validateInput: value => (lengthMinutesOf(value) === null ? `A whole number of minutes, from 1 to ${MAX_LENGTH_MINUTES}` : null),
+    });
+    const minutes = lengthMinutesOf(answer);
+    if (minutes === null || running.ended) return;
+    const edit = frontMatterEdit(document.getText(), 'ritemark-length', String(minutes));
+    const workspaceEdit = new vscode.WorkspaceEdit();
+    workspaceEdit.replace(document.uri, new vscode.Range(document.positionAt(edit.start), document.positionAt(edit.end)), edit.text);
+    await vscode.workspace.applyEdit(workspaceEdit);
+    await this.showPresenter(running);
+  }
+
+  private async receive(running: Running, screen: Screen, raw: unknown): Promise<void> {
     if (isShellPageSignal(raw)) return;
     const request = decodeWallRequest(raw);
     if (!request || running.ended) return;
     switch (request.type) {
       case 'present/ready':
-        await this.show(running);
+        screen.loads++;
+        for (const resolve of screen.loaded.splice(0)) resolve();
+        if (screen === running.wall) await this.showWall(running);
+        else await this.showPresenter(running);
         return;
       case 'present/focus':
-        running.focused(request.fullScreen);
+        if (screen === running.wall) running.focused(request.fullScreen);
         return;
       case 'present/stop':
-        running.wall.dispose();
+        this.stop();
+        return;
+      case 'present/presenter':
+        await this.setPresenter(!running.presenter);
+        return;
+      case 'present/swap':
+        if (screen === running.presenter) await this.swap(running);
+        return;
+      case 'present/set-length':
+        if (screen === running.presenter) await this.setLength(running);
         return;
       case 'present/peek': {
         running.session.read(running.origin.document.getText());
         const slide = running.session.slideNumbered(request.number);
-        await post(running.wall.webview, { type: 'present/peeked', number: request.number, title: slide ? presentTitleOf(slide) : null });
+        await post(screen.panel.webview, { type: 'present/peeked', number: request.number, title: slide ? presentTitleOf(slide) : null });
         return;
       }
       default: {
         running.session.move(running.origin.document.getText(), moveOf(request));
         // Even a move that goes nowhere (the last slide, a number with no slide) draws the deck as it is now.
-        await this.show(running);
+        await this.showWall(running);
+        await this.showPresenter(running);
       }
     }
   }
 
-  /** Send the wall its state, from the deck's document as it is now. */
-  private async show(running: Running): Promise<void> {
+  /** The deck's look as its front matter has it now. */
+  private async look(running: Running): Promise<{ borderless: boolean; theme: DeckTheme }> {
     const text = running.origin.document.getText();
-    const view = running.session.view();
     const themePath = parseDeck(text).theme;
     if (running.theme.path !== themePath) {
       // The deck view's own reading of the theme file, from the same project folder.
       const themeText = themePath ? await readTheme(running.origin.document, themePath) : null;
       running.theme = { path: themePath, value: themeText === null ? BUILT_IN_THEME : parseTheme(themeText) };
     }
-    // The pictures are looked up on disk only when the document or the slides shown changed since the last move.
-    const paths = wallPicturePaths(view);
+    return { borderless: deckLookOf(text) === 'borderless', theme: running.theme.value };
+  }
+
+  /** The pictures as a window's URIs, looked up on disk only when the document or the pictures changed. */
+  private assets(running: Running, screen: Screen, paths: string[]): Record<string, string> {
     const version = running.origin.document.version;
-    if (!running.assets || running.assets.version !== version || running.assets.paths !== paths.join('\n')) {
-      running.assets = { version, paths: paths.join('\n'), value: resolveAssetsIn(path.dirname(running.origin.document.uri.fsPath), running.wall.webview, paths) };
+    const key = paths.join('\n');
+    if (!screen.assets || screen.assets.version !== version || screen.assets.paths !== key) {
+      screen.assets = { version, paths: key, value: resolveAssetsIn(path.dirname(running.origin.document.uri.fsPath), screen.panel.webview, paths) };
     }
+    return screen.assets.value;
+  }
+
+  /** Send the wall its state. */
+  private async showWall(running: Running): Promise<void> {
     if (running.ended) return;
-    await post(running.wall.webview, wallStateOf(view, { borderless: deckLookOf(text) === 'borderless', theme: running.theme.value }, running.assets.value));
+    const view = running.session.view();
+    const look = await this.look(running);
+    const assets = this.assets(running, running.wall, wallPicturePaths(view));
+    if (running.ended) return;
+    const presenter = { available: this.presenterAvailable(running), on: !!running.presenter };
+    await post(running.wall.panel.webview, wallStateOf(view, look, assets, presenter));
+  }
+
+  /** Send the presenter view its state, the deck read again (so an edit shows in the next slide and the row). */
+  private async showPresenter(running: Running): Promise<void> {
+    const screen = running.presenter;
+    if (!screen || running.ended) return;
+    running.session.read(running.origin.document.getText());
+    const view = running.session.view();
+    const look = await this.look(running);
+    const assets = this.assets(running, screen, presenterPicturePaths(view));
+    if (running.ended || running.presenter !== screen) return;
+    const twoDisplays = running.displays.length > 1;
+    await post(screen.panel.webview, presenterStateOf(view, look, assets, {
+      wallDisplay: twoDisplays ? running.displays[running.wallDisplay]?.name ?? null : null,
+      canSwap: twoDisplays,
+      length: lengthMinutesOf(frontMatterValue(running.origin.document.getText(), 'ritemark-length')),
+      startedAt: running.startedAt,
+    }));
   }
 
   /**
-   * The wall is gone, and its window with it: the deck view shows the slide the presenter ended on. (The deck is not
-   * revealed: a reveal while the wall's window closes would open the deck in that window.)
+   * The wall is gone: the presentation ends, the presenter view closes, and the deck view shows the slide the presenter
+   * ended on. (The deck is not revealed: a reveal while the wall's window closes would open the deck in that window.)
    */
   private async end(running: Running): Promise<void> {
     if (running.ended) return;
     running.ended = true;
     if (this.running === running) this.running = null;
     for (const subscription of running.subscriptions) subscription.dispose();
+    running.presenter?.panel.dispose();
     const index = running.session.endedIndex(running.origin.document.getText());
     await post(running.origin.panel.webview, { type: 'deck/present-ended', index });
   }
@@ -181,7 +422,7 @@ export class DeckPresenter implements vscode.Disposable {
   }
 }
 
-function moveOf(request: Exclude<WallRequest, { type: 'present/ready' | 'present/focus' | 'present/stop' | 'present/peek' }>): PresentMove {
+function moveOf(request: Extract<WallRequest, { type: 'present/next' | 'present/back' | 'present/first' | 'present/last' | 'present/go' }>): PresentMove {
   switch (request.type) {
     case 'present/next': return { type: 'next' };
     case 'present/back': return { type: 'back' };
@@ -191,9 +432,47 @@ function moveOf(request: Exclude<WallRequest, { type: 'present/ready' | 'present
   }
 }
 
+/** True when the screen's page loads (says it is ready) within `ms`; false after it. */
+function nextLoad(screen: Screen, ms: number): Promise<boolean> {
+  return new Promise(resolve => {
+    const timer = setTimeout(() => resolve(false), ms);
+    screen.loaded.push(() => { clearTimeout(timer); resolve(true); });
+  });
+}
+
+/** The shell can place the windows: this Ritemark's shell has the commands (patch 018, Sprint 159). */
+async function hasShellPlacement(): Promise<boolean> {
+  // All commands, the private ones too (`getCommands(true)` leaves out those whose name starts with an underscore).
+  const commands = await vscode.commands.getCommands(false);
+  return commands.includes(PLACE_COMMAND) && commands.includes(DISPLAYS_COMMAND);
+}
+
+async function readDisplays(): Promise<PresentDisplay[]> {
+  try {
+    const displays = await vscode.commands.executeCommand<unknown>(DISPLAYS_COMMAND);
+    if (!Array.isArray(displays)) return [];
+    return displays
+      .filter((display): display is PresentDisplay => !!display && typeof display.name === 'string')
+      .map(display => ({ name: display.name, primary: display.primary === true, internal: display.internal === true }));
+  } catch {
+    return [];
+  }
+}
+
+/** Wait until a panel of this view type is an editor the window knows (its tab); false after a while or when ended. */
+async function panelIsOpen(running: Running, viewType: string): Promise<boolean> {
+  const started = Date.now();
+  while (!running.ended && Date.now() - started < ACTIVE_WAIT_MS) {
+    const open = vscode.window.tabGroups.all.some(group => group.tabs.some(tab => tab.input instanceof vscode.TabInputWebview && tab.input.viewType.endsWith(viewType)));
+    if (open) return true;
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  return false;
+}
+
 /**
- * The wall goes into a window of its own, then that window is made compact, its group locked and the window made full
- * screen (in a dev build's windowed mode it stays a compact window).
+ * The path without the shell's commands (PR 5): the wall goes into a window of its own, then that window is made
+ * compact, its group locked and the window made full screen (in a dev build's windowed mode it stays a compact window).
  *
  *  - The panel is moved only once the main window reports it as the active editor: the move takes whatever editor is
  *    active, and it must never be the deck.
@@ -205,7 +484,7 @@ function moveOf(request: Exclude<WallRequest, { type: 'present/ready' | 'present
  *    the main window instead.
  *  - Full screen is a toggle, so it is sent only when the wall says its window is not full screen already.
  */
-async function placeWall(running: Running): Promise<void> {
+async function placeWithoutShell(running: Running): Promise<void> {
   if (!(await wallIsActive(running))) return;
   await vscode.commands.executeCommand(MOVE_TO_NEW_WINDOW);
   if (running.ended || !(await wallHasFocus(running))) return;
@@ -234,6 +513,7 @@ async function wallIsActive(running: Running): Promise<boolean> {
 function wallHasFocus(running: Running): Promise<{ fullScreen: boolean } | null> {
   return new Promise(resolve => {
     const started = Date.now();
+    const wall = running.wall.panel;
     const finish = (value: { fullScreen: boolean } | null) => { clearInterval(timer); running.focused = () => {}; resolve(value); };
     const ask = () => {
       if (running.ended || Date.now() - started > FOCUS_WAIT_MS) {
@@ -241,8 +521,8 @@ function wallHasFocus(running: Running): Promise<{ fullScreen: boolean } | null>
         return;
       }
       // The wall's window can have the focus with nothing inside it focused: revealing the panel puts it in the wall.
-      if (Date.now() - started >= FOCUS_CHECK_MS) running.wall.reveal(running.wall.viewColumn, false);
-      void post(running.wall.webview, { type: 'present/focus-check' });
+      if (Date.now() - started >= FOCUS_CHECK_MS) wall.reveal(wall.viewColumn, false);
+      void post(wall.webview, { type: 'present/focus-check' });
     };
     const timer = setInterval(ask, FOCUS_CHECK_MS);
     running.focused = fullScreen => finish({ fullScreen });
@@ -271,9 +551,11 @@ async function post(webview: vscode.Webview, message: WallHostMessage | DeckPres
   }
 }
 
-function wallHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
+function presentHtml(webview: vscode.Webview, extensionUri: vscode.Uri, editorType: 'deck-wall' | 'deck-presenter'): string {
   const nonce = Array.from({ length: 32 }, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random() * 62))).join('');
   const script = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'webview.js'));
+  // The first frame's colour: the wall's bands, the presenter view's Ritemark Dark, so neither flashes white.
+  const ground = editorType === 'deck-wall' ? '#0E0C24' : '#16132F';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -283,12 +565,11 @@ function wallHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
   <title>Presenting</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    /* The bands' colour from the first frame, so the wall never flashes white before it draws */
-    html, body { height: 100%; overflow: hidden; background: #0E0C24 !important; }
+    html, body { height: 100%; overflow: hidden; background: ${ground} !important; }
   </style>
 </head>
 <body>
-  <div id="root" data-editor-type="deck-wall"></div>
+  <div id="root" data-editor-type="${editorType}"></div>
   <script nonce="${nonce}" src="${script}"></script>
 </body>
 </html>`;

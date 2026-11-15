@@ -13,6 +13,8 @@ import { presentTitleOf, type PresentSlide, type PresentView } from './presentSe
 
 /** The webview panel that is the wall. */
 export const DECK_WALL_VIEW_TYPE = 'ritemark.deckWall';
+/** The webview panel that is the presenter view (Sprint 159, PR 6). */
+export const DECK_PRESENTER_VIEW_TYPE = 'ritemark.deckPresenter';
 
 /** A slide as the wall draws it: the layout's words and settings, and its thumbnail number. */
 export interface WallSlide {
@@ -40,6 +42,37 @@ export interface WallState {
   theme: DeckTheme;
   /** The pictures these slides name, as the wall's webview URIs. */
   assets: Record<string, string>;
+  /** The bar offers the presenter view (a second display, or a dev build's windowed mode), and whether it is on. */
+  presenter: { available: boolean; on: boolean };
+}
+
+/**
+ * The host's state for the presenter view: the wall's, and what only the presenter sees. It is the one state that
+ * carries the speaker notes, and only the presenter view's panel ever gets it.
+ */
+export interface PresenterState {
+  type: 'present/presenter';
+  /** The slide on the wall now, and the one Next shows (null at the end). */
+  current: WallSlide;
+  next: WallSlide | null;
+  /** The current slide's speaker notes ('' without any). */
+  notes: string;
+  position: number | null;
+  count: number;
+  skipped: boolean;
+  /** The slides shown, in order: the row under the slide. */
+  slides: WallSlide[];
+  borderless: boolean;
+  theme: DeckTheme;
+  assets: Record<string, string>;
+  /** The display the wall is on, by its name, or null on one display. */
+  wallDisplay: string | null;
+  /** Swap displays: there are two. */
+  canSwap: boolean;
+  /** The session's length in minutes (`ritemark-length` in the deck's front matter), or null. */
+  length: number | null;
+  /** When the presentation started (ms since the epoch), for the clock. */
+  startedAt: number;
 }
 
 /** The host's answer to a typed number: the title of the slide with that number, or null when the deck has none. */
@@ -54,7 +87,7 @@ export interface WallFocusCheck {
   type: 'present/focus-check';
 }
 
-export type WallHostMessage = WallState | WallPeeked | WallFocusCheck;
+export type WallHostMessage = WallState | WallPeeked | WallFocusCheck | PresenterState;
 
 /** The wall's requests. */
 export type WallRequest =
@@ -70,7 +103,13 @@ export type WallRequest =
   | { type: 'present/last' }
   | { type: 'present/go'; number: number }
   | { type: 'present/peek'; number: number }
-  | { type: 'present/stop' };
+  | { type: 'present/stop' }
+  /** The wall's bar: the presenter view on or off. */
+  | { type: 'present/presenter' }
+  /** The presenter view: the wall and the presenter view change displays. */
+  | { type: 'present/swap' }
+  /** The presenter view's clock: ask the session's length and keep it in the deck's front matter. */
+  | { type: 'present/set-length' };
 
 /** The deck view's Present: from its current slide (`index`, from 0) or from the start. */
 export interface DeckPresentRequest {
@@ -113,7 +152,12 @@ export function wallPicturePaths(view: PresentView): string[] {
 }
 
 /** The wall's state after a move. */
-export function wallStateOf(view: PresentView, look: { borderless: boolean; theme: DeckTheme }, assets: Record<string, string>): WallState {
+export function wallStateOf(
+  view: PresentView,
+  look: { borderless: boolean; theme: DeckTheme },
+  assets: Record<string, string>,
+  presenter: { available: boolean; on: boolean } = { available: false, on: false },
+): WallState {
   return {
     type: 'present/wall',
     slide: wallSlideOf(view.current),
@@ -124,6 +168,40 @@ export function wallStateOf(view: PresentView, look: { borderless: boolean; them
     borderless: look.borderless,
     theme: look.theme,
     assets,
+    presenter: { available: presenter.available, on: presenter.on },
+  };
+}
+
+/** The pictures the presenter view names: the wall's, and the next slide's. */
+export function presenterPicturePaths(view: PresentView): string[] {
+  const paths = new Set(wallPicturePaths(view));
+  if (view.next?.data.image) paths.add(view.next.data.image);
+  return [...paths].sort();
+}
+
+/** The presenter view's state: the wall's slide, the next one and the notes, and the clock's. */
+export function presenterStateOf(
+  view: PresentView,
+  look: { borderless: boolean; theme: DeckTheme },
+  assets: Record<string, string>,
+  session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number },
+): PresenterState {
+  return {
+    type: 'present/presenter',
+    current: wallSlideOf(view.current),
+    next: view.next ? wallSlideOf(view.next) : null,
+    notes: view.current.notes ?? '',
+    position: view.position,
+    count: view.count,
+    skipped: view.current.skip,
+    slides: view.shown.map(wallSlideOf),
+    borderless: look.borderless,
+    theme: look.theme,
+    assets,
+    wallDisplay: session.wallDisplay,
+    canSwap: session.canSwap,
+    length: session.length,
+    startedAt: session.startedAt,
   };
 }
 
@@ -143,6 +221,9 @@ export function decodeWallRequest(value: unknown): WallRequest | null {
     case 'present/focus':
       return exactKeys(input, ['type', 'fullScreen']) && typeof input.fullScreen === 'boolean' ? { type: 'present/focus', fullScreen: input.fullScreen } : null;
     case 'present/ready':
+    case 'present/presenter':
+    case 'present/swap':
+    case 'present/set-length':
     case 'present/next':
     case 'present/back':
     case 'present/first':
@@ -165,4 +246,85 @@ export function decodeDeckPresentRequest(value: unknown): DeckPresentRequest | n
   if (input.from !== 'here' && input.from !== 'start') return null;
   if (typeof input.index !== 'number' || !Number.isInteger(input.index) || input.index < 0 || input.index > MAX_NUMBER) return null;
   return { type: 'deck/present', from: input.from, index: input.index };
+}
+
+/** The deck view's Present menu: whether a presenter view can show, where, and whether it is on. */
+export interface DeckPresentOptions {
+  type: 'deck/present-options';
+  /** A second display is connected (or a dev build's windowed mode) and the shell can place the windows. */
+  available: boolean;
+  on: boolean;
+  /** The display the wall goes to, by its name ("Slides on <name>, notes here"), or null. */
+  wallDisplay: string | null;
+}
+
+/** The deck view's requests about the menu: the options, and Presenter view turned on or off. */
+export type DeckPresentMenuRequest = { type: 'deck/present-options' } | { type: 'deck/present-presenter'; on: boolean };
+
+export function decodeDeckPresentMenuRequest(value: unknown): DeckPresentMenuRequest | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const input = value as Record<string, unknown>;
+  if (input.type === 'deck/present-options') return exactKeys(input, ['type']) ? { type: 'deck/present-options' } : null;
+  if (input.type === 'deck/present-presenter' && exactKeys(input, ['type', 'on']) && typeof input.on === 'boolean') return { type: 'deck/present-presenter', on: input.on };
+  return null;
+}
+
+/** The longest session the clock is set for, in minutes. */
+export const MAX_LENGTH_MINUTES = 24 * 60;
+
+/** A session length as written (`45`, `"90"`): whole minutes from 1 to a day, or null. */
+export function lengthMinutesOf(value: string | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const text = value.trim();
+  if (!/^\d{1,4}$/.test(text)) return null;
+  const minutes = Number(text);
+  return minutes >= 1 && minutes <= MAX_LENGTH_MINUTES ? minutes : null;
+}
+
+/**
+ * The edit that sets one plain value in the deck's front matter (`ritemark-length: 45`): the line replaced when it is
+ * there, added at the front matter's end when not, or a front matter made for it at the top. Everything else stays
+ * byte for byte.
+ */
+export function frontMatterEdit(text: string, key: string, value: string): { start: number; end: number; text: string } {
+  const newline = text.includes('\r\n') ? '\r\n' : '\n';
+  const match = /^---[ \t]*\r?\n([\s\S]*?)(\r?\n)---[ \t]*(?:\r?\n|$)/.exec(text);
+  if (!match) return { start: 0, end: 0, text: `---${newline}${key}: ${value}${newline}---${newline}${newline}` };
+  const bodyStart = match[0].indexOf('\n') + 1;
+  const body = match[1];
+  let offset = bodyStart;
+  for (const line of body.split('\n')) {
+    const bare = line.replace(/\r$/, '');
+    const entry = /^([A-Za-z0-9_-]+):/.exec(bare);
+    if (entry && entry[1] === key) return { start: offset, end: offset + bare.length, text: `${key}: ${value}` };
+    offset += line.length + 1;
+  }
+  // Before the closing line: after the body's last line.
+  const bodyEnd = bodyStart + body.length;
+  return { start: bodyEnd, end: bodyEnd, text: `${newline}${key}: ${value}` };
+}
+
+/** A display, as the shell's `_ritemark.present.displays` gives it. */
+export interface PresentDisplay {
+  name: string;
+  primary: boolean;
+  internal: boolean;
+}
+
+/**
+ * Which display the wall goes to and which the presenter view. The wall: the first display that is neither built in
+ * nor the primary (the projector), else the first that isn't the primary (a closed laptop on a desk monitor), else
+ * the first that isn't built in. The presenter view: the built-in display, else the primary, else another. On one
+ * display (or mirrored displays, which report one), both are the same. Pure, so the test reads the same rule.
+ */
+export function chooseDisplays(displays: PresentDisplay[]): { wall: number; presenter: number } {
+  if (displays.length < 2) return { wall: 0, presenter: 0 };
+  let wall = displays.findIndex(display => !display.internal && !display.primary);
+  if (wall < 0) wall = displays.findIndex(display => !display.primary);
+  if (wall < 0) wall = displays.findIndex(display => !display.internal);
+  if (wall < 0) wall = 1;
+  let presenter = displays.findIndex((display, index) => index !== wall && display.internal);
+  if (presenter < 0) presenter = displays.findIndex((display, index) => index !== wall && display.primary);
+  if (presenter < 0) presenter = displays.findIndex((_display, index) => index !== wall);
+  return { wall, presenter };
 }

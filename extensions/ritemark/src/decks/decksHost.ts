@@ -26,8 +26,8 @@ export function registerDecks(context: vscode.ExtensionContext): DecksHost {
   };
   const pages = new DeckPages(library);
   // Present (Sprint 159): the wall, a window of its own over the main window.
-  const presenter = new DeckPresenter(context.extensionUri);
-  pages.presentHandler = (origin, request) => presenter.start(origin, request);
+  const presenter = new DeckPresenter(context.extensionUri, context.globalState);
+  pages.presenter = presenter;
   // The AI's deck tools (PR 5): the same library, and an open deck's view to insert through as one undo step.
   setDeckToolHost(() => (isEnabled('decks') ? {
     library,
