@@ -16,8 +16,9 @@ import type { Step } from '@tiptap/pm/transform'
 import { newId, writeSlideBody } from '../../../../../src/decks/deckFormat'
 import { isSlideNode, slideDataOf } from '../deckDocument'
 
-/** Meta on the deck view's own transactions (strip operations): the guard lets them through. */
-export const DECK_OPERATION = 'deckOperation'
+import { DECK_OPERATION } from '../deckDocument'
+
+export { DECK_OPERATION }
 
 export const deckGuardKey = new PluginKey('deckGuard')
 

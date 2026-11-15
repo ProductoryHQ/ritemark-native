@@ -18,6 +18,8 @@ import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { slidesOf, type DeckSlideEntry } from './deckDocument'
+import { getClipboardImageFile, getUniqueImageFilename, readFileAsBase64, shouldPreferTextPaste } from '../../lib/pastedImage'
+import { hiddenNote } from './slide/convertKind'
 import { SlideCanvas, editedText, type SlideEditing } from './slide/SlideCanvas'
 import { layoutSlide, textBoxes } from './slide/layoutSlide'
 import { addColumn, addRow, cellPath, insertItemAfter, isEmptyItem, itemPath, nextCell, removeItem, setIcon, setPath, valueAt } from './slide/slideEdits'
@@ -35,6 +37,13 @@ interface StageProps {
   /** The speaker notes fold, open or closed for the whole deck (as the prototype keeps it). */
   notesOpen: boolean
   onNotesOpen: (open: boolean) => void
+  /** Settings beside the slide: open, and the button that opens and closes it. */
+  settingsOpen: boolean
+  onSettings: () => void
+  /** Words to put the caret in once the slide is drawn (a new slide's title). */
+  initialFocus?: string
+  /** A picture pasted or dropped on the slide, read as a data URL. */
+  onPicture: (dataUrl: string, filename: string) => void
 }
 
 /** The library's topic or the deck a copy came from, for the quiet line under the slide. */
@@ -52,8 +61,8 @@ function notesPreview(notes: string | null): string {
   return text.length > 30 ? `${text.slice(0, 30)}…` : text
 }
 
-export function Stage({ editor, slide, theme, borderless, assets, width, onWriting, notesOpen, onNotesOpen }: StageProps) {
-  const [focusPath, setFocusPath] = useState<string | null>(null)
+export function Stage({ editor, slide, theme, borderless, assets, width, onWriting, notesOpen, onNotesOpen, settingsOpen, onSettings, initialFocus, onPicture }: StageProps) {
+  const [focusPath, setFocusPath] = useState<string | null>(initialFocus ?? null)
   const notesRef = useRef<HTMLDivElement>(null)
 
   /** Change this slide's data (and its notes) in one transaction, from the editor's document as it is now. */
@@ -160,10 +169,41 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
 
   const source = sourceLine(slide.data.from)
   const preview = notesPreview(slide.notes)
+  const hidden = hiddenNote(slide.kind, slide.data)
+
+  /** A picture from the computer onto the slide: pasted (unless words are being pasted into a box) or dropped. */
+  const takePicture = (transfer: DataTransfer | null, pasted: boolean): boolean => {
+    const file = getClipboardImageFile(transfer)
+    if (!file) return false
+    if (pasted && shouldPreferTextPaste(transfer)) return false
+    void readFileAsBase64(file).then(dataUrl => onPicture(dataUrl, getUniqueImageFilename(file)))
+    return true
+  }
 
   return (
     <>
-      <div className="deck-big" style={{ width }}>
+      <div className="deck-sethead">
+        <Tooltip label={settingsOpen ? 'Close the settings' : "The slide's layout, look and picture"}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="deck-settings-button"
+            data-state={settingsOpen ? 'active' : undefined}
+            aria-pressed={settingsOpen}
+            onClick={onSettings}
+          >
+            <Icon name="gear" size={14} tone="inherit" />
+            Settings
+          </Button>
+        </Tooltip>
+      </div>
+      <div
+        className="deck-big"
+        style={{ width }}
+        onPaste={event => { if (takePicture(event.clipboardData, true)) event.preventDefault() }}
+        onDragOver={event => { if (Array.from(event.dataTransfer.types).includes('Files')) event.preventDefault() }}
+        onDrop={event => { if (takePicture(event.dataTransfer, false)) event.preventDefault() }}
+      >
         <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={theme} borderless={borderless} assets={assets} editing={editing} />
       </div>
       <div className="deck-under">
@@ -171,6 +211,12 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
           <div className="deck-source">
             <Icon name={source.library ? 'books' : 'presentation'} size={12} tone="inherit" />
             {source.library ? `From the library · ${source.name}` : `From ${source.name}`}
+          </div>
+        ) : null}
+        {hidden ? (
+          <div className="deck-source">
+            <Icon name="eye-slash" size={12} tone="inherit" />
+            {hidden}
           </div>
         ) : null}
         {slide.kind === 'table' ? (

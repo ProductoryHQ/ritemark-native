@@ -579,12 +579,16 @@ export function isReadableDeckVersion(version: string | null): boolean {
 
 const ID_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz';
 
-/** A new slide id: four characters, base36, not one of `taken`. */
+/** A new slide id: four characters, base36 with a letter first, not one of `taken`. */
 export function newId(taken: Iterable<string>, random: () => number = Math.random): string {
   const used = new Set(taken);
   for (;;) {
     let id = '';
-    for (let index = 0; index < 4; index++) id += ID_ALPHABET[Math.floor(random() * ID_ALPHABET.length) % ID_ALPHABET.length];
+    // A letter first, so a new id never reads as a number and is written without quotes.
+    for (let index = 0; index < 4; index++) {
+      const alphabet = index === 0 ? ID_ALPHABET.slice(10) : ID_ALPHABET;
+      id += alphabet[Math.floor(random() * alphabet.length) % alphabet.length];
+    }
     if (!used.has(id)) return id;
   }
 }

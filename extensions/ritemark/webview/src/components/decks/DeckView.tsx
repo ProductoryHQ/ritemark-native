@@ -10,7 +10,7 @@
  * Kept in step (README decision 5): scrolling the handout changes the slide; choosing a thumbnail scrolls the handout
  * to its part; writing in a part makes its slide the current one.
  */
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { Editor } from '../Editor'
@@ -22,27 +22,36 @@ import { documentBarStatus, type DocumentSyncAction } from '../header/DocumentSy
 import type { DocumentApplyTarget } from '../../types/documentSync'
 import type { DocumentSyncState } from '../../../../src/editorSync/protocol'
 import type { EditorSelection } from '../../types/editor'
-import type { SlideData } from '../../../../src/decks/deckFormat'
-import type { DeckTheme } from '../../../../src/decks/deckTheme'
 import type { DocumentProperties } from '../properties'
 import { SegmentedControl } from '../ui/segmented-control'
 import { onDocChanged } from '../../lib/docChange'
-import { partIndexAt, slidesOf, type DeckSlideEntry } from './deckDocument'
+import type { SlideData } from '../../../../src/decks/deckFormat'
+import { deleteSlide, duplicateSlide, insertSlide, moveSlide, partIndexAt, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
+import { onMessage, sendToExtension } from '../../bridge'
+import { isTrustedDeckTransaction } from './handout/deckGuard'
+import { convertKind } from './slide/convertKind'
+import { SlideSettings } from './SlideSettings'
+import { SlideStrip, type StripActions } from './SlideStrip'
+import { newId } from '../../../../src/decks/deckFormat'
+import type { Transaction } from '@tiptap/pm/state'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { currentPart, scrollTopFor } from './scrollRule'
 import { DeckGuard } from './handout/deckGuard'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
-import { SlideCanvas } from './slide/SlideCanvas'
 import { Stage } from './Stage'
 import './decks.css'
 
 /** The deck's extensions, made once: the editor's extension list is fixed at mount. */
 const DECK_EXTENSIONS = [DeckSlideWithPartHead, DeckGuard, DeckCurrent]
 
-/** The strip's width, and the thumbnails' (the prototype's 132 and 96). */
+/** The strip's width (the prototype's 132). */
 const STRIP_WIDTH = 132
-const THUMB_WIDTH = 96
+/** Settings beside the slide: its width, and how long a notice stays in the bar. */
+const SETTINGS_WIDTH = 316
+const NOTICE_MS = 8000
+/** The quiet hint when a line is typed in the handout (the Experience lead's answer 10). */
+const LINE_HINT = 'In this version a line stays a line. Add a slide with + between the thumbnails.'
 /** The slide's room on the stage: 24 on each side, at most 900 wide. */
 const STAGE_MARGIN = 24
 const BIG_MAX = 900
@@ -83,37 +92,6 @@ export function stageWidthFor(avail: number, ratio: number, handoutShown: boolea
   return Math.max(0, Math.min(avail - HANDOUT_MIN, Math.max(STAGE_MIN, Math.round(avail * ratio))))
 }
 
-interface ThumbnailProps {
-  index: number
-  kind: string
-  data: SlideData
-  current: boolean
-  theme: DeckTheme
-  borderless: boolean
-  assets: Record<string, string>
-  onPick: (index: number) => void
-}
-
-/** One numbered thumbnail in the strip. */
-const Thumbnail = memo(function Thumbnail({ index, kind, data, current, theme, borderless, assets, onPick }: ThumbnailProps) {
-  return (
-    <div
-      role="option"
-      aria-selected={current}
-      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${data.skip ? ', skipped' : ''}`}
-      data-thumb={index}
-      className={`deck-thumb${current ? ' is-current' : ''}${data.skip ? ' is-skip' : ''}`}
-      onClick={() => onPick(index)}
-    >
-      <span className="deck-thumb-no">{index + 1}</span>
-      <div className="deck-thumb-slide">
-        <SlideCanvas kind={kind} data={data} width={THUMB_WIDTH} theme={theme} borderless={borderless} assets={assets} />
-      </div>
-      {data.skip ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}
-    </div>
-  )
-})
-
 export function DeckView({
   content,
   onChange,
@@ -136,6 +114,11 @@ export function DeckView({
   const [stripWanted, setStripWanted] = useState(true)
   const [handoutWanted, setHandoutWanted] = useState(true)
   const [notesOpen, setNotesOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsAt, setSettingsAt] = useState<{ left: number; top: number } | null>(null)
+  const [notice, setNotice] = useState<{ text: string; undo?: boolean } | null>(null)
+  const [focusTitleOf, setFocusTitleOf] = useState<number | null>(null)
+  const lineHintShown = useRef(false)
   const [ratio, setRatio] = useState(DEFAULT_RATIO)
   const [deskWidth, setDeskWidth] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -317,16 +300,6 @@ export function DeckView({
     if (container && tops[index] !== undefined) container.scrollTop = scrollTopFor(tops[index])
   }, [makeCurrent, partTops, scrollContainer])
 
-  const onStripKey = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (count === 0) return
-    const step = event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 0
-    if (event.key === 'Home') { event.preventDefault(); pick(0); return }
-    if (event.key === 'End') { event.preventDefault(); pick(count - 1); return }
-    if (step === 0) return
-    event.preventDefault()
-    pick(Math.max(0, Math.min(count - 1, shown + step)))
-  }, [count, pick, shown])
-
   // The line between the slide and the handout is dragged to change the widths.
   const onDividerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -353,26 +326,122 @@ export function DeckView({
     target.addEventListener('pointercancel', up)
   }, [avail, stripWidth, pick])
 
+  // ---- the strip's operations: each one transaction, so Undo takes it back whole
+  const dispatch = useCallback((tr: Transaction | null) => {
+    if (tr && editor && !editor.isDestroyed) editor.view.dispatch(tr)
+    return !!tr
+  }, [editor])
+
+  const stripActions = useMemo<StripActions>(() => ({
+    pick,
+    insert: (at, kind) => {
+      if (!editor || !dispatch(insertSlide(editor.state, at, kind))) return
+      setFocusTitleOf(at)
+      requestAnimationFrame(() => pick(at))
+    },
+    duplicate: index => {
+      if (editor && dispatch(duplicateSlide(editor.state, index))) requestAnimationFrame(() => pick(index + 1))
+    },
+    toggleSkip: index => {
+      if (!editor) return
+      const entry = slidesOf(editor.state.doc)[index]
+      if (entry) dispatch(updateSlide(editor.state, index, { ...entry.data, skip: entry.data.skip ? undefined : true }))
+    },
+    remove: index => {
+      if (!editor || !dispatch(deleteSlide(editor.state, index))) return
+      setNotice({ text: `Slide ${index + 1} is deleted`, undo: true })
+      const left = slidesOf(editor.state.doc).length
+      requestAnimationFrame(() => pick(Math.min(index, left - 1)))
+    },
+    move: (from, to) => {
+      if (editor && dispatch(moveSlide(editor.state, from, to))) requestAnimationFrame(() => pick(to > from ? to - 1 : to))
+    },
+  }), [editor, dispatch, pick])
+
+  // A notice in the bar fades after a while.
+  useEffect(() => {
+    if (!notice) return
+    const timer = window.setTimeout(() => setNotice(null), NOTICE_MS)
+    return () => window.clearTimeout(timer)
+  }, [notice])
+
+  // A line typed in the handout stays a line in this cut; the first time, one quiet hint says how a slide is added.
+  useEffect(() => {
+    if (!editor) return
+    const onTransaction = ({ transaction }: { transaction: Transaction }) => {
+      if (lineHintShown.current || !transaction.docChanged || isTrustedDeckTransaction(transaction)) return
+      const count = (doc: typeof transaction.doc) => {
+        let lines = 0
+        doc.descendants(node => { if (node.type.name === 'horizontalRule') lines++; return node.isBlock && !node.isTextblock })
+        return lines
+      }
+      if (count(transaction.doc) > count(transaction.before)) {
+        lineHintShown.current = true
+        setNotice({ text: LINE_HINT })
+      }
+    }
+    editor.on('transaction', onTransaction)
+    return () => { editor.off('transaction', onTransaction) }
+  }, [editor])
+
+  // Settings beside the slide: closed when the slide changes, and placed beside it (over the handout when it must).
+  useEffect(() => { setSettingsOpen(false) }, [shown])
+  // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one.
+  useEffect(() => {
+    if (focusTitleOf === null || focusTitleOf !== shown) return
+    const frame = requestAnimationFrame(() => setFocusTitleOf(null))
+    return () => cancelAnimationFrame(frame)
+  }, [shown, focusTitleOf])
+  useLayoutEffect(() => {
+    if (!settingsOpen) { setSettingsAt(null); return }
+    const desk = deskRef.current
+    const big = desk?.querySelector<HTMLElement>('.deck-big')
+    if (!desk || !big) return
+    const deskBox = desk.getBoundingClientRect()
+    const bigBox = big.getBoundingClientRect()
+    setSettingsAt({
+      left: Math.max(8, Math.min(bigBox.right - deskBox.left + 12, deskBox.width - SETTINGS_WIDTH - 8)),
+      top: Math.max(8, bigBox.top - deskBox.top - 4),
+    })
+  }, [settingsOpen, deskWidth, stageWidth, shown])
+
+  const changeSlide = useCallback((data: SlideData, kind?: string) => {
+    if (editor) dispatch(updateSlide(editor.state, shown, data, kind))
+  }, [editor, dispatch, shown])
+
+  // A picture pasted or dropped on a slide: saved beside the deck by the host, then the slide shows it. A slide that
+  // places no picture beside or behind its words becomes a Picture slide.
+  const onPicture = useCallback((dataUrl: string, filename: string) => {
+    if (!editor) return
+    const entry = slidesOf(editor.state.doc)[shown]
+    if (!entry) return
+    let id = entry.data.id
+    if (!id) {
+      id = newId(slidesOf(editor.state.doc).map(other => other.data.id).filter((value): value is string => !!value))
+      dispatch(updateSlide(editor.state, shown, { ...entry.data, id }))
+    }
+    sendToExtension('deck/save-image', { slideId: id, dataUrl, filename })
+  }, [editor, dispatch, shown])
+
+  useEffect(() => onMessage(message => {
+    if (!editor || editor.isDestroyed) return
+    if (message.type === 'deck/image-failed') {
+      setNotice({ text: typeof message.message === 'string' ? message.message : 'The picture could not be saved.' })
+      return
+    }
+    if (message.type !== 'deck/image-saved' || typeof message.slideId !== 'string' || typeof message.path !== 'string') return
+    const index = slidesOf(editor.state.doc).findIndex(entry => entry.data.id === message.slideId)
+    if (index < 0) return
+    const entry = slidesOf(editor.state.doc)[index]
+    const placed = entry.data.picture && entry.data.picture !== 'none'
+    const kind = placed || entry.kind === 'picture' ? undefined : 'picture'
+    dispatch(updateSlide(editor.state, index, kind ? { ...convertKind(entry.data, 'picture'), image: message.path } : { ...entry.data, image: message.path }, kind))
+  }), [editor, dispatch])
+
   const status = documentBarStatus(syncState, syncAction)
   const handoutContainer = scrollContainer()
   // Writing on the slide keeps it the current one while the handout is still.
   const onWriting = useCallback(() => { lockUntil.current = Date.now() + WRITE_LOCK_MS }, [])
-
-  // Keyed by place and memoised on the slide's own data (read once per distinct body), so a keystroke redraws only
-  // the thumbnail whose slide changed.
-  const strip = slides.map(entry => (
-    <Thumbnail
-      key={entry.index}
-      index={entry.index}
-      kind={entry.kind}
-      data={entry.data}
-      current={entry.index === shown}
-      theme={theme}
-      borderless={borderless}
-      assets={assets}
-      onPick={pick}
-    />
-  ))
 
   return (
     <div className="deck-view h-screen bg-surface flex flex-col">
@@ -391,6 +460,27 @@ export function DeckView({
           </Button>
         </Tooltip>
         <span className="deck-count">{count === 0 ? 'No slides yet' : `Slide ${shown + 1} of ${count}`}</span>
+        <span className="deck-notice" role="status" aria-live="polite">
+          {notice ? (
+            <>
+              <span className="deck-notice-text">{notice.text}</span>
+              {notice.undo ? (
+                <Tooltip label="Put the slide back">
+                  <Button
+                    variant="link"
+                    className="deck-line-action"
+                    onClick={() => {
+                      editor?.commands.undo()
+                      setNotice(null)
+                    }}
+                  >
+                    Undo
+                  </Button>
+                </Tooltip>
+              ) : null}
+            </>
+          ) : null}
+        </span>
         <span className="flex-1" />
         <Tooltip label="How the slides look: as a card, or the whole column as the stage">
           <SegmentedControl
@@ -411,16 +501,15 @@ export function DeckView({
 
       <div ref={deskRef} className="deck-desk">
         {stripShown ? (
-          <div
-            ref={stripRef}
-            className={`deck-strip${borderless ? ' is-borderless' : ''}`}
-            role="listbox"
-            aria-label="Slides"
-            tabIndex={0}
-            onKeyDown={onStripKey}
-          >
-            {strip}
-          </div>
+          <SlideStrip
+            slides={slides}
+            current={shown}
+            theme={theme}
+            borderless={borderless}
+            assets={assets}
+            actions={stripActions}
+            stripRef={stripRef}
+          />
         ) : null}
 
         <div className={`deck-stage${borderless ? ' is-borderless' : ''}`} style={{ left: stripWidth, width: stageWidth }}>
@@ -437,6 +526,10 @@ export function DeckView({
                 onWriting={onWriting}
                 notesOpen={notesOpen}
                 onNotesOpen={setNotesOpen}
+                settingsOpen={settingsOpen}
+                onSettings={() => setSettingsOpen(open => !open)}
+                initialFocus={focusTitleOf === slide.index ? 'title' : undefined}
+                onPicture={onPicture}
               />
             ) : null}
           </div>
@@ -469,6 +562,18 @@ export function DeckView({
               </Button>
             </Tooltip>
           </div>
+        ) : null}
+
+        {settingsOpen && slide && settingsAt ? (
+          <SlideSettings
+            number={shown + 1}
+            kind={slide.kind}
+            data={slide.data}
+            style={{ left: settingsAt.left, top: settingsAt.top }}
+            onKind={kind => changeSlide(convertKind(slide.data, kind), kind)}
+            onChange={data => changeSlide(data)}
+            onClose={() => setSettingsOpen(false)}
+          />
         ) : null}
 
         <div className={`deck-handout${handoutShown ? '' : ' is-folded'}`} style={{ left: dividerLeft + 8 }} aria-hidden={handoutShown ? undefined : true}>
