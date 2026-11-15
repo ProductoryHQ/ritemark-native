@@ -390,7 +390,7 @@ export function createBoardToolGroup(controller: () => BoardController | null): 
         },
         run: async (args, context) => {
           const answer = await board().move(String(args.card_id), args.stage as (typeof CARD_STAGES)[number], {}, ACTOR_OF_RUNTIME[context.runtimeId]);
-          return answerText(answer, `Moved card ${String(args.card_id)} to ${STAGE_WORDS[String(args.stage)]}.`);
+          return answerText(answer, `Moved the card to ${STAGE_WORDS[String(args.stage)]}.`);
         },
       },
       {
