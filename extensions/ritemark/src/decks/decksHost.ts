@@ -24,6 +24,8 @@ export interface DecksHost {
 export interface DecksHostOptions {
   /** The folder New makes a file in: the folder chosen in Documents, else the project's top (extension.ts). */
   newFileFolder: () => Promise<string>;
+  /** A file New made, counted as made once first saved, as Text and Table are (Sprint 140, R15). */
+  noteNewFile: (fsPath: string) => void;
 }
 
 export function registerDecks(context: vscode.ExtensionContext, options: DecksHostOptions): DecksHost {
@@ -72,8 +74,12 @@ function dayOf(modified: number): string {
 async function newDeck(pages: DeckPages, options: DecksHostOptions): Promise<void> {
   const root = projectRoot();
   if (!root) return;
-  // The folder New was opened from, as it is now (the folder chosen in Documents), before the quick pick takes the focus
-  const folder = await options.newFileFolder();
+  // The folder New was opened from, as it is now (the folder chosen in Documents), before the quick pick takes the focus.
+  // Decks live in the project's (first) folder: a folder chosen in another of the window's folders makes it at its top.
+  const chosen = await options.newFileFolder();
+  const chosenRelative = chosen === root ? '' : projectRelative(root, chosen);
+  const folder = chosenRelative === null ? root : chosen;
+  const toFolder = chosenRelative ?? '';
   const files = workspaceDeckFiles(root);
   const choices = newDeckChoices(await files.list(), path.basename(root), dayOf);
   const picked = await vscode.window.showQuickPick<vscode.QuickPickItem & { choice: NewDeckChoice }>(
@@ -81,8 +87,6 @@ async function newDeck(pages: DeckPages, options: DecksHostOptions): Promise<voi
     { title: 'New deck', placeHolder: 'Start empty, or from a copy of an earlier deck', matchOnDescription: true },
   );
   if (!picked) return;
-  const toFolder = folder === root ? '' : projectRelative(root, folder);
-  if (toFolder === null) return; // New in a project always has a folder inside it
   const source = picked.choice.source;
   let text = emptyDeckText();
   if (source) {
@@ -93,21 +97,26 @@ async function newDeck(pages: DeckPages, options: DecksHostOptions): Promise<voi
     }
     text = copiedDeckText(written, folderOf(source), toFolder);
   }
-  // Never over an existing file: the create fails if the name was taken meanwhile, and the next free one is tried
+  // Never over an existing file, nor over a deck open in Ritemark whose file is gone: the create fails if the name was
+  // taken meanwhile, and the next free one is tried
+  const isOpen = (target: string) => vscode.workspace.textDocuments.some(document => document.uri.scheme === 'file' && path.normalize(document.uri.fsPath) === path.normalize(target));
   for (let attempt = 0; attempt < 20; attempt++) {
-    const taken = (fileName: string) => fs.existsSync(path.join(folder, fileName));
+    const taken = (fileName: string) => fs.existsSync(path.join(folder, fileName)) || isOpen(path.join(folder, fileName));
     const fileName = source ? copyFileName(picked.choice.label, taken) : emptyFileName(taken);
     const relative = toFolder ? `${toFolder}/${fileName}` : fileName;
     try {
       await files.write(relative, text, { create: true });
     } catch (error) {
-      if (fs.existsSync(path.join(folder, fileName))) continue;
+      if (taken(fileName)) continue;
       void vscode.window.showErrorMessage(`The deck could not be made: ${error instanceof Error ? error.message : String(error)}`);
       return;
     }
     const target = path.join(folder, fileName);
+    options.noteNewFile(target);
     pages.selectTitleWhenShown(target);
-    await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(target), 'ritemark.editor');
+    // As Text and Table open theirs: a tab of its own, not a preview the next file replaces
+    await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(target), 'ritemark.editor', { preview: false, preserveFocus: false });
     return;
   }
+  void vscode.window.showErrorMessage('The deck could not be made: every name tried was taken meanwhile.');
 }

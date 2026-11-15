@@ -44,6 +44,8 @@ interface StageProps {
   initialFocus?: string
   /** Sprint 159 (PR 7): select those words whole, to be typed over (a deck New just made), rather than put the caret after them. */
   selectOnFocus?: boolean
+  /** The words asked for took the caret (or the selection). */
+  onFocusTaken?: () => void
   /** A picture pasted or dropped on the slide, read as a data URL. */
   onPicture: (dataUrl: string, filename: string) => void
   /** The lines about where a copy came from, with their actions (Sprint 157, PR 4); else the plain source line. */
@@ -65,15 +67,21 @@ function notesPreview(notes: string | null): string {
   return text.length > 30 ? `${text.slice(0, 30)}…` : text
 }
 
-export function Stage({ editor, slide, theme, borderless, assets, width, onWriting, notesOpen, onNotesOpen, settingsOpen, onSettings, initialFocus, selectOnFocus, onPicture, sourceLines }: StageProps) {
+export function Stage({ editor, slide, theme, borderless, assets, width, onWriting, notesOpen, onNotesOpen, settingsOpen, onSettings, initialFocus, selectOnFocus, onFocusTaken, onPicture, sourceLines }: StageProps) {
   const [focusPath, setFocusPath] = useState<string | null>(initialFocus ?? null)
   const [focusSelect, setFocusSelect] = useState(!!selectOnFocus)
-  // A request that comes after the stage is drawn (the deck's first slide, already shown when New's deck opens)
+  // A request that comes after the stage is drawn (the deck's first slide, already shown when New's deck opens); the
+  // one it was drawn with is already in the state above, so the first run leaves it, and the caret is placed once
+  const asked = useRef({ initialFocus, selectOnFocus })
   useEffect(() => {
+    if (asked.current.initialFocus === initialFocus && asked.current.selectOnFocus === selectOnFocus) return
+    asked.current = { initialFocus, selectOnFocus }
     if (!initialFocus) return
     setFocusPath(initialFocus)
     setFocusSelect(!!selectOnFocus)
   }, [initialFocus, selectOnFocus])
+  const onFocusTakenRef = useRef(onFocusTaken)
+  onFocusTakenRef.current = onFocusTaken
   const notesRef = useRef<HTMLDivElement>(null)
 
   /** Change this slide's data (and its notes) in one transaction, from the editor's document as it is now. */
@@ -173,6 +181,7 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
     onFocused: () => {
       setFocusPath(null)
       setFocusSelect(false)
+      onFocusTakenRef.current?.()
     },
   }), [onWriting, write, focusPath, focusSelect])
 

@@ -91,19 +91,22 @@ import { BUILT_IN_THEME_PATH } from './deckTheme';
   assert.match(copiedDeckText(deck.replace('Clients/Harbour', ''), '', 'Courses/2026'), /!\[logo\]\(\.\.\/\.\.\/images\/logo\.png\)/);
 }
 
-// The quick pick: Empty deck first, then the decks newest first with folder and date; the library's topics left out.
+// The quick pick: Empty deck first, then the decks newest first with folder and date; the library's topics left out
+// (isTopicPath: a deck in a folder under the library is no topic, as the library's Other decks lists it).
 {
   const rows = newDeckChoices([
     { path: 'Clients/Harbour/AI assistants and agents.deck.md', modified: 200 },
     { path: 'Slide library/AI assistants.deck.md', modified: 500 },
     { path: 'Kickoff.deck.md', modified: 300 },
     { path: 'Clients/Northwind/Data in Excel.deck.md', modified: 100 },
+    { path: 'Slide library/Old/Retired.deck.md', modified: 50 },
   ], 'Trainings', modified => `day ${modified}`);
   assert.deepEqual(rows, [
     { label: 'Empty deck' },
     { label: 'Kickoff', description: 'Trainings · day 300', source: 'Kickoff.deck.md' },
     { label: 'AI assistants and agents', description: 'Clients/Harbour · day 200', source: 'Clients/Harbour/AI assistants and agents.deck.md' },
     { label: 'Data in Excel', description: 'Clients/Northwind · day 100', source: 'Clients/Northwind/Data in Excel.deck.md' },
+    { label: 'Retired', description: 'Slide library/Old · day 50', source: 'Slide library/Old/Retired.deck.md' },
   ]);
   assert.deepEqual(newDeckChoices([], 'Trainings', () => ''), [{ label: 'Empty deck' }]);
 }

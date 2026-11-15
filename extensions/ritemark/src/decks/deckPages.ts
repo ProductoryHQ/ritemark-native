@@ -58,8 +58,8 @@ export class DeckPages implements vscode.Disposable {
   private readonly writes = new Map<string, LibraryWrite>();
   private readonly waiting = new Map<string, (ok: boolean) => void>();
   private requests = 0;
-  /** Sprint 159 (PR 7): decks New just made, whose view selects the title slide's title once it is drawn. */
-  private readonly selectTitle = new Set<string>();
+  /** Sprint 159 (PR 7): decks New just made, whose view selects the title slide's title once it is drawn; each forgotten after a minute. */
+  private readonly selectTitle = new Map<string, ReturnType<typeof setTimeout>>();
 
   /** `library` gives the project's library, or null when the window has no project folder on disk. */
   constructor(private readonly library: () => DeckLibrary | null = () => null) {}
@@ -80,8 +80,18 @@ export class DeckPages implements vscode.Disposable {
    */
   selectTitleWhenShown(fsPath: string): void {
     const key = path.normalize(fsPath);
-    this.selectTitle.add(key);
-    setTimeout(() => this.selectTitle.delete(key), 60_000);
+    clearTimeout(this.selectTitle.get(key));
+    this.selectTitle.set(key, setTimeout(() => this.selectTitle.delete(key), 60_000));
+  }
+
+  /** The deck's request to select its title, taken once; none for a deck with no slides (nothing to select). */
+  private takeSelectTitle(document: vscode.TextDocument): boolean {
+    const key = path.normalize(document.uri.fsPath);
+    const timer = this.selectTitle.get(key);
+    if (timer === undefined) return false;
+    clearTimeout(timer);
+    this.selectTitle.delete(key);
+    return slidesOfText(document.getText()).length > 0;
   }
 
   /** A deck's panel, while it is open: the active one is where the library inserts. */
@@ -225,7 +235,7 @@ export class DeckPages implements vscode.Disposable {
           connected.count = request.count;
           if (connected === this.activeView()) this.changed.fire();
         }
-        if (this.selectTitle.delete(path.normalize(document.uri.fsPath))) await this.post(webview, { type: 'deck/select-title' });
+        if (this.takeSelectTitle(document)) await this.post(webview, { type: 'deck/select-title' });
         return;
       }
       default:
@@ -330,6 +340,8 @@ export class DeckPages implements vscode.Disposable {
   }
 
   dispose(): void {
+    for (const timer of this.selectTitle.values()) clearTimeout(timer);
+    this.selectTitle.clear();
     this.changed.dispose();
     this.revealed.dispose();
     this.views.clear();

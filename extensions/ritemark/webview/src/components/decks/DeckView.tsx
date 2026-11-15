@@ -558,12 +558,20 @@ export function DeckView({
   useEffect(() => { setSettingsOpen(false) }, [shown])
   // The Add to library sheet belongs to its slide: another slide closes it.
   useEffect(() => { setAddSheet(sheet => (sheet && sheet.number - 1 !== shown ? null : sheet)) }, [shown])
-  // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one.
+  // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one. A
+  // request to select the title (Sprint 159, PR 7) waits instead until the stage says it selected it (its stage may not
+  // be drawn yet while the view is laid out), and ends when another slide is chosen first.
   useEffect(() => {
-    if (focusTitleOf === null || focusTitleOf.index !== shown) return
+    if (focusTitleOf === null) return
+    if (focusTitleOf.select) {
+      if (focusTitleOf.index !== shown) setFocusTitleOf(null)
+      return
+    }
+    if (focusTitleOf.index !== shown) return
     const frame = requestAnimationFrame(() => setFocusTitleOf(null))
     return () => cancelAnimationFrame(frame)
   }, [shown, focusTitleOf])
+  const titleSelected = useCallback(() => setFocusTitleOf(current => (current?.select ? null : current)), [])
   useLayoutEffect(() => {
     if (!settingsOpen && !addSheet) { setSettingsAt(null); return }
     const desk = deskRef.current
@@ -896,6 +904,7 @@ export function DeckView({
                 onSettings={() => setSettingsOpen(open => !open)}
                 initialFocus={focusTitleOf?.index === slide.index ? 'title' : undefined}
                 selectOnFocus={focusTitleOf?.index === slide.index && focusTitleOf.select}
+                onFocusTaken={titleSelected}
                 onPicture={onPicture}
                 sourceLines={slide.data.id && sources[slide.data.id] ? (
                   <SourceLines

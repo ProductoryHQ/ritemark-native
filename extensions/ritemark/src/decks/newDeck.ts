@@ -8,18 +8,17 @@
  *    It is the deck as written, notes included (it is the person's own deck); only its relative paths change when it
  *    lands in another folder, so its pictures and links still point where they did.
  *  - The quick pick lists "Empty deck" first, then the project's decks, newest first, each with its folder and date.
- *    The Slide library's topics are the library, not earlier decks, so they are left out.
+ *    The Slide library's topics are the library, not earlier decks, so they are left out (as the library's Other decks
+ *    leaves them out).
  */
 
-import { newId, parseDeck, parseSlideBody, writeScalar, writeSlideBody } from './deckFormat';
-import { folderOf, newTopicText, partText, rebasePath, rewriteMarkdownTargets } from './deckLibraryFormat';
+import { newId, parseDeck, writeScalar } from './deckFormat';
+import { folderOf, newTopicText, partText, rebaseSlide } from './deckLibraryFormat';
+import { isTopicPath } from './DeckLibrary';
 import { BUILT_IN_THEME_PATH } from './deckTheme';
 
 /** The words an empty deck's title slide starts with, selected so they are typed over. */
 export const EMPTY_DECK_TITLE = "The deck's title";
-
-/** The library's folder (DeckLibrary's LIBRARY_FOLDER): its decks are topics, not earlier decks. */
-const LIBRARY_FOLDER = 'Slide library';
 
 /** A new deck: one title slide, its title the words to type over, in the built-in theme. */
 export function emptyDeckText(random: () => number = Math.random): string {
@@ -56,22 +55,21 @@ export function emptyFileName(taken: (fileName: string) => boolean): string {
  */
 export function copiedDeckText(text: string, fromFolder: string, toFolder: string): string {
   if (fromFolder === toFolder) return text;
-  const rebase = (markdown: string) => rewriteMarkdownTargets(markdown, target => rebasePath(target, fromFolder, toFolder));
+  // The library's own rebase of a slide (its picture through the slide writer) and of Markdown (links and pictures)
+  const rebaseText = (markdown: string) => rebaseSlide('', markdown, fromFolder, toFolder).handout;
   const deck = parseDeck(text);
   let out = text.slice(0, deck.bodyStart);
   let at = deck.bodyStart;
   for (const slide of deck.slides) {
-    out += rebase(text.slice(at, slide.start));
+    out += rebaseText(text.slice(at, slide.start));
     const block = text.slice(slide.start, slide.end);
-    const data = parseSlideBody(slide.body);
-    const bodyAt = data.image ? block.indexOf(slide.body) : -1;
-    out += bodyAt < 0 ? block
-      : block.slice(0, bodyAt) + writeSlideBody(slide.body, { ...data, image: rebasePath(data.image ?? '', fromFolder, toFolder) }) + block.slice(bodyAt + slide.body.length);
-    out += text.slice(slide.end, slide.handoutStart);
-    out += rebase(text.slice(slide.handoutStart, slide.handoutEnd));
+    const { body, handout } = rebaseSlide(slide.body, text.slice(slide.handoutStart, slide.handoutEnd), fromFolder, toFolder);
+    const bodyAt = body === slide.body ? -1 : block.indexOf(slide.body);
+    out += bodyAt < 0 ? block : block.slice(0, bodyAt) + body + block.slice(bodyAt + slide.body.length);
+    out += text.slice(slide.end, slide.handoutStart) + handout;
     at = slide.handoutEnd;
   }
-  return out + rebase(text.slice(at));
+  return out + rebaseText(text.slice(at));
 }
 
 /** A row of the quick pick: an empty deck, or a copy of a deck at its project path. */
@@ -88,7 +86,7 @@ export interface NewDeckChoice {
  */
 export function newDeckChoices(decks: ReadonlyArray<{ path: string; modified: number }>, projectName: string, day: (modified: number) => string): NewDeckChoice[] {
   const earlier = decks
-    .filter(deck => deck.path !== LIBRARY_FOLDER && !deck.path.startsWith(`${LIBRARY_FOLDER}/`))
+    .filter(deck => !isTopicPath(deck.path))
     .slice()
     .sort((a, b) => b.modified - a.modified || a.path.localeCompare(b.path));
   return [
