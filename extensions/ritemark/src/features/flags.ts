@@ -67,6 +67,8 @@ export type FlagId =
   | 'control-catalogue'
   // Sprint 148 (#591): Ritemark's own search, the words layer (its index reads the project in a worker)
   | 'project-search'
+  // Sprint 157 (experience 46): a `.deck.md` opens as a deck, with the Slide library and the AI's deck tools
+  | 'decks'
   // Sprint 158 (#711): editing an .xlsx in place, saved cell by cell; the kill switch for it
   | 'excel-editing';
 
@@ -84,6 +86,16 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     label: 'Control Catalogue',
     description: 'A test page of every shared control in every state, opened only when a test script starts Ritemark with RITEMARK_CONTROL_CATALOGUE=1.',
     status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  // Sprint 157 (experience 46, README decision 10): Decks, the first cut. OFF by default on Jarmo's word (14 November
+  // 2026: "behind a feature flag, in dev runs, not on main at first"), which HARD RULE #2 allows. Off, a `.deck.md`
+  // opens as an ordinary document and nothing else changes; on (`ritemark.features.decks`), it opens as a deck.
+  decks: {
+    id: 'decks',
+    label: 'Decks',
+    description: 'Open a .deck.md file as a deck: slides beside their handout, with a Slide library to take copies from.',
+    status: 'experimental',
     platforms: ['darwin', 'win32', 'linux'],
   },
   // Sprint 148 (#591): kill switch for Ritemark's own search, as `powerpoint-preview` is. Default ON (HARD RULE #2):

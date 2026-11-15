@@ -82,6 +82,9 @@ const ControlCatalogue = lazy(() =>
   import('./components/catalogue/ControlCatalogue').then((m) => ({ default: m.ControlCatalogue }))
 )
 // The Publish sheet (Sprint 149, R4, R5): the page that shows what will be public (src/publish/PublishSheetPanel.ts)
+const SlideLibraryPanel = lazy(() =>
+  import('./components/decks/library/SlideLibraryPanel').then((m) => ({ default: m.SlideLibraryPanel }))
+)
 const PublishSheet = lazy(() =>
   import('./components/publish/PublishSheet').then((m) => ({ default: m.PublishSheet }))
 )
@@ -103,7 +106,8 @@ if (
   editorType === 'flows-panel' ||
   editorType === 'ai-sidebar' ||
   editorType === 'transcribe-panel' ||
-  editorType === 'tasks-panel'
+  editorType === 'tasks-panel' ||
+  editorType === 'slide-library'
 ) {
   document.body.style.backgroundColor = 'var(--r-surface-muted)'
 }
@@ -174,6 +178,10 @@ ReactDOM.createRoot(rootElement).render(
     ) : editorType === 'control-catalogue' ? (
       <Suspense fallback={null}>
         <ControlCatalogue />
+      </Suspense>
+    ) : editorType === 'slide-library' ? (
+      <Suspense fallback={<LoadingFallback />}>
+        <SlideLibraryPanel />
       </Suspense>
     ) : editorType === 'publish-sheet' ? (
       <Suspense fallback={null}>

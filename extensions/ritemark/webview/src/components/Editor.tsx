@@ -5,8 +5,9 @@ import { DOMSerializer } from '@tiptap/pm/model'
 import { Fragment } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
 import { closeHistory } from '@tiptap/pm/history'
-import { createNodeFromContent } from '@tiptap/core'
+import { createNodeFromContent, type AnyExtension } from '@tiptap/core'
 import { sendToExtension, onMessage } from '../bridge'
+import { getClipboardImageFile, getUniqueImageFilename, readFileAsBase64, shouldPreferTextPaste } from '../lib/pastedImage'
 import Placeholder from '@tiptap/extension-placeholder'
 import { CodeBlockWithCopyExtension } from '../extensions/CodeBlockWithCopyExtension'
 import { sameRelativeImagePath } from '../../../src/utils/imagePaths'
@@ -46,90 +47,6 @@ import {
 // corpus tests drive the same code. The comment `marked` tokenizer registers
 // lazily, gated on the flag (see ensureCommentMarkedPipeline there).
 
-// Helper to read a File as base64 data URL
-function readFileAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
-
-// Generate a unique filename for pasted/dropped images.
-// macOS screenshots always have file.name = "image.png", so we must
-// detect generic names and always generate a unique timestamp-based name.
-function getUniqueImageFilename(file: File): string {
-  const extension = file.type.split('/')[1] || 'png'
-  const baseName = file.name ? file.name.replace(/\.[^.]+$/, '') : ''
-  const isGeneric = !baseName || /^image$/i.test(baseName)
-  if (isGeneric) {
-    return `image-${Date.now()}.${extension}`
-  }
-  return file.name
-}
-
-function getClipboardImageFile(dataTransfer: DataTransfer | null): File | null {
-  if (!dataTransfer) {
-    return null
-  }
-
-  if (dataTransfer.items) {
-    for (const item of Array.from(dataTransfer.items)) {
-      if (item.kind === 'file' && item.type.startsWith('image/')) {
-        const file = item.getAsFile()
-        if (file) {
-          return file
-        }
-      }
-    }
-  }
-
-  if (dataTransfer.files && dataTransfer.files.length > 0) {
-    for (const file of Array.from(dataTransfer.files)) {
-      if (file.type.startsWith('image/')) {
-        return file
-      }
-    }
-  }
-
-  return null
-}
-
-function extractPlainTextFromHtml(html: string): string {
-  if (!html.trim()) {
-    return ''
-  }
-
-  try {
-    const doc = new DOMParser().parseFromString(html, 'text/html')
-    return doc.body.textContent?.trim() ?? ''
-  } catch {
-    return ''
-  }
-}
-
-function shouldPreferTextPaste(dataTransfer: DataTransfer | null): boolean {
-  if (!dataTransfer) {
-    return false
-  }
-
-  const types = Array.from(dataTransfer.types ?? [])
-  const plainText = dataTransfer.getData('text/plain').trim()
-  const html = dataTransfer.getData('text/html')
-  const htmlText = extractPlainTextFromHtml(html)
-
-  if (plainText.length > 0) {
-    return true
-  }
-
-  if ((types.includes('text/html') || types.includes('text/rtf')) && htmlText.length > 0) {
-    return true
-  }
-
-  return false
-}
-
 interface EditorProps {
   value: string
   onChange: (value: string) => void
@@ -145,6 +62,9 @@ interface EditorProps {
   /** Sprint 130: content above the document inside the same scroll (a task
    *  card's title, state and files on its page). */
   header?: React.ReactNode
+  /** Sprint 157: extra schema extensions for a mode of the editor (a deck's slide node and its guard), fixed at
+   *  mount like the rest of the list. */
+  extensions?: AnyExtension[]
 }
 
 export function Editor({
@@ -159,6 +79,7 @@ export function Editor({
   syncTarget,
   onExternalApplied,
   header,
+  extensions,
 }: EditorProps) {
   // Register the comment `marked` tokenizer before initialContent is parsed on
   // mount — only when the flag is on (see ensureCommentMarkedPipeline above).
@@ -245,6 +166,8 @@ export function Editor({
       // Sprint 138 (#481): the equation nodes with their typesetting views.
       mathInline: MathInlineWithView,
       mathBlock: MathBlockWithView,
+      // Sprint 157: a deck's slide node and its guard, only in a deck.
+      deck: extensions,
     }),
     content: initialContent,
     onCreate: ({ editor }) => {

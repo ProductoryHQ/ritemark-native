@@ -14,6 +14,7 @@ import { PDFViewer } from './components/viewers/PDFViewer'
 import { DocumentHeader, PropertiesModal, ExportMenu, SyncActionButton } from './components/header'
 import { VoiceDictationButton } from './components/VoiceDictationButton'
 import { CardHead, CardStrip } from './components/tasks/CardPage'
+import { DeckView } from './components/decks/DeckView'
 import { AboutProjectNote } from './components/AboutProjectNote'
 import { startBoard, useBoardSnapshot } from './components/tasks/boardClient'
 import { CommentsMenuButton } from './components/header/CommentsMenuButton'
@@ -111,6 +112,8 @@ function App() {
   // Task card page (Sprint 130, design.md §5): the card's strip and head come
   // from the board, the body is this document.
   const [cardMode, setCardMode] = useState<{ cardId: string } | null>(null)
+  // Sprint 157: a `.deck.md` shown as a deck (the host decides: the flag, the name, the deck version).
+  const [deckMode, setDeckMode] = useState(false)
   const boardSnapshot = useBoardSnapshot()
   const cardPageOn = cardMode !== null
   useEffect(() => {
@@ -209,6 +212,7 @@ function App() {
       })
       const nextCard = payload.cardMode ?? null
       setCardMode((current) => (nextCard && current?.cardId === nextCard.cardId ? current : nextCard))
+      setDeckMode(payload.deckMode === true)
       if (payload.isAgentMode) {
         setIsAgentMode(true)
         setAgentFrontmatter((payload.agentFrontmatter as AgentFrontmatter) || {})
@@ -324,6 +328,7 @@ function App() {
             saveAsMarkdownFromPreview: false
           })
           setCardMode((message.cardMode as { cardId: string } | undefined) ?? null)
+          setDeckMode(message.deckMode === true)
           if (message.isAgentMode) {
             setIsAgentMode(true)
             setAgentFrontmatter((message.agentFrontmatter as AgentFrontmatter) || {})
@@ -850,6 +855,51 @@ function App() {
         />
         {paragraphDialog}
       </>
+    )
+  }
+
+  // Sprint 157: a deck, as a mode of this one Markdown editor: the same content, edits, sync target and dialogs.
+  // Kept after the CSV block, away from the spreadsheet routes.
+  if (deckMode && fileType === 'markdown') {
+    return (
+      <DeckView
+        content={content}
+        onChange={handleContentChange}
+        onEditorReady={handleEditorReady}
+        onSelectionChange={handleSelectionChange}
+        imageMappings={imageMappings}
+        commentCallouts={features.commentCallouts}
+        syncTarget={syncTarget}
+        onExternalApplied={handleDocumentApplied}
+        syncAction={syncAction}
+        syncState={documentViewSync.state}
+        properties={properties}
+        onPropertiesChange={handlePropertiesChange}
+        findBar={showFindBar && editorRef.current ? (
+          <FindBar
+            editor={editorRef.current}
+            request={findRequest}
+            onClose={() => {
+              setShowFindBar(false)
+              setFindRequest(null)
+            }}
+          />
+        ) : null}
+        dialogs={
+          <>
+            <DocumentConflictDialog
+              isOpen={showConflictDialog && !!documentViewSync.conflict}
+              filename={documentViewSync.conflict?.filename || filename}
+              reason={documentViewSync.conflict?.reason}
+              onClose={() => setShowConflictDialog(false)}
+              onCompare={() => sendConflictAction('compare')}
+              onKeepLocal={() => sendConflictAction('keep-local')}
+              onUseDisk={() => sendConflictAction('use-disk')}
+            />
+            {paragraphDialog}
+          </>
+        }
+      />
     )
   }
 

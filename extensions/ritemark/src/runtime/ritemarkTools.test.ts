@@ -409,6 +409,103 @@ async function main(): Promise<void> {
     setBoardToolController(() => null);
   }
 
+  // ── Sprint 157: the deck tools, through the same library the buttons use ──
+  {
+    const { DeckLibrary } = await import('../decks/DeckLibrary');
+    const { slidesOfText } = await import('../decks/deckLibraryFormat');
+    const files: Record<string, string> = {
+      'Slide library/Agents.deck.md': '---\ndeck: 1\n---\n\n```slide points\nid: g1\ntitle: Why agents?\n```\n\nAgents change who does the steps.\n',
+      'Clients/Harbour.deck.md': '---\ndeck: 1\n---\n\n```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome.\n',
+      'notes.md': 'not a deck',
+    };
+    const library = new DeckLibrary({
+      async list() { return Object.keys(files).filter((path) => path.endsWith('.deck.md')).map((path) => ({ path, modified: 0 })); },
+      async read(path) { return files[path] ?? null; },
+      async write(path, text) { files[path] = text; },
+    });
+    const viewed: Array<{ count: number; afterIndex: number }> = [];
+    let open = false;
+    const deckGroup = tools.DECK_TOOL_GROUP;
+    assert.equal(tools.deckToolsAvailable(), false, 'no decks host: no deck tools');
+    tools.setDeckToolHost(() => ({
+      library: () => library,
+      viewInsert: () => (open ? async (parts, afterIndex) => { viewed.push({ count: parts.length, afterIndex }); return true; } : undefined),
+    }));
+    assert.equal(tools.deckToolsAvailable(), true);
+    assert.deepEqual(toolGroupsFor({ browser: false }).map((group) => group.id), ['deck']);
+    assert.equal(toolGroupById('deck'), deckGroup);
+    assert.deepEqual(deckGroup.tools.map((tool) => tool.name), ['list_decks', 'read_deck', 'insert_slides', 'update_library_slide', 'add_to_library']);
+    assert.equal(claudeAllowName(deckGroup, deckGroup.tools[0]), 'mcp__ritemark_decks__list_decks');
+    const tool = (name: string) => deckGroup.tools.find((item) => item.name === name)!;
+    const context = { runtimeId: 'claude-code' as const };
+
+    const listed = await runTool(tool('list_decks'), { where: 'library' }, context);
+    assert.match(listed.text, /^Slide library\/Agents\.deck\.md · library topic · 1 slide/);
+    // A closed deck: the copy is written into its file, with its from: line.
+    const inserted = await runTool(tool('insert_slides'), { deck: 'Clients/Harbour.deck.md', source: 'Slide library/Agents.deck.md', slide_ids: ['g1'], after: 1 }, context);
+    assert.equal(inserted.text, 'Inserted 1 slide into Harbour: slide 2.');
+    const copy = slidesOfText(files['Clients/Harbour.deck.md'])[1];
+    assert.match(copy.data.from ?? '', /^Slide library\/Agents\.deck\.md#g1 @[0-9a-z]{6}$/);
+    assert.match((await runTool(tool('read_deck'), { deck: 'Clients/Harbour.deck.md' }, context)).text, /Slide 2 · id \w+ · points · copy of Slide library\/Agents\.deck\.md/);
+    // An open deck: through its view, as one undo step there; the file is left to the view.
+    open = true;
+    const before = files['Clients/Harbour.deck.md'];
+    await runTool(tool('insert_slides'), { deck: 'Clients/Harbour.deck.md', source: 'Slide library/Agents.deck.md', slide_ids: ['g1'] }, context);
+    assert.deepEqual(viewed, [{ count: 1, afterIndex: 1 }]);
+    assert.equal(files['Clients/Harbour.deck.md'], before);
+    // An open deck that doesn't take them: an error, and the file is never written under the view.
+    const refusing = tools.createDeckToolGroup(() => ({ library: () => library, viewInsert: () => async () => false }));
+    const refused = await runTool(refusing.tools.find((item) => item.name === 'insert_slides')!, { deck: 'Clients/Harbour.deck.md', source: 'Slide library/Agents.deck.md', slide_ids: ['g1'] }, context);
+    assert.equal(refused.isError, true);
+    assert.match(refused.text, /didn't take the slides/);
+    assert.equal(files['Clients/Harbour.deck.md'], before);
+    open = false;
+    // Update the library: the topic gets the copy's words, the copy a new from: stamp.
+    files['Clients/Harbour.deck.md'] = files['Clients/Harbour.deck.md'].replace('title: Why agents?', 'title: Why agents, now?');
+    const updated = await runTool(tool('update_library_slide'), { deck: 'Clients/Harbour.deck.md', slide_id: copy.data.id }, context);
+    assert.equal(updated.isError, undefined, updated.text);
+    assert.match(files['Slide library/Agents.deck.md'], /title: Why agents, now\?/);
+    assert.notEqual(slidesOfText(files['Clients/Harbour.deck.md'])[1].data.from, copy.data.from);
+    // Add to library: a new topic, and the slide becomes a copy of it.
+    const added = await runTool(tool('add_to_library'), { deck: 'Clients/Harbour.deck.md', slide_id: 't1', topic: 'Openings' }, context);
+    assert.equal(added.text, 'Added the slide to the library under Openings (a new topic).');
+    assert.match(slidesOfText(files['Clients/Harbour.deck.md'])[0].data.from ?? '', /^Slide library\/Openings\.deck\.md#/);
+    // An open deck gets the copy's new from: through its view, not as a whole-file write.
+    const setThroughView: Array<[string, string]> = [];
+    const viaView = tools.createDeckToolGroup(() => ({
+      library: () => library,
+      viewInsert: () => undefined,
+      viewSetFrom: () => async (id, from) => { setThroughView.push([id, from]); return true; },
+    }));
+    const deckText = files['Clients/Harbour.deck.md'];
+    await runTool(viaView.tools.find((item) => item.name === 'update_library_slide')!, { deck: 'Clients/Harbour.deck.md', slide_id: copy.data.id }, context);
+    assert.equal(setThroughView.length, 1);
+    assert.equal(files['Clients/Harbour.deck.md'], deckText);
+    // OpenCode reaches the same tools through the IPC adapter.
+    const injector = new RitemarkToolsInjector();
+    const ipcList = await injector.handleIpc({ id: '1', op: 'list', group: 'deck' });
+    assert.deepEqual(ipcList.tools?.map((item) => item.name), deckGroup.tools.map((item) => item.name));
+    const ipcCall = await injector.handleIpc({ id: '2', op: 'call', group: 'deck', tool: 'list_decks', params: { where: 'library' } });
+    assert.match(ipcCall.text ?? "", /Slide library\/Agents\.deck\.md/);
+    // A copy that can't be linked: the library write is undone, so nothing is left behind.
+    const agentsBefore = files['Slide library/Agents.deck.md'];
+    const unlinked = tools.createDeckToolGroup(() => ({
+      library: () => library,
+      viewInsert: () => undefined,
+      viewSetFrom: () => async () => false,
+    }));
+    const failedAdd = await runTool(unlinked.tools.find((item) => item.name === 'add_to_library')!, { deck: 'Clients/Harbour.deck.md', slide_id: 't1', topic: 'Agents' }, context);
+    assert.equal(failedAdd.isError, true);
+    assert.match(failedAdd.text, /The library is back as it was/);
+    assert.equal(files['Slide library/Agents.deck.md'], agentsBefore);
+    // Only decks inside the project.
+    assert.equal((await runTool(tool('read_deck'), { deck: 'notes.md' }, context)).isError, true);
+    assert.equal((await runTool(tool('read_deck'), { deck: '../outside.deck.md' }, context)).isError, true);
+    assert.equal((await runTool(tool('insert_slides'), { deck: 'Clients/Harbour.deck.md', source: 'Slide library/Agents.deck.md', slide_ids: ['../x'] }, context)).isError, true);
+    tools.setDeckToolHost(() => null);
+    assert.equal(tools.deckToolsAvailable(), false);
+  }
+
   console.log('runtime/ritemarkTools: all assertions passed');
 }
 

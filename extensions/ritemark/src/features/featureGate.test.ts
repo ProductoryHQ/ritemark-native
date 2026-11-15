@@ -114,6 +114,9 @@ assert.strictEqual(featureProperties['ritemark.features.composer-thinking-effort
 // Sprint 148 (#591): the search index's kill switch, on by default (HARD RULE #2).
 assert.strictEqual(FLAGS['project-search'].status, 'experimental');
 assert.strictEqual(featureProperties['ritemark.features.project-search']?.default, true);
+// Sprint 157 (README decision 10): Decks, off by default on Jarmo's word, as an experimental flag.
+assert.strictEqual(FLAGS.decks.status, 'experimental');
+assert.strictEqual(featureProperties['ritemark.features.decks']?.default, false);
 // Sprint 158 (#711): Excel editing's kill switch, on everywhere by default (HARD RULE #2). Off, an .xlsx is read-only
 // and the host refuses its edits; an .xls is read-only either way.
 for (const platform of ['darwin', 'win32', 'linux'] as Platform[]) {

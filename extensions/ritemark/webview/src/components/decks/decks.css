@@ -1,0 +1,308 @@
+/* Sprint 157 (experience 46): the deck view, as the Experience lead's prototype draws it (prototype.html, `.dbar`,
+   `.strip`, `.stage`, `.divider`, `.hand`). The prototype's colours are Ritemark's tokens here: ground → surface-muted,
+   hair → hairline, ink → ink-strong, body → ink-body, muted → ink-muted, soft → accent-soft. */
+
+.deck-view {
+  --deck-bar: 44px;
+  --deck-strip: 132px;
+  font-family: var(--ritemark-ui-font-family);
+}
+
+/* ---- the bar */
+.deck-bar { height: var(--deck-bar); display: flex; align-items: center; gap: 4px; padding: 0 8px; box-sizing: border-box; flex: none; }
+.deck-bar .deck-count { margin-left: 4px; font-size: 12.5px; line-height: 1; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.deck-bar .deck-look { margin-right: 8px; }
+.deck-bar .deck-saved { margin-right: 6px; font-size: 12px; line-height: 1; color: var(--r-ink-muted); white-space: nowrap; }
+
+/* ---- the desk: strip, stage, divider, handout */
+.deck-desk { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+
+.deck-strip { position: absolute; left: 0; top: 0; bottom: 0; width: var(--deck-strip); border-right: 1px solid var(--r-hairline); overflow-y: auto; overflow-x: hidden; padding: 6px 0 40px; box-sizing: border-box; outline: none; user-select: none; -webkit-user-select: none; }
+/* A thumbnail is moved by the strip's own drag: never a native drag of its words or pictures. */
+.deck-thumb, .deck-thumb * { -webkit-user-drag: none; }
+.deck-thumb { touch-action: none; }
+.deck-thumb { position: relative; height: 62px; display: flex; align-items: flex-start; gap: 6px; padding: 3px 10px 0 6px; }
+.deck-thumb .deck-thumb-no { width: 18px; margin-top: 3px; text-align: right; font-size: 11px; font-weight: 500; line-height: 14px; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
+.deck-thumb .deck-thumb-slide { position: relative; width: 96px; height: 54px; border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline); }
+.deck-thumb:hover .deck-thumb-slide { box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 6px -2px rgba(30, 27, 75, 0.25); }
+.deck-thumb:active .deck-thumb-slide { filter: brightness(0.94); }
+.deck-thumb.is-current .deck-thumb-slide { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
+.deck-thumb.is-current .deck-thumb-no { color: var(--r-accent); font-weight: 700; }
+.deck-thumb.is-skip .deck-thumb-slide { opacity: 0.4; }
+.deck-thumb .deck-thumb-eye { position: absolute; left: 58px; top: 22px; width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.92); display: grid; place-items: center; color: var(--r-ink-strong); }
+:where(:root:not([data-input-mode="pointer"])) .deck-strip:focus-visible .deck-thumb.is-current .deck-thumb-slide { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent), 0 0 0 6px var(--r-accent-soft); }
+
+.deck-stage { position: absolute; top: 0; bottom: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; }
+.deck-stage .deck-stage-group { margin: auto 0; padding: 8px 0 48px; }
+.deck-stage .deck-big { position: relative; margin: 0 24px; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline), 0 8px 24px -10px rgba(30, 27, 75, 0.35); }
+.deck-stage .deck-under { margin: 12px 24px 0; display: grid; gap: 8px; }
+.deck-source { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--r-ink-muted); }
+
+.deck-divider { position: absolute; top: 0; bottom: 0; width: 13px; margin-left: -6px; cursor: col-resize; z-index: 3; touch-action: none; }
+.deck-divider::before { content: ''; position: absolute; left: 6px; top: 12px; bottom: 12px; border-left: 1.5px dotted var(--r-hairline-strong); }
+.deck-divider:hover::before, .deck-divider.is-dragging::before { border-left: 2px solid var(--r-accent); }
+.deck-fold { position: absolute; bottom: 28px; margin-left: -13px; z-index: 4; }
+.deck-fold .deck-fold-button { width: 26px; height: 26px; padding: 0; border-radius: 50%; }
+
+.deck-handout { position: absolute; top: 0; bottom: 0; right: 0; }
+.deck-handout.is-folded { visibility: hidden; pointer-events: none; }
+.deck-handout .wysiwyg-editor .ProseMirror {
+  counter-reset: deck-slide;
+  max-width: none !important;
+  /* The prototype's 20 on the left (no + or block handle in the handout); 22 on the right; room below to scroll the
+     last part to the top (60vh until the deck view measures the exact room) */
+  padding: 6px 22px 60vh 20px !important;
+  font-size: 14.5px !important;
+  line-height: 1.65 !important;
+  color: var(--r-ink-body);
+}
+/* No block handle and no + in the handout (Jarmo, 15 November): a block dragged there could land in another slide's
+   part, and / adds what the + would. The + lives on the page's body, so it is hidden by the deck view's presence. */
+.deck-handout .drag-handle { visibility: hidden !important; pointer-events: none !important; }
+body:has(.deck-view) .block-plus-btn { display: none !important; }
+.deck-handout .wysiwyg-editor .ProseMirror p { margin: 0 0 10px !important; font-size: 14.5px !important; line-height: 1.65 !important; }
+.deck-handout .wysiwyg-editor .ProseMirror li p { margin: 0 !important; }
+.deck-handout .wysiwyg-editor .ProseMirror h1 { font-size: 20px !important; margin: 16px 0 6px !important; }
+.deck-handout .wysiwyg-editor .ProseMirror h2 { font-size: 17px !important; margin: 14px 0 6px !important; }
+.deck-handout .wysiwyg-editor .ProseMirror h3,
+.deck-handout .wysiwyg-editor .ProseMirror h4,
+.deck-handout .wysiwyg-editor .ProseMirror h5,
+.deck-handout .wysiwyg-editor .ProseMirror h6 { font-size: 15.5px !important; margin: 12px 0 6px !important; }
+/* A prompt in the handout: the prototype's light block in small type, with the document's Copy */
+.deck-handout .wysiwyg-editor .ProseMirror pre.tiptap-code-block {
+  margin: 4px 0 12px !important;
+  padding: 10px 12px !important;
+  border-radius: 8px !important;
+  background: var(--r-surface-muted) !important;
+  box-shadow: inset 0 0 0 1px var(--r-hairline);
+  color: var(--r-ink-strong) !important;
+  font-family: ui-monospace, Menlo, Consolas, monospace !important;
+  font-size: 12.5px !important;
+  line-height: 1.55 !important;
+}
+.deck-handout .wysiwyg-editor .ProseMirror pre.tiptap-code-block code { white-space: pre-wrap !important; overflow-x: visible !important; }
+.deck-handout .wysiwyg-editor .ProseMirror pre.tiptap-code-block [class^="hljs-"] { color: inherit !important; font-style: normal !important; }
+
+/* each slide's part head: its title over a thin line, its number on the right */
+.deck-part-head { position: relative; counter-increment: deck-slide; padding: 14px 40px 0 0; margin: 4px 0 6px; border-top: 1px solid var(--r-hairline); }
+.ProseMirror > .deck-part-head:first-child { border-top: 0; margin-top: 0; }
+.deck-part-title { padding: 1px 0; font-size: 19px; font-weight: 600; line-height: 1.4; color: var(--r-ink-strong); outline: none; text-wrap: balance; cursor: text; }
+.deck-part-title:empty::before { content: attr(data-placeholder); color: var(--r-ink-faint); font-weight: 500; }
+.deck-part-head.is-first .deck-part-title:empty::before { content: "The deck's title"; }
+.deck-part-number { position: absolute; right: 0; top: 21px; display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; line-height: 14px; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; font-family: var(--ritemark-ui-font-family); }
+.deck-part-number::after { content: counter(deck-slide); }
+.deck-part-head.is-current .deck-part-number { color: var(--r-accent); }
+.deck-part-head.is-skip .deck-part-title { color: var(--r-ink-muted); }
+
+/* A section slide's part is a chapter: a grey band with "Section N" over its title (the Experience lead's decision 12,
+   the prototype's `.hpart.sect`). The band is drawn behind the part by the deck view (.deck-part-band), 12 pixels into
+   both gutters, so the title keeps the column's left edge. */
+.deck-part-eyebrow { display: none; }
+.deck-part-head.is-section { border-top: 0; margin-top: 10px; padding-top: 12px; }
+.deck-part-head.is-section .deck-part-eyebrow { display: block; margin: 2px 40px 4px 0; font-family: var(--ritemark-ui-font-family); font-size: 11px; font-weight: 700; line-height: 14px; letter-spacing: .06em; text-transform: uppercase; color: var(--r-ink-muted); user-select: none; }
+.deck-part-head.is-section .deck-part-number { top: 14px; }
+.deck-part-head.is-section .deck-part-title { font-size: 21px; font-weight: 700; line-height: 1.35; }
+.deck-part-head.after-section { border-top: 0; margin-top: 14px; } /* 8 of the band's padding and 6 below it */
+.deck-part-band { position: absolute; border-radius: 8px; background: var(--r-surface-soft); pointer-events: none; z-index: 0; }
+.deck-handout .wysiwyg-editor .ProseMirror { position: relative; z-index: 1; }
+
+/* the current part's line on the left, from its head to the next part's */
+.deck-part-bar { position: absolute; width: 2px; border-radius: 1px; background: var(--r-accent-soft); pointer-events: none; }
+
+/* ---- the slide, drawn on a 960 × 540 canvas and scaled (SlideCanvas): the prototype's `.sl` rules, its `.lt` as
+   Borderless. Colours come from the theme as --s-* (themeVars); the fallbacks are Evening's. */
+.deck-slide { position: relative; overflow: hidden; }
+.deck-sl { position: absolute; left: 0; top: 0; width: 960px; height: 540px; transform-origin: 0 0; overflow: hidden; color: var(--s-hd, #fff); font-family: var(--s-fb, 'Sofia Sans'), sans-serif;
+  background: var(--s-bg, radial-gradient(120% 95% at 88% 8%, #3D428F 0%, #1C1F4A 52%, #13153A 100%)); }
+.deck-sl [contenteditable] { outline: 0; border-radius: 4px; cursor: text; }
+.deck-sl [contenteditable]:hover { box-shadow: 0 0 0 2px var(--s-ring, rgba(255,255,255,.18)); }
+.deck-sl [contenteditable]:focus { box-shadow: 0 0 0 2px var(--s-foc, rgba(242,181,68,.7)); }
+.deck-sl [contenteditable]:empty::before { content: attr(data-ph); color: var(--s-ph, rgba(255,255,255,.35)); }
+.deck-sl .st { position: absolute; font-weight: 700; letter-spacing: -.3px; font-family: var(--s-fh, 'Sofia Sans'), sans-serif; overflow-wrap: anywhere; }
+.deck-sl .sx { position: absolute; font: 400 24px/32px var(--s-fb, 'Sofia Sans'); color: var(--s-sub, #C7CAEB); }
+.deck-sl .bar { position: absolute; width: 64px; height: 6px; border-radius: 3px; background: var(--s-acc, #F2B544); }
+.deck-sl .pts { position: absolute; margin: 0; padding-left: 40px; list-style: decimal outside; font: 500 28px/40px var(--s-fb, 'Sofia Sans'); color: var(--s-tx, #E4E6F7); }
+.deck-sl .pts li::marker { color: var(--s-acc, #F2B544); font-weight: 700; }
+.deck-sl .pts .px { display: block; font: 400 20px/26px var(--s-fb, 'Sofia Sans'); color: var(--s-fnt, #AEB2DD); }
+.deck-sl .stc { position: absolute; text-align: center; font: 700 58px/66px var(--s-fh, 'Sofia Sans'); overflow-wrap: anywhere; }
+.deck-sl .sxc { position: absolute; text-align: center; font: 400 26px/36px var(--s-fb, 'Sofia Sans'); color: var(--s-sub, #C7CAEB); }
+.deck-sl .sn { position: absolute; min-width: 40px; font: 700 132px/132px var(--s-fh, 'Sofia Sans'); color: var(--s-acc, #F2B544); }
+.deck-sl .bx { position: absolute; box-sizing: border-box; padding: 24px 22px; border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.13)); }
+.deck-sl .bx.alt { background: var(--s-box2, rgba(255,255,255,.06)); }
+.deck-sl .ic { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); margin-bottom: 18px; }
+.deck-sl .ic svg { width: 28px; height: 28px; }
+.deck-sl .ic.sm svg { width: 18px; height: 18px; }
+.deck-sl .pickic:hover, :where(:root:not([data-input-mode="pointer"])) .deck-sl .pickic:focus-visible { outline: 0; box-shadow: 0 0 0 3px var(--s-foc, rgba(242,181,68,.6)); }
+.deck-sl .noic { background: transparent; box-shadow: inset 0 0 0 2px var(--s-accl, rgba(242,181,68,.35)); color: var(--s-acct, rgba(242,181,68,.6)); }
+.deck-sl .picbox { position: absolute; border-radius: var(--s-r2, 10px); overflow: hidden; display: grid; place-items: center; background: var(--s-pic, rgba(255,255,255,.05)); }
+.deck-sl .picbox.empty { box-shadow: inset 0 0 0 3px var(--s-emp, rgba(255,255,255,.22)); color: var(--s-empt, rgba(255,255,255,.6)); font: 500 24px/32px var(--s-fb, 'Sofia Sans'); text-align: center; }
+.deck-sl .picbox.empty small { font-size: 18px; opacity: .7; }
+.deck-sl .picbox img { width: 100%; height: 100%; object-fit: contain; }
+.deck-sl .tbl { position: absolute; border-collapse: separate; border-spacing: 0; border-radius: var(--s-r2, 10px); overflow: hidden; box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.14)); color: var(--s-tx, #E4E6F7); }
+.deck-sl .tbl th { text-align: left; background: var(--s-thbg, rgba(242,181,68,.16)); color: var(--s-thfg, #F2B544); font-weight: 700; }
+.deck-sl .tbl td { border-top: 1px solid var(--s-row, rgba(255,255,255,.1)); line-height: 1.3; }
+.deck-sl .tbl tr:nth-child(odd) td { background: var(--s-odd, rgba(255,255,255,.03)); }
+.deck-sl .cap { position: absolute; text-align: center; font: 400 20px/28px var(--s-fb, 'Sofia Sans'); color: var(--s-sub, #C7CAEB); }
+.deck-sl .bh { display: block; font: 700 25px/31px var(--s-fh, 'Sofia Sans'); margin-bottom: 8px; }
+.deck-sl .bt { display: block; font: 400 19px/26px var(--s-fb, 'Sofia Sans'); color: var(--s-sub, #C7CAEB); }
+.deck-sl .ln { position: absolute; height: 3px; background: var(--s-accl, rgba(242,181,68,.55)); }
+.deck-sl .spi { position: absolute; text-align: center; }
+.deck-sl .spi .nm { display: grid; place-items: center; width: 68px; height: 68px; margin: 0 auto 20px; border-radius: 50%; background: var(--s-nm, #1C1F4A); box-shadow: inset 0 0 0 3px var(--s-acc, #F2B544); font: 700 28px/1 var(--s-fh, 'Sofia Sans'); color: var(--s-acct, #F2B544); }
+.deck-sl .tli { position: absolute; }
+.deck-sl .tli .dt { display: block; width: 28px; height: 28px; margin: 0 0 24px; border-radius: 50%; background: var(--s-acc, #F2B544); box-shadow: 0 0 0 8px var(--s-accs, rgba(242,181,68,.18)); }
+.deck-sl .arws { position: absolute; }
+.deck-sl .arw { position: absolute; box-sizing: border-box; padding: 22px 30px 22px 40px; background: var(--s-arw, rgba(255,255,255,.08)); clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 50%, calc(100% - 26px) 100%, 0 100%, 26px 50%); }
+.deck-sl .arw.first { clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 50%, calc(100% - 26px) 100%, 0 100%); }
+.deck-sl .cl { position: absolute; box-sizing: border-box; padding: 26px 30px; border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.13)); }
+.deck-sl .cl .ch { display: block; font: 700 30px/36px var(--s-fh, 'Sofia Sans'); color: var(--s-acct, #F2B544); margin-bottom: 14px; }
+.deck-sl .cl .cx { display: block; font: 400 23px/40px var(--s-fb, 'Sofia Sans'); color: var(--s-tx, #E4E6F7); white-space: pre-line; }
+.deck-sl .gnm { display: inline-grid; place-items: center; width: 34px; height: 34px; margin-bottom: 10px; border-radius: 50%; box-shadow: inset 0 0 0 2.5px var(--s-acc, #F2B544); color: var(--s-acct, #F2B544); font: 700 17px/1 var(--s-fh, 'Sofia Sans'); }
+.deck-sl .gdt { display: block; width: 18px; height: 18px; margin-bottom: 12px; border-radius: 50%; background: var(--s-acc, #F2B544); box-shadow: 0 0 0 6px var(--s-accs, rgba(242,181,68,.18)); }
+.deck-sl .gar { display: inline-grid; place-items: center; width: 34px; height: 34px; margin-bottom: 10px; border-radius: 8px; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); }
+.deck-sl .tag { position: absolute; top: 52px; padding: 4px 14px; border-radius: var(--s-rt, 20px); background: var(--s-acc, #F2B544); color: var(--s-tagfg, #1C1F4A); font: 700 17px/26px var(--s-fb, 'Sofia Sans'); letter-spacing: 1px; text-transform: uppercase; }
+.deck-sl .es { position: absolute; display: flex; align-items: center; gap: 22px; font: 500 27px/34px var(--s-fb, 'Sofia Sans'); color: var(--s-tx, #E4E6F7); }
+.deck-sl .es .esn { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); font: 700 23px/1 var(--s-fh, 'Sofia Sans'); flex: none; }
+.deck-sl .es > div { flex: 1; min-width: 0; }
+.deck-sl .photo { position: absolute; top: 0; bottom: 0; background-position: center; background-size: cover; background-color: var(--s-pic, rgba(255,255,255,.05)); }
+.deck-sl .photo.empty { box-shadow: inset 0 0 0 3px var(--s-emp, rgba(255,255,255,.22)); }
+.deck-sl .veil { position: absolute; inset: 0; background: var(--s-veil, linear-gradient(90deg, rgba(19,21,58,.92) 0%, rgba(19,21,58,.7) 55%, rgba(19,21,58,.35) 100%)); }
+
+/* Borderless: the slide's words on the desk's white surface (the prototype's `.lt`) */
+.deck-slide.is-borderless .deck-sl { background: transparent; color: var(--s-hd, #1C1F4A); }
+.deck-slide.is-borderless .deck-sl .sx, .deck-slide.is-borderless .deck-sl .sxc, .deck-slide.is-borderless .deck-sl .bt, .deck-slide.is-borderless .deck-sl .cap { color: var(--s-sub, #5B5F86); }
+.deck-slide.is-borderless .deck-sl .px { color: var(--s-fnt, #5B5F86); }
+.deck-slide.is-borderless .deck-sl .pts, .deck-slide.is-borderless .deck-sl .es, .deck-slide.is-borderless .deck-sl .cl .cx { color: var(--s-tx, #33365A); }
+.deck-slide.is-borderless .deck-sl .pts li::marker { color: var(--s-acct, #C98A10); }
+.deck-slide.is-borderless .deck-sl .sn { color: var(--s-acc, #E0A21F); }
+.deck-slide.is-borderless .deck-sl .bx, .deck-slide.is-borderless .deck-sl .cl { background: var(--s-box, #F6F6FB); box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); }
+.deck-slide.is-borderless .deck-sl .bx.alt { background: var(--s-box2, #F6F6FB); }
+.deck-slide.is-borderless .deck-sl .ic { background: var(--s-accs, rgba(242,181,68,.2)); color: var(--s-acct, #B07A12); }
+.deck-slide.is-borderless .deck-sl .noic { background: transparent; box-shadow: inset 0 0 0 2px var(--s-accl, rgba(224,162,31,.4)); color: var(--s-acct, rgba(176,122,18,.7)); }
+.deck-slide.is-borderless .deck-sl .cl .ch { color: var(--s-acct, #B07A12); }
+.deck-slide.is-borderless .deck-sl .ln { background: var(--s-accl, rgba(224,162,31,.5)); }
+.deck-slide.is-borderless .deck-sl .spi .nm { background: var(--s-nm, #fff); color: var(--s-acct, #B07A12); box-shadow: inset 0 0 0 3px var(--s-acc, #E0A21F); }
+.deck-slide.is-borderless .deck-sl .tli .dt, .deck-slide.is-borderless .deck-sl .gdt { background: var(--s-acc, #E0A21F); }
+.deck-slide.is-borderless .deck-sl .arw { background: var(--s-arw, #F1F1F8); }
+.deck-slide.is-borderless .deck-sl .es .esn { background: var(--s-accs, rgba(242,181,68,.22)); color: var(--s-acct, #B07A12); }
+.deck-slide.is-borderless .deck-sl .gnm { color: var(--s-acct, #B07A12); box-shadow: inset 0 0 0 2.5px var(--s-acc, #E0A21F); }
+.deck-slide.is-borderless .deck-sl .gar { color: var(--s-acct, #B07A12); background: var(--s-accs, rgba(242,181,68,.2)); }
+.deck-slide.is-borderless .deck-sl .tbl { color: var(--s-tx, #33365A); box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); }
+.deck-slide.is-borderless .deck-sl .tbl th { background: var(--s-thbg, #FFF4D6); color: var(--s-thfg, #8A5A00); }
+.deck-slide.is-borderless .deck-sl .tbl td { border-top-color: var(--s-row, #ECEDF5); }
+.deck-slide.is-borderless .deck-sl .tbl tr:nth-child(odd) td { background: var(--s-odd, #FAFAFD); }
+.deck-slide.is-borderless .deck-sl .veil { background: var(--s-veil, linear-gradient(90deg, rgba(255,255,255,.94) 0%, rgba(255,255,255,.78) 55%, rgba(255,255,255,.35) 100%)); }
+.deck-slide.is-borderless .deck-sl .picbox { background: var(--s-pic, #F6F6FB); }
+.deck-slide.is-borderless .deck-sl .picbox.empty { box-shadow: inset 0 0 0 3px var(--s-emp, #E2E3EE); color: var(--s-empt, #8A8DAE); }
+.deck-slide.is-borderless .deck-sl [contenteditable]:hover { box-shadow: 0 0 0 2px var(--s-ring, rgba(28,31,74,.12)); }
+.deck-slide.is-borderless .deck-sl [contenteditable]:focus { box-shadow: 0 0 0 2px var(--s-foc, rgba(224,162,31,.75)); }
+.deck-slide.is-borderless .deck-sl [contenteditable]:empty::before { color: var(--s-ph, rgba(28,31,74,.3)); }
+
+/* The stage and the strip in Borderless: no card edges; the thumbnails keep a hairline to show their place */
+.deck-stage.is-borderless .deck-big { box-shadow: none; border-radius: 0; overflow: visible; }
+.deck-strip.is-borderless .deck-thumb-slide { background: var(--r-surface); }
+
+/* The icon grid on the stage (prototype `.icgrid`): six across, the chosen one filled */
+.deck-icon-grid { display: grid; grid-template-columns: repeat(6, 36px); gap: 4px; padding: 4px; }
+.deck-icon-grid .deck-icon-choice { width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 7px; }
+.deck-icon-grid .deck-icon-choice:focus { background: var(--r-accent-soft); color: var(--r-accent); }
+.deck-icon-grid .deck-icon-choice[data-state="on"] { background: var(--r-accent); color: #fff; }
+
+/* Under the slide: quiet lines that never reach the wall (prototype `.srcl`, `.notesr`, `.notes`) */
+.deck-source .deck-line-action { height: auto; padding: 0; font-size: 12px; line-height: 16px; font-weight: 500; }
+.deck-notes-toggle { height: 24px; padding: 0 6px 0 0; gap: 6px; width: max-content; font-size: 12.5px; font-weight: 500; color: var(--r-ink-body); }
+.deck-notes-toggle:hover { background: transparent; color: var(--r-ink-strong); }
+.deck-notes-toggle svg { color: var(--r-ink-muted); transition: transform .15s; }
+.deck-notes-toggle.is-open svg { transform: rotate(90deg); }
+.deck-notes-label { overflow: hidden; text-overflow: ellipsis; }
+.deck-notes { min-height: 60px; padding: 10px 12px; border-radius: 8px; background: #FFFBEB; box-shadow: inset 0 0 0 1px #FDE68A; font: 400 13px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #713F12; outline: 0; white-space: pre-wrap; cursor: text; }
+.deck-notes:empty::before { content: attr(data-ph); color: #A16207; opacity: .7; }
+.deck-notes:focus { box-shadow: inset 0 0 0 2px #F59E0B; }
+
+/* The strip's + between thumbnails, its menus, and a thumbnail being dragged (prototype `.gapz`, `.addend`, `.menu`) */
+.deck-gap { position: relative; height: 0; }
+.deck-gap .deck-gap-plus { position: absolute; left: 58px; top: -11px; z-index: 2; width: 22px; height: 22px; padding: 0; border-radius: 50%; color: var(--r-accent); opacity: 0; transition: opacity .12s; }
+.deck-gap::before { content: ''; position: absolute; left: 0; right: 0; top: -6px; height: 12px; }
+.deck-gap:hover .deck-gap-plus, :where(:root:not([data-input-mode="pointer"])) .deck-gap .deck-gap-plus:focus-visible, .deck-gap .deck-gap-plus[data-state="open"] { opacity: 1; }
+.deck-gap.is-drop::after { content: ''; position: absolute; left: 28px; right: 12px; top: -1px; height: 2px; border-radius: 1px; background: var(--r-accent); }
+.deck-thumb.is-dragging { opacity: .5; }
+/* The lifted copy that follows the pointer while a thumbnail is dragged (the prototype's .dragghost). */
+.deck-drag-ghost { position: fixed; z-index: 60; width: 120px; height: 67.5px; border-radius: 5px; overflow: hidden; pointer-events: none; transform: rotate(-3deg); box-shadow: 0 14px 28px -8px rgba(30, 27, 75, 0.5), 0 0 0 2px var(--r-accent); }
+.deck-drag-ghost .deck-thumb-slide { position: relative; width: 96px; height: 54px; overflow: hidden; transform-origin: 0 0; }
+.deck-thumb .deck-thumb-more { position: absolute; right: 12px; top: 6px; display: none; }
+/* The prototype's ⋯: 20 pixels, a 13-pixel icon, in the slide's top right corner. */
+.deck-thumb .deck-thumb-more .deck-thumb-more-button { width: 20px; height: 20px; min-width: 20px; padding: 0; border-radius: 5px; }
+.deck-thumb .deck-thumb-more .deck-thumb-more-button svg { width: 13px; height: 13px; }
+.deck-thumb:hover .deck-thumb-more, .deck-thumb.is-menu .deck-thumb-more, .deck-thumb .deck-thumb-more:focus-within { display: block; }
+.deck-thumb .deck-thumb-more button { background: rgba(255,255,255,.94); box-shadow: 0 1px 3px rgba(30,27,75,.25); color: var(--r-ink-strong); }
+.deck-add-end { margin: 4px 8px 0 26px; height: 28px; padding: 0 8px; font-size: 12.5px; color: var(--r-ink-body); }
+.deck-menu-head { padding: 8px 8px 4px; font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--r-ink-muted); }
+.deck-menu-sub { padding-left: 16px; font-size: 12px; color: var(--r-ink-faint); }
+
+/* The bar's notice: a deleted slide's Undo, the line hint (quiet, as the prototype's toasts) */
+.deck-notice { display: inline-flex; align-items: center; gap: 8px; min-width: 0; margin-left: 12px; font-size: 12.5px; color: var(--r-ink-body); }
+.deck-notice-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Settings above the slide's right corner, and its panel beside the slide (prototype `.sethead`, `.setp`) */
+.deck-sethead { display: flex; justify-content: flex-end; align-items: center; height: 36px; padding: 0 24px; }
+.deck-settings-button { height: 28px; padding: 0 9px; gap: 6px; font-size: 12.5px; color: var(--r-ink-body); }
+.deck-settings-button[data-state="active"] { background: var(--r-accent-soft); color: var(--r-accent); }
+.deck-settings { position: absolute; z-index: 40; width: 316px; padding: 12px; box-sizing: border-box; border-radius: 12px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline), 0 16px 34px -10px rgba(30,27,75,.28); font-size: 13px; line-height: 18px; color: var(--r-ink-strong); }
+.deck-settings-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 4px; font-weight: 600; line-height: 24px; }
+.deck-settings-k { margin: 12px 0 6px; font-size: 11px; font-weight: 600; line-height: 14px; letter-spacing: .5px; text-transform: uppercase; color: var(--r-ink-muted); }
+.deck-settings .deck-settings-lays { grid-template-columns: repeat(5, 1fr); gap: 8px 5px; }
+.deck-settings .deck-settings-pics { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.deck-settings .deck-settings-lays > label, .deck-settings .deck-settings-pics > label { padding: 2px 2px 4px; }
+.deck-settings .deck-settings-lays > label > span:last-child, .deck-settings .deck-settings-pics > label > span:last-child { font-size: 11px; line-height: 14px; }
+.deck-settings .deck-settings-lays > label > span:nth-of-type(1), .deck-settings .deck-settings-pics > label > span:nth-of-type(1) { margin-bottom: 4px; }
+.deck-lay-pic, .deck-pic-pic { position: relative; display: block; width: 100%; height: 38px; border-radius: 5px; background: var(--r-surface-muted); box-shadow: inset 0 0 0 1px var(--r-hairline-strong); overflow: hidden; }
+.deck-pic-pic { height: 30px; }
+.deck-lay-pic i { position: absolute; background: var(--r-ink-faint); border-radius: 1px; }
+.deck-pic-pic i { position: absolute; background: #B8C2D6; }
+.deck-settings input:checked ~ span .deck-lay-pic, .deck-settings input:checked ~ span .deck-pic-pic { box-shadow: inset 0 0 0 2px var(--r-accent); }
+.deck-settings input:checked ~ span .deck-lay-pic i { background: var(--r-accent); opacity: .55; }
+.deck-settings-sep { height: 1px; margin: 12px -12px 10px; background: var(--r-hairline); }
+.deck-settings-row { display: flex; align-items: center; justify-content: space-between; }
+
+/* Sprint 157, PR 4: the Slide library place (README frame 3; prototype .lsearch, .row, .lgrid, .lit, .lhint). */
+.deck-lib { min-height: 100vh; padding: 4px 8px 16px; box-sizing: border-box; color: var(--r-ink-strong); }
+.deck-lib-search { display: flex; align-items: center; gap: 8px; height: 32px; margin: 2px 0 8px; padding: 0 10px; border-radius: 7px; background: var(--r-surface); box-shadow: inset 0 0 0 1px var(--r-hairline-strong); color: var(--r-ink-muted); }
+.deck-lib-search:focus-within { box-shadow: inset 0 0 0 1px var(--vscode-focusBorder, var(--r-accent)); }
+.deck-lib-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: 400 13px/32px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.deck-lib-search input::placeholder { color: var(--r-ink-muted); opacity: 1; }
+.deck-lib-search input::-webkit-search-cancel-button { display: none; }
+.deck-lib-row { display: flex; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 8px; border: 0; border-radius: 6px; background: none; font: 400 13.5px/30px var(--ritemark-ui-font-family); color: var(--r-ink-strong); text-align: left; white-space: nowrap; }
+.deck-lib-row:hover { background: var(--vscode-toolbar-hoverBackground, var(--r-surface-soft)); }
+.deck-lib-row > svg { flex-shrink: 0; color: var(--r-ink-body); }
+.deck-lib-row > svg.deck-lib-caret { color: var(--r-ink-muted); }
+.deck-lib-name { overflow: hidden; text-overflow: ellipsis; }
+.deck-lib-count { margin-left: auto; font-size: 12px; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
+.deck-lib-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 8px; padding: 4px 8px 10px; }
+.deck-lib-tile { display: grid; gap: 4px; align-content: start; padding: 0; border: 0; border-radius: 6px; background: none; text-align: left; font: 400 11.5px/15px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.deck-lib-thumb { position: relative; display: block; width: 104px; height: 58.5px; border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline); pointer-events: none; }
+/* Sprint 159 (PR 2): a hand-written ring shows only in the keyboard's mode (inputMode.test.ts), as every ring here does. */
+.deck-lib-tile:hover .deck-lib-thumb, .deck-lib-tile.sel .deck-lib-thumb, :where(:root:not([data-input-mode="pointer"])) .deck-lib-tile:focus-visible .deck-lib-thumb { box-shadow: 0 0 0 2px var(--r-accent); }
+:where(:root:not([data-input-mode="pointer"])) .deck-lib-tile:focus-visible { outline: none; }
+.deck-lib-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.deck-lib-group { margin: 14px 8px 4px; font: 600 11px/14px var(--ritemark-ui-font-family); letter-spacing: .6px; text-transform: uppercase; color: var(--r-ink-muted); }
+.deck-lib-hint, .deck-lib-none { margin: 6px 8px 0; font: 400 12px/17px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+.deck-lib-empty { padding: 24px 16px; text-align: center; font: 400 12px/1.5 var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+.deck-lib-menu-head { padding: 6px 8px 4px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.deck-lib-menu-note { padding: 4px 8px 6px; max-width: 240px; font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+.deck-lib-notice { position: fixed; left: 8px; right: 8px; bottom: 12px; padding: 8px 12px; border-radius: 8px; background: var(--r-ink-strong); color: var(--r-surface); font: 12px/1.4 var(--ritemark-ui-font-family); }
+/* Sprint 157, PR 4: a copy's lines under the slide (prototype .chgl, .srcl) and the amber dot on its thumbnail (.th .dot). */
+.deck-thumb .deck-thumb-dot { position: absolute; left: 8px; top: 22px; width: 6px; height: 6px; border-radius: 50%; background: #F2B544; }
+.deck-change { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 12px; border-radius: 8px; background: var(--r-surface-muted); font-size: 12.5px; line-height: 18px; color: var(--r-ink-body); }
+.deck-change.is-new { background: #FFF7E6; }
+.deck-change.is-question { background: none; padding: 2px 0; font-size: 12px; color: var(--r-ink-muted); gap: 12px; }
+/* Sprint 159 (PR 2): a done line is a check in ink on the quiet chip; green is only the ready dot (greenIsTheReadyDot.test.ts). */
+.deck-change.is-done { color: var(--r-ink-strong); }
+.deck-change .deck-grow { flex: 1; }
+.deck-change .deck-line-action { height: auto; padding: 0; font-size: 12px; line-height: 16px; font-weight: 500; white-space: nowrap; }
+.deck-line-action.is-strong { font-weight: 600; }
+.deck-change .deck-use-it { height: 26px; padding: 0 10px; font-size: 12px; white-space: nowrap; }
+/* Add to library: a sheet beside the slide (prototype sheet "addlib"), in the Settings panel's material. */
+.deck-addlib .deck-addlib-lede { margin: 0 0 10px; font-size: 12.5px; line-height: 18px; color: var(--r-ink-body); }
+.deck-addlib .deck-addlib-topic { width: 100%; }
+.deck-addlib .deck-addlib-name { margin-top: 8px; }
+.deck-addlib .deck-addlib-problem { margin: 4px 0 0; font-size: 12px; line-height: 16px; color: var(--r-ink-muted); }
+.deck-addlib .deck-addlib-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
