@@ -72,14 +72,17 @@ export function SlideLibraryPanel() {
   const [selected, setSelected] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const field = useRef<HTMLInputElement>(null)
+  // The field shows once the place's Search is pressed (as Tasks' does), and stays while it holds words.
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [focusSearch, setFocusSearch] = useState(0)
 
   useEffect(() => {
     const stop = onMessage((message) => {
       if (message.type === 'library/state') setState(message as unknown as LibraryState)
       else if (message.type === 'library/active') setState((value) => (value ? { ...value, active: (message.active as ActiveDeck | null) ?? null } : value))
       else if (message.type === 'library/focus-search') {
-        field.current?.focus()
-        field.current?.select()
+        setSearchOpen(true)
+        setFocusSearch((count) => count + 1)
       } else if (message.type === 'library/notice' && typeof message.text === 'string') setNotice(message.text)
       else if (message.type === 'library/reveal' && typeof message.path === 'string') {
         const path = message.path
@@ -98,6 +101,12 @@ export function SlideLibraryPanel() {
     const timer = setTimeout(() => sendToExtension('library/search', { query }), 150)
     return () => clearTimeout(timer)
   }, [query])
+
+  useEffect(() => {
+    if (!focusSearch) return
+    field.current?.focus()
+    field.current?.select()
+  }, [focusSearch])
 
   useEffect(() => {
     if (!notice) return
@@ -200,6 +209,7 @@ export function SlideLibraryPanel() {
 
   return (
     <div className="deck-lib font-ui">
+      {searchOpen || query ? (
       <label className="deck-lib-search">
         <Icon name="magnifying-glass" size={14} tone="inherit" />
         <input
@@ -210,13 +220,15 @@ export function SlideLibraryPanel() {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Escape' && query) {
-              event.preventDefault()
-              setQuery('')
-            }
+            if (event.key !== 'Escape') return
+            event.preventDefault()
+            if (query) setQuery('')
+            else setSearchOpen(false)
           }}
+          onBlur={() => { if (!query) setSearchOpen(false) }}
         />
       </label>
+      ) : null}
       {topics.map((deck) => deckRows(deck, false))}
       {topics.length === 0 && !searching ? (
         <p className="deck-lib-none">No topics yet. Add a slide to the library from a deck's slide menu.</p>
