@@ -78,6 +78,7 @@ function App() {
   const [filename, setFilename] = useState<string>('')
   const [encoding, setEncoding] = useState<string | undefined>()
   const [sizeBytes, setSizeBytes] = useState<number | undefined>()
+  const [xlsxLoad, setXlsxLoad] = useState<{ id: number; pendingEdits: unknown[] }>({ id: 0, pendingEdits: [] })
   const [workerSrc, setWorkerSrc] = useState<string | undefined>()
   const [workerSource, setWorkerSource] = useState<string | undefined>()
   const [properties, setProperties] = useState<DocumentProperties>({})
@@ -299,6 +300,13 @@ function App() {
           return
         case 'load':
           setContent(message.content as string)
+          // Sprint 158 (#711): a workbook's load is numbered and carries the edits the host holds unsaved
+          if (message.fileType === 'xlsx') {
+            setXlsxLoad({
+              id: typeof message.loadId === 'number' ? message.loadId : 0,
+              pendingEdits: Array.isArray(message.pendingEdits) ? (message.pendingEdits as unknown[]) : [],
+            })
+          }
           setFileType((message.fileType as FileType) || 'markdown')
           setFilename((message.filename as string) || '')
           setEncoding(message.encoding as string | undefined)
@@ -540,14 +548,6 @@ function App() {
       sendToExtension('contentChanged', { content: newContent })
     }
   }, [sendDocumentEdit])
-
-  // Handle Excel content changes — newContent is the serialized workbook
-  // as base64. Updating local content keeps the viewer's parsed workbook in
-  // sync and makes a later revert (different base64 string) re-render.
-  const handleExcelChange = useCallback((newContent: string) => {
-    setContent(newContent)
-    sendToExtension('contentChanged', { content: newContent })
-  }, [])
 
   const handleDocumentApplied = useCallback((target: DocumentApplyTarget) => {
     if (!documentSync) return
@@ -828,7 +828,9 @@ function App() {
           fileType={fileType}
           encoding={encoding}
           sizeBytes={sizeBytes}
-          onChange={fileType === 'csv' ? handleCSVChange : (isXlsxEditable ? handleExcelChange : undefined)}
+          onChange={fileType === 'csv' ? handleCSVChange : undefined}
+          xlsxEditable={isXlsxEditable}
+          xlsxLoad={fileType === 'xlsx' ? xlsxLoad : undefined}
           syncEnabled={fileType === 'csv' && !!documentSync}
           syncAction={fileType === 'csv' ? syncAction : undefined}
           syncTarget={fileType === 'csv' ? syncTarget : undefined}

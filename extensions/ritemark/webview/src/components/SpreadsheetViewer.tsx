@@ -1,17 +1,14 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import { DataTable } from './DataTable'
 import { SpreadsheetToolbar } from './header/SpreadsheetToolbar'
 import { ConflictDialog } from './dialogs/ConflictDialog'
 import { Button } from './ui/button'
-import { Alert, AlertDescription } from './ui/alert'
-import { Icon } from './ui/Icon'
-import { Tooltip } from './ui/tooltip'
-import { defaultSpreadsheetApp } from '../hooks/usePlatform'
 import { sendToExtension, onMessage } from '../bridge'
 import type { DocumentSyncAction } from './header/DocumentSyncAction'
 import type { DocumentApplyTarget } from '../types/documentSync'
+import { cellValueFromText, isCellEdit, type CellEdit, type CellValue } from '../../../src/excel/cellEdit'
 
 export interface SpreadsheetViewerProps {
   content: string
@@ -20,8 +17,13 @@ export interface SpreadsheetViewerProps {
   encoding?: string
   sizeBytes?: number
   // CSV: receives the serialized CSV text.
-  // XLSX: receives the serialized workbook as base64.
   onChange?: (content: string) => void
+  // XLSX: cells can be edited. Each edit goes to the host on its own ({sheet, ref, value}); a save there changes
+  // only those cells (Sprint 158, #711). .xls stays read-only.
+  xlsxEditable?: boolean
+  // XLSX: the host's load, numbered, so a revert re-reads a workbook whose bytes didn't change, with the edits not
+  // saved yet (a reloaded webview shows them again)
+  xlsxLoad?: { id: number; pendingEdits: unknown[] }
   syncEnabled?: boolean
   syncAction?: DocumentSyncAction
   syncTarget?: DocumentApplyTarget
@@ -36,6 +38,24 @@ interface ParsedData {
 
 const MAX_DISPLAY_ROWS = 10000
 const SIZE_WARNING_BYTES = 5 * 1024 * 1024 // 5MB
+
+/** Write one edit into SheetJS's sheet, as the grid shows it: a value only, any formula gone. */
+function writeSheetCell(worksheet: XLSX.WorkSheet, addr: string, value: CellValue) {
+  if (value === null || value === '') {
+    delete worksheet[addr]
+    return
+  }
+  // Replacing the whole cell object drops any formula the cell had: basic editing stores plain values only
+  worksheet[addr] = typeof value === 'number' ? { t: 'n', v: value } : { t: 's', v: value }
+  // Expand the used range when the edit lands outside it (e.g. in a leading blank row above the data)
+  const { r, c } = XLSX.utils.decode_cell(addr)
+  const range = XLSX.utils.decode_range(worksheet['!ref'] || addr)
+  range.s.r = Math.min(range.s.r, r)
+  range.s.c = Math.min(range.s.c, c)
+  range.e.r = Math.max(range.e.r, r)
+  range.e.c = Math.max(range.e.c, c)
+  worksheet['!ref'] = XLSX.utils.encode_range(range)
+}
 
 /**
  * Extract a single sheet from a parsed workbook into table data.
@@ -95,6 +115,8 @@ export function SpreadsheetViewer({
   encoding,
   sizeBytes,
   onChange,
+  xlsxEditable = false,
+  xlsxLoad,
   syncEnabled = false,
   syncAction,
   syncTarget,
@@ -107,7 +129,6 @@ export function SpreadsheetViewer({
   const [selectedSheet, setSelectedSheet] = useState<string>('')
   const [cachedWorkbook, setCachedWorkbook] = useState<XLSX.WorkBook | null>(null)
   const [hasExcel, setHasExcel] = useState(false)
-  const [excelChecked, setExcelChecked] = useState(false)
   const [parsedSyncTarget, setParsedSyncTarget] = useState<DocumentApplyTarget | undefined>()
 
   // Conflict detection state
@@ -118,9 +139,21 @@ export function SpreadsheetViewer({
   // File change indicator (badge on refresh button)
   const [hasFileChanged, setHasFileChanged] = useState(false)
 
-  // Editable when the host provides a change handler
-  // (App passes one for CSV and for .xlsx files; .xls stays read-only)
-  const isEditable = !!onChange
+  // Editable when the host provides a change handler (CSV) or says the workbook is editable (.xlsx; .xls stays
+  // read-only)
+  const isEditable = fileType === 'xlsx' ? xlsxEditable : !!onChange
+
+  // Sprint 158 (#711): each edit sent to the host waits there for its check; a refused one puts the cell back.
+  // Keyed by the edit's id: the sheet, the address and the cell as it was before.
+  const pendingEdits = useRef(new Map<number, { sheet: string; addr: string; previous: XLSX.CellObject | undefined }>())
+  const nextEditId = useRef(1)
+  const workbookRef = useRef<XLSX.WorkBook | null>(null)
+  const selectedSheetRef = useRef('')
+  const loadId = xlsxLoad?.id ?? 0
+  const loadEdits = useMemo(() => (xlsxLoad?.pendingEdits ?? []).filter(isCellEdit), [xlsxLoad])
+  // Whether a cell has been edited since the workbook was loaded, and whether a formula cell is being typed over
+  const [hasEdited, setHasEdited] = useState(false)
+  const [editingFormula, setEditingFormula] = useState(false)
 
   // Check if Excel is installed on mount and listen for messages
   useEffect(() => {
@@ -129,7 +162,6 @@ export function SpreadsheetViewer({
     const unsubscribe = onMessage((message) => {
       if (message.type === 'excelStatus') {
         setHasExcel(message.hasExcel as boolean)
-        setExcelChecked(true)
       } else if (!syncEnabled && message.type === 'showConflictDialog') {
         // True conflict: local edits + disk changes
         setIsDiskConflict(true)
@@ -144,6 +176,17 @@ export function SpreadsheetViewer({
       } else if (message.type === 'fileDeleted') {
         // File was deleted externally
         alert(`File ${message.filename} was deleted on disk.`)
+      } else if (message.type === 'cellEditResult' && typeof message.id === 'number') {
+        const pending = pendingEdits.current.get(message.id)
+        pendingEdits.current.delete(message.id)
+        const workbook = workbookRef.current
+        if (message.ok || !pending || !workbook) return
+        // Refused (the host said why): put the cell back as it was
+        const worksheet = workbook.Sheets[pending.sheet]
+        if (!worksheet) return
+        if (pending.previous) worksheet[pending.addr] = pending.previous
+        else delete worksheet[pending.addr]
+        if (pending.sheet === selectedSheetRef.current) setParsedData(extractSheet(workbook, pending.sheet))
       }
     })
 
@@ -200,6 +243,16 @@ export function SpreadsheetViewer({
         return
       }
 
+      // A load (also a revert's, with the same bytes) starts over; edits the host holds but hasn't saved (a reloaded
+      // webview) are shown again
+      pendingEdits.current.clear()
+      setHasEdited(loadEdits.length > 0)
+      for (const edit of loadEdits) {
+        const worksheet = workbook.Sheets[edit.sheet]
+        if (worksheet) writeSheetCell(worksheet, edit.ref, edit.value)
+      }
+
+      workbookRef.current = workbook
       setCachedWorkbook(workbook)
       // Keep the current sheet across refreshes when it still exists
       setSelectedSheet(prev =>
@@ -214,7 +267,11 @@ export function SpreadsheetViewer({
       })
       setIsLoading(false)
     }
-  }, [content, fileType, encoding, showSizeWarning, proceedWithLargeFile])
+  }, [content, fileType, encoding, showSizeWarning, proceedWithLargeFile, loadId, loadEdits])
+
+  useEffect(() => {
+    selectedSheetRef.current = selectedSheet
+  }, [selectedSheet])
 
   // XLSX: extract the selected sheet from the cached workbook
   useEffect(() => {
@@ -382,22 +439,8 @@ export function SpreadsheetViewer({
   }, [parsedData, onChange])
 
   // ── Excel editing (XLSX only) ────────────────────────────────────────
-  // Edits write directly into the cached workbook's worksheet cells, so
-  // formulas/values in untouched cells are preserved. The whole workbook
-  // is then re-serialized and sent to the extension for dirty/save handling.
-
-  const serializeWorkbook = useCallback((workbook: XLSX.WorkBook) => {
-    if (!onChange) return
-    try {
-      const base64 = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' }) as string
-      onChange(base64)
-    } catch (error) {
-      console.error('Excel serialize error:', error)
-      sendToExtension('error', {
-        message: error instanceof Error ? error.message : 'Failed to serialize workbook',
-      })
-    }
-  }, [onChange])
+  // Sprint 158 (#711): an edit is written into the cached workbook's cell, so the grid and the formula bar show it,
+  // and sent to the host on its own. The host keeps the edits and a save changes only those cells in the file.
 
   // Formula lookup for the fx bar — the grid is anchored at A1, so display
   // indexes ARE the cell address. Returns the formula with a leading '='.
@@ -408,43 +451,30 @@ export function SpreadsheetViewer({
     return cell?.f ? `=${cell.f}` : undefined
   }, [cachedWorkbook, selectedSheet])
 
-  const handleExcelCellChange = useCallback((rowIndex: number, columnId: string, value: string) => {
-    if (!cachedWorkbook || !selectedSheet || !parsedData || !onChange) return
+  const handleExcelCellChange = useCallback((rowIndex: number, columnId: string, text: string) => {
+    if (!cachedWorkbook || !selectedSheet || !parsedData || !isEditable) return
     const worksheet = cachedWorkbook.Sheets[selectedSheet]
     if (!worksheet) return
 
     // The grid is anchored at A1, so display indexes ARE the cell address
-    const r = rowIndex
-    const c = XLSX.utils.decode_col(columnId)
-    const addr = XLSX.utils.encode_cell({ r, c })
-
-    if (value === '') {
-      delete worksheet[addr]
-    } else {
-      // Replacing the whole cell object drops any formula the cell had —
-      // basic editing stores plain values only
-      const numeric = value.trim() !== '' && !Number.isNaN(Number(value))
-      worksheet[addr] = numeric ? { t: 'n', v: Number(value) } : { t: 's', v: value }
-
-      // Expand the used range when the edit lands outside it (e.g. in a
-      // leading blank row above the data) so the cell survives saving
-      const range = XLSX.utils.decode_range(worksheet['!ref'] || addr)
-      range.s.r = Math.min(range.s.r, r)
-      range.s.c = Math.min(range.s.c, c)
-      range.e.r = Math.max(range.e.r, r)
-      range.e.c = Math.max(range.e.c, c)
-      worksheet['!ref'] = XLSX.utils.encode_range(range)
-    }
+    const addr = XLSX.utils.encode_cell({ r: rowIndex, c: XLSX.utils.decode_col(columnId) })
+    const value = cellValueFromText(text)
+    const id = nextEditId.current++
+    pendingEdits.current.set(id, { sheet: selectedSheet, addr, previous: worksheet[addr] })
+    writeSheetCell(worksheet, addr, value)
 
     const newRows = [...parsedData.rows]
-    newRows[rowIndex] = { ...newRows[rowIndex], [columnId]: value }
+    newRows[rowIndex] = { ...newRows[rowIndex], [columnId]: text }
     setParsedData({ ...parsedData, rows: newRows })
+    setHasEdited(true)
 
-    serializeWorkbook(cachedWorkbook)
-  }, [cachedWorkbook, selectedSheet, parsedData, onChange, serializeWorkbook])
+    const edit: CellEdit = { sheet: selectedSheet, ref: addr, value }
+    sendToExtension('cellEdit', { id, edit })
+  }, [cachedWorkbook, selectedSheet, parsedData, isEditable])
 
+  // Add row and the + column widen the grid to type in; the file changes once a cell in them is typed into
   const handleExcelAddRow = useCallback(() => {
-    if (!cachedWorkbook || !selectedSheet || !onChange) return
+    if (!cachedWorkbook || !selectedSheet || !isEditable) return
     const worksheet = cachedWorkbook.Sheets[selectedSheet]
     if (!worksheet) return
 
@@ -459,11 +489,10 @@ export function SpreadsheetViewer({
     }
 
     setParsedData(extractSheet(cachedWorkbook, selectedSheet))
-    serializeWorkbook(cachedWorkbook)
-  }, [cachedWorkbook, selectedSheet, onChange, serializeWorkbook])
+  }, [cachedWorkbook, selectedSheet, isEditable])
 
   const handleExcelAddColumn = useCallback(() => {
-    if (!cachedWorkbook || !selectedSheet || !onChange) return
+    if (!cachedWorkbook || !selectedSheet || !isEditable) return
     const worksheet = cachedWorkbook.Sheets[selectedSheet]
     if (!worksheet) return
 
@@ -478,8 +507,7 @@ export function SpreadsheetViewer({
     }
 
     setParsedData(extractSheet(cachedWorkbook, selectedSheet))
-    serializeWorkbook(cachedWorkbook)
-  }, [cachedWorkbook, selectedSheet, onChange, serializeWorkbook])
+  }, [cachedWorkbook, selectedSheet, isEditable])
 
   // Handle conflict dialog actions
   const handleConfirmDiscard = useCallback(() => {
@@ -518,6 +546,16 @@ export function SpreadsheetViewer({
   const handleOpenInNumbers = useCallback(() => {
     sendToExtension('openInExternalApp', { app: 'numbers' })
   }, [])
+
+  // Sprint 158 (#711; experience 47, frame 2): once a cell is edited, the bar says once what a save does; while a
+  // formula cell is typed over, what that typing does
+  const excelNotice = fileType !== 'xlsx' || !isEditable
+    ? undefined
+    : editingFormula
+      ? 'Typing here replaces the formula with a value.'
+      : hasEdited
+        ? 'Only the cells you change are saved; the rest of the workbook stays as it is. Totals that use them update when the file opens in Excel.'
+        : undefined
 
   // Status bar info
   const statusInfo = useMemo(() => {
@@ -598,34 +636,8 @@ export function SpreadsheetViewer({
           onOpenInNumbers={handleOpenInNumbers}
           hasExcel={hasExcel}
           syncAction={toolbarSyncAction}
+          notice={excelNotice}
         />
-
-      {/* Sprint 158 PR 0 (#711; experience 47, frame 3): until the save keeps a workbook's formatting, an editable
-          workbook says from the moment it opens what a save here removes, and offers the app that keeps it. It replaces
-          the toast the host showed once, after the first edit. .xls is read-only and CSV has no formatting to lose. */}
-      {isEditable && fileType === 'xlsx' && (
-        <div className="shrink-0 px-4 pb-2">
-          <Alert variant="warning" className="flex min-h-9 items-center gap-2">
-            <Icon name="warning" size={16} className="shrink-0" />
-            <AlertDescription className="flex-1 text-[13px] leading-[18px]">
-              Saving here removes this workbook's colours, bold text, borders, charts and pictures. Values and formulas stay.
-            </AlertDescription>
-            {/* The action shows once the host has said whether Excel is here, so its words don't change under the pointer */}
-            {excelChecked && (
-              <Tooltip label={hasExcel ? `Open ${filename} in Excel, which keeps its formatting` : `Open ${filename} in ${defaultSpreadsheetApp}`}>
-                <Button
-                  type="button"
-                  variant="warning"
-                  size="compact"
-                  onClick={hasExcel ? handleOpenInExcel : handleOpenInNumbers}
-                >
-                  {`Open in ${hasExcel ? 'Excel' : defaultSpreadsheetApp} to keep them`}
-                </Button>
-              </Tooltip>
-            )}
-          </Alert>
-        </div>
-      )}
 
       {/* Truncation warning — only rendered when a large file is cut off */}
       {statusInfo?.truncated && (
@@ -662,6 +674,7 @@ export function SpreadsheetViewer({
             onInsertRowAt={isEditable && fileType === 'csv' ? handleInsertRowAt : undefined}
             onDeleteRow={isEditable && fileType === 'csv' ? handleDeleteRow : undefined}
             getCellFormula={fileType === 'xlsx' ? getExcelCellFormula : undefined}
+            onEditingFormulaChange={fileType === 'xlsx' ? setEditingFormula : undefined}
             namedColumns={fileType === 'csv'}
           />
         </div>
