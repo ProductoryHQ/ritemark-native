@@ -2,13 +2,19 @@ import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { ExcelDocument } from './excelDocument';
+import { CellEditRefused, SaveCheckFailed } from './excel/applyCellEdits';
+import { PackageError } from './excel/xlsxPackage';
+import { cellValueFromText, isCellEdit, type CellEdit } from './excel/cellEdit';
 import { isAppInstalled, openInExternalApp, openCsvInExcelWithHints, getSpreadsheetAppName } from './utils/openExternal';
 import { trackEvent } from './analytics/posthog';
 
 /**
  * Custom editor provider for Excel files (.xlsx, .xls)
  * Multi-sheet preview with basic editing for .xlsx (cell edits, add row/column).
- * .xls stays read-only (SheetJS would re-encode it as xlsx on save).
+ * .xls stays read-only.
+ *
+ * Sprint 158 (#711): the webview sends each cell edit ({sheet, ref, value}); the document keeps them, and a save
+ * writes the original file with only those cells changed (`src/excel/applyCellEdits.ts`).
  */
 export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDocument> {
   // File watchers and debounce timers
@@ -22,6 +28,8 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
   private savingFiles = new Set<string>();
   // The excel_edit usage event goes once per session
   private editEventSent = false;
+  // Each load message's number, so the webview re-reads a workbook whose bytes didn't change (a revert)
+  private loadCount = 0;
 
   private readonly _onDidChangeCustomDocument =
     new vscode.EventEmitter<vscode.CustomDocumentContentChangeEvent<ExcelDocument>>();
@@ -59,10 +67,12 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
     _token: vscode.CancellationToken
   ): Promise<ExcelDocument> {
     try {
-      // Restore from hot-exit backup when present
+      // Restore from hot-exit backup when present: the workbook's bytes, and beside them the edits not saved
+      // (an older backup is the edited workbook itself, with no list)
       const dataPath = openContext.backupId ? vscode.Uri.parse(openContext.backupId).fsPath : uri.fsPath;
       const buffer = await fs.readFile(dataPath);
-      return new ExcelDocument(uri, buffer);
+      const edits = openContext.backupId ? await this.readBackupEdits(dataPath) : [];
+      return new ExcelDocument(uri, buffer, edits);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Failed to read Excel file: ${message}`);
@@ -100,6 +110,10 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
     webviewPanel.webview.html = this.getHtml(webviewPanel.webview, scriptUri);
 
     this.webviewPanels.set(document.uri.toString(), webviewPanel);
+    // A document restored from a hot-exit backup comes with unsaved edits: a refresh asks before dropping them
+    if (document.isDirty) {
+      this.dirtyDocuments.add(document.uri.toString());
+    }
 
     // Create file watcher for external changes
     this.createFileWatcher(document, webviewPanel.webview);
@@ -114,9 +128,9 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
             this.sendExcelData(webviewPanel.webview, document);
             break;
 
-          case 'contentChanged':
-            // Webview edited the workbook — update document and mark dirty
-            this.handleContentChanged(document, message.content as string);
+          case 'cellEdit':
+            // Webview edited one cell — keep the edit and mark the document dirty
+            await this.handleCellEdit(document, webviewPanel.webview, message);
             break;
 
           case 'refresh':
@@ -175,30 +189,68 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
   }
 
   /**
-   * Apply a webview edit (full serialized workbook, base64) to the document
+   * Keep one cell edit from the webview and mark the document dirty. An edit that can't be written safely (inside an
+   * array formula, a table's column name, …) is refused: the webview puts the cell back and the person is told why.
    */
-  private handleContentChanged(document: ExcelDocument, base64Content: string): void {
-    if (!this.isEditable(document) || typeof base64Content !== 'string') {
+  private async handleCellEdit(document: ExcelDocument, webview: vscode.Webview, message: Record<string, unknown>): Promise<void> {
+    const id = message.id;
+    const raw = message.edit;
+    if (!this.isEditable(document) || !isCellEdit(raw)) {
       return;
     }
-
-    document.update(Buffer.from(base64Content, 'base64'));
+    const edit: CellEdit = {
+      sheet: raw.sheet,
+      ref: raw.ref,
+      value: typeof raw.value === 'string' ? cellValueFromText(raw.value) : raw.value,
+    };
+    try {
+      await document.addEdit(edit);
+    } catch (error) {
+      const reason = error instanceof CellEditRefused || error instanceof PackageError
+        ? error.message
+        : 'The cell could not be changed.';
+      webview.postMessage({ type: 'cellEditResult', id, ok: false, reason });
+      vscode.window.showWarningMessage(reason);
+      return;
+    }
+    webview.postMessage({ type: 'cellEditResult', id, ok: true });
     this.dirtyDocuments.add(document.uri.toString());
     this._onDidChangeCustomDocument.fire({ document });
 
-    // What a save removes is said by the warning above the sheet from the moment it opens (Sprint 158 PR 0, #711),
-    // so the first edit only counts the feature, once per session.
+    // The first edit counts the feature, once per session
     if (!this.editEventSent) {
       this.editEventSent = true;
       void trackEvent('feature_used', { feature: 'excel_edit' });
     }
   }
 
+  /**
+   * The bytes a save writes: the original file with the edits in. A save that can't be written safely throws with
+   * the reason in plain words, so VS Code reports it and the document stays unsaved; nothing is written.
+   */
+  private async bytesToSave(document: ExcelDocument): Promise<{ bytes: Buffer; editCount: number }> {
+    try {
+      return await document.savedBytes();
+    } catch (error) {
+      const detail = error instanceof CellEditRefused || error instanceof PackageError
+        ? error.message
+        : error instanceof SaveCheckFailed
+          ? `the saved file did not read back correctly (${error.message})`
+          : error instanceof Error ? error.message : 'unknown error';
+      console.error('[Ritemark Excel] Save refused:', error);
+      throw new Error(`Nothing was written: ${detail}. Your changes are still here, unsaved.`);
+    }
+  }
+
   // ── Save / revert / backup (vscode.CustomEditorProvider) ──────────────
 
   async saveCustomDocument(document: ExcelDocument, _token: vscode.CancellationToken): Promise<void> {
-    await this.writeFileSuppressingWatcher(document.uri.fsPath, document.buffer, document.uri.fsPath);
-    this.dirtyDocuments.delete(document.uri.toString());
+    const { bytes, editCount } = await this.bytesToSave(document);
+    await this.writeFileSuppressingWatcher(document.uri.fsPath, bytes, document.uri.fsPath);
+    document.markSaved(bytes, editCount);
+    if (!document.isDirty) {
+      this.dirtyDocuments.delete(document.uri.toString());
+    }
   }
 
   async saveCustomDocumentAs(
@@ -206,7 +258,8 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
     destination: vscode.Uri,
     _token: vscode.CancellationToken
   ): Promise<void> {
-    await this.writeFileSuppressingWatcher(destination.fsPath, document.buffer, document.uri.fsPath);
+    const { bytes } = await this.bytesToSave(document);
+    await this.writeFileSuppressingWatcher(destination.fsPath, bytes, document.uri.fsPath);
   }
 
   async revertCustomDocument(document: ExcelDocument, _token: vscode.CancellationToken): Promise<void> {
@@ -242,17 +295,36 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
   ): Promise<vscode.CustomDocumentBackup> {
     const destination = context.destination;
     await fs.mkdir(path.dirname(destination.fsPath), { recursive: true });
+    // A hot-exit backup holds the workbook's bytes and, beside them, the edits not saved yet. VS Code backs up soon
+    // after each change, so it never runs the save itself (seconds on a large sheet, on the extension host).
     await fs.writeFile(destination.fsPath, document.buffer);
+    await fs.writeFile(this.backupEditsPath(destination.fsPath), JSON.stringify(document.edits));
     return {
       id: destination.toString(),
       delete: async () => {
-        try {
-          await fs.unlink(destination.fsPath);
-        } catch {
-          // Backup already gone — nothing to do
+        for (const file of [destination.fsPath, this.backupEditsPath(destination.fsPath)]) {
+          try {
+            await fs.unlink(file);
+          } catch {
+            // Backup already gone — nothing to do
+          }
         }
       }
     };
+  }
+
+  private backupEditsPath(backupPath: string): string {
+    return `${backupPath}.edits.json`;
+  }
+
+  /** The edits a backup kept beside the workbook's bytes; none when it has no list or the list can't be read. */
+  private async readBackupEdits(backupPath: string): Promise<CellEdit[]> {
+    try {
+      const list: unknown = JSON.parse(await fs.readFile(this.backupEditsPath(backupPath), 'utf8'));
+      return Array.isArray(list) ? list.filter(isCellEdit) : [];
+    } catch {
+      return [];
+    }
   }
 
   /**
@@ -300,8 +372,9 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
   }
 
   /**
-   * Send Excel data to webview (called ONCE on load)
-   * Webview will handle multi-sheet parsing and caching
+   * Send Excel data to webview (on load, and again after a revert or refresh)
+   * Webview will handle multi-sheet parsing and caching. Edits not saved yet go
+   * with it, so a reloaded webview shows them again.
    */
   private sendExcelData(
     webview: vscode.Webview,
@@ -316,7 +389,9 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
       content: base64,
       encoding: 'base64',
       filename: filename,
-      sizeBytes: document.buffer.length
+      sizeBytes: document.buffer.length,
+      loadId: ++this.loadCount,
+      pendingEdits: document.edits
     });
   }
 
