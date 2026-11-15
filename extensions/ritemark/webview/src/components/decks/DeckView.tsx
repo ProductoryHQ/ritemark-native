@@ -39,7 +39,7 @@ import { SlideStrip, type StripActions, type StripMark } from './SlideStrip'
 import { newId, parseSlideBody, writeSlideBlock, writeSlideBody } from '../../../../src/decks/deckFormat'
 import type { Transaction } from '@tiptap/pm/state'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
-import { currentPart, scrollTopFor } from './scrollRule'
+import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
 import { DeckGuard } from './handout/deckGuard'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
@@ -276,6 +276,17 @@ export function DeckView({
     const container = scrollContainer()
     if (!container || !editor || tops.length === 0) { setBar(null); setBands([]); return }
     const heads = Array.from(editor.view.dom.querySelectorAll<HTMLElement>(':scope > .deck-part-head'))
+    // Room below the text so the last part can be scrolled to the top, and no more (the prototype's `.hand`
+    // padding): every part can then become the current one by scrolling.
+    {
+      const dom = editor.view.dom
+      const origin = container.getBoundingClientRect().top - container.scrollTop
+      const padding = parseFloat(getComputedStyle(dom).paddingBottom) || 0
+      const textEnd = dom.getBoundingClientRect().bottom - origin - padding
+      const lastHeight = textEnd - tops[tops.length - 1]
+      const room = Math.round(Math.max(40, container.clientHeight - lastHeight - PART_TOP_GAP))
+      if (Math.abs(room - padding) > 1) dom.style.setProperty('padding-bottom', `${room}px`, 'important')
+    }
     /** Where part `index` ends: the next part's head, or for the last part, where the text does (above the room left
      *  for scrolling it to the top). */
     const endOf = (index: number, gap: number): number => {
@@ -332,9 +343,24 @@ export function DeckView({
         if (next !== null && next !== currentRef.current) makeCurrent(next)
       })
     }
+    // One turn of the wheel moves the slide on by one at most, so a short part (a title alone) is never skipped
+    // (Jarmo, 15 November). The turn is cut short where the next part is the current one, and that part is shown at once.
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY) || Date.now() < lockUntil.current) return
+      const delta = event.deltaMode === 1 ? event.deltaY * 40 : event.deltaMode === 2 ? event.deltaY * container.clientHeight : event.deltaY
+      const state = { partTops: partTops(), scrollTop: container.scrollTop, clientHeight: container.clientHeight, scrollHeight: container.scrollHeight, writing: null }
+      const stop = wheelStop(state, delta, currentRef.current)
+      if (stop === null) return
+      event.preventDefault()
+      container.scrollTop = stop
+      const next = currentPart({ ...state, scrollTop: container.scrollTop })
+      if (next !== null && next !== currentRef.current) makeCurrent(next)
+    }
     container.addEventListener('scroll', onScroll, { passive: true })
+    container.addEventListener('wheel', onWheel, { passive: false })
     return () => {
       container.removeEventListener('scroll', onScroll)
+      container.removeEventListener('wheel', onWheel)
       if (frame !== null) cancelAnimationFrame(frame)
     }
   }, [scrollContainer, partTops, makeCurrent])

@@ -50,7 +50,7 @@
   counter-reset: deck-slide;
   max-width: none !important;
   /* The prototype's 20 on the left (no + or block handle in the handout); 22 on the right; room below to scroll the
-     last part to the top */
+     last part to the top (60vh until the deck view measures the exact room) */
   padding: 6px 22px 60vh 20px !important;
   font-size: 14.5px !important;
   line-height: 1.65 !important;
