@@ -258,6 +258,22 @@ async function main() {
     await assert.rejects(checkCellEdit(index, { sheet: 'Sales', ref: 'D4', value: 1 }), /shared across D3:D6/);
   }
 
+  // ── Single quotes (Codex on #725): a shared group written with them is split, and a sheet whose r:id has them
+  //    can be edited ─
+  {
+    const single = await rezip(shared, (files) => {
+      files.set('xl/worksheets/sheet1.xml', (files.get('xl/worksheets/sheet1.xml') as string).replace(/<f t="shared"[^>]*>/g, (m) => m.replace(/"/g, "'")));
+      files.set('xl/workbook.xml', (files.get('xl/workbook.xml') as string).replace(/<sheet [^>]*\/>/g, (m) => m.replace(/"/g, "'")));
+    });
+    assert.match((await partText(single, 'xl/worksheets/sheet1.xml'))!, /t='shared' si='0'/, 'the fixture quotes with single quotes');
+    assert.match((await partText(single, 'xl/workbook.xml'))!, /r:id='rId\d+'/);
+    const { bytes } = await applyCellEdits(single, [{ sheet: 'Sales', ref: 'D5', value: 2 }]);
+    const xml = (await partText(bytes, 'xl/worksheets/sheet1.xml'))!;
+    assert.doesNotMatch(xml, /shared|si=|ref='/, 'no sharing left behind');
+    const split = cellsOf(bytes, 'Sales');
+    assert.deepEqual([split.D3, split.D4, split.D5, split.D6], ['f:B3*C3', 'f:B4*C4', 2, 'f:B6*C6']);
+  }
+
   // ── The calculation chain's relationship and content type, written with single quotes, go too (Codex on #722) ─
   {
     const quoted = await rezip(excelish, (files) => {

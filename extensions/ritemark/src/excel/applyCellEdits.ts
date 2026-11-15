@@ -158,8 +158,8 @@ export async function indexWorkbook(bytes: Uint8Array): Promise<WorkbookIndex> {
   const wp = rootPrefix(workbookXml, 'workbook');
   for (const m of workbookXml.matchAll(new RegExp(`<${wp}sheet(?=[\\s/>])([^>]*?)\\/?>`, 'g'))) {
     const rawName = attr(m[1], 'name');
-    // the relationship id is r:id, whatever prefix the relationships namespace has here
-    const rid = /\s[\w.-]+:id\s*=\s*"([^"]*)"/.exec(m[1])?.[1];
+    // the relationship id is r:id, whatever prefix the relationships namespace has here, in either quote (Codex on #725)
+    const rid = /\s[\w.-]+:id\s*=\s*(["'])(.*?)\1/.exec(m[1])?.[2];
     if (rawName === undefined || !rid) continue;
     const name = decodeXmlEntities(rawName);
     const rel = byId.get(rid);
@@ -321,7 +321,7 @@ function unshareFormula(xml: string, p: string, anchor: CellPosition, si: string
     const at = ref ? parseCellRef(ref) : null;
     if (!at) throw new FormulaShiftError('A shared formula cell has no position');
     const moved = shiftFormula(formula, at.r - anchor.r, at.c - anchor.c);
-    const keep = fa.replace(/\s+(?:t|si|ref)\s*=\s*"[^"]*"/g, '');
+    const keep = stripSharing(fa);
     pieces.push(xml.slice(last, m.index), `<${p}f${keep}>${escapeXml(moved)}</${p}f>`);
     last = m.index + m[0].length;
   }
@@ -432,7 +432,7 @@ export async function applyCellEdits(
                 // the anchor keeps its formula as its own
                 const found = findSharedAnchor(xml, p, si);
                 if (found) {
-                  const own = found.tag.replace(/\s+(?:t|si|ref)\s*=\s*"[^"]*"/g, '');
+                  const own = stripSharing(found.tag);
                   xml = xml.slice(0, found.tagStart) + own + xml.slice(found.tagStart + found.tag.length);
                 }
               }
@@ -479,6 +479,11 @@ export async function applyCellEdits(
   const bytes = await rewritePackage(index.pkg, replace);
   await verifySavedWorkbook(index.pkg, bytes, final, report.touched);
   return { bytes, report };
+}
+
+/** A formula's attributes without the ones that share it (t, si, ref), in either quote style (Codex on #725). */
+function stripSharing(attrs: string): string {
+  return attrs.replace(/\s+(?:t|si|ref)\s*=\s*(?:"[^"]*"|'[^']*')/g, '');
 }
 
 /** Well-formed XML: every element closed in order, quotes and comments closed. One regular expression per tag
