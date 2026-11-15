@@ -37,6 +37,9 @@
   position: relative;
   overflow: hidden;
   background: #ffffff;
+  /* each region stacks its own layers: without this the body's text and borders (z-index 3 and 2) drew over the
+     frozen columns (z-index 2) once the sheet scrolled sideways */
+  isolation: isolate;
 }
 .sg-corner { position: sticky; top: 0; left: 0; z-index: 4; }
 .sg-top { position: sticky; top: 0; z-index: 3; }
