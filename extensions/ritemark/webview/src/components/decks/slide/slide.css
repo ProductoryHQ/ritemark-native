@@ -25,7 +25,7 @@
 .deck-sl .ic { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); margin-bottom: 18px; }
 .deck-sl .ic svg { width: 28px; height: 28px; }
 .deck-sl .ic.sm svg { width: 18px; height: 18px; }
-.deck-sl .pickic:hover, .deck-sl .pickic:focus-visible { outline: 0; box-shadow: 0 0 0 3px var(--s-foc, rgba(242,181,68,.6)); }
+.deck-sl .pickic:hover, :where(:root:not([data-input-mode="pointer"])) .deck-sl .pickic:focus-visible { outline: 0; box-shadow: 0 0 0 3px var(--s-foc, rgba(242,181,68,.6)); }
 .deck-sl .noic { background: transparent; box-shadow: inset 0 0 0 2px var(--s-accl, rgba(242,181,68,.35)); color: var(--s-acct, rgba(242,181,68,.6)); }
 .deck-sl .picbox { position: absolute; border-radius: var(--s-r2, 10px); overflow: hidden; display: grid; place-items: center; background: var(--s-pic, rgba(255,255,255,.05)); }
 .deck-sl .picbox.empty { box-shadow: inset 0 0 0 3px var(--s-emp, rgba(255,255,255,.22)); color: var(--s-empt, rgba(255,255,255,.6)); font: 500 24px/32px var(--s-fb, 'Sofia Sans'); text-align: center; }

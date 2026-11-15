@@ -313,6 +313,33 @@ function retryIn(text: string, now: number): string | undefined {
   return new Date(now + Math.ceil(seconds) * 1000).toISOString();
 }
 
+/**
+ * Sprint 160 (#686): how long Google said to wait, in seconds: the message's own "Please retry in 41.1s."
+ * (a Go duration: "41.1s", "1m3s", "250ms"), or the `google.rpc.RetryInfo` detail's `"retryDelay": "41s"`.
+ * Undefined when it said neither.
+ */
+export function googleRetryDelaySeconds(text: string): number | undefined {
+  const said = /\bretry in\s+((?:\d+(?:\.\d+)?(?:ms|h|m|s))+)(?![a-z])/i.exec(text)?.[1];
+  // The detail may come quoted inside another message, its quotes escaped.
+  const info = /\\?"retryDelay\\?"\s*:\s*\\?"(\d+(?:\.\d+)?)s\\?"/.exec(text)?.[1];
+  if (said) {
+    let seconds = 0;
+    for (const part of said.matchAll(/(\d+(?:\.\d+)?)(ms|h|m|s)/gi)) {
+      const value = Number(part[1]);
+      const unit = part[2].toLowerCase();
+      seconds += unit === 'ms' ? value / 1000 : unit === 'h' ? value * 3600 : unit === 'm' ? value * 60 : value;
+    }
+    if (seconds > 0) return seconds;
+  }
+  if (info !== undefined && Number(info) > 0) return Number(info);
+  return undefined;
+}
+
+/** Sprint 160: Google's quota line for a model the key has no quota for ("…, limit: 0, model: …"). */
+const GOOGLE_NO_QUOTA = /Quota exceeded for metric:[^\n]*?\blimit:\s*0\b/i;
+/** Sprint 160: a daily quota, named in QuotaFailure's quotaId ("GenerateRequestsPerDayPerProjectPerModel-FreeTier"). */
+const GOOGLE_DAILY_QUOTA = /PerDay/;
+
 function retryAtTime(text: string, now: number): string | undefined {
   const iso = /try again (?:at|after)\s+(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)/i.exec(text);
   if (iso) {
@@ -483,6 +510,24 @@ export function classifyRuntimeError(
         : /platform\.openai\.com|insufficient_quota/i.test(haystack)
           ? 'openai'
           : modelProvider;
+      // Sprint 160 (#686): Google's 429 that says when to retry ("Please retry in 41s.", RetryInfo) is the
+      // model's usage limit for now, not a key that needs credits. Without a time it stays the quota card,
+      // and so does a quota of "limit: 0" (the key has none for this model: waiting never helps). A daily
+      // quota (`…PerDay…`) is a limit, but Google's seconds then name no real time, so the card gives none.
+      const retrySeconds = agentId === 'opencode' && billing === 'google' && !GOOGLE_NO_QUOTA.test(haystack)
+        ? googleRetryDelaySeconds(raw)
+        : undefined;
+      if (retrySeconds !== undefined) {
+        const model = hints?.turnModel?.replace(/^opencode:/, '');
+        const retryAt = retrySeconds <= 24 * 3600 && !GOOGLE_DAILY_QUOTA.test(raw)
+          ? new Date(Date.now() + Math.ceil(retrySeconds) * 1000).toISOString()
+          : undefined;
+        return finish(agentId, 'limit', providerSentence, hints, {
+          limit: 'plan',
+          ...(model ? { model } : {}),
+          ...(retryAt ? { retryAt } : {}),
+        });
+      }
       if (billing) return finish(agentId, 'limit', providerSentence, hints, { billing, limit: 'quota' });
     }
   }

@@ -1,0 +1,10 @@
+// Run inside the deck's editor webview (cdp.mjs wv): posts a deck/assets request as the deck view would, and returns
+// what the host answered within 2 s, with the view's mode. Expression form: (d, w) are the active frame's document
+// and window.
+new Promise(resolve => {
+	const answers = [];
+	const listen = event => { const type = event.data && event.data.type; if (typeof type === 'string' && type.startsWith('deck/')) answers.push(type); };
+	w.addEventListener('message', listen);
+	w.__vscodeApi.postMessage({ type: 'deck/library-topics' });
+	setTimeout(() => { w.removeEventListener('message', listen); resolve({ deckView: !!d.querySelector('[class*=deck-]'), codeBlocks: d.querySelectorAll('.ProseMirror pre').length, answers }); }, 2000);
+})

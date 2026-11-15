@@ -2,7 +2,7 @@
  * Sprint 157: copying slides between decks and the library. Run with `npx tsx src/decks/deckLibraryFormat.test.ts`.
  */
 import { strict as assert } from 'node:assert';
-import { parseDeck } from './deckFormat';
+import { parseDeck, parseSlideBody } from './deckFormat';
 import {
   appendPart, folderOf, newTopicText, normalizePath, partText, projectPath, rebasePath, rebaseSlide,
   foldMarkdown, insertPartsText, replaceSlidePart, rewriteMarkdownTargets, slideStamp, slidesOfText,
@@ -31,6 +31,10 @@ assert.equal(
   const rebased = rebaseSlide('id: a1\ntitle: T\nimage: images/agent.png', 'Use ![shot](images/s.png) and [the brief](Brief.md).', 'Slide library', 'Clients/Harbour');
   assert.equal(rebased.body, 'id: a1\ntitle: T\nimage: ../../Slide library/images/agent.png');
   assert.equal(rebased.handout, 'Use ![shot](<../../Slide library/images/s.png>) and [the brief](<../../Slide library/Brief.md>).');
+  // Sprint 159 (PR 2, Codex): a path that needs quoting stays one path, quoted, and every other line as written
+  const quoted = rebaseSlide('id: a1\ntitle: T\nimage: "images/foo #1.png"\nlook: steps', '', 'Slide library', 'Clients/Harbour');
+  assert.equal(parseSlideBody(quoted.body).image, '../../Slide library/images/foo #1.png');
+  assert.equal(quoted.body, 'id: a1\ntitle: T\nimage: "../../Slide library/images/foo #1.png"\nlook: steps');
 }
 
 // The stamp: what a person sees, paths resolved, whitespace folded; not id, from, kept, skip or notes.

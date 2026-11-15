@@ -7,7 +7,9 @@
  * copy, so "the header behaves exactly like History" is true by construction
  * rather than by care. Pure, so it is unit-testable without React.
  */
+import type { AgentId } from '../../../../src/agent/types';
 import type { ConversationSummaryV1 } from '../../../../src/conversations/types';
+import { aiName } from '../../../../src/runtime/turnFailureCopy';
 
 /** How many conversations can be pinned at once. The store enforces it too. */
 export const MAX_PINNED_CONVERSATIONS = 5;
@@ -61,16 +63,72 @@ export function headerStatusLabel(summary: Pick<ConversationSummaryV1, 'lifecycl
   return isConversationRunning(summary) ? conversationStatusLabel(summary) : null;
 }
 
+/**
+ * Sprint 160 (#686): the AI whose usage limit stopped the chat's last turn, or
+ * null. A usage limit is a `limit` failure that isn't ChatGPT's "busy" (a 429
+ * that isn't a limit; its card says so). Only while the chat is interrupted by
+ * that failure.
+ */
+export function usageLimitRuntime(summary: Pick<ConversationSummaryV1, 'lifecycle' | 'lastFailure'>): AgentId | null {
+  const { lifecycle, lastFailure } = summary;
+  if (lifecycle.state !== 'interrupted' || lifecycle.reason !== 'failed') return null;
+  if (lastFailure?.kind !== 'limit' || lastFailure.limit === 'busy') return null;
+  return lastFailure.runtimeId;
+}
+
+/** Sprint 160 (#686, the Experience lead): the chat list's and the rail's word for a usage limit. */
+export const LIMIT_REACHED = 'Limit reached';
+
+/**
+ * Sprint 160 (#686, the Experience lead): the rail's tooltip for a usage limit. Claude's and ChatGPT's
+ * limit is the plan's, so it names the AI. OpenCode's is the model's, so it names the model as the
+ * card's title does ("Stopped at Gemini 3.8 Flash's usage limit"), or none when its label is unknown.
+ */
+export function usageLimitTooltip(
+  failure: { runtimeId: AgentId; model?: string },
+  modelLabel?: (modelId: string) => string | undefined,
+): string {
+  if (failure.runtimeId !== 'opencode') return `Stopped at ${aiName(failure.runtimeId)}'s usage limit`;
+  const label = failure.model ? modelLabel?.(failure.model) : undefined;
+  return label ? `Stopped at ${label}'s usage limit` : 'Stopped at a usage limit';
+}
+
 /** Short status for a conversation that is not idle; null when there is nothing to say. */
-export function conversationStatusLabel(summary: Pick<ConversationSummaryV1, 'lifecycle'>): string | null {
+export function conversationStatusLabel(summary: Pick<ConversationSummaryV1, 'lifecycle' | 'lastFailure'>): string | null {
   switch (summary.lifecycle.state) {
     case 'working':
       return 'Working';
     case 'needs-user':
       return 'Needs you';
     case 'interrupted':
-      return 'Interrupted';
+      // Other failures keep "Interrupted" (Sprint 160, decision 9).
+      return usageLimitRuntime(summary) ? LIMIT_REACHED : 'Interrupted';
     default:
       return null;
   }
+}
+
+/**
+ * The rail's accessible name and tooltip for one chat: its title and its
+ * state. Pinned says Pinned; an unread reply says New reply first. A usage
+ * limit reads "Limit reached", and its tooltip says whose limit it was
+ * (`modelLabel`: an OpenCode model's label, as the failure card names it).
+ */
+export function railEntryLabels(
+  summary: Pick<ConversationSummaryV1, 'title' | 'lifecycle' | 'lastFailure'>,
+  options: { pinned: boolean; unread: boolean; modelLabel?: (modelId: string) => string | undefined },
+): { label: string; tooltip: string } {
+  if (options.pinned) {
+    const label = `${summary.title} — ${options.unread ? 'Pinned, new reply' : 'Pinned'}`;
+    return { label, tooltip: label };
+  }
+  const { state } = summary.lifecycle;
+  const status = state === 'needs-user' || state === 'working'
+    ? conversationStatusLabel(summary)!
+    : options.unread
+      ? 'New reply'
+      : conversationStatusLabel(summary) ?? 'Recent';
+  const label = `${summary.title} — ${status}`;
+  const limited = status === LIMIT_REACHED && usageLimitRuntime(summary) ? summary.lastFailure : undefined;
+  return { label, tooltip: limited ? `${summary.title} — ${usageLimitTooltip(limited, options.modelLabel)}` : label };
 }

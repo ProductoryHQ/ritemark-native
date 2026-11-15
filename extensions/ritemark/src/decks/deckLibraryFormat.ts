@@ -8,7 +8,7 @@
  *    were rebased does not show as changed, and an edit that only moves line breaks in the handout doesn't either.
  *  - Update the library writes one slide by id (`replaceSlideBlock`), and every other byte of the topic stays.
  */
-import { parseDeck, parseSlideBody, writeSlideBlock, type SlideData } from './deckFormat';
+import { parseDeck, parseSlideBody, writeSlideBlock, writeSlideBody, type SlideData } from './deckFormat';
 
 // ---------------------------------------------------------------------------
 // Paths (posix, project-relative)
@@ -98,7 +98,8 @@ export function rebaseSlide(body: string, handout: string, fromFolder: string, t
   if (fromFolder === toFolder) return { body, handout };
   const data = parseSlideBody(body);
   return {
-    body: data.image ? body.replace(/^(image:\s*)(.*)$/m, (_line, key: string) => `${key}${rebasePath(data.image ?? '', fromFolder, toFolder)}`) : body,
+    // Sprint 159 (PR 2, Codex): through the slide writer, so a path that needs quoting (`images/foo #1.png`) stays one
+    body: data.image ? writeSlideBody(body, { ...data, image: rebasePath(data.image, fromFolder, toFolder) }) : body,
     handout: rewriteMarkdownTargets(handout, target => rebasePath(target, fromFolder, toFolder)),
   };
 }

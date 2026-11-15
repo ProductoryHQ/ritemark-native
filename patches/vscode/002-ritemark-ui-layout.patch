@@ -70,6 +70,15 @@ Sprint 148, PR 3 (R7): a head row may be the search box (`field: true` in the ma
   and the tree keeps its folders and scroll and its place in ExplorerService. Whatever opens the tree (Show in Documents,
   New file or folder, a reveal, Refresh Explorer) runs 018's `_ritemark.projectHead.clearSearch` first (the container's
   openView).
+Sprint 159, PR 1 (Decks behind its flag): a place in the manifest may carry a `setting` (a feature flag, off by default),
+  which shows it only while it is true, the opposite of a tab's on purpose (ritemarkFrame.ts, IRitemarkFramePlace). The
+  extension's views in it are shown on `config.<setting>` (scripts/check-frame-manifest.mjs checks both sides), so the
+  row follows the setting live; ritemarkSeedPlaces seeds such a place as VS Code caches an extension's place with a
+  `when` (not built in, its one view on `config.<setting>`), so a new profile's first frame has it only while the setting
+  is on, where it drew an always-shown placeholder. layout.ts (one statement in this patch's hunk, beside
+  isRitemarkPlace): a window closed on such a place, with the flag turned off since, opens on VS Code's default place
+  (ritemarkPlaceShown), where it drew the hidden place checked with an empty column until the extensions were read.
+  Test: ritemarkFrame.test.ts.
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 index 833787070f3..e4fa4a207e5 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
@@ -280,18 +289,18 @@ index f7b82f298f7..e8bbceb8706 100644
  	}
  ]);
 diff --git a/src/vs/workbench/browser/layout.ts b/src/vs/workbench/browser/layout.ts
-index 75f9238..72cb1c1 100644
+index 75f9238fd75..95f50ac4648 100644
 --- a/src/vs/workbench/browser/layout.ts
 +++ b/src/vs/workbench/browser/layout.ts
 @@ -51,6 +51,7 @@ import { ITelemetryService } from '../../platform/telemetry/common/telemetry.js'
  import { IAuxiliaryWindowService } from '../services/auxiliaryWindow/browser/auxiliaryWindowService.js';
  import { CodeWindow, mainWindow } from '../../base/browser/window.js';
  import { localize } from '../../nls.js';
-+import { isRitemarkPlace, ritemarkAiColumnBroughtBack, RITEMARK_AI_COLUMN_RELEASED_KEY, RITEMARK_AI_COLUMN_WAITING_KEY, RITEMARK_PROJECT_OPENED_KEY, ritemarkFrame, ritemarkNotePlaceToRestore, ritemarkNoteWelcomeAloneExpected, ritemarkRestoresDocuments, ritemarkSlotReleased } from './ritemarkFrame.js';
++import { isRitemarkPlace, ritemarkAiColumnBroughtBack, RITEMARK_AI_COLUMN_RELEASED_KEY, RITEMARK_AI_COLUMN_WAITING_KEY, RITEMARK_PROJECT_OPENED_KEY, ritemarkFrame, ritemarkNotePlaceToRestore, ritemarkNoteWelcomeAloneExpected, ritemarkPlaceShown, ritemarkRestoresDocuments, ritemarkSlotReleased } from './ritemarkFrame.js';
  
  //#region Layout Implementation
  
-@@ -837,9 +838,50 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
+@@ -837,9 +838,55 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
  			}
  		}
  
@@ -308,6 +317,11 @@ index 75f9238..72cb1c1 100644
 +		if (ritemarkProjectWindow && this.state.initialization.views.containerToRestore.sideBar) {
 +			this.state.initialization.views.containerToRestore.sideBar = isRitemarkPlace(ritemarkStoredPlace) ? ritemarkStoredPlace
 +				: ritemarkFirstOpening && ritemarkFrame.homePlace ? ritemarkFrame.homePlace : this.state.initialization.views.containerToRestore.sideBar;
++		}
++		// Sprint 159: a place behind a flag that is off now (the window closed on it, the flag turned off since) is not
++		// restored; VS Code's default place opens instead, from the first frame
++		if (!ritemarkPlaceShown(this.state.initialization.views.containerToRestore.sideBar, this.configurationService)) {
++			this.state.initialization.views.containerToRestore.sideBar = this.viewDescriptorService.getDefaultViewContainer(ViewContainerLocation.Sidebar)?.id;
 +		}
 +		if (ritemarkProjectWindow && ritemarkFirstOpening) {
 +			this.storageService.store(RITEMARK_PROJECT_OPENED_KEY, true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
@@ -343,7 +357,7 @@ index 75f9238..72cb1c1 100644
  			if (viewContainerToRestore) {
  				this.state.initialization.views.containerToRestore.auxiliaryBar = viewContainerToRestore;
  			} else {
-@@ -1192,6 +1234,16 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
+@@ -1192,6 +1239,16 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
  
  			await this.openViewContainer(ViewContainerLocation.AuxiliaryBar, this.state.initialization.views.containerToRestore.auxiliaryBar);
  
@@ -360,7 +374,7 @@ index 75f9238..72cb1c1 100644
  			mark('code/didRestoreAuxiliaryBar');
  		})());
  
-@@ -1225,6 +1277,9 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
+@@ -1225,6 +1282,9 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
  			Promises.settled(layoutRestoredPromises).finally(() => {
  				if (
  					this.editorService.editors.length === 0 && 			// no editors opened or restored
@@ -370,7 +384,7 @@ index 75f9238..72cb1c1 100644
  					this.isVisible(Parts.AUXILIARYBAR_PART) && 			// auxiliary bar is visible
  					!this.hasFocus(Parts.AUXILIARYBAR_PART) && 			// auxiliary bar does not have focus yet
  					!this.environmentService.enableSmokeTestDriver 		// not in smoke test mode (where focus is sensitive)
-@@ -3037,8 +3092,11 @@ class LayoutStateModel extends Disposable {
+@@ -3037,8 +3097,11 @@ class LayoutStateModel extends Disposable {
  
  			// Unless auxiliary bar visibility is explicitly configured, make
  			// sure to not force open it in case we know it was empty before.
@@ -1422,10 +1436,10 @@ index bfc8839cc65..745739c61f4 100644
  		};
 diff --git a/src/vs/workbench/browser/ritemarkFrame.ts b/src/vs/workbench/browser/ritemarkFrame.ts
 new file mode 100644
-index 00000000000..1eaf7d80f4f
+index 00000000000..b11084faab6
 --- /dev/null
 +++ b/src/vs/workbench/browser/ritemarkFrame.ts
-@@ -0,0 +1,507 @@
+@@ -0,0 +1,533 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1494,6 +1508,13 @@ index 00000000000..1eaf7d80f4f
 +	readonly icon?: string;
 +	/** The project's head on this place: its rows (their room is kept from the first frame), and the label over the content. */
 +	readonly head?: { readonly rows: readonly IRitemarkFrameHeadRow[]; readonly label?: string };
++	/**
++	 * Sprint 159: the setting that shows the place only when true (a feature flag, off by default); always shown when
++	 * unset. The opposite of a tab's on purpose: a tab's setting turns an on tab off, a place's turns an off place on.
++	 * The extension's views in the place carry `when: config.<setting>` (check-frame-manifest.mjs), so the row follows
++	 * the setting live; the shell needs it only for a new profile's first frame (`ritemarkSeedPlaces`).
++	 */
++	readonly setting?: string;
 +}
 +
 +/** A permanent tab (Home, the Task board): its webview's view type, its name and its icons, as the extension gives them. */
@@ -1536,7 +1557,7 @@ index 00000000000..1eaf7d80f4f
 +}
 +
 +function place(value: unknown): IRitemarkFramePlace | undefined {
-+	const raw = value as { id?: unknown; title?: unknown; order?: unknown; icon?: unknown; head?: { rows?: unknown; label?: unknown } } | null;
++	const raw = value as { id?: unknown; title?: unknown; order?: unknown; icon?: unknown; head?: { rows?: unknown; label?: unknown }; setting?: unknown } | null;
 +	const id = text(raw?.id);
 +	const title = text(raw?.title);
 +	if (!id || !title) {
@@ -1545,12 +1566,14 @@ index 00000000000..1eaf7d80f4f
 +	const icon = text(raw?.icon);
 +	const label = text(raw?.head?.label);
 +	const rows = Array.isArray(raw?.head?.rows) ? raw.head.rows.map(headRow).filter((row): row is IRitemarkFrameHeadRow => !!row) : undefined;
++	const setting = text(raw?.setting);
 +	return {
 +		id,
 +		title,
 +		...(typeof raw?.order === 'number' && Number.isFinite(raw.order) ? { order: raw.order } : {}),
 +		...(icon ? { icon } : {}),
 +		...(rows ? { head: { rows, ...(label ? { label } : {}) } } : {}),
++		...(setting ? { setting } : {}),
 +	};
 +}
 +
@@ -1634,6 +1657,17 @@ index 00000000000..1eaf7d80f4f
 +/** Whether a view container is one of the frame's places. */
 +export function isRitemarkPlace(containerId: string | undefined): boolean {
 +	return ritemarkFrame.places.some(entry => entry.id === containerId);
++}
++
++/**
++ * Sprint 159: whether a view container may be shown now, false only for a frame's place behind a setting that is not
++ * on. A window closed on such a place, with the flag turned off since, opens on VS Code's default place (layout.ts):
++ * restored, the hidden place drew as the checked one with an empty column until the extensions were read. "On" is the
++ * places row's own reading of its views' `when: config.<setting>`: any value the context key counts as true.
++ */
++export function ritemarkPlaceShown(containerId: string | undefined, configurationService: IConfigurationService, frame = ritemarkFrame): boolean {
++	const setting = frame.places.find(entry => entry.id === containerId)?.setting;
++	return !setting || !!configurationService.getValue(setting);
 +}
 +
 +/** The built-in copy of the extension, in the app's own extensions folder: its media is there before it starts. */
@@ -1745,6 +1779,11 @@ index 00000000000..1eaf7d80f4f
 + * among them by itself. A seeded Documents, with no order, made every other place VS Code added after it go in at the
 + * places' end, one before the other, so More's order differed from a profile without seeds (Chat Debug before
 + * Extensions).
++ *
++ * Sprint 159: a place with a setting (a feature flag) is seeded as VS Code caches an extension's place whose views
++ * have a `when`: not built in, its one view shown on `config.<setting>`. So it is in the row from the first frame only
++ * while the setting is on (paneCompositeBar.ts, shouldBeHidden, reads the person's settings.json before the setting is
++ * registered), and a new profile with the flag off draws no placeholder for it.
 + */
 +export function ritemarkSeedPlaces(storageService: IStorageService, pinnedKey: string, placeholderKey: string, frame = ritemarkFrame): void {
 +	const places = frame.places.filter(entry => entry.order !== undefined);
@@ -1757,8 +1796,9 @@ index 00000000000..1eaf7d80f4f
 +		id: entry.id,
 +		name: entry.title,
 +		iconUrl: extension && entry.icon ? joinPath(extension, entry.icon).toJSON() : undefined,
-+		isBuiltin: true,
-+		views: [{}], // shown while its views register, a moment after its container (paneCompositeBar.ts, shouldBeHidden)
++		...(entry.setting
++			? { isBuiltin: false, views: [{ when: `config.${entry.setting}` }] } // shown only while its setting is on
++			: { isBuiltin: true, views: [{}] }), // shown while its views register, a moment after its container (paneCompositeBar.ts, shouldBeHidden)
 +	}))), StorageScope.PROFILE, StorageTarget.MACHINE);
 +}
 +
@@ -2615,10 +2655,10 @@ index ef3388a877f..873b2dbf292 100644
  
 diff --git a/src/vs/workbench/test/browser/ritemarkFrame.test.ts b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
 new file mode 100644
-index 00000000000..be058b5c8b9
+index 00000000000..7f76b16deb6
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
-@@ -0,0 +1,153 @@
+@@ -0,0 +1,203 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2628,18 +2668,22 @@ index 00000000000..be058b5c8b9
 +import { ISerializedLeafNode, ISerializedNode } from '../../../base/browser/ui/grid/gridview.js';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../base/test/common/utils.js';
 +import { IConfigurationService } from '../../../platform/configuration/common/configuration.js';
++import { TestConfigurationService } from '../../../platform/configuration/test/common/testConfigurationService.js';
++import { ContextKeyService } from '../../../platform/contextkey/browser/contextKeyService.js';
++import { ContextKeyExpr } from '../../../platform/contextkey/common/contextkey.js';
 +import { ServicesAccessor } from '../../../platform/instantiation/common/instantiation.js';
 +import { NullLogService } from '../../../platform/log/common/log.js';
 +import { IStorageService, StorageScope } from '../../../platform/storage/common/storage.js';
 +import { IWorkspaceContextService, WorkbenchState } from '../../../platform/workspace/common/workspace.js';
-+import { readRitemarkFrame, ritemarkFirstDesk, ritemarkSeedPlaces, ritemarkSlotReleased } from '../../browser/ritemarkFrame.js';
++import { readRitemarkFrame, ritemarkFirstDesk, ritemarkPlaceShown, ritemarkSeedPlaces, ritemarkSlotReleased } from '../../browser/ritemarkFrame.js';
 +import { ISerializedEditorGroupModel } from '../../common/editor/editorGroupModel.js';
 +import { Memento } from '../../common/memento.js';
 +import { TestStorageService } from '../common/workbenchTestServices.js';
 +
 +/**
 + * Ritemark 2.0 (Sprint 152, R1, R3, R7, R9): the frame's manifest (product.json's `ritemarkFrame`) as the shell reads
-+ * it at the first frame, the slots' release log, a new profile's places and a project's first desk.
++ * it at the first frame, the slots' release log, a new profile's places and a project's first desk. Sprint 159: a
++ * place with a setting (a feature flag) at a new profile's first frame.
 + */
 +suite('Ritemark frame', () => {
 +
@@ -2658,6 +2702,7 @@ index 00000000000..be058b5c8b9
 +		places: [
 +			{ id: 'workbench.view.extension.ritemark-home', title: 'Home', order: -1, icon: 'media/home-icon.svg' },
 +			{ id: 'workbench.view.explorer', title: 'Documents', head: { rows: [{ command: 'ritemark.projectHead.newRow', menu: 'ritemark/projectHead/new' }, { command: 'ritemark.projectHead.search', field: true }], label: 'Documents' } },
++			{ id: 'workbench.view.extension.ritemark-slide-library', title: 'Slide library', order: 0.55, icon: 'media/slide-library-icon.svg', setting: 'ritemark.features.decks' },
 +		],
 +	};
 +
@@ -2666,7 +2711,7 @@ index 00000000000..be058b5c8b9
 +		const read = readRitemarkFrame({
 +			...manifest,
 +			futureKey: { anything: true },
-+			places: [...manifest.places, { id: 'no-title' }, { title: 'No id' }, { id: 'p', title: 'P', order: 'first', head: { rows: [{ menu: 'no command' }, { command: 'c', field: 'yes' }] } }],
++			places: [...manifest.places, { id: 'no-title' }, { title: 'No id' }, { id: 'p', title: 'P', order: 'first', head: { rows: [{ menu: 'no command' }, { command: 'c', field: 'yes' }] }, setting: 7 }, { id: 'q', title: 'Q', setting: '' }],
 +			permanentTabs: [...manifest.permanentTabs, { title: 'No view type' }],
 +			welcome: 7,
 +		});
@@ -2682,7 +2727,7 @@ index 00000000000..be058b5c8b9
 +			read: {
 +				...manifest,
 +				welcome: undefined,
-+				places: [...manifest.places, { id: 'p', title: 'P', head: { rows: [{ command: 'c' }] } }],
++				places: [...manifest.places, { id: 'p', title: 'P', head: { rows: [{ command: 'c' }] } }, { id: 'q', title: 'Q' }],
 +			},
 +		});
 +	});
@@ -2709,14 +2754,59 @@ index 00000000000..be058b5c8b9
 +
 +		assert.deepStrictEqual({
 +			pinned,
-+			placeholders: placeholders.map((entry: { id: string; name: string; iconUrl?: { path: string }; isBuiltin: boolean; views: object[] }) => ({ id: entry.id, name: entry.name, icon: entry.iconUrl?.path.endsWith('/ritemark/media/home-icon.svg') ?? null, isBuiltin: entry.isBuiltin, views: entry.views })),
++			placeholders: placeholders.map((entry: { id: string; name: string; iconUrl?: { path: string }; isBuiltin: boolean; views: object[] }) => ({ id: entry.id, name: entry.name, icon: entry.iconUrl?.path.match(/\/ritemark\/(media\/.*)$/)?.[1] ?? null, isBuiltin: entry.isBuiltin, views: entry.views })),
 +			storedLeftAlone: [stored.get('pinned', StorageScope.PROFILE), stored.get('placeholders', StorageScope.PROFILE)],
 +		}, {
-+			pinned: [{ id: 'workbench.view.extension.ritemark-home', pinned: true, visible: true, order: -1 }],
++			pinned: [
++				{ id: 'workbench.view.extension.ritemark-home', pinned: true, visible: true, order: -1 },
++				{ id: 'workbench.view.extension.ritemark-slide-library', pinned: true, visible: true, order: 0.55 },
++			],
 +			placeholders: [
-+				{ id: 'workbench.view.extension.ritemark-home', name: 'Home', icon: true, isBuiltin: true, views: [{}] },
++				{ id: 'workbench.view.extension.ritemark-home', name: 'Home', icon: 'media/home-icon.svg', isBuiltin: true, views: [{}] },
++				{ id: 'workbench.view.extension.ritemark-slide-library', name: 'Slide library', icon: 'media/slide-library-icon.svg', isBuiltin: false, views: [{ when: 'config.ritemark.features.decks' }] },
 +			],
 +			storedLeftAlone: ['[{"id":"workbench.view.search","pinned":true,"visible":true}]', undefined],
++		});
++	});
++
++	test('Sprint 159: a seeded place with a setting is in the row at the first frame only while the setting is on; one without is always', () => {
++		const fresh = store.add(new TestStorageService());
++		ritemarkSeedPlaces(fresh, 'pinned', 'placeholders', readRitemarkFrame(manifest));
++		const placeholders: { id: string; isBuiltin: boolean; views: { when?: string }[] }[] = JSON.parse(fresh.get('placeholders', StorageScope.PROFILE) ?? '[]');
++		// paneCompositeBar.ts's shouldBeHidden for a place its extension hasn't registered yet: a built-in one shows; an
++		// extension's hides when every view has a `when` the context doesn't match
++		const shown = (settings: Record<string, unknown>) => {
++			const contextKeyService = store.add(new ContextKeyService(new TestConfigurationService(settings)));
++			return placeholders.filter(entry => entry.isBuiltin || !entry.views.every(({ when }) => !!when && !contextKeyService.contextMatchesRules(ContextKeyExpr.deserialize(when)))).map(entry => entry.id);
++		};
++		assert.deepStrictEqual({
++			unset: shown({}),
++			off: shown({ 'ritemark.features.decks': false }),
++			on: shown({ 'ritemark.features.decks': true }),
++		}, {
++			unset: ['workbench.view.extension.ritemark-home'],
++			off: ['workbench.view.extension.ritemark-home'],
++			on: ['workbench.view.extension.ritemark-home', 'workbench.view.extension.ritemark-slide-library'],
++		});
++	});
++
++	test('Sprint 159: a place behind a setting that is off is not restored (layout.ts opens VS Code\'s default place instead); every other place is; "on" is the row\'s own reading', () => {
++		const frame = readRitemarkFrame(manifest);
++		const shown = (settings: Record<string, unknown>) => ['workbench.view.extension.ritemark-slide-library', 'workbench.view.extension.ritemark-home', 'workbench.view.explorer', 'workbench.view.search', undefined]
++			.map(id => ritemarkPlaceShown(id, new TestConfigurationService(settings), frame));
++		// The places row shows the place on its views' `when: config.<setting>`: the restore must agree with it for any value
++		const rowShows = (value: unknown) => store.add(new ContextKeyService(new TestConfigurationService({ 'ritemark.features.decks': value }))).contextMatchesRules(ContextKeyExpr.deserialize('config.ritemark.features.decks'));
++		const values: unknown[] = [undefined, false, true, 'yes', '', 0, 1, ['a']];
++		assert.deepStrictEqual({
++			unset: shown({}),
++			off: shown({ 'ritemark.features.decks': false }),
++			on: shown({ 'ritemark.features.decks': true }),
++			agreesWithTheRow: values.map(value => ritemarkPlaceShown('workbench.view.extension.ritemark-slide-library', new TestConfigurationService({ 'ritemark.features.decks': value }), frame) === rowShows(value)),
++		}, {
++			unset: [false, true, true, true, true],
++			off: [false, true, true, true, true],
++			on: [true, true, true, true, true],
++			agreesWithTheRow: values.map(() => true),
 +		});
 +	});
 +

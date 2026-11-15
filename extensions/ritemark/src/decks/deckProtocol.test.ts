@@ -3,7 +3,7 @@
  */
 import { strict as assert } from 'node:assert';
 import { decodeDeckRequest, decodeLibraryRequest, DeckProtocolError, MAX_ASSET_PATHS } from './deckProtocol';
-import { deckModeOf, isDeckPath } from './deckMode';
+import { deckModeOf, isDeckPath, ModeFixedPerView } from './deckMode';
 import { isThemePath } from './deckTheme';
 
 assert.deepEqual(decodeDeckRequest({ type: 'deck/assets', paths: ['images/a.png'] }), { type: 'deck/assets', paths: ['images/a.png'] });
@@ -66,6 +66,34 @@ assert.ok(!deckModeOf({ ...deck, flagOn: false }), 'flag off: a document');
 assert.ok(!deckModeOf({ ...deck, scheme: 'untitled' }), 'not on disk: a document');
 assert.ok(!deckModeOf({ ...deck, fsPath: '/p/Training.md' }), 'not .deck.md: a document');
 assert.ok(!deckModeOf({ ...deck, text: '---\ndeck: 2\n---\n' }), 'a later format: a document');
+
+// Sprint 159 (PR 2): a view keeps the flag it opened with (recorded as it opens, as ritemarkEditor.ts does); the flag
+// turned on or off meanwhile reaches only views opened afterwards: the flag never turns a document view into a deck
+// view, nor a deck view into a document. The file is read live, as DeckPages.deckModeFor(document, flag) reads it: a deck
+// rewritten to a later format shows as a document rather than be rewritten, and as a deck again once it reads.
+{
+  const flags = new ModeFixedPerView<object>();
+  let flagOn = false;
+  const mode = (view: object, text = deck.text, fsPath = deck.fsPath) => deckModeOf({ scheme: deck.scheme, fsPath, text, flagOn: flags.of(view, () => flagOn) });
+  const openedOff = {};
+  const openedOn = {};
+  const first = mode(openedOff);
+  flagOn = true;
+  const afterOn = [mode(openedOff), mode(openedOn)];
+  flagOn = false;
+  const afterOff = [mode(openedOff), mode(openedOn), mode({})];
+  const laterFormat = [mode(openedOn, '---\ndeck: 2\n---\n'), mode(openedOn, '---\ndeck: 1\n---\n')];
+  const flagOffLaterFormatBack = [mode(openedOff, '---\ndeck: 2\n---\n'), mode(openedOff, '---\ndeck: 1\n---\n')];
+  const notADeck = mode(openedOn, deck.text, '/p/Training.md');
+  assert.deepEqual({ first, afterOn, afterOff, laterFormat, flagOffLaterFormatBack, notADeck }, {
+    first: false,
+    afterOn: [false, true],
+    afterOff: [false, true, false],
+    laterFormat: [false, true],
+    flagOffLaterFormatBack: [false, false],
+    notADeck: false,
+  });
+}
 
 // Which theme paths a deck may name: project-relative .theme.md files, never outside the project.
 assert.ok(isThemePath('Slide library/Themes/Evening.theme.md'));
