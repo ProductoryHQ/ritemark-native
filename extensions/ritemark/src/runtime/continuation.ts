@@ -43,7 +43,15 @@ export interface NormalizedRuntimeContext {
   coveredThroughEventId: string | null;
   truncated: boolean;
   omittedEventCount: number;
+  /** An earlier request has no completed answer. The model's context marks it unanswered. */
   hasUnansweredRequest: boolean;
+  /**
+   * Sprint 160 (#686): an earlier request has no completed answer and no
+   * recorded end either (no failure, no stop): only then does the chat say
+   * "The previous agent did not return a saved answer." A turn that failed or
+   * was stopped already says what happened.
+   */
+  hasUnendedRequest: boolean;
 }
 
 export interface RuntimeContinuationRequest {
@@ -156,7 +164,7 @@ export function transcriptRestoredState(context: NormalizedRuntimeContext): Runt
   return {
     mode: 'transcript-restored',
     truncated: context.truncated,
-    unansweredPriorRequest: context.hasUnansweredRequest,
+    unansweredPriorRequest: context.hasUnendedRequest,
   };
 }
 

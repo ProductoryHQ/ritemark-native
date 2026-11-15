@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { buildNormalizedContextPack, truncateContextMessage } from './contextPack';
+import { transcriptRestoredState } from '../runtime/continuation';
 import { resolveProjectScope } from './projectScope';
 import type { ConversationEventV1, ConversationRecordV1 } from './types';
 
@@ -66,8 +67,64 @@ function testRuntimeInitiatedTurn(): void {
   assert.ok(pack.text.includes('launched\n\nfinal: all facts checked'), 'the follow-up answer continues the user turn');
 }
 
+/**
+ * Sprint 160 (#686): "The previous agent did not return a saved answer" is said
+ * only for an earlier turn with no recorded end. A turn that failed (a usage
+ * limit) or was stopped already says what happened; a restart's turn does not.
+ */
+function testRecordedEnd(): void {
+  const purpose = [
+    event('user-message', 0, { turnId: 'turn-purpose', runtimeId: 'opencode', text: 'Summarise the notes', mode: 'agent', attachments: [] }),
+    event('assistant-message', 1, { turnId: 'turn-purpose', runtimeId: 'opencode', content: 'Here is the summary.', terminalStatus: 'completed' }),
+    event('user-message', 2, { turnId: 'turn-limit', runtimeId: 'opencode', text: 'Now shorten it', mode: 'agent', attachments: [] }),
+  ];
+  const next = (sequence: number) => event('user-message', sequence, { turnId: 'turn-next', runtimeId: 'opencode', text: 'Try once more', mode: 'agent', attachments: [] });
+  const packFor = (ending: ConversationEventV1[]) => {
+    const events = [...purpose, ...ending, next(3 + ending.length)];
+    const pack = buildNormalizedContextPack(base(events), { beforeEventId: events[events.length - 1].eventId });
+    assert.ok(pack);
+    return pack;
+  };
+
+  // A usage limit: the failed turn is still unanswered context for the model, but the chat adds no line.
+  const limit = packFor([event('boundary', 3, {
+    turnId: 'turn-limit', runtimeId: 'opencode', boundaryKind: 'failed',
+    message: "You've used Gemini 3.8 Flash's limit for now. It can answer again in a minute. Until then, use another model.",
+    errorKind: 'limit', errorDetail: { limit: 'plan', retryAt: '2026-11-16T01:00:41.000Z', model: 'google/gemini-3.8-flash' },
+  })]);
+  assert.match(limit.text, /Now shorten it/);
+  assert.match(limit.text, /· unanswered\]/, 'the model still reads the failed request as unanswered');
+  assert.equal(limit.hasUnansweredRequest, true);
+  assert.equal(limit.hasUnendedRequest, false, 'a failed turn has a recorded end');
+  assert.equal(transcriptRestoredState(limit).unansweredPriorRequest, false, 'so the next message adds no "did not return a saved answer"');
+
+  // A failure with partial text is an assistant message that failed: a recorded end too.
+  const partial = packFor([event('assistant-message', 3, { turnId: 'turn-limit', runtimeId: 'opencode', content: 'Short', terminalStatus: 'failed', error: 'x', errorKind: 'limit' })]);
+  assert.equal(partial.hasUnendedRequest, false);
+
+  // A stop is a recorded end.
+  const stopped = packFor([event('boundary', 3, { turnId: 'turn-limit', runtimeId: 'opencode', boundaryKind: 'cancelled', message: 'The turn was cancelled.' })]);
+  assert.equal(transcriptRestoredState(stopped).unansweredPriorRequest, false);
+
+  // A turn a restart ended has no recorded end: the line stays.
+  const restart = packFor([event('boundary', 3, { turnId: 'turn-limit', runtimeId: 'opencode', boundaryKind: 'interrupted', message: 'Ritemark closed while this turn was running.' })]);
+  assert.equal(restart.hasUnendedRequest, true);
+  assert.equal(transcriptRestoredState(restart).unansweredPriorRequest, true, 'a restart still gives the line');
+
+  // A turn with no ending event at all (the next message overtook it) gives the line too.
+  const overtaken = packFor([]);
+  assert.equal(transcriptRestoredState(overtaken).unansweredPriorRequest, true);
+
+  // Only the unanswered turns count: an answered chat says nothing either way.
+  const answered = buildNormalizedContextPack(base([...purpose.slice(0, 2), next(2)]), { beforeEventId: 'event-2' });
+  assert.ok(answered);
+  assert.equal(answered.hasUnansweredRequest, false);
+  assert.equal(answered.hasUnendedRequest, false);
+}
+
 function run(): void {
   testRuntimeInitiatedTurn();
+  testRecordedEnd();
   const record = fixture();
   const pack = buildNormalizedContextPack(record, { beforeEventId: 'event-9' });
   assert.ok(pack);
