@@ -67,10 +67,12 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
     _token: vscode.CancellationToken
   ): Promise<ExcelDocument> {
     try {
-      // Restore from hot-exit backup when present
+      // Restore from hot-exit backup when present: the workbook's bytes, and beside them the edits not saved
+      // (an older backup is the edited workbook itself, with no list)
       const dataPath = openContext.backupId ? vscode.Uri.parse(openContext.backupId).fsPath : uri.fsPath;
       const buffer = await fs.readFile(dataPath);
-      return new ExcelDocument(uri, buffer);
+      const edits = openContext.backupId ? await this.readBackupEdits(dataPath) : [];
+      return new ExcelDocument(uri, buffer, edits);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Failed to read Excel file: ${message}`);
@@ -289,19 +291,36 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
   ): Promise<vscode.CustomDocumentBackup> {
     const destination = context.destination;
     await fs.mkdir(path.dirname(destination.fsPath), { recursive: true });
-    // A hot-exit backup holds the workbook with the edits in, which reopening reads as the file
-    const { bytes } = await this.bytesToSave(document);
-    await fs.writeFile(destination.fsPath, bytes);
+    // A hot-exit backup holds the workbook's bytes and, beside them, the edits not saved yet. VS Code backs up soon
+    // after each change, so it never runs the save itself (seconds on a large sheet, on the extension host).
+    await fs.writeFile(destination.fsPath, document.buffer);
+    await fs.writeFile(this.backupEditsPath(destination.fsPath), JSON.stringify(document.edits));
     return {
       id: destination.toString(),
       delete: async () => {
-        try {
-          await fs.unlink(destination.fsPath);
-        } catch {
-          // Backup already gone — nothing to do
+        for (const file of [destination.fsPath, this.backupEditsPath(destination.fsPath)]) {
+          try {
+            await fs.unlink(file);
+          } catch {
+            // Backup already gone — nothing to do
+          }
         }
       }
     };
+  }
+
+  private backupEditsPath(backupPath: string): string {
+    return `${backupPath}.edits.json`;
+  }
+
+  /** The edits a backup kept beside the workbook's bytes; none when it has no list or the list can't be read. */
+  private async readBackupEdits(backupPath: string): Promise<CellEdit[]> {
+    try {
+      const list: unknown = JSON.parse(await fs.readFile(this.backupEditsPath(backupPath), 'utf8'));
+      return Array.isArray(list) ? list.filter(isCellEdit) : [];
+    } catch {
+      return [];
+    }
   }
 
   /**

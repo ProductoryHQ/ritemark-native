@@ -270,6 +270,24 @@ async function main() {
     await assert.rejects(checkCellEdit(chartIndex, { sheet: third!.name, ref: 'A1', value: 1 }), /chart sheet/);
   }
 
+  // ── A shared anchor in a sheet whose cells carry no r is guarded at edit time too ─
+  {
+    const noR = await rezip(excelMac, (files) => {
+      const xml = (files.get('xl/worksheets/sheet1.xml') as string)
+        .replace('<f>B3*C3</f>', '<f t="shared" ref="D3:D6" si="0">B1048574*2</f>')
+        .replace('<f>B4*C4</f>', '<f t="shared" si="0"/>')
+        .replace(/<c r="[A-Z]+\d+"/g, '<c');
+      files.set('xl/worksheets/sheet1.xml', xml);
+    });
+    await assert.rejects(checkCellEdit(await indexWorkbook(noR), { sheet: 'Sales', ref: 'D3', value: 1 }), /shared with other cells/);
+  }
+
+  // ── A package that would unpack to too much is refused before anything is inflated ─
+  {
+    const bomb = await rezip(excelMac, (files) => files.set('xl/media/zeros.bin', new Uint8Array(21 * 1024 * 1024)));
+    await assert.rejects(indexWorkbook(bomb), /too complex/);
+  }
+
   // ── A workbook with no calcPr gets one in schema order ──────────────────────
   {
     const noCalc = await rezip(excelMac, (files) => {

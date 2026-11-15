@@ -44,7 +44,7 @@ The sheet holds 35 MB of XML in a 5.2 MB file, with shared strings and a formula
 | Save, 2 edits (one overwrites a formula), with the read-back | 1,091 ms |
 | Save, 21 edits, with the read-back | 2,297 ms |
 
-2.2 took about 4 s for this file on every cell commit (the study). The save's cost grows by about 60 ms an edit on a sheet this size, because each edit copies the sheet's text once. That is fine for the edits a person makes by hand. PR 4, which looks at performance on a 50,000-row sheet, can make it one pass if needed.
+2.2 took about 4 s for this file on every cell commit (the study). Ritemark saves automatically one second after an edit (`files.autoSave: afterDelay`), so on a sheet this size a person typing gets a save, about a second of the extension host's time, every second. PR 4 makes the save one pass over the sheet and measures it again. The save's cost grows by about 60 ms an edit on a sheet this size, because each edit copies the sheet's text once. That is fine for the edits a person makes by hand. PR 4, which looks at performance on a 50,000-row sheet, can make it one pass if needed.
 
 ## In the app
 

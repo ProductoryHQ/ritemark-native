@@ -21,9 +21,12 @@ export class ExcelDocument implements vscode.CustomDocument {
 
   constructor(
     readonly uri: vscode.Uri,
-    buffer: Buffer
+    buffer: Buffer,
+    /** Edits restored from a hot-exit backup; they were checked when they were made. */
+    edits: readonly CellEdit[] = []
   ) {
     this._buffer = buffer;
+    this._edits = [...edits];
   }
 
   /** The workbook's bytes without the pending edits: what the webview reads and the edits apply to. */

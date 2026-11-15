@@ -181,6 +181,14 @@ export function SpreadsheetViewer({
         pendingEdits.current.delete(message.id)
         const workbook = workbookRef.current
         if (message.ok || !pending || !workbook) return
+        // A later edit of the same cell is drawn and on its way: it decides what the cell shows, and if it is refused
+        // too, the cell goes back to what it held before this one
+        for (const [id, other] of pendingEdits.current) {
+          if (id > (message.id as number) && other.sheet === pending.sheet && other.addr === pending.addr) {
+            other.previous = pending.previous
+            return
+          }
+        }
         // Refused (the host said why): put the cell back as it was
         const worksheet = workbook.Sheets[pending.sheet]
         if (!worksheet) return

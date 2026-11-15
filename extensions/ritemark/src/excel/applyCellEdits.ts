@@ -108,7 +108,12 @@ function relsPathFor(partPath: string): string {
 
 /** A relationship's target as a part path ("worksheets/sheet1.xml" from "xl/workbook.xml" → "xl/worksheets/sheet1.xml"). */
 export function resolveTarget(fromPart: string, target: string): string {
-  const decoded = decodeURI(target);
+  let decoded = target;
+  try {
+    decoded = decodeURI(target);
+  } catch {
+    // a stray % in the target: it names the part as written
+  }
   if (decoded.startsWith('/')) return decoded.slice(1);
   const parts = fromPart.split('/');
   parts.pop();
@@ -177,6 +182,7 @@ function sheetGuardsFrom(xml: string, p: string): Pick<SheetGuards, 'arrays' | '
   const arrays: SheetGuards['arrays'] = [];
   const unmovableAnchors = new Set<string>();
   const fRe = new RegExp(`<${p}f(?=[\\s/>])([^>]*?)(\\/?)>`, 'g');
+  const cellTagRe = new RegExp(`<${p}c(?=[\\s/>])[^>]*>`, 'y');
   let m: RegExpExecArray | null;
   while ((m = fRe.exec(xml))) {
     const t = attr(m[1], 't');
@@ -188,8 +194,9 @@ function sheetGuardsFrom(xml: string, p: string): Pick<SheetGuards, 'arrays' | '
       // reaches the range's four corners it reaches every cell between them.
       const close = xml.indexOf(`</${p}f>`, fRe.lastIndex);
       const formula = decodeXmlEntities(xml.slice(fRe.lastIndex, close));
-      const cellStart = xml.lastIndexOf(`<${p}c`, m.index);
-      const anchorRef = attr(/<[^>]*>/.exec(xml.slice(cellStart))?.[0] ?? '', 'r');
+      // the anchor's cell tag, read in place (no copy of the rest of the sheet per anchor)
+      cellTagRe.lastIndex = xml.lastIndexOf(`<${p}c`, m.index);
+      const anchorRef = attr(cellTagRe.exec(xml)?.[0] ?? '', 'r');
       const anchor = anchorRef ? parseCellRef(anchorRef) : null;
       if (!anchor || !anchorRef) continue;
       try {
@@ -207,8 +214,10 @@ function sheetGuardsFrom(xml: string, p: string): Pick<SheetGuards, 'arrays' | '
 async function guardsFor(index: WorkbookIndex, sheetPath: string, xml?: string): Promise<SheetGuards> {
   const known = index.guards.get(sheetPath);
   if (known) return known;
-  const text = xml ?? (await mustReadText(index.pkg, sheetPath));
-  const p = rootPrefix(text, 'worksheet');
+  const read = xml ?? (await mustReadText(index.pkg, sheetPath));
+  const p = rootPrefix(read, 'worksheet');
+  // with the positions the save writes out, so a cell without `r` is guarded as it will be written
+  const text = writeImplicitPositions(read, p);
   const guards: SheetGuards = { ...sheetGuardsFrom(text, p), tableRows: [] };
   const relsText = await readTextPart(index.pkg, relsPathFor(sheetPath));
   if (relsText) {

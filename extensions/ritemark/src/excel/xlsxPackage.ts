@@ -7,7 +7,7 @@
  * copied entries' records as they were, each pointing at its part's new offset.
  */
 import { deflateRaw } from 'node:zlib';
-import { readZipDirectory, readZipEntry, type ZipEntry } from '../officePreview/officePackageCheck';
+import { OFFICE_PREVIEW_LIMITS, readZipDirectory, readZipEntry, type ZipEntry } from '../officePreview/officePackageCheck';
 
 const LOCAL_FILE = 0x04034b50;
 const DIRECTORY_ENTRY = 0x02014b50;
@@ -28,6 +28,18 @@ export function openPackage(bytes: Uint8Array): XlsxPackage {
   if (entries.some((e) => e.flags & 0x1)) throw new PackageError('The workbook is encrypted');
   // The writer below keeps 32-bit offsets; a package that needs ZIP64 is far past what the editor opens.
   if (bytes.length >= 0xffffffff || entries.length >= 0xffff) throw new PackageError('The workbook is too large to save here');
+  // The Office preview's limits on what a package may unpack to, so a crafted file can't make the host inflate gigabytes
+  let unpacked = 0;
+  for (const e of entries) {
+    unpacked += e.uncompressedSize;
+    const ratio = e.uncompressedSize / Math.max(1, e.compressedSize);
+    if (e.uncompressedSize > OFFICE_PREVIEW_LIMITS.bombPartBytes && ratio > OFFICE_PREVIEW_LIMITS.maxRatio) {
+      throw new PackageError('The workbook is too complex to save here');
+    }
+  }
+  if (entries.length > OFFICE_PREVIEW_LIMITS.maxEntries || unpacked > OFFICE_PREVIEW_LIMITS.maxUnpackedBytes) {
+    throw new PackageError('The workbook is too complex to save here');
+  }
   const byName = new Map<string, ZipEntry>();
   for (const e of entries) {
     if (byName.has(e.name)) throw new PackageError(`The workbook holds two parts named ${e.name}`);
@@ -97,6 +109,10 @@ function directoryRecords(bytes: Uint8Array, count: number): Array<{ start: numb
   for (let n = 0; n < count; n++) {
     if (view.getUint32(at, true) !== DIRECTORY_ENTRY) throw new PackageError('The workbook\'s ZIP directory is damaged');
     const end = at + 46 + view.getUint16(at + 28, true) + view.getUint16(at + 30, true) + view.getUint16(at + 32, true);
+    // A record that keeps its sizes or offset in a ZIP64 field can't be copied with a new 32-bit offset
+    if (view.getUint32(at + 20, true) === 0xffffffff || view.getUint32(at + 24, true) === 0xffffffff || view.getUint32(at + 42, true) === 0xffffffff) {
+      throw new PackageError('The workbook uses a ZIP format this editor can\'t save');
+    }
     out.push({ start: at, end });
     at = end;
   }
