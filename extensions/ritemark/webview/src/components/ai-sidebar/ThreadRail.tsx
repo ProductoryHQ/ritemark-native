@@ -4,6 +4,7 @@ import { ConversationBubbleIcon } from './ConversationBubbleIcon';
 import { ConversationTooltip } from './ConversationTooltip';
 import { conversationPinState, railEntryLabels } from './conversationActionsModel';
 import { railMarkOf, selectRailConversationIds } from './conversationSelectors';
+import { openCodeLabel } from './runtimeAvailability';
 import { useAISidebarStore } from './store';
 
 export function ThreadRail() {
@@ -18,6 +19,7 @@ export function ThreadRail() {
   const showPanel = useAISidebarStore((state) => state.showHistoryPanel);
   const pin = useAISidebarStore((state) => state.pinConversation);
   const unpin = useAISidebarStore((state) => state.unpinConversation);
+  const byokProviderModels = useAISidebarStore((state) => state.byokProviderModels);
 
   const ids = useMemo(() => selectRailConversationIds(summaries, pinnedIds, activeId), [summaries, pinnedIds, activeId]);
   const byId = useMemo(() => new Map(summaries.map((summary) => [summary.conversationId, summary])), [summaries]);
@@ -38,7 +40,7 @@ export function ThreadRail() {
     const { pinned: isPinned, atCapacity: pinAtCapacity, label: pinLabel, icon: pinIcon } = conversationPinState(id, summary.title, pinnedIds);
     const isActive = activeId === id;
     const mark = railMarkOf(summary);
-    const { label, tooltip } = railEntryLabels(summary, { pinned: isPinned, unread: mark === 'unread' });
+    const { label, tooltip } = railEntryLabels(summary, { pinned: isPinned, unread: mark === 'unread', modelLabel: (modelId) => openCodeLabel(byokProviderModels, modelId) });
     return (
       <div key={id} className="group relative h-10 w-10 shrink-0">
         <ConversationTooltip label={tooltip}>

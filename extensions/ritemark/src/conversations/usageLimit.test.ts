@@ -63,13 +63,15 @@ async function run(): Promise<void> {
     errorDetail: { limit: 'plan', model: 'google/gemini-3.8-flash', retryAt: new Date(clock + 41_000).toISOString() },
   });
   assert.equal(failed.lifecycle.state, 'interrupted');
-  assert.deepEqual(lastFailureOf(failed), { runtimeId: 'opencode', kind: 'limit', limit: 'plan' });
+  // The model too: OpenCode's rail tooltip names it (the Experience lead, 16 November).
+  const FLASH_LIMIT = { runtimeId: 'opencode', kind: 'limit', limit: 'plan', model: 'google/gemini-3.8-flash' };
+  assert.deepEqual(lastFailureOf(failed), FLASH_LIMIT);
 
   // ── The summary carries it, through the index and a fresh store ──
-  assert.deepEqual(summarizeConversationRecord(failed, 'now').lastFailure, { runtimeId: 'opencode', kind: 'limit', limit: 'plan' });
+  assert.deepEqual(summarizeConversationRecord(failed, 'now').lastFailure, FLASH_LIMIT);
   const freshStore = new ConversationStore(temp, { randomId, now });
   const listed = (await freshStore.list(scope.scopeId)).find((entry) => entry.conversationId === first.conversationId);
-  assert.deepEqual(listed?.lastFailure, { runtimeId: 'opencode', kind: 'limit', limit: 'plan' }, 'read back from the index');
+  assert.deepEqual(listed?.lastFailure, FLASH_LIMIT, 'read back from the index');
 
   // An index written before Sprint 160 has no field, and a malformed one is dropped; neither quarantines a chat.
   const indexFile = path.join(temp, 'index.json');
@@ -79,11 +81,14 @@ async function run(): Promise<void> {
   const olderIndex = await new ConversationStore(temp, { randomId, now }).list(scope.scopeId);
   assert.equal(olderIndex.length, 1);
   assert.equal(olderIndex[0].integrity, 'verified');
-  assert.deepEqual(olderIndex[0].lastFailure, { runtimeId: 'opencode', kind: 'limit', limit: 'plan' }, 'this build fills it in again from the record');
+  assert.deepEqual(olderIndex[0].lastFailure, FLASH_LIMIT, 'this build fills it in again from the record');
   for (const odd of [{ runtimeId: 'legacy-ritemark', kind: 'limit' }, { runtimeId: 'opencode', kind: 'plan' }, 'limit', null, []]) {
     assert.equal(decodeLastFailure(odd), undefined, JSON.stringify(odd));
   }
   assert.deepEqual(decodeLastFailure({ runtimeId: 'codex', kind: 'limit', limit: 'later' }), { runtimeId: 'codex', kind: 'limit' }, 'an unknown limit is dropped, the kind kept');
+  for (const model of [42, '', ' ', 'x'.repeat(257)]) {
+    assert.deepEqual(decodeLastFailure({ runtimeId: 'opencode', kind: 'limit', limit: 'plan', model }), { runtimeId: 'opencode', kind: 'limit', limit: 'plan' }, `a model of ${JSON.stringify(model).slice(0, 12)} is dropped`);
+  }
 
   // ── The next message: no "did not return a saved answer", with or without a model switch ──
   const retry = await controller.acceptRuntimeTurn({ conversationId: first.conversationId, bindingGeneration: failed.bindingGeneration, agentId: 'opencode', text: 'Try once more' });

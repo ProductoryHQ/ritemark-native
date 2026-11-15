@@ -106,9 +106,15 @@ const interrupted: Lifecycle = { state: 'interrupted', turnId: null, reason: 're
     }
     assert.equal(headerStatusLabel(chat(failed, limitOf(runtime, 'plan'))), null, 'the header still shows just the title');
   }
-  assert.equal(usageLimitTooltip('opencode'), "Stopped at OpenCode's usage limit");
-  assert.equal(usageLimitTooltip('codex'), "Stopped at ChatGPT's usage limit", "people's names, never Codex");
-  assert.equal(usageLimitTooltip('claude-code'), "Stopped at Claude's usage limit");
+  // The Experience lead (16 November): OpenCode's limit is the model's, so the tooltip names the model as
+  // the card's title does; Claude's and ChatGPT's is the plan's, so it names the AI.
+  const labels = (id: string) => ({ 'google/gemini-3.8-flash': 'Gemini 3.8 Flash' } as Record<string, string>)[id];
+  assert.equal(usageLimitTooltip({ runtimeId: 'opencode', model: 'google/gemini-3.8-flash' }, labels), "Stopped at Gemini 3.8 Flash's usage limit");
+  assert.equal(usageLimitTooltip({ runtimeId: 'opencode', model: 'google/gemini-unlisted' }, labels), 'Stopped at a usage limit', 'the label unknown');
+  assert.equal(usageLimitTooltip({ runtimeId: 'opencode' }, labels), 'Stopped at a usage limit', 'no model (a billing stop)');
+  assert.equal(usageLimitTooltip({ runtimeId: 'opencode', model: 'google/gemini-3.8-flash' }), 'Stopped at a usage limit', 'no catalog');
+  assert.equal(usageLimitTooltip({ runtimeId: 'codex', model: 'gpt-6.1-sol' }, labels), "Stopped at ChatGPT's usage limit", "people's names, never Codex");
+  assert.equal(usageLimitTooltip({ runtimeId: 'claude-code' }, labels), "Stopped at Claude's usage limit");
 
   // ChatGPT's "busy" isn't a usage limit (its card says so); other kinds, and a chat from before Sprint 160, keep the word.
   assert.equal(conversationStatusLabel(chat(failed, limitOf('codex', 'busy'))), 'Interrupted');
@@ -122,10 +128,15 @@ const interrupted: Lifecycle = { state: 'interrupted', turnId: null, reason: 're
   assert.equal(conversationStatusLabel(chat(working, limitOf('opencode', 'plan'))), 'Working');
 
   // The rail: its accessible name says "Limit reached", its tooltip whose limit it was.
-  assert.deepEqual(railEntryLabels(chat(failed, limitOf('opencode', 'plan')), { pinned: false, unread: false }), {
+  const flashLimit = { ...limitOf('opencode', 'plan'), model: 'google/gemini-3.8-flash' };
+  assert.deepEqual(railEntryLabels(chat(failed, flashLimit), { pinned: false, unread: false, modelLabel: labels }), {
     label: 'Shorten the notes — Limit reached',
-    tooltip: "Shorten the notes — Stopped at OpenCode's usage limit",
+    tooltip: "Shorten the notes — Stopped at Gemini 3.8 Flash's usage limit",
   });
+  assert.equal(railEntryLabels(chat(failed, limitOf('opencode', 'plan')), { pinned: false, unread: false, modelLabel: labels }).tooltip,
+    'Shorten the notes — Stopped at a usage limit', 'no model in the summary');
+  assert.equal(railEntryLabels(chat(failed, limitOf('claude-code', 'plan')), { pinned: false, unread: false, modelLabel: labels }).tooltip,
+    "Shorten the notes — Stopped at Claude's usage limit");
   assert.deepEqual(railEntryLabels(chat(failed, { runtimeId: 'opencode', kind: 'network' }), { pinned: false, unread: false }), {
     label: 'Shorten the notes — Interrupted',
     tooltip: 'Shorten the notes — Interrupted',

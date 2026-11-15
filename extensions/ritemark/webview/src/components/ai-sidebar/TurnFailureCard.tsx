@@ -13,20 +13,13 @@ import { Icon, type PhosphorIconName } from '../ui/Icon';
 import { RuntimeNotice } from './RuntimeNotice';
 import { useActiveConversation, useAISidebarStore } from './store';
 import { defaultCodexModelId } from './modelPresentation';
-import { anotherOpenCodeModel, deriveRuntimeAvailabilities, listReadyAlternatives, resolveAvailableRuntimeModel, stillLimitedOpenCodeModels } from './runtimeAvailability';
+import { anotherOpenCodeModel, deriveRuntimeAvailabilities, listReadyAlternatives, openCodeLabel, resolveAvailableRuntimeModel, stillLimitedOpenCodeModels } from './runtimeAvailability';
 import { vscode } from '../../lib/vscode';
 import { turnFailureCard, type ModelNames } from '../../../../src/runtime/turnFailureCopy';
-import type { AgentId, ByokModelOption, ModelOption, RuntimeErrorDetail, RuntimeErrorKind } from './types';
+import type { AgentId, ModelOption, RuntimeErrorDetail, RuntimeErrorKind } from './types';
 
 function findModel(models: ModelOption[], id: string): ModelOption | undefined {
   return models.find((model) => model.id === id || model.resolvedModel === id || model.aliases?.includes(id));
-}
-
-function openCodeLabel(byok: Record<string, ByokModelOption[]> | undefined, id: string): string | undefined {
-  const bare = id.replace(/^opencode:/, '');
-  const slash = bare.indexOf('/');
-  if (slash <= 0) return undefined;
-  return byok?.[bare.slice(0, slash)]?.find((model) => model.id === bare.slice(slash + 1))?.label;
 }
 
 const ACTION_ICONS: Record<string, PhosphorIconName> = {

@@ -77,6 +77,18 @@ export function deriveRuntimeAvailabilities(
   return deriveSharedRuntimeAvailabilities(input);
 }
 
+/**
+ * An OpenCode model's label in the model menu (`provider/model`, with or without `opencode:`), or
+ * undefined when it isn't listed. The failure card's title and the rail's tooltip both name a model
+ * with it, so the two read alike (Sprint 160).
+ */
+export function openCodeLabel(byok: Record<string, ByokModelOption[]> | undefined, id: string): string | undefined {
+  const bare = id.replace(/^opencode:/, '');
+  const slash = bare.indexOf('/');
+  if (slash <= 0) return undefined;
+  return byok?.[bare.slice(0, slash)]?.find((model) => model.id === bare.slice(slash + 1))?.label;
+}
+
 /** OpenCode's key providers, in the order a handoff and the usage-limit card try them. */
 const OPENCODE_PROVIDERS = ['google', 'openai', 'anthropic', 'openrouter'] as const;
 

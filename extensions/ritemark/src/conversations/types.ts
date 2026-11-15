@@ -267,6 +267,8 @@ export interface ConversationLastFailureV1 {
   kind: RuntimeErrorKind;
   /** For `limit`: what ran out (`errorDetail.limit`). */
   limit?: LimitKind;
+  /** The model the failure named (`errorDetail.model`): OpenCode's rail tooltip names the model at its limit. */
+  model?: string;
 }
 
 /** Sprint 155: one file a chat changed, and when its newest change finished. */
@@ -644,6 +646,7 @@ export function lastFailureOf(record: Pick<ConversationRecordV1, 'lifecycle' | '
       runtimeId: event.runtimeId as AgentId,
       kind: event.errorKind,
       ...(event.errorDetail?.limit ? { limit: event.errorDetail.limit } : {}),
+      ...(event.errorDetail?.model ? { model: event.errorDetail.model } : {}),
     };
   }
   return undefined;
@@ -659,6 +662,7 @@ export function decodeLastFailure(value: unknown): ConversationLastFailureV1 | u
     runtimeId: input.runtimeId as AgentId,
     kind: input.kind,
     ...(isLimitKind(input.limit) ? { limit: input.limit } : {}),
+    ...(typeof input.model === 'string' && input.model.trim() && input.model.length <= MAX_SAVED_MODEL_ID_CHARS ? { model: input.model } : {}),
   };
 }
 
