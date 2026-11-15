@@ -320,7 +320,8 @@ export function SheetGrid({
         if (a && (a.wrap || a.rotation || a.shrink)) continue
         const h = horizontalOf(cell, style)
         if (h === 'justify') continue
-        const width = measure(cell.text, fontShorthand(style?.font, base)) + 2 * CELL_PADDING + (a?.indent ?? 0) * 9
+        const shown = cell.pad ? cell.pad[0] + cell.text + cell.pad[1] : cell.text
+        const width = measure(shown, fontShorthand(style?.font, base)) + 2 * CELL_PADDING + (a?.indent ?? 0) * 9
         const avail = layout.colW[c]
         if (width <= avail + 0.5) continue
         if (cell.kind !== 's') {
@@ -652,6 +653,14 @@ export function SheetGrid({
               {run.text}
             </span>
           ))}
+        </span>
+      )
+    } else if (cell.pad) {
+      inner = (
+        <span>
+          <span className="sg-pad">{cell.pad[0]}</span>
+          {cell.text}
+          <span className="sg-pad">{cell.pad[1]}</span>
         </span>
       )
     } else inner = <span>{cell.text}</span>

@@ -106,6 +106,7 @@ export function modelSource(model: WorkbookModel): SheetSource {
       const out = formatCellValue(value, codeOf(model, s), model.date1904)
       const cell: CellModel = { kind: typeof value === 'number' ? 'n' : 's', value, text: out.text, s }
       if (out.color) cell.color = out.color
+      if (out.pad) cell.pad = out.pad
       sheet.cells.set(key, cell)
       if (row > sheet.maxR) sheet.maxR = row
       if (col > sheet.maxC) sheet.maxC = col

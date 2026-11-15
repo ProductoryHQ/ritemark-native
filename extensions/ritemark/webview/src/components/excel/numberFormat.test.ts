@@ -25,6 +25,17 @@ assert.equal(text(0.257, '0.0%'), '25.7%')
 assert.deepEqual(formatCellValue(-360, '#,##0.00 "€";[Red]-#,##0.00 "€"'), { text: '-360.00 €', color: '#FF0000' })
 // accounting: zero as a dash
 assert.match(text(0, '_-* #,##0.00 €_-;-* #,##0.00 €_-;_-* "-"?? €_-;_-@_-'), /^\s*-\s+€\s*$/)
+// `_x` at either end is a gap as wide as x (Excel leaves the width of "-" for `_-`), kept beside the text, not in it
+{
+  const acc = '_-* #,##0.00\\ "€"_-;\\-* #,##0.00\\ "€"_-;_-* "-"??\\ "€"_-;_-@_-'
+  assert.deepEqual(formatCellValue(23904, acc), { text: '23,904.00 €', pad: ['-', '-'] })
+  assert.deepEqual(formatCellValue(-5, acc), { text: '-5.00 €', pad: ['', '-'] })
+  assert.deepEqual(formatCellValue('Booked', acc), { text: 'Booked', pad: ['-', '-'] })
+  assert.deepEqual(formatCellValue(1234.5, '#,##0.00_);(#,##0.00)'), { text: '1,234.50', pad: ['', ')'] })
+  // one in the middle stays a space
+  assert.equal(text(7, '0_x"a"'), '7 a')
+  assert.deepEqual(formatCellValue(7, '0'), { text: '7' })
+}
 // General keeps up to 11 significant characters, as Excel does
 assert.equal(text(0.1 + 0.2, 'General'), '0.3')
 assert.equal(text(123456789012, 'General'), '1.23457E+11')

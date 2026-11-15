@@ -33,6 +33,8 @@ export interface CellModel {
   text: string
   /** A colour the number format asks for ([Red] …). */
   color?: string
+  /** Gaps the number format leaves before and after the text (`_-`): as wide as these characters. */
+  pad?: [string, string]
   /** The cell style's index (`s`). */
   s: number
   /** The formula without its "=", when the cell has one. */
@@ -407,6 +409,7 @@ async function readWorksheet(
         const out = formatCellValue(value, formatCode(model.styles.xfNumFmt[s] ?? 0, model.styles.numFmts), model.date1904)
         cell.text = out.text
         if (out.color) cell.color = out.color
+        if (out.pad) cell.pad = out.pad
       }
       sheet.cells.set(cellKey(r, c), cell)
       if (r > sheet.maxR) sheet.maxR = r

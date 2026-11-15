@@ -39,6 +39,9 @@ async function main() {
     const win = columnScale(calibri, 'windows')
     for (const [chars, points] of [[34, 204], [12, 72], [14, 84], [12.5, 75], [10, 60]]) assert.equal(mac.pixels(chars), Math.round((points * 4) / 3), `${chars} characters`)
     assert.equal(mac.defaultPixels(undefined, 8), Math.round((53 * 4) / 3))
+    // the timesheet's Normal font is Aptos Narrow: 5.3 pt, rounded up to 6 as Excel for Mac does; A 69, B 33, H 276
+    const narrow = columnScale({ name: 'Aptos Narrow', size: 11 }, 'mac')
+    for (const [chars, points] of [[11.5, 69], [5.5, 33], [46, 276]]) assert.equal(narrow.pixels(chars), Math.round((points * 4) / 3), `${chars} characters`)
     assert.equal(win.pixels(12.5), 87)
     assert.equal(win.defaultPixels(undefined, 8), 64)
   }

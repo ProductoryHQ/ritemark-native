@@ -45,6 +45,9 @@ export function formatCode(id: number, custom: ReadonlyMap<number, string>): str
 }
 
 const OPTIONS = { locale: 'en', throws: false, leap1900: true, nbsp: false } as const
+/** numfmt marks each `_x` with this before x, so the cell can leave a gap as wide as x, as Excel does. */
+const SKIP = '\uE000'
+const PAD_OPTIONS = { ...OPTIONS, skipChar: SKIP } as const
 
 /** Days between the 1904 and the 1900 date systems. */
 const DATE_1904_OFFSET = 1462
@@ -53,6 +56,27 @@ export interface FormattedValue {
   text: string
   /** A colour the format asks for ([Red] …), as CSS. */
   color?: string
+  /** The format's `_x` at the text's start and end (accounting's `_-`, `_)`): gaps as wide as these characters,
+   *  drawn but not seen. Not part of `text`, so a copy doesn't carry them. */
+  pad?: [string, string]
+}
+
+/** A `_x` at either end becomes a pad of x's width; one in the middle a space, as numfmt writes it otherwise. */
+function withPads(out: string): Pick<FormattedValue, 'text' | 'pad'> {
+  if (!out.includes(SKIP)) return { text: out }
+  let start = ''
+  let end = ''
+  let s = out
+  while (s.startsWith(SKIP) && s.length > 1) {
+    start += s[1]
+    s = s.slice(2)
+  }
+  while (s.length > 1 && s[s.length - 2] === SKIP) {
+    end = s[s.length - 1] + end
+    s = s.slice(0, -2)
+  }
+  const text = s.split(SKIP).map((part, i) => (i === 0 ? part : ' ' + part.slice(1))).join('')
+  return start || end ? { text, pad: [start, end] } : { text }
 }
 
 /** A cell's text as Excel draws it. Numbers that can't be formatted fall back to their plain digits. */
@@ -62,19 +86,19 @@ export function formatCellValue(value: CellValue | boolean, code: string, date19
   if (typeof value === 'string') {
     // a text section (`…;…;…;@`) applies to text; any other format leaves it as it is
     if (code !== 'General' && code.includes('@')) {
-      const out = numfmt.format(code, value, OPTIONS)
-      return { text: typeof out === 'string' ? out : value }
+      const out = numfmt.format(code, value, PAD_OPTIONS)
+      return typeof out === 'string' ? withPads(out) : { text: value }
     }
     return { text: value }
   }
   const isDate = numfmt.isDateFormat(code)
   const v = isDate && date1904 ? value + DATE_1904_OFFSET : value
-  const out = numfmt.format(code, v, OPTIONS)
-  const text = typeof out === 'string' ? out : String(value)
+  const out = numfmt.format(code, v, PAD_OPTIONS)
+  const formatted = typeof out === 'string' ? withPads(out) : { text: String(value) }
   const colour = /\[(red|blue|green|black|white|yellow|magenta|cyan|color\s*\d+)\]/i.test(code)
     ? numfmt.formatColor(code, v, OPTIONS)
     : null
-  return colour && typeof colour === 'string' ? { text, color: EXCEL_COLOURS[colour.toLowerCase()] ?? colour } : { text }
+  return colour && typeof colour === 'string' ? { ...formatted, color: EXCEL_COLOURS[colour.toLowerCase()] ?? colour } : formatted
 }
 
 /** Excel's named format colours, which differ from CSS's names ([Green] is #00FF00, CSS green #008000). */

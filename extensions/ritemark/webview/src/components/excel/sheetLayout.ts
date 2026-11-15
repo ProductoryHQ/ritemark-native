@@ -12,9 +12,10 @@ import { cellKey, type SheetModel } from './readWorkbook'
 
 /** Header row height and the frame's look (experience 47, decision 9). */
 export const HEADER_HEIGHT = 22
-/** Cell text inset each side, in pixels: about Excel's at 100 % (the Experience lead, 15 November: 1 px ran
- *  "8:15" into "Müük"). */
-export const CELL_PADDING = 2
+/** Cell text inset each side, in pixels: Excel for Mac's at 100 %. Measured on the training budget against Excel's
+ *  window, text starts 0.25–0.9 pt further in there than at 2 px (Sprint 158 PR 4); 1 px ran "8:15" into "Müük"
+ *  (the Experience lead, 15 November). */
+export const CELL_PADDING = 3
 
 export interface SheetLayout {
   /** Drawn rows and columns. */

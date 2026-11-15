@@ -119,6 +119,9 @@
 .sg-eraser { background: #ffffff; z-index: 1; }
 .sg-border { z-index: 2; pointer-events: none; }
 
+/* a number format's `_-`: a gap as wide as the character, as Excel leaves */
+.sg-pad { visibility: hidden; }
+
 .sg-text {
   z-index: 3;
   display: flex;
