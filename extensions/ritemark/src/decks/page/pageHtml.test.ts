@@ -169,6 +169,14 @@ assert.deepEqual(scanText(html), []);
   const before = ticks(exercise);
   assert.equal(before.length, 2);
   assert.deepEqual(ticks('```slide title\ntitle: A new first slide\n```\n\n' + exercise), before);
+  // Two exercises with one title and the same step keep their ticks apart (round 2), and so do the text before the
+  // first slide and a slide titled like it.
+  const twins = ticks('```slide exercise\ntitle: Your turn\n```\n\n1. Open the file\n\n```slide exercise\ntitle: Your turn\n```\n\n1. Open the file\n');
+  assert.equal(twins.length, 2);
+  assert.notEqual(twins[0], twins[1]);
+  const preamble = ticks('- [ ] Open the file\n\n```slide points\ntitle: preamble\n```\n\n- [ ] Open the file\n');
+  assert.equal(preamble.length, 2);
+  assert.notEqual(preamble[0], preamble[1]);
 }
 
 // No handout text can open a tag on the page (the security review of PR 3). In marked's raw mode, after an inline
@@ -236,6 +244,13 @@ assert.equal(pictureFile('images/a%23b.png?v=2#top', 'handout'), 'images/a#b.png
 assert.equal(pictureFile('images/my picture.png', 'handout'), 'images/my picture.png');
 assert.equal(pictureFile('images/50%off.png', 'handout'), 'images/50%off.png', 'a stray % stays');
 assert.equal(pictureFile('images/Q%26A.png', 'slide'), 'images/Q%26A.png');
+// As a browser reads the address: %2E%2E is .., but an encoded separator never becomes one (round 2).
+assert.equal(pictureFile('%2E%2E/shared/x.png', 'handout'), '../shared/x.png');
+assert.equal(pictureFile('images/a%2Fb.png', 'handout'), 'images/a%2Fb.png');
+assert.equal(pictureFile('images/a%5Cb.png', 'handout'), 'images/a%5Cb.png');
+// A slide's path as the deck view reads it: a backslash separates folders on Windows only.
+assert.equal(pictureFile('pics\\a.png', 'slide', 'darwin'), 'pics\\a.png');
+assert.equal(pictureFile('pics\\a.png', 'slide', 'win32'), 'pics/a.png');
 assert.equal(pictureAddress('images/Q&A.png'), 'images/Q%26A.png');
 assert.equal(pictureAddress('images/a#b?.png'), 'images/a%23b%3F.png');
 assert.equal(pictureAddress('images/my picture.png'), 'images/my%20picture.png');

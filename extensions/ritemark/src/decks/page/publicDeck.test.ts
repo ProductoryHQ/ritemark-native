@@ -59,6 +59,8 @@ assert.equal(publicDeck('---\ndeck: 1\n---\n\n<!-- only a note -->\n\n```slide t
   const unclosed = publicDeck('---\ndeck: 1\ntheme: Slide library/Themes/SECRETTHEME.theme.md\n\n```slide title\ntitle: T\n```\n', options);
   assert.equal(unclosed.preamble, '');
   assert.equal(unclosed.slides.length, 1);
+  // An empty front matter (--- twice) is closed: the text after it goes (round 2).
+  assert.equal(publicDeck('---\n---\nHello public intro\n\n```slide points\ntitle: P\n```\n', options).preamble, 'Hello public intro');
 }
 
 // A deck with no title slide shown takes its name; a skipped title slide's title stays private.

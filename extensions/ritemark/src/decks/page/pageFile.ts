@@ -21,7 +21,7 @@ import * as path from 'node:path';
 import { marked } from 'marked';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import type { DeckTheme } from '../deckTheme';
-import { DIGEST_META, GENERATOR_META, lexHandout, pageHtml, pictureAddress, pictureFile, type PageAssets, type PictureFrom } from './pageHtml';
+import { DIGEST_META, GENERATOR_META, lexHandout, pageHtml, pictureAddress, pictureFile, pictureKey, type PageAssets, type PictureFrom } from './pageHtml';
 import { deckDigest, publicDeck, type PublicDeck } from './publicDeck';
 
 export interface PageFs {
@@ -139,7 +139,7 @@ export async function removeDeckPage(pageFs: PageFs, pagePath: string, digest: s
 export function picturePaths(deck: PublicDeck): Array<{ path: string; from: PictureFrom }> {
   const found = new Map<string, { path: string; from: PictureFrom }>();
   const add = (picture: string, from: PictureFrom) => {
-    if (isRelativeTarget(picture)) found.set(`${from}\u0000${picture.trim()}`, { path: picture.trim(), from });
+    if (isRelativeTarget(picture)) found.set(pictureKey(picture, from), { path: picture.trim(), from });
   };
   for (const slide of deck.slides) if (slide.data.image) add(slide.data.image, 'slide');
   for (const markdown of [deck.preamble, ...deck.slides.map(slide => slide.handout)]) {
@@ -154,16 +154,16 @@ export function picturePaths(deck: PublicDeck): Array<{ path: string; from: Pict
 /** The pictures the page names that are files beside the deck, by where they are named: their addresses on the page. */
 async function foundPictures(deck: PublicDeck, deckPath: string, pageFs: Pick<PageFs, 'stat'>): Promise<Map<string, string>> {
   const folder = path.dirname(deckPath);
-  const found = new Map<string, string>();
-  for (const picture of picturePaths(deck)) {
+  const checked = await Promise.all(picturePaths(deck).map(async picture => {
     const file = pictureFile(picture.path, picture.from);
     try {
-      if ((await pageFs.stat(path.resolve(folder, ...file.split('/')))).isFile()) found.set(`${picture.from}\u0000${picture.path}`, pictureAddress(file));
+      return (await pageFs.stat(path.resolve(folder, ...file.split('/')))).isFile() ? [pictureKey(picture.path, picture.from), pictureAddress(file)] as const : null;
     } catch {
       // Not there: the slide draws its empty picture place, the handout the picture's words.
+      return null;
     }
-  }
-  return found;
+  }));
+  return new Map(checked.filter((entry): entry is readonly [string, string] => entry !== null));
 }
 
 /**
@@ -198,7 +198,7 @@ export async function buildDeckPage(
   const deck = publicDeckOf(input.deckPath, input.text, input.theme, input.steps);
   const urls = await foundPictures(deck, input.deckPath, pageFs);
   const digest = pageDigest(deck, urls.values());
-  const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(`${from}\u0000${picture.trim()}`) ?? null });
+  const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null });
   return { deck, digest, html };
 }
 

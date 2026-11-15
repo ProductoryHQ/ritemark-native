@@ -507,29 +507,33 @@ function fencesOf(text: string, from: number): Fence[] {
   return fences;
 }
 
-function frontMatterOf(text: string): { version: string | null; theme: string | null; end: number } {
+/** The front matter's values, in order, and where the body starts; null when the text has no front matter. */
+function frontMatterEntries(text: string): { entries: Array<[string, string]>; end: number } | null {
   const match = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(text);
-  if (!match) return { version: null, theme: null, end: 0 };
-  let version: string | null = null;
-  let theme: string | null = null;
+  if (!match) return null;
+  const entries: Array<[string, string]> = [];
   for (const line of match[1].split(/\r?\n/)) {
     const key = KEY_LINE.exec(line);
-    if (!key) continue;
-    if (key[1] === 'deck') version = readScalar(key[2] ?? '');
-    if (key[1] === 'theme') theme = readScalar(key[2] ?? '');
+    if (key) entries.push([key[1], readScalar(key[2] ?? '')]);
   }
-  return { version, theme, end: match[0].length };
+  return { entries, end: match[0].length };
+}
+
+function frontMatterOf(text: string): { version: string | null; theme: string | null; end: number } {
+  const front = frontMatterEntries(text);
+  if (!front) return { version: null, theme: null, end: 0 };
+  let version: string | null = null;
+  let theme: string | null = null;
+  for (const [key, value] of front.entries) {
+    if (key === 'deck') version = value;
+    if (key === 'theme') theme = value;
+  }
+  return { version, theme, end: front.end };
 }
 
 /** One of the front matter's values (`look`, say), read as `parseDeck` reads `deck` and `theme`; null when absent. */
 export function frontMatterField(text: string, name: string): string | null {
-  const match = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(text);
-  if (!match) return null;
-  for (const line of match[1].split(/\r?\n/)) {
-    const key = KEY_LINE.exec(line);
-    if (key && key[1] === name) return readScalar(key[2] ?? '');
-  }
-  return null;
+  return frontMatterEntries(text)?.entries.find(([key]) => key === name)?.[1] ?? null;
 }
 
 /** The info string's kind: `slide boxes` → `boxes`; null when the block is no slide. */

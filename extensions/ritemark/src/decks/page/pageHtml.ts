@@ -66,16 +66,25 @@ const esc = escapeHtml;
  * path, as the deck view reads it; a handout's picture is a Markdown address, so its `?…` and `#…` are no part of the
  * file and each of its folders and name is decoded (`%20`, `%26`, `%23` alike).
  */
-export function pictureFile(path: string, from: PictureFrom): string {
-  const trimmed = path.trim().replace(/\\/g, '/');
-  if (from === 'slide') return trimmed;
+export function pictureFile(path: string, from: PictureFrom, platform: NodeJS.Platform = process.platform): string {
+  const trimmed = path.trim();
+  // The deck view reads a slide's path with the system's own rules: a backslash separates folders on Windows only.
+  if (from === 'slide') return platform === 'win32' ? trimmed.replace(/\\/g, '/') : trimmed;
+  // As a browser reads an address: a part decodes to its characters (`%2E%2E` to `..`, as the browser takes it), but
+  // never into a folder separator, which an encoded `%2F` or `%5C` is not.
   return trimmed.split(/[?#]/)[0].split('/').map(part => {
     try {
-      return decodeURIComponent(part);
+      const decoded = decodeURIComponent(part);
+      return /[\\/]/.test(decoded) ? part : decoded;
     } catch {
       return part;
     }
   }).join('/');
+}
+
+/** One key for a picture by its path as written and where it is named (the page's lookups all use it). */
+export function pictureKey(path: string, from: PictureFrom): string {
+  return `${from}\u0000${path.trim()}`;
 }
 
 /** A file's address on the page, beside the deck: each folder and the name encoded, so any character reads back. */
@@ -228,7 +237,8 @@ export function handoutHtml(markdown: string, options: { partKey: string; exerci
   if (!markdown.trim()) return '';
   const renderer = new HandoutRenderer(options.partKey, options.pictureUrl);
   const tokens = lexHandout(markdown);
-  const parser = new marked.Parser({ ...MARKED_OPTIONS, tokenizer: handoutTokenizer(), renderer });
+  // The parser only renders tokens; the lexer above is where the handout is read, and the one place raw mode is kept out.
+  const parser = new marked.Parser({ ...MARKED_OPTIONS, renderer });
   let out = '';
   tokens.forEach((token: Token, index: number) => {
     if (token.type === 'list' && token.ordered && options.exercise) {
@@ -420,11 +430,10 @@ function fontFaces(fonts: PageFont[]): string {
 const titleOf = (slide: PublicSlide) => (slide.data.title ?? '').trim();
 
 /** The text column's part for one shown slide. */
-function partHtml(slide: PublicSlide, index: number, options: PageOptions): string {
+function partHtml(slide: PublicSlide, index: number, options: PageOptions, partKey: string): string {
   const number = index + 1;
   const title = titleOf(slide);
-  // A tick's id is the part's title and the step's words, never its place: a slide added before it keeps its ticks.
-  const body = handoutHtml(slide.handout, { partKey: title || `Slide ${number}`, exercise: slide.kind === 'exercise', pictureUrl: options.pictureUrl });
+  const body = handoutHtml(slide.handout, { partKey, exercise: slide.kind === 'exercise', pictureUrl: options.pictureUrl });
   if (slide.kind === 'section') {
     const label = `Section${slide.data.number?.trim() ? ` ${slide.data.number.trim()}` : ''}`;
     return `<section class="part sect" data-i="${index}" id="s${number}"><div class="eyebrow">${esc(label)}</div>${title ? `<h2>${esc(title)}</h2>` : ''}\n${body}</section>`;
@@ -476,8 +485,16 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     return `<div class="layer${index === 0 ? ' on' : ''}" data-title="${esc(titleOf(slide))}">${markup}</div>`;
   });
   const first = deck.slides[0];
-  const preamble = handoutHtml(deck.preamble, { partKey: 'pre', exercise: false, pictureUrl: options.pictureUrl });
-  const parts = deck.slides.map((slide, index) => partHtml(slide, index, options));
+  const preamble = handoutHtml(deck.preamble, { partKey: 'preamble', exercise: false, pictureUrl: options.pictureUrl });
+  // A tick's id is its part's title (with which part of that title it is) and the step's words, never the part's place:
+  // a slide added before an exercise keeps its ticks, and two exercises with one title keep theirs apart.
+  const titles = new Map<string, number>();
+  const parts = deck.slides.map((slide, index) => {
+    const title = titleOf(slide);
+    const nth = (titles.get(title) ?? 0) + 1;
+    titles.set(title, nth);
+    return partHtml(slide, index, options, `part\u0000${title}\u0000${nth}`);
+  });
   const who = `<div class="who"><b>${esc(deck.client)}</b><span>${esc(deck.title)}</span></div>`;
   const foot = [deck.client, deck.title].filter(Boolean).map(esc).join(' · ');
   return [

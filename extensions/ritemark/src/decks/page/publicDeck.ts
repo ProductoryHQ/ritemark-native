@@ -258,8 +258,9 @@ function stepOf(steps: readonly number[] | undefined, index: number): number {
 
 /** What of this deck goes public on its handout page. */
 export function publicDeck(input: string, options: PublicDeckOptions): PublicDeck {
-  // A file saved with a byte-order mark: the front matter is still the front matter.
-  const text = input.replace(/^\uFEFF/, '');
+  // A file saved with a byte-order mark: the front matter is still the front matter. An empty front matter (`---` twice)
+  // holds nothing, and is no part of the text before the first slide.
+  const text = input.replace(/^\uFEFF/, '').replace(/^---[ \t]*\r?\n---[ \t]*(?:\r?\n|$)/, '');
   const parsed = parseDeck(text);
   const slides: PublicSlide[] = [];
   parsed.slides.forEach((block, index) => {
