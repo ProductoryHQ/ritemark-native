@@ -7,7 +7,7 @@ import assert from 'node:assert/strict'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readWorkbook } from './readWorkbook'
+import { cellKey, readWorkbook } from './readWorkbook'
 import { modelSource } from './sheetSource'
 
 const repo = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../../../..')
@@ -72,6 +72,21 @@ async function main() {
     const after = source.extract(source.initial)
     assert.equal(after.rows.length, before.rows.length + 1)
     assert.equal(after.columns.length, before.columns.length + 1)
+  }
+
+  // a cell typed into an empty spot takes its column's style, as the save writes it (review of #726)
+  {
+    const source = await open('training-budget.xlsx')
+    const sheet = source.model!.sheets[0]
+    sheet.layout.cols.push({ min: 12, max: 12, hidden: false, style: sheet.cells.get(cellKey(5, 2))!.s })
+    assert.equal(source.valueFor(sheet.name, 40, 12, '14'), 14)
+    source.write(sheet.name, 40, 12, 14)
+    const cell = sheet.cells.get(cellKey(40, 12))!
+    assert.equal(cell.s, sheet.cells.get(cellKey(5, 2))!.s, 'the column style')
+    assert.match(cell.text, /14\.00 €/, 'drawn in the column format')
+    // and with no row or column style, the default
+    source.write(sheet.name, 40, 20, 'x')
+    assert.equal(sheet.cells.get(cellKey(40, 20))!.s, 0)
   }
 
   console.log('sheetSource: all passed')

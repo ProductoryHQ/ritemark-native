@@ -147,7 +147,7 @@ export function SheetGrid({
   useEffect(() => {
     setSortState(null)
     setEditing(null)
-    setReach({ rows: 0, cols: 0 })
+    setReach({ sheet: sheet.name, rows: 0, cols: 0 })
     setSelected({ i: sheet.layout.frozen.rows, c: sheet.layout.frozen.cols })
     scroller.current?.scrollTo(0, 0)
   }, [sheet])
@@ -165,10 +165,23 @@ export function SheetGrid({
   // The sheet goes on past the paper's edge, as Excel's does: there is no Add row or + column (Sprint 158 PR 5).
   // A scroll to the grid's end, or a cell chosen near it, adds rows and columns, up to Excel's 1,048,576 by 16,384.
   // Typing into one writes that cell, and the sheet's used range grows to take it in.
-  const [reach, setReach] = useState({ rows: 0, cols: 0 })
+  // kept with its sheet's name, so a newly chosen sheet is never laid out with another sheet's reach
+  const [reachOf, setReach] = useState({ sheet: sheet.name, rows: 0, cols: 0 })
+  const reach = reachOf.sheet === sheet.name ? reachOf : { sheet: sheet.name, rows: 0, cols: 0 }
   const growBy = useCallback((rows: number, cols: number) => {
-    setReach((r) => ({ rows: Math.min(1_048_576, Math.max(r.rows, layoutRef.current.rows) + rows), cols: Math.min(16_384, Math.max(r.cols, layoutRef.current.cols) + cols) }))
+    setReach((r) => {
+      const from = r.sheet === sheetName.current ? r : { sheet: sheetName.current, rows: 0, cols: 0 }
+      const next = {
+        sheet: sheetName.current,
+        rows: Math.min(1_048_576, Math.max(from.rows, layoutRef.current.rows) + rows),
+        cols: Math.min(16_384, Math.max(from.cols, layoutRef.current.cols) + cols),
+      }
+      // nothing grew (a sheet already at Excel's last row or column): keep the state, so the layout isn't rebuilt
+      return next.sheet === r.sheet && next.rows === r.rows && next.cols === r.cols ? r : next
+    })
   }, [])
+  const sheetName = useRef(sheet.name)
+  sheetName.current = sheet.name
 
   const frame = useRef(0)
   const onScroll = useCallback(() => {
@@ -257,7 +270,7 @@ export function SheetGrid({
       }),
     // the grid grows by whole screens, so a resize by a few pixels doesn't lay the sheet out again
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sheet, styles, version, Math.ceil(viewport.w / 400), Math.ceil(viewport.h / 400), reach, sort, autoHeight],
+    [sheet, styles, version, Math.ceil(viewport.w / 400), Math.ceil(viewport.h / 400), reach.rows, reach.cols, sort, autoHeight],
   )
 
   const layoutRef = useRef(layout)
