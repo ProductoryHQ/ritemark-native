@@ -1,0 +1,26 @@
+#!/bin/bash
+# The edge of technical plan §3: a window closed on the Slide library, the flag turned off meanwhile, then a start.
+# The flag goes off the moment the page unloads (Reload Window), so the closing window has stored the Slide library
+# as its place and the new window reads the flag off from its start. Then the left column is followed for 15 s.
+# Usage: edge-run.sh <port> <profile dir> <out dir>
+S=$(dirname "$0")  # this folder, with cdp.mjs, flag-at-unload.mjs and sample-left.mjs
+export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
+PORT=$1
+PROFILE=$2
+OUT=$3
+mkdir -p "$OUT"
+node -e "const fs=require('fs');const p='$PROFILE/User/settings.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j['ritemark.features.decks']=true;fs.writeFileSync(p,JSON.stringify(j,null,1));"
+sleep 3
+XY=$(node "$S/cdp.mjs" "$PORT" eval "(() => { const a = [...document.querySelectorAll('.part.sidebar .composite-bar .action-item .action-label')].find(e => (e.getAttribute('aria-label')||'').startsWith('Slide library')); if (!a) return ''; const r = a.getBoundingClientRect(); return (r.x + r.width/2) + ' ' + (r.y + r.height/2); })()" | tr -d '"')
+echo "slide library at: $XY"
+node "$S/cdp.mjs" "$PORT" click $XY
+sleep 2
+echo "before: $(node "$S/cdp.mjs" "$PORT" places)"
+node "$S/cdp.mjs" "$PORT" shot "$OUT/before-reload.png" > /dev/null
+node "$S/flag-at-unload.mjs" "$PORT" "$PROFILE/User/settings.json" false &
+WATCH=$!
+sleep 0.3
+node "$S/cdp.mjs" "$PORT" cmd "Developer: Reload Window"
+wait $WATCH
+node "$S/sample-left.mjs" "$PORT" 15 "$OUT/after-reload"
+echo "settings: $(grep decks "$PROFILE/User/settings.json")"
