@@ -19,7 +19,9 @@ import {
 } from '../runtime/runtimeErrorPresentation';
 import {
   decodeRuntimeErrorDetail,
+  isLimitKind,
   isRuntimeErrorKind,
+  type LimitKind,
   type RuntimeErrorDetail,
   type RuntimeErrorKind,
 } from '../runtime/turnFailureCopy';
@@ -249,6 +251,22 @@ export interface ConversationSummaryV1 {
    * and All chats read it from the index, without opening each record.
    */
   changedFiles?: ConversationChangedFileV1[];
+  /**
+   * Sprint 160 (#686): how the chat's last turn failed, while the chat is
+   * interrupted by that failure (see {@link lastFailureOf}). The rail and the
+   * chat list say "Limit reached" for a usage limit instead of "Interrupted".
+   * Absent for any other state, for a failure with no kind (a chat from 2.0),
+   * and in an index written before Sprint 160. Older builds drop it.
+   */
+  lastFailure?: ConversationLastFailureV1;
+}
+
+/** Sprint 160 (#686): the kind of the failure that ended a chat's last turn, and whose turn it was. */
+export interface ConversationLastFailureV1 {
+  runtimeId: AgentId;
+  kind: RuntimeErrorKind;
+  /** For `limit`: what ran out (`errorDetail.limit`). */
+  limit?: LimitKind;
 }
 
 /** Sprint 155: one file a chat changed, and when its newest change finished. */
@@ -607,6 +625,44 @@ export function decodeChangedFiles(value: unknown): ConversationChangedFileV1[] 
 }
 
 /**
+ * Sprint 160 (#686): the failure that interrupted the chat, read from the
+ * failed turn's ending event (`errorKind`, `errorDetail.limit`). Only while
+ * the lifecycle says the turn failed: a later turn, a stop or a restart
+ * clears it.
+ */
+export function lastFailureOf(record: Pick<ConversationRecordV1, 'lifecycle' | 'events'>): ConversationLastFailureV1 | undefined {
+  const { lifecycle } = record;
+  if (lifecycle.state !== 'interrupted' || lifecycle.reason !== 'failed' || !lifecycle.turnId) return undefined;
+  for (let index = record.events.length - 1; index >= 0; index -= 1) {
+    const event = record.events[index];
+    if (event.turnId !== lifecycle.turnId) continue;
+    const failed = (event.kind === 'assistant-message' && event.terminalStatus === 'failed')
+      || (event.kind === 'boundary' && event.boundaryKind === 'failed');
+    if (!failed) continue;
+    if (!event.errorKind || !AGENT_RUNTIME_IDS.has(event.runtimeId as AgentId)) return undefined;
+    return {
+      runtimeId: event.runtimeId as AgentId,
+      kind: event.errorKind,
+      ...(event.errorDetail?.limit ? { limit: event.errorDetail.limit } : {}),
+    };
+  }
+  return undefined;
+}
+
+/** Sprint 160 (#686): the summary's last failure, read leniently from an index entry. */
+export function decodeLastFailure(value: unknown): ConversationLastFailureV1 | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const input = value as Record<string, unknown>;
+  if (typeof input.runtimeId !== 'string' || !AGENT_RUNTIME_IDS.has(input.runtimeId as AgentId)) return undefined;
+  if (!isRuntimeErrorKind(input.kind)) return undefined;
+  return {
+    runtimeId: input.runtimeId as AgentId,
+    kind: input.kind,
+    ...(isLimitKind(input.limit) ? { limit: input.limit } : {}),
+  };
+}
+
+/**
  * Sprint 155: which chat last changed this file, and when. `samePath` decides
  * whether a stored path names the file (the host compares real paths).
  */
@@ -913,6 +969,7 @@ export function summarizeConversationRecord(record: ConversationRecordV1, verifi
   const firstMessage = record.events.find((event): event is UserMessageEventV1 => event.kind === 'user-message')?.text;
   const titleIsFirstMessage = Boolean(firstMessage?.trim()) && record.title === fallbackTitleFromPrompt(firstMessage!);
   const changedFiles = changedFilesOf(record.events);
+  const lastFailure = lastFailureOf(record);
   return {
     conversationId: record.conversationId,
     scopeId: record.scopeId,
@@ -930,5 +987,6 @@ export function summarizeConversationRecord(record: ConversationRecordV1, verifi
     ...(lastReplyAt ? { lastReplyAt } : {}),
     ...(titleIsFirstMessage ? { titleIsFirstMessage: true as const } : {}),
     ...(changedFiles.length ? { changedFiles } : {}),
+    ...(lastFailure ? { lastFailure } : {}),
   };
 }
