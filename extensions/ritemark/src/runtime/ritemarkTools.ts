@@ -378,7 +378,7 @@ export function createBoardToolGroup(controller: () => BoardController | null): 
             },
             ACTOR_OF_RUNTIME[context.runtimeId],
           );
-          return answerText(answer, `Updated card ${String(args.card_id)}.`);
+          return answerText(answer, 'Updated the card.');
         },
       },
       {
