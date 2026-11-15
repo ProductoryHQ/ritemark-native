@@ -33,6 +33,12 @@ export interface DataTableProps {
   /** Sprint 158 (#711): told whether the cell being typed in holds a formula (the typing replaces it), and false
    *  when no cell is being edited. */
   onEditingFormulaChange?: (editingFormula: boolean) => void
+  /** Sprint 158 PR 2: each data row's number in the sheet (1-based), shown in the row-number column and the cell's
+   *  reference; a sheet with hidden rows leaves them out of `data`. Without it rows are numbered 1, 2, 3 … */
+  rowLabels?: number[]
+  /** Sprint 158 PR 2: what the formula bar shows and an edit starts with, when it differs from the drawn text (a
+   *  cell drawn "1,450.00 €" is edited as 1450, as in Excel). The row is the data's row. */
+  getCellInput?: (rowIndex: number, columnIndex: number) => string | undefined
   /** The columns have names (a CSV's header row), so the formula bar names the cell "Row 2 · Item";
    *  otherwise the columns are letters and it uses A1-style references (Excel). */
   namedColumns?: boolean
@@ -43,7 +49,7 @@ interface ActiveCell {
   columnIndex: number
 }
 
-export function DataTable({ data, columns, editable = false, onCellChange, onAddRow, onAddColumn, onRenameColumn, onDeleteColumn, onInsertRowAt, onDeleteRow, getCellFormula, onEditingFormulaChange, namedColumns = false }: DataTableProps) {
+export function DataTable({ data, columns, editable = false, onCellChange, onAddRow, onAddColumn, onRenameColumn, onDeleteColumn, onInsertRowAt, onDeleteRow, getCellFormula, onEditingFormulaChange, rowLabels, getCellInput, namedColumns = false }: DataTableProps) {
   const parentRef = useRef<HTMLDivElement>(null)
   const formulaRef = useRef<HTMLTextAreaElement>(null)
   const [formulaFocused, setFormulaFocused] = useState(false)
@@ -127,6 +133,13 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
     return value === null || value === undefined ? '' : String(value)
   }, [rows, columns])
 
+  // What an edit starts with and is compared against: the cell's input (its value as typed) when the grid has one
+  const getEditValue = useCallback((cell: ActiveCell): string => {
+    const row = rows[cell.rowPosition]
+    const input = row ? getCellInput?.(row.index, cell.columnIndex) : undefined
+    return input ?? getCellValue(cell)
+  }, [rows, getCellInput, getCellValue])
+
   const commitEdit = useCallback((nextCell?: ActiveCell | null) => {
     if (!editingCell) return
 
@@ -137,7 +150,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
       return
     }
 
-    const originalValue = getCellValue(editingCell)
+    const originalValue = getEditValue(editingCell)
     if (editValue !== originalValue && onCellChange) {
       onCellChange(row.index, columnId, editValue)
     }
@@ -146,13 +159,13 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
     if (nextCell) {
       setActiveCell(nextCell)
     }
-  }, [editingCell, rows, columns, editValue, getCellValue, onCellChange])
+  }, [editingCell, rows, columns, editValue, getEditValue, onCellChange])
 
   const cancelEdit = useCallback(() => {
     if (!editingCell) return
-    setEditValue(getCellValue(editingCell))
+    setEditValue(getEditValue(editingCell))
     setEditingCell(null)
-  }, [editingCell, getCellValue])
+  }, [editingCell, getEditValue])
 
   const setActiveAndFocus = useCallback((cell: ActiveCell) => {
     setActiveCell(cell)
@@ -174,11 +187,11 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
     editStartedByTyping.current = initialValue !== undefined
     setActiveCell(cell)
     setEditingCell(cell)
-    setEditValue(initialValue ?? getCellValue(cell))
-  }, [getCellValue])
+    setEditValue(initialValue ?? getEditValue(cell))
+  }, [getEditValue])
 
   const activeColumnId = activeCell ? columns[activeCell.columnIndex] : ''
-  const activeCellValue = activeCell ? getCellValue(activeCell) : ''
+  const activeCellValue = activeCell ? getEditValue(activeCell) : ''
   // Excel-style: a formula cell shows its formula in the fx bar (read-only —
   // there is no formula engine; editing the cell in the grid replaces the
   // formula with a plain value, which is the documented basic-editing scope).
@@ -196,7 +209,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
     ? '–'
     : namedColumns
       ? `Row ${activeCell.rowPosition + 1} · ${activeColumnId || '-'}`
-      : `${activeColumnId || '-'}${activeRowIndex + 1}`
+      : `${activeColumnId || '-'}${rowLabels?.[activeRowIndex] ?? activeRowIndex + 1}`
 
   // The value field is one line; while it has the keyboard it grows with its value up to 5 lines (120), then scrolls
   useLayoutEffect(() => {
@@ -603,7 +616,7 @@ export function DataTable({ data, columns, editable = false, onCellChange, onAdd
                       </Button>
                     </Tooltip>
                   ) : (
-                    virtualRow.index + 1
+                    rowLabels?.[row.index] ?? virtualRow.index + 1
                   )}
 
                   {onInsertRowAt && (

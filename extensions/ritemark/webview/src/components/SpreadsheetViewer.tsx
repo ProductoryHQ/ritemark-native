@@ -9,7 +9,9 @@ import { Icon } from './ui/Icon'
 import { sendToExtension, onMessage } from '../bridge'
 import type { DocumentSyncAction } from './header/DocumentSyncAction'
 import type { DocumentApplyTarget } from '../types/documentSync'
-import { cellValueFromText, isCellEdit, type CellEdit, type CellValue } from '../../../src/excel/cellEdit'
+import { isCellEdit, type CellEdit } from '../../../src/excel/cellEdit'
+import { readWorkbook } from './excel/readWorkbook'
+import { MAX_DISPLAY_ROWS, modelSource, sheetJsSource, type SheetSource } from './excel/sheetSource'
 
 export interface SpreadsheetViewerProps {
   content: string
@@ -34,79 +36,37 @@ export interface SpreadsheetViewerProps {
 interface ParsedData {
   columns: string[]
   rows: Record<string, unknown>[]
+  /** Each row's 1-based sheet row when hidden rows are left out (an .xlsx read by our reader). */
+  rowLabels?: number[]
   error?: string
 }
-
-const MAX_DISPLAY_ROWS = 10000
 const SIZE_WARNING_BYTES = 5 * 1024 * 1024 // 5MB
 
-/** Write one edit into SheetJS's sheet, as the grid shows it: a value only, any formula gone. */
-function writeSheetCell(worksheet: XLSX.WorkSheet, addr: string, value: CellValue) {
-  if (value === null || value === '') {
-    delete worksheet[addr]
-    return
-  }
-  // Replacing the whole cell object drops any formula the cell had: basic editing stores plain values only
-  worksheet[addr] = typeof value === 'number' ? { t: 'n', v: value } : { t: 's', v: value }
-  // Expand the used range when the edit lands outside it (e.g. in a leading blank row above the data)
-  const { r, c } = XLSX.utils.decode_cell(addr)
-  const range = XLSX.utils.decode_range(worksheet['!ref'] || addr)
-  range.s.r = Math.min(range.s.r, r)
-  range.s.c = Math.min(range.s.c, c)
-  range.e.r = Math.max(range.e.r, r)
-  range.e.c = Math.max(range.e.c, c)
-  worksheet['!ref'] = XLSX.utils.encode_range(range)
+/** Base64 from the host to bytes. */
+function bytesOf(base64: string): Uint8Array {
+  const binary = atob(base64)
+  const out = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i)
+  return out
 }
 
 /**
- * Extract a single sheet from a parsed workbook into table data.
- * Uses spreadsheet-letter columns (A, B, C…) and a full 1:1 grid
- * (blank rows included, first row NOT swallowed as a header) so that
- * row/column indexes map exactly to worksheet cell addresses for editing.
- *
- * The grid is always anchored at A1 — even when the sheet's used range
- * starts later (e.g. data begins at B3) — so the grid's row numbers and
- * column letters match Excel's actual addresses and leading blank
- * rows/columns are visible.
+ * Sprint 158 PR 2 (#711): an .xlsx is read by our reader (excel/readWorkbook.ts: number formats as Excel draws
+ * them, hidden rows, columns and sheets, the sheet it opens on); .xls, and a workbook our reader can't read, by
+ * SheetJS as before.
  */
-function extractSheet(workbook: XLSX.WorkBook, sheetName: string): ParsedData {
-  const worksheet = workbook.Sheets[sheetName]
-  if (!worksheet) {
-    return { columns: [], rows: [], error: 'Sheet not found in workbook' }
+async function openWorkbook(content: string, encoding: string | undefined, filename: string): Promise<SheetSource> {
+  const isXlsx = filename.toLowerCase().endsWith('.xlsx') && encoding === 'base64'
+  if (isXlsx) {
+    try {
+      return modelSource(await readWorkbook(bytesOf(content)))
+    } catch (error) {
+      console.warn('[Ritemark Excel] Falling back to SheetJS:', error)
+    }
   }
-
-  const ref = worksheet['!ref']
-  if (!ref) {
-    return { columns: [], rows: [] }
-  }
-
-  const range = XLSX.utils.decode_range(ref)
-  const columns: string[] = []
-  for (let c = 0; c <= range.e.c; c++) {
-    columns.push(XLSX.utils.encode_col(c))
-  }
-
-  const aoa = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
-    header: 1,
-    defval: '',
-    blankrows: true,
-    raw: false,
-    range: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: range.e }),
-  })
-
-  let rows = aoa.map(cells => {
-    const row: Record<string, unknown> = {}
-    columns.forEach((col, i) => {
-      row[col] = cells[i] ?? ''
-    })
-    return row
-  })
-
-  if (rows.length > MAX_DISPLAY_ROWS) {
-    rows = rows.slice(0, MAX_DISPLAY_ROWS)
-  }
-
-  return { columns, rows }
+  const workbook = XLSX.read(content, { type: encoding === 'base64' ? 'base64' : 'string', cellStyles: true })
+  if (workbook.SheetNames.length === 0) throw new Error('Workbook contains no sheets')
+  return sheetJsSource(workbook)
 }
 
 export function SpreadsheetViewer({
@@ -128,7 +88,7 @@ export function SpreadsheetViewer({
   const [showSizeWarning, setShowSizeWarning] = useState(false)
   const [proceedWithLargeFile, setProceedWithLargeFile] = useState(false)
   const [selectedSheet, setSelectedSheet] = useState<string>('')
-  const [cachedWorkbook, setCachedWorkbook] = useState<XLSX.WorkBook | null>(null)
+  const [source, setSource] = useState<SheetSource | null>(null)
   const [hasExcel, setHasExcel] = useState(false)
   const [parsedSyncTarget, setParsedSyncTarget] = useState<DocumentApplyTarget | undefined>()
 
@@ -146,9 +106,9 @@ export function SpreadsheetViewer({
 
   // Sprint 158 (#711): each edit sent to the host waits there for its check; a refused one puts the cell back.
   // Keyed by the edit's id: the sheet, the address and the cell as it was before.
-  const pendingEdits = useRef(new Map<number, { sheet: string; addr: string; previous: XLSX.CellObject | undefined }>())
+  const pendingEdits = useRef(new Map<number, { sheet: string; row: number; col: number; previous: unknown }>())
   const nextEditId = useRef(1)
-  const workbookRef = useRef<XLSX.WorkBook | null>(null)
+  const sourceRef = useRef<SheetSource | null>(null)
   const selectedSheetRef = useRef('')
   const loadId = xlsxLoad?.id ?? 0
   const loadEdits = useMemo(() => (xlsxLoad?.pendingEdits ?? []).filter(isCellEdit), [xlsxLoad])
@@ -180,22 +140,19 @@ export function SpreadsheetViewer({
       } else if (message.type === 'cellEditResult' && typeof message.id === 'number') {
         const pending = pendingEdits.current.get(message.id)
         pendingEdits.current.delete(message.id)
-        const workbook = workbookRef.current
-        if (message.ok || !pending || !workbook) return
+        const current = sourceRef.current
+        if (message.ok || !pending || !current) return
         // A later edit of the same cell is drawn and on its way: it decides what the cell shows, and if it is refused
         // too, the cell goes back to what it held before this one
         for (const [id, other] of pendingEdits.current) {
-          if (id > (message.id as number) && other.sheet === pending.sheet && other.addr === pending.addr) {
+          if (id > (message.id as number) && other.sheet === pending.sheet && other.row === pending.row && other.col === pending.col) {
             other.previous = pending.previous
             return
           }
         }
         // Refused (the host said why): put the cell back as it was
-        const worksheet = workbook.Sheets[pending.sheet]
-        if (!worksheet) return
-        if (pending.previous) worksheet[pending.addr] = pending.previous
-        else delete worksheet[pending.addr]
-        if (pending.sheet === selectedSheetRef.current) setParsedData(extractSheet(workbook, pending.sheet))
+        current.restore(pending.sheet, pending.row, pending.col, pending.previous)
+        if (pending.sheet === selectedSheetRef.current) setParsedData(current.extract(pending.sheet))
       }
     })
 
@@ -228,66 +185,60 @@ export function SpreadsheetViewer({
     return () => cancelAnimationFrame(frame)
   }, [parsedSyncTarget, onDocumentApplied])
 
-  // XLSX: parse the workbook ONCE per content change and cache it.
+  // XLSX: read the workbook ONCE per load and keep it.
   //
   // Fix for #110: this effect must NOT depend on selectedSheet. The old
-  // combined effect cleared cachedWorkbook whenever the default sheet was
-  // set (selectedSheet was a dependency), which left the cache null and
-  // permanently hid the sheet selector. Sheet switching is now a separate,
+  // combined effect cleared the cache whenever the default sheet was
+  // set (selectedSheet was a dependency), which left it null and
+  // permanently hid the sheet selector. Sheet switching is a separate,
   // extraction-only effect below.
   useEffect(() => {
     if (fileType !== 'xlsx') return
     if (showSizeWarning && !proceedWithLargeFile) return
+    let cancelled = false
 
-    try {
-      const workbook = XLSX.read(content, {
-        type: encoding === 'base64' ? 'base64' : 'string',
-        // Keeps column widths / row heights through an edit-save round-trip
-        cellStyles: true,
-      })
-
-      if (workbook.SheetNames.length === 0) {
-        setParsedData({ columns: [], rows: [], error: 'Workbook contains no sheets' })
+    openWorkbook(content, encoding, filename).then(
+      (opened) => {
+        if (cancelled) return
+        // A load (also a revert's, with the same bytes) starts over; edits the host holds but hasn't saved (a reloaded
+        // webview) are shown again
+        pendingEdits.current.clear()
+        setHasEdited(loadEdits.length > 0)
+        for (const edit of loadEdits) {
+          const at = XLSX.utils.decode_cell(edit.ref)
+          opened.write(edit.sheet, at.r, at.c, edit.value)
+        }
+        sourceRef.current = opened
+        setSource(opened)
+        // Keep the current sheet across refreshes when it is still shown; otherwise the sheet the workbook opens on
+        setSelectedSheet((prev) => (prev && opened.tabs.includes(prev) ? prev : opened.initial))
+      },
+      (error) => {
+        if (cancelled) return
+        console.error('Excel parse error:', error)
+        setParsedData({
+          columns: [],
+          rows: [],
+          error: error instanceof Error ? error.message : 'Failed to parse Excel file',
+        })
         setIsLoading(false)
-        return
-      }
-
-      // A load (also a revert's, with the same bytes) starts over; edits the host holds but hasn't saved (a reloaded
-      // webview) are shown again
-      pendingEdits.current.clear()
-      setHasEdited(loadEdits.length > 0)
-      for (const edit of loadEdits) {
-        const worksheet = workbook.Sheets[edit.sheet]
-        if (worksheet) writeSheetCell(worksheet, edit.ref, edit.value)
-      }
-
-      workbookRef.current = workbook
-      setCachedWorkbook(workbook)
-      // Keep the current sheet across refreshes when it still exists
-      setSelectedSheet(prev =>
-        prev && workbook.SheetNames.includes(prev) ? prev : workbook.SheetNames[0]
-      )
-    } catch (error) {
-      console.error('Excel parse error:', error)
-      setParsedData({
-        columns: [],
-        rows: [],
-        error: error instanceof Error ? error.message : 'Failed to parse Excel file',
-      })
-      setIsLoading(false)
+      },
+    )
+    return () => {
+      cancelled = true
     }
-  }, [content, fileType, encoding, showSizeWarning, proceedWithLargeFile, loadId, loadEdits])
+  }, [content, fileType, encoding, filename, showSizeWarning, proceedWithLargeFile, loadId, loadEdits])
 
   useEffect(() => {
     selectedSheetRef.current = selectedSheet
   }, [selectedSheet])
 
-  // XLSX: extract the selected sheet from the cached workbook
+  // XLSX: extract the selected sheet from the workbook
   useEffect(() => {
-    if (fileType !== 'xlsx' || !cachedWorkbook || !selectedSheet) return
-    setParsedData(extractSheet(cachedWorkbook, selectedSheet))
+    if (fileType !== 'xlsx' || !source || !selectedSheet) return
+    setParsedData(source.extract(selectedSheet))
     setIsLoading(false)
-  }, [fileType, cachedWorkbook, selectedSheet])
+  }, [fileType, source, selectedSheet])
 
   const parseCSV = (csvContent: string, target?: DocumentApplyTarget) => {
     Papa.parse(csvContent, {
@@ -451,72 +402,53 @@ export function SpreadsheetViewer({
   // Sprint 158 (#711): an edit is written into the cached workbook's cell, so the grid and the formula bar show it,
   // and sent to the host on its own. The host keeps the edits and a save changes only those cells in the file.
 
-  // Formula lookup for the fx bar — the grid is anchored at A1, so display
-  // indexes ARE the cell address. Returns the formula with a leading '='.
-  const getExcelCellFormula = useCallback((rowPosition: number, columnIndex: number): string | undefined => {
-    if (!cachedWorkbook || !selectedSheet) return undefined
-    const worksheet = cachedWorkbook.Sheets[selectedSheet]
-    const cell = worksheet?.[XLSX.utils.encode_cell({ r: rowPosition, c: columnIndex })]
-    return cell?.f ? `=${cell.f}` : undefined
-  }, [cachedWorkbook, selectedSheet])
+  // Formula lookup for the fx bar. The grid is anchored at A1 and names each row's sheet row, so a row index and a
+  // column letter are the cell's address. Returns the formula with a leading '='.
+  const sheetRowOf = useCallback((rowIndex: number) => parsedData?.rowLabels?.[rowIndex] !== undefined
+    ? parsedData.rowLabels[rowIndex] - 1
+    : rowIndex, [parsedData])
+
+  const getExcelCellFormula = useCallback((rowIndex: number, columnIndex: number): string | undefined => {
+    if (!source || !selectedSheet || !parsedData) return undefined
+    const col = XLSX.utils.decode_col(parsedData.columns[columnIndex] ?? 'A')
+    return source.formulaAt(selectedSheet, sheetRowOf(rowIndex), col)
+  }, [source, selectedSheet, parsedData, sheetRowOf])
+
+  const getExcelCellInput = useCallback((rowIndex: number, columnIndex: number): string | undefined => {
+    if (!source || !selectedSheet || !parsedData) return undefined
+    const col = XLSX.utils.decode_col(parsedData.columns[columnIndex] ?? 'A')
+    return source.inputAt(selectedSheet, sheetRowOf(rowIndex), col)
+  }, [source, selectedSheet, parsedData, sheetRowOf])
 
   const handleExcelCellChange = useCallback((rowIndex: number, columnId: string, text: string) => {
-    if (!cachedWorkbook || !selectedSheet || !parsedData || !isEditable) return
-    const worksheet = cachedWorkbook.Sheets[selectedSheet]
-    if (!worksheet) return
+    if (!source || !selectedSheet || !parsedData || !isEditable) return
 
-    // The grid is anchored at A1, so display indexes ARE the cell address
-    const addr = XLSX.utils.encode_cell({ r: rowIndex, c: XLSX.utils.decode_col(columnId) })
-    const value = cellValueFromText(text)
+    const row = sheetRowOf(rowIndex)
+    const col = XLSX.utils.decode_col(columnId)
+    const value = source.valueFor(selectedSheet, row, col, text)
     const id = nextEditId.current++
-    pendingEdits.current.set(id, { sheet: selectedSheet, addr, previous: worksheet[addr] })
-    writeSheetCell(worksheet, addr, value)
-
-    const newRows = [...parsedData.rows]
-    newRows[rowIndex] = { ...newRows[rowIndex], [columnId]: text }
-    setParsedData({ ...parsedData, rows: newRows })
+    const previous = source.write(selectedSheet, row, col, value)
+    pendingEdits.current.set(id, { sheet: selectedSheet, row, col, previous })
+    // the grid shows the cell as its format draws it (14 in a money cell: 14.00 €)
+    setParsedData(source.extract(selectedSheet))
     setHasEdited(true)
 
-    const edit: CellEdit = { sheet: selectedSheet, ref: addr, value }
+    const edit: CellEdit = { sheet: selectedSheet, ref: XLSX.utils.encode_cell({ r: row, c: col }), value }
     sendToExtension('cellEdit', { id, edit })
-  }, [cachedWorkbook, selectedSheet, parsedData, isEditable])
+  }, [source, selectedSheet, parsedData, isEditable, sheetRowOf])
 
   // Add row and the + column widen the grid to type in; the file changes once a cell in them is typed into
   const handleExcelAddRow = useCallback(() => {
-    if (!cachedWorkbook || !selectedSheet || !isEditable) return
-    const worksheet = cachedWorkbook.Sheets[selectedSheet]
-    if (!worksheet) return
-
-    const ref = worksheet['!ref']
-    if (!ref) {
-      // Empty sheet: seed a 1×1 grid so editing can start
-      worksheet['!ref'] = 'A1'
-    } else {
-      const range = XLSX.utils.decode_range(ref)
-      range.e.r += 1
-      worksheet['!ref'] = XLSX.utils.encode_range(range)
-    }
-
-    setParsedData(extractSheet(cachedWorkbook, selectedSheet))
-  }, [cachedWorkbook, selectedSheet, isEditable])
+    if (!source || !selectedSheet || !isEditable) return
+    source.widen(selectedSheet, 1, 0)
+    setParsedData(source.extract(selectedSheet))
+  }, [source, selectedSheet, isEditable])
 
   const handleExcelAddColumn = useCallback(() => {
-    if (!cachedWorkbook || !selectedSheet || !isEditable) return
-    const worksheet = cachedWorkbook.Sheets[selectedSheet]
-    if (!worksheet) return
-
-    const ref = worksheet['!ref']
-    if (!ref) {
-      // Empty sheet: seed a 1×1 grid so editing can start
-      worksheet['!ref'] = 'A1'
-    } else {
-      const range = XLSX.utils.decode_range(ref)
-      range.e.c += 1
-      worksheet['!ref'] = XLSX.utils.encode_range(range)
-    }
-
-    setParsedData(extractSheet(cachedWorkbook, selectedSheet))
-  }, [cachedWorkbook, selectedSheet, isEditable])
+    if (!source || !selectedSheet || !isEditable) return
+    source.widen(selectedSheet, 0, 1)
+    setParsedData(source.extract(selectedSheet))
+  }, [source, selectedSheet, isEditable])
 
   // Handle conflict dialog actions
   const handleConfirmDiscard = useCallback(() => {
@@ -692,6 +624,8 @@ export function SpreadsheetViewer({
             onInsertRowAt={isEditable && fileType === 'csv' ? handleInsertRowAt : undefined}
             onDeleteRow={isEditable && fileType === 'csv' ? handleDeleteRow : undefined}
             getCellFormula={fileType === 'xlsx' ? getExcelCellFormula : undefined}
+            getCellInput={fileType === 'xlsx' ? getExcelCellInput : undefined}
+            rowLabels={parsedData.rowLabels}
             onEditingFormulaChange={fileType === 'xlsx' ? setEditingFormula : undefined}
             namedColumns={fileType === 'csv'}
           />
@@ -702,9 +636,9 @@ export function SpreadsheetViewer({
           if multiple sheets). The hairline runs across inactive tabs and the
           strip remainder but is BROKEN over the active tab, whose editor
           background merges seamlessly with the grid above (no gap, no line). */}
-      {fileType === 'xlsx' && cachedWorkbook && cachedWorkbook.SheetNames.length > 1 && (
+      {fileType === 'xlsx' && source && source.tabs.length > 1 && (
         <div className="flex bg-[var(--vscode-sideBar-background)] overflow-x-auto shrink-0">
-          {cachedWorkbook.SheetNames.map(sheetName => (
+          {source.tabs.map(sheetName => (
             <Button
               key={sheetName}
               variant="ghost"
