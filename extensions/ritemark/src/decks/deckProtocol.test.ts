@@ -28,6 +28,8 @@ assert.throws(() => decodeDeckRequest({ type: 'deck/add-to-library', id: '', tex
 assert.throws(() => decodeDeckRequest({ type: 'deck/add-to-library', id: 'a1', text: 5 }), DeckProtocolError);
 assert.deepEqual(decodeDeckRequest({ type: 'deck/show-in-library', from: 'Slide library/A.deck.md#x1 @abc123' }).type, 'deck/show-in-library');
 assert.deepEqual(decodeDeckRequest({ type: 'deck/undo-library', token: 'w1' }), { type: 'deck/undo-library', token: 'w1' });
+assert.deepEqual(decodeDeckRequest({ type: 'deck/applied', requestId: 'r1', ok: true }), { type: 'deck/applied', requestId: 'r1', ok: true });
+assert.throws(() => decodeDeckRequest({ type: 'deck/applied', requestId: 'r1', ok: 'yes' }), DeckProtocolError);
 assert.deepEqual(decodeDeckRequest({ type: 'deck/current', index: 2, count: 9 }), { type: 'deck/current', index: 2, count: 9 });
 assert.throws(() => decodeDeckRequest({ type: 'deck/current', index: -1, count: 9 }), DeckProtocolError);
 assert.throws(() => decodeDeckRequest({ type: 'deck/unknown' }), DeckProtocolError);

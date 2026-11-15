@@ -453,6 +453,12 @@ async function main(): Promise<void> {
     await runTool(tool('insert_slides'), { deck: 'Clients/Harbour.deck.md', source: 'Slide library/Agents.deck.md', slide_ids: ['g1'] }, context);
     assert.deepEqual(viewed, [{ count: 1, afterIndex: 1 }]);
     assert.equal(files['Clients/Harbour.deck.md'], before);
+    // An open deck that doesn't take them: an error, and the file is never written under the view.
+    const refusing = tools.createDeckToolGroup(() => ({ library: () => library, viewInsert: () => async () => false }));
+    const refused = await runTool(refusing.tools.find((item) => item.name === 'insert_slides')!, { deck: 'Clients/Harbour.deck.md', source: 'Slide library/Agents.deck.md', slide_ids: ['g1'] }, context);
+    assert.equal(refused.isError, true);
+    assert.match(refused.text, /didn't take the slides/);
+    assert.equal(files['Clients/Harbour.deck.md'], before);
     open = false;
     // Update the library: the topic gets the copy's words, the copy a new from: stamp.
     files['Clients/Harbour.deck.md'] = files['Clients/Harbour.deck.md'].replace('title: Why agents?', 'title: Why agents, now?');
@@ -464,6 +470,23 @@ async function main(): Promise<void> {
     const added = await runTool(tool('add_to_library'), { deck: 'Clients/Harbour.deck.md', slide_id: 't1', topic: 'Openings' }, context);
     assert.equal(added.text, 'Added the slide to the library under Openings (a new topic).');
     assert.match(slidesOfText(files['Clients/Harbour.deck.md'])[0].data.from ?? '', /^Slide library\/Openings\.deck\.md#/);
+    // An open deck gets the copy's new from: through its view, not as a whole-file write.
+    const setThroughView: Array<[string, string]> = [];
+    const viaView = tools.createDeckToolGroup(() => ({
+      library: () => library,
+      viewInsert: () => undefined,
+      viewSetFrom: () => async (id, from) => { setThroughView.push([id, from]); return true; },
+    }));
+    const deckText = files['Clients/Harbour.deck.md'];
+    await runTool(viaView.tools.find((item) => item.name === 'update_library_slide')!, { deck: 'Clients/Harbour.deck.md', slide_id: copy.data.id }, context);
+    assert.equal(setThroughView.length, 1);
+    assert.equal(files['Clients/Harbour.deck.md'], deckText);
+    // OpenCode reaches the same tools through the IPC adapter.
+    const injector = new RitemarkToolsInjector();
+    const ipcList = await injector.handleIpc({ id: '1', op: 'list', group: 'deck' });
+    assert.deepEqual(ipcList.tools?.map((item) => item.name), deckGroup.tools.map((item) => item.name));
+    const ipcCall = await injector.handleIpc({ id: '2', op: 'call', group: 'deck', tool: 'list_decks', params: { where: 'library' } });
+    assert.match(ipcCall.text ?? "", /Slide library\/Agents\.deck\.md/);
     // Only decks inside the project.
     assert.equal((await runTool(tool('read_deck'), { deck: 'notes.md' }, context)).isError, true);
     assert.equal((await runTool(tool('read_deck'), { deck: '../outside.deck.md' }, context)).isError, true);

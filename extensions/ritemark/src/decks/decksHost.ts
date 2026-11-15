@@ -32,6 +32,11 @@ export function registerDecks(context: vscode.ExtensionContext): DecksHost {
       const view = root ? pages.viewOf(path.join(root, ...deckPath.split('/'))) : null;
       return view ? (parts, afterIndex) => view.insert(parts, afterIndex) : undefined;
     },
+    viewSetFrom: (deckPath: string) => {
+      const root = projectRoot();
+      const view = root ? pages.viewOf(path.join(root, ...deckPath.split('/'))) : null;
+      return view ? (id, from) => view.setFrom(id, from) : undefined;
+    },
   } : null));
   const view = new SlideLibraryViewProvider(context.extensionUri, pages, library);
   context.subscriptions.push(

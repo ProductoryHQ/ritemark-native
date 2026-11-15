@@ -440,6 +440,8 @@ export interface DeckToolHost {
   library(): DeckLibrary | null;
   /** The open view of a deck (project-relative path), which inserts as one undo step there; undefined when closed. */
   viewInsert(deckPath: string): ((parts: CopiedPart[], afterIndex: number) => Promise<boolean>) | undefined;
+  /** The open view of a deck, which sets a copy's `from:` line; undefined when closed. */
+  viewSetFrom?(deckPath: string): ((id: string, from: string) => Promise<boolean>) | undefined;
 }
 
 const deckPathInput = (what: string) =>
@@ -546,10 +548,10 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
         input: { deck: deckPathInput('The deck holding the copy'), slide_id: slideIdInput },
         run: async (args) => {
           const deck = deckPathOf(args.deck);
-          const { library: project } = library();
+          const { host: current, library: project } = library();
           const copy = await project.slideOf(deck, String(args.slide_id));
           const write = await project.updateLibrarySlide(deck, copy);
-          await project.setFrom(deck, String(args.slide_id), write.from);
+          await project.setFrom(deck, String(args.slide_id), write.from, current.viewSetFrom?.(deck));
           return { text: `Updated the slide in ${deckName(write.path)}. Other decks that use it will offer the new version.` };
         },
       },
@@ -564,10 +566,10 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
         },
         run: async (args) => {
           const deck = deckPathOf(args.deck);
-          const { library: project } = library();
+          const { host: current, library: project } = library();
           const copy = await project.slideOf(deck, String(args.slide_id));
           const write = await project.addToLibrary(deck, String(args.topic), copy);
-          await project.setFrom(deck, String(args.slide_id), write.from);
+          await project.setFrom(deck, String(args.slide_id), write.from, current.viewSetFrom?.(deck));
           return { text: `Added the slide to the library under ${deckName(write.path)}${write.previous === null ? ' (a new topic)' : ''}.` };
         },
       },

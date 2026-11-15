@@ -37,7 +37,9 @@ export type DeckRequest =
   /** Show the copy's source in the Slide library. */
   | { type: 'deck/show-in-library'; from: string }
   /** Undo a library write this view made. */
-  | { type: 'deck/undo-library'; token: string };
+  | { type: 'deck/undo-library'; token: string }
+  /** The view's answer to a `deck/insert` or `deck/set-from` that carried a request id: done, or not. */
+  | { type: 'deck/applied'; requestId: string; ok: boolean };
 
 /** The host's answers. */
 export type DeckHostMessage =
@@ -57,7 +59,9 @@ export type DeckHostMessage =
   /** The library write with this token is undone: the copy's `from:` goes back too. */
   | { type: 'deck/library-undone'; token: string }
   /** Slides to insert after part `after` (from the Slide library or the AI's tools), as one undo step. */
-  | { type: 'deck/insert'; after: number; parts: Array<{ kind: string; body: string; handout: string }> };
+  | { type: 'deck/insert'; after: number; parts: Array<{ kind: string; body: string; handout: string }>; requestId?: string }
+  /** A copy's `from:` after the AI's library write, set by the open view (the person may be typing in it). */
+  | { type: 'deck/set-from'; id: string; from: string; requestId: string };
 
 export class DeckProtocolError extends Error {}
 
@@ -115,6 +119,11 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
     case 'deck/undo-library': {
       exactKeys(input, ['type', 'token']);
       return { type: 'deck/undo-library', token: stringOf(input.token, 64) };
+    }
+    case 'deck/applied': {
+      exactKeys(input, ['type', 'requestId', 'ok']);
+      if (typeof input.ok !== 'boolean') throw new DeckProtocolError('ok must be a boolean');
+      return { type: 'deck/applied', requestId: stringOf(input.requestId, 64), ok: input.ok };
     }
     default:
       throw new DeckProtocolError('Unknown deck request');

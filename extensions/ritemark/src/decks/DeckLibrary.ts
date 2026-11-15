@@ -190,7 +190,10 @@ export class DeckLibrary {
     const taken = slides.map(slide => slide.data.id).filter((id): id is string => !!id);
     const parts = await this.copies(sourcePath, ids, targetPath, taken);
     const at = Math.max(0, Math.min(slides.length, after ?? slides.length));
-    if (!(intoView && (await intoView(parts, at - 1)))) {
+    if (intoView) {
+      // An open deck takes them only through its view: its file is never written under the person's typing.
+      if (!(await intoView(parts, at - 1))) throw new Error(`${deckName(targetPath)} is open but didn't take the slides. Nothing was inserted; try again.`);
+    } else {
       await this.files.write(targetPath, insertPartsText(text, at, parts.map(part => partText(part.kind, part.body, part.handout))));
     }
     return { first: at + 1, count: parts.length };
@@ -285,8 +288,15 @@ export class DeckLibrary {
     return { kind: slide.kind, body: slide.body, handout: slide.handout, from: slide.data.from };
   }
 
-  /** The copy's `from:` line in its deck, after a library write (the deck view does this itself for the buttons). */
-  async setFrom(deckPath: string, id: string, from: string): Promise<void> {
+  /**
+   * The copy's `from:` line in its deck, after a library write (the deck view does this itself for the buttons). An
+   * open deck gets it through its view (`viaView`), never as a whole-file write.
+   */
+  async setFrom(deckPath: string, id: string, from: string, viaView?: (id: string, from: string) => Promise<boolean>): Promise<void> {
+    if (viaView) {
+      if (!(await viaView(id, from))) throw new Error(`The library is written, but ${deckName(deckPath)} is open and didn't take the slide's new from: line.`);
+      return;
+    }
     const text = await this.files.read(deckPath);
     const slide = text === null ? undefined : slidesOfText(text).find(entry => entry.data.id === id);
     if (text === null || !slide) throw new Error(`${deckName(deckPath)} has no slide ${id}.`);

@@ -43,6 +43,8 @@ export interface ActiveDeck {
 
 /** Library writes kept for their Undo, this many at most. */
 const KEPT_WRITES = 20;
+/** How long the host waits for an open deck view to answer an insert or a from: line. */
+const VIEW_ANSWER_MS = 5000;
 
 export class DeckPages implements vscode.Disposable {
   private readonly views = new Set<DeckView>();
@@ -54,6 +56,8 @@ export class DeckPages implements vscode.Disposable {
   /** Show in the library: the library view shows this topic's slide. */
   readonly onDidRevealInLibrary = this.revealed.event;
   private readonly writes = new Map<string, LibraryWrite>();
+  private readonly waiting = new Map<string, (ok: boolean) => void>();
+  private requests = 0;
 
   /** `library` gives the project's library, or null when the window has no project folder on disk. */
   constructor(private readonly library: () => DeckLibrary | null = () => null) {}
@@ -106,11 +110,31 @@ export class DeckPages implements vscode.Disposable {
     return this.post(view.panel.webview, { type: 'deck/insert', after: after ?? view.current, parts });
   }
 
-  /** The open view of this deck, if there is one (the AI's tools insert through it). */
-  viewOf(fsPath: string): { insert: (parts: Array<{ kind: string; body: string; handout: string }>, after: number) => Promise<boolean> } | null {
+  /**
+   * The open view of this deck, if there is one: the AI's tools change an open deck through it (one undo step there,
+   * and never a whole-file write under the person's typing). Each call waits for the view to say it was done.
+   */
+  viewOf(fsPath: string): {
+    insert: (parts: Array<{ kind: string; body: string; handout: string }>, after: number) => Promise<boolean>;
+    setFrom: (id: string, from: string) => Promise<boolean>;
+  } | null {
     const view = [...this.views].find(entry => path.normalize(entry.document.uri.fsPath) === path.normalize(fsPath));
     if (!view) return null;
-    return { insert: (parts, after) => this.post(view.panel.webview, { type: 'deck/insert', after, parts }) };
+    return {
+      insert: (parts, after) => this.ask(view, requestId => ({ type: 'deck/insert', after, parts, requestId })),
+      setFrom: (id, from) => this.ask(view, requestId => ({ type: 'deck/set-from', id, from, requestId })),
+    };
+  }
+
+  /** Send the view a change and wait for its answer (false when it doesn't answer in time). */
+  private async ask(view: DeckView, message: (requestId: string) => DeckHostMessage): Promise<boolean> {
+    const requestId = `r${++this.requests}`;
+    const answer = new Promise<boolean>(resolve => {
+      const timer = setTimeout(() => { this.waiting.delete(requestId); resolve(false); }, VIEW_ANSWER_MS);
+      this.waiting.set(requestId, ok => { clearTimeout(timer); this.waiting.delete(requestId); resolve(ok); });
+    });
+    if (!(await this.post(view.panel.webview, message(requestId)))) this.waiting.get(requestId)?.(false);
+    return answer;
   }
 
   private activeView(): DeckView | null {
@@ -140,6 +164,9 @@ export class DeckPages implements vscode.Disposable {
         return;
       case 'deck/save-image':
         await this.post(webview, await savePicture(document, webview, request.slideId, request.dataUrl, request.filename));
+        return;
+      case 'deck/applied':
+        this.waiting.get(request.requestId)?.(request.ok);
         return;
       case 'deck/current': {
         const view = [...this.views].find(entry => entry.panel.webview === webview);
