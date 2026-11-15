@@ -5,6 +5,10 @@ import { DataTable } from './DataTable'
 import { SpreadsheetToolbar } from './header/SpreadsheetToolbar'
 import { ConflictDialog } from './dialogs/ConflictDialog'
 import { Button } from './ui/button'
+import { Alert, AlertDescription } from './ui/alert'
+import { Icon } from './ui/Icon'
+import { Tooltip } from './ui/tooltip'
+import { defaultSpreadsheetApp } from '../hooks/usePlatform'
 import { sendToExtension, onMessage } from '../bridge'
 import type { DocumentSyncAction } from './header/DocumentSyncAction'
 import type { DocumentApplyTarget } from '../types/documentSync'
@@ -593,6 +597,30 @@ export function SpreadsheetViewer({
           hasExcel={hasExcel}
           syncAction={toolbarSyncAction}
         />
+
+      {/* Sprint 158 PR 0 (#711; experience 47, frame 3): until the save keeps a workbook's formatting, an editable
+          workbook says from the moment it opens what a save here removes, and offers the app that keeps it. It replaces
+          the toast the host showed once, after the first edit. .xls is read-only and CSV has no formatting to lose. */}
+      {isEditable && fileType === 'xlsx' && (
+        <div className="shrink-0 px-4 pb-2">
+          <Alert variant="warning" className="flex min-h-9 items-center gap-2">
+            <Icon name="warning" size={16} className="rm-alert-icon shrink-0" />
+            <AlertDescription className="flex-1 text-[13px] leading-[18px]">
+              Saving here removes this workbook's colours, bold text, borders, charts and pictures. Values and formulas stay.
+            </AlertDescription>
+            <Tooltip label={`Open ${filename} in ${hasExcel ? 'Excel' : defaultSpreadsheetApp}, which keeps its formatting`}>
+              <Button
+                type="button"
+                variant="warning"
+                size="compact"
+                onClick={hasExcel ? handleOpenInExcel : handleOpenInNumbers}
+              >
+                {`Open in ${hasExcel ? 'Excel' : defaultSpreadsheetApp} to keep them`}
+              </Button>
+            </Tooltip>
+          </Alert>
+        </div>
+      )}
 
       {/* Truncation warning — only rendered when a large file is cut off */}
       {statusInfo?.truncated && (

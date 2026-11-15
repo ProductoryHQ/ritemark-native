@@ -80,6 +80,13 @@
   --ritemark-success-soft: #dcfce7;
   --ritemark-warning: #f59e0b;
   --ritemark-warning-soft: #fef3c7;
+  /* A warning bar's own colours (experience 47, frame 3): its ground, line, words, icon and action */
+  --ritemark-warning-surface: #fef6e4;
+  --ritemark-warning-line: #f3d9a4;
+  --ritemark-warning-ink: #5c4210;
+  --ritemark-warning-icon: #b07a12;
+  --ritemark-warning-action: #fffdf7;
+  --ritemark-warning-action-line: #e8c98a;
   --ritemark-error: #ef4444;
   --ritemark-error-soft: #fee2e2;
 
@@ -103,6 +110,12 @@
   --ritemark-dark-success-soft: rgba(34, 197, 94, 0.18);
   --ritemark-dark-warning: #fbbf24;
   --ritemark-dark-warning-soft: rgba(245, 158, 11, 0.18);
+  --ritemark-dark-warning-surface: #3a2f14;
+  --ritemark-dark-warning-line: #6b5420;
+  --ritemark-dark-warning-ink: #f6e3b8;
+  --ritemark-dark-warning-icon: #e0a21f;
+  --ritemark-dark-warning-action: #2c2410;
+  --ritemark-dark-warning-action-line: #6b5420;
   --ritemark-dark-error: #f87171;
   --ritemark-dark-error-soft: rgba(239, 68, 68, 0.18);
 
@@ -143,6 +156,12 @@
   --r-success-soft: var(--ritemark-success-soft);
   --r-warning: var(--ritemark-warning);
   --r-warning-soft: var(--ritemark-warning-soft);
+  --r-warning-surface: var(--ritemark-warning-surface);
+  --r-warning-line: var(--ritemark-warning-line);
+  --r-warning-ink: var(--ritemark-warning-ink);
+  --r-warning-icon: var(--ritemark-warning-icon);
+  --r-warning-action: var(--ritemark-warning-action);
+  --r-warning-action-line: var(--ritemark-warning-action-line);
   --r-error: var(--ritemark-error);
   --r-error-soft: var(--ritemark-error-soft);
   /* Persisted conversation identity slots. Each round exhausts the eight base
@@ -224,6 +243,12 @@ body[data-vscode-theme-kind='vscode-dark'],
   --r-success-soft: var(--ritemark-dark-success-soft);
   --r-warning: var(--ritemark-dark-warning);
   --r-warning-soft: var(--ritemark-dark-warning-soft);
+  --r-warning-surface: var(--ritemark-dark-warning-surface);
+  --r-warning-line: var(--ritemark-dark-warning-line);
+  --r-warning-ink: var(--ritemark-dark-warning-ink);
+  --r-warning-icon: var(--ritemark-dark-warning-icon);
+  --r-warning-action: var(--ritemark-dark-warning-action);
+  --r-warning-action-line: var(--ritemark-dark-warning-action-line);
   --r-error: var(--ritemark-dark-error);
   --r-error-soft: var(--ritemark-dark-error-soft);
   --r-conversation-0: #f87171;
