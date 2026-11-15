@@ -118,6 +118,12 @@
 #   and the "changed" chip's tooltip are unchanged. Tested in
 #   test/electron-browser/features/ritemarkBrowserPageFeature.test.ts.
 #
+# #710 (2026-11-15): opening an .html file whose page tab is already open still
+#   brings that tab forward, and now also reloads it when its page failed to load
+#   (the model has an error, e.g. the file was missing when the tab was restored),
+#   as the bar's Reload does. A tab that loaded fine, or whose page is not
+#   resolved yet (it loads the file when shown), is only brought forward.
+#
 # File(s): src/vs/platform/browserView/common/browserView.ts,
 #          src/vs/platform/browserView/electron-main/browserViewMainService.ts,
 #          src/vs/platform/browserView/electron-main/ritemarkLinkMenu.ts,
@@ -138,7 +144,7 @@
 #          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserActionFeature.test.ts,
 #          src/vs/workbench/contrib/browserView/test/electron-browser/features/ritemarkBrowserPageFeature.test.ts
 # Created: 2026-05-13
-# Updated: 2026-11-09 (2.2: the Published chip's menu drops from the chip; See online, Update the page only while changed, Unpublish); 2026-11-06 (Sprint 149 PR 4: the Published chip, Copy link, Publishing… and Unpublishing…; round 3: no chip carried to another page; round 5: Publishing…'s tooltip from the extension); 2026-11-05 (PR 2: the page's bar, Open in your browser and Publish; round 2: no file reaches the system's opener)
+# Updated: 2026-11-15 (#710: a failed page reloads when its file is opened again); 2026-11-09 (2.2: the Published chip's menu drops from the chip; See online, Update the page only while changed, Unpublish); 2026-11-06 (Sprint 149 PR 4: the Published chip, Copy link, Publishing… and Unpublishing…; round 3: no chip carried to another page; round 5: Publishing…'s tooltip from the extension); 2026-11-05 (PR 2: the page's bar, Open in your browser and Publish; round 2: no file reaches the system's opener)
 #
 diff --git a/src/vs/platform/browserView/common/browserView.ts b/src/vs/platform/browserView/common/browserView.ts
 index 31466d78914..e7d9a1af46e 100644
@@ -662,7 +668,7 @@ index 00000000000..22662ff787d
 +	return rest as Omit<T, keyof IRitemarkPageTarget>;
 +}
 diff --git a/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts b/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
-index 9d39a07860c..c146a8ab3e0 100644
+index 9d39a07860c..0789e22f816 100644
 --- a/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
 +++ b/src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts
 @@ -21,6 +21,7 @@ import { BrowserViewWorkbenchService } from './browserViewWorkbenchService.js';
@@ -690,7 +696,7 @@ index 9d39a07860c..c146a8ab3e0 100644
  	) {
  		editorResolverService.registerEditor(
  			`${Schemas.vscodeBrowser}:/**`,
-@@ -145,6 +149,57 @@ class BrowserEditorResolverContribution implements IWorkbenchContribution {
+@@ -145,6 +149,64 @@ class BrowserEditorResolverContribution implements IWorkbenchContribution {
  				}
  			);
  		}
@@ -703,7 +709,11 @@ index 9d39a07860c..c146a8ab3e0 100644
 +		//
 +		// Reuse rule: if a BrowserEditorInput already exists with the same file
 +		// URL, focus that one instead of creating a new tab. Avoids tab pile-up
-+		// when the user clicks the same .html file repeatedly.
++		// when the user clicks the same .html file repeatedly. A page that failed
++		// to load (its file was missing when the tab was restored) is loaded again
++		// as well, the way the bar's Reload does, so opening the file that is back
++		// shows it (#710). A tab whose page has not been resolved yet loads the file
++		// when it is shown, so it is only focused.
 +		//
 +		// Sprint 135: upstream registers its own file:/**/*.{html,htm,mhtml,mht} entry above at
 +		// option priority (a resource-backed tab with a read-only address bar). Ritemark's entry
@@ -727,6 +737,9 @@ index 9d39a07860c..c146a8ab3e0 100644
 +						input instanceof BrowserEditorInput && input.url === fileUrl,
 +					);
 +					if (existing) {
++						if (existing.model?.error) {
++							void existing.model.reload();
++						}
 +						return {
 +							editor: existing,
 +							options: { ...options, pinned: true },
