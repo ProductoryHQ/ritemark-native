@@ -11,6 +11,13 @@
 // defaults for the frame-shaping settings the manifest lists (`settings`). A slot the extension no longer fills is released, logged, and the frame
 // moves; a place it adds that the manifest doesn't name arrives late. release-extension-preflight.sh stops either.
 //
+// Sprint 159: a place may carry a `setting` (a feature flag, off by default), which shows it only while it is true. Its
+// setting must be one of the extension's booleans, false by default, and every view in it must be shown on exactly
+// `config.<setting>`, which is what the shell seeds for a new profile's first frame (ritemarkFrame.ts). A place that
+// is off by default in that way and missing from an older shell's manifest is accepted (decision 2): with the flag
+// off, as every installed app has it, the place never shows, so the frame doesn't move; with it on, the place
+// arrives after the first frame until the shell release that names it. The CLI says so on stderr.
+//
 // Usage:
 //   node scripts/check-frame-manifest.mjs [--ref <git-ref> | --product <product.json>] [--extension <dir>]
 //
@@ -50,6 +57,36 @@ export function readFrameIdentifiers(source) {
   return identifiers;
 }
 
+/** The extension's settings: package.json's `configuration`, one section or a list of them, as one map of properties. */
+function settingsOf(pkg) {
+  const configuration = pkg.contributes?.configuration ?? [];
+  return Object.assign({}, ...(Array.isArray(configuration) ? configuration : [configuration]).map(section => section?.properties ?? {}));
+}
+
+/**
+ * The setting that keeps a view container off by default: every one of its views is shown on exactly `config.<key>`,
+ * and the key is a boolean of the extension's that is false by default. Undefined when it is not off by default.
+ */
+export function offByDefaultSetting(pkg, containerId) {
+  const views = pkg.contributes?.views?.[containerId];
+  if (!Array.isArray(views) || !views.length) {
+    return undefined;
+  }
+  const keys = new Set(views.map(view => typeof view.when === 'string' && view.when.startsWith('config.') ? view.when.slice('config.'.length) : undefined));
+  const [key] = keys;
+  const setting = settingsOf(pkg)[key];
+  return keys.size === 1 && key && /^[\w.-]+$/.test(key) && setting?.type === 'boolean' && setting.default === false ? key : undefined;
+}
+
+/** The extension's places that the shell's manifest doesn't name but that are off by default, with their settings (accepted, decision 2). */
+export function offByDefaultPlacesMissing(product, pkg) {
+  const places = product.ritemarkFrame?.places ?? [];
+  return (pkg.contributes?.viewsContainers?.activitybar ?? []).flatMap(container => {
+    const setting = offByDefaultSetting(pkg, container.id);
+    return setting && !places.some(place => place.id === `${CONTAINER}${container.id}`) ? [{ id: `${CONTAINER}${container.id}`, setting }] : [];
+  });
+}
+
 /** Each way the extension (its package.json and frame identifiers) doesn't fill the frame the product's manifest draws. */
 export function frameMismatches(product, pkg, identifiers) {
   const frame = product.ritemarkFrame;
@@ -65,6 +102,7 @@ export function frameMismatches(product, pkg, identifiers) {
   const contributes = pkg.contributes ?? {};
   const containers = contributes.viewsContainers ?? {};
   const views = contributes.views ?? {};
+  const settings = settingsOf(pkg);
   const commands = new Set((contributes.commands ?? []).map(command => command.command));
   const menus = new Set(Object.keys(contributes.menus ?? {}));
   const hasViews = id => Array.isArray(views[id]) && views[id].length > 0;
@@ -96,9 +134,28 @@ export function frameMismatches(product, pkg, identifiers) {
     if (place.icon && container.icon !== place.icon) {
       problems.push(`place ${place.id}: its icon is ${container.icon}, the manifest's placeholder draws ${place.icon}`);
     }
+    // A place with a setting: shown only while it is on, at the first frame as the shell seeds it and after it
+    if (place.setting !== undefined) {
+      const setting = settings[place.setting];
+      if (typeof place.setting !== 'string' || setting?.type !== 'boolean') {
+        problems.push(`place ${place.id}: its setting ${JSON.stringify(place.setting)} is not a boolean setting in package.json`);
+      } else if (setting.default !== false) {
+        problems.push(`place ${place.id}: its setting ${place.setting} is ${JSON.stringify(setting.default)} by default; a place with a setting is off by default (one that is on has no setting)`);
+      }
+      for (const view of hasViews(id) ? views[id] : []) {
+        if (view.when !== `config.${place.setting}`) {
+          problems.push(`place ${place.id}: its view ${view.id} is shown on ${JSON.stringify(view.when)}, the manifest seeds it on "config.${place.setting}"`);
+        }
+      }
+    } else if (offByDefaultSetting(pkg, id)) {
+      // Drawn from a new profile's first frame, then hidden once the extension registers it with the flag off
+      problems.push(`place ${place.id}: off by default in package.json (config.${offByDefaultSetting(pkg, id)}), but the manifest draws it always: give it "setting": "${offByDefaultSetting(pkg, id)}"`);
+    }
   }
   for (const container of activitybar) {
-    if (!places.some(place => place.id === `${CONTAINER}${container.id}`)) {
+    // A place off by default (its views all shown on one false-by-default flag) may be missing from an older shell's
+    // manifest: with the flag off it never shows (decision 2)
+    if (!places.some(place => place.id === `${CONTAINER}${container.id}`) && !offByDefaultSetting(pkg, container.id)) {
       problems.push(`place ${CONTAINER}${container.id}: not in the manifest (it would arrive after the first frame)`);
     }
   }
@@ -208,6 +265,9 @@ function main(argv) {
   const problems = frameMismatches(product, pkg, identifiers);
   for (const problem of problems) {
     console.log(problem);
+  }
+  for (const place of offByDefaultPlacesMissing(product, pkg)) {
+    console.error(`place ${place.id} is off by default (${place.setting}) and not in this shell's manifest: it shows only once the setting is on, after the first frame`);
   }
   return problems.length ? 1 : 0;
 }

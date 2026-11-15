@@ -1,6 +1,7 @@
 // Sprint 152 (R7): the frame manifest check, on this repository and on fixtures made from it: a renamed head command,
 // a renamed permanent tab, a place the manifest doesn't name, a frame-shaping default that differs, and a shell from
-// before the manifest. Run: node --test scripts/check-frame-manifest.test.mjs
+// before the manifest. Sprint 159: a place with a setting (a feature flag), and one off by default that an older
+// shell's manifest doesn't name (decision 2). Run: node --test scripts/check-frame-manifest.test.mjs
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -10,7 +11,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { frameMismatches, readFrameIdentifiers } from './check-frame-manifest.mjs';
+import { frameMismatches, offByDefaultPlacesMissing, readFrameIdentifiers } from './check-frame-manifest.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(root, 'scripts', 'check-frame-manifest.mjs');
@@ -21,15 +22,15 @@ const identifiers = readFrameIdentifiers(identifiersSource);
 const clone = value => JSON.parse(JSON.stringify(value));
 
 /** An extension folder with this package.json and frameIdentifiers.ts, changed by `change`, and the CLI's answer. */
-function runOnFixture(change = (fixture) => fixture) {
+function runOnFixture(change = (fixture) => fixture, productFile = path.join(root, 'branding', 'product.json')) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-frame-check-'));
   try {
     const fixture = change({ pkg: clone(pkg), identifiers: identifiersSource });
     fs.mkdirSync(path.join(dir, 'src'));
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(fixture.pkg));
     fs.writeFileSync(path.join(dir, 'src', 'frameIdentifiers.ts'), fixture.identifiers);
-    const run = spawnSync(process.execPath, [cli, '--product', path.join(root, 'branding', 'product.json'), '--extension', dir], { encoding: 'utf8' });
-    return { status: run.status, out: run.stdout.trim().split('\n').filter(Boolean) };
+    const run = spawnSync(process.execPath, [cli, '--product', productFile, '--extension', dir], { encoding: 'utf8' });
+    return { status: run.status, out: run.stdout.trim().split('\n').filter(Boolean), err: run.stderr.trim().split('\n').filter(Boolean) };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -37,7 +38,7 @@ function runOnFixture(change = (fixture) => fixture) {
 
 test('this repository\'s extension fills its shell\'s frame', () => {
   assert.deepEqual(frameMismatches(product, pkg, identifiers), []);
-  assert.deepEqual(runOnFixture(), { status: 0, out: [] });
+  assert.deepEqual(runOnFixture(), { status: 0, out: [], err: [] });
 });
 
 test('the identifiers are read from the module the extension compiles, however it is written', () => {
@@ -52,7 +53,7 @@ test('the identifiers are read from the module the extension compiles, however i
 
 test('an identifier the check can\'t read is a mismatch, not a skip', () => {
   const result = runOnFixture(({ pkg: same, identifiers: source }) => ({ pkg: same, identifiers: source.replace(`export const HOME_PLACE_ID = 'workbench.view.extension.ritemark-home';`, `export const HOME_PLACE_ID = \`workbench.view.extension.ritemark-home\`;`) }));
-  assert.deepEqual(result, { status: 1, out: ['could not read HOME_PLACE_ID from src/frameIdentifiers.ts', 'Home\'s place is workbench.view.extension.ritemark-home in the manifest, undefined in src/frameIdentifiers.ts'] });
+  assert.deepEqual(result, { status: 1, out: ['could not read HOME_PLACE_ID from src/frameIdentifiers.ts', 'Home\'s place is workbench.view.extension.ritemark-home in the manifest, undefined in src/frameIdentifiers.ts'], err: [] });
 });
 
 test('a renamed head command is refused, with its name', () => {
@@ -60,12 +61,12 @@ test('a renamed head command is refused, with its name', () => {
     changed.contributes.commands = changed.contributes.commands.map(command => command.command === 'ritemark.tasks.newTask' ? { ...command, command: 'ritemark.tasks.addTask' } : command);
     return { pkg: changed, identifiers: source };
   });
-  assert.deepEqual(result, { status: 1, out: ['head row on workbench.view.extension.ritemark-tasks: no command ritemark.tasks.newTask in package.json'] });
+  assert.deepEqual(result, { status: 1, out: ['head row on workbench.view.extension.ritemark-tasks: no command ritemark.tasks.newTask in package.json'], err: [] });
 });
 
 test('a renamed permanent tab is refused, with its name', () => {
   const result = runOnFixture(({ pkg: same, identifiers: source }) => ({ pkg: same, identifiers: source.replace(`BOARD_TAB_VIEW_TYPE = 'ritemark.taskBoard'`, `BOARD_TAB_VIEW_TYPE = 'ritemark.board'`) }));
-  assert.deepEqual(result, { status: 1, out: ['the permanent tabs are mainThreadWebview-ritemark.home, mainThreadWebview-ritemark.taskBoard in the manifest, mainThreadWebview-ritemark.home, mainThreadWebview-ritemark.board in src/frameIdentifiers.ts'] });
+  assert.deepEqual(result, { status: 1, out: ['the permanent tabs are mainThreadWebview-ritemark.home, mainThreadWebview-ritemark.taskBoard in the manifest, mainThreadWebview-ritemark.home, mainThreadWebview-ritemark.board in src/frameIdentifiers.ts'], err: [] });
 });
 
 test('a permanent tab\'s title, icons or gating setting that differ from the manifest\'s are refused, naming the tab and the field', () => {
@@ -76,7 +77,7 @@ test('a permanent tab\'s title, icons or gating setting that differ from the man
   assert.deepEqual(check(source(`HOME_TAB_ICON_LIGHT = 'media/home/home-tab-light.svg'`, `HOME_TAB_ICON_LIGHT = 'media/home.svg'`)), ['permanent tab Home: its light icon is "media/home/home-tab-light.svg" in the manifest, "media/home.svg" in src/frameIdentifiers.ts']);
   assert.deepEqual(check(source(`BOARD_TAB_SETTING = 'ritemark.features.task-board'`, `BOARD_TAB_SETTING = 'ritemark.features.board'`)), ['permanent tab Task board: its setting is "ritemark.features.task-board" in the manifest, "ritemark.features.board" in src/frameIdentifiers.ts']);
   const result = runOnFixture(({ pkg: same, identifiers: text }) => ({ pkg: same, identifiers: text.replace(`BOARD_TAB_TITLE = 'Task board'`, `BOARD_TAB_TITLE = 'Tasks'`) }));
-  assert.deepEqual(result, { status: 1, out: ['permanent tab Task board: its title is "Task board" in the manifest, "Tasks" in src/frameIdentifiers.ts'] });
+  assert.deepEqual(result, { status: 1, out: ['permanent tab Task board: its title is "Task board" in the manifest, "Tasks" in src/frameIdentifiers.ts'], err: [] });
   assert.deepEqual(frameMismatches(product, pkg, identifiers), [], 'the values that match pass');
 });
 
@@ -119,4 +120,94 @@ test('the check runs when it is reached through a symlink', () => {
 test('a shell from before the manifest draws no slots: nothing to fill', () => {
   const { ritemarkFrame: _frame, ...older } = product;
   assert.deepEqual(frameMismatches(older, pkg, identifiers), []);
+});
+
+// --- Sprint 159: a place with a setting -------------------------------------------------------------------------
+
+const DECKS = 'ritemark.features.decks';
+const SLIDES = 'workbench.view.extension.ritemark-slide-library';
+const slidesPlace = { id: SLIDES, title: 'Slide library', order: 0.55, icon: 'media/slide-library-icon.svg', setting: DECKS };
+
+/** This package.json with a Slide library place behind the `decks` flag, as the Decks branch has it, changed by `change`. */
+function withSlides(change = () => {}) {
+  const changed = clone(pkg);
+  changed.contributes.viewsContainers.activitybar.push({ id: 'ritemark-slide-library', title: 'Slide library', icon: 'media/slide-library-icon.svg' });
+  changed.contributes.views['ritemark-slide-library'] = [{ type: 'webview', id: 'ritemark.slideLibraryView', name: 'Slide library', when: `config.${DECKS}` }];
+  const section = changed.contributes.configuration.find(entry => entry.properties) ?? changed.contributes.configuration[0];
+  section.properties[DECKS] = { type: 'boolean', default: false, description: 'Decks' };
+  change(changed);
+  return changed;
+}
+
+/** This product.json with the Slide library place in its manifest (after Tasks), changed by `place`. */
+function productWithSlides(place = slidesPlace) {
+  const changed = clone(product);
+  const places = changed.ritemarkFrame.places.filter(entry => entry.id !== SLIDES);
+  places.splice(places.findIndex(entry => entry.id === 'workbench.view.extension.ritemark-tasks') + 1, 0, place);
+  changed.ritemarkFrame.places = places;
+  return changed;
+}
+
+test('a place with a setting passes when its setting is a boolean off by default and every view in it is shown on config.<setting>', () => {
+  assert.deepEqual(frameMismatches(productWithSlides(), withSlides(), identifiers), []);
+});
+
+test('a place\'s setting that isn\'t a boolean of the extension\'s, or is on by default, or a view shown on anything else, is refused', () => {
+  assert.deepEqual({
+    notASetting: frameMismatches(productWithSlides({ ...slidesPlace, setting: 'ritemark.features.slides' }), withSlides(), identifiers),
+    notABoolean: frameMismatches(productWithSlides(), withSlides(changed => { changed.contributes.configuration.find(entry => entry.properties?.[DECKS]).properties[DECKS] = { type: 'string', default: 'off' }; }), identifiers),
+    onByDefault: frameMismatches(productWithSlides(), withSlides(changed => { changed.contributes.configuration.find(entry => entry.properties?.[DECKS]).properties[DECKS].default = true; }), identifiers),
+    anotherWhen: frameMismatches(productWithSlides(), withSlides(changed => { changed.contributes.views['ritemark-slide-library'].push({ id: 'ritemark.slideLibraryHelp', name: 'Help', when: `config.${DECKS} && workspaceFolderCount > 0` }, { id: 'ritemark.slideLibraryAlways', name: 'Always' }); }), identifiers),
+  }, {
+    notASetting: [
+      `place ${SLIDES}: its setting "ritemark.features.slides" is not a boolean setting in package.json`,
+      `place ${SLIDES}: its view ritemark.slideLibraryView is shown on "config.${DECKS}", the manifest seeds it on "config.ritemark.features.slides"`,
+    ],
+    notABoolean: [
+      `place ${SLIDES}: its setting "${DECKS}" is not a boolean setting in package.json`,
+    ],
+    onByDefault: [
+      `place ${SLIDES}: its setting ${DECKS} is true by default; a place with a setting is off by default (one that is on has no setting)`,
+    ],
+    anotherWhen: [
+      `place ${SLIDES}: its view ritemark.slideLibraryHelp is shown on "config.${DECKS} && workspaceFolderCount > 0", the manifest seeds it on "config.${DECKS}"`,
+      `place ${SLIDES}: its view ritemark.slideLibraryAlways is shown on undefined, the manifest seeds it on "config.${DECKS}"`,
+    ],
+  });
+});
+
+test('a place off by default that the manifest draws always (no setting) is refused, naming the setting it needs', () => {
+  const { setting: _setting, ...always } = slidesPlace;
+  assert.deepEqual(frameMismatches(productWithSlides(always), withSlides(), identifiers), [
+    `place ${SLIDES}: off by default in package.json (config.${DECKS}), but the manifest draws it always: give it "setting": "${DECKS}"`,
+  ]);
+});
+
+test('decision 2: an older shell\'s manifest without a place that is off by default passes, and the CLI says why on stderr', () => {
+  const older = clone(product);
+  older.ritemarkFrame.places = older.ritemarkFrame.places.filter(entry => entry.id !== SLIDES);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-frame-older-'));
+  try {
+    const productFile = path.join(dir, 'product.json');
+    fs.writeFileSync(productFile, JSON.stringify(older));
+    const accepted = runOnFixture(({ identifiers: source }) => ({ pkg: withSlides(), identifiers: source }), productFile);
+    // Not off by default: on by default, or one of its views shown always, or on two flags
+    const onByDefault = runOnFixture(({ identifiers: source }) => ({ pkg: withSlides(changed => { changed.contributes.configuration.find(entry => entry.properties?.[DECKS]).properties[DECKS].default = true; }), identifiers: source }), productFile);
+    const shownAlways = frameMismatches(older, withSlides(changed => { changed.contributes.views['ritemark-slide-library'].push({ id: 'ritemark.slideLibraryAlways', name: 'Always' }); }), identifiers);
+    const twoFlags = frameMismatches(older, withSlides(changed => {
+      changed.contributes.views['ritemark-slide-library'].push({ id: 'ritemark.slideLibraryOther', name: 'Other', when: 'config.ritemark.features.other' });
+      changed.contributes.configuration.find(entry => entry.properties?.[DECKS]).properties['ritemark.features.other'] = { type: 'boolean', default: false };
+    }), identifiers);
+    const missing = `place ${SLIDES}: not in the manifest (it would arrive after the first frame)`;
+    assert.deepEqual({ accepted, onByDefault, shownAlways, twoFlags, listed: offByDefaultPlacesMissing(older, withSlides()), listedOnNewer: offByDefaultPlacesMissing(productWithSlides(), withSlides()) }, {
+      accepted: { status: 0, out: [], err: [`place ${SLIDES} is off by default (${DECKS}) and not in this shell's manifest: it shows only once the setting is on, after the first frame`] },
+      onByDefault: { status: 1, out: [missing], err: [] },
+      shownAlways: [missing],
+      twoFlags: [missing],
+      listed: [{ id: SLIDES, setting: DECKS }],
+      listedOnNewer: [],
+    });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

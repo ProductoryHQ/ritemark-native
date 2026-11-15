@@ -595,11 +595,14 @@ moved to Home's place, tabs arrived and the welcome took the window late.
   placeholders, seeded from the manifest), the place the window restores checked and its head drawn (a project with
   none stored opens on Home's place), Home's and the Task board's tabs on a project's first desk (saved webview tabs of
   the built-in extension, revived when its serializers register), the welcome alone in the welcome's window, the AI
-  column in a project window, and a restored terminal's tab with its name and its icon's room.
+  column in a project window, and a restored terminal's tab with its name and its icon's room. A place behind a feature
+  flag (the manifest's `setting`, Sprint 159) is seeded with its views' `when: config.<setting>`, so it is there only
+  while the flag is on.
 - **Version skew.** An extension release runs in an older shell, so `release-extension-preflight.sh` compares every
   identifier the manifest at its `--ref` names with the extension's own (`package.json`, and `src/frameIdentifiers.ts`
   for those that live in code) and refuses a release that adds, removes or renames one
-  (`scripts/check-frame-manifest.mjs`); `frameIdentifiers.test.ts` keeps the frame-shaping defaults equal;
+  (`scripts/check-frame-manifest.mjs`), except a place off by default that an older manifest doesn't name (Sprint 159,
+  decision 2); `frameIdentifiers.test.ts` keeps the frame-shaping defaults equal;
   `validate-build-output.sh` fails a build without the block. `scripts/qa/project-check.mjs --first-frame` fails when the
   frame moves after its first frame, in five starts.
 - **The loading look** (PR 3). What a slot shows while its content isn't there yet, the same in every slot: its own
