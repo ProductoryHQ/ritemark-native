@@ -86,6 +86,10 @@ Handout Markdown up to the next slide block…
   - the source is not found: a quiet "missing" line;
   - a `from:` pointing at a deck outside the library reads "From <deck>", with no update actions.
 - **Ids** are 4 characters, base36, unique within the deck. A duplicate id from a paste gets a new one (the guard, section 5).
+- **As built in PR 4 (two changes from this plan, accepted by the Development manager on 15 November):**
+  1. **The host reads the copy; the view doesn't write it out part by part.** One part's Markdown, serialised on its own in the webview, can differ from what the file holds, and a fresh copy would then read as changed. So the host reads a copy's state from the deck's document. Update the library, Use it and Add to library send the slide's id and the deck's whole text as the view holds it, written by the same writer that writes the file. The host reads the slide from that text by id, so the newest words count even before they reach the document.
+  2. **The stamp leaves out formatting-only differences in the handout:** list markers, emphasis marks at a word's edge, escapes, heading marks and ordered-list numbers. A `_` or `*` inside a word still counts (`foldMarkdown` in `deckLibraryFormat.ts`).
+  - Also as built: a `from:` that names no `.deck.md` inside the project is no source, so nothing reads or writes it. The AI's tools change an open deck only through its view, and count a change done only once the document holds it.
 
 ### 1.6 The theme: one, not editable
 
