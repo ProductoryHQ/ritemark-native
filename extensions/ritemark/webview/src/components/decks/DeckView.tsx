@@ -26,7 +26,7 @@ import type { DocumentProperties } from '../properties'
 import { SegmentedControl } from '../ui/segmented-control'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
-import { deleteSlide, duplicateSlide, insertSlide, moveSlide, partContent, partIndexAt, restoreSlide, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
+import { deleteSlide, duplicateSlide, insertSlide, moveSlide, partContent, partIndexAt, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
 import type { Fragment, Slice } from '@tiptap/pm/model'
 import { onMessage, sendToExtension } from '../../bridge'
 import { isTrustedDeckTransaction } from './handout/deckGuard'
@@ -482,7 +482,10 @@ export function DeckView({
                     onClick={() => {
                       // The deleted part itself goes back where it was; what was done since stays.
                       const restore = notice.restore
-                      if (editor && restore) {
+                      // Only while the slide is still gone: Cmd+Z may have put it back already.
+                      const id = restore?.content.firstChild ? slideDataOf(restore.content.firstChild.attrs.body).id : undefined
+                      const back = !!editor && !!id && slidesOf(editor.state.doc).some(entry => entry.data.id === id)
+                      if (editor && restore && !back) {
                         dispatch(restoreSlide(editor.state, restore.at, restore.content))
                         requestAnimationFrame(() => pick(restore.at))
                       }
@@ -531,7 +534,8 @@ export function DeckView({
           <div className="deck-stage-group">
             {editor && slide && bigWidth > 0 ? (
               <Stage
-                key={slide.index}
+                // By the slide's id: a new slide at the current place is a new stage, which takes the caret.
+                key={slide.data.id ?? `index-${slide.index}`}
                 editor={editor}
                 slide={slide}
                 theme={theme}

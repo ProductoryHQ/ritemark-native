@@ -79,8 +79,11 @@ export function writeImageRelativeTo(
   } else {
     const ext = path.extname(rawFilename);
     const rawBaseName = path.basename(rawFilename, ext);
-    const sanitizedBaseName = sanitizeImageBaseName(rawBaseName);
-    finalFilename = `${sanitizedBaseName || 'image'}${ext}`;
+    const sanitizedBaseName = sanitizeImageBaseName(rawBaseName) || 'image';
+    // A pasted or dropped picture never replaces another one of the same name: other documents and slides may show
+    // it (Codex on Sprint 157 PR 3). The next free name, `name-2.png`, `name-3.png`, … is used instead.
+    finalFilename = `${sanitizedBaseName}${ext}`;
+    for (let n = 2; fs.existsSync(path.join(targetDir, finalFilename)); n++) finalFilename = `${sanitizedBaseName}-${n}${ext}`;
   }
   const imagePath = path.join(targetDir, finalFilename);
 
