@@ -1436,10 +1436,10 @@ index bfc8839cc65..745739c61f4 100644
  		};
 diff --git a/src/vs/workbench/browser/ritemarkFrame.ts b/src/vs/workbench/browser/ritemarkFrame.ts
 new file mode 100644
-index 00000000000..c8d9ed6da96
+index 00000000000..b11084faab6
 --- /dev/null
 +++ b/src/vs/workbench/browser/ritemarkFrame.ts
-@@ -0,0 +1,532 @@
+@@ -0,0 +1,533 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1662,11 +1662,12 @@ index 00000000000..c8d9ed6da96
 +/**
 + * Sprint 159: whether a view container may be shown now, false only for a frame's place behind a setting that is not
 + * on. A window closed on such a place, with the flag turned off since, opens on VS Code's default place (layout.ts):
-+ * restored, the hidden place drew as the checked one with an empty column until the extensions were read.
++ * restored, the hidden place drew as the checked one with an empty column until the extensions were read. "On" is the
++ * places row's own reading of its views' `when: config.<setting>`: any value the context key counts as true.
 + */
 +export function ritemarkPlaceShown(containerId: string | undefined, configurationService: IConfigurationService, frame = ritemarkFrame): boolean {
 +	const setting = frame.places.find(entry => entry.id === containerId)?.setting;
-+	return !setting || configurationService.getValue(setting) === true;
++	return !setting || !!configurationService.getValue(setting);
 +}
 +
 +/** The built-in copy of the extension, in the app's own extensions folder: its media is there before it starts. */
@@ -2654,10 +2655,10 @@ index ef3388a877f..873b2dbf292 100644
  
 diff --git a/src/vs/workbench/test/browser/ritemarkFrame.test.ts b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
 new file mode 100644
-index 00000000000..7608fb94116
+index 00000000000..7f76b16deb6
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
-@@ -0,0 +1,200 @@
+@@ -0,0 +1,203 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2789,20 +2790,23 @@ index 00000000000..7608fb94116
 +		});
 +	});
 +
-+	test('Sprint 159: a place behind a setting that is off is not restored (layout.ts opens VS Code\'s default place instead); every other place is', () => {
++	test('Sprint 159: a place behind a setting that is off is not restored (layout.ts opens VS Code\'s default place instead); every other place is; "on" is the row\'s own reading', () => {
 +		const frame = readRitemarkFrame(manifest);
 +		const shown = (settings: Record<string, unknown>) => ['workbench.view.extension.ritemark-slide-library', 'workbench.view.extension.ritemark-home', 'workbench.view.explorer', 'workbench.view.search', undefined]
 +			.map(id => ritemarkPlaceShown(id, new TestConfigurationService(settings), frame));
++		// The places row shows the place on its views' `when: config.<setting>`: the restore must agree with it for any value
++		const rowShows = (value: unknown) => store.add(new ContextKeyService(new TestConfigurationService({ 'ritemark.features.decks': value }))).contextMatchesRules(ContextKeyExpr.deserialize('config.ritemark.features.decks'));
++		const values: unknown[] = [undefined, false, true, 'yes', '', 0, 1, ['a']];
 +		assert.deepStrictEqual({
 +			unset: shown({}),
 +			off: shown({ 'ritemark.features.decks': false }),
-+			notTrue: shown({ 'ritemark.features.decks': 'yes' }),
 +			on: shown({ 'ritemark.features.decks': true }),
++			agreesWithTheRow: values.map(value => ritemarkPlaceShown('workbench.view.extension.ritemark-slide-library', new TestConfigurationService({ 'ritemark.features.decks': value }), frame) === rowShows(value)),
 +		}, {
 +			unset: [false, true, true, true, true],
 +			off: [false, true, true, true, true],
-+			notTrue: [false, true, true, true, true],
 +			on: [true, true, true, true, true],
++			agreesWithTheRow: values.map(() => true),
 +		});
 +	});
 +

@@ -185,6 +185,28 @@ test('a place\'s setting that isn\'t a boolean of the extension\'s, or is on by 
   });
 });
 
+test('a setting on VS Code\'s own place (Documents) is refused: only an extension\'s place is shown on one', () => {
+  const product159 = productWithSlides();
+  product159.ritemarkFrame.places = product159.ritemarkFrame.places.map(place => place.id === 'workbench.view.explorer' ? { ...place, setting: DECKS } : place);
+  assert.deepEqual(frameMismatches(product159, withSlides(), identifiers), [
+    'place workbench.view.explorer: VS Code\'s own place can\'t carry a setting (only an extension\'s place is shown on one)',
+  ]);
+});
+
+test('two places off by default missing from an older manifest: each is accepted and named on its own line', () => {
+  const older = clone(product);
+  older.ritemarkFrame.places = older.ritemarkFrame.places.filter(entry => entry.id !== SLIDES);
+  const twoPlaces = withSlides(changed => {
+    changed.contributes.viewsContainers.activitybar.push({ id: 'ritemark-handouts', title: 'Handouts', icon: 'media/handouts.svg' });
+    changed.contributes.views['ritemark-handouts'] = [{ id: 'ritemark.handoutsView', name: 'Handouts', when: 'config.ritemark.features.handouts' }];
+    changed.contributes.configuration.find(entry => entry.properties?.[DECKS]).properties['ritemark.features.handouts'] = { type: 'boolean', default: false };
+  });
+  assert.deepEqual({ problems: frameMismatches(older, twoPlaces, identifiers), accepted: offByDefaultPlacesMissing(older, twoPlaces) }, {
+    problems: [],
+    accepted: [{ id: SLIDES, setting: DECKS }, { id: 'workbench.view.extension.ritemark-handouts', setting: 'ritemark.features.handouts' }],
+  });
+});
+
 test('a place off by default that the manifest draws always (no setting) is refused, naming the setting it needs', () => {
   const { setting: _setting, ...always } = slidesPlace;
   assert.deepEqual(frameMismatches(productWithSlides(always), withSlides(), identifiers), [
@@ -209,7 +231,7 @@ test('decision 2: an older shell\'s manifest without a place that is off by defa
     }), identifiers);
     const missing = `place ${SLIDES}: not in the manifest (it would arrive after the first frame)`;
     assert.deepEqual({ accepted, onByDefault, shownAlways, twoFlags, listed: offByDefaultPlacesMissing(older, withSlides()), listedOnNewer: offByDefaultPlacesMissing(productWithSlides(), withSlides()) }, {
-      accepted: { status: 0, out: [], err: [`place ${SLIDES} is off by default (${DECKS}) and not in this shell's manifest: it shows only once the setting is on, after the first frame`] },
+      accepted: { status: 0, out: [], err: [`place ${SLIDES} is off by default (${DECKS}) and not in this shell's manifest: it shows only once the setting is on, after the first frame and in More`] },
       onByDefault: { status: 1, out: [missing], err: [] },
       shownAlways: [missing],
       twoFlags: [missing],

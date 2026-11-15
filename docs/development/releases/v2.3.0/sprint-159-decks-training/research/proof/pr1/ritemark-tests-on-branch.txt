@@ -1,8 +1,8 @@
 # This branch: ./scripts/test.sh --grep Ritemark (all of Ritemark's shell tests).
 
-(node:2822) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(node:2822) [DEP0025] DeprecationWarning: sys is deprecated. Use util instead.
-(node:2822) ExperimentalWarning: WASI is an experimental feature and might change at any time
+(node:45638) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(node:45638) [DEP0025] DeprecationWarning: sys is deprecated. Use util instead.
+(node:45638) ExperimentalWarning: WASI is an experimental feature and might change at any time
     ✔ the split itself: the last dot, never a leading dot, never a trailing one
     ✔ a tab (no highlights): the extension in its own span inside the name, the text unchanged
     ✔ a tree row (highlights): a filter match across the dot is split with the name
@@ -128,7 +128,7 @@
     ✔ a slot's release is logged once
     ✔ R9: a new profile's places row gets the extension's places as placeholders (not VS Code's own Documents); a stored row is left alone
     ✔ Sprint 159: a seeded place with a setting is in the row at the first frame only while the setting is on; one without is always
-    ✔ Sprint 159: a place behind a setting that is off is not restored (layout.ts opens VS Code's default place instead); every other place is
+    ✔ Sprint 159: a place behind a setting that is off is not restored (layout.ts opens VS Code's default place instead); every other place is; "on" is the row's own reading
     ✔ R3: a project's first desk is Home and the Task board, pinned, Home in front; Home alone with the board's flag off; none without a folder
     ✔ the slot's material for a second, then the mark alone; at a start's main slot the line after ten seconds; disposing takes it all away
     ✔ a wait that began earlier (W5) shows the mark at once, and the slot's moment is the shell's to hand over
@@ -139,4 +139,4 @@
     ✔ a kept page drawn while no look waited is there at once when shown again; one that has only said it is drawing is waited for; a page has one look; no wait outlasts the slot's minute
     ✔ settled twice a look goes on; a slot's moment is its own look's; a gone webview ends the look even when the look stays where it is
     ✔ a tab's look marks its box while it waits (the desk hides its progress line), and the box's next tab ends the last one's look
-  136 passing (396ms)
+  136 passing (399ms)
