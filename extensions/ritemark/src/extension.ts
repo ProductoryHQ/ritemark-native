@@ -519,7 +519,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── Decks (Sprint 157, experience 46) ───────────────────────────────────────
   // A `.deck.md` opens as a deck in the Ritemark editor while the flag `decks` is on.
-  decks = registerDecks(context);
+  decks = registerDecks(context, { newFileFolder: getNewDocumentFolder });
 
   // ── Search, the words layer (Sprint 148, #591) ─────────────────────────────
   // The index of this window's project, in its own worker thread, and its results

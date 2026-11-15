@@ -58,6 +58,8 @@ export class DeckPages implements vscode.Disposable {
   private readonly writes = new Map<string, LibraryWrite>();
   private readonly waiting = new Map<string, (ok: boolean) => void>();
   private requests = 0;
+  /** Sprint 159 (PR 7): decks New just made, whose view selects the title slide's title once it is drawn. */
+  private readonly selectTitle = new Set<string>();
 
   /** `library` gives the project's library, or null when the window has no project folder on disk. */
   constructor(private readonly library: () => DeckLibrary | null = () => null) {}
@@ -70,6 +72,16 @@ export class DeckPages implements vscode.Disposable {
   /** The connected deck view of this webview, if it is one. */
   private viewFor(webview: vscode.Webview): DeckView | undefined {
     return [...this.views].find(view => view.panel.webview === webview);
+  }
+
+  /**
+   * Sprint 159 (PR 7): the deck at `fsPath` was just made by New: its view, once it says which slide it shows (its first
+   * `deck/current`), is told to select the title slide's title. Forgotten after a minute if no view comes.
+   */
+  selectTitleWhenShown(fsPath: string): void {
+    const key = path.normalize(fsPath);
+    this.selectTitle.add(key);
+    setTimeout(() => this.selectTitle.delete(key), 60_000);
   }
 
   /** A deck's panel, while it is open: the active one is where the library inserts. */
@@ -213,6 +225,7 @@ export class DeckPages implements vscode.Disposable {
           connected.count = request.count;
           if (connected === this.activeView()) this.changed.fire();
         }
+        if (this.selectTitle.delete(path.normalize(document.uri.fsPath))) await this.post(webview, { type: 'deck/select-title' });
         return;
       }
       default:

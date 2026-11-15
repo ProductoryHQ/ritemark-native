@@ -10,7 +10,7 @@
  * Every change is one transaction on the slide's node in the handout's editor, so it saves, merges and undoes as the
  * rest of the deck does; Cmd+Z on the stage runs the editor's undo.
  */
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { parseFrom, writeSlideBody, type SlideData } from '../../../../src/decks/deckFormat'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
@@ -40,8 +40,10 @@ interface StageProps {
   /** Settings beside the slide: open, and the button that opens and closes it. */
   settingsOpen: boolean
   onSettings: () => void
-  /** Words to put the caret in once the slide is drawn (a new slide's title). */
+  /** Words to put the caret in once the slide is drawn (a new slide's title); asked again when it changes. */
   initialFocus?: string
+  /** Sprint 159 (PR 7): select those words whole, to be typed over (a deck New just made), rather than put the caret after them. */
+  selectOnFocus?: boolean
   /** A picture pasted or dropped on the slide, read as a data URL. */
   onPicture: (dataUrl: string, filename: string) => void
   /** The lines about where a copy came from, with their actions (Sprint 157, PR 4); else the plain source line. */
@@ -63,8 +65,15 @@ function notesPreview(notes: string | null): string {
   return text.length > 30 ? `${text.slice(0, 30)}…` : text
 }
 
-export function Stage({ editor, slide, theme, borderless, assets, width, onWriting, notesOpen, onNotesOpen, settingsOpen, onSettings, initialFocus, onPicture, sourceLines }: StageProps) {
+export function Stage({ editor, slide, theme, borderless, assets, width, onWriting, notesOpen, onNotesOpen, settingsOpen, onSettings, initialFocus, selectOnFocus, onPicture, sourceLines }: StageProps) {
   const [focusPath, setFocusPath] = useState<string | null>(initialFocus ?? null)
+  const [focusSelect, setFocusSelect] = useState(!!selectOnFocus)
+  // A request that comes after the stage is drawn (the deck's first slide, already shown when New's deck opens)
+  useEffect(() => {
+    if (!initialFocus) return
+    setFocusPath(initialFocus)
+    setFocusSelect(!!selectOnFocus)
+  }, [initialFocus, selectOnFocus])
   const notesRef = useRef<HTMLDivElement>(null)
 
   /** Change this slide's data (and its notes) in one transaction, from the editor's document as it is now. */
@@ -160,8 +169,12 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
     onKey: (path, event) => onKeyRef.current(path, event),
     onSetIcon: (index, name) => write(current => setIcon(current, index, name)),
     focusPath,
-    onFocused: () => setFocusPath(null),
-  }), [onWriting, write, focusPath])
+    focusSelect,
+    onFocused: () => {
+      setFocusPath(null)
+      setFocusSelect(false)
+    },
+  }), [onWriting, write, focusPath, focusSelect])
 
   // The notes, uncontrolled while they have the caret, as the slide's words are.
   useLayoutEffect(() => {

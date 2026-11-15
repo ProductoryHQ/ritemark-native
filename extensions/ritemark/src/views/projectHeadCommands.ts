@@ -38,6 +38,8 @@ export const PROJECT_MENU_COMMANDS: readonly ProjectHeadCommand[] = [
 export const NEW_MENU_COMMANDS: readonly ProjectHeadCommand[] = [
   { id: 'ritemark.projectHead.newText', runs: 'ritemark.newDocument' },
   { id: 'ritemark.projectHead.newTable', runs: 'ritemark.newTable' },
+  // Sprint 159 (PR 7): a deck, empty or a copy of an earlier one; shown only with the `decks` flag on (package.json)
+  { id: 'ritemark.projectHead.newDeck', runs: 'ritemark.decks.new' },
   { id: 'ritemark.projectHead.newFlow', runs: 'ritemark.flows.new' },
   { id: 'ritemark.projectHead.newFile', runs: 'explorer.newFile' },
   { id: 'ritemark.projectHead.newFolderInNew', runs: 'explorer.newFolder' },
