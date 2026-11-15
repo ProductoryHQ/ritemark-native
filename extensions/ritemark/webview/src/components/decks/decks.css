@@ -59,7 +59,20 @@
 .deck-handout .wysiwyg-editor .ProseMirror h4,
 .deck-handout .wysiwyg-editor .ProseMirror h5,
 .deck-handout .wysiwyg-editor .ProseMirror h6 { font-size: 15.5px !important; margin: 12px 0 6px !important; }
-.deck-handout .wysiwyg-editor .ProseMirror pre { font-size: 12.5px !important; line-height: 1.55 !important; }
+/* A prompt in the handout: the prototype's light block in small type, with the document's Copy */
+.deck-handout .wysiwyg-editor .ProseMirror pre.tiptap-code-block {
+  margin: 4px 0 12px !important;
+  padding: 10px 12px !important;
+  border-radius: 8px !important;
+  background: var(--r-surface-muted) !important;
+  box-shadow: inset 0 0 0 1px var(--r-hairline);
+  color: var(--r-ink-strong) !important;
+  font-family: ui-monospace, Menlo, Consolas, monospace !important;
+  font-size: 12.5px !important;
+  line-height: 1.55 !important;
+}
+.deck-handout .wysiwyg-editor .ProseMirror pre.tiptap-code-block code { white-space: pre-wrap !important; overflow-x: visible !important; }
+.deck-handout .wysiwyg-editor .ProseMirror pre.tiptap-code-block [class^="hljs-"] { color: inherit !important; font-style: normal !important; }
 
 /* each slide's part head: its title over a thin line, its number on the right */
 .deck-part-head { position: relative; counter-increment: deck-slide; padding: 14px 40px 0 0; margin: 4px 0 6px; border-top: 1px solid var(--r-hairline); }
