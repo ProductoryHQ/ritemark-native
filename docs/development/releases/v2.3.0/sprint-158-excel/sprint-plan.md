@@ -137,7 +137,7 @@ The full list is in the study. The three that can change the plan:
 
 ## Close-out
 
-All six PRs are merged to main. Jarmo's gate passed: the saved files opened in Excel and Numbers with no repair prompt, including the file typed below and beside the data ("excel on ok", in the Development manager's session).
+All six PRs are merged to main. Jarmo's gate passed: the saved files opened in Excel with no repair prompt, including the file typed below and beside the data ("excel on ok", in the Development manager's session).
 
 | PR | What | Merged |
 | --- | --- | --- |
@@ -155,6 +155,7 @@ All six PRs are merged to main. Jarmo's gate passed: the saved files opened in E
 - **The fonts** are bundled as renamed Latin subsets, Ritemark Grid Sans and Ritemark Grid Serif. Carlito's licence reserves its name for unmodified copies.
 
 **Not run:**
+- **The saved files in Numbers.** Jarmo's "excel on ok" confirms Excel only.
 - **The grid on Windows on a real machine.** Windows' column widths, its 2 px inset and the fonts are in the code and tested, but no one has looked at the grid on Windows.
 - **A real-world set of workbooks.** None arrived, so the tests ran on the study's synthetic files and one Excel for Mac file. Still missing: files saved by Excel 365 on Windows, Google Sheets, Numbers, LibreOffice and pandas, and files with pivots, sparklines, threaded comments or dynamic arrays.
 - **The kill switch's off-state** was checked in a local build with the flag switched off: the grid was read-only and the file unchanged. An edit message sent straight to the host with the flag off was not tried. The host's refusal is covered by `canEditWorkbook`'s test and by the code.
