@@ -1,0 +1,37 @@
+# check-frame-manifest.mjs with the Decks branch's extension (origin/sprint-157-decks at f16be476: its package.json and src/frameIdentifiers.ts)
+
+## main's check, against the 2.2.0 shell (--ref v2.2.0): the fault
+place workbench.view.extension.ritemark-slide-library: not in the manifest (it would arrive after the first frame)
+exit 1
+
+## this branch's check, against the 2.2.0 shell (--ref v2.2.0): decision 2
+place workbench.view.extension.ritemark-slide-library is off by default (ritemark.features.decks) and not in this shell's manifest: it shows only once the setting is on, after the first frame
+exit 0
+
+## this branch's check, against the Decks branch's own product.json (its Slide library place has no setting yet: PR 2 adds it)
+place workbench.view.extension.ritemark-slide-library: off by default in package.json (config.ritemark.features.decks), but the manifest draws it always: give it "setting": "ritemark.features.decks"
+exit 1
+
+## this branch's check, main's extension against the 2.2.0 shell, then against HEAD
+exit 0
+exit 0
+
+## node --test scripts/check-frame-manifest.test.mjs
+✔ this repository's extension fills its shell's frame (25.454667ms)
+✔ the identifiers are read from the module the extension compiles, however it is written (0.141042ms)
+✔ an identifier the check can't read is a mismatch, not a skip (23.757375ms)
+✔ a renamed head command is refused, with its name (25.587833ms)
+✔ a renamed permanent tab is refused, with its name (25.089625ms)
+✔ a permanent tab's title, icons or gating setting that differ from the manifest's are refused, naming the tab and the field (23.632083ms)
+✔ a frame-shaping setting the shell lists is compared even when the extension no longer sets it (0.261166ms)
+✔ a place the manifest doesn't name, a place gone, and a default that differs are refused (0.268375ms)
+✔ a manifest that lists no frame-shaping settings is refused (0.09825ms)
+✔ the check runs when it is reached through a symlink (46.353833ms)
+✔ a shell from before the manifest draws no slots: nothing to fill (0.083958ms)
+✔ a place with a setting passes when its setting is a boolean off by default and every view in it is shown on config.<setting> (0.351917ms)
+✔ a place's setting that isn't a boolean of the extension's, or is on by default, or a view shown on anything else, is refused (0.892042ms)
+✔ a place off by default that the manifest draws always (no setting) is refused, naming the setting it needs (0.249417ms)
+✔ decision 2: an older shell's manifest without a place that is off by default passes, and the CLI says why on stderr (49.581458ms)
+ℹ tests 15
+ℹ pass 15
+ℹ fail 0
