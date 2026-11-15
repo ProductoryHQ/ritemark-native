@@ -85,6 +85,11 @@ async function main() {
     const sorted = buildLayout(model.sheets[0], model.styles, { ...opts, minRows: plain.rows + 3, rowOrder: sortedRows(model.sheets[0], 3, 1, compareCells) })
     assert.equal(sorted.rows, plain.rows + 3)
     assert.equal(new Set(sorted.rowOf).size, sorted.rows, 'no sheet row shows twice')
+    // a sheet whose rows are hidden by default (zeroHeight) doesn't fill the paper with hidden rows to row 1,048,576
+    const hiddenByDefault = { ...model.sheets[0], layout: { ...model.sheets[0].layout, zeroHeight: true } }
+    const zero = buildLayout(hiddenByDefault, model.styles, { minWidth: 3000, minHeight: 3000 })
+    assert.ok(zero.rows <= plain.rows, `rows: ${zero.rows}`)
+    assert.equal(buildLayout(hiddenByDefault, model.styles, { minWidth: 3000, minHeight: 3000, minRows: zero.rows + 5 }).rows, zero.rows + 5)
   }
 
   // The project plan: merges, rotated heads, no sort with merged cells across the rows

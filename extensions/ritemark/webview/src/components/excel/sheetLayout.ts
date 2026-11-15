@@ -183,7 +183,10 @@ export function buildLayout(sheet: SheetModel, styles: WorkbookStyles, opts: Lay
     height += h
     return h
   })
-  while ((height < opts.minHeight || order.length < (opts.minRows ?? 0)) && order.length < 1_048_576) {
+  // On a sheet whose rows are hidden unless they say otherwise (zeroHeight), every row past the data is hidden: none
+  // fills the paper, so filling it would run to Excel's last row (Codex on #726). Only the rows the grid asks for go on.
+  const fillsPaper = !L.zeroHeight
+  while (((fillsPaper && height < opts.minHeight) || order.length < (opts.minRows ?? 0)) && order.length < 1_048_576) {
     const r = order.length
     order.push(r)
     const h = heightOf(r)
