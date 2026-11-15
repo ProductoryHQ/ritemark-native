@@ -7120,10 +7120,10 @@ index 41250d7b714..133c8807b3f 100644
  				agentsWindow: { default: 'custom' },
 diff --git a/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts b/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts
 new file mode 100644
-index 00000000000..9b889529b80
+index 00000000000..fe6727d70a8
 --- /dev/null
 +++ b/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts
-@@ -0,0 +1,164 @@
+@@ -0,0 +1,177 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -7265,9 +7265,16 @@ index 00000000000..9b889529b80
 +		return 'moved';
 +	}
 +
-+	// A new window: marked as a presentation's before its parts are laid out, so it never shows a title row
++	// A new window: marked as a presentation's before its parts are laid out, so it never shows a title row. Only the
++	// first window that opens is marked, and the mark is checked against the part's own window below: no other window
++	// (the browser's, a floating editor, the main window) ever takes a presentation's look.
++	let marked: { window: Window; container: HTMLElement } | undefined;
 +	const opened = auxiliaryWindowService.onDidOpenAuxiliaryWindow(({ window }) => {
-+		markRitemarkPresentingWindow(window.window);
++		if (marked) {
++			return;
++		}
++		marked = { window: window.window, container: window.container };
++		markRitemarkPresentingWindow(window.window, true);
 +		window.container.classList.add('ritemark-presenting');
 +	});
 +	try {
@@ -7280,6 +7287,12 @@ index 00000000000..9b889529b80
 +			mode: request.fullScreen ? AuxiliaryWindowMode.Fullscreen : AuxiliaryWindowMode.Normal
 +		};
 +		const part = await editorGroupsService.createAuxiliaryEditorPart(options);
++		opened.dispose();
++		if (marked && marked.window !== getWindowById(part.windowId)?.window) {
++			// Another window opened first: it is not the presentation's, and keeps its own look
++			markRitemarkPresentingWindow(marked.window, false);
++			marked.container.classList.remove('ritemark-presenting');
++		}
 +		panel.group.moveEditor(panel.editor, part.activeGroup);
 +		part.activeGroup.lock(true);
 +		part.activeGroup.focus();
@@ -7478,7 +7491,7 @@ index 86a3d521e1b..78bbd2e6450 100644
  	}
  
 diff --git a/src/vs/workbench/services/layout/browser/layoutService.ts b/src/vs/workbench/services/layout/browser/layoutService.ts
-index 6851c3b584c..6dff5338c0c 100644
+index 6851c3b584c..686f8932c2d 100644
 --- a/src/vs/workbench/services/layout/browser/layoutService.ts
 +++ b/src/vs/workbench/services/layout/browser/layoutService.ts
 @@ -11,8 +11,8 @@ import { IDimension } from '../../../../base/browser/dom.js';
@@ -7492,7 +7505,7 @@ index 6851c3b584c..6dff5338c0c 100644
  import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
  import { IDisposable } from '../../../../base/common/lifecycle.js';
  
-@@ -733,7 +733,37 @@ export interface IWorkbenchLayoutService extends ILayoutService {
+@@ -733,7 +733,43 @@ export interface IWorkbenchLayoutService extends ILayoutService {
  	getVisibleNeighborPart(part: Parts, direction: Direction): Parts | undefined;
  }
  
@@ -7507,11 +7520,17 @@ index 6851c3b584c..6dff5338c0c 100644
 +/**
 + * Ritemark (Sprint 159): the windows a deck is presented in, the wall and the presenter view
 + * (electron-browser/parts/ritemarkPresent.ts). Each is only its page, edge to edge: no title row, no desk's edge.
++ * A window is one only by its own entry here, so the main window and every other auxiliary window keep their frame.
 + */
 +const ritemarkPresentingWindows = new WeakSet<Window>();
 +
-+export function markRitemarkPresentingWindow(window: Window): void {
-+	ritemarkPresentingWindows.add(window);
++/** Mark (or unmark) one window as a presentation's: set by `_ritemark.present.place` as the window opens. */
++export function markRitemarkPresentingWindow(window: Window, presenting: boolean): void {
++	if (presenting) {
++		ritemarkPresentingWindows.add(window);
++	} else {
++		ritemarkPresentingWindows.delete(window);
++	}
 +}
 +
 +export function isRitemarkPresentingWindow(window: Window): boolean {
