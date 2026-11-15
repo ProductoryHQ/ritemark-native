@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx'
 import { cellValueFromText, type CellValue } from '../../../../src/excel/cellEdit'
 import { cellKey, codeOf, type CellModel, type WorkbookModel } from './readWorkbook'
 import { formatCellValue, inputText, valueFromInput } from './numberFormat'
+import { styleIndexOf } from './sheetLayout'
 
 export const MAX_DISPLAY_ROWS = 10000
 
@@ -88,8 +89,9 @@ export function modelSource(model: WorkbookModel): SheetSource {
       return inputText(cell.value as CellValue | boolean, codeOf(model, cell.s), model.date1904)
     },
     valueFor(name, row, col, text) {
-      const cell = sheetOf(name)?.cells.get(cellKey(row, col))
-      return valueFromInput(text, cell ? codeOf(model, cell.s) : 'General', model.date1904)
+      // an empty cell reads its input by its row's or column's format, as the save styles it (review of #726)
+      const sheet = sheetOf(name)
+      return valueFromInput(text, sheet ? codeOf(model, styleIndexOf(sheet, row, col)) : 'General', model.date1904)
     },
     write(name, row, col, value) {
       const sheet = sheetOf(name)
@@ -102,7 +104,8 @@ export function modelSource(model: WorkbookModel): SheetSource {
         else sheet.cells.delete(key)
         return previous
       }
-      const s = previous?.s ?? 0
+      // a new cell takes its row's style, else its column's, as the save writes it and Excel does (review of #726)
+      const s = previous?.s ?? styleIndexOf(sheet, row, col)
       const out = formatCellValue(value, codeOf(model, s), model.date1904)
       const cell: CellModel = { kind: typeof value === 'number' ? 'n' : 's', value, text: out.text, s }
       if (out.color) cell.color = out.color

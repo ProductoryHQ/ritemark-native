@@ -4,7 +4,8 @@ import * as path from 'path';
 import { ExcelDocument } from './excelDocument';
 import { CellEditRefused, SaveCheckFailed } from './excel/applyCellEdits';
 import { PackageError } from './excel/xlsxPackage';
-import { cellValueFromText, isCellEdit, type CellEdit } from './excel/cellEdit';
+import { canEditWorkbook, cellValueFromText, isCellEdit, type CellEdit } from './excel/cellEdit';
+import { isEnabled } from './features';
 import { isAppInstalled, openInExternalApp, openCsvInExcelWithHints, getSpreadsheetAppName } from './utils/openExternal';
 import { trackEvent } from './analytics/posthog';
 
@@ -51,10 +52,10 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   /**
-   * Only .xlsx supports editing; .xls is read-only
+   * Only .xlsx supports editing, while the `excel-editing` flag (the kill switch) is on; .xls is read-only
    */
   private isEditable(document: ExcelDocument): boolean {
-    return document.uri.fsPath.toLowerCase().endsWith('.xlsx');
+    return canEditWorkbook(document.uri.fsPath, isEnabled('excel-editing'));
   }
 
   /**
@@ -195,7 +196,10 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
   private async handleCellEdit(document: ExcelDocument, webview: vscode.Webview, message: Record<string, unknown>): Promise<void> {
     const id = message.id;
     const raw = message.edit;
-    if (!this.isEditable(document) || !isCellEdit(raw)) {
+    if (!isCellEdit(raw)) return;
+    if (!this.isEditable(document)) {
+      // read-only (an .xls, or editing turned off): refused here, whatever the webview sent, and the cell goes back
+      webview.postMessage({ type: 'cellEditResult', id, ok: false, reason: 'This workbook opens read-only here.' });
       return;
     }
     const edit: CellEdit = {
@@ -391,7 +395,8 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
       filename: filename,
       sizeBytes: document.buffer.length,
       loadId: ++this.loadCount,
-      pendingEdits: document.edits
+      pendingEdits: document.edits,
+      editable: this.isEditable(document)
     });
   }
 

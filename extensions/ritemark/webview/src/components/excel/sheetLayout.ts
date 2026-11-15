@@ -47,9 +47,10 @@ export interface LayoutOptions {
   /** Fill at least this much: the grid runs to the paper's edges (decision 9). */
   minWidth: number
   minHeight: number
-  /** Extra rows and columns from Add row and the + column. */
-  extraRows?: number
-  extraCols?: number
+  /** At least this many rows and columns: the sheet goes on past the paper's edge as Excel's does, and the grid
+   *  asks for more as the person moves or scrolls there (Sprint 158 PR 5). */
+  minRows?: number
+  minCols?: number
   /** The rows under the frozen ones in a sort's order (sortedRows), worked out when the sort was chosen and kept
    *  through edits, as Excel keeps a sorted range: an edit doesn't move its row. */
   rowOrder?: number[]
@@ -145,15 +146,14 @@ export function buildLayout(sheet: SheetModel, styles: WorkbookStyles, opts: Lay
   }
   const colWidths: number[] = []
   let width = 0
-  const lastUsedC = usedC + (opts.extraCols ?? 0)
-  for (let c = 0; c < 16384 && (c <= lastUsedC || width < opts.minWidth); c++) {
+  for (let c = 0; c < 16384 && (c <= usedC || width < opts.minWidth || c < (opts.minCols ?? 0)); c++) {
     const w = widthOf(c)
     colWidths.push(w)
     width += w
   }
 
   // rows: the frozen ones, then the rest in display order (sorted, when a sort is chosen)
-  const lastUsedR = usedR + (opts.extraRows ?? 0)
+  const lastUsedR = usedR
   const heightOf = (r: number): number => {
     if (sheet.hiddenRows.has(r)) return 0
     const def = L.rows.get(r)
@@ -183,7 +183,10 @@ export function buildLayout(sheet: SheetModel, styles: WorkbookStyles, opts: Lay
     height += h
     return h
   })
-  while (height < opts.minHeight && order.length < 1_048_576) {
+  // On a sheet whose rows are hidden unless they say otherwise (zeroHeight), every row past the data is hidden: none
+  // fills the paper, so filling it would run to Excel's last row (Codex on #726). Only the rows the grid asks for go on.
+  const fillsPaper = !L.zeroHeight
+  while (((fillsPaper && height < opts.minHeight) || order.length < (opts.minRows ?? 0)) && order.length < 1_048_576) {
     const r = order.length
     order.push(r)
     const h = heightOf(r)

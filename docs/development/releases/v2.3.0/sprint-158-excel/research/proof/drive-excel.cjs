@@ -5,6 +5,7 @@
  *   NODE_PATH=<checkout>/vscode/node_modules node drive-excel.cjs <port> shot <out.png>
  *   NODE_PATH=… node drive-excel.cjs <port> edit <row> <col> <text>     row and col 0-based, as the grid shows them
  *   NODE_PATH=… node drive-excel.cjs <port> save
+ *   NODE_PATH=… node drive-excel.cjs <port> cell <ref> [2]              choose a sheet-grid cell (A27) by a click; 2 double-clicks to edit it
  *   NODE_PATH=… node drive-excel.cjs <port> eval <expression>          run in the Excel webview's own document
  *
  * Mouse and keyboard go through the workbench page (Input.dispatch*), at the cell's place on screen: the webview's
@@ -127,6 +128,30 @@ async function main() {
     }
     await sleep(400);
     console.log('clicked', x, y, count);
+  } else if (action === 'cell') {
+    // a click on a sheet-grid cell by its reference (A27), where its column letter and row number meet
+    const [, letters, digits] = /^([A-Z]+)(\d+)$/.exec(rest[0]);
+    const web = await excelWebview();
+    const outer = await evaluate(wb, `(() => { const all = [...document.querySelectorAll('iframe.webview')].filter(f => f.getBoundingClientRect().width > 0); const f = all.find(f => f.parentElement.classList.contains('ritemark-desk-webview')) || all.sort((a, b) => b.getBoundingClientRect().width - a.getBoundingClientRect().width)[0]; const r = f.getBoundingClientRect(); return { x: r.left, y: r.top }; })()`);
+    const inner = await evaluate(web, inFrame(`
+      const af2 = document.getElementById('active-frame').getBoundingClientRect();
+      const heads = [...d.querySelectorAll('.sg-head')];
+      const col = heads.find((e) => e.classList.contains('sg-col-head') && e.textContent.trim() === ${JSON.stringify(letters)});
+      const row = heads.find((e) => !e.classList.contains('sg-col-head') && e.textContent.trim() === ${JSON.stringify(digits)});
+      if (!col || !row) return null;
+      const cx = col.getBoundingClientRect(), ry = row.getBoundingClientRect();
+      return { x: af2.left + cx.left + cx.width / 2, y: af2.top + ry.top + ry.height / 2 };`));
+    if (!inner) throw new Error(`${rest[0]} isn't drawn`);
+    const x = outer.x + inner.x;
+    const y = outer.y + inner.y;
+    // `cell A27 2`: a double click, which opens the cell's editor for `type`
+    for (let n = 1; n <= Number(rest[1] ?? 1); n++) {
+      await wb.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: n });
+      await wb.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: n });
+    }
+    await sleep(400);
+    console.log('chose', rest[0]);
+    web.close();
   } else if (action === 'type') {
     await wb.send('Input.insertText', { text: rest.join(' ') });
     await sleep(200);

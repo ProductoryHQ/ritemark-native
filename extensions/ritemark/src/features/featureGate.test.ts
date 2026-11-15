@@ -6,6 +6,7 @@
 
 import * as assert from 'assert';
 import { FLAGS } from './flags';
+import { canEditWorkbook } from '../excel/cellEdit';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -113,5 +114,15 @@ assert.strictEqual(featureProperties['ritemark.features.composer-thinking-effort
 // Sprint 148 (#591): the search index's kill switch, on by default (HARD RULE #2).
 assert.strictEqual(FLAGS['project-search'].status, 'experimental');
 assert.strictEqual(featureProperties['ritemark.features.project-search']?.default, true);
+// Sprint 158 (#711): Excel editing's kill switch, on everywhere by default (HARD RULE #2). Off, an .xlsx is read-only
+// and the host refuses its edits; an .xls is read-only either way.
+for (const platform of ['darwin', 'win32', 'linux'] as Platform[]) {
+  assert.strictEqual(isEnabledPure('excel-editing', FLAGS as Record<string, FeatureFlag>, platform, {}), true, `excel-editing on ${platform}`);
+}
+assert.strictEqual(canEditWorkbook('/w/Budget.XLSX', true), true, 'flag on: an .xlsx is editable');
+assert.strictEqual(canEditWorkbook('/w/Budget.xlsx', false), false, 'flag off: an .xlsx is read-only');
+assert.strictEqual(canEditWorkbook('/w/Old.xls', true), false, 'an .xls is read-only with the flag on');
+assert.strictEqual(canEditWorkbook('/w/Old.xls', false), false);
+assert.strictEqual(isEnabledPure('excel-editing', { ...FLAGS, 'excel-editing': { ...FLAGS['excel-editing'], status: 'disabled' } } as Record<string, FeatureFlag>, 'darwin', {}), false, 'the switch turns it off');
 
 console.log('All feature gate tests passed.');

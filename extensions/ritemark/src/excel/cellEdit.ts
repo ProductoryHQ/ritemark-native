@@ -43,6 +43,12 @@ export function coalesceEdits(edits: readonly CellEdit[]): CellEdit[] {
   return [...last.values()];
 }
 
+/** Whether a workbook may be edited: an .xlsx, while the `excel-editing` flag is on. A legacy .xls stays read-only
+ *  (a save would re-encode it as .xlsx). The host decides, and refuses edits otherwise, whatever the webview sends. */
+export function canEditWorkbook(fsPath: string, editingOn: boolean): boolean {
+  return editingOn && fsPath.toLowerCase().endsWith('.xlsx');
+}
+
 export function isCellEdit(value: unknown): value is CellEdit {
   if (!value || typeof value !== 'object') return false;
   const e = value as Record<string, unknown>;
