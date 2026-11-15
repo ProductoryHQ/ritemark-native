@@ -89,7 +89,7 @@ function testRecordedEnd(): void {
   // A usage limit: the failed turn is still unanswered context for the model, but the chat adds no line.
   const limit = packFor([event('boundary', 3, {
     turnId: 'turn-limit', runtimeId: 'opencode', boundaryKind: 'failed',
-    message: "You've used Gemini 3.8 Flash's limit for now. It can answer again in a minute. Until then, use another model.",
+    message: "You've used Gemini 3.8 Flash's limit for now. Try again later, or use another model.",
     errorKind: 'limit', errorDetail: { limit: 'plan', retryAt: '2026-11-16T01:00:41.000Z', model: 'google/gemini-3.8-flash' },
   })]);
   assert.match(limit.text, /Now shorten it/);

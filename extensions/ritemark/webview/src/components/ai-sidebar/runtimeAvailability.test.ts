@@ -4,6 +4,7 @@ import {
   deriveRuntimeAvailabilities,
   listReadyAlternatives,
   resolveAvailableRuntimeModel,
+  stillLimitedOpenCodeModels,
   type RuntimeAvailabilityInput,
 } from './runtimeAvailability'
 
@@ -156,6 +157,31 @@ const catalogs = {
   const noKey = { ...limitCatalogs, acpProviders: { google: true, openai: false, anthropic: false, openrouter: false } }
   assert.equal(anotherOpenCodeModel('openai/gpt-5.6', noKey), 'google/gemini-3.8-flash', 'never a provider without a key')
   assert.equal(anotherOpenCodeModel(undefined, limitCatalogs), 'google/gemini-3.8-flash', 'the model unknown: the first one')
+
+  // Review finding 2: two models at their limit are never offered in turn.
+  assert.equal(
+    anotherOpenCodeModel('google/gemini-3.8-pro', limitCatalogs, ['google/gemini-3.8-flash']),
+    'openai/gpt-5.6',
+    'Flash is still at its limit: another provider instead',
+  )
+  assert.equal(anotherOpenCodeModel('google/gemini-3.8-pro', limitCatalogs, ['opencode:google/gemini-3.8-flash', 'openai/gpt-5.6']), null, 'nothing left')
+
+  const now = Date.parse('2026-11-16T13:00:00.000Z')
+  const turn = (model: string, extra: { retryAt?: string } = {}, runtime = 'opencode') => ({
+    runtime,
+    timestamp: now - 60_000,
+    result: { errorKind: 'limit', errorDetail: { limit: 'plan' as const, model, ...extra } },
+  })
+  assert.deepEqual(stillLimitedOpenCodeModels([
+    turn('google/gemini-3.8-flash', { retryAt: '2026-11-16T13:00:41.000Z' }),
+    turn('google/gemini-3.8-pro', { retryAt: '2026-11-16T12:59:00.000Z' }),
+    turn('google/gemini-4-argon'),
+    turn('openai/gpt-5.6', {}, 'codex'),
+    { runtime: 'opencode', timestamp: now, result: { errorKind: 'limit', errorDetail: { billing: 'google', limit: 'quota' } } },
+    { runtime: 'opencode', timestamp: now - 2 * 24 * 3600_000, result: { errorKind: 'limit', errorDetail: { limit: 'plan', model: 'google/gemini-old' } } },
+    { runtime: 'opencode', timestamp: now },
+  ], now), ['google/gemini-3.8-flash', 'google/gemini-4-argon'],
+  'a time still ahead, or no time and less than a day old; never a passed time, another AI, a quota, or an old turn')
 }
 
 console.log('runtimeAvailability tests passed.')

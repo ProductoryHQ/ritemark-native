@@ -13,7 +13,7 @@ import { Icon, type PhosphorIconName } from '../ui/Icon';
 import { RuntimeNotice } from './RuntimeNotice';
 import { useActiveConversation, useAISidebarStore } from './store';
 import { defaultCodexModelId } from './modelPresentation';
-import { anotherOpenCodeModel, deriveRuntimeAvailabilities, listReadyAlternatives, resolveAvailableRuntimeModel } from './runtimeAvailability';
+import { anotherOpenCodeModel, deriveRuntimeAvailabilities, listReadyAlternatives, resolveAvailableRuntimeModel, stillLimitedOpenCodeModels } from './runtimeAvailability';
 import { vscode } from '../../lib/vscode';
 import { turnFailureCard, type ModelNames } from '../../../../src/runtime/turnFailureCopy';
 import type { AgentId, ByokModelOption, ModelOption, RuntimeErrorDetail, RuntimeErrorKind } from './types';
@@ -112,16 +112,6 @@ export function TurnFailureCard({
         ? findModel(codexModels, id)?.label
         : openCodeLabel(byokProviderModels, id),
   };
-  // OpenCode has no default to fall back on: only its usage-limit card offers another model (Sprint 160,
-  // #686). Its model card still asks the person to choose one.
-  const fallbackModel = runtimeId === 'claude-code'
-    ? (defaultClaudeModel || models[0]?.id)
-    : runtimeId === 'codex'
-      ? defaultCodexModelId(codexModels)
-      : errorKind === 'limit' && errorDetail?.limit === 'plan'
-        ? anotherOpenCodeModel(errorDetail.model, { opencode: byokProviderModels, acpProviders }) ?? undefined
-        : undefined;
-
   // "Switched" follows the chat's own model: the switch was taken (now or before a restart), or the
   // restore fell back to the default. A switch the person declines (Claude's background-work
   // question) leaves the card offering it.
@@ -130,7 +120,18 @@ export function TurnFailureCard({
     : runtimeId === 'codex'
       ? conversation.codexSelectedModel
       : conversation.opencodeSelectedModel.replace(/^opencode:/, '');
-  const offersModel = errorKind === 'model' || (runtimeId === 'opencode' && errorKind === 'limit' && errorDetail?.limit === 'plan');
+  // OpenCode has no default to fall back on: only its usage-limit card offers another model (Sprint 160,
+  // #686), never one the chat found at its limit and still is. Its model card still asks the person to choose.
+  const openCodeLimit = runtimeId === 'opencode' && errorKind === 'limit' && errorDetail?.limit === 'plan';
+  const fallbackModel = runtimeId === 'claude-code'
+    ? (defaultClaudeModel || models[0]?.id)
+    : runtimeId === 'codex'
+      ? defaultCodexModelId(codexModels)
+      : openCodeLimit && errorDetail?.model
+        ? anotherOpenCodeModel(errorDetail.model, { opencode: byokProviderModels, acpProviders }, stillLimitedOpenCodeModels(conversation.codexConversation)) ?? undefined
+        : undefined;
+  // A failure that names no model (the model unknown) offers no switch, so it can never read as taken.
+  const offersModel = errorKind === 'model' || openCodeLimit;
   const alreadySwitched = isLatest && offersModel && fallbackModel && currentModel === fallbackModel
     && errorDetail?.model !== fallbackModel
     ? fallbackModel

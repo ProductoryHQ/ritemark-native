@@ -335,6 +335,11 @@ export function googleRetryDelaySeconds(text: string): number | undefined {
   return undefined;
 }
 
+/** Sprint 160: Google's quota line for a model the key has no quota for ("…, limit: 0, model: …"). */
+const GOOGLE_NO_QUOTA = /Quota exceeded for metric:[^\n]*?\blimit:\s*0\b/i;
+/** Sprint 160: a daily quota, named in QuotaFailure's quotaId ("GenerateRequestsPerDayPerProjectPerModel-FreeTier"). */
+const GOOGLE_DAILY_QUOTA = /PerDay/;
+
 function retryAtTime(text: string, now: number): string | undefined {
   const iso = /try again (?:at|after)\s+(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)/i.exec(text);
   if (iso) {
@@ -506,11 +511,17 @@ export function classifyRuntimeError(
           ? 'openai'
           : modelProvider;
       // Sprint 160 (#686): Google's 429 that says when to retry ("Please retry in 41s.", RetryInfo) is the
-      // model's usage limit for now, not a key that needs credits. Without a time it stays the quota card.
-      const retrySeconds = agentId === 'opencode' && billing === 'google' ? googleRetryDelaySeconds(raw) : undefined;
+      // model's usage limit for now, not a key that needs credits. Without a time it stays the quota card,
+      // and so does a quota of "limit: 0" (the key has none for this model: waiting never helps). A daily
+      // quota (`…PerDay…`) is a limit, but Google's seconds then name no real time, so the card gives none.
+      const retrySeconds = agentId === 'opencode' && billing === 'google' && !GOOGLE_NO_QUOTA.test(haystack)
+        ? googleRetryDelaySeconds(raw)
+        : undefined;
       if (retrySeconds !== undefined) {
         const model = hints?.turnModel?.replace(/^opencode:/, '');
-        const retryAt = retrySeconds <= 24 * 3600 ? new Date(Date.now() + Math.ceil(retrySeconds) * 1000).toISOString() : undefined;
+        const retryAt = retrySeconds <= 24 * 3600 && !GOOGLE_DAILY_QUOTA.test(raw)
+          ? new Date(Date.now() + Math.ceil(retrySeconds) * 1000).toISOString()
+          : undefined;
         return finish(agentId, 'limit', providerSentence, hints, {
           limit: 'plan',
           ...(model ? { model } : {}),

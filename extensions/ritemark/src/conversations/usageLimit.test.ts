@@ -23,7 +23,7 @@ function uuid(value: number): string {
   return `30000000-0000-4000-8000-${value.toString().padStart(12, '0')}`;
 }
 
-const LIMIT_SENTENCE = "You've used Gemini 3.8 Flash's limit for now. It can answer again in a minute. Until then, use another model.";
+const LIMIT_SENTENCE = "You've used Gemini 3.8 Flash's limit for now. Try again later, or use another model.";
 
 async function run(): Promise<void> {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-usage-limit-'));

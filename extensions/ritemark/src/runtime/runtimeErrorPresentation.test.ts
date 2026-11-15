@@ -516,12 +516,24 @@ console.log('runtimeErrorPresentation: Sprint 139 card copy passes');
   assert.equal(timed?.detail?.model, 'google/gemini-3.8-flash');
   const retryAt = Date.parse(timed?.detail?.retryAt ?? '');
   assert.ok(retryAt - before >= 41_000 && retryAt - before < 47_000, 'forty-two seconds from now');
-  assert.equal(timed?.sentence, "You've used Gemini 3.8 Flash's limit for now. It can answer again in a minute. Until then, use another model.");
+  // The sentence the record keeps has no time, which would read wrong later; the card shows it.
+  assert.equal(timed?.sentence, "You've used Gemini 3.8 Flash's limit for now. Try again later, or use another model.");
   assert.doesNotMatch(timed?.sentence ?? '', /credits|AI Studio|RESOURCE_EXHAUSTED|429/);
   // Through OpenCode's ACP wrapper, and as the message alone or the RetryInfo alone.
   assert.equal(classifyRuntimeError('opencode', `Internal error: ${googleBody(true)}`, hints)?.detail?.limit, 'plan');
   assert.equal(classifyRuntimeError('opencode', 'You exceeded your current quota, please check your plan and billing details. Please retry in 41s.', hints)?.detail?.limit, 'plan');
   assert.equal(classifyRuntimeError('opencode', '{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED","details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"7s"}]}}', hints)?.detail?.limit, 'plan');
+
+  // A key with no quota for the model ("limit: 0") is never "for now": waiting won't help, so the quota card.
+  assert.deepEqual(
+    classifyRuntimeError('opencode', 'Internal error: You exceeded your current quota, please check your plan and billing details.\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-4-argon\nPlease retry in 41s.', hints)?.detail,
+    { billing: 'google', limit: 'quota' },
+  );
+  // A daily quota: the model's limit, but Google's seconds are no real time, so the card gives none.
+  assert.deepEqual(
+    classifyRuntimeError('opencode', googleBody(true).replace('PerMinutePerProjectPerModel', 'PerDayPerProjectPerModel'), hints)?.detail,
+    { limit: 'plan', model: 'google/gemini-3.8-flash' },
+  );
 
   // Without the time: the quota card, as before.
   assert.deepEqual(classifyRuntimeError('opencode', googleBody(false), hints)?.detail, { billing: 'google', limit: 'quota' });
@@ -590,11 +602,14 @@ console.log('runtimeErrorPresentation: Sprint 139 card copy passes');
   // ChatGPT's and Claude's plan cards keep their words.
   assert.equal(turnFailureCard({ runtimeId: 'codex', kind: 'limit', detail: { limit: 'plan' }, sentence: '' })?.title, "You've used ChatGPT's limit for now");
   assert.equal(failureSilencesStatusLine('opencode', 'limit', { limit: 'plan' }), true, 'the card speaks; the status line stays silent');
-  // The sentence the record keeps reads as the card does.
-  assert.equal(
-    failureSentence({ runtimeId: 'opencode', kind: 'limit', detail: { limit: 'plan', model, retryAt: '2026-11-16T13:12:00.000Z' }, providerSentence: '', names, now, formatTime }),
-    "You've used Gemini 3.8 Flash's limit for now. It can answer again after 3:12 PM. Until then, use another model.",
-  );
+  // The sentence the record keeps (comment tasks, task cards) is the card's title with the no-time body, so
+  // it never says "in a minute" days later, nor a time in the host's format (review finding 5).
+  for (const retryAt of ['2026-11-16T13:12:00.000Z', '2026-11-16T13:00:41.000Z', undefined]) {
+    assert.equal(
+      failureSentence({ runtimeId: 'opencode', kind: 'limit', detail: { limit: 'plan', model, ...(retryAt ? { retryAt } : {}) }, providerSentence: '', names }),
+      "You've used Gemini 3.8 Flash's limit for now. Try again later, or use another model.",
+    );
+  }
   // A record keeps the detail.
   assert.deepEqual(decodeRuntimeErrorDetail({ limit: 'plan', model, retryAt: '2026-11-16T13:12:00.000Z' }), { limit: 'plan', model, retryAt: '2026-11-16T13:12:00.000Z' });
   console.log('runtimeErrorPresentation: Sprint 160 usage limit passes');

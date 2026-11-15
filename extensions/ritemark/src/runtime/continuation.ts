@@ -43,7 +43,10 @@ export interface NormalizedRuntimeContext {
   coveredThroughEventId: string | null;
   truncated: boolean;
   omittedEventCount: number;
-  /** An earlier request has no completed answer. The model's context marks it unanswered. */
+  /**
+   * An earlier request has no completed answer (the pack's text marks each such request "unanswered" by
+   * itself). Since Sprint 160 nothing decides on it; the chat's line reads {@link hasUnendedRequest}.
+   */
   hasUnansweredRequest: boolean;
   /**
    * Sprint 160 (#686): an earlier request has no completed answer and no
