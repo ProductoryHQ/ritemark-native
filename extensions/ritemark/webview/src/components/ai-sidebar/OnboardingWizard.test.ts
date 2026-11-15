@@ -220,6 +220,18 @@ function buttons(root: Root) {
 function words(root: Root, text: string) {
   return root.querySelectorAll('p').filter((p) => p.text.trim() === text)
 }
+/** "Open the page again": its row pulls back the quiet button's 12 px left padding (`px-3`), so the words start where
+ *  the card's text does; the button is the ghost Button at `sm`, whose padding that is. */
+function assertReopenOnTextEdge(card: Root, where: string) {
+  const row = card.querySelector('[data-reopen-row]')
+  assert.ok(row, `${where}: an "Open the page again" row`)
+  assert.ok(row.getAttribute('class')?.split(/\s+/).includes('-ml-3'), `${where}: its row pulls back 12 px`)
+  const button = row.querySelector('button')
+  assert.equal(button?.text.trim(), COPY.reopen)
+  const classes = button?.getAttribute('class')?.split(/\s+/) ?? []
+  assert.ok(classes.includes('px-3') && !classes.some((c) => /^(p|px|pl|ml|-ml)-/.test(c) && c !== 'px-3'), `${where}: the button's own left padding is 12 px, nothing else moves it`)
+}
+
 /** A card by its title. */
 function card(root: Root, title: string) {
   const heading = root.querySelectorAll('div').find((el) => el.text.trim() === title && el.getAttribute('class')?.includes('font-semibold'))
@@ -273,6 +285,9 @@ const startedHere = { ...signedOut, claudeLoginState: 'pending', sheetSignIns: {
   assert.equal(tipOf(COPY.reopen), reopenTip('claude'), `${where}: "Open the page again"'s tooltip is Home's`)
   assert.equal(tipOf(COPY.signingIn), browserOpened('claude'), `${where}: the waiting button says why it waits`)
   for (const t of tooltips) assert.ok(t.tip && t.tip !== 'undefined', `${where}: "${t.words}" has a tooltip`)
+  // Review of #730 (the Experience lead): "Open the page again"'s words sit on the card's text edge, where state 4's
+  // line sits: its row pulls back exactly the quiet button's own left padding
+  assertReopenOnTextEdge(claude, where)
   calls.length = 0
   click(recorded, COPY.cancel, where)
   click(recorded, COPY.reopen, where)
@@ -350,21 +365,24 @@ for (const ended of ['failed', 'timed-out', 'could-not-start'] as const) {
   assert.equal(facts('ready', 'auth-in-progress'), 'chat', 'state 6: Claude ready: the chat, though ChatGPT still signs in')
 }
 
-// 7. Offline: the line once, Sign in waits for the connection, a key does not; a running sign-in keeps waiting
+// 7. Offline: Sign in waits for the connection and says why, a key does not; a running sign-in keeps waiting. The AI
+// column's banner (Check again) is the one offline message: the sheet adds no line of its own (the Experience lead,
+// review of #730)
 {
   const where = 'state 7'
   const { root, tooltips } = render(both, {}, { ...signedOut, isOnline: false })
   assertSharedButtons(root, where)
-  assert.equal(root.querySelectorAll('p').filter((p) => p.text.includes(OFFLINE_LINE)).length, 1, `${where}: the offline line, once`)
-  const intro = root.querySelectorAll('p').findIndex((p) => p.text.trim() === 'Sign in to start using AI in Ritemark.')
-  assert.ok(root.querySelectorAll('p')[intro + 1]?.text.includes(OFFLINE_LINE), `${where}: under "Sign in to start using AI in Ritemark."`)
+  assert.ok(!root.text.includes(OFFLINE_LINE) && !/offline/i.test(root.text), `${where}: no offline line on the sheet's cards`)
+  const intro = (r: Root) => r.querySelectorAll('h2').find((h) => h.text.trim() === 'Almost there!')?.parentNode?.toString()
+  assert.equal(intro(root), intro(render(both, {}, signedOut).root), `${where}: "Almost there!" and its line are as online, nothing under them`)
   assert.deepEqual(buttons(root), [
     { words: 'Sign in with Claude.ai', disabled: true },
     { words: 'Use API key', disabled: false },
     { words: 'Sign in with ChatGPT', disabled: true },
     { words: 'Re-check', disabled: false },
   ], `${where}: Sign in disabled, Use API key and Re-check not`)
-  assert.equal(tooltips.find((t) => t.words === 'Sign in with Claude.ai')?.tip, 'Claude sign-in needs an internet connection.', `${where}: the disabled Sign in says why`)
+  assert.equal(tooltips.find((t) => t.words === 'Sign in with Claude.ai')?.tip, 'Claude sign-in needs an internet connection.', `${where}: Claude's disabled Sign in says why`)
+  assert.equal(tooltips.find((t) => t.words === 'Sign in with ChatGPT')?.tip, 'ChatGPT sign-in needs an internet connection.', `${where}: and ChatGPT's, with its name`)
 
   const running = render(both, {}, { ...signedOut, isOnline: false, setupStatus: setup('auth-in-progress'), sheetSignIns: startedHere.sheetSignIns })
   assertSharedButtons(running.root, where)
@@ -389,6 +407,7 @@ for (const ended of ['failed', 'timed-out', 'could-not-start'] as const) {
   ], `${where}: ChatGPT waits, Claude's Sign in stays`)
   assert.equal(words(card(root, 'Sign in to ChatGPT'), browserOpened('chatgpt')).length, 1, `${where}: its line`)
   assert.equal(tooltips.find((t) => t.words === COPY.cancel)?.tip, stopWaitingTip('chatgpt'), `${where}: Cancel's tooltip names ChatGPT`)
+  assertReopenOnTextEdge(card(root, 'Sign in to ChatGPT'), where)
   calls.length = 0
   click(recorded, COPY.cancel, where)
   click(recorded, COPY.reopen, where)

@@ -14,7 +14,7 @@ import { useAISidebarStore } from './store';
 import { deriveRuntimeAvailabilities } from './runtimeAvailability';
 import type { OnboardingDependency, OnboardingInstallState, OnboardingStatus } from './types';
 import { COPY, PLAN_LINES, browserOpened, reopenTip, stopWaitingTip } from '../welcome/welcomeCopy';
-import { OFFLINE_LINE, PROVIDER_NAMES, homeReopenNotOpened, signInNeedsConnection, signInProblem } from '../../../../src/welcome/words';
+import { PROVIDER_NAMES, homeReopenNotOpened, signInNeedsConnection, signInProblem } from '../../../../src/welcome/words';
 import type { SheetSignInAi, SheetSignInView } from '../../../../src/views/agentSidebarProtocol';
 
 type WizardStep = 'checklist' | 'authenticate' | 'ready';
@@ -243,13 +243,8 @@ function AuthenticateStep({
         <p className="mt-1 text-xs leading-5 opacity-75">
           Sign in to start using AI in Ritemark.
         </p>
-        {/* Sprint 160 (#696): once, under the line; the Sign in buttons wait for the connection, a key does not */}
-        {offline && (
-          <p className="mt-1 flex items-start gap-1.5 text-xs leading-5" role="status">
-            <Icon name="wifi-slash" size={14} tone="inherit" className="mt-[3px] shrink-0" />
-            {OFFLINE_LINE}
-          </p>
-        )}
+        {/* Sprint 160 (#696): offline, the AI column's own banner (Check again) is the one offline message; the Sign
+            in buttons wait for the connection and say why, a key does not (the Experience lead, review of #730) */}
       </div>
 
       {/* Compact checklist showing current state */}
@@ -330,8 +325,9 @@ function AuthenticateStep({
  * One AI's sign-in card (Sprint 160, #696; the Experience lead's states, 15 November). Signed out, it offers Sign in
  * under which plans work, or under why the last sign-in ended. While its sign-in runs, wherever it started, it borrows
  * the welcome's frame 2 as Home's card does: the main button waits, a quiet Cancel follows it, the line says the
- * browser opened the page, and "Open the page again" is under the row while the page is known. Offline, Sign in
- * waits for the connection; a sign-in already running keeps waiting. The words are the welcome's and Home's.
+ * browser opened the page, and "Open the page again" is under the row, on the card's text edge, while the page is
+ * known. Offline, Sign in waits for the connection and its tooltip says so; the AI column's banner is the offline
+ * message; a sign-in already running keeps waiting. The words are the welcome's and Home's.
  */
 function SignInCard({
   ai,
@@ -392,7 +388,9 @@ function SignInCard({
         {children}
       </div>
       {waiting && signIn.page && (
-        <div className="mt-1">
+        // Its words on the card's text edge, where state 4's line sits: the quiet button's own 12 px padding is
+        // pulled back (the Experience lead, review of #730)
+        <div className="-ml-3 mt-1" data-reopen-row>
           <Tooltip label={reopenTip(ai)}>
             <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={onReopen}>
               {COPY.reopen}
