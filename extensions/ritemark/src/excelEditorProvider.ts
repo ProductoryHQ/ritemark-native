@@ -20,8 +20,8 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
   private dirtyDocuments = new Set<string>();
   // Files currently being saved by us — suppresses our own watcher events
   private savingFiles = new Set<string>();
-  // One-time-per-session caveat about basic editing fidelity
-  private editCaveatShown = false;
+  // The excel_edit usage event goes once per session
+  private editEventSent = false;
 
   private readonly _onDidChangeCustomDocument =
     new vscode.EventEmitter<vscode.CustomDocumentContentChangeEvent<ExcelDocument>>();
@@ -186,12 +186,11 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
     this.dirtyDocuments.add(document.uri.toString());
     this._onDidChangeCustomDocument.fire({ document });
 
-    if (!this.editCaveatShown) {
-      this.editCaveatShown = true;
+    // What a save removes is said by the warning above the sheet from the moment it opens (Sprint 158 PR 0, #711),
+    // so the first edit only counts the feature, once per session.
+    if (!this.editEventSent) {
+      this.editEventSent = true;
       void trackEvent('feature_used', { feature: 'excel_edit' });
-      vscode.window.showInformationMessage(
-        'Excel editing is basic: edited cells replace formulas with plain values, and complex formatting may be simplified when the file is saved.'
-      );
     }
   }
 
