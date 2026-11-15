@@ -128,11 +128,20 @@ const DECKS = 'ritemark.features.decks';
 const SLIDES = 'workbench.view.extension.ritemark-slide-library';
 const slidesPlace = { id: SLIDES, title: 'Slide library', order: 0.55, icon: 'media/slide-library-icon.svg', setting: DECKS };
 
-/** This package.json with a Slide library place behind the `decks` flag, as the Decks branch has it, changed by `change`. */
+/**
+ * This package.json with a Slide library place behind the `decks` flag, as the Decks branch has it, changed by
+ * `change`: whatever this repository's own package.json already has of it is replaced, so the fixture is the same
+ * before and after Decks is on main.
+ */
 function withSlides(change = () => {}) {
   const changed = clone(pkg);
-  changed.contributes.viewsContainers.activitybar.push({ id: 'ritemark-slide-library', title: 'Slide library', icon: 'media/slide-library-icon.svg' });
+  const activitybar = changed.contributes.viewsContainers.activitybar.filter(container => container.id !== 'ritemark-slide-library');
+  activitybar.splice(activitybar.findIndex(container => container.id === 'ritemark-tasks') + 1, 0, { id: 'ritemark-slide-library', title: 'Slide library', icon: 'media/slide-library-icon.svg' });
+  changed.contributes.viewsContainers.activitybar = activitybar;
   changed.contributes.views['ritemark-slide-library'] = [{ type: 'webview', id: 'ritemark.slideLibraryView', name: 'Slide library', when: `config.${DECKS}` }];
+  for (const section of changed.contributes.configuration) {
+    delete section.properties?.[DECKS];
+  }
   const section = changed.contributes.configuration.find(entry => entry.properties) ?? changed.contributes.configuration[0];
   section.properties[DECKS] = { type: 'boolean', default: false, description: 'Decks' };
   change(changed);

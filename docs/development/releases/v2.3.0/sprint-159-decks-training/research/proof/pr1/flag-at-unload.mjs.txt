@@ -1,0 +1,45 @@
+// node flag-at-unload.mjs <port> <settings.json> <true|false>
+// Waits until the workbench page unloads (a reload already asked for), then writes the decks flag at once, before
+// the new page reads its settings. Prints when it saw the unload and when it wrote.
+import { readFileSync, writeFileSync } from 'node:fs';
+
+const [port, settingsPath, value] = process.argv.slice(2);
+const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+const page = list.find(t => t.type === 'page' && t.url.includes('workbench'));
+const socket = new WebSocket(page.webSocketDebuggerUrl);
+await new Promise(resolve => socket.addEventListener('open', resolve, { once: true }));
+let id = 0;
+const pending = new Map();
+socket.addEventListener('message', event => {
+	const message = JSON.parse(event.data);
+	if (message.id && pending.has(message.id)) {
+		pending.get(message.id)(message);
+		pending.delete(message.id);
+	}
+});
+const evaluate = expression => new Promise(resolve => {
+	const n = ++id;
+	pending.set(n, resolve);
+	socket.send(JSON.stringify({ id: n, method: 'Runtime.evaluate', params: { expression, returnByValue: true } }));
+	setTimeout(() => { if (pending.has(n)) { pending.delete(n); resolve({ timeout: true }); } }, 200);
+});
+const first = (await evaluate('performance.timeOrigin')).result?.result?.value;
+const started = Date.now();
+for (;;) {
+	const answer = await evaluate('performance.timeOrigin');
+	const origin = answer.result?.result?.value;
+	if (answer.timeout || answer.error || answer.result?.exceptionDetails || origin !== first) {
+		break;
+	}
+	if (Date.now() - started > 30000) {
+		console.log('no unload in 30 s');
+		process.exit(1);
+	}
+	await new Promise(resolve => setTimeout(resolve, 10));
+}
+const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+settings['ritemark.features.decks'] = value === 'true';
+writeFileSync(settingsPath, JSON.stringify(settings, null, 1));
+console.log(`unload seen after ${Date.now() - started} ms; flag ${value} written`);
+socket.close();
+process.exit(0);
