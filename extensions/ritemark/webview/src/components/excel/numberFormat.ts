@@ -143,6 +143,11 @@ function serialOf(year: number, month: number, day: number): number | null {
  */
 export function valueFromInput(text: string, code: string, date1904 = false): CellValue {
   const trimmed = text.trim()
+  // a time or a duration typed in a time cell (8:30, 36:00, 8:30:15) is a fraction of a day
+  const time = /^(\d{1,5}):([0-5]\d)(?::([0-5]\d))?$/.exec(trimmed)
+  if (time && isDateCode(code) && /h/i.test(code.replace(/"[^"]*"/g, ''))) {
+    return (Number(time[1]) + Number(time[2]) / 60 + Number(time[3] ?? 0) / 3600) / 24
+  }
   if (isDateCode(code) && trimmed) {
     const order = dateOrder(code)
     const parts = trimmed.split(/[./\-\s]+/)

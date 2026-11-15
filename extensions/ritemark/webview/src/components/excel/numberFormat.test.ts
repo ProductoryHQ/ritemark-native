@@ -55,6 +55,11 @@ assert.equal(valueFromInput('25%', '0%'), 0.25)
 assert.equal(valueFromInput('1450', '#,##0.00 "€"'), 1450)
 assert.equal(valueFromInput('Booked', 'General'), 'Booked')
 assert.equal(valueFromInput('', 'dd.mm.yyyy'), null)
+// times and durations typed in a time cell stay times
+assert.equal(valueFromInput('8:15', '[h]:mm'), 0.34375)
+assert.equal(valueFromInput('36:00', '[h]:mm'), 1.5)
+assert.equal(valueFromInput('18:00', 'hh:mm'), 0.75)
+assert.equal(valueFromInput('8:15', 'General'), '8:15', 'not a time cell: text, as before')
 // minutes are not months
 assert.equal(valueFromInput('03.01.2026', 'dd.mm.yyyy hh:mm'), 46025)
 
