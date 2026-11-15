@@ -1,0 +1,48 @@
+{
+  "deckToolsAvailable": false,
+  "browser=false board=false": {
+    "groups": [],
+    "codexTools": "",
+    "mcpTools": "4f53cda18c2baa0c",
+    "toolSetKey": ""
+  },
+  "browser=true board=false": {
+    "groups": [
+      "browser"
+    ],
+    "codexTools": "ritemark_browser_navigate ritemark_browser_click ritemark_browser_fill ritemark_browser_type ritemark_browser_scroll ritemark_browser_snapshot",
+    "mcpTools": "be34626846bf49f8",
+    "toolSetKey": "b3417060d79e0c1fe859e23193f04e523bd9c14c96d4557a462db0ebac0c6a0f"
+  },
+  "browser=false board=true": {
+    "groups": [
+      "board"
+    ],
+    "codexTools": "ritemark_board_list_cards ritemark_board_read_card ritemark_board_add_card ritemark_board_update_card ritemark_board_move_card ritemark_board_report_result ritemark_board_ask_user",
+    "mcpTools": "adbb77a01831b777",
+    "toolSetKey": "807a9873ebdd43b794697d30135709e536a286eb20a84bcee9d911feb476fbef"
+  },
+  "browser=true board=true": {
+    "groups": [
+      "browser",
+      "board"
+    ],
+    "codexTools": "ritemark_browser_navigate ritemark_browser_click ritemark_browser_fill ritemark_browser_type ritemark_browser_scroll ritemark_browser_snapshot ritemark_board_list_cards ritemark_board_read_card ritemark_board_add_card ritemark_board_update_card ritemark_board_move_card ritemark_board_report_result ritemark_board_ask_user",
+    "mcpTools": "d89b3e52534fa036",
+    "toolSetKey": "635d30e9eb80bc569c5285cba8f91e54535ffd0519d18984608896f66f9555bc"
+  },
+  "instructions": {
+    "claude-code browser=false board=false": "01fce292014fde37 (5179 chars, DECKS absent)",
+    "claude-code browser=false board=true": "d254842de1d05a9d (6172 chars, DECKS absent)",
+    "claude-code browser=true board=false": "fcd13f77723c3399 (5351 chars, DECKS absent)",
+    "claude-code browser=true board=true": "ae3e32bed3262038 (6344 chars, DECKS absent)",
+    "codex browser=false board=false": "e4d9fd74a5db47b4 (5159 chars, DECKS absent)",
+    "codex browser=false board=true": "ea99c8e80352b92f (6152 chars, DECKS absent)",
+    "codex browser=true board=false": "7478c64b691c27fc (5331 chars, DECKS absent)",
+    "codex browser=true board=true": "7a44ce94504eac53 (6324 chars, DECKS absent)",
+    "opencode browser=false board=false": "befcd125cf9cdae7 (5181 chars, DECKS absent)",
+    "opencode browser=false board=true": "dee87e239de9a2a7 (6174 chars, DECKS absent)",
+    "opencode browser=true board=false": "c300b48c13d090e0 (5353 chars, DECKS absent)",
+    "opencode browser=true board=true": "90f7759be2991c78 (6346 chars, DECKS absent)"
+  }
+}
