@@ -71,6 +71,11 @@ try {
     `default path must sanitize user-supplied filenames (got "${sanitized}")`
   );
 
+  // A second picture of the same name gets the next free name; the first stays as it was.
+  const again = writeImageRelativeTo(pasteDir, 'My File: Foo.png', ONE_PIXEL_PNG_BASE64);
+  assert.strictEqual(again, 'My-File-Foo-2.png', `a name in use is never overwritten (got "${again}")`);
+  assert.strictEqual(writeImageRelativeTo(pasteDir, 'My File: Foo.png', ONE_PIXEL_PNG_BASE64), 'My-File-Foo-3.png');
+
   // skipSanitize must refuse any input that could escape targetDir on disk.
   // Defense-in-depth against a crafted webview message — Codex PR #75 P1.
   const trapDir = join(tempRoot, 'trap');
