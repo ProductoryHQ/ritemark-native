@@ -66,11 +66,15 @@
 
 .sg-comment { width: 0; height: 0; border-top: 6px solid #d93025; border-left: 6px solid transparent; z-index: 4; pointer-events: none; }
 
+/* A chart's or picture's place (decision 6): its icon and words at the top left, so they show as soon as any of the
+   card is in view (the Experience lead, 15 November) */
 .sg-object {
   z-index: 4;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
   overflow: hidden;
   border: 1px dashed var(--sg-freeze);
   border-radius: 4px;
@@ -79,8 +83,8 @@
   text-align: center;
   color: var(--sg-head-ink);
 }
-.sg-object-label { margin-top: 4px; font-size: 13px; font-weight: 600; color: #3b4452; }
-.sg-object-sub { margin-top: 2px; font-size: 11px; }
+.sg-object-label { font-size: 13px; font-weight: 600; line-height: 16px; color: #3b4452; text-align: left; }
+.sg-object-sub { margin-top: 2px; font-size: 11px; text-align: left; }
 
 .sg-head {
   z-index: 5;

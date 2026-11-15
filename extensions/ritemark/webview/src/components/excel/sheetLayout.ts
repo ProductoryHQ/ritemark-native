@@ -12,8 +12,9 @@ import { cellKey, type SheetModel } from './readWorkbook'
 
 /** Header row height and the frame's look (experience 47, decision 9). */
 export const HEADER_HEIGHT = 22
-/** Cell text inset each side, in pixels (experience 47: 1 px; the spike's PADX 2 in all). */
-export const CELL_PADDING = 1
+/** Cell text inset each side, in pixels: about Excel's at 100 % (the Experience lead, 15 November: 1 px ran
+ *  "8:15" into "Müük"). */
+export const CELL_PADDING = 2
 
 export interface SheetLayout {
   /** Drawn rows and columns. */
@@ -44,8 +45,9 @@ export interface LayoutOptions {
   /** Extra rows and columns from Add row and the + column. */
   extraRows?: number
   extraCols?: number
-  /** A sort of the rows under the frozen ones, by a column. */
-  sort?: { col: number; dir: 1 | -1; compare: (a: unknown, b: unknown) => number }
+  /** The rows under the frozen ones in a sort's order (sortedRows), worked out when the sort was chosen and kept
+   *  through edits, as Excel keeps a sorted range: an edit doesn't move its row. */
+  rowOrder?: number[]
   /** Auto-fit heights: rows without a height of their own, that hold wrapped text or a larger font. */
   autoHeight?: (row: number) => number | undefined
 }
@@ -120,27 +122,20 @@ export function buildLayout(sheet: SheetModel, styles: WorkbookStyles, opts: Lay
     return Math.max(defaultRowPx, opts.autoHeight?.(r) ?? 0)
   }
   let order: number[] = []
-  for (let r = 0; r <= lastUsedR; r++) order.push(r)
-  if (opts.sort && order.length > L.frozen.rows) {
-    const { col, dir, compare } = opts.sort
-    const head = order.slice(0, L.frozen.rows)
-    // only the rows that hold something are sorted; the empty ones after them stay at the end
-    const body = order.slice(L.frozen.rows, sheet.maxR + 1)
-    const tail = order.slice(Math.max(L.frozen.rows, sheet.maxR + 1))
-    const valueOf = (r: number) => {
-      const cell = sheet.cells.get(cellKey(r, col))
-      return cell && cell.value !== '' ? cell.value : ''
+  if (opts.rowOrder) {
+    // the frozen rows, the sorted ones, then any row not in the sort (rows added since) in sheet order
+    const seen = new Set<number>()
+    for (let r = 0; r < Math.min(L.frozen.rows, lastUsedR + 1); r++) {
+      order.push(r)
+      seen.add(r)
     }
-    // empty cells sort last either way, as Excel does
-    body.sort((a, b) => {
-      const va = valueOf(a)
-      const vb = valueOf(b)
-      if (va === '' && vb === '') return a - b
-      if (va === '') return 1
-      if (vb === '') return -1
-      return dir * compare(va, vb) || a - b
-    })
-    order = [...head, ...body, ...tail]
+    for (const r of opts.rowOrder) if (r <= lastUsedR && !seen.has(r)) {
+      order.push(r)
+      seen.add(r)
+    }
+    for (let r = 0; r <= lastUsedR; r++) if (!seen.has(r)) order.push(r)
+  } else {
+    for (let r = 0; r <= lastUsedR; r++) order.push(r)
   }
   let height = 0
   const rowHeights: number[] = order.map((r) => {
@@ -189,6 +184,27 @@ export function buildLayout(sheet: SheetModel, styles: WorkbookStyles, opts: Lay
     mergeAt,
     merges: L.merges,
   }
+}
+
+/**
+ * The rows under the frozen ones that hold something, sorted by a column; empty cells last either way, as Excel
+ * sorts. The empty rows after them aren't sorted.
+ */
+export function sortedRows(sheet: SheetModel, col: number, dir: 1 | -1, compare: (a: unknown, b: unknown) => number): number[] {
+  const body: number[] = []
+  for (let r = sheet.layout.frozen.rows; r <= sheet.maxR; r++) body.push(r)
+  const valueOf = (r: number) => {
+    const cell = sheet.cells.get(cellKey(r, col))
+    return cell && cell.value !== '' ? cell.value : ''
+  }
+  return body.sort((a, b) => {
+    const va = valueOf(a)
+    const vb = valueOf(b)
+    if (va === '' && vb === '') return a - b
+    if (va === '') return 1
+    if (vb === '') return -1
+    return dir * compare(va, vb) || a - b
+  })
 }
 
 /**

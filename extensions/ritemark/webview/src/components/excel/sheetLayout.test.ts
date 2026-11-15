@@ -7,7 +7,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readWorkbook, cellKey } from './readWorkbook'
-import { buildLayout, fontCss, indexAt, sortRefusal, styleIndexOf, styleOf } from './sheetLayout'
+import { buildLayout, fontCss, indexAt, sortRefusal, sortedRows, styleIndexOf, styleOf } from './sheetLayout'
 import { applyTint, colorOf, readTheme } from './excelStyles'
 import { columnPixels, maxDigitWidth } from './columnWidth'
 import { compareCells } from '../sheetSort'
@@ -80,13 +80,21 @@ async function main() {
     const model = await open('training-budget.xlsx')
     const sheet = model.sheets[0]
     assert.equal(sortRefusal(sheet, letters), undefined)
-    const L = buildLayout(sheet, model.styles, { ...opts, sort: { col: 1, dir: -1, compare: compareCells } })
+    const rows = sortedRows(sheet, 1, -1, compareCells)
+    const L = buildLayout(sheet, model.styles, { ...opts, rowOrder: rows })
     assert.deepEqual([...L.rowOf.slice(0, 4)], [0, 1, 2, 3], 'the frozen rows stay')
     const firstSorted = L.rowOf[4]
     const values = [...L.rowOf.slice(4, sheet.maxR + 1)].map((r) => sheet.cells.get(cellKey(r, 1))?.value).filter((v) => typeof v === 'number') as number[]
     assert.deepEqual(values, [...values].sort((a, b) => b - a), 'Participants high to low')
     assert.equal(sheet.cells.get(cellKey(firstSorted, 1))?.value, Math.max(...values))
     assert.equal(L.displayOf.get(L.rowOf[10]), 10)
+    // an edit after the sort doesn't move its row: the order chosen with the sort is kept
+    const top = L.rowOf[4]
+    sheet.cells.set(cellKey(top, 1), { kind: 'n', value: 0, text: '0', s: sheet.cells.get(cellKey(top, 1))!.s })
+    const again = buildLayout(sheet, model.styles, { ...opts, rowOrder: rows })
+    assert.equal(again.rowOf[4], top, 'the edited row stays where it was')
+    // every row is still there once
+    assert.equal(new Set(again.rowOf).size, again.rows)
   }
 
   // The sales report: a chart in its place, colour rules counted, a chart sheet with its chart's title

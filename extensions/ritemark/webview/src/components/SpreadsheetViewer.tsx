@@ -83,7 +83,10 @@ function keptNotice(layout: { drawings: Array<{ what: string }>; conditionalForm
   if (layout.conditionalFormats) things.push('colour rules')
   if (!things.length) return undefined
   const list = things.length === 1 ? things[0] : `${things.slice(0, -1).join(', ')} and ${things[things.length - 1]}`
-  return `This sheet has ${list}. They're kept in the file; Open in Excel to see them.`
+  const one = things.length === 1 && /^an? /.test(list)
+  return one
+    ? `This sheet has ${list}. It's kept in the file; Open in Excel to see it.`
+    : `This sheet has ${list}. They're kept in the file; Open in Excel to see them.`
 }
 
 /** A chart sheet's card title (frame 8). */
@@ -531,7 +534,7 @@ export function SpreadsheetViewer({
       ? 'Typing here replaces the formula with a value.'
       : isEditable && hasEdited
         ? 'Only the cells you change are saved; the rest of the workbook stays as it is. Totals that use them update when the file opens in Excel.'
-        : sheetModel ? keptNotice(sheetModel.layout) : undefined
+        : sheetModel && sheetModel.kind === 'worksheet' ? keptNotice(sheetModel.layout) : undefined
   const openInLabel = `Open in ${hasExcel ? 'Excel' : defaultSpreadsheetApp}`
 
   // Status bar info

@@ -18,7 +18,8 @@ import { writeClipboard, readClipboard } from '../../lib/clipboard'
 import { compareCells } from '../sheetSort'
 import { installFontFallbacks, installOfficeFontAliases } from '../viewers/docx/officeFonts'
 import { cellKey, type CellModel, type SheetModel, type WorkbookModel } from './readWorkbook'
-import { CELL_PADDING, buildLayout, fontCss, fontShorthand, indexAt, sortRefusal, styleIndexOf, styleOf, type SheetLayout } from './sheetLayout'
+import { CELL_PADDING, buildLayout, fontCss, fontShorthand, indexAt, sortRefusal, sortedRows, styleIndexOf, styleOf, type SheetLayout } from './sheetLayout'
+import { columnPixels, defaultColumnPixels, maxDigitWidth } from './columnWidth'
 import type { CellStyle } from './excelStyles'
 import './sheetGrid.css'
 
@@ -111,9 +112,17 @@ export function SheetGrid({
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const [viewport, setViewport] = useState({ w: 1200, h: 800 })
   const [scroll, setScroll] = useState({ x: 0, y: 0 })
-  const [sort, setSort] = useState<{ col: number; dir: 1 | -1 } | null>(null)
+  // a sort: its column and direction, and the row order worked out when it was chosen
+  const [sort, setSortState] = useState<{ col: number; dir: 1 | -1; rows: number[] } | null>(null)
   const [selected, setSelected] = useState<Pos>({ i: 0, c: 0 })
-  const [editing, setEditing] = useState<{ pos: Pos; value: string; fromBar: boolean } | null>(null)
+  const [editing, setEditingState] = useState<{ pos: Pos; value: string; fromBar: boolean } | null>(null)
+  // the live edit, for handlers of an older render (a blur right after Enter or Escape must see that it has ended)
+  const editingRef = useRef<{ pos: Pos; value: string; fromBar: boolean } | null>(null)
+  const setEditing = useCallback((next: { pos: Pos; value: string; fromBar: boolean } | null | ((prev: { pos: Pos; value: string; fromBar: boolean } | null) => { pos: Pos; value: string; fromBar: boolean } | null)) => {
+    const value = typeof next === 'function' ? next(editingRef.current) : next
+    editingRef.current = value
+    setEditingState(value)
+  }, [])
   const [fontsReady, setFontsReady] = useState(0)
 
   // Office fonts: Calibri and friends by their metric twins, others by Arial (officeFonts.ts)
@@ -126,9 +135,13 @@ export function SheetGrid({
     })
   }, [styles])
 
+  const setSort = useCallback((next: { col: number; dir: 1 | -1 } | null) => {
+    setSortState(next ? { ...next, rows: sortedRows(sheet, next.col, next.dir, compareCells) } : null)
+  }, [sheet])
+
   // a new sheet: back to its top-left, no sort
   useEffect(() => {
-    setSort(null)
+    setSortState(null)
     setEditing(null)
     setSelected({ i: sheet.layout.frozen.rows, c: sheet.layout.frozen.cols })
     scroller.current?.scrollTo(0, 0)
@@ -156,16 +169,20 @@ export function SheetGrid({
   // rows without a height of their own grow for wrapped text and larger fonts, as Excel fits them
   const autoHeight = useMemo(() => {
     const cache = new Map<number, number | undefined>()
+    // the layout's own widths: by the Normal font's widest digit and the sheet's default
+    const mdw = maxDigitWidth(base)
+    const defaultPx = defaultColumnPixels(sheet.layout.defaultColWidth, sheet.layout.baseColWidth, mdw)
     const colPx = (c: number) => {
+      if (sheet.hiddenCols.has(c)) return 0
       const col = sheet.layout.cols.find((d) => c >= d.min && c <= d.max)
-      return col?.width !== undefined ? col.width * 7 + 5 : 64
+      return col?.width !== undefined ? columnPixels(col.width, mdw) : defaultPx
     }
     return (r: number) => {
       if (cache.has(r)) return cache.get(r)
       let need: number | undefined
       for (let c = 0; c <= sheet.maxC; c++) {
         const cell = sheet.cells.get(cellKey(r, c))
-        if (!cell || cell.text === '' || sheet.layout.merges.some(([r1, c1, r2, c2]) => r >= r1 && r <= r2 && c >= c1 && c <= c2)) continue
+        if (!cell || cell.text === '' || !colPx(c) || sheet.layout.merges.some(([r1, c1, r2, c2]) => r >= r1 && r <= r2 && c >= c1 && c <= c2)) continue
         const style = styleOf(styles, cell.s)
         const px = ((style?.font.size ?? base.size) * 4) / 3
         let h = Math.ceil(px * 1.36)
@@ -202,7 +219,7 @@ export function SheetGrid({
         minHeight: Math.ceil(viewport.h / 400) * 400 + 40,
         extraRows,
         extraCols,
-        sort: sort ? { ...sort, compare: compareCells } : undefined,
+        rowOrder: sort?.rows,
         autoHeight,
       }),
     // the grid grows by whole screens, so a resize by a few pixels doesn't lay the sheet out again
@@ -364,19 +381,22 @@ export function SheetGrid({
   }, [editable, getInput, rowOf])
 
   const commit = useCallback((then?: Pos) => {
-    if (editing) {
-      const row = rowOf[editing.pos.i]
-      if (editing.value !== getInput(row, editing.pos.c)) onEdit(row, editing.pos.c, editing.value)
+    // the live edit, ended before the grid takes the focus, so the editor's blur that follows sends nothing
+    const live = editingRef.current
+    if (live) {
       setEditing(null)
+      const row = rowOf[live.pos.i]
+      // the text a cell shows as its value, or its formula shown in the bar and not changed, is no edit
+      if (live.value !== getInput(row, live.pos.c) && live.value !== getFormula(row, live.pos.c)) onEdit(row, live.pos.c, live.value)
     }
     if (then) select(then)
     scroller.current?.focus()
-  }, [editing, getInput, onEdit, rowOf, select])
+  }, [getInput, getFormula, onEdit, rowOf, select, setEditing])
 
   const cancel = useCallback(() => {
     setEditing(null)
     scroller.current?.focus()
-  }, [])
+  }, [setEditing])
 
   useEffect(() => {
     if (!editing || editing.fromBar) return
@@ -387,7 +407,8 @@ export function SheetGrid({
   }, [editing?.pos.i, editing?.pos.c, editing?.fromBar]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onGridKey = (e: React.KeyboardEvent) => {
-    if (editing) return
+    // keys from the sort menu (a portal, but a React child of the grid) are the menu's
+    if (editing || !scroller.current?.contains(e.target as Node)) return
     const move: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }
     if (move[e.key]) {
       e.preventDefault()
@@ -420,7 +441,8 @@ export function SheetGrid({
       if (getInput(selectedRow, selected.c) !== '') onEdit(selectedRow, selected.c, '')
       return
     }
-    if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    // a character starts an edit, also one typed with Option or AltGr (€, @, { on an Estonian keyboard)
+    if (e.key.length === 1 && !e.metaKey && !(e.ctrlKey && !e.altKey)) {
       e.preventDefault()
       startEditing(selected, e.key)
     }
@@ -442,7 +464,8 @@ export function SheetGrid({
 
   const onPointerDown = (e: React.MouseEvent) => {
     // a click inside the cell being edited moves its caret; it doesn't choose another cell
-    if (e.button !== 0 || e.target === editorRef.current) return
+    // a click in the sort menu (a portal, but a React child of the grid) is the menu's
+    if (e.button !== 0 || e.target === editorRef.current || !scroller.current?.contains(e.target as Node)) return
     const pos = posFromPoint(e.clientX, e.clientY)
     if (!pos) return
     if (editing) commit()
@@ -657,15 +680,13 @@ export function SheetGrid({
       const small = w < 160 || h < 90
       out.push(
         <div key={`o${n}`} className="sg-object" style={place(HW + x0, HH + y0, w, h)} title={`${label}. Kept in the file. Open in Excel to see it.`}>
-          <div>
-            <Icon name={d.what === 'chart' ? 'chart-bar' : 'image'} size={20} tone="inherit" />
-            {!small && (
-              <>
-                <div className="sg-object-label">{label}</div>
-                <div className="sg-object-sub">Kept in the file. Open in Excel to see it.</div>
-              </>
-            )}
-          </div>
+          <Icon name={d.what === 'chart' ? 'chart-bar' : 'image'} size={16} tone="inherit" className="shrink-0" />
+          {!small && (
+            <div className="min-w-0">
+              <div className="sg-object-label">{label}</div>
+              <div className="sg-object-sub">Kept in the file. Open in Excel to see it.</div>
+            </div>
+          )}
         </div>,
       )
     })
@@ -771,7 +792,9 @@ export function SheetGrid({
             cancel()
           }
         }}
-        onBlur={() => commit()}
+        onBlur={() => {
+          if (editingRef.current) commit()
+        }}
         aria-label={`Edit ${letters(pos.c)}${rowOf[pos.i] + 1}`}
       />
     )
@@ -797,7 +820,7 @@ export function SheetGrid({
           value={barValue}
           readOnly={!editable}
           onFocus={() => {
-            if (editable && !editing) setEditing({ pos: selected, value: formula ?? getInput(selectedRow, selected.c), fromBar: true })
+            if (editable && !editingRef.current) setEditing({ pos: selected, value: formula ?? getInput(selectedRow, selected.c), fromBar: true })
           }}
           onChange={(e) => setEditing({ pos: editing?.pos ?? selected, value: e.target.value, fromBar: true })}
           onKeyDown={(e) => {
@@ -810,11 +833,7 @@ export function SheetGrid({
             }
           }}
           onBlur={() => {
-            if (editing?.fromBar) {
-              // a formula shown in the bar but not changed is not typed over
-              if (formula !== undefined && editing.value === formula) setEditing(null)
-              else commit()
-            }
+            if (editingRef.current?.fromBar) commit()
           }}
         />
       </div>
