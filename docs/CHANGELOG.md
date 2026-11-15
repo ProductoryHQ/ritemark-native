@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] — 2.3.0
+## [Unreleased] — v2.3.0
+
+#### Fixed
+- **A page that failed to load opens when you open its file again (#710).** If a web page's `.html` file was missing when Ritemark opened, its tab showed "Failed to Load Page", and opening the file again from Documents once it was back only brought that failed tab forward. Now opening the file loads the page again in the same tab, as the bar's Reload does. A page that loaded fine is only brought forward, as before.
 
 ### Sprint 158: Excel looks like Excel, and a save keeps it (#711)
 
