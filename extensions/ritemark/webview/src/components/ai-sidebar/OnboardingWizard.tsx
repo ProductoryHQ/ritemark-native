@@ -6,12 +6,16 @@
  * Replaces the fragmented per-agent setup screens during first-run.
  */
 
+import type { ReactNode } from 'react';
 import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
 import { Tooltip } from '../ui/tooltip';
 import { useAISidebarStore } from './store';
+import { deriveRuntimeAvailabilities } from './runtimeAvailability';
 import type { OnboardingDependency, OnboardingInstallState, OnboardingStatus } from './types';
-import { PLAN_LINES } from '../welcome/welcomeCopy';
+import { COPY, PLAN_LINES, browserOpened, reopenTip, stopWaitingTip } from '../welcome/welcomeCopy';
+import { PROVIDER_NAMES, homeReopenNotOpened, signInNeedsConnection, signInProblem } from '../../../../src/welcome/words';
+import type { SheetSignInAi, SheetSignInView } from '../../../../src/views/agentSidebarProtocol';
 
 type WizardStep = 'checklist' | 'authenticate' | 'ready';
 
@@ -34,10 +38,42 @@ export function OnboardingWizard() {
   const startLogin = useAISidebarStore((s) => s.startLogin);
   const startCodexLogin = useAISidebarStore((s) => s.startCodexLogin);
   const openApiKeySettings = useAISidebarStore((s) => s.openApiKeySettings);
+  const cancelSignIn = useAISidebarStore((s) => s.cancelSignIn);
+  const reopenSignIn = useAISidebarStore((s) => s.reopenSignIn);
+  // Sprint 160 (#696): the cards read the one availability the composer and the view rule read, so a sign-in that
+  // runs (started here, on Home, in the welcome or in Settings) waits here too
+  const runtimeHydration = useAISidebarStore((s) => s.runtimeHydration);
+  const setupStatus = useAISidebarStore((s) => s.setupStatus);
+  const codexStatus = useAISidebarStore((s) => s.codexStatus);
+  const opencodeEnabled = useAISidebarStore((s) => s.opencodeEnabled);
+  const acpProviders = useAISidebarStore((s) => s.acpProviders);
+  const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
+  const claudeLoginState = useAISidebarStore((s) => s.claudeLoginState);
+  const sheetSignIns = useAISidebarStore((s) => s.sheetSignIns);
+  const isOnline = useAISidebarStore((s) => s.isOnline);
 
   if (!status) return null;
 
   const step = getWizardStep(status);
+  const availabilities = deriveRuntimeAvailabilities({
+    runtimeHydration,
+    setupStatus,
+    codexStatus,
+    opencodeEnabled,
+    acpProviders,
+    byokProviderModels,
+  });
+  const cards: Record<SheetSignInAi, SignInCardState> = {
+    claude: {
+      // A press here waits at once, before the host's first status says the sign-in runs (`startLogin`)
+      waiting: availabilities['claude-code'].state === 'auth-in-progress' || claudeLoginState === 'pending',
+      signIn: sheetSignIns.claude,
+    },
+    chatgpt: {
+      waiting: availabilities.codex.state === 'auth-in-progress',
+      signIn: sheetSignIns.chatgpt,
+    },
+  };
 
   return (
     <div className="flex-1 overflow-y-auto px-3 py-4">
@@ -53,11 +89,15 @@ export function OnboardingWizard() {
         <AuthenticateStep
           status={status}
           installStates={installStates}
+          cards={cards}
+          offline={!isOnline}
           onInstall={installDependency}
           onRecheck={recheckDependencies}
           onLoginClaude={() => startLogin()}
           onLoginCodex={startCodexLogin}
           onApiKey={openApiKeySettings}
+          onCancel={cancelSignIn}
+          onReopen={reopenSignIn}
         />
       )}
       {step === 'ready' && (
@@ -163,22 +203,38 @@ function ChecklistStep({
 
 // ── Step 2: Authenticate ──
 
+/** Sprint 160 (#696): what one AI's sign-in card draws from. */
+interface SignInCardState {
+  /** Its sign-in runs, wherever it started: the welcome's frame 2, as Home's card borrows it (Sprint 156). */
+  waiting: boolean;
+  /** The host's page and line for it (`onboarding:sign-in`). */
+  signIn: SheetSignInView;
+}
+
 function AuthenticateStep({
   status,
   installStates,
+  cards,
+  offline,
   onInstall,
   onRecheck,
   onLoginClaude,
   onLoginCodex,
   onApiKey,
+  onCancel,
+  onReopen,
 }: {
   status: OnboardingStatus;
   installStates: Record<OnboardingDependency, OnboardingInstallState>;
+  cards: Record<SheetSignInAi, SignInCardState>;
+  offline: boolean;
   onInstall: (dep: OnboardingDependency) => void;
   onRecheck: () => void;
   onLoginClaude: () => void;
   onLoginCodex: () => void;
   onApiKey: () => void;
+  onCancel: (ai: SheetSignInAi) => void;
+  onReopen: (ai: SheetSignInAi) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -187,6 +243,8 @@ function AuthenticateStep({
         <p className="mt-1 text-xs leading-5 opacity-75">
           Sign in to start using AI in Ritemark.
         </p>
+        {/* Sprint 160 (#696): offline, the AI column's own banner (Check again) is the one offline message; the Sign
+            in buttons wait for the connection and say why, a key does not (the Experience lead, review of #730) */}
       </div>
 
       {/* Compact checklist showing current state */}
@@ -218,43 +276,37 @@ function AuthenticateStep({
 
       {/* Auth cards for installed CLIs — show all that need auth */}
       {status.claudeCliInstalled && !status.claudeCliAuthenticated && (
-        <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4">
-          <div className="text-sm font-semibold mb-1">Sign in to Claude</div>
-          <p className="text-xs leading-5 opacity-75 mb-3">
-            {PLAN_LINES.claude}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Tooltip label="Sign in with your Claude account in the browser">
-              <Button type="button" size="sm" className="text-xs" onClick={onLoginClaude}>
-                <Icon name="sign-in" size={14} />
-                Sign in with Claude.ai
-              </Button>
-            </Tooltip>
-            <Tooltip label="Use an Anthropic API key instead, in Settings">
-              <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onApiKey}>
-                <Icon name="key" size={14} />
-                Use API key
-              </Button>
-            </Tooltip>
-          </div>
-        </div>
+        <SignInCard
+          ai="claude"
+          signInLabel="Sign in with Claude.ai"
+          signInTip="Sign in with your Claude account in the browser"
+          card={cards.claude}
+          offline={offline}
+          onSignIn={onLoginClaude}
+          onCancel={() => onCancel('claude')}
+          onReopen={() => onReopen('claude')}
+        >
+          {/* A key can be saved while Claude signs in, and offline */}
+          <Tooltip label="Use an Anthropic API key instead, in Settings">
+            <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onApiKey}>
+              <Icon name="key" size={14} />
+              Use API key
+            </Button>
+          </Tooltip>
+        </SignInCard>
       )}
 
       {status.codexCliInstalled && !status.codexCliAuthenticated && (
-        <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4">
-          <div className="text-sm font-semibold mb-1">Sign in to ChatGPT</div>
-          <p className="text-xs leading-5 opacity-75 mb-3">
-            {PLAN_LINES.chatgpt}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Tooltip label="Sign in with your ChatGPT account in the browser">
-              <Button type="button" size="sm" className="text-xs" onClick={onLoginCodex}>
-                <Icon name="sign-in" size={14} />
-                Sign in with ChatGPT
-              </Button>
-            </Tooltip>
-          </div>
-        </div>
+        <SignInCard
+          ai="chatgpt"
+          signInLabel="Sign in with ChatGPT"
+          signInTip="Sign in with your ChatGPT account in the browser"
+          card={cards.chatgpt}
+          offline={offline}
+          onSignIn={onLoginCodex}
+          onCancel={() => onCancel('chatgpt')}
+          onReopen={() => onReopen('chatgpt')}
+        />
       )}
 
       <div className="flex justify-end">
@@ -265,6 +317,90 @@ function AuthenticateStep({
           </Button>
         </Tooltip>
       </div>
+    </div>
+  );
+}
+
+/**
+ * One AI's sign-in card (Sprint 160, #696; the Experience lead's states, 15 November). Signed out, it offers Sign in
+ * under which plans work, or under why the last sign-in ended. While its sign-in runs, wherever it started, it borrows
+ * the welcome's frame 2 as Home's card does: the main button waits, a quiet Cancel follows it, the line says the
+ * browser opened the page, and "Open the page again" is under the row, on the card's text edge, while the page is
+ * known. Offline, Sign in waits for the connection and its tooltip says so; the AI column's banner is the offline
+ * message; a sign-in already running keeps waiting. The words are the welcome's and Home's.
+ */
+function SignInCard({
+  ai,
+  signInLabel,
+  signInTip,
+  card,
+  offline,
+  onSignIn,
+  onCancel,
+  onReopen,
+  children,
+}: {
+  ai: SheetSignInAi;
+  signInLabel: string;
+  signInTip: string;
+  card: SignInCardState;
+  offline: boolean;
+  onSignIn: () => void;
+  onCancel: () => void;
+  onReopen: () => void;
+  /** The card's other buttons (Claude's Use API key), after Sign in and its Cancel. */
+  children?: ReactNode;
+}) {
+  const { waiting, signIn } = card;
+  const name = PROVIDER_NAMES[ai];
+  const ended = !waiting && signIn.line !== null && signIn.line !== 'not-opened' ? signIn.line : null;
+  // The line: frame 2's while it waits; why the last sign-in ended; else which plans work
+  const line = waiting ? browserOpened(ai) : ended ? signInProblem(ai, ended) : PLAN_LINES[ai];
+  return (
+    <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4" aria-busy={waiting || undefined}>
+      <div className="text-sm font-semibold mb-1">Sign in to {name}</div>
+      <p className="text-xs leading-5 opacity-75 mb-3" role={waiting || ended ? 'status' : undefined}>
+        {line}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        {waiting ? (
+          <>
+            <Tooltip label={browserOpened(ai)}>
+              <Button type="button" size="sm" className="text-xs" disabled>
+                <Icon name="circle-notch" size={14} tone="inherit" className="animate-spin motion-reduce:animate-none" />
+                {COPY.signingIn}
+              </Button>
+            </Tooltip>
+            <Tooltip label={stopWaitingTip(ai)}>
+              <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={onCancel}>
+                {COPY.cancel}
+              </Button>
+            </Tooltip>
+          </>
+        ) : (
+          <Tooltip label={offline ? signInNeedsConnection(ai) : signInTip}>
+            <Button type="button" size="sm" className="text-xs" disabled={offline} onClick={onSignIn}>
+              <Icon name="sign-in" size={14} />
+              {signInLabel}
+            </Button>
+          </Tooltip>
+        )}
+        {children}
+      </div>
+      {waiting && signIn.page && (
+        // Its words on the card's text edge, where state 4's line sits: the quiet button's own 12 px padding is
+        // pulled back (the Experience lead, review of #730)
+        <div className="-ml-3 mt-1" data-reopen-row>
+          <Tooltip label={reopenTip(ai)}>
+            <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={onReopen}>
+              {COPY.reopen}
+            </Button>
+          </Tooltip>
+        </div>
+      )}
+      {waiting && signIn.line === 'not-opened' && (
+        <p className="mt-2 text-xs leading-5" role="status">{homeReopenNotOpened(ai)}</p>
+      )}
     </div>
   );
 }

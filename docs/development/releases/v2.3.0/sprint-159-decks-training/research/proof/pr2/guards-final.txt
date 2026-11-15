@@ -1,0 +1,28 @@
+# guard-check.sh.txt on this branch's final code: the flag-off guards hold (no deck answer to a panel opened as a document, no switch to a deck view after a change on disk; reopened, a deck view).
+
+== flag off, opened as a document:
+{
+ "deckView": false,
+ "codeBlocks": 5,
+ "answers": []
+}
+== flag turned on, the same document panel:
+{
+ "deckView": false,
+ "codeBlocks": 5,
+ "answers": []
+}
+== flag on, after a change on disk:
+{
+ "deckView": false,
+ "codeBlocks": 5,
+ "hasLine": true
+}
+== flag on, reopened:
+{
+ "deckView": true,
+ "codeBlocks": 1,
+ "answers": [
+  "deck/assets"
+ ]
+}

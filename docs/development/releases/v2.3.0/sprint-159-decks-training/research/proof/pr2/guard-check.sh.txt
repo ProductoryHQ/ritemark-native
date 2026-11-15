@@ -1,0 +1,29 @@
+#!/bin/bash
+# To run it: put this file, open-deck.sh.txt, deck-probe.js.txt and library-probe.js.txt (beside it) and
+# ../pr1/cdp.mjs.txt in one folder, drop their .txt endings, and use the Node in vscode/.nvmrc (arm64) on PATH. It
+# drives a dev window started with scripts/qa/dev-launch-isolated.sh (its PORT and --user-data-dir).
+# guard-check.sh <port> <profile> <deck file>: the flag-off guards in a dev window. The deck opened with the flag off
+# is a document; the flag turned on, the same panel gets no deck answer and stays a document after a change on disk;
+# reopened, it is a deck view.
+S=$(dirname "$0")
+export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
+P=$1
+PROFILE=$2
+DECK=$3
+setflag() { node -e "const fs=require('fs');const p='$PROFILE/User/settings.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j['ritemark.features.decks']=$1;fs.writeFileSync(p,JSON.stringify(j,null,1));"; }
+setflag false
+sleep 3
+bash "$S/open-deck.sh" "$P" close
+echo "== flag off, opened as a document:"
+node "$S/cdp.mjs" "$P" wv "AI assistants" "$(cat "$S/deck-probe.js")"
+setflag true
+sleep 3
+echo "== flag turned on, the same document panel:"
+node "$S/cdp.mjs" "$P" wv "AI assistants" "$(cat "$S/deck-probe.js")"
+printf '\nA line written by another program.\n' >> "$DECK"
+sleep 3
+echo "== flag on, after a change on disk:"
+node "$S/cdp.mjs" "$P" wv "AI assistants" "({ deckView: !!d.querySelector('[class*=deck-]'), codeBlocks: d.querySelectorAll('.ProseMirror pre').length, hasLine: d.body.innerText.includes('another program') })"
+bash "$S/open-deck.sh" "$P" close
+echo "== flag on, reopened:"
+node "$S/cdp.mjs" "$P" wv "AI assistants" "$(cat "$S/deck-probe.js")"

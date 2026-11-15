@@ -68,6 +68,8 @@ export const COPY = {
   setUp: 'Set up',
   continue: 'Continue',
   cancel: 'Cancel',
+  /** A sign-in's main button while it waits: Home's card (Sprint 156) and the AI sheet's cards (Sprint 160). */
+  signingIn: 'Signing in…',
   finishThere: 'Finish there',
   tryAgain: 'Try again',
   openSettings: 'Open Settings',

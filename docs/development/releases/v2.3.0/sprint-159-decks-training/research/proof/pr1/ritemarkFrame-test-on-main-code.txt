@@ -1,0 +1,131 @@
+# The fault first: this branch's ritemarkFrame.test.ts run on main's ritemarkFrame.ts (./scripts/test.sh --run src/vs/workbench/test/browser/ritemarkFrame.test.ts).
+# On main a place's setting is dropped when the manifest is read, and the place is seeded built in with views [{}], so it shows at the first frame whatever the flag.
+
+  Tests are using suiteSetup and setup correctly
+    ✔ assertCleanState - check that registries are clean at the start of test running
+  Ritemark frame
+    1) the manifest: no block reads as no frame; unknown keys are ignored, and entries it can't use are left out
+    ✔ a slot's release is logged once
+    2) R9: a new profile's places row gets the extension's places as placeholders (not VS Code's own Documents); a stored row is left alone
+    3) Sprint 159: a seeded place with a setting is in the row at the first frame only while the setting is on; one without is always
+    ✔ R3: a project's first desk is Home and the Task board, pinned, Home in front; Home alone with the board's flag off; none without a folder
+  3 passing (6ms)
+  3 failing
+  1) Ritemark frame
+       the manifest: no block reads as no frame; unknown keys are ignored, and entries it can't use are left out:
+      
+      + expected - actual
+             {
+               "icon": "media/slide-library-icon.svg"
+               "id": "workbench.view.extension.ritemark-slide-library"
+               "order": 0.55
+      +        "setting": "ritemark.features.decks"
+               "title": "Slide library"
+             }
+             {
+               "head": {
+      
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    {
+      array: {
+        aiColumn: undefined,
+        deskFront: undefined,
+        extension: undefined,
+  ...
+            order: 0.55,
+  -         setting: 'ritemark.features.decks',
+            title: 'Slide library'
+          },
+          {
+            head: {
+              rows: [
+  
+      at Context.<anonymous> (vscode/out/vs/workbench/test/browser/ritemarkFrame.test.js:40:12)
+  2) Ritemark frame
+       R9: a new profile's places row gets the extension's places as placeholders (not VS Code's own Documents); a stored row is left alone:
+      
+      + expected - actual
+           }
+           {
+             "icon": "media/slide-library-icon.svg"
+             "id": "workbench.view.extension.ritemark-slide-library"
+      -      "isBuiltin": true
+      +      "isBuiltin": false
+             "name": "Slide library"
+             "views": [
+      -        {}
+      +        {
+      +          "when": "config.ritemark.features.decks"
+      +        }
+             ]
+           }
+         ]
+         "storedLeftAlone": [
+      
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    {
+      pinned: [
+        {
+          id: 'workbench.view.extension.ritemark-home',
+          order: -1,
+  ...
+          id: 'workbench.view.extension.ritemark-slide-library',
+  +       isBuiltin: true,
+  -       isBuiltin: false,
+          name: 'Slide library',
+          views: [
+  +         {}
+  -         {
+  -           when: 'config.ritemark.features.decks'
+  -         }
+          ]
+        }
+      ],
+      storedLeftAlone: [
+        '[{"id":"workbench.view.search","pinned":true,"visible":true}]',
+  
+      at Context.<anonymous> (vscode/out/vs/workbench/test/browser/ritemarkFrame.test.js:77:12)
+  3) Ritemark frame
+       Sprint 159: a seeded place with a setting is in the row at the first frame only while the setting is on; one without is always:
+      
+      + expected - actual
+       {
+         "off": [
+           "workbench.view.extension.ritemark-home"
+      -    "workbench.view.extension.ritemark-slide-library"
+         ]
+         "on": [
+           "workbench.view.extension.ritemark-home"
+           "workbench.view.extension.ritemark-slide-library"
+         ]
+         "unset": [
+           "workbench.view.extension.ritemark-home"
+      -    "workbench.view.extension.ritemark-slide-library"
+         ]
+       }
+      
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+      off: [
+        'workbench.view.extension.ritemark-home',
+  +     'workbench.view.extension.ritemark-slide-library'
+      ],
+      on: [
+        'workbench.view.extension.ritemark-home',
+        'workbench.view.extension.ritemark-slide-library'
+      ],
+      unset: [
+        'workbench.view.extension.ritemark-home',
+  +     'workbench.view.extension.ritemark-slide-library'
+      ]
+    }
+  
+      at Context.<anonymous> (vscode/out/vs/workbench/test/browser/ritemarkFrame.test.js:101:12)

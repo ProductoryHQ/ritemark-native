@@ -362,6 +362,8 @@ export interface AgentExecutionOptions {
   abortSignal?: AbortSignal;
   onProgress?: (progress: AgentProgress) => void;
   pathToClaudeCodeExecutable?: string;
+  /** Sprint 160 (#541): the Anthropic key, only when Claude runs on the key saved in Ritemark (`claudeApiKey`). */
+  anthropicApiKey?: string;
 }
 
 /**
