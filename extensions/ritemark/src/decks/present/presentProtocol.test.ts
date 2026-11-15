@@ -171,6 +171,8 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const desk = { name: 'Desk', primary: true, internal: false };
   assert.deepEqual(chooseDisplays([desk, projector]), { wall: 1, presenter: 0 });
   assert.deepEqual(chooseDisplays([laptop, { ...desk, primary: false }, projector]), { wall: 1, presenter: 0 }, 'the first that is neither');
+  // A projector made the primary in the Mac's settings: the wall still goes to it, the notes stay on the laptop.
+  assert.deepEqual(chooseDisplays([{ ...projector, primary: true }, { ...laptop, primary: false }]), { wall: 0, presenter: 1 });
 }
 
 // ---- The session's length, kept in the deck's front matter
@@ -185,6 +187,8 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   assert.equal(apply(withLength, frontMatterEdit(withLength, 'ritemark-length', '60')), '---\ndeck: 1\nritemark-length: 60\nlook: borderless\n---\nbody\n', 'replaced in place');
   const crlf = '---\r\ndeck: 1\r\n---\r\nbody\r\n';
   assert.equal(apply(crlf, frontMatterEdit(crlf, 'ritemark-length', '45')), '---\r\ndeck: 1\r\nritemark-length: 45\r\n---\r\nbody\r\n', "the file's own line ends");
+  const empty = '---\n---\n\n```slide title\ntitle: A\n```\n---\nmore\n';
+  assert.equal(apply(empty, frontMatterEdit(empty, 'ritemark-length', '45')), '---\nritemark-length: 45\n---\n\n```slide title\ntitle: A\n```\n---\nmore\n', 'an empty front matter, not a later ---');
   const bare = '```slide title\ntitle: A\n```\n';
   assert.equal(apply(bare, frontMatterEdit(bare, 'ritemark-length', '45')), '---\nritemark-length: 45\n---\n\n```slide title\ntitle: A\n```\n', 'a front matter made for it');
 }

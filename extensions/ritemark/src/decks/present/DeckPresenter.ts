@@ -87,6 +87,11 @@ interface Running {
   presenterDisplay: number;
   startedAt: number;
   ended: boolean;
+  /** A swap is moving the windows: a second press waits for it to end. */
+  swapping: boolean;
+  /** The presenter view's refresh after an edit, once the typing pauses; and the latest state's number. */
+  refresh: ReturnType<typeof setTimeout> | null;
+  presenterSerial: number;
   /** The wall answered a focus check (the PR 5 path): its window has the focus (and whether it is full screen). */
   focused: (fullScreen: boolean) => void;
 }
@@ -108,6 +113,8 @@ const ACTIVE_WAIT_MS = 3000;
 /** How long a page may take to load (the bundle is large): before a panel is moved, and again after. */
 const LOAD_WAIT_MS = 8000;
 const RELOAD_WAIT_MS = 4000;
+/** The presenter view follows edits this long after the typing pauses. */
+const EDIT_REFRESH_MS = 200;
 /** Presenter view on or off, as the person last chose in the menu (on by default, with two displays). */
 const PRESENTER_KEY = 'ritemark.present.presenterView';
 /** The dev windowed mode's windows, on the one display: the wall left, the presenter view right. */
@@ -166,7 +173,7 @@ export class DeckPresenter implements vscode.Disposable {
     const running: Running = {
       session,
       origin,
-      wall: this.createScreen(origin.document, DECK_WALL_VIEW_TYPE),
+      wall: this.createScreen(origin, DECK_WALL_VIEW_TYPE),
       presenter: null,
       subscriptions: [],
       theme: { path: null, value: BUILT_IN_THEME },
@@ -176,6 +183,9 @@ export class DeckPresenter implements vscode.Disposable {
       presenterDisplay: chosen.presenter,
       startedAt: Date.now(),
       ended: false,
+      swapping: false,
+      refresh: null,
+      presenterSerial: 0,
       focused: () => {},
     };
     this.running = running;
@@ -183,21 +193,27 @@ export class DeckPresenter implements vscode.Disposable {
     running.subscriptions.push(
       // The deck's view closed: there is nothing to return to, and the presentation goes too.
       origin.panel.onDidDispose(() => { if (this.running === running) this.stop(); }),
-      // The presenter view's next slide and row follow edits as they come (the wall waits for the next move).
+      // The presenter view's next slide and row follow edits as they come, once the typing pauses (the wall waits for
+      // the next move).
       vscode.workspace.onDidChangeTextDocument(event => {
-        if (event.document === origin.document && running.presenter) void this.showPresenter(running);
+        if (event.document !== origin.document || !running.presenter) return;
+        if (running.refresh) clearTimeout(running.refresh);
+        running.refresh = setTimeout(() => { running.refresh = null; void this.showPresenter(running); }, EDIT_REFRESH_MS);
       }),
+      { dispose: () => { if (running.refresh) clearTimeout(running.refresh); } },
     );
     if (!shell) {
       await placeWithoutShell(running);
       return;
     }
-    // Both panels are made in the main window first, then each is placed: the wall on its display, then the presenter
-    // view on the laptop's, which keeps the focus (the presenter's keys and clicker work there).
-    const withPresenter = this.presenterAvailable(running) && this.presenterWanted();
-    if (withPresenter) this.addPresenter(running);
+    // The wall is placed on its display, then the presenter view is made and placed on the laptop's, which keeps the
+    // focus (the presenter's keys and clicker work there). Each panel is made in the deck's group, where it is the
+    // tab in front, so its page loads before it moves (a panel behind another tab loads nothing).
     await this.place(running, running.wall, DECK_WALL_VIEW_TYPE, running.wallDisplay, WINDOWED_WALL);
-    if (withPresenter && running.presenter) await this.place(running, running.presenter, DECK_PRESENTER_VIEW_TYPE, running.presenterDisplay, WINDOWED_PRESENTER);
+    if (this.presenterAvailable(running) && this.presenterWanted() && !running.ended) {
+      this.addPresenter(running);
+      if (running.presenter) await this.place(running, running.presenter, DECK_PRESENTER_VIEW_TYPE, running.presenterDisplay, WINDOWED_PRESENTER);
+    }
     // The keys go to the window placed last: the focus inside its page, not only on its window.
     const focused = (running.presenter ?? running.wall).panel;
     if (!running.ended) focused.reveal(focused.viewColumn, false);
@@ -215,11 +231,13 @@ export class DeckPresenter implements vscode.Disposable {
     return running.shell && (running.displays.length > 1 || presentWindowed());
   }
 
-  private createScreen(document: vscode.TextDocument, viewType: string): Screen {
+  private createScreen(origin: DeckOrigin, viewType: string): Screen {
+    const document = origin.document;
     const panel = vscode.window.createWebviewPanel(
       viewType,
       deckTitle(document),
-      { viewColumn: vscode.ViewColumn.Active, preserveFocus: false },
+      // In the deck's own group, in front: never in the wall's locked window, and loaded at once.
+      { viewColumn: origin.panel.viewColumn ?? vscode.ViewColumn.Active, preserveFocus: false },
       {
         enableScripts: true,
         // Kept while hidden: the go-to box, the grid and the clock survive anything shown over them for a moment.
@@ -252,7 +270,7 @@ export class DeckPresenter implements vscode.Disposable {
 
   /** The presenter view's panel, made in the main window (placed by the caller). */
   private addPresenter(running: Running): void {
-    const screen = this.createScreen(running.origin.document, DECK_PRESENTER_VIEW_TYPE);
+    const screen = this.createScreen(running.origin, DECK_PRESENTER_VIEW_TYPE);
     running.presenter = screen;
     this.listen(running, screen);
   }
@@ -261,16 +279,18 @@ export class DeckPresenter implements vscode.Disposable {
     if (on && !running.presenter && this.presenterAvailable(running)) {
       this.addPresenter(running);
       if (running.presenter) await this.place(running, running.presenter, DECK_PRESENTER_VIEW_TYPE, running.presenterDisplay, WINDOWED_PRESENTER);
+      await this.showWall(running);
     } else if (!on && running.presenter) {
+      // Its onDidDispose tells the wall.
       running.presenter.panel.dispose();
     }
-    await this.showWall(running);
   }
 
   /**
    * The shell places a panel in a window of its own on a display, once the panel is an editor it can find and its page
-   * has loaded. The window it places last has the focus. A webview moved between windows loads its page again; when it
-   * doesn't (a panel moved while its first page was still on its way), the page is set again.
+   * has loaded. The window it places last has the focus. A webview moved into a new window loads its page again; when
+   * it doesn't (a panel moved while its first page was still on its way), the page is set again. A panel already in
+   * its own window moves with the window (Swap displays) and keeps its page.
    */
   private async place(running: Running, screen: Screen, viewType: string, display: number, windowed: { x: number; y: number; width: number; height: number }): Promise<void> {
     if (!(await panelIsOpen(running, viewType))) return;
@@ -278,17 +298,23 @@ export class DeckPresenter implements vscode.Disposable {
     if (running.ended) return;
     const fullScreen = !presentWindowed();
     const reloaded = nextLoad(screen, RELOAD_WAIT_MS);
-    await vscode.commands.executeCommand(PLACE_COMMAND, { viewType, display, fullScreen, ...(fullScreen ? {} : { windowed }) });
+    const placed = await vscode.commands.executeCommand<unknown>(PLACE_COMMAND, { viewType, display, fullScreen, ...(fullScreen ? {} : { windowed }) });
+    if (placed !== 'opened') return;
     if (!(await reloaded) && !running.ended) screen.panel.webview.html = `${screen.html}<!-- ${Date.now()} -->`;
   }
 
   /** Swap displays: the wall goes where the presenter view is, and the presenter view where the wall was. */
   private async swap(running: Running): Promise<void> {
-    if (!running.shell || running.displays.length < 2) return;
-    [running.wallDisplay, running.presenterDisplay] = [running.presenterDisplay, running.wallDisplay];
-    await this.place(running, running.wall, DECK_WALL_VIEW_TYPE, running.wallDisplay, WINDOWED_WALL);
-    if (running.presenter) await this.place(running, running.presenter, DECK_PRESENTER_VIEW_TYPE, running.presenterDisplay, WINDOWED_PRESENTER);
-    await this.showPresenter(running);
+    if (!running.shell || running.displays.length < 2 || running.swapping) return;
+    running.swapping = true;
+    try {
+      [running.wallDisplay, running.presenterDisplay] = [running.presenterDisplay, running.wallDisplay];
+      await this.place(running, running.wall, DECK_WALL_VIEW_TYPE, running.wallDisplay, WINDOWED_WALL);
+      if (running.presenter) await this.place(running, running.presenter, DECK_PRESENTER_VIEW_TYPE, running.presenterDisplay, WINDOWED_PRESENTER);
+      await this.showPresenter(running);
+    } finally {
+      running.swapping = false;
+    }
   }
 
   /** The presenter view's clock: the session's length, asked and kept in the deck's front matter (`ritemark-length`). */
@@ -389,11 +415,13 @@ export class DeckPresenter implements vscode.Disposable {
   private async showPresenter(running: Running): Promise<void> {
     const screen = running.presenter;
     if (!screen || running.ended) return;
+    // Only the newest state is sent: an older one still reading the theme gives way.
+    const serial = ++running.presenterSerial;
     running.session.read(running.origin.document.getText());
     const view = running.session.view();
     const look = await this.look(running);
     const assets = this.assets(running, screen, presenterPicturePaths(view));
-    if (running.ended || running.presenter !== screen) return;
+    if (running.ended || running.presenter !== screen || serial !== running.presenterSerial) return;
     const twoDisplays = running.displays.length > 1;
     await post(screen.panel.webview, presenterStateOf(view, look, assets, {
       wallDisplay: twoDisplays ? running.displays[running.wallDisplay]?.name ?? null : null,

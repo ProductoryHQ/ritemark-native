@@ -288,10 +288,13 @@ export function lengthMinutesOf(value: string | null | undefined): number | null
  */
 export function frontMatterEdit(text: string, key: string, value: string): { start: number; end: number; text: string } {
   const newline = text.includes('\r\n') ? '\r\n' : '\n';
-  const match = /^---[ \t]*\r?\n([\s\S]*?)(\r?\n)---[ \t]*(?:\r?\n|$)/.exec(text);
+  // An empty front matter (`---` then `---`) first: the body is optional and lazy, so a later `---` in the deck is
+  // never taken for the closing line.
+  const match = /^---[ \t]*\r?\n(?:([\s\S]*?)\r?\n)??---[ \t]*(?:\r?\n|$)/.exec(text);
   if (!match) return { start: 0, end: 0, text: `---${newline}${key}: ${value}${newline}---${newline}${newline}` };
   const bodyStart = match[0].indexOf('\n') + 1;
   const body = match[1];
+  if (body === undefined) return { start: bodyStart, end: bodyStart, text: `${key}: ${value}${newline}` };
   let offset = bodyStart;
   for (const line of body.split('\n')) {
     const bare = line.replace(/\r$/, '');
@@ -313,15 +316,15 @@ export interface PresentDisplay {
 
 /**
  * Which display the wall goes to and which the presenter view. The wall: the first display that is neither built in
- * nor the primary (the projector), else the first that isn't the primary (a closed laptop on a desk monitor), else
- * the first that isn't built in. The presenter view: the built-in display, else the primary, else another. On one
- * display (or mirrored displays, which report one), both are the same. Pure, so the test reads the same rule.
+ * nor the primary (the projector), else the first that isn't built in (a projector made the primary), else the first
+ * that isn't the primary. The presenter view: the built-in display, else the primary, else another. On one display (or
+ * mirrored displays, which report one), both are the same. Pure, so the test reads the same rule.
  */
 export function chooseDisplays(displays: PresentDisplay[]): { wall: number; presenter: number } {
   if (displays.length < 2) return { wall: 0, presenter: 0 };
   let wall = displays.findIndex(display => !display.internal && !display.primary);
-  if (wall < 0) wall = displays.findIndex(display => !display.primary);
   if (wall < 0) wall = displays.findIndex(display => !display.internal);
+  if (wall < 0) wall = displays.findIndex(display => !display.primary);
   if (wall < 0) wall = 1;
   let presenter = displays.findIndex((display, index) => index !== wall && display.internal);
   if (presenter < 0) presenter = displays.findIndex((display, index) => index !== wall && display.primary);

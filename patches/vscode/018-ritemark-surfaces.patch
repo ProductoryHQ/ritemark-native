@@ -7120,10 +7120,10 @@ index 41250d7b714..133c8807b3f 100644
  				agentsWindow: { default: 'custom' },
 diff --git a/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts b/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts
 new file mode 100644
-index 00000000000..72c5c41bc2c
+index 00000000000..9b889529b80
 --- /dev/null
 +++ b/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts
-@@ -0,0 +1,160 @@
+@@ -0,0 +1,164 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -7225,7 +7225,11 @@ index 00000000000..72c5c41bc2c
 +
 +CommandsRegistry.registerCommand('_ritemark.present.displays', () => ritemarkDisplays());
 +
-+CommandsRegistry.registerCommand('_ritemark.present.place', async (accessor, request: unknown): Promise<boolean> => {
++/**
++ * Answers 'opened' (the panel moved into a new window, where its page loads again), 'moved' (its window moved, the page
++ * kept) or false (no such panel, or a malformed request).
++ */
++CommandsRegistry.registerCommand('_ritemark.present.place', async (accessor, request: unknown): Promise<'opened' | 'moved' | false> => {
 +	if (!isPlaceRequest(request)) {
 +		return false;
 +	}
@@ -7258,7 +7262,7 @@ index 00000000000..72c5c41bc2c
 +		if (request.fullScreen) {
 +			await nativeHostService.toggleFullScreen(options);
 +		}
-+		return true;
++		return 'moved';
 +	}
 +
 +	// A new window: marked as a presentation's before its parts are laid out, so it never shows a title row
@@ -7282,7 +7286,7 @@ index 00000000000..72c5c41bc2c
 +	} finally {
 +		opened.dispose();
 +	}
-+	return true;
++	return 'opened';
 +});
 diff --git a/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts
 index 9fd23700423..d7f7d78c0ca 100644

@@ -91,7 +91,7 @@ export function DeckPresenterView() {
     if (digits === null) return
     const number = Number(digits)
     if (number >= 1) sendToExtension('present/peek', { number })
-    const timer = window.setTimeout(() => setDigits(null), GOTO_MS)
+    const timer = window.setTimeout(() => { setDigits(null); setPeeked(null) }, GOTO_MS)
     return () => window.clearTimeout(timer)
   }, [digits])
 
@@ -104,10 +104,11 @@ export function DeckPresenterView() {
       if (step.handled) {
         take()
         setDigits(step.digits)
+        if (step.digits === null) setPeeked(null)
         if (step.go !== undefined) send('present/go', { number: step.go })
         return
       }
-      if (digits !== null) setDigits(null)
+      if (digits !== null) { setDigits(null); setPeeked(null) }
       const key = wallKeyOf(event)
       if (!key || key.type === 'digit') return
       // Return and space on one of this view's buttons press that button.
