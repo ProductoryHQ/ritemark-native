@@ -6,6 +6,7 @@ import * as fsp from 'fs/promises';
 import { parseFrontmatterFromText, serializeFrontmatter, discoverCommands } from './agent/discovery';
 import type { CardPages } from './taskBoard/cardPages';
 import type { DeckPages } from './decks/deckPages';
+import { isDeckPath } from './decks/deckMode';
 import { cardTabWrite } from './taskBoard/cardFile';
 import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
@@ -776,6 +777,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       ? cardPages.connect(document, webviewPanel.webview)
       : null;
 
+    // Sprint 157: a deck's panel, while it is open, so the Slide library and the AI's tools can insert into it.
+    const deckPage = document.uri.scheme === 'file' && isDeckPath(document.uri.fsPath)
+      ? RitemarkEditorProvider.deckPages()?.connect(document, webviewPanel)
+      : undefined;
+
     // #477: a card page's tab shows its card's title and the task mark, as
     // drawn (the Experience lead, 2026-10-20), and follows an edit of the title.
     // Every other file keeps its file name and icon.
@@ -1212,6 +1218,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       }
       imageWatcher.dispose();
       cardPage?.dispose();
+      deckPage?.dispose();
       cardTabWatcher?.dispose();
       this.documentSync.disposeView(document, webview);
       this.dictationControllers.get(webview)?.cleanup();

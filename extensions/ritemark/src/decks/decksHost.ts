@@ -3,13 +3,32 @@
  * of the sprint add the Slide library and the AI's deck tools here.
  */
 
-import type * as vscode from 'vscode';
-import { DeckPages } from './deckPages';
+import * as vscode from 'vscode';
+import { isEnabled } from '../features';
+import { DeckLibrary } from './DeckLibrary';
+import { projectRoot, workspaceDeckFiles } from './deckDocuments';
+import { DeckPages, SLIDE_LIBRARY_VIEW } from './deckPages';
+import { SlideLibraryViewProvider } from './SlideLibraryViewProvider';
 
 export interface DecksHost {
   pages: DeckPages;
+  /** The project's Slide library and decks, or null without a project folder on disk. */
+  library: () => DeckLibrary | null;
 }
 
-export function registerDecks(_context: vscode.ExtensionContext): DecksHost {
-  return { pages: new DeckPages() };
+export function registerDecks(context: vscode.ExtensionContext): DecksHost {
+  const library = () => {
+    const root = projectRoot();
+    return root ? new DeckLibrary(workspaceDeckFiles(root)) : null;
+  };
+  const pages = new DeckPages(library);
+  const view = new SlideLibraryViewProvider(context.extensionUri, pages, library);
+  context.subscriptions.push(
+    pages,
+    view,
+    vscode.window.registerWebviewViewProvider(SLIDE_LIBRARY_VIEW, view, { webviewOptions: { retainContextWhenHidden: false } }),
+    // The place's head row (Search), from the frame's manifest.
+    vscode.commands.registerCommand('ritemark.slideLibrary.search', () => (isEnabled('decks') ? view.focusSearch() : undefined)),
+  );
+  return { pages, library };
 }

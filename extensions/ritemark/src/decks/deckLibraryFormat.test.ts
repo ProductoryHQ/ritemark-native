@@ -5,7 +5,7 @@ import { strict as assert } from 'node:assert';
 import { parseDeck } from './deckFormat';
 import {
   appendPart, folderOf, newTopicText, normalizePath, partText, projectPath, rebasePath, rebaseSlide,
-  replaceSlidePart, rewriteMarkdownTargets, slideStamp, slidesOfText,
+  foldMarkdown, replaceSlidePart, rewriteMarkdownTargets, slideStamp, slidesOfText,
 } from './deckLibraryFormat';
 
 // Paths.
@@ -43,6 +43,9 @@ assert.equal(
   assert.notEqual(slideStamp('points', data, 'Text with ![x](images/s.png).', 'Slide library'), base, 'kind');
   assert.notEqual(slideStamp('boxes', { ...data, title: 'Five parts' }, 'Text with ![x](images/s.png).', 'Slide library'), base, 'words');
   assert.notEqual(slideStamp('boxes', data, 'Other text.', 'Slide library'), base, 'handout (answer 2)');
+  // The same handout as the editor writes it back is the same copy.
+  assert.equal(foldMarkdown('* One\n+ Two\n\n1) Three\n\n__Bold__ and *it*\\!\n\nTitle\n====='), foldMarkdown('- One\n- Two\n\n1. Three\n\n**Bold** and _it_!\n\n## Title ##'));
+  assert.notEqual(foldMarkdown('- One'), foldMarkdown('- Two'));
 }
 
 // One slide of a deck by id: replaced with every other byte kept; appended; a new topic.

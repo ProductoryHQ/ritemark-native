@@ -20,11 +20,102 @@ import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import { deckModeOf } from './deckMode';
 import { isThemePath } from './deckTheme';
 import { decodeDeckRequest, DeckProtocolError, type DeckHostMessage, type DeckRequest } from './deckProtocol';
+import { parseFrom } from './deckFormat';
+import { slidesOfText } from './deckLibraryFormat';
+import { deckName, type DeckLibrary, type LibraryWrite } from './DeckLibrary';
+import { projectRelative, projectRoot } from './deckDocuments';
 
-export class DeckPages {
+/** One open deck view: its document and panel, and the slide it shows. */
+interface DeckView {
+  document: vscode.TextDocument;
+  panel: vscode.WebviewPanel;
+  current: number;
+  count: number;
+}
+
+/** The deck the Slide library inserts into: its project-relative path, name and current slide. */
+export interface ActiveDeck {
+  path: string;
+  name: string;
+  current: number;
+  count: number;
+}
+
+/** Library writes kept for their Undo, this many at most. */
+const KEPT_WRITES = 20;
+
+export class DeckPages implements vscode.Disposable {
+  private readonly views = new Set<DeckView>();
+  private active: DeckView | null = null;
+  private readonly changed = new vscode.EventEmitter<void>();
+  /** The active deck, or the slide it shows, changed (the Slide library says "Insert after slide N"). */
+  readonly onDidChangeActive = this.changed.event;
+  private readonly revealed = new vscode.EventEmitter<{ path: string; id: string }>();
+  /** Show in the library: the library view shows this topic's slide. */
+  readonly onDidRevealInLibrary = this.revealed.event;
+  private readonly writes = new Map<string, LibraryWrite>();
+
+  /** `library` gives the project's library, or null when the window has no project folder on disk. */
+  constructor(private readonly library: () => DeckLibrary | null = () => null) {}
+
   /** Does this document open as a deck? */
   deckModeFor(document: vscode.TextDocument): boolean {
     return deckModeOf({ flagOn: isEnabled('decks'), scheme: document.uri.scheme, fsPath: document.uri.fsPath, text: document.getText() });
+  }
+
+  /** A deck's panel, while it is open: the active one is where the library inserts. */
+  connect(document: vscode.TextDocument, panel: vscode.WebviewPanel): vscode.Disposable {
+    const view: DeckView = { document, panel, current: 0, count: 0 };
+    this.views.add(view);
+    if (panel.active) this.active = view;
+    const state = panel.onDidChangeViewState(() => {
+      if (panel.active && this.active !== view) {
+        this.active = view;
+        this.changed.fire();
+      }
+    });
+    this.changed.fire();
+    return {
+      dispose: () => {
+        state.dispose();
+        this.views.delete(view);
+        if (this.active === view) this.active = [...this.views].find(other => other.panel.active) ?? null;
+        this.changed.fire();
+      },
+    };
+  }
+
+  /** The deck the library inserts into: the active deck view, or the last one shown. */
+  activeDeck(): ActiveDeck | null {
+    const view = this.activeView();
+    const root = projectRoot();
+    const relative = view && root ? projectRelative(root, view.document.uri.fsPath) : null;
+    if (!view || !relative || !this.deckModeFor(view.document)) return null;
+    return { path: relative, name: deckName(relative), current: view.current, count: view.count };
+  }
+
+  /** The active deck's text and the ids it holds (for new copies' ids). */
+  activeDocument(): vscode.TextDocument | null {
+    return this.activeView()?.document ?? null;
+  }
+
+  /** Slides into the active deck after its current slide, as one undo step there. */
+  async insertIntoActive(parts: Array<{ kind: string; body: string; handout: string }>, after?: number): Promise<boolean> {
+    const view = this.activeView();
+    if (!view) return false;
+    return this.post(view.panel.webview, { type: 'deck/insert', after: after ?? view.current, parts });
+  }
+
+  /** The open view of this deck, if there is one (the AI's tools insert through it). */
+  viewOf(fsPath: string): { insert: (parts: Array<{ kind: string; body: string; handout: string }>, after: number) => Promise<boolean> } | null {
+    const view = [...this.views].find(entry => path.normalize(entry.document.uri.fsPath) === path.normalize(fsPath));
+    if (!view) return null;
+    return { insert: (parts, after) => this.post(view.panel.webview, { type: 'deck/insert', after, parts }) };
+  }
+
+  private activeView(): DeckView | null {
+    if (this.active && this.views.has(this.active)) return this.active;
+    return [...this.views].find(view => view.panel.visible) ?? null;
   }
 
   /** One request from a deck view; the answer goes to that webview only. */
@@ -50,16 +141,129 @@ export class DeckPages {
       case 'deck/save-image':
         await this.post(webview, await savePicture(document, webview, request.slideId, request.dataUrl, request.filename));
         return;
+      case 'deck/current': {
+        const view = [...this.views].find(entry => entry.panel.webview === webview);
+        if (view && (view.current !== request.index || view.count !== request.count)) {
+          view.current = request.index;
+          view.count = request.count;
+          if (view === this.activeView()) this.changed.fire();
+        }
+        return;
+      }
+      default:
+        await this.handleLibrary(document, webview, request);
     }
   }
 
-  private async post(webview: vscode.Webview, message: DeckHostMessage): Promise<void> {
+  /** The copies' and the library's requests, through the project's library. */
+  private async handleLibrary(document: vscode.TextDocument, webview: vscode.Webview, request: DeckRequest): Promise<void> {
+    const library = this.library();
+    const root = projectRoot();
+    const deckPath = root ? projectRelative(root, document.uri.fsPath) : null;
+    const failed = (id: string | null, message: string) => this.post(webview, { type: 'deck/library-failed', id, message });
+    if (!library || !deckPath) {
+      if (request.type !== 'deck/source-states') await failed(null, 'The Slide library works for a deck inside the open project folder.');
+      return;
+    }
+    // The copy as the deck's document holds it: the bytes that are saved, so its stamp is the file's.
+    const part = (id: string) => {
+      const slide = slidesOfText(document.getText()).find(entry => entry.data.id === id);
+      if (!slide) throw new Error('That slide is no longer in the deck.');
+      return { id, kind: slide.kind, body: slide.body, handout: slide.handout, from: slide.data.from };
+    };
     try {
-      await webview.postMessage(message);
-    } catch {
-      // The view closed meanwhile.
+      switch (request.type) {
+        case 'deck/source-states': {
+          const copies = slidesOfText(document.getText())
+            .filter(slide => slide.data.id && slide.data.from)
+            .map(slide => ({ id: slide.data.id as string, from: slide.data.from as string, kind: slide.kind, body: slide.body, handout: slide.handout }));
+          await this.post(webview, { type: 'deck/source-states', states: copies.length ? await library.sourceStates(deckPath, copies) : [] });
+          return;
+        }
+        case 'deck/update-library': {
+          const write = await library.updateLibrarySlide(deckPath, part(request.id));
+          await this.post(webview, { type: 'deck/library-written', id: request.id, from: write.from, verb: 'updated', token: this.keep(write), sourceName: deckName(write.path) });
+          return;
+        }
+        case 'deck/use-library': {
+          const copied = await library.useSource(deckPath, part(request.id).body);
+          await this.post(webview, { type: 'deck/library-part', id: request.id, ...copied });
+          return;
+        }
+        case 'deck/add-to-library': {
+          const copy = part(request.id);
+          const topic = await pickTopic(library);
+          if (!topic) return;
+          const write = await library.addToLibrary(deckPath, topic, copy);
+          await this.post(webview, { type: 'deck/library-written', id: request.id, from: write.from, verb: 'added', token: this.keep(write), sourceName: deckName(write.path) });
+          return;
+        }
+        case 'deck/show-in-library': {
+          const source = parseFrom(request.from);
+          if (!source) return;
+          await vscode.commands.executeCommand(`${SLIDE_LIBRARY_VIEW}.focus`);
+          this.revealed.fire({ path: source.path, id: source.id });
+          return;
+        }
+        case 'deck/undo-library': {
+          const write = this.writes.get(request.token);
+          this.writes.delete(request.token);
+          if (!write || !(await library.undoWrite(write))) {
+            await failed(null, 'The library was changed since, so it is left as it is.');
+          }
+          return;
+        }
+      }
+    } catch (error) {
+      await failed('id' in request ? request.id : null, error instanceof Error ? error.message : 'The Slide library could not do that.');
     }
   }
+
+  /** Keep a library write for its Undo; returns the token the view sends back. */
+  private keep(write: LibraryWrite): string | null {
+    if (write.previous === null) return null;
+    const token = `w${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    this.writes.set(token, write);
+    while (this.writes.size > KEPT_WRITES) this.writes.delete(this.writes.keys().next().value as string);
+    return token;
+  }
+
+  private async post(webview: vscode.Webview, message: DeckHostMessage): Promise<boolean> {
+    try {
+      return await webview.postMessage(message);
+    } catch {
+      // The view closed meanwhile.
+      return false;
+    }
+  }
+
+  dispose(): void {
+    this.changed.dispose();
+    this.revealed.dispose();
+    this.views.clear();
+  }
+}
+
+/** The view id of the Slide library place. */
+export const SLIDE_LIBRARY_VIEW = 'ritemark.slideLibraryView';
+
+/** Add to library: one of the library's topics, or a new one by name. */
+async function pickTopic(library: DeckLibrary): Promise<string | null> {
+  const topics = await library.listDecks({ where: 'library' });
+  const NEW = '$(add) New topic…';
+  const picked = await vscode.window.showQuickPick(
+    [...topics.map(topic => ({ label: topic.name, description: `${topic.slides.length} slides`, path: topic.path })), { label: NEW, description: '', path: '' }],
+    { title: 'Add to the Slide library', placeHolder: 'Choose the topic this slide belongs to' },
+  );
+  if (!picked) return null;
+  if (picked.path) return picked.path;
+  const name = await vscode.window.showInputBox({
+    title: 'New topic in the Slide library',
+    prompt: 'A topic is a deck in the Slide library folder.',
+    placeHolder: 'Working with data',
+    validateInput: value => (value.trim() ? (/[\\/:*?"<>|]/.test(value) ? 'A topic name has no / \\ : * ? " < > |' : null) : 'Give the topic a name'),
+  });
+  return name?.trim() || null;
 }
 
 /**

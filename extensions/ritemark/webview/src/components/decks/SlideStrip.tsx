@@ -32,6 +32,15 @@ export interface StripActions {
   remove: (index: number) => void
   /** Move part `from` to stand before part `to`. */
   move: (from: number, to: number) => void
+  /** The strip menu's Add to library… and Show in the library. */
+  addToLibrary: (index: number) => void
+  showInLibrary: (index: number) => void
+}
+
+/** What the strip shows of a copy's source: from a library topic, and whether the library has a newer version. */
+export interface StripMark {
+  library: boolean
+  newer: boolean
 }
 
 /** A new slide takes the caret in its title: the menu doesn't hand the focus back to its + when it closes. */
@@ -96,17 +105,20 @@ interface ThumbnailProps {
   /** The menu, open or closed; the strip opens it from the keyboard too. */
   menuOpen: boolean
   onMenuOpen: (index: number | null) => void
+  /** A copy of a library slide; the amber dot when the library has a newer version (README frame 4). */
+  fromLibrary: boolean
+  newer: boolean
 }
 
 /** One numbered thumbnail, with its menu. */
-const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart, menuOpen, onMenuOpen }: ThumbnailProps) {
+const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart, menuOpen, onMenuOpen, fromLibrary, newer }: ThumbnailProps) {
   const { index, kind, data } = entry
   const skipped = data.skip === true
   return (
     <div
       role="option"
       aria-selected={current}
-      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}`}
+      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}${newer ? ', the library has a newer version' : ''}`}
       data-thumb={index}
       className={`deck-thumb${current ? ' is-current' : ''}${skipped ? ' is-skip' : ''}${dragging ? ' is-dragging' : ''}${menuOpen ? ' is-menu' : ''}`}
       onPointerDown={event => onDragStart(index, event)}
@@ -121,6 +133,10 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
         <SlideCanvas kind={kind} data={data as SlideData} width={THUMB_WIDTH} theme={theme} borderless={borderless} assets={assets} />
       </div>
       {skipped ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}
+      {newer ? (
+        // The tooltip's own wrapper is the dot: a child inside it would join the thumbnail's row and push the slide over.
+        <Tooltip label="The library has a newer version" className="deck-thumb-dot">{null}</Tooltip>
+      ) : null}
       <div className="deck-thumb-more" onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
         <DropdownMenu modal={false} open={menuOpen} onOpenChange={open => onMenuOpen(open ? entry.index : null)}>
           <MoreActionsTrigger label={`Slide ${index + 1}: more actions`} />
@@ -133,6 +149,17 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
               <Icon name={skipped ? 'eye' : 'eye-slash'} size={14} tone="inherit" />
               {skipped ? 'Show slide' : 'Skip slide'}
             </DropdownMenuItem>
+            {fromLibrary ? (
+              <DropdownMenuItem onSelect={() => actions.showInLibrary(index)}>
+                <Icon name="books" size={14} tone="inherit" />
+                Show in the library
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onSelect={() => actions.addToLibrary(index)}>
+                <Icon name="books" size={14} tone="inherit" />
+                Add to library…
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem tone="danger" disabled={count < 2} onSelect={() => actions.remove(index)}>
               <Icon name="trash" size={14} tone="inherit" />
@@ -153,9 +180,11 @@ interface SlideStripProps {
   assets: Record<string, string>
   actions: StripActions
   stripRef: React.RefObject<HTMLDivElement>
+  /** Each copy's source marks, by the slide's id. */
+  marks: Record<string, StripMark>
 }
 
-export function SlideStrip({ slides, current, theme, borderless, assets, actions, stripRef }: SlideStripProps) {
+export function SlideStrip({ slides, current, theme, borderless, assets, actions, stripRef, marks }: SlideStripProps) {
   const count = slides.length
   const [drag, setDrag] = useState<{ from: number; to: number | null } | null>(null)
   const [menuFor, setMenuFor] = useState<number | null>(null)
@@ -271,6 +300,8 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
             onDragStart={onDragStart}
             menuOpen={menuFor === entry.index}
             onMenuOpen={setMenuFor}
+            fromLibrary={!!(entry.data.id && marks[entry.data.id]?.library)}
+            newer={!!(entry.data.id && marks[entry.data.id]?.newer)}
           />
         </div>
       ))}

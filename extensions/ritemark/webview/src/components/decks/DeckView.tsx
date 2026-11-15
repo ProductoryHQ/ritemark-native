@@ -26,14 +26,16 @@ import type { DocumentProperties } from '../properties'
 import { SegmentedControl } from '../ui/segmented-control'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
-import { deleteSlide, duplicateSlide, insertSlide, moveSlide, partContent, partIndexAt, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
-import type { Fragment, Slice } from '@tiptap/pm/model'
+import { deleteSlide, duplicateSlide, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
+import { DOMParser as PMDOMParser, Fragment, type Node as PMNode, type Slice } from '@tiptap/pm/model'
+import { markdownToEditorHTML } from '../../utils/editorMarkdown'
+import { SourceLines, type CopySource } from './library/SourceLines'
 import { onMessage, sendToExtension } from '../../bridge'
 import { isTrustedDeckTransaction } from './handout/deckGuard'
 import { convertKind } from './slide/convertKind'
 import { SlideSettings } from './SlideSettings'
-import { SlideStrip, type StripActions } from './SlideStrip'
-import { newId } from '../../../../src/decks/deckFormat'
+import { SlideStrip, type StripActions, type StripMark } from './SlideStrip'
+import { newId, writeSlideBlock } from '../../../../src/decks/deckFormat'
 import type { Transaction } from '@tiptap/pm/state'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { currentPart, scrollTopFor } from './scrollRule'
@@ -66,6 +68,54 @@ const DEFAULT_RATIO = 0.6
 /** How long a thumbnail's scroll holds the slide, and how long writing does (the prototype's `syncLock`). */
 const PICK_LOCK_MS = 500
 const WRITE_LOCK_MS = 1200
+/** The copies' sources are asked again this long after the deck stops changing; "Updated in the library" stays this long. */
+const SOURCES_MS = 700
+const UPDATED_MS = 4000
+
+/** A notice in the deck's bar, with one action (Undo) when it has one. */
+interface Notice {
+  text: string
+  action?: { label: string; tip: string; run: () => void }
+}
+
+/** A part to put in the deck: its slide block's kind and body, its handout, and its notes when it keeps some. */
+interface NewPart {
+  kind: string
+  body: string
+  handout: string
+  notes?: string | null
+}
+
+function isNewPart(value: unknown): value is NewPart {
+  const part = value as Record<string, unknown> | null
+  return !!part && typeof part.kind === 'string' && typeof part.body === 'string' && typeof part.handout === 'string'
+}
+
+/**
+ * Parts as the editor's own nodes: written as the file would hold them and read through the document's own Markdown
+ * pipeline, so a copy is what loading the deck would make of it. The HTML is read in an inert document, never put into
+ * the page. Each slide gets a paragraph after it when its handout is empty, as a new slide does.
+ */
+function partsFragment(editor: TipTapEditor, parts: NewPart[], imageMappings: Record<string, string>): Fragment | null {
+  const markdown = parts
+    .map(part => [writeSlideBlock(part.kind, part.body, part.notes ?? null), part.handout.trim()].filter(Boolean).join('\n\n'))
+    .join('\n\n')
+  let html: string
+  try {
+    html = markdownToEditorHTML(`${markdown}\n`, imageMappings)
+  } catch {
+    return null
+  }
+  const body = new window.DOMParser().parseFromString(html, 'text/html').body
+  const content = PMDOMParser.fromSchema(editor.schema).parseSlice(body).content
+  const nodes: PMNode[] = []
+  content.forEach((node, _offset, index) => {
+    nodes.push(node)
+    const next = index + 1 < content.childCount ? content.child(index + 1) : null
+    if (isSlideNode(node) && (!next || isSlideNode(next))) nodes.push(editor.schema.nodes.paragraph.create())
+  })
+  return nodes.filter(isSlideNode).length === parts.length ? Fragment.fromArray(nodes) : null
+}
 
 interface DeckViewProps {
   content: string
@@ -117,7 +167,12 @@ export function DeckView({
   const [notesOpen, setNotesOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsAt, setSettingsAt] = useState<{ left: number; top: number } | null>(null)
-  const [notice, setNotice] = useState<{ text: string; restore?: { at: number; content: Fragment } } | null>(null)
+  const [notice, setNotice] = useState<Notice | null>(null)
+  // The Slide library (PR 4): each copy's source, by the slide's id; the copy just written to the library; and the
+  // copies whose library write or read is on its way.
+  const [sources, setSources] = useState<Record<string, CopySource>>({})
+  const [justUpdated, setJustUpdated] = useState<string | null>(null)
+  const [busy, setBusy] = useState<Record<string, true>>({})
   const [focusTitleOf, setFocusTitleOf] = useState<number | null>(null)
   const lineHintShown = useRef(false)
   const [ratio, setRatio] = useState(DEFAULT_RATIO)
@@ -327,6 +382,18 @@ export function DeckView({
     target.addEventListener('pointercancel', up)
   }, [avail, stripWidth, pick])
 
+  /** Part `index`'s slide id, given one first when it has none (the library and pictures find a slide by its id). */
+  const idOf = useCallback((index: number): string | null => {
+    if (!editor) return null
+    const entry = slidesOf(editor.state.doc)[index]
+    if (!entry) return null
+    if (entry.data.id) return entry.data.id
+    const id = newId(slidesOf(editor.state.doc).map(other => other.data.id).filter((value): value is string => !!value))
+    const tr = updateSlide(editor.state, index, { ...entry.data, id })
+    if (tr) editor.view.dispatch(tr)
+    return id
+  }, [editor])
+
   // ---- the strip's operations: each one transaction, so Undo takes it back whole
   const dispatch = useCallback((tr: Transaction | null) => {
     if (tr && editor && !editor.isDestroyed) editor.view.dispatch(tr)
@@ -352,14 +419,40 @@ export function DeckView({
       if (!editor) return
       const content = partContent(editor.state.doc, index)
       if (!content || !dispatch(deleteSlide(editor.state, index))) return
-      setNotice({ text: `Slide ${index + 1} is deleted`, restore: { at: index, content } })
+      setNotice({
+        text: `Slide ${index + 1} is deleted`,
+        action: {
+          label: 'Undo',
+          tip: 'Put the slide back',
+          run: () => {
+            // The deleted part itself goes back where it was; what was done since stays. Only while the slide is
+            // still gone: Cmd+Z may have put it back already.
+            const id = content.firstChild ? slideDataOf(content.firstChild.attrs.body).id : undefined
+            const back = !!id && slidesOf(editor.state.doc).some(entry => entry.data.id === id)
+            if (!back && !editor.isDestroyed) {
+              dispatch(restoreSlide(editor.state, index, content))
+              requestAnimationFrame(() => pick(index))
+            }
+          },
+        },
+      })
       const left = slidesOf(editor.state.doc).length
       requestAnimationFrame(() => pick(Math.min(index, left - 1)))
     },
     move: (from, to) => {
       if (editor && dispatch(moveSlide(editor.state, from, to))) requestAnimationFrame(() => pick(to > from ? to - 1 : to))
     },
-  }), [editor, dispatch, pick])
+    addToLibrary: index => {
+      const id = idOf(index)
+      if (!id) return
+      setBusy(value => ({ ...value, [id]: true }))
+      sendToExtension('deck/add-to-library', { id })
+    },
+    showInLibrary: index => {
+      const from = editor ? slidesOf(editor.state.doc)[index]?.data.from : undefined
+      if (from) sendToExtension('deck/show-in-library', { from })
+    },
+  }), [editor, dispatch, pick, idOf])
 
   // A notice in the bar fades after a while.
   useEffect(() => {
@@ -423,15 +516,9 @@ export function DeckView({
   // places no picture beside or behind its words becomes a Picture slide.
   const onPicture = useCallback((dataUrl: string, filename: string) => {
     if (!editor) return
-    const entry = slidesOf(editor.state.doc)[shown]
-    if (!entry) return
-    let id = entry.data.id
-    if (!id) {
-      id = newId(slidesOf(editor.state.doc).map(other => other.data.id).filter((value): value is string => !!value))
-      dispatch(updateSlide(editor.state, shown, { ...entry.data, id }))
-    }
-    sendToExtension('deck/save-image', { slideId: id, dataUrl, filename })
-  }, [editor, dispatch, shown])
+    const id = idOf(shown)
+    if (id) sendToExtension('deck/save-image', { slideId: id, dataUrl, filename })
+  }, [editor, idOf, shown])
 
   useEffect(() => onMessage(message => {
     if (!editor || editor.isDestroyed) return
@@ -447,6 +534,148 @@ export function DeckView({
     const kind = placed || entry.kind === 'picture' ? undefined : 'picture'
     dispatch(updateSlide(editor.state, index, kind ? { ...convertKind(entry.data, 'picture'), image: message.path } : { ...entry.data, image: message.path }, kind))
   }), [editor, dispatch])
+
+  // ---- the Slide library (PR 4)
+
+  // The host knows which slide is current, for the Slide library's "Insert after slide N".
+  useEffect(() => {
+    sendToExtension('deck/current', { index: shown, count })
+  }, [shown, count])
+
+  // Each copy's source, asked a moment after the deck stops changing, and again when the window comes back (another
+  // deck may have updated the library meanwhile).
+  const hasCopies = slides.some(entry => entry.data.from && entry.data.id)
+  useEffect(() => {
+    if (!hasCopies) { setSources({}); return }
+    const timer = window.setTimeout(() => sendToExtension('deck/source-states'), SOURCES_MS)
+    return () => window.clearTimeout(timer)
+  }, [slides, hasCopies])
+  useEffect(() => {
+    const again = () => { if (hasCopies && document.visibilityState === 'visible') sendToExtension('deck/source-states') }
+    window.addEventListener('focus', again)
+    document.addEventListener('visibilitychange', again)
+    return () => {
+      window.removeEventListener('focus', again)
+      document.removeEventListener('visibilitychange', again)
+    }
+  }, [hasCopies])
+
+  useEffect(() => {
+    if (!justUpdated) return
+    const timer = window.setTimeout(() => setJustUpdated(null), UPDATED_MS)
+    return () => window.clearTimeout(timer)
+  }, [justUpdated])
+
+  const marks = useMemo(() => {
+    const result: Record<string, StripMark> = {}
+    for (const [id, source] of Object.entries(sources)) result[id] = { library: source.library, newer: source.library && source.newer && !source.changed && !source.missing }
+    return result
+  }, [sources])
+
+  const done = useCallback((id: string | null) => {
+    if (id) setBusy(value => { const next = { ...value }; delete next[id]; return next })
+  }, [])
+
+  /** A slide by its id, as the document has it now: the document may have moved on since the request. */
+  const slideById = useCallback((id: string) => {
+    if (!editor) return null
+    return slidesOf(editor.state.doc).find(entry => entry.data.id === id) ?? null
+  }, [editor])
+
+  const sourceActions = useMemo(() => {
+    const ask = (type: string) => {
+      const id = slide?.data.id
+      if (!id) return
+      setBusy(value => ({ ...value, [id]: true }))
+      sendToExtension(type, { id })
+    }
+    return {
+      keepHere: () => changeSlide(data => ({ ...data, kept: true })),
+      updateLibrary: () => ask('deck/update-library'),
+      useLibrary: () => ask('deck/use-library'),
+    }
+  }, [slide, changeSlide])
+
+  useEffect(() => onMessage(message => {
+    if (!editor || editor.isDestroyed) return
+    switch (message.type) {
+      case 'deck/source-states': {
+        if (!Array.isArray(message.states)) return
+        const next: Record<string, CopySource> = {}
+        for (const state of message.states as CopySource[]) if (state && typeof state.id === 'string') next[state.id] = state
+        setSources(next)
+        return
+      }
+      case 'deck/library-failed': {
+        done(typeof message.id === 'string' ? message.id : null)
+        setNotice({ text: typeof message.message === 'string' ? message.message : 'The Slide library could not do that.' })
+        return
+      }
+      case 'deck/library-written': {
+        const id = typeof message.id === 'string' ? message.id : null
+        done(id)
+        const entry = id ? slideById(id) : null
+        if (!id || !entry || typeof message.from !== 'string') return
+        const before = { from: entry.data.from, kept: entry.data.kept }
+        const wasNewer = !!sources[id]?.newer
+        dispatch(updateSlide(editor.state, entry.index, { ...entry.data, from: message.from, kept: undefined }))
+        const token = typeof message.token === 'string' ? message.token : null
+        const undo = token ? {
+          label: 'Undo',
+          tip: 'Put the library back as it was',
+          run: () => {
+            sendToExtension('deck/undo-library', { token })
+            const now = slideById(id)
+            if (now && !editor.isDestroyed) dispatch(updateSlide(editor.state, now.index, { ...now.data, from: before.from, kept: before.kept }))
+          },
+        } : undefined
+        const name = typeof message.sourceName === 'string' ? message.sourceName : 'the library'
+        if (message.verb === 'added') setNotice({ text: `Added to the library under ${name}.`, action: undo })
+        else if (wasNewer) setNotice({ text: "The library's newer version is replaced by this one.", action: undo })
+        else setJustUpdated(id)
+        return
+      }
+      case 'deck/library-part': {
+        const id = typeof message.id === 'string' ? message.id : null
+        done(id)
+        const entry = id ? slideById(id) : null
+        if (!id || !entry || !isNewPart(message)) return
+        const previous = partContent(editor.state.doc, entry.index)
+        const content = partsFragment(editor, [{ kind: message.kind, body: message.body, handout: message.handout, notes: entry.notes }], imageMappings)
+        if (!previous || !content || !dispatch(replacePart(editor.state, entry.index, content))) {
+          setNotice({ text: "The library's version could not be put in." })
+          return
+        }
+        const hadChange = !!sources[id]?.changed
+        setNotice({
+          text: hadChange ? "This slide is the library's newest version now. Your change here is gone." : "This slide is the library's newest version now.",
+          action: hadChange ? {
+            label: 'Undo',
+            tip: 'Bring back your change',
+            run: () => {
+              const now = slideById(id)
+              if (now && !editor.isDestroyed) dispatch(replacePart(editor.state, now.index, previous))
+            },
+          } : undefined,
+        })
+        return
+      }
+      case 'deck/insert': {
+        const parts = Array.isArray(message.parts) ? message.parts.filter(isNewPart) : []
+        if (parts.length === 0 || typeof message.after !== 'number') return
+        const total = slidesOf(editor.state.doc).length
+        const at = total === 0 ? 0 : Math.max(0, Math.min(total, Math.floor(message.after) + 1))
+        const content = partsFragment(editor, parts.map(part => ({ kind: part.kind, body: part.body, handout: part.handout })), imageMappings)
+        if (!content) {
+          setNotice({ text: 'The slides could not be put in.' })
+          return
+        }
+        dispatch(restoreSlide(editor.state, at, content))
+        requestAnimationFrame(() => pick(at))
+        return
+      }
+    }
+  }), [editor, dispatch, done, slideById, sources, imageMappings, pick])
 
   const status = documentBarStatus(syncState, syncAction)
   const handoutContainer = scrollContainer()
@@ -474,25 +703,17 @@ export function DeckView({
           {notice ? (
             <>
               <span className="deck-notice-text">{notice.text}</span>
-              {notice.restore ? (
-                <Tooltip label="Put the slide back">
+              {notice.action ? (
+                <Tooltip label={notice.action.tip}>
                   <Button
                     variant="link"
                     className="deck-line-action"
                     onClick={() => {
-                      // The deleted part itself goes back where it was; what was done since stays.
-                      const restore = notice.restore
-                      // Only while the slide is still gone: Cmd+Z may have put it back already.
-                      const id = restore?.content.firstChild ? slideDataOf(restore.content.firstChild.attrs.body).id : undefined
-                      const back = !!editor && !!id && slidesOf(editor.state.doc).some(entry => entry.data.id === id)
-                      if (editor && restore && !back) {
-                        dispatch(restoreSlide(editor.state, restore.at, restore.content))
-                        requestAnimationFrame(() => pick(restore.at))
-                      }
+                      notice.action?.run()
                       setNotice(null)
                     }}
                   >
-                    Undo
+                    {notice.action.label}
                   </Button>
                 </Tooltip>
               ) : null}
@@ -527,6 +748,7 @@ export function DeckView({
             assets={assets}
             actions={stripActions}
             stripRef={stripRef}
+            marks={marks}
           />
         ) : null}
 
@@ -549,6 +771,15 @@ export function DeckView({
                 onSettings={() => setSettingsOpen(open => !open)}
                 initialFocus={focusTitleOf === slide.index ? 'title' : undefined}
                 onPicture={onPicture}
+                sourceLines={slide.data.id && sources[slide.data.id] ? (
+                  <SourceLines
+                    source={sources[slide.data.id]}
+                    kept={slide.data.kept === true}
+                    justUpdated={justUpdated === slide.data.id}
+                    busy={!!busy[slide.data.id]}
+                    actions={sourceActions}
+                  />
+                ) : undefined}
               />
             ) : null}
           </div>

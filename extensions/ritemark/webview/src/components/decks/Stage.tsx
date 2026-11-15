@@ -10,7 +10,7 @@
  * Every change is one transaction on the slide's node in the handout's editor, so it saves, merges and undoes as the
  * rest of the deck does; Cmd+Z on the stage runs the editor's undo.
  */
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { parseFrom, writeSlideBody, type SlideData } from '../../../../src/decks/deckFormat'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
@@ -44,6 +44,8 @@ interface StageProps {
   initialFocus?: string
   /** A picture pasted or dropped on the slide, read as a data URL. */
   onPicture: (dataUrl: string, filename: string) => void
+  /** The lines about where a copy came from, with their actions (Sprint 157, PR 4); else the plain source line. */
+  sourceLines?: ReactNode
 }
 
 /** The library's topic or the deck a copy came from, for the quiet line under the slide. */
@@ -61,7 +63,7 @@ function notesPreview(notes: string | null): string {
   return text.length > 30 ? `${text.slice(0, 30)}…` : text
 }
 
-export function Stage({ editor, slide, theme, borderless, assets, width, onWriting, notesOpen, onNotesOpen, settingsOpen, onSettings, initialFocus, onPicture }: StageProps) {
+export function Stage({ editor, slide, theme, borderless, assets, width, onWriting, notesOpen, onNotesOpen, settingsOpen, onSettings, initialFocus, onPicture, sourceLines }: StageProps) {
   const [focusPath, setFocusPath] = useState<string | null>(initialFocus ?? null)
   const notesRef = useRef<HTMLDivElement>(null)
 
@@ -207,12 +209,12 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
         <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={theme} borderless={borderless} assets={assets} editing={editing} />
       </div>
       <div className="deck-under">
-        {source ? (
+        {sourceLines ?? (source ? (
           <div className="deck-source">
             <Icon name={source.library ? 'books' : 'presentation'} size={12} tone="inherit" />
             {source.library ? `From the library · ${source.name}` : `From ${source.name}`}
           </div>
-        ) : null}
+        ) : null)}
         {hidden ? (
           <div className="deck-source">
             <Icon name="eye-slash" size={12} tone="inherit" />

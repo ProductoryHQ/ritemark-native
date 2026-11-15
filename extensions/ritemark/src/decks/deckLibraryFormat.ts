@@ -120,6 +120,20 @@ function fnv1a(text: string): string {
 const fold = (text: string | undefined) => (text ?? '').replace(/\s+/g, ' ').trim();
 
 /**
+ * A handout's words with the Markdown forms the editor may write differently folded away: list markers, emphasis
+ * marks, escapes, heading marks (atx or setext), and the numbers of an ordered list. A copy whose handout the editor
+ * writes back as `- ` instead of `* ` is the same copy.
+ */
+export function foldMarkdown(text: string): string {
+  return fold(text
+    .replace(/\\([\\`*_{}\[\]()#+\-.!>~|])/g, '$1')
+    .replace(/^[ \t]*(?:[*+-]|\d{1,9}[.)])[ \t]+/gm, '- ')
+    .replace(/^[ \t]*#{1,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/gm, '$1')
+    .replace(/^[ \t]*(?:=+|-{2,})[ \t]*$/gm, '')
+    .replace(/[*_]+/g, ''));
+}
+
+/**
  * The stamp of a slide as a person sees it: kind, words, look, picture and handout. Not its id, its `from:`, whether
  * it is kept or skipped, or its notes. Paths are resolved from `folder` (the deck's project-relative folder).
  */
@@ -131,7 +145,7 @@ export function slideStamp(kind: string, data: SlideData, handout: string, folde
     fold(data.title), fold(data.subtitle), fold(data.number), data.look ?? '', data.picture ?? '', image,
     ...(data.items ?? []).map(item => `${fold(item.heading)}|${fold(item.text)}|${item.icon ?? ''}`),
     '#rows', ...(data.rows ?? []).map(row => row.map(fold).join('|')),
-    '#handout', fold(resolvedHandout),
+    '#handout', foldMarkdown(resolvedHandout),
   ];
   return fnv1a(parts.join('\u0001'));
 }

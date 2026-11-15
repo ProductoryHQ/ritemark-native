@@ -163,3 +163,10 @@ export function updateSlide(state: EditorState, index: number, data: SlideData, 
   if (body === slide.node.attrs.body && nextKind === slide.kind) return null
   return state.tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, body, kind: nextKind })
 }
+
+/** Put `content` in place of part `index` (the library's version of a copy, or the copy back again), as one step. */
+export function replacePart(state: EditorState, index: number, content: Fragment): Transaction | null {
+  const range = partRange(state.doc, index)
+  if (!range) return null
+  return operation(state.tr.replaceWith(range.from, range.to, content))
+}

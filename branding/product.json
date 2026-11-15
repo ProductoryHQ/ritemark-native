@@ -251,6 +251,7 @@
       { "id": "workbench.view.extension.ritemark-home", "title": "Home", "order": -1, "icon": "media/home-icon.svg" },
       { "id": "workbench.view.explorer", "title": "Documents", "head": {"rows": [{"command": "ritemark.projectHead.newRow", "menu": "ritemark/projectHead/new"}, {"command": "ritemark.projectHead.search", "field": true}], "label": "Documents"} },
       { "id": "workbench.view.extension.ritemark-tasks", "title": "Tasks", "order": 0.5, "icon": "media/tasks-icon.svg", "head": {"rows": [{"command": "ritemark.tasks.newTask"}, {"command": "ritemark.tasks.search"}]} },
+      { "id": "workbench.view.extension.ritemark-slide-library", "title": "Slide library", "order": 0.55, "icon": "media/slide-library-icon.svg", "head": {"rows": [{"command": "ritemark.slideLibrary.search"}]} },
       { "id": "workbench.view.extension.ritemark-browser", "title": "Browser", "order": 0.6, "icon": "media/browser-icon.svg", "head": {"rows": [{"command": "ritemark.browser.newPage"}]} },
       { "id": "workbench.view.extension.ritemark-agent-library", "title": "Agents", "order": 0.7, "icon": "media/agent-library-icon.svg", "head": {"rows": [{"command": "ritemark.projectHead.newRow", "menu": "ritemark/projectHead/agents/new"}, {"command": "ritemark.agentLibrary.search"}]} },
       { "id": "workbench.view.extension.ritemark-transcribe", "title": "Transcribe", "order": 0.8, "icon": "media/transcribe-icon.svg", "head": {"rows": [{"command": "ritemark.transcribe.record"}, {"command": "ritemark.transcribe.addFile"}]} }
