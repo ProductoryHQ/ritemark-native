@@ -1,0 +1,91 @@
+/* Sprint 159: the slide's own rules, split out of decks.css so the deck view (SlideCanvas imports this file) and the
+   published handout page (the host inlines it through esbuild's text loader, src/decks/page/pageAssets.ts) draw a slide
+   with the same CSS. Plain CSS only: no Tailwind, no Ritemark tokens (--r-*), nothing outside .deck-slide. */
+
+/* ---- the slide, drawn on a 960 × 540 canvas and scaled (SlideCanvas): the prototype's `.sl` rules, its `.lt` as
+   Borderless. Colours come from the theme as --s-* (themeVars); the fallbacks are Evening's. */
+.deck-slide { position: relative; overflow: hidden; }
+.deck-sl { position: absolute; left: 0; top: 0; width: 960px; height: 540px; transform-origin: 0 0; overflow: hidden; color: var(--s-hd, #fff); font-family: var(--s-fb, 'Sofia Sans'), sans-serif;
+  background: var(--s-bg, radial-gradient(120% 95% at 88% 8%, #3D428F 0%, #1C1F4A 52%, #13153A 100%)); }
+.deck-sl [contenteditable] { outline: 0; border-radius: 4px; cursor: text; }
+.deck-sl [contenteditable]:hover { box-shadow: 0 0 0 2px var(--s-ring, rgba(255,255,255,.18)); }
+.deck-sl [contenteditable]:focus { box-shadow: 0 0 0 2px var(--s-foc, rgba(242,181,68,.7)); }
+.deck-sl [contenteditable]:empty::before { content: attr(data-ph); color: var(--s-ph, rgba(255,255,255,.35)); }
+.deck-sl .st { position: absolute; font-weight: 700; letter-spacing: -.3px; font-family: var(--s-fh, 'Sofia Sans'), sans-serif; overflow-wrap: anywhere; }
+.deck-sl .sx { position: absolute; font: 400 24px/32px var(--s-fb, 'Sofia Sans'); color: var(--s-sub, #C7CAEB); }
+.deck-sl .bar { position: absolute; width: 64px; height: 6px; border-radius: 3px; background: var(--s-acc, #F2B544); }
+.deck-sl .pts { position: absolute; margin: 0; padding-left: 40px; list-style: decimal outside; font: 500 28px/40px var(--s-fb, 'Sofia Sans'); color: var(--s-tx, #E4E6F7); }
+.deck-sl .pts li::marker { color: var(--s-acc, #F2B544); font-weight: 700; }
+.deck-sl .pts .px { display: block; font: 400 20px/26px var(--s-fb, 'Sofia Sans'); color: var(--s-fnt, #AEB2DD); }
+.deck-sl .stc { position: absolute; text-align: center; font: 700 58px/66px var(--s-fh, 'Sofia Sans'); overflow-wrap: anywhere; }
+.deck-sl .sxc { position: absolute; text-align: center; font: 400 26px/36px var(--s-fb, 'Sofia Sans'); color: var(--s-sub, #C7CAEB); }
+.deck-sl .sn { position: absolute; min-width: 40px; font: 700 132px/132px var(--s-fh, 'Sofia Sans'); color: var(--s-acc, #F2B544); }
+.deck-sl .bx { position: absolute; box-sizing: border-box; padding: 24px 22px; border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.13)); }
+.deck-sl .bx.alt { background: var(--s-box2, rgba(255,255,255,.06)); }
+.deck-sl .ic { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); margin-bottom: 18px; }
+.deck-sl .ic svg { width: 28px; height: 28px; }
+.deck-sl .ic.sm svg { width: 18px; height: 18px; }
+.deck-sl .pickic:hover, .deck-sl .pickic:focus-visible { outline: 0; box-shadow: 0 0 0 3px var(--s-foc, rgba(242,181,68,.6)); }
+.deck-sl .noic { background: transparent; box-shadow: inset 0 0 0 2px var(--s-accl, rgba(242,181,68,.35)); color: var(--s-acct, rgba(242,181,68,.6)); }
+.deck-sl .picbox { position: absolute; border-radius: var(--s-r2, 10px); overflow: hidden; display: grid; place-items: center; background: var(--s-pic, rgba(255,255,255,.05)); }
+.deck-sl .picbox.empty { box-shadow: inset 0 0 0 3px var(--s-emp, rgba(255,255,255,.22)); color: var(--s-empt, rgba(255,255,255,.6)); font: 500 24px/32px var(--s-fb, 'Sofia Sans'); text-align: center; }
+.deck-sl .picbox.empty small { font-size: 18px; opacity: .7; }
+.deck-sl .picbox img { width: 100%; height: 100%; object-fit: contain; }
+.deck-sl .tbl { position: absolute; border-collapse: separate; border-spacing: 0; border-radius: var(--s-r2, 10px); overflow: hidden; box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.14)); color: var(--s-tx, #E4E6F7); }
+.deck-sl .tbl th { text-align: left; background: var(--s-thbg, rgba(242,181,68,.16)); color: var(--s-thfg, #F2B544); font-weight: 700; }
+.deck-sl .tbl td { border-top: 1px solid var(--s-row, rgba(255,255,255,.1)); line-height: 1.3; }
+.deck-sl .tbl tr:nth-child(odd) td { background: var(--s-odd, rgba(255,255,255,.03)); }
+.deck-sl .cap { position: absolute; text-align: center; font: 400 20px/28px var(--s-fb, 'Sofia Sans'); color: var(--s-sub, #C7CAEB); }
+.deck-sl .bh { display: block; font: 700 25px/31px var(--s-fh, 'Sofia Sans'); margin-bottom: 8px; }
+.deck-sl .bt { display: block; font: 400 19px/26px var(--s-fb, 'Sofia Sans'); color: var(--s-sub, #C7CAEB); }
+.deck-sl .ln { position: absolute; height: 3px; background: var(--s-accl, rgba(242,181,68,.55)); }
+.deck-sl .spi { position: absolute; text-align: center; }
+.deck-sl .spi .nm { display: grid; place-items: center; width: 68px; height: 68px; margin: 0 auto 20px; border-radius: 50%; background: var(--s-nm, #1C1F4A); box-shadow: inset 0 0 0 3px var(--s-acc, #F2B544); font: 700 28px/1 var(--s-fh, 'Sofia Sans'); color: var(--s-acct, #F2B544); }
+.deck-sl .tli { position: absolute; }
+.deck-sl .tli .dt { display: block; width: 28px; height: 28px; margin: 0 0 24px; border-radius: 50%; background: var(--s-acc, #F2B544); box-shadow: 0 0 0 8px var(--s-accs, rgba(242,181,68,.18)); }
+.deck-sl .arws { position: absolute; }
+.deck-sl .arw { position: absolute; box-sizing: border-box; padding: 22px 30px 22px 40px; background: var(--s-arw, rgba(255,255,255,.08)); clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 50%, calc(100% - 26px) 100%, 0 100%, 26px 50%); }
+.deck-sl .arw.first { clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 50%, calc(100% - 26px) 100%, 0 100%); }
+.deck-sl .cl { position: absolute; box-sizing: border-box; padding: 26px 30px; border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.13)); }
+.deck-sl .cl .ch { display: block; font: 700 30px/36px var(--s-fh, 'Sofia Sans'); color: var(--s-acct, #F2B544); margin-bottom: 14px; }
+.deck-sl .cl .cx { display: block; font: 400 23px/40px var(--s-fb, 'Sofia Sans'); color: var(--s-tx, #E4E6F7); white-space: pre-line; }
+.deck-sl .gnm { display: inline-grid; place-items: center; width: 34px; height: 34px; margin-bottom: 10px; border-radius: 50%; box-shadow: inset 0 0 0 2.5px var(--s-acc, #F2B544); color: var(--s-acct, #F2B544); font: 700 17px/1 var(--s-fh, 'Sofia Sans'); }
+.deck-sl .gdt { display: block; width: 18px; height: 18px; margin-bottom: 12px; border-radius: 50%; background: var(--s-acc, #F2B544); box-shadow: 0 0 0 6px var(--s-accs, rgba(242,181,68,.18)); }
+.deck-sl .gar { display: inline-grid; place-items: center; width: 34px; height: 34px; margin-bottom: 10px; border-radius: 8px; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); }
+.deck-sl .tag { position: absolute; top: 52px; padding: 4px 14px; border-radius: var(--s-rt, 20px); background: var(--s-acc, #F2B544); color: var(--s-tagfg, #1C1F4A); font: 700 17px/26px var(--s-fb, 'Sofia Sans'); letter-spacing: 1px; text-transform: uppercase; }
+.deck-sl .es { position: absolute; display: flex; align-items: center; gap: 22px; font: 500 27px/34px var(--s-fb, 'Sofia Sans'); color: var(--s-tx, #E4E6F7); }
+.deck-sl .es .esn { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); font: 700 23px/1 var(--s-fh, 'Sofia Sans'); flex: none; }
+.deck-sl .es > div { flex: 1; min-width: 0; }
+.deck-sl .photo { position: absolute; top: 0; bottom: 0; background-position: center; background-size: cover; background-color: var(--s-pic, rgba(255,255,255,.05)); }
+.deck-sl .photo.empty { box-shadow: inset 0 0 0 3px var(--s-emp, rgba(255,255,255,.22)); }
+.deck-sl .veil { position: absolute; inset: 0; background: var(--s-veil, linear-gradient(90deg, rgba(19,21,58,.92) 0%, rgba(19,21,58,.7) 55%, rgba(19,21,58,.35) 100%)); }
+
+/* Borderless: the slide's words on the desk's white surface (the prototype's `.lt`) */
+.deck-slide.is-borderless .deck-sl { background: transparent; color: var(--s-hd, #1C1F4A); }
+.deck-slide.is-borderless .deck-sl .sx, .deck-slide.is-borderless .deck-sl .sxc, .deck-slide.is-borderless .deck-sl .bt, .deck-slide.is-borderless .deck-sl .cap { color: var(--s-sub, #5B5F86); }
+.deck-slide.is-borderless .deck-sl .px { color: var(--s-fnt, #5B5F86); }
+.deck-slide.is-borderless .deck-sl .pts, .deck-slide.is-borderless .deck-sl .es, .deck-slide.is-borderless .deck-sl .cl .cx { color: var(--s-tx, #33365A); }
+.deck-slide.is-borderless .deck-sl .pts li::marker { color: var(--s-acct, #C98A10); }
+.deck-slide.is-borderless .deck-sl .sn { color: var(--s-acc, #E0A21F); }
+.deck-slide.is-borderless .deck-sl .bx, .deck-slide.is-borderless .deck-sl .cl { background: var(--s-box, #F6F6FB); box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); }
+.deck-slide.is-borderless .deck-sl .bx.alt { background: var(--s-box2, #F6F6FB); }
+.deck-slide.is-borderless .deck-sl .ic { background: var(--s-accs, rgba(242,181,68,.2)); color: var(--s-acct, #B07A12); }
+.deck-slide.is-borderless .deck-sl .noic { background: transparent; box-shadow: inset 0 0 0 2px var(--s-accl, rgba(224,162,31,.4)); color: var(--s-acct, rgba(176,122,18,.7)); }
+.deck-slide.is-borderless .deck-sl .cl .ch { color: var(--s-acct, #B07A12); }
+.deck-slide.is-borderless .deck-sl .ln { background: var(--s-accl, rgba(224,162,31,.5)); }
+.deck-slide.is-borderless .deck-sl .spi .nm { background: var(--s-nm, #fff); color: var(--s-acct, #B07A12); box-shadow: inset 0 0 0 3px var(--s-acc, #E0A21F); }
+.deck-slide.is-borderless .deck-sl .tli .dt, .deck-slide.is-borderless .deck-sl .gdt { background: var(--s-acc, #E0A21F); }
+.deck-slide.is-borderless .deck-sl .arw { background: var(--s-arw, #F1F1F8); }
+.deck-slide.is-borderless .deck-sl .es .esn { background: var(--s-accs, rgba(242,181,68,.22)); color: var(--s-acct, #B07A12); }
+.deck-slide.is-borderless .deck-sl .gnm { color: var(--s-acct, #B07A12); box-shadow: inset 0 0 0 2.5px var(--s-acc, #E0A21F); }
+.deck-slide.is-borderless .deck-sl .gar { color: var(--s-acct, #B07A12); background: var(--s-accs, rgba(242,181,68,.2)); }
+.deck-slide.is-borderless .deck-sl .tbl { color: var(--s-tx, #33365A); box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); }
+.deck-slide.is-borderless .deck-sl .tbl th { background: var(--s-thbg, #FFF4D6); color: var(--s-thfg, #8A5A00); }
+.deck-slide.is-borderless .deck-sl .tbl td { border-top-color: var(--s-row, #ECEDF5); }
+.deck-slide.is-borderless .deck-sl .tbl tr:nth-child(odd) td { background: var(--s-odd, #FAFAFD); }
+.deck-slide.is-borderless .deck-sl .veil { background: var(--s-veil, linear-gradient(90deg, rgba(255,255,255,.94) 0%, rgba(255,255,255,.78) 55%, rgba(255,255,255,.35) 100%)); }
+.deck-slide.is-borderless .deck-sl .picbox { background: var(--s-pic, #F6F6FB); }
+.deck-slide.is-borderless .deck-sl .picbox.empty { box-shadow: inset 0 0 0 3px var(--s-emp, #E2E3EE); color: var(--s-empt, #8A8DAE); }
+.deck-slide.is-borderless .deck-sl [contenteditable]:hover { box-shadow: 0 0 0 2px var(--s-ring, rgba(28,31,74,.12)); }
+.deck-slide.is-borderless .deck-sl [contenteditable]:focus { box-shadow: 0 0 0 2px var(--s-foc, rgba(224,162,31,.75)); }
+.deck-slide.is-borderless .deck-sl [contenteditable]:empty::before { color: var(--s-ph, rgba(28,31,74,.3)); }

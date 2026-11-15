@@ -2,19 +2,12 @@
  * Sprint 157: the icons a box can carry, as the prototype's grid of 24 (prototype.html:1151). A slide stores an icon
  * by its Ritemark name (`icon: list-checks`), so the file reads the same in any AI or editor; the stage draws the
  * Phosphor icon for it through the one `Icon` component.
+ *
+ * No imports (Sprint 159): the published handout page draws the same icons on the host (`slideMarkup`, from
+ * `@phosphor-icons/core`'s SVGs), so the host's type check reads this file too. SlideCanvas's `<Icon name>` checks
+ * that every `phosphor` here is one of Ritemark's icons.
  */
-import type { PhosphorIconName } from '../../ui/Icon'
-
-export interface SlideIcon {
-  /** The name written in the slide file. */
-  name: string
-  /** The Phosphor icon drawn for it. */
-  phosphor: PhosphorIconName
-  /** Its words in the grid's tooltip. */
-  label: string
-}
-
-export const SLIDE_ICONS: SlideIcon[] = [
+export const SLIDE_ICONS = [
   { name: 'list-checks', phosphor: 'list-checks', label: 'Checklist' },
   { name: 'book-open', phosphor: 'book-open', label: 'Book' },
   { name: 'puzzle', phosphor: 'puzzle-piece', label: 'Puzzle piece' },
@@ -39,7 +32,16 @@ export const SLIDE_ICONS: SlideIcon[] = [
   { name: 'circle-help', phosphor: 'question', label: 'Question' },
   { name: 'triangle-alert', phosphor: 'warning', label: 'Warning' },
   { name: 'circle-check', phosphor: 'check-circle', label: 'Done' },
-]
+] as const
+
+export interface SlideIcon {
+  /** The name written in the slide file. */
+  name: string
+  /** The Phosphor icon drawn for it. */
+  phosphor: (typeof SLIDE_ICONS)[number]['phosphor']
+  /** Its words in the grid's tooltip. */
+  label: string
+}
 
 /** Names other tools write for the same icons (Lucide's and a few plain words), drawn as the grid's own. */
 const ALIASES: Record<string, string> = {
@@ -58,7 +60,7 @@ const ALIASES: Record<string, string> = {
   'folder': 'folder-open',
 }
 
-const BY_NAME = new Map(SLIDE_ICONS.map(icon => [icon.name, icon]))
+const BY_NAME = new Map<string, SlideIcon>(SLIDE_ICONS.map(icon => [icon.name, icon]))
 
 /** The icon for a name a slide carries, or null when it is none of the grid's (the box draws no icon). */
 export function slideIcon(name: string | undefined): SlideIcon | null {

@@ -18,6 +18,8 @@ import { Tooltip } from '../../ui/tooltip'
 import { themeStyle } from '../theme/themeVars'
 import { SLIDE_ICONS, slideIcon } from './iconSet'
 import { BOTTOM, CANVAS_HEIGHT, CANVAS_WIDTH, MAX_STEP, layoutSlide, type BoxStyle, type MarkBox, type SlideBox, type TextBox } from './layoutSlide'
+// The slide's rules, shared with the published handout page (Sprint 159): every view that draws a slide gets them.
+import './slide.css'
 
 export { CANVAS_HEIGHT, CANVAS_WIDTH }
 
