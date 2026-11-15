@@ -1,6 +1,74 @@
 /* Sprint 158 PR 3 (#711; experience 47): the sheet grid. The cells sit on white paper in both themes (decision 1),
    with Excel's grey headers and frozen-pane line (decision 5) and Ritemark's accent ring for the chosen cell. */
 
+/* Sprint 158 PR 4: Calibri's and Cambria's metric twins for a Mac without Office's fonts — Latin subsets of Carlito and
+   Caladea (SIL OFL 1.1), renamed because a subset is a modified version and Carlito's name is reserved
+   (branding/ATTRIBUTION.md; made by research/proof/make-grid-fonts.py). Inlined into the bundle, about 15 KB a face,
+   so an extension release ships them. */
+@font-face {
+  font-family: 'Ritemark Grid Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('../../assets/fonts/RitemarkGridSans-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Ritemark Grid Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('../../assets/fonts/RitemarkGridSans-Bold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Ritemark Grid Sans';
+  font-style: italic;
+  font-weight: 400;
+  font-display: block;
+  src: url('../../assets/fonts/RitemarkGridSans-Italic.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Ritemark Grid Sans';
+  font-style: italic;
+  font-weight: 700;
+  font-display: block;
+  src: url('../../assets/fonts/RitemarkGridSans-BoldItalic.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Ritemark Grid Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('../../assets/fonts/RitemarkGridSerif-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Ritemark Grid Serif';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('../../assets/fonts/RitemarkGridSerif-Bold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Ritemark Grid Serif';
+  font-style: italic;
+  font-weight: 400;
+  font-display: block;
+  src: url('../../assets/fonts/RitemarkGridSerif-Italic.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Ritemark Grid Serif';
+  font-style: italic;
+  font-weight: 700;
+  font-display: block;
+  src: url('../../assets/fonts/RitemarkGridSerif-BoldItalic.woff2') format('woff2');
+}
+
 .sg-paper {
   --sg-grid: #dadce0;
   --sg-head: #f5f6f8;

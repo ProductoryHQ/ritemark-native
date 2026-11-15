@@ -16,10 +16,11 @@ import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { writeClipboard, readClipboard } from '../../lib/clipboard'
 import { compareCells } from '../sheetSort'
-import { installFontFallbacks, installOfficeFontAliases } from '../viewers/docx/officeFonts'
+import { installFontFallbacks, installOfficeFontAliases, isOfficeFontMissing } from '../viewers/docx/officeFonts'
 import { cellKey, type CellModel, type SheetModel, type WorkbookModel } from './readWorkbook'
-import { CELL_PADDING, buildLayout, fontCss, fontShorthand, indexAt, mergeIndex, sortRefusal, sortedRows, styleIndexOf, styleOf, type SheetLayout } from './sheetLayout'
-import { columnPixels, defaultColumnPixels, maxDigitWidth } from './columnWidth'
+import { CELL_PADDING, GRID_SANS, GRID_SERIF, buildLayout, fontCss, fontShorthand, indexAt, mergeIndex, setFontTwins, sortRefusal, sortedRows, styleIndexOf, styleOf, type SheetLayout } from './sheetLayout'
+import { columnScale, type ExcelGeometry } from './columnWidth'
+import { isMac } from '../../hooks/usePlatform'
 import type { CellStyle } from './excelStyles'
 import './sheetGrid.css'
 
@@ -57,6 +58,9 @@ type RegionKind = 'corner' | 'top' | 'left' | 'body'
 
 let measureContext: CanvasRenderingContext2D | null = null
 /** Text widths, kept while the fonts are the same: scrolling measures the same cells again and again. */
+/** Column widths as the Excel on this computer lays them out (columnWidth.ts). */
+const GEOMETRY: ExcelGeometry = isMac ? 'mac' : 'windows'
+
 const measured = new Map<string, number>()
 function measure(text: string, font: string): number {
   const key = `${font}\u0000${text}`
@@ -125,14 +129,23 @@ export function SheetGrid({
   }, [])
   const [fontsReady, setFontsReady] = useState(0)
 
-  // Office fonts: Calibri and friends by their metric twins, others by Arial (officeFonts.ts)
+  // Office fonts: Calibri and Cambria, where missing, by their bundled metric twins; Aptos and the rest by the
+  // Office aliases (officeFonts.ts); a family installed nowhere by Arial
   useEffect(() => {
     installOfficeFontAliases()
     installFontFallbacks(styles.families)
-    void document.fonts?.ready.then(() => {
-      forgetMeasures()
-      setFontsReady((n) => n + 1)
-    })
+    const twins: Array<[string, string]> = []
+    if (isOfficeFontMissing('Calibri')) twins.push(['Calibri', GRID_SANS])
+    if (isOfficeFontMissing('Cambria')) twins.push(['Cambria', GRID_SERIF])
+    setFontTwins(twins)
+    // a face loads when text first asks for it, after this effect: load the twins' faces now, then measure again
+    const faces = twins.flatMap(([, twin]) => ['', 'bold ', 'italic ', 'italic bold '].map((face) => `${face}16px '${twin}'`))
+    void Promise.all(faces.map((face) => document.fonts?.load(face).catch(() => [])))
+      .then(() => document.fonts?.ready)
+      .then(() => {
+        forgetMeasures()
+        setFontsReady((n) => n + 1)
+      })
   }, [styles])
 
   const setSort = useCallback((next: { col: number; dir: 1 | -1 } | null) => {
@@ -183,12 +196,12 @@ export function SheetGrid({
       candidates.set(r, list)
     }
     // the layout's own widths: by the Normal font's widest digit and the sheet's default
-    const mdw = maxDigitWidth(base)
-    const defaultPx = defaultColumnPixels(sheet.layout.defaultColWidth, sheet.layout.baseColWidth, mdw)
+    const scale = columnScale(base, GEOMETRY)
+    const defaultPx = scale.defaultPixels(sheet.layout.defaultColWidth, sheet.layout.baseColWidth)
     const colPx = (c: number) => {
       if (sheet.hiddenCols.has(c)) return 0
       const col = sheet.layout.cols.find((d) => c >= d.min && c <= d.max)
-      return col?.width !== undefined ? columnPixels(col.width, mdw) : defaultPx
+      return col?.width !== undefined ? scale.pixels(col.width) : defaultPx
     }
     return (r: number) => {
       const cols = candidates.get(r)
@@ -236,6 +249,7 @@ export function SheetGrid({
         extraCols,
         rowOrder: sort?.rows,
         autoHeight,
+        geometry: GEOMETRY,
       }),
     // the grid grows by whole screens, so a resize by a few pixels doesn't lay the sheet out again
     // eslint-disable-next-line react-hooks/exhaustive-deps
