@@ -13,20 +13,13 @@ import { Icon, type PhosphorIconName } from '../ui/Icon';
 import { RuntimeNotice } from './RuntimeNotice';
 import { useActiveConversation, useAISidebarStore } from './store';
 import { defaultCodexModelId } from './modelPresentation';
-import { deriveRuntimeAvailabilities, listReadyAlternatives, resolveAvailableRuntimeModel } from './runtimeAvailability';
+import { anotherOpenCodeModel, deriveRuntimeAvailabilities, listReadyAlternatives, openCodeLabel, resolveAvailableRuntimeModel, stillLimitedOpenCodeModels } from './runtimeAvailability';
 import { vscode } from '../../lib/vscode';
 import { turnFailureCard, type ModelNames } from '../../../../src/runtime/turnFailureCopy';
-import type { AgentId, ByokModelOption, ModelOption, RuntimeErrorDetail, RuntimeErrorKind } from './types';
+import type { AgentId, ModelOption, RuntimeErrorDetail, RuntimeErrorKind } from './types';
 
 function findModel(models: ModelOption[], id: string): ModelOption | undefined {
   return models.find((model) => model.id === id || model.resolvedModel === id || model.aliases?.includes(id));
-}
-
-function openCodeLabel(byok: Record<string, ByokModelOption[]> | undefined, id: string): string | undefined {
-  const bare = id.replace(/^opencode:/, '');
-  const slash = bare.indexOf('/');
-  if (slash <= 0) return undefined;
-  return byok?.[bare.slice(0, slash)]?.find((model) => model.id === bare.slice(slash + 1))?.label;
 }
 
 const ACTION_ICONS: Record<string, PhosphorIconName> = {
@@ -95,6 +88,7 @@ export function TurnFailureCard({
   const models = useAISidebarStore((s) => s.models);
   const codexModels = useAISidebarStore((s) => s.codexModels);
   const byokProviderModels = useAISidebarStore((s) => s.byokProviderModels);
+  const acpProviders = useAISidebarStore((s) => s.acpProviders);
   const defaultClaudeModel = useAISidebarStore((s) => s.defaultClaudeModel);
   const selectRuntimeModel = useAISidebarStore((s) => s.selectRuntimeModel);
   const continueWithAlternative = useAISidebarStore((s) => s.continueWithAlternative);
@@ -111,12 +105,6 @@ export function TurnFailureCard({
         ? findModel(codexModels, id)?.label
         : openCodeLabel(byokProviderModels, id),
   };
-  const fallbackModel = runtimeId === 'claude-code'
-    ? (defaultClaudeModel || models[0]?.id)
-    : runtimeId === 'codex'
-      ? defaultCodexModelId(codexModels)
-      : undefined;
-
   // "Switched" follows the chat's own model: the switch was taken (now or before a restart), or the
   // restore fell back to the default. A switch the person declines (Claude's background-work
   // question) leaves the card offering it.
@@ -125,7 +113,19 @@ export function TurnFailureCard({
     : runtimeId === 'codex'
       ? conversation.codexSelectedModel
       : conversation.opencodeSelectedModel.replace(/^opencode:/, '');
-  const alreadySwitched = isLatest && errorKind === 'model' && fallbackModel && currentModel === fallbackModel
+  // OpenCode has no default to fall back on: only its usage-limit card offers another model (Sprint 160,
+  // #686), never one the chat found at its limit and still is. Its model card still asks the person to choose.
+  const openCodeLimit = runtimeId === 'opencode' && errorKind === 'limit' && errorDetail?.limit === 'plan';
+  const fallbackModel = runtimeId === 'claude-code'
+    ? (defaultClaudeModel || models[0]?.id)
+    : runtimeId === 'codex'
+      ? defaultCodexModelId(codexModels)
+      : openCodeLimit && errorDetail?.model
+        ? anotherOpenCodeModel(errorDetail.model, { opencode: byokProviderModels, acpProviders }, stillLimitedOpenCodeModels(conversation.codexConversation)) ?? undefined
+        : undefined;
+  // A failure that names no model (the model unknown) offers no switch, so it can never read as taken.
+  const offersModel = errorKind === 'model' || openCodeLimit;
+  const alreadySwitched = isLatest && offersModel && fallbackModel && currentModel === fallbackModel
     && errorDetail?.model !== fallbackModel
     ? fallbackModel
     : undefined;

@@ -14,7 +14,7 @@ import { initConnectivity } from './ai/connectivity';
 import { initAiStatusItem } from './ai/aiStatusItem';
 import * as modelCatalog from './ai/modelCatalog';
 import { discoverAnthropic, discoverOpenAI, discoverGemini, discoverCodex } from './ai/modelCatalog/providerDiscovery';
-import { getSetupStatus } from './agent/setup';
+import { anthropicKeyChanged, getSetupStatus, registerAnthropicKeyReader } from './agent/setup';
 import { CodexManager } from './codex/codexManager';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { registerFeedback } from './feedback/feedbackSheet';
@@ -37,6 +37,7 @@ import { createFlowScheduler, FlowScheduler } from './flows/FlowScheduler';
 import { RitemarkSettingsProvider, isSettingsSection } from './settings/RitemarkSettingsProvider';
 import { setExtensionContext as setLLMExtensionContext } from './flows/nodes/LLMNodeExecutor';
 import { setImageNodeExtensionContext } from './flows/nodes/ImageNodeExecutor';
+import { setClaudeCodeNodeKeyReader } from './flows/nodes/ClaudeCodeNodeExecutor';
 import { registerFlowTestCommand } from './flows/FlowTestRunner';
 import { registerConfigureApiKeyCommand, registerCheckApiKeyCommand } from './commands/configureApiKey';
 import {
@@ -282,6 +283,15 @@ export function activate(context: vscode.ExtensionContext) {
   // RITEMARK_TEST_KEY_* variables move from this process's environment into providerKeys.ts, so no child (Claude
   // Code, Codex, git, MCP servers) inherits them; a key reaches an agent only through the BYOK env.
   snapshotTestKeys();
+  // Sprint 160 (#541): one reader of the saved Anthropic key, for Claude's readiness (every check; only true or false
+  // comes back from setup.ts) and for a Flow's Claude step, which runs on the key. A key saved or removed anywhere,
+  // another window included, drops the cached status, so the next check reads it again.
+  const readAnthropicKey = () => readProviderKey(context.secrets, 'anthropic-api-key');
+  registerAnthropicKeyReader(readAnthropicKey);
+  setClaudeCodeNodeKeyReader(readAnthropicKey);
+  context.subscriptions.push(context.secrets.onDidChange((event) => {
+    if (event.key === 'anthropic-api-key') anthropicKeyChanged();
+  }));
 
   // === Theme & branding: fresh install, version upgrade, or design-foundation migration ===
   const currentVersion = context.extension.packageJSON.version as string;

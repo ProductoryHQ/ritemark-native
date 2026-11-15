@@ -1,0 +1,12 @@
+{"at":"2026-11-15T22:46:11.226Z","method":"HEAD","path":"/api/hello","xApiKey":"none","authorization":"none","userAgent":"Bun/1.4.3","model":null}
+{"at":"2026-11-15T22:46:11.435Z","method":"HEAD","path":"/api/hello","xApiKey":"none","authorization":"none","userAgent":"Bun/1.4.3","model":null}
+{"at":"2026-11-15T22:46:27.383Z","method":"HEAD","path":"/api/hello","xApiKey":"none","authorization":"none","userAgent":"Bun/1.4.3","model":null}
+{"at":"2026-11-15T22:46:28.164Z","method":"HEAD","path":"/api/hello","xApiKey":"none","authorization":"none","userAgent":"Bun/1.4.3","model":null}
+{"at":"2026-11-15T22:46:59.376Z","method":"HEAD","path":"/api/hello","xApiKey":"none","authorization":"none","userAgent":"Bun/1.4.3","model":null}
+{"at":"2026-11-15T22:46:59.519Z","method":"HEAD","path":"/api/hello","xApiKey":"none","authorization":"none","userAgent":"Bun/1.4.3","model":null}
+{"at":"2026-11-15T22:47:00.060Z","method":"POST","path":"/v1/messages","xApiKey":"placeholder","authorization":"none","userAgent":"claude-cli/2.1.289","model":"claude-sonnet-5-5"}
+{"at":"2026-11-15T22:47:00.636Z","method":"POST","path":"/v1/messages","xApiKey":"placeholder","authorization":"none","userAgent":"claude-cli/2.1.289","model":"claude-sonnet-5-5"}
+{"at":"2026-11-15T22:47:01.721Z","method":"POST","path":"/v1/messages","xApiKey":"placeholder","authorization":"none","userAgent":"claude-cli/2.1.289","model":"claude-sonnet-5-5"}
+{"at":"2026-11-15T22:47:03.838Z","method":"POST","path":"/v1/messages","xApiKey":"placeholder","authorization":"none","userAgent":"claude-cli/2.1.289","model":"claude-sonnet-5-5"}
+{"at":"2026-11-15T22:47:07.997Z","method":"POST","path":"/v1/messages","xApiKey":"placeholder","authorization":"none","userAgent":"claude-cli/2.1.289","model":"claude-sonnet-5-5"}
+{"at":"2026-11-15T22:47:16.888Z","method":"POST","path":"/v1/messages","xApiKey":"placeholder","authorization":"none","userAgent":"claude-cli/2.1.289","model":"claude-sonnet-5-5"}
