@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import {
   beginClaudeLogin,
   cancelClaudeLogin,
+  claudeLoginPage,
+  followClaudeLogin,
   isClaudeLoginActive,
 } from './claudeLogin';
 
@@ -63,6 +65,30 @@ async function run(): Promise<void> {
     assert.deepEqual(urls.ordinary, [], 'an ordinary joiner (Settings, the AI\'s sheet) gets nothing, as before: no second toast');
     assert.equal(cancelClaudeLogin(), true);
     assert.deepEqual([urls.first.length, urls.asks.length, urls.ordinary.length], [1, 1, 0], 'nobody hears it twice');
+
+    // Sprint 160 (#696): the AI's sheet follows a login another surface started, and never starts one itself
+    const heard: string[] = [];
+    const follower = {
+      onUrl: (url: string) => heard.push(`url:${url}`),
+      onComplete: () => heard.push('complete'),
+      onError: () => heard.push('error'),
+      onTimeout: () => heard.push('timeout'),
+      onCancel: () => heard.push('cancel'),
+    };
+    assert.equal(followClaudeLogin(follower), false, 'with no login running there is nothing to follow');
+    assert.equal(isClaudeLoginActive(), false, 'and following starts none');
+    assert.equal(claudeLoginPage(), null, 'and there is no page');
+    assert.equal(beginClaudeLogin(urlBinary, {}), 'started');
+    assert.equal(followClaudeLogin(follower), true, 'a running login is followed');
+    await waitFor(() => heard.length === 1);
+    assert.deepEqual(heard, [`url:${PAGE}`], 'the follower hears the page when the CLI prints it');
+    assert.equal(claudeLoginPage(), PAGE, 'and the page is kept for "Open the page again"');
+    const late: string[] = [];
+    assert.equal(followClaudeLogin({ onUrl: (url) => late.push(url) }), true);
+    assert.deepEqual(late, [PAGE], 'a follower that comes after the page gets it at once');
+    assert.equal(cancelClaudeLogin(), true);
+    assert.deepEqual(heard, [`url:${PAGE}`, 'cancel'], 'and hears how the login ended');
+    assert.equal(claudeLoginPage(), null, 'an ended login has no page');
   } finally {
     if (isClaudeLoginActive()) cancelClaudeLogin();
     rmSync(fixtureDir, { recursive: true, force: true });
