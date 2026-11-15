@@ -45,6 +45,8 @@ export interface SheetOptions {
   destination?: PublishSheetModel['destination'];
   address?: PublishSheetModel['address'];
   nameRow?: PublishSheetModel['nameRow'];
+  /** A deck's page: its What goes and What stays rows (Sprint 159 PR 4). */
+  deck?: PublishSheetModel['deck'];
 }
 
 /** The person's press of Publish, as the sheet sent it. Checked again by the host before anything is named. */

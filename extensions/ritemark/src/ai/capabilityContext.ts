@@ -167,6 +167,8 @@ const SECTIONS: CapabilitySection[] = [
             '- Find and read slides with the `ritemark_decks` tools (list_decks, read_deck). Put a slide from the library or another deck into a deck only with insert_slides, so the copy gets its `from:` line; never paste a library slide in by hand.',
             '- Never change anything in `Slide library/` unless the user asks for it; then use update_library_slide or add_to_library.',
             '- To change a deck\'s own slides, edit the file. Each slide is a fenced block ```` ```slide <kind> ```` (kinds: title, section, statement, points, boxes, columns, table, picture, exercise) holding `id:`, `title:` and the slide\'s words as YAML (`items:` with `heading`, `text`, `icon`; `rows:` for a table). Keep each slide\'s `id:` and `from:` lines as they are. A ```` ```notes ```` block right after a slide is its speaker notes; the Markdown after a slide, up to the next one, is its handout.',
+            // Sprint 159 PR 4: the handout page is made from the deck at Publish
+            '- The web page beside a deck (`<deck name>.html`) is made from the deck when it is published: to change the page, change the deck, never the page.',
           ].join('\n')
         : null,
   },

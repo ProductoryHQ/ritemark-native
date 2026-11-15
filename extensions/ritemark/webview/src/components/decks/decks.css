@@ -13,6 +13,9 @@
 .deck-bar .deck-count { margin-left: 4px; font-size: 12.5px; line-height: 1; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .deck-bar .deck-look { margin-right: 8px; }
 .deck-bar .deck-saved { margin-right: 6px; font-size: 12px; line-height: 1; color: var(--r-ink-muted); white-space: nowrap; }
+/* Publish on the bar (Sprint 159 PR 4): the Published chip in the accent, as the browser bar's (frame 6) */
+.deck-bar .deck-publish-chip { background: var(--r-accent-soft); color: var(--r-accent); }
+.deck-bar .deck-publish-chip:hover { background: var(--r-accent-soft); color: var(--r-accent); filter: brightness(.97); }
 
 /* ---- the desk: strip, stage, divider, handout */
 .deck-desk { position: relative; flex: 1; min-height: 0; overflow: hidden; }

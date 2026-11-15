@@ -44,6 +44,7 @@ import { DeckGuard } from './handout/deckGuard'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
 import { Stage } from './Stage'
+import { DeckPublish } from './DeckPublish'
 import './decks.css'
 
 /** The deck's extensions, made once: the editor's extension list is fixed at mount. */
@@ -204,6 +205,9 @@ export function DeckView({
     else delete next.look
     onPropertiesChange(next)
   }, [properties, onPropertiesChange])
+
+  // Publish on the bar (Sprint 159 PR 4) says its one line here: why a page wasn't written, or that the link is copied.
+  const publishNotice = useCallback((text: string) => setNotice({ text }), [])
 
   const handleEditorReady = useCallback((instance: TipTapEditor) => {
     setEditor(instance)
@@ -846,6 +850,7 @@ export function DeckView({
         ) : (
           <span className={`deck-saved${status === 'saved' ? '' : ' invisible'}`}>Saved</span>
         )}
+        <DeckPublish count={count} onNotice={publishNotice} />
       </header>
 
       <div ref={deskRef} className="deck-desk">

@@ -213,6 +213,11 @@ export interface PublishControllerDeps {
   readUpload?: (plan: GatheredPlan) => Promise<VerifiedUpload>;
   /** A page's bar state changed (patch 010's bar asks again). */
   onPageState?: (pagePath: string) => void;
+  /**
+   * The sheet's What goes and What stays rows for a page made from a deck (Sprint 159 PR 4): the deck host answers
+   * for its own pages, undefined for any other. Counts only; the gather and the file list are unchanged.
+   */
+  pageRows?: (pagePath: string) => Promise<SheetOptions['deck'] | undefined>;
   log: (line: string) => void;
   now?: () => number;
   /** Tests only: the random end of a new page's address. */
@@ -564,6 +569,8 @@ export class PublishController {
     const options: SheetOptions = {
       destination: { name: 'Your Cloudflare', detail: accountName ?? 'Your account' },
     };
+    const deck = await this.deps.pageRows?.(page.realPath).catch(() => undefined);
+    if (deck) options.deck = deck;
     if (record) {
       options.address = { page: record.siteName, suffix: `.${subdomain ?? 'workers'}.workers.dev`, editable: false };
     } else {

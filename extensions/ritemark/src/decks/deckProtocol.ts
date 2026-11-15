@@ -43,7 +43,26 @@ export type DeckRequest =
   /** Undo a library write this view made. */
   | { type: 'deck/undo-library'; token: string }
   /** The view's answer to a `deck/insert` or `deck/set-from` that carried a request id: done, or not. */
-  | { type: 'deck/applied'; requestId: string; ok: boolean };
+  | { type: 'deck/applied'; requestId: string; ok: boolean }
+  /** Sprint 159 PR 4: the bar's Publish control asks for the page's state. */
+  | { type: 'deck/page-state' }
+  /**
+   * Publish or Update the page: the host writes the page beside the deck and runs 2.2's Publish on it. `steps` is
+   * each slide's fit as the open view measured it, by its place in the deck: numbers only, 0 to 3.
+   */
+  | { type: 'deck/publish'; steps: number[] }
+  /** The Published chip's menu: Copy link, See online, Unpublish (2.2's commands on the page). */
+  | { type: 'deck/page-action'; action: DeckPageAction };
+
+export type DeckPageAction = 'copy-link' | 'see-online' | 'unpublish';
+
+/** The bar's Publish control: hidden until Publish can be reached; then the page's state, as 2.2 keeps it. */
+export interface DeckPageState {
+  ready: boolean;
+  kind: 'unpublished' | 'publishing' | 'published' | 'unpublishing';
+  /** "Published · changed": 2.2 finds a change, or the deck's public content is no longer the page's. */
+  changed: boolean;
+}
 
 /** The host's answers. */
 export type DeckHostMessage =
@@ -67,7 +86,11 @@ export type DeckHostMessage =
   /** Slides to insert after part `after` (from the Slide library or the AI's tools), as one undo step. */
   | { type: 'deck/insert'; after: number; parts: Array<{ kind: string; body: string; handout: string }>; requestId?: string }
   /** A copy's `from:` after the AI's library write, set by the open view (the person may be typing in it). */
-  | { type: 'deck/set-from'; id: string; from: string; requestId: string };
+  | { type: 'deck/set-from'; id: string; from: string; requestId: string }
+  /** The bar's Publish control's state (Sprint 159 PR 4). */
+  | { type: 'deck/page-state'; state: DeckPageState }
+  /** A line for the deck's bar from Publish: why a page wasn't written, or that the link is copied. */
+  | { type: 'deck/page-notice'; text: string };
 
 export class DeckProtocolError extends Error {}
 
@@ -144,6 +167,24 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
     case 'deck/undo-library': {
       exactKeys(input, ['type', 'token']);
       return { type: 'deck/undo-library', token: stringOf(input.token, 64) };
+    }
+    case 'deck/page-state': {
+      exactKeys(input, ['type']);
+      return { type: 'deck/page-state' };
+    }
+    case 'deck/publish': {
+      exactKeys(input, ['type', 'steps']);
+      if (!Array.isArray(input.steps) || input.steps.length > MAX_ASSET_PATHS) throw new DeckProtocolError('steps must be a short list');
+      const steps = input.steps.map(step => {
+        if (typeof step !== 'number' || !Number.isInteger(step) || step < 0 || step > 3) throw new DeckProtocolError('Each step must be 0 to 3');
+        return step;
+      });
+      return { type: 'deck/publish', steps };
+    }
+    case 'deck/page-action': {
+      exactKeys(input, ['type', 'action']);
+      if (input.action !== 'copy-link' && input.action !== 'see-online' && input.action !== 'unpublish') throw new DeckProtocolError('Unknown page action');
+      return { type: 'deck/page-action', action: input.action };
     }
     case 'deck/applied': {
       exactKeys(input, ['type', 'requestId', 'ok']);

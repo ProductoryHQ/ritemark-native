@@ -261,7 +261,8 @@ export function PublishSheetView({
             </Row>
           )}
           <Row label="What goes">
-            <span className="block">{whatGoesLine(model.files)}</span>
+            {/* A deck's page says it in the deck's words (Sprint 159 PR 4); its file list stays under it */}
+            <span className="block">{model.deck ? model.deck.goes : whatGoesLine(model.files)}</span>
             <span className="block text-[12px] leading-4 text-ink-muted">{NOTHING_ELSE}</span>
             {model.scriptBuilt && <span className="mt-1 block text-[12px] leading-4 text-ink-muted">{SCRIPT_BUILT_LINE}</span>}
             {fold && (
@@ -315,6 +316,11 @@ export function PublishSheetView({
               </div>
             )}
           </Row>
+          {model.deck && (
+            <Row label="What stays">
+              <span className="block">{model.deck.stays}</span>
+            </Row>
+          )}
           {limit && (
             <div className="mt-1 flex items-start gap-2.5 rounded-md bg-surface-soft px-3 py-2.5 text-[12px] leading-[18px] text-ink-strong">
               <Icon name="warning" size={16} tone="inherit" className="mt-px flex-none" />

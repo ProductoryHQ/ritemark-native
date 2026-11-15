@@ -9,11 +9,14 @@ import { DeckLibrary } from './DeckLibrary';
 import { projectRoot, workspaceDeckFiles } from './deckDocuments';
 import { DeckPages, SLIDE_LIBRARY_VIEW } from './deckPages';
 import { SlideLibraryViewProvider } from './SlideLibraryViewProvider';
+import { DeckPublisher } from './deckPublish';
 import { setDeckToolHost } from '../runtime/ritemarkTools';
 import * as path from 'path';
 
 export interface DecksHost {
   pages: DeckPages;
+  /** Publish on the deck's bar (Sprint 159 PR 4): connected to 2.2's Publish once that is composed. */
+  publisher: DeckPublisher;
   /** The project's Slide library and decks, or null without a project folder on disk. */
   library: () => DeckLibrary | null;
 }
@@ -23,7 +26,8 @@ export function registerDecks(context: vscode.ExtensionContext): DecksHost {
     const root = projectRoot();
     return root ? new DeckLibrary(workspaceDeckFiles(root)) : null;
   };
-  const pages = new DeckPages(library);
+  const publisher = new DeckPublisher(context.extensionPath);
+  const pages = new DeckPages(library, publisher);
   // The AI's deck tools (PR 5): the same library, and an open deck's view to insert through as one undo step.
   setDeckToolHost(() => (isEnabled('decks') ? {
     library,
@@ -40,11 +44,12 @@ export function registerDecks(context: vscode.ExtensionContext): DecksHost {
   } : null));
   const view = new SlideLibraryViewProvider(context.extensionUri, pages, library);
   context.subscriptions.push(
+    publisher,
     pages,
     view,
     vscode.window.registerWebviewViewProvider(SLIDE_LIBRARY_VIEW, view, { webviewOptions: { retainContextWhenHidden: false } }),
     // The place's head row (Search), from the frame's manifest.
     vscode.commands.registerCommand('ritemark.slideLibrary.search', () => (isEnabled('decks') ? view.focusSearch() : undefined)),
   );
-  return { pages, library };
+  return { pages, publisher, library };
 }

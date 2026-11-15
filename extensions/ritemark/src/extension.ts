@@ -541,6 +541,8 @@ export function activate(context: vscode.ExtensionContext) {
     () => isEnabled('web-page-publishing'),
     (message) => console.log(message),
   );
+  // Sprint 159 PR 4: Publish on a deck's bar is this Publish, on the page written beside the deck.
+  decks.publisher.connect(publish);
 
   // Model catalog (Sprint 89, GH #109): resolve model lists via live provider probes
   // → remote catalog (ritemark-public) → on-disk cache → bundled baseline. The live
@@ -1138,7 +1140,7 @@ export function activate(context: vscode.ExtensionContext) {
   }
   // Sprint 149 (PR 3): the Publish sheet's dev harness, only in a development build started with its setting
   try {
-    openPublishSheetHarnessIfAsked(context);
+    openPublishSheetHarnessIfAsked(context, process.env, (pagePath) => decks?.publisher.pageRows(pagePath) ?? Promise.resolve(undefined));
   } catch (error) {
     console.warn('Ritemark: the Publish sheet harness did not open', error);
   }

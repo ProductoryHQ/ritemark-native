@@ -76,4 +76,20 @@ assert.ok(!isThemePath('C:/x.theme.md'));
 assert.ok(!isThemePath('Slide library/Themes/Evening.md'));
 assert.ok(!isThemePath(''));
 
+// Sprint 159 PR 4: Publish on the bar. The steps are numbers 0 to 3, one per slide; the actions are three; exact fields.
+assert.deepEqual(decodeDeckRequest({ type: 'deck/page-state' }), { type: 'deck/page-state' });
+assert.throws(() => decodeDeckRequest({ type: 'deck/page-state', path: '/etc/passwd' }), DeckProtocolError);
+assert.deepEqual(decodeDeckRequest({ type: 'deck/publish', steps: [0, 1, 3] }), { type: 'deck/publish', steps: [0, 1, 3] });
+assert.deepEqual(decodeDeckRequest({ type: 'deck/publish', steps: [] }), { type: 'deck/publish', steps: [] });
+for (const steps of [[4], [-1], [1.5], ['1'], [null], 'all', Array.from({ length: 501 }, () => 0)]) {
+  assert.throws(() => decodeDeckRequest({ type: 'deck/publish', steps }), DeckProtocolError, JSON.stringify(steps).slice(0, 40));
+}
+assert.throws(() => decodeDeckRequest({ type: 'deck/publish', steps: [0], pagePath: '/x.html' }), DeckProtocolError, 'no page path from the view');
+assert.throws(() => decodeDeckRequest({ type: 'deck/publish', steps: [0], html: '<p>' }), DeckProtocolError, 'no page from the view');
+for (const action of ['copy-link', 'see-online', 'unpublish'] as const) {
+  assert.deepEqual(decodeDeckRequest({ type: 'deck/page-action', action }), { type: 'deck/page-action', action });
+}
+assert.throws(() => decodeDeckRequest({ type: 'deck/page-action', action: 'open-url' }), DeckProtocolError);
+assert.throws(() => decodeDeckRequest({ type: 'deck/page-action', action: 'see-online', url: 'https://evil.example' }), DeckProtocolError);
+
 console.log('deckProtocol: passed');

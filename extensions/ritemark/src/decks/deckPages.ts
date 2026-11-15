@@ -24,6 +24,7 @@ import { parseFrom } from './deckFormat';
 import { slidesOfText } from './deckLibraryFormat';
 import { deckName, type DeckLibrary, type LibraryWrite } from './DeckLibrary';
 import { projectRelative, projectRoot } from './deckDocuments';
+import type { DeckPublisher } from './deckPublish';
 
 /** One open deck view: its document and panel, and the slide it shows. */
 interface DeckView {
@@ -59,8 +60,11 @@ export class DeckPages implements vscode.Disposable {
   private readonly waiting = new Map<string, (ok: boolean) => void>();
   private requests = 0;
 
-  /** `library` gives the project's library, or null when the window has no project folder on disk. */
-  constructor(private readonly library: () => DeckLibrary | null = () => null) {}
+  /**
+   * `library` gives the project's library, or null when the window has no project folder on disk. `publisher` is the
+   * bar's Publish (Sprint 159 PR 4).
+   */
+  constructor(private readonly library: () => DeckLibrary | null = () => null, private readonly publisher: DeckPublisher | null = null) {}
 
   /** Does this document open as a deck? */
   deckModeFor(document: vscode.TextDocument): boolean {
@@ -79,8 +83,11 @@ export class DeckPages implements vscode.Disposable {
       }
     });
     this.changed.fire();
+    // The bar's Publish control hears the page's state while this view is open.
+    const seat = this.publisher?.attach(document, message => this.post(panel.webview, message));
     return {
       dispose: () => {
+        seat?.dispose();
         state.dispose();
         this.views.delete(view);
         if (this.active === view) this.active = [...this.views].find(other => other.panel.active) ?? null;
@@ -196,6 +203,15 @@ export class DeckPages implements vscode.Disposable {
         this.revealed.fire({ section: request.section });
         return;
       }
+      case 'deck/page-state':
+        if (this.publisher) await this.post(webview, { type: 'deck/page-state', state: await this.publisher.stateOf(document) });
+        return;
+      case 'deck/publish':
+        await this.publisher?.publish(document, request.steps, text => void this.post(webview, { type: 'deck/page-notice', text }));
+        return;
+      case 'deck/page-action':
+        await this.publisher?.pageAction(document, request.action, text => void this.post(webview, { type: 'deck/page-notice', text }));
+        return;
       case 'deck/current': {
         const view = [...this.views].find(entry => entry.panel.webview === webview);
         if (view && (view.current !== request.index || view.count !== request.count)) {
