@@ -6,7 +6,7 @@ import * as fsp from 'fs/promises';
 import { parseFrontmatterFromText, serializeFrontmatter, discoverCommands } from './agent/discovery';
 import type { CardPages } from './taskBoard/cardPages';
 import type { DeckPages } from './decks/deckPages';
-import { isDeckPath, ModeFixedPerView, viewDeckMode } from './decks/deckMode';
+import { isDeckPath, ModeFixedPerView } from './decks/deckMode';
 import { cardTabWrite } from './taskBoard/cardFile';
 import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
@@ -169,9 +169,10 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   private readonly documentSync: DocumentSyncCoordinator;
 
   /**
-   * Sprint 159 (PR 2): the `decks` flag each open panel opened with, kept while it lives (`viewDeckMode`). A deck keeps
-   * its mode until it is opened again, whatever the flag does meanwhile, so a later payload never turns a document view
-   * into a deck view, nor a deck view into a document; only a deck rewritten to a later format falls back to one.
+   * Sprint 159 (PR 2): the `decks` flag each open panel opened with, recorded as it opens and kept while it lives. A
+   * deck keeps its mode until it is opened again, whatever the flag does meanwhile: the flag never turns a document
+   * view into a deck view, nor a deck view into a document. The file is read at every payload (`deckModeFor`), so a deck
+   * that another program rewrites to a later `deck:` version shows as a document, and as a deck again once it reads.
    */
   private readonly deckFlags = new ModeFixedPerView<vscode.Webview>();
 
@@ -180,8 +181,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   private deckModeOfView(document: vscode.TextDocument, webview: vscode.Webview): boolean {
-    return !!RitemarkEditorProvider.deckPages()
-      && viewDeckMode(this.deckFlags, webview, () => isEnabled('decks'), { scheme: document.uri.scheme, fsPath: document.uri.fsPath, text: document.getText() });
+    return RitemarkEditorProvider.deckPages()?.deckModeFor(document, this.deckFlagOfView(webview)) ?? false;
   }
 
   // Voice dictation controller
@@ -768,6 +768,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       localResourceRoots: resourceRoots.map(root => vscode.Uri.file(root))
     };
 
+    // Sprint 159 (PR 2): the panel's `decks` flag, as it opens, before its first payload asks
+    const deckFlag = this.deckFlagOfView(webviewPanel.webview);
     const syncBootstrap = this.documentSync.prepareView(document, webviewPanel);
     webviewPanel.webview.html = this.getHtml(webviewPanel.webview, scriptUri, syncBootstrap);
 
@@ -794,12 +796,12 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       : null;
 
     // Sprint 157: a deck's panel, while it is open, so the Slide library and the AI's tools can insert into it.
-    // Sprint 159 (PR 2): only a panel that opened with the flag on, and that isn't a card page (the payload's own test,
-    // `cardModeFor`). With the flag off a `.deck.md` is an ordinary document: nothing may treat its panel as a deck view,
-    // even once the flag is turned on. A connected panel is served while it lives; the deck pages answer it only while
-    // its file reads as a deck this build can write.
+    // Sprint 159 (PR 2): only a `.deck.md`'s panel that opened with the flag on: the same flag every payload of this
+    // panel uses. With the flag off a `.deck.md` is an ordinary document: nothing may treat its panel as a deck view,
+    // even once the flag is turned on. The deck pages answer a connected panel while its file reads as a deck this build
+    // writes and isn't shown as a card (a card page's webview sends no `deck/` request).
     const deckPages = RitemarkEditorProvider.deckPages();
-    const deckPage = deckPages && !cardPages?.cardModeFor(document) && document.uri.scheme === 'file' && isDeckPath(document.uri.fsPath) && this.deckFlagOfView(webview)
+    const deckPage = deckPages && deckFlag && document.uri.scheme === 'file' && isDeckPath(document.uri.fsPath)
       ? deckPages.connect(document, webviewPanel)
       : undefined;
 

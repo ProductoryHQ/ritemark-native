@@ -7,7 +7,7 @@
  * from any other deck, is a copy carrying `from: <path>#<id> @<stamp>`. The UI and the AI's tools call the same
  * operations here (README decision 9, dual use).
  */
-import { newId, parseFrom, parseSlideBody, writeFrom, writeSlideBody, type SlideData } from './deckFormat';
+import { deckVersionOf, isReadableDeckVersion, newId, parseFrom, parseSlideBody, writeFrom, writeSlideBody, type SlideData } from './deckFormat';
 import {
   appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp,
   slidesOfText, type DeckSlideText,
@@ -103,6 +103,18 @@ const words = (slide: DeckSlideText) => [
   ...(slide.data.rows ?? []).flat(), slide.handout,
 ].filter(Boolean).join(' ').toLowerCase();
 
+/**
+ * Sprint 159 (PR 2): a deck file this build may change. A deck whose front matter names a later `deck:` version (a
+ * newer Ritemark wrote it) opens as a document and is never rewritten in this build's format: the library, the AI's
+ * tools and the buttons refuse to write it, as the editor does.
+ */
+function writableDeckText(path: string, text: string): string {
+  if (!isReadableDeckVersion(deckVersionOf(text))) {
+    throw new Error(`${deckName(path)} is written in a newer deck format than this Ritemark reads, so it isn't changed.`);
+  }
+  return text;
+}
+
 export class DeckLibrary {
   constructor(private readonly files: DeckFiles) {}
 
@@ -184,8 +196,9 @@ export class DeckLibrary {
     intoView?: (parts: CopiedPart[], afterIndex: number) => Promise<boolean>,
   ): Promise<{ first: number; count: number }> {
     if (!/\.deck\.md$/i.test(targetPath) || normalizePath(targetPath) !== targetPath) throw new Error(`${targetPath} is no deck in this project.`);
-    const text = await this.files.read(targetPath);
-    if (text === null) throw new Error(`No deck at ${targetPath}.`);
+    const read = await this.files.read(targetPath);
+    if (read === null) throw new Error(`No deck at ${targetPath}.`);
+    const text = writableDeckText(targetPath, read);
     const slides = slidesOfText(text);
     const taken = slides.map(slide => slide.data.id).filter((id): id is string => !!id);
     const parts = await this.copies(sourcePath, ids, targetPath, taken);
@@ -234,6 +247,7 @@ export class DeckLibrary {
     if (!source) throw new Error('This slide is no copy of a deck in this project.');
     const previous = await this.files.read(source.path);
     if (previous === null) throw new Error(`${deckName(source.path)} is no longer there.`);
+    writableDeckText(source.path, previous);
     const { body, handout } = this.asSourcePart(copy, source.id, deckPath, source.path);
     const written = replaceSlidePart(previous, source.id, partText(copy.kind, body, handout));
     if (written === null) throw new Error(`${deckName(source.path)} no longer has that slide.`);
@@ -264,6 +278,7 @@ export class DeckLibrary {
     const path = isTopicPath(topic) ? topic : `${LIBRARY_FOLDER}/${topic.replace(/[\\/:*?"<>|]+/g, ' ').trim()}.deck.md`;
     if (!isTopicPath(path)) throw new Error('A topic needs a name.');
     const previous = await this.files.read(path);
+    if (previous !== null) writableDeckText(path, previous);
     const taken = previous ? slidesOfText(previous).map(slide => slide.data.id).filter((id): id is string => !!id) : [];
     const id = newId(taken);
     const { body, handout } = this.asSourcePart(copy, id, deckPath, path);
@@ -298,7 +313,7 @@ export class DeckLibrary {
       return;
     }
     const text = await this.files.read(deckPath);
-    const slide = text === null ? undefined : slidesOfText(text).find(entry => entry.data.id === id);
+    const slide = text === null ? undefined : slidesOfText(writableDeckText(deckPath, text)).find(entry => entry.data.id === id);
     if (text === null || !slide) throw new Error(`${deckName(deckPath)} has no slide ${id}.`);
     const body = writeSlideBody(slide.body, { ...slide.data, from, kept: undefined });
     const written = replaceSlidePart(text, id, partText(slide.kind, body, slide.handout, slide.notes));

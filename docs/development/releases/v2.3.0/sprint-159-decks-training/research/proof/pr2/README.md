@@ -56,3 +56,15 @@ The flag is on and the Slide library open. Reload Window is sent, and the flag i
   - With the flag off, the deck view is still served.
   - The `deck: 2` file falls back to a document and is not rewritten.
   - It is a deck again at `deck: 1`.
+
+## Round two's fixes
+
+- **`round2-mode-fixed.txt`** (`round2-check.sh.txt`; `library-probe.js.txt` posts `deck/library-topics`):
+  - A deck opened with the flag on still answers its own requests after the flag is turned off, but refuses the Slide library's then (`deck/library-failed`). While the flag is on it answers them.
+  - A `deck: 2` rewrite shows as a document: it is not served and not rewritten. At `deck: 1` it is a deck again.
+- **The library and the AI's tools refuse to write a deck or topic in a later format.** `DeckLibrary.test.ts` covers insert, update, add-to-library and the `from:` line, and checks that each file is left byte for byte.
+- **`guards-final.txt`** (`guard-check.sh.txt`): the flag-off guards, re-run on the final code.
+
+## Main at 114da368 (Sprint 160's PRs)
+
+After merging it, the AI's tools, instructions and `toolSetKey` with the flag off were made again from main's sources and from this branch's. They are identical, and main's are unchanged by Sprint 160 (`ai-tools-flag-off-*.json` stand). The extension's `npm test` passes, `test:decks` included.

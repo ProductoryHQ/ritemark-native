@@ -1,4 +1,7 @@
 #!/bin/bash
+# To run it: put this file, open-deck.sh.txt and deck-probe.js.txt (beside it) and ../pr1/cdp.mjs.txt in one folder,
+# drop their .txt endings, and use the Node in vscode/.nvmrc (arm64) on PATH. It drives a dev window started with
+# scripts/qa/dev-launch-isolated.sh (its PORT and --user-data-dir).
 # open-deck.sh <port> [close]: (closes the deck's tab first with "close", then) opens Training.deck.md through Go to File.
 S=$(dirname "$0")
 export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
