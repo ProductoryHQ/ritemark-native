@@ -3,12 +3,13 @@
  */
 import { strict as assert } from 'node:assert'
 import { getSchema } from '@tiptap/core'
-import { EditorState, NodeSelection, TextSelection } from '@tiptap/pm/state'
+import { EditorState, NodeSelection, TextSelection, type Transaction } from '@tiptap/pm/state'
+import { history, undo } from '@tiptap/pm/history'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
 import { installTestDocument } from '../../../utils/markdownFidelity'
 import { parseSlideBody } from '../../../../../src/decks/deckFormat'
 import { DeckSlide } from './deckSchema'
-import { DECK_OPERATION, guardFixes, isTrustedDeckTransaction, removesSlides } from './deckGuard'
+import { DECK_OPERATION, guardFixes, isTrustedDeckTransaction, removesSlides, touchesSlides } from './deckGuard'
 
 installTestDocument()
 const schema = getSchema(createEditorSchemaExtensions({ deck: [DeckSlide] }))
@@ -20,11 +21,12 @@ const state = EditorState.create({ doc })
 // Backspace onto a selected slide, or a selection across a slide: refused.
 {
   const deleteSlide = state.tr.setSelection(NodeSelection.create(doc, 0)).deleteSelection()
-  assert.ok(removesSlides(doc, deleteSlide.doc))
+  assert.ok(touchesSlides(deleteSlide) && removesSlides(doc, deleteSlide.doc))
   const across = state.tr.setSelection(TextSelection.create(doc, 3, doc.content.size - 2)).deleteSelection()
-  assert.ok(removesSlides(doc, across.doc))
-  // The person's typing in a part is fine.
+  assert.ok(touchesSlides(across) && removesSlides(doc, across.doc))
+  // The person's typing in a part is fine, and skips the count.
   const typing = state.tr.insertText('!', 4)
+  assert.ok(!touchesSlides(typing))
   assert.ok(!removesSlides(doc, typing.doc))
 }
 
@@ -33,13 +35,17 @@ const state = EditorState.create({ doc })
   const listItem = schema.nodes.listItem.create(null, [paragraph('item'), slide('cccc')])
   const list = schema.nodes.bulletList.create(null, [listItem])
   const buried = state.tr.insert(doc.content.size, list)
-  assert.ok(removesSlides(doc, buried.doc))
+  assert.ok(touchesSlides(buried) && removesSlides(doc, buried.doc))
 }
 
 // The host's updates, undo and the deck view's own operations are let through.
 {
   assert.ok(isTrustedDeckTransaction(state.tr.setMeta('ritemarkDocumentRevision', 3)))
-  assert.ok(isTrustedDeckTransaction(state.tr.setMeta('history$', { redo: false })))
+  const withHistory = EditorState.create({ doc, plugins: [history()] })
+  const typed = withHistory.apply(withHistory.tr.insertText('x', 4))
+  let undoTransaction: Transaction | undefined
+  undo(typed, tr => { undoTransaction = tr })
+  assert.ok(undoTransaction && isTrustedDeckTransaction(undoTransaction))
   assert.ok(isTrustedDeckTransaction(state.tr.setMeta(DECK_OPERATION, true)))
   assert.ok(!isTrustedDeckTransaction(state.tr))
 }

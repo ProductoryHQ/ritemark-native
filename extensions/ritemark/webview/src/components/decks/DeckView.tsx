@@ -10,7 +10,7 @@
  * Kept in step (README decision 5): scrolling the handout changes the slide; choosing a thumbnail scrolls the handout
  * to its part; writing in a part makes its slide the current one.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { Editor } from '../Editor'
@@ -22,7 +22,7 @@ import { documentBarStatus, type DocumentSyncAction } from '../header/DocumentSy
 import type { DocumentApplyTarget } from '../../types/documentSync'
 import type { DocumentSyncState } from '../../../../src/editorSync/protocol'
 import type { EditorSelection } from '../../types/editor'
-import { parseFrom } from '../../../../src/decks/deckFormat'
+import { parseFrom, type SlideData } from '../../../../src/decks/deckFormat'
 import { onDocChanged } from '../../lib/docChange'
 import { partIndexAt, slidesOf, type DeckSlideEntry } from './deckDocument'
 import { useDeckAssets } from './deckBridge'
@@ -66,6 +66,8 @@ interface DeckViewProps {
   syncState?: DocumentSyncState
   /** The conflict and paragraph dialogs, the document's own. */
   dialogs?: ReactNode
+  /** The document's find bar, over the handout (Cmd+F and a search result). */
+  findBar?: ReactNode
 }
 
 /** The stage's width for a desk width, the handout's ratio and what is shown. */
@@ -82,6 +84,35 @@ function sourceLine(from: string | undefined): { library: boolean; name: string 
   return { library: /^Slide library\//.test(source.path), name }
 }
 
+interface ThumbnailProps {
+  index: number
+  kind: string
+  data: SlideData
+  current: boolean
+  pictureUrl?: string
+  onPick: (index: number) => void
+}
+
+/** One numbered thumbnail in the strip. */
+const Thumbnail = memo(function Thumbnail({ index, kind, data, current, pictureUrl, onPick }: ThumbnailProps) {
+  return (
+    <div
+      role="option"
+      aria-selected={current}
+      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${data.skip ? ', skipped' : ''}`}
+      data-thumb={index}
+      className={`deck-thumb${current ? ' is-current' : ''}${data.skip ? ' is-skip' : ''}`}
+      onClick={() => onPick(index)}
+    >
+      <span className="deck-thumb-no">{index + 1}</span>
+      <div className="deck-thumb-slide">
+        <SlideCanvas kind={kind} data={data} width={THUMB_WIDTH} pictureUrl={pictureUrl} />
+      </div>
+      {data.skip ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}
+    </div>
+  )
+})
+
 export function DeckView({
   content,
   onChange,
@@ -94,6 +125,7 @@ export function DeckView({
   syncAction,
   syncState,
   dialogs,
+  findBar,
 }: DeckViewProps) {
   const [editor, setEditor] = useState<TipTapEditor | null>(null)
   const [slides, setSlides] = useState<DeckSlideEntry[]>([])
@@ -313,24 +345,19 @@ export function DeckView({
   const handoutContainer = scrollContainer()
   const pictureOf = (entry: DeckSlideEntry) => (entry.data.image ? assets[entry.data.image] : undefined)
 
-  const strip = useMemo(() => slides.map(entry => (
-    <div
-      key={entry.pos}
-      role="option"
-      aria-selected={entry.index === shown}
-      aria-label={`Slide ${entry.index + 1}${entry.data.title ? `: ${entry.data.title}` : ''}${entry.data.skip ? ', skipped' : ''}`}
-      data-thumb={entry.index}
-      className={`deck-thumb${entry.index === shown ? ' is-current' : ''}${entry.data.skip ? ' is-skip' : ''}`}
-      onClick={() => pick(entry.index)}
-    >
-      <span className="deck-thumb-no">{entry.index + 1}</span>
-      <div className="deck-thumb-slide">
-        <SlideCanvas kind={entry.kind} data={entry.data} width={THUMB_WIDTH} pictureUrl={pictureOf(entry)} />
-      </div>
-      {entry.data.skip ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}
-    </div>
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  )), [slides, shown, pick, assets])
+  // Keyed by place and memoised on the slide's own data (read once per distinct body), so a keystroke redraws only
+  // the thumbnail whose slide changed.
+  const strip = slides.map(entry => (
+    <Thumbnail
+      key={entry.index}
+      index={entry.index}
+      kind={entry.kind}
+      data={entry.data}
+      current={entry.index === shown}
+      pictureUrl={pictureOf(entry)}
+      onPick={pick}
+    />
+  ))
 
   return (
     <div className="deck-view h-screen bg-surface flex flex-col">
@@ -420,6 +447,7 @@ export function DeckView({
         ) : null}
 
         <div className={`deck-handout${handoutShown ? '' : ' is-folded'}`} style={{ left: dividerLeft + 8 }} aria-hidden={handoutShown ? undefined : true}>
+          {findBar}
           <Editor
             value={content}
             onChange={onChange}

@@ -9,8 +9,10 @@
  *    otherwise become a slide when the deck is opened again.
  */
 import { Extension } from '@tiptap/core'
-import type { Node as PMNode } from '@tiptap/pm/model'
+import type { Node as PMNode, Slice } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type Transaction } from '@tiptap/pm/state'
+import { isHistoryTransaction } from '@tiptap/pm/history'
+import type { Step } from '@tiptap/pm/transform'
 import { newId, writeSlideBody } from '../../../../../src/decks/deckFormat'
 import { isSlideNode, slideDataOf } from '../deckDocument'
 
@@ -22,8 +24,32 @@ export const deckGuardKey = new PluginKey('deckGuard')
 /** A transaction the guard leaves alone: the host's, undo and redo, or the deck view's own. */
 export function isTrustedDeckTransaction(tr: Transaction): boolean {
   return tr.getMeta('ritemarkDocumentRevision') !== undefined
-    || tr.getMeta('history$') !== undefined
+    || isHistoryTransaction(tr)
     || tr.getMeta(DECK_OPERATION) === true
+}
+
+/**
+ * Could this transaction take a slide away or bury one? Only when a step's range covers a slide, or a step inserts
+ * content holding one (a paste). Typing in a part's text touches neither, so most keystrokes skip the full count.
+ */
+export function touchesSlides(tr: Transaction): boolean {
+  for (let index = 0; index < tr.steps.length; index++) {
+    const step = tr.steps[index] as Step & { from?: number; to?: number; slice?: Slice }
+    const doc = tr.docs[index]
+    let hit = false
+    if (typeof step.from === 'number' && typeof step.to === 'number' && step.to > step.from) {
+      doc.nodesBetween(step.from, step.to, node => {
+        if (isSlideNode(node)) hit = true
+        return !hit && !node.isTextblock
+      })
+    }
+    step.slice?.content.descendants(node => {
+      if (isSlideNode(node)) hit = true
+      return !hit
+    })
+    if (hit) return true
+  }
+  return false
 }
 
 /** How many slide nodes the document holds at its top level, and whether any sits inside another block. */
@@ -105,7 +131,7 @@ export const DeckGuard = Extension.create({
         key: deckGuardKey,
         filterTransaction(tr, state) {
           if (!tr.docChanged || isTrustedDeckTransaction(tr)) return true
-          return !removesSlides(state.doc, tr.doc)
+          return !touchesSlides(tr) || !removesSlides(state.doc, tr.doc)
         },
         appendTransaction(transactions, oldState, newState) {
           if (!transactions.some(tr => tr.docChanged && !isTrustedDeckTransaction(tr))) return null

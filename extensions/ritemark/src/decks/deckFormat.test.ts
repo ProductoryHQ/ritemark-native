@@ -165,6 +165,8 @@ test('every body the writer emits reads the same in js-yaml', () => {
     '', ' padded ', 'true', 'No', '1', '1e10', '0x1F', '2026-11-15', '- dash', 'key: value', 'a #hash', '#hash',
     '"quoted"', "it's", 'line\nbreak', 'tab\there', '[x]', '{y}', '@at', '`tick`', '* star', '& amp', '!bang', '%pct',
     'Ünïcödé · dash — "quotes"', 'ends with colon:', '?', ':', 'null', '~', '.5', '+1', 'x, y', '\u2028',
+    // A backslash before an escape letter is a backslash (review round 1 of PR 1).
+    'a: \\e', '- \\0', '#C:\\new\\x41', '"\\\\"', 'tab\\t', 'end\\',
   ];
   const data: SlideData = {
     id: '1234',
@@ -197,6 +199,9 @@ test('the fence is sized past any backticks in the body', () => {
   assert.equal(writeSlideBlock('points', 'a\n````b'), '`````slide points\na\n````b\n`````');
   assert.equal(writeSlideBlock('title', 'id: x', 'Say hi.'), '```slide title\nid: x\n```\n\n```notes\nSay hi.\n```');
   assert.equal(writeSlideBlock('title', '', ''), '```slide title\n```\n\n```notes\n```');
+  // A kind that isn't one word can't break the fence line (review round 1 of PR 1).
+  assert.equal(writeSlideBlock('x\n```\n# injected', 'id: a'), '```slide points\nid: a\n```');
+  assert.equal(writeSlideBlock('', 'id: a'), '```slide\nid: a\n```');
   const deck = parseDeck(writeSlideBlock('points', 'a\n````b', 'n'));
   assert.equal(deck.slides[0].body, 'a\n````b');
   assert.equal(deck.slides[0].notes, 'n');

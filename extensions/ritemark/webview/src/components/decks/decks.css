@@ -79,6 +79,7 @@
 .ProseMirror > .deck-part-head:first-child { border-top: 0; margin-top: 0; }
 .deck-part-title { padding: 1px 0; font-size: 19px; font-weight: 600; line-height: 1.4; color: var(--r-ink-strong); outline: none; text-wrap: balance; cursor: text; }
 .deck-part-title:empty::before { content: attr(data-placeholder); color: var(--r-ink-faint); font-weight: 500; }
+.deck-part-head.is-first .deck-part-title:empty::before { content: "The deck's title"; }
 .deck-part-number { position: absolute; right: 0; top: 21px; display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; line-height: 14px; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; font-family: var(--ritemark-ui-font-family); }
 .deck-part-number::after { content: counter(deck-slide); }
 .deck-part-head.is-current .deck-part-number { color: var(--r-accent); }

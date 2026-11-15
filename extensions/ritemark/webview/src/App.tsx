@@ -868,6 +868,16 @@ function App() {
         onExternalApplied={handleDocumentApplied}
         syncAction={syncAction}
         syncState={documentViewSync.state}
+        findBar={showFindBar && editorRef.current ? (
+          <FindBar
+            editor={editorRef.current}
+            request={findRequest}
+            onClose={() => {
+              setShowFindBar(false)
+              setFindRequest(null)
+            }}
+          />
+        ) : null}
         dialogs={
           <>
             <DocumentConflictDialog

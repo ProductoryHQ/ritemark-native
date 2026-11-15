@@ -14,7 +14,7 @@
  */
 import { Node, mergeAttributes } from '@tiptap/core'
 import type TurndownService from 'turndown'
-import { slideKindOfInfo, writeSlideBlock } from '../../../../../src/decks/deckFormat'
+import { cleanKind, slideKindOfInfo, writeSlideBlock } from '../../../../../src/decks/deckFormat'
 
 /** The attribute on the slide node's element, for the Turndown rule and the deck view's measuring. */
 export const DECK_SLIDE_ATTRIBUTE = 'data-deck-slide'
@@ -58,7 +58,8 @@ export const DeckSlide = Node.create({
       kind: {
         default: 'points',
         // Null when absent, so a rule's own attributes (the fence's) stand: TipTap lets these win otherwise.
-        parseHTML: element => element.getAttribute('data-kind'),
+        // A pasted element's kind must be one word, or it would break the fence line; anything else is Points.
+        parseHTML: element => (element.hasAttribute('data-kind') ? cleanKind(element.getAttribute('data-kind')) ?? 'points' : null),
         renderHTML: attributes => ({ 'data-kind': attributes.kind }),
       },
       body: {

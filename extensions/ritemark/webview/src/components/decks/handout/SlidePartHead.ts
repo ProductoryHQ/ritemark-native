@@ -38,12 +38,15 @@ class SlidePartHeadView implements NodeView {
     this.title.setAttribute('spellcheck', 'true')
     this.title.setAttribute('role', 'textbox')
     this.title.setAttribute('aria-label', 'Slide title')
+    // The first part's own words ("The deck's title") come from CSS, by the `is-first` mark deckCurrent puts on it.
+    this.title.setAttribute('data-placeholder', 'Slide title')
     this.mark = document.createElement('span')
     this.mark.className = 'deck-part-number'
     this.mark.setAttribute('aria-hidden', 'true')
     this.dom.append(this.title, this.mark)
     this.title.addEventListener('input', this.onInput)
     this.title.addEventListener('keydown', this.onKeyDown)
+    this.title.addEventListener('blur', this.onBlur)
     this.render(true)
   }
 
@@ -54,7 +57,6 @@ class SlidePartHeadView implements NodeView {
     if (force || document.activeElement !== this.title) {
       if (this.title.textContent !== title) this.title.textContent = title
     }
-    this.title.setAttribute('data-placeholder', this.isFirst() ? "The deck's title" : 'Slide title')
     this.dom.classList.toggle('is-skip', data.skip === true)
     this.mark.innerHTML = data.skip ? EYE_SLASH_SVG : ''
   }
@@ -71,20 +73,22 @@ class SlidePartHeadView implements NodeView {
     selection?.addRange(range)
   }
 
-  private isFirst(): boolean {
-    const pos = this.getPos()
-    if (pos === undefined) return false
-    let first = true
-    this.editor.state.doc.forEach((child, offset) => {
-      if (offset < pos && child.type.name === 'deckSlide') first = false
-    })
-    return first
+  private onInput = () => {
+    this.writeTitle(oneLineTitle(this.title.textContent ?? ''))
   }
 
-  private onInput = () => {
+  /** Leaving the title: spaces typed at its ends are not kept in the file. */
+  private onBlur = () => {
+    const text = oneLineTitle(this.title.textContent ?? '')
+    if (text !== text.trim()) {
+      this.writeTitle(text.trim())
+      this.render(true)
+    }
+  }
+
+  private writeTitle(text: string) {
     const pos = this.getPos()
     if (pos === undefined) return
-    const text = oneLineTitle(this.title.textContent ?? '')
     const data = slideDataOf(this.node.attrs.body)
     if ((data.title ?? '') === text) return
     const body = writeSlideBody(this.node.attrs.body, { ...data, title: text === '' ? undefined : text })
@@ -159,6 +163,7 @@ class SlidePartHeadView implements NodeView {
   destroy() {
     this.title.removeEventListener('input', this.onInput)
     this.title.removeEventListener('keydown', this.onKeyDown)
+    this.title.removeEventListener('blur', this.onBlur)
   }
 }
 

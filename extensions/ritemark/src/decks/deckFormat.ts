@@ -75,15 +75,7 @@ function plainValue(raw: string): string {
 /** Read one scalar as written: double-quoted, single-quoted or plain. */
 export function readScalar(raw: string): string {
   const text = raw.trim();
-  if (text.startsWith('"')) {
-    const end = closingDoubleQuote(text);
-    const quoted = end > 0 ? text.slice(0, end + 1) : text + '"';
-    try {
-      return JSON.parse(quoted.replace(/\\x([0-9a-fA-F]{2})/g, '\\u00$1').replace(/\\([0abtnvfre /N_LP])/g, yamlEscape));
-    } catch {
-      return quoted.slice(1, -1);
-    }
-  }
+  if (text.startsWith('"')) return readDoubleQuoted(text);
   if (text.startsWith("'")) {
     let out = '';
     for (let index = 1; index < text.length; index++) {
@@ -99,29 +91,42 @@ export function readScalar(raw: string): string {
   return plainValue(text);
 }
 
-/** YAML's escapes beyond JSON's, turned into JSON's own. */
-function yamlEscape(_match: string, char: string): string {
-  switch (char) {
-    case '0': return '\\u0000';
-    case 'a': return '\\u0007';
-    case 'v': return '\\u000b';
-    case 'e': return '\\u001b';
-    case ' ': return ' ';
-    case '/': return '/';
-    case 'N': return '\\u0085';
-    case '_': return '\\u00a0';
-    case 'L': return '\\u2028';
-    case 'P': return '\\u2029';
-    default: return '\\' + char; // b t n f r are JSON's too
-  }
-}
+/** YAML's one-letter escapes in a double-quoted scalar. */
+const SIMPLE_ESCAPES: Record<string, string> = {
+  '0': '\u0000', a: '\u0007', b: '\b', t: '\t', '\t': '\t', n: '\n', v: '\u000b', f: '\f', r: '\r', e: '\u001b',
+  ' ': ' ', '"': '"', '/': '/', '\\': '\\', N: '\u0085', _: ' ', L: ' ', P: ' ',
+};
 
-function closingDoubleQuote(text: string): number {
+/**
+ * A double-quoted scalar, its escapes read in one pass from left to right (so `\\e` is a backslash and an `e`, never
+ * an escape). An escape this reader doesn't know stays as written; an unclosed quote runs to the end.
+ */
+function readDoubleQuoted(text: string): string {
+  let out = '';
   for (let index = 1; index < text.length; index++) {
-    if (text[index] === '\\') { index++; continue; }
-    if (text[index] === '"') return index;
+    const char = text[index];
+    if (char === '"') return out;
+    if (char !== '\\') { out += char; continue; }
+    const next = text[index + 1];
+    if (next === undefined) { out += char; break; }
+    const width = next === 'x' ? 2 : next === 'u' ? 4 : next === 'U' ? 8 : 0;
+    if (width > 0) {
+      const hex = text.slice(index + 2, index + 2 + width);
+      const code = /^[0-9a-fA-F]+$/.test(hex) && hex.length === width ? parseInt(hex, 16) : NaN;
+      if (Number.isFinite(code) && code <= 0x10ffff) {
+        out += String.fromCodePoint(code);
+        index += 1 + width;
+        continue;
+      }
+    } else if (next in SIMPLE_ESCAPES) {
+      out += SIMPLE_ESCAPES[next];
+      index += 1;
+      continue;
+    }
+    out += char + next;
+    index += 1;
   }
-  return -1;
+  return out;
 }
 
 /**
@@ -418,9 +423,16 @@ export function fenceFor(body: string): string {
 }
 
 /** A slide block's text, with its notes block after it when it has notes. */
+/** A kind as the fence's info string may carry it: one word of letters, digits, `-` and `_`, or null. */
+export function cleanKind(kind: string | null | undefined): string | null {
+  return typeof kind === 'string' && /^[A-Za-z0-9_-]{0,40}$/.test(kind) ? kind : null;
+}
+
 export function writeSlideBlock(kind: string, body: string, notes?: string | null): string {
   const fence = fenceFor(body);
-  let block = `${fence}slide${kind ? ` ${kind}` : ''}\n${body}${body === '' ? '' : '\n'}${fence}`;
+  // A kind that isn't one word (a pasted element's) would break the fence line: it is written as a Points slide.
+  const word = cleanKind(kind) ?? 'points';
+  let block = `${fence}slide${word ? ` ${word}` : ''}\n${body}${body === '' ? '' : '\n'}${fence}`;
   if (notes !== undefined && notes !== null) {
     const notesFence = fenceFor(notes);
     block += `\n\n${notesFence}notes\n${notes}${notes === '' ? '' : '\n'}${notesFence}`;
@@ -544,6 +556,11 @@ export function parseDeck(text: string): ParsedDeck {
     if (index + 1 < slides.length) slide.handoutEnd = slides[index + 1].start;
   });
   return { version: front.version, theme: front.theme, bodyStart: front.end, slides };
+}
+
+/** The front matter's `deck:` value, as written, or null: read from the front matter alone. */
+export function deckVersionOf(text: string): string | null {
+  return frontMatterOf(text).version;
 }
 
 /** Is this front matter's `deck:` one this version reads? Absent or at most 1. */

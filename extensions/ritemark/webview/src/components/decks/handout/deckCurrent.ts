@@ -1,7 +1,7 @@
 /**
  * Sprint 157: the current slide's part head is marked in the handout (its number in the accent colour), as the
- * prototype's `.hpart.cur`. The deck view sets the current slide with `setCurrentSlide`; the mark is a node
- * decoration, so nothing in the document changes.
+ * prototype's `.hpart.cur`, and the first slide's head says it holds the deck's title. The deck view sets the
+ * current slide with `setCurrentSlide`; the marks are node decorations, so nothing in the document changes.
  */
 import { Extension } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
@@ -19,16 +19,17 @@ export function currentSlideOf(state: EditorState): number | null {
   return deckCurrentKey.getState(state) ?? null
 }
 
+/** The current slide's head (`is-current`) and the first slide's (`is-first`, the deck's title). */
 function decorations(doc: PMNode, current: number | null): DecorationSet {
-  if (current === null) return DecorationSet.empty
   let index = -1
-  let found: Decoration | null = null
+  const found: Decoration[] = []
   doc.forEach((node, pos) => {
-    if (found || node.type.name !== 'deckSlide') return
+    if (node.type.name !== 'deckSlide') return
     index++
-    if (index === current) found = Decoration.node(pos, pos + node.nodeSize, { class: 'is-current' })
+    const classes = [index === 0 ? 'is-first' : '', index === current ? 'is-current' : ''].filter(Boolean).join(' ')
+    if (classes) found.push(Decoration.node(pos, pos + node.nodeSize, { class: classes }))
   })
-  return found ? DecorationSet.create(doc, [found]) : DecorationSet.empty
+  return found.length ? DecorationSet.create(doc, found) : DecorationSet.empty
 }
 
 export const DeckCurrent = Extension.create({

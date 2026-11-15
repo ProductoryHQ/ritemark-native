@@ -1,7 +1,7 @@
 /**
  * Which files open as decks (Sprint 157). Pure, so the test reads the same rule the editor uses.
  */
-import { isReadableDeckVersion, parseDeck } from './deckFormat';
+import { deckVersionOf, isReadableDeckVersion } from './deckFormat';
 
 /** A deck's file name ends `.deck.md`, in any case. */
 export function isDeckPath(fsPath: string): boolean {
@@ -14,5 +14,6 @@ export function isDeckPath(fsPath: string): boolean {
  */
 export function deckModeOf(input: { flagOn: boolean; scheme: string; fsPath: string; text: string }): boolean {
   if (!input.flagOn || input.scheme !== 'file' || !isDeckPath(input.fsPath)) return false;
-  return isReadableDeckVersion(parseDeck(input.text).version);
+  // The front matter only: this runs for every payload the editor sends the view.
+  return isReadableDeckVersion(deckVersionOf(input.text));
 }
