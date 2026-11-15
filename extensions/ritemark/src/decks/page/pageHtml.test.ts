@@ -7,6 +7,7 @@
  * Run: npx tsx src/decks/page/pageHtml.test.ts
  */
 import { strict as assert } from 'node:assert';
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parse } from 'node-html-parser';
@@ -14,7 +15,7 @@ import { BUILT_IN_THEME } from '../deckTheme';
 import { cssReferences, pageReferences, scriptBuildsReferences } from '../../publish/references';
 import { scanText } from '../../publish/secretScan';
 import { PAGE_FONTS } from './pageFile';
-import { DIGEST_META, handoutHtml, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
+import { DIGEST_META, PAGE_CSP, handoutHtml, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
 import { PAGE_SCRIPT } from './pageScript';
 import { deckDigest, publicDeck } from './publicDeck';
 import { PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_WORDS } from './testing/privateDeck';
@@ -168,6 +169,57 @@ assert.deepEqual(scanText(html), []);
   const before = ticks(exercise);
   assert.equal(before.length, 2);
   assert.deepEqual(ticks('```slide title\ntitle: A new first slide\n```\n\n' + exercise), before);
+}
+
+// No handout text can open a tag on the page (the security review of PR 3). In marked's raw mode, after an inline
+// <code>, <pre>, <kbd> or <script>, text went on unescaped, and a tag marked doesn't read as one (no space before its
+// attribute) reached the page live: in the same paragraph, and in every later one.
+{
+  const render = (markdown: string) => handoutHtml(markdown, { partKey: 'k', exercise: true, pictureUrl });
+  const payloads = ['<svg/onload=alert(1)>', '<img/src/onerror=alert(1)>', '<img/src="x"/onerror=alert(2)>'];
+  for (const tag of ['code', 'pre', 'kbd', 'script', 'CODE', 'pre class="x"']) {
+    for (const payload of payloads) {
+      const places = [
+        `See <${tag}> ${payload}`,
+        `First <${tag}>x\n\nA later paragraph ${payload}`,
+        `# Head <${tag}> ${payload}`,
+        `- item <${tag}> ${payload}\n- next ${payload}`,
+        `1. step <${tag}> ${payload}`,
+        `| a | b |\n| - | - |\n| <${tag}> | ${payload} |`,
+        `[link <${tag}> ${payload}](https://example.com)`,
+        `> quote <${tag}> ${payload}`,
+      ];
+      for (const markdown of places) {
+        const html = render(markdown);
+        assert.ok(!/<(?:svg|img)\b[^>]*on\w+=/i.test(html) && !/<(?:svg|img)\//i.test(html), `${JSON.stringify(markdown)} gave ${html}`);
+        assert.ok(!/<(?:code|pre|kbd|script)\b/i.test(html.replace(/<pre><code>[\s\S]*?<\/code><\/pre>/g, '')), `no raw tag: ${html}`);
+      }
+    }
+  }
+  // The words are still there, as words.
+  assert.equal(render('See <code> <svg/onload=alert(1)>'), '<p>See &lt;code&gt; &lt;svg/onload=alert(1)&gt;</p>\n');
+  // The whole page, from a deck that carries it.
+  const deckText = '```slide title\ntitle: T\n```\n\nSee <code> <svg/onload=alert(document.domain)>\n\nLater <img/src/onerror=alert(1)>\n';
+  const page = pageHtml(publicDeck(deckText, { folderName: 'F', deckName: 'D', theme: BUILT_IN_THEME }), assets, { digest, pictureUrl });
+  assert.ok(!page.includes('<svg/') && !page.includes('<img/'), 'no live tag on the page');
+  assert.deepEqual(pageReferences(page).refs.filter(ref => ref.as !== 'link'), [], 'and nothing the gather would send for it');
+}
+
+// The page's Content Security Policy: first in the head; its one script allowed by its exact hash, nothing else run or
+// loaded from elsewhere.
+{
+  const head = html.slice(0, html.indexOf('<title>'));
+  assert.ok(head.startsWith('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta http-equiv="Content-Security-Policy" content="'));
+  const policy = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(html)![1];
+  assert.equal(policy, PAGE_CSP);
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1]);
+  assert.equal(scripts.length, 1);
+  const hash = createHash('sha256').update(scripts[0]).digest('base64');
+  assert.ok(policy.includes(`script-src 'sha256-${hash}'`), 'the script is allowed by its own hash');
+  for (const part of ["default-src 'none'", "style-src 'unsafe-inline'", 'font-src data:', "img-src 'self' data: file:", "base-uri 'none'", "form-action 'none'"]) {
+    assert.ok(policy.includes(part), part);
+  }
+  assert.ok(!/unsafe-eval|https?:|\*/.test(policy), 'nothing from elsewhere, no eval');
 }
 
 // A deck with nothing to show says so.

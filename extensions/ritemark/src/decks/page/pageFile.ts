@@ -21,7 +21,7 @@ import * as path from 'node:path';
 import { marked } from 'marked';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import type { DeckTheme } from '../deckTheme';
-import { DIGEST_META, GENERATOR_META, pageHtml, pictureAddress, pictureFile, type PageAssets, type PictureFrom } from './pageHtml';
+import { DIGEST_META, GENERATOR_META, lexHandout, pageHtml, pictureAddress, pictureFile, type PageAssets, type PictureFrom } from './pageHtml';
 import { deckDigest, publicDeck, type PublicDeck } from './publicDeck';
 
 export interface PageFs {
@@ -144,7 +144,7 @@ export function picturePaths(deck: PublicDeck): Array<{ path: string; from: Pict
   for (const slide of deck.slides) if (slide.data.image) add(slide.data.image, 'slide');
   for (const markdown of [deck.preamble, ...deck.slides.map(slide => slide.handout)]) {
     if (!markdown) continue;
-    marked.walkTokens(marked.lexer(markdown, { gfm: true }), token => {
+    marked.walkTokens(lexHandout(markdown), token => {
       if (token.type === 'image') add(token.href, 'handout');
     });
   }

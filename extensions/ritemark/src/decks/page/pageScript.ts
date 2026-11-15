@@ -117,7 +117,8 @@ const PAGE_BEHAVIOUR = String.raw`
     if (stitle) stitle.textContent = (index + 1) + (title ? ' \u00b7 ' + title : '');
     if (prev) prev.disabled = index === 0;
     if (next) next.disabled = index === count - 1;
-    parts.forEach(function (part, at) { part.classList.toggle('dim', at !== index && !part.classList.contains('sect')); });
+    // Every part but the current one is dimmed; a section's band stays, its words dim (the Experience lead, PR 3).
+    parts.forEach(function (part, at) { part.classList.toggle('dim', at !== index); });
     goers.forEach(function (button) { button.classList.toggle('on', Number(button.getAttribute('data-go')) === index); });
   }
 
@@ -244,7 +245,9 @@ const PAGE_BEHAVIOUR = String.raw`
       var done = false;
       try { done = doc.execCommand('copy') === true; } catch (error) { done = false; }
       if (done) { selection.removeAllRanges(); copied(); return; }
-      say('Selected. Press Ctrl+C or \u2318C to copy.');
+      // On a touch screen there are no keys to press: the phone's own menu has Copy (the Experience lead, PR 3).
+      var touch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      say(touch ? 'Selected. Tap Copy in your phone\'s menu.' : 'Selected. Press Ctrl+C or \u2318C to copy.');
     };
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(words).then(copied, select);

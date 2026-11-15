@@ -134,6 +134,12 @@ class HandoutRenderer extends marked.Renderer {
     return sanitizeHtml(html);
   }
 
+  // Text arrives escaped (`handoutTokenizer` keeps marked out of its raw mode); a `<` that still came through raw
+  // is escaped here, so no handout text can open a tag on the page. Entities stay as they are.
+  text(text: string): string {
+    return text.replace(/</g, '&lt;');
+  }
+
   heading(text: string, level: number): string {
     // The part's own title is its heading (h2); the handout's headings sit under it.
     const tag = level <= 2 ? 'h3' : level === 3 ? 'h4' : 'h5';
@@ -190,6 +196,28 @@ class HandoutRenderer extends marked.Renderer {
 
 const MARKED_OPTIONS = { gfm: true, breaks: false, headerIds: false, mangle: false, smartypants: false } as const;
 
+/**
+ * The handout's tokenizer: marked's own, except that an inline `<code>`, `<pre>`, `<kbd>` or `<script>` never puts it
+ * in its raw mode, where it hands the text after the tag on unescaped (the security review of PR 3: `See <code>
+ * <svg/onload=…>` reached the page as a live tag). The tag itself is a handout's raw HTML, which `sanitizeHtml`
+ * shows as words.
+ */
+function handoutTokenizer(): marked.Tokenizer {
+  const tokenizer = new marked.Tokenizer();
+  const tag = tokenizer.tag;
+  tokenizer.tag = function (this: marked.Tokenizer & marked.TokenizerThis, src: string) {
+    const token = tag.call(this, src);
+    this.lexer.state.inRawBlock = false;
+    return token;
+  };
+  return tokenizer;
+}
+
+/** A handout's Markdown as tokens, read the one way the page reads it (`pageFile.ts` finds its pictures with it too). */
+export function lexHandout(markdown: string): ReturnType<typeof marked.lexer> {
+  return marked.lexer(markdown, { ...MARKED_OPTIONS, tokenizer: handoutTokenizer() });
+}
+
 /** A label over a prompt: a short paragraph in capitals ("TRY IT", "PROMPT") just before a code block. */
 const PROMPT_LABEL = /^[A-Z0-9][A-Z0-9 .,'’&:!?-]{0,28}$/;
 
@@ -199,8 +227,8 @@ type Token = ReturnType<typeof marked.lexer>[number];
 export function handoutHtml(markdown: string, options: { partKey: string; exercise: boolean; pictureUrl: PictureUrl }): string {
   if (!markdown.trim()) return '';
   const renderer = new HandoutRenderer(options.partKey, options.pictureUrl);
-  const tokens = marked.lexer(markdown, { ...MARKED_OPTIONS });
-  const parser = new marked.Parser({ ...MARKED_OPTIONS, renderer });
+  const tokens = lexHandout(markdown);
+  const parser = new marked.Parser({ ...MARKED_OPTIONS, tokenizer: handoutTokenizer(), renderer });
   let out = '';
   tokens.forEach((token: Token, index: number) => {
     if (token.type === 'list' && token.ordered && options.exercise) {
@@ -283,6 +311,10 @@ svg { flex: none; }
 .part { padding: 26px 0 18px; border-top: 1px solid var(--line); scroll-margin-top: 80px; transition: opacity .3s; }
 .text > .part:first-child, .pre + .part { border-top: 0; padding-top: 8px; }
 .part.dim { opacity: .5; }
+/* A section that isn't the current part keeps its grey band; its words dim as every other part's text does. */
+.sect.dim { opacity: 1; }
+.sect > * { transition: opacity .3s; }
+.sect.dim > * { opacity: .5; }
 .part .lab { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font: 700 12px/16px 'Sofia Sans', sans-serif; letter-spacing: .7px; text-transform: uppercase; color: var(--label); }
 .part h2 { margin: 0 0 10px; font: 700 25px/1.25 'Sofia Sans', sans-serif; color: var(--ink); text-wrap: balance; }
 .part h3 { margin: 18px 0 8px; font: 700 19px/1.3 'Sofia Sans', sans-serif; color: var(--ink); }
@@ -353,7 +385,7 @@ body.bl .stage { border-right: 1px solid var(--line); padding-right: 40px; }
   body.bl .stage { border-right: 0; padding-right: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .layer, .layer.on, body.bl .layer, body.bl .layer.on, .bar i, .part { transition: none; }
+  .layer, .layer.on, body.bl .layer, body.bl .layer.on, .bar i, .part, .sect > * { transition: none; }
 }
 `;
 
@@ -412,6 +444,24 @@ function contentsHtml(slides: PublicSlide[]): string {
   return `<div class="toc" id="toc" role="menu" aria-label="Contents" hidden><div class="hd">Contents</div>${rows.join('')}</div>`;
 }
 
+/** The script element's text, exactly: what the page's Content Security Policy hashes. */
+const SCRIPT_TEXT = `\n${PAGE_SCRIPT}\n`;
+
+/**
+ * The page's Content Security Policy: its one script by its hash, so nothing else runs (no inline handler, no other
+ * script); styles and fonts its own (inline, data:); pictures from beside it (and from disk when the file is opened
+ * there, as in the room without a network); and nothing loaded from anywhere else. It goes first in the head.
+ */
+export const PAGE_CSP = [
+  "default-src 'none'",
+  `script-src 'sha256-${createHash('sha256').update(SCRIPT_TEXT).digest('base64')}'`,
+  "style-src 'unsafe-inline'",
+  'font-src data:',
+  "img-src 'self' data: file:",
+  "base-uri 'none'",
+  "form-action 'none'",
+].join('; ');
+
 /** The page: one HTML file, the same bytes for the same deck. */
 export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOptions): string {
   const borderless = deck.look === 'borderless';
@@ -435,6 +485,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     '<html lang="en">',
     '<head>',
     '<meta charset="utf-8">',
+    `<meta http-equiv="Content-Security-Policy" content="${PAGE_CSP}">`,
     '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
     `<meta name="generator" content="${GENERATOR_META}">`,
     `<meta name="${DIGEST_META}" content="${esc(options.digest)}">`,
@@ -459,7 +510,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     '</section>',
     '</main>',
     '<div class="toast" id="toast" role="status" hidden></div>',
-    `<script>\n${PAGE_SCRIPT}\n</script>`,
+    `<script>${SCRIPT_TEXT}</script>`,
     '</body>',
     '</html>',
   ].filter(line => line !== '').join('\n') + '\n';
