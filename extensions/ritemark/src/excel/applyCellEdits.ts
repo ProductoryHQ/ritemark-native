@@ -96,8 +96,9 @@ export interface WorkbookIndex {
 
 interface SheetGuards {
   arrays: Array<{ from: CellPosition; to: CellPosition; ref: string }>;
-  /** Shared formulas' anchors whose formula can't be moved to every cell of their range. */
-  unmovableAnchors: Set<string>;
+  /** Shared formulas whose formula can't be moved to every cell of their range: typing over any of their cells
+   *  splits the group, so the whole range is refused. */
+  unmovable: Array<{ from: CellPosition; to: CellPosition; ref: string }>;
   tableRows: Array<{ from: CellPosition; to: CellPosition; what: 'header' | 'totals'; table: string }>;
 }
 
@@ -178,9 +179,9 @@ export async function indexWorkbook(bytes: Uint8Array): Promise<WorkbookIndex> {
   };
 }
 
-function sheetGuardsFrom(xml: string, p: string): Pick<SheetGuards, 'arrays' | 'unmovableAnchors'> {
+function sheetGuardsFrom(xml: string, p: string): Pick<SheetGuards, 'arrays' | 'unmovable'> {
   const arrays: SheetGuards['arrays'] = [];
-  const unmovableAnchors = new Set<string>();
+  const unmovable: SheetGuards['unmovable'] = [];
   const fRe = new RegExp(`<${p}f(?=[\\s/>])([^>]*?)(\\/?)>`, 'g');
   const cellTagRe = new RegExp(`<${p}c(?=[\\s/>])[^>]*>`, 'y');
   let m: RegExpExecArray | null;
@@ -204,11 +205,11 @@ function sheetGuardsFrom(xml: string, p: string): Pick<SheetGuards, 'arrays' | '
           for (const c of [range.from.c, range.to.c]) shiftFormula(formula, r - anchor.r, c - anchor.c);
         }
       } catch {
-        unmovableAnchors.add(anchorRef);
+        unmovable.push({ ...range, ref: ref! });
       }
     }
   }
-  return { arrays, unmovableAnchors };
+  return { arrays, unmovable };
 }
 
 async function guardsFor(index: WorkbookIndex, sheetPath: string, xml?: string): Promise<SheetGuards> {
@@ -260,8 +261,9 @@ export async function checkCellEdit(index: WorkbookIndex, edit: CellEdit): Promi
   if (array) {
     throw new CellEditRefused(edit, `${edit.ref} is part of an array formula (${array.ref}). Change it in Excel.`);
   }
-  if (guards.unmovableAnchors.has(edit.ref)) {
-    throw new CellEditRefused(edit, `The formula in ${edit.ref} is shared with other cells and can't be moved to them. Change it in Excel.`);
+  const shared = guards.unmovable.find((u) => rangeContains(u, at));
+  if (shared) {
+    throw new CellEditRefused(edit, `${edit.ref} is in a formula shared across ${shared.ref} that can't be moved cell by cell. Change it in Excel.`);
   }
   const tableRow = guards.tableRows.find((t) => rangeContains(t, at));
   if (tableRow) {
@@ -277,6 +279,23 @@ export async function checkCellEdit(index: WorkbookIndex, edit: CellEdit): Promi
 /** Plain XML text escaping, for a formula moved to another cell (its `_xHHHH_` sequences are kept as written). */
 function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** A shared formula group's anchor: the cell with `<f t="shared" si=".." ref="..">text</f>`. */
+function findSharedAnchor(xml: string, p: string, si: string): { at: CellPosition; formula: string; tagStart: number; tag: string } | null {
+  // not a self-closing <f/>: that would run on to another group's </f> and hide its anchor
+  const fRe = new RegExp(`<${p}f(?=[\\s>])([^>]*?)(?<!\\/)>([\\s\\S]*?)</${p}f>`, 'g');
+  const cellTagRe = new RegExp(`<${p}c(?=[\\s/>])[^>]*>`, 'y');
+  let m: RegExpExecArray | null;
+  while ((m = fRe.exec(xml))) {
+    if (attr(m[1], 't') !== 'shared' || attr(m[1], 'si') !== si || attr(m[1], 'ref') === undefined) continue;
+    cellTagRe.lastIndex = xml.lastIndexOf(`<${p}c`, m.index);
+    const ref = attr(cellTagRe.exec(xml)?.[0] ?? '', 'r');
+    const at = ref ? parseCellRef(ref) : null;
+    if (!at) return null;
+    return { at, formula: decodeXmlEntities(m[2]), tagStart: m.index, tag: m[0].slice(0, m[0].indexOf('>') + 1) };
+  }
+  return null;
 }
 
 /**
@@ -395,16 +414,30 @@ export async function applyCellEdits(
           report.formulasRemoved++;
           const fa = content.formulaAttrs ?? '';
           const si = attr(fa, 'si');
-          if (attr(fa, 't') === 'shared' && attr(fa, 'ref') !== undefined && si !== undefined) {
-            try {
-              xml = unshareFormula(xml, p, at, si, content.formula);
-            } catch (error) {
-              if (error instanceof FormulaShiftError) {
-                throw new CellEditRefused(edit, `The formula in ${edit.ref} is shared with other cells and can't be moved to them. Change it in Excel.`);
+          // Typing over any cell of a shared formula splits the group: every other cell gets its own formula, so
+          // no cell is left in a shared range it no longer belongs to (Excel could repair it, or put the formula back).
+          if (attr(fa, 't') === 'shared' && si !== undefined) {
+            const isAnchor = attr(fa, 'ref') !== undefined;
+            const anchor = isAnchor ? { at, formula: content.formula } : findSharedAnchor(xml, p, si);
+            if (anchor) {
+              try {
+                xml = unshareFormula(xml, p, anchor.at, si, anchor.formula);
+              } catch (error) {
+                if (error instanceof FormulaShiftError) {
+                  throw new CellEditRefused(edit, `The formula in ${edit.ref} is shared with other cells and can't be moved to them. Change it in Excel.`);
+                }
+                throw error;
               }
-              throw error;
+              if (!isAnchor) {
+                // the anchor keeps its formula as its own
+                const found = findSharedAnchor(xml, p, si);
+                if (found) {
+                  const own = found.tag.replace(/\s+(?:t|si|ref)\s*=\s*"[^"]*"/g, '');
+                  xml = xml.slice(0, found.tagStart) + own + xml.slice(found.tagStart + found.tag.length);
+                }
+              }
+              loc = locateCell(xml, at, p);
             }
-            loc = locateCell(xml, at, p);
           }
         }
       } else {
@@ -430,13 +463,13 @@ export async function applyCellEdits(
       replace.set(chainPath, null);
       const rels = await mustReadText(index.pkg, index.workbookRelsPath);
       const withoutChain = rels.replace(
-        new RegExp(`<(?:\\w+:)?Relationship(?=[\\s/>])[^>]*\\sId\\s*=\\s*"${chain.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*\\/>`),
+        new RegExp(`<(?:\\w+:)?Relationship(?=[\\s/>])[^>]*\\sId\\s*=\\s*(["'])${chain.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\1[^>]*\\/>`),
         '',
       );
       replace.set(index.workbookRelsPath, encodeText(withoutChain));
       const types = await mustReadText(index.pkg, '[Content_Types].xml');
       const partName = `/${chainPath}`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      replace.set('[Content_Types].xml', encodeText(types.replace(new RegExp(`<Override(?=\\s)[^>]*PartName\\s*=\\s*"${partName}"[^>]*\\/>`, 'i'), '')));
+      replace.set('[Content_Types].xml', encodeText(types.replace(new RegExp(`<Override(?=\\s)[^>]*PartName\\s*=\\s*(["'])${partName}\\1[^>]*\\/>`, 'i'), '')));
       report.calcChainDropped = true;
     }
   }
