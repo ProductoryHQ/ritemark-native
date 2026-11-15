@@ -14,7 +14,7 @@ import { useAISidebarStore } from './store';
 import { deriveRuntimeAvailabilities } from './runtimeAvailability';
 import type { OnboardingDependency, OnboardingInstallState, OnboardingStatus } from './types';
 import { COPY, PLAN_LINES, browserOpened, reopenTip, stopWaitingTip } from '../welcome/welcomeCopy';
-import { OFFLINE_LINE, PROVIDER_NAMES, homeReopenNotOpened, signInProblem } from '../../../../src/welcome/words';
+import { OFFLINE_LINE, PROVIDER_NAMES, homeReopenNotOpened, signInNeedsConnection, signInProblem } from '../../../../src/welcome/words';
 import type { SheetSignInAi, SheetSignInView } from '../../../../src/views/agentSidebarProtocol';
 
 type WizardStep = 'checklist' | 'authenticate' | 'ready';
@@ -382,7 +382,7 @@ function SignInCard({
             </Tooltip>
           </>
         ) : (
-          <Tooltip label={offline ? `${name} sign-in needs an internet connection.` : signInTip}>
+          <Tooltip label={offline ? signInNeedsConnection(ai) : signInTip}>
             <Button type="button" size="sm" className="text-xs" disabled={offline} onClick={onSignIn}>
               <Icon name="sign-in" size={14} />
               {signInLabel}

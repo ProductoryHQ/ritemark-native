@@ -62,6 +62,7 @@ import { browserTurnPageFor, chooseTurnPage, contextAfterShareWait } from '../br
 import {
   decodeBrowserShareAnswer,
   decodeSheetSignInRequest,
+  sheetLineForCodexPollEnd,
   type BrowserShareQuestionClearMessage,
   type BrowserShareQuestionMessage,
   type SheetSignInAi,
@@ -415,6 +416,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private readonly _sheetSignInLines: Record<SheetSignInAi, SheetSignInLine | null> = { claude: null, chatgpt: null };
   /** Sprint 160 (#696): the sheet follows each AI's running sign-in once, wherever it started, for its page and end. */
   private readonly _sheetSignInFollowed: Record<SheetSignInAi, boolean> = { claude: false, chatgpt: false };
+  /** Sprint 160 (#696): the sheet's own Cancel is stopping Claude's login, so the sheet's sign-in settles quietly. */
+  private _sheetCancelsClaudeLogin = false;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -2271,24 +2274,35 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       } else if (isEnabled('codex-integration')) {
         // ChatGPT's poll ends with its login: ready, a failed login, the give-up after 2 minutes, or a stop
         const rt = this._runtimeRegistry.get('codex') as CodexRuntime;
+        const pageOpened = rt.signInPage() !== null;
         this._sheetSignInFollowed.chatgpt = true;
-        rt.listenToLoginPoll(() => {}, (end) => ended(end === 'failed' ? 'failed' : end === 'gave-up' ? 'timed-out' : null));
+        rt.listenToLoginPoll(() => {}, (end) => ended(sheetLineForCodexPollEnd(end, pageOpened)));
       }
       if (!this._sheetSignInFollowed[ai]) return;
     }
     this._setSheetSignInLine(ai, null);
   }
 
-  /** The card's Cancel runs Home's: the shared owner's `cancelClaudeLogin`, or `stopCodexSignIn`. */
+  /**
+   * The card's Cancel runs Home's: the shared owner's `cancelClaudeLogin`, or `stopCodexSignIn`. Like Home's, it
+   * settles quietly: the sheet's own sign-in (`_handleClaudeLogin`) doesn't report it as "cancelled".
+   */
   private async _cancelSheetSignIn(ai: SheetSignInAi): Promise<void> {
     if (ai === 'claude') {
-      if (!cancelClaudeLogin()) {
+      let cancelled: boolean;
+      this._sheetCancelsClaudeLogin = true;
+      try {
+        cancelled = cancelClaudeLogin();
+      } finally {
+        this._sheetCancelsClaudeLogin = false;
+      }
+      if (!cancelled) {
         // No login ran: the card was waiting on an old answer; read Claude again
         clearSetupCache();
         emitClaudeStatusInvalidated('status-refresh');
       }
     } else {
-      await this.stopCodexSignIn();
+      await this.stopCodexSignIn().catch((error: unknown) => console.warn('[ritemark] Could not stop the ChatGPT sign-in:', error));
     }
     this._setSheetSignInLine(ai, null);
   }
@@ -3420,6 +3434,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       emitCodexStatusInvalidated('login-started');
     } catch (error) {
       rt.stopLoginPolling();
+      // Sprint 160 (#696): the sign-in is over here, so a login Codex did start is not handed to the next press
+      rt.setLoginInProgress(false);
       const message = error instanceof Error ? error.message : String(error);
       this._postCodexSidebarStatus({ enabled: true, state: 'needs-auth', version: null, authMethod: null, email: null, plan: null, error: message, diagnostics: [], repairCommand: null, binaryPath: null, compatibility: null });
       // Sprint 160 (#696): the sheet's card says so in the welcome's words
@@ -3606,6 +3622,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         });
       },
       onCancel: () => {
+        // Sprint 160 (#696): the sheet's own Cancel settles quietly, as Home's does; the store already stopped waiting
+        if (this._sheetCancelsClaudeLogin) return;
         this._view?.webview.postMessage({
           type: 'agent-setup:error',
           error: 'Claude sign-in was cancelled.',

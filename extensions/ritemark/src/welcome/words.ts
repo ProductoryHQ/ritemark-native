@@ -43,6 +43,11 @@ export const CHECK_TIMED_OUT = 'Couldn’t check. Try again.';
 
 export const OFFLINE_LINE = 'You are offline. Your sign-ins are checked when you are back online.';
 
+/** Sprint 160 (#696): why Sign in waits while offline: the AI sheet's sign-in cards and Claude's setup view. */
+export function signInNeedsConnection(provider: WelcomeProviderId): string {
+  return `${PROVIDER_NAMES[provider]} sign-in needs an internet connection.`;
+}
+
 export function folderGone(name: string): string {
   return `The folder “${name}” isn’t there any more. Choose where your work is.`;
 }

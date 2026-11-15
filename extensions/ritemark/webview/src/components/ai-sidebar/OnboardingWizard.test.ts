@@ -339,7 +339,7 @@ for (const ended of ['failed', 'timed-out', 'could-not-start'] as const) {
       setupStatus: setup(setupState) as never,
       codexStatus: codex(codexState) as never,
       opencodeEnabled: false,
-      acpProviders: {},
+      acpProviders: { google: false, openai: false, anthropic: false, openrouter: false },
     }),
     onboardingStatusKnown: true,
     onboardingDismissed: false,
@@ -407,10 +407,17 @@ for (const ended of ['failed', 'timed-out', 'could-not-start'] as const) {
     assert.equal(useAISidebarStore.getState().setupStatus?.state, 'needs-auth', "Cancel: Claude's card stops waiting at once")
     assert.equal(useAISidebarStore.getState().claudeLoginState, 'idle', 'Cancel: and the press that started it is over')
     assert.equal(useAISidebarStore.getState().codexStatus.state, 'auth-in-progress', "Cancel: ChatGPT's sign-in is not touched")
+    // Review of #730: Cancel settles quietly, as Home's does. A status read during the wait leaves the store's
+    // "didn't finish" behind (`agent-setup:complete` while pending); Cancel doesn't keep it
+    useAISidebarStore.setState({ setupStatus: setup('auth-in-progress') as never, claudeLoginState: 'error', setupError: 'Claude sign-in did not finish. Please try again.' })
+    realCancelSignIn('claude')
+    assert.equal(useAISidebarStore.getState().claudeLoginState, 'idle', 'Cancel: no sign-in error after a Cancel')
+    assert.equal(useAISidebarStore.getState().setupError, null, 'Cancel: and no error words')
     realCancelSignIn('chatgpt')
     assert.equal(useAISidebarStore.getState().codexStatus.state, 'needs-auth', "Cancel: ChatGPT's card stops waiting at once")
     realReopenSignIn('claude')
     assert.deepEqual(posted, [
+      { type: 'onboarding:cancel-sign-in', ai: 'claude' },
       { type: 'onboarding:cancel-sign-in', ai: 'claude' },
       { type: 'onboarding:cancel-sign-in', ai: 'chatgpt' },
       { type: 'onboarding:reopen-sign-in', ai: 'claude' },

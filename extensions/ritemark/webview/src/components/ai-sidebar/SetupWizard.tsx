@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Icon } from '../ui/Icon';
 import { EnvironmentStatusNotice } from './EnvironmentStatusNotice';
 import { useAISidebarStore } from './store';
+import { signInNeedsConnection } from '../../../../src/welcome/words';
 
 export function SetupWizard() {
   const setupStatus = useAISidebarStore((s) => s.setupStatus);
@@ -63,7 +64,7 @@ export function SetupWizard() {
       : loginInProgress
         ? 'Your terminal and browser were opened for Claude.ai sign-in. Ritemark will update automatically when sign-in completes.'
         : offlineBlocked
-          ? 'Claude sign-in needs an internet connection.'
+          ? signInNeedsConnection('claude')
           : 'To use Claude in Ritemark, sign in with Claude.ai or use an Anthropic API key.';
 
   return (

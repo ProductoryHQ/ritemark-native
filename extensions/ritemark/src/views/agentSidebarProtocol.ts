@@ -2,6 +2,8 @@ import type { AgentId, AgentInfo } from '../agent/types';
 import type { DiscoveredAgent, DiscoveredCommand } from '../agent/discovery';
 import type { ModelEntry } from '../ai/modelCatalog';
 import type { RuntimeCapabilities } from '../runtime/capabilities';
+import type { SignInProblem } from '../welcome/words';
+import type { LoginPollEnd } from '../codex/codexStatusEvents';
 
 export interface AgentSidebarBootstrapMessage {
   type: 'agent:bootstrap';
@@ -101,7 +103,7 @@ export type SheetSignInAi = 'claude' | 'chatgpt';
  * (`signInProblem`'s 'failed', 'timed-out' and 'could-not-start'); 'not-opened' is "Open the page again" finding no
  * page to open while the sign-in still waits (`homeReopenNotOpened`).
  */
-export type SheetSignInLine = 'failed' | 'timed-out' | 'could-not-start' | 'not-opened';
+export type SheetSignInLine = Exclude<SignInProblem, 'not-ready'>;
 
 /**
  * Sprint 160 (#696): what a sign-in card on the sheet shows beyond the AI's state, from the host. `page`: the running
@@ -121,6 +123,16 @@ export type SheetSignInView = Pick<SheetSignInMessage, 'page' | 'line'>;
 export interface SheetSignInRequest {
   type: 'onboarding:cancel-sign-in' | 'onboarding:reopen-sign-in';
   ai: SheetSignInAi;
+}
+
+/**
+ * Sprint 160 (#696): the ChatGPT card's line when its sign-in's poll ends. The 2-minute give-up says "not finished in
+ * time" only for a login whose page opened here; Settings' own login (another app-server, which says it started before
+ * its login has a page) just ends. Ready and a stop leave no line.
+ */
+export function sheetLineForCodexPollEnd(end: LoginPollEnd, pageOpened: boolean): SheetSignInLine | null {
+  if (end === 'failed') return 'failed';
+  return end === 'gave-up' && pageOpened ? 'timed-out' : null;
 }
 
 export function decodeSheetSignInRequest(value: unknown): SheetSignInRequest | null {

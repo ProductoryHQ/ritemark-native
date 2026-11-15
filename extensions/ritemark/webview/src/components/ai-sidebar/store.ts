@@ -2116,12 +2116,18 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     cancelSignIn: (ai) => {
       // The card stops waiting at once, as Home's does when its Cancel is pressed; the host's status follows
+      // and, like Home's, it settles quietly: no "didn't finish" is left behind for this sign-in
       if (ai === 'claude') {
-        const setup = get().setupStatus;
-        set({
-          ...(setup?.state === 'auth-in-progress' ? { setupStatus: { ...setup, state: 'needs-auth' as const } } : {}),
-          ...(get().claudeLoginState === 'pending' ? { claudeLoginState: 'idle' as const, setupInProgress: false } : {}),
-        });
+        const { setupStatus: setup, claudeLoginState } = get();
+        const signing = setup?.state === 'auth-in-progress';
+        if (signing || claudeLoginState === 'pending') {
+          set({
+            ...(signing ? { setupStatus: { ...setup, state: 'needs-auth' as const } } : {}),
+            claudeLoginState: 'idle',
+            setupInProgress: false,
+            setupError: null,
+          });
+        }
       } else {
         const codex = get().codexStatus;
         if (codex.state === 'auth-in-progress') set({ codexStatus: { ...codex, state: 'needs-auth', error: null } });
