@@ -118,10 +118,11 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
       return { type: input.type, id: slideIdOf(input.id), text: stringOf(input.text, MAX_DECK_TEXT, true) };
     }
     case 'deck/add-to-library': {
-      // The topic is the sheet's choice (a topic's path or a new topic's name); without one, the host asks.
+      // The topic is the sheet's choice (a topic's path, as long as a path may be, or a new topic's name); without one,
+      // the host asks.
       if ('topic' in input) {
         exactKeys(input, ['type', 'id', 'text', 'topic']);
-        return { type: 'deck/add-to-library', id: slideIdOf(input.id), text: stringOf(input.text, MAX_DECK_TEXT, true), topic: stringOf(input.topic, 200) };
+        return { type: 'deck/add-to-library', id: slideIdOf(input.id), text: stringOf(input.text, MAX_DECK_TEXT, true), topic: stringOf(input.topic, MAX_PATH_LENGTH) };
       }
       exactKeys(input, ['type', 'id', 'text']);
       return { type: 'deck/add-to-library', id: slideIdOf(input.id), text: stringOf(input.text, MAX_DECK_TEXT, true) };

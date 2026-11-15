@@ -19,6 +19,8 @@ export interface LibraryTopic {
 const NEW_TOPIC = '__new'
 /** A topic's name never holds these: it is a file name in the Slide library folder. */
 const BAD_NAME = /[\\/:*?"<>|]/
+/** A new topic's name, at most this long: it becomes a file name, and the host takes paths up to its own limit. */
+const MAX_NAME = 120
 
 interface AddToLibrarySheetProps {
   number: number
@@ -43,7 +45,7 @@ export function AddToLibrarySheet({ number, topics, style, onAdd, onClose }: Add
   }, [choice])
 
   const trimmed = name.trim()
-  const nameProblem = choice === NEW_TOPIC ? (!trimmed ? 'Give the topic a name' : BAD_NAME.test(trimmed) ? 'A topic name has no / \\ : * ? " < > |' : null) : null
+  const nameProblem = choice === NEW_TOPIC ? (!trimmed ? 'Give the topic a name' : BAD_NAME.test(trimmed) ? 'A topic name has no / \\ : * ? " < > |' : trimmed.length > MAX_NAME ? `A topic name has at most ${MAX_NAME} characters` : null) : null
   const ready = !!choice && !nameProblem
   const add = () => { if (ready) onAdd(choice === NEW_TOPIC ? trimmed : choice) }
 

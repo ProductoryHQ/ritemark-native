@@ -32,6 +32,9 @@ assert.deepEqual(decodeDeckRequest({ type: 'deck/applied', requestId: 'r1', ok: 
 assert.deepEqual(decodeDeckRequest({ type: 'deck/open-library', section: 'other', after: -1 }), { type: 'deck/open-library', section: 'other', after: -1 });
 assert.deepEqual(decodeDeckRequest({ type: 'deck/add-to-library', id: 'a1', text: '', topic: 'Openings' }), { type: 'deck/add-to-library', id: 'a1', text: '', topic: 'Openings' });
 assert.throws(() => decodeDeckRequest({ type: 'deck/add-to-library', id: 'a1', text: '', topic: '' }), DeckProtocolError);
+// A topic's path may be as long as any path (Codex on #727): a long one is accepted.
+const longTopic = 'Slide library/' + 'x'.repeat(260) + '.deck.md'
+assert.equal((decodeDeckRequest({ type: 'deck/add-to-library', id: 'a1', text: '', topic: longTopic }) as { topic?: string }).topic, longTopic);
 assert.deepEqual(decodeDeckRequest({ type: 'deck/library-topics' }), { type: 'deck/library-topics' });
 assert.throws(() => decodeDeckRequest({ type: 'deck/open-library', section: 'all', after: 0 }), DeckProtocolError);
 assert.throws(() => decodeDeckRequest({ type: 'deck/open-library', section: 'topics', after: -2 }), DeckProtocolError);
