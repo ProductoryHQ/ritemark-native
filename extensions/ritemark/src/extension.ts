@@ -14,7 +14,7 @@ import { initConnectivity } from './ai/connectivity';
 import { initAiStatusItem } from './ai/aiStatusItem';
 import * as modelCatalog from './ai/modelCatalog';
 import { discoverAnthropic, discoverOpenAI, discoverGemini, discoverCodex } from './ai/modelCatalog/providerDiscovery';
-import { getSetupStatus } from './agent/setup';
+import { getSetupStatus, registerAnthropicKeyReader } from './agent/setup';
 import { CodexManager } from './codex/codexManager';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { registerFeedback } from './feedback/feedbackSheet';
@@ -36,6 +36,7 @@ import { createFlowScheduler, FlowScheduler } from './flows/FlowScheduler';
 import { RitemarkSettingsProvider, isSettingsSection } from './settings/RitemarkSettingsProvider';
 import { setExtensionContext as setLLMExtensionContext } from './flows/nodes/LLMNodeExecutor';
 import { setImageNodeExtensionContext } from './flows/nodes/ImageNodeExecutor';
+import { setClaudeCodeNodeSecrets } from './flows/nodes/ClaudeCodeNodeExecutor';
 import { registerFlowTestCommand } from './flows/FlowTestRunner';
 import { registerConfigureApiKeyCommand, registerCheckApiKeyCommand } from './commands/configureApiKey';
 import {
@@ -279,6 +280,8 @@ export function activate(context: vscode.ExtensionContext) {
   // RITEMARK_TEST_KEY_* variables move from this process's environment into providerKeys.ts, so no child (Claude
   // Code, Codex, git, MCP servers) inherits them; a key reaches an agent only through the BYOK env.
   snapshotTestKeys();
+  // Sprint 160 (#541): Claude's readiness reads the saved Anthropic key on every check; only true or false comes back.
+  registerAnthropicKeyReader(() => readProviderKey(context.secrets, 'anthropic-api-key'));
 
   // === Theme & branding: fresh install, version upgrade, or design-foundation migration ===
   const currentVersion = context.extension.packageJSON.version as string;
@@ -397,9 +400,10 @@ export function activate(context: vscode.ExtensionContext) {
   // Initialize API key manager (must be first)
   initAPIKeyManager(context);
 
-  // Initialize executor contexts (for Gemini API key access)
+  // Initialize executor contexts (for the Gemini and Anthropic keys)
   setLLMExtensionContext(context);
   setImageNodeExtensionContext(context);
+  setClaudeCodeNodeSecrets(context.secrets);
 
   // Initialize connectivity monitoring (online detection; the status bar's AI item reads it, below)
   initConnectivity(context);

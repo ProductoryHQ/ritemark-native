@@ -15,7 +15,6 @@ export {
   checkWingetAvailable,
   clearSetupCache,
   setAnthropicKeyAvailable,
-  hasCliOAuth,
   setClaudeLoginInProgress,
   setClaudePendingReload,
   clearClaudePendingReload,

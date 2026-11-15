@@ -29,7 +29,10 @@ import type {
 } from './types';
 
 let cachedStatus: SetupStatus | null = null;
-let hasAnthropicKeyInSecrets = false;
+// Whether the cached status was decided with a saved Anthropic key (null: no key was read for it).
+let cachedKeySaved: boolean | null = null;
+// Written only by the shared sign-in owner, claudeLogin.ts (Sprint 160, #696): a poll, a re-check or a saved key
+// never ends a sign-in that is still running.
 let claudeLoginInProgress = false;
 let claudePendingReload = false;
 let claudePendingReloadDiagnostics: string[] = [];
@@ -41,8 +44,47 @@ let inflightStatus: { epoch: number; promise: Promise<SetupStatus> } | null = nu
 
 function invalidateStatus(): void {
   cachedStatus = null;
+  cachedKeySaved = null;
   statusEpoch += 1;
 }
+
+/**
+ * Reads the Anthropic key saved in Ritemark (Sprint 160, #541). `extension.ts` registers it at activation; every
+ * probe asks it, so readiness never rests on a flag another surface forgot to set. Only true or false leaves this
+ * module: the key is never logged, cached or put in a status.
+ */
+export type AnthropicKeyReader = () => PromiseLike<string | undefined>;
+
+let anthropicKeyReader: AnthropicKeyReader | null = null;
+
+export function registerAnthropicKeyReader(reader: AnthropicKeyReader | null): void {
+  anthropicKeyReader = reader;
+  invalidateStatus();
+}
+
+interface SavedKeyAnswer {
+  saved: boolean;
+  /** Why the key could not be read; the key then counts as none. */
+  diagnostic?: string;
+}
+
+async function readAnthropicKeySaved(): Promise<SavedKeyAnswer> {
+  if (!anthropicKeyReader) return { saved: false };
+  try {
+    return { saved: Boolean(await anthropicKeyReader()) };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    console.warn(`[ritemark] Claude check: the saved Anthropic key could not be read, so it counts as none (${detail})`);
+    return { saved: false, diagnostic: 'The saved Anthropic API key could not be read, so it counts as none.' };
+  }
+}
+
+// The CLI's sign-in check keeps its 5 s for now (Sprint 160, decision 2): first the log says why answers were
+// unusable. It and the macOS Keychain check are replaceable by the tests (`__testOnly`), so a test never reads the
+// developer's own Keychain.
+const AUTH_CHECK_TIMEOUT_MS = 5000;
+let keychainCheck: () => Promise<boolean> = checkKeychainAuth;
+let authCheckTimeoutMs = AUTH_CHECK_TIMEOUT_MS;
 
 onClaudeStatusInvalidated(() => {
   invalidateStatus();
@@ -64,6 +106,10 @@ interface ClaudeBinaryInspection {
 interface ClaudeStatusInput {
   binary: ClaudeBinaryInspection;
   authMethod: ClaudeAuthMethod;
+  /** Whether this probe found an Anthropic key saved in Ritemark. */
+  keySaved?: boolean;
+  /** What the sign-in decision noted: why the CLI's answer was unusable, the Keychain fallback, a failed key read. */
+  authDiagnostics?: string[];
   loginInProgress: boolean;
   pendingReload: boolean;
   pendingReloadDiagnostics: string[];
@@ -72,6 +118,34 @@ interface ClaudeStatusInput {
 interface ClaudeAuthStatusJson {
   loggedIn?: boolean;
   authMethod?: string;
+}
+
+/**
+ * Why `claude auth status --json` gave no usable answer (#703): it timed out, could not run (`spawn-error:<code>`),
+ * or printed no JSON that says signed in or out. With the exit status, the time it took and the output's size,
+ * never the output itself, which can hold the account's e-mail.
+ */
+export interface ClaudeAuthCheckUnusable {
+  reason: 'timeout' | 'no-json' | `spawn-error:${string}`;
+  status: number | null;
+  elapsedMs: number;
+  stdoutBytes: number;
+  stderrBytes: number;
+}
+
+/** The CLI's own answer: its sign-in method (`null` for signed out), or why it gave none. */
+export type ClaudeAuthCheck = { method: ClaudeAuthMethod } | { unusable: ClaudeAuthCheckUnusable };
+
+/** Everything the sign-in decision reads (§2 of Sprint 160's technical plan). */
+export interface ClaudeAuthEvidence {
+  platform: NodeJS.Platform;
+  cli: ClaudeAuthCheck;
+  /** An Anthropic key is saved in Ritemark (the key reader's answer). */
+  keySaved: boolean;
+  /** macOS: Claude Code's Keychain item exists. Read only when the decision needs it (`needsKeychainCheck`). */
+  keychainSignedIn?: boolean;
+  /** `ANTHROPIC_API_KEY` is set in the extension host's environment. */
+  envApiKey: boolean;
 }
 
 function isSupportedPlatform(platform: NodeJS.Platform): platform is SupportedPlatform {
@@ -363,18 +437,6 @@ async function checkKeychainAuth(): Promise<boolean> {
   }
 }
 
-async function checkWindowsAuth(): Promise<boolean> {
-  try {
-    const result = await runProcess('cmdkey', ['/list:Claude*'], {
-      timeout: 3000,
-      shell: true,
-    });
-    return result.status === 0 && (result.stdout?.includes('Claude') ?? false);
-  } catch {
-    return false;
-  }
-}
-
 function parseClaudeAuthStatusJson(output: string): ClaudeAuthMethod | undefined {
   try {
     const status = JSON.parse(output) as ClaudeAuthStatusJson;
@@ -393,57 +455,113 @@ function parseClaudeAuthStatusJson(output: string): ClaudeAuthMethod | undefined
   return undefined;
 }
 
-async function checkClaudeAuthStatus(binaryPath: string): Promise<ClaudeAuthMethod | undefined> {
+/**
+ * Ask the CLI itself. A JSON answer counts even when the process then failed (a timed-out CLI that already printed
+ * it); otherwise the answer says why it was unusable.
+ */
+async function checkClaudeAuthStatus(binaryPath: string): Promise<ClaudeAuthCheck> {
+  const started = Date.now();
+  let result: ProcessResult;
   try {
-    const result = await runBinary(binaryPath, ['auth', 'status', '--json'], 5000);
-    const parsed = parseClaudeAuthStatusJson(result.stdout ?? '');
-    if (parsed !== undefined) {
-      return parsed;
-    }
-    const stderrParsed = parseClaudeAuthStatusJson(result.stderr ?? '');
-    if (stderrParsed !== undefined) {
-      return stderrParsed;
-    }
-  } catch {
-    // CLI unreachable — caller decides on fallbacks.
+    result = await runBinary(binaryPath, ['auth', 'status', '--json'], authCheckTimeoutMs);
+  } catch (error) {
+    // runProcess throws only for invalid arguments; a failed spawn comes back in `result.error`.
+    const code = (error as NodeJS.ErrnoException | undefined)?.code ?? 'unknown';
+    return { unusable: { reason: `spawn-error:${code}`, status: null, elapsedMs: Date.now() - started, stdoutBytes: 0, stderrBytes: 0 } };
   }
 
-  return undefined;
+  const parsed = parseClaudeAuthStatusJson(result.stdout ?? '');
+  if (parsed !== undefined) {
+    return { method: parsed };
+  }
+  const stderrParsed = parseClaudeAuthStatusJson(result.stderr ?? '');
+  if (stderrParsed !== undefined) {
+    return { method: stderrParsed };
+  }
+
+  const code = result.error?.code;
+  return {
+    unusable: {
+      reason: code === 'ETIMEDOUT' ? 'timeout' : result.error ? `spawn-error:${code ?? 'unknown'}` : 'no-json',
+      status: result.status,
+      elapsedMs: Date.now() - started,
+      stdoutBytes: Buffer.byteLength(result.stdout ?? ''),
+      stderrBytes: Buffer.byteLength(result.stderr ?? ''),
+    },
+  };
 }
 
-async function detectClaudeAuthMethod(
-  platform: NodeJS.Platform = getCurrentPlatform(),
-  binaryPath?: string
-): Promise<ClaudeAuthMethod> {
-  // 1. Primary source of truth: ask the CLI directly. Returns null after `claude logout`.
-  if (binaryPath) {
-    const cliStatus = await checkClaudeAuthStatus(binaryPath);
-    if (cliStatus !== undefined) {
-      return cliStatus;
-    }
-  }
+/** One line for the log and the diagnostics: the reason and the measurements, never the output. */
+function describeUnusableAuthCheck(unusable: ClaudeAuthCheckUnusable): string {
+  return `Claude's sign-in check gave no usable answer: ${unusable.reason} `
+    + `(exit ${unusable.status ?? 'none'}, ${unusable.elapsedMs} ms, stdout ${unusable.stdoutBytes} bytes, stderr ${unusable.stderrBytes} bytes).`;
+}
 
-  // 2. Explicit user-set secret (entered via Settings UI).
-  if (hasAnthropicKeyInSecrets) {
+/**
+ * Claude's sign-in method from what the probe found (Sprint 160, §2; #703, #541). Pure: the probe gathers the
+ * evidence (`probeClaudeAuth`).
+ *
+ * 1. The CLI says signed in: its own method. A Claude.ai sign-in still wins over a saved key.
+ * 2. A key saved in Ritemark: `api-key`, also when the CLI says signed out (#541).
+ * 3. The CLI says signed out: signed out.
+ * 4. The CLI gave no usable answer: on macOS, Claude Code's Keychain item counts as a Claude.ai sign-in. On Windows
+ *    nothing does: cmdkey's listing names its filter in its header, so it read as signed in on every PC (#703).
+ *    Then `ANTHROPIC_API_KEY` in the environment, the weakest signal; else signed out.
+ */
+export function detectClaudeAuthMethod(evidence: ClaudeAuthEvidence): ClaudeAuthMethod {
+  if ('method' in evidence.cli && evidence.cli.method !== null) {
+    return evidence.cli.method;
+  }
+  if (evidence.keySaved) {
     return 'api-key';
   }
-
-  // 3. Platform credential stores.
-  if (platform === 'darwin' && await checkKeychainAuth()) {
+  if ('method' in evidence.cli) {
+    return null;
+  }
+  if (evidence.platform === 'darwin' && evidence.keychainSignedIn) {
     return 'claude-oauth';
   }
-
-  if (platform === 'win32' && await checkWindowsAuth()) {
-    return 'claude-oauth';
-  }
-
-  // 4. Last resort: ANTHROPIC_API_KEY env var. Weakest signal — could be set by any
-  //    parent shell or process and does not imply token validity.
-  if (process.env.ANTHROPIC_API_KEY) {
+  if (evidence.envApiKey) {
     return 'api-key';
   }
-
   return null;
+}
+
+/** The decision reads the Keychain only on macOS, after an unusable CLI answer, with no key saved. */
+function needsKeychainCheck(platform: NodeJS.Platform, cli: ClaudeAuthCheck, keySaved: boolean): boolean {
+  return platform === 'darwin' && !keySaved && !('method' in cli);
+}
+
+interface ClaudeAuthProbe {
+  authMethod: ClaudeAuthMethod;
+  keySaved: boolean;
+  diagnostics: string[];
+}
+
+/** Gather the evidence for `detectClaudeAuthMethod`, and log what the decision fell back on. */
+async function probeClaudeAuth(platform: NodeJS.Platform, binaryPath: string): Promise<ClaudeAuthProbe> {
+  const [cli, key] = await Promise.all([checkClaudeAuthStatus(binaryPath), readAnthropicKeySaved()]);
+  const diagnostics: string[] = key.diagnostic ? [key.diagnostic] : [];
+  if ('unusable' in cli) {
+    const line = describeUnusableAuthCheck(cli.unusable);
+    console.warn(`[ritemark] ${line}`);
+    diagnostics.push(line);
+  }
+
+  const keychainSignedIn = needsKeychainCheck(platform, cli, key.saved) ? await keychainCheck() : undefined;
+  const authMethod = detectClaudeAuthMethod({
+    platform,
+    cli,
+    keySaved: key.saved,
+    keychainSignedIn,
+    envApiKey: Boolean(process.env.ANTHROPIC_API_KEY),
+  });
+  if (keychainSignedIn && authMethod === 'claude-oauth') {
+    const line = 'Claude counts as signed in from its macOS Keychain item, since its own check gave no usable answer.';
+    console.warn(`[ritemark] ${line}`);
+    diagnostics.push(line);
+  }
+  return { authMethod, keySaved: key.saved, diagnostics };
 }
 
 export function deriveClaudeSetupStatus(input: ClaudeStatusInput): SetupStatus {
@@ -479,7 +597,8 @@ export function deriveClaudeSetupStatus(input: ClaudeStatusInput): SetupStatus {
   if (input.binary.version) {
     diagnostics.unshift(`Version: ${input.binary.version}`);
   }
-  if (input.authMethod === 'claude-oauth' && hasAnthropicKeyInSecrets) {
+  diagnostics.push(...(input.authDiagnostics ?? []));
+  if (input.authMethod === 'claude-oauth' && input.keySaved) {
     diagnostics.push('Anthropic API key is configured, but Claude.ai credentials are active and take precedence.');
   }
 
@@ -498,14 +617,18 @@ export function deriveClaudeSetupStatus(input: ClaudeStatusInput): SetupStatus {
   };
 }
 
-export async function hasCliOAuth(): Promise<boolean> {
-  return (await detectClaudeAuthMethod()) === 'claude-oauth';
-}
-
+/**
+ * A surface that has just read, saved or removed the Anthropic key says whether one is saved. The key reader decides
+ * on every probe (#541); this only drops a cached status that was decided with the other answer, such as a key saved
+ * in another window.
+ */
 export function setAnthropicKeyAvailable(hasKey: boolean): void {
-  hasAnthropicKeyInSecrets = hasKey;
+  if (cachedKeySaved !== null && cachedKeySaved !== hasKey) {
+    invalidateStatus();
+  }
 }
 
+/** Only `claudeLogin.ts`, the shared sign-in owner, calls this (Sprint 160, #696; `claudeLogin.test.ts` checks). */
 export function setClaudeLoginInProgress(inProgress: boolean): void {
   claudeLoginInProgress = inProgress;
   invalidateStatus();
@@ -527,7 +650,7 @@ export function clearSetupCache(): void {
   invalidateStatus();
 }
 
-async function probeSetupStatus(epoch: number): Promise<SetupStatus> {
+async function probeSetupStatus(epoch: number): Promise<{ status: SetupStatus; keySaved: boolean | null }> {
   const binary = await inspectClaudeBinary();
   // Not clearClaudePendingReload(): that would invalidate this very probe. A
   // probe overtaken by an invalidation leaves the flags to the newer one.
@@ -536,22 +659,27 @@ async function probeSetupStatus(epoch: number): Promise<SetupStatus> {
     claudePendingReloadDiagnostics = [];
   }
 
-  const authMethod = binary.runnable ? await detectClaudeAuthMethod(getCurrentPlatform(), binary.authCheckPath ?? binary.path) : null;
-  return deriveClaudeSetupStatus({
+  const authCheckPath = binary.authCheckPath ?? binary.path;
+  const auth = binary.runnable && authCheckPath ? await probeClaudeAuth(getCurrentPlatform(), authCheckPath) : null;
+  const status = deriveClaudeSetupStatus({
     binary,
-    authMethod,
+    authMethod: auth?.authMethod ?? null,
+    keySaved: auth?.keySaved ?? false,
+    authDiagnostics: auth?.diagnostics,
     loginInProgress: claudeLoginInProgress,
     pendingReload: claudePendingReload,
     pendingReloadDiagnostics: claudePendingReloadDiagnostics,
   });
+  return { status, keySaved: auth ? auth.keySaved : null };
 }
 
 function startSetupStatusProbe(): Promise<SetupStatus> {
   const epoch = statusEpoch;
-  const promise = probeSetupStatus(epoch).then((status) => {
+  const promise = probeSetupStatus(epoch).then(({ status, keySaved }) => {
     // A probe that started before an invalidation must not replace newer state.
     if (epoch === statusEpoch) {
       cachedStatus = status;
+      cachedKeySaved = keySaved;
     }
     return status;
   });
@@ -661,7 +789,7 @@ export async function getOnboardingStatus(options?: {
   const codexCliAuthenticated = options?.codexCliAuthenticated ?? false;
 
   const hasOpenAiKey = options?.hasOpenAiKey ?? false;
-  const hasAnthropicKey = options?.hasAnthropicKey ?? hasAnthropicKeyInSecrets;
+  const hasAnthropicKey = options?.hasAnthropicKey ?? (await readAnthropicKeySaved()).saved;
 
   // Any agent is ready if at least one path is fully usable
   const claudeReady = claudeCliAuthenticated;
@@ -691,4 +819,16 @@ export const __testOnly = {
   recommendedEnvironmentAction,
   systemRuntimeToolsRequired,
   parseClaudeAuthStatusJson,
+  checkClaudeAuthStatus,
+  describeUnusableAuthCheck,
+  /** Replace the macOS Keychain check; `null` restores the real one. */
+  setKeychainCheck(check: (() => Promise<boolean>) | null): void {
+    keychainCheck = check ?? checkKeychainAuth;
+    invalidateStatus();
+  },
+  /** Replace the sign-in check's time limit; `null` restores the real one. */
+  setAuthCheckTimeout(ms: number | null): void {
+    authCheckTimeoutMs = ms ?? AUTH_CHECK_TIMEOUT_MS;
+    invalidateStatus();
+  },
 };
