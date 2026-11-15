@@ -21,7 +21,6 @@ import {
   logoutClaude,
   emitClaudeStatusInvalidated,
   onClaudeStatusInvalidated,
-  setAnthropicKeyAvailable,
   beginClaudeLogin,
   cancelClaudeLogin as cancelActiveClaudeLogin,
   type SetupStatus,
@@ -444,7 +443,6 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           const applied = await applyApiKeyMessage(message, this.keyFlags(), this.context.secrets);
           if (!applied) break;
           if (applied.key === 'anthropic-api-key') {
-            setAnthropicKeyAvailable(applied.action === 'stored');
             emitClaudeStatusInvalidated('settings-updated');
           }
           // The secrets listener redraws which keys are saved; this covers a store that reports no change
@@ -993,8 +991,6 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
   /** Claude's part: its setup status (cached until an event says it changed). */
   private async probeClaude() {
-    const anthropicKey = await readProviderKey(this.context.secrets, 'anthropic-api-key');
-    setAnthropicKeyAvailable(Boolean(anthropicKey));
     const claudeStatus = await getSetupStatus();
     return {
       installed: claudeStatus.cliInstalled,
@@ -1282,7 +1278,6 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
     }
 
     await this.context.secrets.store('anthropic-api-key', key);
-    setAnthropicKeyAvailable(true);
     emitClaudeStatusInvalidated('settings-updated');
     vscode.window.showInformationMessage('Anthropic API key saved.');
     this.queueBase();
@@ -1331,7 +1326,8 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
           this.queueParts(['claudeCode']);
         }
 
-        if (status.state === 'ready') {
+        // A Claude.ai sign-in finished: Claude ready on a saved key isn't one (#541 makes that common)
+        if (status.state === 'ready' && status.authMethod === 'claude-oauth') {
           this.stopClaudeLoginPolling();
           emitClaudeStatusInvalidated('login-finished');
           return;

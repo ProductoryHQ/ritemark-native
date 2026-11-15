@@ -297,7 +297,7 @@ async function main() {
   assert.equal(firstStatement, 'snapshotTestKeys();', `activate starts with the snapshot (found: ${firstStatement})`);
 
   const routed: Record<string, string[]> = {
-    'views/UnifiedViewProvider.ts': ["readByokKeys(this._secrets", "readProviderKey(this._secrets, 'anthropic-api-key')", 'claudeApiKey(claudeStatus.authMethod, byokKeys.anthropic)', 'claudeApiKey((await getSetupStatus()).authMethod, byokKeys.anthropic)'],
+    'views/UnifiedViewProvider.ts': ["readByokKeys(this._secrets", 'claudeApiKey(claudeStatus.authMethod, byokKeys.anthropic)', 'claudeApiKey((await getSetupStatus()).authMethod, byokKeys.anthropic)'],
     'settings/RitemarkSettingsProvider.ts': [
       "readProviderKey(this.context.secrets, 'openai-api-key')",
       "readProviderKey(this.context.secrets, 'google-ai-key')",
@@ -309,7 +309,9 @@ async function main() {
       "readProviderKey(context.secrets, 'openai-api-key')",
       "readProviderKey(context.secrets, 'google-ai-key')",
       "readProviderKey(context.secrets, 'anthropic-api-key')",
-      "registerAnthropicKeyReader(() => readProviderKey(context.secrets, 'anthropic-api-key'))",
+      "const readAnthropicKey = () => readProviderKey(context.secrets, 'anthropic-api-key')",
+      'registerAnthropicKeyReader(readAnthropicKey)',
+      'setClaudeCodeNodeKeyReader(readAnthropicKey)',
     ],
     'transcriptWorkbenchProvider.ts': ['insightsAnthropicKey(this._context.secrets, async () => (await getSetupStatus()).authMethod)'],
     'speech/index.ts': ["readProviderKey(context.secrets, 'elevenlabs-api-key')"],
@@ -317,7 +319,7 @@ async function main() {
     'flows/FlowEditorProvider.ts': ['readProviderKey(this.context.secrets, stepKeySecret(provider))', 'readProviderKey(this.context.secrets, STEP_KEY_SECRETS.gemini)'],
     'flows/nodes/LLMNodeExecutor.ts': ['readProviderKey(extensionContext.secrets, STEP_KEY_SECRETS.gemini)'],
     'flows/nodes/ImageNodeExecutor.ts': ['readProviderKey(extensionContext.secrets, STEP_KEY_SECRETS.gemini)'],
-    'flows/nodes/ClaudeCodeNodeExecutor.ts': ["readProviderKey(secrets, 'anthropic-api-key')", 'claudeApiKey(setupStatus.authMethod, savedKey)'],
+    'flows/nodes/ClaudeCodeNodeExecutor.ts': ['claudeApiKey(setupStatus.authMethod, savedKey)'],
   };
   for (const [rel, needles] of Object.entries(routed)) {
     const source = read(rel);

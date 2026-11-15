@@ -250,10 +250,11 @@ import {
   clearSetupCache,
   getOnboardingStatus,
   getSetupStatus,
+  anthropicKeyChanged,
   registerAnthropicKeyReader,
-  setAnthropicKeyAvailable,
   setClaudePendingReload,
 } from './setup';
+import { onClaudeStatusInvalidated } from './claudeStatusEvents';
 
 // A placeholder, not a credential: the tests check it never leaves setup.ts.
 const PLACEHOLDER_KEY = 'sk-ant-test-placeholder-0000';
@@ -574,14 +575,31 @@ async function testSetupStatusProbe() {
     assert.strictEqual(oauthWithKey.authMethod, 'claude-oauth');
     assert.ok(oauthWithKey.diagnostics.includes('Anthropic API key is configured, but Claude.ai credentials are active and take precedence.'));
 
-    // A surface's word about the key drops only a status decided with the other answer.
-    set({ calls: '' });
-    setAnthropicKeyAvailable(true);
-    assert.strictEqual(await getSetupStatus(), oauthWithKey, 'the same answer keeps the cached status');
-    assert.deepStrictEqual(calls(), []);
-    setAnthropicKeyAvailable(false);
-    assert.notStrictEqual(await getSetupStatus(), oauthWithKey, 'the other answer drops it');
-    assert.deepStrictEqual(calls(), ['--version', 'auth status --json']);
+    // The saved key changed (SecretStorage's onDidChange, this window or another): a status decided with the other
+    // answer is dropped and every surface hears it; the same answer keeps it and says nothing.
+    const heard: string[] = [];
+    const stopListening = onClaudeStatusInvalidated((event) => { heard.push(event.reason); });
+    try {
+      // This status was decided with a key saved: the same answer says nothing and keeps it.
+      set({ calls: '' });
+      await anthropicKeyChanged();
+      assert.deepStrictEqual(heard, [], 'the same answer: nothing to say');
+      assert.strictEqual(await getSetupStatus(), oauthWithKey, 'and the cached status stays');
+      assert.deepStrictEqual(calls(), []);
+      // The key removed, e.g. in another window: the other answer.
+      let keyNow: string | undefined = PLACEHOLDER_KEY;
+      registerAnthropicKeyReader(async () => keyNow);
+      const decided = await getSetupStatus();
+      set({ calls: '' });
+      keyNow = undefined;
+      await anthropicKeyChanged();
+      assert.deepStrictEqual(heard, ['settings-updated'], 'the other answer: every surface hears it');
+      assert.notStrictEqual(await getSetupStatus(), decided, 'and the next check probes again');
+      assert.deepStrictEqual(calls(), ['--version', 'auth status --json']);
+    } finally {
+      stopListening();
+    }
+    registerAnthropicKeyReader(async () => PLACEHOLDER_KEY);
 
     // A key that can't be read counts as none, and the log says so.
     set({ auth: loggedOut });
@@ -696,6 +714,10 @@ async function testAuthCheckReasons() {
     assert.ok('unusable' in hung && hung.unusable.reason === 'timeout', JSON.stringify(hung));
     assert.strictEqual(hung.unusable.status, null);
     assert.ok(hung.unusable.elapsedMs >= 300, `the time limit was kept (${hung.unusable.elapsedMs} ms)`);
+
+    // A runaway CLI (more than runProcess keeps, 1 MiB): too-much-output, not a failure to start.
+    const flood = await checkClaudeAuthStatus(script('floods', "head -c 1200000 /dev/zero | tr '\\0' a; exec sleep 5"));
+    assert.ok('unusable' in flood && flood.unusable.reason === 'too-much-output', JSON.stringify(flood));
 
     // A CLI that can't start: spawn-error with its code.
     const missing = await checkClaudeAuthStatus(join(dir, 'not-there'));

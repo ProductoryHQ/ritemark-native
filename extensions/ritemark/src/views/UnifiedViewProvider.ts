@@ -39,7 +39,6 @@ import {
   getSetupStatus,
   getAgentEnvironmentStatus,
   clearSetupCache,
-  setAnthropicKeyAvailable,
   installClaude,
   openAnthropicKeySettings,
   beginClaudeLogin,
@@ -65,7 +64,7 @@ import { BUNDLED_CODEX_REPAIR_MESSAGE, CodexManager, onCodexStatusInvalidated, e
 import type { LoginPollEnd } from '../codex/codexStatusEvents';
 // Sprint 76 R3a/R4/R5/R6: ACP + OpenCode BYOK runtime
 import { byokProviderFlags, buildByokEnv, BYOK_SECRET_KEYS, type ByokKeys, type ByokProviderFlags } from '../acp';
-import { claudeApiKey, readByokKeys, readProviderKey } from '../ai/providerKeys';
+import { claudeApiKey, readByokKeys } from '../ai/providerKeys';
 import { TRANSCRIPT_WORKBENCH_VIEW_TYPE, transcriptDocumentFor } from '../speech/activeTranscript';
 // Sprint 79: runtime adapter wrappers + registry (registry created here; dispatch wired in W2)
 import { RuntimeRegistry } from '../runtime/RuntimeRegistry';
@@ -3081,16 +3080,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     try {
       // Always leave the bootstrap call stack before a CLI/keychain probe.
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
-      if (this._secrets) {
-        try {
-          const anthropicKey = await readProviderKey(this._secrets, 'anthropic-api-key');
-          setAnthropicKeyAvailable(Boolean(anthropicKey));
-        } catch (error) {
-          // Keychain failure must not erase or block the local model catalog.
-          setAnthropicKeyAvailable(false);
-          console.error('[Agent Chat Claude status] Could not read Anthropic key:', error);
-        }
-      }
       const status = await getSetupStatus();
       const environmentStatus = await getAgentEnvironmentStatus({ setupStatus: status });
       if (!this._isCurrentSidebarView(target.webview, target.generation)
@@ -3186,7 +3175,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       void (async () => {
         const status = await getSetupStatus({ refresh: true });
 
-        if (status.state === 'ready') {
+        if (status.state === 'ready' && status.authMethod === 'claude-oauth') {
           this._stopClaudeLoginPolling();
           emitClaudeStatusInvalidated('login-finished');
           return;

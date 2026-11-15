@@ -36,6 +36,17 @@ function checkSigningInHasOneWriter(): void {
     .map((file) => relative(src, file).split('\\').join('/'));
   assert.deepEqual(writers, ['agent/claudeLogin.ts'], `only claudeLogin.ts writes Claude's signing-in flag (found: ${writers.join(', ')})`);
   assert.ok(!/\bsetClaudeLoginInProgress\b/.test(readFileSync(join(src, 'agent', 'index.ts'), 'utf-8')), 'agent/index.ts no longer exports it');
+  // The sheet's and Settings' polls call a sign-in finished only on a Claude.ai sign-in: with a key saved, Claude reads
+  // ready on the key from the first tick (#541), while the browser sign-in still runs.
+  for (const rel of ['views/UnifiedViewProvider.ts', 'settings/RitemarkSettingsProvider.ts']) {
+    const finished = readFileSync(join(src, rel), 'utf-8').split('\n')
+      .filter((line) => line.includes("status.state === 'ready'"))
+      .map((line) => line.trim());
+    assert.ok(
+      finished.includes("if (status.state === 'ready' && status.authMethod === 'claude-oauth') {") && !finished.includes("if (status.state === 'ready') {"),
+      `${rel}: the poll's finish test (found: ${finished.join(' | ')})`,
+    );
+  }
 }
 
 async function run(): Promise<void> {

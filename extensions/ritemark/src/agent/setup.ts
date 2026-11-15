@@ -16,7 +16,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { getCurrentPlatform } from '../utils/platform';
 import { findBundledAgentRuntime, isBundledAgentRuntimePath, readAgentRuntimePreference, readBundledRuntimeVersion, type AgentRuntimePreference } from '../utils/bundledAgentRuntime';
-import { onClaudeStatusInvalidated } from './claudeStatusEvents';
+import { emitClaudeStatusInvalidated, onClaudeStatusInvalidated } from './claudeStatusEvents';
 import { runProcess, type ProcessResult } from '../utils/runProcess';
 import type {
   AgentEnvironmentStatus,
@@ -122,11 +122,11 @@ interface ClaudeAuthStatusJson {
 
 /**
  * Why `claude auth status --json` gave no usable answer (#703): it timed out, could not run (`spawn-error:<code>`),
- * or printed no JSON that says signed in or out. With the exit status, the time it took and the output's size,
- * never the output itself, which can hold the account's e-mail.
+ * printed more than runProcess keeps (`too-much-output`), or printed no JSON that says signed in or out. With the exit
+ * status, the time it took and the output's size, never the output itself, which can hold the account's e-mail.
  */
 export interface ClaudeAuthCheckUnusable {
-  reason: 'timeout' | 'no-json' | `spawn-error:${string}`;
+  reason: 'timeout' | 'no-json' | 'too-much-output' | `spawn-error:${string}`;
   status: number | null;
   elapsedMs: number;
   stdoutBytes: number;
@@ -482,7 +482,10 @@ async function checkClaudeAuthStatus(binaryPath: string): Promise<ClaudeAuthChec
   const code = result.error?.code;
   return {
     unusable: {
-      reason: code === 'ETIMEDOUT' ? 'timeout' : result.error ? `spawn-error:${code ?? 'unknown'}` : 'no-json',
+      reason: code === 'ETIMEDOUT' ? 'timeout'
+        : code === 'ENOBUFS' ? 'too-much-output'
+        : result.error ? `spawn-error:${code ?? 'unknown'}`
+        : 'no-json',
       status: result.status,
       elapsedMs: Date.now() - started,
       stdoutBytes: Buffer.byteLength(result.stdout ?? ''),
@@ -618,13 +621,16 @@ export function deriveClaudeSetupStatus(input: ClaudeStatusInput): SetupStatus {
 }
 
 /**
- * A surface that has just read, saved or removed the Anthropic key says whether one is saved. The key reader decides
- * on every probe (#541); this only drops a cached status that was decided with the other answer, such as a key saved
- * in another window.
+ * The saved Anthropic key changed (SecretStorage's onDidChange, from this window or another; `extension.ts` listens).
+ * When the cached status was decided with the other answer, every surface hears it ('settings-updated'), which drops
+ * the cache. A save in this window has already said so itself, so it finds no cached answer, or the same one.
  */
-export function setAnthropicKeyAvailable(hasKey: boolean): void {
-  if (cachedKeySaved !== null && cachedKeySaved !== hasKey) {
-    invalidateStatus();
+export async function anthropicKeyChanged(): Promise<void> {
+  if (cachedKeySaved === null) return;
+  const decidedWith = cachedKeySaved;
+  const { saved } = await readAnthropicKeySaved();
+  if (cachedKeySaved === decidedWith && saved !== decidedWith) {
+    emitClaudeStatusInvalidated('settings-updated');
   }
 }
 

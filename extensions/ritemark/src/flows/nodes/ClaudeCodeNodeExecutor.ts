@@ -7,14 +7,17 @@
 
 import type { FlowNode, ExecutionContext, ProgressCallback } from '../types';
 import { getSetupStatus, runAgent, type AgentExecutionOptions, type AgentResult, type SetupStatus } from '../../agent';
-import { claudeApiKey, readProviderKey, type SecretReader } from '../../ai/providerKeys';
+import { claudeApiKey } from '../../ai/providerKeys';
 import { interpolateVariables } from './interpolate';
 
-let secrets: SecretReader | null = null;
+let anthropicKeyReader: (() => PromiseLike<string | undefined>) | null = null;
 
-/** At activation: where the step reads the Anthropic key saved in Ritemark (Sprint 160, #541). */
-export function setClaudeCodeNodeSecrets(store: SecretReader): void {
-  secrets = store;
+/**
+ * At activation: the reader of the Anthropic key saved in Ritemark (Sprint 160, #541), the same one Claude's
+ * readiness asks (`registerAnthropicKeyReader`), so the key the step runs on is the key that made Claude ready.
+ */
+export function setClaudeCodeNodeKeyReader(reader: () => PromiseLike<string | undefined>): void {
+  anthropicKeyReader = reader;
 }
 
 /** What the step uses from the host; the tests pass their own. */
@@ -27,7 +30,7 @@ export interface ClaudeCodeNodeDependencies {
 const hostDependencies: ClaudeCodeNodeDependencies = {
   getSetupStatus,
   runAgent,
-  readAnthropicKey: async () => (secrets ? readProviderKey(secrets, 'anthropic-api-key') : undefined),
+  readAnthropicKey: async () => (anthropicKeyReader ? anthropicKeyReader() : undefined),
 };
 
 /**
