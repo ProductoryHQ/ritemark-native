@@ -9,7 +9,7 @@
  */
 
 import assert from 'assert';
-import { existsSync, mkdirSync, readdirSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { writeImageRelativeTo, sanitizeImageBaseName, parseImageDataUrl } from './imageWriter';
@@ -72,8 +72,10 @@ try {
   );
 
   // A second picture of the same name gets the next free name; the first stays as it was.
-  const again = writeImageRelativeTo(pasteDir, 'My File: Foo.png', ONE_PIXEL_PNG_BASE64);
+  const firstBytes = readFileSync(join(pasteDir, 'My-File-Foo.png'));
+  const again = writeImageRelativeTo(pasteDir, 'My File: Foo.png', Buffer.from('a different picture').toString('base64'));
   assert.strictEqual(again, 'My-File-Foo-2.png', `a name in use is never overwritten (got "${again}")`);
+  assert.ok(readFileSync(join(pasteDir, 'My-File-Foo.png')).equals(firstBytes), 'the first picture keeps its bytes');
   assert.strictEqual(writeImageRelativeTo(pasteDir, 'My File: Foo.png', ONE_PIXEL_PNG_BASE64), 'My-File-Foo-3.png');
 
   // skipSanitize must refuse any input that could escape targetDir on disk.
