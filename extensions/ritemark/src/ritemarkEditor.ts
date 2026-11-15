@@ -6,7 +6,7 @@ import * as fsp from 'fs/promises';
 import { parseFrontmatterFromText, serializeFrontmatter, discoverCommands } from './agent/discovery';
 import type { CardPages } from './taskBoard/cardPages';
 import type { DeckPages } from './decks/deckPages';
-import { isDeckPath } from './decks/deckMode';
+import { isDeckPath, ModeFixedPerView } from './decks/deckMode';
 import { cardTabWrite } from './taskBoard/cardFile';
 import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
@@ -167,6 +167,17 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   private readonly documentSync: DocumentSyncCoordinator;
+
+  /**
+   * Sprint 159 (PR 2): whether each open panel shows its document as a deck, fixed the first time it is asked (as the
+   * panel opens). A deck keeps its mode until it is opened again, whatever the flag does meanwhile, so a later payload
+   * never turns a document view into a deck view that no deck page serves, or the other way round.
+   */
+  private readonly deckModes = new ModeFixedPerView<vscode.Webview>();
+
+  private deckModeOfView(document: vscode.TextDocument, webview: vscode.Webview): boolean {
+    return this.deckModes.of(webview, () => RitemarkEditorProvider.deckPages()?.deckModeFor(document) ?? false);
+  }
 
   // Voice dictation controller
   // One per editor webview: each tab dictates into its own document (Sprint 129).
@@ -342,7 +353,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     // view, and the view's strip reads the card from the board (Sprint 130).
     const cardMode = RitemarkEditorProvider.cardPages()?.cardModeFor(document) ?? null;
     // Sprint 157: a deck's view draws the slides beside their handout; its front matter stays the document's.
-    const deckMode = !cardMode && (RitemarkEditorProvider.deckPages()?.deckModeFor(document) ?? false);
+    const deckMode = !cardMode && this.deckModeOfView(document, webview);
     // Views compare host payloads against their own Markdown projection, which
     // never carries the persisted trailing newline or gray-matter's leading one.
     // Send the projection form, or the echo of an accepted edit is mistaken for
@@ -778,8 +789,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       : null;
 
     // Sprint 157: a deck's panel, while it is open, so the Slide library and the AI's tools can insert into it.
-    const deckPage = document.uri.scheme === 'file' && isDeckPath(document.uri.fsPath)
-      ? RitemarkEditorProvider.deckPages()?.connect(document, webviewPanel)
+    // Sprint 159 (PR 2): only a panel that shows its document as a deck (the flag on as it opened). With the flag off a
+    // `.deck.md` is an ordinary document: nothing may treat its panel as a deck view, even once the flag is turned on.
+    const deckPages = RitemarkEditorProvider.deckPages();
+    const deckPage = deckPages && !cardPage && document.uri.scheme === 'file' && isDeckPath(document.uri.fsPath) && this.deckModeOfView(document, webview)
+      ? deckPages.connect(document, webviewPanel)
       : undefined;
 
     // #477: a card page's tab shows its card's title and the task mark, as
@@ -892,8 +906,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         }
 
         // Sprint 157: a deck view's requests, decoded and answered to this webview by the deck pages.
+        // Sprint 159 (PR 2): only from a panel that is a deck view; anything else's `deck/` message is dropped.
         if (typeof message.type === 'string' && message.type.startsWith('deck/')) {
-          void RitemarkEditorProvider.deckPages()?.handle(document, webview, message);
+          if (deckPage) {
+            void RitemarkEditorProvider.deckPages()?.handle(document, webview, message);
+          }
           return;
         }
 

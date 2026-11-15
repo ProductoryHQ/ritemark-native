@@ -17,3 +17,20 @@ export function deckModeOf(input: { flagOn: boolean; scheme: string; fsPath: str
   // The front matter only: this runs for every payload the editor sends the view.
   return isReadableDeckVersion(deckVersionOf(input.text));
 }
+
+/**
+ * Sprint 159 (PR 2): each open view's mode, decided the first time it is asked (as the view opens) and kept while the
+ * view lives: a deck keeps its mode until it is opened again, whatever the flag does meanwhile. Keyed weakly by view.
+ */
+export class ModeFixedPerView<View extends object> {
+  private readonly modes = new WeakMap<View, boolean>();
+
+  of(view: View, decide: () => boolean): boolean {
+    let mode = this.modes.get(view);
+    if (mode === undefined) {
+      mode = decide();
+      this.modes.set(view, mode);
+    }
+    return mode;
+  }
+}
