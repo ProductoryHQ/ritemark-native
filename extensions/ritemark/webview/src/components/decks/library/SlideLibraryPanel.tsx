@@ -62,7 +62,9 @@ function titleOf(slide: LibrarySlide): string {
 /** "Insert after slide N" for the open deck, or why there is nowhere to insert. */
 export function insertLabel(active: ActiveDeck | null): string | null {
   if (!active) return null
-  return active.count === 0 ? 'Insert as slide 1' : `Insert after slide ${Math.min(active.current, active.count - 1) + 1}`
+  if (active.count === 0) return 'Insert as slide 1'
+  if (active.current < 0) return 'Insert before slide 1'
+  return `Insert after slide ${Math.min(active.current, active.count - 1) + 1}`
 }
 
 export function SlideLibraryPanel() {
@@ -71,6 +73,7 @@ export function SlideLibraryPanel() {
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [selected, setSelected] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [openOthers, setOpenOthers] = useState(false)
   const field = useRef<HTMLInputElement>(null)
   // The field shows once the place's Search is pressed (as Tasks' does), and stays while it holds words.
   const [searchOpen, setSearchOpen] = useState(false)
@@ -84,7 +87,15 @@ export function SlideLibraryPanel() {
         setSearchOpen(true)
         setFocusSearch((count) => count + 1)
       } else if (message.type === 'library/notice' && typeof message.text === 'string') setNotice(message.text)
-      else if (message.type === 'library/reveal' && typeof message.path === 'string') {
+      else if (message.type === 'library/show' && (message.section === 'topics' || message.section === 'other')) {
+        const section = message.section
+        setQuery('')
+        sendToExtension('library/search', { query: '' })
+        // Other decks open with their slides, so a slide is one click away.
+        requestAnimationFrame(() => document.querySelector(section === 'other' ? '.deck-lib-group' : '.deck-lib-search, .deck-lib-row')?.scrollIntoView({ block: 'start' }))
+        // Each open starts as asked: "From another deck…" opens the newest other deck, "From the library…" does not.
+        setOpenOthers(section === 'other')
+      } else if (message.type === 'library/reveal' && typeof message.path === 'string') {
         const path = message.path
         setQuery('')
         sendToExtension('library/search', { query: '' })
@@ -149,14 +160,15 @@ export function SlideLibraryPanel() {
   const label = insertLabel(state.active)
 
   const deckRows = (deck: LibraryDeck, numbered: boolean) => {
-    const expanded = searching || !!open[deck.path]
+    // "From another deck…" opens the newest other deck; the others stay one click away.
+    const expanded = searching || !!open[deck.path] || (openOthers && deck.path === others[0]?.path && open[deck.path] !== false)
     return (
       <div key={deck.path}>
         <button
           type="button"
           className="deck-lib-row"
           aria-expanded={expanded}
-          onClick={() => setOpen((value) => ({ ...value, [deck.path]: !value[deck.path] }))}
+          onClick={() => setOpen((value) => ({ ...value, [deck.path]: !expanded }))}
         >
           <Icon name={expanded ? 'caret-down' : 'caret-right'} size={12} tone="inherit" className="deck-lib-caret" />
           <Icon name="presentation" size={16} tone="inherit" />

@@ -25,6 +25,8 @@ class SlidePartHeadView implements NodeView {
   dom: HTMLElement
   private title: HTMLElement
   private mark: HTMLElement
+  /** A section's eyebrow, "Section 2", over its title (the Experience lead's decision 12); not editable. */
+  private eyebrow: HTMLElement
   private node: PMNode
 
   constructor(node: PMNode, private readonly editor: Editor, private readonly getPos: () => number | undefined) {
@@ -43,7 +45,10 @@ class SlidePartHeadView implements NodeView {
     this.mark = document.createElement('span')
     this.mark.className = 'deck-part-number'
     this.mark.setAttribute('aria-hidden', 'true')
-    this.dom.append(this.title, this.mark)
+    this.eyebrow = document.createElement('div')
+    this.eyebrow.className = 'deck-part-eyebrow'
+    this.eyebrow.setAttribute('contenteditable', 'false')
+    this.dom.append(this.eyebrow, this.title, this.mark)
     this.title.addEventListener('input', this.onInput)
     this.title.addEventListener('keydown', this.onKeyDown)
     this.title.addEventListener('blur', this.onBlur)
@@ -58,6 +63,9 @@ class SlidePartHeadView implements NodeView {
       if (this.title.textContent !== title) this.title.textContent = title
     }
     this.dom.classList.toggle('is-skip', data.skip === true)
+    const section = this.node.attrs.kind === 'section'
+    const eyebrow = section ? `Section${data.number?.trim() ? ` ${data.number.trim()}` : ''}` : ''
+    if (this.eyebrow.textContent !== eyebrow) this.eyebrow.textContent = eyebrow
     this.mark.innerHTML = data.skip ? EYE_SLASH_SVG : ''
   }
 

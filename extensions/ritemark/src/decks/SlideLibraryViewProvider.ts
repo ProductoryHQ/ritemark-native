@@ -43,7 +43,9 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
       pages.onDidChangeActive(() => {
         if (this.ready && this.view?.visible) void this.post({ type: 'library/active', active: isEnabled('decks') ? this.pages.activeDeck() : null });
       }),
-      pages.onDidRevealInLibrary(target => void this.post({ type: 'library/reveal', path: target.path, id: target.id })),
+      pages.onDidRevealInLibrary(target => void this.post('section' in target
+        ? { type: 'library/show', section: target.section }
+        : { type: 'library/reveal', path: target.path, id: target.id })),
     );
     const watcher = vscode.workspace.createFileSystemWatcher('**/*.deck.md');
     this.subscriptions.push(

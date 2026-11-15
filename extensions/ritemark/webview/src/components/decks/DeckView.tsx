@@ -30,6 +30,7 @@ import { deleteSlide, duplicateSlide, insertSlide, isSlideNode, moveSlide, partC
 import { DOMParser as PMDOMParser, Fragment, type Node as PMNode, type Slice } from '@tiptap/pm/model'
 import { editorHTMLToMarkdown, markdownToEditorHTML } from '../../utils/editorMarkdown'
 import { SourceLines, type CopySource } from './library/SourceLines'
+import { AddToLibrarySheet, type LibraryTopic } from './library/AddToLibrarySheet'
 import { onMessage, sendToExtension } from '../../bridge'
 import { isTrustedDeckTransaction } from './handout/deckGuard'
 import { convertKind } from './slide/convertKind'
@@ -38,7 +39,7 @@ import { SlideStrip, type StripActions, type StripMark } from './SlideStrip'
 import { newId, parseSlideBody, writeSlideBlock, writeSlideBody } from '../../../../src/decks/deckFormat'
 import type { Transaction } from '@tiptap/pm/state'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
-import { currentPart, scrollTopFor } from './scrollRule'
+import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
 import { DeckGuard } from './handout/deckGuard'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
@@ -173,6 +174,9 @@ export function DeckView({
   const [sources, setSources] = useState<Record<string, CopySource>>({})
   const [justUpdated, setJustUpdated] = useState<string | null>(null)
   const [busy, setBusy] = useState<Record<string, true>>({})
+  // Add to library: the sheet beside the slide, for this slide's id, and the library's topics once the host sends them.
+  const [addSheet, setAddSheet] = useState<{ id: string; number: number } | null>(null)
+  const [topics, setTopics] = useState<LibraryTopic[] | null>(null)
   // The deck's text as this view holds it, sent with a library request: the document may not have its newest words yet.
   const contentRef = useRef(content)
   contentRef.current = content
@@ -184,6 +188,8 @@ export function DeckView({
   const [deskWidth, setDeskWidth] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [bar, setBar] = useState<{ left: number; top: number; height: number } | null>(null)
+  /** Each section part's grey band in the handout (the Experience lead's decision 12). */
+  const [bands, setBands] = useState<Array<{ left: number; width: number; top: number; height: number }>>([])
   const deskRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
   const lockUntil = useRef(0)
@@ -213,6 +219,8 @@ export function DeckView({
   }, [editor])
 
   const count = slides.length
+  const countRef = useRef(count)
+  countRef.current = count
   const shown = count === 0 ? 0 : Math.min(current, count - 1)
   const slide = slides[shown]
 
@@ -264,25 +272,49 @@ export function DeckView({
     }
   }, [editor, shown, count])
 
-  // The current part's line on the left of the handout, from its head to the next one's.
+  // The current part's line on the left of the handout, from its head to the next one's; and each section part's band.
   const measureBar = useCallback(() => {
     const tops = partTops()
     const container = scrollContainer()
-    if (!container || !editor || tops.length === 0 || shown >= tops.length) { setBar(null); return }
-    const top = tops[shown] + 16
-    let end: number
-    if (shown + 1 < tops.length) {
-      end = tops[shown + 1] - 6
-    } else {
-      // The last part ends where the text does, above the room left for scrolling it to the top.
+    if (!container || !editor || tops.length === 0) { setBar(null); setBands([]); return }
+    const heads = Array.from(editor.view.dom.querySelectorAll<HTMLElement>(':scope > .deck-part-head'))
+    // Room below the text so the last part can be scrolled to the top, and no more (the prototype's `.hand`
+    // padding): every part can then become the current one by scrolling.
+    {
       const dom = editor.view.dom
       const origin = container.getBoundingClientRect().top - container.scrollTop
-      end = dom.getBoundingClientRect().bottom - origin - (parseFloat(getComputedStyle(dom).paddingBottom) || 0) - 10
+      const padding = parseFloat(getComputedStyle(dom).paddingBottom) || 0
+      const textEnd = dom.getBoundingClientRect().bottom - origin - padding
+      const lastHeight = textEnd - tops[tops.length - 1]
+      const room = Math.round(Math.max(40, container.clientHeight - lastHeight - PART_TOP_GAP))
+      if (Math.abs(room - padding) > 1) dom.style.setProperty('padding-bottom', `${room}px`, 'important')
     }
-    // 12 to the left of the part's text, as the prototype's `.hpart.cur::before`.
-    const head = editor.view.dom.querySelector<HTMLElement>(':scope > .deck-part-head')
-    const left = head ? head.getBoundingClientRect().left - container.getBoundingClientRect().left - 12 : 8
-    setBar({ left, top, height: Math.max(0, end - top) })
+    /** Where part `index` ends: the next part's head, or for the last part, where the text does (above the room left
+     *  for scrolling it to the top). */
+    const endOf = (index: number, gap: number): number => {
+      if (index + 1 < tops.length) return tops[index + 1] - gap
+      const dom = editor.view.dom
+      const origin = container.getBoundingClientRect().top - container.scrollTop
+      return dom.getBoundingClientRect().bottom - origin - (parseFloat(getComputedStyle(dom).paddingBottom) || 0) - 10
+    }
+    // 12 to the left of the part's text, as the prototype's `.hpart.cur::before` and `.hpart.sect`.
+    const first = heads[0]
+    const left = first ? first.getBoundingClientRect().left - container.getBoundingClientRect().left - 12 : 8
+    const width = first ? first.getBoundingClientRect().width + 24 : 0
+    // A band from its head's top to 8 below the part's last block (the prototype's padding), its text inside; the
+    // next head keeps 6 below it (`.after-section`).
+    const origin = container.getBoundingClientRect().top - container.scrollTop
+    setBands(heads.flatMap((head, index) => {
+      if (!head.classList.contains('is-section') || index >= tops.length) return []
+      let last: Element = head
+      for (let next = head.nextElementSibling; next && !next.classList.contains('deck-part-head'); next = next.nextElementSibling) last = next
+      const top = tops[index]
+      return [{ left, width, top, height: Math.max(0, last.getBoundingClientRect().bottom - origin + 8 - top) }]
+    }))
+    // The band marks a section's part; the current one shows by its accent number, as every part does.
+    if (shown >= tops.length || heads[shown]?.classList.contains('is-section')) { setBar(null); return }
+    const top = tops[shown] + 16
+    setBar({ left, top, height: Math.max(0, endOf(shown, 6) - top) })
   }, [partTops, scrollContainer, shown, editor])
 
   useEffect(() => {
@@ -290,6 +322,10 @@ export function DeckView({
     if (!editor) return
     const observer = new ResizeObserver(() => measureBar())
     observer.observe(editor.view.dom)
+    // The handout's own height sets the room below the text too (a taller window, a folded bar).
+    const container = scrollContainer()
+    if (container) observer.observe(container)
+
     return () => observer.disconnect()
   }, [editor, measureBar, slides])
 
@@ -313,9 +349,24 @@ export function DeckView({
         if (next !== null && next !== currentRef.current) makeCurrent(next)
       })
     }
+    // One turn of the wheel moves the slide on by one at most, so a short part (a title alone) is never skipped
+    // (Jarmo, 15 November). The turn is cut short where the next part is the current one, and that part is shown at once.
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY) || Date.now() < lockUntil.current) return
+      const delta = event.deltaMode === 1 ? event.deltaY * 40 : event.deltaMode === 2 ? event.deltaY * container.clientHeight : event.deltaY
+      const state = { partTops: partTops(), scrollTop: container.scrollTop, clientHeight: container.clientHeight, scrollHeight: container.scrollHeight, writing: null }
+      const stop = wheelStop(state, delta, currentRef.current)
+      if (stop === null) return
+      event.preventDefault()
+      container.scrollTop = stop
+      const next = currentPart({ ...state, scrollTop: container.scrollTop })
+      if (next !== null && next !== currentRef.current) makeCurrent(next)
+    }
     container.addEventListener('scroll', onScroll, { passive: true })
+    container.addEventListener('wheel', onWheel, { passive: false })
     return () => {
       container.removeEventListener('scroll', onScroll)
+      container.removeEventListener('wheel', onWheel)
       if (frame !== null) cancelAnimationFrame(frame)
     }
   }, [scrollContainer, partTops, makeCurrent])
@@ -356,6 +407,9 @@ export function DeckView({
   const pick = useCallback((index: number) => {
     lockUntil.current = Date.now() + PICK_LOCK_MS
     makeCurrent(index)
+    // Told even when this slide was already current: a + menu's "From the library…" may have moved the host's insert
+    // point to a gap, and picking a slide brings it back to the slide.
+    sendToExtension('deck/current', { index, count: countRef.current })
     const container = scrollContainer()
     const tops = partTops()
     if (container && tops[index] !== undefined) container.scrollTop = scrollTopFor(tops[index])
@@ -450,9 +504,16 @@ export function DeckView({
     addToLibrary: index => {
       const id = idOf(index)
       if (!id) return
-      setBusy(value => ({ ...value, [id]: true }))
-      // The id may have just been given: the text is read after that change.
-      requestAnimationFrame(() => sendToExtension('deck/add-to-library', { id, text: editor && !editor.isDestroyed ? editorHTMLToMarkdown(editor.getHTML()) : contentRef.current }))
+      // The sheet opens beside the slide; the slide is the current one, so the sheet sits by it.
+      pick(index)
+      setSettingsOpen(false)
+      setTopics(null)
+      setAddSheet({ id, number: index + 1 })
+      sendToExtension('deck/library-topics')
+    },
+    fromLibrary: (at, section) => {
+      // The slides go before part `at`: the library inserts after the part before it (-1: before the first).
+      sendToExtension('deck/open-library', { section, after: at - 1 })
     },
     showInLibrary: index => {
       const from = editor ? slidesOf(editor.state.doc)[index]?.data.from : undefined
@@ -492,6 +553,8 @@ export function DeckView({
 
   // Settings beside the slide: closed when the slide changes, and placed beside it (over the handout when it must).
   useEffect(() => { setSettingsOpen(false) }, [shown])
+  // The Add to library sheet belongs to its slide: another slide closes it.
+  useEffect(() => { setAddSheet(sheet => (sheet && sheet.number - 1 !== shown ? null : sheet)) }, [shown])
   // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one.
   useEffect(() => {
     if (focusTitleOf === null || focusTitleOf !== shown) return
@@ -499,7 +562,7 @@ export function DeckView({
     return () => cancelAnimationFrame(frame)
   }, [shown, focusTitleOf])
   useLayoutEffect(() => {
-    if (!settingsOpen) { setSettingsAt(null); return }
+    if (!settingsOpen && !addSheet) { setSettingsAt(null); return }
     const desk = deskRef.current
     const big = desk?.querySelector<HTMLElement>('.deck-big')
     if (!desk || !big) return
@@ -509,7 +572,7 @@ export function DeckView({
       left: Math.max(8, Math.min(bigBox.right - deskBox.left + 12, deskBox.width - SETTINGS_WIDTH - 8)),
       top: Math.max(8, bigBox.top - deskBox.top - 4),
     })
-  }, [settingsOpen, deskWidth, stageWidth, shown])
+  }, [settingsOpen, addSheet, deskWidth, stageWidth, shown])
 
   /** Settings' change, made to the slide as the document has it now. */
   const changeSlide = useCallback((change: (data: SlideData) => SlideData, kind?: string) => {
@@ -621,6 +684,10 @@ export function DeckView({
         undoneFrom.current.delete(message.token as string)
         const now = slideById(back.id)
         if (now) dispatch(updateSlide(editor.state, now.index, { ...now.data, from: back.from, kept: back.kept }))
+        return
+      }
+      case 'deck/library-topics': {
+        if (Array.isArray(message.topics)) setTopics((message.topics as LibraryTopic[]).filter(topic => topic && typeof topic.path === 'string' && typeof topic.name === 'string'))
         return
       }
       case 'deck/library-failed': {
@@ -857,6 +924,20 @@ export function DeckView({
           </div>
         ) : null}
 
+        {addSheet && settingsAt ? (
+          <AddToLibrarySheet
+            number={addSheet.number}
+            topics={topics}
+            style={{ left: settingsAt.left, top: settingsAt.top }}
+            onClose={() => setAddSheet(null)}
+            onAdd={topic => {
+              const id = addSheet.id
+              setAddSheet(null)
+              setBusy(value => ({ ...value, [id]: true }))
+              sendToExtension('deck/add-to-library', { id, text: currentText(), topic })
+            }}
+          />
+        ) : null}
         {settingsOpen && slide && settingsAt ? (
           <SlideSettings
             number={shown + 1}
@@ -885,6 +966,7 @@ export function DeckView({
             extensions={DECK_EXTENSIONS}
           />
           {handoutContainer && bar ? createPortal(<div className="deck-part-bar" style={{ left: bar.left, top: bar.top, height: bar.height }} />, handoutContainer) : null}
+          {handoutContainer && bands.length ? createPortal(bands.map(band => <div key={band.top} className="deck-part-band" style={band} />), handoutContainer) : null}
         </div>
       </div>
       {dialogs}
