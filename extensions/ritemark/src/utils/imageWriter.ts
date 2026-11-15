@@ -82,8 +82,20 @@ export function writeImageRelativeTo(
     const sanitizedBaseName = sanitizeImageBaseName(rawBaseName) || 'image';
     // A pasted or dropped picture never replaces another one of the same name: other documents and slides may show
     // it (Codex on Sprint 157 PR 3). The next free name, `name-2.png`, `name-3.png`, … is used instead.
-    finalFilename = `${sanitizedBaseName}${ext}`;
-    for (let n = 2; fs.existsSync(path.join(targetDir, finalFilename)); n++) finalFilename = `${sanitizedBaseName}-${n}${ext}`;
+    // The write itself claims the name ('wx'), so two saves at the same moment can't both take it.
+    const bytes = Buffer.from(base64, 'base64');
+    for (let n = 1; ; n++) {
+      // The name stays within the 255-byte limit of one path component, suffix included (Codex on #716).
+      const suffix = n === 1 ? '' : `-${n}`;
+      const room = 255 - Buffer.byteLength(ext) - suffix.length;
+      finalFilename = `${sanitizedBaseName.slice(0, room)}${suffix}${ext}`;
+      try {
+        fs.writeFileSync(path.join(targetDir, finalFilename), bytes, { flag: 'wx' });
+        return finalFilename;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      }
+    }
   }
   const imagePath = path.join(targetDir, finalFilename);
 
