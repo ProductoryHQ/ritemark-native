@@ -481,11 +481,28 @@ export async function applyCellEdits(
   return { bytes, report };
 }
 
-/** Well-formed XML: every element closed in order, quotes and comments closed. */
+/** Well-formed XML: every element closed in order, quotes and comments closed. One regular expression per tag
+ *  (Sprint 158 PR 4: a loop over every character took a third of a large sheet's save). */
 export function isWellFormedXml(xml: string): boolean {
   const stack: string[] = [];
+  // a tag: its slash, its name, its attributes (quoted values may hold > and /), its closing slash
+  const tagRe = /<(\/?)([^\s/>!?<]+)(?:[^>"'<]|"[^"]*"|'[^']*')*?(\/?)>/y;
   let i = xml.indexOf('<');
   while (i >= 0) {
+    // most tags are elements: look at the character after < before anything else
+    const next = xml.charCodeAt(i + 1);
+    if (next !== 63 /* ? */ && next !== 33 /* ! */) {
+      tagRe.lastIndex = i;
+      const m = tagRe.exec(xml);
+      if (!m) return false;
+      if (m[1]) {
+        if (m[3] || stack.pop() !== m[2]) return false;
+      } else if (!m[3]) {
+        stack.push(m[2]);
+      }
+      i = xml.indexOf('<', i + m[0].length);
+      continue;
+    }
     if (xml.startsWith('<?', i)) {
       const end = xml.indexOf('?>', i + 2);
       if (end < 0) return false;
@@ -504,34 +521,10 @@ export function isWellFormedXml(xml: string): boolean {
       i = xml.indexOf('<', end + 3);
       continue;
     }
-    if (xml.startsWith('<!', i)) {
-      const end = xml.indexOf('>', i + 2);
-      if (end < 0) return false;
-      i = xml.indexOf('<', end + 1);
-      continue;
-    }
-    const closing = xml[i + 1] === '/';
-    let k = i + (closing ? 2 : 1);
-    const nameStart = k;
-    while (k < xml.length && !/[\s/>]/.test(xml[k])) k++;
-    const name = xml.slice(nameStart, k);
-    if (!name) return false;
-    let quote = '';
-    for (; k < xml.length; k++) {
-      const ch = xml[k];
-      if (quote) {
-        if (ch === quote) quote = '';
-      } else if (ch === '"' || ch === "'") quote = ch;
-      else if (ch === '<') return false;
-      else if (ch === '>') break;
-    }
-    if (k >= xml.length) return false;
-    if (closing) {
-      if (stack.pop() !== name) return false;
-    } else if (xml[k - 1] !== '/') {
-      stack.push(name);
-    }
-    i = xml.indexOf('<', k + 1);
+    // <!DOCTYPE …> and the like
+    const end = xml.indexOf('>', i + 2);
+    if (end < 0) return false;
+    i = xml.indexOf('<', end + 1);
   }
   return stack.length === 0;
 }

@@ -46,6 +46,23 @@ The sheet holds 35 MB of XML in a 5.2 MB file, with shared strings and a formula
 
 2.2 took about 4 s for this file on every cell commit (the study). Ritemark saves automatically one second after an edit (`files.autoSave: afterDelay`), so on a sheet this size a person typing gets a save, about a second of the extension host's time, every second. PR 4 makes the save one pass over the sheet and measures it again. The save's cost grows by about 60 ms an edit on a sheet this size, because each edit copies the sheet's text once. That is fine for the edits a person makes by hand. PR 4, which looks at performance on a 50,000-row sheet, can make it one pass if needed.
 
+## PR 4: the same sheet after the performance pass
+
+Profiling the save (`node --cpu-prof`) showed three costs that grew with the sheet rather than the edits. One was the search for `</sheetData>`, which ran forward over 35 MB on every edit. Another was the walk to an edited row from the sheet's top. The third was the read-back's character loop. A fourth cost, in the save and in the preview's reader, was `attr`, which compiled a new regular expression on every call.
+
+| Step, 50,000 × 20 | PR 1 | PR 4 |
+| --- | --- | --- |
+| Save, 2 edits, read-back included | 1,092 ms | 918 ms |
+| Save, 21 edits, read-back included | 2,297 ms | 1,251 ms |
+| The preview's reader (`read-50k.ts`, Node) | 1,872 ms | 1,275 ms |
+| Laying the sheet out (`buildLayout`) | | 4 ms |
+
+What is left is fixed: inflating, re-deflating and reading back 35 MB of XML, about 0.9 s, much of it on the extension host's thread. Ritemark saves one second after an edit, so on a sheet this size the host is busy for about a second after each pause in typing. That is acceptable for a 50,000-row sheet. Moving the save into a worker thread is the next step if a real workbook shows it hurts.
+
+In a dev instance (`pr4-big-open.png`, `pr4-big-scrolled.png`), the 5.2 MB workbook opens straight into the sheet grid. A jump anywhere in it takes about 33 ms for two frames (median and 90th percentile alike), with about 1,240 elements in the page.
+
+**The 10,000-row cap:** the sheet grid draws every row, since it draws only what is in view. The cap and its "showing first 10,000 rows" note stay for the table that CSV, `.xls` and the SheetJS fallback use.
+
 ## In the app
 
 The screenshots of the same edit and save in a dev instance, before and after, are attached to PR 1.

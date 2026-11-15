@@ -334,6 +334,15 @@ async function main() {
     assert.equal(cellsOf(bytes, 'Sales').A2, 'x');
   }
 
+  // ── The read-back's well-formedness check ─────────────────────────────────
+  assert.ok(isWellFormedXml('<?xml version="1.0"?><!-- a --><a x="1>2" y=\'</b>\'><b/><c><![CDATA[<d>]]></c></a>'))
+  assert.ok(!isWellFormedXml('<a><b></a></b>'), 'wrong order')
+  assert.ok(!isWellFormedXml('<a><b>'), 'not closed')
+  assert.ok(!isWellFormedXml('<a x="1></a>'), 'quote not closed')
+  assert.ok(!isWellFormedXml('<a><!-- open</a>'), 'comment not closed')
+  assert.ok(!isWellFormedXml('<a></a/>'), 'a closing tag that also self-closes')
+  assert.ok(isWellFormedXml('<x:a xmlns:x="m"><x:b r="A1"/></x:a>'))
+
   // ── No edits: the same bytes ────────────────────────────────────────────────
   assert.equal((await applyCellEdits(excelish, [])).bytes, excelish);
 

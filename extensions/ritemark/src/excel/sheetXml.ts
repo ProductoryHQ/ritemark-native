@@ -70,9 +70,17 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** Each attribute name's pattern, compiled once: a million-cell sheet asks for three attributes per cell. */
+const attrPatterns = new Map<string, RegExp>();
+
 /** An attribute's value in a start tag's text, or undefined. `name` may carry a prefix ("r:id"). */
 export function attr(tagText: string, name: string): string | undefined {
-  const m = new RegExp(`(?:^|\\s)${escapeRegExp(name)}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`).exec(tagText);
+  let re = attrPatterns.get(name);
+  if (!re) {
+    re = new RegExp(`(?:^|\\s)${escapeRegExp(name)}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`);
+    attrPatterns.set(name, re);
+  }
+  const m = re.exec(tagText);
   return m ? (m[1] ?? m[2]) : undefined;
 }
 
@@ -158,8 +166,10 @@ export function findSheetData(xml: string, p: string): SheetDataSpan {
   if (open[2] === '/') {
     return { openStart: open.index, contentStart, contentEnd: contentStart, selfClosing: true, openTag: open[0] };
   }
-  const close = xml.indexOf(`</${p}sheetData>`, contentStart);
-  if (close < 0) throw new Error('The sheet has no </sheetData>');
+  // the one </sheetData> is near the part's end (only merges, rules and page setup follow it): look from there,
+  // not through every row (Sprint 158 PR 4: this search ran over 35 MB on every edit)
+  const close = xml.lastIndexOf(`</${p}sheetData>`);
+  if (close < contentStart) throw new Error('The sheet has no </sheetData>');
   return { openStart: open.index, contentStart, contentEnd: close, selfClosing: false, openTag: open[0] };
 }
 
@@ -211,6 +221,15 @@ export function locateCell(xml: string, target: CellPosition, p: string): CellLo
   if (sd.selfClosing) return { kind: 'emptySheetData', at: sd.openStart, len: sd.openTag.length };
   const rowRe = new RegExp(startTag(p, 'row'), 'g');
   rowRe.lastIndex = sd.contentStart;
+  // A fast path for large sheets: jump to the row by its r, written first as Excel and most writers write it, and
+  // check it is a row tag in sheetData. Otherwise (another attribute order, a row not there) walk the rows.
+  const jump = xml.indexOf(`<${p}row r="${target.r}"`, sd.contentStart);
+  if (jump >= 0 && jump < sd.contentEnd) {
+    rowRe.lastIndex = jump;
+    const tag = rowRe.exec(xml);
+    if (tag && tag.index === jump && attr(tag[1], 'r') === String(target.r)) rowRe.lastIndex = jump;
+    else rowRe.lastIndex = sd.contentStart;
+  }
   const rowClose = `</${p}row>`;
   const cellClose = `</${p}c>`;
   let m: RegExpExecArray | null;
