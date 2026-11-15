@@ -126,4 +126,19 @@ const slides = (doc: PMNode) => {
   assert.equal(save(doc), text)
 }
 
+// A notes block with an HTML comment between it and the slide is not the slide's: both stay where they are (Codex on PR 1).
+{
+  const text = '```slide points\nid: p001\n```\n\n<!-- a comment -->\n\n```notes\nNot the slide\'s.\n```\n'
+  const { doc, save } = open(text)
+  assert.equal(slides(doc)[0].attrs.notes, null)
+  assert.equal(save(doc).indexOf('```notes') > save(doc).indexOf('a comment'), true, 'the notes stay after the comment')
+  // With comment callouts off the comment arrives as a DOM comment node, which `nextElementSibling` skipped.
+  const html = '<pre data-md-info="slide points"><code>id: p001\n</code></pre><!-- c --><pre data-md-info="notes"><code>x\n</code></pre>'
+  const parsed = PMDOMParser.fromSchema(schema).parse(elementFromString(html), { preserveWhitespace: 'full' })
+  assert.equal(slides(parsed)[0].attrs.notes, null, 'a comment node between them: the notes are not the slide\'s')
+  let notesBlocks = 0
+  parsed.descendants(node => { if (node.type.name === 'codeBlock') notesBlocks++ })
+  assert.equal(notesBlocks, 1, 'and the notes block stays, as a code block')
+}
+
 console.log('deckRoundTrip: passed')

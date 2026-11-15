@@ -30,6 +30,19 @@ function isSlidePre(element: Element | null): boolean {
   return info !== null && slideKindOfInfo(info) !== null
 }
 
+/**
+ * The block right beside this one, as the file has it: only whitespace text may stand between them. An HTML comment,
+ * words or any other node in between means the two are not adjacent (Codex on PR 1: `nextElementSibling` skipped
+ * them, and the notes moved ahead of what stood between on save).
+ */
+function adjacent(element: Element, direction: 'next' | 'previous'): Element | null {
+  let node = direction === 'next' ? element.nextSibling : element.previousSibling
+  while (node && node.nodeType === 3 && !(node.nodeValue ?? '').trim()) {
+    node = direction === 'next' ? node.nextSibling : node.previousSibling
+  }
+  return node && node.nodeType === 1 ? (node as Element) : null
+}
+
 /** A fence's text: the code's text without the one newline `marked` puts after it. */
 function fenceText(element: Element): string {
   return (element.textContent ?? '').replace(/\n$/, '')
@@ -87,7 +100,7 @@ export const DeckSlide = Node.create({
           const el = element as HTMLElement
           const kind = slideKindOfInfo(infoOf(el) ?? 'none')
           if (kind === null) return false
-          const next = el.nextElementSibling
+          const next = adjacent(el, 'next')
           const notes = infoOf(next) === 'notes' ? fenceText(next as Element) : null
           return { kind, body: fenceText(el), notes }
         },
@@ -97,7 +110,7 @@ export const DeckSlide = Node.create({
         tag: 'pre',
         priority: 1001,
         ignore: true,
-        getAttrs: element => (infoOf(element as HTMLElement) === 'notes' && isSlidePre((element as HTMLElement).previousElementSibling) ? null : false),
+        getAttrs: element => (infoOf(element as HTMLElement) === 'notes' && isSlidePre(adjacent(element as HTMLElement, 'previous')) ? null : false),
       },
     ]
   },
