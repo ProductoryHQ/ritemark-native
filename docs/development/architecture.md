@@ -805,6 +805,38 @@ After a PDF or Word copy, the message counts the equations that went as their so
 | Equations in Google Docs are pictures | The Docs API cannot create Docs equations; an inline picture's bottom sits on the baseline, so an equation with depth sits slightly high |
 | Math in a Mermaid label shows its source | Mermaid is drawn with `htmlLabels: false`, and Mermaid typesets label math only in HTML labels |
 
+### Decks (Sprint 157, on main from Sprint 159 behind `ritemark.features.decks`)
+
+A `.deck.md` is a Markdown file that opens as a slide deck: numbered thumbnails on the left, one slide large in the middle, and the handout (the text of every slide, a part per slide) on the right. Experience 46 (`ritemark-dev/product/design/experience/experiences/decks/`) draws it; the plans are in `docs/development/releases/v2.3.0/sprint-157-decks/` and `sprint-159-decks-training/`. The flag `decks` is off by default (`status: 'experimental'`, Jarmo's word of 14 November 2026); with it off nothing of Decks shows, and a `.deck.md` is an ordinary document.
+
+**The file.** Front matter with `deck: 1` and the deck's theme; each slide one fenced block, ```` ```slide <kind> ````, whose body is a strict subset of YAML (`id`, `title`, the kind's words and items, `look`, `picture`, `image`, `skip`, `kept`, `from`), so any AI can read and write it; its speaker notes a ```` ```notes ```` block right after it; the handout the Markdown between slides. `src/decks/deckFormat.ts` reads and writes it, and a later `deck:` version opens as a document rather than be rewritten (`deckMode.ts`).
+
+**One editor, a mode of it.** A deck is a path-based mode of `ritemark.editor`, as card pages and agent files are, not a second custom editor: patch 014's save-conflict and reload-merge hand-off covers only `ritemark.editor`, so saving, conflicts, the writer's-copy merge and undo stay a document's. The host decides the mode (`deckPages.deckModeFor`: the flag, a file on disk, the name, a readable version) and sends `deckMode` in the editor's payload; `App.tsx` then renders `DeckView` instead of the document view. Each panel's mode is fixed as it opens (`ModeFixedPerView` in `ritemarkEditor.ts`): a deck keeps its mode until it is opened again, whatever the flag does meanwhile. The handout is the document editor holding the whole deck file, each slide an atom node (`handout/deckSchema.ts`, the equation block's pattern: data in attributes, written from them on save by `addDeckTurndownRules`, which is in every save path but matches only `div[data-deck-slide]`); the strip and the stage are drawn from the editor's own document (`deckDocument.ts`), and `handout/deckGuard.ts` keeps typing from breaking a slide node.
+
+| Module | Role |
+|---|---|
+| `src/decks/deckPages.ts` | The host's side of the mode: which documents open as decks, the open deck views (the Slide library and the AI's tools insert through the one in front, as one undo step there), and the view's `deck/*` requests, decoded with exact fields (`deckProtocol.ts`) and answered to that one webview. `ritemarkEditor.ts` connects a panel and routes `deck/*` to it only when the panel is a deck view (Sprint 159) |
+| `src/decks/DeckLibrary.ts`, `deckLibraryFormat.ts`, `deckDocuments.ts` | The Slide library (the folder `Slide library` at the project's top, one `.deck.md` per topic) and the project's decks: copying slides between them with a `from:` line and its stamp, never speaker notes; an open deck read from and written through its document |
+| `src/decks/SlideLibraryViewProvider.ts`, `decksHost.ts` | The Slide library place (`ritemark-slide-library`, after Tasks) and the composition at activation; the place's view is shown on `config.ritemark.features.decks` |
+| `src/decks/deckTheme.ts`, `webview/src/components/decks/theme/` | A deck's theme (`.theme.md`): one built-in theme in this cut, drawn as Card or Borderless through `--s-*` properties |
+| `webview/src/components/decks/slide/` | `layoutSlide.ts` (pure: a slide on a fixed 960 × 540 canvas, every kind fitting itself), `SlideCanvas.tsx` (draws it, with a measuring pass for real font metrics), `convertKind.ts` (a change of layout keeps the words), `slideEdits.ts`, `iconSet.ts` |
+| `webview/src/components/decks/DeckView.tsx`, `SlideStrip.tsx`, `Stage.tsx`, `SlideSettings.tsx`, `scrollRule.ts` | The deck's bar, the strip (+ between thumbnails, Duplicate, Skip, Delete with Undo), the stage (words typed on the slide; speaker notes folded under it, never sent anywhere), Settings beside the slide, and which slide is current as the handout scrolls |
+| `src/runtime/ritemarkTools.ts` (`DECK_TOOL_GROUP`), `src/ai/capabilityContext.ts` | The AI's deck tools (`list_decks`, `read_deck`, `insert_slides`, `update_library_slide`, `add_to_library`) and the DECKS section of its instructions, both only while `deckToolsAvailable()`: the flag on and a project folder on disk. With the flag off the tool list, the instructions and `toolSetKey` are main's as before Decks |
+
+**The flag and the frame.** The Slide library place is in product.json's frame manifest with `"setting": "ritemark.features.decks"` (Sprint 159, patch 002): the shell seeds a new profile's places row with it hidden while the flag is off, so the first frame is the same as without Decks; its view's `when: config.ritemark.features.decks` shows and hides it live. `scripts/check-frame-manifest.mjs` checks both sides, and accepts the place's absence from an older shell's manifest because it is off by default (decision 2), so an extension release to the 2.2.0 shell still passes its frame check (Decks itself reaches people only with the shell release).
+
+**The bundle.** `App.tsx` imports `DeckView`, so `media/webview.js` carries Decks for everyone (about 258 KB, 2.9%); a lazy split is later work if load time shows it.
+
+#### TO BE — Sprint 159 and later
+
+| Item | Where |
+|---|---|
+| Present: the wall and the presenter view | Sprint 159, PRs 5 and 6 |
+| The handout page, published with 2.2's Publish | Sprint 159, PRs 3 and 4 |
+| New → Deck | Sprint 159, PR 7 |
+| Themes and theme editing | Roadmap step 3 |
+| The place without its setting, the flag gone | Roadmap step 5 |
+
 ## Agent Runtime Architecture
 
 ### Bundled runtime baseline (Sprint 111, RC-corrected 2026-09-03; Windows sandbox helpers added 2026-09-07)
