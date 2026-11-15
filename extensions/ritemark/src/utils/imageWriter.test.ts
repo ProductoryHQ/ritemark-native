@@ -9,7 +9,7 @@
  */
 
 import assert from 'assert';
-import { existsSync, mkdirSync, readdirSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { writeImageRelativeTo, sanitizeImageBaseName, parseImageDataUrl } from './imageWriter';
@@ -70,6 +70,19 @@ try {
     'My-File-Foo.png',
     `default path must sanitize user-supplied filenames (got "${sanitized}")`
   );
+
+  // A second picture of the same name gets the next free name; the first stays as it was.
+  const firstBytes = readFileSync(join(pasteDir, 'My-File-Foo.png'));
+  const again = writeImageRelativeTo(pasteDir, 'My File: Foo.png', Buffer.from('a different picture').toString('base64'));
+  assert.strictEqual(again, 'My-File-Foo-2.png', `a name in use is never overwritten (got "${again}")`);
+  assert.ok(readFileSync(join(pasteDir, 'My-File-Foo.png')).equals(firstBytes), 'the first picture keeps its bytes');
+  assert.strictEqual(writeImageRelativeTo(pasteDir, 'My File: Foo.png', ONE_PIXEL_PNG_BASE64), 'My-File-Foo-3.png');
+
+  // A name at the 255-byte limit still finds a free name: the base is shortened to make room for the suffix.
+  const longBase = 'a'.repeat(251);
+  assert.strictEqual(writeImageRelativeTo(pasteDir, `${longBase}.png`, ONE_PIXEL_PNG_BASE64), `${longBase}.png`);
+  const longAgain = writeImageRelativeTo(pasteDir, `${longBase}.png`, ONE_PIXEL_PNG_BASE64);
+  assert.strictEqual(longAgain, `${'a'.repeat(249)}-2.png`, `a long name gets room for its suffix (got ${longAgain.length} bytes)`);
 
   // skipSanitize must refuse any input that could escape targetDir on disk.
   // Defense-in-depth against a crafted webview message — Codex PR #75 P1.

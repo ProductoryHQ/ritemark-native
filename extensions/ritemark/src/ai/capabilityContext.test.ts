@@ -152,6 +152,7 @@ test('task board guidance appears exactly when a runtime has the board tools', (
     const withBoard = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: true }));
     const withoutBoard = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false }));
     assert.ok(withBoard.includes('TASK BOARD'), `${runtime} with the board gets the section`);
+    assert.ok(withBoard.includes("A card's id is for the tools only"), `${runtime} is told to keep card ids out of replies (#709)`);
     assert.ok(!withoutBoard.includes('TASK BOARD'), `${runtime} without a board omits it`);
     // What the agent must do on a card: the tools, report_result with things to
     // check, decisions before long work, and never finishing or editing files.

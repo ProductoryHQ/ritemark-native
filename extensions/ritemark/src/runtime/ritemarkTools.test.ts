@@ -384,7 +384,7 @@ async function main(): Promise<void> {
     assert.equal(await injector.claudeMcpServers([]), undefined);
     assert.equal(injector.codexDynamicTools([]), undefined);
     const routed = await injector.codexToolCall(groups, 'ritemark_board_move_card', { card_id: 'abc123', stage: 'doing' });
-    assert.deepEqual(routed, { text: 'Moved card abc123 to Doing.', success: true });
+    assert.deepEqual(routed, { text: 'Moved the card to Doing.', success: true });
     assert.deepEqual(calls.at(-1), { method: 'move', args: ['abc123', 'doing', {}, 'codex'] });
     assert.deepEqual(await injector.codexToolCall(groups, 'ritemark_board_delete_card', {}), { text: 'Unknown tool: ritemark_board_delete_card', success: false });
 
