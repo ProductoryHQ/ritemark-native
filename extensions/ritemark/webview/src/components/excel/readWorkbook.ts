@@ -195,9 +195,10 @@ function readWorksheet(
         kind = 'e'
         value = v !== undefined ? decodeXmlEntities(v) : '#N/A'
       } else if (t === 'd') {
-        // an ISO date, as some writers store it
+        // an ISO date, as some writers store it: a serial in the workbook's own date system, since the formatting
+        // adds the 1904 system's offset back (Codex on #723)
         const time = v !== undefined ? Date.parse(decodeXmlEntities(v)) : NaN
-        value = Number.isFinite(time) ? (time - Date.UTC(1899, 11, 30)) / 86_400_000 : null
+        value = Number.isFinite(time) ? (time - Date.UTC(1899, 11, 30)) / 86_400_000 - (model.date1904 ? 1462 : 0) : null
       } else if (v !== undefined && v.trim() !== '') {
         const n = Number(v)
         value = Number.isFinite(n) ? n : null
