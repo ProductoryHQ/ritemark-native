@@ -75,7 +75,10 @@ Sprint 159, PR 1 (Decks behind its flag): a place in the manifest may carry a `s
   extension's views in it are shown on `config.<setting>` (scripts/check-frame-manifest.mjs checks both sides), so the
   row follows the setting live; ritemarkSeedPlaces seeds such a place as VS Code caches an extension's place with a
   `when` (not built in, its one view on `config.<setting>`), so a new profile's first frame has it only while the setting
-  is on, where it drew an always-shown placeholder. No upstream hunk changes. Test: ritemarkFrame.test.ts.
+  is on, where it drew an always-shown placeholder. layout.ts (one statement in this patch's hunk, beside
+  isRitemarkPlace): a window closed on such a place, with the flag turned off since, opens on VS Code's default place
+  (ritemarkPlaceShown), where it drew the hidden place checked with an empty column until the extensions were read.
+  Test: ritemarkFrame.test.ts.
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 index 833787070f3..e4fa4a207e5 100644
 --- a/src/vs/workbench/api/browser/viewsExtensionPoint.ts
@@ -286,18 +289,18 @@ index f7b82f298f7..e8bbceb8706 100644
  	}
  ]);
 diff --git a/src/vs/workbench/browser/layout.ts b/src/vs/workbench/browser/layout.ts
-index 75f9238..72cb1c1 100644
+index 75f9238fd75..95f50ac4648 100644
 --- a/src/vs/workbench/browser/layout.ts
 +++ b/src/vs/workbench/browser/layout.ts
 @@ -51,6 +51,7 @@ import { ITelemetryService } from '../../platform/telemetry/common/telemetry.js'
  import { IAuxiliaryWindowService } from '../services/auxiliaryWindow/browser/auxiliaryWindowService.js';
  import { CodeWindow, mainWindow } from '../../base/browser/window.js';
  import { localize } from '../../nls.js';
-+import { isRitemarkPlace, ritemarkAiColumnBroughtBack, RITEMARK_AI_COLUMN_RELEASED_KEY, RITEMARK_AI_COLUMN_WAITING_KEY, RITEMARK_PROJECT_OPENED_KEY, ritemarkFrame, ritemarkNotePlaceToRestore, ritemarkNoteWelcomeAloneExpected, ritemarkRestoresDocuments, ritemarkSlotReleased } from './ritemarkFrame.js';
++import { isRitemarkPlace, ritemarkAiColumnBroughtBack, RITEMARK_AI_COLUMN_RELEASED_KEY, RITEMARK_AI_COLUMN_WAITING_KEY, RITEMARK_PROJECT_OPENED_KEY, ritemarkFrame, ritemarkNotePlaceToRestore, ritemarkNoteWelcomeAloneExpected, ritemarkPlaceShown, ritemarkRestoresDocuments, ritemarkSlotReleased } from './ritemarkFrame.js';
  
  //#region Layout Implementation
  
-@@ -837,9 +838,50 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
+@@ -837,9 +838,55 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
  			}
  		}
  
@@ -314,6 +317,11 @@ index 75f9238..72cb1c1 100644
 +		if (ritemarkProjectWindow && this.state.initialization.views.containerToRestore.sideBar) {
 +			this.state.initialization.views.containerToRestore.sideBar = isRitemarkPlace(ritemarkStoredPlace) ? ritemarkStoredPlace
 +				: ritemarkFirstOpening && ritemarkFrame.homePlace ? ritemarkFrame.homePlace : this.state.initialization.views.containerToRestore.sideBar;
++		}
++		// Sprint 159: a place behind a flag that is off now (the window closed on it, the flag turned off since) is not
++		// restored; VS Code's default place opens instead, from the first frame
++		if (!ritemarkPlaceShown(this.state.initialization.views.containerToRestore.sideBar, this.configurationService)) {
++			this.state.initialization.views.containerToRestore.sideBar = this.viewDescriptorService.getDefaultViewContainer(ViewContainerLocation.Sidebar)?.id;
 +		}
 +		if (ritemarkProjectWindow && ritemarkFirstOpening) {
 +			this.storageService.store(RITEMARK_PROJECT_OPENED_KEY, true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
@@ -349,7 +357,7 @@ index 75f9238..72cb1c1 100644
  			if (viewContainerToRestore) {
  				this.state.initialization.views.containerToRestore.auxiliaryBar = viewContainerToRestore;
  			} else {
-@@ -1192,6 +1234,16 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
+@@ -1192,6 +1239,16 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
  
  			await this.openViewContainer(ViewContainerLocation.AuxiliaryBar, this.state.initialization.views.containerToRestore.auxiliaryBar);
  
@@ -366,7 +374,7 @@ index 75f9238..72cb1c1 100644
  			mark('code/didRestoreAuxiliaryBar');
  		})());
  
-@@ -1225,6 +1277,9 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
+@@ -1225,6 +1282,9 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
  			Promises.settled(layoutRestoredPromises).finally(() => {
  				if (
  					this.editorService.editors.length === 0 && 			// no editors opened or restored
@@ -376,7 +384,7 @@ index 75f9238..72cb1c1 100644
  					this.isVisible(Parts.AUXILIARYBAR_PART) && 			// auxiliary bar is visible
  					!this.hasFocus(Parts.AUXILIARYBAR_PART) && 			// auxiliary bar does not have focus yet
  					!this.environmentService.enableSmokeTestDriver 		// not in smoke test mode (where focus is sensitive)
-@@ -3037,8 +3092,11 @@ class LayoutStateModel extends Disposable {
+@@ -3037,8 +3097,11 @@ class LayoutStateModel extends Disposable {
  
  			// Unless auxiliary bar visibility is explicitly configured, make
  			// sure to not force open it in case we know it was empty before.
@@ -1428,10 +1436,10 @@ index bfc8839cc65..745739c61f4 100644
  		};
 diff --git a/src/vs/workbench/browser/ritemarkFrame.ts b/src/vs/workbench/browser/ritemarkFrame.ts
 new file mode 100644
-index 00000000000..73473df3f77
+index 00000000000..b11084faab6
 --- /dev/null
 +++ b/src/vs/workbench/browser/ritemarkFrame.ts
-@@ -0,0 +1,522 @@
+@@ -0,0 +1,533 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1649,6 +1657,17 @@ index 00000000000..73473df3f77
 +/** Whether a view container is one of the frame's places. */
 +export function isRitemarkPlace(containerId: string | undefined): boolean {
 +	return ritemarkFrame.places.some(entry => entry.id === containerId);
++}
++
++/**
++ * Sprint 159: whether a view container may be shown now, false only for a frame's place behind a setting that is not
++ * on. A window closed on such a place, with the flag turned off since, opens on VS Code's default place (layout.ts):
++ * restored, the hidden place drew as the checked one with an empty column until the extensions were read. "On" is the
++ * places row's own reading of its views' `when: config.<setting>`: any value the context key counts as true.
++ */
++export function ritemarkPlaceShown(containerId: string | undefined, configurationService: IConfigurationService, frame = ritemarkFrame): boolean {
++	const setting = frame.places.find(entry => entry.id === containerId)?.setting;
++	return !setting || !!configurationService.getValue(setting);
 +}
 +
 +/** The built-in copy of the extension, in the app's own extensions folder: its media is there before it starts. */
@@ -2636,10 +2655,10 @@ index ef3388a877f..873b2dbf292 100644
  
 diff --git a/src/vs/workbench/test/browser/ritemarkFrame.test.ts b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
 new file mode 100644
-index 00000000000..80117461df1
+index 00000000000..7f76b16deb6
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
-@@ -0,0 +1,183 @@
+@@ -0,0 +1,203 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2656,7 +2675,7 @@ index 00000000000..80117461df1
 +import { NullLogService } from '../../../platform/log/common/log.js';
 +import { IStorageService, StorageScope } from '../../../platform/storage/common/storage.js';
 +import { IWorkspaceContextService, WorkbenchState } from '../../../platform/workspace/common/workspace.js';
-+import { readRitemarkFrame, ritemarkFirstDesk, ritemarkSeedPlaces, ritemarkSlotReleased } from '../../browser/ritemarkFrame.js';
++import { readRitemarkFrame, ritemarkFirstDesk, ritemarkPlaceShown, ritemarkSeedPlaces, ritemarkSlotReleased } from '../../browser/ritemarkFrame.js';
 +import { ISerializedEditorGroupModel } from '../../common/editor/editorGroupModel.js';
 +import { Memento } from '../../common/memento.js';
 +import { TestStorageService } from '../common/workbenchTestServices.js';
@@ -2768,6 +2787,26 @@ index 00000000000..80117461df1
 +			unset: ['workbench.view.extension.ritemark-home'],
 +			off: ['workbench.view.extension.ritemark-home'],
 +			on: ['workbench.view.extension.ritemark-home', 'workbench.view.extension.ritemark-slide-library'],
++		});
++	});
++
++	test('Sprint 159: a place behind a setting that is off is not restored (layout.ts opens VS Code\'s default place instead); every other place is; "on" is the row\'s own reading', () => {
++		const frame = readRitemarkFrame(manifest);
++		const shown = (settings: Record<string, unknown>) => ['workbench.view.extension.ritemark-slide-library', 'workbench.view.extension.ritemark-home', 'workbench.view.explorer', 'workbench.view.search', undefined]
++			.map(id => ritemarkPlaceShown(id, new TestConfigurationService(settings), frame));
++		// The places row shows the place on its views' `when: config.<setting>`: the restore must agree with it for any value
++		const rowShows = (value: unknown) => store.add(new ContextKeyService(new TestConfigurationService({ 'ritemark.features.decks': value }))).contextMatchesRules(ContextKeyExpr.deserialize('config.ritemark.features.decks'));
++		const values: unknown[] = [undefined, false, true, 'yes', '', 0, 1, ['a']];
++		assert.deepStrictEqual({
++			unset: shown({}),
++			off: shown({ 'ritemark.features.decks': false }),
++			on: shown({ 'ritemark.features.decks': true }),
++			agreesWithTheRow: values.map(value => ritemarkPlaceShown('workbench.view.extension.ritemark-slide-library', new TestConfigurationService({ 'ritemark.features.decks': value }), frame) === rowShows(value)),
++		}, {
++			unset: [false, true, true, true, true],
++			off: [false, true, true, true, true],
++			on: [true, true, true, true, true],
++			agreesWithTheRow: values.map(() => true),
 +		});
 +	});
 +

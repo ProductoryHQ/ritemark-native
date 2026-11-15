@@ -1,13 +1,142 @@
 # This branch: ./scripts/test.sh --grep Ritemark (all of Ritemark's shell tests).
 
-  Ritemark frame
+(node:45638) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(node:45638) [DEP0025] DeprecationWarning: sys is deprecated. Use util instead.
+(node:45638) ExperimentalWarning: WASI is an experimental feature and might change at any time
+    ✔ the split itself: the last dot, never a leading dot, never a trailing one
+    ✔ a tab (no highlights): the extension in its own span inside the name, the text unchanged
+    ✔ a tree row (highlights): a filter match across the dot is split with the name
+    ✔ a reused row that becomes a folder drops the extension
+    ✔ upstream: the first action is the default
+    ✔ with ritemarkFocusCancel, Cancel is the default
+    ✔ Open Link in External Browser is offered for a website only, and opens only that address
+    ✔ the icons' style sheet names the family and loads no Phosphor file of its own
+    ✔ Ritemark first window: 1440 x 900, or 90% of a smaller work area
+    ✔ each address is a local page, a project page, or neither
+    ✔ the page's file drops the address's fragment and query
+    ✔ Open in your browser shows on every local page; Publish only on a project page once publishing is ready
+    ✔ PR 4: the extension's answer as the bar's state; anything else is "not published"
+    ✔ PR 4 round 5: Publishing…'s tooltip from the extension, only while publishing and only a short line
+    ✔ PR 4: Publish, Publishing…, the Published chip with Copy link, and Unpublishing… take the same place in turn
+    ✔ three pages, another one active: an action acts in the turn's page
+    ✔ a page that has gone is an error, never the active tab
+    ✔ navigate never loads an address into another open tab
+    ✔ a page the AI was not given must be shared already
+    ✔ new pages are named once, a page not shared by its id alone
+    ✔ the page target does not reach the function that runs in the page
+    ✔ targetModel finds the turn's page by id, not the active browser tab
+    ✔ an input action in the turn's page, which is in front, acts in it and not in the active tab
+    ✔ a page that is not in front is refused at once: no question, nothing opened, nothing done
+    ✔ the control question is asked about a page in front
+    ✔ navigate with the turn's page loads the address there, never in the active tab
+    ✔ navigate into an existing page that is not in front is refused: nothing loaded, no question, nothing opened
+    ✔ navigate with no page opens a new tab (the one tab that comes forward), asks about it in front, and loads the address there
+    ✔ a page in front whose model is not visible is still in front: blank, failed, or under an overlay
+    ✔ a page behind another editor is not in front, even when its model says it is visible
+    ✔ a maximized AI column hides the editor area: its front page is not in front, refused at once
+    ✔ another maximized desk hides this desk: its front page is not in front, refused at once
+    ✔ the page's own maximized desk is in front: the action is done there
+    ✔ a refusal carries the page id and the error, never its address or title
+    ✔ Open in External Browser sends every file: address to the guarded opener, never to the system's
+    ✔ the bar's registered items show where they should, and Publish can't run anywhere else
+    ✔ another page never shows the last page's chip or address while it is asked about; the same page keeps its own
+    ✔ round 5: Publishing…'s tooltip is the extension's while a new address is awaited, and goes with the wait or the page
+    ✔ 2.2: the chip's menu drops from the chip even with the chat box focused, and offers Update the page only while changed
+    ✔ a save refused as newer, for a document Ritemark's editor holds, goes to Ritemark
+    ✔ everything else keeps VS Code's notification
+    ✔ a reload asks Ritemark only for a document Ritemark's editor holds
+    ✔ Add File to Chat is in none of the three menus and stays in All commands
+    ✔ Add Folder to Chat keeps Documents' folder menu, its only way in (upstream's f1: false)
+    ✔ Add Selection to Chat is not in the editor's menu and stays in All commands
+    ✔ Open Inline Chat is not in the editor's menu, and keeps All commands and ⌘I
+    ✔ drops the listed IDs and every ID under a listed prefix, and keeps the rest
+    ✔ the commands whose menu items left the menus in Sprint 154 stay in All commands (#650, decision 4)
+    ✔ other products are unchanged
+    ✔ All commands offers no dropped command, from the editor or the palette's items, in the order it had
+    ✔ search, by words or by exact ID, finds no dropped command
+    ✔ recently used never offers a dropped command, even one used last
+    ✔ panel terminals move onto the desk: behind the document at start, in front later; hidden ones stay
+    ✔ #501: onto an empty desk, restored terminals wait for its first document, past a terminal tab and the sweep, then open behind it
+    ✔ #501: with no document within the wait, restored terminals open anyway; one closed meanwhile does not
+    ✔ plain terminals are named Terminal, Terminal 2; named, task and revived ones keep their names
+    ✔ Sprint 152: a restored terminal has the name it was given as it is made, before its tab draws; a process's title and a new one are left as they were
+    ✔ the next name is the lowest free one
+    ✔ the width, and the keys
+    ✔ opens over the window, follows the page's height, and Escape closes it with the focus back
+    ✔ close by view type, a second sheet waits, and the view's own dispose closes it
+    ✔ a view another extension answered is refused, and a press on the dim does nothing
+    ✔ a foreign extension's view is refused before anything shows
+    ✔ a foreign view whose resolve never returns never shows
+    ✔ a resolve that throws at once leaves no dim
+    ✔ the open command takes only ritemark.sheet. view types that are no contributed view
+    ✔ a pinned Task board tab cannot be closed, unpinned or moved to another group
+    ✔ no other tab moves or opens in front of it, from this desk or another
+    ✔ Close all and Close others leave it
+    ✔ the extension removes it by disposing it
+    ✔ a Task board tab that is not pinned is an ordinary tab
+    ✔ Ritemark reload participant: its answer becomes the dirty model text
+    ✔ Ritemark reload participant: no answer, or the file's own text, reloads as usual
+    ✔ Ritemark reload participant: not asked on a first resolve, a revert, or a file type Ritemark does not edit
+    ✔ Ritemark reload participant: an edit while Ritemark answers wins over the answer
+    ✔ the count is the Tasks place's number badge, nothing else
+    ✔ the badge shows the count up to 99+, and goes when nothing waits
+    ✔ the words
+    ✔ only the Task board tab
+    ✔ a document's tab: the usual items and Show in Documents, none of VS Code's
+    ✔ Home and the Task board lose Reopen Editor With… and keep the rest; a terminal's menu is as it was
+    ✔ the filter names what goes: an item no one named still shows
+    ✔ a file's tab during a Copilot CLI session loses Add File to Copilot CLI, as it loses Add File to Chat
+    ✔ Show in Documents runs Reveal in Explorer View with the menu's arguments
+    ✔ Home and the Task board leave out what they refuse: Close, Unpin, Split & Move and Move into New Window (#634)
+    ✔ the tab row's empty area offers New tab and Reopen closed tab first, and no Tab Bar or Editor Actions Position (#634, #650)
+    ✔ Editor Actions Position leaves the empty area by its submenu's ID only: its commands stay in All commands (#650)
+    ✔ a permanent tab is Home or the Task board by its view type, and only while pinned (#634)
+    ✔ Reopen closed tab keeps VS Code's ⇧⌘T (New tab's ⌘T is the extension's, projectHeadCommands.test.ts) (#634)
+    ✔ no separator is left at either end or twice in a row
+    ✔ the route follows the boxes, and the keys
+    ✔ the words change live with the boxes; Send is off until something is typed
+    ✔ a modal sheet: named for screen readers, focus kept inside, Escape closes
+    ✔ an AI issue: the box ticked, the last answer's box in place of the answer's, its quote shown when ticked
+    ✔ after pressing: closed when accepted, one line when it did not go, the hand-off for the e-mail route
+    ✔ a pointer resting on a flyout row and a click on it open one flyout
+    ✔ the context key, and when the words open the results
+    ✔ the keys: down and Enter go to the results with words; Escape clears, then leaves
+    ✔ the extension's answer decides, with the folder about to open
+    ✔ no such command, or no answer and no question within the ceiling: the reload goes on
+    ✔ a question on screen waits for the person past the ceiling
+    ✔ #569: the window a switch opens lands on Home: within two minutes, in the folder it opened, or any other one
+    ✔ #569: Home's tab goes first in its desk's order of use, the tabs' order and the other desk unchanged
+    ✔ #569: the note is written with the last save of a switch that goes on, never after a veto or for a reload
+    ✔ #569 (Codex): only the window the note is for takes it; another folder's window and a window with no folder leave it; an unusable note goes
+    ✔ #569: Ritemark's answer that comes after another participant vetoed the switch sets no note
+    ✔ #623: the extension is told its attempt, and whether that attempt still goes on once the person answers
+    ✔ alone from the first frame; the welcome takes over and keeps it; closing the welcome ends it, the columns left to the extension
+    ✔ another editor in front first (an empty window's restored editors) releases it, logged once, and the columns it closed come back
+    ✔ a minute with no welcome (a failed start too), or Ritemark not installed: released
+    ✔ while it waits for the welcome, the window's centre shows the loading look: the mark after a second, the line after ten; the welcome's page replaces it once it speaks
+    ✔ a window that isn't the welcome's (a folder, or files to open) is never alone before the welcome
+    ✔ the bands
+    ✔ narrowing from 1500 to 900 and back (S42)
+    ✔ a jump across every width takes each crossing in order
+    ✔ a column the person opened stays open until the window crosses that width again (S43)
+    ✔ the narrowed AI comes back even when the layout gave it a little less than 336
+    ✔ what the person changed is not undone
+    ✔ Help is a fail-closed product allowlist with normalized separators
+    ✔ unknown and developer-only top-level Help commands are rejected
+    ✔ other products and other top-level menus are unchanged
     ✔ the manifest: no block reads as no frame; unknown keys are ignored, and entries it can't use are left out
     ✔ a slot's release is logged once
     ✔ R9: a new profile's places row gets the extension's places as placeholders (not VS Code's own Documents); a stored row is left alone
     ✔ Sprint 159: a seeded place with a setting is in the row at the first frame only while the setting is on; one without is always
+    ✔ Sprint 159: a place behind a setting that is off is not restored (layout.ts opens VS Code's default place instead); every other place is; "on" is the row's own reading
     ✔ R3: a project's first desk is Home and the Task board, pinned, Home in front; Home alone with the board's flag off; none without a folder
     ✔ the slot's material for a second, then the mark alone; at a start's main slot the line after ten seconds; disposing takes it all away
     ✔ a wait that began earlier (W5) shows the mark at once, and the slot's moment is the shell's to hand over
+    ✔ a page that says it is drawing keeps the look above it until it is drawn; one that says nothing of it ends the look with its first message
+    ✔ a Ritemark page still loading shows the mark after its second and the line at a start, above it, up to a limit; another extension's page with nothing showing ends the look at once
+    ✔ a kept page that has spoken is there at once when shown again; a quiet page of another extension lets the look go after a while; a page without a box keeps the look where it is
+    ✔ a webview's page: Ritemark's by its extension, kept by its options, above it unless asked not to be
     ✔ a kept page drawn while no look waited is there at once when shown again; one that has only said it is drawing is waited for; a page has one look; no wait outlasts the slot's minute
     ✔ settled twice a look goes on; a slot's moment is its own look's; a gone webview ends the look even when the look stays where it is
-  135 passing (429ms)
+    ✔ a tab's look marks its box while it waits (the desk hides its progress line), and the box's next tab ends the last one's look
+  136 passing (399ms)
