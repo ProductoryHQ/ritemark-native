@@ -60,6 +60,11 @@ assert.equal(valueFromInput('8:15', '[h]:mm'), 0.34375)
 assert.equal(valueFromInput('36:00', '[h]:mm'), 1.5)
 assert.equal(valueFromInput('18:00', 'hh:mm'), 0.75)
 assert.equal(valueFromInput('8:15', 'General'), '8:15', 'not a time cell: text, as before')
+// before March 1900 Excel's serials count a 29 February that never was (Codex on #724)
+assert.equal(valueFromInput('01.01.1900', 'dd.mm.yyyy'), 1)
+assert.equal(valueFromInput('28.02.1900', 'dd.mm.yyyy'), 59)
+assert.equal(valueFromInput('01.03.1900', 'dd.mm.yyyy'), 61)
+assert.equal(text(1, 'dd.mm.yyyy'), '01.01.1900')
 // minutes are not months
 assert.equal(valueFromInput('03.01.2026', 'dd.mm.yyyy hh:mm'), 46025)
 

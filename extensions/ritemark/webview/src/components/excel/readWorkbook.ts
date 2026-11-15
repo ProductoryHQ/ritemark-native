@@ -420,8 +420,12 @@ async function readWorksheet(
     const to = position(b ?? a ?? '')
     if (!from || !to) continue
     layout.merges.push([from[0], from[1], to[0], to[1]])
-    if (to[0] > sheet.maxR) sheet.maxR = to[0]
-    if (to[1] > sheet.maxC) sheet.maxC = to[1]
+    // a merge widens the drawn area to take it in, unless it is huge (a whole sheet merged): then the cells say how
+    // far the sheet goes
+    if ((to[0] - from[0] + 1) * (to[1] - from[1] + 1) <= 100_000) {
+      if (to[0] > sheet.maxR) sheet.maxR = to[0]
+      if (to[1] > sheet.maxC) sheet.maxC = to[1]
+    }
   }
   layout.conditionalFormats = (xml.match(new RegExp(`<${p}conditionalFormatting(?=[\\s>])`, 'g')) ?? []).length
 

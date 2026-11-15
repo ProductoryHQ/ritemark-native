@@ -33,8 +33,8 @@ export interface SheetLayout {
   frozenCols: number
   headerW: number
   headerH: number
-  /** Merges by every sheet cell they cover: the merge's index. */
-  mergeAt: Map<number, number>
+  /** The merge a sheet cell is in, by its cellKey: the merge's index. */
+  mergeAt: MergeIndex
   merges: Array<[number, number, number, number]>
 }
 
@@ -50,6 +50,39 @@ export interface LayoutOptions {
   rowOrder?: number[]
   /** Auto-fit heights: rows without a height of their own, that hold wrapped text or a larger font. */
   autoHeight?: (row: number) => number | undefined
+}
+
+/** Which merge a cell is in. Small merges are indexed cell by cell; a large one (a whole sheet merged, A1:XFD1048576,
+ *  is a few bytes in a file) is kept as a range and checked as one, so it can't make the grid enumerate billions of
+ *  cells (Codex on #724). */
+export interface MergeIndex {
+  get(key: number): number | undefined
+  has(key: number): boolean
+}
+
+const CELL_BY_CELL_MERGE = 4096
+
+export function mergeIndex(merges: ReadonlyArray<[number, number, number, number]>): MergeIndex {
+  const small = new Map<number, number>()
+  const large: number[] = []
+  merges.forEach(([r1, c1, r2, c2], i) => {
+    if ((r2 - r1 + 1) * (c2 - c1 + 1) > CELL_BY_CELL_MERGE) {
+      large.push(i)
+      return
+    }
+    for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) small.set(cellKey(r, c), i)
+  })
+  const get = (key: number) => {
+    const found = small.get(key)
+    if (found !== undefined || !large.length) return found
+    const r = Math.floor(key / 16384)
+    const c = key % 16384
+    return large.find((i) => {
+      const [r1, c1, r2, c2] = merges[i]
+      return r >= r1 && r <= r2 && c >= c1 && c <= c2
+    })
+  }
+  return { get, has: (key) => get(key) !== undefined }
 }
 
 /** The style a cell draws with: its own, else its row's, else its column's (Excel's order). */
@@ -163,10 +196,7 @@ export function buildLayout(sheet: SheetModel, styles: WorkbookStyles, opts: Lay
   const Y = new Float64Array(rows + 1)
   for (let i = 0; i < rows; i++) Y[i + 1] = Y[i] + rowH[i]
 
-  const mergeAt = new Map<number, number>()
-  L.merges.forEach(([r1, c1, r2, c2], i) => {
-    for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) mergeAt.set(cellKey(r, c), i)
-  })
+  const mergeAt = mergeIndex(L.merges)
 
   return {
     rows,
