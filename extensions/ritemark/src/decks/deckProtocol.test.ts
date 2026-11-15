@@ -3,7 +3,7 @@
  */
 import { strict as assert } from 'node:assert';
 import { decodeDeckRequest, decodeLibraryRequest, DeckProtocolError, MAX_ASSET_PATHS } from './deckProtocol';
-import { deckModeOf, isDeckPath, ModeFixedPerView } from './deckMode';
+import { deckModeOf, isDeckPath, ModeFixedPerView, viewDeckMode } from './deckMode';
 import { isThemePath } from './deckTheme';
 
 assert.deepEqual(decodeDeckRequest({ type: 'deck/assets', paths: ['images/a.png'] }), { type: 'deck/assets', paths: ['images/a.png'] });
@@ -67,20 +67,29 @@ assert.ok(!deckModeOf({ ...deck, scheme: 'untitled' }), 'not on disk: a document
 assert.ok(!deckModeOf({ ...deck, fsPath: '/p/Training.md' }), 'not .deck.md: a document');
 assert.ok(!deckModeOf({ ...deck, text: '---\ndeck: 2\n---\n' }), 'a later format: a document');
 
-// Sprint 159 (PR 2): a view keeps the mode it opened in; the flag turned on or off meanwhile reaches only views opened
-// afterwards (a document view never turns into a deck view no deck page serves, nor a deck view into a document).
+// Sprint 159 (PR 2): a view keeps the flag it opened with; the flag turned on or off meanwhile reaches only views opened
+// afterwards (a document view never turns into a deck view, nor a deck view into a document). The file is read live:
+// a deck rewritten to a later format falls back to a document rather than be rewritten, and back when it reads again.
 {
-  const modes = new ModeFixedPerView<object>();
+  const flags = new ModeFixedPerView<object>();
   let flagOn = false;
-  const decide = () => deckModeOf({ ...deck, flagOn });
+  const mode = (view: object, text = deck.text) => viewDeckMode(flags, view, () => flagOn, { scheme: deck.scheme, fsPath: deck.fsPath, text });
   const openedOff = {};
   const openedOn = {};
-  const first = modes.of(openedOff, decide);
+  const first = mode(openedOff);
   flagOn = true;
-  const afterOn = [modes.of(openedOff, decide), modes.of(openedOn, decide)];
+  const afterOn = [mode(openedOff), mode(openedOn)];
   flagOn = false;
-  const afterOff = [modes.of(openedOff, decide), modes.of(openedOn, decide), modes.of({}, decide)];
-  assert.deepEqual({ first, afterOn, afterOff }, { first: false, afterOn: [false, true], afterOff: [false, true, false] });
+  const afterOff = [mode(openedOff), mode(openedOn), mode({})];
+  const laterFormat = [mode(openedOn, '---\ndeck: 2\n---\n'), mode(openedOn, '---\ndeck: 1\n---\n')];
+  const notADeck = viewDeckMode(flags, openedOn, () => true, { scheme: deck.scheme, fsPath: '/p/Training.md', text: deck.text });
+  assert.deepEqual({ first, afterOn, afterOff, laterFormat, notADeck }, {
+    first: false,
+    afterOn: [false, true],
+    afterOff: [false, true, false],
+    laterFormat: [false, true],
+    notADeck: false,
+  });
 }
 
 // Which theme paths a deck may name: project-relative .theme.md files, never outside the project.

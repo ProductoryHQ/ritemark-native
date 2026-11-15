@@ -1,0 +1,31 @@
+#!/bin/bash
+# round1-check.sh <port> <profile> <deck file>: PR 2 round one's two fixes in a dev window.
+#  1. A deck opened with the flag on keeps working after the flag is turned off (its requests are answered).
+#  2. A deck rewritten to a later format by another program falls back to a document, and is no longer served.
+S=$(dirname "$0")
+export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
+P=$1
+PROFILE=$2
+DECK=$3
+setflag() { node -e "const fs=require('fs');const p='$PROFILE/User/settings.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j['ritemark.features.decks']=$1;fs.writeFileSync(p,JSON.stringify(j,null,1));"; }
+setflag true
+sleep 3
+bash "$S/open-deck.sh" "$P"
+echo "== flag on, opened as a deck:"
+node "$S/cdp.mjs" "$P" wv "AI assistants" "$(cat "$S/deck-probe.js")"
+setflag false
+sleep 3
+echo "== the flag turned off, the same deck view:"
+node "$S/cdp.mjs" "$P" wv "AI assistants" "$(cat "$S/deck-probe.js")"
+echo "   places: $(node "$S/cdp.mjs" "$P" places)"
+setflag true
+sleep 2
+sed -i '' 's/^deck: 1$/deck: 2/' "$DECK"
+sleep 3
+echo "== flag on, the file rewritten to deck: 2 by another program:"
+node "$S/cdp.mjs" "$P" wv "AI assistants" "$(cat "$S/deck-probe.js")"
+echo "   the file's head: $(head -3 "$DECK" | tr '\n' ' ')"
+sed -i '' 's/^deck: 2$/deck: 1/' "$DECK"
+sleep 3
+echo "== and back to deck: 1:"
+node "$S/cdp.mjs" "$P" wv "AI assistants" "$(cat "$S/deck-probe.js")"

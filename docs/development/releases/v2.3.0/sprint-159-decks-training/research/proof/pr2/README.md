@@ -44,3 +44,15 @@ The flag is on and the Slide library open. Reload Window is sent, and the flag i
 
 - **The dev tree's built-in Copilot Chat** fails to activate ("the default value for setting chat.cli.planExitMode.enabled is different"). It comes from the copied dev tree, not from Ritemark.
 - **"Extension host did not start in 10 seconds"** appears only in the held runs (`--inspect-brk-extensions`).
+
+## Round one's fixes: each panel keeps the flag it opened with, and the file is read live
+
+`round1-check.sh.txt`, in a dev window, opens a deck with the flag on. It then turns the flag off and probes the deck view, then rewrites the file to `deck: 2` the way another program would and probes again, then rewrites it back to `deck: 1`.
+
+- **On the reviewed head** (`round1-mode-before-fix.txt`):
+  - With the flag off, the deck view stays a deck, but no request of its is answered: no pictures, theme or saves.
+  - After the rewrite it stays a deck view, so its next save would write this build's blocks over a newer file.
+- **With the fixes** (`round1-mode-fixed.txt`):
+  - With the flag off, the deck view is still served.
+  - The `deck: 2` file falls back to a document and is not rewritten.
+  - It is a deck again at `deck: 1`.

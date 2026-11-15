@@ -62,9 +62,18 @@ export class DeckPages implements vscode.Disposable {
   /** `library` gives the project's library, or null when the window has no project folder on disk. */
   constructor(private readonly library: () => DeckLibrary | null = () => null) {}
 
-  /** Does this document open as a deck? */
-  deckModeFor(document: vscode.TextDocument): boolean {
-    return deckModeOf({ flagOn: isEnabled('decks'), scheme: document.uri.scheme, fsPath: document.uri.fsPath, text: document.getText() });
+  /** Does this document open as a deck? `flagOn` is the flag now unless given (a connected view's, as it opened). */
+  deckModeFor(document: vscode.TextDocument, flagOn = isEnabled('decks')): boolean {
+    return deckModeOf({ flagOn, scheme: document.uri.scheme, fsPath: document.uri.fsPath, text: document.getText() });
+  }
+
+  /**
+   * Sprint 159 (PR 2): is this webview a connected deck view whose file reads as a deck now? A view is connected only
+   * when it opened with the flag on (ritemarkEditor.ts), and keeps its mode while it lives, so the flag is not read
+   * again here; the file's name and version are, so a deck rewritten to a later format is no longer served.
+   */
+  private serves(document: vscode.TextDocument, webview: vscode.Webview): boolean {
+    return [...this.views].some(view => view.panel.webview === webview) && this.deckModeFor(document, true);
   }
 
   /** A deck's panel, while it is open: the active one is where the library inserts. */
@@ -94,7 +103,7 @@ export class DeckPages implements vscode.Disposable {
     const view = this.activeView();
     const root = projectRoot();
     const relative = view && root ? projectRelative(root, view.document.uri.fsPath) : null;
-    if (!view || !relative || !this.deckModeFor(view.document)) return null;
+    if (!view || !relative || !this.deckModeFor(view.document, true)) return null;
     return { path: relative, name: deckName(relative), current: view.current, count: view.count };
   }
 
@@ -160,7 +169,7 @@ export class DeckPages implements vscode.Disposable {
 
   /** One request from a deck view; the answer goes to that webview only. */
   async handle(document: vscode.TextDocument, webview: vscode.Webview, message: unknown): Promise<void> {
-    if (!this.deckModeFor(document)) return;
+    if (!this.serves(document, webview)) return;
     let request: DeckRequest;
     try {
       request = decodeDeckRequest(message);

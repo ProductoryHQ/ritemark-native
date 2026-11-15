@@ -47,6 +47,17 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
         ? { type: 'library/show', section: target.section }
         : { type: 'library/reveal', path: target.path, id: target.id })),
     );
+  }
+
+  /**
+   * Sprint 159 (PR 2): the project's decks are watched only once the place has been shown (the flag on): with the flag
+   * off, as most windows have it, nothing of the library runs.
+   */
+  private watching = false;
+
+  private watchDecks(): void {
+    if (this.watching) return;
+    this.watching = true;
     const watcher = vscode.workspace.createFileSystemWatcher('**/*.deck.md');
     this.subscriptions.push(
       watcher,
@@ -58,6 +69,7 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
+    this.watchDecks();
     this.view = view;
     this.ready = false;
     // The project folder too: the slides' pictures are drawn on the thumbnails.

@@ -6,7 +6,7 @@ import * as fsp from 'fs/promises';
 import { parseFrontmatterFromText, serializeFrontmatter, discoverCommands } from './agent/discovery';
 import type { CardPages } from './taskBoard/cardPages';
 import type { DeckPages } from './decks/deckPages';
-import { isDeckPath, ModeFixedPerView } from './decks/deckMode';
+import { isDeckPath, ModeFixedPerView, viewDeckMode } from './decks/deckMode';
 import { cardTabWrite } from './taskBoard/cardFile';
 import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
@@ -169,14 +169,19 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   private readonly documentSync: DocumentSyncCoordinator;
 
   /**
-   * Sprint 159 (PR 2): whether each open panel shows its document as a deck, fixed the first time it is asked (as the
-   * panel opens). A deck keeps its mode until it is opened again, whatever the flag does meanwhile, so a later payload
-   * never turns a document view into a deck view that no deck page serves, or the other way round.
+   * Sprint 159 (PR 2): the `decks` flag each open panel opened with, kept while it lives (`viewDeckMode`). A deck keeps
+   * its mode until it is opened again, whatever the flag does meanwhile, so a later payload never turns a document view
+   * into a deck view, nor a deck view into a document; only a deck rewritten to a later format falls back to one.
    */
-  private readonly deckModes = new ModeFixedPerView<vscode.Webview>();
+  private readonly deckFlags = new ModeFixedPerView<vscode.Webview>();
+
+  private deckFlagOfView(webview: vscode.Webview): boolean {
+    return this.deckFlags.of(webview, () => isEnabled('decks'));
+  }
 
   private deckModeOfView(document: vscode.TextDocument, webview: vscode.Webview): boolean {
-    return this.deckModes.of(webview, () => RitemarkEditorProvider.deckPages()?.deckModeFor(document) ?? false);
+    return !!RitemarkEditorProvider.deckPages()
+      && viewDeckMode(this.deckFlags, webview, () => isEnabled('decks'), { scheme: document.uri.scheme, fsPath: document.uri.fsPath, text: document.getText() });
   }
 
   // Voice dictation controller
@@ -789,10 +794,12 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       : null;
 
     // Sprint 157: a deck's panel, while it is open, so the Slide library and the AI's tools can insert into it.
-    // Sprint 159 (PR 2): only a panel that shows its document as a deck (the flag on as it opened). With the flag off a
-    // `.deck.md` is an ordinary document: nothing may treat its panel as a deck view, even once the flag is turned on.
+    // Sprint 159 (PR 2): only a panel that opened with the flag on, and that isn't a card page (the payload's own test,
+    // `cardModeFor`). With the flag off a `.deck.md` is an ordinary document: nothing may treat its panel as a deck view,
+    // even once the flag is turned on. A connected panel is served while it lives; the deck pages answer it only while
+    // its file reads as a deck this build can write.
     const deckPages = RitemarkEditorProvider.deckPages();
-    const deckPage = deckPages && !cardPage && document.uri.scheme === 'file' && isDeckPath(document.uri.fsPath) && this.deckModeOfView(document, webview)
+    const deckPage = deckPages && !cardPages?.cardModeFor(document) && document.uri.scheme === 'file' && isDeckPath(document.uri.fsPath) && this.deckFlagOfView(webview)
       ? deckPages.connect(document, webviewPanel)
       : undefined;
 
