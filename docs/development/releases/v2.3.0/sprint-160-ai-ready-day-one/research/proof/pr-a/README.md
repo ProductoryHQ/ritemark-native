@@ -28,7 +28,7 @@ Two hidden-profile dev instances (`scripts/qa/dev-launch-isolated.sh`: a fresh p
 | A Flow's Claude step | `main-12-flow-result.png`: "Claude is not signed in…", nothing sent | `branch-11-flow-result.png` and `branch-12-flow-step-output.png`: the step ran on the key; its output holds the CLI's "Invalid API key" (see below) |
 | Requests at the capture | [`capture-main.jsonl`](capture-main.jsonl): 6 × `HEAD /api/hello`, no `POST`, no key | [`capture-branch-chat.jsonl`](capture-branch-chat.jsonl) and [`capture-branch-flow.jsonl`](capture-branch-flow.jsonl): 13 `POST /v1/messages` each, every one with `x-api-key` = the placeholder and no `authorization` |
 
-The branch run above was at `2d468079`. After review round 1 (`d3449bc0`: one key reader shared with the Flow step, the sheet's and Settings' key pre-reads deleted), a third run repeated the key save and the Flow step: Settings and the sheet read Claude ready on the key, and the step's requests carry the placeholder ([`capture-round1-flow.jsonl`](capture-round1-flow.jsonl)). `unit-red-green.txt` is from `d3449bc0`.
+The branch run above was at `2d468079`. After review round 1 (`d3449bc0`: one key reader shared with the Flow step, the sheet's and Settings' key pre-reads deleted), a third run repeated the key save and the Flow step: Settings and the sheet read Claude ready on the key, and the step's requests carry the placeholder ([`capture-round1-flow.jsonl`](capture-round1-flow.jsonl)). `unit-red-green.txt` is from `f2af9751` (after review round 2 and the merge of main with PR B).
 
 ## What the run also showed
 
