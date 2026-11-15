@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Changed
 - **Hidden rows, columns and sheets stay hidden**, as the author left them, and a workbook opens on its own sheet. A cell edits as Excel's bar shows it: 1450 in a cell that reads "1,450.00 €".
 - **A workbook looks as it does in Excel.** Its column widths and row heights, cell colours, fonts, borders and alignment, wrapped and turned text, merged cells, frozen rows and columns and gridlines show as the author made them, on white paper also in Ritemark Dark, with Excel's grey letters and numbers around the sheet. Text runs on into empty cells beside it, and a number too wide for its column shows ####, as in Excel. A chart or picture shows where it sits, as a card saying it is kept in the file, and a chart sheet is a card with Open in Excel. You edit a cell where it is, in its own font, and sorting by a column stays a view, so the file's order doesn't change; with merged cells across the rows, sorting is off and says why. The sheet tabs show even for one sheet, with their colours.
+- **A large workbook opens and saves faster, and its totals fit as they do in Excel.** A 50,000-row sheet saves in under a second and opens in a little over one. Where Calibri and Cambria aren't installed, Ritemark draws them with fonts of the same widths, and on a Mac the columns are as wide as Excel for Mac makes them, so a total that fits in Excel doesn't show #### here.
 
 ## [2.2.0] — 2026-11-11
 
