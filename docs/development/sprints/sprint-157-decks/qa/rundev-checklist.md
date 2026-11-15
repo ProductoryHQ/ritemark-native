@@ -6,7 +6,7 @@ Run on Sunday 15 November 2026 on `sprint-157-decks` at 4ba08c88 plus a193a4b5 (
 
 Both used isolated AI homes, `--use-mock-keychain`, a fresh `--extensions-dir`, `RITEMARK_BUILD_CHANNEL=test` and a dead PostHog address (`127.0.0.1:9`). I drove them over CDP, ran them on a copy of [the demo project](../demo-project/README.md), and stopped each at the end (`LEFT=0`). Jarmo said the 18:00 wait doesn't apply on Sundays ("ei pea ootama pühapäeval").
 
-Keys: the test vault holds only the Gemini key, which came in through `scripts/qa/with-test-keys.sh --only gemini`. Jarmo signed in to ChatGPT himself in the test window, so his sign-in landed in the run's isolated Codex home and not in his own.
+Keys: the test vault holds only the Gemini key, which came in through `scripts/qa/with-test-keys.sh --only gemini`. Jarmo signed in to ChatGPT himself, in the test window itself (his answer, 15 November), so the sign-in landed in the run's isolated Codex home and not in his own. Nothing was copied from `~/.codex`.
 
 | # | Item | Result |
 | --- | --- | --- |
@@ -35,7 +35,7 @@ Screenshots: `qa/rundev/` (this run) and `qa/pr4/rundev-*.png` (the library run)
 - **OpenCode reads the person's own `~/.claude/skills` in a test window.** Its log shows `duplicate skill name ... existing=/Users/jarmotuisk/.claude/skills/...`. HOME isn't changed, so the isolated AI homes don't cover it. It reads only and writes nothing, but a test run can carry the person's skills into the model's context.
 - **The worktree had no bundled agent binaries.** `binaries/agents/` is gitignored, so OpenCode first said "OpenCode runtime not found". The `darwin-arm64` folder was then cloned in copy-on-write from the main checkout, after checking that the manifests are equal.
 - **Home came to the front once on its own** during the Settings and picture steps. The deck kept working in its retained view, but the screenshots of those steps show Home. I didn't find why; it is noted, not explained.
-- **A code block "Näidisprompt"** appeared in the duplicated "Shared prompt board" part. No Ritemark code writes that word, and OpenCode's stored session doesn't have it. It was most likely typed in the window by hand. I asked Jarmo.
+- **A code block "Näidisprompt"** appeared in the duplicated "Shared prompt board" part. Jarmo typed it himself in the test window (his answer, 15 November). It isn't a defect.
 
 ## PR 6 (New → Deck): skipped
 
