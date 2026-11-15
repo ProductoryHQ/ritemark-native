@@ -197,8 +197,9 @@ export function SheetGrid({
   const layout: SheetLayout = useMemo(
     () =>
       buildLayout(sheet, styles, {
-        minWidth: viewport.w + 64,
-        minHeight: viewport.h + 40,
+        // whole steps of 400 px, the same steps the layout is rebuilt at, so the grid always reaches the edges
+        minWidth: Math.ceil(viewport.w / 400) * 400 + 64,
+        minHeight: Math.ceil(viewport.h / 400) * 400 + 40,
         extraRows,
         extraCols,
         sort: sort ? { ...sort, compare: compareCells } : undefined,
