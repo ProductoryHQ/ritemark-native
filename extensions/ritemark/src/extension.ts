@@ -66,6 +66,7 @@ import { BrowserNavigationRecorder, DID_NAVIGATE_COMMAND } from './browser/brows
 import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
 import { findReplacedTextTab, findStuckMarkdownTabs } from './utils/stickyTabHealer';
+import { applyFirstRunThemeSettings } from './firstRunThemeSettings';
 import { openControlCatalogueIfAsked } from './views/ControlCataloguePanel';
 import { registerWebviewSheetDemoIfAsked } from './webviewSheet/devSheetDemo';
 import { openPublishSheetHarnessIfAsked } from './publish/devSheetHarness';
@@ -319,12 +320,15 @@ export function activate(context: vscode.ExtensionContext) {
   const lastDesignThemeMigration = context.globalState.get<string>('ritemark.designFoundationsThemeMigration');
   if (lastDesignThemeMigration !== designFoundationsThemeMigration) {
     setTimeout(async () => {
-      const wb = vscode.workspace.getConfiguration('workbench');
-      const win = vscode.workspace.getConfiguration('window');
-      await win.update('autoDetectColorScheme', true, vscode.ConfigurationTarget.Global);
-      await wb.update('iconTheme', 'ritemark-icons', vscode.ConfigurationTarget.Global);
-      await wb.update('preferredLightColorTheme', 'ritemark-light', vscode.ConfigurationTarget.Global);
-      await wb.update('preferredDarkColorTheme', 'ritemark-dark', vscode.ConfigurationTarget.Global);
+      // #461: on a new profile, only what the person hasn't set; a value already in settings.json before the first
+      // start (the person's, or an admin's) is kept. A profile a Ritemark 1 build before Sprint 52 set up (it stored
+      // themeAppliedVersion) holds that build's light theme with auto-detect off, which this migration replaces.
+      const setUpBefore = context.globalState.get<string>('ritemark.themeAppliedVersion') !== undefined;
+      const done = await applyFirstRunThemeSettings({
+        userValue: (section, key) => vscode.workspace.getConfiguration(section).inspect(key)?.globalValue,
+        write: (section, key, value) => vscode.workspace.getConfiguration(section).update(key, value, vscode.ConfigurationTarget.Global),
+      }, setUpBefore);
+      if (!done) return;
       context.globalState.update('ritemark.themeAppliedVersion', currentVersion);
       context.globalState.update('ritemark.designFoundationsThemeMigration', designFoundationsThemeMigration);
     }, 1500);
