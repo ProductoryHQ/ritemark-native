@@ -57,7 +57,7 @@ const state = EditorState.create({ doc })
   assert.ok(guardFixes(doc, pasted.doc, fix, () => 0.5))
   const ids: string[] = []
   fix.doc.forEach(node => { if (node.type.name === 'deckSlide') ids.push(parseSlideBody(node.attrs.body).id!) })
-  assert.deepEqual(ids, ['aaaa', 'bbbb', 'iiii'])
+  assert.deepEqual(ids, ['aaaa', 'bbbb', 'niii'])
 }
 
 // A code block typed as `slide` or `notes` loses that language; other languages stay.

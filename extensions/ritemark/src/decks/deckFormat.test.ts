@@ -221,7 +221,8 @@ test('info strings, versions, ids and the from line', () => {
   assert.ok(!isReadableDeckVersion('next'));
   let n = 0;
   const sequence = [0, 0, 0, 0, 0.5, 0.5, 0.5, 0.5];
-  assert.equal(newId(['0000'], () => sequence[n++ % sequence.length]), 'iiii');
+  assert.equal(newId(['0000'], () => sequence[n++ % sequence.length]), 'a000');
+  assert.match(newId([], () => 0.05), /^[a-z]/, 'a letter first');
   assert.match(newId([]), /^[0-9a-z]{4}$/);
   const from = parseFrom('Slide library/AI assistants.deck.md#a7c2 @k3f9z1');
   assert.deepEqual(from, { path: 'Slide library/AI assistants.deck.md', id: 'a7c2', stamp: 'k3f9z1' });

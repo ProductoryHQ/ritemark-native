@@ -15,6 +15,8 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { isEnabled } from '../features';
 import { isRelativeImagePath } from '../utils/imagePaths';
+import { parseImageDataUrl, writeImageRelativeTo } from '../utils/imageWriter';
+import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import { deckModeOf } from './deckMode';
 import { isThemePath } from './deckTheme';
 import { decodeDeckRequest, DeckProtocolError, type DeckHostMessage, type DeckRequest } from './deckProtocol';
@@ -44,6 +46,9 @@ export class DeckPages {
         return;
       case 'deck/theme':
         await this.post(webview, { type: 'deck/theme', path: request.path, text: await readTheme(document, request.path) });
+        return;
+      case 'deck/save-image':
+        await this.post(webview, await savePicture(document, webview, request.slideId, request.dataUrl, request.filename));
         return;
     }
   }
@@ -101,5 +106,25 @@ async function readTheme(document: vscode.TextDocument, themePath: string): Prom
     return await fs.promises.readFile(realFile, 'utf8');
   } catch {
     return null;
+  }
+}
+
+/**
+ * A picture pasted or dropped on a slide, saved as the editor saves a pasted picture: in `images/` beside the deck
+ * (only while the deck's folder is there), under a cleaned name that never overwrites another file.
+ */
+async function savePicture(document: vscode.TextDocument, webview: vscode.Webview, slideId: string, dataUrl: string, filename: string): Promise<DeckHostMessage> {
+  try {
+    const parsed = parseImageDataUrl(dataUrl);
+    if (!parsed) throw new Error('That is not a picture.');
+    const folder = path.dirname(document.uri.fsPath);
+    const imagesDir = path.join(folder, 'images');
+    await ensureProjectSubfolder(folder, imagesDir);
+    const written = writeImageRelativeTo(imagesDir, `${path.basename(filename, path.extname(filename))}.${parsed.extension}`, parsed.base64);
+    const url = webview.asWebviewUri(vscode.Uri.file(path.join(imagesDir, written))).toString();
+    return { type: 'deck/image-saved', slideId, path: `images/${written}`, url };
+  } catch (error) {
+    console.warn('[Decks] Could not save a picture:', error);
+    return { type: 'deck/image-failed', slideId, message: 'The picture could not be saved beside the deck.' };
   }
 }
