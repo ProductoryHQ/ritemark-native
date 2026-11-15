@@ -93,7 +93,7 @@ interface Running {
   presenterDisplay: number;
   startedAt: number;
   ended: boolean;
-  /** A swap is moving the windows: a second press waits for it to end. */
+  /** A swap is moving the windows: a second press meanwhile is let go. */
   swapping: boolean;
   /** The presenter view's refresh after an edit, once the typing pauses; and the latest state's number. */
   refresh: ReturnType<typeof setTimeout> | null;
@@ -150,7 +150,7 @@ export class DeckPresenter implements vscode.Disposable {
     const chosen = chooseDisplays(displays);
     return {
       type: 'deck/present-options',
-      canPresent: shell || presentFallbackAllowed(),
+      unavailable: shell || presentFallbackAllowed() ? null : PRESENT_NEEDS_UPDATE,
       available,
       on: available && this.presenterWanted(),
       wallDisplay: available && displays.length > 1 ? displays[chosen.wall].name : null,
@@ -226,7 +226,8 @@ export class DeckPresenter implements vscode.Disposable {
     // focus (the presenter's keys and clicker work there). Each panel is made in the deck's group, where it is the
     // tab in front, so its page loads before it moves (a panel behind another tab loads nothing).
     await this.place(running, running.wall, DECK_WALL_VIEW_TYPE, running.wallDisplay, WINDOWED_WALL);
-    if (this.presenterAvailable(running) && this.presenterWanted() && !running.ended) {
+    // (A presenter view turned on from the wall's bar while the wall was being placed is there already.)
+    if (this.presenterAvailable(running) && this.presenterWanted() && !running.ended && !running.presenter) {
       this.addPresenter(running);
       if (running.presenter) await this.place(running, running.presenter, DECK_PRESENTER_VIEW_TYPE, running.presenterDisplay, WINDOWED_PRESENTER);
     }
@@ -310,13 +311,16 @@ export class DeckPresenter implements vscode.Disposable {
    */
   private async place(running: Running, screen: Screen, viewType: string, display: number, windowed: { x: number; y: number; width: number; height: number }): Promise<void> {
     if (!(await panelIsOpen(running, viewType))) return;
-    if (screen.loads === 0) await nextLoad(screen, LOAD_WAIT_MS);
+    if (screen.loads === 0) await nextLoad(screen, LOAD_WAIT_MS).loaded;
     if (running.ended) return;
     const fullScreen = !presentWindowed();
     const reloaded = nextLoad(screen, RELOAD_WAIT_MS);
     const placed = await vscode.commands.executeCommand<unknown>(PLACE_COMMAND, { viewType, display, fullScreen, ...(fullScreen ? {} : { windowed }) });
-    if (placed !== 'opened') return;
-    if (!(await reloaded) && !running.ended) screen.panel.webview.html = `${screen.html}<!-- ${Date.now()} -->`;
+    if (placed !== 'opened') {
+      reloaded.cancel();
+      return;
+    }
+    if (!(await reloaded.loaded) && !running.ended) screen.panel.webview.html = `${screen.html}<!-- ${Date.now()} -->`;
   }
 
   /** Swap displays: the wall goes where the presenter view is, and the presenter view where the wall was. */
@@ -476,16 +480,30 @@ function moveOf(request: Extract<WallRequest, { type: 'present/next' | 'present/
   }
 }
 
-/** True when the screen's page loads (says it is ready) within `ms`; false after it. */
-function nextLoad(screen: Screen, ms: number): Promise<boolean> {
-  return new Promise(resolve => {
-    const timer = setTimeout(() => resolve(false), ms);
-    screen.loaded.push(() => { clearTimeout(timer); resolve(true); });
+/** Whether the screen's page loads (says it is ready) within `ms`; `cancel` takes the wait back. */
+function nextLoad(screen: Screen, ms: number): { loaded: Promise<boolean>; cancel: () => void } {
+  let done: () => void = () => {};
+  let cancel: () => void = () => {};
+  const loaded = new Promise<boolean>(resolve => {
+    const timer = setTimeout(() => { remove(); resolve(false); }, ms);
+    const remove = () => { const at = screen.loaded.indexOf(done); if (at >= 0) screen.loaded.splice(at, 1); };
+    done = () => { clearTimeout(timer); resolve(true); };
+    cancel = () => { clearTimeout(timer); remove(); resolve(false); };
+    screen.loaded.push(done);
   });
+  return { loaded, cancel };
 }
 
+/** The shell's commands don't change while Ritemark runs: asked once. */
+let shellPlacement: Promise<boolean> | null = null;
+
 /** The shell can place the windows: this Ritemark's shell has the commands (patch 018, Sprint 159). */
-async function hasShellPlacement(): Promise<boolean> {
+function hasShellPlacement(): Promise<boolean> {
+  shellPlacement ??= askShellPlacement();
+  return shellPlacement;
+}
+
+async function askShellPlacement(): Promise<boolean> {
   // All commands, the private ones too (`getCommands(true)` leaves out those whose name starts with an underscore).
   const commands = await vscode.commands.getCommands(false);
   return commands.includes(PLACE_COMMAND) && commands.includes(DISPLAYS_COMMAND);

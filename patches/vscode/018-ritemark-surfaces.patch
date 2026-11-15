@@ -251,7 +251,10 @@ build's windowed mode at the given bounds); a panel already in such a window mov
 Such a window is a presentation's window (layoutService.ts `markRitemarkPresentingWindow`, set as the window opens):
 no title row (shouldShowCustomTitleBar), no desk's bottom gap (editorPart.ts), no desk's edge, corners or ground
 (ritemarkSurfaces.css `.ritemark-presenting`); 019 drops its desk gap. electron-browser/parts/ritemarkPresent.ts, loaded
-by desktop.contribution.ts. The extension checks the commands exist; an older shell presents with VS Code's commands.
+by desktop.contribution.ts. Only the window `place` opens is marked (the first to open, checked against its part's
+window; unmarked again if the part fails), so the main window and every other auxiliary window keep their frame. A
+presentation's window is titled by its page alone (the deck's name), never with the project's. The extension checks the
+commands exist; without them Present says it needs a newer Ritemark (a dev build uses VS Code's own commands).
 diff --git a/src/vs/base/browser/ui/dialog/dialog.ts b/src/vs/base/browser/ui/dialog/dialog.ts
 index 34d22b5d162..644a11f194a 100644
 --- a/src/vs/base/browser/ui/dialog/dialog.ts
@@ -7120,10 +7123,10 @@ index 41250d7b714..133c8807b3f 100644
  				agentsWindow: { default: 'custom' },
 diff --git a/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts b/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts
 new file mode 100644
-index 00000000000..93b5e0c1061
+index 00000000000..809c511ea4c
 --- /dev/null
 +++ b/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts
-@@ -0,0 +1,197 @@
+@@ -0,0 +1,212 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -7142,7 +7145,8 @@ index 00000000000..93b5e0c1061
 + *   window (layoutService.ts): frameless, no title row, no gap and no desk's edge, the page edge to edge. A panel that
 + *   is in such a window already moves with its window to the display asked for (Swap displays).
 + *
-+ * The extension checks that the commands exist; an older shell presents with VS Code's own window commands instead.
++ * The extension checks that the commands exist. Without them (an older shell) Present says it needs a newer Ritemark;
++ * only a dev build then presents with VS Code's own window commands, whose window would show the project's name.
 + */
 +
 +import { mainWindow } from '../../../base/browser/window.js';
@@ -7154,7 +7158,7 @@ index 00000000000..93b5e0c1061
 +import { IRectangle } from '../../../platform/window/common/window.js';
 +import { EditorInput } from '../../common/editor/editorInput.js';
 +import { AuxiliaryWindowMode, IAuxiliaryWindowOpenOptions, IAuxiliaryWindowService } from '../../services/auxiliaryWindow/browser/auxiliaryWindowService.js';
-+import { IEditorGroup, IEditorGroupsService } from '../../services/editor/common/editorGroupsService.js';
++import { IAuxiliaryEditorPart, IEditorGroup, IEditorGroupsService } from '../../services/editor/common/editorGroupsService.js';
 +import { isRitemarkPresentingWindow, markRitemarkPresentingWindow } from '../../services/layout/browser/layoutService.js';
 +
 +/** A display, as the extension gets it. */
@@ -7284,18 +7288,24 @@ index 00000000000..93b5e0c1061
 +		return 'moved';
 +	}
 +
-+	// A new window: marked as a presentation's before its parts are laid out, so it never shows a title row. Only the
-+	// first window that opens is marked, and the mark is checked against the part's own window below: no other window
-+	// (the browser's, a floating editor, the main window) ever takes a presentation's look.
++	// A new window: marked as a presentation's, and named by its page, as it opens and before its parts are laid out,
++	// so it never shows a title row or the project's name. Only the first window that opens is marked, and the mark is
++	// checked against the part's own window: no other window (the browser's, a floating editor, the main window) ever
++	// takes a presentation's look, and a part that fails to open leaves no mark behind.
++	const title = panel.editor.getName();
 +	let marked: { window: Window; container: HTMLElement } | undefined;
++	const setPresenting = (target: { window: Window; container: HTMLElement }, presenting: boolean) => {
++		markRitemarkPresentingWindow(target.window, presenting);
++		target.container.classList.toggle('ritemark-presenting', presenting);
++	};
 +	const opened = auxiliaryWindowService.onDidOpenAuxiliaryWindow(({ window }) => {
-+		if (marked) {
-+			return;
++		if (!marked) {
++			marked = { window: window.window, container: window.container };
++			setPresenting(marked, true);
++			keepTitle(window.window, title);
 +		}
-+		marked = { window: window.window, container: window.container };
-+		markRitemarkPresentingWindow(window.window, true);
-+		window.container.classList.add('ritemark-presenting');
 +	});
++	let part: IAuxiliaryEditorPart;
 +	try {
 +		// The editor parts pass every window option on (IAuxiliaryEditorPartOpenOptions), beyond the service's three
 +		const options: IAuxiliaryWindowOpenOptions = {
@@ -7305,20 +7315,28 @@ index 00000000000..93b5e0c1061
 +			backgroundColor: '#0E0C24',
 +			mode: request.fullScreen ? AuxiliaryWindowMode.Fullscreen : AuxiliaryWindowMode.Normal
 +		};
-+		const part = await editorGroupsService.createAuxiliaryEditorPart(options);
-+		opened.dispose();
-+		if (marked && marked.window !== getWindowById(part.windowId)?.window) {
-+			// Another window opened first: it is not the presentation's, and keeps its own look
-+			markRitemarkPresentingWindow(marked.window, false);
-+			marked.container.classList.remove('ritemark-presenting');
++		part = await editorGroupsService.createAuxiliaryEditorPart(options);
++	} catch (error) {
++		if (marked) {
++			setPresenting(marked, false);
 +		}
-+		panel.group.moveEditor(panel.editor, part.activeGroup);
-+		part.activeGroup.lock(true);
-+		part.activeGroup.focus();
-+		keepTitle(getWindowById(part.windowId)?.window, panel.editor.getName());
++		throw error;
 +	} finally {
 +		opened.dispose();
 +	}
++	const own = auxiliaryWindowService.getWindow(part.windowId);
++	if (marked && marked.window !== own?.window) {
++		// Another window opened first: it keeps its own look, and the presentation's own window takes the mark (laid out
++		// again when it goes full screen)
++		setPresenting(marked, false);
++		if (own) {
++			setPresenting({ window: own.window, container: own.container }, true);
++			keepTitle(own.window, title);
++		}
++	}
++	panel.group.moveEditor(panel.editor, part.activeGroup);
++	part.activeGroup.lock(true);
++	part.activeGroup.focus();
 +	return 'opened';
 +});
 diff --git a/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts

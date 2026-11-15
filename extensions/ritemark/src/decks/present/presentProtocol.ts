@@ -254,8 +254,8 @@ export const PRESENT_NEEDS_UPDATE = 'Presenting needs the newest Ritemark. Updat
 /** The deck view's Present menu: whether Present can run, whether a presenter view can show, where, and whether it is on. */
 export interface DeckPresentOptions {
   type: 'deck/present-options';
-  /** The shell can place the wall (or a dev build may use VS Code's own commands). */
-  canPresent: boolean;
+  /** Why Present can't run here (an older shell), or null: the shell can place the wall, or a dev build may. */
+  unavailable: string | null;
   /** A second display is connected (or a dev build's windowed mode) and the shell can place the windows. */
   available: boolean;
   on: boolean;

@@ -28,8 +28,19 @@ Stop in the presenter view: both windows close, the deck view is on slide 5 (the
 fallback: one window of VS Code's default size, tab row 0 high, title row shown; no presenter view
 ```
 
+## The main window and an ordinary floating window, unchanged (`frame-checks/`)
+
+The presentation's look (no title row, no desk gap or edge) is set only on the window `_ritemark.present.place` opens, by that window's own entry (`markRitemarkPresentingWindow`). To prove nothing else changed, the frame checks ran twice on fresh profiles with the frame sample (`/private/tmp/ritemark-frame/Harbour leadership programme`), flag off: once with PR 6's shell (A), once with the dev build's `out/` files from before it (B: `layoutService.js`, `editorPart.js`, `editorGroupView.js`, `ritemarkSurfaces.css`, `desktop.contribution.js` and `app.js` from the Decks branch's tree), everything else the same.
+
+- `frame-screenshots --compare`, B against A: **0 of 34 scenes differ, 0% each; every join ok** (`frame-screenshots-without-vs-with-pr6.txt`).
+- `frame-screenshots --compare docs/development/frame-baseline` (main's baseline), A: every join ok; 0.65% to 15% differ in every scene, the same in A and B. That is the isolated AI homes (the baseline was taken signed in to Claude and ChatGPT, so its AI column differs from a test profile's "Sign in" cards, about 8% as noted in the frame baseline's history), not this PR: the scenes with the AI column hidden differ least (1.9%, 0.65%), and A and B are identical (`frame-screenshots-vs-main-baseline.txt`).
+- `frame-geometry`: 34 PASS, 2 SKIP (the tabs' labels in a state without them), 0 FAIL, in A and in B; the measurements and results are identical.
+- `project-check --first-frame relaunch`: PASS in both: 19 boxes kept their place and the document stayed in front.
+- **An ordinary floating editor window** (Brief.md through View: Move Editor into New Window), A and B: the title row (44), the tab row, the group's 8 px padding, the desk's 10 px corners and the part's box are identical, `ritemark-presenting` is absent, and the screenshots are byte for byte the same (`floating-window-*`).
+
 ## Not verified (Jarmo's, on real hardware)
 
+- The wall shows nothing but the slide.
 - The wall full screen on a projector and the presenter view on the laptop, each placed by display; Presenter view coming on by itself and naming the display.
 - Swap displays (out of full screen, over, in again).
 - A clicker.

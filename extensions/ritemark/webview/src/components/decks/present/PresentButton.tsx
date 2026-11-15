@@ -11,7 +11,6 @@ import { DropdownMenuItem, DropdownMenuSeparator } from '../../ui/dropdown-menu'
 import { Icon } from '../../ui/Icon'
 import { SplitButton } from '../../ui/split-button'
 import { presentKeyOf } from './wallKeys'
-import { PRESENT_NEEDS_UPDATE } from '../../../../../src/decks/present/presentProtocol'
 
 export type PresentFrom = 'here' | 'start'
 
@@ -20,7 +19,8 @@ const START_KEYS = isMac ? '⇧⌘↩' : 'Shift+Ctrl+Enter'
 
 /** The host's answer for the menu's Presenter view (`deck/present-options`). */
 interface PresentOptions {
-  canPresent: boolean
+  /** Why Present can't run here (an older shell), or null. */
+  unavailable: string | null
   available: boolean
   on: boolean
   wallDisplay: string | null
@@ -62,12 +62,12 @@ export function PresentButton({ slideNumber, startNumber, onPresent }: {
 }) {
   const [options, setOptions] = useState<PresentOptions | null>(null)
   // An older shell can't place the wall without showing the project's name: Present waits for an update there.
-  const needsUpdate = options !== null && !options.canPresent
-  const disabled = slideNumber === null || needsUpdate
+  const unavailable = options?.unavailable ?? null
+  const disabled = slideNumber === null || unavailable !== null
 
   useEffect(() => onMessage(message => {
     if (message.type !== 'deck/present-options') return
-    setOptions({ canPresent: message.canPresent !== false, available: message.available === true, on: message.on === true, wallDisplay: typeof message.wallDisplay === 'string' ? message.wallDisplay : null })
+    setOptions({ unavailable: typeof message.unavailable === 'string' ? message.unavailable : null, available: message.available === true, on: message.on === true, wallDisplay: typeof message.wallDisplay === 'string' ? message.wallDisplay : null })
   }), [])
   useEffect(() => { sendToExtension('deck/present-options') }, [])
 
@@ -79,7 +79,7 @@ export function PresentButton({ slideNumber, startNumber, onPresent }: {
       main={{
         label: 'Present',
         icon: <Icon name="play" size={14} tone="inherit" />,
-        tooltip: needsUpdate ? PRESENT_NEEDS_UPDATE : slideNumber === null ? 'Add a slide to present the deck' : `Present from this slide (${HERE_KEYS})`,
+        tooltip: unavailable ?? (slideNumber === null ? 'Add a slide to present the deck' : `Present from this slide (${HERE_KEYS})`),
         onClick: () => onPresent('here'),
       }}
       menu={{
