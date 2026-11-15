@@ -37,6 +37,7 @@ import { CommentMark } from '../extensions/comment/CommentMark'
 import { CommentNode } from '../extensions/comment/CommentNode'
 import { commentMarkedExtension } from '../extensions/comment/commentMarkedExtension'
 import { addCommentTurndownRules } from '../extensions/comment/commentTurndownRules'
+import { addDeckTurndownRules } from '../components/decks/handout/deckSchema'
 import { mathMarkedExtension } from '../extensions/math/mathMarkedExtension'
 import { LiteralDollar, MathBlock, MathInline } from '../extensions/math/mathNodes'
 import { classifyLinkTarget, isSafeRelativePath } from '../lib/linkTargets'
@@ -317,6 +318,8 @@ export interface EditorExtensionSlots {
   mathInline?: TipTapNode
   /** Sprint 138 (#481): the equation block node; the editor passes its typesetting view. */
   mathBlock?: TipTapNode
+  /** Sprint 157: a deck's slide node and its guard, only when the document opens as a deck. */
+  deck?: AnyExtension[]
 }
 
 /**
@@ -397,6 +400,8 @@ export function createEditorSchemaExtensions(slots: EditorExtensionSlots = {}): 
     slots.mathInline ?? MathInline,
     slots.mathBlock ?? MathBlock,
     LiteralDollar,
+    // Sprint 157: the deck's slide node, after math, only in a deck.
+    ...(slots.deck ?? []),
     // Sprint 137 (#539): inline code no longer excludes every other mark, so
     // a link, bold, italic or strikethrough around code keeps its mark
     // (``[`file.md`](file.md)``, ``**`name` is vendored**``). It comes last, so
@@ -454,6 +459,8 @@ export function preprocessTableHTML(html: string): string {
 export function createEditorTurndownService(): TurndownService {
   const service = createTurndownService()
   addCommentTurndownRules(service)
+  // Sprint 157: a deck's slide nodes. Harmless without them, like the comment rules.
+  addDeckTurndownRules(service)
   return service
 }
 

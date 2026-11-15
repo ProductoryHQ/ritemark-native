@@ -5,7 +5,7 @@ import { DOMSerializer } from '@tiptap/pm/model'
 import { Fragment } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
 import { closeHistory } from '@tiptap/pm/history'
-import { createNodeFromContent } from '@tiptap/core'
+import { createNodeFromContent, type AnyExtension } from '@tiptap/core'
 import { sendToExtension, onMessage } from '../bridge'
 import Placeholder from '@tiptap/extension-placeholder'
 import { CodeBlockWithCopyExtension } from '../extensions/CodeBlockWithCopyExtension'
@@ -145,6 +145,9 @@ interface EditorProps {
   /** Sprint 130: content above the document inside the same scroll (a task
    *  card's title, state and files on its page). */
   header?: React.ReactNode
+  /** Sprint 157: extra schema extensions for a mode of the editor (a deck's slide node and its guard), fixed at
+   *  mount like the rest of the list. */
+  extensions?: AnyExtension[]
 }
 
 export function Editor({
@@ -159,6 +162,7 @@ export function Editor({
   syncTarget,
   onExternalApplied,
   header,
+  extensions,
 }: EditorProps) {
   // Register the comment `marked` tokenizer before initialContent is parsed on
   // mount — only when the flag is on (see ensureCommentMarkedPipeline above).
@@ -245,6 +249,8 @@ export function Editor({
       // Sprint 138 (#481): the equation nodes with their typesetting views.
       mathInline: MathInlineWithView,
       mathBlock: MathBlockWithView,
+      // Sprint 157: a deck's slide node and its guard, only in a deck.
+      deck: extensions,
     }),
     content: initialContent,
     onCreate: ({ editor }) => {
