@@ -2,6 +2,8 @@ import type { AgentId, AgentInfo } from '../agent/types';
 import type { DiscoveredAgent, DiscoveredCommand } from '../agent/discovery';
 import type { ModelEntry } from '../ai/modelCatalog';
 import type { RuntimeCapabilities } from '../runtime/capabilities';
+import type { SignInProblem } from '../welcome/words';
+import type { LoginPollEnd } from '../codex/codexStatusEvents';
 
 export interface AgentSidebarBootstrapMessage {
   type: 'agent:bootstrap';
@@ -91,4 +93,52 @@ export function decodeBrowserShareAnswer(value: unknown): BrowserShareAnswerMess
   if (message.type !== 'browser:share-answer' || typeof message.pageId !== 'string' || !message.pageId) return null;
   if (message.answer !== 'share' && message.answer !== 'notNow') return null;
   return { type: 'browser:share-answer', pageId: message.pageId, answer: message.answer, withoutAsking: message.withoutAsking === true };
+}
+
+/** Sprint 160 (#696): the two AIs whose sign-in the AI's sheet runs and shows ("Almost there!"). */
+export type SheetSignInAi = 'claude' | 'chatgpt';
+
+/**
+ * Sprint 160 (#696): the line a sign-in card on the sheet shows. A sign-in that ended without success says why
+ * (`signInProblem`'s 'failed', 'timed-out' and 'could-not-start'); 'not-opened' is "Open the page again" finding no
+ * page to open while the sign-in still waits (`homeReopenNotOpened`).
+ */
+export type SheetSignInLine = Exclude<SignInProblem, 'not-ready'>;
+
+/**
+ * Sprint 160 (#696): what a sign-in card on the sheet shows beyond the AI's state, from the host. `page`: the running
+ * sign-in's page is known, so "Open the page again" can open it. Never the page's address itself.
+ */
+export interface SheetSignInMessage {
+  type: 'onboarding:sign-in';
+  ai: SheetSignInAi;
+  page: boolean;
+  line: SheetSignInLine | null;
+}
+
+/** What the sheet keeps of it, per AI. */
+export type SheetSignInView = Pick<SheetSignInMessage, 'page' | 'line'>;
+
+/** Sprint 160 (#696): the card's Cancel and its "Open the page again", from the sheet to the host. */
+export interface SheetSignInRequest {
+  type: 'onboarding:cancel-sign-in' | 'onboarding:reopen-sign-in';
+  ai: SheetSignInAi;
+}
+
+/**
+ * Sprint 160 (#696): the ChatGPT card's line when its sign-in's poll ends. The 2-minute give-up says "not finished in
+ * time" only for a login whose page opened here; Settings' own login (another app-server, which says it started before
+ * its login has a page) just ends. Ready and a stop leave no line.
+ */
+export function sheetLineForCodexPollEnd(end: LoginPollEnd, pageOpened: boolean): SheetSignInLine | null {
+  if (end === 'failed') return 'failed';
+  return end === 'gave-up' && pageOpened ? 'timed-out' : null;
+}
+
+export function decodeSheetSignInRequest(value: unknown): SheetSignInRequest | null {
+  if (!value || typeof value !== 'object') return null;
+  const message = value as Record<string, unknown>;
+  if (message.type !== 'onboarding:cancel-sign-in' && message.type !== 'onboarding:reopen-sign-in') return null;
+  if (message.ai !== 'claude' && message.ai !== 'chatgpt') return null;
+  return { type: message.type, ai: message.ai };
 }

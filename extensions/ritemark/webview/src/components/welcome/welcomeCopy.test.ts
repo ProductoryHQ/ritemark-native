@@ -24,6 +24,8 @@ assert.equal(browserOpened('chatgpt'), 'Your browser opened ChatGPT’s sign-in 
 assert.equal(stopWaitingTip('chatgpt'), 'Stop waiting for ChatGPT’s sign-in', 'Cancel\'s tooltip (the welcome adds its key, Escape)')
 assert.equal(reopenTip('claude'), 'Open Claude’s sign-in page again')
 assert.equal(COPY.reopen, 'Did nothing open? Open the page again')
+// Sprint 160 (#696): the waiting button's words, Home's and the AI sheet's
+assert.equal(COPY.signingIn, 'Signing in…')
 assert.equal(OPENCODE_SET_UP_TIP, 'Add an API key of your own for OpenCode')
 
 const everyWord = JSON.stringify({ COPY, PLAN_LINES, PROVIDER_NAMES, tips: [stopWaitingTip('chatgpt'), reopenTip('chatgpt'), OPENCODE_SET_UP_TIP] })
