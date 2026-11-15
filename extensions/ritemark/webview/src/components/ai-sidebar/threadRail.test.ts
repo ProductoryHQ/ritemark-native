@@ -124,4 +124,27 @@ assert.match(
   'The state is one unbroken piece of text; only "Current" may move to a second line',
 );
 
+// Sprint 160 (#686): a chat that stopped at a usage limit says "Limit reached" in the chats list and
+// on the rail, instead of "Interrupted".
+const limitSummary: ConversationSummaryV1 = {
+  ...rowSummary,
+  conversationId: 'conversation-limit',
+  lifecycle: { state: 'interrupted', turnId: 'turn-row', reason: 'failed' },
+  runtimeSummary: ['opencode'],
+  lastFailure: { runtimeId: 'opencode', kind: 'limit', limit: 'plan' },
+};
+const limitRowMarkup = renderToStaticMarkup(createElement(ConversationRow, {
+  summary: limitSummary,
+  pin: conversationPinState(limitSummary.conversationId, rowTitle, []),
+  current: false,
+  onOpen: noop,
+  onRename: noop,
+  onPin: noop,
+  onDelete: noop,
+}));
+assert.match(limitRowMarkup, /<span class="whitespace-nowrap">Limit reached<\/span>/, 'the chats list says the limit was reached');
+assert.doesNotMatch(limitRowMarkup, /Interrupted/);
+// The rail's words come from `railEntryLabels` (conversationActionsModel.test.ts): a server render reads
+// the store's initial state, so the rail itself is not rendered with a chat here.
+
 console.log('threadRail.test.ts: all assertions passed');
