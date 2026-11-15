@@ -210,3 +210,15 @@ export function appendPart(text: string, part: string): string {
 export function newTopicText(theme: string, part: string): string {
   return `---\ndeck: 1\ntheme: ${theme}\n---\n\n${part}\n`;
 }
+
+/**
+ * The deck's text with `parts` put in after slide `after` (its number, from 1; 0 puts them before the first slide), and
+ * every other byte as it was. A number past the last slide puts them at the end.
+ */
+export function insertPartsText(text: string, after: number, parts: string[]): string {
+  const deck = parseDeck(text);
+  const joined = parts.join('\n\n');
+  if (deck.slides.length === 0 || after >= deck.slides.length) return appendPart(text, joined);
+  const at = deck.slides[Math.max(0, after)].start;
+  return `${text.slice(0, at)}${joined}\n\n${text.slice(at)}`;
+}

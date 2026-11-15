@@ -35,7 +35,7 @@ import { isTrustedDeckTransaction } from './handout/deckGuard'
 import { convertKind } from './slide/convertKind'
 import { SlideSettings } from './SlideSettings'
 import { SlideStrip, type StripActions, type StripMark } from './SlideStrip'
-import { newId, writeSlideBlock } from '../../../../src/decks/deckFormat'
+import { newId, parseSlideBody, writeSlideBlock, writeSlideBody } from '../../../../src/decks/deckFormat'
 import type { Transaction } from '@tiptap/pm/state'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { currentPart, scrollTopFor } from './scrollRule'
@@ -679,17 +679,42 @@ export function DeckView({
         return
       }
       case 'deck/insert': {
+        const requestId = typeof message.requestId === 'string' ? message.requestId : null
+        const answer = (ok: boolean) => { if (requestId) sendToExtension('deck/applied', { requestId, ok }) }
         const parts = Array.isArray(message.parts) ? message.parts.filter(isNewPart) : []
-        if (parts.length === 0 || typeof message.after !== 'number') return
-        const total = slidesOf(editor.state.doc).length
+        if (parts.length === 0 || typeof message.after !== 'number') { answer(false); return }
+        const current = slidesOf(editor.state.doc)
+        const total = current.length
         const at = total === 0 ? 0 : Math.max(0, Math.min(total, Math.floor(message.after) + 1))
-        const content = partsFragment(editor, parts.map(part => ({ kind: part.kind, body: part.body, handout: part.handout })), imageMappings)
-        if (!content) {
+        // The host chose the copies' ids from the document, which may not have this view's newest slides yet: an id
+        // that is taken here is renewed.
+        const taken = new Set(current.map(entry => entry.data.id).filter((id): id is string => !!id))
+        const fresh = parts.map(part => {
+          const data = parseSlideBody(part.body)
+          if (!data.id || !taken.has(data.id)) {
+            if (data.id) taken.add(data.id)
+            return part
+          }
+          const id = newId(taken)
+          taken.add(id)
+          return { ...part, body: writeSlideBody(part.body, { ...data, id }) }
+        })
+        const content = partsFragment(editor, fresh.map(part => ({ kind: part.kind, body: part.body, handout: part.handout })), imageMappings)
+        if (!content || !dispatch(restoreSlide(editor.state, at, content))) {
           setNotice({ text: 'The slides could not be put in.' })
+          answer(false)
           return
         }
-        dispatch(restoreSlide(editor.state, at, content))
+        answer(true)
         requestAnimationFrame(() => pick(at))
+        return
+      }
+      case 'deck/set-from': {
+        const requestId = typeof message.requestId === 'string' ? message.requestId : null
+        const entry = typeof message.id === 'string' ? slideById(message.id) : null
+        const ok = !!entry && typeof message.from === 'string'
+          && dispatch(updateSlide(editor.state, entry.index, { ...entry.data, from: message.from as string, kept: undefined }))
+        if (requestId) sendToExtension('deck/applied', { requestId, ok })
         return
       }
     }

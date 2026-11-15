@@ -37,6 +37,8 @@ export interface CapabilityDescriptor {
   hasBrowserTools: boolean;
   /** Whether this runtime has the task board tools (include the TASK BOARD section). */
   hasBoardTools: boolean;
+  /** Whether this runtime has the deck tools (include the DECKS section). */
+  hasDeckTools?: boolean;
 }
 
 export const CLAUDE_DESCRIPTOR: CapabilityDescriptor = {
@@ -69,8 +71,8 @@ const DESCRIPTORS: Record<AgentId, CapabilityDescriptor> = {
  * tools since Sprint 79 yet was the one runtime whose hint did not follow them;
  * routing all three through here keeps it so.
  */
-export function capabilityDescriptorFor(runtime: AgentId, tools: { browser: boolean; board: boolean }): CapabilityDescriptor {
-  return { ...DESCRIPTORS[runtime], hasBrowserTools: tools.browser, hasBoardTools: tools.board };
+export function capabilityDescriptorFor(runtime: AgentId, tools: { browser: boolean; board: boolean; deck?: boolean }): CapabilityDescriptor {
+  return { ...DESCRIPTORS[runtime], hasBrowserTools: tools.browser, hasBoardTools: tools.board, hasDeckTools: tools.deck === true };
 }
 
 interface CapabilitySection {
@@ -152,6 +154,18 @@ const SECTIONS: CapabilitySection[] = [
             '- When a message says it is a card on the task board, work toward the card\'s "Done when", and finish with report_result for that card: one or two sentences on what you did, plus up to three short things the user should check.',
             '- Before long work, put the decisions that would change the result to the user with ask_user first, rather than stopping halfway. For any decision that can wait, use ask_user instead of guessing, then end your turn; the answer comes back to the conversation.',
             '- Only the user marks a card done, and only the user deletes one.',
+          ].join('\n')
+        : null,
+  },
+  {
+    id: 'decks',
+    render: (d) =>
+      d.hasDeckTools
+        ? [
+            'DECKS: a `.deck.md` file is a slide deck. The `Slide library` folder holds one deck per topic: the slides to reuse.',
+            '- Find and read slides with the `ritemark_decks` tools (list_decks, read_deck). Put a slide from the library or another deck into a deck only with insert_slides, so the copy gets its `from:` line; never paste a library slide in by hand.',
+            '- Never change anything in `Slide library/` unless the user asks for it; then use update_library_slide or add_to_library.',
+            '- To change a deck\'s own slides, edit the file. Each slide is a fenced block ```` ```slide <kind> ```` (kinds: title, section, statement, points, boxes, columns, table, picture, exercise) holding `id:`, `title:` and the slide\'s words as YAML (`items:` with `heading`, `text`, `icon`; `rows:` for a table). Keep each slide\'s `id:` and `from:` lines as they are. A ```` ```notes ```` block right after a slide is its speaker notes; the Markdown after a slide, up to the next one, is its handout.',
           ].join('\n')
         : null,
   },

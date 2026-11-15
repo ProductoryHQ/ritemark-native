@@ -9,8 +9,8 @@
  */
 import { newId, parseFrom, parseSlideBody, writeFrom, writeSlideBody, type SlideData } from './deckFormat';
 import {
-  appendPart, folderOf, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp, slidesOfText,
-  type DeckSlideText,
+  appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp,
+  slidesOfText, type DeckSlideText,
 } from './deckLibraryFormat';
 import { BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT } from './deckTheme';
 
@@ -171,6 +171,34 @@ export class DeckLibrary {
     });
   }
 
+  /**
+   * Insert copies of slides `ids` of `sourcePath` into the deck at `targetPath`, after its slide `after` (a number from
+   * 1; 0 is before the first; left out, at the end). When the deck is open, `intoView` puts them in through its view, as
+   * one undo step there; otherwise the file is written. Returns the new slides' numbers.
+   */
+  async insertCopies(
+    sourcePath: string,
+    ids: string[],
+    targetPath: string,
+    after: number | undefined,
+    intoView?: (parts: CopiedPart[], afterIndex: number) => Promise<boolean>,
+  ): Promise<{ first: number; count: number }> {
+    if (!/\.deck\.md$/i.test(targetPath) || normalizePath(targetPath) !== targetPath) throw new Error(`${targetPath} is no deck in this project.`);
+    const text = await this.files.read(targetPath);
+    if (text === null) throw new Error(`No deck at ${targetPath}.`);
+    const slides = slidesOfText(text);
+    const taken = slides.map(slide => slide.data.id).filter((id): id is string => !!id);
+    const parts = await this.copies(sourcePath, ids, targetPath, taken);
+    const at = Math.max(0, Math.min(slides.length, after ?? slides.length));
+    if (intoView) {
+      // An open deck takes them only through its view: its file is never written under the person's typing.
+      if (!(await intoView(parts, at - 1))) throw new Error(`${deckName(targetPath)} is open but didn't take the slides. Nothing was inserted; try again.`);
+    } else {
+      await this.files.write(targetPath, insertPartsText(text, at, parts.map(part => partText(part.kind, part.body, part.handout))));
+    }
+    return { first: at + 1, count: parts.length };
+  }
+
   /** What each copy of the deck at `deckPath` shows under it. */
   async sourceStates(deckPath: string, copies: Array<{ id: string; from: string; kind: string; body: string; handout: string }>): Promise<SourceState[]> {
     const folder = folderOf(deckPath);
@@ -251,6 +279,30 @@ export class DeckLibrary {
     await this.files.write(path, written, { create: previous === null });
     const stamp = slideStamp(copy.kind, parseSlideBody(body), handout, folderOf(path));
     return { from: writeFrom({ path, id, stamp }), path, previous, written };
+  }
+
+  /** The deck's slide `id` as written, for the AI's library tools (they name a slide, the buttons send its text). */
+  async slideOf(deckPath: string, id: string): Promise<CopiedPart & { from?: string }> {
+    const slide = (await this.readDeck(deckPath))?.find(entry => entry.data.id === id);
+    if (!slide) throw new Error(`${deckName(deckPath)} has no slide ${id}. Use read_deck to see its slides' ids.`);
+    return { kind: slide.kind, body: slide.body, handout: slide.handout, from: slide.data.from };
+  }
+
+  /**
+   * The copy's `from:` line in its deck, after a library write (the deck view does this itself for the buttons). An
+   * open deck gets it through its view (`viaView`), never as a whole-file write.
+   */
+  async setFrom(deckPath: string, id: string, from: string, viaView?: (id: string, from: string) => Promise<boolean>): Promise<void> {
+    if (viaView) {
+      if (!(await viaView(id, from))) throw new Error(`The library is written, but ${deckName(deckPath)} is open and didn't take the slide's new from: line.`);
+      return;
+    }
+    const text = await this.files.read(deckPath);
+    const slide = text === null ? undefined : slidesOfText(text).find(entry => entry.data.id === id);
+    if (text === null || !slide) throw new Error(`${deckName(deckPath)} has no slide ${id}.`);
+    const body = writeSlideBody(slide.body, { ...slide.data, from, kept: undefined });
+    const written = replaceSlidePart(text, id, partText(slide.kind, body, slide.handout, slide.notes));
+    if (written !== null && written !== text) await this.files.write(deckPath, written);
   }
 
   /** Undo a library write: the file's text before it, when nothing changed it since. */

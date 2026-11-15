@@ -5,7 +5,7 @@ import { strict as assert } from 'node:assert';
 import { parseDeck } from './deckFormat';
 import {
   appendPart, folderOf, newTopicText, normalizePath, partText, projectPath, rebasePath, rebaseSlide,
-  foldMarkdown, replaceSlidePart, rewriteMarkdownTargets, slideStamp, slidesOfText,
+  foldMarkdown, insertPartsText, replaceSlidePart, rewriteMarkdownTargets, slideStamp, slidesOfText,
 } from './deckLibraryFormat';
 
 // Paths.
@@ -65,6 +65,16 @@ assert.equal(
   assert.equal(newTopicText('Slide library/Themes/Evening.theme.md', part), `---\ndeck: 1\ntheme: Slide library/Themes/Evening.theme.md\n---\n\n${part}\n`);
   const slides = slidesOfText(deck);
   assert.deepEqual(slides.map(slide => [slide.data.id, slide.handout, slide.notes]), [['t1', 'Intro.', null], ['p1', 'Text b.', 'N'], ['s1', 'Text c.', null]]);
+}
+
+// Parts put in after slide N; every other byte kept.
+{
+  const text = '---\ndeck: 1\n---\n\n```slide title\nid: a\n```\n\nOne.\n\n```slide title\nid: b\n```\n\nTwo.\n';
+  const part = '```slide points\nid: n\n```\n\nNew.';
+  assert.deepEqual(slidesOfText(insertPartsText(text, 1, [part])).map(slide => slide.data.id), ['a', 'n', 'b']);
+  assert.deepEqual(slidesOfText(insertPartsText(text, 0, [part])).map(slide => slide.data.id), ['n', 'a', 'b']);
+  assert.deepEqual(slidesOfText(insertPartsText(text, 9, [part])).map(slide => slide.data.id), ['a', 'b', 'n']);
+  assert.ok(insertPartsText(text, 1, [part]).startsWith(text.slice(0, text.indexOf('```slide title\nid: b'))));
 }
 
 console.log('deckLibraryFormat: passed');
