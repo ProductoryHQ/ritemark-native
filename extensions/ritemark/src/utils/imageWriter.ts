@@ -85,7 +85,10 @@ export function writeImageRelativeTo(
     // The write itself claims the name ('wx'), so two saves at the same moment can't both take it.
     const bytes = Buffer.from(base64, 'base64');
     for (let n = 1; ; n++) {
-      finalFilename = n === 1 ? `${sanitizedBaseName}${ext}` : `${sanitizedBaseName}-${n}${ext}`;
+      // The name stays within the 255-byte limit of one path component, suffix included (Codex on #716).
+      const suffix = n === 1 ? '' : `-${n}`;
+      const room = 255 - Buffer.byteLength(ext) - suffix.length;
+      finalFilename = `${sanitizedBaseName.slice(0, room)}${suffix}${ext}`;
       try {
         fs.writeFileSync(path.join(targetDir, finalFilename), bytes, { flag: 'wx' });
         return finalFilename;

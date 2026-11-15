@@ -78,6 +78,12 @@ try {
   assert.ok(readFileSync(join(pasteDir, 'My-File-Foo.png')).equals(firstBytes), 'the first picture keeps its bytes');
   assert.strictEqual(writeImageRelativeTo(pasteDir, 'My File: Foo.png', ONE_PIXEL_PNG_BASE64), 'My-File-Foo-3.png');
 
+  // A name at the 255-byte limit still finds a free name: the base is shortened to make room for the suffix.
+  const longBase = 'a'.repeat(251);
+  assert.strictEqual(writeImageRelativeTo(pasteDir, `${longBase}.png`, ONE_PIXEL_PNG_BASE64), `${longBase}.png`);
+  const longAgain = writeImageRelativeTo(pasteDir, `${longBase}.png`, ONE_PIXEL_PNG_BASE64);
+  assert.strictEqual(longAgain, `${'a'.repeat(249)}-2.png`, `a long name gets room for its suffix (got ${longAgain.length} bytes)`);
+
   // skipSanitize must refuse any input that could escape targetDir on disk.
   // Defense-in-depth against a crafted webview message — Codex PR #75 P1.
   const trapDir = join(tempRoot, 'trap');
