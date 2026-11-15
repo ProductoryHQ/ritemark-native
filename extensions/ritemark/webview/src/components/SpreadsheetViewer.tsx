@@ -5,6 +5,10 @@ import { DataTable } from './DataTable'
 import { SpreadsheetToolbar } from './header/SpreadsheetToolbar'
 import { ConflictDialog } from './dialogs/ConflictDialog'
 import { Button } from './ui/button'
+import { Alert, AlertDescription } from './ui/alert'
+import { Icon } from './ui/Icon'
+import { Tooltip } from './ui/tooltip'
+import { defaultSpreadsheetApp } from '../hooks/usePlatform'
 import { sendToExtension, onMessage } from '../bridge'
 import type { DocumentSyncAction } from './header/DocumentSyncAction'
 import type { DocumentApplyTarget } from '../types/documentSync'
@@ -103,6 +107,7 @@ export function SpreadsheetViewer({
   const [selectedSheet, setSelectedSheet] = useState<string>('')
   const [cachedWorkbook, setCachedWorkbook] = useState<XLSX.WorkBook | null>(null)
   const [hasExcel, setHasExcel] = useState(false)
+  const [excelChecked, setExcelChecked] = useState(false)
   const [parsedSyncTarget, setParsedSyncTarget] = useState<DocumentApplyTarget | undefined>()
 
   // Conflict detection state
@@ -124,6 +129,7 @@ export function SpreadsheetViewer({
     const unsubscribe = onMessage((message) => {
       if (message.type === 'excelStatus') {
         setHasExcel(message.hasExcel as boolean)
+        setExcelChecked(true)
       } else if (!syncEnabled && message.type === 'showConflictDialog') {
         // True conflict: local edits + disk changes
         setIsDiskConflict(true)
@@ -593,6 +599,33 @@ export function SpreadsheetViewer({
           hasExcel={hasExcel}
           syncAction={toolbarSyncAction}
         />
+
+      {/* Sprint 158 PR 0 (#711; experience 47, frame 3): until the save keeps a workbook's formatting, an editable
+          workbook says from the moment it opens what a save here removes, and offers the app that keeps it. It replaces
+          the toast the host showed once, after the first edit. .xls is read-only and CSV has no formatting to lose. */}
+      {isEditable && fileType === 'xlsx' && (
+        <div className="shrink-0 px-4 pb-2">
+          <Alert variant="warning" className="flex min-h-9 items-center gap-2">
+            <Icon name="warning" size={16} className="shrink-0" />
+            <AlertDescription className="flex-1 text-[13px] leading-[18px]">
+              Saving here removes this workbook's colours, bold text, borders, charts and pictures. Values and formulas stay.
+            </AlertDescription>
+            {/* The action shows once the host has said whether Excel is here, so its words don't change under the pointer */}
+            {excelChecked && (
+              <Tooltip label={hasExcel ? `Open ${filename} in Excel, which keeps its formatting` : `Open ${filename} in ${defaultSpreadsheetApp}`}>
+                <Button
+                  type="button"
+                  variant="warning"
+                  size="compact"
+                  onClick={hasExcel ? handleOpenInExcel : handleOpenInNumbers}
+                >
+                  {`Open in ${hasExcel ? 'Excel' : defaultSpreadsheetApp} to keep them`}
+                </Button>
+              </Tooltip>
+            )}
+          </Alert>
+        </div>
+      )}
 
       {/* Truncation warning — only rendered when a large file is cut off */}
       {statusInfo?.truncated && (

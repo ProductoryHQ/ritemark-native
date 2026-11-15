@@ -1,0 +1,10 @@
+const fs = require('fs'); const { unzipSync, strFromU8 } = require('../00-tools/node_modules/fflate');
+const { parseStyles, applyTint } = require('./styles.cjs');
+const z = unzipSync(new Uint8Array(fs.readFileSync('../01-fixtures/rich-excelish.xlsx')));
+const st = parseStyles(strFromU8(z['xl/styles.xml']), strFromU8(z['xl/theme/theme1.xml']));
+console.log('theme colours', st.theme.colors.join(' '), 'minor font', st.theme.minorFont);
+console.log('tint checks (SheetJS gave 95B3D7 and E46C0A):', applyTint(st.theme.colors[4], 0.3999755851924192), applyTint(st.theme.colors[9], -0.249977111117893));
+console.log('known Excel UI values: accent1 4F81BD lighter 80% = DBE5F1 ->', applyTint('4F81BD', 0.7999816888943144), '; darker 50% = 244062 ->', applyTint('4F81BD', -0.499984740745262));
+st.css.forEach((c, i) => console.log(c));
+const sheet = strFromU8(z['xl/worksheets/sheet1.xml']);
+const cells = [...sheet.matchAll(/<c r="([A-Z]+\d+)"[^>]*?\ss="(\d+)"/g)].slice(0, 12).map(m => m[1] + '->x' + m[2]); console.log(cells.join(' '));
