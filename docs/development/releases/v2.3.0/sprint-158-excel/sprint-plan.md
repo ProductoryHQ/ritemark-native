@@ -2,7 +2,7 @@
 
 Track: Full (it changes the Excel editor's contract in `architecture.md`: the host saves edits instead of taking a whole workbook from the webview)<br>
 Release tier: extension. No patches, no `vscode`, no `product.json`, no binaries, no new bundle and no esbuild external. numfmt is built into `media/webview.js`, which an extension release ships. `branding/ATTRIBUTION.md` gains numfmt's line; that file reaches users with the next shell release.<br>
-**Status:** Approved by Jarmo on 15 November 2026, together with the mockup's six decisions ("Exceli plaan on kinnitatud"). Phase 3 starts on this branch. PR 0's early extension release still needs his own release word.<br>
+**Status:** **Done**, 15–16 November 2026. All six PRs are on main, ee34c930 … c493d143 (#721, #722, #723, #724, #725, #726). What was not run is listed under [Close-out](#close-out) at the end. Approved by Jarmo on 15 November 2026, together with the mockup's six decisions ("Exceli plaan on kinnitatud").<br>
 **Approval:** Jarmo. On 14 November he asked for an Excel preview at ChatGPT's and Claude's level ("Ma tahaks selle ka saada ChatGPT/Claude'i eelvaadetega samale tasemele"). On 15 November he agreed that 2.3 starts now, with everything except the skip path, and that Decks goes first when the two streams compete, except for the Excel notice. He approved this plan and the mockup on 15 November ("Exceli plaan on kinnitatud").<br>
 **Release:** v2.3.0. Its release plan follows the 20 November cohort read.<br>
 **Branch:** `sprint-158-excel`.<br>
@@ -134,3 +134,35 @@ The full list is in the study. The three that can change the plan:
 - **Excel's reaction to the surgical output is not verified yet.** The points are calcChain removal, `fullCalcOnLoad`, appended shared strings, and editing a table's header cell. PR 1 is not done until Jarmo has opened saved files in Excel with no repair prompt.
 - **A wrong shared-formula translation would write wrong formulas.** The fuzz test and the translation cases are the guard, and an edit the code can't translate safely is refused.
 - **Formulas that use an edited cell show their old value in the preview** until Excel recalculates the file. The notice says so.
+
+## Close-out
+
+All six PRs are merged to main. Jarmo's gate passed: the saved files opened in Excel and Numbers with no repair prompt, including the file typed below and beside the data ("excel on ok", in the Development manager's session).
+
+| PR | What | Merged |
+| --- | --- | --- |
+| 0 | The warning from the moment a workbook opens | #721 |
+| 1 | The surgical save: only the edited cells change | #722 |
+| 2 | The reader with numfmt: dates as written, hidden things hidden | #723 |
+| 3 | The sheet grid: Excel's look | #724 |
+| 4 | Speed on a 50,000-row sheet; Carlito and Caladea; Excel for Mac's column widths | #725 |
+| 5 | No Add row or + column: the sheet goes on; the `excel-editing` kill switch | #726 |
+
+**Changed during the sprint:**
+- **PR 5 was added** on 15 November (mockup question 3), with Jarmo's yes in the Development manager's session and in this one.
+- **The flag `excel-editing` was added in PR 5**, on the Development manager's technical answer to Codex. It is stable and on by default; off opens an `.xlsx` read-only and the host refuses every edit.
+- **The cell inset** is 3 px on a Mac and 2 px on Windows, not 2 px everywhere.
+- **The fonts** are bundled as renamed Latin subsets, Ritemark Grid Sans and Ritemark Grid Serif. Carlito's licence reserves its name for unmodified copies.
+
+**Not run:**
+- **The grid on Windows on a real machine.** Windows' column widths, its 2 px inset and the fonts are in the code and tested, but no one has looked at the grid on Windows.
+- **A real-world set of workbooks.** None arrived, so the tests ran on the study's synthetic files and one Excel for Mac file. Still missing: files saved by Excel 365 on Windows, Google Sheets, Numbers, LibreOffice and pandas, and files with pivots, sparklines, threaded comments or dynamic arrays.
+- **The kill switch's off-state** was checked in a local build with the flag switched off: the grid was read-only and the file unchanged. An edit message sent straight to the host with the flag off was not tried. The host's refusal is covered by `canEditWorkbook`'s test and by the code.
+- **PR 0's early extension release** didn't happen: PR 1 replaced the warning the same evening.
+
+**Left as they are, on purpose:**
+- **The accounting gap on the right:** Excel's measures 6.5 pt and Ritemark's 4.9 pt. The 1.6 pt left over is about what the downscaled reference image can resolve. The Experience lead agreed to leave it.
+- **The save on the extension host's thread:** about 0.9 s on a 35 MB sheet. A worker thread is the next step if a real workbook shows it hurts.
+- **The row header widens** when row numbers gain a digit (1,000, 10,000), as Excel's does.
+
+**Next:** charts and colour rules (conditional formatting) get their own plan (Jarmo, 15 November).
