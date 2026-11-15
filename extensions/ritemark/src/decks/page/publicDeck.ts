@@ -133,6 +133,8 @@ export function drawnData(kind: string, data: SlideData): SlideData {
 // ---------------------------------------------------------------------------
 
 const FENCE_OPEN = /^([ \t]*)(`{3,}|~{3,})(.*)$/;
+/** A line's quote markers (`> `, `> > `). */
+const QUOTE = /^(?:[ \t]*>)+[ \t]?/;
 
 /** A fence that never goes: speaker notes, or a slide's block (its id and from lines) inside a handout. */
 function isPrivateFence(info: string): boolean {
@@ -177,17 +179,28 @@ export function publicMarkdown(markdown: string): string {
     if (lineStart) {
       const lineEnd = text.indexOf('\n', index);
       const line = text.slice(index, lineEnd < 0 ? text.length : lineEnd);
-      const open = FENCE_OPEN.exec(line);
+      // A fence in a quote (`> ```notes`) is a fence too (Codex on #729): read past the quote's markers.
+      const quote = QUOTE.exec(line)?.[0] ?? '';
+      const depth = (quote.match(/>/g) ?? []).length;
+      const open = FENCE_OPEN.exec(line.slice(quote.length));
       if (open && !(open[2][0] === '`' && open[3].includes('`'))) {
-        // A fenced block, to its closing fence (or the end): kept as written, or dropped whole when private.
+        // A fenced block, to its closing fence (or the end, or the end of its quote): kept as written, or dropped whole
+        // when private.
         const char = open[2][0];
         const size = open[2].length;
         let end = lineEnd < 0 ? text.length : lineEnd + 1;
         while (end < text.length) {
           const next = text.indexOf('\n', end);
           const body = text.slice(end, next < 0 ? text.length : next);
+          let inner = body;
+          if (depth > 0) {
+            const marks = QUOTE.exec(body)?.[0] ?? '';
+            // A line that leaves the quote ends the quote's fence; it is read again as text
+            if ((marks.match(/>/g) ?? []).length < depth) break;
+            inner = body.slice(marks.length);
+          }
           end = next < 0 ? text.length : next + 1;
-          const close = /^[ \t]*(`{3,}|~{3,})[ \t]*$/.exec(body);
+          const close = /^[ \t]*(`{3,}|~{3,})[ \t]*$/.exec(inner);
           if (close && close[1][0] === char && close[1].length >= size) break;
         }
         if (!isPrivateFence(open[3])) out += text.slice(index, end);

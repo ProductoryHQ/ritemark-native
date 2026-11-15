@@ -46,8 +46,11 @@ The regression test runs each of the four tags, with `<svg/onload>` and two `<im
 
 One 400 px wheel turn at a time at 1440 × 900, the slide shown after each turn. Down: `2 3 4 5 6 7 8 9 10 11 12 12 12 12`; up: `11 10 9 8 7 6 5 4 3 2 1 1 1 1`. One part at a time, both ways, none skipped. `pageScript.test.ts` runs the page's copy of the rule and `scrollRule.ts` over 10,000 generated states and they agree on every answer.
 
+## The text before the first slide
+
+`pr3-preamble-in-the-deck-view-1440.png`: a dev window (PR 4's run, isolated) shows a deck's handout with the text before the first slide at its top, above the first part ("Words before the first slide: PREAMBLE-VISIBLE."). So the page shows it too, without its private parts, as `publicDeck.test.ts` says.
+
 ## Not verified here
 
-- That the text before the first slide shows in the deck view's handout. Read from the code (the handout is the editor holding the whole file, and nothing hides blocks before the first part head); the dev window check is in PR 4.
-- That the deck view's fit steps give the same fit on the page (they reach the page in PR 4).
+- That the deck view's fit steps give the same fit on the page. They reach the page in PR 4, where every thumbnail of the demo deck measured 0.
 - Safari and Firefox; a real phone.

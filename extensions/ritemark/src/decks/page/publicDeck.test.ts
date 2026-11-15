@@ -105,6 +105,17 @@ assert.equal(publicMarkdown('a\n\n<!-- one -->\n\nb'), publicMarkdown('a\n\nb'),
 assert.equal(publicMarkdown('Run `npm\n```notes\nsecret notes `\n```\n\nafter'), 'Run `npm\n\nafter');
 assert.equal(publicMarkdown('Run `npm\nmore` and <!-- secret -->'), 'Run `npm\nmore` and');
 assert.equal(publicMarkdown('Prompt:\n\n    write <!-- gone --> here'), 'Prompt:\n\n    write  here');
+// A notes fence in a quote is a notes fence (Codex on #729), at any depth; a fence in a quote ends with its quote.
+assert.equal(publicMarkdown('> Before\n> ```notes\n> secret\n> ```\n> After'), '> Before\n> After');
+assert.equal(publicMarkdown('> > ```notes\n> > secret\n> > ```\n\nafter'), 'after');
+assert.equal(publicMarkdown('> ```notes\n> secret\n\nOutside the quote'), 'Outside the quote', 'the quote ends, and with it the fence');
+assert.equal(publicMarkdown('> ```\n> a prompt\n> ```'), '> ```\n> a prompt\n> ```', 'a prompt in a quote stays');
+// A notes fence outside a quote isn't closed by a quoted fence line: everything to its own close goes.
+assert.equal(publicMarkdown('```notes\nsecret\n> ```\nmore secret\n```\n\nafter'), 'after');
+{
+  const quoted = (notes: string) => deckDigest(publicDeck(`\`\`\`slide points\ntitle: Q\n\`\`\`\n\nText.\n\n> \`\`\`notes\n> ${notes}\n> \`\`\`\n`, options));
+  assert.equal(quoted('first'), quoted('second'), 'notes in a quote are no change');
+}
 
 // The digest: a public edit changes it; notes, a comment, a skipped slide, an id or from line, and the fit don't.
 {
