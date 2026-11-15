@@ -33,9 +33,13 @@ export type DeckRequest =
    */
   | { type: 'deck/update-library'; id: string; text: string }
   | { type: 'deck/use-library'; id: string; text: string }
-  | { type: 'deck/add-to-library'; id: string; text: string }
+  | { type: 'deck/add-to-library'; id: string; text: string; topic?: string }
+  /** The library's topics, for the Add to library sheet. */
+  | { type: 'deck/library-topics' }
   /** Show the copy's source in the Slide library. */
   | { type: 'deck/show-in-library'; from: string }
+  /** The strip's + "From the library…" / "From another deck…": the place opens there, inserting after part `after` (-1: before the first). */
+  | { type: 'deck/open-library'; section: 'topics' | 'other'; after: number }
   /** Undo a library write this view made. */
   | { type: 'deck/undo-library'; token: string }
   /** The view's answer to a `deck/insert` or `deck/set-from` that carried a request id: done, or not. */
@@ -56,6 +60,8 @@ export type DeckHostMessage =
   /** The library's version of a copy, to put in its place (its notes stay the deck's). */
   | { type: 'deck/library-part'; id: string; kind: string; body: string; handout: string }
   | { type: 'deck/library-failed'; id: string | null; message: string }
+  /** The library's topics: path, name and how many slides. */
+  | { type: 'deck/library-topics'; topics: Array<{ path: string; name: string; count: number }> }
   /** The library write with this token is undone: the copy's `from:` goes back too. */
   | { type: 'deck/library-undone'; token: string }
   /** Slides to insert after part `after` (from the Slide library or the AI's tools), as one undo step. */
@@ -107,10 +113,28 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
       return { type: 'deck/source-states' };
     }
     case 'deck/update-library':
-    case 'deck/use-library':
-    case 'deck/add-to-library': {
+    case 'deck/use-library': {
       exactKeys(input, ['type', 'id', 'text']);
       return { type: input.type, id: slideIdOf(input.id), text: stringOf(input.text, MAX_DECK_TEXT, true) };
+    }
+    case 'deck/add-to-library': {
+      // The topic is the sheet's choice (a topic's path or a new topic's name); without one, the host asks.
+      if ('topic' in input) {
+        exactKeys(input, ['type', 'id', 'text', 'topic']);
+        return { type: 'deck/add-to-library', id: slideIdOf(input.id), text: stringOf(input.text, MAX_DECK_TEXT, true), topic: stringOf(input.topic, 200) };
+      }
+      exactKeys(input, ['type', 'id', 'text']);
+      return { type: 'deck/add-to-library', id: slideIdOf(input.id), text: stringOf(input.text, MAX_DECK_TEXT, true) };
+    }
+    case 'deck/library-topics': {
+      exactKeys(input, ['type']);
+      return { type: 'deck/library-topics' };
+    }
+    case 'deck/open-library': {
+      exactKeys(input, ['type', 'section', 'after']);
+      if (input.section !== 'topics' && input.section !== 'other') throw new DeckProtocolError('section must be topics or other');
+      if (typeof input.after !== 'number' || !Number.isInteger(input.after) || input.after < -1 || input.after >= 100_000) throw new DeckProtocolError('after must be a part or -1');
+      return { type: 'deck/open-library', section: input.section, after: input.after };
     }
     case 'deck/show-in-library': {
       exactKeys(input, ['type', 'from']);

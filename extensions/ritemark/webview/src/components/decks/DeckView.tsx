@@ -30,6 +30,7 @@ import { deleteSlide, duplicateSlide, insertSlide, isSlideNode, moveSlide, partC
 import { DOMParser as PMDOMParser, Fragment, type Node as PMNode, type Slice } from '@tiptap/pm/model'
 import { editorHTMLToMarkdown, markdownToEditorHTML } from '../../utils/editorMarkdown'
 import { SourceLines, type CopySource } from './library/SourceLines'
+import { AddToLibrarySheet, type LibraryTopic } from './library/AddToLibrarySheet'
 import { onMessage, sendToExtension } from '../../bridge'
 import { isTrustedDeckTransaction } from './handout/deckGuard'
 import { convertKind } from './slide/convertKind'
@@ -173,6 +174,9 @@ export function DeckView({
   const [sources, setSources] = useState<Record<string, CopySource>>({})
   const [justUpdated, setJustUpdated] = useState<string | null>(null)
   const [busy, setBusy] = useState<Record<string, true>>({})
+  // Add to library: the sheet beside the slide, for this slide's id, and the library's topics once the host sends them.
+  const [addSheet, setAddSheet] = useState<{ id: string; number: number } | null>(null)
+  const [topics, setTopics] = useState<LibraryTopic[] | null>(null)
   // The deck's text as this view holds it, sent with a library request: the document may not have its newest words yet.
   const contentRef = useRef(content)
   contentRef.current = content
@@ -450,9 +454,16 @@ export function DeckView({
     addToLibrary: index => {
       const id = idOf(index)
       if (!id) return
-      setBusy(value => ({ ...value, [id]: true }))
-      // The id may have just been given: the text is read after that change.
-      requestAnimationFrame(() => sendToExtension('deck/add-to-library', { id, text: editor && !editor.isDestroyed ? editorHTMLToMarkdown(editor.getHTML()) : contentRef.current }))
+      // The sheet opens beside the slide; the slide is the current one, so the sheet sits by it.
+      pick(index)
+      setSettingsOpen(false)
+      setTopics(null)
+      setAddSheet({ id, number: index + 1 })
+      sendToExtension('deck/library-topics')
+    },
+    fromLibrary: (at, section) => {
+      // The slides go before part `at`: the library inserts after the part before it (-1: before the first).
+      sendToExtension('deck/open-library', { section, after: at - 1 })
     },
     showInLibrary: index => {
       const from = editor ? slidesOf(editor.state.doc)[index]?.data.from : undefined
@@ -492,6 +503,8 @@ export function DeckView({
 
   // Settings beside the slide: closed when the slide changes, and placed beside it (over the handout when it must).
   useEffect(() => { setSettingsOpen(false) }, [shown])
+  // The Add to library sheet belongs to its slide: another slide closes it.
+  useEffect(() => { setAddSheet(sheet => (sheet && sheet.number - 1 !== shown ? null : sheet)) }, [shown])
   // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one.
   useEffect(() => {
     if (focusTitleOf === null || focusTitleOf !== shown) return
@@ -499,7 +512,7 @@ export function DeckView({
     return () => cancelAnimationFrame(frame)
   }, [shown, focusTitleOf])
   useLayoutEffect(() => {
-    if (!settingsOpen) { setSettingsAt(null); return }
+    if (!settingsOpen && !addSheet) { setSettingsAt(null); return }
     const desk = deskRef.current
     const big = desk?.querySelector<HTMLElement>('.deck-big')
     if (!desk || !big) return
@@ -509,7 +522,7 @@ export function DeckView({
       left: Math.max(8, Math.min(bigBox.right - deskBox.left + 12, deskBox.width - SETTINGS_WIDTH - 8)),
       top: Math.max(8, bigBox.top - deskBox.top - 4),
     })
-  }, [settingsOpen, deskWidth, stageWidth, shown])
+  }, [settingsOpen, addSheet, deskWidth, stageWidth, shown])
 
   /** Settings' change, made to the slide as the document has it now. */
   const changeSlide = useCallback((change: (data: SlideData) => SlideData, kind?: string) => {
@@ -621,6 +634,10 @@ export function DeckView({
         undoneFrom.current.delete(message.token as string)
         const now = slideById(back.id)
         if (now) dispatch(updateSlide(editor.state, now.index, { ...now.data, from: back.from, kept: back.kept }))
+        return
+      }
+      case 'deck/library-topics': {
+        if (Array.isArray(message.topics)) setTopics((message.topics as LibraryTopic[]).filter(topic => topic && typeof topic.path === 'string' && typeof topic.name === 'string'))
         return
       }
       case 'deck/library-failed': {
@@ -857,6 +874,20 @@ export function DeckView({
           </div>
         ) : null}
 
+        {addSheet && settingsAt ? (
+          <AddToLibrarySheet
+            number={addSheet.number}
+            topics={topics}
+            style={{ left: settingsAt.left, top: settingsAt.top }}
+            onClose={() => setAddSheet(null)}
+            onAdd={topic => {
+              const id = addSheet.id
+              setAddSheet(null)
+              setBusy(value => ({ ...value, [id]: true }))
+              sendToExtension('deck/add-to-library', { id, text: currentText(), topic })
+            }}
+          />
+        ) : null}
         {settingsOpen && slide && settingsAt ? (
           <SlideSettings
             number={shown + 1}

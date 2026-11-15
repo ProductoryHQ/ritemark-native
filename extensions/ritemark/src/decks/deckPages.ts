@@ -52,7 +52,7 @@ export class DeckPages implements vscode.Disposable {
   private readonly changed = new vscode.EventEmitter<void>();
   /** The active deck, or the slide it shows, changed (the Slide library says "Insert after slide N"). */
   readonly onDidChangeActive = this.changed.event;
-  private readonly revealed = new vscode.EventEmitter<{ path: string; id: string }>();
+  private readonly revealed = new vscode.EventEmitter<{ path: string; id: string } | { section: 'topics' | 'other' }>();
   /** Show in the library: the library view shows this topic's slide. */
   readonly onDidRevealInLibrary = this.revealed.event;
   private readonly writes = new Map<string, LibraryWrite>();
@@ -184,6 +184,18 @@ export class DeckPages implements vscode.Disposable {
       case 'deck/applied':
         this.waiting.get(request.requestId)?.(request.ok);
         return;
+      case 'deck/open-library': {
+        // The + between thumbnails names where the slides go: the library inserts there until another slide is current.
+        const view = [...this.views].find(entry => entry.panel.webview === webview);
+        if (view) {
+          view.current = request.after;
+          this.active = view;
+          this.changed.fire();
+        }
+        await vscode.commands.executeCommand(`${SLIDE_LIBRARY_VIEW}.focus`);
+        this.revealed.fire({ section: request.section });
+        return;
+      }
       case 'deck/current': {
         const view = [...this.views].find(entry => entry.panel.webview === webview);
         if (view && (view.current !== request.index || view.count !== request.count)) {
@@ -236,10 +248,15 @@ export class DeckPages implements vscode.Disposable {
         }
         case 'deck/add-to-library': {
           const copy = part(request.id, request.text);
-          const topic = await pickTopic(library);
+          const topic = request.topic?.trim() || await pickTopic(library);
           if (!topic) return;
           const write = await library.addToLibrary(deckPath, topic, copy);
           await this.post(webview, { type: 'deck/library-written', id: request.id, from: write.from, verb: 'added', token: this.keep(write), sourceName: deckName(write.path) });
+          return;
+        }
+        case 'deck/library-topics': {
+          const topics = await library.listDecks({ where: 'library' });
+          await this.post(webview, { type: 'deck/library-topics', topics: topics.map(topic => ({ path: topic.path, name: topic.name, count: topic.slides.length })) });
           return;
         }
         case 'deck/show-in-library': {

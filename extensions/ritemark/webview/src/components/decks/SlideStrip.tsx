@@ -32,6 +32,8 @@ export interface StripActions {
   remove: (index: number) => void
   /** Move part `from` to stand before part `to`. */
   move: (from: number, to: number) => void
+  /** The + menu's From the library… and From another deck…: the Slide library opens, inserting before part `at`. */
+  fromLibrary: (at: number, section: 'topics' | 'other') => void
   /** The strip menu's Add to library… and Show in the library. */
   addToLibrary: (index: number) => void
   showInLibrary: (index: number) => void
@@ -63,6 +65,15 @@ function NewSlideItems({ at, actions }: { at: number; actions: StripActions }) {
       <DropdownMenuItem onSelect={() => actions.insert(at, 'exercise')}>
         <Icon name="list-checks" size={14} tone="inherit" />
         New exercise
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onSelect={() => actions.fromLibrary(at, 'topics')}>
+        <Icon name="books" size={14} tone="inherit" />
+        From the library…
+      </DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => actions.fromLibrary(at, 'other')}>
+        <Icon name="presentation" size={14} tone="inherit" />
+        From another deck…
       </DropdownMenuItem>
     </>
   )
@@ -122,6 +133,7 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
       data-thumb={index}
       className={`deck-thumb${current ? ' is-current' : ''}${skipped ? ' is-skip' : ''}${dragging ? ' is-dragging' : ''}${menuOpen ? ' is-menu' : ''}`}
       onPointerDown={event => onDragStart(index, event)}
+      onDragStart={event => event.preventDefault()}
       onClick={() => actions.pick(index)}
       onContextMenu={event => {
         event.preventDefault()
@@ -207,8 +219,16 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
 
   const startDrag = (index: number, event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || dragSession.current) return
+    // The press is the drag's: no text selection across the thumbnails, and no native drag of their words or pictures,
+    // which would take the pointer away (Jarmo, 15 November: slides could not be dragged). The strip takes the focus
+    // the press would have given it, so the arrow keys still work.
+    event.preventDefault()
+    stripRef.current?.focus({ preventScroll: true })
     const startY = event.clientY
     const pointerId = event.pointerId
+    // The pointer stays the drag's when it leaves the thumbnail, or the deck's frame.
+    const target = event.currentTarget
+    try { target.setPointerCapture(pointerId) } catch { /* the pointer is gone already */ }
     let moved = false
     // On the window, so the drag ends however the pointer leaves the thumbnail.
     const move = (moveEvent: PointerEvent) => {
@@ -218,6 +238,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
       setDrag({ from: index, to: gapAt(moveEvent.clientY) })
     }
     const end = () => {
+      try { if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId) } catch { /* released */ }
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', cancel)

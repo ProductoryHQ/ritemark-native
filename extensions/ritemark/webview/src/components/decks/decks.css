@@ -17,7 +17,10 @@
 /* ---- the desk: strip, stage, divider, handout */
 .deck-desk { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 
-.deck-strip { position: absolute; left: 0; top: 0; bottom: 0; width: var(--deck-strip); border-right: 1px solid var(--r-hairline); overflow-y: auto; overflow-x: hidden; padding: 6px 0 40px; box-sizing: border-box; outline: none; }
+.deck-strip { position: absolute; left: 0; top: 0; bottom: 0; width: var(--deck-strip); border-right: 1px solid var(--r-hairline); overflow-y: auto; overflow-x: hidden; padding: 6px 0 40px; box-sizing: border-box; outline: none; user-select: none; -webkit-user-select: none; }
+/* A thumbnail is moved by the strip's own drag: never a native drag of its words or pictures. */
+.deck-thumb, .deck-thumb * { -webkit-user-drag: none; }
+.deck-thumb { touch-action: none; }
 .deck-thumb { position: relative; height: 62px; display: flex; align-items: flex-start; gap: 6px; padding: 3px 10px 0 6px; }
 .deck-thumb .deck-thumb-no { width: 18px; margin-top: 3px; text-align: right; font-size: 11px; font-weight: 500; line-height: 14px; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
 .deck-thumb .deck-thumb-slide { position: relative; width: 96px; height: 54px; border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline); }
@@ -272,3 +275,9 @@
 .deck-change .deck-line-action { height: auto; padding: 0; font-size: 12px; line-height: 16px; font-weight: 500; white-space: nowrap; }
 .deck-line-action.is-strong { font-weight: 600; }
 .deck-change .deck-use-it { height: 26px; padding: 0 10px; font-size: 12px; white-space: nowrap; }
+/* Add to library: a sheet beside the slide (prototype sheet "addlib"), in the Settings panel's material. */
+.deck-addlib .deck-addlib-lede { margin: 0 0 10px; font-size: 12.5px; line-height: 18px; color: var(--r-ink-body); }
+.deck-addlib .deck-addlib-topic { width: 100%; }
+.deck-addlib .deck-addlib-name { margin-top: 8px; }
+.deck-addlib .deck-addlib-problem { margin: 4px 0 0; font-size: 12px; line-height: 16px; color: var(--r-ink-muted); }
+.deck-addlib .deck-addlib-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
