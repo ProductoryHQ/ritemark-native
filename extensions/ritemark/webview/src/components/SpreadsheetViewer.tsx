@@ -12,6 +12,9 @@ import type { DocumentApplyTarget } from '../types/documentSync'
 import { isCellEdit, type CellEdit } from '../../../src/excel/cellEdit'
 import { readWorkbook } from './excel/readWorkbook'
 import { MAX_DISPLAY_ROWS, modelSource, sheetJsSource, type SheetSource } from './excel/sheetSource'
+import { SheetGrid } from './excel/SheetGrid'
+import { Tooltip } from './ui/tooltip'
+import { defaultSpreadsheetApp } from '../hooks/usePlatform'
 
 export interface SpreadsheetViewerProps {
   content: string
@@ -69,6 +72,28 @@ async function openWorkbook(content: string, encoding: string | undefined, filen
   return sheetJsSource(workbook)
 }
 
+/** What a sheet keeps that the preview doesn't draw, said once on the line under the bar (experience 47, frame 7). */
+function keptNotice(layout: { drawings: Array<{ what: string }>; conditionalFormats: number }): string | undefined {
+  const count = (what: string) => layout.drawings.filter((d) => d.what === what).length
+  const things: string[] = []
+  const name = (n: number, one: string, many: string) => (n === 1 ? `a ${one}` : `${n} ${many}`)
+  if (count('chart')) things.push(name(count('chart'), 'chart', 'charts'))
+  if (count('image')) things.push(name(count('image'), 'picture', 'pictures'))
+  if (count('shape')) things.push(name(count('shape'), 'shape', 'shapes'))
+  if (layout.conditionalFormats) things.push('colour rules')
+  if (!things.length) return undefined
+  const list = things.length === 1 ? things[0] : `${things.slice(0, -1).join(', ')} and ${things[things.length - 1]}`
+  const one = things.length === 1 && /^an? /.test(list)
+  return one
+    ? `This sheet has ${list}. It's kept in the file; Open in Excel to see it.`
+    : `This sheet has ${list}. They're kept in the file; Open in Excel to see them.`
+}
+
+/** A chart sheet's card title (frame 8). */
+function chartSheetTitle(name: string): string {
+  return `${name} is a chart.`
+}
+
 export function SpreadsheetViewer({
   content,
   filename,
@@ -115,6 +140,8 @@ export function SpreadsheetViewer({
   // Whether a cell has been edited since the workbook was loaded, and whether a formula cell is being typed over
   const [hasEdited, setHasEdited] = useState(false)
   const [editingFormula, setEditingFormula] = useState(false)
+  // Sprint 158 PR 3: raised by every edit, so the sheet grid draws the model again
+  const [version, setVersion] = useState(0)
 
   // Check if Excel is installed on mount and listen for messages
   useEffect(() => {
@@ -152,7 +179,8 @@ export function SpreadsheetViewer({
         }
         // Refused (the host said why): put the cell back as it was
         current.restore(pending.sheet, pending.row, pending.col, pending.previous)
-        if (pending.sheet === selectedSheetRef.current) setParsedData(current.extract(pending.sheet))
+        setVersion((v) => v + 1)
+        if (pending.sheet === selectedSheetRef.current && !current.model) setParsedData(current.extract(pending.sheet))
       }
     })
 
@@ -420,35 +448,44 @@ export function SpreadsheetViewer({
     return source.inputAt(selectedSheet, sheetRowOf(rowIndex), col)
   }, [source, selectedSheet, parsedData, sheetRowOf])
 
-  const handleExcelCellChange = useCallback((rowIndex: number, columnId: string, text: string) => {
-    if (!source || !selectedSheet || !parsedData || !isEditable) return
-
-    const row = sheetRowOf(rowIndex)
-    const col = XLSX.utils.decode_col(columnId)
+  /** One cell typed into, by its sheet row and column: shown at once, and sent to the host on its own. */
+  const editCell = useCallback((row: number, col: number, text: string) => {
+    if (!source || !selectedSheet || !isEditable) return
     const value = source.valueFor(selectedSheet, row, col, text)
     const id = nextEditId.current++
     const previous = source.write(selectedSheet, row, col, value)
     pendingEdits.current.set(id, { sheet: selectedSheet, row, col, previous })
-    // the grid shows the cell as its format draws it (14 in a money cell: 14.00 €)
-    setParsedData(source.extract(selectedSheet))
+    // the cell is drawn as its format draws it (14 in a money cell: 14.00 €)
+    setVersion((v) => v + 1)
+    if (!source.model) setParsedData(source.extract(selectedSheet))
     setHasEdited(true)
 
     const edit: CellEdit = { sheet: selectedSheet, ref: XLSX.utils.encode_cell({ r: row, c: col }), value }
     sendToExtension('cellEdit', { id, edit })
-  }, [source, selectedSheet, parsedData, isEditable, sheetRowOf])
+  }, [source, selectedSheet, isEditable])
+
+  const handleExcelCellChange = useCallback((rowIndex: number, columnId: string, text: string) => {
+    editCell(sheetRowOf(rowIndex), XLSX.utils.decode_col(columnId), text)
+  }, [editCell, sheetRowOf])
 
   // Add row and the + column widen the grid to type in; the file changes once a cell in them is typed into
   const handleExcelAddRow = useCallback(() => {
     if (!source || !selectedSheet || !isEditable) return
     source.widen(selectedSheet, 1, 0)
+    setVersion((v) => v + 1)
     setParsedData(source.extract(selectedSheet))
   }, [source, selectedSheet, isEditable])
 
   const handleExcelAddColumn = useCallback(() => {
     if (!source || !selectedSheet || !isEditable) return
     source.widen(selectedSheet, 0, 1)
+    setVersion((v) => v + 1)
     setParsedData(source.extract(selectedSheet))
   }, [source, selectedSheet, isEditable])
+
+  // the sheet grid's lookups, by sheet row and column
+  const gridInput = useCallback((row: number, col: number) => (source && selectedSheet ? source.inputAt(selectedSheet, row, col) ?? '' : ''), [source, selectedSheet])
+  const gridFormula = useCallback((row: number, col: number) => (source && selectedSheet ? source.formulaAt(selectedSheet, row, col) : undefined), [source, selectedSheet])
 
   // Handle conflict dialog actions
   const handleConfirmDiscard = useCallback(() => {
@@ -490,22 +527,25 @@ export function SpreadsheetViewer({
 
   // Sprint 158 (#711; experience 47, frame 2): once a cell is edited, the line under the bar says what a save does;
   // while a formula cell is typed over, what that typing does
-  const excelNotice = fileType !== 'xlsx' || !isEditable
+  const sheetModel = source?.model?.sheets.find((s) => s.name === selectedSheet)
+  const excelNotice = fileType !== 'xlsx'
     ? undefined
-    : editingFormula
+    : isEditable && editingFormula
       ? 'Typing here replaces the formula with a value.'
-      : hasEdited
+      : isEditable && hasEdited
         ? 'Only the cells you change are saved; the rest of the workbook stays as it is. Totals that use them update when the file opens in Excel.'
-        : undefined
+        : sheetModel && sheetModel.kind === 'worksheet' ? keptNotice(sheetModel.layout) : undefined
+  const openInLabel = `Open in ${hasExcel ? 'Excel' : defaultSpreadsheetApp}`
 
   // Status bar info
   const statusInfo = useMemo(() => {
     if (!parsedData) return null
     const rowCount = parsedData.rows.length
     const colCount = parsedData.columns.length
-    const truncated = sizeBytes && rowCount === MAX_DISPLAY_ROWS
+    // the sheet grid draws every row; only the table stops at MAX_DISPLAY_ROWS
+    const truncated = sizeBytes && rowCount === MAX_DISPLAY_ROWS && !source?.model
     return { rowCount, colCount, truncated }
-  }, [parsedData, sizeBytes])
+  }, [parsedData, sizeBytes, source])
 
   // Size warning (checked first: no data is parsed while it's showing)
   if (showSizeWarning) {
@@ -596,10 +636,40 @@ export function SpreadsheetViewer({
         </div>
       )}
 
-      {/* Table — empty state rendered inline so the toolbar and sheet
-          selector stay accessible (an empty first sheet must not hide
-          the other sheets in a multi-sheet workbook) */}
-      {isEmpty ? (
+      {/* Sprint 158 PR 3 (#711; experience 47): a workbook our reader read is drawn as Excel draws it, in the sheet
+          grid; a chart sheet is a card (frame 8). .xls and the SheetJS fallback keep the table below. */}
+      {source?.model && sheetModel?.kind === 'chartsheet' ? (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="flex h-[320px] w-[560px] max-w-[calc(100%-32px)] flex-col items-center justify-center gap-1.5 rounded border border-dashed border-[#9aa3ae] bg-white text-center text-xs text-[#5f6b7a]">
+            <Icon name="chart-bar" size={20} tone="inherit" />
+            <b className="text-[15px] text-[#3b4452]">{chartSheetTitle(sheetModel.name)}</b>
+            <span>It's kept in the file as it is. The preview doesn't draw charts yet.</span>
+            <Tooltip label={`${openInLabel}, where the chart is drawn`}>
+              <Button type="button" variant="outline" size="compact" className="mt-2" onClick={hasExcel ? handleOpenInExcel : handleOpenInNumbers}>
+                <Icon name="arrow-square-out" size={14} tone="inherit" />
+                <span>{openInLabel}</span>
+              </Button>
+            </Tooltip>
+          </div>
+        </div>
+      ) : source?.model && sheetModel ? (
+        <SheetGrid
+          model={source.model}
+          sheet={sheetModel}
+          version={version}
+          editable={isEditable}
+          extraRows={source.extra(sheetModel.name).rows}
+          extraCols={source.extra(sheetModel.name).cols}
+          onEdit={editCell}
+          getInput={gridInput}
+          getFormula={gridFormula}
+          onEditingFormulaChange={setEditingFormula}
+          onAddRow={isEditable ? handleExcelAddRow : undefined}
+          onAddColumn={isEditable ? handleExcelAddColumn : undefined}
+          onOpenInExcel={hasExcel ? handleOpenInExcel : handleOpenInNumbers}
+          openInLabel={openInLabel}
+        />
+      ) : isEmpty ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-3">
           <div className="text-[var(--r-ink-muted)]">
             {fileType === 'xlsx' && selectedSheet ? `${selectedSheet} is empty` : `${filename} is empty`}
@@ -632,27 +702,37 @@ export function SpreadsheetViewer({
         </div>
       )}
 
-      {/* Sheet tab strip — bottom of the viewport, Excel-style (Excel only,
-          if multiple sheets). The hairline runs across inactive tabs and the
-          strip remainder but is BROKEN over the active tab, whose editor
-          background merges seamlessly with the grid above (no gap, no line). */}
-      {fileType === 'xlsx' && source && source.tabs.length > 1 && (
-        <div className="flex bg-[var(--vscode-sideBar-background)] overflow-x-auto shrink-0">
-          {source.tabs.map(sheetName => (
-            <Button
-              key={sheetName}
-              variant="ghost"
-              size="sm"
-              onClick={() => handleSheetChange(sheetName)}
-              className={`h-auto rounded-none px-3.5 py-1 text-xs border-t border-b-2 ${
-                sheetName === selectedSheet
-                  ? 'bg-[var(--vscode-editor-background)] text-[var(--r-accent)] font-semibold border-t-transparent border-x border-x-[var(--r-hairline)] border-b-[var(--r-accent)] hover:bg-[var(--vscode-editor-background)] hover:text-[var(--r-accent)]'
-                  : 'border-t-[var(--r-hairline)] border-x border-x-transparent border-b-transparent text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)]'
-              }`}
-            >
-              {sheetName}
-            </Button>
-          ))}
+      {/* Sheet tab strip — bottom of the viewport, Excel-style (Excel only).
+          The hairline runs across inactive tabs and the strip remainder but is
+          BROKEN over the active tab, whose editor background merges seamlessly
+          with the grid above (no gap, no line). Sprint 158 PR 3 (experience 47,
+          decisions 5 and 11): a workbook our reader read shows the strip even
+          for one sheet, since that is where the sheet's name is; a tab colour
+          is a strip, a chart sheet has a chart icon, a hidden sheet no tab. */}
+      {fileType === 'xlsx' && source && (source.tabs.length > 1 || (source.model && source.tabs.length > 0)) && (
+        <div className={`flex bg-[var(--vscode-sideBar-background)] overflow-x-auto shrink-0${source.model ? ' mx-4 mb-4 rounded-b-lg border border-t-0 border-[var(--r-hairline)]' : ''}`}>
+          {source.tabs.map(sheetName => {
+            const tab = source.model?.sheets.find((s) => s.name === sheetName)
+            return (
+              <Button
+                key={sheetName}
+                variant="ghost"
+                size="sm"
+                onClick={() => handleSheetChange(sheetName)}
+                className={`relative h-auto rounded-none px-3.5 py-1 text-xs border-t border-b-2 ${
+                  sheetName === selectedSheet
+                    ? 'bg-[var(--vscode-editor-background)] text-[var(--r-accent)] font-semibold border-t-transparent border-x border-x-[var(--r-hairline)] border-b-[var(--r-accent)] hover:bg-[var(--vscode-editor-background)] hover:text-[var(--r-accent)]'
+                    : 'border-t-[var(--r-hairline)] border-x border-x-transparent border-b-transparent text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)]'
+                }`}
+              >
+                {tab?.kind === 'chartsheet' && <Icon name="chart-bar" size={12} tone="inherit" />}
+                {sheetName}
+                {tab?.layout.tabColor && (
+                  <span aria-hidden className="absolute inset-x-1 bottom-0 h-[3px] rounded-sm" style={{ background: tab.layout.tabColor }} />
+                )}
+              </Button>
+            )
+          })}
           <div className="flex-1 min-w-4 border-t border-[var(--r-hairline)]" />
         </div>
       )}

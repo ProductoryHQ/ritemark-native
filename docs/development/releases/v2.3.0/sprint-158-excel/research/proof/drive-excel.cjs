@@ -118,6 +118,46 @@ async function main() {
     await sleep(500);
     console.log('edited', row, col, '→', text);
     web.close();
+  } else if (action === 'click') {
+    // a click (or a double click) at a point of the window, in CSS pixels
+    const [x, y, count] = [Number(rest[0]), Number(rest[1]), Number(rest[2] ?? 1)];
+    for (let n = 1; n <= count; n++) {
+      await wb.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: n });
+      await wb.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: n });
+    }
+    await sleep(400);
+    console.log('clicked', x, y, count);
+  } else if (action === 'type') {
+    await wb.send('Input.insertText', { text: rest.join(' ') });
+    await sleep(200);
+    console.log('typed');
+  } else if (action === 'press') {
+    const keys = { Enter: ['Enter', 13, '\r'], Escape: ['Escape', 27], Tab: ['Tab', 9], ArrowDown: ['ArrowDown', 40], ArrowRight: ['ArrowRight', 39] };
+    const [code, keyCode, text] = keys[rest[0]];
+    await key(wb, rest[0], code, keyCode, 0, text);
+    await sleep(400);
+    console.log('pressed', rest[0]);
+  } else if (action === 'tab') {
+    // the editor tab whose label holds the text (a workbook's file name)
+    const at = await evaluate(wb, `(() => { const t = [...document.querySelectorAll('.tab')].find(t => (t.getAttribute('aria-label') || t.textContent || '').includes(${JSON.stringify(rest.join(' '))})); if (!t) return null; const r = t.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    if (!at) throw new Error('no tab ' + rest.join(' '));
+    await wb.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: at.x, y: at.y, button: 'left', clickCount: 1 });
+    await wb.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: at.x, y: at.y, button: 'left', clickCount: 1 });
+    await sleep(1500);
+    console.log('tab', rest.join(' '));
+  } else if (action === 'sheet') {
+    // a sheet tab under the grid, by its name
+    const web = await excelWebview();
+    const outer = await evaluate(wb, `(() => { const all = [...document.querySelectorAll('iframe.webview')].filter(f => f.getBoundingClientRect().width > 0); const f = all.find(f => f.parentElement.classList.contains('ritemark-desk-webview')) || all.sort((a, b) => b.getBoundingClientRect().width - a.getBoundingClientRect().width)[0]; const r = f.getBoundingClientRect(); return { x: r.left, y: r.top }; })()`);
+    const inner = await evaluate(web, inFrame(`const af2 = document.getElementById('active-frame').getBoundingClientRect(); const b = [...d.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(rest.join(' '))}); if (!b) return null; const r = b.getBoundingClientRect(); return { x: af2.left + r.left + r.width / 2, y: af2.top + r.top + r.height / 2 };`));
+    if (!inner) throw new Error('no sheet ' + rest.join(' '));
+    const x = outer.x + inner.x;
+    const y = outer.y + inner.y;
+    await wb.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
+    await wb.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
+    await sleep(800);
+    console.log('sheet', rest.join(' '));
+    web.close();
   } else if (action === 'save') {
     await key(wb, 's', 'KeyS', 83, 4);
     await sleep(1500);

@@ -39,7 +39,13 @@ async function main() {
   zip.file('xl/worksheets/sheet1.xml', sheetXml);
   zip.file('xl/sharedStrings.xml', `<?xml version="1.0" encoding="UTF-8"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${strings.length}" uniqueCount="${strings.length}">${strings.map((s) => `<si><t>${s}</t></si>`).join('')}</sst>`);
   const bytes = new Uint8Array(await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }));
-  console.log(`file ${(bytes.length / 1e6).toFixed(2)} MB, sheet XML ${(sheetXml.length / 1e6).toFixed(1)} MB`);
+  console.log(`file ${(bytes.length / 1e6).toFixed(2)} MB, sheet XML ${(sheetXml.length / 1e6).toFixed(1)} MB`)
+  // with a path, the workbook is also written there, to open in a dev instance
+  if (process.argv[2]) {
+    req('node:fs').writeFileSync(process.argv[2], bytes)
+    console.log('wrote', process.argv[2])
+    if (process.argv[3] === '--write-only') return
+  };
 
   const t0 = performance.now();
   const index = await indexWorkbook(bytes);

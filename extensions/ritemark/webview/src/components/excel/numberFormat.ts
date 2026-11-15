@@ -133,7 +133,8 @@ function serialOf(year: number, month: number, day: number): number | null {
   const check = new Date(time)
   if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) return null
   const days = Math.round((time - Date.UTC(1899, 11, 30)) / 86_400_000)
-  return days
+  // Excel counts a 29 February 1900 that never was: before March 1900 its serials are one lower (Codex on #724)
+  return days < 61 ? days - 1 : days
 }
 
 /**
