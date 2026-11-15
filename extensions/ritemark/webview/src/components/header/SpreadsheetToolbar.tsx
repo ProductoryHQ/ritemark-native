@@ -12,9 +12,6 @@ interface SpreadsheetToolbarProps {
   onOpenInNumbers?: () => void
   hasExcel: boolean
   syncAction?: DocumentSyncAction
-  /** Sprint 158 (#711; experience 47, frame 2): a quiet line on the bar, in place of the file's name, saying what
-   *  an edit or a save does. */
-  notice?: string
 }
 
 /**
@@ -33,7 +30,6 @@ export function SpreadsheetToolbar({
   onOpenInNumbers,
   hasExcel,
   syncAction,
-  notice,
 }: SpreadsheetToolbarProps) {
   // Determine primary and secondary actions based on Excel availability
   const altAppLabel = `Open in ${defaultSpreadsheetApp}`
@@ -49,18 +45,11 @@ export function SpreadsheetToolbar({
   return (
     <header className="spreadsheet-toolbar">
       <div className="toolbar-content">
-        {/* Filename on the left, or the notice in its place */}
-        {notice ? (
-          <div className="toolbar-notice" role="status" aria-live="polite">
-            <Icon name="info" size={14} tone="inherit" className="shrink-0" />
-            <span className="truncate">{notice}</span>
-          </div>
-        ) : (
-          <div className="toolbar-filename">{filename}</div>
-        )}
+        {/* Filename on the left */}
+        <div className="toolbar-filename">{filename}</div>
 
-        {/* Spacer (the notice takes the free room itself) */}
-        {!notice && <div className="flex-1" />}
+        {/* Spacer */}
+        <div className="flex-1" />
 
         <span className="sr-only" role="status" aria-live="polite">
           {syncAction?.label ?? ''}
@@ -141,17 +130,6 @@ export function SpreadsheetToolbar({
           font-size: 13px;
           color: var(--r-ink-muted);
           font-weight: 500;
-        }
-
-        /* The notice: one quiet line, cut with an ellipsis when the bar is narrow */
-        .toolbar-notice {
-          display: flex;
-          flex: 1 1 0%;
-          align-items: center;
-          gap: 6px;
-          min-width: 0;
-          font-size: 12px;
-          color: var(--r-ink-muted);
         }
 
         /* Button text - hidden on narrow viewports */

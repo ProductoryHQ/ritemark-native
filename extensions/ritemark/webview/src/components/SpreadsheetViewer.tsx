@@ -5,6 +5,7 @@ import { DataTable } from './DataTable'
 import { SpreadsheetToolbar } from './header/SpreadsheetToolbar'
 import { ConflictDialog } from './dialogs/ConflictDialog'
 import { Button } from './ui/button'
+import { Icon } from './ui/Icon'
 import { sendToExtension, onMessage } from '../bridge'
 import type { DocumentSyncAction } from './header/DocumentSyncAction'
 import type { DocumentApplyTarget } from '../types/documentSync'
@@ -487,8 +488,8 @@ export function SpreadsheetViewer({
     sendToExtension('openInExternalApp', { app: 'numbers' })
   }, [])
 
-  // Sprint 158 (#711; experience 47, frame 2): once a cell is edited, the bar says once what a save does; while a
-  // formula cell is typed over, what that typing does
+  // Sprint 158 (#711; experience 47, frame 2): once a cell is edited, the line under the bar says what a save does;
+  // while a formula cell is typed over, what that typing does
   const excelNotice = fileType !== 'xlsx' || !isEditable
     ? undefined
     : editingFormula
@@ -576,8 +577,17 @@ export function SpreadsheetViewer({
           onOpenInNumbers={handleOpenInNumbers}
           hasExcel={hasExcel}
           syncAction={toolbarSyncAction}
-          notice={excelNotice}
         />
+
+      {/* Sprint 158 (#711; experience 47, frame 2): under the bar, where PR 0's warning stood, a quiet line says once
+          what a save does after the first edit, and while a formula cell is typed over, what that typing does. It
+          wraps rather than being cut; the bar keeps the file's name. */}
+      {excelNotice && (
+        <div className="flex shrink-0 items-start gap-1.5 px-4 pb-2 text-xs leading-[18px] text-[var(--r-ink-muted)]" role="status" aria-live="polite">
+          <Icon name="info" size={14} tone="inherit" className="mt-0.5 shrink-0" />
+          <span>{excelNotice}</span>
+        </div>
+      )}
 
       {/* Truncation warning — only rendered when a large file is cut off */}
       {statusInfo?.truncated && (
