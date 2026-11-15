@@ -78,7 +78,7 @@ function App() {
   const [filename, setFilename] = useState<string>('')
   const [encoding, setEncoding] = useState<string | undefined>()
   const [sizeBytes, setSizeBytes] = useState<number | undefined>()
-  const [xlsxLoad, setXlsxLoad] = useState<{ id: number; pendingEdits: unknown[] }>({ id: 0, pendingEdits: [] })
+  const [xlsxLoad, setXlsxLoad] = useState<{ id: number; pendingEdits: unknown[]; editable: boolean }>({ id: 0, pendingEdits: [], editable: true })
   const [workerSrc, setWorkerSrc] = useState<string | undefined>()
   const [workerSource, setWorkerSource] = useState<string | undefined>()
   const [properties, setProperties] = useState<DocumentProperties>({})
@@ -305,6 +305,8 @@ function App() {
             setXlsxLoad({
               id: typeof message.loadId === 'number' ? message.loadId : 0,
               pendingEdits: Array.isArray(message.pendingEdits) ? (message.pendingEdits as unknown[]) : [],
+              // an older host sends no `editable`: it takes edits, as before the flag
+              editable: message.editable !== false,
             })
           }
           setFileType((message.fileType as FileType) || 'markdown')
@@ -819,7 +821,8 @@ function App() {
   // Route to SpreadsheetViewer for CSV/Excel files
   if (fileType === 'csv' || fileType === 'xlsx') {
     // .xlsx is editable; legacy .xls stays read-only (saving would re-encode it as xlsx)
-    const isXlsxEditable = fileType === 'xlsx' && filename.toLowerCase().endsWith('.xlsx')
+    // the host says whether it takes edits (the `excel-editing` kill switch); it refuses them anyway when it doesn't
+    const isXlsxEditable = fileType === 'xlsx' && filename.toLowerCase().endsWith('.xlsx') && xlsxLoad.editable
     return (
       <>
         <SpreadsheetViewer
