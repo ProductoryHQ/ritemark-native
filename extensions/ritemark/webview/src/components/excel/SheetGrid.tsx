@@ -387,6 +387,32 @@ export function SheetGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout])
 
+  // A sideways scroll settles with a whole column at the frozen line: a cell cut partway reads as another number
+  // ("20.00 €" for 5,220.00 €; the Experience lead, 15 November). Vertical scrolling stays smooth: a cut row doesn't
+  // change what a number says. The scroll offset that puts column c at the frozen line is X[c] - FW.
+  const columnEdge = useCallback((x: number, toward: 'nearest' | 'up') => {
+    if (x <= 0) return 0
+    const c = Math.max(fc, indexAt(X, layout.cols, x + FW))
+    const lo = X[c] - FW
+    const hi = c + 1 <= layout.cols ? X[c + 1] - FW : lo
+    if (toward === 'up') return x <= lo + 0.5 ? lo : hi
+    return x - lo <= hi - x ? lo : hi
+  }, [X, FW, fc, layout.cols])
+
+  useEffect(() => {
+    const el = scroller.current
+    if (!el) return
+    const settle = () => {
+      const max = el.scrollWidth - el.clientWidth
+      const x = el.scrollLeft
+      if (x <= 0 || x >= max - 1) return
+      const edge = Math.min(columnEdge(x, 'nearest'), max)
+      if (Math.abs(edge - x) > 0.5) el.scrollTo({ left: edge, behavior: 'smooth' })
+    }
+    el.addEventListener('scrollend', settle)
+    return () => el.removeEventListener('scrollend', settle)
+  }, [columnEdge])
+
   // keep the chosen cell in view, beside the frozen panes
   useEffect(() => {
     const el = scroller.current
@@ -396,7 +422,8 @@ export function SheetGrid({
     const top = r.y - HH
     if (selected.c >= fc) {
       if (left - FW < el.scrollLeft) el.scrollLeft = left - FW
-      else if (r.x + r.w > el.scrollLeft + el.clientWidth) el.scrollLeft = r.x + r.w - el.clientWidth
+      // far enough for the whole cell, to the next column edge, so the settle above has nothing to move
+      else if (r.x + r.w > el.scrollLeft + el.clientWidth) el.scrollLeft = columnEdge(r.x + r.w - el.clientWidth, 'up')
     }
     if (selected.i >= fr) {
       if (top - FH < el.scrollTop) el.scrollTop = top - FH
@@ -615,7 +642,11 @@ export function SheetGrid({
     if (layout.headerH) out.push(...headers(kind, place))
     if (kind === regionOfPos(selected)) {
       const R = cellRect(selected)
-      out.push(<div key="sel" className="sg-selection" style={place(R.x - 1, R.y - 1, R.w + 1, R.h + 1)} />)
+      // the ring reaches 1 px outside its cell; where the cell meets the region's edge (B5 beside the frozen line,
+      // a first row under the headers) the region would clip that side, so the ring steps inside there
+      const x0 = Math.max(R.x - 1, o.x + 1)
+      const y0 = Math.max(R.y - 1, o.y + 1)
+      out.push(<div key="sel" className="sg-selection" style={place(x0, y0, R.x + R.w - x0, R.y + R.h - y0)} />)
     }
     if (editing && kind === regionOfPos(editing.pos)) out.push(editor(editing.pos, place))
     if (fr && (kind === 'corner' || kind === 'top')) out.push(<div key="fh" className="sg-freeze-h" />)
