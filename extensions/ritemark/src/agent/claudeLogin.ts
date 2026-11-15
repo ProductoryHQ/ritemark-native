@@ -115,3 +115,21 @@ export function cancelClaudeLogin(): boolean {
 export function isClaudeLoginActive(): boolean {
   return activeLogin !== null;
 }
+
+/**
+ * Sprint 160 (#696): hear the login running now without starting one. A surface that shows a sign-in it didn't start
+ * (the AI's sheet, for one Home, the welcome or Settings started) hears its page and its end as the surface that
+ * started it does. False when no login runs.
+ */
+export function followClaudeLogin(options: ClaudeLoginOptions): boolean {
+  const login = activeLogin;
+  if (!login) return false;
+  login.subscribers.push(options);
+  if (login.url) notifySubscribers([options], (subscriber) => subscriber.onUrl?.(login.url!));
+  return true;
+}
+
+/** Sprint 160 (#696): the running login's sign-in page, once the CLI has printed it ("Open the page again"); else null. */
+export function claudeLoginPage(): string | null {
+  return activeLogin?.url ?? null;
+}

@@ -223,11 +223,10 @@ fi
 # -----------------------------------------------------------------------------
 FRAME_LOG=/tmp/release-extension-preflight-frame.log
 if FRAME=$(node scripts/check-frame-manifest.mjs --ref "$REF" 2>"$FRAME_LOG"); then
-  if [[ -s "$FRAME_LOG" ]]; then
-    ok "the extension fills the frame the shell at $REF draws ($(head -1 "$FRAME_LOG"))"
-  else
-    ok "the extension fills the frame the shell at $REF draws"
-  fi
+  ok "the extension fills the frame the shell at $REF draws"
+  # Its notes, each on its own line: a shell with no manifest, or each place off by default that the shell's manifest
+  # doesn't name (Sprint 159, decision 2: accepted, it shows only once its flag is on)
+  sed '/^$/d; s/^/  /' "$FRAME_LOG"
 elif [[ -n "$FRAME" ]]; then
   fail "the extension no longer fills the frame the shell at $REF draws (a shell release changes these):"
   echo "$FRAME" | sed 's/^/  /'

@@ -1,0 +1,60 @@
+// node sample-left.mjs <port> <seconds> [shot prefix]: follows the workbench page (across a reload) every 50 ms and prints
+// each change of the left column: the places row (* = checked), the head's words, and whether the column shows.
+// With a shot prefix it also captures the first sample with a laid-out row, and the last.
+import { writeFileSync } from 'node:fs';
+
+const [port, seconds, shots] = process.argv.slice(2);
+const PLACES = `(() => {
+	if (!document.querySelector('.monaco-workbench')) return null;
+	const items = [...document.querySelectorAll('.part.sidebar .composite-bar .action-item')].filter(e => e.getBoundingClientRect().width > 0);
+	const row = items.map(e => { const a = e.querySelector('.action-label'); const label = (a && a.getAttribute('aria-label')) || ''; return (e.classList.contains('checked') ? '*' : '') + label.split(/[\\n(]/)[0].trim(); });
+	const head = [...document.querySelectorAll('.part.sidebar .ritemark-project-head *')].filter(e => e.children.length === 0 && e.textContent.trim()).map(e => e.textContent.trim()).slice(0, 6);
+	const content = [...document.querySelectorAll('.part.sidebar .split-view-view')].filter(e => e.getBoundingClientRect().height > 0).length;
+	return JSON.stringify({ row, head, views: content });
+})()`;
+const start = Date.now();
+let last = '';
+let socket = null;
+let shotFirst = false;
+let id = 0;
+const pending = new Map();
+async function open() {
+	const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+	const page = list.find(t => t.type === 'page' && t.url.includes('workbench'));
+	if (!page) return null;
+	const s = new WebSocket(page.webSocketDebuggerUrl);
+	await new Promise((resolve, reject) => { s.addEventListener('open', resolve, { once: true }); s.addEventListener('error', reject, { once: true }); });
+	s.addEventListener('message', event => { const m = JSON.parse(event.data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } });
+	s.addEventListener('close', () => { if (socket === s) socket = null; });
+	return s;
+}
+const call = (method, params) => new Promise(resolve => {
+	const n = ++id;
+	pending.set(n, resolve);
+	try { socket.send(JSON.stringify({ id: n, method, params })); } catch { pending.delete(n); resolve({}); }
+	setTimeout(() => { if (pending.has(n)) { pending.delete(n); resolve({}); } }, 500);
+});
+while (Date.now() - start < Number(seconds) * 1000) {
+	try {
+		if (!socket) socket = await open();
+		const answer = await call('Runtime.evaluate', { expression: PLACES, returnByValue: true });
+		const value = answer.result?.result?.value;
+		if (value && value !== last) {
+			console.log(`+${((Date.now() - start) / 1000).toFixed(2)} s ${value}`);
+			last = value;
+			if (shots && !shotFirst && JSON.parse(value).row.length) {
+				shotFirst = true;
+				const shot = await call('Page.captureScreenshot', { format: 'png' });
+				if (shot.result) writeFileSync(`${shots}-first.png`, Buffer.from(shot.result.data, 'base64'));
+			}
+		}
+	} catch {
+		socket = null;
+	}
+	await new Promise(resolve => setTimeout(resolve, 50));
+}
+if (shots && socket) {
+	const shot = await call('Page.captureScreenshot', { format: 'png' });
+	if (shot.result) writeFileSync(`${shots}-settled.png`, Buffer.from(shot.result.data, 'base64'));
+}
+process.exit(0);
