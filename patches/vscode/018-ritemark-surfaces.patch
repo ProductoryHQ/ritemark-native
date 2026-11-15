@@ -7120,10 +7120,10 @@ index 41250d7b714..133c8807b3f 100644
  				agentsWindow: { default: 'custom' },
 diff --git a/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts b/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts
 new file mode 100644
-index 00000000000..fe6727d70a8
+index 00000000000..93b5e0c1061
 --- /dev/null
 +++ b/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts
-@@ -0,0 +1,177 @@
+@@ -0,0 +1,197 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -7223,6 +7223,25 @@ index 00000000000..fe6727d70a8
 +	return undefined;
 +}
 +
++/**
++ * A presentation's window is named by its page alone (the deck's name), never "<deck> — <project>": the system shows a
++ * window's title in its window lists, and the room must not read the project's name. The workbench's own window title
++ * keeps setting it, so it is set back whenever it changes.
++ */
++function keepTitle(window: Window | undefined, title: string): void {
++	if (!window) {
++		return;
++	}
++	const document = window.document;
++	const set = () => {
++		if (document.title !== title) {
++			document.title = title;
++		}
++	};
++	set();
++	new (window as Window & typeof globalThis).MutationObserver(set).observe(document.head, { childList: true, characterData: true, subtree: true });
++}
++
 +CommandsRegistry.registerCommand('_ritemark.present.displays', () => ritemarkDisplays());
 +
 +/**
@@ -7296,6 +7315,7 @@ index 00000000000..fe6727d70a8
 +		panel.group.moveEditor(panel.editor, part.activeGroup);
 +		part.activeGroup.lock(true);
 +		part.activeGroup.focus();
++		keepTitle(getWindowById(part.windowId)?.window, panel.editor.getName());
 +	} finally {
 +		opened.dispose();
 +	}

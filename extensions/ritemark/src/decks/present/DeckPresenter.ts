@@ -24,6 +24,11 @@
  *
  * `RITEMARK_PRESENT_WINDOWED=1` keeps both in windows instead of full screen, and offers the presenter view on one
  * display, only in a dev build (`VSCODE_DEV`), so a hidden test run never takes over the screen.
+ *
+ * The path without the shell's commands runs only in a dev build: in Ritemark's frame a window moved with VS Code's
+ * commands keeps its title row ("<deck> — <project>") and the desk's edge, and the room would read the project's name
+ * on the projector (the Experience lead, 16 November). Elsewhere, an older shell, Present says it needs a newer
+ * Ritemark.
  */
 import * as os from 'os';
 import * as path from 'path';
@@ -45,6 +50,7 @@ import {
   wallPicturePaths,
   wallStateOf,
   chooseDisplays,
+  PRESENT_NEEDS_UPDATE,
   type DeckPresentOptions,
   type DeckPresentRequest,
   type PresentDisplay,
@@ -121,6 +127,11 @@ const PRESENTER_KEY = 'ritemark.present.presenterView';
 const WINDOWED_WALL = { x: 24, y: 64, width: 800, height: 450 };
 const WINDOWED_PRESENTER = { x: 840, y: 64, width: 864, height: 540 };
 
+/** VS Code's own window commands may place the wall only in a dev build (their window shows the project's name). */
+export function presentFallbackAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
+  return !!env.VSCODE_DEV;
+}
+
 /** The dev-only windowed mode: honoured only in a dev build. */
 export function presentWindowed(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.RITEMARK_PRESENT_WINDOWED === '1' && !!env.VSCODE_DEV;
@@ -139,6 +150,7 @@ export class DeckPresenter implements vscode.Disposable {
     const chosen = chooseDisplays(displays);
     return {
       type: 'deck/present-options',
+      canPresent: shell || presentFallbackAllowed(),
       available,
       on: available && this.presenterWanted(),
       wallDisplay: available && displays.length > 1 ? displays[chosen.wall].name : null,
@@ -168,6 +180,10 @@ export class DeckPresenter implements vscode.Disposable {
       return;
     }
     const shell = await hasShellPlacement();
+    if (!shell && !presentFallbackAllowed()) {
+      await post(origin.panel.webview, { type: 'deck/present-failed', message: PRESENT_NEEDS_UPDATE });
+      return;
+    }
     const displays = shell ? await readDisplays() : [];
     const chosen = chooseDisplays(displays);
     const running: Running = {

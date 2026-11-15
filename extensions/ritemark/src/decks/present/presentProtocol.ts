@@ -248,9 +248,14 @@ export function decodeDeckPresentRequest(value: unknown): DeckPresentRequest | n
   return { type: 'deck/present', from: input.from, index: input.index };
 }
 
-/** The deck view's Present menu: whether a presenter view can show, where, and whether it is on. */
+/** Why Present can't run on a shell without its placement commands (outside a dev build). */
+export const PRESENT_NEEDS_UPDATE = 'Presenting needs the newest Ritemark. Update Ritemark, then present.';
+
+/** The deck view's Present menu: whether Present can run, whether a presenter view can show, where, and whether it is on. */
 export interface DeckPresentOptions {
   type: 'deck/present-options';
+  /** The shell can place the wall (or a dev build may use VS Code's own commands). */
+  canPresent: boolean;
   /** A second display is connected (or a dev build's windowed mode) and the shell can place the windows. */
   available: boolean;
   on: boolean;
