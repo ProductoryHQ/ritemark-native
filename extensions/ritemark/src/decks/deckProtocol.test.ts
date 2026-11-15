@@ -2,7 +2,7 @@
  * Sprint 157: the deck view's requests are decoded with exact fields. Run with `npx tsx src/decks/deckProtocol.test.ts`.
  */
 import { strict as assert } from 'node:assert';
-import { decodeDeckRequest, DeckProtocolError, MAX_ASSET_PATHS } from './deckProtocol';
+import { decodeDeckRequest, decodeLibraryRequest, DeckProtocolError, MAX_ASSET_PATHS } from './deckProtocol';
 import { deckModeOf, isDeckPath } from './deckMode';
 import { isThemePath } from './deckTheme';
 
@@ -18,7 +18,30 @@ assert.deepEqual(decodeDeckRequest({ type: 'deck/save-image', slideId: 'ab12', d
 assert.throws(() => decodeDeckRequest({ type: 'deck/save-image', slideId: '../x', dataUrl: 'data:image/png;base64,AAA=', filename: 'a.png' }), DeckProtocolError);
 assert.throws(() => decodeDeckRequest({ type: 'deck/save-image', slideId: 'ab12', dataUrl: 'data:text/html,<b>', filename: 'a.png' }), DeckProtocolError);
 assert.throws(() => decodeDeckRequest({ type: 'deck/save-image', slideId: 'ab12', dataUrl: 'data:image/png;base64,AAA=', filename: '' }), DeckProtocolError);
+assert.deepEqual(decodeDeckRequest({ type: 'deck/update-library', id: 'a1b2', text: '' }), { type: 'deck/update-library', id: 'a1b2', text: '' });
+assert.throws(() => decodeDeckRequest({ type: 'deck/update-library', id: 'a1b2' }), DeckProtocolError, 'the deck text is required');
+assert.deepEqual(decodeDeckRequest({ type: 'deck/source-states' }), { type: 'deck/source-states' });
+assert.throws(() => decodeDeckRequest({ type: 'deck/source-states', copies: [] }), DeckProtocolError);
+assert.throws(() => decodeDeckRequest({ type: 'deck/update-library', id: 'a1b2', text: '', extra: 1 }), DeckProtocolError);
+assert.throws(() => decodeDeckRequest({ type: 'deck/use-library', id: '../x', text: '' }), DeckProtocolError);
+assert.throws(() => decodeDeckRequest({ type: 'deck/add-to-library', id: '', text: '' }), DeckProtocolError);
+assert.throws(() => decodeDeckRequest({ type: 'deck/add-to-library', id: 'a1', text: 5 }), DeckProtocolError);
+assert.deepEqual(decodeDeckRequest({ type: 'deck/show-in-library', from: 'Slide library/A.deck.md#x1 @abc123' }).type, 'deck/show-in-library');
+assert.deepEqual(decodeDeckRequest({ type: 'deck/undo-library', token: 'w1' }), { type: 'deck/undo-library', token: 'w1' });
+assert.deepEqual(decodeDeckRequest({ type: 'deck/current', index: 2, count: 9 }), { type: 'deck/current', index: 2, count: 9 });
+assert.throws(() => decodeDeckRequest({ type: 'deck/current', index: -1, count: 9 }), DeckProtocolError);
 assert.throws(() => decodeDeckRequest({ type: 'deck/unknown' }), DeckProtocolError);
+
+// The Slide library place's requests.
+assert.deepEqual(decodeLibraryRequest({ type: 'library/ready' }), { type: 'library/ready' });
+assert.deepEqual(decodeLibraryRequest({ type: 'library/search', query: 'agents' }), { type: 'library/search', query: 'agents' });
+assert.deepEqual(decodeLibraryRequest({ type: 'library/insert', path: 'Slide library/Agents.deck.md', id: 'g1' }), { type: 'library/insert', path: 'Slide library/Agents.deck.md', id: 'g1' });
+assert.equal(decodeLibraryRequest({ type: 'library/insert', path: 'Slide library/Agents.deck.md', id: 'g1', extra: 1 }), null);
+assert.equal(decodeLibraryRequest({ type: 'library/insert', path: 'Slide library/Agents.deck.md', id: '../g1' }), null);
+assert.equal(decodeLibraryRequest({ type: 'library/open', path: '../../etc/passwd' }), null, 'only a deck is opened');
+assert.equal(decodeLibraryRequest({ type: 'library/search', query: 'x'.repeat(201) }), null);
+assert.equal(decodeLibraryRequest({ type: 'library/ready', more: true }), null);
+assert.equal(decodeLibraryRequest('library/ready'), null);
 assert.throws(() => decodeDeckRequest(null), DeckProtocolError);
 assert.throws(() => decodeDeckRequest([]), DeckProtocolError);
 
