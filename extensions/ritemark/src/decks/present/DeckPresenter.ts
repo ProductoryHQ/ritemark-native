@@ -15,6 +15,10 @@
  *
  * `RITEMARK_PRESENT_WINDOWED=1` keeps the wall in its compact window instead of full screen, only in a dev build
  * (`VSCODE_DEV`), so a hidden test run never takes over the screen.
+ *
+ * In Ritemark's frame a window moved this way keeps its title row ("<deck> — <project>") and the desk's edge, and the
+ * room would read the project's name on the projector (the Experience lead, 16 November). So this path runs only in a
+ * dev build; elsewhere Present says it needs a newer Ritemark, until the shell places the wall itself (PR 6).
  */
 import * as os from 'os';
 import * as path from 'path';
@@ -61,6 +65,14 @@ const FOCUS_WAIT_MS = 10_000;
 const FOCUS_CHECK_MS = 150;
 const ACTIVE_WAIT_MS = 3000;
 
+/** Why Present can't run without the shell's placement, outside a dev build. */
+export const PRESENT_NEEDS_UPDATE = 'Presenting needs the newest Ritemark. Update Ritemark, then present.';
+
+/** VS Code's own window commands may place the wall only in a dev build (their window shows the project's name). */
+export function presentFallbackAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
+  return !!env.VSCODE_DEV;
+}
+
 /** The dev-only windowed mode: honoured only in a dev build. */
 export function presentWindowed(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.RITEMARK_PRESENT_WINDOWED === '1' && !!env.VSCODE_DEV;
@@ -80,6 +92,10 @@ export class DeckPresenter implements vscode.Disposable {
     } catch (error) {
       if (!(error instanceof PresentStartError)) throw error;
       await post(origin.panel.webview, { type: 'deck/present-failed', message: error.message });
+      return;
+    }
+    if (!presentFallbackAllowed()) {
+      await post(origin.panel.webview, { type: 'deck/present-failed', message: PRESENT_NEEDS_UPDATE });
       return;
     }
     const wall = vscode.window.createWebviewPanel(
