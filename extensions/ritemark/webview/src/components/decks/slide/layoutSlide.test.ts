@@ -138,4 +138,7 @@ for (const kind of ['points', 'boxes', 'exercise']) {
 }
 assert.deepEqual(textBoxes(layoutSlide('columns', { title: 'T' }, { editing: true })).map(box => box.path), ['title', 'items.0.heading', 'items.0.text', 'items.1.heading', 'items.1.text'])
 
+// A table's cells follow its title in the keyboard order (Codex on PR 2).
+assert.deepEqual(textBoxes(layoutSlide('table', { title: 'T', rows: [['A', 'B'], ['1', '2']] })).map(box => box.path), ['title', 'rows.0.0', 'rows.0.1', 'rows.1.0', 'rows.1.1'])
+
 console.log('layoutSlide: passed')

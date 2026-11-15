@@ -375,6 +375,10 @@ export function textBoxes(layout: SlideLayout): TextBox[] {
     if (box.type === 'text') found.push(box)
     else if (box.type === 'group') box.children.forEach(visit)
     else if (box.type === 'list') box.items.forEach(item => { found.push(item.heading); if (item.text) found.push(item.text) })
+    // A table's cells, row by row, so the keyboard goes on from the title into the first cell (Codex on PR 2).
+    else if (box.type === 'table') {
+      box.rows.forEach(row => row.cells.forEach(cell => found.push({ type: 'text', key: cell.path, cls: '', path: cell.path, text: cell.text, placeholder: cell.head ? 'Heading' : '' })))
+    }
   }
   layout.boxes.forEach(visit)
   return found

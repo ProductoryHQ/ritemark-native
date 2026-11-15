@@ -18,7 +18,7 @@ import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { slidesOf, type DeckSlideEntry } from './deckDocument'
-import { SlideCanvas, type SlideEditing } from './slide/SlideCanvas'
+import { SlideCanvas, editedText, type SlideEditing } from './slide/SlideCanvas'
 import { layoutSlide, textBoxes } from './slide/layoutSlide'
 import { addColumn, addRow, cellPath, insertItemAfter, isEmptyItem, itemPath, nextCell, removeItem, setIcon, setPath, valueAt } from './slide/slideEdits'
 
@@ -207,7 +207,7 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
             data-ph="What you will say. Only you see it, and only here."
             onInput={event => {
               onWriting()
-              const text = event.currentTarget.textContent ?? ''
+              const text = editedText(event.currentTarget)
               writeNotes(text === '' ? null : text)
             }}
             onKeyDown={event => {

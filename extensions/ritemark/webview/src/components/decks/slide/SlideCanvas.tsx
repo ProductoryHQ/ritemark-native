@@ -50,6 +50,16 @@ const px = (style: BoxStyle | undefined): CSSProperties | undefined => {
   return Object.fromEntries(Object.entries(style).map(([key, value]) => [key, typeof value === 'number' && key !== 'fontWeight' ? `${value}px` : value])) as CSSProperties
 }
 
+/**
+ * The text of a multi-line editing host, its lines as the person sees them. Chromium may write a typed line break as
+ * a `<br>` or a `<div>`, which `textContent` runs together; `innerText` reads them as line breaks. The one empty line a
+ * trailing `<br>` adds is not the person's.
+ */
+export function editedText(element: HTMLElement): string {
+  const text = element.innerText ?? element.textContent ?? ''
+  return element.lastChild?.nodeName === 'BR' ? text.replace(/\n$/, '') : text
+}
+
 /** One of the slide's words: plain text, or a small editing host on the stage. */
 function SlideText({ box, editing, tag = 'div' }: { box: TextBox; editing?: SlideEditing; tag?: 'div' | 'span' }) {
   const ref = useRef<HTMLElement>(null)
@@ -89,7 +99,8 @@ function SlideText({ box, editing, tag = 'div' }: { box: TextBox; editing?: Slid
       data-ph={box.placeholder}
       data-path={box.path}
       onInput={event => {
-        const raw = event.currentTarget.textContent ?? ''
+        // A line typed with Enter may arrive as a <br> or a <div>: `innerText` reads each as a line break.
+        const raw = box.multiline ? editedText(event.currentTarget) : event.currentTarget.textContent ?? ''
         editing.onText(box.path, box.multiline ? raw : raw.replace(/[\r\n\u2028\u2029]+/g, ' '))
       }}
       onKeyDown={event => {
