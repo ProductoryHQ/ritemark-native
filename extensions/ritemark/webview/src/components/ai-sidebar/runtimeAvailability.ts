@@ -111,3 +111,28 @@ export function resolveAvailableRuntimeModel(
   }
   return null;
 }
+
+/**
+ * Sprint 160 (#686): another OpenCode model to use while this one is at its usage limit, as
+ * `provider/model`, or null. First the same provider's next model (a limit belongs to one model), then
+ * the first model of another provider with a key, in the menu's own order. Never a hidden model.
+ */
+export function anotherOpenCodeModel(
+  failedModelId: string | undefined,
+  catalogs: Pick<RuntimeModelCatalogs, 'opencode' | 'acpProviders'>,
+): string | null {
+  const failed = failedModelId?.replace(/^opencode:/, '') ?? '';
+  const separator = failed.indexOf('/');
+  const failedProvider = separator > 0 ? failed.slice(0, separator) : '';
+  const providers = ['google', 'openai', 'anthropic', 'openrouter'] as const;
+  const ordered = [
+    ...providers.filter((provider) => provider === failedProvider),
+    ...providers.filter((provider) => provider !== failedProvider),
+  ];
+  for (const provider of ordered) {
+    if (!catalogs.acpProviders[provider]) continue;
+    const model = catalogs.opencode?.[provider]?.find((entry) => !entry.hidden && `${provider}/${entry.id}` !== failed);
+    if (model) return `${provider}/${model.id}`;
+  }
+  return null;
+}

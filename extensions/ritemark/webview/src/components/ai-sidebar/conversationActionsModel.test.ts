@@ -14,6 +14,9 @@ import {
   deleteConfirmLabel,
   headerStatusLabel,
   isConversationRunning,
+  railEntryLabels,
+  usageLimitRuntime,
+  usageLimitTooltip,
 } from './conversationActionsModel';
 
 type Lifecycle = ConversationSummaryV1['lifecycle'];
@@ -86,6 +89,54 @@ const interrupted: Lifecycle = { state: 'interrupted', turnId: null, reason: 're
       assert.equal(conversationStatusLabel(summary(ended)), 'Interrupted', 'the chats list keeps its word');
     }
   }
+}
+
+// Sprint 160 (#686, the Experience lead): a usage limit says so, in the chats list and on the rail,
+// instead of "Interrupted". Other failures keep "Interrupted" (decision 9).
+{
+  const failed: Lifecycle = { state: 'interrupted', turnId: 't1', reason: 'failed' };
+  type Failure = NonNullable<ConversationSummaryV1['lastFailure']>;
+  const chat = (lifecycle: Lifecycle, lastFailure?: Failure) => ({ title: 'Shorten the notes', lifecycle, ...(lastFailure ? { lastFailure } : {}) });
+  const limitOf = (runtimeId: Failure['runtimeId'], limit?: Failure['limit']): Failure => ({ runtimeId, kind: 'limit', ...(limit ? { limit } : {}) });
+
+  for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
+    for (const limit of ['plan', 'quota', 'credits', undefined] as const) {
+      assert.equal(conversationStatusLabel(chat(failed, limitOf(runtime, limit))), 'Limit reached', `${runtime} ${limit ?? '(no detail)'}`);
+      assert.equal(usageLimitRuntime(chat(failed, limitOf(runtime, limit))), runtime);
+    }
+    assert.equal(headerStatusLabel(chat(failed, limitOf(runtime, 'plan'))), null, 'the header still shows just the title');
+  }
+  assert.equal(usageLimitTooltip('opencode'), "Stopped at OpenCode's usage limit");
+  assert.equal(usageLimitTooltip('codex'), "Stopped at ChatGPT's usage limit", "people's names, never Codex");
+  assert.equal(usageLimitTooltip('claude-code'), "Stopped at Claude's usage limit");
+
+  // ChatGPT's "busy" isn't a usage limit (its card says so); other kinds, and a chat from before Sprint 160, keep the word.
+  assert.equal(conversationStatusLabel(chat(failed, limitOf('codex', 'busy'))), 'Interrupted');
+  for (const kind of ['sign-in', 'model', 'network', 'provider'] as const) {
+    assert.equal(conversationStatusLabel(chat(failed, { runtimeId: 'opencode', kind })), 'Interrupted', kind);
+  }
+  assert.equal(conversationStatusLabel(chat(failed)), 'Interrupted', 'no failure kind in the summary');
+  // Only while the failure is what interrupted the chat.
+  assert.equal(conversationStatusLabel(chat({ state: 'interrupted', turnId: 't1', reason: 'cancelled' }, limitOf('opencode', 'plan'))), 'Interrupted');
+  assert.equal(conversationStatusLabel(chat(idle, limitOf('opencode', 'plan'))), null);
+  assert.equal(conversationStatusLabel(chat(working, limitOf('opencode', 'plan'))), 'Working');
+
+  // The rail: its accessible name says "Limit reached", its tooltip whose limit it was.
+  assert.deepEqual(railEntryLabels(chat(failed, limitOf('opencode', 'plan')), { pinned: false, unread: false }), {
+    label: 'Shorten the notes — Limit reached',
+    tooltip: "Shorten the notes — Stopped at OpenCode's usage limit",
+  });
+  assert.deepEqual(railEntryLabels(chat(failed, { runtimeId: 'opencode', kind: 'network' }), { pinned: false, unread: false }), {
+    label: 'Shorten the notes — Interrupted',
+    tooltip: 'Shorten the notes — Interrupted',
+  });
+  // As before: an unread reply first, and a pinned chat says Pinned.
+  assert.equal(railEntryLabels(chat(failed, limitOf('opencode', 'plan')), { pinned: false, unread: true }).tooltip, 'Shorten the notes — New reply');
+  assert.equal(railEntryLabels(chat(failed, limitOf('opencode', 'plan')), { pinned: true, unread: false }).tooltip, 'Shorten the notes — Pinned');
+  assert.equal(railEntryLabels(chat(failed, limitOf('opencode', 'plan')), { pinned: true, unread: true }).label, 'Shorten the notes — Pinned, new reply');
+  assert.equal(railEntryLabels(chat(working), { pinned: false, unread: true }).label, 'Shorten the notes — Working');
+  assert.equal(railEntryLabels(chat(needsUser), { pinned: false, unread: false }).label, 'Shorten the notes — Needs you');
+  assert.equal(railEntryLabels(chat(idle), { pinned: false, unread: false }).label, 'Shorten the notes — Recent');
 }
 
 console.log('conversationActionsModel.test.ts: all tests passed');

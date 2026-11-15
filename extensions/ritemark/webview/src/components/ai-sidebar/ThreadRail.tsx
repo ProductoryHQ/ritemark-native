@@ -2,17 +2,9 @@ import { useMemo } from 'react';
 import { Icon } from '../ui/Icon';
 import { ConversationBubbleIcon } from './ConversationBubbleIcon';
 import { ConversationTooltip } from './ConversationTooltip';
-import { conversationPinState } from './conversationActionsModel';
+import { conversationPinState, railEntryLabels } from './conversationActionsModel';
 import { railMarkOf, selectRailConversationIds } from './conversationSelectors';
 import { useAISidebarStore } from './store';
-
-function statusLabel(state: string, unread: boolean): string {
-  if (state === 'needs-user') return 'Needs you';
-  if (state === 'working') return 'Working';
-  if (unread) return 'New reply';
-  if (state === 'interrupted') return 'Interrupted';
-  return 'Recent';
-}
 
 export function ThreadRail() {
   const summaries = useAISidebarStore((state) => state.hostConversations);
@@ -46,10 +38,10 @@ export function ThreadRail() {
     const { pinned: isPinned, atCapacity: pinAtCapacity, label: pinLabel, icon: pinIcon } = conversationPinState(id, summary.title, pinnedIds);
     const isActive = activeId === id;
     const mark = railMarkOf(summary);
-    const label = `${summary.title} — ${isPinned ? (mark === 'unread' ? 'Pinned, new reply' : 'Pinned') : statusLabel(summary.lifecycle.state, mark === 'unread')}`;
+    const { label, tooltip } = railEntryLabels(summary, { pinned: isPinned, unread: mark === 'unread' });
     return (
       <div key={id} className="group relative h-10 w-10 shrink-0">
-        <ConversationTooltip label={label}>
+        <ConversationTooltip label={tooltip}>
           <button type="button" aria-label={label} aria-current={isActive ? 'true' : undefined} onClick={() => openConversations[id] ? switchConversation(id) : loadSavedConversation(id)} className={`flex h-10 w-10 items-center justify-center rounded-[11px] outline-none transition-colors motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-[var(--r-accent)] ${isActive ? 'bg-[var(--r-accent-soft)]' : 'hover:bg-[var(--r-surface-soft)]'}`}>
             <ConversationBubbleIcon identityColorSlot={summary.identityColorSlot} />
             {(mark === 'needs-you' || mark === 'unread') && <span className="absolute bottom-[3px] right-[3px] h-2 w-2 rounded-full bg-[var(--r-warning)] ring-2 ring-[var(--r-surface-muted)]" aria-hidden="true" />}
