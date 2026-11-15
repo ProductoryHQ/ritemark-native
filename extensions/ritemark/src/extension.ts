@@ -24,6 +24,7 @@ import { madeSomething } from './guidance/madeSomething';
 import { CommentTaskStore, commentTaskStoreDir } from './commentTasks/CommentTaskStore';
 import { CommentTaskController } from './commentTasks/CommentTaskController';
 import { registerTaskBoard, type TaskBoardHost } from './taskBoard/taskBoardHost';
+import { registerDecks, type DecksHost } from './decks/decksHost';
 import { registerProjects, type ProjectsHost } from './projects/projectsHost';
 import { registerProjectSearch } from './search/SearchHost';
 import { buildCommentTaskPrompt } from './commentTasks/commentTaskPrompt';
@@ -95,6 +96,8 @@ export let googleDocs: GoogleDocsFeature | undefined;
 export let publish: PublishFeature | undefined;
 /** The task board (Sprint 130): the Ritemark editor asks it which documents are card pages. */
 export let taskBoard: TaskBoardHost | undefined;
+/** Decks (Sprint 157): the Ritemark editor asks it which documents open as decks. */
+export let decks: DecksHost | undefined;
 
 // Agent Library view provider
 let agentLibraryViewProvider: AgentLibraryViewProvider | null = null;
@@ -499,6 +502,10 @@ export function activate(context: vscode.ExtensionContext) {
     attachTaskListener: (listener) => unifiedViewProvider.attachTaskListener(listener),
     oneShotSettings: (runtimeId) => unifiedViewProvider.oneShotSettings(runtimeId),
   });
+
+  // ── Decks (Sprint 157, experience 46) ───────────────────────────────────────
+  // A `.deck.md` opens as a deck in the Ritemark editor while the flag `decks` is on.
+  decks = registerDecks(context);
 
   // ── Search, the words layer (Sprint 148, #591) ─────────────────────────────
   // The index of this window's project, in its own worker thread, and its results

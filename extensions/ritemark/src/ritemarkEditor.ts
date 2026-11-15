@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import { parseFrontmatterFromText, serializeFrontmatter, discoverCommands } from './agent/discovery';
 import type { CardPages } from './taskBoard/cardPages';
+import type { DeckPages } from './decks/deckPages';
 import { cardTabWrite } from './taskBoard/cardFile';
 import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
@@ -272,6 +273,15 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     return ext.taskBoard?.cardPages ?? null;
   }
 
+  /**
+   * Sprint 157 (experience 46): a `.deck.md` opens here as a deck while the flag is on, a mode of this one editor,
+   * so saving, conflicts, the writer's-copy merge and undo stay a document's. Lazy, as for the card pages.
+   */
+  private static deckPages(): DeckPages | null {
+    const ext = require('./extension') as typeof import('./extension');
+    return ext.decks?.pages ?? null;
+  }
+
   constructor(private readonly context: vscode.ExtensionContext) {
     this.documentSync = new DocumentSyncCoordinator(context, {
       buildPayload: (document, webview) => this.buildSyncPayload(document, webview),
@@ -330,6 +340,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     // A task card shows as a page: the board's front matter never reaches the
     // view, and the view's strip reads the card from the board (Sprint 130).
     const cardMode = RitemarkEditorProvider.cardPages()?.cardModeFor(document) ?? null;
+    // Sprint 157: a deck's view draws the slides beside their handout; its front matter stays the document's.
+    const deckMode = !cardMode && (RitemarkEditorProvider.deckPages()?.deckModeFor(document) ?? false);
     // Views compare host payloads against their own Markdown projection, which
     // never carries the persisted trailing newline or gray-matter's leading one.
     // Send the projection form, or the echo of an accepted edit is mistaken for
@@ -382,6 +394,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       systemLanguage: systemLanguage(process.env, vscode.env.language),
       ...agentFields,
       ...(cardMode ? { cardMode } : {}),
+      ...(deckMode ? { deckMode: true } : {}),
     };
   }
 
@@ -869,6 +882,12 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         // identity itself; the webview can only name an action.
         if (typeof message.type === 'string' && message.type.startsWith('google-docs/')) {
           void this.handleGoogleDocsMessage(document, message);
+          return;
+        }
+
+        // Sprint 157: a deck view's requests, decoded and answered to this webview by the deck pages.
+        if (typeof message.type === 'string' && message.type.startsWith('deck/')) {
+          void RitemarkEditorProvider.deckPages()?.handle(document, webview, message);
           return;
         }
 

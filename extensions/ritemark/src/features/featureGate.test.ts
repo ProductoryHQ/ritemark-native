@@ -113,5 +113,8 @@ assert.strictEqual(featureProperties['ritemark.features.composer-thinking-effort
 // Sprint 148 (#591): the search index's kill switch, on by default (HARD RULE #2).
 assert.strictEqual(FLAGS['project-search'].status, 'experimental');
 assert.strictEqual(featureProperties['ritemark.features.project-search']?.default, true);
+// Sprint 157 (README decision 10): Decks, off by default on Jarmo's word, as an experimental flag.
+assert.strictEqual(FLAGS.decks.status, 'experimental');
+assert.strictEqual(featureProperties['ritemark.features.decks']?.default, false);
 
 console.log('All feature gate tests passed.');

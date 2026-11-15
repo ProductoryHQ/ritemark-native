@@ -1,0 +1,89 @@
+/* Sprint 157 (experience 46): the deck view, as the Experience lead's prototype draws it (prototype.html, `.dbar`,
+   `.strip`, `.stage`, `.divider`, `.hand`). The prototype's colours are Ritemark's tokens here: ground → surface-muted,
+   hair → hairline, ink → ink-strong, body → ink-body, muted → ink-muted, soft → accent-soft. */
+
+.deck-view {
+  --deck-bar: 44px;
+  --deck-strip: 132px;
+  font-family: var(--ritemark-ui-font-family);
+}
+
+/* ---- the bar */
+.deck-bar { height: var(--deck-bar); display: flex; align-items: center; gap: 4px; padding: 0 8px; box-sizing: border-box; flex: none; }
+.deck-bar .deck-count { margin-left: 4px; font-size: 12.5px; line-height: 1; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.deck-bar .deck-saved { margin-right: 6px; font-size: 12px; line-height: 1; color: var(--r-ink-muted); white-space: nowrap; }
+
+/* ---- the desk: strip, stage, divider, handout */
+.deck-desk { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+
+.deck-strip { position: absolute; left: 0; top: 0; bottom: 0; width: var(--deck-strip); border-right: 1px solid var(--r-hairline); overflow-y: auto; overflow-x: hidden; padding: 6px 0 40px; box-sizing: border-box; outline: none; }
+.deck-thumb { position: relative; height: 62px; display: flex; align-items: flex-start; gap: 6px; padding: 3px 10px 0 6px; cursor: pointer; }
+.deck-thumb .deck-thumb-no { width: 18px; margin-top: 3px; text-align: right; font-size: 11px; font-weight: 500; line-height: 14px; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
+.deck-thumb .deck-thumb-slide { position: relative; width: 96px; height: 54px; border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline); }
+.deck-thumb:hover .deck-thumb-slide { box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 6px -2px rgba(30, 27, 75, 0.25); }
+.deck-thumb:active .deck-thumb-slide { filter: brightness(0.94); }
+.deck-thumb.is-current .deck-thumb-slide { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
+.deck-thumb.is-current .deck-thumb-no { color: var(--r-accent); font-weight: 700; }
+.deck-thumb.is-skip .deck-thumb-slide { opacity: 0.4; }
+.deck-thumb .deck-thumb-eye { position: absolute; left: 58px; top: 22px; width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.92); display: grid; place-items: center; color: var(--r-ink-strong); }
+.deck-strip:focus-visible .deck-thumb.is-current .deck-thumb-slide { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent), 0 0 0 6px var(--r-accent-soft); }
+
+.deck-stage { position: absolute; top: 0; bottom: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; }
+.deck-stage .deck-stage-group { margin: auto 0; padding: 8px 0 48px; }
+.deck-stage .deck-big { position: relative; margin: 0 24px; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline), 0 8px 24px -10px rgba(30, 27, 75, 0.35); }
+.deck-stage .deck-under { margin: 12px 24px 0; display: grid; gap: 8px; }
+.deck-source { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--r-ink-muted); }
+
+.deck-divider { position: absolute; top: 0; bottom: 0; width: 13px; margin-left: -6px; cursor: col-resize; z-index: 3; touch-action: none; }
+.deck-divider::before { content: ''; position: absolute; left: 6px; top: 12px; bottom: 12px; border-left: 1.5px dotted var(--r-hairline-strong); }
+.deck-divider:hover::before, .deck-divider.is-dragging::before { border-left: 2px solid var(--r-accent); }
+.deck-fold { position: absolute; bottom: 28px; margin-left: -13px; z-index: 4; }
+.deck-fold .deck-fold-button { width: 26px; height: 26px; padding: 0; border-radius: 50%; }
+
+.deck-handout { position: absolute; top: 0; bottom: 0; right: 0; }
+.deck-handout.is-folded { visibility: hidden; pointer-events: none; }
+.deck-handout .wysiwyg-editor .ProseMirror {
+  counter-reset: deck-slide;
+  max-width: none !important;
+  /* The prototype's 20 on the left, with room for the block handle; 22 on the right; room below to scroll the last part to the top */
+  padding: 6px 22px 60vh 28px !important;
+  font-size: 14.5px !important;
+  line-height: 1.65 !important;
+  color: var(--r-ink-body);
+}
+.deck-handout .wysiwyg-editor .ProseMirror p { margin: 0 0 10px !important; font-size: 14.5px !important; line-height: 1.65 !important; }
+.deck-handout .wysiwyg-editor .ProseMirror li p { margin: 0 !important; }
+.deck-handout .wysiwyg-editor .ProseMirror h1 { font-size: 20px !important; margin: 16px 0 6px !important; }
+.deck-handout .wysiwyg-editor .ProseMirror h2 { font-size: 17px !important; margin: 14px 0 6px !important; }
+.deck-handout .wysiwyg-editor .ProseMirror h3,
+.deck-handout .wysiwyg-editor .ProseMirror h4,
+.deck-handout .wysiwyg-editor .ProseMirror h5,
+.deck-handout .wysiwyg-editor .ProseMirror h6 { font-size: 15.5px !important; margin: 12px 0 6px !important; }
+.deck-handout .wysiwyg-editor .ProseMirror pre { font-size: 12.5px !important; line-height: 1.55 !important; }
+
+/* each slide's part head: its title over a thin line, its number on the right */
+.deck-part-head { position: relative; counter-increment: deck-slide; padding: 14px 40px 0 0; margin: 4px 0 6px; border-top: 1px solid var(--r-hairline); }
+.ProseMirror > .deck-part-head:first-child { border-top: 0; margin-top: 0; }
+.deck-part-title { padding: 1px 0; font-size: 19px; font-weight: 600; line-height: 1.4; color: var(--r-ink-strong); outline: none; text-wrap: balance; cursor: text; }
+.deck-part-title:empty::before { content: attr(data-placeholder); color: var(--r-ink-faint); font-weight: 500; }
+.deck-part-number { position: absolute; right: 0; top: 21px; display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; line-height: 14px; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; font-family: var(--ritemark-ui-font-family); }
+.deck-part-number::after { content: counter(deck-slide); }
+.deck-part-head.is-current .deck-part-number { color: var(--r-accent); }
+.deck-part-head.is-skip .deck-part-title { color: var(--r-ink-muted); }
+
+/* the current part's line on the left, from its head to the next part's */
+.deck-part-bar { position: absolute; width: 2px; border-radius: 1px; background: var(--r-accent-soft); pointer-events: none; }
+
+/* ---- the slide, drawn on a 960 × 540 canvas and scaled (SlideCanvas) */
+.deck-slide { position: relative; overflow: hidden; }
+.deck-slide-canvas { position: absolute; left: 0; top: 0; width: 960px; height: 540px; transform-origin: 0 0; box-sizing: border-box; padding: 56px 64px; font-family: 'Sofia Sans', var(--ritemark-ui-font-family); }
+.deck-slide-canvas.is-evening { background: radial-gradient(120% 90% at 85% 0%, #2B2F6B 0%, #1C1F4A 55%, #15173A 100%); color: #E4E6F7; }
+.deck-slide-title { font-size: 44px; line-height: 52px; font-weight: 700; color: #FFFFFF; margin: 0; overflow-wrap: anywhere; }
+.deck-slide-canvas.is-lead { display: flex; flex-direction: column; justify-content: center; }
+.deck-slide-canvas.is-lead .deck-slide-title { font-size: 56px; line-height: 64px; }
+.deck-slide-sub { margin-top: 16px; font-size: 24px; line-height: 32px; color: #E4E6F7; }
+.deck-slide-number { font-size: 40px; font-weight: 700; color: #F2B544; margin-bottom: 8px; }
+.deck-slide-items { margin: 28px 0 0; padding: 0 0 0 28px; font-size: 26px; line-height: 36px; }
+.deck-slide-items li { margin: 0 0 8px; }
+.deck-slide-items li::marker { color: #F2B544; }
+.deck-slide-picture { position: absolute; right: 0; top: 0; bottom: 0; width: 40%; background-position: center; background-size: cover; }
