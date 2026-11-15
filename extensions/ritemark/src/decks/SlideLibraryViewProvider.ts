@@ -27,6 +27,8 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
   private ready = false;
   private held: Array<Record<string, unknown>> = [];
   private query = '';
+  /** Each refresh's number: a slower, older one (a broader search) never posts over a newer one. */
+  private generation = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private readonly subscriptions: vscode.Disposable[] = [];
 
@@ -140,10 +142,13 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
       await this.post({ type: 'library/state', enabled: false, decks: [], active: null, query: this.query, project: false });
       return;
     }
+    const generation = ++this.generation;
+    const query = this.query;
     const library = this.library();
-    const decks = library ? await library.listDecks({ query: this.query }) : [];
+    const decks = library ? await library.listDecks({ query }) : [];
     const { assets, themes } = this.view ? await looksOf(this.view.webview, decks) : { assets: {}, themes: {} };
-    await this.post({ type: 'library/state', enabled: true, decks, assets, themes, active: this.pages.activeDeck(), query: this.query, project: !!library });
+    if (generation !== this.generation) return;
+    await this.post({ type: 'library/state', enabled: true, decks, assets, themes, active: this.pages.activeDeck(), query, project: !!library });
   }
 
   private async post(message: Record<string, unknown>): Promise<void> {

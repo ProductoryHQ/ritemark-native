@@ -664,16 +664,17 @@ export function DeckView({
           return
         }
         const hadChange = !!sources[id]?.changed
+        // Undo is always offered: words typed while the library was being read are in `previous` too.
         setNotice({
           text: hadChange ? "This slide is the library's newest version now. Your change here is gone." : "This slide is the library's newest version now.",
-          action: hadChange ? {
+          action: {
             label: 'Undo',
-            tip: 'Bring back your change',
+            tip: 'Put this slide back as it was',
             run: () => {
               const now = slideById(id)
               if (now && !editor.isDestroyed) dispatch(replacePart(editor.state, now.index, previous))
             },
-          } : undefined,
+          },
         })
         return
       }
