@@ -51,7 +51,7 @@ export function PresentButton({ slideNumber, startNumber, onPresent }: {
       main={{
         label: 'Present',
         icon: <Icon name="play" size={14} tone="inherit" />,
-        tooltip: disabled ? 'Add a slide to present the deck' : `Present from slide ${slideNumber}, full screen (${HERE_KEYS})`,
+        tooltip: disabled ? 'Add a slide to present the deck' : `Present from this slide (${HERE_KEYS})`,
         onClick: () => onPresent('here'),
       }}
       menu={{
