@@ -44,11 +44,16 @@ export interface PageOptions {
   /** The page's digest (`deckDigest`), written in its `ritemark-deck` meta. */
   digest: string;
   /**
-   * A picture's address on the page, by the path the deck writes (relative to the deck's folder, where the page is):
-   * null when it isn't a picture that is there, and then the slide draws its empty place, as the deck view does.
+   * A picture's address on the page, by the path the deck writes (relative to the deck's folder, where the page is) and
+   * where it writes it (`pictureFile`): null when it isn't a picture that is there, and then the slide draws its empty
+   * place, as the deck view does.
    */
-  pictureUrl: (path: string) => string | null;
+  pictureUrl: PictureUrl;
 }
+
+/** Where a picture is named: a slide's `image:` line (a plain path) or a handout's Markdown (an address). */
+export type PictureFrom = 'slide' | 'handout';
+export type PictureUrl = (path: string, from: PictureFrom) => string | null;
 
 /** The meta tags that mark a page Ritemark wrote from a deck (`pageFile.ts` reads them). */
 export const GENERATOR_META = 'Ritemark';
@@ -56,15 +61,26 @@ export const DIGEST_META = 'ritemark-deck';
 
 const esc = escapeHtml;
 
-/** A path as a page's address: decoded once if it was written encoded, then every unsafe character encoded. */
-export function encodePath(path: string): string {
-  let decoded = path;
-  try {
-    decoded = decodeURI(path);
-  } catch {
-    // written as it is
-  }
-  return encodeURI(decoded).replace(/[?#]/g, char => encodeURIComponent(char));
+/**
+ * The file a picture names, relative to the deck's folder, with `/` between folders. A slide's `image:` is a plain
+ * path, as the deck view reads it; a handout's picture is a Markdown address, so its `?…` and `#…` are no part of the
+ * file and each of its folders and name is decoded (`%20`, `%26`, `%23` alike).
+ */
+export function pictureFile(path: string, from: PictureFrom): string {
+  const trimmed = path.trim().replace(/\\/g, '/');
+  if (from === 'slide') return trimmed;
+  return trimmed.split(/[?#]/)[0].split('/').map(part => {
+    try {
+      return decodeURIComponent(part);
+    } catch {
+      return part;
+    }
+  }).join('/');
+}
+
+/** A file's address on the page, beside the deck: each folder and the name encoded, so any character reads back. */
+export function pictureAddress(file: string): string {
+  return file.split('/').map(part => encodeURIComponent(part)).join('/');
 }
 
 const isWebAddress = (href: string) => /^(?:https?:\/\/|mailto:)/i.test(href.trim());
@@ -85,11 +101,25 @@ function shortHash(text: string): string {
 /** Words without tags, for a tick's id. */
 const plain = (html: string) => html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 
+/**
+ * Whether a list's own items (not those of a list inside one of them) are ticks. The body is this renderer's own
+ * markup (a handout's raw HTML is escaped), so its `<li>` tags are the items'.
+ */
+function ownItemsAreSteps(body: string): boolean {
+  let depth = 0;
+  for (const tag of body.matchAll(/<li\b[^>]*>|<\/li>/g)) {
+    if (tag[0] === '</li>') { depth--; continue; }
+    if (depth === 0 && tag[0] === '<li class="step">') return true;
+    depth++;
+  }
+  return false;
+}
+
 /** The renderer for one part's handout: `partKey` makes its ticks' ids. */
 class HandoutRenderer extends marked.Renderer {
   private readonly seen = new Map<string, number>();
 
-  constructor(private readonly partKey: string, private readonly pictureUrl: (path: string) => string | null) {
+  constructor(private readonly partKey: string, private readonly pictureUrl: PictureUrl) {
     super();
   }
 
@@ -124,8 +154,9 @@ class HandoutRenderer extends marked.Renderer {
   image(href: string | null, _title: string | null, text: string): string {
     const target = (href ?? '').trim();
     if (isRelativeTarget(target)) {
-      const url = this.pictureUrl(target);
-      return url ? `<img src="${esc(url)}" alt="${esc(plain(text))}" loading="lazy">` : (text ? `<span class="nopic">${text}</span>` : '');
+      const url = this.pictureUrl(target, 'handout');
+      // `marked` hands a picture's words over escaped already.
+      return url ? `<img src="${esc(url)}" alt="${text}" loading="lazy">` : (text ? `<span class="nopic">${text}</span>` : '');
     }
     // A picture on the web is a link to it: the page loads nothing from elsewhere.
     if (/^https?:\/\//i.test(target)) return `<a href="${esc(target)}" target="_blank" rel="noopener noreferrer">${text || 'Picture'}</a>`;
@@ -147,7 +178,7 @@ class HandoutRenderer extends marked.Renderer {
 
   list(body: string, ordered: boolean, start: number | ''): string {
     const tag = ordered ? 'ol' : 'ul';
-    const steps = body.includes('<li class="step">') ? ' class="steps"' : '';
+    const steps = ownItemsAreSteps(body) ? ' class="steps"' : '';
     const from = ordered && start !== '' && start !== 1 ? ` start="${Number(start)}"` : '';
     return `<${tag}${steps}${from}>\n${body}</${tag}>\n`;
   }
@@ -165,7 +196,7 @@ const PROMPT_LABEL = /^[A-Z0-9][A-Z0-9 .,'’&:!?-]{0,28}$/;
 type Token = ReturnType<typeof marked.lexer>[number];
 
 /** One part's handout as HTML. In an Exercise, a numbered list at the top level is its steps, each with a tick. */
-export function handoutHtml(markdown: string, options: { partKey: string; exercise: boolean; pictureUrl: (path: string) => string | null }): string {
+export function handoutHtml(markdown: string, options: { partKey: string; exercise: boolean; pictureUrl: PictureUrl }): string {
   if (!markdown.trim()) return '';
   const renderer = new HandoutRenderer(options.partKey, options.pictureUrl);
   const tokens = marked.lexer(markdown, { ...MARKED_OPTIONS });
@@ -360,7 +391,8 @@ const titleOf = (slide: PublicSlide) => (slide.data.title ?? '').trim();
 function partHtml(slide: PublicSlide, index: number, options: PageOptions): string {
   const number = index + 1;
   const title = titleOf(slide);
-  const body = handoutHtml(slide.handout, { partKey: `${number}\u0000${title}`, exercise: slide.kind === 'exercise', pictureUrl: options.pictureUrl });
+  // A tick's id is the part's title and the step's words, never its place: a slide added before it keeps its ticks.
+  const body = handoutHtml(slide.handout, { partKey: title || `Slide ${number}`, exercise: slide.kind === 'exercise', pictureUrl: options.pictureUrl });
   if (slide.kind === 'section') {
     const label = `Section${slide.data.number?.trim() ? ` ${slide.data.number.trim()}` : ''}`;
     return `<section class="part sect" data-i="${index}" id="s${number}"><div class="eyebrow">${esc(label)}</div>${title ? `<h2>${esc(title)}</h2>` : ''}\n${body}</section>`;
@@ -389,7 +421,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
       theme: deck.theme,
       borderless,
       step: slide.step,
-      pictureUrl: options.pictureUrl,
+      pictureUrl: picture => options.pictureUrl(picture, 'slide'),
     });
     return `<div class="layer${index === 0 ? ' on' : ''}" data-title="${esc(titleOf(slide))}">${markup}</div>`;
   });
@@ -419,7 +451,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
       + `<div class="under"><span class="t" id="stitle">${first ? esc(`1 · ${titleOf(first)}`) : ''}</span><span class="nav">`
       + `<button id="prev" type="button" aria-label="Previous slide" disabled>${iconSvg('caret-up', 16)}</button>`
       + `<button id="next" type="button" aria-label="Next slide"${count > 1 ? '' : ' disabled'}>${iconSvg('caret-down', 16)}</button></span></div></aside>`,
-    // The ticks' place in this browser's storage: the same for every version of this deck's page.
+    // The ticks' place in this browser's storage: the same for every version of the page that keeps its client and title.
     `<section class="text" id="text" data-store="ritemark-ticks-${shortHash(`${deck.client}\u0000${deck.title}`)}">`,
     preamble ? `<div class="pre">\n${preamble}</div>` : '',
     count ? parts.join('\n') : '<p class="empty">This deck has no slides to show.</p>',

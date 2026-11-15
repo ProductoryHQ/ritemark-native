@@ -521,6 +521,17 @@ function frontMatterOf(text: string): { version: string | null; theme: string | 
   return { version, theme, end: match[0].length };
 }
 
+/** One of the front matter's values (`look`, say), read as `parseDeck` reads `deck` and `theme`; null when absent. */
+export function frontMatterField(text: string, name: string): string | null {
+  const match = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(text);
+  if (!match) return null;
+  for (const line of match[1].split(/\r?\n/)) {
+    const key = KEY_LINE.exec(line);
+    if (key && key[1] === name) return readScalar(key[2] ?? '');
+  }
+  return null;
+}
+
 /** The info string's kind: `slide boxes` → `boxes`; null when the block is no slide. */
 export function slideKindOfInfo(info: string): string | null {
   const match = /^slide(?:\s+(\S+))?\s*$/.exec(info.trim());

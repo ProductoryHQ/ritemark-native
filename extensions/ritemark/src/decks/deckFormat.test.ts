@@ -5,6 +5,7 @@ import { strict as assert } from 'node:assert';
 import * as yaml from 'js-yaml';
 import {
   fenceFor,
+  frontMatterField,
   isReadableDeckVersion,
   newId,
   parseDeck,
@@ -229,6 +230,15 @@ test('info strings, versions, ids and the from line', () => {
   assert.equal(writeFrom(from!), 'Slide library/AI assistants.deck.md#a7c2 @k3f9z1');
   assert.deepEqual(parseFrom('Other/Deck.deck.md#ab12'), { path: 'Other/Deck.deck.md', id: 'ab12', stamp: null });
   assert.equal(parseFrom('no hash'), null);
+});
+
+test('a front matter value by name (Sprint 159: the look)', () => {
+  const text = '---\ndeck: 1\ntheme: Slide library/Themes/Evening.theme.md\nlook: borderless\n---\n\n```slide title\ntitle: T\n```\n';
+  assert.equal(frontMatterField(text, 'look'), 'borderless');
+  assert.equal(frontMatterField(text, 'theme'), 'Slide library/Themes/Evening.theme.md');
+  assert.equal(frontMatterField(text, 'owner'), null);
+  assert.equal(frontMatterField('look: borderless\n', 'look'), null, 'only in the front matter');
+  assert.equal(frontMatterField('---\nlook: "borderless"\n---\n', 'look'), 'borderless');
 });
 
 console.log(`deckFormat: ${passed} passed`);

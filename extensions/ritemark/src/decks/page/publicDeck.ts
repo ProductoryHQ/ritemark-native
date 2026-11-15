@@ -28,13 +28,9 @@
  * (`deckDigest`) is a hash of it, so an edit to anything private never shows the page as changed.
  */
 import { createHash } from 'node:crypto';
-import { parseDeck, parseSlideBody, readScalar, type SlideData, type SlideItem } from '../deckFormat';
+import { frontMatterField, isSlideKind, parseDeck, parseSlideBody, type SlideData, type SlideItem } from '../deckFormat';
 import type { DeckTheme } from '../deckTheme';
-
-/** The nine kinds a slide's layout knows; any other kind draws its title alone. */
-const KNOWN_KINDS: ReadonlySet<string> = new Set(['title', 'section', 'points', 'boxes', 'columns', 'statement', 'exercise', 'picture', 'table']);
-/** How many sizes smaller the deck view's measuring pass may ask a slide to be (`layoutSlide`'s MAX_STEP). */
-const MAX_STEP = 3;
+import { MAX_STEP } from '../../../webview/src/components/decks/slide/layoutSlide';
 
 export interface PublicSlide {
   /** One of the nine kinds, or `other` for a kind this build doesn't draw (its title alone, as on the stage). */
@@ -90,7 +86,7 @@ function itemsOf(items: SlideItem[] | undefined, keys: ReadonlyArray<keyof Slide
 export function drawnData(kind: string, data: SlideData): SlideData {
   const out: SlideData = {};
   if (data.title !== undefined) out.title = data.title;
-  if (!KNOWN_KINDS.has(kind)) return out;
+  if (!isSlideKind(kind)) return out;
   // A picture beside or behind the words, in every kind but Picture, which draws its own.
   if (kind === 'picture') {
     if (data.image !== undefined) out.image = data.image;
@@ -117,10 +113,11 @@ export function drawnData(kind: string, data: SlideData): SlideData {
       out.items = itemsOf(data.items, ['heading', 'text'], 2);
       break;
     case 'boxes': {
-      const look = data.look || 'boxes';
       if (data.look !== undefined) out.look = data.look;
-      // Steps, Line and Arrows draw their own mark in place of a box's icon.
-      out.items = itemsOf(data.items, look === 'boxes' ? ['heading', 'text', 'icon'] : ['heading', 'text']);
+      // Steps, Line and Arrows draw their own mark in place of a box's icon; any other look draws the icon, as
+      // `layoutSlide` does (a look it doesn't know draws boxes).
+      const ownMark = data.look === 'steps' || data.look === 'line' || data.look === 'arrows';
+      out.items = itemsOf(data.items, ownMark ? ['heading', 'text'] : ['heading', 'text', 'icon']);
       break;
     }
     case 'table':
@@ -163,7 +160,13 @@ function tagEnd(text: string, from: number): number {
  * every HTML comment removed (a standalone comment note, or one inside a paragraph), and every `<mark …>` and
  * `</mark>` tag dropped, so an anchored comment's words stay and its note goes. Fenced code and code spans are left as
  * written: what a prompt shows is the prompt. A comment that opens outside code runs to its `-->`, through a fence if
- * need be, as Markdown reads it. Fails closed: an unclosed comment or tag removes everything after it.
+ * need be, as Markdown reads it.
+ *
+ * Where this scanner and Markdown could read the text differently, it fails closed, toward privacy: a fence at any
+ * indentation counts as a fence; a code span only closes on its own line (a span that runs on, or into a fence, is
+ * text here, so a fence after it is still seen); an indented code block (four spaces, which the editor never writes:
+ * it writes fences) is text here, so a comment in one goes; and an unclosed comment or tag removes everything after
+ * it. The page's renderer (`pageHtml.ts`) then filters again with Markdown's own reading.
  */
 export function publicMarkdown(markdown: string): string {
   const text = markdown.replace(/\r\n?/g, '\n');
@@ -195,11 +198,11 @@ export function publicMarkdown(markdown: string): string {
     }
     const char = text[index];
     if (char === '`') {
-      // A code span: from a run of backticks to the next run of the same length within the paragraph.
+      // A code span: from a run of backticks to the next run of the same length on the same line.
       let run = index;
       while (text[run] === '`') run++;
       const size = run - index;
-      const paragraphEnd = (() => { const blank = text.indexOf('\n\n', run); return blank < 0 ? text.length : blank; })();
+      const paragraphEnd = (() => { const end = text.indexOf('\n', run); return end < 0 ? text.length : end; })();
       let search = run;
       let close = -1;
       while (search < paragraphEnd) {
@@ -245,13 +248,7 @@ export function publicMarkdown(markdown: string): string {
 
 /** The front matter's `look:` (Card unless it says borderless). The rest of the front matter is private. */
 function lookOf(text: string): 'card' | 'borderless' {
-  const match = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(text);
-  if (!match) return 'card';
-  for (const line of match[1].split(/\r?\n/)) {
-    const key = /^look:\s*(.*)$/.exec(line);
-    if (key) return readScalar(key[1]).trim().toLowerCase() === 'borderless' ? 'borderless' : 'card';
-  }
-  return 'card';
+  return (frontMatterField(text, 'look') ?? '').trim().toLowerCase() === 'borderless' ? 'borderless' : 'card';
 }
 
 function stepOf(steps: readonly number[] | undefined, index: number): number {
@@ -260,13 +257,15 @@ function stepOf(steps: readonly number[] | undefined, index: number): number {
 }
 
 /** What of this deck goes public on its handout page. */
-export function publicDeck(text: string, options: PublicDeckOptions): PublicDeck {
+export function publicDeck(input: string, options: PublicDeckOptions): PublicDeck {
+  // A file saved with a byte-order mark: the front matter is still the front matter.
+  const text = input.replace(/^\uFEFF/, '');
   const parsed = parseDeck(text);
   const slides: PublicSlide[] = [];
   parsed.slides.forEach((block, index) => {
     const data = parseSlideBody(block.body);
     if (data.skip) return;
-    const kind = KNOWN_KINDS.has(block.kind) ? block.kind : 'other';
+    const kind = isSlideKind(block.kind) ? block.kind : 'other';
     slides.push({
       kind,
       data: drawnData(block.kind, data),
@@ -275,7 +274,10 @@ export function publicDeck(text: string, options: PublicDeckOptions): PublicDeck
     });
   });
   const first = parsed.slides[0];
-  const preamble = publicMarkdown(text.slice(parsed.bodyStart, first ? first.start : text.length));
+  // A file that opens a front matter it never closes: everything before the first slide may be front matter, so none
+  // of it goes (fail closed).
+  const unclosedFrontMatter = parsed.bodyStart === 0 && /^---[ \t]*\r?\n/.test(text);
+  const preamble = unclosedFrontMatter ? '' : publicMarkdown(text.slice(parsed.bodyStart, first ? first.start : text.length));
   const titleSlide = slides.find(slide => slide.kind === 'title' && (slide.data.title ?? '').trim());
   return {
     title: (titleSlide?.data.title ?? '').trim() || options.deckName.trim(),

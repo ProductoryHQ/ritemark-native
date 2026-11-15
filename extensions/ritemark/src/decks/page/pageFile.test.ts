@@ -16,7 +16,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { gatherPage } from '../../publish/gather';
 import { BUILT_IN_THEME } from '../deckTheme';
-import { PAGE_FONTS, buildDeckPage, deckNameOf, digestOfDeck, foreignPageLine, nodePageFs, pagePathFor, picturePaths, readPageMeta, removeDeckPage, writeDeckPage, type PageFs } from './pageFile';
+import { PAGE_FONTS, buildDeckPage, currentPageDigest, deckNameOf, foreignPageLine, nodePageFs, pagePathFor, picturePaths, readPageMeta, removeDeckPage, writeDeckPage, type PageFs } from './pageFile';
 import type { PageAssets } from './pageHtml';
 import { PRIVATE_DECK, PRIVATE_WORDS } from './testing/privateDeck';
 
@@ -45,10 +45,10 @@ async function main(): Promise<void> {
   fs.writeFileSync(path.join(folder, 'images', `${PRIVATE_WORDS.skippedPicture}.png`), png);
 
   const built = await buildDeckPage({ deckPath, text: PRIVATE_DECK, theme: BUILT_IN_THEME }, assets);
-  assert.deepEqual(picturePaths(built.deck), ['images/which-stays.png'], 'only the shown parts\' pictures are named');
+  assert.deepEqual(picturePaths(built.deck), [{ path: 'images/which-stays.png', from: 'handout' }], 'only the shown parts\' pictures are named');
   assert.equal(readPageMeta(built.html).digest, built.digest);
   assert.ok(readPageMeta(built.html).ritemark);
-  assert.equal(digestOfDeck(deckPath, PRIVATE_DECK, BUILT_IN_THEME), built.digest, 'the chip\'s digest is the page\'s');
+  assert.equal(await currentPageDigest(deckPath, PRIVATE_DECK, BUILT_IN_THEME), built.digest, 'the chip\'s digest is the page\'s');
 
   // A first write creates it; the same page again changes nothing; a new page replaces Ritemark's own.
   const first = await writeDeckPage(nodePageFs, deckPath, built.html);
@@ -131,15 +131,23 @@ async function main(): Promise<void> {
 
   // The digest changes with a public edit, and not with an edit to notes or to a skipped slide.
   {
-    const digest = (text: string) => digestOfDeck(deckPath, text, BUILT_IN_THEME);
-    const base = digest(PRIVATE_DECK);
-    assert.equal(digest(PRIVATE_DECK.replace(PRIVATE_WORDS.foldedNotes, 'other notes')), base, 'notes');
-    assert.equal(digest(PRIVATE_DECK.replace(PRIVATE_WORDS.strayNotes, 'other')), base, 'a stray notes block');
-    assert.equal(digest(PRIVATE_DECK.replace(PRIVATE_WORDS.skippedHandout, 'other')), base, "a skipped slide's handout");
-    assert.equal(digest(PRIVATE_DECK.replace(PRIVATE_WORDS.skippedWords, 'other')), base, "a skipped slide's words");
-    assert.equal(digest(PRIVATE_DECK.replace(PRIVATE_WORDS.standaloneComment, 'other')), base, 'a comment');
-    assert.notEqual(digest(PRIVATE_DECK.replace('Choose a task you do every week', 'Choose a task')), base, 'a handout');
-    assert.notEqual(digest(PRIVATE_DECK.replace('title: Read the room', 'title: Read it')), base, 'a slide');
+    const digest = (text: string) => currentPageDigest(deckPath, text, BUILT_IN_THEME);
+    const base = await digest(PRIVATE_DECK);
+    assert.equal(await digest(PRIVATE_DECK.replace(PRIVATE_WORDS.foldedNotes, 'other notes')), base, 'notes');
+    assert.equal(await digest(PRIVATE_DECK.replace(PRIVATE_WORDS.strayNotes, 'other')), base, 'a stray notes block');
+    assert.equal(await digest(PRIVATE_DECK.replace(PRIVATE_WORDS.skippedHandout, 'other')), base, "a skipped slide's handout");
+    assert.equal(await digest(PRIVATE_DECK.replace(PRIVATE_WORDS.skippedWords, 'other')), base, "a skipped slide's words");
+    assert.equal(await digest(PRIVATE_DECK.replace(PRIVATE_WORDS.standaloneComment, 'other')), base, 'a comment');
+    assert.notEqual(await digest(PRIVATE_DECK.replace('Choose a task you do every week', 'Choose a task')), base, 'a handout');
+    assert.notEqual(await digest(PRIVATE_DECK.replace('title: Read the room', 'title: Read it')), base, 'a slide');
+    // A picture the page names, added since: the page would change (its place stops being empty), so the digest does.
+    const withPicture = PRIVATE_DECK.replace('![A picture that stays](images/which-stays.png)', '![A picture that stays](images/which-stays.png) ![Later](images/later%20one.png)');
+    const before = await digest(withPicture);
+    fs.writeFileSync(path.join(folder, 'images', 'later one.png'), png);
+    assert.notEqual(await digest(withPicture), before, 'a picture that arrived');
+    const page = await buildDeckPage({ deckPath, text: withPicture, theme: BUILT_IN_THEME }, assets);
+    assert.ok(page.html.includes('src="images/later%20one.png"'), 'the handout\'s picture, its address encoded once');
+    assert.equal(page.digest, await digest(withPicture));
   }
 
   fs.rmSync(root, { recursive: true, force: true });

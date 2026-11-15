@@ -4,8 +4,9 @@
  * disk, its upload reads it again and checks every hash, and its records are keyed by the page's path).
  *
  *  - The page carries `<meta name="generator" content="Ritemark">` and `<meta name="ritemark-deck" content="<digest>">`,
- *    the digest being `deckDigest` of what `publicDeck` returns. Those two mark a file Ritemark wrote for the deck
- *    beside it, and the digest says whether the deck has changed since (the chip's "Published · changed").
+ *    the digest being `pageDigest`: what `publicDeck` returns, and which of its pictures are there. Those two mark a
+ *    file Ritemark wrote for the deck beside it, and the digest says whether the deck has changed since (the chip's
+ *    "Published · changed").
  *  - It never overwrites a file Ritemark didn't write for this deck: it stops and says why in one line. Nor a link, a
  *    folder or anything else that isn't a plain file. A page is written next to its place and moved over it, so a
  *    half-written page is never what Publish reads.
@@ -14,13 +15,13 @@
  *
  * The file system is a parameter (`PageFs`), so every rule here tests under plain Node; `nodePageFs` is the real one.
  */
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { marked } from 'marked';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import type { DeckTheme } from '../deckTheme';
-import { DIGEST_META, GENERATOR_META, encodePath, pageHtml, type PageAssets } from './pageHtml';
+import { DIGEST_META, GENERATOR_META, pageHtml, pictureAddress, pictureFile, type PageAssets, type PictureFrom } from './pageHtml';
 import { deckDigest, publicDeck, type PublicDeck } from './publicDeck';
 
 export interface PageFs {
@@ -134,23 +135,55 @@ export async function removeDeckPage(pageFs: PageFs, pagePath: string, digest: s
   return true;
 }
 
-/** Every picture path the public deck names: the slides' and the handouts' (relative ones only). */
-export function picturePaths(deck: PublicDeck): string[] {
-  const found = new Set<string>();
-  for (const slide of deck.slides) if (slide.data.image && isRelativeTarget(slide.data.image)) found.add(slide.data.image.trim());
+/** Every picture the public deck names, and where: the slides' `image:` lines and the handouts' pictures (relative ones). */
+export function picturePaths(deck: PublicDeck): Array<{ path: string; from: PictureFrom }> {
+  const found = new Map<string, { path: string; from: PictureFrom }>();
+  const add = (picture: string, from: PictureFrom) => {
+    if (isRelativeTarget(picture)) found.set(`${from}\u0000${picture.trim()}`, { path: picture.trim(), from });
+  };
+  for (const slide of deck.slides) if (slide.data.image) add(slide.data.image, 'slide');
   for (const markdown of [deck.preamble, ...deck.slides.map(slide => slide.handout)]) {
     if (!markdown) continue;
     marked.walkTokens(marked.lexer(markdown, { gfm: true }), token => {
-      if (token.type === 'image' && isRelativeTarget(token.href)) found.add(token.href.trim());
+      if (token.type === 'image') add(token.href, 'handout');
     });
   }
-  return [...found];
+  return [...found.values()];
+}
+
+/** The pictures the page names that are files beside the deck, by where they are named: their addresses on the page. */
+async function foundPictures(deck: PublicDeck, deckPath: string, pageFs: Pick<PageFs, 'stat'>): Promise<Map<string, string>> {
+  const folder = path.dirname(deckPath);
+  const found = new Map<string, string>();
+  for (const picture of picturePaths(deck)) {
+    const file = pictureFile(picture.path, picture.from);
+    try {
+      if ((await pageFs.stat(path.resolve(folder, ...file.split('/')))).isFile()) found.set(`${picture.from}\u0000${picture.path}`, pictureAddress(file));
+    } catch {
+      // Not there: the slide draws its empty picture place, the handout the picture's words.
+    }
+  }
+  return found;
+}
+
+/**
+ * The page's digest: the public deck's (`deckDigest`) and which of its pictures are there, since a picture added
+ * later changes the page (its place stops being empty) while 2.2's own check, which reads the files the page names,
+ * can't see a picture the page doesn't name yet.
+ */
+export function pageDigest(deck: PublicDeck, addresses: Iterable<string>): string {
+  const pictures = [...new Set(addresses)].sort();
+  return createHash('sha256').update(`${deckDigest(deck)}\n${pictures.join('\n')}`).digest('hex');
 }
 
 export interface BuiltPage {
   deck: PublicDeck;
   digest: string;
   html: string;
+}
+
+function publicDeckOf(deckPath: string, text: string, theme: DeckTheme, steps?: readonly number[]): PublicDeck {
+  return publicDeck(text, { folderName: path.basename(path.dirname(deckPath)), deckName: deckNameOf(deckPath), theme, steps });
 }
 
 /**
@@ -162,29 +195,15 @@ export async function buildDeckPage(
   assets: PageAssets,
   pageFs: Pick<PageFs, 'stat'> = nodePageFs,
 ): Promise<BuiltPage> {
-  const deck = publicDeck(input.text, {
-    folderName: path.basename(path.dirname(input.deckPath)),
-    deckName: deckNameOf(input.deckPath),
-    theme: input.theme,
-    steps: input.steps,
-  });
-  const digest = deckDigest(deck);
-  const folder = path.dirname(input.deckPath);
-  const urls = new Map<string, string>();
-  for (const picture of picturePaths(deck)) {
-    let decoded = picture;
-    try { decoded = decodeURI(picture); } catch { /* as written */ }
-    try {
-      if ((await pageFs.stat(path.resolve(folder, decoded))).isFile()) urls.set(picture, encodePath(picture));
-    } catch {
-      // Not there: the slide draws its empty picture place.
-    }
-  }
-  const html = pageHtml(deck, assets, { digest, pictureUrl: picture => urls.get(picture.trim()) ?? null });
+  const deck = publicDeckOf(input.deckPath, input.text, input.theme, input.steps);
+  const urls = await foundPictures(deck, input.deckPath, pageFs);
+  const digest = pageDigest(deck, urls.values());
+  const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(`${from}\u0000${picture.trim()}`) ?? null });
   return { deck, digest, html };
 }
 
-/** The deck's digest now, without building the page: what the chip compares with the page's (PR 4). */
-export function digestOfDeck(deckPath: string, text: string, theme: DeckTheme): string {
-  return deckDigest(publicDeck(text, { folderName: path.basename(path.dirname(deckPath)), deckName: deckNameOf(deckPath), theme }));
+/** The deck's page digest now, without building the page: what the chip compares with the page's own (PR 4). */
+export async function currentPageDigest(deckPath: string, text: string, theme: DeckTheme, pageFs: Pick<PageFs, 'stat'> = nodePageFs): Promise<string> {
+  const deck = publicDeckOf(deckPath, text, theme);
+  return pageDigest(deck, (await foundPictures(deck, deckPath, pageFs)).values());
 }

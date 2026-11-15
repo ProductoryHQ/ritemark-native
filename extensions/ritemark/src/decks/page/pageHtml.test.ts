@@ -14,7 +14,7 @@ import { BUILT_IN_THEME } from '../deckTheme';
 import { cssReferences, pageReferences, scriptBuildsReferences } from '../../publish/references';
 import { scanText } from '../../publish/secretScan';
 import { PAGE_FONTS } from './pageFile';
-import { DIGEST_META, encodePath, handoutHtml, pageHtml, sanitizeHtml, type PageAssets } from './pageHtml';
+import { DIGEST_META, handoutHtml, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
 import { PAGE_SCRIPT } from './pageScript';
 import { deckDigest, publicDeck } from './publicDeck';
 import { PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_WORDS } from './testing/privateDeck';
@@ -25,7 +25,10 @@ const assets: PageAssets = {
   fonts: PAGE_FONTS.map(font => ({ base64: fs.readFileSync(path.join(extension, 'media', 'fonts', font.file)).toString('base64'), unicodeRange: font.unicodeRange })),
 };
 const there = new Set(['images/which-stays.png']);
-const pictureUrl = (picture: string) => (there.has(picture) ? encodePath(picture) : null);
+const pictureUrl = (picture: string, from: PictureFrom) => {
+  const file = pictureFile(picture, from);
+  return there.has(file) ? pictureAddress(file) : null;
+};
 
 const deck = publicDeck(PRIVATE_DECK, { folderName: 'Harbour Logistics', deckName: 'AI assistants and agents', theme: BUILT_IN_THEME });
 const digest = deckDigest(deck);
@@ -126,6 +129,9 @@ assert.deepEqual(scanText(html), []);
   assert.deepEqual(parse(local).querySelectorAll('.file').map(file => file.text), ['Exercise files A', 'the brief']);
   assert.ok(!render('[x](javascript:alert(1)) [y](file:///etc/passwd) [z](vscode://x)').includes('href'));
   assert.equal(render('![A chart](images/which-stays.png)'), '<p><img src="images/which-stays.png" alt="A chart" loading="lazy"></p>\n');
+  // A picture's words are escaped once: marked hands them over escaped, and twice would read "Q&amp;amp;A".
+  assert.equal(render('![Q&A <b> "x"](images/which-stays.png)'), '<p><img src="images/which-stays.png" alt="Q&amp;A &lt;b&gt; &quot;x&quot;" loading="lazy"></p>\n');
+  assert.equal(render('![Gone & lost](images/missing.png)'), '<p><span class="nopic">Gone &amp; lost</span></p>\n');
   assert.equal(render('![Gone](images/missing.png)'), '<p><span class="nopic">Gone</span></p>\n');
   assert.ok(!render('![Far](https://example.com/a.png)').includes('<img'));
   assert.ok(!render('![](/Users/someone/a.png)').includes('Users'));
@@ -141,10 +147,27 @@ assert.deepEqual(scanText(html), []);
   assert.ok(parse(render('- [x] two')).querySelector('input')!.hasAttribute('checked'));
   assert.equal(parse(render('1. a\n2. b')).querySelectorAll('input').length, 0);
   assert.equal(parse(render('1. a\n2. b', true)).querySelectorAll('ol.steps input').length, 2);
+  // A list that only holds a task list inside one of its items stays a list (its bullets kept); the inner one ticks.
+  {
+    const nested = parse(render('- one\n  - [ ] sub\n- two'));
+    assert.equal(nested.querySelector('ul')!.getAttribute('class'), undefined);
+    assert.equal(nested.querySelectorAll('ul.steps').length, 1);
+    assert.equal(nested.querySelectorAll('ul.steps > li.step').length, 1);
+  }
   // The same step twice gets two ids; the same words give the same id again (a tick survives an update).
   const twice = parse(render('- [ ] same\n- [ ] same')).querySelectorAll('input').map(input => input.getAttribute('data-tick'));
   assert.notEqual(twice[0], twice[1]);
   assert.equal(parse(render('- [ ] same')).querySelector('input')!.getAttribute('data-tick'), twice[0]);
+}
+
+// A tick's id is the part's title and the step's words, not its place: a slide added before the exercise keeps its ticks.
+{
+  const ticks = (text: string) => parse(pageHtml(publicDeck(text, { folderName: 'F', deckName: 'D', theme: BUILT_IN_THEME }), assets, { digest, pictureUrl }))
+    .querySelectorAll('input[data-tick]').map(input => input.getAttribute('data-tick'));
+  const exercise = '```slide exercise\ntitle: Try it\n```\n\n1. First step\n2. Second step\n';
+  const before = ticks(exercise);
+  assert.equal(before.length, 2);
+  assert.deepEqual(ticks('```slide title\ntitle: A new first slide\n```\n\n' + exercise), before);
 }
 
 // A deck with nothing to show says so.
@@ -154,10 +177,17 @@ assert.deepEqual(scanText(html), []);
   assert.equal(parse(empty).querySelectorAll('.layer').length, 0);
 }
 
-// Paths as addresses: spaces and the like encoded once, an already-encoded path not twice, # and ? kept in the name.
-assert.equal(encodePath('images/my picture.png'), 'images/my%20picture.png');
-assert.equal(encodePath('images/my%20picture.png'), 'images/my%20picture.png');
-assert.equal(encodePath('images/a#b?.png'), 'images/a%23b%3F.png');
-assert.equal(encodePath('images/"q".png'), 'images/%22q%22.png');
+// Pictures: a slide's image: line is a plain path, as the deck view reads it; a handout's picture is an address, its
+// folders and name decoded (%26 and %23 too) and its query cut; on the page each part is encoded once.
+assert.equal(pictureFile('images/Q%26A.png', 'handout'), 'images/Q&A.png');
+assert.equal(pictureFile('images/a%23b.png?v=2#top', 'handout'), 'images/a#b.png');
+assert.equal(pictureFile('images/my picture.png', 'handout'), 'images/my picture.png');
+assert.equal(pictureFile('images/50%off.png', 'handout'), 'images/50%off.png', 'a stray % stays');
+assert.equal(pictureFile('images/Q%26A.png', 'slide'), 'images/Q%26A.png');
+assert.equal(pictureAddress('images/Q&A.png'), 'images/Q%26A.png');
+assert.equal(pictureAddress('images/a#b?.png'), 'images/a%23b%3F.png');
+assert.equal(pictureAddress('images/my picture.png'), 'images/my%20picture.png');
+assert.equal(pictureAddress('../shared/"q".png'), '../shared/%22q%22.png');
+assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'images/a%2523.png', 'never encoded twice');
 
 console.log('pageHtml: passed');

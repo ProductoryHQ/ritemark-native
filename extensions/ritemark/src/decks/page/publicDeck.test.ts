@@ -49,6 +49,18 @@ assert.equal(deck.preamble, 'Before the first slide: PREAMBLEPUBLIC, for everyon
 assert.equal(publicDeck('```slide title\ntitle: T\n```\n', options).preamble, '', 'no preamble, none on the page');
 assert.equal(publicDeck('---\ndeck: 1\n---\n\n<!-- only a note -->\n\n```slide title\ntitle: T\n```\n', options).preamble, '', 'a preamble that is only private is none');
 
+// A file saved with a byte-order mark keeps its front matter private and its look; a front matter never closed sends
+// nothing before the first slide (fail closed).
+{
+  const bom = publicDeck('﻿---\ndeck: 1\ntheme: Slide library/Themes/SECRETTHEME.theme.md\nlook: borderless\n---\n\n```slide title\ntitle: T\n```\n', options);
+  assert.equal(bom.preamble, '');
+  assert.equal(bom.look, 'borderless');
+  assert.ok(!JSON.stringify(bom).includes('SECRETTHEME'));
+  const unclosed = publicDeck('---\ndeck: 1\ntheme: Slide library/Themes/SECRETTHEME.theme.md\n\n```slide title\ntitle: T\n```\n', options);
+  assert.equal(unclosed.preamble, '');
+  assert.equal(unclosed.slides.length, 1);
+}
+
 // A deck with no title slide shown takes its name; a skipped title slide's title stays private.
 assert.equal(publicDeck('```slide points\ntitle: Agenda\n```\n', options).title, 'AI assistants and agents');
 assert.equal(publicDeck('```slide title\ntitle: Secret\nskip: true\n```\n\n```slide points\ntitle: Agenda\n```\n', options).title, 'AI assistants and agents');
@@ -66,6 +78,9 @@ assert.deepEqual(drawnData('points', { title: 'P', picture: 'right', image: 'ima
 assert.deepEqual(drawnData('points', { title: 'P', picture: 'none', image: 'images/PRIVATEPATH.png' }), { title: 'P' });
 assert.deepEqual(drawnData('picture', { title: 'P', image: 'images/a.png', subtitle: 'cap', items: [{ heading: 'hidden' }] }), { title: 'P', image: 'images/a.png', subtitle: 'cap' });
 assert.deepEqual(drawnData('table', { title: 'T', rows: [['a', 'b']], items: [{ heading: 'hidden' }] }), { title: 'T', rows: [['a', 'b']] });
+// A box's icon goes wherever the layout draws it: every look but Steps, Line and Arrows (one it doesn't know draws boxes).
+for (const look of ['steps', 'line', 'arrows']) assert.deepEqual(drawnData('boxes', { look, items: [{ heading: 'h', icon: 'wrench' }] }).items, [{ heading: 'h' }], look);
+for (const look of [undefined, 'boxes', 'Steps', 'cards']) assert.deepEqual(drawnData('boxes', { look, items: [{ heading: 'h', icon: 'wrench' }] }).items, [{ heading: 'h', icon: 'wrench' }], String(look));
 
 // publicMarkdown, case by case.
 assert.equal(publicMarkdown('a\n\n```notes\nsecret\n```\n\nb'), 'a\n\nb');
@@ -82,6 +97,12 @@ assert.equal(publicMarkdown('<markdown> is a word'), '<markdown> is a word', 'on
 assert.equal(publicMarkdown('a\r\n\r\n<!-- x -->\r\n\r\nb'), 'a\n\nb', 'Windows line ends');
 assert.equal(publicMarkdown('```\nline\n\n\n\nafter blank lines\n```'), '```\nline\n\n\n\nafter blank lines\n```', 'a prompt keeps its blank lines');
 assert.equal(publicMarkdown('a\n\n<!-- one -->\n\nb'), publicMarkdown('a\n\nb'), 'taking a comment out reads as before the comment');
+// Where the scanner and Markdown could differ, it fails closed: a code span closes on its own line only, so a notes
+// fence right after an unclosed backtick is still a fence; an indented code block is text here (the editor writes
+// fences), so a comment in one goes.
+assert.equal(publicMarkdown('Run `npm\n```notes\nsecret notes `\n```\n\nafter'), 'Run `npm\n\nafter');
+assert.equal(publicMarkdown('Run `npm\nmore` and <!-- secret -->'), 'Run `npm\nmore` and');
+assert.equal(publicMarkdown('Prompt:\n\n    write <!-- gone --> here'), 'Prompt:\n\n    write  here');
 
 // The digest: a public edit changes it; notes, a comment, a skipped slide, an id or from line, and the fit don't.
 {
