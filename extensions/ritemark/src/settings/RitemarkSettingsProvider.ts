@@ -22,7 +22,6 @@ import {
   emitClaudeStatusInvalidated,
   onClaudeStatusInvalidated,
   setAnthropicKeyAvailable,
-  setClaudeLoginInProgress,
   beginClaudeLogin,
   cancelClaudeLogin as cancelActiveClaudeLogin,
   type SetupStatus,
@@ -1299,7 +1298,6 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
 
     try {
       await logoutClaude(status.binaryPath);
-      setClaudeLoginInProgress(false);
       // Sprint 156: a sign-out pressed in Ritemark forgets Claude as the AI last seen ready (only if it was Claude)
       await clearLastReadyAi(this.context.globalState, 'claude-code').catch(() => false);
       emitClaudeStatusInvalidated('logout');
@@ -1334,14 +1332,12 @@ export class RitemarkSettingsProvider implements vscode.WebviewPanelSerializer {
         }
 
         if (status.state === 'ready') {
-          setClaudeLoginInProgress(false);
           this.stopClaudeLoginPolling();
           emitClaudeStatusInvalidated('login-finished');
           return;
         }
 
         if (attempts >= 60) {
-          setClaudeLoginInProgress(false);
           this.stopClaudeLoginPolling();
           if (panel) {
             this.queueParts(['claudeCode']);

@@ -15,7 +15,6 @@ export {
   checkWingetAvailable,
   clearSetupCache,
   setAnthropicKeyAvailable,
-  setClaudeLoginInProgress,
   setClaudePendingReload,
   clearClaudePendingReload,
 } from './setup';

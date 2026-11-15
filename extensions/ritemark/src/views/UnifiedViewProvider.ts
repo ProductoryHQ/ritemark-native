@@ -48,7 +48,6 @@ import {
   installCodexCli,
   getOnboardingStatus,
   checkWingetAvailable,
-  setClaudeLoginInProgress,
   clearClaudePendingReload,
   emitClaudeStatusInvalidated,
   onClaudeStatusInvalidated,
@@ -3142,13 +3141,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     reason: 'install-started' | 'install-finished' | 'login-started' | 'login-finished' | 'authentication-failed' | 'logout' | 'status-refresh' | 'settings-updated'
   ): Promise<void> {
     if (reason === 'login-started') {
-      setClaudeLoginInProgress(true);
       this._startClaudeLoginPolling();
     } else if (reason === 'login-finished') {
-      setClaudeLoginInProgress(false);
       this._stopClaudeLoginPolling();
     } else if (reason === 'authentication-failed' || reason === 'logout' || reason === 'install-finished' || reason === 'settings-updated' || reason === 'status-refresh') {
-      setClaudeLoginInProgress(false);
       this._stopClaudeLoginPolling();
     }
 
@@ -3191,7 +3187,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         const status = await getSetupStatus({ refresh: true });
 
         if (status.state === 'ready') {
-          setClaudeLoginInProgress(false);
           this._stopClaudeLoginPolling();
           emitClaudeStatusInvalidated('login-finished');
           return;
@@ -3200,7 +3195,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         await this._sendClaudeSidebarStatus();
 
         if (attempts >= 60) {
-          setClaudeLoginInProgress(false);
           this._stopClaudeLoginPolling();
           await this._sendClaudeSidebarStatus();
         }

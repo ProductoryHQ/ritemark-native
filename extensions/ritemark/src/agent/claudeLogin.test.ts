@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import {
   beginClaudeLogin,
   cancelClaudeLogin,
@@ -16,7 +16,31 @@ async function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void
   }
 }
 
+/**
+ * Sprint 160 (#696): Claude's "signing in" has one writer, this shared sign-in owner. A poll, a re-check, a saved key
+ * or a sign-out elsewhere used to clear it while the sign-in still ran, and the AI's sheet offered Sign in again.
+ */
+function checkSigningInHasOneWriter(): void {
+  const src = join(__dirname, '..');
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) files.push(path);
+    }
+  };
+  walk(src);
+  const writers = files
+    .filter((file) => /\bsetClaudeLoginInProgress\(/.test(readFileSync(file, 'utf-8').replace(/export function setClaudeLoginInProgress\(/, '')))
+    .map((file) => relative(src, file).split('\\').join('/'));
+  assert.deepEqual(writers, ['agent/claudeLogin.ts'], `only claudeLogin.ts writes Claude's signing-in flag (found: ${writers.join(', ')})`);
+  assert.ok(!/\bsetClaudeLoginInProgress\b/.test(readFileSync(join(src, 'agent', 'index.ts'), 'utf-8')), 'agent/index.ts no longer exports it');
+}
+
 async function run(): Promise<void> {
+  checkSigningInHasOneWriter();
+
   if (process.platform === 'win32') {
     console.log('claudeLogin tests skipped: POSIX fake binary fixture');
     return;
