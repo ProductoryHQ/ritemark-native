@@ -48,14 +48,21 @@ export function partStarts(partTops: number[], clientHeight: number): number[] {
 
 /** The current part's index, or null when the deck has no parts. */
 export function currentPart(state: ScrollState): number | null {
-  const { partTops, scrollTop, clientHeight, scrollHeight, writing } = state
+  const { partTops, clientHeight, writing } = state
   const count = partTops.length
   if (count === 0) return null
   if (writing !== null && writing >= 0 && writing < count) return writing
+  return partAt(state, partStarts(partTops, clientHeight), state.scrollTop)
+}
+
+/** The part current at `scrollTop`, from the parts' starts (nobody writing). */
+function partAt(state: ScrollState, starts: number[], scrollTop: number): number {
+  const { partTops, clientHeight, scrollHeight } = state
+  const count = partTops.length
   if (scrollTop < 8) return 0
   if (scrollTop + clientHeight >= scrollHeight - 4 && scrollTop >= partTops[count - 1] - PART_TOP_GAP - 2) return count - 1
   let current = 0
-  partStarts(partTops, clientHeight).forEach((start, index) => {
+  starts.forEach((start, index) => {
     if (start <= scrollTop) current = index
   })
   return current
@@ -71,7 +78,10 @@ export function wheelStop(state: ScrollState, delta: number, shown: number): num
   const target = Math.min(maxTop, Math.max(0, state.scrollTop + delta))
   const step = delta > 0 ? 1 : -1
   const next = shown + step
-  const at = (scrollTop: number) => currentPart({ ...state, scrollTop, writing: null }) ?? shown
+  if (state.partTops.length === 0) return null
+  // The starts depend on the parts and the height only, so they are worked out once for the whole turn.
+  const starts = partStarts(state.partTops, state.clientHeight)
+  const at = (scrollTop: number) => partAt(state, starts, scrollTop)
   const skips = (part: number) => (step > 0 ? part > next : part < next)
   if (delta === 0 || !skips(at(target))) return null
   let stop: number | null = null

@@ -93,7 +93,8 @@ export function SlideLibraryPanel() {
         sendToExtension('library/search', { query: '' })
         // Other decks open with their slides, so a slide is one click away.
         requestAnimationFrame(() => document.querySelector(section === 'other' ? '.deck-lib-group' : '.deck-lib-search, .deck-lib-row')?.scrollIntoView({ block: 'start' }))
-        if (section === 'other') setOpenOthers(true)
+        // Each open starts as asked: "From another deck…" opens the newest other deck, "From the library…" does not.
+        setOpenOthers(section === 'other')
       } else if (message.type === 'library/reveal' && typeof message.path === 'string') {
         const path = message.path
         setQuery('')

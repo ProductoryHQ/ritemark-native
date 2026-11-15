@@ -219,6 +219,8 @@ export function DeckView({
   }, [editor])
 
   const count = slides.length
+  const countRef = useRef(count)
+  countRef.current = count
   const shown = count === 0 ? 0 : Math.min(current, count - 1)
   const slide = slides[shown]
 
@@ -320,6 +322,10 @@ export function DeckView({
     if (!editor) return
     const observer = new ResizeObserver(() => measureBar())
     observer.observe(editor.view.dom)
+    // The handout's own height sets the room below the text too (a taller window, a folded bar).
+    const container = scrollContainer()
+    if (container) observer.observe(container)
+
     return () => observer.disconnect()
   }, [editor, measureBar, slides])
 
@@ -401,6 +407,9 @@ export function DeckView({
   const pick = useCallback((index: number) => {
     lockUntil.current = Date.now() + PICK_LOCK_MS
     makeCurrent(index)
+    // Told even when this slide was already current: a + menu's "From the library…" may have moved the host's insert
+    // point to a gap, and picking a slide brings it back to the slide.
+    sendToExtension('deck/current', { index, count: countRef.current })
     const container = scrollContainer()
     const tops = partTops()
     if (container && tops[index] !== undefined) container.scrollTop = scrollTopFor(tops[index])
