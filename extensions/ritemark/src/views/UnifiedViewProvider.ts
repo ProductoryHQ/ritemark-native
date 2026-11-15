@@ -72,7 +72,7 @@ import { TRANSCRIPT_WORKBENCH_VIEW_TYPE, transcriptDocumentFor } from '../speech
 import { RuntimeRegistry } from '../runtime/RuntimeRegistry';
 import { createRuntime } from '../runtime/runtimeFactory';
 import { RitemarkToolsInjector } from '../runtime/RitemarkToolsInjector';
-import { boardToolsAvailable, toolGroupsFor, toolSetKey } from '../runtime/ritemarkTools';
+import { boardToolsAvailable, deckToolsAvailable, toolGroupsFor, toolSetKey } from '../runtime/ritemarkTools';
 import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
 import { countTurnAccepted, countTurnEnded } from '../analytics/posthog';
 import * as modelCatalog from '../ai/modelCatalog';
@@ -1328,7 +1328,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             // runtime its browser tools (Claude: in-process MCP server, Codex:
             // dynamic tools, OpenCode: the MCP adapter AcpRuntime attaches).
             extraSystemPrompt: renderCapabilityContext(
-              capabilityDescriptorFor(agentId as AgentId, { browser: browserEnabled, board: boardToolsAvailable() }),
+              capabilityDescriptorFor(agentId as AgentId, { browser: browserEnabled, board: boardToolsAvailable(), deck: deckToolsAvailable() }),
             ),
             mcpServers,
             allowedTools: isClaudeCode && toolGroups.length

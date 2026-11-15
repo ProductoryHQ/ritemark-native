@@ -161,6 +161,19 @@ test('task board guidance appears exactly when a runtime has the board tools', (
   }
 });
 
+// ── Sprint 157: the DECKS section follows the deck tools ─────────────────────
+test('deck guidance appears exactly when a runtime has the deck tools', () => {
+  for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
+    const withDecks = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true }));
+    const withoutDecks = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false }));
+    assert.ok(withDecks.includes('DECKS'), `${runtime} with decks gets the section`);
+    assert.ok(!withoutDecks.includes('DECKS'), `${runtime} without decks omits it`);
+    for (const needle of ['ritemark_decks', 'insert_slides', 'from:', 'Never change anything in `Slide library/` unless the user asks', 'update_library_slide', '```slide <kind>', 'speaker notes']) {
+      assert.ok(withDecks.includes(needle), `${runtime}: ${needle}`);
+    }
+  }
+});
+
 // ── R7: per-runtime edit-tool binding, not per-capability content ────────────
 test('edit-tool naming is bound per runtime', () => {
   assert.ok(claude.includes('Write/Edit'), 'Claude edit tool');

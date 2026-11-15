@@ -39,6 +39,8 @@ import type { DynamicToolDefinition } from '../codex/codexProtocol';
 import { ACTOR_OF_RUNTIME, type BoardController } from '../taskBoard/BoardController';
 import type { BoardAnswer } from '../taskBoard/protocol';
 import { CARD_STAGES } from '../taskBoard/cardTypes';
+import { deckName, type CopiedPart, type DeckLibrary } from '../decks/DeckLibrary';
+import { normalizePath } from '../decks/deckLibraryFormat';
 
 export interface ToolResult {
   text: string;
@@ -59,7 +61,7 @@ export interface RitemarkTool {
   run(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult>;
 }
 
-export type ToolGroupId = 'browser' | 'board';
+export type ToolGroupId = 'browser' | 'board' | 'deck';
 
 export interface RitemarkToolGroup {
   id: ToolGroupId;
@@ -431,6 +433,148 @@ export function createBoardToolGroup(controller: () => BoardController | null): 
   };
 }
 
+// ── Decks (Sprint 157) ──────────────────────────────────────────────────────
+
+/** What the deck tools need from the host: the project's library, and an open deck's view to insert through. */
+export interface DeckToolHost {
+  library(): DeckLibrary | null;
+  /** The open view of a deck (project-relative path), which inserts as one undo step there; undefined when closed. */
+  viewInsert(deckPath: string): ((parts: CopiedPart[], afterIndex: number) => Promise<boolean>) | undefined;
+}
+
+const deckPathInput = (what: string) =>
+  z.string().min(1).max(1024).describe(`${what}: its path from the project's top, as list_decks gives it, ending in .deck.md.`);
+const slideIdInput = z.string().regex(/^[0-9a-z]{1,16}$/i).describe("A slide's id, as read_deck gives it.");
+
+/** A deck path the tools accept: a `.deck.md` inside the project, written with `/`. */
+function deckPathOf(value: unknown): string {
+  const text = String(value ?? '').trim().replace(/\\/g, '/');
+  const path = normalizePath(text);
+  if (!path || !/\.deck\.md$/i.test(path)) throw new Error(`${text} is not a deck in this project. Use list_decks to find one.`);
+  return path;
+}
+
+/** A slide's words in one line, for read_deck. */
+function slideWords(data: { title?: string; subtitle?: string; number?: string; items?: Array<{ heading?: string; text?: string }>; rows?: string[][] }): string {
+  return [
+    data.number, data.title, data.subtitle,
+    ...(data.items ?? []).map(item => [item.heading, item.text].filter(Boolean).join(': ')),
+    ...(data.rows ?? []).map(row => row.join(' | ')),
+  ].filter(Boolean).join(' · ');
+}
+
+export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkToolGroup {
+  const library = (): { host: DeckToolHost; library: DeckLibrary } => {
+    const current = host();
+    const project = current?.library();
+    if (!current || !project) throw new Error('Decks need a project folder in this window (and decks turned on).');
+    return { host: current, library: project };
+  };
+  return {
+    id: 'deck',
+    server: 'ritemark_decks',
+    codexPrefix: 'ritemark_decks_',
+    tools: [
+      {
+        name: 'list_decks',
+        description:
+          "List the project's decks (.deck.md files): the Slide library's topics (one deck per topic, in the folder `Slide library`) and every other deck. With a query, only decks and slides whose words or handout match. Returns each deck's path, slide count, theme and when it changed.",
+        input: {
+          where: z.enum(['library', 'other', 'all']).optional().describe('library: only the Slide library\'s topics; other: only the other decks; all (the default): both.'),
+          query: z.string().max(200).optional().describe('Words to look for in slide titles, words and handouts.'),
+        },
+        run: async (args) => {
+          const decks = await library().library.listDecks({ where: args.where as 'library' | 'other' | 'all' | undefined, query: args.query as string | undefined });
+          if (!decks.length) return { text: args.query ? `No deck has a slide matching "${String(args.query)}".` : 'This project has no decks yet.' };
+          const lines = decks.map(deck => {
+            const head = `${deck.path} · ${deck.topic ? 'library topic' : 'deck'} · ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'}${args.query ? ' matching' : ''}${deck.theme ? ` · theme ${deck.theme}` : ''} · changed ${new Date(deck.modified).toISOString().slice(0, 10)}`;
+            if (!args.query) return head;
+            return [head, ...deck.slides.map(slide => `  slide ${slide.index + 1} (id ${slide.id ?? 'none'}, ${slide.kind}): ${slide.data.title ?? ''}`)].join('\n');
+          });
+          return { text: lines.join('\n') };
+        },
+      },
+      {
+        name: 'read_deck',
+        description:
+          "Read one deck: per slide its number, id, kind, words, whether it is skipped or has speaker notes, where a copy came from and whether it changed, and its handout text.",
+        input: { deck: deckPathInput('The deck') },
+        run: async (args) => {
+          const path = deckPathOf(args.deck);
+          const { library: project } = library();
+          const slides = await project.readDeck(path);
+          if (!slides) return { text: `There is no deck at ${path}. Use list_decks to find one.`, isError: true };
+          const copies = slides.filter(slide => slide.data.id && slide.data.from).map(slide => ({ id: slide.data.id as string, from: slide.data.from as string, kind: slide.kind, body: slide.body, handout: slide.handout }));
+          const states = new Map((await project.sourceStates(path, copies)).map(state => [state.id, state]));
+          const lines = [`${deckName(path)} (${path}), ${slides.length} slide${slides.length === 1 ? '' : 's'}`];
+          for (const slide of slides) {
+            const state = slide.data.id ? states.get(slide.data.id) : undefined;
+            const marks = [
+              slide.data.skip ? 'skipped' : '',
+              slide.notes ? 'has speaker notes' : '',
+              state ? `copy of ${state.sourcePath}${state.missing ? ' (no longer there)' : ''}${state.changed ? ', changed here' : ''}${state.newer ? ', the source has a newer version' : ''}` : '',
+            ].filter(Boolean).join('; ');
+            lines.push('', `Slide ${slide.index + 1} · id ${slide.data.id ?? 'none'} · ${slide.kind}${marks ? ` · ${marks}` : ''}`, slideWords(slide.data) || '(no words)');
+            if (slide.handout.trim()) lines.push('Handout:', slide.handout.trim());
+          }
+          return { text: lines.join('\n') };
+        },
+      },
+      {
+        name: 'insert_slides',
+        description:
+          "Insert copies of slides from the Slide library or another deck into a deck. Always use this for library slides: each copy gets its `from:` line, so the deck can later offer the library's newer version, and its picture and link paths are rewritten for the deck's folder. Answers with the new slides' numbers.",
+        input: {
+          deck: deckPathInput('The deck to insert into'),
+          source: deckPathInput('The deck or library topic the slides come from'),
+          slide_ids: z.array(slideIdInput).min(1).max(50).describe('The ids of the slides to copy, in the order they go in.'),
+          after: z.number().int().min(0).optional().describe('Put them after this slide number (0: before the first). Left out: at the end.'),
+        },
+        run: async (args) => {
+          const deck = deckPathOf(args.deck);
+          const source = deckPathOf(args.source);
+          const { host: current, library: project } = library();
+          const result = await project.insertCopies(source, args.slide_ids as string[], deck, args.after as number | undefined, current.viewInsert(deck));
+          const last = result.first + result.count - 1;
+          return { text: `Inserted ${result.count} slide${result.count === 1 ? '' : 's'} into ${deckName(deck)}: ${result.count === 1 ? `slide ${result.first}` : `slides ${result.first}–${last}`}.` };
+        },
+      },
+      {
+        name: 'update_library_slide',
+        description:
+          "Write a copy's slide and handout back into the Slide library topic it came from (Update the library). Only when the user asks for it: the library is shared by every deck.",
+        input: { deck: deckPathInput('The deck holding the copy'), slide_id: slideIdInput },
+        run: async (args) => {
+          const deck = deckPathOf(args.deck);
+          const { library: project } = library();
+          const copy = await project.slideOf(deck, String(args.slide_id));
+          const write = await project.updateLibrarySlide(deck, copy);
+          await project.setFrom(deck, String(args.slide_id), write.from);
+          return { text: `Updated the slide in ${deckName(write.path)}. Other decks that use it will offer the new version.` };
+        },
+      },
+      {
+        name: 'add_to_library',
+        description:
+          "Add a deck's slide to the Slide library under a topic (a deck in the `Slide library` folder; a new topic is made when none has that name). The slide in the deck becomes a copy of it. Only when the user asks for it.",
+        input: {
+          deck: deckPathInput('The deck holding the slide'),
+          slide_id: slideIdInput,
+          topic: z.string().min(1).max(120).describe("The topic's name (for example \"Working with data\"), or a topic's path from list_decks."),
+        },
+        run: async (args) => {
+          const deck = deckPathOf(args.deck);
+          const { library: project } = library();
+          const copy = await project.slideOf(deck, String(args.slide_id));
+          const write = await project.addToLibrary(deck, String(args.topic), copy);
+          await project.setFrom(deck, String(args.slide_id), write.from);
+          return { text: `Added the slide to the library under ${deckName(write.path)}${write.previous === null ? ' (a new topic)' : ''}.` };
+        },
+      },
+    ],
+  };
+}
+
 // ── Which groups a turn gets ────────────────────────────────────────────────
 
 let boardController: () => BoardController | null = () => null;
@@ -447,13 +591,32 @@ export function boardToolsAvailable(): boolean {
   return boardController() !== null;
 }
 
+let deckToolHost: () => DeckToolHost | null = () => null;
+
+/** The decks host hands its library to the tools (Sprint 157). */
+export function setDeckToolHost(provider: () => DeckToolHost | null): void {
+  deckToolHost = provider;
+}
+
+export const DECK_TOOL_GROUP: RitemarkToolGroup = createDeckToolGroup(() => deckToolHost());
+
+/** This window has decks (the flag on and a project folder on disk), so agents get the deck tools. */
+export function deckToolsAvailable(): boolean {
+  return deckToolHost()?.library() != null;
+}
+
 /** The groups for one turn (Claude, Codex) or one OpenCode process. */
 export function toolGroupsFor(options: { browser: boolean }): RitemarkToolGroup[] {
-  return [...(options.browser ? [BROWSER_TOOL_GROUP] : []), ...(boardToolsAvailable() ? [BOARD_TOOL_GROUP] : [])];
+  return [
+    ...(options.browser ? [BROWSER_TOOL_GROUP] : []),
+    ...(boardToolsAvailable() ? [BOARD_TOOL_GROUP] : []),
+    ...(deckToolsAvailable() ? [DECK_TOOL_GROUP] : []),
+  ];
 }
 
 export function toolGroupById(id: string): RitemarkToolGroup | null {
   if (id === BROWSER_TOOL_GROUP.id) return BROWSER_TOOL_GROUP;
   if (id === BOARD_TOOL_GROUP.id) return BOARD_TOOL_GROUP;
+  if (id === DECK_TOOL_GROUP.id) return DECK_TOOL_GROUP;
   return null;
 }

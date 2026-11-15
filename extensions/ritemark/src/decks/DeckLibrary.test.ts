@@ -98,6 +98,23 @@ async function run() {
   await assert.rejects(library.updateLibrarySlide('Clients/Harbour/Harbour.deck.md', { kind: 'title', body: 'id: x1\nfrom: Slide library/../notes.deck.md#a1 @aaaaaa', handout: '' }));
   assert.equal(files.files['notes.md'], '```slide title\nid: a1\ntitle: Kept\n```\n');
 
+  // The AI's insert_slides: after slide 1 of a closed deck, written to its file; through an open view when there is one.
+  const inserted = await library.insertCopies('Slide library/AI assistants.deck.md', ['a2'], 'Clients/Harbour/Harbour.deck.md', 0);
+  assert.deepEqual(inserted, { first: 1, count: 1 });
+  const harbour = slidesOfText(files.files['Clients/Harbour/Harbour.deck.md']);
+  assert.equal(harbour[0].data.title, 'Assistant or agent?');
+  assert.equal(parseFrom(harbour[0].data.from)?.id, 'a2');
+  let viewed: { count: number; afterIndex: number } | null = null;
+  const beforeView = files.files['Clients/Harbour/Harbour.deck.md'];
+  const viaView = await library.insertCopies('Slide library/AI assistants.deck.md', ['a1', 'a2'], 'Clients/Harbour/Harbour.deck.md', 99, async (parts, afterIndex) => {
+    viewed = { count: parts.length, afterIndex };
+    return true;
+  });
+  assert.equal(files.files['Clients/Harbour/Harbour.deck.md'], beforeView, 'an open deck is changed through its view');
+  assert.deepEqual(viewed, { count: 2, afterIndex: harbour.length - 1 });
+  assert.equal(viaView.first, harbour.length + 1);
+  await assert.rejects(library.insertCopies('Slide library/AI assistants.deck.md', ['a1'], 'notes.md', 0));
+
   console.log('DeckLibrary: passed');
 }
 
