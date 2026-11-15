@@ -16,6 +16,7 @@ import * as vscode from 'vscode';
 import { isEnabled } from '../features';
 import { isRelativeImagePath } from '../utils/imagePaths';
 import { deckModeOf } from './deckMode';
+import { isThemePath } from './deckTheme';
 import { decodeDeckRequest, DeckProtocolError, type DeckHostMessage, type DeckRequest } from './deckProtocol';
 
 export class DeckPages {
@@ -40,6 +41,9 @@ export class DeckPages {
     switch (request.type) {
       case 'deck/assets':
         await this.post(webview, { type: 'deck/assets', assets: resolveAssets(document, webview, request.paths) });
+        return;
+      case 'deck/theme':
+        await this.post(webview, { type: 'deck/theme', path: request.path, text: await readTheme(document, request.path) });
         return;
     }
   }
@@ -72,4 +76,30 @@ function resolveAssets(document: vscode.TextDocument, webview: vscode.Webview, p
     }
   }
   return assets;
+}
+
+/** A theme file is front matter only: anything larger than this is not one. */
+const MAX_THEME_BYTES = 64 * 1024;
+
+/**
+ * The text of the theme file a deck names, or null. The path is project-relative (`Slide library/Themes/…`), so it is
+ * read from the deck's project folder, or the deck's own folder when it has none, and never from outside it.
+ */
+async function readTheme(document: vscode.TextDocument, themePath: string): Promise<string | null> {
+  if (!isThemePath(themePath)) return null;
+  const root = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath ?? path.dirname(document.uri.fsPath);
+  const absolute = path.resolve(root, themePath);
+  const relative = path.relative(root, absolute);
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return null;
+  try {
+    // A link inside the project that points out of it is not followed.
+    const [realRoot, realFile] = await Promise.all([fs.promises.realpath(root), fs.promises.realpath(absolute)]);
+    const realRelative = path.relative(realRoot, realFile);
+    if (!realRelative || realRelative.startsWith('..') || path.isAbsolute(realRelative)) return null;
+    const stat = await fs.promises.stat(realFile);
+    if (!stat.isFile() || stat.size > MAX_THEME_BYTES) return null;
+    return await fs.promises.readFile(realFile, 'utf8');
+  } catch {
+    return null;
+  }
 }

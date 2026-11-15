@@ -22,15 +22,19 @@ import { documentBarStatus, type DocumentSyncAction } from '../header/DocumentSy
 import type { DocumentApplyTarget } from '../../types/documentSync'
 import type { DocumentSyncState } from '../../../../src/editorSync/protocol'
 import type { EditorSelection } from '../../types/editor'
-import { parseFrom, type SlideData } from '../../../../src/decks/deckFormat'
+import type { SlideData } from '../../../../src/decks/deckFormat'
+import type { DeckTheme } from '../../../../src/decks/deckTheme'
+import type { DocumentProperties } from '../properties'
+import { SegmentedControl } from '../ui/segmented-control'
 import { onDocChanged } from '../../lib/docChange'
 import { partIndexAt, slidesOf, type DeckSlideEntry } from './deckDocument'
-import { useDeckAssets } from './deckBridge'
+import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { currentPart, scrollTopFor } from './scrollRule'
 import { DeckGuard } from './handout/deckGuard'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
 import { SlideCanvas } from './slide/SlideCanvas'
+import { Stage } from './Stage'
 import './decks.css'
 
 /** The deck's extensions, made once: the editor's extension list is fixed at mount. */
@@ -68,6 +72,9 @@ interface DeckViewProps {
   dialogs?: ReactNode
   /** The document's find bar, over the handout (Cmd+F and a search result). */
   findBar?: ReactNode
+  /** The deck's front matter (its theme and its look), and the change of it. */
+  properties: DocumentProperties
+  onPropertiesChange: (properties: DocumentProperties) => void
 }
 
 /** The stage's width for a desk width, the handout's ratio and what is shown. */
@@ -76,25 +83,19 @@ export function stageWidthFor(avail: number, ratio: number, handoutShown: boolea
   return Math.max(0, Math.min(avail - HANDOUT_MIN, Math.max(STAGE_MIN, Math.round(avail * ratio))))
 }
 
-/** The library's topic or the deck a copy came from, for the quiet line under the slide. */
-function sourceLine(from: string | undefined): { library: boolean; name: string } | null {
-  const source = parseFrom(from)
-  if (!source) return null
-  const name = source.path.split('/').pop()?.replace(/\.deck\.md$/i, '') ?? source.path
-  return { library: /^Slide library\//.test(source.path), name }
-}
-
 interface ThumbnailProps {
   index: number
   kind: string
   data: SlideData
   current: boolean
-  pictureUrl?: string
+  theme: DeckTheme
+  borderless: boolean
+  assets: Record<string, string>
   onPick: (index: number) => void
 }
 
 /** One numbered thumbnail in the strip. */
-const Thumbnail = memo(function Thumbnail({ index, kind, data, current, pictureUrl, onPick }: ThumbnailProps) {
+const Thumbnail = memo(function Thumbnail({ index, kind, data, current, theme, borderless, assets, onPick }: ThumbnailProps) {
   return (
     <div
       role="option"
@@ -106,7 +107,7 @@ const Thumbnail = memo(function Thumbnail({ index, kind, data, current, pictureU
     >
       <span className="deck-thumb-no">{index + 1}</span>
       <div className="deck-thumb-slide">
-        <SlideCanvas kind={kind} data={data} width={THUMB_WIDTH} pictureUrl={pictureUrl} />
+        <SlideCanvas kind={kind} data={data} width={THUMB_WIDTH} theme={theme} borderless={borderless} assets={assets} />
       </div>
       {data.skip ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}
     </div>
@@ -126,12 +127,15 @@ export function DeckView({
   syncState,
   dialogs,
   findBar,
+  properties,
+  onPropertiesChange,
 }: DeckViewProps) {
   const [editor, setEditor] = useState<TipTapEditor | null>(null)
   const [slides, setSlides] = useState<DeckSlideEntry[]>([])
   const [current, setCurrent] = useState(0)
   const [stripWanted, setStripWanted] = useState(true)
   const [handoutWanted, setHandoutWanted] = useState(true)
+  const [notesOpen, setNotesOpen] = useState(false)
   const [ratio, setRatio] = useState(DEFAULT_RATIO)
   const [deskWidth, setDeskWidth] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -141,6 +145,15 @@ export function DeckView({
   const lockUntil = useRef(0)
   const currentRef = useRef(0)
   const assets = useDeckAssets(slides)
+  const theme = useDeckTheme(properties.theme)
+  // Card or Borderless is the deck's own choice, in its front matter (Jarmo, 15 November: both are offered).
+  const borderless = properties.look === 'borderless'
+  const setLook = useCallback((look: string) => {
+    const next: DocumentProperties = { ...properties }
+    if (look === 'borderless') next.look = 'borderless'
+    else delete next.look
+    onPropertiesChange(next)
+  }, [properties, onPropertiesChange])
 
   const handleEditorReady = useCallback((instance: TipTapEditor) => {
     setEditor(instance)
@@ -341,9 +354,9 @@ export function DeckView({
   }, [avail, stripWidth, pick])
 
   const status = documentBarStatus(syncState, syncAction)
-  const source = slide ? sourceLine(slide.data.from) : null
   const handoutContainer = scrollContainer()
-  const pictureOf = (entry: DeckSlideEntry) => (entry.data.image ? assets[entry.data.image] : undefined)
+  // Writing on the slide keeps it the current one while the handout is still.
+  const onWriting = useCallback(() => { lockUntil.current = Date.now() + WRITE_LOCK_MS }, [])
 
   // Keyed by place and memoised on the slide's own data (read once per distinct body), so a keystroke redraws only
   // the thumbnail whose slide changed.
@@ -354,7 +367,9 @@ export function DeckView({
       kind={entry.kind}
       data={entry.data}
       current={entry.index === shown}
-      pictureUrl={pictureOf(entry)}
+      theme={theme}
+      borderless={borderless}
+      assets={assets}
       onPick={pick}
     />
   ))
@@ -377,6 +392,15 @@ export function DeckView({
         </Tooltip>
         <span className="deck-count">{count === 0 ? 'No slides yet' : `Slide ${shown + 1} of ${count}`}</span>
         <span className="flex-1" />
+        <Tooltip label="How the slides look: as a card, or the whole column as the stage">
+          <SegmentedControl
+            aria-label="How the slides look"
+            className="deck-look"
+            value={borderless ? 'borderless' : 'card'}
+            onValueChange={setLook}
+            options={[{ value: 'card', label: 'Card' }, { value: 'borderless', label: 'Borderless' }]}
+          />
+        </Tooltip>
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>
         {status === 'action' && syncAction ? (
           <SyncActionButton action={syncAction} />
@@ -389,7 +413,7 @@ export function DeckView({
         {stripShown ? (
           <div
             ref={stripRef}
-            className="deck-strip"
+            className={`deck-strip${borderless ? ' is-borderless' : ''}`}
             role="listbox"
             aria-label="Slides"
             tabIndex={0}
@@ -399,20 +423,21 @@ export function DeckView({
           </div>
         ) : null}
 
-        <div className="deck-stage" style={{ left: stripWidth, width: stageWidth }}>
+        <div className={`deck-stage${borderless ? ' is-borderless' : ''}`} style={{ left: stripWidth, width: stageWidth }}>
           <div className="deck-stage-group">
-            {slide && bigWidth > 0 ? (
-              <div className="deck-big" style={{ width: bigWidth }}>
-                <SlideCanvas kind={slide.kind} data={slide.data} width={bigWidth} pictureUrl={pictureOf(slide)} />
-              </div>
-            ) : null}
-            {source ? (
-              <div className="deck-under">
-                <div className="deck-source">
-                  <Icon name={source.library ? 'books' : 'presentation'} size={12} tone="inherit" />
-                  {source.library ? `From the library · ${source.name}` : `From ${source.name}`}
-                </div>
-              </div>
+            {editor && slide && bigWidth > 0 ? (
+              <Stage
+                key={slide.index}
+                editor={editor}
+                slide={slide}
+                theme={theme}
+                borderless={borderless}
+                assets={assets}
+                width={bigWidth}
+                onWriting={onWriting}
+                notesOpen={notesOpen}
+                onNotesOpen={setNotesOpen}
+              />
             ) : null}
           </div>
         </div>

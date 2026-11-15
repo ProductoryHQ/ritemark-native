@@ -868,6 +868,8 @@ function App() {
         onExternalApplied={handleDocumentApplied}
         syncAction={syncAction}
         syncState={documentViewSync.state}
+        properties={properties}
+        onPropertiesChange={handlePropertiesChange}
         findBar={showFindBar && editorRef.current ? (
           <FindBar
             editor={editorRef.current}
