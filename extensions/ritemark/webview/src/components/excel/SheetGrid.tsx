@@ -18,7 +18,7 @@ import { writeClipboard, readClipboard } from '../../lib/clipboard'
 import { compareCells } from '../sheetSort'
 import { installFontFallbacks, installOfficeFontAliases } from '../viewers/docx/officeFonts'
 import { cellKey, type CellModel, type SheetModel, type WorkbookModel } from './readWorkbook'
-import { CELL_PADDING, buildLayout, fontCss, fontShorthand, indexAt, sortRefusal, sortedRows, styleIndexOf, styleOf, type SheetLayout } from './sheetLayout'
+import { CELL_PADDING, buildLayout, fontCss, fontShorthand, indexAt, mergeIndex, sortRefusal, sortedRows, styleIndexOf, styleOf, type SheetLayout } from './sheetLayout'
 import { columnPixels, defaultColumnPixels, maxDigitWidth } from './columnWidth'
 import type { CellStyle } from './excelStyles'
 import './sheetGrid.css'
@@ -166,9 +166,22 @@ export function SheetGrid({
     })
   }, [])
 
+  const mergedCells = useMemo(() => mergeIndex(sheet.layout.merges), [sheet])
+
   // rows without a height of their own grow for wrapped text and larger fonts, as Excel fits them
   const autoHeight = useMemo(() => {
     const cache = new Map<number, number | undefined>()
+    // only rows with a wrapped cell or a font larger than the sheet's are fitted: found once, from the cells
+    const candidates = new Map<number, number[]>()
+    for (const [key, cell] of sheet.cells) {
+      if (cell.text === '') continue
+      const style = styleOf(styles, cell.s)
+      if (!style?.align.wrap && (style?.font.size ?? base.size) <= base.size) continue
+      const r = Math.floor(key / 16384)
+      const list = candidates.get(r) ?? []
+      list.push(key % 16384)
+      candidates.set(r, list)
+    }
     // the layout's own widths: by the Normal font's widest digit and the sheet's default
     const mdw = maxDigitWidth(base)
     const defaultPx = defaultColumnPixels(sheet.layout.defaultColWidth, sheet.layout.baseColWidth, mdw)
@@ -178,11 +191,13 @@ export function SheetGrid({
       return col?.width !== undefined ? columnPixels(col.width, mdw) : defaultPx
     }
     return (r: number) => {
+      const cols = candidates.get(r)
+      if (!cols) return undefined
       if (cache.has(r)) return cache.get(r)
       let need: number | undefined
-      for (let c = 0; c <= sheet.maxC; c++) {
+      for (const c of cols) {
         const cell = sheet.cells.get(cellKey(r, c))
-        if (!cell || cell.text === '' || !colPx(c) || sheet.layout.merges.some(([r1, c1, r2, c2]) => r >= r1 && r <= r2 && c >= c1 && c <= c2)) continue
+        if (!cell || cell.text === '' || !colPx(c) || mergedCells.has(cellKey(r, c))) continue
         const style = styleOf(styles, cell.s)
         const px = ((style?.font.size ?? base.size) * 4) / 3
         let h = Math.ceil(px * 1.36)
@@ -209,7 +224,7 @@ export function SheetGrid({
       return need
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheet, styles, version, fontsReady])
+  }, [sheet, styles, version, fontsReady, mergedCells])
 
   const layout: SheetLayout = useMemo(
     () =>

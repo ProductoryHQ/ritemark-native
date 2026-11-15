@@ -7,7 +7,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readWorkbook, cellKey } from './readWorkbook'
-import { buildLayout, fontCss, indexAt, sortRefusal, sortedRows, styleIndexOf, styleOf } from './sheetLayout'
+import { buildLayout, fontCss, indexAt, mergeIndex, sortRefusal, sortedRows, styleIndexOf, styleOf } from './sheetLayout'
 import { applyTint, colorOf, readTheme } from './excelStyles'
 import { columnPixels, maxDigitWidth } from './columnWidth'
 import { compareCells } from '../sheetSort'
@@ -105,6 +105,23 @@ async function main() {
     assert.ok(sheet.layout.conditionalFormats > 0, 'colour rules')
     const chartSheet = model.sheets.find((s) => s.kind === 'chartsheet')!
     assert.ok(chartSheet.layout.drawings[0]?.what === 'chart')
+  }
+
+  // A whole sheet merged (a few bytes in a file) is a range, not billions of cells (Codex on #724)
+  {
+    const t0 = performance.now()
+    const index = mergeIndex([[0, 0, 1_048_575, 16_383], [2, 1, 3, 2]])
+    assert.ok(performance.now() - t0 < 50, 'indexed at once')
+    assert.equal(index.get(cellKey(500_000, 9_000)), 0)
+    assert.equal(index.get(cellKey(3, 2)), 1, 'a small merge inside it is found first')
+    assert.ok(index.has(cellKey(0, 0)))
+    const model = await open('training-budget.xlsx')
+    const sheet = model.sheets[0]
+    const huge = { ...sheet, layout: { ...sheet.layout, merges: [[0, 0, 1_048_575, 16_383] as [number, number, number, number]] } }
+    const t1 = performance.now()
+    const L = buildLayout(huge, model.styles, opts)
+    assert.ok(performance.now() - t1 < 500, 'laid out quickly')
+    assert.ok(L.rows < 1000, 'the drawn area follows the cells, not the huge merge')
   }
 
   // Tab colours
