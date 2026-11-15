@@ -115,41 +115,28 @@ async function main(): Promise<void> {
     assert.deepEqual(fs.readdirSync(folder).filter(name => name.endsWith('.tmp')), []);
   }
 
-  // Replacing Ritemark's own page (Codex on #729): a file swapped in just before the page is moved aside goes back,
-  // untouched; one that arrives while the page is aside stays. Nothing is left under a hidden name.
+  // Where nothing is, the page goes in only if nothing arrived meanwhile, in one step (Codex on #729). Another
+  // window's page for this deck that arrived meanwhile is replaced; where the system has no second names, whatever
+  // its error, a move after a last check stands in. Nothing is left under a hidden name.
   {
-    const swapped = path.join(folder, 'Swapped.deck.md');
-    const swappedPage = pagePathFor(swapped);
-    await writeDeckPage(nodePageFs, swapped, built.html);
-    const swapIn: PageFs = {
+    const twin = path.join(folder, 'Twin.deck.md');
+    const twinPage = pagePathFor(twin);
+    const otherWindow: PageFs = {
       ...nodePageFs,
-      rename: async (from, to) => {
-        if (from === swappedPage) fs.writeFileSync(swappedPage, 'someone else\'s page');
-        await nodePageFs.rename(from, to);
+      writeFile: async (target, data) => {
+        await nodePageFs.writeFile(target, data);
+        fs.writeFileSync(twinPage, built.html);
       },
     };
-    assert.equal((await writeDeckPage(swapIn, swapped, edited.html)).kind, 'refused');
-    assert.equal(fs.readFileSync(swappedPage, 'utf8'), 'someone else\'s page', 'put back, untouched');
-
-    const arriving = path.join(folder, 'Arriving.deck.md');
-    const arrivingPage = pagePathFor(arriving);
-    await writeDeckPage(nodePageFs, arriving, built.html);
-    let moved = false;
-    const arriveWhileAside: PageFs = {
-      ...nodePageFs,
-      rename: async (from, to) => {
-        await nodePageFs.rename(from, to);
-        if (from === arrivingPage && !moved) { moved = true; fs.writeFileSync(arrivingPage, 'arrived meanwhile'); }
-      },
-    };
-    assert.equal((await writeDeckPage(arriveWhileAside, arriving, edited.html)).kind, 'refused');
-    assert.equal(fs.readFileSync(arrivingPage, 'utf8'), 'arrived meanwhile', 'never overwritten');
-    // Where the file system has no second names, a move after a last check stands in.
-    const noLinks: PageFs = { ...nodePageFs, link: async () => { throw Object.assign(new Error('no links'), { code: 'EPERM' }); } };
-    const plain = path.join(folder, 'Plain.deck.md');
-    assert.deepEqual(await writeDeckPage(noLinks, plain, built.html), { kind: 'written', pagePath: pagePathFor(plain), created: true, unchanged: false });
-    assert.deepEqual(await writeDeckPage(noLinks, plain, edited.html), { kind: 'written', pagePath: pagePathFor(plain), created: false, unchanged: false });
-    assert.equal(fs.readFileSync(pagePathFor(plain), 'utf8'), edited.html);
+    assert.deepEqual(await writeDeckPage(otherWindow, twin, edited.html), { kind: 'written', pagePath: twinPage, created: false, unchanged: false });
+    assert.equal(fs.readFileSync(twinPage, 'utf8'), edited.html);
+    for (const code of ['EPERM', 'EISDIR', 'EXDEV', 'EINVAL']) {
+      const noLinks: PageFs = { ...nodePageFs, link: async () => { throw Object.assign(new Error('no second names'), { code }); } };
+      const plain = path.join(folder, `Plain ${code}.deck.md`);
+      assert.deepEqual(await writeDeckPage(noLinks, plain, built.html), { kind: 'written', pagePath: pagePathFor(plain), created: true, unchanged: false }, code);
+      assert.deepEqual(await writeDeckPage(noLinks, plain, edited.html), { kind: 'written', pagePath: pagePathFor(plain), created: false, unchanged: false }, code);
+      assert.equal(fs.readFileSync(pagePathFor(plain), 'utf8'), edited.html);
+    }
     assert.deepEqual(fs.readdirSync(folder).filter(name => name.startsWith('.')), [], 'nothing left under a hidden name');
   }
 

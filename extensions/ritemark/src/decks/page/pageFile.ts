@@ -8,7 +8,8 @@
  *    file Ritemark wrote for the deck beside it, and the digest says whether the deck has changed since (the chip's
  *    "Published · changed").
  *  - It never overwrites a file Ritemark didn't write for this deck: it stops and says why in one line. Nor a link, a
- *    folder or anything else that isn't a plain file. A page is written next to its place and moved over it, so a
+ *    folder or anything else that isn't a plain file. A page is written under a hidden name next to its place, then
+ *    put in where nothing is (refused in one step if something arrived) or moved over Ritemark's own page, so a
  *    half-written page is never what Publish reads.
  *  - A page written for a first Publish that is then cancelled is removed again (`removeDeckPage`), unless it changed
  *    since it was written.
@@ -106,17 +107,15 @@ function besidePage(pagePath: string, ending: string): string {
 }
 
 /**
- * Put `from` at `to` only if nothing is there: a second name (which the system refuses when `to` is taken, in one
- * step), then the first name dropped. False when `to` was taken. Where the file system has no second names (EPERM,
- * ENOTSUP, ENOSYS), a move after a last check stands in for it.
+ * Put `from` at `to` only if nothing is there, in one step: a second name, which the system refuses (EEXIST) when
+ * `to` is taken, then the first name dropped. False when `to` was taken. Where the file system can't give a second
+ * name (FAT and exFAT, some network and synced folders, whatever the error), a move after a last check stands in.
  */
 async function placeNoReplace(pageFs: PageFs, from: string, to: string): Promise<boolean> {
   try {
     await pageFs.link(from, to);
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException)?.code;
-    if (code === 'EEXIST') return false;
-    if (code !== 'EPERM' && code !== 'ENOTSUP' && code !== 'ENOSYS') throw error;
+    if ((error as NodeJS.ErrnoException)?.code === 'EEXIST') return false;
     if ((await pageAt(pageFs, to)).kind !== 'none') return false;
     await pageFs.rename(from, to);
     return true;
@@ -128,44 +127,27 @@ async function placeNoReplace(pageFs: PageFs, from: string, to: string): Promise
 /**
  * Write the page beside the deck. A file Ritemark didn't write for a deck (or a link, or a folder) is never touched:
  * the result says why in one line. The page is written under a hidden name first, so a half-written page is never what
- * Publish reads, and it is only ever put where nothing is (`placeNoReplace`): a page Ritemark wrote is first moved
- * aside in one step and checked there, so a file that arrived at any moment in between is never overwritten (Codex on
- * #729); were it someone else's after all, it goes back.
+ * Publish reads. Where nothing is, it goes in only if nothing arrived meanwhile, in one step (`placeNoReplace`: Codex
+ * on #729); a page Ritemark wrote is replaced by a move over it, after a last check, so the place is never empty.
  */
 export async function writeDeckPage(pageFs: PageFs, deckPath: string, html: string): Promise<WriteResult> {
   const pagePath = pagePathFor(deckPath);
   const refused = (): WriteResult => ({ kind: 'refused', pagePath, line: foreignPageLine(pagePath) });
-  const there = await pageAt(pageFs, pagePath);
+  let there = await pageAt(pageFs, pagePath);
   if (there.kind === 'foreign') return refused();
   if (there.kind === 'ours' && there.html === html) return { kind: 'written', pagePath, created: false, unchanged: true };
   const temporary = besidePage(pagePath, 'tmp');
   await pageFs.writeFile(temporary, html);
   try {
     if (there.kind === 'none') {
-      if (!(await placeNoReplace(pageFs, temporary, pagePath))) return refused();
-      return { kind: 'written', pagePath, created: true, unchanged: false };
+      if (await placeNoReplace(pageFs, temporary, pagePath)) return { kind: 'written', pagePath, created: true, unchanged: false };
+      // Something arrived meanwhile: another window's page for this deck is replaced, anything else stays.
+      there = await pageAt(pageFs, pagePath);
+      if (there.kind !== 'ours') return refused();
     }
-    // The page Ritemark wrote: moved aside in one step, and what was moved is checked there.
-    const aside = besidePage(pagePath, 'old');
-    try {
-      await pageFs.rename(pagePath, aside);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error;
-      // Gone meanwhile: the page goes in where nothing is.
-      if (!(await placeNoReplace(pageFs, temporary, pagePath))) return refused();
-      return { kind: 'written', pagePath, created: true, unchanged: false };
-    }
-    if ((await pageAt(pageFs, aside)).kind !== 'ours') {
-      // Someone else's file arrived just before the move: it goes back where it was, untouched.
-      await placeNoReplace(pageFs, aside, pagePath);
-      return refused();
-    }
-    if (!(await placeNoReplace(pageFs, temporary, pagePath))) {
-      // A file arrived in the moment the page was aside: it stays; the old page Ritemark wrote is let go.
-      await pageFs.unlink(aside).catch(() => undefined);
-      return refused();
-    }
-    await pageFs.unlink(aside).catch(() => undefined);
+    // Checked again just before the move: a file that arrived meanwhile is still never overwritten.
+    if ((await pageAt(pageFs, pagePath)).kind === 'foreign') return refused();
+    await pageFs.rename(temporary, pagePath);
     return { kind: 'written', pagePath, created: false, unchanged: false };
   } finally {
     await pageFs.unlink(temporary).catch(() => undefined);

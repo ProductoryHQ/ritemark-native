@@ -24,8 +24,10 @@ import { isRelativeTarget } from '../deckLibraryFormat';
 import { slideMarkup, escapeHtml } from '../../../webview/src/components/decks/slide/slideMarkup';
 import { themeStyle, themeVars } from '../../../webview/src/components/decks/theme/themeVars';
 import { iconSvg } from '../../../webview/src/components/decks/slide/pageIcons';
-import type { PublicDeck, PublicSlide } from './publicDeck';
+import { MARKED_OPTIONS, lexHandout, type PublicDeck, type PublicSlide } from './publicDeck';
 import { PAGE_SCRIPT } from './pageScript';
+
+export { lexHandout };
 
 export interface PageFont {
   /** The woff2 file's bytes, base64. */
@@ -201,30 +203,6 @@ class HandoutRenderer extends marked.Renderer {
   table(header: string, body: string): string {
     return `<div class="tw"><table>\n<thead>\n${header}</thead>\n${body ? `<tbody>${body}</tbody>` : ''}</table></div>\n`;
   }
-}
-
-const MARKED_OPTIONS = { gfm: true, breaks: false, headerIds: false, mangle: false, smartypants: false } as const;
-
-/**
- * The handout's tokenizer: marked's own, except that an inline `<code>`, `<pre>`, `<kbd>` or `<script>` never puts it
- * in its raw mode, where it hands the text after the tag on unescaped (the security review of PR 3: `See <code>
- * <svg/onload=…>` reached the page as a live tag). The tag itself is a handout's raw HTML, which `sanitizeHtml`
- * shows as words.
- */
-function handoutTokenizer(): marked.Tokenizer {
-  const tokenizer = new marked.Tokenizer();
-  const tag = tokenizer.tag;
-  tokenizer.tag = function (this: marked.Tokenizer & marked.TokenizerThis, src: string) {
-    const token = tag.call(this, src);
-    this.lexer.state.inRawBlock = false;
-    return token;
-  };
-  return tokenizer;
-}
-
-/** A handout's Markdown as tokens, read the one way the page reads it (`pageFile.ts` finds its pictures with it too). */
-export function lexHandout(markdown: string): ReturnType<typeof marked.lexer> {
-  return marked.lexer(markdown, { ...MARKED_OPTIONS, tokenizer: handoutTokenizer() });
 }
 
 /** A label over a prompt: a short paragraph in capitals ("TRY IT", "PROMPT") just before a code block. */

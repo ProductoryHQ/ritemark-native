@@ -28,6 +28,7 @@
  * (`deckDigest`) is a hash of it, so an edit to anything private never shows the page as changed.
  */
 import { createHash } from 'node:crypto';
+import { marked } from 'marked';
 import { frontMatterField, isSlideKind, parseDeck, parseSlideBody, type SlideData, type SlideItem } from '../deckFormat';
 import type { DeckTheme } from '../deckTheme';
 import { MAX_STEP } from '../../../webview/src/components/decks/slide/layoutSlide';
@@ -128,13 +129,42 @@ export function drawnData(kind: string, data: SlideData): SlideData {
   return out;
 }
 
+export const MARKED_OPTIONS = { gfm: true, breaks: false, headerIds: false, mangle: false, smartypants: false } as const;
+
+/**
+ * The handout's tokenizer: marked's own, except that an inline `<code>`, `<pre>`, `<kbd>` or `<script>` never puts it
+ * in its raw mode, where it hands the text after the tag on unescaped (the security review of PR 3: `See <code>
+ * <svg/onload=…>` reached the page as a live tag). The tag itself is a handout's raw HTML, which `sanitizeHtml`
+ * shows as words.
+ */
+function handoutTokenizer(): marked.Tokenizer {
+  const tokenizer = new marked.Tokenizer();
+  const tag = tokenizer.tag;
+  tokenizer.tag = function (this: marked.Tokenizer & marked.TokenizerThis, src: string) {
+    const token = tag.call(this, src);
+    this.lexer.state.inRawBlock = false;
+    return token;
+  };
+  return tokenizer;
+}
+
+/** A handout's Markdown as tokens, read the one way the page reads it (`pageFile.ts` finds its pictures with it too). */
+export function lexHandout(markdown: string): ReturnType<typeof marked.lexer> {
+  return marked.lexer(markdown, { ...MARKED_OPTIONS, tokenizer: handoutTokenizer() });
+}
+
 // ---------------------------------------------------------------------------
 // A handout's Markdown
 // ---------------------------------------------------------------------------
 
 const FENCE_OPEN = /^([ \t]*)(`{3,}|~{3,})(.*)$/;
-/** A line's quote markers (`> `, `> > `). */
-const QUOTE = /^(?:[ \t]*>)+[ \t]?/;
+
+/** A line's indentation in columns (a tab to the next stop of four, as Markdown counts it). */
+function columnsOf(indent: string): number {
+  let columns = 0;
+  for (const char of indent) columns = char === '\t' ? columns + 4 - (columns % 4) : columns + 1;
+  return columns;
+}
 
 /** A fence that never goes: speaker notes, or a slide's block (its id and from lines) inside a handout. */
 function isPrivateFence(info: string): boolean {
@@ -164,13 +194,37 @@ function tagEnd(text: string, from: number): number {
  * written: what a prompt shows is the prompt. A comment that opens outside code runs to its `-->`, through a fence if
  * need be, as Markdown reads it.
  *
- * Where this scanner and Markdown could read the text differently, it fails closed, toward privacy: a fence at any
- * indentation counts as a fence; a code span only closes on its own line (a span that runs on, or into a fence, is
- * text here, so a fence after it is still seen); an indented code block (four spaces, which the editor never writes:
- * it writes fences) is text here, so a comment in one goes; and an unclosed comment or tag removes everything after
- * it. The page's renderer (`pageHtml.ts`) then filters again with Markdown's own reading.
+ * Where this scanner and Markdown could read the text differently, it fails closed, toward privacy, and never the
+ * other way: it never ends a private fence before Markdown would (only a closing line at most three columns deeper
+ * than the opening one closes it), so taking out a fence's first line always takes out all of it; a fence at any
+ * indentation counts as one; a code span only closes on its own line (a span that runs on, or into a fence, is text
+ * here, so a fence after it is still seen); an indented code block (four spaces, which the editor never writes: it
+ * writes fences) is text here, so a comment in one goes; and an unclosed comment or tag removes everything after it.
+ *
+ * A private fence inside a quote or a list item (`> ```notes`, `- ```notes`) is found by Markdown's own reading
+ * (`lexHandout`), and the whole quote or list holding it goes (Codex on #729: its notes otherwise stayed in the
+ * digest). The page's renderer (`pageHtml.ts`) filters once more, with the same reading.
  */
 export function publicMarkdown(markdown: string): string {
+  return withoutPrivateContainers(scanPrivate(markdown));
+}
+
+/** Every top-level quote or list that holds a private fence, as Markdown reads it, taken out whole. */
+function withoutPrivateContainers(text: string): string {
+  if (!/```|~~~/.test(text)) return text;
+  const tokens = lexHandout(text);
+  const holdsPrivate = (token: unknown): boolean => {
+    let found = false;
+    marked.walkTokens([token as marked.Token], entry => {
+      if (entry.type === 'code' && isPrivateFence(String((entry as { lang?: string }).lang ?? ''))) found = true;
+    });
+    return found;
+  };
+  if (!tokens.some(holdsPrivate)) return text;
+  return tokens.map(token => (holdsPrivate(token) ? '\n' : token.raw)).join('').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function scanPrivate(markdown: string): string {
   const text = markdown.replace(/\r\n?/g, '\n');
   let out = '';
   let index = 0;
@@ -179,29 +233,20 @@ export function publicMarkdown(markdown: string): string {
     if (lineStart) {
       const lineEnd = text.indexOf('\n', index);
       const line = text.slice(index, lineEnd < 0 ? text.length : lineEnd);
-      // A fence in a quote (`> ```notes`) is a fence too (Codex on #729): read past the quote's markers.
-      const quote = QUOTE.exec(line)?.[0] ?? '';
-      const depth = (quote.match(/>/g) ?? []).length;
-      const open = FENCE_OPEN.exec(line.slice(quote.length));
+      const open = FENCE_OPEN.exec(line);
       if (open && !(open[2][0] === '`' && open[3].includes('`'))) {
-        // A fenced block, to its closing fence (or the end, or the end of its quote): kept as written, or dropped whole
-        // when private.
+        // A fenced block, to its closing fence (or the end): kept as written, or dropped whole when private. Only a
+        // closing line at most three columns deeper than the opening one closes it, as in Markdown: never earlier.
         const char = open[2][0];
         const size = open[2].length;
+        const deepest = columnsOf(open[1]) + 3;
         let end = lineEnd < 0 ? text.length : lineEnd + 1;
         while (end < text.length) {
           const next = text.indexOf('\n', end);
           const body = text.slice(end, next < 0 ? text.length : next);
-          let inner = body;
-          if (depth > 0) {
-            const marks = QUOTE.exec(body)?.[0] ?? '';
-            // A line that leaves the quote ends the quote's fence; it is read again as text
-            if ((marks.match(/>/g) ?? []).length < depth) break;
-            inner = body.slice(marks.length);
-          }
           end = next < 0 ? text.length : next + 1;
-          const close = /^[ \t]*(`{3,}|~{3,})[ \t]*$/.exec(inner);
-          if (close && close[1][0] === char && close[1].length >= size) break;
+          const close = /^([ \t]*)(`{3,}|~{3,})[ \t]*$/.exec(body);
+          if (close && close[2][0] === char && close[2].length >= size && columnsOf(close[1]) <= deepest) break;
         }
         if (!isPrivateFence(open[3])) out += text.slice(index, end);
         index = end;

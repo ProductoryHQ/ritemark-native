@@ -105,16 +105,23 @@ assert.equal(publicMarkdown('a\n\n<!-- one -->\n\nb'), publicMarkdown('a\n\nb'),
 assert.equal(publicMarkdown('Run `npm\n```notes\nsecret notes `\n```\n\nafter'), 'Run `npm\n\nafter');
 assert.equal(publicMarkdown('Run `npm\nmore` and <!-- secret -->'), 'Run `npm\nmore` and');
 assert.equal(publicMarkdown('Prompt:\n\n    write <!-- gone --> here'), 'Prompt:\n\n    write  here');
-// A notes fence in a quote is a notes fence (Codex on #729), at any depth; a fence in a quote ends with its quote.
-assert.equal(publicMarkdown('> Before\n> ```notes\n> secret\n> ```\n> After'), '> Before\n> After');
+// A notes fence in a quote or a list (Codex on #729), as Markdown reads it: the whole quote or list holding it goes,
+// so its notes are in neither the handout nor the digest. Other quotes, lists and prompts stay.
+assert.equal(publicMarkdown('Before\n\n> Quote\n> ```notes\n> secret\n> ```\n> After\n\nAfter the quote'), 'Before\n\nAfter the quote');
 assert.equal(publicMarkdown('> > ```notes\n> > secret\n> > ```\n\nafter'), 'after');
-assert.equal(publicMarkdown('> ```notes\n> secret\n\nOutside the quote'), 'Outside the quote', 'the quote ends, and with it the fence');
-assert.equal(publicMarkdown('> ```\n> a prompt\n> ```'), '> ```\n> a prompt\n> ```', 'a prompt in a quote stays');
-// A notes fence outside a quote isn't closed by a quoted fence line: everything to its own close goes.
+assert.equal(publicMarkdown('- one\n- ```notes\n  secret two\n  ```\n\nafter'), 'after');
+assert.equal(publicMarkdown('1. step\n\n   ```notes\n   secret\n   ```\n\nafter'), '1. step\n\nafter', 'an indented fence goes by itself');
+assert.equal(publicMarkdown('> ```\n> a prompt\n> ```\n\n- a list'), '> ```\n> a prompt\n> ```\n\n- a list', 'a prompt in a quote stays');
+// The round-3 review's cases: a fence is never ended before Markdown ends it, so its first line never goes alone.
+assert.equal(publicMarkdown('> ```notes\n> > ```\n> secret one\n> ```\n\nafter'), 'after');
+assert.equal(publicMarkdown('> ```notes\n>     ```\n> secret three\n> ```\n\nafter'), 'after');
+assert.equal(publicMarkdown('```notes\nsecret\n    ```\nmore secret\n```\n\nafter'), 'after', 'four columns deep closes nothing');
 assert.equal(publicMarkdown('```notes\nsecret\n> ```\nmore secret\n```\n\nafter'), 'after');
 {
   const quoted = (notes: string) => deckDigest(publicDeck(`\`\`\`slide points\ntitle: Q\n\`\`\`\n\nText.\n\n> \`\`\`notes\n> ${notes}\n> \`\`\`\n`, options));
   assert.equal(quoted('first'), quoted('second'), 'notes in a quote are no change');
+  const listed = (notes: string) => deckDigest(publicDeck(`\`\`\`slide points\ntitle: Q\n\`\`\`\n\n- \`\`\`notes\n  ${notes}\n  \`\`\`\n`, options));
+  assert.equal(listed('first'), listed('second'), 'notes in a list are no change');
 }
 
 // The digest: a public edit changes it; notes, a comment, a skipped slide, an id or from line, and the fit don't.
