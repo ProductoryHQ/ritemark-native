@@ -55,11 +55,23 @@ const OVERSCAN = 3
 type RegionKind = 'corner' | 'top' | 'left' | 'body'
 
 let measureContext: CanvasRenderingContext2D | null = null
+/** Text widths, kept while the fonts are the same: scrolling measures the same cells again and again. */
+const measured = new Map<string, number>()
 function measure(text: string, font: string): number {
+  const key = `${font}\u0000${text}`
+  const known = measured.get(key)
+  if (known !== undefined) return known
   if (!measureContext) measureContext = document.createElement('canvas').getContext('2d')
   if (!measureContext) return text.length * 7
   measureContext.font = font
-  return measureContext.measureText(text).width
+  const width = measureContext.measureText(text).width
+  if (measured.size > 50_000) measured.clear()
+  measured.set(key, width)
+  return width
+}
+/** Fonts that finished loading change widths: measure again. */
+function forgetMeasures() {
+  measured.clear()
 }
 
 function horizontalOf(cell: CellModel | undefined, style: CellStyle | undefined): string {
@@ -108,7 +120,10 @@ export function SheetGrid({
   useEffect(() => {
     installOfficeFontAliases()
     installFontFallbacks(styles.families)
-    void document.fonts?.ready.then(() => setFontsReady((n) => n + 1))
+    void document.fonts?.ready.then(() => {
+      forgetMeasures()
+      setFontsReady((n) => n + 1)
+    })
   }, [styles])
 
   // a new sheet: back to its top-left, no sort
@@ -425,7 +440,8 @@ export function SheetGrid({
   }
 
   const onPointerDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return
+    // a click inside the cell being edited moves its caret; it doesn't choose another cell
+    if (e.button !== 0 || e.target === editorRef.current) return
     const pos = posFromPoint(e.clientX, e.clientY)
     if (!pos) return
     if (editing) commit()

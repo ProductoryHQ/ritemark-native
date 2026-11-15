@@ -539,9 +539,10 @@ export function SpreadsheetViewer({
     if (!parsedData) return null
     const rowCount = parsedData.rows.length
     const colCount = parsedData.columns.length
-    const truncated = sizeBytes && rowCount === MAX_DISPLAY_ROWS
+    // the sheet grid draws every row; only the table stops at MAX_DISPLAY_ROWS
+    const truncated = sizeBytes && rowCount === MAX_DISPLAY_ROWS && !source?.model
     return { rowCount, colCount, truncated }
-  }, [parsedData, sizeBytes])
+  }, [parsedData, sizeBytes, source])
 
   // Size warning (checked first: no data is parsed while it's showing)
   if (showSizeWarning) {
