@@ -75,6 +75,16 @@ async function main() {
     assert.equal(red?.color, '#FF0000')
   }
 
+  // A workbook whose <sheet> tags quote r:id with single quotes is still read (Codex on #725)
+  {
+    const zip = await JSZip.loadAsync(fs.readFileSync(path.join(spike, 'training-budget.xlsx')))
+    const wb = await zip.file('xl/workbook.xml')!.async('string')
+    zip.file('xl/workbook.xml', wb.replace(/<sheet [^>]*\/>/g, (m) => m.replace(/"/g, "'")))
+    const model = await readWorkbook(new Uint8Array(await zip.generateAsync({ type: 'uint8array' })))
+    assert.equal(model.sheets[0].kind, 'worksheet')
+    assert.equal(model.sheets[0].cells.get(cellKey(5, 2))?.text.trim(), '1,450.00 €')
+  }
+
   // The project plan: a hidden sheet, a sheet that opens first
   {
     const model = await readWorkbook(new Uint8Array(fs.readFileSync(path.join(spike, 'project-plan.xlsx'))))

@@ -6,15 +6,20 @@
  * order doesn't change). `rowOf[i]` is display row i's sheet row. Columns are in sheet order. Hidden rows and columns
  * are 0 px, as in Excel.
  */
-import { columnPixels, defaultColumnPixels, defaultRowPoints, maxDigitWidth, pointsToPixels } from './columnWidth'
+import { columnScale, defaultRowPoints, pointsToPixels, type ExcelGeometry } from './columnWidth'
+export type { ExcelGeometry }
 import type { CellStyle, FontStyle, WorkbookStyles } from './excelStyles'
 import { cellKey, type SheetModel } from './readWorkbook'
 
 /** Header row height and the frame's look (experience 47, decision 9). */
 export const HEADER_HEIGHT = 22
-/** Cell text inset each side, in pixels: about Excel's at 100 % (the Experience lead, 15 November: 1 px ran
- *  "8:15" into "Müük"). */
-export const CELL_PADDING = 2
+/** Cell text inset each side, in pixels, by the Excel the widths follow (columnWidth.ts). Excel for Mac's: measured
+ *  on the training budget against its window, text starts 0.25–0.9 pt further in than at 2 px (Sprint 158 PR 4).
+ *  Excel for Windows keeps 2: its 64 px default column holds eight Calibri digits only at 2 (review of #725).
+ *  1 px ran "8:15" into "Müük" (the Experience lead, 15 November). */
+export function cellPadding(geometry: ExcelGeometry): number {
+  return geometry === 'mac' ? 3 : 2
+}
 
 export interface SheetLayout {
   /** Drawn rows and columns. */
@@ -50,6 +55,8 @@ export interface LayoutOptions {
   rowOrder?: number[]
   /** Auto-fit heights: rows without a height of their own, that hold wrapped text or a larger font. */
   autoHeight?: (row: number) => number | undefined
+  /** Column widths as Excel for Mac or for Windows lays them out (columnWidth.ts); Windows when not given. */
+  geometry?: ExcelGeometry
 }
 
 /** Which merge a cell is in. Small merges are indexed cell by cell; a large one (a whole sheet merged, A1:XFD1048576,
@@ -113,8 +120,8 @@ export function indexAt(P: Float64Array, n: number, v: number): number {
 
 export function buildLayout(sheet: SheetModel, styles: WorkbookStyles, opts: LayoutOptions): SheetLayout {
   const L = sheet.layout
-  const mdw = maxDigitWidth(styles.baseFont)
-  const defaultColPx = defaultColumnPixels(L.defaultColWidth, L.baseColWidth, mdw)
+  const scale = columnScale(styles.baseFont, opts.geometry ?? 'windows')
+  const defaultColPx = scale.defaultPixels(L.defaultColWidth, L.baseColWidth)
   const defaultRowPx = pointsToPixels(L.defaultRowHeight ?? defaultRowPoints(styles.baseFont))
 
   // drawings reach as far as their end cell
@@ -133,7 +140,7 @@ export function buildLayout(sheet: SheetModel, styles: WorkbookStyles, opts: Lay
   // columns: their widths, then as many as fill the paper
   const widthOf = (c: number): number => {
     if (sheet.hiddenCols.has(c)) return 0
-    for (const col of L.cols) if (c >= col.min && c <= col.max) return col.width !== undefined ? columnPixels(col.width, mdw) : defaultColPx
+    for (const col of L.cols) if (c >= col.min && c <= col.max) return col.width !== undefined ? scale.pixels(col.width) : defaultColPx
     return defaultColPx
   }
   const colWidths: number[] = []
@@ -252,13 +259,26 @@ export function sortRefusal(sheet: SheetModel, columnLetters: (c: number) => str
   return `This sheet has merged cells in the ${name} column, so its rows can't be sorted here. Excel asks for them to be unmerged first too.`
 }
 
+/** Calibri and Cambria, where they aren't installed, drawn by their metric twins: subsets of Carlito and Caladea
+ *  (SIL OFL) in the bundle, renamed as the licence asks (sheetGrid.css). Same advance widths, so a column holds what
+ *  it holds in Excel and #### shows where Excel shows it. Set by the grid (`useFontTwins`); lower-case family to twin. */
+export const GRID_SANS = 'Ritemark Grid Sans'
+export const GRID_SERIF = 'Ritemark Grid Serif'
+const fontTwins = new Map<string, string>()
+
+export function setFontTwins(twins: Iterable<[string, string]>): void {
+  fontTwins.clear()
+  for (const [family, twin] of twins) fontTwins.set(family.toLowerCase(), twin)
+}
+
 /** A font as CSS, on the white paper: its family with fallbacks, size, weight, slant, decoration and colour. */
 export function fontCss(font: Partial<FontStyle> | undefined, base: FontStyle): Record<string, string> {
   const f = { ...base, ...font }
   const family = f.name ?? base.name ?? 'Calibri'
+  const twin = fontTwins.get(family.toLowerCase())
   const decoration = [f.underline ? 'underline' : '', f.strike ? 'line-through' : ''].filter(Boolean).join(' ')
   const css: Record<string, string> = {
-    fontFamily: `'${family.replace(/['"\\]/g, '')}', 'Carlito', Arial, sans-serif`,
+    fontFamily: twin ? `'${twin}', Arial, sans-serif` : `'${family.replace(/['"\\]/g, '')}', 'Carlito', Arial, sans-serif`,
     fontSize: `${((f.size ?? 11) * 4) / 3}px`,
     fontWeight: f.bold ? '700' : '400',
     fontStyle: f.italic ? 'italic' : 'normal',

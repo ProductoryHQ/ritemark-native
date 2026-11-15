@@ -33,6 +33,8 @@ export interface CellModel {
   text: string
   /** A colour the number format asks for ([Red] …). */
   color?: string
+  /** Gaps the number format leaves before and after the text (`_-`): as wide as these characters. */
+  pad?: [string, string]
   /** The cell style's index (`s`). */
   s: number
   /** The formula without its "=", when the cell has one. */
@@ -407,6 +409,7 @@ async function readWorksheet(
         const out = formatCellValue(value, formatCode(model.styles.xfNumFmt[s] ?? 0, model.styles.numFmts), model.date1904)
         cell.text = out.text
         if (out.color) cell.color = out.color
+        if (out.pad) cell.pad = out.pad
       }
       sheet.cells.set(cellKey(r, c), cell)
       if (r > sheet.maxR) sheet.maxR = r
@@ -485,7 +488,8 @@ export async function readWorkbook(bytes: Uint8Array): Promise<WorkbookModel> {
     const name = decodeXmlEntities(attr(m[1], 'name') ?? '')
     const stateAttr = attr(m[1], 'state')
     const state: SheetState = stateAttr === 'hidden' || stateAttr === 'veryHidden' ? stateAttr : 'visible'
-    const rid = /\s[\w.-]+:id\s*=\s*"([^"]*)"/.exec(m[1])?.[1]
+    // r:id in either quote (Codex on #725)
+    const rid = /\s[\w.-]+:id\s*=\s*(["'])(.*?)\1/.exec(m[1])?.[2]
     const rel = rid ? wbRels.get(rid) : undefined
     if (rel?.type === 'worksheet') {
       sheets.push(await readWorksheet(zip, rel.target, name, state, strings, base, ctx))

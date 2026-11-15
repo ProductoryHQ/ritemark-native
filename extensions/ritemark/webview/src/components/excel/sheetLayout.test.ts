@@ -7,9 +7,9 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readWorkbook, cellKey } from './readWorkbook'
-import { buildLayout, fontCss, indexAt, mergeIndex, sortRefusal, sortedRows, styleIndexOf, styleOf } from './sheetLayout'
+import { GRID_SANS, GRID_SERIF, buildLayout, cellPadding, fontCss, fontShorthand, indexAt, mergeIndex, setFontTwins, sortRefusal, sortedRows, styleIndexOf, styleOf } from './sheetLayout'
 import { applyTint, colorOf, readTheme } from './excelStyles'
-import { columnPixels, maxDigitWidth } from './columnWidth'
+import { columnPixels, columnScale, maxDigitWidth } from './columnWidth'
 import { compareCells } from '../sheetSort'
 
 const repo = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../../../..')
@@ -31,6 +31,24 @@ async function main() {
   // padding as 9.140625) is 64 px
   assert.equal(maxDigitWidth({ name: 'Calibri', size: 11 }), 7)
   assert.equal(columnPixels(9.140625, 7), 64)
+  // Excel for Mac counts points with the digit at 72 dpi (6 pt): the training budget's columns as its window shows
+  // them, in points, A 204, B 72, D 84, E 75, K 60 and the default 53 (reference/excel-training-budget.jpg)
+  {
+    const calibri = { name: 'Calibri', size: 11 }
+    const mac = columnScale(calibri, 'mac')
+    const win = columnScale(calibri, 'windows')
+    for (const [chars, points] of [[34, 204], [12, 72], [14, 84], [12.5, 75], [10, 60]]) assert.equal(mac.pixels(chars), Math.round((points * 4) / 3), `${chars} characters`)
+    assert.equal(mac.defaultPixels(undefined, 8), Math.round((53 * 4) / 3))
+    // the timesheet's Normal font is Aptos Narrow: 5.3 pt, rounded up to 6 as Excel for Mac does; A 69, B 33, H 276
+    const narrow = columnScale({ name: 'Aptos Narrow', size: 11 }, 'mac')
+    for (const [chars, points] of [[11.5, 69], [5.5, 33], [46, 276]]) assert.equal(narrow.pixels(chars), Math.round((points * 4) / 3), `${chars} characters`)
+    assert.equal(win.pixels(12.5), 87)
+    // eight Calibri digits (7.43 px each) fit Windows' 64 px default column only with its 2 px inset
+    assert.equal(cellPadding('windows'), 2)
+    assert.ok(8 * 7.43 + 2 * cellPadding('windows') <= 64.5)
+    assert.equal(cellPadding('mac'), 3)
+    assert.equal(win.defaultPixels(undefined, 8), 64)
+  }
 
   // The training budget: frozen at B5, widths from the file, row 14 hidden, A1's title in its own font
   {
@@ -128,6 +146,21 @@ async function main() {
   {
     const model = await open('project-plan.xlsx')
     assert.ok(model.sheets.some((s) => s.layout.tabColor), 'a tab colour')
+  }
+
+  // Calibri and Cambria by their bundled twins where the grid found them missing (PR 4); others keep their own name
+  {
+    const base = { name: 'Calibri', size: 11, bold: false, italic: false, strike: false }
+    assert.match(fontCss(undefined, base).fontFamily, /^'Calibri', 'Carlito'/, 'no twins set: the family itself')
+    setFontTwins([['Calibri', GRID_SANS], ['Cambria', GRID_SERIF]])
+    assert.equal(fontCss(undefined, base).fontFamily, `'${GRID_SANS}', Arial, sans-serif`)
+    assert.equal(fontCss({ name: 'CAMBRIA' }, base).fontFamily, `'${GRID_SERIF}', Arial, sans-serif`)
+    assert.match(fontCss({ name: 'Verdana' }, base).fontFamily, /^'Verdana'/)
+    assert.equal(fontShorthand({ bold: true }, base), `normal 700 ${44 / 3}px '${GRID_SANS}', Arial, sans-serif`)
+    setFontTwins([])
+    // Cambria's widest digit is Caladea's: 11 pt is 8 px, 12 pt is 8 px (0.55 made it 9)
+    assert.equal(maxDigitWidth({ name: 'Cambria', size: 11 }), 8)
+    assert.equal(maxDigitWidth({ name: 'Cambria', size: 12 }), 8)
   }
 
   console.log('sheetLayout: all passed')

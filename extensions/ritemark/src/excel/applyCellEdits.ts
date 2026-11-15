@@ -158,8 +158,8 @@ export async function indexWorkbook(bytes: Uint8Array): Promise<WorkbookIndex> {
   const wp = rootPrefix(workbookXml, 'workbook');
   for (const m of workbookXml.matchAll(new RegExp(`<${wp}sheet(?=[\\s/>])([^>]*?)\\/?>`, 'g'))) {
     const rawName = attr(m[1], 'name');
-    // the relationship id is r:id, whatever prefix the relationships namespace has here
-    const rid = /\s[\w.-]+:id\s*=\s*"([^"]*)"/.exec(m[1])?.[1];
+    // the relationship id is r:id, whatever prefix the relationships namespace has here, in either quote (Codex on #725)
+    const rid = /\s[\w.-]+:id\s*=\s*(["'])(.*?)\1/.exec(m[1])?.[2];
     if (rawName === undefined || !rid) continue;
     const name = decodeXmlEntities(rawName);
     const rel = byId.get(rid);
@@ -321,7 +321,7 @@ function unshareFormula(xml: string, p: string, anchor: CellPosition, si: string
     const at = ref ? parseCellRef(ref) : null;
     if (!at) throw new FormulaShiftError('A shared formula cell has no position');
     const moved = shiftFormula(formula, at.r - anchor.r, at.c - anchor.c);
-    const keep = fa.replace(/\s+(?:t|si|ref)\s*=\s*"[^"]*"/g, '');
+    const keep = stripSharing(fa);
     pieces.push(xml.slice(last, m.index), `<${p}f${keep}>${escapeXml(moved)}</${p}f>`);
     last = m.index + m[0].length;
   }
@@ -432,7 +432,7 @@ export async function applyCellEdits(
                 // the anchor keeps its formula as its own
                 const found = findSharedAnchor(xml, p, si);
                 if (found) {
-                  const own = found.tag.replace(/\s+(?:t|si|ref)\s*=\s*"[^"]*"/g, '');
+                  const own = stripSharing(found.tag);
                   xml = xml.slice(0, found.tagStart) + own + xml.slice(found.tagStart + found.tag.length);
                 }
               }
@@ -481,11 +481,33 @@ export async function applyCellEdits(
   return { bytes, report };
 }
 
-/** Well-formed XML: every element closed in order, quotes and comments closed. */
+/** A formula's attributes without the ones that share it (t, si, ref), in either quote style (Codex on #725). */
+function stripSharing(attrs: string): string {
+  return attrs.replace(/\s+(?:t|si|ref)\s*=\s*(?:"[^"]*"|'[^']*')/g, '');
+}
+
+/** Well-formed XML: every element closed in order, quotes and comments closed. One regular expression per tag
+ *  (Sprint 158 PR 4: a loop over every character took a third of a large sheet's save). */
 export function isWellFormedXml(xml: string): boolean {
   const stack: string[] = [];
+  // a tag: its slash, its name, its attributes (quoted values may hold > and /), its closing slash
+  const tagRe = /<(\/?)([^\s/>!?<]+)(?:[^>"'<]|"[^"]*"|'[^']*')*?(\/?)>/y;
   let i = xml.indexOf('<');
   while (i >= 0) {
+    // most tags are elements: look at the character after < before anything else
+    const next = xml.charCodeAt(i + 1);
+    if (next !== 63 /* ? */ && next !== 33 /* ! */) {
+      tagRe.lastIndex = i;
+      const m = tagRe.exec(xml);
+      if (!m) return false;
+      if (m[1]) {
+        if (m[3] || stack.pop() !== m[2]) return false;
+      } else if (!m[3]) {
+        stack.push(m[2]);
+      }
+      i = xml.indexOf('<', i + m[0].length);
+      continue;
+    }
     if (xml.startsWith('<?', i)) {
       const end = xml.indexOf('?>', i + 2);
       if (end < 0) return false;
@@ -504,34 +526,10 @@ export function isWellFormedXml(xml: string): boolean {
       i = xml.indexOf('<', end + 3);
       continue;
     }
-    if (xml.startsWith('<!', i)) {
-      const end = xml.indexOf('>', i + 2);
-      if (end < 0) return false;
-      i = xml.indexOf('<', end + 1);
-      continue;
-    }
-    const closing = xml[i + 1] === '/';
-    let k = i + (closing ? 2 : 1);
-    const nameStart = k;
-    while (k < xml.length && !/[\s/>]/.test(xml[k])) k++;
-    const name = xml.slice(nameStart, k);
-    if (!name) return false;
-    let quote = '';
-    for (; k < xml.length; k++) {
-      const ch = xml[k];
-      if (quote) {
-        if (ch === quote) quote = '';
-      } else if (ch === '"' || ch === "'") quote = ch;
-      else if (ch === '<') return false;
-      else if (ch === '>') break;
-    }
-    if (k >= xml.length) return false;
-    if (closing) {
-      if (stack.pop() !== name) return false;
-    } else if (xml[k - 1] !== '/') {
-      stack.push(name);
-    }
-    i = xml.indexOf('<', k + 1);
+    // <!DOCTYPE …> and the like
+    const end = xml.indexOf('>', i + 2);
+    if (end < 0) return false;
+    i = xml.indexOf('<', end + 1);
   }
   return stack.length === 0;
 }

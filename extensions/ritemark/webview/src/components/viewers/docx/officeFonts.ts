@@ -69,11 +69,20 @@ export function isFontInstalled(family: string): boolean {
 }
 
 const STYLE_ID = 'ritemark-office-font-aliases';
+let missingOffice: ReadonlySet<string> | undefined;
+
+/** Whether an Office family was missing when the aliases went in (lower case). Once aliased, the family measures as
+ *  installed, so `isFontInstalled` can no longer tell. */
+export function isOfficeFontMissing(family: string): boolean {
+  installOfficeFontAliases();
+  return missingOffice?.has(family.toLowerCase()) ?? false;
+}
 
 /** Add the aliases for missing Office fonts to the page, once. Call before rendering a document. */
 export function installOfficeFontAliases(): void {
   if (document.getElementById(STYLE_ID)) return;
   const missing = OFFICE_FONT_ALIASES.filter((alias) => !isFontInstalled(alias.family));
+  missingOffice = new Set(missing.map((alias) => alias.family.toLowerCase()));
   const style = document.createElement('style');
   style.id = STYLE_ID;
   style.textContent = aliasCss(missing);

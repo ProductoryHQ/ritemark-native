@@ -16,10 +16,11 @@ import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { writeClipboard, readClipboard } from '../../lib/clipboard'
 import { compareCells } from '../sheetSort'
-import { installFontFallbacks, installOfficeFontAliases } from '../viewers/docx/officeFonts'
+import { installFontFallbacks, installOfficeFontAliases, isOfficeFontMissing } from '../viewers/docx/officeFonts'
 import { cellKey, type CellModel, type SheetModel, type WorkbookModel } from './readWorkbook'
-import { CELL_PADDING, buildLayout, fontCss, fontShorthand, indexAt, mergeIndex, sortRefusal, sortedRows, styleIndexOf, styleOf, type SheetLayout } from './sheetLayout'
-import { columnPixels, defaultColumnPixels, maxDigitWidth } from './columnWidth'
+import { GRID_SANS, cellPadding, GRID_SERIF, buildLayout, fontCss, fontShorthand, indexAt, mergeIndex, setFontTwins, sortRefusal, sortedRows, styleIndexOf, styleOf, type SheetLayout } from './sheetLayout'
+import { columnScale, type ExcelGeometry } from './columnWidth'
+import { isMac } from '../../hooks/usePlatform'
 import type { CellStyle } from './excelStyles'
 import './sheetGrid.css'
 
@@ -56,6 +57,10 @@ const OVERSCAN = 3
 type RegionKind = 'corner' | 'top' | 'left' | 'body'
 
 let measureContext: CanvasRenderingContext2D | null = null
+/** Column widths and the cell inset as the Excel on this computer lays them out (columnWidth.ts). */
+const GEOMETRY: ExcelGeometry = isMac ? 'mac' : 'windows'
+const CELL_PADDING = cellPadding(GEOMETRY)
+
 /** Text widths, kept while the fonts are the same: scrolling measures the same cells again and again. */
 const measured = new Map<string, number>()
 function measure(text: string, font: string): number {
@@ -125,14 +130,23 @@ export function SheetGrid({
   }, [])
   const [fontsReady, setFontsReady] = useState(0)
 
-  // Office fonts: Calibri and friends by their metric twins, others by Arial (officeFonts.ts)
+  // Office fonts: Calibri and Cambria, where missing, by their bundled metric twins; Aptos and the rest by the
+  // Office aliases (officeFonts.ts); a family installed nowhere by Arial
   useEffect(() => {
     installOfficeFontAliases()
     installFontFallbacks(styles.families)
-    void document.fonts?.ready.then(() => {
-      forgetMeasures()
-      setFontsReady((n) => n + 1)
-    })
+    const twins: Array<[string, string]> = []
+    if (isOfficeFontMissing('Calibri')) twins.push(['Calibri', GRID_SANS])
+    if (isOfficeFontMissing('Cambria')) twins.push(['Cambria', GRID_SERIF])
+    setFontTwins(twins)
+    // a face loads when text first asks for it, after this effect: load the twins' faces now, then measure again
+    const faces = twins.flatMap(([, twin]) => ['', 'bold ', 'italic ', 'italic bold '].map((face) => `${face}16px '${twin}'`))
+    void Promise.all(faces.map((face) => document.fonts?.load(face).catch(() => [])))
+      .then(() => document.fonts?.ready)
+      .then(() => {
+        forgetMeasures()
+        setFontsReady((n) => n + 1)
+      })
   }, [styles])
 
   const setSort = useCallback((next: { col: number; dir: 1 | -1 } | null) => {
@@ -183,12 +197,12 @@ export function SheetGrid({
       candidates.set(r, list)
     }
     // the layout's own widths: by the Normal font's widest digit and the sheet's default
-    const mdw = maxDigitWidth(base)
-    const defaultPx = defaultColumnPixels(sheet.layout.defaultColWidth, sheet.layout.baseColWidth, mdw)
+    const scale = columnScale(base, GEOMETRY)
+    const defaultPx = scale.defaultPixels(sheet.layout.defaultColWidth, sheet.layout.baseColWidth)
     const colPx = (c: number) => {
       if (sheet.hiddenCols.has(c)) return 0
       const col = sheet.layout.cols.find((d) => c >= d.min && c <= d.max)
-      return col?.width !== undefined ? columnPixels(col.width, mdw) : defaultPx
+      return col?.width !== undefined ? scale.pixels(col.width) : defaultPx
     }
     return (r: number) => {
       const cols = candidates.get(r)
@@ -236,6 +250,7 @@ export function SheetGrid({
         extraCols,
         rowOrder: sort?.rows,
         autoHeight,
+        geometry: GEOMETRY,
       }),
     // the grid grows by whole screens, so a resize by a few pixels doesn't lay the sheet out again
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -306,7 +321,8 @@ export function SheetGrid({
         if (a && (a.wrap || a.rotation || a.shrink)) continue
         const h = horizontalOf(cell, style)
         if (h === 'justify') continue
-        const width = measure(cell.text, fontShorthand(style?.font, base)) + 2 * CELL_PADDING + (a?.indent ?? 0) * 9
+        const shown = cell.pad ? cell.pad[0] + cell.text + cell.pad[1] : cell.text
+        const width = measure(shown, fontShorthand(style?.font, base)) + 2 * CELL_PADDING + (a?.indent ?? 0) * 9
         const avail = layout.colW[c]
         if (width <= avail + 0.5) continue
         if (cell.kind !== 's') {
@@ -372,6 +388,32 @@ export function SheetGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout])
 
+  // A sideways scroll settles with a whole column at the frozen line: a cell cut partway reads as another number
+  // ("20.00 €" for 5,220.00 €; the Experience lead, 15 November). Vertical scrolling stays smooth: a cut row doesn't
+  // change what a number says. The scroll offset that puts column c at the frozen line is X[c] - FW.
+  const columnEdge = useCallback((x: number, toward: 'nearest' | 'up') => {
+    if (x <= 0) return 0
+    const c = Math.max(fc, indexAt(X, layout.cols, x + FW))
+    const lo = X[c] - FW
+    const hi = c + 1 <= layout.cols ? X[c + 1] - FW : lo
+    if (toward === 'up') return x <= lo + 0.5 ? lo : hi
+    return x - lo <= hi - x ? lo : hi
+  }, [X, FW, fc, layout.cols])
+
+  useEffect(() => {
+    const el = scroller.current
+    if (!el) return
+    const settle = () => {
+      const max = el.scrollWidth - el.clientWidth
+      const x = el.scrollLeft
+      if (x <= 0 || x >= max - 1) return
+      const edge = Math.min(columnEdge(x, 'nearest'), max)
+      if (Math.abs(edge - x) > 0.5) el.scrollTo({ left: edge, behavior: 'smooth' })
+    }
+    el.addEventListener('scrollend', settle)
+    return () => el.removeEventListener('scrollend', settle)
+  }, [columnEdge])
+
   // keep the chosen cell in view, beside the frozen panes
   useEffect(() => {
     const el = scroller.current
@@ -381,7 +423,8 @@ export function SheetGrid({
     const top = r.y - HH
     if (selected.c >= fc) {
       if (left - FW < el.scrollLeft) el.scrollLeft = left - FW
-      else if (r.x + r.w > el.scrollLeft + el.clientWidth) el.scrollLeft = r.x + r.w - el.clientWidth
+      // far enough for the whole cell, to the next column edge, so the settle above has nothing to move
+      else if (r.x + r.w > el.scrollLeft + el.clientWidth) el.scrollLeft = columnEdge(r.x + r.w - el.clientWidth, 'up')
     }
     if (selected.i >= fr) {
       if (top - FH < el.scrollTop) el.scrollTop = top - FH
@@ -600,7 +643,11 @@ export function SheetGrid({
     if (layout.headerH) out.push(...headers(kind, place))
     if (kind === regionOfPos(selected)) {
       const R = cellRect(selected)
-      out.push(<div key="sel" className="sg-selection" style={place(R.x - 1, R.y - 1, R.w + 1, R.h + 1)} />)
+      // the ring reaches 1 px outside its cell; where the cell meets the region's edge (B5 beside the frozen line,
+      // a first row under the headers) the region would clip that side, so the ring steps inside there
+      const x0 = Math.max(R.x - 1, o.x + 1)
+      const y0 = Math.max(R.y - 1, o.y + 1)
+      out.push(<div key="sel" className="sg-selection" style={place(x0, y0, R.x + R.w - x0, R.y + R.h - y0)} />)
     }
     if (editing && kind === regionOfPos(editing.pos)) out.push(editor(editing.pos, place))
     if (fr && (kind === 'corner' || kind === 'top')) out.push(<div key="fh" className="sg-freeze-h" />)
@@ -638,6 +685,14 @@ export function SheetGrid({
               {run.text}
             </span>
           ))}
+        </span>
+      )
+    } else if (cell.pad) {
+      inner = (
+        <span>
+          <span className="sg-pad">{cell.pad[0]}</span>
+          {cell.text}
+          <span className="sg-pad">{cell.pad[1]}</span>
         </span>
       )
     } else inner = <span>{cell.text}</span>

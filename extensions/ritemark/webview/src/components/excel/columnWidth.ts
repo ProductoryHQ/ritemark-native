@@ -6,9 +6,11 @@
  */
 import type { FontStyle } from './excelStyles'
 
-/** The widest digit, in pixels at 96 dpi, of an Office font at its size: known values, others scaled from Calibri. */
-export function maxDigitWidth(font: Pick<FontStyle, 'name' | 'size'>): number {
-  const px = (font.size * 4) / 3
+/** The widest digit, in pixels at 96 dpi, of an Office font at its size: known values, others scaled from Calibri.
+ *  Excel for Mac (`mac`) measures it in points and rounds it up: Calibri 11 (5.6 pt) and Aptos Narrow 11 (5.3 pt)
+ *  are both 6 there, as the budget's and the timesheet's columns show. */
+export function maxDigitWidth(font: Pick<FontStyle, 'name' | 'size'>, mac = false): number {
+  const px = mac ? font.size : (font.size * 4) / 3
   const ratio: Record<string, number> = {
     calibri: 0.507,
     carlito: 0.507,
@@ -16,11 +18,48 @@ export function maxDigitWidth(font: Pick<FontStyle, 'name' | 'size'>): number {
     aptos: 0.55,
     arial: 0.556,
     liberation: 0.556,
-    cambria: 0.55,
-    caladea: 0.55,
+    // Caladea, Cambria's metric twin: its digits are 517 of 1,000 units (Sprint 158 PR 4)
+    cambria: 0.517,
+    caladea: 0.517,
     'times new roman': 0.5,
   }
-  return Math.max(5, Math.round(px * (ratio[String(font.name ?? '').toLowerCase()] ?? 0.507)))
+  const digit = px * (ratio[String(font.name ?? '').toLowerCase()] ?? 0.507)
+  return mac ? Math.max(4, Math.ceil(digit - 1e-9)) : Math.max(5, Math.round(digit))
+}
+
+/**
+ * Which Excel the widths follow (Sprint 158 PR 4). Excel for Windows counts a column in pixels at 96 dpi, with the
+ * widest digit there (Calibri 11: 7 px; a 12.5-character column is 87 px). Excel for Mac counts it in points, with the
+ * widest digit in points rounded up (Calibri 11: 6 pt; the same column is 75 pt, 100 px), and pads no default column to a
+ * multiple of 8. So a file's columns are about 14% wider on a Mac, and a total that fits there shows #### on Windows.
+ * Checked against Excel for Mac's own window: the training budget's columns A, B, D, E, K and its default, and the
+ * timesheet's (Aptos Narrow) A, B, G and H, within a point.
+ * The grid follows the Excel of the computer it runs on.
+ */
+export type ExcelGeometry = 'mac' | 'windows'
+
+export interface ColumnScale {
+  /** A stored width (characters) in pixels. */
+  pixels(width: number): number
+  /** A column with no width of its own: `defaultColWidth`, else `baseColWidth` (8) and padding. */
+  defaultPixels(defaultColWidth: number | undefined, baseColWidth: number | undefined): number
+}
+
+export function columnScale(font: Pick<FontStyle, 'name' | 'size'>, geometry: ExcelGeometry): ColumnScale {
+  if (geometry === 'mac') {
+    const mdw = maxDigitWidth(font, true)
+    const px = (points: number) => Math.round((points * 4) / 3)
+    return {
+      pixels: (width) => px(columnPixels(width, mdw)),
+      defaultPixels: (defaultColWidth, baseColWidth) =>
+        px(defaultColWidth !== undefined ? columnPixels(defaultColWidth, mdw) : (baseColWidth ?? 8) * mdw + 5),
+    }
+  }
+  const mdw = maxDigitWidth(font)
+  return {
+    pixels: (width) => columnPixels(width, mdw),
+    defaultPixels: (defaultColWidth, baseColWidth) => defaultColumnPixels(defaultColWidth, baseColWidth, mdw),
+  }
 }
 
 /** A stored column width (characters) in pixels. */
