@@ -93,11 +93,13 @@ interface ThumbnailProps {
   actions: StripActions
   dragging: boolean
   onDragStart: (index: number, event: ReactPointerEvent<HTMLDivElement>) => void
+  /** The menu, open or closed; the strip opens it from the keyboard too. */
+  menuOpen: boolean
+  onMenuOpen: (index: number | null) => void
 }
 
 /** One numbered thumbnail, with its menu. */
-const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart }: ThumbnailProps) {
-  const [menuOpen, setMenuOpen] = useState(false)
+const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart, menuOpen, onMenuOpen }: ThumbnailProps) {
   const { index, kind, data } = entry
   const skipped = data.skip === true
   return (
@@ -111,7 +113,7 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
       onClick={() => actions.pick(index)}
       onContextMenu={event => {
         event.preventDefault()
-        setMenuOpen(true)
+        onMenuOpen(entry.index)
       }}
     >
       <span className="deck-thumb-no">{index + 1}</span>
@@ -120,7 +122,7 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
       </div>
       {skipped ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}
       <div className="deck-thumb-more" onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
-        <DropdownMenu modal={false} open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenu modal={false} open={menuOpen} onOpenChange={open => onMenuOpen(open ? entry.index : null)}>
           <MoreActionsTrigger label={`Slide ${index + 1}: more actions`} />
           <DropdownMenuContent align="start" side="right">
             <DropdownMenuItem onSelect={() => actions.duplicate(index)}>
@@ -156,6 +158,7 @@ interface SlideStripProps {
 export function SlideStrip({ slides, current, theme, borderless, assets, actions, stripRef }: SlideStripProps) {
   const count = slides.length
   const [drag, setDrag] = useState<{ from: number; to: number | null } | null>(null)
+  const [menuFor, setMenuFor] = useState<number | null>(null)
   const suppressClick = useRef(false)
 
   /** The gap nearest the pointer: before the thumbnail whose middle is below it. */
@@ -234,6 +237,8 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
     if (count === 0 || event.target !== event.currentTarget) return
     if (event.key === 'Home') { event.preventDefault(); actions.pick(0); return }
     if (event.key === 'End') { event.preventDefault(); actions.pick(count - 1); return }
+    // The current slide's menu, as a right-click opens it: Shift+F10 or the menu key.
+    if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) { event.preventDefault(); setMenuFor(current); return }
     const step = event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 0
     if (step === 0) return
     event.preventDefault()
@@ -264,6 +269,8 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
             actions={pickUnlessDragged}
             dragging={drag?.from === entry.index}
             onDragStart={onDragStart}
+            menuOpen={menuFor === entry.index}
+            onMenuOpen={setMenuFor}
           />
         </div>
       ))}

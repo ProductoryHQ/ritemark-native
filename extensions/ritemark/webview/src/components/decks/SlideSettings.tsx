@@ -53,7 +53,8 @@ interface SlideSettingsProps {
   kind: string
   data: SlideData
   onKind: (kind: string) => void
-  onChange: (data: SlideData) => void
+  /** The settings changed, as a patch on the slide's data (an undefined value takes the line out). */
+  onChange: (patch: Partial<SlideData>) => void
   onClose: () => void
   style?: React.CSSProperties
 }
@@ -86,7 +87,7 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, s
             aria-label="Look of the boxes"
             className="w-full [&>label]:flex-1 [&>label>span]:w-full [&>label>span]:text-center"
             value={data.look || 'boxes'}
-            onValueChange={look => onChange({ ...data, look: look === 'boxes' ? undefined : look })}
+            onValueChange={look => onChange({ look: look === 'boxes' ? undefined : look })}
             options={LOOKS}
           />
         </>
@@ -99,7 +100,7 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, s
             variant="picture"
             className="deck-settings-pics"
             value={data.picture || 'none'}
-            onValueChange={picture => onChange({ ...data, picture: picture === 'none' ? undefined : picture })}
+            onValueChange={picture => onChange({ picture: picture === 'none' ? undefined : picture })}
             options={PICTURES}
           />
         </>
@@ -107,7 +108,7 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, s
       <div className="deck-settings-sep" />
       <div className="deck-settings-row">
         <Label htmlFor={skipId}>Skip slide</Label>
-        <Switch id={skipId} checked={data.skip === true} onCheckedChange={skip => onChange({ ...data, skip: skip || undefined })} />
+        <Switch id={skipId} checked={data.skip === true} onCheckedChange={skip => onChange({ skip: skip || undefined })} />
       </div>
     </section>
   )

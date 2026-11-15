@@ -3,7 +3,7 @@
  * document: its slide nodes, in order. A part is a slide node and the blocks after it up to the next slide node;
  * blocks before the first slide are the preamble, kept as written.
  */
-import type { Node as PMNode } from '@tiptap/pm/model'
+import type { Fragment, Node as PMNode } from '@tiptap/pm/model'
 import type { EditorState, Transaction } from '@tiptap/pm/state'
 import { newId, parseSlideBody, writeSlideBody, type SlideData } from '../../../../src/decks/deckFormat'
 
@@ -131,6 +131,17 @@ export function deleteSlide(state: EditorState, index: number): Transaction | nu
   const range = partRange(state.doc, index)
   if (!range) return null
   return operation(state.tr.delete(range.from, range.to))
+}
+
+/** The content of part `index` (its slide and handout), to put back later with `restoreSlide`. */
+export function partContent(doc: PMNode, index: number): Fragment | null {
+  const range = partRange(doc, index)
+  return range ? doc.slice(range.from, range.to).content : null
+}
+
+/** Put a deleted part back before part `at` (the delete's own Undo: whatever was done since stays). */
+export function restoreSlide(state: EditorState, at: number, content: Fragment): Transaction {
+  return operation(state.tr.insert(insertPoint(state.doc, at), content))
 }
 
 /** A new empty slide of `kind` before part `at` (at the end when `at` is the count); returns where it went. */

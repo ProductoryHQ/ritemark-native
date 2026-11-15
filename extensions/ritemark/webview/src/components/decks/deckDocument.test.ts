@@ -9,7 +9,7 @@ import { createEditorSchemaExtensions } from '../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../utils/markdownFidelity'
 import { DeckSlide } from './handout/deckSchema'
 import { removesSlides } from './handout/deckGuard'
-import { DECK_OPERATION, deleteSlide, duplicateSlide, insertSlide, moveSlide, partIndexAt, partRange, slidesOf, updateSlide } from './deckDocument'
+import { DECK_OPERATION, deleteSlide, duplicateSlide, insertSlide, moveSlide, partContent, partIndexAt, partRange, restoreSlide, slidesOf, updateSlide } from './deckDocument'
 import { convertKind, hiddenNote } from './slide/convertKind'
 
 installTestDocument()
@@ -57,6 +57,11 @@ assert.equal(partIndexAt(doc, slidesOf(doc)[1].pos + 3), 1)
 {
   const tr = deleteSlide(state, 1)!
   assert.deepEqual(order(tr.doc), ['Preamble', '[A]', 'a text', '[C]', 'c text'])
+  // The delete's Undo puts the part itself back, after a later change too.
+  const content = partContent(doc, 1)!
+  const later = EditorState.create({ doc: tr.doc }).tr.insertText('!', slidesOf(tr.doc)[0].pos + slidesOf(tr.doc)[0].node.nodeSize + 1)
+  const back = restoreSlide(EditorState.create({ doc: later.doc }), 1, content)
+  assert.deepEqual(order(back.doc), ['Preamble', '[A]', '!a text', '[B]', 'b text', 'b more', '[C]', 'c text'])
   const one = EditorState.create({ doc: schema.nodes.doc.create(null, [slide('aaaa', 'A')]) })
   assert.equal(deleteSlide(one, 0), null)
 }

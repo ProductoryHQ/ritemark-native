@@ -26,7 +26,8 @@ import type { DocumentProperties } from '../properties'
 import { SegmentedControl } from '../ui/segmented-control'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
-import { deleteSlide, duplicateSlide, insertSlide, moveSlide, partIndexAt, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
+import { deleteSlide, duplicateSlide, insertSlide, moveSlide, partContent, partIndexAt, restoreSlide, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
+import type { Fragment, Slice } from '@tiptap/pm/model'
 import { onMessage, sendToExtension } from '../../bridge'
 import { isTrustedDeckTransaction } from './handout/deckGuard'
 import { convertKind } from './slide/convertKind'
@@ -116,7 +117,7 @@ export function DeckView({
   const [notesOpen, setNotesOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsAt, setSettingsAt] = useState<{ left: number; top: number } | null>(null)
-  const [notice, setNotice] = useState<{ text: string; undo?: boolean } | null>(null)
+  const [notice, setNotice] = useState<{ text: string; restore?: { at: number; content: Fragment } } | null>(null)
   const [focusTitleOf, setFocusTitleOf] = useState<number | null>(null)
   const lineHintShown = useRef(false)
   const [ratio, setRatio] = useState(DEFAULT_RATIO)
@@ -348,8 +349,10 @@ export function DeckView({
       if (entry) dispatch(updateSlide(editor.state, index, { ...entry.data, skip: entry.data.skip ? undefined : true }))
     },
     remove: index => {
-      if (!editor || !dispatch(deleteSlide(editor.state, index))) return
-      setNotice({ text: `Slide ${index + 1} is deleted`, undo: true })
+      if (!editor) return
+      const content = partContent(editor.state.doc, index)
+      if (!content || !dispatch(deleteSlide(editor.state, index))) return
+      setNotice({ text: `Slide ${index + 1} is deleted`, restore: { at: index, content } })
       const left = slidesOf(editor.state.doc).length
       requestAnimationFrame(() => pick(Math.min(index, left - 1)))
     },
@@ -370,12 +373,16 @@ export function DeckView({
     if (!editor) return
     const onTransaction = ({ transaction }: { transaction: Transaction }) => {
       if (lineHintShown.current || !transaction.docChanged || isTrustedDeckTransaction(transaction)) return
-      const count = (doc: typeof transaction.doc) => {
-        let lines = 0
-        doc.descendants(node => { if (node.type.name === 'horizontalRule') lines++; return node.isBlock && !node.isTextblock })
-        return lines
-      }
-      if (count(transaction.doc) > count(transaction.before)) {
+      // Only what the steps put in is looked at, not the whole deck.
+      const addsLine = transaction.steps.some(step => {
+        let found = false
+        ;(step as { slice?: Slice }).slice?.content.descendants(node => {
+          if (node.type.name === 'horizontalRule') found = true
+          return !found
+        })
+        return found
+      })
+      if (addsLine) {
         lineHintShown.current = true
         setNotice({ text: LINE_HINT })
       }
@@ -405,8 +412,11 @@ export function DeckView({
     })
   }, [settingsOpen, deskWidth, stageWidth, shown])
 
-  const changeSlide = useCallback((data: SlideData, kind?: string) => {
-    if (editor) dispatch(updateSlide(editor.state, shown, data, kind))
+  /** Settings' change, made to the slide as the document has it now. */
+  const changeSlide = useCallback((change: (data: SlideData) => SlideData, kind?: string) => {
+    if (!editor) return
+    const entry = slidesOf(editor.state.doc)[shown]
+    if (entry) dispatch(updateSlide(editor.state, shown, change(entry.data), kind))
   }, [editor, dispatch, shown])
 
   // A picture pasted or dropped on a slide: saved beside the deck by the host, then the slide shows it. A slide that
@@ -464,13 +474,18 @@ export function DeckView({
           {notice ? (
             <>
               <span className="deck-notice-text">{notice.text}</span>
-              {notice.undo ? (
+              {notice.restore ? (
                 <Tooltip label="Put the slide back">
                   <Button
                     variant="link"
                     className="deck-line-action"
                     onClick={() => {
-                      editor?.commands.undo()
+                      // The deleted part itself goes back where it was; what was done since stays.
+                      const restore = notice.restore
+                      if (editor && restore) {
+                        dispatch(restoreSlide(editor.state, restore.at, restore.content))
+                        requestAnimationFrame(() => pick(restore.at))
+                      }
                       setNotice(null)
                     }}
                   >
@@ -570,8 +585,8 @@ export function DeckView({
             kind={slide.kind}
             data={slide.data}
             style={{ left: settingsAt.left, top: settingsAt.top }}
-            onKind={kind => changeSlide(convertKind(slide.data, kind), kind)}
-            onChange={data => changeSlide(data)}
+            onKind={kind => changeSlide(data => convertKind(data, kind), kind)}
+            onChange={patch => changeSlide(data => ({ ...data, ...patch }))}
             onClose={() => setSettingsOpen(false)}
           />
         ) : null}
