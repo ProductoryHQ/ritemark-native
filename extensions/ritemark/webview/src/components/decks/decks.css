@@ -49,12 +49,17 @@
 .deck-handout .wysiwyg-editor .ProseMirror {
   counter-reset: deck-slide;
   max-width: none !important;
-  /* The prototype's 20 on the left, with room for the block handle; 22 on the right; room below to scroll the last part to the top */
-  padding: 6px 22px 60vh 28px !important;
+  /* On the left, room for the editor's + inside the handout, so it never sits over the slide's side (Jarmo,
+     15 November); 22 on the right; room below to scroll the last part to the top */
+  padding: 6px 22px 60vh 34px !important;
   font-size: 14.5px !important;
   line-height: 1.65 !important;
   color: var(--r-ink-body);
 }
+/* No block dragging in the handout (Jarmo, 15 November): a block dragged there could land in another slide's part.
+   The handle stays in the page, hidden and out of the pointer's way, because the editor places the + by it; moved
+   right by the +'s own offset, so the + sits where the handle was, just left of the text. */
+.deck-handout .drag-handle { margin-left: 28px; visibility: hidden !important; pointer-events: none !important; }
 .deck-handout .wysiwyg-editor .ProseMirror p { margin: 0 0 10px !important; font-size: 14.5px !important; line-height: 1.65 !important; }
 .deck-handout .wysiwyg-editor .ProseMirror li p { margin: 0 !important; }
 .deck-handout .wysiwyg-editor .ProseMirror h1 { font-size: 20px !important; margin: 16px 0 6px !important; }
@@ -88,6 +93,18 @@
 .deck-part-number::after { content: counter(deck-slide); }
 .deck-part-head.is-current .deck-part-number { color: var(--r-accent); }
 .deck-part-head.is-skip .deck-part-title { color: var(--r-ink-muted); }
+
+/* A section slide's part is a chapter: a grey band with "Section N" over its title (the Experience lead's decision 12,
+   the prototype's `.hpart.sect`). The band is drawn behind the part by the deck view (.deck-part-band), 12 pixels into
+   both gutters, so the title keeps the column's left edge. */
+.deck-part-eyebrow { display: none; }
+.deck-part-head.is-section { border-top: 0; margin-top: 10px; padding-top: 12px; }
+.deck-part-head.is-section .deck-part-eyebrow { display: block; margin: 2px 40px 4px 0; font-family: var(--ritemark-ui-font-family); font-size: 11px; font-weight: 700; line-height: 14px; letter-spacing: .06em; text-transform: uppercase; color: var(--r-ink-muted); user-select: none; }
+.deck-part-head.is-section .deck-part-number { top: 14px; }
+.deck-part-head.is-section .deck-part-title { font-size: 21px; font-weight: 700; line-height: 1.35; }
+.deck-part-head.after-section { border-top: 0; margin-top: 14px; } /* 8 of the band's padding and 6 below it */
+.deck-part-band { position: absolute; border-radius: 8px; background: var(--r-surface-soft); pointer-events: none; z-index: 0; }
+.deck-handout .wysiwyg-editor .ProseMirror { position: relative; z-index: 1; }
 
 /* the current part's line on the left, from its head to the next part's */
 .deck-part-bar { position: absolute; width: 2px; border-radius: 1px; background: var(--r-accent-soft); pointer-events: none; }
@@ -208,7 +225,13 @@
 .deck-gap:hover .deck-gap-plus, .deck-gap .deck-gap-plus:focus-visible, .deck-gap .deck-gap-plus[data-state="open"] { opacity: 1; }
 .deck-gap.is-drop::after { content: ''; position: absolute; left: 28px; right: 12px; top: -1px; height: 2px; border-radius: 1px; background: var(--r-accent); }
 .deck-thumb.is-dragging { opacity: .5; }
-.deck-thumb .deck-thumb-more { position: absolute; left: 82px; top: 6px; display: none; }
+/* The lifted copy that follows the pointer while a thumbnail is dragged (the prototype's .dragghost). */
+.deck-drag-ghost { position: fixed; z-index: 60; width: 120px; height: 67.5px; border-radius: 5px; overflow: hidden; pointer-events: none; transform: rotate(-3deg); box-shadow: 0 14px 28px -8px rgba(30, 27, 75, 0.5), 0 0 0 2px var(--r-accent); }
+.deck-drag-ghost .deck-thumb-slide { position: relative; width: 96px; height: 54px; overflow: hidden; transform-origin: 0 0; }
+.deck-thumb .deck-thumb-more { position: absolute; right: 12px; top: 6px; display: none; }
+/* The prototype's ⋯: 20 pixels, a 13-pixel icon, in the slide's top right corner. */
+.deck-thumb .deck-thumb-more .deck-thumb-more-button { width: 20px; height: 20px; min-width: 20px; padding: 0; border-radius: 5px; }
+.deck-thumb .deck-thumb-more .deck-thumb-more-button svg { width: 13px; height: 13px; }
 .deck-thumb:hover .deck-thumb-more, .deck-thumb.is-menu .deck-thumb-more, .deck-thumb .deck-thumb-more:focus-within { display: block; }
 .deck-thumb .deck-thumb-more button { background: rgba(255,255,255,.94); box-shadow: 0 1px 3px rgba(30,27,75,.25); color: var(--r-ink-strong); }
 .deck-add-end { margin: 4px 8px 0 26px; height: 28px; padding: 0 8px; font-size: 12.5px; color: var(--r-ink-body); }

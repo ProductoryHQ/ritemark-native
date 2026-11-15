@@ -188,6 +188,8 @@ export function DeckView({
   const [deskWidth, setDeskWidth] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [bar, setBar] = useState<{ left: number; top: number; height: number } | null>(null)
+  /** Each section part's grey band in the handout (the Experience lead's decision 12). */
+  const [bands, setBands] = useState<Array<{ left: number; width: number; top: number; height: number }>>([])
   const deskRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
   const lockUntil = useRef(0)
@@ -268,25 +270,38 @@ export function DeckView({
     }
   }, [editor, shown, count])
 
-  // The current part's line on the left of the handout, from its head to the next one's.
+  // The current part's line on the left of the handout, from its head to the next one's; and each section part's band.
   const measureBar = useCallback(() => {
     const tops = partTops()
     const container = scrollContainer()
-    if (!container || !editor || tops.length === 0 || shown >= tops.length) { setBar(null); return }
-    const top = tops[shown] + 16
-    let end: number
-    if (shown + 1 < tops.length) {
-      end = tops[shown + 1] - 6
-    } else {
-      // The last part ends where the text does, above the room left for scrolling it to the top.
+    if (!container || !editor || tops.length === 0) { setBar(null); setBands([]); return }
+    const heads = Array.from(editor.view.dom.querySelectorAll<HTMLElement>(':scope > .deck-part-head'))
+    /** Where part `index` ends: the next part's head, or for the last part, where the text does (above the room left
+     *  for scrolling it to the top). */
+    const endOf = (index: number, gap: number): number => {
+      if (index + 1 < tops.length) return tops[index + 1] - gap
       const dom = editor.view.dom
       const origin = container.getBoundingClientRect().top - container.scrollTop
-      end = dom.getBoundingClientRect().bottom - origin - (parseFloat(getComputedStyle(dom).paddingBottom) || 0) - 10
+      return dom.getBoundingClientRect().bottom - origin - (parseFloat(getComputedStyle(dom).paddingBottom) || 0) - 10
     }
-    // 12 to the left of the part's text, as the prototype's `.hpart.cur::before`.
-    const head = editor.view.dom.querySelector<HTMLElement>(':scope > .deck-part-head')
-    const left = head ? head.getBoundingClientRect().left - container.getBoundingClientRect().left - 12 : 8
-    setBar({ left, top, height: Math.max(0, end - top) })
+    // 12 to the left of the part's text, as the prototype's `.hpart.cur::before` and `.hpart.sect`.
+    const first = heads[0]
+    const left = first ? first.getBoundingClientRect().left - container.getBoundingClientRect().left - 12 : 8
+    const width = first ? first.getBoundingClientRect().width + 24 : 0
+    // A band from its head's top to 8 below the part's last block (the prototype's padding), its text inside; the
+    // next head keeps 6 below it (`.after-section`).
+    const origin = container.getBoundingClientRect().top - container.scrollTop
+    setBands(heads.flatMap((head, index) => {
+      if (!head.classList.contains('is-section') || index >= tops.length) return []
+      let last: Element = head
+      for (let next = head.nextElementSibling; next && !next.classList.contains('deck-part-head'); next = next.nextElementSibling) last = next
+      const top = tops[index]
+      return [{ left, width, top, height: Math.max(0, last.getBoundingClientRect().bottom - origin + 8 - top) }]
+    }))
+    // The band marks a section's part; the current one shows by its accent number, as every part does.
+    if (shown >= tops.length || heads[shown]?.classList.contains('is-section')) { setBar(null); return }
+    const top = tops[shown] + 16
+    setBar({ left, top, height: Math.max(0, endOf(shown, 6) - top) })
   }, [partTops, scrollContainer, shown, editor])
 
   useEffect(() => {
@@ -916,6 +931,7 @@ export function DeckView({
             extensions={DECK_EXTENSIONS}
           />
           {handoutContainer && bar ? createPortal(<div className="deck-part-bar" style={{ left: bar.left, top: bar.top, height: bar.height }} />, handoutContainer) : null}
+          {handoutContainer && bands.length ? createPortal(bands.map(band => <div key={band.top} className="deck-part-band" style={band} />), handoutContainer) : null}
         </div>
       </div>
       {dialogs}

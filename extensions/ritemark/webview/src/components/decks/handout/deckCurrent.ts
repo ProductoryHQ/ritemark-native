@@ -19,14 +19,19 @@ export function currentSlideOf(state: EditorState): number | null {
   return deckCurrentKey.getState(state) ?? null
 }
 
-/** The current slide's head (`is-current`) and the first slide's (`is-first`, the deck's title). */
+/** The current slide's head (`is-current`), the first slide's (`is-first`, the deck's title), a section's
+ *  (`is-section`) and the head after a section's part (`after-section`). */
 function decorations(doc: PMNode, current: number | null): DecorationSet {
   let index = -1
+  let afterSection = false
   const found: Decoration[] = []
   doc.forEach((node, pos) => {
     if (node.type.name !== 'deckSlide') return
     index++
-    const classes = [index === 0 ? 'is-first' : '', index === current ? 'is-current' : ''].filter(Boolean).join(' ')
+    // A section's part is a band (the Experience lead's decision 12); the part after it needs no line on top.
+    const section = node.attrs.kind === 'section'
+    const classes = [index === 0 ? 'is-first' : '', index === current ? 'is-current' : '', section ? 'is-section' : '', afterSection ? 'after-section' : ''].filter(Boolean).join(' ')
+    afterSection = section
     if (classes) found.push(Decoration.node(pos, pos + node.nodeSize, { class: classes }))
   })
   return found.length ? DecorationSet.create(doc, found) : DecorationSet.empty
