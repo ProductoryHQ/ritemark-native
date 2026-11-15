@@ -66,9 +66,14 @@ export class DeckPages implements vscode.Disposable {
    */
   constructor(private readonly library: () => DeckLibrary | null = () => null, private readonly publisher: DeckPublisher | null = null) {}
 
-  /** Does this document open as a deck? */
-  deckModeFor(document: vscode.TextDocument): boolean {
-    return deckModeOf({ flagOn: isEnabled('decks'), scheme: document.uri.scheme, fsPath: document.uri.fsPath, text: document.getText() });
+  /** Does this document open as a deck? `flagOn` is the flag now unless given (a connected view's, as it opened). */
+  deckModeFor(document: vscode.TextDocument, flagOn = isEnabled('decks')): boolean {
+    return deckModeOf({ flagOn, scheme: document.uri.scheme, fsPath: document.uri.fsPath, text: document.getText() });
+  }
+
+  /** The connected deck view of this webview, if it is one. */
+  private viewFor(webview: vscode.Webview): DeckView | undefined {
+    return [...this.views].find(view => view.panel.webview === webview);
   }
 
   /** A deck's panel, while it is open: the active one is where the library inserts. */
@@ -101,7 +106,8 @@ export class DeckPages implements vscode.Disposable {
     const view = this.activeView();
     const root = projectRoot();
     const relative = view && root ? projectRelative(root, view.document.uri.fsPath) : null;
-    if (!view || !relative || !this.deckModeFor(view.document)) return null;
+    // Sprint 159 (PR 2): the library inserts only while the flag is on (its place shows), into a deck this build writes
+    if (!isEnabled('decks') || !view || !relative || !this.deckModeFor(view.document, true)) return null;
     return { path: relative, name: deckName(relative), current: view.current, count: view.count };
   }
 
@@ -126,7 +132,9 @@ export class DeckPages implements vscode.Disposable {
     setFrom: (id: string, from: string) => Promise<boolean>;
   } | null {
     const view = [...this.views].find(entry => path.normalize(entry.document.uri.fsPath) === path.normalize(fsPath));
-    if (!view) return null;
+    // Sprint 159 (PR 2): a view whose file another program rewrote to a later format shows it as a document, and the
+    // library refuses to write it (DeckLibrary)
+    if (!view || !this.deckModeFor(view.document, true)) return null;
     const slideCount = () => slidesOfText(view.document.getText()).length;
     return {
       insert: async (parts, after) => {
@@ -167,7 +175,12 @@ export class DeckPages implements vscode.Disposable {
 
   /** One request from a deck view; the answer goes to that webview only. */
   async handle(document: vscode.TextDocument, webview: vscode.Webview, message: unknown): Promise<void> {
-    if (!this.deckModeFor(document)) return;
+    // Sprint 159 (PR 2): a connected deck view (one that opened with the flag on: ritemarkEditor.ts) is served while it
+    // lives, as long as its file reads as a deck this build writes; the flag is not read again for the deck itself, so
+    // a deck opened with the flag on keeps working after it is turned off. The Slide library's requests need the flag
+    // now, since its place shows only then.
+    const connected = this.viewFor(webview);
+    if (!connected || !this.deckModeFor(document, true)) return;
     let request: DeckRequest;
     try {
       request = decodeDeckRequest(message);
@@ -192,13 +205,11 @@ export class DeckPages implements vscode.Disposable {
         this.waiting.get(request.requestId)?.(request.ok);
         return;
       case 'deck/open-library': {
+        if (!isEnabled('decks')) return;
         // The + between thumbnails names where the slides go: the library inserts there until another slide is current.
-        const view = [...this.views].find(entry => entry.panel.webview === webview);
-        if (view) {
-          view.current = request.after;
-          this.active = view;
-          this.changed.fire();
-        }
+        connected.current = request.after;
+        this.active = connected;
+        this.changed.fire();
         await vscode.commands.executeCommand(`${SLIDE_LIBRARY_VIEW}.focus`);
         this.revealed.fire({ section: request.section });
         return;
@@ -213,11 +224,10 @@ export class DeckPages implements vscode.Disposable {
         await this.publisher?.pageAction(document, request.action, text => void this.post(webview, { type: 'deck/page-notice', text }));
         return;
       case 'deck/current': {
-        const view = [...this.views].find(entry => entry.panel.webview === webview);
-        if (view && (view.current !== request.index || view.count !== request.count)) {
-          view.current = request.index;
-          view.count = request.count;
-          if (view === this.activeView()) this.changed.fire();
+        if (connected.current !== request.index || connected.count !== request.count) {
+          connected.current = request.index;
+          connected.count = request.count;
+          if (connected === this.activeView()) this.changed.fire();
         }
         return;
       }
@@ -232,6 +242,12 @@ export class DeckPages implements vscode.Disposable {
     const root = projectRoot();
     const deckPath = root ? projectRelative(root, document.uri.fsPath) : null;
     const failed = (id: string | null, message: string) => this.post(webview, { type: 'deck/library-failed', id, message });
+    if (!isEnabled('decks')) {
+      // Sprint 159 (PR 2): the deck keeps working with the flag turned off since it opened, but the library is off
+      if (request.type === 'deck/source-states') await this.post(webview, { type: 'deck/source-states', states: [] });
+      else if (request.type !== 'deck/show-in-library') await failed('id' in request ? request.id : null, 'The Slide library is off while Decks are turned off in Settings.');
+      return;
+    }
     if (!library || !deckPath) {
       if (request.type !== 'deck/source-states') await failed(null, 'The Slide library works for a deck inside the open project folder.');
       return;

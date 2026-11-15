@@ -1,0 +1,27 @@
+#!/bin/bash
+# To run it: put this file, open-deck.sh.txt and deck-probe.js.txt (beside it) and ../pr1/cdp.mjs.txt in one folder,
+# drop their .txt endings, and use the Node in vscode/.nvmrc (arm64) on PATH. It drives a dev window started with
+# scripts/qa/dev-launch-isolated.sh (its PORT and --user-data-dir).
+# open-deck.sh <port> [close]: (closes the deck's tab first with "close", then) opens Training.deck.md through Go to File.
+S=$(dirname "$0")
+export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
+PORT=$1
+if [[ ${2:-} == close ]]; then
+	XY=$(node "$S/cdp.mjs" "$PORT" eval "(() => { const t = [...document.querySelectorAll('.part.editor .tabs-container > .tab')].find(t => (t.getAttribute('aria-label')||'').startsWith('Training')); if (!t) return ''; const r = t.getBoundingClientRect(); return (r.x + r.width/2) + ' ' + (r.y + r.height/2); })()" | tr -d '"')
+	if [[ -n $XY ]]; then
+		node "$S/cdp.mjs" "$PORT" click $XY
+		sleep 0.8
+		node "$S/cdp.mjs" "$PORT" cmd "View: Close Editor" > /dev/null
+		sleep 1
+	fi
+fi
+node "$S/cdp.mjs" "$PORT" cmd "Go to File..." > /dev/null
+sleep 0.8
+node "$S/cdp.mjs" "$PORT" type "Training.deck.md"
+for i in 1 2 3 4 5 6 7 8 9 10; do
+	ROW=$(node "$S/cdp.mjs" "$PORT" eval "[...document.querySelectorAll('.quick-input-widget .monaco-list-row')].map(r => r.getAttribute('aria-label'))[0] || ''")
+	[[ $ROW == *Training.deck.md* ]] && break
+	sleep 0.3
+done
+node "$S/cdp.mjs" "$PORT" key Enter
+sleep 4

@@ -14,9 +14,6 @@ export {
   getOnboardingStatus,
   checkWingetAvailable,
   clearSetupCache,
-  setAnthropicKeyAvailable,
-  hasCliOAuth,
-  setClaudeLoginInProgress,
   setClaudePendingReload,
   clearClaudePendingReload,
 } from './setup';

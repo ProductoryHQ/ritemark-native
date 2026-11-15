@@ -8,7 +8,8 @@
  *    file Ritemark wrote for the deck beside it, and the digest says whether the deck has changed since (the chip's
  *    "Published · changed").
  *  - It never overwrites a file Ritemark didn't write for this deck: it stops and says why in one line. Nor a link, a
- *    folder or anything else that isn't a plain file. A page is written next to its place and moved over it, so a
+ *    folder or anything else that isn't a plain file. A page is written under a hidden name next to its place, then
+ *    put in where nothing is (refused in one step if something arrived) or moved over Ritemark's own page, so a
  *    half-written page is never what Publish reads.
  *  - A page written for a first Publish that is then cancelled is removed again (`removeDeckPage`), unless it changed
  *    since it was written.
@@ -32,6 +33,8 @@ export interface PageFs {
   readFile(target: string): Promise<string>;
   writeFile(target: string, data: string): Promise<void>;
   rename(from: string, to: string): Promise<void>;
+  /** A second name for a file, failing (EEXIST) when `to` is taken: the one way a page is put in its place. */
+  link(from: string, to: string): Promise<void>;
   unlink(target: string): Promise<void>;
 }
 
@@ -41,6 +44,7 @@ export const nodePageFs: PageFs = {
   readFile: target => fs.promises.readFile(target, 'utf8'),
   writeFile: (target, data) => fs.promises.writeFile(target, data, { encoding: 'utf8', flag: 'wx' }),
   rename: (from, to) => fs.promises.rename(from, to),
+  link: (from, to) => fs.promises.link(from, to),
   unlink: target => fs.promises.unlink(target),
 };
 
@@ -97,40 +101,67 @@ async function pageAt(pageFs: PageFs, pagePath: string): Promise<{ kind: 'none' 
   return readPageMeta(html).ritemark ? { kind: 'ours', html } : { kind: 'foreign' };
 }
 
+/** A hidden name beside the page: never a page of the project, and never sent by Publish's gather. */
+function besidePage(pagePath: string, ending: string): string {
+  return path.join(path.dirname(pagePath), `.${path.basename(pagePath)}.${randomBytes(4).toString('hex')}.${ending}`);
+}
+
+/**
+ * Put `from` at `to` only if nothing is there, in one step: a second name, which the system refuses (EEXIST) when
+ * `to` is taken, then the first name dropped. False when `to` was taken. Where the file system can't give a second
+ * name (FAT and exFAT, some network and synced folders, whatever the error), a move after a last check stands in.
+ */
+async function placeNoReplace(pageFs: PageFs, from: string, to: string): Promise<boolean> {
+  try {
+    await pageFs.link(from, to);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'EEXIST') return false;
+    if ((await pageAt(pageFs, to)).kind !== 'none') return false;
+    await pageFs.rename(from, to);
+    return true;
+  }
+  await pageFs.unlink(from).catch(() => undefined);
+  return true;
+}
+
 /**
  * Write the page beside the deck. A file Ritemark didn't write for a deck (or a link, or a folder) is never touched:
- * the result says why in one line. The new page is written beside its place and moved over it in one step.
+ * the result says why in one line. The page is written under a hidden name first, so a half-written page is never what
+ * Publish reads. Where nothing is, it goes in only if nothing arrived meanwhile, in one step (`placeNoReplace`: Codex
+ * on #729); a page Ritemark wrote is replaced by a move over it, after a last check, so the place is never empty.
  */
 export async function writeDeckPage(pageFs: PageFs, deckPath: string, html: string): Promise<WriteResult> {
   const pagePath = pagePathFor(deckPath);
-  const there = await pageAt(pageFs, pagePath);
-  if (there.kind === 'foreign') return { kind: 'refused', pagePath, line: foreignPageLine(pagePath) };
+  const refused = (): WriteResult => ({ kind: 'refused', pagePath, line: foreignPageLine(pagePath) });
+  let there = await pageAt(pageFs, pagePath);
+  if (there.kind === 'foreign') return refused();
   if (there.kind === 'ours' && there.html === html) return { kind: 'written', pagePath, created: false, unchanged: true };
-  // A hidden name beside the page: never a page of the project, and never sent by Publish's gather.
-  const temporary = path.join(path.dirname(pagePath), `.${path.basename(pagePath)}.${randomBytes(4).toString('hex')}.tmp`);
+  const temporary = besidePage(pagePath, 'tmp');
   await pageFs.writeFile(temporary, html);
   try {
-    // Checked again just before the move: a file that arrived meanwhile is still never overwritten.
-    const now = await pageAt(pageFs, pagePath);
-    if (now.kind === 'foreign') {
-      await pageFs.unlink(temporary).catch(() => undefined);
-      return { kind: 'refused', pagePath, line: foreignPageLine(pagePath) };
+    if (there.kind === 'none') {
+      if (await placeNoReplace(pageFs, temporary, pagePath)) return { kind: 'written', pagePath, created: true, unchanged: false };
+      // Something arrived meanwhile: another window's page for this deck is replaced, anything else stays.
+      there = await pageAt(pageFs, pagePath);
+      if (there.kind !== 'ours') return refused();
     }
+    // Checked again just before the move: a file that arrived meanwhile is still never overwritten.
+    if ((await pageAt(pageFs, pagePath)).kind === 'foreign') return refused();
     await pageFs.rename(temporary, pagePath);
-    return { kind: 'written', pagePath, created: now.kind === 'none', unchanged: false };
-  } catch (error) {
+    return { kind: 'written', pagePath, created: false, unchanged: false };
+  } finally {
     await pageFs.unlink(temporary).catch(() => undefined);
-    throw error;
   }
 }
 
 /**
- * Take back a page written for a first Publish that was then cancelled: only a page Ritemark wrote, still holding the
- * digest it was written with. Anything else stays. True when it was removed.
+ * Take back a page written for a first Publish that was then cancelled: only while the file is still exactly the page
+ * that was written (Codex on #729: an edit that kept the marks is still an edit). Anything else stays. True when it
+ * was removed.
  */
-export async function removeDeckPage(pageFs: PageFs, pagePath: string, digest: string): Promise<boolean> {
+export async function removeDeckPage(pageFs: PageFs, pagePath: string, html: string): Promise<boolean> {
   const there = await pageAt(pageFs, pagePath).catch(() => ({ kind: 'foreign' as const }));
-  if (there.kind !== 'ours' || readPageMeta(there.html).digest !== digest) return false;
+  if (there.kind !== 'ours' || there.html !== html) return false;
   await pageFs.unlink(pagePath);
   return true;
 }

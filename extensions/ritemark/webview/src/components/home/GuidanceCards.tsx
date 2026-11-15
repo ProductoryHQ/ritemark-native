@@ -40,7 +40,7 @@ function AiMark({ id }: { id: HomeAiId }) {
 const WELCOME_ID: Record<HomeAiId, WelcomeProviderId> = { 'claude-code': 'claude', codex: 'chatgpt', opencode: 'opencode' }
 
 /** An AI signing in: Ask with's row, and the card's main part while it waits (Sprint 156). */
-const SIGNING_IN = 'Signing in…'
+const SIGNING_IN = COPY.signingIn
 
 function stateWords(ai: HomeAi): string | null {
   switch (ai.state) {

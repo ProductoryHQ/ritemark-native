@@ -1,0 +1,33 @@
+# round1-check.sh.txt on the reviewed head (05e1fdc3) in a dev window: a deck opened with the flag on, then the flag turned off (findings 1), then the file rewritten to deck: 2 by another program (finding 2).
+# The deck view stays a deck after the flag goes off but no request is answered; after the rewrite it stays a deck view (whose next save would write deck: 1 blocks over a deck: 2 file).
+
+== flag on, opened as a deck:
+{
+ "deckView": true,
+ "codeBlocks": 1,
+ "answers": [
+  "deck/assets"
+ ]
+}
+== the flag turned off, the same deck view:
+{
+ "deckView": true,
+ "codeBlocks": 1,
+ "answers": []
+}
+   places: {"row":["*Home","Documents","Tasks","Browser","Agents","Transcribe","More"],"title":"RPrm159a-projHome","head":["RP","rm159a-proj","Home"],"panes":2,"sidebarVisible":true}
+== flag on, the file rewritten to deck: 2 by another program:
+{
+ "deckView": true,
+ "codeBlocks": 1,
+ "answers": []
+}
+   the file's head: --- deck: 2 theme: Slide library/Themes/Evening.theme.md 
+== and back to deck: 1:
+{
+ "deckView": true,
+ "codeBlocks": 1,
+ "answers": [
+  "deck/assets"
+ ]
+}

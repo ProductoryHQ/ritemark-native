@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Fixed
 - **A page that failed to load opens when you open its file again (#710).** If a web page's `.html` file was missing when Ritemark opened, its tab showed "Failed to Load Page", and opening the file again from Documents once it was back only brought that failed tab forward. Now opening the file loads the page again in the same tab, as the bar's Reload does. A page that loaded fine is only brought forward, as before.
 
+### Sprint 158: Excel looks like Excel, and a save keeps it (#711)
+
+#### Fixed
+- **Saving a workbook keeps everything you didn't change.** Until now, one edit and a save in Ritemark removed the whole workbook's cell colours, bold text, borders, frozen rows, charts, pictures, drop-down lists and colour rules. Now only the cells you typed into change; everything else in the file stays exactly as it was. A cell that held a formula keeps the value you typed, and the totals that use it update when the file opens in Excel. After your first edit, a quiet line under the bar says so. A cell Ritemark can't change safely (part of an array formula, a table's column name, a chart sheet) says why and stays as it was, and if a save can't be written safely, nothing is written and your changes stay, unsaved.
+- **Dates read as the file writes them.** A day-first date such as 03.01.2026, as Estonian workbooks write them, no longer shows as 1/3/26. Durations (8:15), money, percentages and red negatives follow each cell's own format, and a date or time you type into such a cell stays a date or time.
+
+#### Changed
+- **Hidden rows, columns and sheets stay hidden**, as the author left them, and a workbook opens on its own sheet. A cell edits as Excel's bar shows it: 1450 in a cell that reads "1,450.00 €".
+- **A workbook looks as it does in Excel.** Its column widths and row heights, cell colours, fonts, borders and alignment, wrapped and turned text, merged cells, frozen rows and columns and gridlines show as the author made them, on white paper also in Ritemark Dark, with Excel's grey letters and numbers around the sheet. Text runs on into empty cells beside it, and a number too wide for its column shows ####, as in Excel. A chart or picture shows where it sits, as a card saying it is kept in the file, and a chart sheet is a card with Open in Excel. You edit a cell where it is, in its own font, and sorting by a column stays a view, so the file's order doesn't change; with merged cells across the rows, sorting is off and says why. The sheet tabs show even for one sheet, with their colours.
+- **A large workbook opens and saves faster, and its totals fit as they do in Excel.** A 50,000-row sheet saves in under a second and opens in a little over one. Where Calibri and Cambria aren't installed, Ritemark draws them with fonts of the same widths, and on a Mac the columns are as wide as Excel for Mac makes them, so a total that fits in Excel doesn't show #### here.
+- **A workbook's sheet goes on, as in Excel.** Add row and the + column button are gone from Excel files: type into any empty cell below or beside the data, and the sheet grows to take it in. Only that cell changes in the file. CSV files keep Add row and the + column. A kill switch, the `excel-editing` flag, opens workbooks read-only if editing ever has to be turned off.
+
 ## [2.2.0] — 2026-11-11
 
 ### 2.2: the Published chip's menu (Jarmo's test, 9 November)

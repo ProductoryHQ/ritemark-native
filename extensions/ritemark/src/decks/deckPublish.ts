@@ -155,17 +155,17 @@ export class DeckPublisher implements vscode.Disposable {
     } finally {
       listener.dispose();
     }
-    if (takeBack) await this.takeBackIfCancelled(feature, pagePath, realPage, built.digest);
+    if (takeBack) await this.takeBackIfCancelled(feature, pagePath, realPage, built.html);
     const seat = [...this.seats].find(entry => entry.document === document);
     if (seat) void this.refresh(seat);
   }
 
   /** After a first Publish's flow: no record and no failure line is a cancel, and the page it wrote goes again. */
-  private async takeBackIfCancelled(feature: PublishFeature, pagePath: string, realPage: string, digest: string): Promise<void> {
+  private async takeBackIfCancelled(feature: PublishFeature, pagePath: string, realPage: string, html: string): Promise<void> {
     if (await feature.controller.recordFor(realPage)) return;
     const state = await feature.controller.pageState(realPage);
     if (state.kind !== 'unpublished' || state.line) return;
-    await removeDeckPage(nodePageFs, pagePath, digest).catch(() => false);
+    await removeDeckPage(nodePageFs, pagePath, html).catch(() => false);
   }
 
   // ------------------------------------------------------------------ Copy link, See online, Unpublish

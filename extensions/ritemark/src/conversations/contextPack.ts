@@ -26,6 +26,12 @@ interface ContextTurn {
   turnId: string;
   user: ContextMessage;
   assistant?: ContextMessage;
+  /**
+   * Sprint 160 (#686): the turn has a recorded end, a failure or a stop, so the
+   * chat already says what happened to it. A restart's or a released runtime's
+   * `interrupted` boundary is not one: that turn just stopped being followed.
+   */
+  ended: boolean;
 }
 
 export interface ContextPackOptions {
@@ -74,8 +80,21 @@ function receiptByTurn(events: ConversationEventV1[]): Map<string, DispatchRecei
   return receipts;
 }
 
+/** Sprint 160 (#686): the turns a failure or a stop ended, as the record wrote them. */
+function endedTurnIds(events: ConversationEventV1[]): Set<string> {
+  const ended = new Set<string>();
+  for (const event of events) {
+    if ((event.kind === 'assistant-message' && (event.terminalStatus === 'failed' || event.terminalStatus === 'cancelled'))
+      || (event.kind === 'boundary' && (event.boundaryKind === 'failed' || event.boundaryKind === 'cancelled'))) {
+      ended.add(event.turnId);
+    }
+  }
+  return ended;
+}
+
 function normalizeTurns(events: ConversationEventV1[]): ContextTurn[] {
   const receipts = receiptByTurn(events);
+  const ended = endedTurnIds(events);
   const assistants = new Map<string, AssistantMessageEventV1>();
   for (const event of events) {
     if (event.kind === 'assistant-message' && event.terminalStatus === 'completed' && event.content.trim()) {
@@ -106,6 +125,7 @@ function normalizeTurns(events: ConversationEventV1[]): ContextTurn[] {
       const unanswered = !assistant;
       return {
         turnId: user.turnId,
+        ended: ended.has(user.turnId),
         user: {
           id: user.eventId,
           turnId: user.turnId,
@@ -233,5 +253,6 @@ export function buildNormalizedContextPack(
     truncated: omittedEventCount > 0 || allMessages.some((message) => utf8Bytes(message.text) > maxMessageBytes),
     omittedEventCount,
     hasUnansweredRequest: unanswered.length > 0,
+    hasUnendedRequest: unanswered.some((turn) => !turn.ended),
   };
 }

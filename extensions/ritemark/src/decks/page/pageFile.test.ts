@@ -115,18 +115,49 @@ async function main(): Promise<void> {
     assert.deepEqual(fs.readdirSync(folder).filter(name => name.endsWith('.tmp')), []);
   }
 
+  // Where nothing is, the page goes in only if nothing arrived meanwhile, in one step (Codex on #729). Another
+  // window's page for this deck that arrived meanwhile is replaced; where the system has no second names, whatever
+  // its error, a move after a last check stands in. Nothing is left under a hidden name.
+  {
+    const twin = path.join(folder, 'Twin.deck.md');
+    const twinPage = pagePathFor(twin);
+    const otherWindow: PageFs = {
+      ...nodePageFs,
+      writeFile: async (target, data) => {
+        await nodePageFs.writeFile(target, data);
+        fs.writeFileSync(twinPage, built.html);
+      },
+    };
+    assert.deepEqual(await writeDeckPage(otherWindow, twin, edited.html), { kind: 'written', pagePath: twinPage, created: false, unchanged: false });
+    assert.equal(fs.readFileSync(twinPage, 'utf8'), edited.html);
+    for (const code of ['EPERM', 'EISDIR', 'EXDEV', 'EINVAL']) {
+      const noLinks: PageFs = { ...nodePageFs, link: async () => { throw Object.assign(new Error('no second names'), { code }); } };
+      const plain = path.join(folder, `Plain ${code}.deck.md`);
+      assert.deepEqual(await writeDeckPage(noLinks, plain, built.html), { kind: 'written', pagePath: pagePathFor(plain), created: true, unchanged: false }, code);
+      assert.deepEqual(await writeDeckPage(noLinks, plain, edited.html), { kind: 'written', pagePath: pagePathFor(plain), created: false, unchanged: false }, code);
+      assert.equal(fs.readFileSync(pagePathFor(plain), 'utf8'), edited.html);
+    }
+    assert.deepEqual(fs.readdirSync(folder).filter(name => name.startsWith('.')), [], 'nothing left under a hidden name');
+  }
+
   // A first Publish cancelled: the page written for it is taken back. Not when it changed since, and never another file.
   {
     const cancelled = path.join(folder, 'Cancelled.deck.md');
     const page = (await buildDeckPage({ deckPath: cancelled, text: PRIVATE_DECK, theme: BUILT_IN_THEME }, assets));
     const written = await writeDeckPage(nodePageFs, cancelled, page.html);
     assert.equal(written.kind === 'written' && written.created, true);
-    assert.equal(await removeDeckPage(nodePageFs, pagePathFor(cancelled), 'f'.repeat(64)), false, 'another digest: kept');
+    assert.equal(await removeDeckPage(nodePageFs, pagePathFor(cancelled), edited.html), false, 'another page: kept');
     assert.ok(fs.existsSync(pagePathFor(cancelled)));
-    assert.equal(await removeDeckPage(nodePageFs, pagePathFor(cancelled), page.digest), true);
+    // An edit that kept Ritemark's marks (Codex on #729) is still an edit: kept.
+    const touched = page.html.replace('</body>', '<p>my own line</p></body>');
+    fs.writeFileSync(pagePathFor(cancelled), touched);
+    assert.equal(await removeDeckPage(nodePageFs, pagePathFor(cancelled), page.html), false, 'edited since: kept');
+    assert.equal(fs.readFileSync(pagePathFor(cancelled), 'utf8'), touched);
+    fs.writeFileSync(pagePathFor(cancelled), page.html);
+    assert.equal(await removeDeckPage(nodePageFs, pagePathFor(cancelled), page.html), true);
     assert.ok(!fs.existsSync(pagePathFor(cancelled)), 'the cancelled first Publish leaves no page');
-    assert.equal(await removeDeckPage(nodePageFs, pagePathFor(cancelled), page.digest), false, 'nothing there: nothing to do');
-    assert.equal(await removeDeckPage(nodePageFs, pagePathFor(path.join(folder, 'Own page.deck.md')), page.digest), false, 'a page of the person\'s own: kept');
+    assert.equal(await removeDeckPage(nodePageFs, pagePathFor(cancelled), page.html), false, 'nothing there: nothing to do');
+    assert.equal(await removeDeckPage(nodePageFs, pagePathFor(path.join(folder, 'Own page.deck.md')), page.html), false, 'a page of the person\'s own: kept');
   }
 
   // The digest changes with a public edit, and not with an edit to notes or to a skipped slide.
