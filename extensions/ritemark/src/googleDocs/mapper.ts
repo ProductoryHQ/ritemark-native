@@ -37,13 +37,6 @@ export interface Run {
   link?: string;
 }
 
-/** A link inside a table cell: a range in the cell's text (UTF-16 units, as Docs counts). */
-export interface CellLink {
-  start: number;
-  end: number;
-  url: string;
-}
-
 export type BlockKind = 'heading' | 'paragraph' | 'listItem' | 'code' | 'quote' | 'rule' | 'table' | 'image';
 
 export interface Block {
@@ -56,10 +49,11 @@ export interface Block {
   checkbox?: 'none' | 'unchecked' | 'checked';
   rows?: string[][];
   /**
-   * #702: the links inside each cell, as ranges in that cell's text. Same
-   * shape as `rows` (row, then column); absent when no cell has a link.
+   * #702: each cell's styled ranges (links, bold, italic, code, strike,
+   * underline), counted in that cell's text as prose runs are in a block's.
+   * Same shape as `rows` (row, then column); absent when no cell has one.
    */
-  cellLinks?: CellLink[][][];
+  cellRuns?: Run[][][];
   /** Image source as the editor wrote it; `title` carries TipTap's original path. */
   src?: string;
   title?: string;
@@ -150,22 +144,44 @@ function mathImageBlock(math: ExportMathElement, picture: NonNullable<ExportMath
   };
 }
 
-interface CellOut { text: string; links: CellLink[] }
+/** A link's address when a published link may carry it: `http(s):` and `mailto:` only. */
+function safeHref(node: Node): string | undefined {
+  const href = node.getAttribute('href') ?? '';
+  return /^(https?:|mailto:)/i.test(href) ? href : undefined;
+}
+
+/** The styles an element adds to the text inside it, the same in prose and in table cells. */
+function withMarks(node: Node, inherited: Partial<Run>): Partial<Run> {
+  const tag = tagOf(node);
+  const next: Partial<Run> = { ...inherited };
+  if (tag === 'strong' || tag === 'b') next.bold = true;
+  if (tag === 'em' || tag === 'i') next.italic = true;
+  if (tag === 'code') next.code = true;
+  if (tag === 's' || tag === 'del' || tag === 'strike') next.strike = true;
+  if (tag === 'u') next.underline = true;
+  if (tag === 'a') {
+    const href = safeHref(node);
+    if (href) next.link = href;
+  }
+  return next;
+}
+
+interface CellOut { text: string; runs: Run[] }
 
 /**
  * A cell's text: a table cell is filled with text, so its equations go as their
- * source. Its links are kept as ranges in that text (#702), with the same
- * `http(s):` / `mailto:` rule as links in prose.
+ * source. Whitespace is collapsed as it is added; a line break (`<br>`, the one
+ * form Markdown keeps in a cell, or a second paragraph) stays a line break, as
+ * in prose. Its styles are kept as runs in that text (#702).
  */
-function cellInto(node: Node, counts: { math: number; typos: number }, out: CellOut, url?: string): void {
-  const add = (text: string): void => {
+function cellInto(node: Node, counts: { math: number; typos: number }, out: CellOut, inherited: Partial<Run> = {}): void {
+  const add = (raw: string): void => {
+    let text = raw.replace(/\s+/g, ' ');
+    if (text.startsWith(' ') && (!out.text || /[ \u000b]$/.test(out.text))) text = text.slice(1);
     if (!text) return;
     const start = out.text.length;
     out.text += text;
-    if (!url) return;
-    const last = out.links[out.links.length - 1];
-    if (last && last.url === url && last.end === start) last.end = out.text.length;
-    else out.links.push({ start, end: out.text.length, url });
+    if (Object.keys(inherited).length) out.runs.push({ start, end: out.text.length, ...inherited });
   };
   for (const child of (node.childNodes ?? []) as Node[]) {
     if (child.nodeType === 3) { add(decodeEntities(child.rawText ?? '')); continue; }
@@ -176,41 +192,20 @@ function cellInto(node: Node, counts: { math: number; typos: number }, out: Cell
       if (math.typo) counts.typos++;
       continue;
     }
-    let next = url;
-    if (tagOf(child) === 'a') {
-      const href = child.getAttribute('href') ?? '';
-      if (/^(https?:|mailto:)/i.test(href)) next = href;
+    const tag = tagOf(child);
+    if (tag === 'br' || (tag === 'p' && out.text)) {
+      if (out.text) cellEnd(out, VERTICAL_TAB);
+      if (tag === 'br') continue;
     }
-    cellInto(child, counts, out, next);
+    cellInto(child, counts, out, withMarks(child, inherited));
   }
 }
 
-/**
- * A cell as it is written into the Doc: runs of whitespace become one space and
- * the ends are trimmed. The links' ranges are moved to match, and a link left
- * with no text is dropped.
- */
-function normaliseCell(raw: CellOut): CellOut {
-  const at: number[] = [];
-  let text = '';
-  for (let i = 0; i < raw.text.length; i++) {
-    at.push(text.length);
-    const ch = raw.text[i];
-    if (/\s/.test(ch)) {
-      if (text && !text.endsWith(' ')) text += ' ';
-    } else text += ch;
-  }
-  at.push(text.length);
-  if (text.endsWith(' ')) text = text.slice(0, -1);
-  const links: CellLink[] = [];
-  for (const link of raw.links) {
-    let start = Math.min(at[link.start], text.length);
-    let end = Math.min(at[link.end], text.length);
-    while (start < end && text[start] === ' ') start++;
-    while (end > start && text[end - 1] === ' ') end--;
-    if (end > start) links.push({ start, end, url: link.url });
-  }
-  return { text, links };
+/** Trim a cell's trailing spaces (and line breaks, at its end), then add `tail`. */
+function cellEnd(out: CellOut, tail = ''): void {
+  out.text = out.text.replace(tail ? / +$/ : /[ \u000b]+$/, '') + tail;
+  const end = out.text.length - tail.length;
+  out.runs = out.runs.map((run) => ({ ...run, end: Math.min(run.end, end) })).filter((run) => run.end > run.start);
 }
 
 interface InlineOut { text: string; runs: Run[]; images?: Placeholder[]; typos?: number }
@@ -245,17 +240,7 @@ function inlineRuns(node: Node, out: InlineOut, inherited: Partial<Run> = {}): v
     }
     if (tag === 'img') continue;             // images inside prose are lifted out as their own block
     if (tag === 'p' && out.text) out.text += VERTICAL_TAB;   // two paragraphs in one list item
-    const next: Partial<Run> = { ...inherited };
-    if (tag === 'strong' || tag === 'b') next.bold = true;
-    if (tag === 'em' || tag === 'i') next.italic = true;
-    if (tag === 'code') next.code = true;
-    if (tag === 's' || tag === 'del' || tag === 'strike') next.strike = true;
-    if (tag === 'u') next.underline = true;
-    if (tag === 'a') {
-      const href = child.getAttribute('href') ?? '';
-      if (/^(https?:|mailto:)/i.test(href)) next.link = href;
-    }
-    inlineRuns(child, out, next);
+    inlineRuns(child, out, withMarks(child, inherited));
   }
 }
 
@@ -379,26 +364,27 @@ function blocksFrom(node: Node, depth = 0): Block[] {
   }
   if (tag === 'table') {
     const rows: string[][] = [];
-    const links: CellLink[][][] = [];
+    const cellRuns: Run[][][] = [];
     const counts = { math: 0, typos: 0 };
     for (const tr of node.querySelectorAll('tr') as Node[]) {
       const cells = (tr.querySelectorAll('th,td') as Node[]).map((cell) => {
-        const raw: CellOut = { text: '', links: [] };
-        cellInto(cell, counts, raw);
-        return normaliseCell(raw);
+        const out: CellOut = { text: '', runs: [] };
+        cellInto(cell, counts, out);
+        cellEnd(out);
+        return out;
       });
       rows.push(cells.map((cell) => cell.text));
-      links.push(cells.map((cell) => cell.links));
+      cellRuns.push(cells.map((cell) => cell.runs));
     }
     const width = Math.max(0, ...rows.map((r) => r.length));
     if (!rows.length || !width) return [];
-    const hasLinks = links.some((row) => row.some((cell) => cell.length));
+    const styled = cellRuns.some((row) => row.some((cell) => cell.length));
     return [{
       kind: 'table',
       text: '',
       runs: [],
       rows: rows.map((r) => [...r, ...Array(width - r.length).fill('')]),
-      ...(hasLinks ? { cellLinks: links } : {}),
+      ...(styled ? { cellRuns } : {}),
       ...(counts.math ? { mathAsSource: counts.math } : {}),
       ...(counts.typos ? { mathTypos: counts.typos } : {}),
     }];
@@ -469,8 +455,8 @@ export interface PublishPlan {
   requests: unknown[];
   placeholders: Placeholder[];
   tables: string[][][];
-  /** #702: each table's cell links, in step with `tables` (table, row, column). */
-  tableLinks: CellLink[][][][];
+  /** #702: each table's cell runs, in step with `tables` (table, row, column). */
+  tableRuns: Run[][][][];
   images: Block[];
 }
 
@@ -481,6 +467,23 @@ export interface PublishPlan {
  * an OptionalColor belonged, so every colour here goes through this helper.
  */
 const grey = (v: number) => ({ color: { rgbColor: { red: v, green: v, blue: Math.min(1, v + 0.02) } } });
+
+/** A run's Docs text style and field mask, the same in prose and in table cells; null when it has none. */
+function runStyle(run: Run): { textStyle: Record<string, unknown>; fields: string } | null {
+  const textStyle: Record<string, unknown> = {};
+  const fields: string[] = [];
+  if (run.bold) { textStyle.bold = true; fields.push('bold'); }
+  if (run.italic) { textStyle.italic = true; fields.push('italic'); }
+  if (run.strike) { textStyle.strikethrough = true; fields.push('strikethrough'); }
+  if (run.underline) { textStyle.underline = true; fields.push('underline'); }
+  if (run.code) {
+    textStyle.weightedFontFamily = { fontFamily: MONO_FONT };
+    textStyle.backgroundColor = grey(0.95);
+    fields.push('weightedFontFamily', 'backgroundColor');
+  }
+  if (run.link) { textStyle.link = { url: run.link }; fields.push('link'); }
+  return fields.length ? { textStyle, fields: fields.join(',') } : null;
+}
 
 export interface PlanOptions {
   /** Add paragraph spacing when no template governs the document's styles. */
@@ -594,19 +597,8 @@ export function buildPublishPlan(blocks: Block[], options: PlanOptions): Publish
       const s = start + prefixLen + run.start;
       const e = start + prefixLen + run.end;
       if (e <= s) continue;
-      const textStyle: Record<string, unknown> = {};
-      const fields: string[] = [];
-      if (run.bold) { textStyle.bold = true; fields.push('bold'); }
-      if (run.italic) { textStyle.italic = true; fields.push('italic'); }
-      if (run.strike) { textStyle.strikethrough = true; fields.push('strikethrough'); }
-      if (run.underline) { textStyle.underline = true; fields.push('underline'); }
-      if (run.code) {
-        textStyle.weightedFontFamily = { fontFamily: MONO_FONT };
-        textStyle.backgroundColor = grey(0.95);
-        fields.push('weightedFontFamily', 'backgroundColor');
-      }
-      if (run.link) { textStyle.link = { url: run.link }; fields.push('link'); }
-      if (fields.length) requests.push({ updateTextStyle: { range: { startIndex: s, endIndex: e }, textStyle, fields: fields.join(',') } });
+      const style = runStyle(run);
+      if (style) requests.push({ updateTextStyle: { range: { startIndex: s, endIndex: e }, ...style } });
     }
   });
 
@@ -621,7 +613,7 @@ export function buildPublishPlan(blocks: Block[], options: PlanOptions): Publish
     requests,
     placeholders,
     tables: placeholders.filter((p) => p.block.kind === 'table').map((p) => p.block.rows ?? []),
-    tableLinks: placeholders.filter((p) => p.block.kind === 'table').map((p) => p.block.cellLinks ?? []),
+    tableRuns: placeholders.filter((p) => p.block.kind === 'table').map((p) => p.block.cellRuns ?? []),
     images: placeholders.filter((p) => p.block.kind === 'image').map((p) => p.block),
   };
 }
@@ -705,10 +697,10 @@ export function placeholderRequests(located: LocatedPlaceholder[], imageUris: Ma
 
 /**
  * Fill table cells from a fresh read, last table, last row, last cell first.
- * A cell's links (#702) are styled right after its text goes in, over ranges
- * counted from that cell's start.
+ * A cell's runs (#702) are styled right after its text goes in, over ranges
+ * counted from that cell's start, with the same styles as prose runs.
  */
-export function tableCellRequests(doc: DocsDocument, tables: string[][][], tableLinks: CellLink[][][][] = []): unknown[] {
+export function tableCellRequests(doc: DocsDocument, tables: string[][][], tableRuns: Run[][][][] = []): unknown[] {
   const docTables = doc.body.content.filter((el) => el.table);
   const requests: unknown[] = [];
   for (let t = docTables.length - 1; t >= 0; t--) {
@@ -723,9 +715,10 @@ export function tableCellRequests(doc: DocsDocument, tables: string[][][], table
         if (!value || typeof at !== 'number') continue;
         requests.push({ insertText: { location: { index: at }, text: value } });
         if (r === 0) requests.push({ updateTextStyle: { range: { startIndex: at, endIndex: at + value.length }, textStyle: { bold: true }, fields: 'bold' } });
-        for (const link of tableLinks[t]?.[r]?.[c] ?? []) {
-          if (link.end > value.length || link.end <= link.start) continue;
-          requests.push({ updateTextStyle: { range: { startIndex: at + link.start, endIndex: at + link.end }, textStyle: { link: { url: link.url } }, fields: 'link' } });
+        for (const run of tableRuns[t]?.[r]?.[c] ?? []) {
+          if (run.end > value.length || run.end <= run.start) continue;
+          const style = runStyle(run);
+          if (style) requests.push({ updateTextStyle: { range: { startIndex: at + run.start, endIndex: at + run.end }, ...style } });
         }
       }
     }

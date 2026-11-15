@@ -194,7 +194,7 @@ const cellInserts = cells.filter((c) => c.insertText).map((c) => c.insertText.lo
 assert.deepEqual(cellInserts, [17, 14, 12], 'filled from the last cell backwards; an empty cell is skipped');
 assert.ok(cells.some((c) => c.updateTextStyle?.textStyle?.bold), 'the header row is bold');
 
-// ── #702: a link inside a table cell keeps its address ────────────────────────
+// ── #702: a table cell keeps its links and its styles ─────────────────────────
 {
   const linkedHtml = `<table><tbody>
 <tr><th><p>Name</p></th><th><p>Where</p></th></tr>
@@ -203,28 +203,52 @@ assert.ok(cells.some((c) => c.updateTextStyle?.textStyle?.bold), 'the header row
   const linkedTable = htmlToBlocks(linkedHtml).find((b) => b.kind === 'table')!;
   assert.deepEqual(linkedTable.rows, [['Name', 'Where'], ['Docs at the site and mail', 'no all of it']],
     'the cell text is unchanged by the links');
-  assert.deepEqual(linkedTable.cellLinks, [
+  assert.deepEqual(linkedTable.cellRuns, [
     [[], []],
     [
-      [{ start: 8, end: 16, url: 'https://example.com/a' }, { start: 21, end: 25, url: 'mailto:a@example.com' }],
-      [{ start: 3, end: 12, url: 'https://example.com/b' }],
+      [{ start: 8, end: 16, link: 'https://example.com/a' }, { start: 21, end: 25, link: 'mailto:a@example.com' }],
+      [{ start: 3, end: 6, link: 'https://example.com/b', bold: true }, { start: 6, end: 12, link: 'https://example.com/b' }],
     ],
-  ], 'ranges follow the cell text after its whitespace is collapsed; an unsafe address is no link');
-  assert.equal(table?.cellLinks, undefined,
-    'a table with no links carries none');
+  ], 'ranges follow the cell text after its whitespace is collapsed; an unsafe address is no link; bold inside a link is kept');
+  assert.equal(table?.cellRuns, undefined,
+    'a table with no styled text carries no runs');
 
   const linkedPlan = buildPublishPlan(htmlToBlocks(linkedHtml), { spacing: true });
-  assert.deepEqual(linkedPlan.tableLinks, [linkedTable.cellLinks]);
-  const linkedCells = tableCellRequests(docWithTable, linkedPlan.tables, linkedPlan.tableLinks) as Record<string, any>[];
-  const linkStyles = linkedCells.filter((c) => c.updateTextStyle?.fields === 'link').map((c) => c.updateTextStyle);
+  assert.deepEqual(linkedPlan.tableRuns, [linkedTable.cellRuns]);
+  const linkedCells = tableCellRequests(docWithTable, linkedPlan.tables, linkedPlan.tableRuns) as Record<string, any>[];
+  const linkStyles = linkedCells.filter((c) => c.updateTextStyle?.textStyle?.link).map((c) => c.updateTextStyle);
   assert.deepEqual(linkStyles, [
-    { range: { startIndex: 19 + 3, endIndex: 19 + 12 }, textStyle: { link: { url: 'https://example.com/b' } }, fields: 'link' },
+    { range: { startIndex: 19 + 3, endIndex: 19 + 6 }, textStyle: { bold: true, link: { url: 'https://example.com/b' } }, fields: 'bold,link' },
+    { range: { startIndex: 19 + 6, endIndex: 19 + 12 }, textStyle: { link: { url: 'https://example.com/b' } }, fields: 'link' },
     { range: { startIndex: 17 + 8, endIndex: 17 + 16 }, textStyle: { link: { url: 'https://example.com/a' } }, fields: 'link' },
     { range: { startIndex: 17 + 21, endIndex: 17 + 25 }, textStyle: { link: { url: 'mailto:a@example.com' } }, fields: 'link' },
-  ], 'each link is styled over its own words, counted from its cell');
+  ], 'each link is styled over its own words, counted from its cell, with the same styles as prose');
   const order = linkedCells.map((c) => (c.insertText ? `text@${c.insertText.location.index}` : `${c.updateTextStyle.fields}@${c.updateTextStyle.range.startIndex}`));
-  assert.ok(order.indexOf('text@19') < order.indexOf('link@22') && order.indexOf('link@22') < order.indexOf('text@17'),
-    'a cell is linked right after it is filled, before an earlier cell moves it');
+  assert.ok(order.indexOf('text@19') < order.indexOf('bold,link@22') && order.indexOf('bold,link@22') < order.indexOf('text@17'),
+    'a cell is styled right after it is filled, before an earlier cell moves it');
+
+  // The same class: bold, italic and code in a body cell were dropped with the links.
+  const styledHtml = `<table><tbody><tr><th><p>A</p></th></tr><tr><td><p><strong>bold</strong>, <em>it</em> and <code>x()</code></p></td></tr></tbody></table>`;
+  const styled = htmlToBlocks(styledHtml).find((b) => b.kind === 'table')!;
+  assert.deepEqual(styled.rows, [['A'], ['bold, it and x()']]);
+  assert.deepEqual(styled.cellRuns?.[1][0], [
+    { start: 0, end: 4, bold: true }, { start: 6, end: 8, italic: true }, { start: 13, end: 16, code: true },
+  ], 'a body cell keeps its bold, italic and code');
+  const styledCells = tableCellRequests(docWithTable, [styled.rows!], [styled.cellRuns!]) as Record<string, any>[];
+  assert.ok(styledCells.some((c) => c.updateTextStyle?.fields === 'weightedFontFamily,backgroundColor' && c.updateTextStyle.range.startIndex === 17 + 13),
+    'code in a cell gets the same font and shading as code in prose');
+
+  // A line break in a cell (`<br>`, the one form Markdown keeps there, or a
+  // second paragraph) used to glue its two lines into one word.
+  const brokenHtml = `<table><tbody><tr><th><p>one<br>two</p></th></tr>
+<tr><td><p><strong>one </strong> <br> two<br></p></td></tr>
+<tr><td><p>one</p><p>two</p></td></tr>
+<tr><td><p><br>one</p></td></tr></tbody></table>`;
+  const broken = htmlToBlocks(brokenHtml).find((b) => b.kind === 'table')!;
+  assert.deepEqual(broken.rows, [['one\u000btwo'], ['one\u000btwo'], ['one\u000btwo'], ['one']],
+    'a line break in a cell stays a line break; spaces around it and a break at either end are dropped');
+  assert.deepEqual(broken.cellRuns?.[1][0], [{ start: 0, end: 3, bold: true }],
+    'a style that ends at a line break does not run over it');
 }
 
 // ── Clearing a body for Sync or a template copy ───────────────────────────────
