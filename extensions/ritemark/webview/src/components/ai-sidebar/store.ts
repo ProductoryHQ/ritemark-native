@@ -72,6 +72,7 @@ import { MAX_PINNED_CONVERSATIONS } from './conversationActionsModel';
 import { projectionToConversation, reconciledOpenCodeModel, reconcileRestoredModels, type RestoreCatalogs } from './conversationProjection';
 import { appendStreamedText } from '../../../../src/agent/types';
 import type { StartingPlace } from '../../../../src/guidance/startingPlace';
+import type { SheetSignInAi, SheetSignInRequest, SheetSignInView } from '../../../../src/views/agentSidebarProtocol';
 import { requestTurnReveal } from './turnReveal';
 import type {
   AgentId,
@@ -426,6 +427,11 @@ interface AISidebarState {
   onboardingStatus: OnboardingStatus | null;
   onboardingDismissed: boolean;
   onboardingInstallStates: Record<OnboardingDependency, OnboardingInstallState>;
+  /**
+   * Sprint 160 (#696): what each sign-in card on "Almost there!" shows beyond its AI's state, from the host
+   * (`onboarding:sign-in`): whether the running sign-in's page can open again, and the card's line.
+   */
+  sheetSignIns: Record<SheetSignInAi, SheetSignInView>;
 
   // ── Discovered agents/commands from .claude/ (APP-GLOBAL) ──
   discoveredAgents: DiscoveredAgent[];
@@ -530,6 +536,10 @@ interface AISidebarState {
   installDependency: (dep: OnboardingDependency) => void;
   recheckDependencies: () => void;
   dismissOnboarding: () => void;
+  /** Sprint 160 (#696): a sign-in card's Cancel, the same stop as Home's. */
+  cancelSignIn: (ai: SheetSignInAi) => void;
+  /** Sprint 160 (#696): a sign-in card's "Open the page again". */
+  reopenSignIn: (ai: SheetSignInAi) => void;
 
   // ── Chat history actions ──
   loadConversationList: () => void;
@@ -1131,6 +1141,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       'claude-cli': 'unknown',
       'codex-cli': 'unknown',
     },
+    sheetSignIns: { claude: { page: false, line: null }, chatgpt: { page: false, line: null } },
 
     chatFontSize: 13,
     discoveredAgents: [],
@@ -2101,6 +2112,25 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
     recheckDependencies: () => {
       vscode.postMessage({ type: 'onboarding:recheck' });
+    },
+
+    cancelSignIn: (ai) => {
+      // The card stops waiting at once, as Home's does when its Cancel is pressed; the host's status follows
+      if (ai === 'claude') {
+        const setup = get().setupStatus;
+        set({
+          ...(setup?.state === 'auth-in-progress' ? { setupStatus: { ...setup, state: 'needs-auth' as const } } : {}),
+          ...(get().claudeLoginState === 'pending' ? { claudeLoginState: 'idle' as const, setupInProgress: false } : {}),
+        });
+      } else {
+        const codex = get().codexStatus;
+        if (codex.state === 'auth-in-progress') set({ codexStatus: { ...codex, state: 'needs-auth', error: null } });
+      }
+      vscode.postMessage({ type: 'onboarding:cancel-sign-in', ai } satisfies SheetSignInRequest);
+    },
+
+    reopenSignIn: (ai) => {
+      vscode.postMessage({ type: 'onboarding:reopen-sign-in', ai } satisfies SheetSignInRequest);
     },
 
     dismissOnboarding: () => {
@@ -3629,6 +3659,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           if (s.claudeCliInstalled) installStates['claude-cli'] = 'installed';
           if (s.codexCliInstalled) installStates['codex-cli'] = 'installed';
           set({ onboardingStatus: s, onboardingInstallStates: installStates });
+          break;
+        }
+
+        case 'onboarding:sign-in': {
+          // Sprint 160 (#696): a sign-in card's page and line, wherever its sign-in started
+          if (message.ai !== 'claude' && message.ai !== 'chatgpt') break;
+          set({ sheetSignIns: { ...get().sheetSignIns, [message.ai]: { page: message.page === true, line: message.line ?? null } } });
           break;
         }
 
