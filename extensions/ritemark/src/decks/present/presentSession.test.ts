@@ -41,6 +41,7 @@ const titleOf = (session: PresentSession) => session.view().current.data.title;
   assert.equal(deckLookOf('---\nlook: Borderless\n---\n'), 'card', "the deck view's exact rule: Borderless only as written");
   assert.equal(frontMatterValue(TEXT, 'ritemark-length'), '45');
   assert.equal(frontMatterValue(TEXT, 'missing'), null);
+  assert.equal(deckLookOf('---\n---\n\n```slide title\nlook: borderless\n```\n---\nmore\n'), 'card', 'an empty front matter, not a slide line before a later ---');
 }
 
 // ---- From the start and From this slide; n of N counts only the slides shown

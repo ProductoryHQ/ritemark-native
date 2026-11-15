@@ -120,7 +120,7 @@ export function DeckWall() {
     if (digits === null) return
     const number = Number(digits)
     if (number >= 1) sendToExtension('present/peek', { number })
-    const timer = window.setTimeout(() => setDigits(null), GOTO_MS)
+    const timer = window.setTimeout(() => { setDigits(null); setPeeked(null) }, GOTO_MS)
     return () => window.clearTimeout(timer)
   }, [digits])
 

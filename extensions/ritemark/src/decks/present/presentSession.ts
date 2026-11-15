@@ -76,8 +76,9 @@ export function presentTitleOf(slide: PresentSlide): string {
 
 /** One value of the deck's front matter (`look`, `ritemark-length`), as written, or null. */
 export function frontMatterValue(text: string, key: string): string | null {
-  const match = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(text);
-  if (!match) return null;
+  // An empty front matter (`---` then `---`) first, so a later `---` in the deck is never taken for its closing line.
+  const match = /^---[ \t]*\r?\n(?:([\s\S]*?)\r?\n)??---[ \t]*(?:\r?\n|$)/.exec(text);
+  if (!match || match[1] === undefined) return null;
   for (const line of match[1].split(/\r?\n/)) {
     const entry = /^([A-Za-z0-9_-]+):[ \t]*(.*)$/.exec(line);
     if (entry && entry[1] === key) return readScalar(entry[2]);
