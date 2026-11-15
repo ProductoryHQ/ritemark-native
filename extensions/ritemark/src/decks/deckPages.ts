@@ -20,6 +20,7 @@ import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import { deckModeOf } from './deckMode';
 import { isThemePath } from './deckTheme';
 import { decodeDeckRequest, DeckProtocolError, type DeckHostMessage, type DeckRequest } from './deckProtocol';
+import { decodeDeckPresentRequest, type DeckPresentRequest } from './present/presentProtocol';
 import { parseFrom } from './deckFormat';
 import { slidesOfText } from './deckLibraryFormat';
 import { deckName, type DeckLibrary, type LibraryWrite } from './DeckLibrary';
@@ -58,6 +59,8 @@ export class DeckPages implements vscode.Disposable {
   private readonly writes = new Map<string, LibraryWrite>();
   private readonly waiting = new Map<string, (ok: boolean) => void>();
   private requests = 0;
+  /** Present on the deck's bar (Sprint 159): the presenter, set once at activation (`decksHost.ts`). */
+  presentHandler: ((origin: { document: vscode.TextDocument; panel: vscode.WebviewPanel }, request: DeckPresentRequest) => Promise<void>) | null = null;
 
   /** `library` gives the project's library, or null when the window has no project folder on disk. */
   constructor(private readonly library: () => DeckLibrary | null = () => null) {}
@@ -161,6 +164,14 @@ export class DeckPages implements vscode.Disposable {
   /** One request from a deck view; the answer goes to that webview only. */
   async handle(document: vscode.TextDocument, webview: vscode.Webview, message: unknown): Promise<void> {
     if (!this.deckModeFor(document)) return;
+    // Present (Sprint 159) has its own decoder, beside the presenter's other messages.
+    if ((message as { type?: unknown } | null)?.type === 'deck/present') {
+      const present = decodeDeckPresentRequest(message);
+      const view = [...this.views].find(entry => entry.panel.webview === webview);
+      if (present && view && this.presentHandler) await this.presentHandler({ document, panel: view.panel }, present);
+      else if (!present) console.warn('[Decks] Dropped a malformed Present request');
+      return;
+    }
     let request: DeckRequest;
     try {
       request = decodeDeckRequest(message);

@@ -44,6 +44,7 @@ import { DeckGuard } from './handout/deckGuard'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
 import { Stage } from './Stage'
+import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import './decks.css'
 
 /** The deck's extensions, made once: the editor's extension list is fixed at mount. */
@@ -414,6 +415,23 @@ export function DeckView({
     const tops = partTops()
     if (container && tops[index] !== undefined) container.scrollTop = scrollTopFor(tops[index])
   }, [makeCurrent, partTops, scrollContainer])
+
+  // Present (Sprint 159): from the current slide or from the start, on the wall; Stop brings the deck back to the slide
+  // the presenter ended on.
+  const present = useCallback((from: PresentFrom) => {
+    if (countRef.current === 0) return
+    sendToExtension('deck/present', { from, index: Math.max(0, Math.min(currentRef.current, countRef.current - 1)) })
+  }, [])
+  usePresentKeys(present, count > 0)
+  useEffect(() => onMessage(message => {
+    if (message.type === 'deck/present-ended' && typeof message.index === 'number' && Number.isInteger(message.index)) {
+      const index = Math.max(0, Math.min(message.index, countRef.current - 1))
+      requestAnimationFrame(() => pick(index))
+    } else if (message.type === 'deck/present-failed' && typeof message.message === 'string') {
+      setNotice({ text: message.message })
+    }
+  }), [pick])
+  const startNumber = slides.find(entry => entry.data.skip !== true)?.index
 
   // The line between the slide and the handout is dragged to change the widths.
   const onDividerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -840,6 +858,7 @@ export function DeckView({
             options={[{ value: 'card', label: 'Card' }, { value: 'borderless', label: 'Borderless' }]}
           />
         </Tooltip>
+        <PresentButton slideNumber={count === 0 ? null : shown + 1} startNumber={startNumber === undefined ? null : startNumber + 1} onPresent={present} />
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>
         {status === 'action' && syncAction ? (
           <SyncActionButton action={syncAction} />
