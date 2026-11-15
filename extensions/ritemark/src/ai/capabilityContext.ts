@@ -152,6 +152,7 @@ const SECTIONS: CapabilitySection[] = [
             'TASK BOARD: this project has a task board — cards the user and agents work through (Ideas, To do, Doing, Done).',
             '- Read and change it only with the `ritemark_board` tools (list_cards, read_card, add_card, update_card, move_card, report_result, ask_user). Never edit the files in `.ritemark/tasks/` yourself.',
             '- When a message says it is a card on the task board, work toward the card\'s "Done when", and finish with report_result for that card: one or two sentences on what you did, plus up to three short things the user should check.',
+            '- A card\'s id is for the tools only. Never write it in a reply to the user: call it "the task\'s card", or name the task by its title.',
             '- Before long work, put the decisions that would change the result to the user with ask_user first, rather than stopping halfway. For any decision that can wait, use ask_user instead of guessing, then end your turn; the answer comes back to the conversation.',
             '- Only the user marks a card done, and only the user deletes one.',
           ].join('\n')

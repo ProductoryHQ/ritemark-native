@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — v2.3.0
+
+#### Fixed
+- **A page that failed to load opens when you open its file again (#710).** If a web page's `.html` file was missing when Ritemark opened, its tab showed "Failed to Load Page", and opening the file again from Documents once it was back only brought that failed tab forward. Now opening the file loads the page again in the same tab, as the bar's Reload does. A page that loaded fine is only brought forward, as before.
+
 ## [2.2.0] — 2026-11-11
 
 ### 2.2: the Published chip's menu (Jarmo's test, 9 November)
