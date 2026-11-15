@@ -100,6 +100,21 @@ async function main() {
     assert.equal(model.sheets[0].cells.get(cellKey(4, 3))?.formula, 'B5*C5')
   }
 
+  // An ISO date (t="d") in a 1904-system workbook reads as the same day (Codex on #723)
+  {
+    const zip = await JSZip.loadAsync(fs.readFileSync(path.join(repo, 'docs/development/sprints/sprint-81-excel-editing/test-workbook.xlsx')))
+    const wb = (await zip.file('xl/workbook.xml')!.async('string')).replace(/<workbookPr([^>]*?)\/>/, '<workbookPr$1 date1904="1"/>')
+    zip.file('xl/workbook.xml', /date1904/.test(wb) ? wb : wb.replace('<sheets>', '<workbookPr date1904="1"/><sheets>'))
+    const sheet = (await zip.file('xl/worksheets/sheet1.xml')!.async('string')).replace('</sheetData>', '<row r="40"><c r="A40" t="d" s="0"><v>2026-01-03T00:00:00Z</v></c></row></sheetData>')
+    zip.file('xl/worksheets/sheet1.xml', sheet)
+    const model = await readWorkbook(new Uint8Array(await zip.generateAsync({ type: 'uint8array' })))
+    assert.ok(model.date1904)
+    const cell = model.sheets[0].cells.get(cellKey(39, 0))!
+    assert.equal(cell.value, 46025 - 1462, 'a serial in the 1904 system')
+    const { formatCellValue } = await import('./numberFormat')
+    assert.equal(formatCellValue(cell.value as number, 'dd.mm.yyyy', true).text, '03.01.2026')
+  }
+
   // Not a workbook: thrown, for the SheetJS fallback
   await assert.rejects(readWorkbook(new Uint8Array([1, 2, 3])))
 

@@ -79,6 +79,7 @@ After PR 1 the warning goes. A quiet line on the bar after the first edit (frame
   - `webview/src/components/SpreadsheetViewer.tsx`, `DataTable.tsx` and `App.tsx` (the xlsx route only);
   - `webview/package.json` and its lockfile (numfmt), and `media/webview.js`;
   - `package.json` (the test list), `docs/development/architecture.md` (the Excel contract at line 201) and `branding/ATTRIBUTION.md`.
+  - `docs/CHANGELOG.md`: each PR adds its user-facing lines under 2.3.0. `docs/releases/v2.3.0/release-notes.md` is written for the release with the release-notes skill, from those lines.
 - **Next to Decks:** Sprint 157 touches `App.tsx` only after the CSV block, away from the xlsx route, and no other file here.
 
 ## Tests

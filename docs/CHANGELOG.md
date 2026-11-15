@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — 2.3.0
+
+### Sprint 158: Excel looks like Excel, and a save keeps it (#711)
+
+#### Fixed
+- **Saving a workbook keeps everything you didn't change.** Until now, one edit and a save in Ritemark removed the whole workbook's cell colours, bold text, borders, frozen rows, charts, pictures, drop-down lists and colour rules. Now only the cells you typed into change; everything else in the file stays exactly as it was. A cell that held a formula keeps the value you typed, and the totals that use it update when the file opens in Excel. After your first edit, a quiet line under the bar says so. A cell Ritemark can't change safely (part of an array formula, a table's column name, a chart sheet) says why and stays as it was, and if a save can't be written safely, nothing is written and your changes stay, unsaved.
+- **Dates read as the file writes them.** A day-first date such as 03.01.2026, as Estonian workbooks write them, no longer shows as 1/3/26. Durations (8:15), money, percentages and red negatives follow each cell's own format, and a date or time you type into such a cell stays a date or time.
+
+#### Changed
+- **Hidden rows, columns and sheets stay hidden**, as the author left them, and a workbook opens on its own sheet. A cell edits as Excel's bar shows it: 1450 in a cell that reads "1,450.00 €".
+
 ## [2.2.0] — 2026-11-11
 
 ### 2.2: the Published chip's menu (Jarmo's test, 9 November)

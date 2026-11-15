@@ -215,11 +215,35 @@ async function main() {
     assert.equal(report.formulasRemoved, 1);
     const cells = cellsOf(bytes, 'Sales');
     assert.equal(cells.D4, 'f:B4*C4');
-    // overwriting a dependent only removes its own formula
+    // overwriting a dependent splits the group too (Codex on #722): no cell is left in a shared range it has left
     const dep = await applyCellEdits(shared, [{ sheet: 'Sales', ref: 'D5', value: 2 }]);
     const depXml = (await partText(dep.bytes, 'xl/worksheets/sheet1.xml'))!;
-    assert.match(depXml, /<f t="shared" ref="D3:D6" si="0">B3\*C3<\/f>/);
-    assert.equal(cellsOf(dep.bytes, 'Sales').D6, 'f:B6*C6');
+    assert.doesNotMatch(depXml, /t="shared"/)
+    assert.match(depXml, /<c r="D3"[^>]*><f>B3\*C3<\/f>/, 'the anchor keeps its formula as its own');
+    assert.match(depXml, /<c r="D4"[^>]*><f>B4\*C4<\/f>/);
+    assert.match(depXml, /<c r="D5"[^>]*><v>2<\/v><\/c>/);
+    assert.match(depXml, /<c r="D6"[^>]*><f>B6\*C6<\/f>/);
+    const split = cellsOf(dep.bytes, "Sales");
+    assert.deepEqual([split.D3, split.D4, split.D5, split.D6], ['f:B3*C3', 'f:B4*C4', 2, 'f:B6*C6']);
+    // an unmovable group refuses a dependent too
+    const index = await indexWorkbook(await rezip(excelMac, (files) => {
+      const xml = files.get('xl/worksheets/sheet1.xml') as string;
+      files.set('xl/worksheets/sheet1.xml', xml.replace('<f>B3*C3</f>', '<f t="shared" ref="D3:D6" si="0">B1048574*2</f>').replace('<f>B4*C4</f>', '<f t="shared" si="0"/>'));
+    }));
+    await assert.rejects(checkCellEdit(index, { sheet: 'Sales', ref: 'D4', value: 1 }), /shared across D3:D6/);
+  }
+
+  // ── The calculation chain's relationship and content type, written with single quotes, go too (Codex on #722) ─
+  {
+    const quoted = await rezip(excelish, (files) => {
+      files.set('xl/_rels/workbook.xml.rels', (files.get('xl/_rels/workbook.xml.rels') as string).replace(/<Relationship ([^>]*calcChain[^>]*)\/>/, (m) => m.replace(/"/g, "'")));
+      files.set('[Content_Types].xml', (files.get('[Content_Types].xml') as string).replace(/<Override ([^>]*calcChain[^>]*)\/>/, (m) => m.replace(/"/g, "'")));
+    });
+    assert.match((await partText(quoted, 'xl/_rels/workbook.xml.rels'))!, /Id='rIdCC'/);
+    const { bytes, report } = await applyCellEdits(quoted, [{ sheet: 'Budget', ref: 'B11', value: 1 }]);
+    assert.ok(report.calcChainDropped);
+    assert.doesNotMatch((await partText(bytes, 'xl/_rels/workbook.xml.rels'))!, /calcChain/);
+    assert.doesNotMatch((await partText(bytes, '[Content_Types].xml'))!, /calcChain/);
   }
 
   // ── A shared formula that can't be moved to every cell of its range is refused when the anchor is edited ─
@@ -229,8 +253,7 @@ async function main() {
       files.set('xl/worksheets/sheet1.xml', xml.replace('<f>B3*C3</f>', '<f t="shared" ref="D3:D6" si="0">B1048574*2</f>').replace('<f>B4*C4</f>', '<f t="shared" si="0"/>'));
     });
     const index = await indexWorkbook(unmovable);
-    await assert.rejects(checkCellEdit(index, { sheet: 'Sales', ref: 'D3', value: 1 }), /shared with other cells/);
-    await checkCellEdit(index, { sheet: 'Sales', ref: 'D4', value: 1 });
+    await assert.rejects(checkCellEdit(index, { sheet: 'Sales', ref: 'D3', value: 1 }), /shared across D3:D6/);
   }
 
   // ── Refusals: an array formula, a data table, a table's header and totals rows, a chart sheet, long text ─
@@ -279,7 +302,7 @@ async function main() {
         .replace(/<c r="[A-Z]+\d+"/g, '<c');
       files.set('xl/worksheets/sheet1.xml', xml);
     });
-    await assert.rejects(checkCellEdit(await indexWorkbook(noR), { sheet: 'Sales', ref: 'D3', value: 1 }), /shared with other cells/);
+    await assert.rejects(checkCellEdit(await indexWorkbook(noR), { sheet: 'Sales', ref: 'D3', value: 1 }), /shared across D3:D6/);
   }
 
   // ── A package that would unpack to too much is refused before anything is inflated ─
