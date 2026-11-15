@@ -49,17 +49,17 @@
 .deck-handout .wysiwyg-editor .ProseMirror {
   counter-reset: deck-slide;
   max-width: none !important;
-  /* On the left, room for the editor's + inside the handout, so it never sits over the slide's side (Jarmo,
-     15 November); 22 on the right; room below to scroll the last part to the top */
-  padding: 6px 22px 60vh 34px !important;
+  /* The prototype's 20 on the left (no + or block handle in the handout); 22 on the right; room below to scroll the
+     last part to the top */
+  padding: 6px 22px 60vh 20px !important;
   font-size: 14.5px !important;
   line-height: 1.65 !important;
   color: var(--r-ink-body);
 }
-/* No block dragging in the handout (Jarmo, 15 November): a block dragged there could land in another slide's part.
-   The handle stays in the page, hidden and out of the pointer's way, because the editor places the + by it; moved
-   right by the +'s own offset, so the + sits where the handle was, just left of the text. */
-.deck-handout .drag-handle { margin-left: 28px; visibility: hidden !important; pointer-events: none !important; }
+/* No block handle and no + in the handout (Jarmo, 15 November): a block dragged there could land in another slide's
+   part, and / adds what the + would. The + lives on the page's body, so it is hidden by the deck view's presence. */
+.deck-handout .drag-handle { visibility: hidden !important; pointer-events: none !important; }
+body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-handout .wysiwyg-editor .ProseMirror p { margin: 0 0 10px !important; font-size: 14.5px !important; line-height: 1.65 !important; }
 .deck-handout .wysiwyg-editor .ProseMirror li p { margin: 0 !important; }
 .deck-handout .wysiwyg-editor .ProseMirror h1 { font-size: 20px !important; margin: 16px 0 6px !important; }
