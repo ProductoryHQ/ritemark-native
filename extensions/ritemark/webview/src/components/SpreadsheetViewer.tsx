@@ -468,7 +468,8 @@ export function SpreadsheetViewer({
     editCell(sheetRowOf(rowIndex), XLSX.utils.decode_col(columnId), text)
   }, [editCell, sheetRowOf])
 
-  // Add row and the + column widen the grid to type in; the file changes once a cell in them is typed into
+  // Add row and the + column of the table (an .xlsx our reader can't open, read by SheetJS) widen it to type in; the
+  // file changes once a cell in them is typed into. The sheet grid has neither: its sheet goes on as Excel's does
   const handleExcelAddRow = useCallback(() => {
     if (!source || !selectedSheet || !isEditable) return
     source.widen(selectedSheet, 1, 0)
@@ -658,14 +659,10 @@ export function SpreadsheetViewer({
           sheet={sheetModel}
           version={version}
           editable={isEditable}
-          extraRows={source.extra(sheetModel.name).rows}
-          extraCols={source.extra(sheetModel.name).cols}
           onEdit={editCell}
           getInput={gridInput}
           getFormula={gridFormula}
           onEditingFormulaChange={setEditingFormula}
-          onAddRow={isEditable ? handleExcelAddRow : undefined}
-          onAddColumn={isEditable ? handleExcelAddColumn : undefined}
           onOpenInExcel={hasExcel ? handleOpenInExcel : handleOpenInNumbers}
           openInLabel={openInLabel}
         />

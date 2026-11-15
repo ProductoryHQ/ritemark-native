@@ -159,6 +159,31 @@ async function main() {
     assert.equal(cellsOf(bytes, 'Budget').B11, 1);
   }
 
+  // ── Sprint 158 PR 5: typing into the first empty row and the first empty column (no Add row any more) ─
+  {
+    const before = (await partText(rich, 'xl/worksheets/sheet1.xml'))!;
+    const [, , lastCol, lastRow] = /<dimension ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"\/>/.exec(before)!.slice(1);
+    const nextRow = Number(lastRow) + 1;
+    const nextCol = String.fromCharCode(lastCol.charCodeAt(lastCol.length - 1) + 1);
+    assert.ok(lastCol.length === 1 && nextCol <= 'Z', 'the fixture ends before column Z');
+    const { bytes, report } = await applyCellEdits(rich, [
+      { sheet: 'Budget', ref: `A${nextRow}`, value: 'a new row' },
+      { sheet: 'Budget', ref: `B${nextRow}`, value: 42 },
+      { sheet: 'Budget', ref: `${nextCol}2`, value: 'a new column' },
+    ]);
+    assert.deepEqual(report.touched.filter((t) => t.startsWith('xl/worksheets/')), ['xl/worksheets/sheet1.xml'], 'only the edited sheet');
+    const xml = (await partText(bytes, 'xl/worksheets/sheet1.xml'))!;
+    assert.match(xml, new RegExp(`<dimension ref="A1:${nextCol}${nextRow}"/>`), 'the used range takes in both');
+    assert.match(xml, new RegExp(`<row r="${nextRow}"[^>]*>`), 'the new row is written');
+    const cells = cellsOf(bytes, 'Budget');
+    assert.equal(cells[`A${nextRow}`], 'a new row');
+    assert.equal(cells[`B${nextRow}`], 42);
+    assert.equal(cells[`${nextCol}2`], 'a new column');
+    // every other cell stays as it was
+    const old = cellsOf(rich, 'Budget');
+    for (const [ref, v] of Object.entries(old)) assert.deepEqual(cells[ref], v, ref);
+  }
+
   // ── Excel for Mac's own file: a value edit touches the sheet and the recalculation flag only ─
   {
     const { bytes, report } = await applyCellEdits(excelMac, [{ sheet: 'Sales', ref: 'B3', value: 13 }]);

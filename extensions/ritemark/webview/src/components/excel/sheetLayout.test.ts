@@ -75,10 +75,16 @@ async function main() {
     const model = await open('training-budget.xlsx')
     const L = buildLayout(model.sheets[0], model.styles, { minWidth: 3000, minHeight: 3000 })
     assert.ok(L.X[L.cols] >= 3000 && L.Y[L.rows] >= 3000)
-    const more = buildLayout(model.sheets[0], model.styles, { ...opts, extraRows: 2, extraCols: 1 })
+    // and goes on past it when the grid asks for more (PR 5): the rows past the data are the sheet's next rows
     const plain = buildLayout(model.sheets[0], model.styles, opts)
-    assert.equal(more.rows, plain.rows + 2)
-    assert.equal(more.cols, plain.cols + 1)
+    const more = buildLayout(model.sheets[0], model.styles, { ...opts, minRows: plain.rows + 20, minCols: plain.cols + 5 })
+    assert.equal(more.rows, plain.rows + 20)
+    assert.equal(more.cols, plain.cols + 5)
+    assert.equal(more.rowOf[more.rows - 1], more.rows - 1)
+    // a sorted view keeps its rows and goes on below them the same way
+    const sorted = buildLayout(model.sheets[0], model.styles, { ...opts, minRows: plain.rows + 3, rowOrder: sortedRows(model.sheets[0], 3, 1, compareCells) })
+    assert.equal(sorted.rows, plain.rows + 3)
+    assert.equal(new Set(sorted.rowOf).size, sorted.rows, 'no sheet row shows twice')
   }
 
   // The project plan: merges, rotated heads, no sort with merged cells across the rows

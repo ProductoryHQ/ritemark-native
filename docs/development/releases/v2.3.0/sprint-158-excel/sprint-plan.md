@@ -61,6 +61,9 @@ Ritemark lets a person edit an `.xlsx` file. Today one edit and a save removes c
 | 2 | The reader with numfmt: number formats (fixes day-first dates), hidden rows, columns and sheets, the active sheet, the SheetJS fallback | Standard |
 | 3 | The Excel look in a new virtualized sheet grid beside `DataTable`: widths, heights, fills, fonts, borders, alignment, wrap, spill, merges, frozen panes, gridlines, the paper | Standard |
 | 4 | Fonts: Carlito for Calibri and Caladea for Cambria (SIL OFL, metric-compatible), cell padding 2 px; performance on a 50,000-row sheet; whether to lift the 10,000-row cap | Standard |
+| 5 | Add row and the + column go from the Excel grid. As in Excel, typing into an empty cell below or beside the data writes that cell (only that cell changes in the file, by PR 1's save), and the sheet grows to take it in. CSV keeps `DataTable`'s Add row and + column | Standard |
+
+**PR 5 was added on 15 November** (mockup question 3). Jarmo, in the Development manager's session: "jah, lisa PR 5-na Sprint 158 plaani" (ritemark-dev 20a9284). In this session: "jah, kinnitan PR 5".
 
 **PR 0 can ship before the rest,** in an extension release on Jarmo's word, because it protects people's files now. The warning sits above the sheet from the moment it opens, not as a toast after the first edit (the Experience lead, frame 3): "Saving here removes this workbook's colours, bold text, borders, charts and pictures. Values and formulas stay." with the button "Open in Excel to keep them".
 
@@ -96,6 +99,7 @@ After PR 1 the warning goes. A quiet line on the bar after the first edit (frame
 - **The bar for the look:** the Experience lead's captures of the same workbooks in Excel, ChatGPT and Claude. PR 3 is compared against them side by side.
 - **Jarmo at the gate:**
   - every saved file opens in Excel and in Numbers with no repair prompt;
+  - a cell typed into below and beside the data (PR 5) saves, and the file opens in Excel and Numbers with no repair prompt;
   - formulas that use an edited cell update, and charts refresh;
   - the preview matches Excel's screenshots;
   - the 50,000-row sheet in a dev instance.

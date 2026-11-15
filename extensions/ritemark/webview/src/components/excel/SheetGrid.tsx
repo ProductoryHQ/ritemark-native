@@ -12,7 +12,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import * as XLSX from 'xlsx'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
-import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { writeClipboard, readClipboard } from '../../lib/clipboard'
 import { compareCells } from '../sheetSort'
@@ -30,17 +29,12 @@ export interface SheetGridProps {
   /** Raised by every edit, so the grid draws the model again. */
   version: number
   editable: boolean
-  /** Rows and columns added by Add row and the + column. */
-  extraRows: number
-  extraCols: number
   /** A cell typed into, by its sheet row and column (0-based). */
   onEdit: (row: number, col: number, text: string) => void
   /** What the formula bar shows and an edit starts with. */
   getInput: (row: number, col: number) => string
   getFormula: (row: number, col: number) => string | undefined
   onEditingFormulaChange?: (editingFormula: boolean) => void
-  onAddRow?: () => void
-  onAddColumn?: () => void
   onOpenInExcel: () => void
   openInLabel: string
 }
@@ -100,14 +94,10 @@ export function SheetGrid({
   sheet,
   version,
   editable,
-  extraRows,
-  extraCols,
   onEdit,
   getInput,
   getFormula,
   onEditingFormulaChange,
-  onAddRow,
-  onAddColumn,
   onOpenInExcel,
   openInLabel,
 }: SheetGridProps) {
@@ -157,6 +147,7 @@ export function SheetGrid({
   useEffect(() => {
     setSortState(null)
     setEditing(null)
+    setReach({ rows: 0, cols: 0 })
     setSelected({ i: sheet.layout.frozen.rows, c: sheet.layout.frozen.cols })
     scroller.current?.scrollTo(0, 0)
   }, [sheet])
@@ -171,14 +162,26 @@ export function SheetGrid({
     return () => ro.disconnect()
   }, [])
 
+  // The sheet goes on past the paper's edge, as Excel's does: there is no Add row or + column (Sprint 158 PR 5).
+  // A scroll to the grid's end, or a cell chosen near it, adds rows and columns, up to Excel's 1,048,576 by 16,384.
+  // Typing into one writes that cell, and the sheet's used range grows to take it in.
+  const [reach, setReach] = useState({ rows: 0, cols: 0 })
+  const growBy = useCallback((rows: number, cols: number) => {
+    setReach((r) => ({ rows: Math.min(1_048_576, Math.max(r.rows, layoutRef.current.rows) + rows), cols: Math.min(16_384, Math.max(r.cols, layoutRef.current.cols) + cols) }))
+  }, [])
+
   const frame = useRef(0)
   const onScroll = useCallback(() => {
     cancelAnimationFrame(frame.current)
     frame.current = requestAnimationFrame(() => {
       const el = scroller.current
-      if (el) setScroll({ x: el.scrollLeft, y: el.scrollTop })
+      if (!el) return
+      setScroll({ x: el.scrollLeft, y: el.scrollTop })
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4 && el.scrollTop > 0
+      const atRight = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4 && el.scrollLeft > 0
+      if (atBottom || atRight) growBy(atBottom ? 50 : 0, atRight ? 10 : 0)
     })
-  }, [])
+  }, [growBy])
 
   const mergedCells = useMemo(() => mergeIndex(sheet.layout.merges), [sheet])
 
@@ -246,17 +249,19 @@ export function SheetGrid({
         // whole steps of 400 px, the same steps the layout is rebuilt at, so the grid always reaches the edges
         minWidth: Math.ceil(viewport.w / 400) * 400 + 64,
         minHeight: Math.ceil(viewport.h / 400) * 400 + 40,
-        extraRows,
-        extraCols,
+        minRows: reach.rows,
+        minCols: reach.cols,
         rowOrder: sort?.rows,
         autoHeight,
         geometry: GEOMETRY,
       }),
     // the grid grows by whole screens, so a resize by a few pixels doesn't lay the sheet out again
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sheet, styles, version, Math.ceil(viewport.w / 400), Math.ceil(viewport.h / 400), extraRows, extraCols, sort, autoHeight],
+    [sheet, styles, version, Math.ceil(viewport.w / 400), Math.ceil(viewport.h / 400), reach, sort, autoHeight],
   )
 
+  const layoutRef = useRef(layout)
+  layoutRef.current = layout
   const { X, Y, rowOf, frozenRows: fr, frozenCols: fc, headerW: HW, headerH: HH } = layout
   const FW = X[fc]
   const FH = Y[fr]
@@ -413,6 +418,12 @@ export function SheetGrid({
     el.addEventListener('scrollend', settle)
     return () => el.removeEventListener('scrollend', settle)
   }, [columnEdge])
+
+  // a cell chosen near the grid's end: more rows or columns past it, so the arrow keys go on as in Excel
+  useEffect(() => {
+    const near = { rows: selected.i >= layout.rows - 3 ? 20 : 0, cols: selected.c >= layout.cols - 2 ? 5 : 0 }
+    if (near.rows || near.cols) growBy(near.rows, near.cols)
+  }, [selected, layout.rows, layout.cols, growBy])
 
   // keep the chosen cell in view, beside the frozen panes
   useEffect(() => {
@@ -927,26 +938,6 @@ export function SheetGrid({
         </div>
       </div>
 
-      {editable && (onAddRow || onAddColumn) && (
-        <div className="sg-addrow flex gap-2">
-          {onAddRow && (
-            <Tooltip label="Add a row under the last one">
-              <Button type="button" variant="ghost" size="compact" onClick={onAddRow}>
-                <Icon name="plus" size={14} tone="inherit" />
-                <span>Add row</span>
-              </Button>
-            </Tooltip>
-          )}
-          {onAddColumn && (
-            <Tooltip label="Add a column after the last one">
-              <Button type="button" variant="ghost" size="compact" onClick={onAddColumn} aria-label="Add column">
-                <Icon name="plus" size={14} tone="inherit" />
-                <span>Column</span>
-              </Button>
-            </Tooltip>
-          )}
-        </div>
-      )}
     </div>
   )
 }

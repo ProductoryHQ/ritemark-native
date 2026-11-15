@@ -43,6 +43,13 @@ async function main() {
   const shared = new Uint8Array(await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }))
   await save('4-mac-excel-shared-formula.xlsx', shared, [{ sheet: 'Sales', ref: 'D5', value: 999 }],
     'a filled-down formula typed over in its middle (D5): D3, D4 and D6 keep their formulas')
+
+  // Sprint 158 PR 5: no Add row; typing below and beside the data grows the sheet (the budget ends at K26)
+  await save('5-budget-typed-below-and-beside.xlsx', read(spike + 'training-budget.xlsx'), [
+    { sheet: 'Budget 2027', ref: 'A27', value: 'Kohvipausid' },
+    { sheet: 'Budget 2027', ref: 'D27', value: 1200 },
+    { sheet: 'Budget 2027', ref: 'L6', value: 'kinnitatud' },
+  ], 'typed into the first empty row (A27, D27) and the first empty column (L6); the used range grows to A1:L27')
 }
 
 main().catch((e) => {
