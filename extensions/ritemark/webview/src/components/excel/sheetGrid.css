@@ -1,0 +1,130 @@
+/* Sprint 158 PR 3 (#711; experience 47): the sheet grid. The cells sit on white paper in both themes (decision 1),
+   with Excel's grey headers and frozen-pane line (decision 5) and Ritemark's accent ring for the chosen cell. */
+
+.sg-paper {
+  --sg-grid: #dadce0;
+  --sg-head: #f5f6f8;
+  --sg-head-line: #d5d9e0;
+  --sg-head-ink: #5f6b7a;
+  --sg-freeze: #9aa3ae;
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  margin: 0 16px;
+  overflow: hidden;
+  border: 1px solid var(--r-hairline);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: #ffffff;
+  color: #000000;
+}
+
+.sg-scroller {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: auto;
+  outline: none;
+  background: #ffffff;
+}
+
+.sg-canvas {
+  display: grid;
+  position: relative;
+}
+
+.sg-region {
+  position: relative;
+  overflow: hidden;
+  background: #ffffff;
+}
+.sg-corner { position: sticky; top: 0; left: 0; z-index: 4; }
+.sg-top { position: sticky; top: 0; z-index: 3; }
+.sg-left { position: sticky; left: 0; z-index: 2; }
+.sg-region > div { position: absolute; box-sizing: border-box; }
+
+.sg-gridline { background: var(--sg-grid); z-index: 0; }
+.sg-fill { z-index: 1; }
+.sg-eraser { background: #ffffff; z-index: 1; }
+.sg-border { z-index: 2; pointer-events: none; }
+
+.sg-text {
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  line-height: 1.2;
+  pointer-events: none;
+}
+.sg-text > span { display: block; width: 100%; white-space: pre; overflow: hidden; }
+.sg-text.sg-wrap > span { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.25; }
+.sg-text.sg-rot { align-items: center; justify-content: center !important; }
+.sg-text.sg-rot > span { width: auto; }
+.sg-text .sg-stack { writing-mode: vertical-rl; text-orientation: upright; }
+.sg-fillrow { display: flex !important; }
+.sg-fillrow .sg-grow { flex: 1; }
+
+.sg-comment { width: 0; height: 0; border-top: 6px solid #d93025; border-left: 6px solid transparent; z-index: 4; pointer-events: none; }
+
+.sg-object {
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px dashed var(--sg-freeze);
+  border-radius: 4px;
+  background: #f8fafc;
+  font-family: var(--ritemark-ui-font-family);
+  text-align: center;
+  color: var(--sg-head-ink);
+}
+.sg-object-label { margin-top: 4px; font-size: 13px; font-weight: 600; color: #3b4452; }
+.sg-object-sub { margin-top: 2px; font-size: 11px; }
+
+.sg-head {
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--sg-head-line);
+  border-bottom: 1px solid var(--sg-head-line);
+  background: var(--sg-head);
+  font: 500 11px var(--ritemark-ui-font-family);
+  color: var(--sg-head-ink);
+  user-select: none;
+}
+.sg-head.sg-row-head { justify-content: flex-end; padding-right: 6px; }
+.sg-head.sg-current { background: var(--ritemark-indigo-soft, #e0e7ff); color: var(--ritemark-indigo-deep, #3730a3); }
+.sg-head.sg-col-head.sg-hidden-next { border-right: 3px double var(--sg-head-ink); }
+.sg-head.sg-row-head.sg-hidden-next { border-bottom: 3px double var(--sg-head-ink); }
+.sg-head .sg-caret { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); opacity: 0; }
+.sg-head.sg-col-head:hover .sg-caret,
+.sg-head.sg-col-head[data-state='open'] .sg-caret,
+.sg-head.sg-col-head.sg-sorted .sg-caret { opacity: 1; }
+
+.sg-freeze-h { left: 0; right: 0; bottom: 0; height: 1px; background: var(--sg-freeze); z-index: 6; }
+.sg-freeze-v { top: 0; bottom: 0; right: 0; width: 1px; background: var(--sg-freeze); z-index: 6; }
+
+/* The chosen cell: Ritemark's accent ring with a 1 px white line inside, so it reads on a dark fill (decision 10) */
+.sg-selection {
+  z-index: 7;
+  pointer-events: none;
+  outline: 2px solid var(--ritemark-indigo-deep, #3730a3);
+  outline-offset: -1px;
+  box-shadow: inset 0 0 0 2px #ffffff;
+}
+
+.sg-editor {
+  z-index: 8;
+  resize: none;
+  margin: 0;
+  border: 0;
+  outline: 2px solid var(--ritemark-indigo-deep, #3730a3);
+  outline-offset: -1px;
+  background: #ffffff;
+  overflow: hidden;
+  line-height: 1.2;
+}
+
+.sg-addrow { padding: 6px 16px 0; }

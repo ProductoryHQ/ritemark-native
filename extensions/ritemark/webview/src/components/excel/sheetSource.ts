@@ -22,6 +22,10 @@ export interface SheetView {
 }
 
 export interface SheetSource {
+  /** Our reader's model, when the workbook was read by it; the sheet grid draws from it (PR 3). */
+  model?: WorkbookModel
+  /** Rows and columns added to a sheet by Add row and the + column. */
+  extra(sheet: string): { rows: number; cols: number }
   /** The sheets shown as tabs, in order: hidden sheets have none. */
   tabs: string[]
   /** The tab the workbook opens on. */
@@ -46,6 +50,8 @@ export function modelSource(model: WorkbookModel): SheetSource {
   const extra = new Map<string, { rows: number; cols: number }>()
   const sheetOf = (name: string) => byName.get(name)
   return {
+    model,
+    extra: (name) => extra.get(name) ?? { rows: 0, cols: 0 },
     tabs: model.sheets.filter((s) => s.state === 'visible').map((s) => s.name),
     initial: model.sheets[model.activeSheet].name,
     extract(name) {
@@ -91,8 +97,9 @@ export function modelSource(model: WorkbookModel): SheetSource {
       const key = cellKey(row, col)
       const previous = sheet.cells.get(key)
       if (value === null || value === '') {
-        // a cleared cell keeps its style but holds nothing; its formula is gone
-        sheet.cells.delete(key)
+        // a cleared cell keeps its style (its fill and borders) but holds nothing; its formula is gone
+        if (previous?.s) sheet.cells.set(key, { kind: 'n', value: '', text: '', s: previous.s })
+        else sheet.cells.delete(key)
         return previous
       }
       const s = previous?.s ?? 0
@@ -129,6 +136,7 @@ export function modelSource(model: WorkbookModel): SheetSource {
 export function sheetJsSource(workbook: XLSX.WorkBook): SheetSource {
   const sheetOf = (name: string) => workbook.Sheets[name]
   return {
+    extra: () => ({ rows: 0, cols: 0 }),
     tabs: [...workbook.SheetNames],
     initial: workbook.SheetNames[0],
     extract(name) {
