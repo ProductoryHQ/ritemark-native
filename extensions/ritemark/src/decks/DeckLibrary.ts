@@ -9,7 +9,7 @@
  */
 import { newId, parseFrom, parseSlideBody, writeFrom, writeSlideBody, type SlideData } from './deckFormat';
 import {
-  appendPart, folderOf, newTopicText, partText, rebaseSlide, replaceSlidePart, slideStamp, slidesOfText,
+  appendPart, folderOf, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp, slidesOfText,
   type DeckSlideText,
 } from './deckLibraryFormat';
 import { BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT } from './deckTheme';
@@ -51,6 +51,8 @@ export interface DeckSummary {
   name: string;
   topic: boolean;
   theme: string | null;
+  /** The deck's look: its slides drawn as cards, or borderless. */
+  borderless: boolean;
   modified: number;
   slides: SlideSummary[];
 }
@@ -86,6 +88,16 @@ export interface LibraryWrite {
   written: string;
 }
 
+/**
+ * Where a copy came from, when its `from:` names a deck inside the project. A deck from someone else can carry any
+ * `from:`, so a source that isn't a `.deck.md` is no source: nothing reads or writes it.
+ */
+function sourceOf(from: string | undefined): { path: string; id: string; stamp: string | null } | null {
+  const source = parseFrom(from);
+  if (!source || !/\.deck\.md$/i.test(source.path) || normalizePath(source.path) !== source.path) return null;
+  return source;
+}
+
 const words = (slide: DeckSlideText) => [
   slide.data.title, slide.data.subtitle, ...(slide.data.items ?? []).flatMap(item => [item.heading, item.text]),
   ...(slide.data.rows ?? []).flat(), slide.handout,
@@ -108,12 +120,15 @@ export class DeckLibrary {
       const slides = slidesOfText(text);
       const hits = query ? slides.filter(slide => words(slide).includes(query) || deckName(file.path).toLowerCase().includes(query)) : slides;
       if (query && hits.length === 0) continue;
-      const theme = /^---[\s\S]*?\ntheme:\s*(.+)\n[\s\S]*?---/.exec(text)?.[1]?.trim() ?? null;
+      const frontMatter = /^---\n([\s\S]*?)\n---/.exec(text)?.[1] ?? '';
+      const theme = /^theme:\s*(.+)$/m.exec(frontMatter)?.[1]?.trim() ?? null;
+      const borderless = /^look:\s*borderless\s*$/m.test(frontMatter);
       found.push({
         path: file.path,
         name: deckName(file.path),
         topic,
         theme,
+        borderless,
         modified: file.modified,
         slides: hits.map(slide => ({
           index: slide.index,
@@ -162,7 +177,7 @@ export class DeckLibrary {
     const cache = new Map<string, DeckSlideText[] | null>();
     const states: SourceState[] = [];
     for (const copy of copies) {
-      const source = parseFrom(copy.from);
+      const source = sourceOf(copy.from);
       if (!source) continue;
       if (!cache.has(source.path)) cache.set(source.path, await this.readDeck(source.path));
       const slide = cache.get(source.path)?.find(entry => entry.data.id === source.id);
@@ -187,8 +202,8 @@ export class DeckLibrary {
    */
   async updateLibrarySlide(deckPath: string, copy: CopiedPart): Promise<LibraryWrite> {
     const data = parseSlideBody(copy.body);
-    const source = parseFrom(data.from);
-    if (!source) throw new Error('This slide is no copy.');
+    const source = sourceOf(data.from);
+    if (!source) throw new Error('This slide is no copy of a deck in this project.');
     const previous = await this.files.read(source.path);
     if (previous === null) throw new Error(`${deckName(source.path)} is no longer there.`);
     const { body, handout } = this.asSourcePart(copy, source.id, deckPath, source.path);
@@ -202,8 +217,8 @@ export class DeckLibrary {
   /** Use it: the source's slide and handout as a part for the copy (its id kept), with a fresh `from:` stamp. */
   async useSource(deckPath: string, copyBody: string): Promise<CopiedPart> {
     const data = parseSlideBody(copyBody);
-    const source = parseFrom(data.from);
-    if (!source || !data.id) throw new Error('This slide is no copy.');
+    const source = sourceOf(data.from);
+    if (!source || !data.id) throw new Error('This slide is no copy of a deck in this project.');
     const slides = await this.readDeck(source.path);
     const slide = slides?.find(entry => entry.data.id === source.id);
     if (!slide) throw new Error(`${deckName(source.path)} no longer has that slide.`);

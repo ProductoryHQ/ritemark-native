@@ -165,9 +165,10 @@ export class DeckPages implements vscode.Disposable {
       if (request.type !== 'deck/source-states') await failed(null, 'The Slide library works for a deck inside the open project folder.');
       return;
     }
-    // The copy as the deck's document holds it: the bytes that are saved, so its stamp is the file's.
-    const part = (id: string) => {
-      const slide = slidesOfText(document.getText()).find(entry => entry.data.id === id);
+    // The copy as the view holds it now (its newest words may still be on their way to the document), written by the
+    // same writer that writes the file, so its stamp is the file's.
+    const part = (id: string, text: string) => {
+      const slide = slidesOfText(text).find(entry => entry.data.id === id);
       if (!slide) throw new Error('That slide is no longer in the deck.');
       return { id, kind: slide.kind, body: slide.body, handout: slide.handout, from: slide.data.from };
     };
@@ -181,17 +182,17 @@ export class DeckPages implements vscode.Disposable {
           return;
         }
         case 'deck/update-library': {
-          const write = await library.updateLibrarySlide(deckPath, part(request.id));
+          const write = await library.updateLibrarySlide(deckPath, part(request.id, request.text));
           await this.post(webview, { type: 'deck/library-written', id: request.id, from: write.from, verb: 'updated', token: this.keep(write), sourceName: deckName(write.path) });
           return;
         }
         case 'deck/use-library': {
-          const copied = await library.useSource(deckPath, part(request.id).body);
+          const copied = await library.useSource(deckPath, part(request.id, request.text).body);
           await this.post(webview, { type: 'deck/library-part', id: request.id, ...copied });
           return;
         }
         case 'deck/add-to-library': {
-          const copy = part(request.id);
+          const copy = part(request.id, request.text);
           const topic = await pickTopic(library);
           if (!topic) return;
           const write = await library.addToLibrary(deckPath, topic, copy);
@@ -210,7 +211,9 @@ export class DeckPages implements vscode.Disposable {
           this.writes.delete(request.token);
           if (!write || !(await library.undoWrite(write))) {
             await failed(null, 'The library was changed since, so it is left as it is.');
+            return;
           }
+          await this.post(webview, { type: 'deck/library-undone', token: request.token });
           return;
         }
       }
@@ -266,13 +269,16 @@ async function pickTopic(library: DeckLibrary): Promise<string | null> {
   return name?.trim() || null;
 }
 
+function resolveAssets(document: vscode.TextDocument, webview: vscode.Webview, paths: string[]): Record<string, string> {
+  return resolveAssetsIn(path.dirname(document.uri.fsPath), webview, paths);
+}
+
 /**
  * The slides' pictures as webview URIs: only relative paths beside the deck that name a file (the same test the
  * editor's Markdown images use), each with its modified time so a changed picture is drawn again.
  */
-function resolveAssets(document: vscode.TextDocument, webview: vscode.Webview, paths: string[]): Record<string, string> {
+export function resolveAssetsIn(folder: string, webview: vscode.Webview, paths: string[]): Record<string, string> {
   const assets: Record<string, string> = {};
-  const folder = path.dirname(document.uri.fsPath);
   for (const relative of paths) {
     if (!isRelativeImagePath(relative) || assets[relative]) continue;
     const absolute = path.resolve(folder, relative);
@@ -295,8 +301,12 @@ const MAX_THEME_BYTES = 64 * 1024;
  * read from the deck's project folder, or the deck's own folder when it has none, and never from outside it.
  */
 async function readTheme(document: vscode.TextDocument, themePath: string): Promise<string | null> {
+  return readProjectTheme(vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath ?? path.dirname(document.uri.fsPath), themePath);
+}
+
+/** The text of a theme file in the project at `root`, or null (the same limits as a deck's own theme). */
+export async function readProjectTheme(root: string, themePath: string): Promise<string | null> {
   if (!isThemePath(themePath)) return null;
-  const root = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath ?? path.dirname(document.uri.fsPath);
   const absolute = path.resolve(root, themePath);
   const relative = path.relative(root, absolute);
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return null;

@@ -91,6 +91,13 @@ async function run() {
   const missing = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: 'x1', from: 'Slide library/Gone.deck.md#a1 @aaaaaa', kind: 'title', body: 'id: x1', handout: '' }]);
   assert.equal(missing[0].missing, true);
 
+  // A from: that names no deck (a deck from someone else can carry any) is no source: nothing reads or writes it.
+  files.files['notes.md'] = '```slide title\nid: a1\ntitle: Kept\n```\n';
+  assert.deepEqual(await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: 'x1', from: 'notes.md#a1 @aaaaaa', kind: 'title', body: 'id: x1', handout: '' }]), []);
+  await assert.rejects(library.updateLibrarySlide('Clients/Harbour/Harbour.deck.md', { kind: 'title', body: 'id: x1\nfrom: notes.md#a1 @aaaaaa', handout: '' }));
+  await assert.rejects(library.updateLibrarySlide('Clients/Harbour/Harbour.deck.md', { kind: 'title', body: 'id: x1\nfrom: Slide library/../notes.deck.md#a1 @aaaaaa', handout: '' }));
+  assert.equal(files.files['notes.md'], '```slide title\nid: a1\ntitle: Kept\n```\n');
+
   console.log('DeckLibrary: passed');
 }
 

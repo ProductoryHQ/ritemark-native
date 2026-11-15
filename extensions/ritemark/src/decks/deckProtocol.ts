@@ -10,6 +10,8 @@ export const MAX_ASSET_PATHS = 500;
 const MAX_PATH_LENGTH = 1024;
 /** A pasted picture as a data URL: at most this many characters (about 25 MB of picture). */
 export const MAX_PICTURE_DATA_URL = 34 * 1024 * 1024;
+/** The deck's text as the view holds it, sent with a library request: at most this many characters. */
+export const MAX_DECK_TEXT = 8 * 1024 * 1024;
 
 export type DeckRequest =
   /** The webview URIs of the slides' pictures, by the paths the slides name (relative to the deck's folder). */
@@ -25,10 +27,13 @@ export type DeckRequest =
    * reads the copies from the deck's document, so the stamps are taken from the bytes the file holds.
    */
   | { type: 'deck/source-states' }
-  /** Update the library with the slide that has this id; Use the library's version; Add the slide to the library. */
-  | { type: 'deck/update-library'; id: string }
-  | { type: 'deck/use-library'; id: string }
-  | { type: 'deck/add-to-library'; id: string }
+  /**
+   * Update the library with the slide that has this id; Use the library's version; Add the slide to the library. `text`
+   * is the deck's text as the view holds it now (its newest words may not have reached the document yet).
+   */
+  | { type: 'deck/update-library'; id: string; text: string }
+  | { type: 'deck/use-library'; id: string; text: string }
+  | { type: 'deck/add-to-library'; id: string; text: string }
   /** Show the copy's source in the Slide library. */
   | { type: 'deck/show-in-library'; from: string }
   /** Undo a library write this view made. */
@@ -49,6 +54,8 @@ export type DeckHostMessage =
   /** The library's version of a copy, to put in its place (its notes stay the deck's). */
   | { type: 'deck/library-part'; id: string; kind: string; body: string; handout: string }
   | { type: 'deck/library-failed'; id: string | null; message: string }
+  /** The library write with this token is undone: the copy's `from:` goes back too. */
+  | { type: 'deck/library-undone'; token: string }
   /** Slides to insert after part `after` (from the Slide library or the AI's tools), as one undo step. */
   | { type: 'deck/insert'; after: number; parts: Array<{ kind: string; body: string; handout: string }> };
 
@@ -98,8 +105,8 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
     case 'deck/update-library':
     case 'deck/use-library':
     case 'deck/add-to-library': {
-      exactKeys(input, ['type', 'id']);
-      return { type: input.type, id: slideIdOf(input.id) };
+      exactKeys(input, ['type', 'id', 'text']);
+      return { type: input.type, id: slideIdOf(input.id), text: stringOf(input.text, MAX_DECK_TEXT, true) };
     }
     case 'deck/show-in-library': {
       exactKeys(input, ['type', 'from']);

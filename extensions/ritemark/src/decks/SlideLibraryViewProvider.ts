@@ -7,18 +7,25 @@
  * The webview is the shared React bundle (`data-editor-type="slide-library"`); the library's work is `DeckLibrary`'s,
  * the same operations the deck view and the AI's tools use.
  */
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { isEnabled } from '../features';
-import type { DeckLibrary } from './DeckLibrary';
-import type { DeckPages } from './deckPages';
-import { normalizePath, slidesOfText } from './deckLibraryFormat';
+import type { DeckLibrary, DeckSummary } from './DeckLibrary';
+import { readProjectTheme, resolveAssetsIn, type DeckPages } from './deckPages';
+import { folderOf, normalizePath, slidesOfText } from './deckLibraryFormat';
+import { projectRoot } from './deckDocuments';
 import { decodeLibraryRequest } from './deckProtocol';
 
 /** Library state is sent at most this often while decks change. */
 const REFRESH_MS = 300;
+/** Messages held for the page until it has loaded (Show in the library, Search, a notice), at most this many. */
+const MAX_HELD = 8;
 
 export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   private view: vscode.WebviewView | null = null;
+  /** The page has loaded and said so: until then messages are held, not lost. */
+  private ready = false;
+  private held: Array<Record<string, unknown>> = [];
   private query = '';
   private timer: ReturnType<typeof setTimeout> | null = null;
   private readonly subscriptions: vscode.Disposable[] = [];
@@ -29,7 +36,11 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     private readonly library: () => DeckLibrary | null,
   ) {
     this.subscriptions.push(
-      pages.onDidChangeActive(() => this.refreshSoon()),
+      // Another deck or another slide: only the active deck's line changes, so only it is sent (the page leaves the
+      // active deck out of Other decks itself).
+      pages.onDidChangeActive(() => {
+        if (this.ready && this.view?.visible) void this.post({ type: 'library/active', active: isEnabled('decks') ? this.pages.activeDeck() : null });
+      }),
       pages.onDidRevealInLibrary(target => void this.post({ type: 'library/reveal', path: target.path, id: target.id })),
     );
     const watcher = vscode.workspace.createFileSystemWatcher('**/*.deck.md');
@@ -44,11 +55,18 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
 
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view;
-    view.webview.options = { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'media')] };
+    this.ready = false;
+    // The project folder too: the slides' pictures are drawn on the thumbnails.
+    const folders = (vscode.workspace.workspaceFolders ?? []).filter(folder => folder.uri.scheme === 'file').map(folder => folder.uri);
+    view.webview.options = { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'media'), ...folders] };
     view.webview.html = libraryHtml(view.webview, this.extensionUri);
     view.webview.onDidReceiveMessage(message => void this.handle(message));
     view.onDidChangeVisibility(() => { if (view.visible) this.refreshSoon(); });
-    view.onDidDispose(() => { if (this.view === view) this.view = null; });
+    view.onDidDispose(() => {
+      if (this.view !== view) return;
+      this.view = null;
+      this.ready = false;
+    });
   }
 
   /** The head row's Search: the place shows, and its search field takes the keyboard. */
@@ -61,9 +79,14 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     const request = decodeLibraryRequest(message);
     if (!request) return;
     switch (request.type) {
-      case 'library/ready':
+      case 'library/ready': {
+        this.ready = true;
         await this.refresh();
+        const held = this.held;
+        this.held = [];
+        for (const message of held) await this.post(message);
         return;
+      }
       case 'library/search':
         this.query = request.query;
         await this.refresh();
@@ -119,10 +142,16 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     }
     const library = this.library();
     const decks = library ? await library.listDecks({ query: this.query }) : [];
-    await this.post({ type: 'library/state', enabled: true, decks, active: this.pages.activeDeck(), query: this.query, project: !!library });
+    const { assets, themes } = this.view ? await looksOf(this.view.webview, decks) : { assets: {}, themes: {} };
+    await this.post({ type: 'library/state', enabled: true, decks, assets, themes, active: this.pages.activeDeck(), query: this.query, project: !!library });
   }
 
   private async post(message: Record<string, unknown>): Promise<void> {
+    if (!this.view || !this.ready) {
+      // The place is opening (or not open yet): the message waits for its page.
+      if (message.type !== 'library/state' && message.type !== 'library/active') this.held = [...this.held, message].slice(-MAX_HELD);
+      return;
+    }
     try {
       await this.view?.webview.postMessage(message);
     } catch {
@@ -134,6 +163,20 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     if (this.timer) clearTimeout(this.timer);
     for (const subscription of this.subscriptions) subscription.dispose();
   }
+}
+
+/** What the thumbnails need to look like their decks: each deck's pictures as webview URIs, and the themes' text. */
+async function looksOf(webview: vscode.Webview, decks: DeckSummary[]): Promise<{ assets: Record<string, Record<string, string>>; themes: Record<string, string | null> }> {
+  const root = projectRoot();
+  const assets: Record<string, Record<string, string>> = {};
+  const themes: Record<string, string | null> = {};
+  if (!root) return { assets, themes };
+  for (const deck of decks) {
+    const images = [...new Set(deck.slides.map(slide => slide.data.image).filter((image): image is string => !!image))];
+    if (images.length) assets[deck.path] = resolveAssetsIn(path.join(root, ...folderOf(deck.path).split('/').filter(Boolean)), webview, images);
+    if (deck.theme && !(deck.theme in themes)) themes[deck.theme] = await readProjectTheme(root, deck.theme);
+  }
+  return { assets, themes };
 }
 
 function libraryHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {

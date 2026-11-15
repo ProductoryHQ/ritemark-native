@@ -130,7 +130,8 @@ export function foldMarkdown(text: string): string {
     .replace(/^[ \t]*(?:[*+-]|\d{1,9}[.)])[ \t]+/gm, '- ')
     .replace(/^[ \t]*#{1,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/gm, '$1')
     .replace(/^[ \t]*(?:=+|-{2,})[ \t]*$/gm, '')
-    .replace(/[*_]+/g, ''));
+    // Emphasis marks stand at a word's edge; a `_` or `*` inside a word (file_name, 2*3) is a character of it.
+    .replace(/(?<![\p{L}\p{N}])[*_]+|[*_]+(?![\p{L}\p{N}])/gu, ''));
 }
 
 /**

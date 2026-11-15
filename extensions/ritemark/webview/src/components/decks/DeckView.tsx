@@ -28,7 +28,7 @@ import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
 import { deleteSlide, duplicateSlide, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
 import { DOMParser as PMDOMParser, Fragment, type Node as PMNode, type Slice } from '@tiptap/pm/model'
-import { markdownToEditorHTML } from '../../utils/editorMarkdown'
+import { editorHTMLToMarkdown, markdownToEditorHTML } from '../../utils/editorMarkdown'
 import { SourceLines, type CopySource } from './library/SourceLines'
 import { onMessage, sendToExtension } from '../../bridge'
 import { isTrustedDeckTransaction } from './handout/deckGuard'
@@ -173,6 +173,11 @@ export function DeckView({
   const [sources, setSources] = useState<Record<string, CopySource>>({})
   const [justUpdated, setJustUpdated] = useState<string | null>(null)
   const [busy, setBusy] = useState<Record<string, true>>({})
+  // The deck's text as this view holds it, sent with a library request: the document may not have its newest words yet.
+  const contentRef = useRef(content)
+  contentRef.current = content
+  // A library write's Undo: the copy's `from:` and `kept` before it, put back once the host says the library is back.
+  const undoneFrom = useRef(new Map<string, { id: string; from: string | undefined; kept: boolean | undefined }>())
   const [focusTitleOf, setFocusTitleOf] = useState<number | null>(null)
   const lineHintShown = useRef(false)
   const [ratio, setRatio] = useState(DEFAULT_RATIO)
@@ -446,7 +451,8 @@ export function DeckView({
       const id = idOf(index)
       if (!id) return
       setBusy(value => ({ ...value, [id]: true }))
-      sendToExtension('deck/add-to-library', { id })
+      // The id may have just been given: the text is read after that change.
+      requestAnimationFrame(() => sendToExtension('deck/add-to-library', { id, text: editor && !editor.isDestroyed ? editorHTMLToMarkdown(editor.getHTML()) : contentRef.current }))
     },
     showInLibrary: index => {
       const from = editor ? slidesOf(editor.state.doc)[index]?.data.from : undefined
@@ -537,6 +543,9 @@ export function DeckView({
 
   // ---- the Slide library (PR 4)
 
+  /** The deck's text as this view holds it now, front matter left out (the host reads the slides from it). */
+  const currentText = useCallback(() => (editor && !editor.isDestroyed ? editorHTMLToMarkdown(editor.getHTML()) : contentRef.current), [editor])
+
   // The host knows which slide is current, for the Slide library's "Insert after slide N".
   useEffect(() => {
     sendToExtension('deck/current', { index: shown, count })
@@ -587,14 +596,14 @@ export function DeckView({
       const id = slide?.data.id
       if (!id) return
       setBusy(value => ({ ...value, [id]: true }))
-      sendToExtension(type, { id })
+      sendToExtension(type, { id, text: currentText() })
     }
     return {
       keepHere: () => changeSlide(data => ({ ...data, kept: true })),
       updateLibrary: () => ask('deck/update-library'),
       useLibrary: () => ask('deck/use-library'),
     }
-  }, [slide, changeSlide])
+  }, [slide, changeSlide, currentText])
 
   useEffect(() => onMessage(message => {
     if (!editor || editor.isDestroyed) return
@@ -604,6 +613,14 @@ export function DeckView({
         const next: Record<string, CopySource> = {}
         for (const state of message.states as CopySource[]) if (state && typeof state.id === 'string') next[state.id] = state
         setSources(next)
+        return
+      }
+      case 'deck/library-undone': {
+        const back = typeof message.token === 'string' ? undoneFrom.current.get(message.token) : undefined
+        if (!back) return
+        undoneFrom.current.delete(message.token as string)
+        const now = slideById(back.id)
+        if (now) dispatch(updateSlide(editor.state, now.index, { ...now.data, from: back.from, kept: back.kept }))
         return
       }
       case 'deck/library-failed': {
@@ -624,9 +641,9 @@ export function DeckView({
           label: 'Undo',
           tip: 'Put the library back as it was',
           run: () => {
+            // The copy's from: goes back only once the library is back (the host refuses when it changed since).
+            undoneFrom.current.set(token, { id, from: before.from, kept: before.kept })
             sendToExtension('deck/undo-library', { token })
-            const now = slideById(id)
-            if (now && !editor.isDestroyed) dispatch(updateSlide(editor.state, now.index, { ...now.data, from: before.from, kept: before.kept }))
           },
         } : undefined
         const name = typeof message.sourceName === 'string' ? message.sourceName : 'the library'

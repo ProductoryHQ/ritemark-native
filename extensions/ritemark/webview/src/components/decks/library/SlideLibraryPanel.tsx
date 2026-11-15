@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { onMessage, sendToExtension } from '../../../bridge'
 import { Icon } from '../../ui/Icon'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../ui/dropdown-menu'
-import { BUILT_IN_THEME } from '../../../../../src/decks/deckTheme'
+import { BUILT_IN_THEME, parseTheme, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import '../decks.css'
@@ -25,6 +25,8 @@ interface LibraryDeck {
   path: string
   name: string
   topic: boolean
+  theme: string | null
+  borderless: boolean
   modified: number
   slides: LibrarySlide[]
 }
@@ -40,9 +42,14 @@ interface LibraryState {
   enabled: boolean
   project: boolean
   decks: LibraryDeck[]
+  /** Each deck's pictures as webview URIs, by the paths its slides name; the themes' text, by path. */
+  assets: Record<string, Record<string, string>>
+  themes: Record<string, string | null>
   active: ActiveDeck | null
   query: string
 }
+
+const NO_ASSETS: Record<string, string> = {}
 
 const TILE_WIDTH = 104
 
@@ -69,6 +76,7 @@ export function SlideLibraryPanel() {
   useEffect(() => {
     const stop = onMessage((message) => {
       if (message.type === 'library/state') setState(message as unknown as LibraryState)
+      else if (message.type === 'library/active') setState((value) => (value ? { ...value, active: (message.active as ActiveDeck | null) ?? null } : value))
       else if (message.type === 'library/focus-search') {
         field.current?.focus()
         field.current?.select()
@@ -109,6 +117,21 @@ export function SlideLibraryPanel() {
     [state],
   )
 
+  // Each theme read once per state.
+  const themeOf = useMemo(() => {
+    const parsed = new Map<string, DeckTheme>()
+    return (path: string | null): DeckTheme => {
+      const text = path ? state?.themes?.[path] : null
+      if (!path || !text) return BUILT_IN_THEME
+      let theme = parsed.get(path)
+      if (!theme) {
+        theme = parseTheme(text)
+        parsed.set(path, theme)
+      }
+      return theme
+    }
+  }, [state])
+
   if (!state) return null
   if (!state.enabled) return <p className="deck-lib-empty">Decks are turned off.</p>
   if (!state.project) return <p className="deck-lib-empty">Open a folder to keep a slide library.</p>
@@ -146,7 +169,7 @@ export function SlideLibraryPanel() {
                       aria-label={`${numbered ? `${slide.index + 1}. ` : ''}${title}: insert into the open deck`}
                     >
                       <span className="deck-lib-thumb" aria-hidden>
-                        <SlideCanvas kind={slide.kind} data={slide.data} width={TILE_WIDTH} theme={BUILT_IN_THEME} borderless={false} assets={{}} />
+                        <SlideCanvas kind={slide.kind} data={slide.data} width={TILE_WIDTH} theme={themeOf(deck.theme)} borderless={deck.borderless} assets={state.assets?.[deck.path] ?? NO_ASSETS} />
                       </span>
                       <span className="deck-lib-title">{numbered ? `${slide.index + 1}. ` : ''}{title}</span>
                     </button>

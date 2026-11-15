@@ -29,10 +29,28 @@ export function projectRelative(root: string, absolute: string): string | null {
   return relative.split(path.sep).join('/');
 }
 
+/**
+ * The file, or the nearest folder of it that exists, is inside the project once links are followed: a linked folder
+ * in a project from someone else never takes a write outside it.
+ */
+async function insideOnDisk(root: string, target: string): Promise<boolean> {
+  let probe = target;
+  for (;;) {
+    try {
+      const [realRoot, real] = await Promise.all([fs.promises.realpath(root), fs.promises.realpath(probe)]);
+      return real === realRoot || projectRelative(realRoot, real) !== null;
+    } catch {
+      const parent = path.dirname(probe);
+      if (parent === probe) return false;
+      probe = parent;
+    }
+  }
+}
+
 export function workspaceDeckFiles(root: string): DeckFiles {
-  const absolute = (relative: string) => {
+  const absolute = async (relative: string) => {
     const target = path.resolve(root, ...relative.split('/'));
-    if (projectRelative(root, target) === null) throw new Error(`${relative} is outside the project.`);
+    if (projectRelative(root, target) === null || !(await insideOnDisk(root, target))) throw new Error(`${relative} is outside the project.`);
     return target;
   };
   return {
@@ -53,7 +71,12 @@ export function workspaceDeckFiles(root: string): DeckFiles {
       return found;
     },
     async read(relative) {
-      const target = absolute(relative);
+      let target: string;
+      try {
+        target = await absolute(relative);
+      } catch {
+        return null;
+      }
       const document = openDocument(target);
       if (document) return document.getText();
       try {
@@ -63,7 +86,7 @@ export function workspaceDeckFiles(root: string): DeckFiles {
       }
     },
     async write(relative, text, options) {
-      const target = absolute(relative);
+      const target = await absolute(relative);
       const document = openDocument(target);
       if (document) {
         if (options?.create) throw new Error(`${relative} already exists.`);

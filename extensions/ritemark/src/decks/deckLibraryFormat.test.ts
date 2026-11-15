@@ -46,6 +46,8 @@ assert.equal(
   // The same handout as the editor writes it back is the same copy.
   assert.equal(foldMarkdown('* One\n+ Two\n\n1) Three\n\n__Bold__ and *it*\\!\n\nTitle\n====='), foldMarkdown('- One\n- Two\n\n1. Three\n\n**Bold** and _it_!\n\n## Title ##'));
   assert.notEqual(foldMarkdown('- One'), foldMarkdown('- Two'));
+  assert.notEqual(foldMarkdown('See report_2025.xlsx'), foldMarkdown('See report2025.xlsx'), 'a `_` inside a word is a character');
+  assert.equal(foldMarkdown('A **bold** _word_, and *this*.'), foldMarkdown('A bold word, and this.'));
 }
 
 // One slide of a deck by id: replaced with every other byte kept; appended; a new topic.
