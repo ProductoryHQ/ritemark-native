@@ -89,6 +89,9 @@ class SlideDivView implements NodeView {
 
   update(node: PMNode): boolean {
     if (node.type !== this.node.type || slideBlockClassOf(attributesOf(node)) !== this.kind) return false
+    // A Boxes block's look draws its boxes' marks: another look draws the block and its boxes again (ProseMirror
+    // doesn't update unchanged children; review of #765).
+    if (this.kind === 'boxes' && (attributesOf(node).values.look ?? 'boxes') !== (attributesOf(this.node).values.look ?? 'boxes')) return false
     this.node = node
     this.render()
     return true

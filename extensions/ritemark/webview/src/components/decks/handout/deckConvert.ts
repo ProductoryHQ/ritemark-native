@@ -20,6 +20,7 @@ import { Extension } from '@tiptap/core'
 import { DOMParser as PMDOMParser, DOMSerializer, type Node as PMNode, type Schema } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { convertSlide, convertsToBlocks, drawsAsBlocks } from '../../../../../src/decks/blocks/convertDeck'
+import { pictureTarget } from '../../../../../src/decks/blocks/legacyToBlocks'
 import { slideDataOf as readSlideData, withBlockMarkdown, writeSlideData } from '../../../../../src/decks/deckFormat'
 import { DECK_DERIVED, DECK_OPERATION, isSlideNode, slidesOf } from '../deckDocument'
 import { passes } from './drawnHeadings'
@@ -108,11 +109,6 @@ export function convertDeckInto(tr: Transaction): DeckConversion | null {
   return result
 }
 
-/** A picture's path as a Markdown target: in angle brackets when it holds a space or a bracket. */
-function pictureTarget(path: string): string {
-  return /[\s()<>]/.test(path) ? `<${path.replace(/[<>]/g, encodeURIComponent)}>` : path
-}
-
 /**
  * A picture the host saved for a slide drawn as blocks (a block slide, or a v1 slide shown as one): beside or behind it
  * when the slide places one there, else a picture block at the end of its words. A v1 slide's deck is converted in the
@@ -123,6 +119,12 @@ export function pictureIntoSlide(state: EditorState, slideId: string, path: stri
   const tr = state.tr
   const before = slidesOf(tr.doc).find(entry => entry.data.id === slideId)
   if (!before || !drawsAsBlocks(before.kind)) return null
+  // A v1 Picture slide's picture is replaced, as before the PR (review of #765): its `image:` first, then the conversion.
+  if (before.kind === 'picture') {
+    tr.setNodeMarkup(before.pos, undefined, { ...before.node.attrs, body: writeSlideData('picture', before.node.attrs.body, { ...before.data, image: path }) })
+    convertDeckInto(tr)
+    return tr
+  }
   convertDeckInto(tr)
   const pos = tr.mapping.map(before.pos)
   const node = tr.doc.nodeAt(pos)

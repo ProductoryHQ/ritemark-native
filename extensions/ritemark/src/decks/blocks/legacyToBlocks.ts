@@ -70,7 +70,7 @@ export function withoutItemNumber(words: string, position: number): string {
 }
 
 /** A path in a Markdown picture: in angle brackets when it holds a space or a bracket. */
-function pictureTarget(path: string): string {
+export function pictureTarget(path: string): string {
   const value = path.trim();
   return /[\s()<>]/.test(value) ? `<${value.replace(/[<>]/g, encodeURIComponent)}>` : value;
 }

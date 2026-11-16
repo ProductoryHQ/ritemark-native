@@ -119,6 +119,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   const onPictureRef = useRef(onPicture)
   onPictureRef.current = onPicture
   const syncRef = useRef<SlideSync | null>(null)
+  // The editor the sync was made for: a new editor (its extensions changed) gets a new sync, on its own schema.
+  const syncEditor = useRef<TipTapEditor | null>(null)
   const frameRef = useRef<HTMLDivElement>(null)
   const stepRef = useRef(0)
   const outerRef = useRef(outer)
@@ -194,7 +196,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     },
   }, [extensions])
   // The slide's sync, made with the editor from the Markdown it was made with.
-  if (editor && !syncRef.current) {
+  if (editor && syncEditor.current !== editor) {
+    syncEditor.current = editor
     const load = (markdown: string) => loadSlideDoc(editor.schema, markdown, assetsRef.current)
     syncRef.current = new SlideSync(load, doc => saveSlideMarkdown(doc, getHTMLFromFragment(doc.content, editor.schema), load), nodeMarkdown, editor.state.doc)
   }

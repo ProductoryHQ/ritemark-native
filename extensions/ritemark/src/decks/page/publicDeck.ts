@@ -174,7 +174,8 @@ export function publicSlide(kind: string, data: SlideData): { kind: string; data
     }
     return { kind: '', data: out };
   }
-  return { kind: isSlideKind(kind) ? kind : 'other', data: drawnData(kind, data) };
+  // A kind this build doesn't know (the nine kinds went out as blocks above): its title alone.
+  return { kind: 'other', data: drawnData(kind, data) };
 }
 
 export const MARKED_OPTIONS = { gfm: true, breaks: false, headerIds: false, mangle: false, smartypants: false } as const;

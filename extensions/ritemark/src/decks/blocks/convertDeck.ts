@@ -61,11 +61,34 @@ export function convertSlide(kind: string, body: string, notes: string | null, h
   return { body: blockSlideBody(blocks.header, blocks.markdown), comment: blocks.comment };
 }
 
-/** A part's handout with `comment` at its end, before the blank lines that end it; as it was without a comment. */
+/**
+ * The closing line for a code fence the text leaves open at its end (an unfinished prompt), or null when every fence
+ * is closed. CommonMark's rule for an unindented fence, as `parseDeck` reads one.
+ */
+function openFenceAtEnd(text: string): string | null {
+  let open: { char: string; size: number } | null = null;
+  for (const line of text.split('\n')) {
+    const fence = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line.replace(/\r$/, ''));
+    if (!fence) continue;
+    if (open) {
+      if (fence[1][0] === open.char && fence[1].length >= open.size && fence[2].trim() === '') open = null;
+    } else if (!(fence[1][0] === '`' && fence[2].includes('`'))) {
+      open = { char: fence[1][0], size: fence[1].length };
+    }
+  }
+  return open ? open.char.repeat(open.size) : null;
+}
+
+/**
+ * A part's handout with `comment` at its end, before the blank lines that end it; as it was without a comment. A fence
+ * the part leaves open (an unfinished prompt runs to the end of the part) is closed first, so the comment is never the
+ * prompt's text, which the page publishes (review of #765).
+ */
 export function withCommentAtEnd(handout: string, comment: string | null): string {
   if (!comment) return handout;
   const trailing = /\s*$/.exec(handout)?.[0] ?? '';
-  const core = handout.slice(0, handout.length - trailing.length);
+  const open = openFenceAtEnd(handout);
+  const core = handout.slice(0, handout.length - trailing.length) + (open ? `\n${open}` : '');
   // A part with no text of its own (a copy's empty handout) is the comment alone.
   if (!core) return trailing ? `\n\n${comment}${trailing}` : comment;
   return `${core}\n\n${comment}${trailing}`;
@@ -164,7 +187,9 @@ export function drawsAsBlocks(kind: string): boolean {
   return kind === '' || convertsToBlocks(kind);
 }
 
-const drawn = new WeakMap<SlideData, SlideData>();
+// By data object, then by kind: the deck view reads two v1 slides with the same body into one data object (its cache
+// is per body), and a Points and an Exercise slide with the same words are drawn differently (review of #765).
+const drawn = new WeakMap<SlideData, Map<string, SlideData>>();
 
 /**
  * A slide's data as a block slide draws it: a block slide's as it is; a v1 slide's as `legacyToBlocks` converts it,
@@ -173,11 +198,13 @@ const drawn = new WeakMap<SlideData, SlideData>();
  */
 export function blockDataOf(kind: string, data: SlideData): SlideData {
   if (!convertsToBlocks(kind)) return data;
-  const cached = drawn.get(data);
+  let byKind = drawn.get(data);
+  const cached = byKind?.get(kind);
   if (cached) return cached;
   const blocks = legacyDataToBlocks(kind, data);
   const out: SlideData = { ...blocks.header, markdown: blocks.markdown };
   if (data.title !== undefined && data.title.trim()) out.title = data.title;
-  drawn.set(data, out);
+  if (!byKind) { byKind = new Map(); drawn.set(data, byKind); }
+  byKind.set(kind, out);
   return out;
 }

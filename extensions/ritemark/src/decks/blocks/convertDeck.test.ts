@@ -109,6 +109,20 @@ assert.equal(convertDeckText(converted), converted, 'converting again changes no
   for (const word of ['SECRET PRICE', 'SECRET TILDE', 'SECRETTAIL']) assert.ok(!page.includes(word), `${word} reached the page`);
 }
 
+// ---- Review of #765, round 2: a comment is never put inside a prompt left open at the end of the deck (the page
+// publishes a prompt's text); two v1 slides of different kinds with the same words are drawn each as its own kind.
+{
+  const open = '```slide columns\nid: c1\ntitle: T\nitems:\n- heading: A\n- heading: B\n- heading: HIDDENWORD\n```\n\nA prompt:\n\n```text\nWrite a summary';
+  const after = convertDeckText(open);
+  assert.ok(after.endsWith('```text\nWrite a summary\n```\n\n<!-- Hidden by the old layout: HIDDENWORD -->'), after);
+  const page = JSON.stringify(publicDeck(after, { folderName: 'Demo', deckName: 'Demo', theme: BUILT_IN_THEME }));
+  assert.ok(!page.includes('HIDDENWORD') && page.includes('Write a summary'));
+  assert.equal(withCommentAtEnd('```\ncode\n```', '<!-- c -->'), '```\ncode\n```\n\n<!-- c -->', 'a closed fence is left alone');
+  const same = slideDataOf('points', 'title: Steps\nitems:\n- heading: One');
+  assert.notEqual(blockDataOf('points', same).markdown, blockDataOf('exercise', same).markdown);
+  assert.match(blockDataOf('exercise', same).markdown ?? '', /::: steps/);
+}
+
 // ---- A copy's stamp: renewed to the block stamp when it still matches (an older v1 stamp), kept when it was changed.
 {
   const data = { id: 'c1', title: 'Four parts', items: [{ heading: 'One' }] };

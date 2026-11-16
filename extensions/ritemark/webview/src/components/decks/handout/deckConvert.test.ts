@@ -270,6 +270,10 @@ const apply = (state: EditorState, tr: Transaction) => state.apply(tr)
   assert.deepEqual([data.picture, data.image], ['right', 'images/a.png'])
   assert.ok(!(data.markdown ?? '').includes('images/a.png'))
   assert.equal(pictureIntoSlide(state, 'nope', 'images/a.png'), null)
+  // A v1 Picture slide's picture is replaced, never a second one added (review of #765, round 2).
+  const pictured = stateOf('```slide picture\nid: pc1\ntitle: Shot\nimage: images/old.png\n```\n\nText.\n', deckPlugins())
+  const replaced = pictured.state.apply(pictureIntoSlide(pictured.state, 'pc1', 'images/new.png')!)
+  assert.equal(slideDataOf('', slidesOf(replaced.doc)[0].node.attrs.body).markdown, '# Shot\n\n![](images/new.png)')
 }
 
 console.log('deckConvert: passed')
