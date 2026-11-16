@@ -150,7 +150,18 @@ const here = (path: string) => readFileSync(fileURLToPath(new URL(path, import.m
   assert.match(view, /const setLook = useCallback\(\(look: string\) => \{\s+const next: DocumentProperties = \{ \.\.\.properties \}\s+if \(look === 'borderless'\) next\.look = 'borderless'\s+else delete next\.look\s+onPropertiesChange\(next\)/, 'the front matter is written as before')
   assert.ok(!here('./decks.css').includes('.deck-look'), "the bar's segment rule is gone")
   // Review, PR 759: Settings with no slide to belong to close, so they never reopen by themselves when it returns.
-  assert.match(view, /useEffect\(\(\) => \{ if \(!slideShown \|\| !slides\[shown\]\) setSettingsOpen\(false\) \}, \[slideShown, slides, shown\]\)/)
+  assert.match(view, /useEffect\(\(\) => \{ if \(!slides\[shown\]\) setSettingsOpen\(false\) \}, \[slides, shown\]\)/)
+  // 16 November (the Experience lead): a hidden slide is still the current one. The gear stays enabled and opens the
+  // same popup; it is disabled only in a deck with no slides, and nothing about the fold closes or disables it.
+  assert.match(view, /const settingsReady = !!slide\n/)
+  assert.match(gear, /disabled=\{!settingsReady\}/)
+  assert.match(gear, /<Tooltip label=\{settingsReady \? 'Slide settings' : 'The deck has no slides yet'\}>/)
+  assert.doesNotMatch(gear, /Show the slide to change its settings/, 'no wording about a hidden slide')
+  assert.doesNotMatch(view.slice(view.indexOf('const settingsReady'), view.indexOf('const settingsReady') + 80), /slideShown/)
+  assert.match(gear, /\{settingsReady && slide \? \(\s+<PopoverContent/, 'the same popup, whatever the fold')
+  for (const line of view.split('\n').filter(text => text.includes('setSettingsOpen(false)'))) {
+    assert.doesNotMatch(line, /slideShown|fold|'slide'/, `nothing about the fold closes Settings: ${line.trim()}`)
+  }
   // The Add to library sheet alone is placed by the desk's measure now.
   assert.match(view, /if \(!addSheet\) \{ setSettingsAt\(null\); return \}/)
   // The thumbnail's badge goes in as plain values, so the memoised thumbnail keeps its memo.

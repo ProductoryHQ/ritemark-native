@@ -591,12 +591,11 @@ export function DeckView({
   }, [avail, stripWidth, pick])
 
   /** A fold button: that side folds away, or comes back; the deck's view keeps the choice, and the part being read
-   *  stays at the top. Settings belong to the slide, so they close with it. */
+   *  stays at the top. Slide settings stay: they belong to the current slide, which the strip still rings. */
   const toggleFold = useCallback((side: 'slide' | 'handout') => {
     const next = toggledFold(fold, side)
     setFold(next)
     keepFold(next)
-    if (next === 'slide') setSettingsOpen(false)
     requestAnimationFrame(() => pick(currentRef.current))
   }, [fold, pick])
 
@@ -706,9 +705,9 @@ export function DeckView({
 
   // Slide settings: closed when the slide changes. Add to library's sheet is placed beside the slide (over the handout when it must).
   useEffect(() => { setSettingsOpen(false) }, [shown])
-  // Settings with no slide to belong to (an undo took it away, the window folded it) close, so they never come back
-  // by themselves when it returns.
-  useEffect(() => { if (!slideShown || !slides[shown]) setSettingsOpen(false) }, [slideShown, slides, shown])
+  // Settings with no slide to belong to (an undo took it away) close, so they never come back by themselves when it
+  // returns. A hidden slide is still the current one: its settings stay (the Experience lead, 16 November).
+  useEffect(() => { if (!slides[shown]) setSettingsOpen(false) }, [slides, shown])
   // The Add to library sheet belongs to its slide: another slide closes it.
   useEffect(() => { setAddSheet(sheet => (sheet && sheet.number - 1 !== shown ? null : sheet)) }, [shown])
   // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one. A
@@ -999,8 +998,9 @@ export function DeckView({
   }), [editor, dispatch, done, slideById, sources, imageMappings, pick])
 
   const status = documentBarStatus(syncState, syncAction)
-  // Slide settings belong to the slide on the stage: none while it is folded away or the deck has no slides.
-  const settingsReady = slideShown && !!slide
+  // Slide settings belong to the current slide (the Experience lead, 16 November): hiding the slide hides the stage,
+  // not the current slide, which the strip still rings, so the gear stays ready. Only a deck with no slides has none.
+  const settingsReady = !!slide
   const handoutContainer = scrollContainer()
   // Writing on the slide keeps it the current one while the handout is still.
   const onWriting = useCallback(() => { lockUntil.current = Date.now() + WRITE_LOCK_MS }, [])
@@ -1026,7 +1026,7 @@ export function DeckView({
             after the count, its popup under it, left-aligned; nothing sits above or beside the slide. A Popover: a
             press outside or Esc closes it and the gear gets the focus back; choosing a layout keeps it open. */}
         <Popover open={settingsOpen && settingsReady} onOpenChange={setSettingsOpen}>
-          <Tooltip label={settingsReady ? 'Slide settings' : 'Show the slide to change its settings'}>
+          <Tooltip label={settingsReady ? 'Slide settings' : 'The deck has no slides yet'}>
             <PopoverTrigger asChild>
               <Button
                 variant="ghost"
