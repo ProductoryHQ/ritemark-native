@@ -125,6 +125,15 @@ test('each head command runs the command that does the work', () => {
   assert.deepEqual(executed, all.map(c => c.onFolder ? [c.runs, projectFolder] : [c.runs]));
 });
 
+test('Home\'s Start something cards run what New runs: Text, Table and Deck (Sprint 159)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { startCommand } = require('../projects/homeState') as typeof import('../projects/homeState');
+  const runs = (id: string) => NEW_MENU_COMMANDS.find(c => c.id === id)?.runs;
+  assert.equal(startCommand('text', true), runs('ritemark.projectHead.newText'));
+  assert.equal(startCommand('table', true), runs('ritemark.projectHead.newTable'));
+  assert.equal(startCommand('deck', true), runs('ritemark.projectHead.newDeck'), 'the Deck card is New → Deck');
+});
+
 test('the Search row runs Ritemark\'s search when given it, with what the shell\'s box sends (Sprint 148)', () => {
   registered.length = 0;
   executed.length = 0;

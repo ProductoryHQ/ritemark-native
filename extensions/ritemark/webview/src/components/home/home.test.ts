@@ -54,6 +54,7 @@ function home(overrides: Partial<HomeState> = {}): HomeState {
     ],
     empty: false,
     boardEnabled: true,
+    decksEnabled: false,
     guidance: null,
     copilotChat: false,
     switchedFrom: null,
@@ -101,6 +102,48 @@ assert.match(fullMarkup, />Six weeks for new team leads</, 'the line')
 assert.equal(parse(fullMarkup).querySelector('.rh-place-text')?.text, '~/Documents/Leadership programme', 'the folder line, read whole (one measured string since Sprint 142)')
 assert.ok(!/Codex/.test(fullMarkup), 'ChatGPT, never Codex')
 assert.deepEqual(posted, [], 'drawing Home sends nothing')
+
+// ── Start something's Deck card (Sprint 159; Jarmo, 17 November): third, New's order, only with the flag on ──
+
+{
+  const tilesOf = (state: HomeState) => parse(render(state)).querySelectorAll('.rh-tile').map(words)
+  assert.deepEqual(tilesOf(home({ decksEnabled: true })), ['TextA new document', 'TableCSV data', 'DeckSlides and a handout', 'Web pageOpen a site'], 'the flag on: Deck third, after Table and before Web page')
+  assert.deepEqual(tilesOf(home({ decksEnabled: false })), ['TextA new document', 'TableCSV data', 'Web pageOpen a site'], 'the flag off: the three cards, as before')
+  assert.equal(tilesOf(home({ decksEnabled: true, empty: true, recent: [] })).length, 4, 'an empty project has the Deck card too')
+  const deckMarkup = render(home({ decksEnabled: true }))
+  assert.equal(parse(deckMarkup).querySelector('.rh-tiles')?.getAttribute('class'), 'rh-tiles rh-tiles-4', 'four cards take the four-card grid')
+  assert.equal(parse(render(home())).querySelector('.rh-tiles')?.getAttribute('class'), 'rh-tiles', 'three cards keep the row as it was')
+  assert.equal(parse(deckMarkup).querySelector('section.rh-start')?.getAttribute('aria-label'), 'Start something in Leadership programme', 'the row is its own width container')
+  // Its icon is the deck's own easel, as in Documents and the tab (#753)
+  const deckIcon = renderToStaticMarkup(createElement(Icon, { name: 'presentation', size: 16, tone: 'inherit' }))
+  assert.equal(parse(deckMarkup).querySelectorAll('.rh-tile .rh-ic')[2].innerHTML, deckIcon, 'the Deck card wears the presentation icon')
+  const { startCards } = await import('./homeWords')
+  assert.deepEqual(startCards(true).map((card) => card.kind), ['text', 'table', 'deck', 'web'])
+  assert.deepEqual(startCards(false).map((card) => card.kind), ['text', 'table', 'web'])
+  assert.equal(startCards(true)[2].tip, 'Make a new deck in this project')
+}
+
+// ── The four-card grid (the Experience lead): four across while each card can be 180 wide, else two by two ──
+
+{
+  const { readFileSync } = await import('node:fs')
+  const css = readFileSync(new URL('./home.css', import.meta.url), 'utf8')
+  const gap = Number(/\.rh-tiles \{[^}]*gap: (\d+)px/.exec(css)?.[1])
+  assert.equal(gap, 12, 'the tiles’ gap')
+  assert.match(css, /\.rh-start \{ container: rh-start \/ inline-size; \}/, 'the row is a container named rh-start')
+  assert.match(css, /\.rh-tiles\.rh-tiles-4 \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}/, 'two by two by default')
+  const query = /@container rh-start \(min-width: (\d+)px\) \{\s*\.rh-tiles\.rh-tiles-4 \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\); \}/.exec(css)
+  assert.ok(query, 'four across from a width up')
+  const step = Number(query[1])
+  assert.equal(step, 4 * 180 + 3 * gap, 'four across exactly while each of four cards can be 180 wide')
+  // The rule as a function of the row's width: four or two, never three and one
+  const columns = (width: number) => (width >= step ? 4 : 2)
+  const cardWidth = (width: number) => (width - (columns(width) - 1) * gap) / columns(width)
+  for (const width of [320, 600, 640, 755]) assert.equal(columns(width), 2, `${width}: two by two`)
+  for (const width of [756, 900, 1200]) assert.equal(columns(width), 4, `${width}: four across`)
+  assert.equal(cardWidth(756), 180, 'at the step, each of the four is 180')
+  for (const width of [756, 900, 1200]) assert.ok(cardWidth(width) >= 180)
+}
 
 // ── What moved (Sprint 136, Windows round 5): Copilot Chat's line only while it is installed ──
 

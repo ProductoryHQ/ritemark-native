@@ -11,7 +11,7 @@ import * as path from 'path';
 import { callsOf } from '../taskBoard/BoardController';
 import type { Card } from '../taskBoard/cardFile';
 import type { CardHandoffRecordV1 } from '../taskBoard/CardTaskStore';
-import { aiNameOf, kindOf, othersOf, RECENT_EXTENSIONS, RECENT_LIMIT, recentItems, waitingItems, type ChangedFile, showWhatMoved, switchNoteEndsOnHost, SWITCH_NOTE_SETTLE_MS } from './homeState';
+import { aiNameOf, kindOf, othersOf, RECENT_EXTENSIONS, RECENT_LIMIT, recentItems, waitingItems, type ChangedFile, showWhatMoved, startCommand, switchNoteEndsOnHost, SWITCH_NOTE_SETTLE_MS } from './homeState';
 import { decodeHomeRequest } from './protocol';
 import { cardItems, chatsWaiting, handoffViewsFor, summarize, type ChatIndexEntry, type ProjectWaiting } from './waiting';
 
@@ -174,5 +174,12 @@ assert.equal(switchNoteEndsOnHost('home-hidden', null), false, 'not before the n
 assert.equal(switchNoteEndsOnHost('home-hidden', SWITCH_NOTE_SETTLE_MS - 1), false, 'the window settling after the switch');
 assert.equal(switchNoteEndsOnHost('home-hidden', SWITCH_NOTE_SETTLE_MS + 500), true, 'another tab chosen');
 assert.equal(switchNoteEndsOnHost('turn-accepted', 4000), true, 'a message sent on the AI’s sheet');
+
+// Sprint 159: each Start something card runs New's own command; Deck runs New → Deck's, only with the flag on
+assert.equal(startCommand('text', false), 'ritemark.newDocument');
+assert.equal(startCommand('table', false), 'ritemark.newTable');
+assert.equal(startCommand('web', false), 'ritemark.browser.newTab');
+assert.equal(startCommand('deck', true), 'ritemark.decks.new', 'the Deck card runs what New → Deck runs');
+assert.equal(startCommand('deck', false), undefined, 'with the flag off, a stray Deck request runs nothing');
 
 console.log('projects/homeState: all assertions passed');
