@@ -1,0 +1,28 @@
+Card | Borderless: the bytes the bar wrote on main, and the bytes the gear's popup writes on this branch.
+One isolated dev window (scripts/qa/dev-launch-isolated.sh), 16 November 2026, about 22:50-23:05 EET.
+
+Two copies of the demo project's "Northwind/Data in Excel.deck.md", made before the launch:
+  Look check/Via the bar.deck.md   62a4c8073a81cea7cb3b4baff75f15911703232d91195a5d22ca920f2a424109
+  Look check/Via the gear.deck.md  62a4c8073a81cea7cb3b4baff75f15911703232d91195a5d22ca920f2a424109
+
+1. This branch's bundle: "Via the gear" opened, the gear pressed ("This deck · all 3 slides"),
+   Borderless chosen in the popup with a real mouse press.
+     Via the gear.deck.md  7dbb8cb753cc62aa0dd8e819fc1d9442228bd649b2ec20d0bfcc33d622a39da9
+
+2. main's bundle (origin/main 5a6cd376's committed media/webview.js, which a build of main reproduces
+   byte for byte), put in place and the window reloaded (Developer: Reload Window). "Via the bar"
+   opened: its bar read "Slide 1 of 3 Card Borderless Saved Publish Present". Borderless chosen on
+   the bar with a real mouse press.
+     Via the bar.deck.md   7dbb8cb753cc62aa0dd8e819fc1d9442228bd649b2ec20d0bfcc33d622a39da9
+
+cmp: the two files are byte-identical. Against the copy before, both gained one line:
+  3a4
+  > look: borderless
+i.e. the front matter now reads:
+  ---
+  deck: 1
+  theme: Slide library/Themes/Evening.theme.md
+  look: borderless
+  ---
+
+Then the branch's bundle was put back (git checkout HEAD -- extensions/ritemark/media/webview.js) and the window was stopped (LEFT=0).
