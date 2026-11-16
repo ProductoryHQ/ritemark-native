@@ -35,7 +35,7 @@ import { AddToLibrarySheet, type LibraryTopic } from './library/AddToLibraryShee
 import { onMessage, sendToExtension } from '../../bridge'
 import { convertKind, hiddenNote } from './slide/convertKind'
 import { addColumn, addRow } from './slide/slideEdits'
-import { SlideAbout, SlideSettings } from './SlideSettings'
+import { DeckLook, SlideAbout, SlideSettings } from './SlideSettings'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { SlideStrip, type StripActions, type StripMark } from './SlideStrip'
 import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, newId, slideDataOf as readSlideData, withPartHeading, writeSlideBlock, writeSlideData } from '../../../../src/decks/deckFormat'
@@ -805,9 +805,8 @@ export function DeckView({
 
   // Slide settings: closed when the slide changes. Add to library's sheet is placed beside the slide (over the handout when it must).
   useEffect(() => { setSettingsOpen(false) }, [shown])
-  // Settings with no slide to belong to (an undo took it away) close, so they never come back by themselves when it
-  // returns. A hidden slide is still the current one: its settings stay (the Experience lead, 16 November).
-  useEffect(() => { if (!slides[shown]) setSettingsOpen(false) }, [slides, shown])
+  // The popup always has something to show (the deck's section when the deck has no slides), so it never stays open
+  // unseen: no effect closes it when the slide goes, and a hidden slide keeps its settings (the Experience lead).
   // The Add to library sheet belongs to its slide: another slide closes it.
   useEffect(() => { setAddSheet(sheet => (sheet && sheet.number - 1 !== shown ? null : sheet)) }, [shown])
   // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one. A
@@ -1098,9 +1097,10 @@ export function DeckView({
   }), [editor, dispatch, done, slideById, sources, imageMappings, pick])
 
   const status = documentBarStatus(syncState, syncAction)
-  // Slide settings belong to the current slide (the Experience lead, 16 November): hiding the slide hides the stage,
-  // not the current slide, which the strip still rings, so the gear stays ready. Only a deck with no slides has none.
-  const settingsReady = !!slide
+  // The gear is always ready (#764). Slide settings belong to the current slide (the Experience lead, 16 November):
+  // hiding the slide hides the stage, not the current slide, which the strip still rings. A deck with no slides still
+  // chooses its look there, as the bar's segment allowed at any count: its popup is the deck's section alone.
+  const deckLook = { count, look: borderless ? 'borderless' as const : 'card' as const, onLook: setLook }
   const handoutContainer = scrollContainer()
   // Writing on the slide keeps it the current one while the handout is still.
   const onWriting = useCallback(() => { lockUntil.current = Date.now() + WRITE_LOCK_MS }, [])
@@ -1125,31 +1125,30 @@ export function DeckView({
         {/* 17 November (the Experience lead, "Nothing around the slide but the slide"): Slide settings is a gear here,
             after the count, its popup under it, left-aligned; nothing sits above or beside the slide. A Popover: a
             press outside or Esc closes it and the gear gets the focus back; choosing a layout keeps it open. */}
-        <Popover open={settingsOpen && settingsReady} onOpenChange={setSettingsOpen}>
-          <Tooltip label={settingsReady ? 'Slide settings' : 'The deck has no slides yet'}>
+        <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <Tooltip label="Slide settings">
             <PopoverTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon-xs"
                 className="deck-settings-button"
-                data-state={settingsOpen && settingsReady ? 'active' : undefined}
+                data-state={settingsOpen ? 'active' : undefined}
                 aria-label="Slide settings"
-                disabled={!settingsReady}
               >
                 <Icon name="gear" size={16} tone="inherit" />
               </Button>
             </PopoverTrigger>
           </Tooltip>
-          {settingsReady && slide ? (
-            <PopoverContent
-              align="start"
-              sideOffset={6}
-              collisionPadding={8}
-              className="deck-settings"
-              // The popup takes the focus itself, not its Close button, so no tooltip opens with it.
-              onOpenAutoFocus={event => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus() }}
-              tabIndex={-1}
-            >
+          <PopoverContent
+            align="start"
+            sideOffset={6}
+            collisionPadding={8}
+            className="deck-settings"
+            // The popup takes the focus itself, not its Close button, so no tooltip opens with it.
+            onOpenAutoFocus={event => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus() }}
+            tabIndex={-1}
+          >
+            {slide ? (
               <SlideSettings
                 number={shown + 1}
                 kind={slide.kind}
@@ -1174,10 +1173,12 @@ export function DeckView({
                 onChange={patch => changeSlide(data => ({ ...data, ...patch }))}
                 onClose={() => setSettingsOpen(false)}
                 onUndo={redo => { if (redo) editor?.commands.redo(); else editor?.commands.undo() }}
-                deck={{ count, look: borderless ? 'borderless' : 'card', onLook: setLook }}
+                deck={deckLook}
               />
-            </PopoverContent>
-          ) : null}
+            ) : (
+              <DeckLook id="deck-reach-none" only {...deckLook} />
+            )}
+          </PopoverContent>
         </Popover>
         <span className="deck-notice" role="status" aria-live="polite">
           {notice ? (

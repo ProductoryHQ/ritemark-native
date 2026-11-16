@@ -193,6 +193,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-settings-about .deck-source { flex-wrap: wrap; }
 .deck-settings-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 4px; font-weight: 600; line-height: 24px; }
 .deck-settings-k { margin: 12px 0 6px; font-size: 11px; font-weight: 600; line-height: 14px; letter-spacing: .5px; text-transform: uppercase; color: var(--r-ink-muted); }
+/* A deck with no slides: the popup is the deck's section alone, its heading at the top (#764) */
+.deck-settings-only > .deck-settings-k { margin-top: 0; }
 .deck-settings .deck-settings-lays { grid-template-columns: repeat(5, 1fr); gap: 8px 5px; }
 .deck-settings .deck-settings-pics { grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .deck-settings .deck-settings-lays > label, .deck-settings .deck-settings-pics > label { padding: 2px 2px 4px; }

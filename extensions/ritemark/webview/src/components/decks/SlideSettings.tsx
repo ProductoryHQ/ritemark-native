@@ -78,8 +78,11 @@ interface SlideSettingsProps {
   /** The lines about the slide, first (`SlideAbout`); none, and the settings start at once. */
   about?: ReactNode
   /** The deck's own look, last: how many slides it reaches, the choice, and the change of it (`setLook`). */
-  deck: { count: number; look: 'card' | 'borderless'; onLook: (look: string) => void }
+  deck: DeckLookChoice
 }
+
+/** The deck's own look: how many slides it reaches, Card or Borderless, and the change of it (`setLook`). */
+export interface DeckLookChoice { count: number; look: 'card' | 'borderless'; onLook: (look: string) => void }
 
 /** Card or Borderless, as the bar's segment offered it before 16 November: the same words and the same tooltip. */
 export const DECK_LOOKS = [{ value: 'card', label: 'Card' }, { value: 'borderless', label: 'Borderless' }]
@@ -87,7 +90,30 @@ export const DECK_LOOK_TIP = 'How the slides look: as a card, or the whole colum
 
 /** The deck section's heading: its reach, so a deck-wide choice in a slide's popup isn't read as that slide's. */
 export function deckReach(count: number): string {
+  if (count === 0) return 'This deck · no slides yet'
   return count === 1 ? 'This deck · 1 slide' : `This deck · all ${count} slides`
+}
+
+/**
+ * The deck's section: its heading, then Card | Borderless, the popup's full width. The last section of a slide's
+ * settings, and the whole popup of a deck with no slides (Development manager, #764: the bar's segment worked at any
+ * count, so an empty deck keeps the choice). One group named by its heading, so a screen reader hears the reach too.
+ */
+export function DeckLook({ id, count, look, onLook, only = false }: DeckLookChoice & { id: string; only?: boolean }) {
+  return (
+    <div role="group" aria-labelledby={id} className={only ? 'deck-settings-only' : undefined}>
+      <div id={id} className="deck-settings-k">{deckReach(count)}</div>
+      <Tooltip label={DECK_LOOK_TIP} className="flex w-full">
+        <SegmentedControl
+          aria-label="How the slides look"
+          className="w-full [&>label]:flex-1 [&>label>span]:w-full [&>label>span]:text-center"
+          value={look}
+          onValueChange={onLook}
+          options={DECK_LOOKS}
+        />
+      </Tooltip>
+    </div>
+  )
 }
 
 /** The library's topic or the deck a copy came from, as its plain line before the host has read the copy's state. */
@@ -228,19 +254,7 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
         <Switch id={skipId} checked={data.skip === true} onCheckedChange={skip => onChange({ skip: skip || undefined })} />
       </div>
       <div className="deck-settings-sep" />
-      {/* The deck's own section: a group named by its heading, so a screen reader hears its reach too (review, #764). */}
-      <div role="group" aria-labelledby={reachId}>
-        <div id={reachId} className="deck-settings-k">{deckReach(deck.count)}</div>
-        <Tooltip label={DECK_LOOK_TIP} className="flex w-full">
-          <SegmentedControl
-            aria-label="How the slides look"
-            className="w-full [&>label]:flex-1 [&>label>span]:w-full [&>label>span]:text-center"
-            value={deck.look}
-            onValueChange={deck.onLook}
-            options={DECK_LOOKS}
-          />
-        </Tooltip>
-      </div>
+      <DeckLook id={reachId} {...deck} />
     </section>
   )
 }

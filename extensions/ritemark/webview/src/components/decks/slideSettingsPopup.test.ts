@@ -20,11 +20,12 @@ const React = await import('react')
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
-const { DECK_LOOKS, DECK_LOOK_TIP, SlideAbout, SlideSettings, deckReach } = await import('./SlideSettings')
+const { DECK_LOOKS, DECK_LOOK_TIP, DeckLook, SlideAbout, SlideSettings, deckReach } = await import('./SlideSettings')
 const { SourceLines } = await import('./library/SourceLines')
 const { libraryBadge } = await import('./SlideStrip')
 
 const noop = () => {}
+const here = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
 const cardDeck = { count: 15, look: 'card' as const, onLook: noop }
 const settings = (kind: string, data: Record<string, unknown>, about: unknown, deck: { count: number; look: 'card' | 'borderless'; onLook: (look: string) => void } = cardDeck) => parse(renderToStaticMarkup(createElement(SlideSettings, {
   number: 6, kind, data, onKind: noop, onChange: noop, onClose: noop, onUndo: noop, about: about as never, deck,
@@ -128,6 +129,28 @@ const settings = (kind: string, data: Record<string, unknown>, about: unknown, d
   assert.equal(settings('points', {}, null, { count: 3, look: 'card', onLook: noop }).querySelectorAll('.deck-settings-k').pop()!.textContent, 'This deck · all 3 slides')
 }
 
+// ---- A deck with no slides (#764): the popup is the deck's section alone, its heading "This deck · no slides yet", with
+// Card | Borderless as anywhere else; no slide head, no slide sections, no line.
+{
+  let chosen = ''
+  const root = parse(renderToStaticMarkup(createElement(DeckLook, { id: 'deck-reach-none', only: true, count: 0, look: 'card', onLook: look => { chosen = look } })))
+  const group = root.childNodes.filter(node => node.nodeType === 1) as unknown as Array<{ getAttribute(name: string): string | null; classNames: string }>
+  assert.equal(group.length, 1, 'one section and nothing else')
+  assert.equal(group[0].getAttribute('role'), 'group')
+  assert.equal(group[0].getAttribute('aria-labelledby'), 'deck-reach-none')
+  assert.equal(group[0].classNames, 'deck-settings-only')
+  assert.equal(root.querySelector('#deck-reach-none')!.textContent, 'This deck · no slides yet')
+  assert.equal(root.querySelectorAll('.deck-settings-k').length, 1)
+  assert.equal(root.querySelectorAll('.deck-settings-sep, section, header').length, 0, 'no line, no slide head, no slide section')
+  assert.ok(!root.textContent.includes('Skip slide') && !root.textContent.includes('Layout'), "none of a slide's settings")
+  assert.deepEqual(root.querySelectorAll('[aria-label="How the slides look"] input').map(input => [input.getAttribute('value'), input.hasAttribute('checked')]), [['card', true], ['borderless', false]])
+  assert.equal(chosen, '', 'nothing chosen by drawing it')
+  assert.equal(deckReach(0), 'This deck · no slides yet')
+  assert.match(here('./decks.css'), /\n\.deck-settings-only > \.deck-settings-k \{ margin-top: 0; \}/, 'its heading at the top of the popup')
+  // The same section, the same choice, the same `setLook`: the slide's popup draws it with the same component.
+  assert.match(here('./SlideSettings.tsx'), /<DeckLook id=\{reachId\} \{\.\.\.deck\} \/>\n    <\/section>/)
+}
+
 // ---- The thumbnail's badge: quiet, amber when changed here or newer there, with a tooltip that says which.
 assert.equal(libraryBadge(undefined), null)
 assert.equal(libraryBadge({ library: false, newer: false }), null, "another deck's copy has no library badge")
@@ -136,25 +159,25 @@ assert.deepEqual(libraryBadge({ library: true, newer: false, changed: true }), {
 assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From the library, which has a newer version', amber: true })
 
 // ---- Where things are: the gear in the bar after the count, nothing above or under the slide but the notes.
-const here = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
 {
   const view = here('./DeckView.tsx')
   const bar = view.slice(view.indexOf('<header className="deck-bar">'), view.indexOf('</header>'))
   const count = bar.indexOf('className="deck-count"')
   const gear = bar.slice(bar.indexOf('<Popover open='), bar.indexOf('</Popover>'))
   assert.ok(count >= 0 && bar.indexOf('<Popover open=') > count && bar.indexOf('<Popover open=') < bar.indexOf('deck-notice'), 'the gear comes right after "Slide 6 of 13"')
-  assert.match(gear, /<Tooltip label=\{settingsReady \? 'Slide settings'/)
+  assert.match(gear, /<Tooltip label="Slide settings">/)
   assert.match(gear, /aria-label="Slide settings"/)
   assert.match(gear, /variant="ghost"\s+size="icon-xs"/, 'a 28 px ghost icon button')
   assert.match(gear, /<Icon name="gear" size=\{16\}/, 'a gear (Jarmo: "gear-icon"), the one the old Settings button drew')
   assert.match(gear, /<PopoverContent\s+align="start"/, 'the popup opens under the gear, left-aligned to it')
-  assert.match(gear, /data-state=\{settingsOpen && settingsReady \? 'active'/, 'its on state while the popup is open')
+  assert.match(gear, /data-state=\{settingsOpen \? 'active'/, 'its on state while the popup is open')
   assert.doesNotMatch(gear, /\btitle=/, 'a tooltip, never a native title')
   // Card or Borderless (16 November): off the bar, into the popup, written by the same `setLook` with the live count.
   for (const gone of ['SegmentedControl', 'Borderless', 'How the slides look', 'deck-look']) {
     assert.ok(!bar.replace(gear, '').includes(gone), `nothing of "${gone}" on the bar outside the popup`)
   }
-  assert.match(gear, /deck=\{\{ count, look: borderless \? 'borderless' : 'card', onLook: setLook \}\}/)
+  assert.match(view, /const deckLook = \{ count, look: borderless \? 'borderless' as const : 'card' as const, onLook: setLook \}/)
+  assert.match(gear, /deck=\{deckLook\}/)
   assert.match(view, /const count = slides\.length/)
   assert.match(view, /const setLook = useCallback\(\(look: string\) => \{\s+const next: DocumentProperties = \{ \.\.\.properties \}\s+if \(look === 'borderless'\) next\.look = 'borderless'\s+else delete next\.look\s+onPropertiesChange\(next\)/, 'the front matter is written as before')
   assert.ok(!here('./decks.css').includes('.deck-look'), "the bar's segment rule is gone")
@@ -163,16 +186,16 @@ const here = (path: string) => readFileSync(fileURLToPath(new URL(path, import.m
   assert.match(here('./decks.css'), /\n\.deck-settings:not\(\.deck-addlib\) \{ max-height: var\(--radix-popover-content-available-height\); overflow-y: auto; \}/)
   assert.match(gear, /<PopoverContent[^>]*className="deck-settings"/, 'the popup carries the rule')
   assert.match(here('./library/AddToLibrarySheet.tsx'), /className="deck-settings deck-addlib"/)
-  // Review, PR 759: Settings with no slide to belong to close, so they never reopen by themselves when it returns.
-  assert.match(view, /useEffect\(\(\) => \{ if \(!slides\[shown\]\) setSettingsOpen\(false\) \}, \[slides, shown\]\)/)
-  // 16 November (the Experience lead): a hidden slide is still the current one. The gear stays enabled and opens the
-  // same popup; it is disabled only in a deck with no slides, and nothing about the fold closes or disables it.
-  assert.match(view, /const settingsReady = !!slide\n/)
-  assert.match(gear, /disabled=\{!settingsReady\}/)
-  assert.match(gear, /<Tooltip label=\{settingsReady \? 'Slide settings' : 'The deck has no slides yet'\}>/)
-  assert.doesNotMatch(gear, /Show the slide to change its settings/, 'no wording about a hidden slide')
-  assert.doesNotMatch(view.slice(view.indexOf('const settingsReady'), view.indexOf('const settingsReady') + 80), /slideShown/)
-  assert.match(gear, /\{settingsReady && slide \? \(\s+<PopoverContent/, 'the same popup, whatever the fold')
+  // The gear is always ready (#764). A hidden slide is still the current one (the Experience lead), and a deck with no
+  // slides still chooses its look, as the bar's segment allowed at any count: its popup is the deck's section alone.
+  // The popup's open state is the gear's own, so it can never stay open unseen (review, PR 759), and nothing closes it
+  // when the slide goes: it shows the deck's section instead.
+  assert.match(gear, /^<Popover open=\{settingsOpen\} onOpenChange=\{setSettingsOpen\}>/)
+  assert.doesNotMatch(gear, /disabled=/, 'never disabled')
+  assert.doesNotMatch(view, /settingsReady|The deck has no slides yet|Show the slide to change its settings/, 'no disabled state or its words')
+  assert.doesNotMatch(view, /setSettingsOpen\(false\) \}, \[slides/, 'no effect closes Settings when the slide goes')
+  assert.match(gear, /<\/Tooltip>\s+<PopoverContent/, 'the popup is always there to open, whatever the fold or the count')
+  assert.match(gear, /\{slide \? \(\s+<SlideSettings[\s\S]*\) : \(\s+<DeckLook id="deck-reach-none" only \{\.\.\.deckLook\} \/>\s+\)\}\s+<\/PopoverContent>/, "a slide's settings, or the deck's section alone")
   for (const line of view.split('\n').filter(text => text.includes('setSettingsOpen(false)'))) {
     assert.doesNotMatch(line, /slideShown|fold|'slide'/, `nothing about the fold closes Settings: ${line.trim()}`)
   }
