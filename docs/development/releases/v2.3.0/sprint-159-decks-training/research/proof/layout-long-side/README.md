@@ -18,6 +18,23 @@ Retaken on 16 November at 22:05 after merging #759 (Slide settings in the deck's
 
 **The slide above is the pane's height less 32, at 16:9:** a pane of 390 gives a slide 636 × 358, with 16 above it. **One row is still under it: "Speaker notes".** It isn't part of #759 (the experience's "Notes are comments" removes it later), so the stage above is 48 px taller than its pane, the notes row sits under the level line and the slide's pane shows a scrollbar at its right. The slide itself is whole.
 
+## Third run: the slide fits around the notes row, one line, ˅ at the right (16 November, 22:21)
+
+After merging #760 (Sprint 161 PR 1) and the fixes on top: one more isolated dev window (fresh profile, `RITEMARK_CONTROL_CATALOGUE=1`, stopped with `LEFT=0`). These replace the earlier files of the same names:
+
+| What | File |
+|---|---|
+| 1440 × 900, the AI column open: above, the slide 551 × 310 over the "Speaker notes" row, no scrollbar | `above-ai-open-1440.png` |
+| 1440 × 900, the left column open: above, the slide 551 × 310, no scrollbar | `above-left-open-1440.png` |
+| The level line with the flat pill, close up: one dotted line, no hairline under it | `flat-pill-closeup.png` |
+| Above, the slide hidden: ˅ "Show the slide" at the handout's top right, where the pill was | `above-slide-hidden-1440.png` |
+
+- **The slide above fits around what's still on the stage:** its pane's height less 32 and less the measured row under it (the speaker notes', 48 px): (390 − 32 − 48) × 16/9 = 551 × 310. The stage group is exactly the pane's 390, so the stage doesn't scroll (`scrollHeight` = `clientHeight` = 390), with the AI column open and with the left column open.
+- **The handout hidden, above:** the slide is 900 × 506 in a 780 pane, the stage group 586; no overflow.
+- **One line:** the hairline under the level line was the current part's head border, 6 px under the handout's top by the scroll rule. Above, the handout's top 8 px are now the desk's colour; the close-up shows the dotted line alone.
+- **The Popover catalogue row:** `control-states.mjs --only popover` captured 6 states, 0 not, in `control-popover/` (unapproved), with `sheet.html`.
+- Every deck file's SHA-256 was unchanged.
+
 ## What the window showed
 
 - **Measured sizes** (CSS px, second run): AI and left column folded: room 1,292, beside, slide 469 wide, centred in its pane's height. AI open: room 900, above, the line at 390 of 780, slide 636 × 358 at 16 from the top. Left column open: room 1,044, above, slide 636. 1920 × 1080, AI open: room 1,380, beside, slide 504.
