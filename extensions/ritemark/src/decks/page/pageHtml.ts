@@ -439,6 +439,7 @@ function blockStepsTag(slide: PublicSlide): string | null {
  * converts). Its number ('' for none), or null for any other slide.
  */
 function sectionNumberOf(slide: PublicSlide): string | null {
+  if (slide.section !== undefined) return slide.section;
   if (slide.kind === 'section') return (slide.data.number ?? '').trim();
   return isBlockSlide(slide.kind) ? blockSectionNumberOf(slide.data.markdown ?? '') : null;
 }

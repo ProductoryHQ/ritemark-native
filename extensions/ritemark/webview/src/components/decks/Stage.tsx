@@ -17,7 +17,7 @@ import { writeSlideData, type SlideData } from '../../../../src/decks/deckFormat
 import { drawsAsBlocks } from '../../../../src/decks/blocks/convertDeck'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
 import { slidesOf, type DeckSlideEntry } from './deckDocument'
-import { getClipboardImageFile, getUniqueImageFilename, readFileAsBase64, shouldPreferTextPaste } from '../../lib/pastedImage'
+import { takeImageFile } from '../../lib/pastedImage'
 import { SlideCanvas, type SlideEditing } from './slide/SlideCanvas'
 import { SlideEditor } from './blocks/SlideEditor'
 import { itemMarksOf, layoutSlide, textBoxes, withoutListMarker } from './slide/layoutSlide'
@@ -181,13 +181,7 @@ function LayoutStage({ editor, slide, theme, borderless, assets, width, onWritin
   }), [onWriting, write, focusPath, focusSelect])
 
   /** A picture from the computer onto the slide: pasted (unless words are being pasted into a box) or dropped. */
-  const takePicture = (transfer: DataTransfer | null, pasted: boolean): boolean => {
-    const file = getClipboardImageFile(transfer)
-    if (!file) return false
-    if (pasted && shouldPreferTextPaste(transfer)) return false
-    void readFileAsBase64(file).then(dataUrl => onPicture(dataUrl, getUniqueImageFilename(file)))
-    return true
-  }
+  const takePicture = (transfer: DataTransfer | null, pasted: boolean): boolean => takeImageFile(transfer, pasted, onPicture)
 
   return (
     <>

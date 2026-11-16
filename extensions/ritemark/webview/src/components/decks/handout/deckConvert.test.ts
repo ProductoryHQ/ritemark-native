@@ -26,7 +26,7 @@ import { DeckSlide } from './deckSchema'
 import { DeckDrawnHeadings, drawnHeadingsFollow } from './drawnHeadings'
 import { deckGuardPlugin } from './deckGuard'
 import { deckLinesPlugin } from './deckLines'
-import { handoutMarkdownOf, convertDeckInto, conversionStateOf, deckConvertPlugin, needsConversion } from './deckConvert'
+import { pictureIntoSlide, handoutMarkdownOf, convertDeckInto, conversionStateOf, deckConvertPlugin, needsConversion } from './deckConvert'
 import { derivedHeadings, slidesOf } from '../deckDocument'
 
 installTestDocument()
@@ -248,6 +248,28 @@ const apply = (state: EditorState, tr: Transaction) => state.apply(tr)
     const from = slideDataOf('', slidesOf(after.doc)[0].node.attrs.body).from ?? ''
     assert.equal(from.split('@')[1], expected, stamp === 'zzzzzz' ? 'a changed copy keeps its stamp' : 'renewed to the block stamp')
   }
+}
+
+// ---- A picture put onto a v1 slide shown as blocks (review of #765): the deck converts in the same step and the picture
+// is a block at the end of that slide's words, every point of it kept on the slide; one Undo gives the file back. On a
+// slide with a picture beside it, the picture takes that place.
+{
+  const { state, save } = stateOf(DECK, deckPlugins())
+  const tr = pictureIntoSlide(state, 'p3', 'images/new shot.png')!
+  const after = state.apply(tr)
+  const slide = slidesOf(after.doc)[2]
+  assert.equal(slide.kind, '')
+  assert.equal(slideDataOf('', slide.node.attrs.body).markdown, '# The steps\n\n1. Sisend\n2. Väljund\n\n![](<images/new shot.png>)')
+  assert.equal(conversionStateOf(after).count, 1)
+  let undone = after
+  undo(after, back => { undone = after.apply(back) })
+  assert.equal(save(undone.doc), DECK, 'one Undo')
+  const beside = stateOf(DECK.replace('title: Two tools\n', 'title: Two tools\npicture: right\n'), deckPlugins())
+  const placed = beside.state.apply(pictureIntoSlide(beside.state, 'c2', 'images/a.png')!)
+  const data = slideDataOf('', slidesOf(placed.doc)[1].node.attrs.body)
+  assert.deepEqual([data.picture, data.image], ['right', 'images/a.png'])
+  assert.ok(!(data.markdown ?? '').includes('images/a.png'))
+  assert.equal(pictureIntoSlide(state, 'nope', 'images/a.png'), null)
 }
 
 console.log('deckConvert: passed')

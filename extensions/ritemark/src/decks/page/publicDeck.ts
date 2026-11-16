@@ -47,6 +47,11 @@ export interface PublicSlide {
   handout: string;
   /** The deck view's fit for it (0–3), when the open view measured one. Not part of the digest. */
   step: number;
+  /**
+   * PR 2: a slide written as a Section slide, which goes out as blocks: its number ('' for none), so the page still
+   * draws its part as a divider. Absent for every other slide.
+   */
+  section?: string;
 }
 
 export interface PublicDeck {
@@ -367,6 +372,7 @@ export function publicDeck(input: string, options: PublicDeckOptions): PublicDec
     const shown = publicSlide(block.kind, data);
     writtenKinds.push(block.kind);
     slides.push({
+      ...(block.kind === 'section' ? { section: (data.number ?? '').trim() } : {}),
       kind: shown.kind,
       data: shown.data,
       handout: publicMarkdown(text.slice(block.handoutStart, block.handoutEnd)),

@@ -45,7 +45,7 @@ import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
 import { CURRENT_SLIDE_SETTLE_MS, currentSlideMessage } from './currentSlideMessage'
 import { DeckGuard } from './handout/deckGuard'
-import { DeckConvert, conversionStateOf, needsConversion } from './handout/deckConvert'
+import { DeckConvert, conversionStateOf, needsConversion, pictureIntoSlide } from './handout/deckConvert'
 import { blockDataOf, drawsAsBlocks, saysBlockDeck, withStepsTag } from '../../../../src/decks/blocks/convertDeck'
 import { blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
 import { hiddenWords } from '../../../../src/decks/blocks/legacyToBlocks'
@@ -937,12 +937,10 @@ export function DeckView({
     if (index < 0) return
     const entry = slidesOf(editor.state.doc)[index]
     const placed = entry.data.picture && entry.data.picture !== 'none'
-    // A block slide (Sprint 161, PR 2): the picture beside or behind it, or a picture block at the end of its words.
-    if (isBlockSlide(entry.kind)) {
-      if (placed) { dispatch(updateSlide(editor.state, index, { ...entry.data, image: message.path })); return }
-      const markdown = (entry.data.markdown ?? '').replace(/\s+$/, '')
-      const target = /[\s()<>]/.test(message.path) ? `<${message.path.replace(/[<>]/g, encodeURIComponent)}>` : message.path
-      dispatch(updateSlideMarkdown(editor.state, index, `${markdown}${markdown ? '\n\n' : ''}![](${target})`))
+    // A slide drawn as blocks (Sprint 161, PR 2): the picture beside or behind it, or a picture block at the end of its
+    // words; a v1 slide's deck converts in the same step, so none of its words move.
+    if (drawsAsBlocks(entry.kind)) {
+      dispatch(pictureIntoSlide(editor.state, message.slideId, message.path))
       return
     }
     const kind = placed || entry.kind === 'picture' ? undefined : 'picture'

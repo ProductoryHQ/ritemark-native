@@ -86,3 +86,15 @@ export function shouldPreferTextPaste(dataTransfer: DataTransfer | null): boolea
 
   return false
 }
+
+/**
+ * A picture from the computer onto a slide (Sprint 157; Sprint 161 PR 2 shares it between both stages): pasted, unless
+ * words are being pasted, or dropped. True when it was a picture, handed on as a data URL with a unique file name.
+ */
+export function takeImageFile(transfer: DataTransfer | null, pasted: boolean, onPicture: (dataUrl: string, filename: string) => void): boolean {
+  const file = getClipboardImageFile(transfer)
+  if (!file) return false
+  if (pasted && shouldPreferTextPaste(transfer)) return false
+  void readFileAsBase64(file).then(dataUrl => onPicture(dataUrl, getUniqueImageFilename(file)))
+  return true
+}

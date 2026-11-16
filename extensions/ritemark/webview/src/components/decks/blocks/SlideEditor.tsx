@@ -26,12 +26,12 @@ import type { Schema } from '@tiptap/pm/model'
 import Placeholder from '@tiptap/extension-placeholder'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
-import { isBlockSlide, withBlockMarkdown, type SlideData } from '../../../../../src/decks/deckFormat'
+import { blockTitleOf, isBlockSlide, withBlockMarkdown, type SlideData } from '../../../../../src/decks/deckFormat'
 import { blockDataOf } from '../../../../../src/decks/blocks/convertDeck'
 import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, isCoverSlide, sidePictureOf } from '../../../../../src/decks/blocks/slideRenderer'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
-import { getClipboardImageFile, getUniqueImageFilename, readFileAsBase64, shouldPreferTextPaste } from '../../../lib/pastedImage'
+import { takeImageFile } from '../../../lib/pastedImage'
 import { FormattingBubbleMenu } from '../../FormattingBubbleMenu'
 import { themeStyle } from '../theme/themeVars'
 import { slidesOf, type DeckSlideEntry } from '../deckDocument'
@@ -67,6 +67,17 @@ export function stageMarkdownOf(kind: string, data: SlideData): string {
 
 /** An empty slide opens with an empty title, so the first words typed are its title (frame 21). */
 const EMPTY_SLIDE_HTML = '<h1></h1>'
+
+/**
+ * The HTML the stage opens a slide with: a slide with no heading at all (a new Boxes slide's empty boxes) opens with an
+ * empty title over its blocks, so there is a title to type (review of #765). Unwritten while it stays empty: an empty
+ * heading saves as nothing, and an untouched slide writes back its Markdown as it was.
+ */
+function slideHTML(markdown: string, assets: Record<string, string>): string {
+  if (!markdown.trim()) return EMPTY_SLIDE_HTML
+  const html = markdownToSlideEditorHTML(markdown, assets)
+  return blockTitleOf(markdown) ? html : EMPTY_SLIDE_HTML + html
+}
 
 /** The slide's node, as the handout's document has it now: by its id, else by its place. */
 function freshEntry(outer: TipTapEditor, slide: DeckSlideEntry): DeckSlideEntry | undefined {
@@ -131,8 +142,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     const node = tr.doc.nodeAt(pos)
     if (!node || node.type.name !== 'deckSlide' || !isBlockSlide(node.attrs.kind)) return
     tr.setNodeMarkup(pos, undefined, { ...node.attrs, body: withBlockMarkdown(node.attrs.body, markdown) })
-    editorOuter.view.dispatch(tr)
+    // Known as the stage's own before anything hears of it, so its echo is never taken for a change from elsewhere.
     syncRef.current?.wrote(markdown, doc)
+    editorOuter.view.dispatch(tr)
     setShownMarkdown(markdown)
     onWritingRef.current()
   }, [])
@@ -156,7 +168,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
 
   const editor = useEditor({
     extensions,
-    content: nodeMarkdown.trim() ? markdownToSlideEditorHTML(nodeMarkdown, assets) : EMPTY_SLIDE_HTML,
+    content: slideHTML(nodeMarkdown, assets),
     editorProps: {
       attributes: { class: 'blk-flow', spellcheck: 'true', 'aria-label': 'The slide' },
       handlePaste: (_view, event) => takePicture(event.clipboardData, true),
@@ -198,11 +210,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
 
   /** A picture from the computer onto the slide: pasted (unless words are being pasted) or dropped. */
   function takePicture(transfer: DataTransfer | null, pasted: boolean): boolean {
-    const file = getClipboardImageFile(transfer)
-    if (!file) return false
-    if (pasted && shouldPreferTextPaste(transfer)) return false
-    void readFileAsBase64(file).then(dataUrl => onPictureRef.current(dataUrl, getUniqueImageFilename(file)))
-    return true
+    return takeImageFile(transfer, pasted, (dataUrl, filename) => onPictureRef.current(dataUrl, filename))
   }
 
   // A change of the node from elsewhere (an undo, an AI's edit): its smallest replacement, once no input method composes.
@@ -268,7 +276,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     stepRef.current = step
     frameRef.current?.setAttribute('data-step', String(step))
   }, [editor])
-  useLayoutEffect(() => { refit() })
+  // Once per change of the words (the editor's update), and when the size, the look or the cover look change.
+  const lookKey = `${width}\u0000${borderless}\u0000${JSON.stringify(theme)}\u0000${isCoverSlide(shownMarkdown)}\u0000${slide.data.picture ?? ""}`
+  useLayoutEffect(() => { refit() }, [refit, lookKey])
   useEffect(() => {
     if (!editor) return
     editor.on('update', refit)
@@ -307,6 +317,5 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
 
 /** The slide editor's own load of a Markdown, as its first content was parsed, with the pictures' addresses it has. */
 function loadSlideDoc(schema: Schema, markdown: string, assets: Record<string, string>): PMNode {
-  const html = markdown.trim() ? markdownToSlideEditorHTML(markdown, assets) : EMPTY_SLIDE_HTML
-  return createNodeFromContent(html, schema, { slice: false }) as PMNode
+  return createNodeFromContent(slideHTML(markdown, assets), schema, { slice: false }) as PMNode
 }

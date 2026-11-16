@@ -187,13 +187,13 @@ export function titlesFromHeadings(state: EditorState): Transaction | null {
   for (const slide of slidesOf(state.doc)) {
     const id = slide.data.id
     if (!id || !titles.waiting.has(id) || (slide.data.title ?? '').trim()) continue
-    // A block slide's title is its own first heading (Sprint 161): the handout's heading gives one only to an empty
-    // slide (a line's, PR 2), as its `# ` title; a slide with words of its own is never written to.
-    if (isBlockSlide(slide.kind) && (slide.data.markdown ?? '').trim()) continue
+    // A block slide's title is its own first heading (Sprint 161): the handout's heading gives one only to a slide with
+    // no heading at all (a line's, a new Boxes slide's, PR 2), as its `# ` title over its blocks.
     const heading = writtenHeadingOf(state.doc, slide.pos)
     if (!heading || (from >= heading.from && to <= heading.to)) continue
+    const markdown = (slide.data.markdown ?? '').replace(/^\s+/, '')
     const body = isBlockSlide(slide.kind)
-      ? withBlockMarkdown(slide.node.attrs.body, `# ${headingMarkdown(heading.text)}`)
+      ? withBlockMarkdown(slide.node.attrs.body, `# ${headingMarkdown(heading.text)}${markdown ? `\n\n${markdown}` : ''}`)
       : writeSlideBody(slide.node.attrs.body, { ...slide.data, title: heading.text })
     tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, body })
   }

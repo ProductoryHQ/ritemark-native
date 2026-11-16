@@ -264,4 +264,19 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
 }
 
 
+// Review of #765: a new Boxes slide has blocks but no heading; the first heading written in its part becomes its `# `
+// title over its boxes, as a line's slide takes one.
+{
+  const boxes = schema.nodes.deckSlide.create({ kind: '', body: '---\nid: bx01\n---\n:::: boxes\n::: box\n:::\n::::', notes: null })
+  let state = stateOf([slide('aaaa', 'One'), heading(2, 'One'), paragraph('x'), boxes, heading(2, ''), paragraph('Words.')])
+  let at = -1
+  state.doc.forEach((node, pos) => { if (at < 0 && node.type.name === 'heading' && node.childCount === 0) at = pos + 1 })
+  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, at)))
+  state = state.apply(state.tr.insertText('Plan'))
+  let end = -1
+  state.doc.forEach((node, pos) => { if (node.type.name === 'paragraph' && node.textContent === 'Words.') end = pos + 1 })
+  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, end)))
+  assert.equal(dataOf(slides(state.doc)[1]).markdown, '# Plan\n\n:::: boxes\n::: box\n:::\n::::')
+}
+
 console.log('deckLines: passed')

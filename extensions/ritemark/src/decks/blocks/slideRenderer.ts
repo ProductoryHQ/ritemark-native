@@ -236,7 +236,8 @@ export function blockSectionNumberOf(markdown: string): string | null {
   const blocks = lexBlockSlide(markdown).filter(token => token.type !== 'space');
   if (blocks.length !== 2 || blocks[0].type !== 'paragraph' || blocks[1].type !== 'heading' || (blocks[1] as Tokens.Heading).depth !== 1) return null;
   const number = (blocks[0] as Tokens.Paragraph).text.replace(/\\(.)/g, '$1').trim();
-  return number.length <= 12 && !number.includes('\n') ? number : null;
+  // A section's number: digits (1, 2.1), a letter or a Roman numeral, never a word over a title ("Productory").
+  return /^(?:\d{1,3}(?:\.\d{1,3})*|[A-Za-z]|[IVXLC]{1,6})[.)]?$/.test(number) ? number : null;
 }
 
 const stepsCache = new Map<string, string | null>();

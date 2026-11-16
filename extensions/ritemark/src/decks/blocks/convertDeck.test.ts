@@ -78,6 +78,19 @@ assert.equal(convertDeckText(converted), converted, 'converting again changes no
   assert.deepEqual(deck.slides.map(slide => slide.data), before.slides.map(slide => slide.data));
 }
 
+// ---- Review of #765: a Section slide without a number is still a divider on the page (its written kind goes with it);
+// a word over a title is no section number.
+{
+  const text = '```slide section\nid: s1\ntitle: Intro\n```\n\nText.\n\n```slide\n---\nid: b2\n---\nProductory\n\n# Workshop\n```\n\nMore.\n';
+  const deck = publicDeck(text, { folderName: 'Demo', deckName: 'Demo', theme: BUILT_IN_THEME });
+  assert.equal(deck.slides[0].section, '');
+  const html = pageHtml(deck, { slideCss: '', fonts: [] }, { digest: deckDigest(deck), pictureUrl: () => null });
+  assert.equal((html.match(/<section class="part sect"/g) ?? []).length, 1, 'the Section slide, and only it');
+  assert.equal(blockSectionNumberOf('Productory\n\n# Workshop'), null);
+  assert.equal(blockSectionNumberOf('2.1\n\n# Workshop'), '2.1');
+  assert.equal(blockSectionNumberOf('B\n\n# Workshop'), 'B');
+}
+
 // ---- A copy's stamp: renewed to the block stamp when it still matches (an older v1 stamp), kept when it was changed.
 {
   const data = { id: 'c1', title: 'Four parts', items: [{ heading: 'One' }] };

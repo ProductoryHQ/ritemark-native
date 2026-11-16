@@ -19,7 +19,8 @@
 import { Extension } from '@tiptap/core'
 import { DOMParser as PMDOMParser, DOMSerializer, type Node as PMNode, type Schema } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
-import { convertSlide, convertsToBlocks } from '../../../../../src/decks/blocks/convertDeck'
+import { convertSlide, convertsToBlocks, drawsAsBlocks } from '../../../../../src/decks/blocks/convertDeck'
+import { slideDataOf as readSlideData, withBlockMarkdown, writeSlideData } from '../../../../../src/decks/deckFormat'
 import { DECK_DERIVED, DECK_OPERATION, isSlideNode, slidesOf } from '../deckDocument'
 import { passes } from './drawnHeadings'
 import { editorHTMLToMarkdown } from '../../../utils/editorMarkdown'
@@ -105,6 +106,35 @@ export function convertDeckInto(tr: Transaction): DeckConversion | null {
   })
   tr.setMeta(DECK_OPERATION, true).setMeta(DECK_CONVERTED, result)
   return result
+}
+
+/** A picture's path as a Markdown target: in angle brackets when it holds a space or a bracket. */
+function pictureTarget(path: string): string {
+  return /[\s()<>]/.test(path) ? `<${path.replace(/[<>]/g, encodeURIComponent)}>` : path
+}
+
+/**
+ * A picture the host saved for a slide drawn as blocks (a block slide, or a v1 slide shown as one): beside or behind it
+ * when the slide places one there, else a picture block at the end of its words. A v1 slide's deck is converted in the
+ * same transaction first, so the picture joins the slide the person sees and none of its words move (review of #765:
+ * the old path made it a Picture slide, whose layout hides its items). Null for any other slide.
+ */
+export function pictureIntoSlide(state: EditorState, slideId: string, path: string): Transaction | null {
+  const tr = state.tr
+  const before = slidesOf(tr.doc).find(entry => entry.data.id === slideId)
+  if (!before || !drawsAsBlocks(before.kind)) return null
+  convertDeckInto(tr)
+  const pos = tr.mapping.map(before.pos)
+  const node = tr.doc.nodeAt(pos)
+  if (!node || node.type.name !== 'deckSlide') return null
+  const data = readSlideData(node.attrs.kind, node.attrs.body)
+  const placed = data.picture && data.picture !== 'none'
+  const markdown = (data.markdown ?? '').replace(/\s+$/, '')
+  const body = placed
+    ? writeSlideData(node.attrs.kind, node.attrs.body, { ...data, image: path })
+    : withBlockMarkdown(node.attrs.body, `${markdown}${markdown ? '\n\n' : ''}![](${pictureTarget(path)})`)
+  tr.setNodeMarkup(pos, undefined, { ...node.attrs, body })
+  return tr
 }
 
 /** A transaction that is the person's own edit: not the host's, not undo or redo, not the view's drawn headings. */
