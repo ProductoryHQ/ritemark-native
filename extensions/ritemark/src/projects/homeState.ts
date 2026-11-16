@@ -8,8 +8,22 @@ import { createHash } from 'crypto';
 import * as path from 'path';
 import { isAboutFile, isRootClaudeFile, ABOUT_TITLE } from './aboutFile';
 import { isDeckPath, splitFileName } from '../decks/deckFileName';
-import type { AiName, HomeRecentItem, HomeWaitingItem, RecentKind } from './protocol';
+import type { AiName, HomeRecentItem, HomeWaitingItem, RecentKind, StartKind } from './protocol';
 import type { ProjectWaiting } from './waiting';
+
+/**
+ * What a Start something card runs: New's own commands, so a card does what New → <kind> does. Deck runs New → Deck's
+ * command (Sprint 159, #749) only while the `decks` flag is on; with it off there is no Deck card, and a stray request
+ * runs nothing.
+ */
+export function startCommand(kind: StartKind, decksEnabled: boolean): string | undefined {
+  switch (kind) {
+    case 'text': return 'ritemark.newDocument';
+    case 'table': return 'ritemark.newTable';
+    case 'deck': return decksEnabled ? 'ritemark.decks.new' : undefined;
+    case 'web': return 'ritemark.browser.newTab';
+  }
+}
 
 /** How many files Last changed lists. */
 export const RECENT_LIMIT = 5;

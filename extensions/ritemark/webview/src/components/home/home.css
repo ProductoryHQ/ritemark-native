@@ -328,6 +328,18 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   .rh-file .rh-when { flex-basis: calc(100% - 24px); margin-left: 24px; }
 }
 .rh-tiles { grid-template-columns: repeat(auto-fit, minmax(min(168px, 100%), 1fr)); }
+/* Four cards (Deck, while the `decks` flag is on; Sprint 159): equal, and never one alone on a row. Four across while
+   each card can be 150 wide, so they sit in one row on Home's 640 column; two by two when Home is narrower; one across
+   once two can't each be 150 (the Experience lead, 17 November). The row is its own container, so the rule keys to the
+   row's width: 636 = 4 cards of 150 + 3 gaps of 12, and 312 = 2 cards of 150 + 1 gap. */
+.rh-start { container: rh-start / inline-size; }
+.rh-tiles.rh-tiles-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@container rh-start (min-width: 636px) {
+  .rh-tiles.rh-tiles-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@container rh-start (max-width: 311.98px) {
+  .rh-tiles.rh-tiles-4 { grid-template-columns: minmax(0, 1fr); }
+}
 .rh-moved { display: flex; align-items: center; gap: 10px; min-height: 32px; font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
 .rh-moved .rh-ic { width: 22px; height: 22px; border-radius: 6px; background: var(--vscode-ritemark-ground, var(--r-surface-soft)); display: grid; place-items: center; flex: none; }
 .rh-moved b { font-weight: 600; color: var(--r-ink-strong); }

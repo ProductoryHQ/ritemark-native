@@ -20,6 +20,7 @@ assert.equal(decodeHomeRequest({ type: 'home/open-waiting', id: '../etc' }).ok, 
 assert.equal(decodeHomeRequest({ type: 'home/open-recent', id: 'file:/Users/a' }).ok, false);
 assert.deepEqual(decodeHomeRequest({ type: 'home/start', kind: 'table' }), { ok: true, request: { type: 'home/start', kind: 'table' } });
 assert.equal(decodeHomeRequest({ type: 'home/start', kind: 'terminal' }).ok, false);
+assert.deepEqual(decodeHomeRequest({ type: 'home/start', kind: 'deck' }), { ok: true, request: { type: 'home/start', kind: 'deck' } }, 'Sprint 159: the Deck card');
 assert.deepEqual(decodeHomeRequest({ type: 'home/drop-files', uris: ['file:///Users/a/x.md'] }), { ok: true, request: { type: 'home/drop-files', uris: ['file:///Users/a/x.md'] } });
 assert.equal(decodeHomeRequest({ type: 'home/drop-files', uris: [] }).ok, false);
 assert.equal(decodeHomeRequest({ type: 'home/drop-files', uris: ['https://example.com/x'] }).ok, false);

@@ -6,7 +6,7 @@
  * - Sprint 140 (R2): at most one guidance card under it: What moved, once, on a
  *   profile updated from Ritemark 1 (experience 32, frame 5); the ready request
  *   (experience 35); or the first-week question (experience 34, frame 1);
- * - Start something in <project>: Text, Table, Web page;
+ * - Start something in <project>: Text, Table, Deck (flag `decks`), Web page;
  * - Last changed in <project>; an empty project's drop target (experience 29, frame 1);
  * - a project of the list whose folder is not found (experience 33, frame 2).
  *
@@ -19,7 +19,7 @@ import type { HomeMessage, HomeState } from '../../../../src/projects/protocol'
 import { Button, wholeWordsTip } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
-import { middleCut, noteEndsOn, othersWords, placeParts, recentIcon, SWITCH_NOTE_MS, waitingIcon, waitingWords, whenWords } from './homeWords'
+import { middleCut, noteEndsOn, othersWords, placeParts, recentIcon, startCards, SWITCH_NOTE_MS, waitingIcon, waitingWords, whenWords } from './homeWords'
 import { ConversationBubbleIcon } from '../ai-sidebar/ConversationBubbleIcon'
 import { send } from './homeClient'
 import { usePageDrawn } from '../../lib/pageDrawn'
@@ -204,18 +204,14 @@ function Waiting({ state, now }: { state: HomeState; now: number }) {
   )
 }
 
-const STARTS = [
-  { kind: 'text' as const, icon: 'file-text' as const, name: 'Text', line: 'A new document', tip: 'Make a new document in this project' },
-  { kind: 'table' as const, icon: 'table' as const, name: 'Table', line: 'CSV data', tip: 'Make a new table in this project' },
-  { kind: 'web' as const, icon: 'globe' as const, name: 'Web page', line: 'Open a site', tip: 'Open a web page in a new tab' },
-]
-
-function StartSomething({ name }: { name: string }) {
+function StartSomething({ name, decksEnabled }: { name: string; decksEnabled: boolean }) {
+  const cards = startCards(decksEnabled)
   return (
-    <section aria-label={`Start something in ${name}`}>
+    <section className="rh-start" aria-label={`Start something in ${name}`}>
       <h2 className="rh-h3">Start something in {name}</h2>
-      <div className="rh-tiles">
-        {STARTS.map((start) => (
+      {/* Four cards are four across or two by two, never three and one (home.css) */}
+      <div className={cards.length === 4 ? 'rh-tiles rh-tiles-4' : 'rh-tiles'}>
+        {cards.map((start) => (
           <Tooltip key={start.kind} label={start.tip} className="block">
             <Button variant="ghost" className="rh-tile grid w-full h-auto items-start justify-items-start justify-start text-left whitespace-normal" onClick={() => send({ type: 'home/start', kind: start.kind })}>
               <span className="rh-ic"><Icon name={start.icon} size={16} tone="inherit" /></span>
@@ -349,7 +345,7 @@ export function HomeView({ state, coverDefault, now }: { state: HomeState; cover
         {/* Waiting for you first, whatever it holds; then at most one guidance card (Sprint 140, R2) */}
         <Waiting state={state} now={now} />
         <GuidanceCard guidance={state.guidance} whatMoved={<WhatMoved copilotChat={state.copilotChat} />} />
-        <StartSomething name={state.project.name} />
+        <StartSomething name={state.project.name} decksEnabled={state.decksEnabled} />
         {state.empty ? <DropFiles /> : <LastChanged state={state} now={now} />}
       </main>
       </div>

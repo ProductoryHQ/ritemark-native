@@ -131,6 +131,8 @@ export interface HomeState {
   /** No documents at all: experience 29, frame 1. */
   empty: boolean;
   boardEnabled: boolean;
+  /** Sprint 159: the `decks` flag is on, so Start something has a Deck card (Jarmo, 17 November). */
+  decksEnabled: boolean;
   /**
    * Sprint 140 (R2): at most one guidance card, under Waiting for you: What moved (experience 32, frame 5: once
    * on a profile updated from Ritemark 1), the ready request, or the feedback card.
@@ -150,7 +152,7 @@ export interface HomeState {
 /** Host → Home. */
 export type HomeMessage = { type: 'home/state'; state: HomeState } | HomeKeysSaved;
 
-export type StartKind = 'text' | 'table' | 'web';
+export type StartKind = 'text' | 'table' | 'deck' | 'web';
 
 /** Home → host. */
 export type HomeRequest =
@@ -303,7 +305,7 @@ export function decodeHomeRequest(raw: unknown): Decoded<HomeRequest> {
     case 'home/start':
       problem = check(['kind']);
       if (problem) return fail(problem);
-      if (raw.kind !== 'text' && raw.kind !== 'table' && raw.kind !== 'web') return fail('kind must be text, table or web');
+      if (raw.kind !== 'text' && raw.kind !== 'table' && raw.kind !== 'deck' && raw.kind !== 'web') return fail('kind must be text, table, deck or web');
       return { ok: true, request: { type: 'home/start', kind: raw.kind } };
     case 'home/drop-files': {
       problem = check(['uris']);

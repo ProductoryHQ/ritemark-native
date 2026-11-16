@@ -43,6 +43,7 @@ class EventEmitter<T> {
   dispose(): void { this.listeners = []; }
 }
 const none = () => ({ dispose() {} });
+const configListeners: Array<(event: { affectsConfiguration(section: string): boolean }) => void> = [];
 const opened: string[] = [];
 const commands: string[] = [];
 const settings = new Map<string, unknown>();
@@ -61,7 +62,7 @@ const vscodeStub = {
     }),
     onDidSaveTextDocument: none,
     onDidChangeTextDocument: none,
-    onDidChangeConfiguration: none,
+    onDidChangeConfiguration: (listener: (event: { affectsConfiguration(section: string): boolean }) => void) => { configListeners.push(listener); return none(); },
     createFileSystemWatcher: () => ({ dispose() {}, onDidCreate: none, onDidDelete: none, onDidChange: none }),
     textDocuments: [],
   },
@@ -492,6 +493,14 @@ async function main(): Promise<void> {
   assert.ok(counts.every((count) => !count.held), 'Home\'s counts are never held: they go only after a yes');
 
   assert.deepEqual(chats, [], 'no sign-in ever sent a message');
+
+  // Sprint 159: the decks flag turning redraws Home's card (its counts line names decks); another setting doesn't
+  let cardChanges = 0;
+  const watching = host.onDidChange(() => { cardChanges++; });
+  for (const listener of configListeners) listener({ affectsConfiguration: (section) => section === 'ritemark.features.decks' });
+  for (const listener of configListeners) listener({ affectsConfiguration: (section) => section === 'editor.fontSize' });
+  assert.equal(cardChanges, 1, 'only the decks flag redraws the card');
+  watching.dispose();
   host.dispose();
   mock.timers.reset();
   fs.rmSync(folder, { recursive: true, force: true });

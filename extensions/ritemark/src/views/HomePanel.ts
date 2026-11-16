@@ -15,7 +15,7 @@ import { HOME_TAB_ICON_DARK, HOME_TAB_ICON_LIGHT, HOME_TAB_TITLE, HOME_TAB_VIEW_
 import type { BoardController } from '../taskBoard/BoardController';
 import type { BoardSnapshot } from '../taskBoard/protocol';
 import { isPointerOnly } from '../projects/aboutFile';
-import { recentItems, RECENT_EXTENSIONS, othersOf, showWhatMoved, switchNoteEndsOnHost, waitingItems } from '../projects/homeState';
+import { recentItems, RECENT_EXTENSIONS, othersOf, showWhatMoved, startCommand, switchNoteEndsOnHost, waitingItems } from '../projects/homeState';
 import { projectInitials, readProject, setProjectCover, setProjectLine, nodeProjectFileFs } from '../projects/projectFile';
 import type { ProjectList } from '../projects/ProjectList';
 import { decodeHomeRequest, type HomeRequest, type HomeState } from '../projects/protocol';
@@ -44,6 +44,8 @@ export interface HomeHostDependencies {
   /** The open project's board; null when there is none or the flag is off. */
   board: () => BoardController | null;
   boardEnabled: () => boolean;
+  /** Sprint 159: the `decks` flag; Start something has a Deck card while it is on. */
+  decksEnabled: () => boolean;
   /** The AI's sheet: open a chat by id (R4). */
   openConversation: (conversationId: string) => Promise<void>;
   /** The projects list: a project of the list was chosen whose folder is not found. */
@@ -95,6 +97,10 @@ export class HomeHost implements vscode.Disposable {
     this.disposables.push({ dispose: offProjects });
     // Copilot Chat installed, enabled or removed: What moved's line follows it.
     this.disposables.push(vscode.extensions.onDidChange(() => this.scheduleRedraw()));
+    // Sprint 159: the Deck card comes and goes with the `decks` flag, without a reload
+    this.disposables.push(vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration('ritemark.features.decks')) this.scheduleRedraw(0);
+    }));
     // Sprint 140: the guidance card follows a sign-in, a press, a send
     if (deps.guidance) this.disposables.push(deps.guidance.onDidChange(() => this.scheduleRedraw(0)));
     // Sprint 142 (R3): a message sent on the AI's sheet ends the switch note
@@ -273,8 +279,8 @@ export class HomeHost implements vscode.Disposable {
         return;
       }
       case 'home/start': {
-        const command = request.kind === 'text' ? 'ritemark.newDocument' : request.kind === 'table' ? 'ritemark.newTable' : 'ritemark.browser.newTab';
-        await vscode.commands.executeCommand(command);
+        const command = startCommand(request.kind, this.deps.decksEnabled());
+        if (command) await vscode.commands.executeCommand(command);
         return;
       }
       case 'home/open-recent': {
@@ -510,6 +516,7 @@ export class HomeHost implements vscode.Disposable {
       recent: recent.items,
       empty: recent.empty,
       boardEnabled: this.deps.boardEnabled(),
+      decksEnabled: this.deps.decksEnabled(),
       guidance,
       copilotChat: vscode.extensions.getExtension(COPILOT_CHAT_EXTENSION_ID) !== undefined,
       switchedFrom: this.switchedFrom ? { name: this.switchedFrom.name } : null,

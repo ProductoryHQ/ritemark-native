@@ -27,6 +27,7 @@ import { projectWindowsDir, ProjectWindow } from './projectWindows';
 import { ProjectSwitcher } from './switchProject';
 import { WaitingReader } from './waiting';
 import { pickerFolder } from '../utils/dialogDefaults';
+import { isEnabled } from '../features/featureGate';
 
 export const FILLED_KEY = 'ritemark.projects.filledV1';
 
@@ -155,6 +156,7 @@ export function registerProjects(deps: ProjectsHostDependencies): ProjectsHost {
     switcher,
     board: () => (deps.boardEnabled() ? deps.taskBoard.controller : null),
     boardEnabled: deps.boardEnabled,
+    decksEnabled: () => isEnabled('decks'),
     openConversation: deps.openConversation,
     onProjectsChanged: () => projectsView?.refresh(),
     guidance: deps.guidance,
