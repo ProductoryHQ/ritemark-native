@@ -290,10 +290,10 @@ index 34d22b5d162..644a11f194a 100644
  						focusedButton = true;
  					}
 diff --git a/src/vs/base/browser/ui/iconLabel/iconLabel.ts b/src/vs/base/browser/ui/iconLabel/iconLabel.ts
-index 034c650442a..3b2312d89cd 100644
+index 034c650442a..79aa767a3f3 100644
 --- a/src/vs/base/browser/ui/iconLabel/iconLabel.ts
 +++ b/src/vs/base/browser/ui/iconLabel/iconLabel.ts
-@@ -43,6 +43,21 @@ export interface IIconLabelValueOptions {
+@@ -43,6 +43,25 @@ export interface IIconLabelValueOptions {
  	readonly domId?: string;
  	iconPath?: URI | ThemeIcon;
  	supportIcons?: boolean;
@@ -305,9 +305,13 @@ index 034c650442a..3b2312d89cd 100644
 +	splitExtension?: boolean;
 +}
 +
-+/** Ritemark 2.0: a name's stem and extension at its last dot, or undefined for a name with none or a leading dot only. */
++/**
++ * Ritemark 2.0: a name's stem and extension at its last dot, or undefined for a name with none or a leading dot only.
++ * A deck's extension is the whole `.deck.md`, as `.md` is a document's (Sprint 159, the Experience lead).
++ */
 +export function ritemarkSplitExtension(label: string): { stem: string; extension: string } | undefined {
-+	const dot = label.lastIndexOf('.');
++	const deck = /\.deck\.md$/i.exec(label);
++	const dot = deck && deck.index > 0 ? deck.index : label.lastIndexOf('.');
 +	if (dot <= 0 || dot === label.length - 1) {
 +		return undefined;
 +	}
@@ -315,7 +319,7 @@ index 034c650442a..3b2312d89cd 100644
  }
  
  class FastLabelNode {
-@@ -295,7 +310,12 @@ class Label {
+@@ -295,7 +314,12 @@ class Label {
  				this.singleLabel = dom.append(this.container, dom.$('a.label-name', { id: options?.domId }));
  			}
  
@@ -329,7 +333,7 @@ index 034c650442a..3b2312d89cd 100644
  		} else {
  			this.container.textContent = '';
  			this.container.classList.add('multiple');
-@@ -341,6 +361,9 @@ class LabelWithHighlights extends Disposable {
+@@ -341,6 +365,9 @@ class LabelWithHighlights extends Disposable {
  	private singleLabel: HighlightedLabel | undefined = undefined;
  	private options: IIconLabelValueOptions | undefined;
  	private readonly _labelDisposables = this._register(new DisposableStore());
@@ -339,7 +343,7 @@ index 034c650442a..3b2312d89cd 100644
  
  	constructor(private container: HTMLElement, private supportIcons: boolean) {
  		super();
-@@ -360,17 +383,39 @@ class LabelWithHighlights extends Disposable {
+@@ -360,17 +387,39 @@ class LabelWithHighlights extends Disposable {
  		if (typeof label === 'string') {
  			if (!this.singleLabel) {
  				this._labelDisposables.clear();
@@ -448,10 +452,10 @@ index 29240b5c9a4..7cae3011235 100644
  	private updateLabels(titleElement: HTMLElement, buttonElement: HTMLElement, label: string): void {
 diff --git a/src/vs/base/test/browser/iconLabel.test.ts b/src/vs/base/test/browser/iconLabel.test.ts
 new file mode 100644
-index 00000000000..b5391e7c619
+index 00000000000..010e1d802cb
 --- /dev/null
 +++ b/src/vs/base/test/browser/iconLabel.test.ts
-@@ -0,0 +1,65 @@
+@@ -0,0 +1,78 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -480,6 +484,19 @@ index 00000000000..b5391e7c619
 +				undefined,
 +				undefined,
 +				{ stem: 'a', extension: '.b' },
++			]
++		);
++	});
++
++	test('a deck: the whole .deck.md is its extension; a file named just deck.md is a document', () => {
++		assert.deepStrictEqual(
++			['Talk.deck.md', 'AI assistants and agents.DECK.MD', 'deck.md', '.deck.md', 'Talk.deck.markdown'].map(ritemarkSplitExtension),
++			[
++				{ stem: 'Talk', extension: '.deck.md' },
++				{ stem: 'AI assistants and agents', extension: '.DECK.MD' },
++				{ stem: 'deck', extension: '.md' },
++				{ stem: '.deck', extension: '.md' },
++				{ stem: 'Talk.deck', extension: '.markdown' },
 +			]
 +		);
 +	});

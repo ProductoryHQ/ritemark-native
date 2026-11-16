@@ -42,7 +42,7 @@
 .deck-stage { position: absolute; top: 0; bottom: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; }
 .deck-stage .deck-stage-group { margin: auto 0; padding: 8px 0 48px; }
 .deck-stage .deck-big { position: relative; margin: 0 24px; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline), 0 8px 24px -10px rgba(30, 27, 75, 0.35); }
-.deck-stage .deck-under { margin: 12px 24px 0; display: grid; gap: 8px; }
+.deck-stage .deck-under { margin: 12px 24px 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; } /* one column no wider than the stage, so a long notes preview ends with … (Sprint 159, the Experience lead) */
 .deck-source { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--r-ink-muted); }
 
 .deck-divider { position: absolute; top: 0; bottom: 0; width: 13px; margin-left: -6px; cursor: col-resize; z-index: 3; touch-action: none; }

@@ -68,7 +68,7 @@ function NewSlideItems({ at, actions }: { at: number; actions: StripActions }) {
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem onSelect={() => actions.fromLibrary(at, 'topics')}>
-        <Icon name="cards" size={14} tone="inherit" />
+        <Icon name="cards-three" size={14} tone="inherit" />
         From the library…
       </DropdownMenuItem>
       <DropdownMenuItem onSelect={() => actions.fromLibrary(at, 'other')}>
@@ -163,12 +163,12 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
             </DropdownMenuItem>
             {fromLibrary ? (
               <DropdownMenuItem onSelect={() => actions.showInLibrary(index)}>
-                <Icon name="cards" size={14} tone="inherit" />
+                <Icon name="cards-three" size={14} tone="inherit" />
                 Show in the library
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem onSelect={() => actions.addToLibrary(index)}>
-                <Icon name="cards" size={14} tone="inherit" />
+                <Icon name="cards-three" size={14} tone="inherit" />
                 Add to library…
               </DropdownMenuItem>
             )}

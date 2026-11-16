@@ -68,7 +68,9 @@ export function recentItems(
     .map((file, index) => {
       const about = isAboutFile(folder, file.path);
       const base = path.basename(file.path);
-      const dot = base.lastIndexOf('.');
+      // A deck's extension is the whole ".deck.md", as Documents splits it (patch 018's ritemarkSplitExtension)
+      const deck = /\.deck\.md$/i.exec(base);
+      const dot = deck && deck.index > 0 ? deck.index : base.lastIndexOf('.');
       const relativeDir = path.relative(folder, path.dirname(file.path));
       return {
         path: file.path,

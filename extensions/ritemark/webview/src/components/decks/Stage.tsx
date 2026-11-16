@@ -233,7 +233,7 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
       <div className="deck-under">
         {sourceLines ?? (source ? (
           <div className="deck-source">
-            <Icon name={source.library ? 'cards' : 'presentation'} size={12} tone="inherit" />
+            <Icon name={source.library ? 'cards-three' : 'presentation'} size={12} tone="inherit" />
             {source.library ? `From the library · ${source.name}` : `From ${source.name}`}
           </div>
         ) : null)}

@@ -66,6 +66,16 @@ assert.equal(full[0].item.changedAt, '2026-10-19T08:59:00.000Z');
 // The default limit, and the person's own CLAUDE.md (not the pointer) is a document like any other.
 assert.deepEqual(recentItems(folder, files, new Set()).map(({ item }) => item.name), ['CLAUDE', 'About this project', 'Outline', 'Session notes', 'AGENTS']);
 assert.equal(recentItems(folder, files, pointers, 2).length, 2);
+// Sprint 159 (deck icons): a deck's extension is the whole ".deck.md", as Documents splits it; a file named deck.md is a document
+assert.deepEqual(
+  recentItems(folder, [
+    { path: at('Talk.deck.md'), changedAt: minutes(1) },
+    { path: at('Slide library', 'TEAMS.DECK.MD'), changedAt: minutes(2) },
+    { path: at('deck.md'), changedAt: minutes(3) },
+    { path: at('Talk.deck.markdown'), changedAt: minutes(4) },
+  ], new Set()).map(({ item }) => [item.name, item.extension, item.kind]),
+  [['Talk', '.deck.md', 'deck'], ['TEAMS', '.DECK.MD', 'deck'], ['deck', '.md', 'markdown'], ['Talk.deck', '.markdown', 'markdown']],
+);
 // Names match without regard to case; a CLAUDE.md in a subfolder is never the pointer.
 assert.deepEqual(recentItems(folder, [
   { path: at('agents.md'), changedAt: minutes(1) },
