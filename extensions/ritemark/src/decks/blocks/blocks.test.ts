@@ -363,4 +363,26 @@ test('R1-7: a v1 slide whose words hold "<!--" keeps every later word in its sta
   assert.notEqual(slideStamp('points', slideDataOf('points', base), '', ''), slideStamp('points', slideDataOf('points', base.replace('One', 'Two')), '', ''));
 });
 
+// ---------------------------------------------------------------------------
+// The security review of #760: marked's raw mode never hands on a live tag
+// ---------------------------------------------------------------------------
+
+test('S-1: a tag after <kbd>, <code>, <pre> or <script> is text on the slide and on the page', () => {
+  const payloads = [
+    'x <kbd> <img/src=x onerror=alert(1)>',
+    '# T <code> <svg/onload=alert(1)>',
+    '| a |\n| - |\n| <pre> <img/src=x onerror=alert(1)> |',
+    '[link <script> <img/src=x onerror=alert(1)>](x)',
+    'Words <kbd> <meta/http-equiv="refresh"/content="0;url=//evil.example/"><a/href="//evil.example/login">Sign in</a>',
+  ];
+  for (const markdown of payloads) {
+    const html = blockSlideHtml(markdown);
+    assert.ok(!/<(img|svg|meta|a)[\s/]/i.test(html), `a live tag on the slide: ${html}`);
+  }
+  const text = `\`\`\`slide\n# T\n\n${payloads[4]}\n\`\`\`\n`;
+  const deck = publicDeck(text, { folderName: 'F', deckName: 'D', theme: BUILT_IN_THEME });
+  const page = pageHtml(deck, assets, { digest: deckDigest(deck), pictureUrl });
+  assert.ok(!/<meta\/http-equiv|<a\/href/i.test(page), 'no live tag on the page');
+});
+
 console.log(`blocks: ${passed} passed`);

@@ -13,7 +13,7 @@
  *
  * Pure: no DOM, no `vscode`. The host's page and the webview import this one file.
  */
-import { Marked, type Token, type Tokens } from 'marked';
+import { Marked, Tokenizer, type Token, type Tokens } from 'marked';
 import { EXERCISE_TAG, sidePictureOf, type SlideData } from '../deckFormat';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import type { DeckTheme } from '../deckTheme';
@@ -119,8 +119,24 @@ function pictureHtml(href: string, text: string): string {
 }
 
 /** Build a renderer instance: the slide's scoped `marked` with the `:::` blocks and the slide's own rules. */
+/**
+ * marked's tokenizer, except that an inline `<code>`, `<pre>`, `<kbd>` or `<script>` never puts it in its raw mode,
+ * where it hands the text after the tag on unescaped (the security review of #760: `<kbd> <img/src=x onerror=…>` drew a
+ * live tag; the handout's `handoutTokenizer` has the same guard since Sprint 159's PR 3).
+ */
+function slideTokenizer(): Tokenizer {
+  const tokenizer = new Tokenizer();
+  const tag = tokenizer.tag;
+  tokenizer.tag = function (this: Tokenizer, src: string) {
+    const token = tag.call(this, src);
+    this.lexer.state.inRawBlock = false;
+    return token;
+  };
+  return tokenizer;
+}
+
 function createSlideMarked(): Marked {
-  const instance = new Marked({ gfm: true, breaks: true });
+  const instance = new Marked({ gfm: true, breaks: true, tokenizer: slideTokenizer() });
   instance.use({
     extensions: [{
       name: 'slideDiv',
@@ -140,6 +156,8 @@ function createSlideMarked(): Marked {
     renderer: {
       // The slide draws no raw HTML: a comment, an anchored comment's `<mark>`, any tag. Their words are text tokens.
       html: () => '',
+      // A second guard: a `<` that still came through raw never opens a tag. Entities stay as they are.
+      text: (text: string) => text.replace(/</g, '&lt;'),
       link: (_href: string, _title: string | null | undefined, text: string) => `<span class="blk-link">${text}</span>`,
       image: (href: string, _title: string | null, text: string) => pictureHtml(href, text),
       paragraph: (text: string) => {
