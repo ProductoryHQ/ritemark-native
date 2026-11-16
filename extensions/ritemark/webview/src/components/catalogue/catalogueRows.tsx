@@ -36,6 +36,7 @@ import { Icon } from '../ui/Icon'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Pill } from '../ui/pill'
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { SegmentedControl } from '../ui/segmented-control'
 import { Progress } from '../ui/progress'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '../ui/select'
@@ -119,6 +120,7 @@ export const NEEDS_NO_ROW: Record<string, string> = {
   DialogPortal: "the dialog's own portal; DialogContent draws through it",
   DialogOverlay: 'the scrim DialogContent draws under every dialog',
   DialogClose: "Radix's close behaviour, with no look of its own (DialogHeader's close draws it)",
+  PopoverAnchor: "Radix's anchor for a popover placed by another element, with no look of its own",
 }
 
 const MENU_ROOM = 200
@@ -228,6 +230,18 @@ function dropdown(): ReactNode {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">{menuItems()}</DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+function popover(): ReactNode {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button data-target variant="outline" size="sm"><Icon name="gear" size={14} tone="inherit" />Settings</Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" style={{ width: 240 }}>
+        <p className="text-[13px] leading-5 text-ink-body">The slide's layout, look and picture.</p>
+      </PopoverContent>
+    </Popover>
   )
 }
 function moreActions(): ReactNode {
@@ -395,6 +409,22 @@ export const CATALOGUE: CatalogueRow[] = [
         ],
       },
     ],
+  },
+  {
+    // 17 November (#759): a popup anchored to a button, which closes on a press outside and on Esc (the deck's Slide
+    // settings).
+    id: 'popover',
+    title: 'Popover',
+    covers: ['Popover', 'PopoverTrigger', 'PopoverContent'],
+    variants: [{
+      id: 'trigger',
+      label: 'trigger',
+      cells: [
+        t('rest', popover),
+        t('open', popover, { width: MENU_WIDTH, height: MENU_ROOM }),
+        t('escape', popover),
+      ],
+    }],
   },
   {
     id: 'more-actions',

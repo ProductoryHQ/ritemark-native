@@ -2,8 +2,10 @@
  * Fold either side (experience 46, "Fold either side"; Jarmo, 16 November: the opposite arrow too, "et saaksin keskenduda
  * ainult teksti kirjutamisele"). The line between the slide and the handout carries one split control (Jarmo, 16 November:
  * "see võiks olla split button"): a 26 px pill standing upright on the line, ‹ Hide the slide over › Hide the handout,
- * with a hairline between the halves. With the slide hidden, the handout is a Text document's centred column and one
- * round › at its left edge brings the slide back; with the handout hidden, one round ‹ at the line brings it back.
+ * with a hairline between the halves. With the slide above the handout (deckLayout.ts), the pill lies flat at the
+ * line's right end: ˄ Hide the slide, ˅ Hide the handout. With the slide hidden, the handout is a Text document's
+ * centred column and one round › at its left edge (˅ at its top edge, above) brings the slide back; with the handout
+ * hidden, one round ‹ at the line (˄ at the slide's bottom, above) brings it back.
  *
  * The fold is one value, so the two sides can never both be hidden. Each deck keeps it in its own view state, as it
  * keeps the divider's share, never in the file: opening a deck writes nothing.
@@ -21,8 +23,9 @@ export function foldFrom(stored: unknown): DeckFold {
   return stored === 'slide' || stored === 'handout' ? stored : null
 }
 
-/** What this deck's view keeps: the slide's share (the divider) and the fold. Never the file. */
-export interface DeckViewState { deckRatio?: unknown; deckFold?: unknown }
+/** What this deck's view keeps: the slide's share of the width beside the handout (`deckRatio`), its share of the
+ *  height above it (`deckAboveRatio`), and the fold. Never the file. */
+export interface DeckViewState { deckRatio?: unknown; deckAboveRatio?: unknown; deckFold?: unknown }
 
 /** This deck's kept view state, or nothing when the view has none. */
 export function deckViewState(): DeckViewState {
@@ -63,50 +66,60 @@ export function foldedSides(fold: DeckFold, handoutRoom: boolean): { slideShown:
 }
 
 /** A folded side's button sits this far from the line, inside the side that shows. (Its distance from the room's
- *  bottom, 28 px, is decks.css's `.deck-fold`, the one place it is kept.) */
+ *  bottom, 28 px, or from its right end with the slide above, is decks.css's `.deck-fold`, the one place it is kept.) */
 const INSET = 22
 
-interface FoldButton { label: string; icon: 'caret-left' | 'caret-right'; side: 'slide' | 'handout' }
+interface FoldButton { label: string; icon: 'caret-left' | 'caret-right' | 'caret-up' | 'caret-down'; side: 'slide' | 'handout' }
 
-/** The fold's control at the line between the slide and the handout (`line`, from the desk's left). With both sides
- *  shown, the split pill's two halves, upper first, centred on the line; otherwise one round button, `INSET` inside the
- *  side that shows, to bring the folded side back. The returned `left` is where the control's middle stands. */
-export function foldControl(slideShown: boolean, handoutShown: boolean, line: number): { left: number; buttons: FoldButton[] } {
-  if (!slideShown) return { left: line + INSET, buttons: [{ label: 'Show the slide', icon: 'caret-right', side: 'slide' }] }
-  if (!handoutShown) return { left: line - INSET, buttons: [{ label: 'Show the handout', icon: 'caret-left', side: 'handout' }] }
+/**
+ * The fold's control at the line between the slide and the handout. Beside, `line` is the line's distance from the
+ * desk's left and the split pill stands upright on it: ‹ Hide the slide over › Hide the handout. With the slide above
+ * (`above`), `line` is its distance from the desk's top and the pill lies flat at the line's right end: ˄ Hide the
+ * slide, ˅ Hide the handout. With one side hidden, one round button, `INSET` inside the side that shows, brings the
+ * folded side back: at the handout's left edge (its top right above, where the pill was, so the hand returns to the same spot), or at the slide's right or bottom end. The
+ * returned `at` is where the control's middle stands along the line's axis.
+ */
+export function foldControl(slideShown: boolean, handoutShown: boolean, line: number, above = false): { at: number; buttons: FoldButton[] } {
+  if (!slideShown) return { at: line + INSET, buttons: [{ label: 'Show the slide', icon: above ? 'caret-down' : 'caret-right', side: 'slide' }] }
+  if (!handoutShown) return { at: line - INSET, buttons: [{ label: 'Show the handout', icon: above ? 'caret-up' : 'caret-left', side: 'handout' }] }
   return {
-    left: line,
+    at: line,
     buttons: [
-      { label: 'Hide the slide', icon: 'caret-left', side: 'slide' },
-      { label: 'Hide the handout', icon: 'caret-right', side: 'handout' },
+      { label: 'Hide the slide', icon: above ? 'caret-up' : 'caret-left', side: 'slide' },
+      { label: 'Hide the handout', icon: above ? 'caret-down' : 'caret-right', side: 'handout' },
     ],
   }
 }
 
-export function DeckFolds({ slideShown, handoutShown, left, onToggle }: {
+export function DeckFolds({ slideShown, handoutShown, line, above = false, onToggle }: {
   slideShown: boolean
   handoutShown: boolean
-  left: number
+  /** The line between the slide and the handout: from the desk's left beside, from its top with the slide above. */
+  line: number
+  above?: boolean
   onToggle: (side: 'slide' | 'handout') => void
 }) {
-  const control = foldControl(slideShown, handoutShown, left)
+  const control = foldControl(slideShown, handoutShown, line, above)
   // Two buttons are the split pill; one is the round button that brings a folded side back.
   const split = control.buttons.length === 2
+  // The tooltip opens off the line: beside the upright pill, over the flat one, and into the side that shows.
+  const tipSide = split ? (above ? 'top' : 'right') : above && slideShown ? 'top' : 'bottom'
   return (
     // One element whatever the fold, and each half keyed by its side: the pressed half stays the same button when the
     // pill becomes the one round button, so the keyboard's focus stays on it.
     <div
-      className={`deck-fold${split ? ' is-split' : ''}`}
-      style={{ left: control.left }}
+      className={`deck-fold${split ? ' is-split' : ''}${above ? ' is-above' : ''}`}
+      style={above ? { top: control.at } : { left: control.at }}
       role={split ? 'group' : undefined}
       aria-label={split ? 'Fold either side' : undefined}
     >
       {control.buttons.map((button, at) => (
-        <Tooltip key={button.side} label={button.label} side={split ? 'right' : 'bottom'}>
+        <Tooltip key={button.side} label={button.label} side={tipSide}>
           <Button
             variant={split ? 'ghost' : 'outline'}
             size="icon-sm"
-            // Each half names its end of the pill, so its corners and the hairline never depend on Tooltip's wrapper.
+            // Each half names its end of the pill (the upper one, or the left one when it lies flat), so its corners and
+            // the hairline never depend on Tooltip's wrapper.
             className={`deck-fold-button${split ? (at === 0 ? ' is-upper' : ' is-lower') : ''}`}
             aria-label={button.label}
             onClick={() => onToggle(button.side)}

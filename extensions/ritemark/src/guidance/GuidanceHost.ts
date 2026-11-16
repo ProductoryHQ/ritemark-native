@@ -40,6 +40,7 @@ import type { AcceptedTurn, ChatOrigin, ChatStartRequest } from '../views/Unifie
 import { saveAiForNewChats } from '../welcome/welcomeHost';
 import { homeReopenNotOpened, signInProblem, type SignInProblem } from '../welcome/words';
 import { countsLine, listFileNames } from './folderCounts';
+import { isEnabled } from '../features/featureGate';
 import { feedbackDue, guidanceCard, localDay } from './guidanceState';
 import { GuidanceStore, noteLastReadyAi, readLastReadyAi, seedLastReadyAiForTest } from './guidanceStore';
 import { madeSomething } from './madeSomething';
@@ -149,7 +150,8 @@ export class GuidanceHost implements vscode.Disposable {
   private feedback: { sending: boolean; problem: string | null } = { sending: false, problem: null };
   private placeTimer: ReturnType<typeof setTimeout> | undefined;
   /** The counts line per folder, listed once and listed again only after a file is created or deleted there (QA). */
-  private readonly counts = new Map<string, Promise<string>>();
+  /** The folder's file names, listed once per folder and skip set (the line is made from them on each read). */
+  private readonly counts = new Map<string, Promise<{ names: string[]; more: boolean }>>();
 
   constructor(private readonly deps: GuidanceDependencies) {
     const version = String(deps.context.extension.packageJSON.version ?? '0.0.0');
@@ -188,6 +190,10 @@ export class GuidanceHost implements vscode.Disposable {
       vscode.window.tabGroups.onDidChangeTabGroups(() => this.schedulePlace()),
       vscode.workspace.onDidChangeTextDocument((event) => {
         if (event.document === this.frontDocument()) this.schedulePlace(600);
+      }),
+      // Sprint 159: the counts line names decks while the `decks` flag is on; Home redraws its card when it turns
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration('ritemark.features.decks')) this.changed.fire();
       }),
     );
     if (deps.folder) {
@@ -742,13 +748,16 @@ export class GuidanceHost implements vscode.Disposable {
    */
   private countsOf(root: string, skipAtRoot: ReadonlySet<string>): Promise<string> {
     const key = `${root}\n${[...skipAtRoot].sort().join('\n')}`;
-    let line = this.counts.get(key);
-    if (!line) {
-      line = listFileNames(root, { skipAtRoot }).then((listed) => countsLine(listed.names, listed.more));
-      line.catch(() => this.counts.delete(key));
-      this.counts.set(key, line);
+    let listed = this.counts.get(key);
+    if (!listed) {
+      listed = listFileNames(root, { skipAtRoot });
+      listed.catch(() => this.counts.delete(key));
+      this.counts.set(key, listed);
     }
-    return line;
+    // Sprint 159: with the `decks` flag on, a .deck.md counts as a deck. The flag is read at each draw from the
+    // names already listed, so turning it over never walks the folder again.
+    const decks = isEnabled('decks');
+    return listed.then((names) => countsLine(names.names, names.more, { decks }));
   }
 
   dispose(): void {

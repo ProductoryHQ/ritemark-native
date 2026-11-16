@@ -10,8 +10,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { isDeckPath } from '../decks/deckFileName';
 
-export type FileKind = 'word' | 'pdf' | 'spreadsheet' | 'presentation' | 'text' | 'picture' | 'other';
+export type FileKind = 'word' | 'pdf' | 'spreadsheet' | 'presentation' | 'deck' | 'text' | 'picture' | 'other';
 
 /** Past this many files the line reads "More than 10,000 files." */
 export const COUNT_LIMIT = 10_000;
@@ -29,19 +30,26 @@ const EXTENSIONS: Record<string, FileKind> = {
 };
 
 /** The kinds in the order a tie keeps them. */
-const KIND_ORDER: readonly FileKind[] = ['word', 'pdf', 'spreadsheet', 'presentation', 'text', 'picture'];
+const KIND_ORDER: readonly FileKind[] = ['word', 'pdf', 'spreadsheet', 'presentation', 'deck', 'text', 'picture'];
 
 const WORDS: Record<FileKind, [one: string, many: string]> = {
   word: ['Word document', 'Word documents'],
   pdf: ['PDF', 'PDFs'],
   spreadsheet: ['spreadsheet', 'spreadsheets'],
   presentation: ['presentation', 'presentations'],
+  deck: ['deck', 'decks'],
   text: ['text document', 'text documents'],
   picture: ['picture', 'pictures'],
   other: ['other', 'others'],
 };
 
-export function fileKindOf(name: string): FileKind {
+/** How the line names files: `decks` (Sprint 159, the `decks` flag on) counts a `.deck.md` as a deck, not a text document. */
+export interface CountOptions {
+  decks?: boolean;
+}
+
+export function fileKindOf(name: string, options: CountOptions = {}): FileKind {
+  if (options.decks && isDeckPath(name)) return 'deck';
   return EXTENSIONS[path.extname(name).toLowerCase()] ?? 'other';
 }
 
@@ -57,13 +65,14 @@ function joinWords(parts: readonly string[]): string {
 /**
  * The line for a list of file names: the total, then at most four kinds, the
  * most numerous first, and the rest as "others", last. `more` says the walk
- * stopped past the limit. Ends with a full stop.
+ * stopped past the limit. With `decks`, a `.deck.md` is a deck ("1 file: 1 deck.").
+ * Ends with a full stop.
  */
-export function countsLine(names: readonly string[], more = false): string {
+export function countsLine(names: readonly string[], more = false, options: CountOptions = {}): string {
   if (more || names.length > COUNT_LIMIT) return 'More than 10,000 files.';
   const counts = new Map<FileKind, number>();
   for (const name of names) {
-    const kind = fileKindOf(name);
+    const kind = fileKindOf(name, options);
     counts.set(kind, (counts.get(kind) ?? 0) + 1);
   }
   const known = KIND_ORDER.filter((kind) => (counts.get(kind) ?? 0) > 0)
