@@ -805,6 +805,7 @@ A `.deck.md` is a Markdown file that opens as a slide deck: numbered thumbnails 
 |---|---|
 | `src/decks/deckPages.ts` | The host's side of the mode: which documents open as decks, the open deck views (the Slide library and the AI's tools insert through the one in front, as one undo step there), and the view's `deck/*` requests, decoded with exact fields (`deckProtocol.ts`) and answered to that one webview. `ritemarkEditor.ts` connects a `.deck.md`'s panel and routes `deck/*` to it only when the panel opened with the flag on; the deck pages answer it while its file reads as a deck this build writes, and the Slide library's requests only while the flag is on now (Sprint 159) |
 | `src/decks/DeckLibrary.ts`, `deckLibraryFormat.ts`, `deckDocuments.ts` | The Slide library (the folder `Slide library` at the project's top, one `.deck.md` per topic) and the project's decks: copying slides between them with a `from:` line and its stamp, never speaker notes; an open deck read from and written through its document |
+| `src/decks/newDeck.ts`, `decksHost.ts` (`ritemark.decks.new`) | New → Deck (Sprint 159, PR 7), in the project head's New menu while the flag is on: one quick pick, "Empty deck" first, then the project's decks newest first with their folder and date (the Slide library's topics left out). An empty deck is a title slide reading "The deck's title"; a copy is "<deck name> (copy)", the deck as written with its relative paths rebased when it lands in another folder. Either is made in the folder New was opened from, never over a file, and opens as a deck with the title slide's title selected (the host's `deck/select-title`, sent once the view reports its first slide) |
 | `src/decks/SlideLibraryViewProvider.ts`, `decksHost.ts` | The Slide library place (`ritemark-slide-library`, after Tasks) and the composition at activation; the place's view is shown on `config.ritemark.features.decks` |
 | `src/decks/deckTheme.ts`, `webview/src/components/decks/theme/` | A deck's theme (`.theme.md`): one built-in theme in this cut, drawn as Card or Borderless through `--s-*` properties |
 | `webview/src/components/decks/slide/` | `layoutSlide.ts` (pure: a slide on a fixed 960 × 540 canvas, every kind fitting itself), `SlideCanvas.tsx` (draws it, with a measuring pass for real font metrics), `convertKind.ts` (a change of layout keeps the words), `slideEdits.ts`, `iconSet.ts` |
@@ -821,7 +822,6 @@ A `.deck.md` is a Markdown file that opens as a slide deck: numbered thumbnails 
 |---|---|
 | Present: the wall and the presenter view | Sprint 159, PRs 5 and 6 |
 | The handout page, published with 2.2's Publish | Sprint 159, PRs 3 and 4 |
-| New → Deck | Sprint 159, PR 7 |
 | Themes and theme editing | Roadmap step 3 |
 | The place without its setting, the flag gone | Roadmap step 5 |
 
