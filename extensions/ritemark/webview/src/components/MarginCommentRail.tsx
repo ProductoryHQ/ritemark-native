@@ -406,9 +406,9 @@ function ComposeBubble({
     onSave(text)
   }
 
-  const choose = (aliasToInsert: string) => {
+  const choose = (written: string) => {
     if (!mention) return
-    const next = insertMention(text, mention, aliasToInsert)
+    const next = insertMention(text, mention, written)
     setText(next.text)
     setCaret(next.caret)
     setDismissedStart(null)

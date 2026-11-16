@@ -50,13 +50,17 @@ export const ALIAS_MENTION: Record<CommentAgentAlias, string> = {
   opencode: 'opencode',
 }
 
-/** Every spelling that assigns, and the alias it stands for. */
-const SPELLING_TO_ALIAS: Record<string, CommentAgentAlias> = {
-  claude: 'claude',
-  chatgpt: 'codex',
-  codex: 'codex',
-  opencode: 'opencode',
-}
+/**
+ * Every spelling that assigns, and the alias it stands for: each alias itself
+ * (so `@codex` keeps working) and its written form from `ALIAS_MENTION`.
+ * Derived, so a spelling the picker offers is always one the collector reads.
+ */
+const SPELLING_TO_ALIAS: Record<string, CommentAgentAlias> = Object.fromEntries(
+  COMMENT_AGENT_ALIASES.flatMap((alias): Array<[string, CommentAgentAlias]> => [
+    [alias, alias],
+    [ALIAS_MENTION[alias], alias],
+  ]),
+)
 
 const SPELLINGS = Object.keys(SPELLING_TO_ALIAS)
 

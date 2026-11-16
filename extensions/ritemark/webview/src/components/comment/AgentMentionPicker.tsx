@@ -83,18 +83,22 @@ export function filterAgentOptions(
   )
 }
 
-/** Replace the in-progress mention with `@alias `, and say where the caret goes. */
+/**
+ * Replace the in-progress mention with `@<written> `, and say where the caret
+ * goes. `written` is an option's `mention` (`chatgpt`), never its `alias`
+ * (`codex`): the alias is the internal name, not what a person is offered.
+ */
 export function insertMention(
   text: string,
   mention: MentionQuery,
-  alias: string,
+  written: string,
 ): { text: string; caret: number } {
   const head = text.slice(0, mention.start)
   const rest = text.slice(mention.start + 1 + mention.query.length)
   // The mention already ends in a space, so a space that was already there
   // would double up.
   const tail = rest.startsWith(' ') ? rest.slice(1) : rest
-  const inserted = `@${alias} `
+  const inserted = `@${written} `
   return { text: `${head}${inserted}${tail}`, caret: head.length + inserted.length }
 }
 
