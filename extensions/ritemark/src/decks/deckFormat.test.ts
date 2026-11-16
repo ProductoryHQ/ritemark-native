@@ -328,6 +328,8 @@ test("a part's own heading: an H1 or H2 as the handout's first block, ATX or set
   // A setext heading as CommonMark (and marked, the editor's and the page's reader) reads one: several lines, marks inside.
   assert.deepEqual(partHeadingOf('Line one\nLine two\n---\nText'), { level: 2, text: 'Line one Line two', end: 22 });
   assert.equal(partHeadingOf('*Note* first\n===\n')?.level, 1, 'emphasis at its start is no list item');
+  assert.equal(partHeadingOf('Title\n    more\n---\n')?.text, 'Title more', 'a lazy continuation line, whatever its indent');
+  assert.equal(partHeadingOf('    code\n---\n'), null, 'indented code is no heading');
   assert.equal(partHeadingOf('Text\n\n---\n'), null, 'a line after a blank line is a line');
   assert.equal(partHeadingOf('***\n---\n'), null, 'a line over a line is no heading');
   assert.equal(partHeadingOf(''), null);

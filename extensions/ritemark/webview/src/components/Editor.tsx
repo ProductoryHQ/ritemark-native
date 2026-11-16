@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { countWords, onDocChanged } from '../lib/docChange'
 import { useEditor, EditorContent, useEditorState, type Editor as TipTapEditor } from '@tiptap/react'
 import { DOMSerializer } from '@tiptap/pm/model'
-import { Fragment } from '@tiptap/pm/model'
+import { Fragment, type Node as PMNode } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
 import { closeHistory } from '@tiptap/pm/history'
 import { createNodeFromContent, type AnyExtension } from '@tiptap/core'
@@ -65,6 +65,10 @@ interface EditorProps {
   /** Sprint 157: extra schema extensions for a mode of the editor (a deck's slide node and its guard), fixed at
    *  mount like the rest of the list. */
   extensions?: AnyExtension[]
+  /** A mode's view of a host revision before it is applied (a deck draws its parts' headings into it, 16 November),
+   *  so the smallest replacement is found against what the view shows. Called with the document the host's text reads
+   *  as; returns it, or a copy with only view-side nodes added. */
+  viewOfIncoming?: (doc: PMNode) => PMNode
 }
 
 export function Editor({
@@ -80,6 +84,7 @@ export function Editor({
   onExternalApplied,
   header,
   extensions,
+  viewOfIncoming,
 }: EditorProps) {
   // Register the comment `marked` tokenizer before initialContent is parsed on
   // mount — only when the flag is on (see ensureCommentMarkedPipeline above).
@@ -533,9 +538,10 @@ export function Editor({
           parseOptions: { preserveWhitespace: 'full' },
           errorOnInvalidContent: true,
         })
-        const nextDoc = parsed instanceof Fragment
+        const hostDoc = parsed instanceof Fragment
           ? editor.schema.topNodeType.create(null, parsed)
           : parsed
+        const nextDoc = viewOfIncoming ? viewOfIncoming(hostDoc) : hostDoc
         // The smallest replacement, with the front and back diffs kept from
         // overlapping (an overlap froze the editor; lib/documentUpdate.ts).
         const replacement = documentReplacement(editor.state.doc, nextDoc)

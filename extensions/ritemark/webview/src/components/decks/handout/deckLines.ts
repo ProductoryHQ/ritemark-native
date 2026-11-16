@@ -63,6 +63,10 @@ export function slidesFromLines(before: PMNode, state: EditorState, random: () =
   if (lines.length !== 1) return null
   const [{ pos: at, index }] = lines
   if (state.selection.$from.index(0) !== index + 1) return null
+  // Only inside a part: a line in the text before the first slide stays a line.
+  let inPart = false
+  state.doc.forEach((node, pos) => { if (pos < at && isSlideNode(node)) inPart = true })
+  if (!inPart) return null
 
   const taken: string[] = []
   state.doc.forEach(node => {

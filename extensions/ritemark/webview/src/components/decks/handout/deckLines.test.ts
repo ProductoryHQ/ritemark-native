@@ -151,6 +151,16 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
   assert.equal(slides(liftedState.doc).length, 1, 'a line already in the file stays a line when lifted out of a quote')
 }
 
+// A line in the text before the first slide stays a line: it is no part's.
+{
+  const state = stateOf([paragraph('A note before the slides.'), paragraph('---'), slide('aaaa', 'One'), heading(2, 'One')])
+  const next = typeLine(state, 1)
+  assert.equal(slides(next.doc).length, 1)
+  let lines = 0
+  next.doc.forEach(node => { if (node.type.name === 'horizontalRule') lines++ })
+  assert.equal(lines, 1)
+}
+
 // A line already in the file stays a line when the person types elsewhere.
 {
   const state = stateOf([slide('aaaa', 'One'), heading(2, 'One'), paragraph('x'), line(), paragraph('y')])

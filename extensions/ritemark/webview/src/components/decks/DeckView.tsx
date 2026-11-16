@@ -26,7 +26,7 @@ import type { DocumentProperties } from '../properties'
 import { SegmentedControl } from '../ui/segmented-control'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
-import { DECK_DERIVED, DEFAULT_RATIO, RATIO_MAX, RATIO_MIN, initialRatio, deleteSlide, derivedHeadings, partHeadingAt, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
+import { DECK_DERIVED, DECK_OPERATION, DEFAULT_RATIO, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
 import { StartCard } from './StartCard'
 import { deckStarted, startCardRows, type StartCardState } from '../../../../src/decks/startCard'
 import { DOMParser as PMDOMParser, Fragment, type Node as PMNode } from '@tiptap/pm/model'
@@ -255,10 +255,12 @@ export function DeckView({
       queued = true
       queueMicrotask(draw)
     }
-    // The document as it arrives, and again as the host replaces it (its updates never come from the person).
+    // The document as it arrives, again as the host replaces it, and after the strip's operations (a new slide's part
+    // gets its heading drawn, following the title typed on the slide).
     const onTransaction = ({ transaction }: { transaction: Transaction }) => {
       if (!transaction.docChanged || transaction.getMeta(DECK_DERIVED) === true) return
-      if (transaction.getMeta('preventUpdate') === true || transaction.getMeta('ritemarkDocumentRevision') !== undefined) later()
+      if (transaction.getMeta('preventUpdate') === true || transaction.getMeta('ritemarkDocumentRevision') !== undefined
+        || transaction.getMeta(DECK_OPERATION) === true) later()
     }
     later()
     editor.on('transaction', onTransaction)
@@ -830,11 +832,18 @@ export function DeckView({
         if (!id || !entry || !isNewPart(message)) return
         const previous = partContent(editor.state.doc, entry.index)
         const fetched = partsFragment(editor, [{ kind: message.kind, body: message.body, handout: message.handout, notes: entry.notes }], imageMappings)
-        // The part's heading is the handout's own, not the slide's (16 November): the copy keeps the one it has.
+        // The part's heading is the handout's own, not the slide's (16 November): the copy keeps the one it has, in place of
+        // the library's (an H1 or H2 right after the slide), or over the library's text when it has none.
         const own = partHeadingAt(editor.state.doc, entry.pos)
-        const content = fetched && own && !own.node.attrs.deckDrawn && fetched.childCount > 1 && fetched.child(1).type.name === 'heading'
-          ? fetched.replaceChild(1, own.node)
-          : fetched
+        let content = fetched
+        if (fetched && own && !own.node.attrs.deckDrawn) {
+          const nodes: PMNode[] = []
+          fetched.forEach(node => nodes.push(node))
+          const second = nodes[1]
+          if (second && second.type.name === 'heading' && second.attrs.level <= 2) nodes[1] = own.node
+          else nodes.splice(1, 0, own.node)
+          content = Fragment.fromArray(nodes)
+        }
         if (!previous || !content || !dispatch(replacePart(editor.state, entry.index, content))) {
           setNotice({ text: "The library's version could not be put in." })
           return
@@ -1077,6 +1086,7 @@ export function DeckView({
             syncTarget={syncTarget}
             onExternalApplied={onExternalApplied}
             extensions={DECK_EXTENSIONS}
+            viewOfIncoming={withDrawnHeadings}
           />
           {handoutContainer && startRows && startState && startAt ? createPortal(
             <StartCard

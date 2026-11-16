@@ -17,7 +17,7 @@ import { Extension } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { isHistoryTransaction } from '@tiptap/pm/history'
-import { derivedHeading } from '../../../../../src/decks/deckFormat'
+import { derivedHeading, partHeadingLevel } from '../../../../../src/decks/deckFormat'
 import { DECK_DERIVED, isSlideNode, partHeadingAt, slidesOf } from '../deckDocument'
 
 export const DRAWN_ATTRIBUTE = 'data-deck-drawn'
@@ -70,11 +70,13 @@ export function drawnHeadingsFollow(transactions: readonly Transaction[], state:
     for (const pos of drawn) tr.setNodeMarkup(pos, undefined, { ...state.doc.nodeAt(pos)!.attrs, deckDrawn: false })
     return tr
   }
-  // A slide changed alone: a drawn heading stays its slide's title.
+  // A slide changed alone: a drawn heading stays its slide's title, at its kind's level (a section's H1).
   for (const slide of [...slidesOf(state.doc)].reverse()) {
     const heading = partHeadingAt(state.doc, slide.pos)
     if (!heading || !isDrawn(heading.node)) continue
     const text = derivedHeading(slide.data)
+    const level = partHeadingLevel(slide.kind)
+    if (heading.node.attrs.level !== level) tr.setNodeMarkup(heading.pos, undefined, { ...heading.node.attrs, level })
     if (heading.node.textContent === text) continue
     tr.replaceWith(heading.pos + 1, heading.pos + heading.node.nodeSize - 1, text ? state.schema.text(text) : [])
   }

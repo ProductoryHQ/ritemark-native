@@ -688,7 +688,8 @@ function setextHeadingOf(handout: string): PartHeading | null {
       const end = lines.slice(0, index + 1).reduce((sum, next) => sum + next.length + 1, 0);
       return { level: underline[1].startsWith('=') ? 1 : 2, text: text.join(' '), end: Math.min(handout.length, end) };
     }
-    if (BLOCK_START.test(line) || /^[ ]{4}/.test(line) || /^[ ]{0,3}(?:\*[ \t]*){3,}$/.test(line)) return null;
+    // Its first line can't be indented code; a later one is a lazy continuation, whatever its indent.
+    if (BLOCK_START.test(line) || (text.length === 0 && /^[ ]{4}/.test(line)) || /^[ ]{0,3}(?:\*[ \t]*){3,}$/.test(line)) return null;
     text.push(line.trim());
   }
   return null;

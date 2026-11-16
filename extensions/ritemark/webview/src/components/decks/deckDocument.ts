@@ -4,7 +4,7 @@
  * blocks before the first slide are the preamble, kept as written.
  */
 import type { Fragment, Node as PMNode } from '@tiptap/pm/model'
-import type { EditorState, Transaction } from '@tiptap/pm/state'
+import { EditorState, type Transaction } from '@tiptap/pm/state'
 import { derivedHeading, newId, parseSlideBody, partHeadingLevel, writeSlideBody, type SlideData } from '../../../../src/decks/deckFormat'
 
 /** Meta on the deck view's own transactions (the strip's operations): the guard lets them through. */
@@ -141,6 +141,15 @@ export function derivedHeadings(state: EditorState): Transaction | null {
   return tr.setMeta(DECK_DERIVED, true).setMeta('addToHistory', false).setMeta('preventUpdate', true)
 }
 
+/**
+ * A document as the deck view shows it: with its parts' drawn headings. The editor finds a host revision's smallest
+ * change against this, so a revision changes only what it changed, never every drawn heading between (Editor's
+ * `viewOfIncoming`).
+ */
+export function withDrawnHeadings(doc: PMNode): PMNode {
+  return derivedHeadings(EditorState.create({ doc }))?.doc ?? doc
+}
+
 /** The empty heading a new part opens with, for its kind. */
 export function emptyPartHeading(state: EditorState, kind: string): PMNode | null {
   return state.schema.nodes.heading?.create({ level: partHeadingLevel(kind) }) ?? null
@@ -166,11 +175,6 @@ export function handoutHasText(doc: PMNode): boolean {
     })
   })
   return found
-}
-
-/** A slide's title as the strip and the stage show it. */
-export function slideTitle(data: SlideData): string {
-  return (data.title ?? '').trim()
 }
 
 // ---------------------------------------------------------------------------
@@ -258,9 +262,9 @@ export function insertSlide(state: EditorState, at: number, kind: string, random
   const body = writeSlideBody('', { id: newId(idsOf(state.doc), random) })
   const slide = type.create({ kind, body, notes: null })
   const point = insertPoint(state.doc, at)
-  // A new part opens with its heading, empty until the person writes it, and room for its words.
-  const heading = emptyPartHeading(state, kind)
-  return operation(state.tr.insert(point, [slide, ...(heading ? [heading] : []), state.schema.nodes.paragraph.create()]))
+  // Room for its words. Its heading is drawn by the deck view, following the title typed on the slide until the person
+  // writes in the handout (handout/drawnHeadings.ts).
+  return operation(state.tr.insert(point, [slide, state.schema.nodes.paragraph.create()]))
 }
 
 /** Change part `index`'s slide: its data (written line by line), and its kind when given. */

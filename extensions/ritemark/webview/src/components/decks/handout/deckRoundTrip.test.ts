@@ -22,7 +22,8 @@ import { parseSlideBody, writeSlideBody } from '../../../../../src/decks/deckFor
 import { createEditorSchemaExtensions, ensureCommentMarkedPipeline, markdownToEditorHTML } from '../../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../../utils/markdownFidelity'
 import { DeckSlide } from './deckSchema'
-import { DECK_DERIVED, derivedHeadings } from '../deckDocument'
+import { DECK_DERIVED, derivedHeadings, withDrawnHeadings } from '../deckDocument'
+import { documentReplacement } from '../../../lib/documentUpdate'
 import { DeckDrawnHeadings, drawnHeadingsFollow } from './drawnHeadings'
 
 installTestDocument()
@@ -246,6 +247,39 @@ const blocksOf = (text: string) => text.match(/```slide[\s\S]*?\n```/g) ?? []
   const reopened = open(written)
   assert.equal(derivedHeadings(EditorState.create({ doc: reopened.doc })), null)
   assert.equal(reopened.save(reopened.doc), written)
+}
+
+// A host revision of an older deck changes only what it changed: the editor diffs it against the view's document, drawn
+// headings and all (Editor's `viewOfIncoming`), so the caret and the current slide stay where they are.
+{
+  const older = [
+    '```slide title', 'id: t0a1', 'title: One', '```', '', 'First.', '',
+    '```slide points', 'id: p001', 'title: Two', '```', '', 'Second.', '',
+    '```slide points', 'id: p002', 'title: Three', '```', '', 'Third.', '',
+  ].join('\n')
+  const { doc } = open(older)
+  const shown = withDrawnHeadings(doc)
+  assert.notEqual(shown, doc, 'the view draws the headings')
+  const revised = withDrawnHeadings(open(older.replace('Second.', 'Second, revised.')).doc)
+  const replacement = documentReplacement(shown, revised)!
+  assert.ok(replacement, 'the revision is a change')
+  const changed = shown.textBetween(replacement.from, replacement.to, '|')
+  assert.equal(changed.includes('One') || changed.includes('Three'), false, `only the changed paragraph is replaced, not "${changed}"`)
+  assert.equal(withDrawnHeadings(shown), shown, 'drawn once')
+}
+
+// A drawn heading follows its slide's kind too: a Points slide made a Section is an H1 until the first edit writes it.
+{
+  const older = '```slide points\nid: p001\ntitle: Why agents?\n```\n\nText.\n'
+  const { doc, save } = open(older)
+  const plugins = [new Plugin({ appendTransaction: (trs, _old, next) => drawnHeadingsFollow(trs, next) })]
+  const state = EditorState.create({ doc, plugins })
+  const drawn = state.apply(derivedHeadings(state)!)
+  const node = drawn.doc.child(0)
+  const section = drawn.apply(drawn.tr.setNodeMarkup(0, undefined, { ...node.attrs, kind: 'section' }))
+  assert.equal(section.doc.child(1).attrs.level, 1, 'a section\'s drawn heading is an H1')
+  assert.equal(section.doc.child(1).attrs.deckDrawn, true)
+  assert.equal(save(section.doc), older.replace('```slide points', '```slide section'), 'still not saved')
 }
 
 // A new deck's title slide ("The deck's title", to be typed over): its part's heading is drawn empty, so it shows the

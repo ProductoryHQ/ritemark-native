@@ -122,15 +122,12 @@ assert.equal(partIndexAt(doc, slidesOf(doc)[1].pos + 3), 1)
   assert.equal(handoutHasText(schema.nodes.doc.create(null, [slide('aaaa', 'T'), heading(2, 'Welcome'), schema.nodes.paragraph.create()])), false)
   assert.equal(handoutHasText(schema.nodes.doc.create(null, [slide('aaaa', 'T'), heading(2, 'Welcome'), paragraph('Words.')])), true)
   assert.equal(handoutHasText(schema.nodes.doc.create(null, [slide('aaaa', 'T'), heading(3, 'Smaller')])), true, 'an H3 is text')
-  // A new part opens with its empty heading (an H1 for a section), then room for its words.
+  // A new part is its slide and room for its words: its heading is drawn by the view (drawnHeadings.ts), following
+  // the title typed on the slide, until the person writes in the handout.
   const made = insertSlide(state, 3, 'section', () => 0.5)!
   const names: string[] = []
   made.doc.forEach(node => names.push(node.type.name === 'heading' ? `h${node.attrs.level}` : node.type.name))
-  assert.deepEqual(names.slice(-3), ['deckSlide', 'h1', 'paragraph'])
-  const points = insertSlide(state, 0, 'points', () => 0.5)!
-  assert.equal(points.doc.child(2).type.name, 'heading')
-  assert.equal(points.doc.child(2).attrs.level, 2)
-  assert.equal(points.doc.child(2).childCount, 0)
+  assert.deepEqual(names.slice(-2), ['deckSlide', 'paragraph'])
 }
 
 // The handout's placeholders: "Heading" on every part's empty heading; "Write here. *** starts a new slide." only on
