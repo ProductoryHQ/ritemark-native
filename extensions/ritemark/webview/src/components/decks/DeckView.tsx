@@ -183,7 +183,10 @@ export function DeckView({
   contentRef.current = content
   // A library write's Undo: the copy's `from:` and `kept` before it, put back once the host says the library is back.
   const undoneFrom = useRef(new Map<string, { id: string; from: string | undefined; kept: boolean | undefined }>())
-  const [focusTitleOf, setFocusTitleOf] = useState<number | null>(null)
+  // A slide whose title takes the caret once its stage is drawn (a new slide's), or is selected whole (a deck New made)
+  const [focusTitleOf, setFocusTitleOf] = useState<{ index: number; select: boolean } | null>(null)
+  // Sprint 159 (PR 7): the host asked to select the title slide's title, once the deck's slides are there
+  const [selectTitle, setSelectTitle] = useState(false)
   const lineHintShown = useRef(false)
   const [ratio, setRatio] = useState(DEFAULT_RATIO)
   const [deskWidth, setDeskWidth] = useState(0)
@@ -481,7 +484,7 @@ export function DeckView({
     pick,
     insert: (at, kind) => {
       if (!editor || !dispatch(insertSlide(editor.state, at, kind))) return
-      setFocusTitleOf(at)
+      setFocusTitleOf({ index: at, select: false })
       requestAnimationFrame(() => pick(at))
     },
     duplicate: index => {
@@ -573,12 +576,20 @@ export function DeckView({
   useEffect(() => { setSettingsOpen(false) }, [shown])
   // The Add to library sheet belongs to its slide: another slide closes it.
   useEffect(() => { setAddSheet(sheet => (sheet && sheet.number - 1 !== shown ? null : sheet)) }, [shown])
-  // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one.
+  // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one. A
+  // request to select the title (Sprint 159, PR 7) waits instead until the stage says it selected it (its stage may not
+  // be drawn yet while the view is laid out), and ends when another slide is chosen first.
   useEffect(() => {
-    if (focusTitleOf === null || focusTitleOf !== shown) return
+    if (focusTitleOf === null) return
+    if (focusTitleOf.select) {
+      if (focusTitleOf.index !== shown) setFocusTitleOf(null)
+      return
+    }
+    if (focusTitleOf.index !== shown) return
     const frame = requestAnimationFrame(() => setFocusTitleOf(null))
     return () => cancelAnimationFrame(frame)
   }, [shown, focusTitleOf])
+  const titleSelected = useCallback(() => setFocusTitleOf(current => (current?.select ? null : current)), [])
   useLayoutEffect(() => {
     if (!settingsOpen && !addSheet) { setSettingsAt(null); return }
     const desk = deskRef.current
@@ -626,6 +637,18 @@ export function DeckView({
 
   /** The deck's text as this view holds it now, front matter left out (the host reads the slides from it). */
   const currentText = useCallback(() => (editor && !editor.isDestroyed ? editorHTMLToMarkdown(editor.getHTML()) : contentRef.current), [editor])
+
+  // Sprint 159 (PR 7): a deck New just made opens with its title slide's title selected, ready to be typed over. The
+  // host says so once this view has told it which slide it shows; the slides may not be read yet, so it waits for them.
+  useEffect(() => onMessage(message => {
+    if (message.type === 'deck/select-title') setSelectTitle(true)
+  }), [])
+  useEffect(() => {
+    if (!selectTitle || slides.length === 0) return
+    setSelectTitle(false)
+    setFocusTitleOf({ index: 0, select: true })
+    requestAnimationFrame(() => pick(0))
+  }, [selectTitle, slides.length, pick])
 
   // The host knows which slide is current, for the Slide library's "Insert after slide N".
   useEffect(() => {
@@ -898,7 +921,9 @@ export function DeckView({
                 onNotesOpen={setNotesOpen}
                 settingsOpen={settingsOpen}
                 onSettings={() => setSettingsOpen(open => !open)}
-                initialFocus={focusTitleOf === slide.index ? 'title' : undefined}
+                initialFocus={focusTitleOf?.index === slide.index ? 'title' : undefined}
+                selectOnFocus={focusTitleOf?.index === slide.index && focusTitleOf.select}
+                onFocusTaken={titleSelected}
                 onPicture={onPicture}
                 sourceLines={slide.data.id && sources[slide.data.id] ? (
                   <SourceLines

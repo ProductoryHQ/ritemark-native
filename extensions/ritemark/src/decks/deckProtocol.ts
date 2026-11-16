@@ -67,7 +67,9 @@ export type DeckHostMessage =
   /** Slides to insert after part `after` (from the Slide library or the AI's tools), as one undo step. */
   | { type: 'deck/insert'; after: number; parts: Array<{ kind: string; body: string; handout: string }>; requestId?: string }
   /** A copy's `from:` after the AI's library write, set by the open view (the person may be typing in it). */
-  | { type: 'deck/set-from'; id: string; from: string; requestId: string };
+  | { type: 'deck/set-from'; id: string; from: string; requestId: string }
+  /** Sprint 159 (PR 7): a deck New just made: its title slide's title, selected to be typed over. */
+  | { type: 'deck/select-title' };
 
 export class DeckProtocolError extends Error {}
 
