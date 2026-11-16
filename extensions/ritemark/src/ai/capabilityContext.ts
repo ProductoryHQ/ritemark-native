@@ -172,6 +172,8 @@ const SECTIONS: CapabilitySection[] = [
             // 16 November: the handout is a Text document, and its headings are its own
             '- The handout is a Text document. Each part opens with its own heading, `# ` for a section slide and `## ` for every other kind: when you make a slide, write that heading right after its block (usually the slide\'s title). The heading is the handout\'s, not the slide\'s: changing a slide\'s `title:` never changes its heading, and a heading never changes the slide, so leave the other one as it is unless the user asks for both. Keep the front matter\'s `handout: text` line as it is: it says the deck\'s handout is written this way.',
             '- A new slide is always a new slide block. In the deck view a line the person types in the handout (`***`) becomes one, with the heading after it as its title; in the file a line is only a line, so never put `***` or `---` between slides.',
+            // 17 November (Jarmo: "how else do I say 'make the corrections on this slide'"): the slide the person is on
+            '- A message sent while a deck is open says which slide the person is on, in a `[Current slide: …]` line with its number, title and id (or the slides selected on the deck\'s strip). "This slide", "here" or "siin" means that slide, and "these slides" means those: read it with read_deck and change it in the file, finding its block by its `id:`. Change other slides only when the person asks for them.',
             // Sprint 159 PR 4: the handout page is made from the deck at Publish
             '- The web page beside a deck (`<deck name>.html`) is made from the deck when it is published: to change the page, change the deck, never the page.',
           ].join('\n')

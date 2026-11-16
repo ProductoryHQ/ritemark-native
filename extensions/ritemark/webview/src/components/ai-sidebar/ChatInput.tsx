@@ -43,6 +43,7 @@ import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandP
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
 import { type SlashCommand, type CommandAction, parseCommand, mergeCommands } from './slashCommands';
 import type { FileAttachment, AttachmentKind, ThinkingEffortCapability } from './types';
+import { currentSlideChipLabel, currentSlideChipTooltip } from '../../../../src/decks/currentSlide';
 
 let attachmentIdCounter = 0;
 let pathChipIdCounter = 0;
@@ -251,6 +252,7 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
   const clearPinnedAgentDismissal = useAISidebarStore((s) => s.clearPinnedAgentDismissal);
   const activeFilePath = useAISidebarStore((s) => s.activeFilePath);
   const activeFileLabel = useAISidebarStore((s) => s.activeFileLabel);
+  const activeSlide = useAISidebarStore((s) => s.activeSlide);
   const currentBrowserContext = useAISidebarStore((s) => s.currentBrowserContext);
   // Selection state — needed to stack the queue notch under SelectedContextTab
   // without a visible seam (Sprint 74 R2 notch-stack rule).
@@ -952,6 +954,7 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
   // Don't show if: no active file, user dismissed it, or it's already in manual path chips
   const showActiveFileChip = activeFilePath && !hideActiveFile &&
     !pathChips.some((p) => p.path === activeFilePath || p.path.endsWith('/' + activeFilePath));
+  const activeChipSlide = activeSlide && activeSlide.slides.length > 0 ? activeSlide : null;
 
   // Sprint 122 (#282): until the person sizes it, the composer fits its text —
   // up to 8 lines or 40% of the window, where it used to stop at 120 px. Its
@@ -1237,10 +1240,17 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
             {showActiveFileChip && (
               <div className="inline-flex min-w-0 max-w-full items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)] text-[var(--r-ink-muted)]">
                 {/* #477: a task card shows its task mark and title, as its tab does (the Experience lead). */}
-                <Icon name={activeFileLabel ? 'check-square' : fileIconOf(activeFilePath, 'file-text')} size={12} className="shrink-0" />
-                <span className="min-w-0 truncate max-w-[140px]" title={activeFileLabel ?? activeFilePath!}>
-                  {activeFileLabel ?? `Active: ${getDisplayPath(activeFilePath!)}`}
-                </span>
+                {/* 17 November: an open deck shows the slide the person is on, its name in the tooltip (the Experience lead). */}
+                <Icon name={activeChipSlide ? 'presentation' : activeFileLabel ? 'check-square' : fileIconOf(activeFilePath, 'file-text')} size={12} className="shrink-0" />
+                {activeChipSlide ? (
+                  <Tooltip label={currentSlideChipTooltip(activeChipSlide, runtimeLabel)} side="top" className="min-w-0">
+                    <span className="min-w-0 truncate max-w-[140px]">{currentSlideChipLabel(activeChipSlide)}</span>
+                  </Tooltip>
+                ) : (
+                  <span className="min-w-0 truncate max-w-[140px]" title={activeFileLabel ?? activeFilePath!}>
+                    {activeFileLabel ?? `Active: ${getDisplayPath(activeFilePath!)}`}
+                  </span>
+                )}
                 <Tooltip label="Remove from this message">
                   <Button
                     type="button"

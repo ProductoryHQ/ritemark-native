@@ -42,6 +42,7 @@ import type { Transaction } from '@tiptap/pm/state'
 import { isHistoryTransaction } from '@tiptap/pm/history'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
+import { CURRENT_SLIDE_SETTLE_MS, currentSlideMessage } from './currentSlideMessage'
 import { DeckGuard } from './handout/deckGuard'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
@@ -370,6 +371,8 @@ export function DeckView({
   }, [])
   const countRef = useRef(count)
   countRef.current = count
+  const slidesRef = useRef(slides)
+  slidesRef.current = slides
   const shown = count === 0 ? 0 : Math.min(current, count - 1)
   const slide = slides[shown]
 
@@ -535,7 +538,7 @@ export function DeckView({
     makeCurrent(index)
     // Told even when this slide was already current: a + menu's "From the library…" may have moved the host's insert
     // point to a gap, and picking a slide brings it back to the slide.
-    sendToExtension('deck/current', { index, count: countRef.current })
+    sendToExtension('deck/current', currentSlideMessage(index, countRef.current, slidesRef.current))
     const container = scrollContainer()
     const tops = partTops()
     if (container && tops[index] !== undefined) container.scrollTop = scrollTopFor(tops[index])
@@ -792,10 +795,14 @@ export function DeckView({
     requestAnimationFrame(() => pick(0))
   }, [selectTitle, slides.length, pick])
 
-  // The host knows which slide is current, for the Slide library's "Insert after slide N".
+  // The host knows which slide is current, for the Slide library's "Insert after slide N", and the AI the slide the
+  // person is on (17 November): its id and title too, told once they settle (a scroll, a title being typed).
+  const shownId = slide?.data.id
+  const shownTitle = slide?.data.title
   useEffect(() => {
-    sendToExtension('deck/current', { index: shown, count })
-  }, [shown, count])
+    const timer = window.setTimeout(() => sendToExtension('deck/current', currentSlideMessage(shown, count, slidesRef.current)), CURRENT_SLIDE_SETTLE_MS)
+    return () => window.clearTimeout(timer)
+  }, [shown, count, shownId, shownTitle])
 
   // Each copy's source, asked a moment after the deck stops changing, and again when the window comes back (another
   // deck may have updated the library meanwhile).

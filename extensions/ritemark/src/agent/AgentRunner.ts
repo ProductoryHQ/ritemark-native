@@ -36,6 +36,7 @@ import { standaloneClaudeAuthenticationError } from '../runtime/runtimeErrorPres
 import * as path from 'path';
 import { traceClaude } from './agentTrace';
 import { claudeChangedFile, workspaceFilesOnly } from '../runtime/turnFiles';
+import { currentSlideNote } from '../decks/currentSlide';
 import {
   createBackgroundTaskState,
   isBackgroundedCard,
@@ -798,6 +799,7 @@ export class AgentSession {
     if (activeFile) {
       const alreadyReferenced = fullPrompt.includes(`[File: ${activeFile.path}]`) ||
         fullPrompt.match(new RegExp(`\\[File:.*/${activeFile.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`));
+      const slideNote = currentSlideNote(activeFile.slide);
       if (!alreadyReferenced) {
         let fileContext = `[Currently editing: ${activeFile.path}]`;
         if (activeFile.selection) {
@@ -806,8 +808,13 @@ export class AgentSession {
             : activeFile.selection;
           fileContext += `\n[Selected text: ${selSnippet}]`;
         }
+        if (slideNote) fileContext += `\n${slideNote}`;
         fullPrompt = fileContext + '\n\n' + fullPrompt;
-      } else if (activeFile.selection) {
+      } else if (slideNote) {
+        // The deck already referenced as a path chip: the slide the person is on still tells "this slide"
+        fullPrompt = `${slideNote}\n\n` + fullPrompt;
+      }
+      if (alreadyReferenced && activeFile.selection) {
         // File already referenced but selection still useful
         const selSnippet = activeFile.selection.length > 500
           ? activeFile.selection.substring(0, 500) + '...'

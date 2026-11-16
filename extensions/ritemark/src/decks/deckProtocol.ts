@@ -24,8 +24,11 @@ export type DeckRequest =
   | { type: 'deck/theme'; path: string }
   /** A picture pasted or dropped on a slide: saved in `images/` beside the deck, for the slide with this id. */
   | { type: 'deck/save-image'; slideId: string; dataUrl: string; filename: string }
-  /** The deck's current slide, for the Slide library's "Insert after slide N". */
-  | { type: 'deck/current'; index: number; count: number }
+  /**
+   * The deck's current slide, for the Slide library's "Insert after slide N"; and, for the AI (17 November), the slide
+   * the person is on (or the slides selected on the strip): each one's place, id and title, and nothing else.
+   */
+  | { type: 'deck/current'; index: number; count: number; slides?: DeckCurrentSlide[] }
   /**
    * What the deck's copies show under them: changed here, a newer version in the library, the source gone. The host
    * reads the copies from the deck's document, so the stamps are taken from the bytes the file holds.
@@ -114,6 +117,33 @@ export type DeckHostMessage =
 
 export class DeckProtocolError extends Error {}
 
+/** A slide the person is on, as the deck view tells it: its place from 0, its `id:` and its `title:` when it has them. */
+export interface DeckCurrentSlide {
+  index: number;
+  id?: string;
+  title?: string;
+}
+
+/** A current slide's title: at most this many characters (the host shortens it again for the AI's line and the chip). */
+export const MAX_CURRENT_TITLE = 300;
+
+function decodeCurrentSlides(value: unknown, count: number): DeckCurrentSlide[] {
+  if (!Array.isArray(value) || value.length === 0 || value.length > count) throw new DeckProtocolError('slides must be the deck\'s slides');
+  return value.map((entry: unknown) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) throw new DeckProtocolError('a slide must be an object');
+    const fields = entry as Record<string, unknown>;
+    exactKeys(fields, ['index', 'id', 'title']);
+    if (!isCount(fields.index) || (fields.index as number) >= count) throw new DeckProtocolError('a slide\'s index must be in the deck');
+    if (fields.id !== undefined && (typeof fields.id !== 'string' || !/^[0-9a-z]{1,16}$/i.test(fields.id))) throw new DeckProtocolError('id must be a slide id');
+    if (fields.title !== undefined && (typeof fields.title !== 'string' || fields.title.length > MAX_CURRENT_TITLE)) throw new DeckProtocolError('title must be a short line');
+    return {
+      index: fields.index as number,
+      ...(fields.id !== undefined ? { id: fields.id as string } : {}),
+      ...(fields.title !== undefined ? { title: fields.title as string } : {}),
+    };
+  });
+}
+
 function exactKeys(input: Record<string, unknown>, keys: readonly string[]): void {
   for (const key of Object.keys(input)) {
     if (!keys.includes(key)) throw new DeckProtocolError(`Unexpected field ${key}`);
@@ -147,9 +177,10 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
       return { type: 'deck/save-image', slideId: input.slideId, dataUrl: input.dataUrl, filename: input.filename };
     }
     case 'deck/current': {
-      exactKeys(input, ['type', 'index', 'count']);
+      exactKeys(input, ['type', 'index', 'count', 'slides']);
       if (!isCount(input.index) || !isCount(input.count)) throw new DeckProtocolError('index and count must be counts');
-      return { type: 'deck/current', index: input.index, count: input.count };
+      if (input.slides === undefined) return { type: 'deck/current', index: input.index, count: input.count };
+      return { type: 'deck/current', index: input.index, count: input.count, slides: decodeCurrentSlides(input.slides, input.count) };
     }
     case 'deck/source-states': {
       exactKeys(input, ['type']);

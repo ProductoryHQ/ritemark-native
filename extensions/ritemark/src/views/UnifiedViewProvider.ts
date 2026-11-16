@@ -122,7 +122,8 @@ import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig } from '../runt
 import type { OneShotSettings } from '../runtime/oneShotTurn';
 import { presentRuntimeError, type RuntimeErrorHints } from '../runtime/runtimeErrorPresentation';
 import { failureSentence, trustedBillingUrl, turnOutcome } from '../runtime/turnFailureCopy';
-import { appendStreamedText } from '../agent/types';
+import { appendStreamedText, type ActiveFileContext } from '../agent/types';
+import type { CurrentSlide } from '../decks/currentSlide';
 import { modelSubstitutionForTurn } from '../runtime/modelSubstitution';
 import {
   isThinkingEffort,
@@ -2026,6 +2027,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       selection,
       activeFilePath: activeFile?.path,
       activeFileLabel: activeFile?.label ?? null,
+      activeSlide: activeFile?.slide ?? null,
     });
   }
 
@@ -3767,6 +3769,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       type: 'active-file-changed',
       path: activeFile?.path ?? null,
       label: activeFile?.label ?? null,
+      slide: activeFile?.slide ?? null,
     });
     // Sprint 155 (PR 2): All chats' order follows the document in front. The active file is sent on every tab change
     // and on a file closed, renamed or deleted, which may also take a chat's document away.
@@ -4055,7 +4058,23 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * fall back to the last text editor, which kept a closed file in the chip.)
    * `label` names a task card by its title (#477).
    */
-  private _getActiveFileContext(): { path: string; selection?: string; label?: string } | undefined {
+  /**
+   * The slide the person is on in an open deck view of a file (17 November), set once Decks is composed
+   * (`connectCurrentSlide`); none before that.
+   */
+  private _currentSlideOf: ((fsPath: string) => CurrentSlide | null) | null = null;
+
+  /**
+   * Decks (17 November): the active file's context names the slide the person is on when the file is an open deck,
+   * and the chip follows that slide as it changes.
+   */
+  public connectCurrentSlide(source: { currentSlideOf: (fsPath: string) => CurrentSlide | null; onDidChangeCurrentSlide: vscode.Event<void> }): vscode.Disposable {
+    this._currentSlideOf = (fsPath) => source.currentSlideOf(fsPath);
+    const listener = source.onDidChangeCurrentSlide(() => this._scheduleActiveFile());
+    return { dispose: () => { listener.dispose(); this._currentSlideOf = null; } };
+  }
+
+  private _getActiveFileContext(): ActiveFileContext | undefined {
     const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
     const input = activeTab?.input;
     if (input instanceof vscode.TabInputTextDiff) {
@@ -4082,16 +4101,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     return undefined;
   }
 
-  private _fileContextFor(uri: vscode.Uri): { path: string; selection?: string; label?: string } | undefined {
+  private _fileContextFor(uri: vscode.Uri): ActiveFileContext | undefined {
     if (uri.scheme === 'file' && !fs.existsSync(uri.fsPath)) return undefined;
     const openDocument = vscode.workspace.textDocuments.find((document) => document.uri.toString() === uri.toString());
     // Only a file with front matter can be a card; skip the parse for every other document.
     const text = openDocument && uri.fsPath.toLowerCase().endsWith('.md') ? openDocument.getText() : '';
     const label = text.startsWith('---') ? cardTitleOf(text) : null;
+    const slide = uri.scheme === 'file' ? this._currentSlideOf?.(uri.fsPath) ?? null : null;
     return {
       path: vscode.workspace.asRelativePath(uri),
       selection: this._currentSelection.isEmpty ? undefined : this._currentSelection.text,
       ...(label ? { label } : {}),
+      ...(slide ? { slide } : {}),
     };
   }
 

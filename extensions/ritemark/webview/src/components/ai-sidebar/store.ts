@@ -74,6 +74,7 @@ import { appendStreamedText } from '../../../../src/agent/types';
 import type { StartingPlace } from '../../../../src/guidance/startingPlace';
 import type { SheetSignInAi, SheetSignInRequest, SheetSignInView } from '../../../../src/views/agentSidebarProtocol';
 import { requestTurnReveal } from './turnReveal';
+import type { CurrentSlide } from '../../../../src/decks/currentSlide';
 import type {
   AgentId,
   AgentInfo,
@@ -290,6 +291,8 @@ interface AISidebarState {
   activeFilePath: string | null;
   /** A task card's title, shown in the chip instead of its file path (#477). */
   activeFileLabel: string | null;
+  /** The slide the person is on when the active file is an open deck (17 November): the chip names it. */
+  activeSlide: CurrentSlide | null;
   currentBrowserContext: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; screenshotPreview?: { dataUrl: string } | null; error?: string } | null;
   /** Sprint 134 (R20): the share question about the page in front, waiting above the message box. */
   browserShareQuestion: { pageId: string; title: string } | null;
@@ -1072,6 +1075,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     selection: { text: '', isEmpty: true, from: 0, to: 0 },
     activeFilePath: null,
     activeFileLabel: null,
+    activeSlide: null,
     currentBrowserContext: null,
     browserShareQuestion: null,
     answerBrowserShareQuestion: (answer, withoutAsking) => {
@@ -3059,13 +3063,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           set({
             selection: message.selection,
             ...(message.activeFilePath !== undefined
-              ? { activeFilePath: message.activeFilePath ?? null, activeFileLabel: message.activeFileLabel ?? null }
+              ? { activeFilePath: message.activeFilePath ?? null, activeFileLabel: message.activeFileLabel ?? null, activeSlide: message.activeSlide ?? null }
               : {}),
           });
           break;
 
         case 'active-file-changed':
-          set({ activeFilePath: message.path, activeFileLabel: message.label ?? null });
+          set({ activeFilePath: message.path, activeFileLabel: message.label ?? null, activeSlide: message.slide ?? null });
           break;
 
         case 'chat-documents':

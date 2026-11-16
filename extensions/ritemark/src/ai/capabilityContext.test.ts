@@ -175,6 +175,16 @@ test('deck guidance appears exactly when a runtime has the deck tools', () => {
   }
 });
 
+// ── 17 November: "this slide", "here" or "siin" is the slide the person is on, for every AI with the deck tools ──
+test('deck guidance says what "this slide" means', () => {
+  for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
+    const withDecks = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true }));
+    for (const needle of ['`[Current slide: …]`', '"This slide", "here" or "siin" means that slide', '"these slides" means those', 'finding its block by its `id:`']) {
+      assert.ok(withDecks.includes(needle), `${runtime}: ${needle}`);
+    }
+  }
+});
+
 // ── R7: per-runtime edit-tool binding, not per-capability content ────────────
 test('edit-tool naming is bound per runtime', () => {
   assert.ok(claude.includes('Write/Edit'), 'Claude edit tool');
