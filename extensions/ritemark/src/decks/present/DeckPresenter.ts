@@ -18,7 +18,8 @@
  *
  * In Ritemark's frame a window moved this way keeps its title row ("<deck> — <project>") and the desk's edge, and the
  * room would read the project's name on the projector (the Experience lead, 16 November). So this path runs only in a
- * dev build; elsewhere Present says it needs a newer Ritemark, until the shell places the wall itself (PR 6).
+ * dev build; elsewhere Present answers with a notice that it needs a newer Ritemark (words only, nothing opens), until
+ * the shell places the wall itself (PR 6).
  */
 import * as os from 'os';
 import * as path from 'path';
@@ -65,8 +66,12 @@ const FOCUS_WAIT_MS = 10_000;
 const FOCUS_CHECK_MS = 150;
 const ACTIVE_WAIT_MS = 3000;
 
-/** Why Present can't run without the shell's placement, outside a dev build. */
-export const PRESENT_NEEDS_UPDATE = 'Presenting needs the newest Ritemark. Update Ritemark, then present.';
+/**
+ * Present's answer when this Ritemark can't place the wall (outside a dev build, until the shell places it): a notice in
+ * the deck's bar, words only, when Present, ⌘↩ or ⇧⌘↩ is pressed (the Experience lead, 16 November). The button stays
+ * enabled, and nothing opens.
+ */
+export const PRESENT_NEEDS_UPDATE = 'Presenting needs a newer Ritemark. Update it, then present again.';
 
 /** VS Code's own window commands may place the wall only in a dev build (their window shows the project's name). */
 export function presentFallbackAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -86,16 +91,17 @@ export class DeckPresenter implements vscode.Disposable {
   /** Present on the wall, from the deck view's current slide or from the start. A second Present ends the first. */
   async start(origin: DeckOrigin, request: DeckPresentRequest): Promise<void> {
     this.stop();
+    // First, before the deck is read or anything opens: this Ritemark can't place the wall.
+    if (!presentFallbackAllowed()) {
+      await post(origin.panel.webview, { type: 'deck/present-failed', message: PRESENT_NEEDS_UPDATE });
+      return;
+    }
     let session: PresentSession;
     try {
       session = new PresentSession(origin.document.getText(), request.from === 'start' ? { from: 'start' } : { from: 'here', index: request.index });
     } catch (error) {
       if (!(error instanceof PresentStartError)) throw error;
       await post(origin.panel.webview, { type: 'deck/present-failed', message: error.message });
-      return;
-    }
-    if (!presentFallbackAllowed()) {
-      await post(origin.panel.webview, { type: 'deck/present-failed', message: PRESENT_NEEDS_UPDATE });
       return;
     }
     const wall = vscode.window.createWebviewPanel(
