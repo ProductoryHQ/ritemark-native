@@ -522,7 +522,7 @@ export function DeckView({
     // (Jarmo, 15 November). The turn is cut short where the next part is the current one, and that part is shown at once.
     const onWheel = (event: WheelEvent) => {
       if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY) || Date.now() < lockUntil.current) return
-      const delta = event.deltaMode === 1 ? event.deltaY * 40 : event.deltaMode === 2 ? event.deltaY * container.clientHeight : event.deltaY
+      const delta = wheelPixels(event, container.clientHeight)
       const state = { partTops: partTops(), scrollTop: container.scrollTop, clientHeight: container.clientHeight, scrollHeight: container.scrollHeight, writing: null }
       const stop = wheelStop(state, delta, currentRef.current)
       if (stop === null) return
@@ -599,7 +599,8 @@ export function DeckView({
       const box = desk.getBoundingClientRect()
       // Above, the level line moves the share of the height; beside, the upright line the share of the width.
       if (above) {
-        if (box.height > 0) setAboveRatio(clampAboveRatio((moveEvent.clientY - box.top) / box.height))
+        // The share kept is the line as shown, held 160 px from either edge, so it comes back where it was seen.
+        if (box.height > 0) setAboveRatio(clampAboveRatio(aboveLineFor(box.height, (moveEvent.clientY - box.top) / box.height) / box.height))
         return
       }
       const x = moveEvent.clientX - box.left - stripWidth

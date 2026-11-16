@@ -15,6 +15,10 @@
  *  next gesture starts. A trackpad flick's momentum keeps the gesture going, so it moves one slide, never ten. */
 export const WHEEL_STEP = 40
 export const WHEEL_QUIET_MS = 400
+/** A mouse wheel's notch is one event of a step or more, its own gesture once this long after the last event: a
+ *  trackpad's flick and its momentum come every frame (about 16 ms) and never leave such a gap, so notches turned in a
+ *  row move a slide each while a flick still moves one. */
+export const WHEEL_NOTCH_GAP_MS = 100
 
 export interface WheelGesture {
   /** The delta added up in this gesture, until it reaches the step. */
@@ -34,11 +38,12 @@ export function wheelPixels(event: { deltaY: number; deltaMode: number }, pageHe
 
 /**
  * One wheel event: the gesture after it, and the slide's move (+1 next, -1 previous, 0 none). A gesture ends once the
- * wheel has been still for `WHEEL_QUIET_MS`. Within a gesture the deltas add up until they reach the step; then the
+ * wheel has been still for `WHEEL_QUIET_MS`, or at a notch (`WHEEL_NOTCH_GAP_MS`). Within a gesture the deltas add up until they reach the step; then the
  * slide moves once and the rest of the gesture is ignored. Turning the other way before the step starts the sum again.
  */
 export function wheelStep(gesture: WheelGesture, delta: number, now: number): { gesture: WheelGesture; move: -1 | 0 | 1 } {
-  const fresh = now - gesture.last >= WHEEL_QUIET_MS
+  const gap = now - gesture.last
+  const fresh = gap >= WHEEL_QUIET_MS || (gap >= WHEEL_NOTCH_GAP_MS && Math.abs(delta) >= WHEEL_STEP)
   const current = fresh ? { ...NO_GESTURE } : gesture
   if (current.spent || !Number.isFinite(delta) || delta === 0) return { gesture: { ...current, last: now }, move: 0 }
   const sum = Math.sign(current.sum) === -Math.sign(delta) ? delta : current.sum + delta

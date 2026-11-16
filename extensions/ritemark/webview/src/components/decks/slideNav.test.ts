@@ -32,9 +32,13 @@ function moves(events: Array<[number, number]>): number[] {
   const flick: Array<[number, number]> = []
   for (let i = 0; i < 90; i++) flick.push([Math.max(1, 80 - i), i * 16])
   assert.deepEqual(moves(flick), [1], 'one slide per flick')
+  // A mouse wheel turned notch by notch, about 120 ms apart: a slide a notch. Spun fast (16 ms apart), one.
+  assert.deepEqual(moves([[100, 0], [100, 120], [100, 240], [100, 360]]), [1, 1, 1, 1], 'four notches, four slides')
+  assert.deepEqual(moves([[100, 0], [100, 16], [100, 32], [100, 48]]), [1], 'a free spin is one gesture')
+  assert.deepEqual(moves([[-3, 0], [-3, 120], [-3, 240]]), [], 'small slow deltas are not notches: they add up')
   // After 400 ms of stillness the next gesture moves again.
   assert.deepEqual(moves([[60, 0], [60, 16], [60, 16 + WHEEL_QUIET_MS], [60, 2000]]), [1, 1, 1])
-  assert.deepEqual(moves([[60, 0], [60, WHEEL_QUIET_MS - 1]]), [1], 'just under 400 ms: the same gesture')
+  assert.deepEqual(moves([[60, 0], [10, WHEEL_QUIET_MS - 1]]), [1], 'a small delta just under 400 ms later: the same gesture')
   // Turning back before the step starts the sum again.
   assert.deepEqual(moves([[30, 0], [-30, 16], [-15, 32]]), [-1])
   assert.deepEqual(moves([[30, 0], [-5, 16], [30, 32]]), [], 'a wobble does not add up across directions')

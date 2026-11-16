@@ -145,6 +145,11 @@ const { initialRatio, DEFAULT_RATIO } = await import('./deckDocument')
   assert.equal(calls('keepAboveRatio'), 1, 'called once')
   const up = view.slice(view.indexOf('const up = () => {'), view.indexOf('const up = () => {') + 300)
   assert.ok(up.includes('if (above) keepAboveRatio(aboveRatioRef.current) else keepRatio(ratioRef.current)'), 'kept when the drag ends')
+  // The share kept is the line as it was shown (held 160 px from either edge), so it comes back where it was seen.
+  assert.ok(view.includes('setAboveRatio(clampAboveRatio(aboveLineFor(box.height, (moveEvent.clientY - box.top) / box.height) / box.height))'))
+  const kept = clampAboveRatio(aboveLineFor(500, 0.25) / 500)
+  assert.equal(aboveLineFor(500, kept), 160, 'on the same window, the same line')
+  assert.equal(aboveLineFor(1000, kept), 320, 'on a taller one, the same share of it, not 25 %')
   assert.ok(view.includes('useState(() => initialAboveRatio(storedAboveRatio()))') && view.includes('useState(() => initialRatio(storedRatio()))'), 'both read at mount')
   // Moving between beside and above keeps the part being read at the top, but not as the deck opens.
   assert.ok(/if \(before === null \|\| before === orientation\) return/.test(view))
