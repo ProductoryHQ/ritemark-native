@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Fixed
 - **A page that failed to load opens when you open its file again (#710).** If a web page's `.html` file was missing when Ritemark opened, its tab showed "Failed to Load Page", and opening the file again from Documents once it was back only brought that failed tab forward. Now opening the file loads the page again in the same tab, as the bar's Reload does. A page that loaded fine is only brought forward, as before.
 
+### Sprint 160: the AI is ready on day one (#703, #541, #696, #686)
+
+#### Fixed
+- **On Windows, Claude no longer shows as signed in when it isn't (#703).** When Claude's own sign-in check gave no answer, any Windows PC read as signed in to Claude, and the first question then failed. Now Claude is ready only when its own check says you're signed in, or an Anthropic API key is saved in Settings (or set in `ANTHROPIC_API_KEY`). Otherwise it shows Sign in.
+- **An Anthropic API key saved in Settings is enough for Claude (#541).** With a key saved and no Claude.ai sign-in, Claude stayed "signed out", because Claude's command-line tool said so. Now the key makes Claude ready everywhere: the AI's sheet, the welcome, Home and Settings. Chats and Flow steps run on it. When you're also signed in with Claude.ai, the sign-in is used. A key Claude doesn't accept shows "Claude did not accept the saved key" with Update key when you send your first message.
+- **The AI's sheet doesn't offer a second sign-in while one runs (#696).** While a sign-in started on Home, the welcome or Settings was still running, the AI's sheet offered Sign in again, and a Re-check, a saved key or Settings could bring the button back too early. Now the sheet's card waits too: "Signing in…", with Cancel, a line saying your browser opened the sign-in page, and "Did nothing open? Open the page again". A second ChatGPT sign-in opens the same page instead of starting another. Offline, Sign in is unavailable and Use API key still works.
+- **A model's usage limit says so (#686).** When Gemini's limit stopped an OpenCode chat and Google said when to try again, the chat told you to add credits in Google AI Studio. Now the card reads "You've used <model>'s limit for now", says when it can answer again ("in a minute", or after a time, in your own time format) or to try again later, and offers another model or another ready AI. On the rail and in the chat list, a chat stopped by an AI's usage limit reads "Limit reached" instead of "Interrupted", and the rail's tooltip says whose limit it was. After a turn that failed or was stopped, the next message no longer adds "The previous agent did not return a saved answer." OpenCode can still show "Working" for about a minute before the card, while it retries by itself.
+
 ### Sprint 158: Excel looks like Excel, and a save keeps it (#711)
 
 #### Fixed
