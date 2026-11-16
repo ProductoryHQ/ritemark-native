@@ -3,7 +3,7 @@
  * Pure functions, so the page's sentences are tested without React.
  */
 
-import type { HomeWaitingItem, HomeRecentItem, HomeState } from '../../../../src/projects/protocol'
+import type { HomeWaitingItem, HomeRecentItem, HomeState, StartKind } from '../../../../src/projects/protocol'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -197,4 +197,27 @@ export function recentIcon(item: HomeRecentItem): 'book-open-text' | 'file-text'
     case 'flow': return 'flow-arrow'
     default: return 'file'
   }
+}
+
+export interface StartCard {
+  kind: StartKind
+  icon: 'file-text' | 'table' | 'presentation' | 'globe'
+  name: string
+  line: string
+  tip: string
+}
+
+/**
+ * Start something's cards, in the New menu's order: Text, Table, Deck, Web page. Deck (Sprint 159; Jarmo, 17 November:
+ * "there could be a Deck here too") is there only while the `decks` flag is on; with it off the row is the three cards
+ * it always was.
+ */
+export function startCards(decksEnabled: boolean): StartCard[] {
+  const cards: StartCard[] = [
+    { kind: 'text', icon: 'file-text', name: 'Text', line: 'A new document', tip: 'Make a new document in this project' },
+    { kind: 'table', icon: 'table', name: 'Table', line: 'CSV data', tip: 'Make a new table in this project' },
+    { kind: 'deck', icon: 'presentation', name: 'Deck', line: 'Slides and a handout', tip: 'Make a new deck in this project' },
+    { kind: 'web', icon: 'globe', name: 'Web page', line: 'Open a site', tip: 'Open a web page in a new tab' },
+  ]
+  return decksEnabled ? cards : cards.filter((card) => card.kind !== 'deck')
 }

@@ -36,6 +36,13 @@ const vscodeStub = {
     },
   },
   extensions: { onDidChange: () => disposable('extensions') },
+  commands: { executeCommand: async (id: string) => { executed.push(id); } },
+};
+const executed: string[] = [];
+let configListener: ((event: { affectsConfiguration(section: string): boolean }) => void) | undefined;
+(vscodeStub.workspace as Record<string, unknown>).onDidChangeConfiguration = (listener: typeof configListener) => {
+  configListener = listener;
+  return disposable('configuration');
 };
 const load = (Module as unknown as { _load: (request: string, ...rest: unknown[]) => unknown })._load;
 (Module as unknown as { _load: unknown })._load = (request: string, ...rest: unknown[]) => (request === 'vscode' ? vscodeStub : load(request, ...rest));
@@ -44,6 +51,7 @@ async function main(): Promise<void> {
   const { HomeHost } = await import('./HomePanel');
   const { ProjectList } = await import('../projects/ProjectList');
 
+  let decksOn = false;
   function host(): { home: InstanceType<typeof HomeHost>; list: InstanceType<typeof ProjectList> } {
     const list = new ProjectList('/nowhere/list.json', {} as never);
     const home = new HomeHost({
@@ -57,6 +65,7 @@ async function main(): Promise<void> {
       switcher: {} as never,
       board: () => null,
       boardEnabled: () => false,
+      decksEnabled: () => decksOn,
       openConversation: async () => undefined,
       onProjectsChanged: () => undefined,
       guidance: null,
@@ -75,6 +84,7 @@ async function main(): Promise<void> {
     home.dispose();
     assert.equal(listeners(list), 0, 'the project list has no listener left');
     assert.ok(disposed.includes('extensions'), 'the extensions listener is disposed');
+    assert.ok(disposed.includes('configuration'), 'the settings listener (the decks flag) is disposed');
     assert.ok(disposed.includes('watcher 0') && disposed.includes('watcher 1'), 'both watchers are disposed');
     assert.equal(disposed[disposed.length - 1], 'panel', 'the panel is disposed last');
   }
@@ -98,6 +108,29 @@ async function main(): Promise<void> {
     assert.ok(disposed.includes('extensions'));
     assert.equal(disposed[disposed.length - 1], 'panel');
     throwingWatcher = -1;
+  }
+
+  // Sprint 159: the Deck card runs New → Deck's command while the flag is on, and nothing with it off
+  {
+    const { home } = host();
+    const handle = (home as unknown as { handle(request: unknown): Promise<void> }).handle.bind(home);
+    executed.length = 0;
+    decksOn = true;
+    await handle({ type: 'home/start', kind: 'deck' });
+    assert.deepEqual(executed, ['ritemark.decks.new'], 'the Deck card is New → Deck');
+    executed.length = 0;
+    decksOn = false;
+    await handle({ type: 'home/start', kind: 'deck' });
+    assert.deepEqual(executed, [], 'with the flag off, nothing runs');
+    await handle({ type: 'home/start', kind: 'table' });
+    assert.deepEqual(executed, ['ritemark.newTable'], 'Table runs as before');
+    // The flag changing redraws Home; another setting does not
+    let redraws = 0;
+    (home as unknown as { scheduleRedraw: (delay?: number) => void }).scheduleRedraw = () => { redraws++; };
+    configListener?.({ affectsConfiguration: (section) => section === 'ritemark.features.decks' });
+    configListener?.({ affectsConfiguration: (section) => section === 'editor.fontSize' });
+    assert.equal(redraws, 1, 'only the decks flag redraws Home');
+    home.dispose();
   }
 
   console.log('HomePanel tests passed');
