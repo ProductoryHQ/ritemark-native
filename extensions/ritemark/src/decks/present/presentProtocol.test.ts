@@ -144,7 +144,7 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   const clock = { wallDisplay: 'Projector', canSwap: true, length: 45, startedAt: 1000 };
   const first = presenterStateOf(session.view(), look, {}, clock);
-  assert.deepEqual(Object.keys(first).sort(), ['assets', 'borderless', 'canSwap', 'count', 'current', 'length', 'next', 'notes', 'position', 'skipped', 'slides', 'startedAt', 'theme', 'type', 'wallDisplay']);
+  assert.deepEqual(Object.keys(first).sort(), ['assets', 'borderless', 'canSwap', 'comments', 'count', 'current', 'length', 'next', 'notes', 'position', 'skipped', 'slides', 'startedAt', 'theme', 'type', 'wallDisplay']);
   assert.equal(first.notes, 'NOTESWORD: say this only to yourself.');
   assert.equal(first.next?.number, 3, 'the next slide shown (2 is skipped)');
   assert.equal(first.wallDisplay, 'Projector');

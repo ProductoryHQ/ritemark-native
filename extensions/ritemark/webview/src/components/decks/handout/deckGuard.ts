@@ -13,7 +13,7 @@ import type { Node as PMNode, Slice } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type Transaction } from '@tiptap/pm/state'
 import { isHistoryTransaction } from '@tiptap/pm/history'
 import type { Step } from '@tiptap/pm/transform'
-import { newId, writeSlideBody } from '../../../../../src/decks/deckFormat'
+import { newId, writeSlideData } from '../../../../../src/decks/deckFormat'
 import { isSlideNode, slideDataOf } from '../deckDocument'
 
 import { DECK_OPERATION } from '../deckDocument'
@@ -91,19 +91,19 @@ export function guardFixes(before: PMNode, after: PMNode, tr: Transaction, rando
   const ids = new Map<string, number>()
   after.forEach(node => {
     if (!isSlideNode(node)) return
-    const id = slideDataOf(node.attrs.body).id
+    const id = slideDataOf(node.attrs.kind, node.attrs.body).id
     if (id) ids.set(id, (ids.get(id) ?? 0) + 1)
   })
   let changed = false
   after.forEach((node, pos) => {
     if (kept.has(node)) return
     if (isSlideNode(node)) {
-      const data = slideDataOf(node.attrs.body)
+      const data = slideDataOf(node.attrs.kind, node.attrs.body)
       if (data.id && (ids.get(data.id) ?? 0) > 1) {
         const id = newId(ids.keys(), random)
         ids.set(data.id, (ids.get(data.id) ?? 1) - 1)
         ids.set(id, 1)
-        tr.setNodeMarkup(pos, undefined, { ...node.attrs, body: writeSlideBody(node.attrs.body, { ...data, id }) })
+        tr.setNodeMarkup(pos, undefined, { ...node.attrs, body: writeSlideData(node.attrs.kind, node.attrs.body, { ...data, id }) })
         changed = true
       }
       return

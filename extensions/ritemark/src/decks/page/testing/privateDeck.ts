@@ -162,3 +162,105 @@ and closes here -->
 <!-- a prompt that shows a comment stays as written -->
 \`\`\`
 `;
+
+/**
+ * Sprint 161: the same rule for block slides (format v2), each private place with its word: the header's keys, a
+ * comment and an anchored comment written on the slide itself, a private fence in a slide, a skipped block slide with
+ * its picture, and a v1 slide's words its layout hides next to it (a mixed deck).
+ */
+export const PRIVATE_BLOCK_WORDS = {
+  headerId: 'hdridqxa',
+  headerFrom: 'HDRFROMQXB',
+  slideComment: 'SLIDECOMMENTQXC',
+  slideAnchored: 'SLIDEANCHOREDQXD',
+  slideNotesFence: 'SLIDENOTESQXE',
+  partComment: 'PARTCOMMENTQXF',
+  skippedBlockTitle: 'SKIPBLOCKQXG',
+  skippedBlockPicture: 'skipblockpicqxh',
+  v1Notes: 'VONENOTESQXI',
+  v1HiddenColumn: 'VONECOLUMNQXJ',
+  rawHtml: 'RAWHTMLQXK',
+} as const;
+
+/** Words of the block deck that must reach the page and the wall. */
+export const PUBLIC_BLOCK_WORDS = ['Copilot or Cursor?', 'Documents and mail', 'Building things', 'Pick a question', 'Harjutus', 'Block cover', 'the anchored words', 'pilot.png'] as const;
+
+const B = PRIVATE_BLOCK_WORDS;
+
+export const PRIVATE_BLOCK_DECK = `---
+deck: 2
+---
+
+\`\`\`slide
+# Block cover
+
+A line under it
+\`\`\`
+
+The cover's handout.
+
+\`\`\`slide
+---
+id: ${B.headerId}
+from: Slide library/${B.headerFrom}.deck.md#a1 @abc123
+kept: true
+---
+# Copilot or Cursor?
+
+:::: columns
+::: column
+### Copilot
+Documents and mail
+:::
+::: column
+### Cursor
+Building things
+<!-- ${B.slideComment} -->
+:::
+::::
+
+Here are <mark data-comment="${B.slideAnchored}">the anchored words</mark> on the slide.
+
+<script>${B.rawHtml}</script>
+
+~~~notes
+${B.slideNotesFence}
+~~~
+\`\`\`
+
+<!-- ${B.partComment} -->
+
+The handout of the columns.
+
+\`\`\`slide
+# Steps
+
+::: {.steps tag="Harjutus"}
+1. Pick a question
+2. Write it down
+:::
+
+![](images/pilot.png)
+\`\`\`
+
+\`\`\`slide
+---
+skip: true
+---
+# ${B.skippedBlockTitle}
+
+![](images/${B.skippedBlockPicture}.png)
+\`\`\`
+
+\`\`\`slide columns
+title: A v1 slide beside them
+items:
+- heading: One
+- heading: Two
+- heading: ${B.v1HiddenColumn}
+\`\`\`
+
+\`\`\`notes
+${B.v1Notes}
+\`\`\`
+`;

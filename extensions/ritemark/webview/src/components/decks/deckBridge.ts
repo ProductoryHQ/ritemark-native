@@ -6,11 +6,13 @@ import { useEffect, useState } from 'react'
 import { onMessage, sendToExtension } from '../../bridge'
 import { BUILT_IN_THEME, isThemePath, parseTheme, type DeckTheme } from '../../../../src/decks/deckTheme'
 import type { DeckSlideEntry } from './deckDocument'
+import { slidePicturePaths } from '../../../../src/decks/blocks/slideRenderer'
 
 /** The slides' pictures as webview URIs, by the paths the slides name; asked again when the set of paths changes. */
 export function useDeckAssets(slides: DeckSlideEntry[]): Record<string, string> {
   const [assets, setAssets] = useState<Record<string, string>>({})
-  const paths = [...new Set(slides.map(slide => slide.data.image).filter((path): path is string => !!path))].sort()
+  // A block slide's own pictures too (Sprint 161), by the paths its renderer asks for.
+  const paths = [...new Set(slides.flatMap(slide => slidePicturePaths(slide.data)))].sort()
   const key = paths.join('\n')
 
   useEffect(() => onMessage(message => {

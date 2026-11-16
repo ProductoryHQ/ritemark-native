@@ -83,7 +83,8 @@ assert.ok(deckModeOf({ ...deck, text: '# no front matter' }));
 assert.ok(!deckModeOf({ ...deck, flagOn: false }), 'flag off: a document');
 assert.ok(!deckModeOf({ ...deck, scheme: 'untitled' }), 'not on disk: a document');
 assert.ok(!deckModeOf({ ...deck, fsPath: '/p/Training.md' }), 'not .deck.md: a document');
-assert.ok(!deckModeOf({ ...deck, text: '---\ndeck: 2\n---\n' }), 'a later format: a document');
+assert.ok(!deckModeOf({ ...deck, text: '---\ndeck: 3\n---\n' }), 'a later format: a document');
+assert.ok(deckModeOf({ ...deck, text: '---\ndeck: 2\n---\n' }), 'Sprint 161: format 2 (block slides) is a deck');
 
 // Sprint 159 (PR 2): a view keeps the flag it opened with (recorded as it opens, as ritemarkEditor.ts does); the flag
 // turned on or off meanwhile reaches only views opened afterwards: the flag never turns a document view into a deck
@@ -100,8 +101,8 @@ assert.ok(!deckModeOf({ ...deck, text: '---\ndeck: 2\n---\n' }), 'a later format
   const afterOn = [mode(openedOff), mode(openedOn)];
   flagOn = false;
   const afterOff = [mode(openedOff), mode(openedOn), mode({})];
-  const laterFormat = [mode(openedOn, '---\ndeck: 2\n---\n'), mode(openedOn, '---\ndeck: 1\n---\n')];
-  const flagOffLaterFormatBack = [mode(openedOff, '---\ndeck: 2\n---\n'), mode(openedOff, '---\ndeck: 1\n---\n')];
+  const laterFormat = [mode(openedOn, '---\ndeck: 3\n---\n'), mode(openedOn, '---\ndeck: 1\n---\n')];
+  const flagOffLaterFormatBack = [mode(openedOff, '---\ndeck: 3\n---\n'), mode(openedOff, '---\ndeck: 1\n---\n')];
   const notADeck = mode(openedOn, deck.text, '/p/Training.md');
   assert.deepEqual({ first, afterOn, afterOff, laterFormat, flagOffLaterFormatBack, notADeck }, {
     first: false,
@@ -122,7 +123,7 @@ assert.ok(!isThemePath('C:/x.theme.md'));
 assert.ok(!isThemePath('Slide library/Themes/Evening.md'));
 assert.ok(!isThemePath(''));
 
-// Sprint 159 PR 4: Publish on the bar. The steps are numbers 0 to 3, one per slide; the actions are three; exact fields.
+// Sprint 159 PR 4: Publish on the bar. The steps are numbers 0 to 5 (a block slide's six, Sprint 161), one per slide; the actions are three; exact fields.
 assert.deepEqual(decodeDeckRequest({ type: 'deck/page-state' }), { type: 'deck/page-state' });
 assert.throws(() => decodeDeckRequest({ type: 'deck/page-state', path: '/etc/passwd' }), DeckProtocolError);
 // The view sends its text and its look (the document may not have its newest words or look yet), never a page or a path.
@@ -131,7 +132,8 @@ assert.deepEqual(decodeDeckRequest({ type: 'deck/publish', text: body, look: 'ca
 assert.deepEqual(decodeDeckRequest({ type: 'deck/publish', text: '', look: 'borderless', steps: [] }), { type: 'deck/publish', text: '', look: 'borderless', steps: [] });
 // A long deck is fine (more than 500 slides); a list past MAX_DECK_SLIDES is not.
 assert.equal((decodeDeckRequest({ type: 'deck/publish', text: body, look: 'card', steps: Array.from({ length: 501 }, () => 0) }) as { steps: number[] }).steps.length, 501);
-for (const steps of [[4], [-1], [1.5], ['1'], [null], 'all', Array.from({ length: MAX_DECK_SLIDES + 1 }, () => 0)]) {
+assert.deepEqual((decodeDeckRequest({ type: 'deck/publish', text: body, look: 'card', steps: [5] }) as { steps: number[] }).steps, [5]);
+for (const steps of [[6], [-1], [1.5], ['1'], [null], 'all', Array.from({ length: MAX_DECK_SLIDES + 1 }, () => 0)]) {
   assert.throws(() => decodeDeckRequest({ type: 'deck/publish', text: body, look: 'card', steps }), DeckProtocolError, JSON.stringify(steps).slice(0, 40));
 }
 assert.throws(() => decodeDeckRequest({ type: 'deck/publish', look: 'card', steps: [0] }), DeckProtocolError, 'the text is needed');

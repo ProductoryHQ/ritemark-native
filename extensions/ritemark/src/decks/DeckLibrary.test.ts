@@ -65,7 +65,7 @@ async function run() {
   const olderCopy = await state(copy.body, copy.handout);
   assert.equal(olderCopy.newer, true);
   assert.equal(olderCopy.changed, false);
-  const used = await library.useSource('Clients/Harbour/Harbour.deck.md', copy.body);
+  const used = await library.useSource('Clients/Harbour/Harbour.deck.md', copy.body, copy.kind);
   assert.equal(parseSlideBody(used.body).id, data.id);
   assert.equal(parseSlideBody(used.body).title, 'Four parts, again');
   assert.equal((await state(used.body, used.handout)).newer, false);
@@ -142,7 +142,7 @@ async function run() {
   // this build's format: inserting into it, updating it, adding to it and a from: line's write are refused, the file
   // left byte for byte.
   {
-    const LATER = '---\ndeck: 2\n---\n\n```slide title\nid: n1\ntitle: Newer\n```\n';
+    const LATER = '---\ndeck: 3\n---\n\n```slide title\nid: n1\ntitle: Newer\n```\n';
     const newer = project({ 'Slide library/AI assistants.deck.md': TOPIC, 'Slide library/Newer.deck.md': LATER.replace('id: n1', 'id: a1'), 'Clients/Newer.deck.md': LATER, 'Clients/Harbour/Harbour.deck.md': DECK });
     const later = new DeckLibrary(newer);
     const refused = /newer deck format/;

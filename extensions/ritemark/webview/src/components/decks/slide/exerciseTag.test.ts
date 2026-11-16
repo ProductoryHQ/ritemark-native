@@ -32,7 +32,7 @@ const { publicDeck, deckDigest } = await import('../../../../../src/decks/page/p
 const { pageHtml } = await import('../../../../../src/decks/page/pageHtml')
 const { PAGE_SCRIPT } = await import('../../../../../src/decks/page/pageScript')
 const { wallDataOf } = await import('../../../../../src/decks/present/presentProtocol')
-const { slideStamp } = await import('../../../../../src/decks/deckLibraryFormat')
+const { slideStamp, slideStamps } = await import('../../../../../src/decks/deckLibraryFormat')
 const { layoutSlide, textBoxes } = await import('./layoutSlide')
 const { oneLine, setPath, undoKeyOf, valueAt } = await import('./slideEdits')
 const { slideMarkup } = await import('./slideMarkup')
@@ -203,8 +203,9 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
 {
   const data = parseSlideBody(BODY)
   const before = slideStamp('exercise', data, 'Do the steps.', 'Slide library')
-  // The stamp main computed for this slide before the pill had a line: pinned, so it can't drift.
-  assert.equal(before, 'la3q3a')
+  // The stamp main computed for this slide before the pill had a line: pinned, so it can't drift. Sprint 161: today's
+  // stamp is the block stamp, and a `from:` line holding this one still matches (`slideStamps`).
+  assert.ok(slideStamps('exercise', data, 'Do the steps.', 'Slide library').includes('la3q3a'))
   assert.notEqual(slideStamp('exercise', { ...data, tag: 'Harjutus' }, 'Do the steps.', 'Slide library'), before)
   assert.notEqual(slideStamp('exercise', { ...data, tag: '' }, 'Do the steps.', 'Slide library'), before)
 }
@@ -250,7 +251,7 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
   const data = parseSlideBody(BODY)
   const stamp = (tag?: string) => slideStamp('exercise', { ...data, ...(tag === undefined ? {} : { tag }) }, 'Do the steps.', 'Slide library')
   assert.equal(stamp('exercise'), stamp())
-  assert.equal(stamp('EXERCISE'), 'la3q3a')
+  assert.ok(slideStamps('exercise', { ...data, tag: 'EXERCISE' }, 'Do the steps.', 'Slide library').includes('la3q3a'))
   // The pill's CSS: no ellipsis while it is typed in (the caret's end stays in view).
   const css = readFileSync(fileURLToPath(new URL('./slide.css', import.meta.url)), 'utf8')
   assert.match(css, /\.deck-sl \.tag\[contenteditable\]:focus \{ text-overflow: clip; \}/)

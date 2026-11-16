@@ -14,7 +14,8 @@
  *
  * No `vscode` and no DOM: the host gives it the open document's text.
  */
-import { parseDeck, parseSlideBody, readScalar, type SlideData } from '../deckFormat';
+import { isBlockSlide, parseDeck, readScalar, slideDataOf, type SlideData } from '../deckFormat';
+import { conversionComment, hiddenWords } from '../blocks/legacyToBlocks';
 
 /** One slide of the deck, as presenting reads it. */
 export interface PresentSlide {
@@ -26,6 +27,12 @@ export interface PresentSlide {
   data: SlideData;
   /** The speaker notes, or null. Only the presenter view gets them; the wall never does (presentProtocol.ts). */
   notes: string | null;
+  /**
+   * Sprint 161: the slide's handout part as written, whose comments "Your comments" shows (read for the current slide
+   * only, `presenterStateOf`), and the comment an older slide's notes and hidden words make, which comes last.
+   */
+  handout: string;
+  converted: string | null;
   skip: boolean;
 }
 
@@ -60,11 +67,15 @@ export type PresentStart = { from: 'start' } | { from: 'here'; index: number };
 export function presentSlidesOf(text: string): PresentSlide[] {
   const seen = new Map<string, number>();
   return parseDeck(text).slides.map((block, index) => {
-    const data = parseSlideBody(block.body);
+    const data = slideDataOf(block.kind, block.body);
     const base = data.id ? `id:${data.id}` : `body:${block.kind}\n${block.body.trim()}`;
     const twins = seen.get(base) ?? 0;
     seen.set(base, twins + 1);
-    return { index, key: twins ? `${base}#${twins}` : base, kind: block.kind, data, notes: block.notes, skip: data.skip === true };
+    // An older slide's notes and hidden words, as the comment its conversion writes; a block slide's notes block (the
+    // Speaker notes fold is still under the stage in this build) the same way, so no note goes missing while presenting.
+    const converted = conversionComment(block.notes, isBlockSlide(block.kind) ? [] : hiddenWords(block.kind, data));
+    const handout = text.slice(block.handoutStart, block.handoutEnd);
+    return { index, key: twins ? `${base}#${twins}` : base, kind: block.kind, data, notes: block.notes, handout, converted, skip: data.skip === true };
   });
 }
 

@@ -20,6 +20,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { marked } from 'marked';
+import { blockPicturePaths } from '../blocks/slideRenderer';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import type { DeckTheme } from '../deckTheme';
 import { DIGEST_META, GENERATOR_META, lexHandout, pageHtml, pictureAddress, pictureFile, pictureKey, type PageAssets, type PictureFrom } from './pageHtml';
@@ -172,7 +173,11 @@ export function picturePaths(deck: PublicDeck): Array<{ path: string; from: Pict
   const add = (picture: string, from: PictureFrom) => {
     if (isRelativeTarget(picture)) found.set(pictureKey(picture, from), { path: picture.trim(), from });
   };
-  for (const slide of deck.slides) if (slide.data.image) add(slide.data.image, 'slide');
+  for (const slide of deck.slides) {
+    if (slide.data.image) add(slide.data.image, 'slide');
+    // A block slide's own pictures (Sprint 161), by the paths its renderer asks for them.
+    if (slide.data.markdown) for (const picture of blockPicturePaths(slide.data.markdown)) add(picture, 'slide');
+  }
   for (const markdown of [deck.preamble, ...deck.slides.map(slide => slide.handout)]) {
     if (!markdown) continue;
     marked.walkTokens(lexHandout(markdown), token => {
