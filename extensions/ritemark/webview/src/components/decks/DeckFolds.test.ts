@@ -26,43 +26,78 @@ const React = await import('react')
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
-const { DeckFolds, foldButtons, foldFrom, foldedSides, keepDeckViewState, keepFold, storedFold, toggledFold } = await import('./DeckFolds')
+const { DeckFolds, foldControl, foldFrom, foldedSides, keepDeckViewState, keepFold, storedFold, toggledFold } = await import('./DeckFolds')
 
 const draw = (slideShown: boolean, handoutShown: boolean) =>
   parse(renderToStaticMarkup(createElement(DeckFolds, { slideShown, handoutShown, left: 500, onToggle: () => {} })))
 const labels = (slideShown: boolean, handoutShown: boolean) =>
   draw(slideShown, handoutShown).querySelectorAll('button').map(button => button.getAttribute('aria-label'))
 
-// Both sides shown: the line carries two round buttons, ‹ Hide the slide over › Hide the handout, at the line.
+// Both sides shown: the line carries one split control, a pill upright on the line: ‹ Hide the slide over › Hide the
+// handout (Jarmo, 16 November: "see võiks olla split button").
 {
   assert.deepEqual(labels(true, true), ['Hide the slide', 'Hide the handout'])
-  const [upper, lower] = foldButtons(true, true, 500)
-  assert.equal(upper.left, 500)
-  assert.equal(lower.left, 500)
-  assert.ok(upper.bottom > lower.bottom, 'Hide the slide is above Hide the handout')
-  assert.equal(lower.bottom, 28, 'Hide the handout stays where the one fold was')
-  assert.equal(upper.icon, 'caret-left')
-  assert.equal(lower.icon, 'caret-right')
-  // Each is the shared round fold button, with the shared tooltip and never a native title.
+  const control = foldControl(true, true, 500)
+  assert.equal(control.buttons.length, 2)
+  assert.equal(control.left, 500, 'on the line')
+  assert.deepEqual(control.buttons.map(b => [b.side, b.icon]), [['slide', 'caret-left'], ['handout', 'caret-right']], 'upper half first')
+  // Both halves are inside one control: one group with both buttons in it, and no second control beside it.
   const html = draw(true, true)
-  assert.equal(html.querySelectorAll('.deck-fold-button').length, 2)
+  const groups = html.querySelectorAll('.deck-fold')
+  assert.equal(groups.length, 1, 'one control')
+  const pill = groups[0]
+  assert.ok(pill.classList.contains('is-split'))
+  assert.equal(pill.getAttribute('role'), 'group')
+  assert.equal(pill.querySelectorAll('button.deck-fold-button').length, 2, 'two halves in it')
+  // Each half names its end of the pill itself, not through the Tooltip's wrapper.
+  assert.deepEqual(pill.querySelectorAll('button').map(b => [b.classList.contains('is-upper'), b.classList.contains('is-lower')]), [[true, false], [false, true]])
+  // Each half stays a real button with its own label.
+  assert.deepEqual(pill.querySelectorAll('button').map(b => b.getAttribute('aria-label')), ['Hide the slide', 'Hide the handout'])
+  assert.equal(html.querySelectorAll('[title]').length, 0, 'no native title')
+  // The tooltips: the shared Tooltip around each half, with that half's words (its content draws only on hover or
+  // focus, so the element tree is read rather than the markup).
+  const { Tooltip } = await import('../ui/tooltip')
+  type Half = { type: unknown; props: { label: string; children: { props: { onClick: () => void } } } }
+  const halves = (onToggle: (side: 'slide' | 'handout') => void) =>
+    DeckFolds({ slideShown: true, handoutShown: true, left: 500, onToggle }).props.children as Half[]
+  assert.ok(halves(() => {}).every(half => half.type === Tooltip), 'each half is in the shared Tooltip')
+  assert.deepEqual(halves(() => {}).map(half => half.props.label), ['Hide the slide', 'Hide the handout'])
+  // Each half folds its own side.
+  const pressed: string[] = []
+  for (const half of halves(side => { pressed.push(side) })) half.props.children.props.onClick()
+  assert.deepEqual(pressed, ['slide', 'handout'])
+  // The pill's look (decks.css): the desk's colour in a 1 px strong-hairline ring with a small shadow, 26×28 halves
+  // with a hairline between, and a hover in the accent's soft fill with the icon in the accent.
+  const { readFileSync } = await import('node:fs')
+  const css = readFileSync(new URL('./decks.css', import.meta.url), 'utf8').replace(/\s+/g, ' ')
+  assert.ok(/\.deck-fold\.is-split \{[^}]*flex-direction: column;[^}]*border-radius: 13px;[^}]*background: var\(--r-surface\);[^}]*box-shadow: 0 0 0 1px var\(--r-hairline-strong\), 0 2px 6px/.test(css), 'the pill')
+  assert.ok(/\.deck-fold\.is-split \.deck-fold-button \{ width: 26px; height: 28px;[^}]*transform: none;/.test(css), '26×28 halves that a press does not shrink')
+  assert.ok(/\.deck-fold\.is-split \.deck-fold-button\.is-upper \{ border-radius: 13px 13px 0 0; \}/.test(css), "the upper half takes the pill's top")
+  assert.ok(/\.deck-fold\.is-split \.deck-fold-button\.is-lower \{ border-radius: 0 0 13px 13px; box-shadow: inset 0 1px 0 var\(--r-hairline-strong\); \}/.test(css), 'a hairline between')
+  assert.ok(!/\.is-split > span/.test(css), "nothing hangs on the Tooltip's wrapper")
+  assert.ok(/\.deck-fold\.is-split \.deck-fold-button:hover, \.deck-fold\.is-split \.deck-fold-button:focus-visible \{ background: var\(--r-accent-soft\); color: var\(--r-accent\); \}/.test(css), 'the hover, and keyboard focus the same')
+  assert.ok(/\.deck-fold\.is-split \.deck-fold-button:focus-visible \{ outline-offset: -2px; \}/.test(css), 'the focus ring inside its half')
+}
+
+// The slide hidden: one round › at the handout's left edge, Show the slide, and nothing to hide the handout with.
+{
+  assert.deepEqual(labels(false, true), ['Show the slide'])
+  const control = foldControl(false, true, 132)
+  assert.equal(control.buttons.length, 1)
+  assert.ok(control.left > 132, "inside the handout's left edge")
+  assert.equal(control.buttons[0].icon, 'caret-right')
+  const html = draw(false, true)
+  assert.equal(html.querySelectorAll('.is-split').length, 0, 'no pill')
+  assert.equal(html.querySelectorAll('[role=group]').length, 0)
   assert.equal(html.querySelectorAll('[title]').length, 0, 'no native title')
 }
 
-// The slide hidden: one › at the handout's left edge, Show the slide, and nothing to hide the handout with.
-{
-  assert.deepEqual(labels(false, true), ['Show the slide'])
-  const [show] = foldButtons(false, true, 132)
-  assert.ok(show.left > 132, "inside the handout's left edge")
-  assert.equal(show.icon, 'caret-right')
-}
-
-// The handout hidden: as today, one ‹ Show the handout at the line, and nothing to hide the slide with.
+// The handout hidden: as today, one round ‹ Show the handout at the line, and nothing to hide the slide with.
 {
   assert.deepEqual(labels(true, false), ['Show the handout'])
-  const [show] = foldButtons(true, false, 900)
-  assert.equal(show.left, 878)
-  assert.equal(show.bottom, 28)
+  const control = foldControl(true, false, 900)
+  assert.equal(control.left, 878)
+  assert.equal(control.buttons.length, 1)
 }
 
 // The two sides can't both be hidden: one fold value, and a press of either button brings its side back or folds it.
