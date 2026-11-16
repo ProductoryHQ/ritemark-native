@@ -14,12 +14,15 @@
  * Pure: no DOM, no `vscode`. The host's page and the webview import this one file.
  */
 import { Marked, type Token, type Tokens } from 'marked';
-import { EXERCISE_TAG, type SlideData } from '../deckFormat';
+import { EXERCISE_TAG, sidePictureOf, type SlideData } from '../deckFormat';
+import { isRelativeTarget } from '../deckLibraryFormat';
 import type { DeckTheme } from '../deckTheme';
 import { themeStyle } from '../../../webview/src/components/decks/theme/themeVars';
 import { slideIcon } from '../../../webview/src/components/decks/slide/iconSet';
 import { iconSvg, isPageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
-import { fencedDivStart, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
+import { OWN_MARK_LOOKS, fencedDivStart, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
+
+export { sidePictureOf };
 
 /** The slide's canvas, as the v1 slide's (`layoutSlide`). */
 export const BLOCK_CANVAS_WIDTH = 960;
@@ -51,12 +54,6 @@ export function picturePathOf(href: string): string {
   }
 }
 
-/** Is this a path beside the deck (not a web address, an anchor, a drive or an absolute path)? */
-function isRelativePath(target: string): boolean {
-  const value = target.trim();
-  if (!value || value.startsWith('#') || value.startsWith('/') || value.startsWith('\\')) return false;
-  return !/^[a-z][a-z0-9+.-]*:/i.test(value);
-}
 
 interface SlideDivToken {
   type: 'slideDiv';
@@ -73,8 +70,6 @@ interface RenderState {
 
 let state: RenderState = { pictureUrl: () => null, looks: [] };
 
-/** The boxes' looks that draw their own mark (a number, a dot, an arrow) where a box's icon would go. */
-const OWN_MARK_LOOKS: ReadonlySet<string> = new Set(['steps', 'line', 'arrows']);
 
 /** The pill over a Steps block: its `tag`, "Exercise" when it has none, and no pill for an empty one (#752's rule). */
 export function stepsTagOf(attrs: FenceAttributes): string {
@@ -119,7 +114,7 @@ function divHtml(token: SlideDivToken, inner: () => string): string {
 /** A picture: drawn from beside the deck, or its empty place. Never loaded from the web. */
 function pictureHtml(href: string, text: string): string {
   const path = picturePathOf(href);
-  const url = isRelativePath(path) ? state.pictureUrl(path) : null;
+  const url = isRelativeTarget(path) ? state.pictureUrl(path) : null;
   return url ? `<img class="blk-pic" src="${esc(url)}" alt="${text}">` : '<span class="blk-pic empty"></span>';
 }
 
@@ -175,7 +170,7 @@ export function blockPicturePaths(markdown: string): string[] {
   slideMarked.walkTokens(lexBlockSlide(markdown), token => {
     if (token.type === 'image') {
       const path = picturePathOf((token as Tokens.Image).href);
-      if (isRelativePath(path)) found.add(path);
+      if (isRelativeTarget(path)) found.add(path);
     }
   });
   const paths = [...found];
@@ -194,13 +189,48 @@ export function slidePicturePaths(data: SlideData): string[] {
  * big and low, as the old Title, Section and Statement slides are (README: "Title, Section and Statement keep their big
  * type as a title-only slide").
  */
+const coverCache = new Map<string, boolean>();
+
 export function isCoverSlide(markdown: string): boolean {
+  const cached = coverCache.get(markdown);
+  if (cached !== undefined) return cached;
+  if (coverCache.size > 500) coverCache.clear();
+  const cover = coverOf(markdown);
+  coverCache.set(markdown, cover);
+  return cover;
+}
+
+function coverOf(markdown: string): boolean {
   const blocks = lexBlockSlide(markdown).filter(token => token.type !== 'space');
   const isTitle = (token: Token | undefined) => token?.type === 'heading' && (token as Tokens.Heading).depth === 1;
   const isLine = (token: Token | undefined) => token?.type === 'paragraph' || (token?.type === 'heading' && (token as Tokens.Heading).depth === 2);
   if (blocks.length === 1) return isTitle(blocks[0]);
   if (blocks.length === 2) return (isTitle(blocks[0]) && isLine(blocks[1])) || (blocks[0].type === 'paragraph' && (blocks[0] as Tokens.Paragraph).text.length <= 12 && isTitle(blocks[1]));
   return false;
+}
+
+const stepsCache = new Map<string, string | null>();
+
+/**
+ * The pill of a block slide's first Steps block ('' for none), or null when it has no Steps block: a slide with Steps
+ * is an exercise on the page, as an Exercise slide is. Read once per Markdown.
+ */
+export function blockStepsTagOf(markdown: string): string | null {
+  if (stepsCache.has(markdown)) return stepsCache.get(markdown) ?? null;
+  if (stepsCache.size > 500) stepsCache.clear();
+  let found: string | null = null;
+  const visit = (tokens: Token[]) => {
+    for (const token of tokens) {
+      if (found !== null) return;
+      if (token.type !== 'slideDiv') continue;
+      const div = token as unknown as SlideDivToken;
+      if (div.attrs.classes.includes('steps')) { found = stepsTagOf(div.attrs); return; }
+      visit(div.tokens);
+    }
+  };
+  visit(lexBlockSlide(markdown));
+  stepsCache.set(markdown, found);
+  return found;
 }
 
 /** A block slide's Markdown as the slide's inner HTML (the flow's children). */
@@ -233,10 +263,6 @@ function styleText(style: Record<string, string | number>): string {
   return Object.entries(style).map(([key, value]) => `${kebab(key)}:${typeof value === 'number' ? `${value}px` : value}`).join(';');
 }
 
-/** The picture beside or behind the words (the header's `picture:` and `image:`), or none. */
-export function sidePictureOf(data: SlideData): 'left' | 'right' | 'behind' | null {
-  return data.picture === 'left' || data.picture === 'right' || data.picture === 'behind' ? data.picture : null;
-}
 
 /**
  * A block slide's canvas (its `.deck-sl`, 960 × 540, scaled to `width` when given): the picture beside or behind, and

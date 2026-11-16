@@ -20,8 +20,7 @@
 import { createHash } from 'node:crypto';
 import { marked } from 'marked';
 import { exerciseTagOf, isBlockSlide, type SlideData } from '../deckFormat';
-import { blockSlideMarkup, lexBlockSlide, stepsTagOf } from '../blocks/slideRenderer';
-import type { FenceAttributes } from '../blocks/fencedDiv';
+import { blockSlideMarkup, blockStepsTagOf } from '../blocks/slideRenderer';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import { slideMarkup, escapeHtml } from '../../../webview/src/components/decks/slide/slideMarkup';
 import { themeStyle, themeVars } from '../../../webview/src/components/decks/theme/themeVars';
@@ -432,19 +431,7 @@ const titleOf = (slide: PublicSlide) => (slide.data.title ?? '').trim();
  * block. A slide with Steps is an exercise on the page, as an Exercise slide is.
  */
 function blockStepsTag(slide: PublicSlide): string | null {
-  if (!isBlockSlide(slide.kind)) return null;
-  let found: string | null = null;
-  const visit = (tokens: ReturnType<typeof lexBlockSlide>) => {
-    for (const token of tokens) {
-      if (found !== null) return;
-      if (token.type !== 'slideDiv') continue;
-      const div = token as unknown as { attrs: FenceAttributes; tokens: ReturnType<typeof lexBlockSlide> };
-      if (div.attrs.classes.includes('steps')) { found = stepsTagOf(div.attrs); return; }
-      visit(div.tokens);
-    }
-  };
-  visit(lexBlockSlide(slide.data.markdown ?? ''));
-  return found;
+  return isBlockSlide(slide.kind) ? blockStepsTagOf(slide.data.markdown ?? '') : null;
 }
 
 /** An Exercise slide, or a block slide with Steps: its numbered steps get ticks, and Contents ticks it when done. */

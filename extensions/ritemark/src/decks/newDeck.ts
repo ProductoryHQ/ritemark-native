@@ -13,7 +13,7 @@
  */
 
 import { EMPTY_DECK_TITLE, newId, parseDeck, writeScalar } from './deckFormat';
-import { folderOf, newTopicText, partText, rebaseSlide } from './deckLibraryFormat';
+import { folderOf, newTopicText, partText, rebasePath, rebaseSlide, rewriteMarkdownTargets } from './deckLibraryFormat';
 import { isTopicPath } from './DeckLibrary';
 import { BUILT_IN_THEME_PATH } from './deckTheme';
 
@@ -56,7 +56,7 @@ export function emptyFileName(taken: (fileName: string) => boolean): string {
 export function copiedDeckText(text: string, fromFolder: string, toFolder: string): string {
   if (fromFolder === toFolder) return text;
   // The library's own rebase of a slide (its picture through the slide writer) and of Markdown (links and pictures)
-  const rebaseText = (markdown: string) => rebaseSlide('', markdown, fromFolder, toFolder).handout;
+  const rebaseText = (markdown: string) => rewriteMarkdownTargets(markdown, target => rebasePath(target, fromFolder, toFolder));
   const deck = parseDeck(text);
   let out = text.slice(0, deck.bodyStart);
   let at = deck.bodyStart;

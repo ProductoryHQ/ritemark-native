@@ -29,8 +29,8 @@
  */
 import { createHash } from 'node:crypto';
 import { marked, Tokenizer, type Token } from 'marked';
-import { frontMatterLook, isBlockSlide, isSlideKind, isTextHandout, parseDeck, slideDataOf, type SlideData, type SlideItem } from '../deckFormat';
-import { BLOCK_MAX_STEP, isCoverSlide } from '../blocks/slideRenderer';
+import { blockTitleOf, frontMatterLook, isBlockSlide, isSlideKind, isTextHandout, parseDeck, slideDataOf, type SlideData, type SlideItem } from '../deckFormat';
+import { BLOCK_MAX_STEP, isCoverSlide, sidePictureOf } from '../blocks/slideRenderer';
 import type { DeckTheme } from '../deckTheme';
 import { MAX_STEP } from '../../../webview/src/components/decks/slide/layoutSlide';
 
@@ -149,9 +149,12 @@ export function drawnData(kind: string, data: SlideData): SlideData {
  */
 export function publicSlide(kind: string, data: SlideData): { kind: string; data: SlideData } {
   if (isBlockSlide(kind)) {
-    const out: SlideData = { markdown: publicMarkdown(data.markdown ?? '') };
-    if (data.title !== undefined) out.title = data.title;
-    if (data.picture === 'left' || data.picture === 'right' || data.picture === 'behind') {
+    const markdown = publicMarkdown(data.markdown ?? '');
+    const out: SlideData = { markdown };
+    // The title from what goes public, never from the slide as written (a heading in a comment stays private).
+    const title = blockTitleOf(markdown);
+    if (title) out.title = title;
+    if (sidePictureOf(data)) {
       out.picture = data.picture;
       if (data.image !== undefined) out.image = data.image;
     }

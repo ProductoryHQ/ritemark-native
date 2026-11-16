@@ -65,7 +65,7 @@ async function run() {
   const olderCopy = await state(copy.body, copy.handout);
   assert.equal(olderCopy.newer, true);
   assert.equal(olderCopy.changed, false);
-  const used = await library.useSource('Clients/Harbour/Harbour.deck.md', copy.body);
+  const used = await library.useSource('Clients/Harbour/Harbour.deck.md', copy.body, copy.kind);
   assert.equal(parseSlideBody(used.body).id, data.id);
   assert.equal(parseSlideBody(used.body).title, 'Four parts, again');
   assert.equal((await state(used.body, used.handout)).newer, false);

@@ -789,38 +789,23 @@
     "icons": {
       "ritemark-flow": {
         "description": "A flow, in New",
-        "default": {
-          "fontPath": "producticons/Phosphor-Regular.woff2",
-          "fontCharacter": "\\e6ec"
-        }
+        "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e6ec" }
       },
       "ritemark-robot": {
         "description": "An agent, in New on Agents",
-        "default": {
-          "fontPath": "producticons/Phosphor-Regular.woff2",
-          "fontCharacter": "\\e762"
-        }
+        "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e762" }
       },
       "ritemark-sparkle": {
         "description": "A skill, in New on Agents",
-        "default": {
-          "fontPath": "producticons/Phosphor-Regular.woff2",
-          "fontCharacter": "\\e6a2"
-        }
+        "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e6a2" }
       },
       "ritemark-command": {
         "description": "A command, in New on Agents",
-        "default": {
-          "fontPath": "producticons/Phosphor-Regular.woff2",
-          "fontCharacter": "\\e1c4"
-        }
+        "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e1c4" }
       },
       "ritemark-deck": {
         "description": "A deck, in New",
-        "default": {
-          "fontPath": "producticons/Phosphor-Regular.woff2",
-          "fontCharacter": "\\e654"
-        }
+        "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e654" }
       }
     },
     "menus": {
@@ -861,171 +846,52 @@
           "command": "ritemark.slideLibrary.search",
           "when": "false"
         },
-        {
-          "command": "ritemark.transcribe.openSettings",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.openFolder",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.revealInFinder",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.revealInFileExplorer",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.aboutProject",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.switchProject",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.newFolder",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.collapseFolders",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.newText",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.newTable",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.newDeck",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.decks.new",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.newFlow",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.newFile",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.newFolderInNew",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.newAgent",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.newSkill",
-          "when": "false"
-        },
-        {
-          "command": "ritemark.projectHead.newCommand",
-          "when": "false"
-        }
+        { "command": "ritemark.transcribe.openSettings", "when": "false" },
+        { "command": "ritemark.projectHead.openFolder", "when": "false" },
+        { "command": "ritemark.projectHead.revealInFinder", "when": "false" },
+        { "command": "ritemark.projectHead.revealInFileExplorer", "when": "false" },
+        { "command": "ritemark.projectHead.aboutProject", "when": "false" },
+        { "command": "ritemark.projectHead.switchProject", "when": "false" },
+        { "command": "ritemark.projectHead.newFolder", "when": "false" },
+        { "command": "ritemark.projectHead.collapseFolders", "when": "false" },
+        { "command": "ritemark.projectHead.newText", "when": "false" },
+        { "command": "ritemark.projectHead.newTable", "when": "false" },
+        { "command": "ritemark.projectHead.newDeck", "when": "false" },
+        { "command": "ritemark.decks.new", "when": "false" },
+        { "command": "ritemark.projectHead.newFlow", "when": "false" },
+        { "command": "ritemark.projectHead.newFile", "when": "false" },
+        { "command": "ritemark.projectHead.newFolderInNew", "when": "false" },
+        { "command": "ritemark.projectHead.newAgent", "when": "false" },
+        { "command": "ritemark.projectHead.newSkill", "when": "false" },
+        { "command": "ritemark.projectHead.newCommand", "when": "false" }
       ],
       "ritemark/fileMenu": [
-        {
-          "command": "ritemark.newTab",
-          "group": "1_new@0"
-        },
-        {
-          "command": "ritemark.projects.switch",
-          "group": "2_open@3"
-        },
-        {
-          "command": "ritemark.document.share",
-          "group": "4_save@1.5"
-        }
+        { "command": "ritemark.newTab", "group": "1_new@0" },
+        { "command": "ritemark.projects.switch", "group": "2_open@3" },
+        { "command": "ritemark.document.share", "group": "4_save@1.5" }
       ],
       "ritemark/projectHead": [
-        {
-          "command": "ritemark.projectHead.switchProject",
-          "group": "1_project@0"
-        },
-        {
-          "command": "ritemark.projectHead.openFolder",
-          "group": "1_project@1"
-        },
-        {
-          "command": "ritemark.projectHead.revealInFinder",
-          "group": "1_project@2",
-          "when": "isMac"
-        },
-        {
-          "command": "ritemark.projectHead.revealInFileExplorer",
-          "group": "1_project@2",
-          "when": "isWindows"
-        },
-        {
-          "command": "ritemark.projectHead.aboutProject",
-          "group": "1_project@3"
-        },
-        {
-          "command": "ritemark.projectHead.newFolder",
-          "group": "3_folder@1",
-          "when": "activeViewlet == 'workbench.view.explorer'"
-        },
-        {
-          "command": "ritemark.projectHead.collapseFolders",
-          "group": "3_folder@2",
-          "when": "activeViewlet == 'workbench.view.explorer'"
-        }
+        { "command": "ritemark.projectHead.switchProject", "group": "1_project@0" },
+        { "command": "ritemark.projectHead.openFolder", "group": "1_project@1" },
+        { "command": "ritemark.projectHead.revealInFinder", "group": "1_project@2", "when": "isMac" },
+        { "command": "ritemark.projectHead.revealInFileExplorer", "group": "1_project@2", "when": "isWindows" },
+        { "command": "ritemark.projectHead.aboutProject", "group": "1_project@3" },
+        { "command": "ritemark.projectHead.newFolder", "group": "3_folder@1", "when": "activeViewlet == 'workbench.view.explorer'" },
+        { "command": "ritemark.projectHead.collapseFolders", "group": "3_folder@2", "when": "activeViewlet == 'workbench.view.explorer'" }
       ],
       "ritemark/projectHead/new": [
-        {
-          "command": "ritemark.projectHead.newText",
-          "group": "1_documents@1"
-        },
-        {
-          "command": "ritemark.projectHead.newTable",
-          "group": "1_documents@2"
-        },
-        {
-          "command": "ritemark.projectHead.newDeck",
-          "group": "1_documents@3",
-          "when": "config.ritemark.features.decks"
-        },
-        {
-          "command": "ritemark.projectHead.newFlow",
-          "group": "2_flows@1"
-        },
-        {
-          "command": "ritemark.projectHead.newFile",
-          "group": "3_files@1"
-        },
-        {
-          "command": "ritemark.projectHead.newFolderInNew",
-          "group": "3_files@2"
-        }
+        { "command": "ritemark.projectHead.newText", "group": "1_documents@1" },
+        { "command": "ritemark.projectHead.newTable", "group": "1_documents@2" },
+        { "command": "ritemark.projectHead.newDeck", "group": "1_documents@3", "when": "config.ritemark.features.decks" },
+        { "command": "ritemark.projectHead.newFlow", "group": "2_flows@1" },
+        { "command": "ritemark.projectHead.newFile", "group": "3_files@1" },
+        { "command": "ritemark.projectHead.newFolderInNew", "group": "3_files@2" }
       ],
       "ritemark/projectHead/agents/new": [
-        {
-          "command": "ritemark.projectHead.newAgent",
-          "group": "1_library@1"
-        },
-        {
-          "command": "ritemark.projectHead.newSkill",
-          "group": "1_library@2"
-        },
-        {
-          "command": "ritemark.projectHead.newCommand",
-          "group": "1_library@3"
-        },
-        {
-          "command": "ritemark.projectHead.newFlow",
-          "group": "1_library@4"
-        }
+        { "command": "ritemark.projectHead.newAgent", "group": "1_library@1" },
+        { "command": "ritemark.projectHead.newSkill", "group": "1_library@2" },
+        { "command": "ritemark.projectHead.newCommand", "group": "1_library@3" },
+        { "command": "ritemark.projectHead.newFlow", "group": "1_library@4" }
       ],
       "editor/title": [
         {
@@ -1186,9 +1052,7 @@
       }
     ],
     "configurationDefaults": {
-      "workbench.editor.customLabels.patterns": {
-        "*/AGENTS.md": "About this project"
-      },
+      "workbench.editor.customLabels.patterns": { "*/AGENTS.md": "About this project" },
       "files.autoSave": "afterDelay",
       "files.autoSaveDelay": 1000,
       "workbench.sideBar.location": "left",
@@ -1247,156 +1111,21 @@
       }
     },
     "colors": [
-      {
-        "id": "ritemark.ground",
-        "description": "Ritemark 2.0: the ground, flat, under everything around the work.",
-        "defaults": {
-          "light": "#F1F5F9",
-          "dark": "#16132F",
-          "highContrast": "#000000",
-          "highContrastLight": "#FFFFFF"
-        }
-      },
-      {
-        "id": "ritemark.aiSheet",
-        "description": "Ritemark 2.0: the AI's sheet, between the ground and the desk.",
-        "defaults": {
-          "light": "#F8FAFC",
-          "dark": "#1A1740",
-          "highContrast": "#000000",
-          "highContrastLight": "#FFFFFF"
-        }
-      },
-      {
-        "id": "ritemark.desk",
-        "description": "Ritemark 2.0: the desk, the raised sheet the documents lie on.",
-        "defaults": {
-          "light": "#FFFFFF",
-          "dark": "#1E1B4B",
-          "highContrast": "#000000",
-          "highContrastLight": "#FFFFFF"
-        }
-      },
-      {
-        "id": "ritemark.sheetBorder",
-        "description": "Ritemark 2.0: the hairline around a sheet.",
-        "defaults": {
-          "light": "#E2E8F0",
-          "dark": "#FFFFFF14",
-          "highContrast": "contrastBorder",
-          "highContrastLight": "contrastBorder"
-        }
-      },
-      {
-        "id": "ritemark.sheetShadow",
-        "description": "Ritemark 2.0: the shadow under what floats (menus, dialogs, quick input, the editor's toolbars), in ink in Light and black at 40% in Dark; high contrast draws none. The desk and the AI's sheet draw hairlines only (Sprint 142, #503; framework §4).",
-        "defaults": {
-          "light": "#1E1B4B12",
-          "dark": "#00000066",
-          "highContrast": "#00000000",
-          "highContrastLight": "#00000000"
-        }
-      },
-      {
-        "id": "ritemark.placeActiveBackground",
-        "description": "Ritemark 2.0: the fill behind the chosen place.",
-        "defaults": {
-          "light": "#E0E7FF",
-          "dark": "#818CF82E",
-          "highContrast": "#00000000",
-          "highContrastLight": "#00000000"
-        }
-      },
-      {
-        "id": "ritemark.placeActiveForeground",
-        "description": "Ritemark 2.0: the chosen place's icon.",
-        "defaults": {
-          "light": "#4338CA",
-          "dark": "#A5B4FC",
-          "highContrast": "contrastActiveBorder",
-          "highContrastLight": "contrastActiveBorder"
-        }
-      },
-      {
-        "id": "ritemark.agentColor.red",
-        "description": "Ritemark 2.0: the icon of an agent whose settings chose Red, in the Agents place.",
-        "defaults": {
-          "light": "#DC2626",
-          "dark": "#F87171",
-          "highContrast": "#F87171",
-          "highContrastLight": "#B91C1C"
-        }
-      },
-      {
-        "id": "ritemark.agentColor.blue",
-        "description": "Ritemark 2.0: the icon of an agent whose settings chose Blue, in the Agents place.",
-        "defaults": {
-          "light": "#2563EB",
-          "dark": "#60A5FA",
-          "highContrast": "#60A5FA",
-          "highContrastLight": "#1D4ED8"
-        }
-      },
-      {
-        "id": "ritemark.agentColor.green",
-        "description": "Ritemark 2.0: the icon of an agent whose settings chose Green, in the Agents place.",
-        "defaults": {
-          "light": "#15803D",
-          "dark": "#4ADE80",
-          "highContrast": "#4ADE80",
-          "highContrastLight": "#15803D"
-        }
-      },
-      {
-        "id": "ritemark.agentColor.yellow",
-        "description": "Ritemark 2.0: the icon of an agent whose settings chose Yellow, in the Agents place.",
-        "defaults": {
-          "light": "#A16207",
-          "dark": "#FACC15",
-          "highContrast": "#FACC15",
-          "highContrastLight": "#A16207"
-        }
-      },
-      {
-        "id": "ritemark.agentColor.purple",
-        "description": "Ritemark 2.0: the icon of an agent whose settings chose Purple, in the Agents place.",
-        "defaults": {
-          "light": "#9333EA",
-          "dark": "#C084FC",
-          "highContrast": "#C084FC",
-          "highContrastLight": "#7E22CE"
-        }
-      },
-      {
-        "id": "ritemark.agentColor.orange",
-        "description": "Ritemark 2.0: the icon of an agent whose settings chose Orange, in the Agents place.",
-        "defaults": {
-          "light": "#C2410C",
-          "dark": "#FB923C",
-          "highContrast": "#FB923C",
-          "highContrastLight": "#C2410C"
-        }
-      },
-      {
-        "id": "ritemark.agentColor.pink",
-        "description": "Ritemark 2.0: the icon of an agent whose settings chose Pink, in the Agents place.",
-        "defaults": {
-          "light": "#DB2777",
-          "dark": "#F472B6",
-          "highContrast": "#F472B6",
-          "highContrastLight": "#BE185D"
-        }
-      },
-      {
-        "id": "ritemark.agentColor.cyan",
-        "description": "Ritemark 2.0: the icon of an agent whose settings chose Cyan, in the Agents place.",
-        "defaults": {
-          "light": "#0E7490",
-          "dark": "#22D3EE",
-          "highContrast": "#22D3EE",
-          "highContrastLight": "#0E7490"
-        }
-      }
+      { "id": "ritemark.ground", "description": "Ritemark 2.0: the ground, flat, under everything around the work.", "defaults": { "light": "#F1F5F9", "dark": "#16132F", "highContrast": "#000000", "highContrastLight": "#FFFFFF" } },
+      { "id": "ritemark.aiSheet", "description": "Ritemark 2.0: the AI's sheet, between the ground and the desk.", "defaults": { "light": "#F8FAFC", "dark": "#1A1740", "highContrast": "#000000", "highContrastLight": "#FFFFFF" } },
+      { "id": "ritemark.desk", "description": "Ritemark 2.0: the desk, the raised sheet the documents lie on.", "defaults": { "light": "#FFFFFF", "dark": "#1E1B4B", "highContrast": "#000000", "highContrastLight": "#FFFFFF" } },
+      { "id": "ritemark.sheetBorder", "description": "Ritemark 2.0: the hairline around a sheet.", "defaults": { "light": "#E2E8F0", "dark": "#FFFFFF14", "highContrast": "contrastBorder", "highContrastLight": "contrastBorder" } },
+      { "id": "ritemark.sheetShadow", "description": "Ritemark 2.0: the shadow under what floats (menus, dialogs, quick input, the editor's toolbars), in ink in Light and black at 40% in Dark; high contrast draws none. The desk and the AI's sheet draw hairlines only (Sprint 142, #503; framework §4).", "defaults": { "light": "#1E1B4B12", "dark": "#00000066", "highContrast": "#00000000", "highContrastLight": "#00000000" } },
+      { "id": "ritemark.placeActiveBackground", "description": "Ritemark 2.0: the fill behind the chosen place.", "defaults": { "light": "#E0E7FF", "dark": "#818CF82E", "highContrast": "#00000000", "highContrastLight": "#00000000" } },
+      { "id": "ritemark.placeActiveForeground", "description": "Ritemark 2.0: the chosen place's icon.", "defaults": { "light": "#4338CA", "dark": "#A5B4FC", "highContrast": "contrastActiveBorder", "highContrastLight": "contrastActiveBorder" } },
+      { "id": "ritemark.agentColor.red", "description": "Ritemark 2.0: the icon of an agent whose settings chose Red, in the Agents place.", "defaults": { "light": "#DC2626", "dark": "#F87171", "highContrast": "#F87171", "highContrastLight": "#B91C1C" } },
+      { "id": "ritemark.agentColor.blue", "description": "Ritemark 2.0: the icon of an agent whose settings chose Blue, in the Agents place.", "defaults": { "light": "#2563EB", "dark": "#60A5FA", "highContrast": "#60A5FA", "highContrastLight": "#1D4ED8" } },
+      { "id": "ritemark.agentColor.green", "description": "Ritemark 2.0: the icon of an agent whose settings chose Green, in the Agents place.", "defaults": { "light": "#15803D", "dark": "#4ADE80", "highContrast": "#4ADE80", "highContrastLight": "#15803D" } },
+      { "id": "ritemark.agentColor.yellow", "description": "Ritemark 2.0: the icon of an agent whose settings chose Yellow, in the Agents place.", "defaults": { "light": "#A16207", "dark": "#FACC15", "highContrast": "#FACC15", "highContrastLight": "#A16207" } },
+      { "id": "ritemark.agentColor.purple", "description": "Ritemark 2.0: the icon of an agent whose settings chose Purple, in the Agents place.", "defaults": { "light": "#9333EA", "dark": "#C084FC", "highContrast": "#C084FC", "highContrastLight": "#7E22CE" } },
+      { "id": "ritemark.agentColor.orange", "description": "Ritemark 2.0: the icon of an agent whose settings chose Orange, in the Agents place.", "defaults": { "light": "#C2410C", "dark": "#FB923C", "highContrast": "#FB923C", "highContrastLight": "#C2410C" } },
+      { "id": "ritemark.agentColor.pink", "description": "Ritemark 2.0: the icon of an agent whose settings chose Pink, in the Agents place.", "defaults": { "light": "#DB2777", "dark": "#F472B6", "highContrast": "#F472B6", "highContrastLight": "#BE185D" } },
+      { "id": "ritemark.agentColor.cyan", "description": "Ritemark 2.0: the icon of an agent whose settings chose Cyan, in the Agents place.", "defaults": { "light": "#0E7490", "dark": "#22D3EE", "highContrast": "#22D3EE", "highContrastLight": "#0E7490" } }
     ],
     "themes": [
       {
@@ -1507,7 +1236,7 @@
     "test:publish": "npx tsx src/publish/gather.test.ts && npx tsx src/publish/secretScan.test.ts && npx tsx src/publish/publishRecords.test.ts && npx tsx src/publish/devSheetHarness.test.ts && npx tsx webview/src/components/publish/publishSheetCopy.test.ts",
     "test:publish-cloudflare": "npx tsx src/publish/cloudflare/cloudflare.test.ts && npx tsx src/publish/PublishController.test.ts && npx tsx src/settings/settingsKeys.test.ts && npx tsx webview/src/components/settings/webPagesCard.test.ts",
     "test:task-list-roundtrip": "npx tsx webview/src/utils/taskListRoundTrip.test.ts",
-    "test:decks": "npx tsx src/decks/deckFormat.test.ts && npx tsx src/decks/blocks/blocks.test.ts && npx tsx webview/src/components/decks/blocks/slideBlocks.roundtrip.test.ts && npx tsx webview/src/components/decks/blocks/slideRenderer.parity.test.ts && npx tsx src/decks/deckProtocol.test.ts && npx tsx webview/src/components/decks/scrollRule.test.ts && npx tsx webview/src/components/decks/handout/deckGuard.test.ts && npx tsx webview/src/components/decks/handout/deckRoundTrip.test.ts && npx tsx webview/src/components/decks/handout/deckLines.test.ts && npx tsx webview/src/extensions/blockItems.test.ts && npx tsx webview/src/components/decks/slide/layoutSlide.test.ts && npx tsx webview/src/components/decks/slide/itemMarkers.test.ts && npx tsx webview/src/components/decks/deckDocument.test.ts && npx tsx src/decks/deckLibraryFormat.test.ts && npx tsx src/decks/DeckLibrary.test.ts && npx tsx src/decks/present/presentSession.test.ts && npx tsx src/decks/present/presentProtocol.test.ts && npx tsx src/decks/present/DeckPresenter.test.ts && npx tsx src/decks/present/DeckPresenter.edits.test.ts && npx tsx webview/src/components/decks/present/wallKeys.test.ts && npx tsx src/decks/newDeck.test.ts && npx tsx src/decks/startCard.test.ts && npx tsx src/decks/page/publicDeck.test.ts && npx tsx src/decks/page/pageHtml.test.ts && npx tsx src/decks/page/pageScript.test.ts && npx tsx src/decks/page/pageFile.test.ts && npx tsx webview/src/components/decks/slide/slideMarkup.test.ts && npx tsx webview/src/components/decks/slide/exerciseTag.test.ts && npx tsx src/decks/page/sheetRows.test.ts && npx tsx webview/src/components/decks/DeckPublish.test.ts && npx tsx webview/src/components/decks/DeckFolds.test.ts && npx tsx webview/src/components/decks/stripKeys.test.ts && npx tsx src/decks/deckFileName.test.ts && npx tsx webview/src/lib/fileIcon.test.ts && npx tsx webview/src/extensions/FileLinkSuggestionList.test.ts",
+    "test:decks": "npx tsx src/decks/deckFormat.test.ts && npx tsx src/decks/blocks/blocks.test.ts && npx tsx webview/src/components/decks/blocks/slideBlocks.roundtrip.test.ts && npx tsx webview/src/components/decks/blocks/slideRenderer.parity.test.ts && npx tsx src/decks/deckProtocol.test.ts && npx tsx src/decks/currentSlide.test.ts && npx tsx webview/src/components/decks/currentSlideMessage.test.ts && npx tsx webview/src/components/decks/scrollRule.test.ts && npx tsx webview/src/components/decks/handout/deckGuard.test.ts && npx tsx webview/src/components/decks/handout/deckRoundTrip.test.ts && npx tsx webview/src/components/decks/handout/deckLines.test.ts && npx tsx webview/src/extensions/blockItems.test.ts && npx tsx webview/src/components/decks/slide/layoutSlide.test.ts && npx tsx webview/src/components/decks/slide/itemMarkers.test.ts && npx tsx webview/src/components/decks/deckDocument.test.ts && npx tsx src/decks/deckLibraryFormat.test.ts && npx tsx src/decks/DeckLibrary.test.ts && npx tsx src/decks/present/presentSession.test.ts && npx tsx src/decks/present/presentProtocol.test.ts && npx tsx src/decks/present/DeckPresenter.test.ts && npx tsx src/decks/present/DeckPresenter.edits.test.ts && npx tsx webview/src/components/decks/present/wallKeys.test.ts && npx tsx src/decks/newDeck.test.ts && npx tsx src/decks/startCard.test.ts && npx tsx src/decks/page/publicDeck.test.ts && npx tsx src/decks/page/pageHtml.test.ts && npx tsx src/decks/page/pageScript.test.ts && npx tsx src/decks/page/pageFile.test.ts && npx tsx webview/src/components/decks/slide/slideMarkup.test.ts && npx tsx webview/src/components/decks/slide/exerciseTag.test.ts && npx tsx src/decks/page/sheetRows.test.ts && npx tsx webview/src/components/decks/DeckPublish.test.ts && npx tsx webview/src/components/decks/DeckFolds.test.ts && npx tsx webview/src/components/decks/stripKeys.test.ts && npx tsx src/decks/deckFileName.test.ts && npx tsx webview/src/lib/fileIcon.test.ts && npx tsx webview/src/extensions/FileLinkSuggestionList.test.ts",
     "test:security-backports": "npx tsx webview/src/utils/securityBackports.test.ts",
     "test:loose-ends-ext": "npx tsx webview/src/components/ai-sidebar/RuntimeNotice.test.ts && npx tsx webview/src/theme/greenIsTheReadyDot.test.ts && npx tsx webview/src/components/settings/versionLabel.test.ts",
     "test:claude-auth": "npx tsx src/agent/claudeLogin.test.ts && npx tsx src/views/webviewAssetUri.test.ts && npx tsx src/views/agentSidebarBootstrap.test.ts && npx tsx webview/src/components/ai-sidebar/bootstrapState.test.ts && npx tsx webview/src/components/ai-sidebar/bootstrapStorageIsolation.test.ts && npx tsx webview/src/components/ai-sidebar/modelPresentation.test.ts && npx tsx webview/src/components/ai-sidebar/authRecoveryState.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeAvailability.test.ts && npx tsx webview/src/components/ai-sidebar/sidebarGate.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeHydrationRefresh.test.ts",

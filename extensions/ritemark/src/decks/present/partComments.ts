@@ -79,8 +79,9 @@ function visit(tokens: Token[], out: PartComment[]): void {
         for (const item of (token as { items: Array<{ tokens: Token[] }> }).items) visit(item.tokens, out);
         continue;
       case 'table': {
+        // A cell is an inline run, as a paragraph's: an anchored comment's `<mark>`, words and `</mark>` read as one.
         const table = token as unknown as { header: Array<{ tokens: Token[] }>; rows: Array<Array<{ tokens: Token[] }>> };
-        for (const cell of [...table.header, ...table.rows.flat()]) visit(cell.tokens, out);
+        for (const cell of [...table.header, ...table.rows.flat()]) commentsIn(cell.tokens.map(child => (child.type === 'codespan' ? '' : child.raw)).join(''), out);
         continue;
       }
       default:

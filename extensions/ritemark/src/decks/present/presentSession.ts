@@ -15,7 +15,7 @@
  * No `vscode` and no DOM: the host gives it the open document's text.
  */
 import { isBlockSlide, parseDeck, readScalar, slideDataOf, type SlideData } from '../deckFormat';
-import { legacyDataToBlocks } from '../blocks/legacyToBlocks';
+import { conversionComment, legacyDataToBlocks } from '../blocks/legacyToBlocks';
 import { partComments, type PartComment } from './partComments';
 
 /** One slide of the deck, as presenting reads it. */
@@ -71,7 +71,9 @@ export function presentSlidesOf(text: string): PresentSlide[] {
     const base = data.id ? `id:${data.id}` : `body:${block.kind}\n${block.body.trim()}`;
     const twins = seen.get(base) ?? 0;
     seen.set(base, twins + 1);
-    const converted = isBlockSlide(block.kind) ? null : legacyDataToBlocks(block.kind, data, block.notes).comment;
+    // An older slide's notes and hidden words, as the comment its conversion writes; a block slide's notes block (the
+    // Speaker notes fold is still under the stage in this build) the same way, so no note goes missing while presenting.
+    const converted = isBlockSlide(block.kind) ? conversionComment(block.notes, []) : legacyDataToBlocks(block.kind, data, block.notes).comment;
     const comments = partComments(text.slice(block.handoutStart, block.handoutEnd), converted);
     return { index, key: twins ? `${base}#${twins}` : base, kind: block.kind, data, notes: block.notes, comments, skip: data.skip === true };
   });

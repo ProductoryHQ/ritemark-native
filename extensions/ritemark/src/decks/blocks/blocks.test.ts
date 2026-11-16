@@ -26,7 +26,7 @@ import { PRIVATE_BLOCK_DECK, PRIVATE_BLOCK_WORDS, PRIVATE_DECK, PRIVATE_WORDS, P
 import { PresentSession } from '../present/presentSession';
 import { presenterStateOf, wallPicturePaths, wallStateOf } from '../present/presentProtocol';
 import { partComments } from '../present/partComments';
-import { slideStamp, slideStamps, slidesOfText } from '../deckLibraryFormat';
+import { rebaseSlide, slideStamp, slideStamps, slidesOfText } from '../deckLibraryFormat';
 
 let passed = 0;
 function test(name: string, run: () => void) {
@@ -314,6 +314,53 @@ test('the library reads a mixed deck: ids, from lines and pictures of block slid
   assert.deepEqual(slides.map(slide => slide.data.id ?? null), [null, PRIVATE_BLOCK_WORDS.headerId, null, null, null]);
   assert.equal(slides[3].data.skip, true);
   assert.ok(slides[1].data.from?.includes(PRIVATE_BLOCK_WORDS.headerFrom));
+});
+
+// ---------------------------------------------------------------------------
+// Review round 1 (code-review high on #760): each finding, red before its fix
+// ---------------------------------------------------------------------------
+
+test('R1-1: a heading inside a comment is never the title on the page, the wall or the go-to box', () => {
+  const text = '---\ndeck: 2\n---\n\n```slide\n<!--\n# Secret price 10k\n-->\nJust words\n```\n\n```slide\n# <mark data-comment="private note">Title</mark>\n```\n';
+  const deck = publicDeck(text, { folderName: 'F', deckName: 'D', theme: BUILT_IN_THEME });
+  const bytes = JSON.stringify(deck) + pageHtml(deck, assets, { digest: deckDigest(deck), pictureUrl });
+  assert.ok(!bytes.includes('Secret price') && !bytes.includes('private note'), 'the page');
+  assert.equal(deck.slides[1].data.title, 'Title');
+  const session = new PresentSession(text, { from: 'start' });
+  const wall = JSON.stringify(wallStateOf(session.view(), { borderless: false, theme: BUILT_IN_THEME }, {}));
+  assert.ok(!wall.includes('Secret price') && !wall.includes('private note'), 'the wall');
+  assert.equal(slideDataOf('', '<!--\n# Secret\n-->\nWords').title, undefined, 'the strip and the go-to box');
+});
+
+test('R1-2: a block slide\'s notes block reaches "Your comments"', () => {
+  const session = new PresentSession('```slide\n# T\n```\n\n```notes\nSay hello\n```\n', { from: 'start' });
+  const state = presenterStateOf(session.view(), { borderless: false, theme: BUILT_IN_THEME }, {}, { wallDisplay: null, canSwap: false, length: null, startedAt: 0 });
+  assert.deepEqual(state.comments, [{ note: 'Say hello' }]);
+});
+
+test('R1-3: a header write keeps every line it doesn\'t change, a title: line someone wrote there too', () => {
+  const body = '---\nid: a\nlayout: wide\n# keep me\nsubtitle: hi\ntitle: There\n---\n# T';
+  assert.equal(writeSlideData('', body, { ...slideDataOf('', body), id: 'b' }), '---\nid: b\nlayout: wide\n# keep me\nsubtitle: hi\ntitle: There\n---\n# T');
+});
+
+test('R1-4: --- # Agenda --- is a rule, a heading and a rule, not a header', () => {
+  assert.equal(splitBlockSlide('---\n# Agenda\n---\nText').header, null);
+  assert.equal(slideDataOf('', '---\n# Agenda\n---\nText').title, 'Agenda');
+  assert.equal(splitBlockSlide('---\n# a YAML comment\nskip: true\n---\nText').header, '# a YAML comment\nskip: true');
+});
+
+test('R1-5: an anchored comment in a handout table reaches "Your comments"', () => {
+  assert.deepEqual(partComments('| a | b |\n| - | - |\n| <mark data-comment="n1">x</mark> | y |'), [{ note: 'n1', words: 'x' }]);
+});
+
+test('R1-6: a block slide copied to another folder gets its pictures rebased', () => {
+  const rebased = rebaseSlide('# T\n\n![](pic.png)', '', 'a', 'b/c', '');
+  assert.equal(rebased.body, '# T\n\n![](../../a/pic.png)');
+});
+
+test('R1-7: a v1 slide whose words hold "<!--" keeps every later word in its stamp', () => {
+  const base = 'title: "Use <!-- for notes"\nitems:\n- heading: One';
+  assert.notEqual(slideStamp('points', slideDataOf('points', base), '', ''), slideStamp('points', slideDataOf('points', base.replace('One', 'Two')), '', ''));
 });
 
 console.log(`blocks: ${passed} passed`);

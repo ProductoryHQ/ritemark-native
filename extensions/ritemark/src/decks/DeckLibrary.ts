@@ -264,7 +264,7 @@ export class DeckLibrary {
   }
 
   /** Use it: the source's slide and handout as a part for the copy (its id kept), with a fresh `from:` stamp. */
-  async useSource(deckPath: string, copyBody: string, copyKind = 'points'): Promise<CopiedPart> {
+  async useSource(deckPath: string, copyBody: string, copyKind: string): Promise<CopiedPart> {
     const data = slideDataOf(copyKind, copyBody);
     const source = sourceOf(data.from);
     if (!source || !data.id) throw new Error('This slide is no copy of a deck in this project.');

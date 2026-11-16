@@ -688,6 +688,11 @@ export function isBlockSlide(kind: string): boolean {
   return kind === '';
 }
 
+/** The picture beside or behind a slide's words (`picture:` left, right or behind), or null. */
+export function sidePictureOf(data: SlideData): 'left' | 'right' | 'behind' | null {
+  return data.picture === 'left' || data.picture === 'right' || data.picture === 'behind' ? data.picture : null;
+}
+
 /** The keys a block slide's header holds: what belongs to the slide as a whole, never its words. */
 export const HEADER_KEYS = ['id', 'from', 'skip', 'picture', 'image', 'kept'] as const;
 
@@ -702,16 +707,20 @@ export interface BlockSlideParts {
 }
 
 /**
- * Split a block slide's body. A header is there only when the body's first line is `---`, a later line is `---`, and
- * every line between them is blank, a `key: value` line or a YAML comment; anything else (`Goal: x` in a sentence, a
- * rule, a setext heading) is Markdown, so a first paragraph is never read as keys.
+ * Split a block slide's body. A header is there only when the body's first line is `---`, a later line is `---`, every
+ * line between them is blank, a `key: value` line or a YAML comment, and one of them is a header key; anything else
+ * (`Goal: x` in a sentence, a rule, a setext heading, `---` `# Agenda` `---`) is Markdown, so a first paragraph is
+ * never read as keys.
  */
 export function splitBlockSlide(body: string): BlockSlideParts {
   const lines = body.split('\n');
   if (!/^---[ \t]*\r?$/.test(lines[0] ?? '')) return { header: null, head: '', markdown: body };
+  // At least one of the header's own keys: `---`, `# Agenda`, `---` (a rule, a heading, a rule) is Markdown.
+  let ownKey = false;
   for (let index = 1; index < lines.length; index++) {
     const line = lines[index].replace(/\r$/, '');
     if (/^---[ \t]*$/.test(line)) {
+      if (!ownKey) return { header: null, head: '', markdown: body };
       const head = lines.slice(0, index + 1).join('\n');
       const rest = body.slice(head.length);
       return {
@@ -720,7 +729,9 @@ export function splitBlockSlide(body: string): BlockSlideParts {
         markdown: rest.startsWith('\n') ? rest.slice(1) : rest,
       };
     }
-    if (line.trim() === '' || /^\s*#/.test(line) || KEY_LINE.test(line)) continue;
+    const key = KEY_LINE.exec(line);
+    if (key && (HEADER_KEYS as readonly string[]).includes(key[1])) ownKey = true;
+    if (line.trim() === '' || /^\s*#/.test(line) || key) continue;
     return { header: null, head: '', markdown: body };
   }
   return { header: null, head: '', markdown: body };
@@ -729,6 +740,7 @@ export function splitBlockSlide(body: string): BlockSlideParts {
 /** A heading's words as plain text: its emphasis, code marks, escapes and link targets taken out. */
 function plainHeading(text: string): string {
   return text
+    .replace(/<\/?[A-Za-z][^>]*>/g, '')
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\\([\\`*_{}[\]()#+\-.!>~|<&$])/g, '$1')
     .replace(/(^|[^\\])[*_`~]+/g, '$1')
@@ -743,10 +755,23 @@ function plainHeading(text: string): string {
  */
 export function blockTitleOf(markdown: string): string {
   let fence: { char: string; size: number } | null = null;
+  let comment = false;
   let first = '';
   const lines = markdown.split('\n');
   for (let index = 0; index < lines.length; index++) {
-    const line = lines[index].replace(/\r$/, '');
+    let line = lines[index].replace(/\r$/, '');
+    // A heading inside a comment is private, never the slide's title (the page and the wall show the title).
+    if (comment) {
+      const close = line.indexOf('-->');
+      if (close < 0) continue;
+      comment = false;
+      line = line.slice(close + 3);
+    }
+    if (!fence) {
+      line = line.replace(/<!--[\s\S]*?-->/g, '');
+      const open = line.indexOf('<!--');
+      if (open >= 0) { comment = true; line = line.slice(0, open); }
+    }
     if (fence) {
       const close = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
       if (close && close[1][0] === fence.char && close[1].length >= fence.size) fence = null;
@@ -802,10 +827,10 @@ export function slideDataOf(kind: string, body: string): SlideData {
 export function writeSlideData(kind: string, body: string, data: SlideData): string {
   if (!isBlockSlide(kind)) return writeSlideBody(body, data);
   const parts = splitBlockSlide(body);
-  const keys: SlideData = {};
-  for (const key of HEADER_KEYS) {
-    if (data[key] !== undefined) (keys as Record<string, unknown>)[key] = data[key];
-  }
+  // The header as it reads, with the header keys from `data`: a line no header key (a `title:` someone wrote there)
+  // stays as written.
+  const keys: SlideData = parts.header === null ? {} : parseSlideBody(parts.header);
+  for (const key of HEADER_KEYS) (keys as Record<string, unknown>)[key] = data[key];
   const inner = writeSlideBody(parts.header ?? '', keys);
   if (inner === (parts.header ?? '')) return body;
   if (inner.trim() === '') return parts.markdown;

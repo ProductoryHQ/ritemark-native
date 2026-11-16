@@ -121,6 +121,9 @@ export function fencedDivStart(src: string): number | undefined {
   return match ? match.index + match[1].length : undefined;
 }
 
+/** The Boxes looks that draw their own mark (a number, a dot, an arrow) where a box's icon would go. */
+export const OWN_MARK_LOOKS: ReadonlySet<string> = new Set(['steps', 'line', 'arrows']);
+
 /** The block classes a slide draws. Any other class is drawn as a plain group of its blocks. */
 export const SLIDE_BLOCK_CLASSES = ['columns', 'column', 'boxes', 'box', 'steps'] as const;
 export type SlideBlockClass = (typeof SLIDE_BLOCK_CLASSES)[number];

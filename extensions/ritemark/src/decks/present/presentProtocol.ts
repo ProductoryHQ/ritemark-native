@@ -153,7 +153,9 @@ export function wallDataOf(data: SlideData): SlideData {
  */
 export function wallSlideOf(slide: PresentSlide): WallSlide {
   const shown = publicSlide(slide.kind, slide.data);
-  return { number: slide.index + 1, kind: shown.kind, title: presentTitleOf(slide), data: wallDataOf(shown.data) };
+  // Its title as the room may see it: a block slide's from its public Markdown (`publicSlide`).
+  const title = presentTitleOf({ ...slide, data: shown.data });
+  return { number: slide.index + 1, kind: shown.kind, title, data: wallDataOf(shown.data) };
 }
 
 /** The pictures the wall's state names: the current slide's and the shown slides'. */

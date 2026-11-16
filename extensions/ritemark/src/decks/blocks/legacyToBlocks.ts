@@ -21,7 +21,8 @@
  *
  * Pure and dependency-free but for the deck format: the host and the webview use this one converter.
  */
-import { HEADER_KEYS, isSlideKind, parseSlideBody, type SlideData, type SlideItem } from '../deckFormat';
+import { HEADER_KEYS, isSlideKind, parseSlideBody, sidePictureOf, type SlideData, type SlideItem } from '../deckFormat';
+import { OWN_MARK_LOOKS } from './fencedDiv';
 
 /** A v1 slide as blocks: the header's data, the Markdown, and the comment its hidden words and notes make. */
 export interface LegacyBlocks {
@@ -77,8 +78,6 @@ function attributeValue(value: string): string {
   return `"${value.replace(/["\\\n\r]/g, ' ')}"`;
 }
 
-const OWN_MARK_LOOKS: ReadonlySet<string> = new Set(['steps', 'line', 'arrows']);
-
 const has = (value: string | undefined): value is string => typeof value === 'string' && value.trim() !== '';
 
 function itemLine(item: SlideItem): string {
@@ -123,7 +122,7 @@ export function hiddenWords(kind: string, data: SlideData): string[] {
     for (const row of data.rows) if (row.some(has)) out.push(row.map(cell => cell.trim()).join(' | '));
   }
   // A Picture slide draws its own picture; any other kind only beside or behind its words.
-  if (kind !== 'picture' && has(data.image) && !(data.picture === 'left' || data.picture === 'right' || data.picture === 'behind')) out.push(`picture ${data.image.trim()}`);
+  if (kind !== 'picture' && has(data.image) && !sidePictureOf(data)) out.push(`picture ${data.image.trim()}`);
   return out;
 }
 
@@ -231,8 +230,9 @@ export function legacyDataToBlocks(kind: string, data: SlideData, notes?: string
     if (key === 'picture' || key === 'image') continue;
     if (data[key] !== undefined) (header as Record<string, unknown>)[key] = data[key];
   }
-  if (kind !== 'picture' && (data.picture === 'left' || data.picture === 'right' || data.picture === 'behind')) {
-    header.picture = data.picture;
+  const side = sidePictureOf(data);
+  if (kind !== 'picture' && side) {
+    header.picture = side;
     if (data.image !== undefined) header.image = data.image;
   }
   return { header, markdown: markdownOf(kind, data), comment: conversionComment(notes, hiddenWords(kind, data)) };

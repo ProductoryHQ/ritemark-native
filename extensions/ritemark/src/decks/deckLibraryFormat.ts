@@ -8,7 +8,7 @@
  *    were rebased does not show as changed, and an edit that only moves line breaks in the handout doesn't either.
  *  - Update the library writes one slide by id (`replaceSlideBlock`), and every other byte of the topic stays.
  */
-import { EXERCISE_TAG, exerciseTagOf, handoutWithoutHeading, isBlockSlide, isDefaultExerciseTag, isSlideKind, parseDeck, slideDataOf, splitBlockSlide, writeSlideBlock, writeSlideData, type SlideData } from './deckFormat';
+import { EXERCISE_TAG, exerciseTagOf, handoutWithoutHeading, isBlockSlide, sidePictureOf, isDefaultExerciseTag, isSlideKind, parseDeck, slideDataOf, splitBlockSlide, writeSlideBlock, writeSlideData, type SlideData } from './deckFormat';
 import { legacyDataToBlocks } from './blocks/legacyToBlocks';
 import { OPEN_FENCE, parseFenceAttributes } from './blocks/fencedDiv';
 
@@ -97,12 +97,12 @@ export function rewriteMarkdownTargets(markdown: string, rewrite: (target: strin
 
 /**
  * A slide's body and handout as written in `fromFolder`, with every relative path rewritten for `toFolder`. `kind` is
- * the slide's (a v1 kind when left out): a block slide's header `image:` and the pictures and links in its Markdown
- * are rebased too, the rest of its body byte for byte.
+ * the slide's: a block slide's header `image:` and the pictures and links in its Markdown are rebased too, the rest of
+ * its body byte for byte.
  */
-export function rebaseSlide(body: string, handout: string, fromFolder: string, toFolder: string, kind?: string): { body: string; handout: string } {
+export function rebaseSlide(body: string, handout: string, fromFolder: string, toFolder: string, kind: string): { body: string; handout: string } {
   if (fromFolder === toFolder) return { body, handout };
-  const slideKind = kind ?? 'points';
+  const slideKind = kind;
   const data = slideDataOf(slideKind, body);
   // Sprint 159 (PR 2, Codex): through the slide writer, so a path that needs quoting (`images/foo #1.png`) stays one
   let next = data.image ? writeSlideData(slideKind, body, { ...data, image: rebasePath(data.image, fromFolder, toFolder) }) : body;
@@ -149,7 +149,8 @@ export function foldMarkdown(text: string): string {
 
 /** Text without its comments (`<!-- … -->`) and anchored comments' `<mark>` tags: what is private is no change. */
 function withoutComments(text: string): string {
-  return text.replace(/<!--[\s\S]*?(?:-->|$)/g, ' ').replace(/<\/?mark\b(?:"[^"]*"|'[^']*'|[^'">])*>?/gi, '');
+  // Only an unescaped `<` opens one: a v1 slide's words through the converter write a typed `<!--` as `\<!--`.
+  return text.replace(/(?<!\\)<!--[\s\S]*?(?:-->|$)/g, ' ').replace(/(?<!\\)<\/?mark\b(?:"[^"]*"|'[^']*'|[^'">])*>?/gi, '');
 }
 
 /**
@@ -176,7 +177,7 @@ function canonicalStepsLines(markdown: string): string {
 function blockStampOf(kind: string, data: SlideData, handout: string, folder: string): string {
   const converted = isBlockSlide(kind) ? { markdown: data.markdown ?? '', header: data } : legacyDataToBlocks(kind, data);
   const blocks = { ...converted, markdown: canonicalStepsLines(converted.markdown) };
-  const side = blocks.header.picture === 'left' || blocks.header.picture === 'right' || blocks.header.picture === 'behind' ? blocks.header.picture : '';
+  const side = sidePictureOf(blocks.header) ?? '';
   const image = side && blocks.header.image ? projectPath(blocks.header.image, folder) ?? blocks.header.image : '';
   const resolve = (markdown: string) => foldMarkdown(withoutComments(rewriteMarkdownTargets(markdown, target => projectPath(target, folder) ?? target)));
   return fnv1a(['blocks', resolve(blocks.markdown), side, image, '#handout', resolve(handout)].join('\u0001'));
