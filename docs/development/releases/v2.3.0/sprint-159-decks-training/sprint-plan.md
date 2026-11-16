@@ -2,7 +2,7 @@
 
 Track: Full. It merges Decks to main, changes patch 002 and adds a small patch 018/004 piece.<br>
 Release tier: **shell** (`patches/`, `branding/product.json`). Decks reaches Jarmo's installed app with the next shell release, behind `ritemark.features.decks`, which is off by default.<br>
-**Status:** **Approved** on the night of 15 November 2026 on Jarmo's delegation. His words, 15 November: "tore! ja võid alustada sprints ise kui olete Experienciga yhel meelel". The Experience lead agreed on looks and feel, provided five changes went in, and they are in this plan. The Development manager approved the technical part.<br>
+**Status:** **Done**, 16 November 2026. All seven PRs are on main, 9672cc23 … 19119f52 (#733, #735, #738, #731, #736, #729, #737). Decks stays behind `ritemark.features.decks`, off by default, until the shell release. What was not run, and two Codex findings still to answer, are under [Close-out](#close-out) at the end. Approved on the night of 15 November 2026 on Jarmo's delegation. His words, 15 November: "tore! ja võid alustada sprints ise kui olete Experienciga yhel meelel". The Experience lead agreed on looks and feel, provided five changes went in, and they are in this plan. The Development manager approved the technical part.<br>
 **Roadmap:** step 2 of `ritemark-dev/product/design/experience/experiences/decks/roadmap.md`.<br>
 **Spec:** experience 46 (`decks/README.md`: frames 6 and 8, and Presenting), experience 17 (`present/`), the learner page, and the Experience lead's list `decks/step-2-look-and-feel.md` (ritemark-dev bc9cdd7). This plan is written against that list.<br>
 **Technical plan:** [technical-plan.md](technical-plan.md), a read-only study of the Decks branch and main.<br>
@@ -125,3 +125,48 @@ The full list is in [technical-plan.md](technical-plan.md) §6. The main points:
 
   PR 1's and PR 6's first steps check these.
 - **The bundle grows by 258 KB (2.9%)** for everyone, because `App.tsx` imports the deck view. It is accepted for now. A lazy split is later work, if load time shows it.
+
+## Close-out
+
+All seven PRs are merged to main, in the order below, on the night of 15 to 16 November. Decks is on main behind `ritemark.features.decks`, off by default, and with it off nothing of Decks shows. The public CHANGELOG and release notes say nothing about Decks while it is behind the flag. 2.2's Publish sheet, which Decks shares, is unchanged on every page that isn't a deck's.
+
+| PR | What | Tier and review | Merged |
+| --- | --- | --- | --- |
+| 1 | A place in the frame's manifest can carry a `setting` (patch 002); `check-frame-manifest.mjs` accepts a place an older shell doesn't name (decision 2) | Shell, High: one round and the security review | #733 |
+| 2 | Decks on main behind the flag: `sprint-157-decks` merged with a merge commit, the `product.json` setting, the flag-off guards | Shell, High: two rounds and the security review | #735 |
+| 7 | New → Deck: an empty deck, or a copy of an earlier one | Extension, Standard: one round | #738 |
+| 5 | Present, the wall | Extension, Standard: one round | #731 |
+| 6 | The presenter view and the second display (patches 004, 018 and 019) | Shell, High: two rounds, the second run again after main, and the security review | #736 |
+| 3 | The handout page, with a stored-XSS fix and a Content Security Policy | Extension, High by choice: three rounds and two security reviews | #729 |
+| 4 | Publish from the deck's bar | Extension, High (`src/publish/`): three rounds and two security reviews | #737 |
+
+**Changed during the sprint:**
+- **The presenter view's shell piece is larger than decision 4's one file.** PR 6's window check passed: `getScreenDetails` answers in Electron 43 with patch 004's `window-management` line, so the one-display fallback wasn't needed. A compact window still drew an auxiliary window's title row and the desk's edge in Ritemark's frame, though, so patch 018's own `layoutService.ts`, `editorPart.ts` and `ritemarkSurfaces.css` hunks and 019's `editorGroupView.ts` gap changed too. Each change applies only to a window that `_ritemark.present.place` opens (`data-ritemark-presenting`). The Development manager accepted the scope on 16 November. Every other window's frame is unchanged: 0 of 34 frame scenes differ.
+- **On a shell without the placement commands, Present answers with a notice** (the Experience lead, 16 November). Present stays enabled, and pressing it, ⌘↩ or ⇧⌘↩ says in the deck's bar "Presenting needs a newer Ritemark. Update it, then present again." Nothing opens. VS Code's own window commands place the wall only in a dev build, because their window shows "<deck> — <project>" and the desk's edge. There is no Check for updates button: Ritemark has no update command to call (the Development manager).
+- **The presentation's windows are named by the deck alone,** never by the project. The wall goes to a display that isn't built in before one that isn't the primary, so a projector set as the primary still gets the slides and not the notes.
+- **Nothing interrupts, with no shell change for it.** Ritemark's extension posts no OS notifications. VS Code's own come only from its chat sessions and from long task runs, and Ritemark starts neither.
+- **The deck's bar follows frame 2** (the Experience lead, on PR 4): Card | Borderless, Saved, Publish, Present. Present is last, the filled split button and the bar's one primary, with the tooltip "Present from this slide (⌘↩)". Every control is 30 px, through a new shared Button size, `bar`.
+- **The Publish sheet has its own line for a deck's page:** "People open it in their browser, on a computer or a phone." Every other page keeps 2.2's line and 2.2's rows.
+- **PR 3 ran at High with `/security-review`, by choice.** Its first security review found a stored XSS through marked's raw mode. The page now has a tokenizer that never enters raw mode, an escape for any bare `<`, and a Content Security Policy that allows only its own script, by its hash.
+- **More stays off the page than the plan listed.** A notes block inside a quote or a list item takes the whole quote or list with it. A front matter that the editor and `parseDeck` read differently never reaches the page: the document as saved is used instead.
+- **The page file is written more carefully.** It goes in only where nothing is, so a file that arrived meanwhile is refused. Two windows writing the same deck replace each other's page. A cancelled first Publish takes the page back only while the file is exactly the page written.
+- **On the page** (the Experience lead, on PR 3), a section that isn't the current part dims its words and keeps its band, and on a touch screen Copy's fallback says "Tap Copy in your phone's menu".
+- **Each deck panel keeps the flag it opened with** (PR 2's review). A deck opened with the flag on keeps working after the flag is turned off, but the Slide library's requests need the flag on. A document view never turns into a deck view because the flag changed. A deck that another program rewrote to a later `deck:` version shows as a document and is never rewritten, by the view, the library or the AI's tools.
+- **New → Deck leaves the Slide library's topics out of its list,** and a copy keeps its speaker notes, since it is the person's own deck.
+- **Decision 2 settles the frame check only.** Check 5b now passes Decks against the 2.2.0 shell. But Check 2 of `release-extension-preflight.sh` has refused an extension release from main against v2.2.0 since #720 changed patch 010, and this sprint changes patches 002, 004, 018 and 019 too. Decks reaches people with the shell release, as planned.
+
+**Not run:**
+- **A real projector and a second display.** Not seen: the wall full screen on a projector with nothing but the slide, and the presenter view on the laptop coming on by itself and naming the display. A hidden run on one display can't show full screen, because macOS refuses it to a window of an app in the background.
+- **Swap displays and a clicker.** Swap needs two displays, so it never ran. A clicker's PageDown and PageUp are tested as keys (`wallKeys.test.ts`), not with a device.
+- **A real Cloudflare publish, Update and Unpublish.** Every Publish ran against the fake Cloudflare host and the sheet harness, and nothing was sent. Copy link and See online weren't pressed in a window either.
+- **The page on a real phone, in Safari and in Firefox.** The page was checked only in the proof runs, at 1440 × 900 and 390 × 844.
+- **Windows.** Nothing of Decks ran on Windows. Windows' second-display check is its own short task after PR 6.
+- **Sprint 157's full checklist with the flag on** (`docs/development/sprints/sprint-157-decks/qa/rundev-checklist.md`) wasn't run again on main. The place, turning the flag on and off live, and a deck opening as a deck were.
+- **The bundle's effect on load time.** `media/webview.js` grew by about 258 KB (2.9%) for everyone, and no one measured whether an ordinary document now opens more slowly.
+- **Smaller ones:** a brand-new profile with the flag on before its first start (PR 1's unit test only); that a slide's fit measured in the deck view gives the same fit on the page (every slide of the demo deck measured 0); words typed a moment before Publish is pressed, and a press while the page's sheet is open from the browser's bar (both unit-tested only).
+
+These are rows in `docs/releases/v2.3.0/TEST-CHECKLIST.md`, under Decks, for Jarmo to test on the release candidate.
+
+**Codex.** It reviewed #733 (no findings), #735 (one, fixed) and #729 (three, fixed; it didn't see the later commits). Then the account hit its Codex usage limit overnight, and the later PRs went in without a Codex review: it failed on #731 and #738, and the Review records of #736 and #737 say it wasn't available. Codex's reviews of #736 and #737 did come in later all the same, each with one P2 finding that has no answer yet:
+- **#736**, `src/decks/present/DeckPresenter.ts` (`showPresenter`): an edit made during the talk redraws the presenter view's Now slide at once, while the wall keeps its slide until the next move, so the laptop can show a different Now from the room's. Codex reviewed `55e91331` three minutes after the merge.
+- **#737**, `src/decks/deckPublish.ts` (`publish`): a Card | Borderless change still on its way to the document when Publish is pressed publishes the old look, and the chip then reads Published · changed. Round 2's finding 6 judged the same case as not mattering, because Update the page corrects it. Codex reviewed `b9996080`, before the Review record was posted.
