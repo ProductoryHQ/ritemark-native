@@ -88,6 +88,10 @@ const SlideLibraryPanel = lazy(() =>
 const PublishSheet = lazy(() =>
   import('./components/publish/PublishSheet').then((m) => ({ default: m.PublishSheet }))
 )
+// The wall while a deck is presented (Sprint 159): the room's screen (src/decks/present/DeckPresenter.ts)
+const DeckWall = lazy(() =>
+  import('./components/decks/present/DeckWall').then((m) => ({ default: m.DeckWall }))
+)
 
 // Check if this is a flow editor instance
 const rootElement = document.getElementById('root')!
@@ -186,6 +190,10 @@ ReactDOM.createRoot(rootElement).render(
     ) : editorType === 'publish-sheet' ? (
       <Suspense fallback={null}>
         <PublishSheet />
+      </Suspense>
+    ) : editorType === 'deck-wall' ? (
+      <Suspense fallback={null}>
+        <DeckWall />
       </Suspense>
     ) : (
       <App />
