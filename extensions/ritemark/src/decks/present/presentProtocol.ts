@@ -172,23 +172,29 @@ export function wallStateOf(
   };
 }
 
-/** The pictures the presenter view names: the wall's, and the next slide's. */
-export function presenterPicturePaths(view: PresentView): string[] {
+/** The pictures the presenter view names: the wall's, the next slide's, and the one on the slide the wall last got. */
+export function presenterPicturePaths(view: PresentView, onWall?: WallSlide): string[] {
   const paths = new Set(wallPicturePaths(view));
   if (view.next?.data.image) paths.add(view.next.data.image);
+  if (onWall?.data.image) paths.add(onWall.data.image);
   return [...paths].sort();
 }
 
-/** The presenter view's state: the wall's slide, the next one and the notes, and the clock's. */
+/**
+ * The presenter view's state: the wall's slide, the next one and the notes, and the clock's. `onWall` is the slide the
+ * wall last got: Now shows it as the room sees it (an edit reaches both at the next move), marked in the row where it
+ * is now, while the next slide and the row follow the edit.
+ */
 export function presenterStateOf(
   view: PresentView,
   look: { borderless: boolean; theme: DeckTheme },
   assets: Record<string, string>,
   session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number },
+  onWall?: WallSlide,
 ): PresenterState {
   return {
     type: 'present/presenter',
-    current: wallSlideOf(view.current),
+    current: onWall ? { ...onWall, number: view.current.index + 1 } : wallSlideOf(view.current),
     next: view.next ? wallSlideOf(view.next) : null,
     notes: view.current.notes ?? '',
     position: view.position,
