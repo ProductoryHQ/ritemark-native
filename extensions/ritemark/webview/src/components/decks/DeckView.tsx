@@ -50,6 +50,7 @@ import { DeckDrawnHeadings, handoutMarkFor, hasDrawnHeadings } from './handout/d
 import { Stage } from './Stage'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
+import { DeckFolds, foldedSides, keepFold, storedFold, toggledFold, type DeckFold } from './DeckFolds'
 import './decks.css'
 
 /** The deck's extensions, made once: the editor's extension list is fixed at mount. */
@@ -166,7 +167,8 @@ interface DeckViewProps {
 }
 
 /** The stage's width for a desk width, the handout's ratio and what is shown. */
-export function stageWidthFor(avail: number, ratio: number, handoutShown: boolean): number {
+export function stageWidthFor(avail: number, ratio: number, handoutShown: boolean, slideShown = true): number {
+  if (!slideShown) return 0
   if (!handoutShown) return avail
   return Math.max(0, Math.min(avail - HANDOUT_MIN, Math.max(STAGE_MIN, Math.round(avail * ratio))))
 }
@@ -191,7 +193,8 @@ export function DeckView({
   const [slides, setSlides] = useState<DeckSlideEntry[]>([])
   const [current, setCurrent] = useState(0)
   const [stripWanted, setStripWanted] = useState(true)
-  const [handoutWanted, setHandoutWanted] = useState(true)
+  // Fold either side (16 November): the slide, the handout, or neither, as this deck's view kept it.
+  const [fold, setFold] = useState<DeckFold>(storedFold)
   const [notesOpen, setNotesOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsAt, setSettingsAt] = useState<{ left: number; top: number } | null>(null)
@@ -397,10 +400,10 @@ export function DeckView({
 
   const narrow = deskWidth > 0 && deskWidth < NARROW_DESK
   const stripShown = stripWanted && !narrow
-  const handoutShown = handoutWanted && !(deskWidth > 0 && deskWidth < NARROWEST_DESK)
+  const { slideShown, handoutShown } = foldedSides(fold, !(deskWidth > 0 && deskWidth < NARROWEST_DESK))
   const stripWidth = stripShown ? STRIP_WIDTH : 0
   const avail = Math.max(0, deskWidth - stripWidth)
-  const stageWidth = stageWidthFor(avail, narrow ? DEFAULT_RATIO : ratio, handoutShown)
+  const stageWidth = stageWidthFor(avail, narrow ? DEFAULT_RATIO : ratio, handoutShown, slideShown)
   const bigWidth = Math.max(0, Math.min(stageWidth - STAGE_MARGIN * 2, BIG_MAX))
   const dividerLeft = stripWidth + stageWidth
 
@@ -595,6 +598,16 @@ export function DeckView({
     target.addEventListener('pointercancel', up)
   }, [avail, stripWidth, pick])
 
+  /** A fold button: that side folds away, or comes back; the deck's view keeps the choice, and the part being read
+   *  stays at the top. Settings belong to the slide, so they close with it. */
+  const toggleFold = useCallback((side: 'slide' | 'handout') => {
+    const next = toggledFold(fold, side)
+    setFold(next)
+    keepFold(next)
+    if (next === 'slide') setSettingsOpen(false)
+    requestAnimationFrame(() => pick(currentRef.current))
+  }, [fold, pick])
+
   /** Part `index`'s slide id, given one first when it has none (the library and pictures find a slide by its id). */
   const idOf = useCallback((index: number): string | null => {
     if (!editor) return null
@@ -691,6 +704,8 @@ export function DeckView({
   // be drawn yet while the view is laid out), and ends when another slide is chosen first.
   useEffect(() => {
     if (focusTitleOf === null) return
+    // With the slide folded away there is no stage to take the caret: the request is dropped, never kept for later.
+    if (!slideShown) { setFocusTitleOf(null); return }
     if (focusTitleOf.select) {
       if (focusTitleOf.index !== shown) setFocusTitleOf(null)
       return
@@ -698,20 +713,25 @@ export function DeckView({
     if (focusTitleOf.index !== shown) return
     const frame = requestAnimationFrame(() => setFocusTitleOf(null))
     return () => cancelAnimationFrame(frame)
-  }, [shown, focusTitleOf])
+  }, [shown, focusTitleOf, slideShown])
   const titleSelected = useCallback(() => setFocusTitleOf(current => (current?.select ? null : current)), [])
   useLayoutEffect(() => {
     if (!settingsOpen && !addSheet) { setSettingsAt(null); return }
     const desk = deskRef.current
-    const big = desk?.querySelector<HTMLElement>('.deck-big')
-    if (!desk || !big) return
+    if (!desk) return
+    const big = desk.querySelector<HTMLElement>('.deck-big')
     const deskBox = desk.getBoundingClientRect()
+    // With the slide folded away, Add to library's sheet opens at the handout's top left, where the slide would be.
+    if (!big) {
+      if (!slideShown) setSettingsAt({ left: dividerLeft + 12, top: 8 })
+      return
+    }
     const bigBox = big.getBoundingClientRect()
     setSettingsAt({
       left: Math.max(8, Math.min(bigBox.right - deskBox.left + 12, deskBox.width - SETTINGS_WIDTH - 8)),
       top: Math.max(8, bigBox.top - deskBox.top - 4),
     })
-  }, [settingsOpen, addSheet, deskWidth, stageWidth, shown])
+  }, [settingsOpen, addSheet, deskWidth, stageWidth, shown, slideShown, dividerLeft])
 
   /** Settings' change, made to the slide as the document has it now. */
   const changeSlide = useCallback((change: (data: SlideData) => SlideData, kind?: string) => {
@@ -1029,42 +1049,44 @@ export function DeckView({
           />
         ) : null}
 
-        <div className={`deck-stage${borderless ? ' is-borderless' : ''}`} style={{ left: stripWidth, width: stageWidth }}>
-          <div className="deck-stage-group">
-            {editor && slide && bigWidth > 0 ? (
-              <Stage
-                // By the slide's id: a new slide at the current place is a new stage, which takes the caret.
-                key={slide.data.id ?? `index-${slide.index}`}
-                editor={editor}
-                slide={slide}
-                theme={theme}
-                borderless={borderless}
-                assets={assets}
-                width={bigWidth}
-                onWriting={onWriting}
-                notesOpen={notesOpen}
-                onNotesOpen={setNotesOpen}
-                settingsOpen={settingsOpen}
-                onSettings={() => setSettingsOpen(open => !open)}
-                initialFocus={focusTitleOf?.index === slide.index ? 'title' : undefined}
-                selectOnFocus={focusTitleOf?.index === slide.index && focusTitleOf.select}
-                onFocusTaken={titleSelected}
-                onPicture={onPicture}
-                sourceLines={slide.data.id && sources[slide.data.id] ? (
-                  <SourceLines
-                    source={sources[slide.data.id]}
-                    kept={slide.data.kept === true}
-                    justUpdated={justUpdated === slide.data.id}
-                    busy={!!busy[slide.data.id]}
-                    actions={sourceActions}
-                  />
-                ) : undefined}
-              />
-            ) : null}
+        {slideShown ? (
+          <div className={`deck-stage${borderless ? ' is-borderless' : ''}`} style={{ left: stripWidth, width: stageWidth }}>
+            <div className="deck-stage-group">
+              {editor && slide && bigWidth > 0 ? (
+                <Stage
+                  // By the slide's id: a new slide at the current place is a new stage, which takes the caret.
+                  key={slide.data.id ?? `index-${slide.index}`}
+                  editor={editor}
+                  slide={slide}
+                  theme={theme}
+                  borderless={borderless}
+                  assets={assets}
+                  width={bigWidth}
+                  onWriting={onWriting}
+                  notesOpen={notesOpen}
+                  onNotesOpen={setNotesOpen}
+                  settingsOpen={settingsOpen}
+                  onSettings={() => setSettingsOpen(open => !open)}
+                  initialFocus={focusTitleOf?.index === slide.index ? 'title' : undefined}
+                  selectOnFocus={focusTitleOf?.index === slide.index && focusTitleOf.select}
+                  onFocusTaken={titleSelected}
+                  onPicture={onPicture}
+                  sourceLines={slide.data.id && sources[slide.data.id] ? (
+                    <SourceLines
+                      source={sources[slide.data.id]}
+                      kept={slide.data.kept === true}
+                      justUpdated={justUpdated === slide.data.id}
+                      busy={!!busy[slide.data.id]}
+                      actions={sourceActions}
+                    />
+                  ) : undefined}
+                />
+              ) : null}
+            </div>
           </div>
-        </div>
+        ) : null}
 
-        {handoutShown ? (
+        {handoutShown && slideShown ? (
           <div
             className={`deck-divider${dragging ? ' is-dragging' : ''}`}
             style={{ left: dividerLeft }}
@@ -1075,22 +1097,7 @@ export function DeckView({
           />
         ) : null}
         {deskWidth >= NARROWEST_DESK ? (
-          <div className="deck-fold" style={{ left: handoutShown ? dividerLeft : dividerLeft - 22 }}>
-            <Tooltip label={handoutShown ? 'Hide the handout' : 'Show the handout'}>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                className="deck-fold-button"
-                aria-label={handoutShown ? 'Hide the handout' : 'Show the handout'}
-                onClick={() => {
-                  setHandoutWanted(value => !value)
-                  requestAnimationFrame(() => pick(currentRef.current))
-                }}
-              >
-                <Icon name={handoutShown ? 'caret-right' : 'caret-left'} size={14} tone="inherit" />
-              </Button>
-            </Tooltip>
-          </div>
+          <DeckFolds slideShown={slideShown} handoutShown={handoutShown} left={dividerLeft} onToggle={toggleFold} />
         ) : null}
 
         {addSheet && settingsAt ? (
@@ -1107,7 +1114,7 @@ export function DeckView({
             }}
           />
         ) : null}
-        {settingsOpen && slide && settingsAt ? (
+        {settingsOpen && slideShown && slide && settingsAt ? (
           <SlideSettings
             number={shown + 1}
             kind={slide.kind}
@@ -1119,7 +1126,12 @@ export function DeckView({
           />
         ) : null}
 
-        <div className={`deck-handout${handoutShown ? '' : ' is-folded'}`} style={{ left: dividerLeft }} aria-hidden={handoutShown ? undefined : true}>
+        <div
+          className={`deck-handout${handoutShown ? '' : ' is-folded'}${slideShown ? '' : ' is-solo'}`}
+          // The handout alone is a Text document's centred column: its width sets the text's edges (decks.css).
+          style={{ left: dividerLeft, ['--deck-handout-width' as string]: `${Math.max(0, deskWidth - dividerLeft)}px` }}
+          aria-hidden={handoutShown ? undefined : true}
+        >
           {findBar}
           <Editor
             value={content}

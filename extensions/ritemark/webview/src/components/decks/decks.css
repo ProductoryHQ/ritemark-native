@@ -49,10 +49,18 @@
 .deck-divider::before { content: ''; position: absolute; left: 6px; top: 12px; bottom: 12px; border-left: 1.5px dotted var(--r-hairline-strong); }
 .deck-divider:hover::before, .deck-divider.is-dragging::before { border-left: 2px solid var(--r-accent); }
 .deck-fold { position: absolute; bottom: 28px; margin-left: -13px; z-index: 4; }
+/* Fold either side: two round buttons on the line, ‹ Hide the slide over › Hide the handout (DeckFolds.tsx) */
 .deck-fold .deck-fold-button { width: 26px; height: 26px; padding: 0; border-radius: 50%; }
 
-.deck-handout { position: absolute; top: 0; bottom: 0; right: 0; }
+.deck-handout { position: absolute; top: 0; bottom: 0; right: 0; --deck-text-left: 48px; --deck-text-right: 32px; }
 .deck-handout.is-folded { visibility: hidden; pointer-events: none; }
+/* The slide folded away (16 November; the prototype's `.hand.solo`): the handout is a Text document's centred column,
+   its text at most 760 wide, and the lines between slides still run its full width. The deck view sets the handout's
+   width, as a length percentages here could not give: they would resolve against each element's own box. */
+.deck-handout.is-solo {
+  --deck-text-left: max(48px, calc((var(--deck-handout-width, 0px) - 760px) / 2));
+  --deck-text-right: max(32px, calc((var(--deck-handout-width, 0px) - 760px) / 2));
+}
 /* The handout is a Text document (Jarmo, 16 November: "very, very similar to our text editor; the only difference is
    one line that signals the slide changes"; the prototype's `.hand`, `.hpart`): the editor's own type, headings and
    code blocks, with no style of the deck's own. The text's edges are 48 on the left and 32 on the right; the column
@@ -61,7 +69,7 @@
   counter-reset: deck-slide;
   max-width: none !important;
   /* room below to scroll the last part to the top (60vh until the deck view measures the exact room) */
-  padding: 0 32px 60vh 48px !important;
+  padding: 0 var(--deck-text-right) 60vh var(--deck-text-left) !important;
 }
 /* No block handle and no + in the handout (Jarmo, 15 November): a block dragged there could land in another slide's
    part, and / adds what the + would. The + lives on the page's body, so it is hidden by the deck view's presence. */
@@ -71,9 +79,9 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 /* Where each slide's part starts: one 1px line in the hairline colour, the handout's full width (none above the first),
    and the slide's number, 12px and muted at the right of the part's first line, in the accent for the current slide. */
 /* 22px of its own under the line (padding, not margin: a margin would fold through the first head, which has no line) */
-.deck-part-head { position: relative; counter-increment: deck-slide; margin: 14px -32px 0 -48px; padding: 0 0 22px; border-top: 1px solid var(--r-hairline); }
+.deck-part-head { position: relative; counter-increment: deck-slide; margin: 14px calc(-1 * var(--deck-text-right, 32px)) 0 calc(-1 * var(--deck-text-left, 48px)); padding: 0 0 22px; border-top: 1px solid var(--r-hairline); }
 .ProseMirror > .deck-part-head:first-child { border-top: 0; margin-top: 0; }
-.deck-part-number { position: absolute; right: 32px; top: 29px; display: flex; align-items: center; gap: 6px; font: 500 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
+.deck-part-number { position: absolute; right: var(--deck-text-right, 32px); top: 29px; display: flex; align-items: center; gap: 6px; font: 500 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
 .deck-part-number::after { content: counter(deck-slide); }
 /* The number sits on the part's first line: half its line box down from the part's top, whatever opens the part */
 .deck-part-head:has(+ h2) .deck-part-number { top: 34px; }
