@@ -69,6 +69,7 @@ import {
   FileCode,
   FileDashed,
   FileDoc,
+  FilePpt,
   FileImage,
   FileText,
   FloppyDisk,
@@ -239,6 +240,7 @@ const iconMap = {
   // Sprint 145 (#596): a file the Task board couldn't read (experience 41)
   'file-dashed': FileDashed,
   'file-doc': FileDoc,
+  'file-ppt': FilePpt,
   'file-image': FileImage,
   'file-text': FileText,
   'floppy-disk': FloppyDisk,

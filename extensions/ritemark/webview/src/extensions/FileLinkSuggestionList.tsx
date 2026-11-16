@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
 import { Icon } from '../components/ui/Icon'
 import type { WorkspaceFileLinkResult } from '../lib/workspaceFileSearch'
-import { isDeckPath } from '../../../src/decks/deckMode'
+import { fileIconOf } from '../lib/fileIcon'
 
 export interface FileLinkSuggestionItem extends Partial<WorkspaceFileLinkResult> {
   disabled?: boolean
@@ -20,11 +20,7 @@ export interface FileLinkSuggestionListHandle {
 
 /** A deck (`*.deck.md`) shows the deck's own icon, as everywhere a file shows (Sprint 159, deck icons). */
 export function iconForFile(kind: WorkspaceFileLinkResult['kind'] | undefined, relativePath = '') {
-  if (isDeckPath(relativePath)) return 'presentation'
-  if (kind === 'markdown' || kind === 'document') return 'file-text'
-  if (kind === 'data') return 'table'
-  if (kind === 'image') return 'file-image'
-  return 'file'
+  return fileIconOf(relativePath, kind === 'markdown' || kind === 'document' ? 'file-text' : kind === 'data' ? 'table' : kind === 'image' ? 'file-image' : 'file')
 }
 
 export const FileLinkSuggestionList = forwardRef<FileLinkSuggestionListHandle, FileLinkSuggestionListProps>((props, ref) => {

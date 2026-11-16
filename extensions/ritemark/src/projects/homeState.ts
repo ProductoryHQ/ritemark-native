@@ -7,7 +7,7 @@
 import { createHash } from 'crypto';
 import * as path from 'path';
 import { isAboutFile, isRootClaudeFile, ABOUT_TITLE } from './aboutFile';
-import { isDeckPath } from '../decks/deckMode';
+import { isDeckPath, splitFileName } from '../decks/deckName';
 import type { AiName, HomeRecentItem, HomeWaitingItem, RecentKind } from './protocol';
 import type { ProjectWaiting } from './waiting';
 
@@ -69,16 +69,15 @@ export function recentItems(
       const about = isAboutFile(folder, file.path);
       const base = path.basename(file.path);
       // A deck's extension is the whole ".deck.md", as Documents splits it (patch 018's ritemarkSplitExtension)
-      const deck = /\.deck\.md$/i.exec(base);
-      const dot = deck && deck.index > 0 ? deck.index : base.lastIndexOf('.');
+      const split = splitFileName(base);
       const relativeDir = path.relative(folder, path.dirname(file.path));
       return {
         path: file.path,
         item: {
           // Stable across redraws, so focus stays on the same file when the list reorders (S15); opaque to the page.
           id: `file:${createHash('sha256').update(path.relative(folder, file.path)).digest('hex').slice(0, 16)}`,
-          name: about ? ABOUT_TITLE : dot > 0 ? base.slice(0, dot) : base,
-          extension: about || dot <= 0 ? '' : base.slice(dot),
+          name: about ? ABOUT_TITLE : split.name,
+          extension: about ? '' : split.extension,
           folder: relativeDir && relativeDir !== '.' ? relativeDir.split(path.sep).join('/') : null,
           kind: kindOf(base),
           about,

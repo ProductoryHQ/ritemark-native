@@ -333,8 +333,8 @@ test('the AI sheet shows a chat\'s turn once, only in that chat, and a later sel
 
 test('a deck shows the deck\'s own icon (presentation); another Markdown file keeps the document page (deck icons)', () => {
   const icon = (name: 'presentation' | 'file-text') => renderToStaticMarkup(createElement(Icon, { name, size: 14, tone: 'inherit' }))
-  const deck = doc(1, { key: 'document:/p/Talk.deck.md', name: 'Talk.deck', path: '/p/Talk.deck.md' })
-  const upper = doc(2, { key: 'document:/p/Topics/TEAMS.DECK.MD', name: 'TEAMS.DECK', path: '/p/Topics/TEAMS.DECK.MD' })
+  const deck = doc(1, { key: 'document:/p/Talk.deck.md', name: 'Talk', path: '/p/Talk.deck.md' })
+  const upper = doc(2, { key: 'document:/p/Topics/TEAMS.DECK.MD', name: 'TEAMS', path: '/p/Topics/TEAMS.DECK.MD' })
   const page = render(state([groupOf('document', [deck, upper, doc(3)])]))
   assert.deepEqual(page.querySelectorAll('.rs-icon').map((node) => node.innerHTML), [icon('presentation'), icon('presentation'), icon('file-text')])
   assert.notEqual(icon('presentation'), icon('file-text'))

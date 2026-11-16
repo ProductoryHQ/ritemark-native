@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { SEARCH_KINDS, type SearchHostToViewMessage, type SearchKind, type SearchOptions, type SearchResult } from '../../../../src/search/protocol'
-import { isDeckPath } from '../../../../src/decks/deckMode'
+import { fileIconOf } from '../../lib/fileIcon'
 import { ConversationBubbleIcon } from '../ai-sidebar/ConversationBubbleIcon'
 import { Button } from '../ui/button'
 import { Icon, type PhosphorIconName } from '../ui/Icon'
@@ -70,7 +70,7 @@ function Marked({ text, marks }: MarkedText) {
 function KindIcon({ result }: { result: SearchResult }) {
   if (result.kind === 'chat') return <ConversationBubbleIcon identityColorSlot={result.colorSlot ?? 0} size={14} />
   // A deck (`*.deck.md`) shows Phosphor's presentation wherever a file shows, as in its tab (Sprint 159, deck icons)
-  const name: PhosphorIconName = result.kind === 'task' ? 'check-square' : isDeckPath(result.path ?? '') ? 'presentation' : FORMAT_ICONS[result.format ?? 'markdown'] ?? 'file-text'
+  const name: PhosphorIconName = result.kind === 'task' ? 'check-square' : fileIconOf(result.path, FORMAT_ICONS[result.format ?? 'markdown'] ?? 'file-text')
   return <Icon name={name} size={14} tone="inherit" />
 }
 

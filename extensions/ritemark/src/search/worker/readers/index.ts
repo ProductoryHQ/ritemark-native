@@ -7,6 +7,7 @@ import { readDocx } from './docx';
 import { readMarkdown } from './markdown';
 import { readPdf } from './pdf';
 import { decodeText, type ReadOutcome } from './types';
+import { splitFileName } from '../../../decks/deckName';
 
 export { READER_VERSION, type Passage, type ReadOutcome } from './types';
 
@@ -39,8 +40,7 @@ export function formatOf(fileName: string): DocumentFormat | null {
   return EXTENSIONS[fileName.slice(dot).toLowerCase()] ?? null;
 }
 
-/** A document's name as the tree shows it: the file name without its extension. */
+/** A document's name as the tree shows it: the file name without its extension (a deck's is the whole `.deck.md`). */
 export function documentName(fileName: string): string {
-  const dot = fileName.lastIndexOf('.');
-  return dot > 0 ? fileName.slice(0, dot) : fileName;
+  return splitFileName(fileName).name;
 }

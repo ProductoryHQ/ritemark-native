@@ -39,6 +39,8 @@ async function main() {
   assert.equal(formatOf('a.doc'), null, 'a legacy .doc is not a kind search reads');
   assert.equal(formatOf('.md'), null);
   assert.equal(documentName('Annual report.pdf'), 'Annual report');
+  // Sprint 159 (deck icons): a deck is named without its whole ".deck.md", as Documents and Last changed name it
+  assert.deepEqual(['Talk.deck.md', 'TEAMS.DECK.MD', 'deck.md', '.deck.md'].map(documentName), ['Talk', 'TEAMS', 'deck', '.deck']);
   assert.equal(decodeEntities('A &amp; B &lt;C&gt; &#228; &#x161;'), 'A & B <C> ä š');
   assert.equal(decodeText(new Uint8Array([0xef, 0xbb, 0xbf, 0x68, 0x69])), 'hi', 'UTF-8 byte-order mark dropped');
   assert.equal(decodeText(new Uint8Array([0xff, 0xfe, 0x68, 0x00])), 'h', 'UTF-16');

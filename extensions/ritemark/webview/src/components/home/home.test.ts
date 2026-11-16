@@ -439,5 +439,6 @@ assert.deepEqual(posted, [], 'drawing sends nothing to the host')
   const row = { id: 'file:1', name: 'Talk.deck', extension: '.md', folder: null, about: false, changedAt: '2026-11-16T18:00:00.000Z' }
   assert.equal(recentIcon({ ...row, kind: 'deck' }), 'presentation', 'a deck')
   assert.equal(recentIcon({ ...row, kind: 'markdown' }), 'file-text', 'a document')
+  assert.equal(recentIcon({ ...row, name: 'Pitch', extension: '.pptx', kind: 'slides' }), 'file-ppt', 'PowerPoint keeps its own page, as in Documents')
 }
 console.log('home: all assertions passed')
