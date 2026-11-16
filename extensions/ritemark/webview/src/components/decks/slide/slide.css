@@ -116,6 +116,10 @@
 .deck-sl.is-blocks h1 + :not(h2) { margin-top: .5em; }
 .deck-sl.is-blocks p { margin: 0 0 .55em; }
 .deck-sl.is-blocks ul, .deck-sl.is-blocks ol { margin: 0 0 .55em; padding-left: 1.25em; }
+/* Lists keep their markers wherever the slide is drawn (the webview's Tailwind preflight takes them off). */
+.deck-sl.is-blocks ul { list-style: disc outside; }
+.deck-sl.is-blocks ol { list-style: decimal outside; }
+.deck-sl.is-blocks ul ul { list-style-type: circle; }
 .deck-sl.is-blocks li { margin-bottom: .32em; }
 .deck-sl.is-blocks li > p { margin: 0; }
 .deck-sl.is-blocks li::marker { color: var(--s-acc, #F2B544); font-weight: 700; }
@@ -157,6 +161,9 @@
 .deck-sl.is-blocks.is-cover h1 { font-size: 2.45em; line-height: 1.08; }
 .deck-sl.is-blocks.is-cover p { color: var(--s-sub, #C7CAEB); }
 .deck-sl.is-blocks.is-cover h1 + p, .deck-sl.is-blocks.is-cover h1 + h2 { margin-top: .5em; }
+/* A short line over the title (an old Section slide's number) is drawn big in the accent, as the Section slide drew it. */
+.deck-sl.is-blocks.is-cover .blk-flow > p:first-child:has(+ h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }
+.deck-slide.is-borderless .deck-sl.is-blocks.is-cover .blk-flow > p:first-child:has(+ h1) { color: var(--s-acc, #E0A21F); }
 
 /* Borderless: the block slide's words on white */
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-flow { color: var(--s-tx, #33365A); }
