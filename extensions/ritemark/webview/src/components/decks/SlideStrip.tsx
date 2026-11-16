@@ -41,6 +41,8 @@ export interface StripActions {
   /** The strip menu's Add to library… and Show in the library. */
   addToLibrary: (index: number) => void
   showInLibrary: (index: number) => void
+  /** Cmd+Z / Cmd+Shift+Z on the strip: the deck's history, as on the stage, so a slide deleted from the keyboard comes back. */
+  undo: (redo: boolean) => void
 }
 
 /** What the strip shows of a copy's source: from a library topic, and whether the library has a newer version. */
@@ -328,19 +330,25 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
   }), [actions])
 
   // A thumbnail's ⋯ shows only on hover, so the focus Radix hands back to it on close fell to the page, and no strip key
-  // arrived (Jarmo, 16 November: a selected slide couldn't be deleted with the keyboard). The strip takes it instead.
+  // arrived (Jarmo, 16 November: a selected slide couldn't be deleted with the keyboard). The strip takes it instead, but
+  // only when the focus is lost: a click into the handout, or a sheet the menu opened, keeps it.
   const onMenuCloseFocus = useCallback((event: Event) => {
+    const strip = stripRef.current
+    const active = strip?.ownerDocument.activeElement
+    if (!strip || (active && active !== strip.ownerDocument.body)) return
     event.preventDefault()
-    stripRef.current?.focus({ preventScroll: true })
+    strip.focus({ preventScroll: true })
   }, [stripRef])
 
   const onKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const origin = keyOrigin(event.target as HTMLElement, event.currentTarget)
-    const key = stripKeyOf(event, origin, count, current)
+    const { key: name, shiftKey, metaKey, ctrlKey, altKey, repeat } = event
+    const key = stripKeyOf({ key: name, shiftKey, metaKey, ctrlKey, altKey, repeat, isComposing: event.nativeEvent.isComposing, defaultPrevented: event.isDefaultPrevented() }, origin, count, current)
     if (!key) return
     event.preventDefault()
     if (key.type === 'pick') actions.pick(key.index)
     else if (key.type === 'menu') setMenuFor(current)
+    else if (key.type === 'undo') actions.undo(key.redo)
     else actions.remove(key.index)
   }
 
