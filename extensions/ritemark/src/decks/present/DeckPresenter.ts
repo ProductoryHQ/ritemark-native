@@ -15,9 +15,10 @@
  *    presenter view.
  *
  * The host is the only source of state. The session (`presentSession.ts`) holds the current slide by its key and reads
- * the deck's open document again at every move, so an edit reaches the wall at the next move; the presenter view's
- * next slide and row follow edits as they come. The wall's state is built field by field and never carries the notes;
- * only the presenter view's panel gets them.
+ * the deck's open document again at every move, so an edit reaches the wall at the next move. The presenter view's Now
+ * is the slide the wall last got, in the wall's look, so it changes with the wall; its next slide and row follow edits
+ * as they come. The wall's state is built field by field and never carries the notes; only the presenter view's panel
+ * gets them.
  *
  * Stopping (Esc in either window, Stop, or the wall's window closed) closes both and returns the deck view to the slide
  * the presenter ended on.
@@ -56,6 +57,7 @@ import {
   type PresentDisplay,
   type WallHostMessage,
   type WallRequest,
+  type WallState,
 } from './presentProtocol';
 import { deckLookOf, frontMatterValue, PresentSession, PresentStartError, presentTitleOf, type PresentMove } from './presentSession';
 
@@ -85,6 +87,8 @@ interface Running {
   subscriptions: vscode.Disposable[];
   /** The theme, read once per theme path (a move reads the front matter again). */
   theme: { path: string | null; value: DeckTheme };
+  /** The state the wall last got: the presenter view's Now is its slide, in its look. */
+  wallState: WallState | null;
   /** The shell places the windows (`_ritemark.present.place`), and the displays it reported. */
   shell: boolean;
   displays: PresentDisplay[];
@@ -213,6 +217,7 @@ export class DeckPresenter implements vscode.Disposable {
       presenter: null,
       subscriptions: [],
       theme: { path: null, value: BUILT_IN_THEME },
+      wallState: null,
       shell,
       displays,
       wallDisplay: chosen.wall,
@@ -229,8 +234,8 @@ export class DeckPresenter implements vscode.Disposable {
     running.subscriptions.push(
       // The deck's view closed: there is nothing to return to, and the presentation goes too.
       origin.panel.onDidDispose(() => { if (this.running === running) this.stop(); }),
-      // The presenter view's next slide and row follow edits as they come, once the typing pauses (the wall waits for
-      // the next move).
+      // The presenter view's next slide and row follow edits as they come, once the typing pauses (the wall, and the
+      // presenter view's Now with it, wait for the next move).
       vscode.workspace.onDidChangeTextDocument(event => {
         if (event.document !== origin.document || !running.presenter) return;
         if (running.refresh) clearTimeout(running.refresh);
@@ -415,9 +420,9 @@ export class DeckPresenter implements vscode.Disposable {
       }
       default: {
         running.session.move(running.origin.document.getText(), moveOf(request));
-        // Even a move that goes nowhere (the last slide, a number with no slide) draws the deck as it is now.
+        // Even a move that goes nowhere (the last slide, a number with no slide) draws the deck as it is now, on the
+        // wall and then in the presenter view.
         await this.showWall(running);
-        await this.showPresenter(running);
       }
     }
   }
@@ -444,7 +449,7 @@ export class DeckPresenter implements vscode.Disposable {
     return screen.assets.value;
   }
 
-  /** Send the wall its state. */
+  /** Send the wall its state, then the presenter view its own, whose Now is the wall's slide. */
   private async showWall(running: Running): Promise<void> {
     if (running.ended) return;
     const view = running.session.view();
@@ -452,10 +457,16 @@ export class DeckPresenter implements vscode.Disposable {
     const assets = this.assets(running, running.wall, wallPicturePaths(view));
     if (running.ended) return;
     const presenter = { available: this.presenterAvailable(running), on: !!running.presenter };
-    await post(running.wall.panel.webview, wallStateOf(view, look, assets, presenter));
+    const state = wallStateOf(view, look, assets, presenter);
+    running.wallState = state;
+    await post(running.wall.panel.webview, state);
+    await this.showPresenter(running);
   }
 
-  /** Send the presenter view its state, the deck read again (so an edit shows in the next slide and the row). */
+  /**
+   * Send the presenter view its state, the deck read again, so an edit shows in the next slide and the row at once.
+   * Its Now is the slide the wall last got, in the wall's look: the edit reaches both at the next move.
+   */
   private async showPresenter(running: Running): Promise<void> {
     const screen = running.presenter;
     if (!screen || running.ended) return;
@@ -463,16 +474,18 @@ export class DeckPresenter implements vscode.Disposable {
     const serial = ++running.presenterSerial;
     running.session.read(running.origin.document.getText());
     const view = running.session.view();
-    const look = await this.look(running);
-    const assets = this.assets(running, screen, presenterPicturePaths(view));
+    // Before the wall has a state, the deck's look as it is now (the wall's first state then sends this view its own).
+    const onWall = running.wallState;
+    const look = onWall ? { borderless: onWall.borderless, theme: onWall.theme } : await this.look(running);
     if (running.ended || running.presenter !== screen || serial !== running.presenterSerial) return;
+    const assets = this.assets(running, screen, presenterPicturePaths(view, onWall?.slide));
     const twoDisplays = running.displays.length > 1;
     await post(screen.panel.webview, presenterStateOf(view, look, assets, {
       wallDisplay: twoDisplays ? running.displays[running.wallDisplay]?.name ?? null : null,
       canSwap: twoDisplays,
       length: lengthMinutesOf(frontMatterValue(running.origin.document.getText(), 'ritemark-length')),
       startedAt: running.startedAt,
-    }));
+    }, onWall?.slide));
   }
 
   /**

@@ -3,7 +3,7 @@
  * beside it (`<deck name>.html`, `page/pageFile.ts`), through 2.2's own Publish: the gather, the key scan, the sheet,
  * the upload and the records are 2.2's, unchanged.
  *
- *  - **Publish and Update the page** do the same three things: take the open view's text and fit steps, write the page
+ *  - **Publish and Update the page** do the same three things: take the view's text, look and fit steps, write the page
  *    file, and run `ritemark.page.publish` on it, waited to its end (`PublishFeature.publishPage`). An update with the
  *    same pictures and nothing key-shaped goes straight up (2.2's `sheetNeeded`). One at a time per deck; the page is
  *    held while its file is written (`holdPage`), and never written while its sheet is open from elsewhere.
@@ -179,10 +179,10 @@ export class DeckPublisher implements vscode.Disposable {
   // ------------------------------------------------------------------ Publish, Update the page
 
   /**
-   * Publish or Update the page: write it beside the deck from the view's text (`body`, front matter left out) and fit
-   * steps, then 2.2's Publish on it.
+   * Publish or Update the page: write it beside the deck from the view's text (`body`, front matter left out), look and
+   * fit steps, then 2.2's Publish on it.
    */
-  async publish(document: vscode.TextDocument, body: string, steps: readonly number[], notice: (text: string) => void): Promise<void> {
+  async publish(document: vscode.TextDocument, body: string, look: 'card' | 'borderless', steps: readonly number[], notice: (text: string) => void): Promise<void> {
     const feature = this.ready();
     // Turned off since the control was drawn: it hides
     if (!feature) return this.refreshDocument(document);
@@ -194,9 +194,10 @@ export class DeckPublisher implements vscode.Disposable {
       const pagePath = pagePathFor(deckPath);
       const pageKey = await pageKeyOf(pagePath);
       const documentText = document.getText();
-      // The view's words, under the document's front matter, where the editor read that front matter as parseDeck does;
-      // else the document as saved (publishText), whose slides take the view's fit only while they are as many
-      const { text, fromView } = publishText(documentText, body, splitFrontMatter(documentText).content);
+      // The view's words and look, with the document's front matter, where the editor read that front matter as
+      // parseDeck does; else the document as saved (publishText), whose slides take the view's fit only while they are
+      // as many
+      const { text, fromView } = publishText(documentText, body, splitFrontMatter(documentText).content, look);
       const fit = fromView || parseDeck(text.replace(/^\uFEFF/, '')).slides.length === steps.length ? steps : [];
       let built: Awaited<ReturnType<typeof buildDeckPage>>;
       let theme: DeckTheme;

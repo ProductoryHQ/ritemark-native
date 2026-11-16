@@ -29,7 +29,7 @@
  */
 import { createHash } from 'node:crypto';
 import { marked } from 'marked';
-import { frontMatterField, isSlideKind, parseDeck, parseSlideBody, type SlideData, type SlideItem } from '../deckFormat';
+import { frontMatterLook, isSlideKind, parseDeck, parseSlideBody, type SlideData, type SlideItem } from '../deckFormat';
 import type { DeckTheme } from '../deckTheme';
 import { MAX_STEP } from '../../../webview/src/components/decks/slide/layoutSlide';
 
@@ -304,11 +304,6 @@ function scanPrivate(markdown: string): string {
 // The deck
 // ---------------------------------------------------------------------------
 
-/** The front matter's `look:` (Card unless it says borderless). The rest of the front matter is private. */
-function lookOf(text: string): 'card' | 'borderless' {
-  return (frontMatterField(text, 'look') ?? '').trim().toLowerCase() === 'borderless' ? 'borderless' : 'card';
-}
-
 function stepOf(steps: readonly number[] | undefined, index: number): number {
   const value = steps?.[index];
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(MAX_STEP, Math.round(value))) : 0;
@@ -341,7 +336,8 @@ export function publicDeck(input: string, options: PublicDeckOptions): PublicDec
   return {
     title: (titleSlide?.data.title ?? '').trim() || options.deckName.trim(),
     client: options.folderName.trim(),
-    look: lookOf(text),
+    // Card or Borderless as the deck view draws it; the rest of the front matter is private.
+    look: frontMatterLook(text),
     theme: options.theme,
     preamble,
     slides,

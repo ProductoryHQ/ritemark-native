@@ -50,10 +50,11 @@ export type DeckRequest =
   | { type: 'deck/page-state' }
   /**
    * Publish or Update the page: the host writes the page beside the deck and runs 2.2's Publish on it. `text` is the
-   * deck as this view holds it, front matter left out (its newest words may not have reached the document yet), and
-   * `steps` each slide's fit as the view measured it, by its place in that text: numbers only, 0 to 3.
+   * deck as this view holds it, front matter left out (its newest words may not have reached the document yet), `look`
+   * the look the view shows (Card or Borderless, which may not have reached it either), and `steps` each slide's fit as
+   * the view measured it, by its place in that text: numbers only, 0 to 3.
    */
-  | { type: 'deck/publish'; text: string; steps: number[] }
+  | { type: 'deck/publish'; text: string; look: 'card' | 'borderless'; steps: number[] }
   /** The Published chip's menu: Copy link, See online, Unpublish (2.2's commands on the page). */
   | { type: 'deck/page-action'; action: DeckPageAction };
 
@@ -178,14 +179,16 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
       return { type: 'deck/page-state' };
     }
     case 'deck/publish': {
-      exactKeys(input, ['type', 'text', 'steps']);
+      exactKeys(input, ['type', 'text', 'look', 'steps']);
       const text = stringOf(input.text, MAX_DECK_TEXT, true);
+      if (input.look !== 'card' && input.look !== 'borderless') throw new DeckProtocolError('look must be card or borderless');
+      const look = input.look;
       if (!Array.isArray(input.steps) || input.steps.length > MAX_DECK_SLIDES) throw new DeckProtocolError('steps must be a short list');
       const steps = input.steps.map(step => {
         if (typeof step !== 'number' || !Number.isInteger(step) || step < 0 || step > 3) throw new DeckProtocolError('Each step must be 0 to 3');
         return step;
       });
-      return { type: 'deck/publish', text, steps };
+      return { type: 'deck/publish', text, look, steps };
     }
     case 'deck/page-action': {
       exactKeys(input, ['type', 'action']);

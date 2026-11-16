@@ -536,6 +536,14 @@ export function frontMatterField(text: string, name: string): string | null {
   return frontMatterEntries(text)?.entries.find(([key]) => key === name)?.[1] ?? null;
 }
 
+/**
+ * Card or Borderless, as the front matter says it: `look: borderless` is Borderless, anything else (or none) Card. The
+ * deck view's own rule (`properties.look === 'borderless'`), so the page Publish builds has the look the view draws.
+ */
+export function frontMatterLook(text: string): 'card' | 'borderless' {
+  return frontMatterField(text, 'look') === 'borderless' ? 'borderless' : 'card';
+}
+
 /** The info string's kind: `slide boxes` → `boxes`; null when the block is no slide. */
 export function slideKindOfInfo(info: string): string | null {
   const match = /^slide(?:\s+(\S+))?\s*$/.exec(info.trim());
@@ -579,19 +587,36 @@ export function parseDeck(text: string): ParsedDeck {
 /**
  * The deck's text Publish builds the page from (Sprint 159): the document's front matter (the theme and the look) with
  * the view's body, front matter left out, since the view's newest words may not have reached the document yet.
- * `fromView` says whether the view's words are in it.
+ * `fromView` says whether the view's words are in it. With them goes the view's `look` (Card or Borderless), for the
+ * same reason: a look chosen a moment before the press may still be on its way to the document.
  *
  * `editorBody` is the body the editor gave the view for this document. The view's body stands in for the document's
  * only where that is exactly what follows the front matter `parseDeck` reads. Anywhere else the editor read the front
  * matter differently (its YAML doesn't read, so the view was given the whole text, or it ends at another line), so
- * the view's words may hold some of it, in the editor's own shape: the document as saved is used then, whose front
- * matter `publicDeck` leaves out exactly (fails closed; words typed a moment before the press may be missing).
+ * the view's words may hold some of it, in the editor's own shape: the document as saved is used then, with its own
+ * look, whose front matter `publicDeck` leaves out exactly (fails closed; words typed a moment before the press may be
+ * missing).
  */
-export function publishText(documentText: string, body: string, editorBody: string): { text: string; fromView: boolean } {
+export function publishText(documentText: string, body: string, editorBody: string, look?: 'card' | 'borderless'): { text: string; fromView: boolean } {
   const text = documentText.replace(/^\uFEFF/, '');
   const head = text.slice(0, parseDeck(text).bodyStart);
   if (head && editorBody.replace(/^\uFEFF/, '') !== text.slice(head.length)) return { text: documentText, fromView: false };
-  return { text: head && !head.endsWith('\n') ? `${head}\n${body}` : head + body, fromView: true };
+  const front = look ? withLook(head, look) : head;
+  return { text: front && !front.endsWith('\n') ? `${front}\n${body}` : front + body, fromView: true };
+}
+
+/**
+ * A front matter (`head`, as `parseDeck` reads it, or '') saying the view's look: unchanged where it says it already
+ * (`frontMatterLook`); else without its `look:` lines, and with `look: borderless` for Borderless.
+ */
+function withLook(head: string, look: 'card' | 'borderless'): string {
+  if (frontMatterLook(head) === look) return head;
+  if (!head) return '---\nlook: borderless\n---\n';
+  const match = /^(---[ \t]*(\r?\n))([\s\S]*?)(\r?\n---[ \t]*(?:\r?\n)?)$/.exec(head);
+  if (!match) return head;
+  const lines = match[3].split(/\r?\n/).filter(line => KEY_LINE.exec(line)?.[1] !== 'look');
+  if (look === 'borderless') lines.push('look: borderless');
+  return match[1] + lines.join(match[2]) + match[4];
 }
 
 /** The front matter's `deck:` value, as written, or null: read from the front matter alone. */

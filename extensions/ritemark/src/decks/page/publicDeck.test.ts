@@ -7,7 +7,8 @@
 import { strict as assert } from 'node:assert';
 import { publishText } from '../deckFormat';
 import { BUILT_IN_THEME, parseTheme } from '../deckTheme';
-import { splitFrontMatter } from '../../editorSync/frontMatter';
+import { joinFrontMatter, splitFrontMatter } from '../../editorSync/frontMatter';
+import { deckLookOf } from '../present/presentSession';
 import { deckDigest, drawnData, publicDeck, publicMarkdown, type PublicDeck } from './publicDeck';
 import { PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_WORDS } from './testing/privateDeck';
 
@@ -171,9 +172,11 @@ for (const front of frontMatters) {
   // The view's body as the editor serialized it: the front matter's words as a heading, then the slides
   const viewBody = `## ${editorBody.split('\n---')[0].replace(/\n/g, ' ')}\n\n\`\`\`slide title\ntitle: Harbour title\n\`\`\`\n\nThe handout, newer.\n`;
   for (const body of [viewBody, editorBody]) {
-    const page = JSON.stringify(publicDeck(publishText(saved, body, editorBody).text, options));
-    assert.ok(!page.includes('FRONTWORDQXZ'), `the front matter's words reached the page (${JSON.stringify(front)})`);
-    assert.ok(page.includes('The handout'));
+    for (const look of [undefined, 'card', 'borderless'] as const) {
+      const page = JSON.stringify(publicDeck(publishText(saved, body, editorBody, look).text, options));
+      assert.ok(!page.includes('FRONTWORDQXZ'), `the front matter's words reached the page (${JSON.stringify(front)}, ${look})`);
+      assert.ok(page.includes('The handout'));
+    }
   }
 }
 // A front matter that reads: the view's newer words go, the front matter doesn't
@@ -181,6 +184,32 @@ for (const front of frontMatters) {
   const saved = '---\ndeck: 1\nclient: FRONTWORDQXZ\n---\n\n```slide title\ntitle: Harbour title\n```\n\nOlder words.\n';
   const page = JSON.stringify(publicDeck(publishText(saved, '```slide title\ntitle: Harbour title\n```\n\nNewer words.\n', splitFrontMatter(saved).content).text, options));
   assert.ok(page.includes('Newer words') && !page.includes('Older words') && !page.includes('FRONTWORDQXZ'));
+}
+
+// The look Publish takes is the deck view's (Codex on #737). The page reads the front matter's look as the editor gives
+// it to the view, and as the wall reads it. A look chosen just before the press, still on its way to the document,
+// makes the page the document makes once the look has reached it (written as the host writes it), so the chip then
+// reads Published.
+{
+  const viewLook = (text: string) => (splitFrontMatter(text).properties.look === 'borderless' ? 'borderless' : 'card');
+  const slides = '\n```slide title\ntitle: Harbour title\n```\n\nThe handout.\n';
+  const fronts = ['', '---\ndeck: 1\n---\n', '---\ndeck: 1\nlook: borderless\n---\n', '---\ndeck: 1\nlook: "borderless"\n---\n', '---\ndeck: 1\nlook: Borderless\n---\n', '---\ndeck: 1\nlook: card\n---\n', '---\nlook: BORDERLESS\ndeck: 1\n---\n'];
+  for (const front of fronts) {
+    const saved = front + slides;
+    assert.equal(publicDeck(saved, options).look, viewLook(saved), `the page's look is the view's: ${JSON.stringify(front)}`);
+    assert.equal(publicDeck(saved, options).look, deckLookOf(saved), `the page's look is the wall's: ${JSON.stringify(front)}`);
+    const { properties, content } = splitFrontMatter(saved);
+    for (const look of ['card', 'borderless'] as const) {
+      // The deck view's Card | Borderless (DeckView's setLook), and the document once it has arrived
+      const next = { ...properties };
+      if (look === 'borderless') next.look = 'borderless';
+      else delete next.look;
+      const caughtUp = joinFrontMatter(next, content, saved);
+      const published = publishText(saved, content, content, look).text;
+      assert.equal(publicDeck(published, options).look, look, `${JSON.stringify(front)} → ${look}`);
+      assert.equal(deckDigest(publicDeck(published, options)), deckDigest(publicDeck(caughtUp, options)), `the chip reads Published: ${JSON.stringify(front)} → ${look}`);
+    }
+  }
 }
 
 console.log('publicDeck: passed');
