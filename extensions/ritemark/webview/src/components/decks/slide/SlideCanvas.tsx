@@ -33,6 +33,8 @@ export interface SlideEditing {
   onSetIcon: (index: number, name: string | null) => void
   /** The text box to put the caret in once it is drawn, and the call that says it was. */
   focusPath: string | null
+  /** Sprint 159 (PR 7): select the words whole rather than put the caret after them. */
+  focusSelect?: boolean
   onFocused: () => void
 }
 
@@ -77,7 +79,7 @@ function SlideText({ box, editing, tag = 'div' }: { box: TextBox; editing?: Slid
     element.focus({ preventScroll: true })
     const range = document.createRange()
     range.selectNodeContents(element)
-    range.collapse(false)
+    if (!editing.focusSelect) range.collapse(false)
     const selection = window.getSelection()
     selection?.removeAllRanges()
     selection?.addRange(range)

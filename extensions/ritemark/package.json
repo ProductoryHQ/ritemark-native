@@ -88,6 +88,16 @@
         "icon": "$(table)"
       },
       {
+        "command": "ritemark.projectHead.newDeck",
+        "title": "Deck",
+        "icon": "$(ritemark-deck)"
+      },
+      {
+        "command": "ritemark.decks.new",
+        "title": "New Deck",
+        "icon": "$(ritemark-deck)"
+      },
+      {
         "command": "ritemark.projectHead.newFlow",
         "title": "Flow",
         "icon": "$(ritemark-flow)"
@@ -792,6 +802,10 @@
       "ritemark-command": {
         "description": "A command, in New on Agents",
         "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e1c4" }
+      },
+      "ritemark-deck": {
+        "description": "A deck, in New",
+        "default": { "fontPath": "producticons/Phosphor-Regular.woff2", "fontCharacter": "\\e654" }
       }
     },
     "menus": {
@@ -842,6 +856,8 @@
         { "command": "ritemark.projectHead.collapseFolders", "when": "false" },
         { "command": "ritemark.projectHead.newText", "when": "false" },
         { "command": "ritemark.projectHead.newTable", "when": "false" },
+        { "command": "ritemark.projectHead.newDeck", "when": "false" },
+        { "command": "ritemark.decks.new", "when": "false" },
         { "command": "ritemark.projectHead.newFlow", "when": "false" },
         { "command": "ritemark.projectHead.newFile", "when": "false" },
         { "command": "ritemark.projectHead.newFolderInNew", "when": "false" },
@@ -866,6 +882,7 @@
       "ritemark/projectHead/new": [
         { "command": "ritemark.projectHead.newText", "group": "1_documents@1" },
         { "command": "ritemark.projectHead.newTable", "group": "1_documents@2" },
+        { "command": "ritemark.projectHead.newDeck", "group": "1_documents@3", "when": "config.ritemark.features.decks" },
         { "command": "ritemark.projectHead.newFlow", "group": "2_flows@1" },
         { "command": "ritemark.projectHead.newFile", "group": "3_files@1" },
         { "command": "ritemark.projectHead.newFolderInNew", "group": "3_files@2" }
@@ -1219,7 +1236,7 @@
     "test:publish": "npx tsx src/publish/gather.test.ts && npx tsx src/publish/secretScan.test.ts && npx tsx src/publish/publishRecords.test.ts && npx tsx src/publish/devSheetHarness.test.ts && npx tsx webview/src/components/publish/publishSheetCopy.test.ts",
     "test:publish-cloudflare": "npx tsx src/publish/cloudflare/cloudflare.test.ts && npx tsx src/publish/PublishController.test.ts && npx tsx src/settings/settingsKeys.test.ts && npx tsx webview/src/components/settings/webPagesCard.test.ts",
     "test:task-list-roundtrip": "npx tsx webview/src/utils/taskListRoundTrip.test.ts",
-    "test:decks": "npx tsx src/decks/deckFormat.test.ts && npx tsx src/decks/deckProtocol.test.ts && npx tsx webview/src/components/decks/scrollRule.test.ts && npx tsx webview/src/components/decks/handout/deckGuard.test.ts && npx tsx webview/src/components/decks/handout/deckRoundTrip.test.ts && npx tsx webview/src/components/decks/slide/layoutSlide.test.ts && npx tsx webview/src/components/decks/deckDocument.test.ts && npx tsx src/decks/deckLibraryFormat.test.ts && npx tsx src/decks/DeckLibrary.test.ts && npx tsx src/decks/page/publicDeck.test.ts && npx tsx src/decks/page/pageHtml.test.ts && npx tsx src/decks/page/pageScript.test.ts && npx tsx src/decks/page/pageFile.test.ts && npx tsx webview/src/components/decks/slide/slideMarkup.test.ts && npx tsx src/decks/page/sheetRows.test.ts && npx tsx webview/src/components/decks/DeckPublish.test.ts",
+    "test:decks": "npx tsx src/decks/deckFormat.test.ts && npx tsx src/decks/deckProtocol.test.ts && npx tsx webview/src/components/decks/scrollRule.test.ts && npx tsx webview/src/components/decks/handout/deckGuard.test.ts && npx tsx webview/src/components/decks/handout/deckRoundTrip.test.ts && npx tsx webview/src/components/decks/slide/layoutSlide.test.ts && npx tsx webview/src/components/decks/deckDocument.test.ts && npx tsx src/decks/deckLibraryFormat.test.ts && npx tsx src/decks/DeckLibrary.test.ts && npx tsx src/decks/page/publicDeck.test.ts && npx tsx src/decks/page/pageHtml.test.ts && npx tsx src/decks/page/pageScript.test.ts && npx tsx src/decks/page/pageFile.test.ts && npx tsx webview/src/components/decks/slide/slideMarkup.test.ts && npx tsx src/decks/page/sheetRows.test.ts && npx tsx webview/src/components/decks/DeckPublish.test.ts && npx tsx src/decks/newDeck.test.ts",
     "test:security-backports": "npx tsx webview/src/utils/securityBackports.test.ts",
     "test:loose-ends-ext": "npx tsx webview/src/components/ai-sidebar/RuntimeNotice.test.ts && npx tsx webview/src/theme/greenIsTheReadyDot.test.ts && npx tsx webview/src/components/settings/versionLabel.test.ts",
     "test:claude-auth": "npx tsx src/agent/claudeLogin.test.ts && npx tsx src/views/webviewAssetUri.test.ts && npx tsx src/views/agentSidebarBootstrap.test.ts && npx tsx webview/src/components/ai-sidebar/bootstrapState.test.ts && npx tsx webview/src/components/ai-sidebar/bootstrapStorageIsolation.test.ts && npx tsx webview/src/components/ai-sidebar/modelPresentation.test.ts && npx tsx webview/src/components/ai-sidebar/authRecoveryState.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeAvailability.test.ts && npx tsx webview/src/components/ai-sidebar/sidebarGate.test.ts && npx tsx webview/src/components/ai-sidebar/runtimeHydrationRefresh.test.ts",
