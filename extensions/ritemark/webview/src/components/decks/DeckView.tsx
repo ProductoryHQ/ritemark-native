@@ -25,7 +25,7 @@ import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
-import { DECK_DERIVED, DECK_OPERATION, DEFAULT_RATIO, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
+import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
 import { StartCard } from './StartCard'
 import { deckStarted, startCardRows, type StartCardState } from '../../../../src/decks/startCard'
 import { DOMParser as PMDOMParser, Fragment, type Node as PMNode } from '@tiptap/pm/model'
@@ -53,6 +53,8 @@ import { Stage } from './Stage'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
 import { DeckFolds, deckViewState, foldedSides, keepDeckViewState, keepFold, storedFold, toggledFold, type DeckFold } from './DeckFolds'
+import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
+import { NO_GESTURE, slideKeyOf, slideKeyTarget, wheelPixels, wheelStep, type KeyTargetElement } from './slideNav'
 import './decks.css'
 
 /** The deck's extensions, made once: the editor's extension list is fixed at mount. */
@@ -63,19 +65,20 @@ const STRIP_WIDTH = 132
 /** The Add to library sheet beside the slide: its width (the Settings material), and how long a notice stays in the bar. */
 const SETTINGS_WIDTH = 316
 const NOTICE_MS = 8000
-/** The slide's room on the stage: 24 on each side, at most 900 wide. */
-const STAGE_MARGIN = 24
-const BIG_MAX = 900
 /** The handout is never narrower than this (the Experience lead's answer 4). */
 const HANDOUT_MIN = 300
 const STAGE_MIN = 300
-/** Below this desk width the strip folds and the slide and the handout split 40:60; below the next, the handout folds. */
+/** Below this desk width the strip folds; below the next, the handout folds. (Both are rooms under 1,100, where the
+ *  slide sits above the handout: deckLayout.ts.) */
 const NARROW_DESK = 900
 const NARROWEST_DESK = 600
 
-/** The slide's share, as this deck's view kept it (`deckViewState`, with the fold). */
+/** The slide's share, as this deck's view kept it (`deckViewState`, with the fold): of the width with the slide beside
+ *  the handout, and of the height with the slide above it. Each orientation keeps its own. */
 const storedRatio = () => deckViewState().deckRatio
 const keepRatio = (ratio: number) => keepDeckViewState({ deckRatio: ratio })
+const storedAboveRatio = () => deckViewState().deckAboveRatio
+const keepAboveRatio = (ratio: number) => keepDeckViewState({ deckAboveRatio: ratio })
 /** How long a thumbnail's scroll holds the slide, and how long writing does (the prototype's `syncLock`). */
 const PICK_LOCK_MS = 500
 const WRITE_LOCK_MS = 1200
@@ -206,9 +209,16 @@ export function DeckView({
   const [ratio, setRatio] = useState(() => initialRatio(storedRatio()))
   const ratioRef = useRef(ratio)
   ratioRef.current = ratio
+  const [aboveRatio, setAboveRatio] = useState(() => initialAboveRatio(storedAboveRatio()))
+  const aboveRatioRef = useRef(aboveRatio)
+  aboveRatioRef.current = aboveRatio
   const [deskWidth, setDeskWidth] = useState(0)
+  const [deskHeight, setDeskHeight] = useState(0)
+  // Beside or above (deckLayout.ts): decided from the room once it is measured, and again whenever it changes.
+  const [orientation, setOrientation] = useState<DeckOrientation | null>(null)
   const [dragging, setDragging] = useState(false)
   const deskRef = useRef<HTMLDivElement>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
   const lockUntil = useRef(0)
   const currentRef = useRef(0)
@@ -378,13 +388,17 @@ export function DeckView({
   const shown = count === 0 ? 0 : Math.min(current, count - 1)
   const slide = slides[shown]
 
-  // The desk's width decides what fits.
+  // The desk's own box decides what fits: never the window's, which holds the left column and the AI column too.
   useLayoutEffect(() => {
     const desk = deskRef.current
     if (!desk) return
-    const observer = new ResizeObserver(() => setDeskWidth(desk.clientWidth))
+    const measure = () => {
+      setDeskWidth(desk.clientWidth)
+      setDeskHeight(desk.clientHeight)
+    }
+    const observer = new ResizeObserver(measure)
     observer.observe(desk)
-    setDeskWidth(desk.clientWidth)
+    measure()
     return () => observer.disconnect()
   }, [])
 
@@ -394,10 +408,35 @@ export function DeckView({
   const slideShownRef = useRef(slideShown)
   slideShownRef.current = slideShown
   const stripWidth = stripShown ? STRIP_WIDTH : 0
+  // The deck's room: the desk less the strip. Opening or folding any panel, or resizing the window, decides again.
   const avail = Math.max(0, deskWidth - stripWidth)
-  const stageWidth = stageWidthFor(avail, narrow ? DEFAULT_RATIO : ratio, handoutShown, slideShown)
-  const bigWidth = Math.max(0, Math.min(stageWidth - STAGE_MARGIN * 2, BIG_MAX))
-  const dividerLeft = stripWidth + stageWidth
+  useLayoutEffect(() => {
+    if (deskWidth > 0) setOrientation(shownNow => orientationFor(avail, shownNow))
+  }, [avail, deskWidth])
+  const above = orientation === 'above'
+  const split = slideShown && handoutShown
+  // Above: the slide's pane over the level line, the handout under it, both the room's full width.
+  const aboveLine = above && split ? aboveLineFor(deskHeight, aboveRatio) : 0
+  const stageWidth = above ? (slideShown ? avail : 0) : stageWidthFor(avail, ratio, handoutShown, slideShown)
+  const stageHeight = above && split ? aboveLine : deskHeight
+  // Above, the slide takes its pane's height less 32 and less whatever row is still under it (today the speaker notes'),
+  // measured from the stage as drawn, so the stage never overflows its pane. With no row under it, it's the pane less 32.
+  const [aboveUnder, setAboveUnder] = useState(0)
+  const bigWidth = slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
+  useLayoutEffect(() => {
+    if (!above) return
+    const group = stageRef.current?.querySelector<HTMLElement>('.deck-stage-group')
+    const big = group?.querySelector<HTMLElement>('.deck-big')
+    if (!group || !big) return
+    const under = rowsUnder(group.offsetHeight, big.offsetHeight)
+    // Only a real change, so a row that wraps differently at the new width can't set the size swinging.
+    if (Math.abs(under - aboveUnder) > 1) setAboveUnder(under)
+  })
+  /** The handout's left edge; beside, the line between the slide and the handout too. */
+  const dividerLeft = above ? stripWidth : stripWidth + stageWidth
+  /** Where the fold's control stands: on the line beside (from the left), on the level line above (from the top); with
+   *  one side hidden, at the edge between them. */
+  const foldLine = above ? (split ? aboveLine : slideShown ? deskHeight : 0) : dividerLeft
 
   const scrollContainer = useCallback((): HTMLElement | null => {
     return (editor?.view.dom.closest('.wysiwyg-editor') as HTMLElement | null) ?? null
@@ -498,7 +537,7 @@ export function DeckView({
     // (Jarmo, 15 November). The turn is cut short where the next part is the current one, and that part is shown at once.
     const onWheel = (event: WheelEvent) => {
       if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY) || Date.now() < lockUntil.current) return
-      const delta = event.deltaMode === 1 ? event.deltaY * 40 : event.deltaMode === 2 ? event.deltaY * container.clientHeight : event.deltaY
+      const delta = wheelPixels(event, container.clientHeight)
       const state = { partTops: partTops(), scrollTop: container.scrollTop, clientHeight: container.clientHeight, scrollHeight: container.scrollHeight, writing: null }
       const stop = wheelStop(state, delta, currentRef.current)
       if (stop === null) return
@@ -572,13 +611,20 @@ export function DeckView({
     target.setPointerCapture(event.pointerId)
     setDragging(true)
     const move = (moveEvent: PointerEvent) => {
-      const left = desk.getBoundingClientRect().left + stripWidth
-      const x = moveEvent.clientX - left
+      const box = desk.getBoundingClientRect()
+      // Above, the level line moves the share of the height; beside, the upright line the share of the width.
+      if (above) {
+        // The share kept is the line as shown, held 160 px from either edge, so it comes back where it was seen.
+        if (box.height > 0) setAboveRatio(clampAboveRatio(aboveLineFor(box.height, (moveEvent.clientY - box.top) / box.height) / box.height))
+        return
+      }
+      const x = moveEvent.clientX - box.left - stripWidth
       if (avail > 0) setRatio(Math.max(RATIO_MIN, Math.min(RATIO_MAX, x / avail)))
     }
     const up = () => {
       setDragging(false)
-      keepRatio(ratioRef.current)
+      if (above) keepAboveRatio(aboveRatioRef.current)
+      else keepRatio(ratioRef.current)
       target.removeEventListener('pointermove', move)
       target.removeEventListener('pointerup', up)
       target.removeEventListener('pointercancel', up)
@@ -588,7 +634,7 @@ export function DeckView({
     target.addEventListener('pointermove', move)
     target.addEventListener('pointerup', up)
     target.addEventListener('pointercancel', up)
-  }, [avail, stripWidth, pick])
+  }, [above, avail, stripWidth, pick])
 
   /** A fold button: that side folds away, or comes back; the deck's view keeps the choice, and the part being read
    *  stays at the top. Slide settings stay: they belong to the current slide, which the strip still rings. */
@@ -598,6 +644,60 @@ export function DeckView({
     keepFold(next)
     requestAnimationFrame(() => pick(currentRef.current))
   }, [fold, pick])
+
+  // When the slide moves beside or above, the part being read stays at the top, as after a drag or a fold. Not at the
+  // first decision, as the deck opens.
+  const orientationShown = useRef<DeckOrientation | null>(null)
+  useEffect(() => {
+    if (orientation === null) return
+    const before = orientationShown.current
+    orientationShown.current = orientation
+    if (before === null || before === orientation) return
+    const frame = requestAnimationFrame(() => pick(currentRef.current))
+    return () => cancelAnimationFrame(frame)
+  }, [orientation, pick])
+
+  // The full slide view (Jarmo, 16 November): with the handout hidden, the wheel over the slide and the keys move
+  // between slides (slideNav.ts), through the strip's own path. With the handout shown, the scroll rule stays.
+  const fullSlide = slideShown && !handoutShown
+  const goTo = useCallback((index: number) => {
+    const count = countRef.current
+    if (count === 0) return
+    const next = Math.max(0, Math.min(count - 1, index))
+    if (next !== Math.min(currentRef.current, count - 1)) pick(next)
+  }, [pick])
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!fullSlide || !stage) return
+    let gesture = NO_GESTURE
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
+      const target = event.target as Element | null
+      // The speaker notes scroll as text; and a stage taller than its room (a short window) still scrolls, outside the
+      // slide itself.
+      if (target?.closest?.('.deck-notes')) return
+      if (stage.scrollHeight > stage.clientHeight + 1 && !target?.closest?.('.deck-big')) return
+      event.preventDefault()
+      const step = wheelStep(gesture, wheelPixels(event, stage.clientHeight), event.timeStamp)
+      gesture = step.gesture
+      if (step.move !== 0) goTo(Math.min(currentRef.current, countRef.current - 1) + step.move)
+    }
+    stage.addEventListener('wheel', onWheel, { passive: false })
+    return () => stage.removeEventListener('wheel', onWheel)
+  }, [fullSlide, goTo])
+  useEffect(() => {
+    if (!fullSlide) return
+    const onKey = (event: KeyboardEvent) => {
+      // A dialog or sheet over the deck keeps its keys.
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return
+      const index = slideKeyOf(event, slideKeyTarget(event.target as KeyTargetElement | null, document.body), countRef.current, currentRef.current)
+      if (index === null) return
+      event.preventDefault()
+      goTo(index)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fullSlide, goTo])
 
   /** Part `index`'s slide id, given one first when it has none (the library and pictures find a slide by its id). */
   const idOf = useCallback((index: number): string | null => {
@@ -748,7 +848,7 @@ export function DeckView({
       left: Math.max(8, Math.min(bigBox.right - deskBox.left + 12, deskBox.width - SETTINGS_WIDTH - 8)),
       top: Math.max(8, bigBox.top - deskBox.top - 4),
     })
-  }, [addSheet, deskWidth, stageWidth, shown, slideShown, dividerLeft])
+  }, [addSheet, deskWidth, deskHeight, stageWidth, bigWidth, aboveLine, shown, slideShown, dividerLeft])
 
   /** Settings' change, made to the slide as the document has it now. */
   const changeSlide = useCallback((change: (data: SlideData) => SlideData, kind?: string) => {
@@ -1126,8 +1226,13 @@ export function DeckView({
         ) : null}
 
         {slideShown ? (
-          <div className={`deck-stage${borderless ? ' is-borderless' : ''}`} style={{ left: stripWidth, width: stageWidth }}>
-            <div className="deck-stage-group">
+          <div
+            ref={stageRef}
+            className={`deck-stage${borderless ? ' is-borderless' : ''}${above ? ' is-above' : ''}`}
+            style={above ? { left: stripWidth, width: stageWidth, height: stageHeight } : { left: stripWidth, width: stageWidth }}
+          >
+            {/* Above, the slide is centred over the handout's column: the group is the slide's own width. */}
+            <div className="deck-stage-group" style={above ? { width: bigWidth + STAGE_MARGIN * 2 } : undefined}>
               {editor && slide && bigWidth > 0 ? (
                 <Stage
                   // By the slide's id: a new slide at the current place is a new stage, which takes the caret.
@@ -1153,16 +1258,17 @@ export function DeckView({
 
         {handoutShown && slideShown ? (
           <div
-            className={`deck-divider${dragging ? ' is-dragging' : ''}`}
-            style={{ left: dividerLeft }}
+            className={`deck-divider${above ? ' is-above' : ''}${dragging ? ' is-dragging' : ''}`}
+            // Above, a level line from the strip to the room's right edge; beside, the upright line.
+            style={above ? { left: stripWidth, top: aboveLine } : { left: dividerLeft }}
             role="separator"
-            aria-orientation="vertical"
-            aria-label="Drag to change the widths"
+            aria-orientation={above ? 'horizontal' : 'vertical'}
+            aria-label={above ? 'Drag to change the heights' : 'Drag to change the widths'}
             onPointerDown={onDividerDown}
           />
         ) : null}
         {deskWidth >= NARROWEST_DESK ? (
-          <DeckFolds slideShown={slideShown} handoutShown={handoutShown} left={dividerLeft} onToggle={toggleFold} />
+          <DeckFolds slideShown={slideShown} handoutShown={handoutShown} line={foldLine} above={above} onToggle={toggleFold} />
         ) : null}
 
         {addSheet && settingsAt ? (
@@ -1181,9 +1287,10 @@ export function DeckView({
           />
         ) : null}
         <div
-          className={`deck-handout${handoutShown ? '' : ' is-folded'}${slideShown ? '' : ' is-solo'}`}
-          // The handout alone is a Text document's centred column: its width sets the text's edges (decks.css).
-          style={{ left: dividerLeft, ['--deck-handout-width' as string]: `${Math.max(0, deskWidth - dividerLeft)}px`, ['--deck-text-column' as string]: `${TEXT_COLUMN_WIDTH}px` }}
+          className={`deck-handout${handoutShown ? '' : ' is-folded'}${slideShown ? '' : ' is-solo'}${above && split ? ' is-above' : ''}`}
+          // The handout alone, or below the slide, is a Text document's centred column: its width sets the text's edges
+          // (decks.css).
+          style={{ left: dividerLeft, top: above && split ? aboveLine : 0, ['--deck-handout-width' as string]: `${Math.max(0, deskWidth - dividerLeft)}px`, ['--deck-text-column' as string]: `${TEXT_COLUMN_WIDTH}px` }}
           aria-hidden={handoutShown ? undefined : true}
         >
           {findBar}
