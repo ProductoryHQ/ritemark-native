@@ -1,0 +1,3 @@
+"id: ex01\ntitle: Proovi ise\ntag: Harjutus" -> data.tag = undefined ; stage pill: mark "Exercise" ; page pill: "Exercise"
+"id: ex01\ntitle: Proovi ise\ntag: \"\"" -> data.tag = undefined ; stage pill: mark "Exercise" ; page pill: "Exercise"
+an edit setting tag: Harjutus writes -> "id: ex01\ntitle: T"

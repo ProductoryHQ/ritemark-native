@@ -89,3 +89,9 @@
 .deck-slide.is-borderless .deck-sl [contenteditable]:hover { box-shadow: 0 0 0 2px var(--s-ring, rgba(28,31,74,.12)); }
 .deck-slide.is-borderless .deck-sl [contenteditable]:focus { box-shadow: 0 0 0 2px var(--s-foc, rgba(224,162,31,.75)); }
 .deck-slide.is-borderless .deck-sl [contenteditable]:empty::before { color: var(--s-ph, rgba(28,31,74,.3)); }
+/* An exercise slide's pill, typed in on the stage (16 November): it keeps its look, grows with its words on one line,
+   shows the default faintly while the caret is in it empty, and goes once the caret leaves (`tag: ""`, no pill). */
+.deck-sl .tag { box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deck-sl .tag[contenteditable]:focus { text-overflow: clip; }
+.deck-slide .deck-sl .tag[contenteditable]:empty::before { color: inherit; opacity: .45; }
+.deck-sl .tag[contenteditable]:empty:not(:focus) { display: none; }

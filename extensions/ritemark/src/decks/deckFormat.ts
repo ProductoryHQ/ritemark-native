@@ -52,6 +52,13 @@ export interface SlideData {
   subtitle?: string;
   /** A section's number, as written ("1", "A"). */
   number?: string;
+  /**
+   * An exercise slide's pill (16 November), the one word a layout draws that isn't the person's own text. The rule for
+   * this word, and for any later fixed word a layout draws: an optional line; when it is missing the slide shows the
+   * default (`EXERCISE_TAG`, "Exercise"), so a deck written before it changes by no byte; `tag: ""` means no pill.
+   * Opening a deck never writes it; only editing the pill or Settings' Label row does.
+   */
+  tag?: string;
   /** The look of a row of boxes: boxes, steps, arrows or line. */
   look?: string;
   /** Where the picture goes: none, left, right or behind. */
@@ -67,8 +74,25 @@ export interface SlideData {
   rows?: string[][];
 }
 
+/** The pill an exercise slide shows when its block has no `tag:` line. Not yet in the deck's own language. */
+export const EXERCISE_TAG = 'Exercise';
+
+/** The words of an exercise slide's pill: its `tag:` line, or the default when there is none; '' (or spaces) is no pill. */
+export function exerciseTagOf(data: SlideData): string {
+  const tag = data.tag ?? EXERCISE_TAG;
+  return tag.trim() ? tag : '';
+}
+
+/**
+ * Does the pill draw what a slide without a `tag:` line draws? The pill is drawn in capitals, so `tag: exercise` and
+ * `tag: Exercise` written out draw the default too (the library stamp and read_deck treat them as no line).
+ */
+export function isDefaultExerciseTag(data: SlideData): boolean {
+  return exerciseTagOf(data).replace(/\s+/g, ' ').trim().toLowerCase() === EXERCISE_TAG.toLowerCase();
+}
+
 /** The scalar keys, in the order the writer puts a new key. */
-const SCALAR_KEYS = ['id', 'title', 'subtitle', 'number', 'look', 'picture', 'image', 'skip', 'kept', 'from'] as const;
+const SCALAR_KEYS = ['id', 'title', 'subtitle', 'number', 'tag', 'look', 'picture', 'image', 'skip', 'kept', 'from'] as const;
 type ScalarKey = (typeof SCALAR_KEYS)[number];
 const BOOLEAN_KEYS: ReadonlySet<string> = new Set(['skip', 'kept']);
 const ITEM_KEYS = ['heading', 'text', 'icon'] as const;

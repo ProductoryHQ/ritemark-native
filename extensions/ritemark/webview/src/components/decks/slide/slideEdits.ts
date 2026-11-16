@@ -2,14 +2,29 @@
  * Sprint 157: the edits typing on the slide makes to its data. Pure: each returns new data, and the deck view writes
  * it into the slide's block (`writeSlideBody`, which rewrites only the lines that changed).
  *
- * Paths are the layout's: `title`, `subtitle`, `number`, `items.2.heading`, `items.2.text`, `rows.1.0`.
+ * Paths are the layout's: `title`, `subtitle`, `number`, `tag`, `items.2.heading`, `items.2.text`, `rows.1.0`.
  */
-import type { SlideData, SlideItem } from '../../../../../src/decks/deckFormat'
+import { exerciseTagOf, type SlideData, type SlideItem } from '../../../../../src/decks/deckFormat'
 
 const ITEM_PATH = /^items\.(\d+)\.(heading|text)$/
 const CELL_PATH = /^rows\.(\d+)\.(\d+)$/
 /** A table starts with a heading row and one row, two columns, empty. */
 const EMPTY_TABLE = [['', ''], ['', '']]
+
+/** Words typed into a one-line place (a title, the pill, the Label row): their line breaks as spaces. */
+export function oneLine(value: string): string {
+  return value.replace(/[\r\n\u2028\u2029]+/g, ' ')
+}
+
+/** The deck's undo keys, as the stage and Settings' fields take them: Cmd+Z, and Cmd+Shift+Z or Cmd+Y for redo. */
+export function undoKeyOf(event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey?: boolean; key: string; isComposing?: boolean }): 'undo' | 'redo' | null {
+  // Mid-composition the field holds marked text the browser has yet to commit; Cmd+Alt+Z is another shortcut.
+  if ((!event.metaKey && !event.ctrlKey) || event.altKey || event.isComposing) return null
+  const key = event.key.toLowerCase()
+  if (key === 'z') return event.shiftKey ? 'redo' : 'undo'
+  if (key === 'y') return 'redo'
+  return null
+}
 
 export function itemPath(path: string): { index: number; field: 'heading' | 'text' } | null {
   const match = ITEM_PATH.exec(path)
@@ -24,6 +39,7 @@ export function cellPath(path: string): { row: number; column: number } | null {
 /** The words at `path`, as the slide holds them now. */
 export function valueAt(data: SlideData, path: string): string {
   if (path === 'title' || path === 'subtitle' || path === 'number') return data[path] ?? ''
+  if (path === 'tag') return exerciseTagOf(data)
   const item = itemPath(path)
   if (item) return data.items?.[item.index]?.[item.field] ?? ''
   const cell = cellPath(path)
@@ -31,10 +47,19 @@ export function valueAt(data: SlideData, path: string): string {
   return ''
 }
 
-/** The words at `path` set to `value`. An emptied title, subtitle or number leaves the file. */
+/**
+ * The words at `path` set to `value`. An emptied title, subtitle or number leaves the file; an emptied pill stays as
+ * `tag: ""`, no pill, since a missing line shows the default.
+ */
 export function setPath(data: SlideData, path: string, value: string): SlideData {
   if (path === 'title' || path === 'subtitle' || path === 'number') {
     return { ...data, [path]: value === '' ? undefined : value }
+  }
+  if (path === 'tag') {
+    // A pill of spaces draws none (`exerciseTagOf`), so it is saved as none: the file never holds `tag: " "`.
+    const tag = value.trim() ? value : ''
+    // Words as they were write nothing: a deck without the line keeps it missing (never `tag: Exercise`).
+    return tag === exerciseTagOf(data) ? data : { ...data, tag }
   }
   const item = itemPath(path)
   if (item) {

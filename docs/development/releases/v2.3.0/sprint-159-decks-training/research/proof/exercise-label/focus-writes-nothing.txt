@@ -1,0 +1,16 @@
+The Experience lead's guard: when a deck has no `tag:` line, focusing the Label row or the pill and leaving without typing writes nothing.
+
+Run: 16 November 2026, 19:55 EET. Build: this branch, with the setPath guard, merged with origin/main (#751). One dev window from scripts/qa/dev-launch-isolated.sh (fresh profile, --use-mock-keychain), launched once and quit at once (LEFT=0). The deck was a fresh copy of the demo project's "AI assistants and agents.deck.md".
+
+Before the launch:
+  6e7c409db4ad41a965c5a26bee77a62378527342c3fa9a5575504746dfbd93fc  (no tag: line)
+
+1. Opened the deck and went to slide 8, an exercise. Opened Settings.
+2. Clicked into the Label field. Focus: deck-tag-8, value "Exercise". Shot: guard-label-focused-1440.png
+3. Clicked on Settings' header and left the field without typing. Focus: BODY. Closed Settings with Escape.
+4. Clicked into the pill. Focus: tag, caret collapsed, text "Exercise". Shot: guard-pill-focused-1440.png
+5. Clicked outside the slide and left the pill without typing. Focus: BODY. The bar read "Saved".
+6. Waited 4 s, then took the file's hash again:
+  6e7c409db4ad41a965c5a26bee77a62378527342c3fa9a5575504746dfbd93fc  (the same; `grep -c "tag:"` = 0)
+
+How this works: nothing writes on focus or blur. The pill writes only on `input`, and the Label row only on `change`. Before this commit, though, a write of the words already shown would have added `tag: Exercise`. Neither path ever made such a write, but `setPath('tag', 'Exercise')` on a deck with no line returned `{ tag: 'Exercise' }`. Now `setPath` returns the same data when the words are unchanged, and the Label row goes through `setPath`. The tests are in exerciseTag.test.ts, in the block "The Experience lead's guard".
