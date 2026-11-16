@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
-import { Icon } from '../components/ui/Icon'
+import { Icon, type PhosphorIconName } from '../components/ui/Icon'
 import type { WorkspaceFileLinkResult } from '../lib/workspaceFileSearch'
+import { fileIconOf } from '../lib/fileIcon'
 
 export interface FileLinkSuggestionItem extends Partial<WorkspaceFileLinkResult> {
   disabled?: boolean
@@ -17,11 +18,11 @@ export interface FileLinkSuggestionListHandle {
   onKeyDown: (props: { event: KeyboardEvent }) => boolean
 }
 
-function iconForKind(kind: WorkspaceFileLinkResult['kind'] | undefined) {
-  if (kind === 'markdown' || kind === 'document') return 'file-text'
-  if (kind === 'data') return 'table'
-  if (kind === 'image') return 'file-image'
-  return 'file'
+/** A deck (`*.deck.md`) shows the deck's own icon, as everywhere a file shows (Sprint 159, deck icons). */
+const KIND_ICONS: Partial<Record<WorkspaceFileLinkResult['kind'], PhosphorIconName>> = { markdown: 'file-text', document: 'file-text', data: 'table', image: 'file-image' }
+
+export function iconForFile(kind: WorkspaceFileLinkResult['kind'] | undefined, relativePath = '') {
+  return fileIconOf(relativePath, (kind && KIND_ICONS[kind]) ?? 'file')
 }
 
 export const FileLinkSuggestionList = forwardRef<FileLinkSuggestionListHandle, FileLinkSuggestionListProps>((props, ref) => {
@@ -108,7 +109,7 @@ export const FileLinkSuggestionList = forwardRef<FileLinkSuggestionListHandle, F
                 className="flex items-center justify-center w-8 h-8"
                 style={{ color: 'var(--vscode-descriptionForeground, #666666)' }}
               >
-                <Icon name={iconForKind(item.kind)} size={20} />
+                <Icon name={iconForFile(item.kind, item.relativePath)} size={20} />
               </span>
               <div className="flex flex-col items-start min-w-0 flex-1">
                 <div className="font-medium truncate w-full">

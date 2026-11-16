@@ -7,6 +7,7 @@
 import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react';
 import { Button } from '../ui/button';
 import { Icon } from '../ui/Icon';
+import { fileIconOf } from '../../lib/fileIcon';
 import { Tooltip } from '../ui/tooltip';
 import {
   Select,
@@ -1236,7 +1237,7 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
             {showActiveFileChip && (
               <div className="inline-flex min-w-0 max-w-full items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)] text-[var(--r-ink-muted)]">
                 {/* #477: a task card shows its task mark and title, as its tab does (the Experience lead). */}
-                <Icon name={activeFileLabel ? 'check-square' : 'file-text'} size={12} className="shrink-0" />
+                <Icon name={activeFileLabel ? 'check-square' : fileIconOf(activeFilePath, 'file-text')} size={12} className="shrink-0" />
                 <span className="min-w-0 truncate max-w-[140px]" title={activeFileLabel ?? activeFilePath!}>
                   {activeFileLabel ?? `Active: ${getDisplayPath(activeFilePath!)}`}
                 </span>

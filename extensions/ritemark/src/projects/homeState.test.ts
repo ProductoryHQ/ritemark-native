@@ -25,8 +25,8 @@ const minutes = (n: number) => T - n * 60_000;
 assert.deepEqual([...RECENT_EXTENSIONS], ['.md', '.markdown', '.txt', '.pdf', '.docx', '.doc', '.csv', '.xlsx', '.xls', '.pptx', '.ppt', '.drawio', '.flow']);
 assert.equal(RECENT_LIMIT, 5);
 assert.deepEqual(
-  ['Plan.md', 'NOTES.MD', 'a.markdown', 'log.txt', 'Brief.pdf', 'Offer.docx', 'old.doc', 'data.csv', 'Budget.xlsx', 'b.xls', 'Deck.pptx', 'd.ppt', 'Map.drawio', 'Weekly.flow', 'Weekly.flow.json', 'WEEKLY.FLOW.JSON', 'data.json', 'photo.png', 'Makefile', '.md'].map(kindOf),
-  ['markdown', 'markdown', 'markdown', 'markdown', 'pdf', 'word', 'word', 'sheet', 'sheet', 'sheet', 'slides', 'slides', 'drawing', 'flow', 'flow', 'flow', 'other', 'other', 'other', 'other'],
+  ['Plan.md', 'NOTES.MD', 'a.markdown', 'log.txt', 'Brief.pdf', 'Offer.docx', 'old.doc', 'data.csv', 'Budget.xlsx', 'b.xls', 'Deck.pptx', 'd.ppt', 'Map.drawio', 'Weekly.flow', 'Weekly.flow.json', 'WEEKLY.FLOW.JSON', 'data.json', 'photo.png', 'Makefile', '.md', 'Talk.deck.md', 'TALK.DECK.MD', 'Slide library/Teams.deck.md'].map(kindOf),
+  ['markdown', 'markdown', 'markdown', 'markdown', 'pdf', 'word', 'word', 'sheet', 'sheet', 'sheet', 'slides', 'slides', 'drawing', 'flow', 'flow', 'flow', 'other', 'other', 'other', 'other', 'deck', 'deck', 'deck'],
 );
 
 // ── The AI's name: ChatGPT, never Codex (R22) ──
@@ -66,6 +66,16 @@ assert.equal(full[0].item.changedAt, '2026-10-19T08:59:00.000Z');
 // The default limit, and the person's own CLAUDE.md (not the pointer) is a document like any other.
 assert.deepEqual(recentItems(folder, files, new Set()).map(({ item }) => item.name), ['CLAUDE', 'About this project', 'Outline', 'Session notes', 'AGENTS']);
 assert.equal(recentItems(folder, files, pointers, 2).length, 2);
+// Sprint 159 (deck icons): a deck's extension is the whole ".deck.md", as Documents splits it; a file named deck.md is a document
+assert.deepEqual(
+  recentItems(folder, [
+    { path: at('Talk.deck.md'), changedAt: minutes(1) },
+    { path: at('Slide library', 'TEAMS.DECK.MD'), changedAt: minutes(2) },
+    { path: at('deck.md'), changedAt: minutes(3) },
+    { path: at('Talk.deck.markdown'), changedAt: minutes(4) },
+  ], new Set()).map(({ item }) => [item.name, item.extension, item.kind]),
+  [['Talk', '.deck.md', 'deck'], ['TEAMS', '.DECK.MD', 'deck'], ['deck', '.md', 'markdown'], ['Talk.deck', '.markdown', 'markdown']],
+);
 // Names match without regard to case; a CLAUDE.md in a subfolder is never the pointer.
 assert.deepEqual(recentItems(folder, [
   { path: at('agents.md'), changedAt: minutes(1) },

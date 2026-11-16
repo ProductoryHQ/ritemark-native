@@ -5,6 +5,7 @@
 
 import type { ReactNode } from 'react';
 import { Icon } from '../ui/Icon';
+import { fileIconOf } from '../../lib/fileIcon';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import type { FileAttachment } from './types';
 
@@ -37,7 +38,7 @@ export function UserPromptBubble({ children, attachments, activeFilePath, active
       {/* Active file context indicator */}
       {activeFilePath && (
         <div className="flex items-center gap-1 mb-1.5 text-[10px] text-[var(--r-ink-muted)]">
-          <Icon name={activeFileLabel ? 'check-square' : 'file-text'} size={12} className="shrink-0" />
+          <Icon name={activeFileLabel ? 'check-square' : fileIconOf(activeFilePath, 'file-text')} size={12} className="shrink-0" />
           <span className="truncate" title={activeFileLabel ?? activeFilePath}>
             {activeFileLabel ?? `Context: ${displayFileName(activeFilePath)}`}
           </span>
