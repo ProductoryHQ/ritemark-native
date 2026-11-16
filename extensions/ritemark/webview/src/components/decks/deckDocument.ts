@@ -257,15 +257,17 @@ export function restoreSlide(state: EditorState, at: number, content: Fragment):
 }
 
 /** A new empty slide of `kind` before part `at` (at the end when `at` is the count); returns where it went. */
-export function insertSlide(state: EditorState, at: number, kind: string, random: () => number = Math.random): Transaction | null {
+export function insertSlide(state: EditorState, at: number, kind: string, random: () => number = Math.random, textHandout = false): Transaction | null {
   const type = state.schema.nodes.deckSlide
   if (!type) return null
   const body = writeSlideBody('', { id: newId(idsOf(state.doc), random) })
   const slide = type.create({ kind, body, notes: null })
   const point = insertPoint(state.doc, at)
   // Room for its words. Its heading is drawn by the deck view, following the title typed on the slide until the person
-  // writes in the handout (handout/drawnHeadings.ts).
-  return operation(state.tr.insert(point, [slide, state.schema.nodes.paragraph.create()]))
+  // writes in the handout (handout/drawnHeadings.ts); in a deck marked `handout: text`, where nothing is drawn, the part
+  // opens with an empty heading of its own, which gives the slide its title once written (`firstHeadingTitlePlugin`).
+  const heading = textHandout ? emptyPartHeading(state, kind) : null
+  return operation(state.tr.insert(point, [slide, ...(heading ? [heading] : []), state.schema.nodes.paragraph.create()]))
 }
 
 /** Change part `index`'s slide: its data (written line by line), and its kind when given. */

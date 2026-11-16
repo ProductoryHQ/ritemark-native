@@ -729,6 +729,9 @@ export function withTextHandoutMark(text: string): string {
   if (isTextHandout(text)) return text;
   const bom = text.startsWith('\uFEFF') ? '\uFEFF' : '';
   const body = text.slice(bom.length);
+  // An empty front matter (`---` twice): the mark goes between its lines, never into the text after it.
+  const empty = /^(---[ \t]*(\r?\n))(---[ \t]*(?:\r?\n|$))/.exec(body);
+  if (empty) return bom + empty[1] + `${TEXT_HANDOUT_KEY}: ${TEXT_HANDOUT_VALUE}` + empty[2] + empty[3] + body.slice(empty[0].length);
   const match = /^(---[ \t]*(\r?\n))([\s\S]*?)(\r?\n---[ \t]*(?:\r?\n|$))/.exec(body);
   if (!match) return `${bom}---\n${TEXT_HANDOUT_KEY}: ${TEXT_HANDOUT_VALUE}\n---\n\n${body}`;
   const lines = match[3].split(/\r?\n/).filter(line => KEY_LINE.exec(line)?.[1] !== TEXT_HANDOUT_KEY);

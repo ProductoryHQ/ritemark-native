@@ -39,6 +39,7 @@ import { SlideSettings } from './SlideSettings'
 import { SlideStrip, type StripActions, type StripMark } from './SlideStrip'
 import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, newId, parseSlideBody, withPartHeading, writeSlideBlock, writeSlideBody } from '../../../../src/decks/deckFormat'
 import type { Transaction } from '@tiptap/pm/state'
+import { isHistoryTransaction } from '@tiptap/pm/history'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
 import { DeckGuard } from './handout/deckGuard'
@@ -144,8 +145,9 @@ function partsFragment(editor: TipTapEditor, parts: NewPart[], imageMappings: Re
 
 interface DeckViewProps {
   content: string
-  /** The editor's Markdown; with the deck's front matter when this edit changes it too (its `handout: text` mark). */
-  onChange: (value: string, properties?: DocumentProperties) => void
+  /** The editor's Markdown; with a change of the deck's front matter when this edit makes it too (its `handout: text`
+   *  mark), applied to the properties as they are then. */
+  onChange: (value: string, properties?: (current: DocumentProperties) => DocumentProperties) => void
   onEditorReady: (editor: TipTapEditor) => void
   onSelectionChange?: (selection: EditorSelection) => void
   imageMappings: Record<string, string>
@@ -247,28 +249,40 @@ export function DeckView({
   const textHandout = properties[TEXT_HANDOUT_KEY] === TEXT_HANDOUT_VALUE
   const textHandoutRef = useRef(textHandout)
   textHandoutRef.current = textHandout
-  const propertiesRef = useRef(properties)
-  propertiesRef.current = properties
   const editorRef = useRef<TipTapEditor | null>(null)
   editorRef.current = editor
   // The mark this view wrote with the first edit: taken out again when Undo brings the drawn headings back.
   const markAdded = useRef(false)
+  // Whether the document's last change was an undo or a redo (the mark is taken out only by one).
+  const lastWasHistory = useRef(false)
+  useEffect(() => {
+    if (!editor) return
+    const onTransaction = ({ transaction }: { transaction: Transaction }) => {
+      if (transaction.docChanged) lastWasHistory.current = isHistoryTransaction(transaction)
+    }
+    editor.on('transaction', onTransaction)
+    return () => { editor.off('transaction', onTransaction) }
+  }, [editor])
   const handleChange = useCallback((markdown: string) => {
-    const current = propertiesRef.current
-    const marked = current[TEXT_HANDOUT_KEY] === TEXT_HANDOUT_VALUE
+    const marked = textHandoutRef.current
     const doc = editorRef.current?.state.doc
-    const mark = handoutMarkFor({ marked, drawn: !doc || hasDrawnHeadings(doc), addedHere: markAdded.current })
+    const mark = handoutMarkFor({ marked, drawn: !doc || hasDrawnHeadings(doc), addedHere: markAdded.current, undo: lastWasHistory.current })
     if (mark === 'add') {
       // The first real edit of the handout: its headings are written, and the mark goes with them, in this one edit.
+      // Nothing is drawn from now on, whatever runs before the view renders again.
       markAdded.current = true
-      onChange(markdown, { ...current, [TEXT_HANDOUT_KEY]: TEXT_HANDOUT_VALUE })
+      textHandoutRef.current = true
+      onChange(markdown, properties => ({ ...properties, [TEXT_HANDOUT_KEY]: TEXT_HANDOUT_VALUE }))
       return
     }
     if (mark === 'remove') {
       markAdded.current = false
-      const next = { ...current }
-      delete next[TEXT_HANDOUT_KEY]
-      onChange(markdown, next)
+      textHandoutRef.current = false
+      onChange(markdown, properties => {
+        const next = { ...properties }
+        delete next[TEXT_HANDOUT_KEY]
+        return next
+      })
       return
     }
     onChange(markdown)
@@ -602,7 +616,7 @@ export function DeckView({
   const stripActions = useMemo<StripActions>(() => ({
     pick,
     insert: (at, kind) => {
-      if (!editor || !dispatch(insertSlide(editor.state, at, kind))) return
+      if (!editor || !dispatch(insertSlide(editor.state, at, kind, Math.random, textHandoutRef.current))) return
       setFocusTitleOf({ index: at, select: false })
       requestAnimationFrame(() => pick(at))
     },

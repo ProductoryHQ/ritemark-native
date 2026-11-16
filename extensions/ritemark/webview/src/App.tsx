@@ -515,15 +515,16 @@ function App() {
     return true
   }, [documentSync, postDocumentEdit])
 
-  /** `nextProperties`: a mode's front matter change that belongs to this very edit (a deck's `handout: text` mark), sent
-   *  with it as one document edit. */
-  const handleContentChange = (newContent: string, nextProperties?: DocumentProperties) => {
+  /** `changeProperties`: a mode's front matter change that belongs to this very edit (a deck's `handout: text` mark),
+   *  applied to the properties as they are now and sent with it as one document edit. */
+  const handleContentChange = (newContent: string, changeProperties?: (current: DocumentProperties) => DocumentProperties) => {
     // Defense in depth: an editor update identical to the accepted host value
     // is not a document edit and must never make the tab dirty.
-    if (newContent === contentRef.current && !nextProperties) return
+    if (newContent === contentRef.current && !changeProperties) return
     contentRef.current = newContent
     setContent(newContent)
-    if (nextProperties) {
+    if (changeProperties) {
+      const nextProperties = changeProperties(propertiesRef.current)
       propertiesRef.current = nextProperties
       setProperties(nextProperties)
       setHasProperties(Object.keys(nextProperties).length > 0)

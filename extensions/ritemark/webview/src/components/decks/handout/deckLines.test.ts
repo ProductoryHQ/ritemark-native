@@ -13,7 +13,7 @@ import { joinBackward, selectNodeBackward, deleteSelection, chainCommands } from
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../../utils/markdownFidelity'
-import { parseSlideBody } from '../../../../../src/decks/deckFormat'
+import { parseSlideBody, writeSlideBody } from '../../../../../src/decks/deckFormat'
 import { DeckSlide } from './deckSchema'
 import { deckGuardPlugin } from './deckGuard'
 import { deckLinesPlugin, firstHeadingTitlePlugin } from './deckLines'
@@ -229,6 +229,36 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
   state = state.apply(state.tr.insertText('From the file', at).setMeta('ritemarkDocumentRevision', 2))
   state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, state.doc.content.size - 1)))
   assert.equal(parseSlideBody(slides(state.doc)[0].attrs.body).title ?? '', '', 'opening or a host update writes nothing')
+}
+
+
+// "Once" is per slide: a title filled from its heading, then cleared on purpose, stays cleared when the heading changes.
+{
+  let state = stateOf([slide('aaaa', ''), heading(2, ''), paragraph('Words.')])
+  const headingAt = state.doc.child(0).nodeSize + 1
+  const words = () => state.doc.content.size - 1
+  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, headingAt)))
+  state = state.apply(state.tr.insertText('Pricing'))
+  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, words())))
+  assert.equal(parseSlideBody(slides(state.doc)[0].attrs.body).title, 'Pricing')
+  // The person clears the title on the stage, then fixes the heading: the title stays cleared.
+  const node = state.doc.child(0)
+  state = state.apply(state.tr.setNodeMarkup(0, undefined, { ...node.attrs, body: writeSlideBody(node.attrs.body, { ...parseSlideBody(node.attrs.body), title: undefined }) }))
+  state = state.apply(state.tr.insertText('s', headingAt + 'Pricing'.length))
+  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, words())))
+  assert.equal(parseSlideBody(slides(state.doc)[0].attrs.body).title, undefined, 'a cleared title stays cleared')
+}
+
+// A heading typed and then emptied stops the waiting: a heading the host writes there later never fills the title.
+{
+  let state = stateOf([slide('aaaa', ''), heading(2, ''), paragraph('Words.')])
+  const headingAt = state.doc.child(0).nodeSize + 1
+  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, headingAt)))
+  state = state.apply(state.tr.insertText('Q'))
+  state = state.apply(state.tr.delete(headingAt, headingAt + 1))
+  state = state.apply(state.tr.insertText('Summary', headingAt).setMeta('ritemarkDocumentRevision', 3))
+  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, state.doc.content.size - 1)))
+  assert.equal(parseSlideBody(slides(state.doc)[0].attrs.body).title ?? '', '')
 }
 
 

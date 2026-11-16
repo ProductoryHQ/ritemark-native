@@ -3,7 +3,7 @@
  * `npx tsx src/editorSync/frontMatter.test.ts` (part of `test:editor-sync`).
  */
 import { strict as assert } from 'node:assert';
-import { joinFrontMatter, splitFrontMatter } from './frontMatter';
+import { headWithPlainKeyChanges, joinFrontMatter, splitFrontMatter } from './frontMatter';
 
 /** The properties as the webview sends them back: through postMessage's JSON. */
 const viaWebview = (properties: Record<string, unknown>) => JSON.parse(JSON.stringify(properties));
@@ -79,5 +79,21 @@ const obsidian = [
   const headOnly = '---\na: 1\n---\n';
   assert.equal(joinFrontMatter({ a: 1 }, '', headOnly), headOnly);
 }
+
+// 16 November: a plain one-word key added or taken out (a deck's `handout: text`) changes only its own line; the
+// comments, quoting and date forms of the rest stay byte for byte, and taking it out again gives back the same bytes.
+{
+  const deck = '---\n# client deck\ndeck: 1\ntheme: "Slide library/Themes/Evening.theme.md"\ndate: 2026-10-20\n---\n\nThe body.\n';
+  const properties = JSON.parse(JSON.stringify(splitFrontMatter(deck).properties));
+  const marked = joinFrontMatter({ ...properties, handout: 'text' }, 'The body, edited.', deck);
+  assert.equal(marked, '---\n# client deck\ndeck: 1\ntheme: "Slide library/Themes/Evening.theme.md"\ndate: 2026-10-20\nhandout: text\n---\n\nThe body, edited.\n');
+  assert.equal(joinFrontMatter(properties, 'The body.', marked), deck, 'taken out again: the bytes as they were');
+  // Anything else is gray-matter's, as before: a changed value, a value that isn't one word.
+  assert.equal(headWithPlainKeyChanges('---\na: 1\n---\n', { a: 1 }, { a: 2 }), null);
+  assert.equal(headWithPlainKeyChanges('---\na: 1\n---\n', { a: 1 }, { a: 1, b: 'two words' }), null);
+  assert.equal(headWithPlainKeyChanges('---\na: 1\n---\n', { a: 1 }, { a: 1 }), null);
+  assert.equal(headWithPlainKeyChanges('---\nlook: borderless\n---\n', { look: 'borderless' }, {}), '---\n---\n');
+}
+
 
 console.log('frontMatter.test.ts — all assertions passed');

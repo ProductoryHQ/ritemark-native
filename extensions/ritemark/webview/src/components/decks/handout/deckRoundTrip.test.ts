@@ -292,18 +292,19 @@ const blocksOf = (text: string) => text.match(/```slide[\s\S]*?\n```/g) ?? []
   const state = EditorState.create({ doc, plugins })
   const drawn = state.apply(derivedHeadings(state)!)
   assert.equal(save(drawn.doc), older, 'opening a deck with no mark: byte for byte')
-  assert.equal(handoutMarkFor({ marked: false, drawn: hasDrawnHeadings(drawn.doc), addedHere: false }), null, 'and no mark is asked for')
+  assert.equal(handoutMarkFor({ marked: false, drawn: hasDrawnHeadings(drawn.doc), addedHere: false, undo: false }), null, 'and no mark is asked for')
   // The first real edit: the heading is written, and the mark goes with it in that same edit.
   const end = drawn.doc.content.size - 1
   const edited = drawn.apply(drawn.tr.insertText(' It acts.', end))
   assert.ok(save(edited.doc).includes('## Agents act\n\nAn agent is given a goal. It acts.'))
-  assert.equal(handoutMarkFor({ marked: false, drawn: hasDrawnHeadings(edited.doc), addedHere: false }), 'add')
+  assert.equal(handoutMarkFor({ marked: false, drawn: hasDrawnHeadings(edited.doc), addedHere: false, undo: false }), 'add')
   // One undo: the edit and its headings go back together, and the mark with them.
   let undone: EditorState = edited
   undo(edited, (tr: Transaction) => { undone = edited.apply(tr) })
   assert.equal(save(undone.doc), older)
-  assert.equal(handoutMarkFor({ marked: true, drawn: hasDrawnHeadings(undone.doc), addedHere: true }), 'remove')
-  assert.equal(handoutMarkFor({ marked: true, drawn: true, addedHere: false }), null, "a mark this view didn't add stays")
+  assert.equal(handoutMarkFor({ marked: true, drawn: hasDrawnHeadings(undone.doc), addedHere: true, undo: true }), 'remove')
+  assert.equal(handoutMarkFor({ marked: true, drawn: true, addedHere: false, undo: true }), null, "a mark this view didn't add stays")
+  assert.equal(handoutMarkFor({ marked: true, drawn: true, addedHere: true, undo: false }), null, 'only an undo takes the mark out: a heading drawn meanwhile never does')
 
   // A marked deck whose part's heading the person deleted: reopened, nothing is drawn, so the heading stays deleted.
   const marked = '---\ndeck: 1\nhandout: text\n---\n\n```slide points\nid: p001\ntitle: Agents act\n```\n\nAn agent is given a goal.\n'

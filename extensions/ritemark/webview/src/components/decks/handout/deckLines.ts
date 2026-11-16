@@ -123,7 +123,14 @@ export function deckLinesPlugin(random: () => number = Math.random): Plugin {
 // A slide with no title takes the first heading written in its part (16 November, the Experience lead)
 // ---------------------------------------------------------------------------
 
-export const firstHeadingTitleKey = new PluginKey<ReadonlySet<string>>('deckFirstHeadingTitle')
+/** Which slides wait for a title from their part's first heading, and which never will again (by slide id). */
+export interface TitleWaiting {
+  waiting: ReadonlySet<string>
+  /** Slides that had a title once, or got one from a heading: "once" is per slide, for the whole session. */
+  done: ReadonlySet<string>
+}
+
+export const firstHeadingTitleKey = new PluginKey<TitleWaiting>('deckFirstHeadingTitle')
 
 /** A part's own heading, written (not drawn), with words: its text, and where it lies. */
 function writtenHeadingOf(doc: PMNode, slidePos: number): { text: string; from: number; to: number } | null {
@@ -134,41 +141,51 @@ function writtenHeadingOf(doc: PMNode, slidePos: number): { text: string; from: 
 }
 
 /**
- * The slides waiting for a title from their part's first heading: a slide with no title whose part's own heading the
- * person just wrote or changed. Its title is set once the caret has left that heading (so a heading typed letter by
- * letter gives its whole words, not its first letter), and never again: a slide with a title is never waiting, and
- * the title is never overwritten. Undo, redo, the host's updates and drawn headings never make a slide wait.
+ * The slides waiting for a title from their part's first heading: a slide with no title, and never one before, whose
+ * part's own heading the person just wrote or changed. Its title is set once the caret has left that heading (so a
+ * heading typed letter by letter gives its whole words), and never again for that slide: a title is never overwritten,
+ * and one the person clears stays cleared. A slide stops waiting when its heading is emptied, and on any change the
+ * person didn't make (undo, redo, the host's updates, drawn headings), so a heading from an AI or the file never fills
+ * a title.
  */
-export function waitingAfter(waiting: ReadonlySet<string>, tr: Transaction, before: PMNode, after: PMNode): ReadonlySet<string> {
-  if (!tr.docChanged) return waiting
+export function waitingAfter(state: TitleWaiting, tr: Transaction, before: PMNode, after: PMNode): TitleWaiting {
+  if (!tr.docChanged) return state
   const person = !passes(tr)
-  const was = new Map<string, string>()
-  if (person) {
-    for (const slide of slidesOf(before)) {
-      if (slide.data.id) was.set(slide.data.id, writtenHeadingOf(before, slide.pos)?.text ?? '')
-    }
-  }
-  const next = new Set<string>()
+  let done: Set<string> | null = null
+  const waiting = new Set<string>()
+  let beforeById: Map<string, number> | null = null
   for (const slide of slidesOf(after)) {
     const id = slide.data.id
-    if (!id || (slide.data.title ?? '').trim()) continue
-    if (waiting.has(id)) { next.add(id); continue }
+    if (!id || state.done.has(id)) continue
+    if ((slide.data.title ?? '').trim()) {
+      done ??= new Set(state.done)
+      done.add(id)
+      continue
+    }
     if (!person) continue
     const heading = writtenHeadingOf(after, slide.pos)
-    if (heading && heading.text !== (was.get(id) ?? '')) next.add(id)
+    if (!heading) continue
+    if (state.waiting.has(id)) { waiting.add(id); continue }
+    if (!beforeById) {
+      beforeById = new Map()
+      for (const entry of slidesOf(before)) if (entry.data.id) beforeById.set(entry.data.id, entry.pos)
+    }
+    const was = beforeById.get(id)
+    if (heading.text !== (was === undefined ? '' : writtenHeadingOf(before, was)?.text ?? '')) waiting.add(id)
   }
-  return next.size === waiting.size && [...next].every(id => waiting.has(id)) ? waiting : next
+  const sameWaiting = waiting.size === state.waiting.size && [...waiting].every(id => state.waiting.has(id))
+  return sameWaiting && !done ? state : { waiting: sameWaiting ? state.waiting : waiting, done: done ?? state.done }
 }
 
 /** The titles of the waiting slides whose heading the caret has left, as one transaction; null when there are none. */
 export function titlesFromHeadings(state: EditorState): Transaction | null {
-  const waiting = firstHeadingTitleKey.getState(state)
-  if (!waiting || waiting.size === 0) return null
+  const titles = firstHeadingTitleKey.getState(state)
+  if (!titles || titles.waiting.size === 0) return null
   const tr = state.tr
   const { from, to } = state.selection
   for (const slide of slidesOf(state.doc)) {
     const id = slide.data.id
-    if (!id || !waiting.has(id) || (slide.data.title ?? '').trim()) continue
+    if (!id || !titles.waiting.has(id) || (slide.data.title ?? '').trim()) continue
     const heading = writtenHeadingOf(state.doc, slide.pos)
     if (!heading || (from >= heading.from && to <= heading.to)) continue
     tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, body: writeSlideBody(slide.node.attrs.body, { ...slide.data, title: heading.text }) })
@@ -177,12 +194,12 @@ export function titlesFromHeadings(state: EditorState): Transaction | null {
 }
 
 /** The plugin that gives a slide with no title its part's first heading (the tests run it with the editor's history). */
-export function firstHeadingTitlePlugin(): Plugin<ReadonlySet<string>> {
-  return new Plugin<ReadonlySet<string>>({
+export function firstHeadingTitlePlugin(): Plugin<TitleWaiting> {
+  return new Plugin<TitleWaiting>({
     key: firstHeadingTitleKey,
     state: {
-      init: () => new Set<string>(),
-      apply: (tr, waiting, oldState, newState) => waitingAfter(waiting, tr, oldState.doc, newState.doc),
+      init: () => ({ waiting: new Set<string>(), done: new Set<string>() }),
+      apply: (tr, value, oldState, newState) => waitingAfter(value, tr, oldState.doc, newState.doc),
     },
     appendTransaction: (_transactions, _oldState, newState) => titlesFromHeadings(newState),
   })

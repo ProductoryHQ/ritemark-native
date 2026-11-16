@@ -34,12 +34,12 @@ export function hasDrawnHeadings(doc: PMNode): boolean {
 
 /**
  * The deck's `handout: text` mark for an edit the editor reports (16 November): added with the first edit after which
- * no heading is drawn (its headings written), and taken out again when Undo brings drawn headings back, if this view
- * added it. Null: the front matter stays as it is.
+ * no heading is drawn (its headings written), and taken out again only when an undo brings drawn headings back, if this
+ * view added it. Null: the front matter stays as it is.
  */
-export function handoutMarkFor(input: { marked: boolean; drawn: boolean; addedHere: boolean }): 'add' | 'remove' | null {
+export function handoutMarkFor(input: { marked: boolean; drawn: boolean; addedHere: boolean; undo: boolean }): 'add' | 'remove' | null {
   if (!input.marked && !input.drawn) return 'add'
-  if (input.marked && input.drawn && input.addedHere) return 'remove'
+  if (input.marked && input.drawn && input.addedHere && input.undo) return 'remove'
   return null
 }
 

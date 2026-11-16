@@ -368,6 +368,8 @@ test('the handout: text mark: read, written into a front matter or a new one, ne
   const marked = '---\ndeck: 1\nhandout: text\n---\n';
   assert.equal(withTextHandoutMark(marked), marked, 'never twice');
   assert.equal(withTextHandoutMark('---\nhandout: other\n---\n'), '---\nhandout: text\n---\n', 'another value is replaced');
+  // An empty front matter takes the mark between its lines, never in the text after it.
+  assert.equal(withTextHandoutMark('---\n---\n\nWords.\n\n---\n\nMore.\n'), '---\nhandout: text\n---\n\nWords.\n\n---\n\nMore.\n');
 });
 
 test('a deck written before the mark gets its headings and the mark together; its slide blocks stay byte for byte', () => {

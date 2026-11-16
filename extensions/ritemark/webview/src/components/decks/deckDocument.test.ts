@@ -128,6 +128,11 @@ assert.equal(partIndexAt(doc, slidesOf(doc)[1].pos + 3), 1)
   const names: string[] = []
   made.doc.forEach(node => names.push(node.type.name === 'heading' ? `h${node.attrs.level}` : node.type.name))
   assert.deepEqual(names.slice(-2), ['deckSlide', 'paragraph'])
+  // In a deck marked `handout: text` nothing is drawn: the part opens with an empty heading of its own.
+  const marked = insertSlide(state, 3, 'points', () => 0.5, true)!
+  const markedNames: string[] = []
+  marked.doc.forEach(node => markedNames.push(node.type.name === 'heading' ? `h${node.attrs.level}` : node.type.name))
+  assert.deepEqual(markedNames.slice(-3), ['deckSlide', 'h2', 'paragraph'])
 }
 
 // The handout's placeholders: "Heading" on every part's empty heading; "Write here. *** starts a new slide." only on
