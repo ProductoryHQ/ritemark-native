@@ -62,22 +62,20 @@ export function foldedSides(fold: DeckFold, handoutRoom: boolean): { slideShown:
   return { slideShown: fold !== 'slide' || !handoutShown, handoutShown }
 }
 
-/** The fold's distance from the room's bottom: the pill's lower end, or the one round button's. */
-const BOTTOM = 28
-/** A folded side's button sits this far from the line, inside the side that shows. */
+/** A folded side's button sits this far from the line, inside the side that shows. (Its distance from the room's
+ *  bottom, 28 px, is decks.css's `.deck-fold`, the one place it is kept.) */
 const INSET = 22
 
 interface FoldButton { label: string; icon: 'caret-left' | 'caret-right'; side: 'slide' | 'handout' }
 
-/** The fold's control: with both sides shown, the split pill's two halves, upper first; otherwise one round button to
- *  bring the folded side back. `left` is where it stands, from the desk's left (the pill's middle on the line). */
-export function foldControl(slideShown: boolean, handoutShown: boolean, line: number): { left: number; bottom: number; split: boolean; buttons: FoldButton[] } {
-  if (!slideShown) return { left: line + INSET, bottom: BOTTOM, split: false, buttons: [{ label: 'Show the slide', icon: 'caret-right', side: 'slide' }] }
-  if (!handoutShown) return { left: line - INSET, bottom: BOTTOM, split: false, buttons: [{ label: 'Show the handout', icon: 'caret-left', side: 'handout' }] }
+/** The fold's control at the line between the slide and the handout (`line`, from the desk's left). With both sides
+ *  shown, the split pill's two halves, upper first, centred on the line; otherwise one round button, `INSET` inside the
+ *  side that shows, to bring the folded side back. The returned `left` is where the control's middle stands. */
+export function foldControl(slideShown: boolean, handoutShown: boolean, line: number): { left: number; buttons: FoldButton[] } {
+  if (!slideShown) return { left: line + INSET, buttons: [{ label: 'Show the slide', icon: 'caret-right', side: 'slide' }] }
+  if (!handoutShown) return { left: line - INSET, buttons: [{ label: 'Show the handout', icon: 'caret-left', side: 'handout' }] }
   return {
     left: line,
-    bottom: BOTTOM,
-    split: true,
     buttons: [
       { label: 'Hide the slide', icon: 'caret-left', side: 'slide' },
       { label: 'Hide the handout', icon: 'caret-right', side: 'handout' },
@@ -92,21 +90,24 @@ export function DeckFolds({ slideShown, handoutShown, left, onToggle }: {
   onToggle: (side: 'slide' | 'handout') => void
 }) {
   const control = foldControl(slideShown, handoutShown, left)
+  // Two buttons are the split pill; one is the round button that brings a folded side back.
+  const split = control.buttons.length === 2
   return (
     // One element whatever the fold, and each half keyed by its side: the pressed half stays the same button when the
     // pill becomes the one round button, so the keyboard's focus stays on it.
     <div
-      className={`deck-fold${control.split ? ' is-split' : ''}`}
-      style={{ left: control.left, bottom: control.bottom }}
-      role={control.split ? 'group' : undefined}
-      aria-label={control.split ? 'Fold either side' : undefined}
+      className={`deck-fold${split ? ' is-split' : ''}`}
+      style={{ left: control.left }}
+      role={split ? 'group' : undefined}
+      aria-label={split ? 'Fold either side' : undefined}
     >
-      {control.buttons.map(button => (
-        <Tooltip key={button.side} label={button.label} side={control.split ? 'right' : 'bottom'}>
+      {control.buttons.map((button, at) => (
+        <Tooltip key={button.side} label={button.label} side={split ? 'right' : 'bottom'}>
           <Button
-            variant={control.split ? 'ghost' : 'outline'}
+            variant={split ? 'ghost' : 'outline'}
             size="icon-sm"
-            className="deck-fold-button"
+            // Each half names its end of the pill, so its corners and the hairline never depend on Tooltip's wrapper.
+            className={`deck-fold-button${split ? (at === 0 ? ' is-upper' : ' is-lower') : ''}`}
             aria-label={button.label}
             onClick={() => onToggle(button.side)}
           >

@@ -38,9 +38,8 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
 {
   assert.deepEqual(labels(true, true), ['Hide the slide', 'Hide the handout'])
   const control = foldControl(true, true, 500)
-  assert.equal(control.split, true)
+  assert.equal(control.buttons.length, 2)
   assert.equal(control.left, 500, 'on the line')
-  assert.equal(control.bottom, 28, 'at the bottom, where the one fold was')
   assert.deepEqual(control.buttons.map(b => [b.side, b.icon]), [['slide', 'caret-left'], ['handout', 'caret-right']], 'upper half first')
   // Both halves are inside one control: one group with both buttons in it, and no second control beside it.
   const html = draw(true, true)
@@ -50,6 +49,8 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
   assert.ok(pill.classList.contains('is-split'))
   assert.equal(pill.getAttribute('role'), 'group')
   assert.equal(pill.querySelectorAll('button.deck-fold-button').length, 2, 'two halves in it')
+  // Each half names its end of the pill itself, not through the Tooltip's wrapper.
+  assert.deepEqual(pill.querySelectorAll('button').map(b => [b.classList.contains('is-upper'), b.classList.contains('is-lower')]), [[true, false], [false, true]])
   // Each half stays a real button with its own label.
   assert.deepEqual(pill.querySelectorAll('button').map(b => b.getAttribute('aria-label')), ['Hide the slide', 'Hide the handout'])
   assert.equal(html.querySelectorAll('[title]').length, 0, 'no native title')
@@ -70,16 +71,19 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
   const { readFileSync } = await import('node:fs')
   const css = readFileSync(new URL('./decks.css', import.meta.url), 'utf8').replace(/\s+/g, ' ')
   assert.ok(/\.deck-fold\.is-split \{[^}]*flex-direction: column;[^}]*border-radius: 13px;[^}]*background: var\(--r-surface\);[^}]*box-shadow: 0 0 0 1px var\(--r-hairline-strong\), 0 2px 6px/.test(css), 'the pill')
-  assert.ok(/\.deck-fold\.is-split \.deck-fold-button \{ width: 26px; height: 28px;/.test(css), '26×28 halves')
-  assert.ok(/\.deck-fold\.is-split > span \+ span \.deck-fold-button \{[^}]*box-shadow: inset 0 1px 0 var\(--r-hairline-strong\)/.test(css), 'a hairline between')
-  assert.ok(/\.deck-fold\.is-split \.deck-fold-button:hover \{ background: var\(--r-accent-soft\); color: var\(--r-accent\); \}/.test(css), 'the hover')
+  assert.ok(/\.deck-fold\.is-split \.deck-fold-button \{ width: 26px; height: 28px;[^}]*transform: none;/.test(css), '26×28 halves that a press does not shrink')
+  assert.ok(/\.deck-fold\.is-split \.deck-fold-button\.is-upper \{ border-radius: 13px 13px 0 0; \}/.test(css), "the upper half takes the pill's top")
+  assert.ok(/\.deck-fold\.is-split \.deck-fold-button\.is-lower \{ border-radius: 0 0 13px 13px; box-shadow: inset 0 1px 0 var\(--r-hairline-strong\); \}/.test(css), 'a hairline between')
+  assert.ok(!/\.is-split > span/.test(css), "nothing hangs on the Tooltip's wrapper")
+  assert.ok(/\.deck-fold\.is-split \.deck-fold-button:hover, \.deck-fold\.is-split \.deck-fold-button:focus-visible \{ background: var\(--r-accent-soft\); color: var\(--r-accent\); \}/.test(css), 'the hover, and keyboard focus the same')
+  assert.ok(/\.deck-fold\.is-split \.deck-fold-button:focus-visible \{ outline-offset: -2px; \}/.test(css), 'the focus ring inside its half')
 }
 
 // The slide hidden: one round › at the handout's left edge, Show the slide, and nothing to hide the handout with.
 {
   assert.deepEqual(labels(false, true), ['Show the slide'])
   const control = foldControl(false, true, 132)
-  assert.equal(control.split, false)
+  assert.equal(control.buttons.length, 1)
   assert.ok(control.left > 132, "inside the handout's left edge")
   assert.equal(control.buttons[0].icon, 'caret-right')
   const html = draw(false, true)
@@ -93,8 +97,7 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
   assert.deepEqual(labels(true, false), ['Show the handout'])
   const control = foldControl(true, false, 900)
   assert.equal(control.left, 878)
-  assert.equal(control.bottom, 28)
-  assert.equal(control.split, false)
+  assert.equal(control.buttons.length, 1)
 }
 
 // The two sides can't both be hidden: one fold value, and a press of either button brings its side back or folds it.
