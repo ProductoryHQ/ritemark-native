@@ -11,6 +11,7 @@ A hidden dev instance (`scripts/qa/dev-launch-isolated.sh`, `RITEMARK_PRESENT_WI
 - `wall-borderless.png`: a Borderless deck's words on white, bands of #0E0C24.
 - `present-menu.png`: Present on the deck's bar and its menu, From the start (⇧⌘↩).
 - `deck-after-stop.png`: Esc on slide 11: the deck view is back on slide 11. (The Copilot Chat toast is the dev build's own and comes with every dev launch.)
+- `present-notice.png`: where this Ritemark can't place the wall (outside a dev build, until PR 6's shell), Present answers in the deck's bar, words only: "Presenting needs a newer Ritemark. Update it, then present again." Present stays enabled; nothing opens. A dev build places the wall, so the host's answer was given to the deck view as the host sends it (`deck/present-failed`, the same words); `DeckPresenter.test.ts` drives the host itself and shows no panel and no window command. The Present label folds to its icon while a notice takes the bar's room: the shared split button's narrow rule, as beside the Delete notice since Sprint 157.
 - `wall-window-title-row.png`: the wall's whole window in the windowed mode: no tab row, but the window's title row and the desk's edge stay (see below).
 
 ## Log

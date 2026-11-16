@@ -248,14 +248,16 @@ export function decodeDeckPresentRequest(value: unknown): DeckPresentRequest | n
   return { type: 'deck/present', from: input.from, index: input.index };
 }
 
-/** Why Present can't run on a shell without its placement commands (outside a dev build). */
-export const PRESENT_NEEDS_UPDATE = 'Presenting needs the newest Ritemark. Update Ritemark, then present.';
+/**
+ * Present's answer on a shell without its placement commands (outside a dev build): a notice in the deck's bar, words
+ * only, when Present, ⌘↩ or ⇧⌘↩ is pressed (the Experience lead, 16 November). The button stays enabled, and nothing
+ * opens.
+ */
+export const PRESENT_NEEDS_UPDATE = 'Presenting needs a newer Ritemark. Update it, then present again.';
 
-/** The deck view's Present menu: whether Present can run, whether a presenter view can show, where, and whether it is on. */
+/** The deck view's Present menu: whether a presenter view can show, where, and whether it is on. */
 export interface DeckPresentOptions {
   type: 'deck/present-options';
-  /** Why Present can't run here (an older shell), or null: the shell can place the wall, or a dev build may. */
-  unavailable: string | null;
   /** A second display is connected (or a dev build's windowed mode) and the shell can place the windows. */
   available: boolean;
   on: boolean;

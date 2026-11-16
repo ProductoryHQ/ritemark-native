@@ -68,7 +68,9 @@ export type FlagId =
   // Sprint 148 (#591): Ritemark's own search, the words layer (its index reads the project in a worker)
   | 'project-search'
   // Sprint 157 (experience 46): a `.deck.md` opens as a deck, with the Slide library and the AI's deck tools
-  | 'decks';
+  | 'decks'
+  // Sprint 158 (#711): editing an .xlsx in place, saved cell by cell; the kill switch for it
+  | 'excel-editing';
 
 /**
  * Feature flag registry
@@ -334,6 +336,17 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     id: 'scheduled-tasks-daemon',
     label: 'Scheduled Tasks Daemon',
     description: 'Run AI agents on a schedule while Ritemark is open',
+    status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  // Sprint 158 (#711): ON by default (HARD RULE #2); a kill switch for the save that writes people's workbooks
+  // (the Development manager, 15 November, answering Codex on #726). Off: an .xlsx opens read-only in the sheet grid,
+  // as an .xls does, and the host refuses every cell edit. It is not 'disabled' code: reverting Sprint 158 would bring
+  // back the save that strips a workbook's formatting, so read-only is the safe off-state.
+  'excel-editing': {
+    id: 'excel-editing',
+    label: 'Excel Editing',
+    description: 'Edit .xlsx workbooks in place; a save changes only the cells you edit. Kill switch: off opens them read-only.',
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },

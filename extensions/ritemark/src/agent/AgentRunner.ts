@@ -386,6 +386,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
     onProgress,
     pathToClaudeCodeExecutable,
     modelDeclaration,
+    anthropicApiKey,
   } = options;
 
   const emitProgress: ExtendedProgressEmitter = (
@@ -455,7 +456,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
         // from the user's personal config. Lazy require: modelCatalog pulls in
         // vscode, which the tsx unit tests cannot load at module scope.
         model: model ?? (require('../ai/modelCatalog') as typeof import('../ai/modelCatalog')).getDefault('anthropic', 'claude-code'),
-        ...claudeRuntimeOptions(undefined, modelDeclaration),
+        ...claudeRuntimeOptions(anthropicApiKey, modelDeclaration),
         settingSources: resolveSettingSources(settingSources),
         // Sprint 103 R2: headless flow runs auto-approve via canUseTool below —
         // same behavior as the old bypassPermissions without the dangerous flag.

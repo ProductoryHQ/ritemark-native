@@ -115,6 +115,23 @@ async function run() {
   assert.equal(viaView.first, harbour.length + 1);
   await assert.rejects(library.insertCopies('Slide library/AI assistants.deck.md', ['a1'], 'notes.md', 0));
 
+  // Sprint 159 (PR 2): a deck or a topic in a later `deck:` format (a newer Ritemark wrote it) is never rewritten in
+  // this build's format: inserting into it, updating it, adding to it and a from: line's write are refused, the file
+  // left byte for byte.
+  {
+    const LATER = '---\ndeck: 2\n---\n\n```slide title\nid: n1\ntitle: Newer\n```\n';
+    const newer = project({ 'Slide library/AI assistants.deck.md': TOPIC, 'Slide library/Newer.deck.md': LATER.replace('id: n1', 'id: a1'), 'Clients/Newer.deck.md': LATER, 'Clients/Harbour/Harbour.deck.md': DECK });
+    const later = new DeckLibrary(newer);
+    const refused = /newer deck format/;
+    await assert.rejects(later.insertCopies('Slide library/AI assistants.deck.md', ['a1'], 'Clients/Newer.deck.md', 1), refused);
+    const [copyOfNewer] = await later.copies('Slide library/Newer.deck.md', ['a1'], 'Clients/Harbour/Harbour.deck.md', ['t1']);
+    await assert.rejects(later.updateLibrarySlide('Clients/Harbour/Harbour.deck.md', copyOfNewer), refused);
+    await assert.rejects(later.addToLibrary('Clients/Harbour/Harbour.deck.md', 'Newer', copyOfNewer), refused);
+    await assert.rejects(later.setFrom('Clients/Newer.deck.md', 'n1', 'Slide library/AI assistants.deck.md#a1 @x'), refused);
+    assert.equal(newer.files['Clients/Newer.deck.md'], LATER);
+    assert.equal(newer.files['Slide library/Newer.deck.md'], LATER.replace('id: n1', 'id: a1'));
+  }
+
   console.log('DeckLibrary: passed');
 }
 

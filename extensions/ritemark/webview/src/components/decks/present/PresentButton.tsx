@@ -19,8 +19,6 @@ const START_KEYS = isMac ? '⇧⌘↩' : 'Shift+Ctrl+Enter'
 
 /** The host's answer for the menu's Presenter view (`deck/present-options`). */
 interface PresentOptions {
-  /** Why Present can't run here (an older shell), or null. */
-  unavailable: string | null
   available: boolean
   on: boolean
   wallDisplay: string | null
@@ -61,13 +59,13 @@ export function PresentButton({ slideNumber, startNumber, onPresent }: {
   onPresent: (from: PresentFrom) => void
 }) {
   const [options, setOptions] = useState<PresentOptions | null>(null)
-  // An older shell can't place the wall without showing the project's name: Present waits for an update there.
-  const unavailable = options?.unavailable ?? null
-  const disabled = slideNumber === null || unavailable !== null
+  // Present stays enabled on an older shell too: pressing it is answered with a notice in the bar (the host's
+  // `deck/present-failed`), never a disabled button.
+  const disabled = slideNumber === null
 
   useEffect(() => onMessage(message => {
     if (message.type !== 'deck/present-options') return
-    setOptions({ unavailable: typeof message.unavailable === 'string' ? message.unavailable : null, available: message.available === true, on: message.on === true, wallDisplay: typeof message.wallDisplay === 'string' ? message.wallDisplay : null })
+    setOptions({ available: message.available === true, on: message.on === true, wallDisplay: typeof message.wallDisplay === 'string' ? message.wallDisplay : null })
   }), [])
   useEffect(() => { sendToExtension('deck/present-options') }, [])
 
@@ -79,7 +77,7 @@ export function PresentButton({ slideNumber, startNumber, onPresent }: {
       main={{
         label: 'Present',
         icon: <Icon name="play" size={14} tone="inherit" />,
-        tooltip: unavailable ?? (slideNumber === null ? 'Add a slide to present the deck' : `Present from this slide (${HERE_KEYS})`),
+        tooltip: disabled ? 'Add a slide to present the deck' : `Present from this slide (${HERE_KEYS})`,
         onClick: () => onPresent('here'),
       }}
       menu={{

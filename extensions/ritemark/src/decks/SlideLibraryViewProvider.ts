@@ -47,17 +47,33 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
         ? { type: 'library/show', section: target.section }
         : { type: 'library/reveal', path: target.path, id: target.id })),
     );
+  }
+
+  /**
+   * Sprint 159 (PR 2): the project's decks are watched only while the place's view exists (the flag on): with the flag
+   * off, as most windows have it, nothing of the library runs, and turning it off ends the watching with the view.
+   */
+  private watching: vscode.Disposable[] = [];
+
+  private watchDecks(): void {
+    if (this.watching.length) return;
     const watcher = vscode.workspace.createFileSystemWatcher('**/*.deck.md');
-    this.subscriptions.push(
+    this.watching = [
       watcher,
       watcher.onDidCreate(() => this.refreshSoon()),
       watcher.onDidDelete(() => this.refreshSoon()),
       watcher.onDidChange(() => this.refreshSoon()),
       vscode.workspace.onDidChangeTextDocument(event => { if (/\.deck\.md$/i.test(event.document.uri.fsPath)) this.refreshSoon(); }),
-    );
+    ];
+  }
+
+  private stopWatching(): void {
+    for (const subscription of this.watching) subscription.dispose();
+    this.watching = [];
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
+    this.watchDecks();
     this.view = view;
     this.ready = false;
     // The project folder too: the slides' pictures are drawn on the thumbnails.
@@ -70,6 +86,7 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
       if (this.view !== view) return;
       this.view = null;
       this.ready = false;
+      this.stopWatching();
     });
   }
 
@@ -169,6 +186,7 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
   dispose(): void {
     if (this.timer) clearTimeout(this.timer);
     for (const subscription of this.subscriptions) subscription.dispose();
+    this.stopWatching();
   }
 }
 

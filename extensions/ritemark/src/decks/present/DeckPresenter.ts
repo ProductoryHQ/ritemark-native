@@ -10,7 +10,7 @@
  *  - With the shell's `_ritemark.present.*` commands (patch 018, `ritemarkPresent.ts`): the wall goes full screen on the
  *    second display (the one that isn't built in) and the presenter view on the laptop's, each in a window of its own
  *    with nothing of Ritemark around it. The presenter view comes on by itself with two displays; the menu turns it off.
- *  - Without them (an older shell): the PR 5 path, VS Code's own commands. The wall moves into a window of its own,
+ *  - Without them, in a dev build only: the PR 5 path, VS Code's own commands. The wall moves into a window of its own,
  *    compact, its group locked, then full screen, each step only once the wall says its window has the focus. No
  *    presenter view.
  *
@@ -27,8 +27,8 @@
  *
  * The path without the shell's commands runs only in a dev build: in Ritemark's frame a window moved with VS Code's
  * commands keeps its title row ("<deck> — <project>") and the desk's edge, and the room would read the project's name
- * on the projector (the Experience lead, 16 November). Elsewhere, an older shell, Present says it needs a newer
- * Ritemark.
+ * on the projector (the Experience lead, 16 November). Elsewhere, on an older shell, Present stays enabled and is
+ * answered with a notice in the deck's bar, words only (`PRESENT_NEEDS_UPDATE`); nothing opens.
  */
 import * as os from 'os';
 import * as path from 'path';
@@ -150,7 +150,6 @@ export class DeckPresenter implements vscode.Disposable {
     const chosen = chooseDisplays(displays);
     return {
       type: 'deck/present-options',
-      unavailable: shell || presentFallbackAllowed() ? null : PRESENT_NEEDS_UPDATE,
       available,
       on: available && this.presenterWanted(),
       wallDisplay: available && displays.length > 1 ? displays[chosen.wall].name : null,
@@ -171,17 +170,19 @@ export class DeckPresenter implements vscode.Disposable {
   /** Present, from the deck view's current slide or from the start. A second Present ends the first. */
   async start(origin: DeckOrigin, request: DeckPresentRequest): Promise<void> {
     this.stop();
+    // First, before the deck is read or anything opens: a shell without the placement commands can't place the wall
+    // (only a dev build may use VS Code's own), and Present answers with the notice.
+    const shell = await hasShellPlacement();
+    if (!shell && !presentFallbackAllowed()) {
+      await post(origin.panel.webview, { type: 'deck/present-failed', message: PRESENT_NEEDS_UPDATE });
+      return;
+    }
     let session: PresentSession;
     try {
       session = new PresentSession(origin.document.getText(), request.from === 'start' ? { from: 'start' } : { from: 'here', index: request.index });
     } catch (error) {
       if (!(error instanceof PresentStartError)) throw error;
       await post(origin.panel.webview, { type: 'deck/present-failed', message: error.message });
-      return;
-    }
-    const shell = await hasShellPlacement();
-    if (!shell && !presentFallbackAllowed()) {
-      await post(origin.panel.webview, { type: 'deck/present-failed', message: PRESENT_NEEDS_UPDATE });
       return;
     }
     const displays = shell ? await readDisplays() : [];

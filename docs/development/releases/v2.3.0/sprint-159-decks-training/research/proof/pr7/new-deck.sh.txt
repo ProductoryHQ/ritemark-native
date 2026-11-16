@@ -1,0 +1,31 @@
+#!/bin/bash
+# new-deck.sh <port> <folder row in Documents> <quick pick row starting with> <shot prefix>: chooses the folder in
+# Documents, opens New → Deck, takes the quick pick's row, and reports the deck view's selection.
+S=$(dirname "$0")
+export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
+P=$1
+FOLDER=$2
+ROW=$3
+SHOT=$4
+at() { node "$S/cdp.mjs" "$P" eval "$1" | tr -d '"'; }
+XY=$(at "(() => { const r = [...document.querySelectorAll('.part.sidebar .monaco-list-row')].find(r => r.getAttribute('aria-label') === '$FOLDER'); if (!r) return ''; const b = r.getBoundingClientRect(); return (b.x + 60) + ' ' + (b.y + b.height/2); })()")
+[[ -n $XY ]] || { echo "no row $FOLDER"; exit 1; }
+node "$S/cdp.mjs" "$P" click $XY
+sleep 0.8
+XY=$(at "(() => { const r = [...document.querySelectorAll('.part.sidebar .ritemark-project-row')].find(e => e.textContent.trim() === 'New'); const b = r.getBoundingClientRect(); return (b.x + b.width/2) + ' ' + (b.y + b.height/2); })()")
+node "$S/cdp.mjs" "$P" click $XY
+sleep 0.8
+XY=$(at "(() => { const r = [...document.querySelectorAll('[role=menuitem]')].find(e => (e.getAttribute('aria-label') || e.textContent || '').trim() === 'Deck'); if (!r) return ''; const b = r.getBoundingClientRect(); return (b.x + b.width/2) + ' ' + (b.y + b.height/2); })()")
+[[ -n $XY ]] || { echo "no Deck in New"; exit 1; }
+node "$S/cdp.mjs" "$P" click $XY
+sleep 1.2
+# the pointer away from the rows, so no hover shows in the shot
+node -e ""
+[[ -n $SHOT ]] && node "$S/cdp.mjs" "$P" shot "$SHOT-pick.png" > /dev/null
+XY=$(at "(() => { const r = [...document.querySelectorAll('.quick-input-widget .monaco-list-row')].find(r => (r.getAttribute('aria-label')||'').startsWith('$ROW')); if (!r) return ''; const b = r.getBoundingClientRect(); return (b.x + b.width/2) + ' ' + (b.y + b.height/2); })()")
+[[ -n $XY ]] || { echo "no row $ROW in the quick pick"; exit 1; }
+node "$S/cdp.mjs" "$P" click $XY
+sleep 5
+node "$S/cdp.mjs" "$P" wv "Slide 1 of" "({ deckView: !!d.querySelector('.deck-view'), selection: w.getSelection().toString(), active: d.activeElement && (d.activeElement.getAttribute('data-path') || d.activeElement.className) })"
+[[ -n $SHOT ]] && node "$S/cdp.mjs" "$P" shot "$SHOT-opened.png" > /dev/null
+echo "tab: $(at "[...document.querySelectorAll('.part.editor .tabs-container > .tab.active')].map(t => t.getAttribute('aria-label')).join(' | ')")"

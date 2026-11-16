@@ -782,7 +782,74 @@ async function run() {
     console.log('✓ Test 20: a sign-in\'s poll listener survives the sheet\'s restart, hears ready and the give-up');
   }
 
-  console.log('\nAll 20 CodexRuntime tests passed!');
+  // ── Test 21 (Sprint 160, #696): a second sign-in joins the running one and gets the same page ──
+  // The welcome, Home and the AI's sheet each called `beginLogin`, and each call asked Codex for another login.
+  {
+    const rt = new CodexRuntime();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = rt as any;
+    r._ensureAppServer(); // a real app-server object and CodexAuth, wired as in use; nothing is spawned until a request
+    const starts: Array<(url: string) => void> = [];
+    r._auth.startLogin = () => new Promise<{ loginId: string; authUrl: string }>((resolve) => {
+      const n = starts.length + 1;
+      starts.push(() => resolve({ loginId: `login-${n}`, authUrl: `https://auth.example/login-${n}` }));
+    });
+    const flush = async () => { for (let i = 0; i < 3; i++) await new Promise((resolve) => setImmediate(resolve)); };
+
+    // Two presses while Codex is still answering the first: one login, one page
+    rt.setLoginInProgress(true);
+    const first = rt.beginLogin();
+    const second = rt.beginLogin();
+    assert.strictEqual(starts.length, 1, 'the second call joins the login the first started');
+    assert.strictEqual(rt.signInPage(), null, 'no page before Codex gives it');
+    starts[0]('');
+    assert.deepStrictEqual(await Promise.all([first, second]), ['https://auth.example/login-1', 'https://auth.example/login-1'], 'both get the same page');
+    await flush();
+    assert.strictEqual(rt.signInPage(), 'https://auth.example/login-1', 'the page is kept for "Open the page again"');
+    // A third caller later (Home after the sheet) gets it at once
+    assert.strictEqual(await rt.beginLogin(), 'https://auth.example/login-1', 'a later caller gets the same page');
+    assert.strictEqual(starts.length, 1, 'still one login');
+
+    // Codex says the login ended (here without success): the next press starts a new login
+    r._auth.emit('loginComplete', { success: false });
+    assert.strictEqual(rt.signInPage(), null, 'an ended login has no page');
+    const third = rt.beginLogin();
+    assert.strictEqual(starts.length, 2, 'a new login starts after the first ends');
+    starts[1]('');
+    assert.strictEqual(await third, 'https://auth.example/login-2', 'with its own page');
+
+    // Cancel (the sheet's, Home's, the welcome's: setLoginInProgress(false)) ends it too
+    rt.setLoginInProgress(false);
+    assert.strictEqual(rt.signInPage(), null, 'a cancelled login has no page');
+    const fourth = rt.beginLogin();
+    assert.strictEqual(starts.length, 3, 'a press after Cancel starts a new login');
+    starts[2]('');
+    await fourth;
+
+    // A login that couldn't start is not kept: the next press tries again
+    r._auth.emit('loginComplete', { success: true });
+    r._auth.startLogin = () => Promise.reject(new Error('could not start'));
+    await assert.rejects(rt.beginLogin(), /could not start/);
+    await flush();
+    let restarted = 0;
+    r._auth.startLogin = async () => { restarted += 1; return { loginId: 'login-5', authUrl: 'https://auth.example/login-5' }; };
+    assert.strictEqual(await rt.beginLogin(), 'https://auth.example/login-5', 'a failed start is not joined');
+    assert.strictEqual(restarted, 1);
+
+    // An app-server that exited takes its login with it: the new one never hands out the old page
+    assert.strictEqual(rt.signInPage(), 'https://auth.example/login-5');
+    r._appServer.emit('exit', 1);
+    assert.strictEqual(rt.signInPage(), null, 'the exited app-server took its login with it');
+    r._ensureAppServer();
+    r._auth.startLogin = async () => ({ loginId: 'login-6', authUrl: 'https://auth.example/login-6' });
+    assert.strictEqual(await rt.beginLogin(), 'https://auth.example/login-6', 'the new app-server starts its own login');
+    rt.stopLoginServer();
+    assert.strictEqual(rt.signInPage(), null, 'a stopped app-server took its login with it');
+    rt.dispose();
+    console.log('✓ Test 21: a second sign-in joins the running one and gets its page; a new one starts after it ends');
+  }
+
+  console.log('\nAll 21 CodexRuntime tests passed!');
 }
 
 run().then(

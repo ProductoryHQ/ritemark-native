@@ -6,9 +6,16 @@ import assert from 'assert';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { delimiter, join } from 'path';
-import { __testOnly } from './setup';
+import { __testOnly, detectClaudeAuthMethod, type ClaudeAuthCheck, type ClaudeAuthEvidence } from './setup';
 
-const { deriveClaudeSetupStatus, recommendedEnvironmentAction, systemRuntimeToolsRequired, parseClaudeAuthStatusJson } = __testOnly;
+const {
+  deriveClaudeSetupStatus,
+  recommendedEnvironmentAction,
+  systemRuntimeToolsRequired,
+  parseClaudeAuthStatusJson,
+  checkClaudeAuthStatus,
+  describeUnusableAuthCheck,
+} = __testOnly;
 
 {
   const status = deriveClaudeSetupStatus({
@@ -147,6 +154,38 @@ const { deriveClaudeSetupStatus, recommendedEnvironmentAction, systemRuntimeTool
   assert.strictEqual(parseClaudeAuthStatusJson('not json'), undefined);
 }
 
+// ── Claude's sign-in decision (Sprint 160, technical plan §2; #703, #541) ──
+{
+  const unusable: ClaudeAuthCheck = { unusable: { reason: 'no-json', status: 0, elapsedMs: 12, stdoutBytes: 40, stderrBytes: 0 } };
+  const said = (method: 'claude-oauth' | 'api-key' | null): ClaudeAuthCheck => ({ method });
+  const rows: Array<[string, Partial<ClaudeAuthEvidence> & Pick<ClaudeAuthEvidence, 'platform' | 'cli'>, 'claude-oauth' | 'api-key' | null]> = [
+    ['CLI signed in with Claude.ai + saved key: the sign-in wins', { platform: 'darwin', cli: said('claude-oauth'), keySaved: true }, 'claude-oauth'],
+    ['the same on Windows', { platform: 'win32', cli: said('claude-oauth'), keySaved: true }, 'claude-oauth'],
+    ['CLI signed in on its own key', { platform: 'darwin', cli: said('api-key') }, 'api-key'],
+    ['#541: CLI signed out + saved key', { platform: 'darwin', cli: said(null), keySaved: true }, 'api-key'],
+    ['#541: the same on Windows', { platform: 'win32', cli: said(null), keySaved: true }, 'api-key'],
+    ['CLI signed out, no key: the Keychain and the environment do not count', { platform: 'darwin', cli: said(null), keychainSignedIn: true, envApiKey: true }, null],
+    ['no CLI answer + saved key', { platform: 'win32', cli: unusable, keySaved: true }, 'api-key'],
+    ['no CLI answer + saved key on macOS: the Keychain item (a plan) before the key', { platform: 'darwin', cli: unusable, keySaved: true, keychainSignedIn: true }, 'claude-oauth'],
+    ['no CLI answer + saved key on macOS, no Keychain item: the key', { platform: 'darwin', cli: unusable, keySaved: true, keychainSignedIn: false }, 'api-key'],
+    ['no CLI answer + saved key + ANTHROPIC_API_KEY: the saved key', { platform: 'win32', cli: unusable, keySaved: true, envApiKey: true }, 'api-key'],
+    ['no CLI answer on macOS: the Keychain item', { platform: 'darwin', cli: unusable, keychainSignedIn: true }, 'claude-oauth'],
+    ['#703: no CLI answer on Windows, no key: signed out (cmdkey no longer counts)', { platform: 'win32', cli: unusable, keychainSignedIn: true }, null],
+    ['no CLI answer, ANTHROPIC_API_KEY in the environment', { platform: 'win32', cli: unusable, envApiKey: true }, 'api-key'],
+    ['no CLI answer on macOS, no Keychain item, ANTHROPIC_API_KEY', { platform: 'darwin', cli: unusable, keychainSignedIn: false, envApiKey: true }, 'api-key'],
+    ['no CLI answer and nothing else', { platform: 'darwin', cli: unusable, keychainSignedIn: false }, null],
+  ];
+  for (const [name, evidence, expected] of rows) {
+    assert.strictEqual(detectClaudeAuthMethod({ keySaved: false, envApiKey: false, ...evidence }), expected, name);
+  }
+
+  // The reason line carries the measurements, never the output.
+  assert.strictEqual(
+    describeUnusableAuthCheck({ reason: 'timeout', status: null, elapsedMs: 5004, stdoutBytes: 0, stderrBytes: 12 }),
+    "Claude's sign-in check gave no usable answer: timeout (exit none, 5004 ms, stdout 0 bytes, stderr 12 bytes).",
+  );
+}
+
 // Git and Node.js are asked for only with a system-installed runtime on Windows:
 // the bundled claude.exe and codex-app-server.exe need neither.
 assert.strictEqual(systemRuntimeToolsRequired('win32', 'system'), true);
@@ -213,8 +252,26 @@ import {
   clearSetupCache,
   getOnboardingStatus,
   getSetupStatus,
+  anthropicKeyChanged,
+  registerAnthropicKeyReader,
   setClaudePendingReload,
 } from './setup';
+import { onClaudeStatusInvalidated } from './claudeStatusEvents';
+
+// A placeholder, not a credential: the tests check it never leaves setup.ts.
+const PLACEHOLDER_KEY = 'sk-ant-test-placeholder-0000';
+
+/** Run `action`, collecting what it writes with console.warn. */
+async function captureWarnings<T>(action: () => Promise<T>): Promise<{ result: T; warnings: string[] }> {
+  const warnings: string[] = [];
+  const original = console.warn;
+  console.warn = (...args: unknown[]) => { warnings.push(args.map(String).join(' ')); };
+  try {
+    return { result: await action(), warnings };
+  } finally {
+    console.warn = original;
+  }
+}
 
 async function testOnboardingStatus() {
   // When Claude is authenticated, anyAgentReady should be true
@@ -312,6 +369,19 @@ async function testOnboardingStatus() {
     assert.strictEqual(status.anyAgentReady, true);
   }
 
+  // hasAnthropicKey comes from the key reader, not from a flag a surface may have left behind
+  {
+    const notInstalled = {
+      cliInstalled: false, runnable: false, authenticated: false, authMethod: null, state: 'not-installed' as const,
+      diagnostics: [], repairAction: 'install' as const, error: null,
+    };
+    registerAnthropicKeyReader(async () => PLACEHOLDER_KEY);
+    assert.strictEqual((await getOnboardingStatus({ setupStatus: notInstalled })).hasAnthropicKey, true);
+    registerAnthropicKeyReader(async () => undefined);
+    assert.strictEqual((await getOnboardingStatus({ setupStatus: notInstalled })).hasAnthropicKey, false);
+    registerAnthropicKeyReader(null);
+  }
+
   console.log('getOnboardingStatus tests passed');
 }
 
@@ -371,8 +441,14 @@ async function testSetupStatusProbe() {
   const loggedOut = '{"loggedIn":false,"authMethod":"none","apiProvider":"firstParty"}';
 
   const originalPath = process.env.PATH;
+  const originalEnvKey = process.env.ANTHROPIC_API_KEY;
   process.env.PATH = `${bin}${delimiter}${originalPath}`;
   process.env.RITEMARK_FAKE_CLAUDE = dir;
+  delete process.env.ANTHROPIC_API_KEY;
+  // Never the developer's own Keychain: the fake answers and counts its calls.
+  let keychainAnswer = false;
+  let keychainCalls = 0;
+  __testOnly.setKeychainCheck(async () => { keychainCalls += 1; return keychainAnswer; });
   try {
     // Ready — and the event loop keeps turning while Claude answers.
     set({
@@ -471,9 +547,135 @@ async function testSetupStatusProbe() {
     assert.strictEqual(afterInstall.repairAction, 'reload');
     assert.ok(afterInstall.diagnostics.includes('Reload to finish setup'));
     clearClaudePendingReload();
+
+    // ── Sprint 160: one source per state (#541, #703) ──
+    assert.strictEqual(keychainCalls, 0, 'every answer so far was usable: the Keychain was never read');
+
+    // #541: the CLI says signed out and a key is saved in Ritemark: ready on the key.
+    set({
+      version: '2.1.999 (Claude Code)', 'version-stderr': '', 'version-exit': '0', 'version-delay': '0',
+      auth: loggedOut, 'auth-delay': '0', calls: '',
+    });
+    let keyReads = 0;
+    registerAnthropicKeyReader(async () => { keyReads += 1; return PLACEHOLDER_KEY; });
+    const onKey = await getSetupStatus();
+    assert.strictEqual(onKey.state, 'ready', '#541: a saved key makes Claude ready although the CLI is signed out');
+    assert.strictEqual(onKey.authMethod, 'api-key');
+    assert.strictEqual(onKey.authenticated, true);
+    assert.strictEqual(keyReads, 1, 'the probe asked the key reader');
+    assert.ok(!JSON.stringify(onKey).includes(PLACEHOLDER_KEY), 'the key never enters the status');
+
+    // Each probe asks again: a key removed since reads as none.
+    registerAnthropicKeyReader(async () => undefined);
+    assert.strictEqual((await getSetupStatus()).state, 'needs-auth');
+    registerAnthropicKeyReader(async () => PLACEHOLDER_KEY);
+
+    // A Claude.ai sign-in still wins over the saved key, and the diagnostics say so from this probe's own answer.
+    set({ auth: loggedIn });
+    clearSetupCache();
+    const oauthWithKey = await getSetupStatus();
+    assert.strictEqual(oauthWithKey.authMethod, 'claude-oauth');
+    assert.ok(oauthWithKey.diagnostics.includes('Anthropic API key is configured, but Claude.ai credentials are active and take precedence.'));
+
+    // The saved key changed (SecretStorage's onDidChange, this window or another): the cached status is dropped, with
+    // no event, and a probe still running then caches nothing.
+    const heard: string[] = [];
+    const stopListening = onClaudeStatusInvalidated((event) => { heard.push(event.reason); });
+    try {
+      set({ calls: '' });
+      anthropicKeyChanged();
+      const afterChange = await getSetupStatus();
+      assert.notStrictEqual(afterChange, oauthWithKey, 'the next check probes again');
+      assert.deepStrictEqual(calls(), ['--version', 'auth status --json']);
+
+      set({ 'auth-delay': '0.5', calls: '' });
+      clearSetupCache();
+      const inFlight = getSetupStatus();
+      await waitFor(() => calls().includes('auth status --json'), 'the auth check never started');
+      anthropicKeyChanged(); // e.g. the key removed in another window while this probe read it
+      await inFlight;
+      set({ 'auth-delay': '0', calls: '' });
+      await getSetupStatus();
+      assert.deepStrictEqual(calls(), ['--version', 'auth status --json'], 'the probe that was running kept nothing');
+      assert.deepStrictEqual(heard, [], 'no event: a sign-in still running is not ended by a key change');
+    } finally {
+      stopListening();
+    }
+    registerAnthropicKeyReader(async () => PLACEHOLDER_KEY);
+
+    // A key that can't be read counts as none, and the log says so.
+    set({ auth: loggedOut });
+    registerAnthropicKeyReader(async () => { throw new Error('secret store locked'); });
+    const unreadable = await captureWarnings(() => getSetupStatus());
+    assert.strictEqual(unreadable.result.state, 'needs-auth');
+    assert.ok(unreadable.result.diagnostics.includes('The saved Anthropic API key could not be read, so it counts as none.'));
+    assert.ok(unreadable.warnings.some((line) => line.startsWith('[ritemark] Claude check: the saved Anthropic key could not be read')));
+    registerAnthropicKeyReader(null);
+    assert.strictEqual(keychainCalls, 0, 'the CLI answered each time: still no Keychain read');
+
+    // #703: an answer that isn't JSON. The reason, its exit status, time and sizes reach the log and the
+    // diagnostics; the output (which can hold the account's e-mail) reaches neither.
+    const notJson = 'Signed in as jane@example.com';
+    set({ auth: notJson });
+    clearSetupCache();
+    const noJson = await captureWarnings(() => getSetupStatus());
+    assert.strictEqual(noJson.result.state, 'needs-auth', 'no usable answer and nothing else: signed out');
+    const reason = noJson.result.diagnostics.find((line) => line.startsWith("Claude's sign-in check gave no usable answer: no-json (exit 0, "));
+    assert.ok(reason, `the reason is in the diagnostics: ${noJson.result.diagnostics.join(' | ')}`);
+    assert.ok(reason.endsWith(`ms, stdout ${Buffer.byteLength(notJson)} bytes, stderr 0 bytes).`), reason);
+    assert.ok(noJson.warnings.includes(`[ritemark] ${reason}`), 'and in the log');
+    assert.ok(!JSON.stringify(noJson.result).includes('jane@example.com'), 'the output is not in the status');
+    assert.ok(!noJson.warnings.join('\n').includes('jane@example.com'), 'nor in the log');
+    assert.strictEqual(keychainCalls, 1, 'on macOS an unusable answer reads the Keychain');
+
+    // The macOS Keychain fallback stays, and is logged when used.
+    keychainAnswer = true;
+    clearSetupCache();
+    const fromKeychain = await captureWarnings(() => getSetupStatus());
+    assert.strictEqual(fromKeychain.result.state, 'ready');
+    assert.strictEqual(fromKeychain.result.authMethod, 'claude-oauth');
+    const keychainLine = 'Claude counts as signed in from its macOS Keychain item, since its own check gave no usable answer.';
+    assert.ok(fromKeychain.result.diagnostics.includes(keychainLine));
+    assert.ok(fromKeychain.warnings.includes(`[ritemark] ${keychainLine}`));
+
+    // With a key saved too, the Keychain item still wins: a Claude.ai sign-in before the key, and the diagnostics say so.
+    registerAnthropicKeyReader(async () => PLACEHOLDER_KEY);
+    const keychainBefore = keychainCalls;
+    const keychainOverKey = (await captureWarnings(() => getSetupStatus())).result;
+    assert.strictEqual(keychainOverKey.authMethod, 'claude-oauth', 'no CLI answer + Keychain item + a saved key');
+    assert.ok(keychainOverKey.diagnostics.includes('Anthropic API key is configured, but Claude.ai credentials are active and take precedence.'));
+    assert.strictEqual(keychainCalls, keychainBefore + 1, 'the Keychain is read with a key saved too');
+    // With no Keychain item, the saved key.
+    keychainAnswer = false;
+    clearSetupCache();
+    assert.strictEqual((await captureWarnings(() => getSetupStatus())).result.authMethod, 'api-key', 'no CLI answer + a saved key');
+    registerAnthropicKeyReader(null);
+
+    // ANTHROPIC_API_KEY in the environment is the last resort.
+    keychainAnswer = false;
+    process.env.ANTHROPIC_API_KEY = PLACEHOLDER_KEY;
+    clearSetupCache();
+    assert.strictEqual((await captureWarnings(() => getSetupStatus())).result.authMethod, 'api-key');
+    delete process.env.ANTHROPIC_API_KEY;
+
+    // A slow answer, with an injected time limit: `timeout`.
+    set({ auth: loggedIn, 'auth-delay': '2' });
+    __testOnly.setAuthCheckTimeout(200);
+    const slow = await captureWarnings(() => getSetupStatus());
+    __testOnly.setAuthCheckTimeout(null);
+    assert.strictEqual(slow.result.state, 'needs-auth');
+    assert.ok(
+      slow.result.diagnostics.some((line) => line.startsWith("Claude's sign-in check gave no usable answer: timeout (exit none, ")),
+      slow.result.diagnostics.join(' | '),
+    );
   } finally {
     process.env.PATH = originalPath;
     delete process.env.RITEMARK_FAKE_CLAUDE;
+    if (originalEnvKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = originalEnvKey;
+    registerAnthropicKeyReader(null);
+    __testOnly.setKeychainCheck(null);
+    __testOnly.setAuthCheckTimeout(null);
     clearSetupCache();
     rmSync(dir, { recursive: true, force: true });
   }
@@ -484,9 +686,141 @@ async function testSetupStatusProbe() {
   console.log('getSetupStatus probe tests passed');
 }
 
+// Why `claude auth status --json` gave no usable answer (#703), one small script per case. POSIX scripts: macOS.
+async function testAuthCheckReasons() {
+  if (process.platform !== 'darwin') {
+    console.log('auth check reason tests skipped (macOS only)');
+    return;
+  }
+  const dir = mkdtempSync(join(tmpdir(), 'ritemark-auth-check-'));
+  const script = (name: string, body: string, mode = 0o755) => {
+    const path = join(dir, name);
+    writeFileSync(path, `#!/bin/sh\n${body}\n`, { mode });
+    return path;
+  };
+  try {
+    // A notice printed before the JSON makes it unusable (one of the plan's likely causes on a cold start).
+    const notice = await checkClaudeAuthStatus(script('notice', `printf 'Update available\\n{"loggedIn":true}'`));
+    assert.ok('unusable' in notice && notice.unusable.reason === 'no-json', JSON.stringify(notice));
+    assert.strictEqual(notice.unusable.status, 0);
+    assert.strictEqual(notice.unusable.stdoutBytes, Buffer.byteLength('Update available\n{"loggedIn":true}'));
+
+    // Nothing printed and a failing exit: no-json with the exit status.
+    const silent = await checkClaudeAuthStatus(script('silent', 'exit 3'));
+    assert.deepStrictEqual('unusable' in silent && [silent.unusable.reason, silent.unusable.status, silent.unusable.stdoutBytes, silent.unusable.stderrBytes], ['no-json', 3, 0, 0]);
+
+    // JSON on stderr still counts, as before.
+    assert.deepStrictEqual(await checkClaudeAuthStatus(script('stderr', `printf '{"loggedIn":true,"authMethod":"apiKey"}' >&2; exit 1`)), { method: 'api-key' });
+
+    // An answer printed before the time limit counts, even though the process is then stopped. (A generous limit: a
+    // script's first run can be slow while macOS checks the new file.)
+    __testOnly.setAuthCheckTimeout(2000);
+    assert.deepStrictEqual(await checkClaudeAuthStatus(script('answers-then-hangs', `printf '{"loggedIn":false}'; exec sleep 8`)), { method: null });
+    __testOnly.setAuthCheckTimeout(300);
+    const hung = await checkClaudeAuthStatus(script('hangs', 'exec sleep 5'));
+    __testOnly.setAuthCheckTimeout(null);
+    assert.ok('unusable' in hung && hung.unusable.reason === 'timeout', JSON.stringify(hung));
+    assert.strictEqual(hung.unusable.status, null);
+    assert.ok(hung.unusable.elapsedMs >= 300, `the time limit was kept (${hung.unusable.elapsedMs} ms)`);
+
+    // A runaway CLI (more than runProcess keeps, 1 MiB): too-much-output, not a failure to start.
+    const flood = await checkClaudeAuthStatus(script('floods', "head -c 1200000 /dev/zero | tr '\\0' a; exec sleep 5"));
+    assert.ok('unusable' in flood && flood.unusable.reason === 'too-much-output', JSON.stringify(flood));
+
+    // A CLI that can't start: spawn-error with its code.
+    const missing = await checkClaudeAuthStatus(join(dir, 'not-there'));
+    assert.ok('unusable' in missing && missing.unusable.reason === 'spawn-error:ENOENT', JSON.stringify(missing));
+    const notExecutable = await checkClaudeAuthStatus(script('not-executable', 'exit 0', 0o644));
+    assert.ok('unusable' in notExecutable && notExecutable.unusable.reason === 'spawn-error:EACCES', JSON.stringify(notExecutable));
+  } finally {
+    __testOnly.setAuthCheckTimeout(null);
+    rmSync(dir, { recursive: true, force: true });
+  }
+  console.log('auth check reason tests passed');
+}
+
+// #703 end to end, as Windows runs it: Claude at its Windows install path answers its sign-in check with no JSON, and
+// cmdkey, the old fallback, prints what it really prints on a PC with no Claude credential: its filter repeated in
+// the header, then "* NONE *", exit 0. That used to read as signed in. Run on macOS with `process.platform` set to
+// win32 and the programs faked (POSIX scripts), cmd.exe too: Node runs a Windows shell command as
+// `cmd.exe /d /s /c "<command>"`, so main's cmdkey call reaches the fake and this test fails on main.
+async function testWindowsColdStart() {
+  if (process.platform !== 'darwin') {
+    console.log('Windows cold-start test skipped (runs on macOS with fakes)');
+    return;
+  }
+  const dir = mkdtempSync(join(tmpdir(), 'ritemark-fake-windows-'));
+  const bin = join(dir, 'bin');
+  const claudeDir = join(dir, 'Programs', 'Claude');
+  mkdirSync(bin);
+  mkdirSync(claudeDir, { recursive: true });
+  const claude = join(claudeDir, 'claude.exe');
+  writeFileSync(claude, FAKE_CLAUDE, { mode: 0o755 });
+  writeFileSync(join(bin, 'cmd.exe'), [
+    '#!/bin/sh',
+    'command=$(printf \'%s\' "$4" | sed \'s/^"//; s/"$//\')',
+    'exec /bin/sh -c "$command"',
+    '',
+  ].join('\n'), { mode: 0o755 });
+  writeFileSync(join(bin, 'cmdkey'), [
+    '#!/bin/sh',
+    'echo "$*" >> "$RITEMARK_FAKE_CLAUDE/cmdkey-calls"',
+    "printf '\\r\\nCurrently stored credentials for Claude*:\\r\\n\\r\\n* NONE *\\r\\n'",
+    'exit 0',
+    '',
+  ].join('\n'), { mode: 0o755 });
+  for (const [name, value] of Object.entries({
+    version: '2.1.999 (Claude Code)', 'version-stderr': '', 'version-exit': '0', 'version-delay': '0',
+    auth: 'Welcome to Claude Code', 'auth-delay': '0', calls: '', 'cmdkey-calls': '',
+  })) writeFileSync(join(dir, name), value);
+
+  const saved = {
+    platform: process.platform,
+    PATH: process.env.PATH,
+    LOCALAPPDATA: process.env.LOCALAPPDATA,
+    APPDATA: process.env.APPDATA,
+    USERPROFILE: process.env.USERPROFILE,
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+  };
+  const restore = (name: 'PATH' | 'LOCALAPPDATA' | 'APPDATA' | 'USERPROFILE' | 'ANTHROPIC_API_KEY') => {
+    if (saved[name] === undefined) delete process.env[name];
+    else process.env[name] = saved[name];
+  };
+  Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+  process.env.PATH = `${bin}${delimiter}${saved.PATH}`;
+  process.env.LOCALAPPDATA = dir;
+  process.env.APPDATA = dir;
+  process.env.USERPROFILE = dir;
+  process.env.RITEMARK_FAKE_CLAUDE = dir;
+  delete process.env.ANTHROPIC_API_KEY;
+  try {
+    clearSetupCache();
+    const status = await captureWarnings(() => getSetupStatus());
+    assert.strictEqual(status.result.binaryPath, claude, 'the fake Claude at its Windows install path ran');
+    assert.strictEqual(status.result.state, 'needs-auth', '#703: no usable answer and no key on Windows is signed out, not signed in');
+    assert.strictEqual(status.result.authMethod, null);
+    assert.ok(status.result.diagnostics.some((line) => line.startsWith("Claude's sign-in check gave no usable answer: no-json")));
+    assert.strictEqual(readFileSync(join(dir, 'cmdkey-calls'), 'utf-8'), '', 'cmdkey is no longer asked');
+
+    // A key saved in Ritemark still makes it ready.
+    registerAnthropicKeyReader(async () => PLACEHOLDER_KEY);
+    assert.strictEqual((await captureWarnings(() => getSetupStatus())).result.authMethod, 'api-key');
+  } finally {
+    Object.defineProperty(process, 'platform', { value: saved.platform, configurable: true });
+    for (const name of ['PATH', 'LOCALAPPDATA', 'APPDATA', 'USERPROFILE', 'ANTHROPIC_API_KEY'] as const) restore(name);
+    delete process.env.RITEMARK_FAKE_CLAUDE;
+    registerAnthropicKeyReader(null);
+    clearSetupCache();
+    rmSync(dir, { recursive: true, force: true });
+  }
+  console.log('Windows cold-start test passed');
+}
+
 async function main() {
   await testOnboardingStatus();
   await testSetupStatusProbe();
+  await testAuthCheckReasons();
+  await testWindowsColdStart();
   console.log('setup.test.ts passed');
 }
 
