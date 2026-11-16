@@ -144,6 +144,7 @@ export function SlideAbout({ data, sourceLines, hidden, table }: SlideAboutProps
 export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about, deck }: SlideSettingsProps) {
   const skipId = `deck-skip-${number}`
   const tagId = `deck-tag-${number}`
+  const reachId = `deck-reach-${number}`
   return (
     <section aria-label={`Settings of slide ${number}`}>
       <header className="deck-settings-head">
@@ -227,16 +228,19 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
         <Switch id={skipId} checked={data.skip === true} onCheckedChange={skip => onChange({ skip: skip || undefined })} />
       </div>
       <div className="deck-settings-sep" />
-      <div className="deck-settings-k">{deckReach(deck.count)}</div>
-      <Tooltip label={DECK_LOOK_TIP} className="flex w-full">
-        <SegmentedControl
-          aria-label="How the slides look"
-          className="deck-settings-look w-full [&>label]:flex-1 [&>label>span]:w-full [&>label>span]:text-center"
-          value={deck.look}
-          onValueChange={deck.onLook}
-          options={DECK_LOOKS}
-        />
-      </Tooltip>
+      {/* The deck's own section: a group named by its heading, so a screen reader hears its reach too (review, #764). */}
+      <div role="group" aria-labelledby={reachId}>
+        <div id={reachId} className="deck-settings-k">{deckReach(deck.count)}</div>
+        <Tooltip label={DECK_LOOK_TIP} className="flex w-full">
+          <SegmentedControl
+            aria-label="How the slides look"
+            className="w-full [&>label]:flex-1 [&>label>span]:w-full [&>label>span]:text-center"
+            value={deck.look}
+            onValueChange={deck.onLook}
+            options={DECK_LOOKS}
+          />
+        </Tooltip>
+      </div>
     </section>
   )
 }

@@ -91,18 +91,27 @@ const settings = (kind: string, data: Record<string, unknown>, about: unknown, d
     ['table', {}, createElement(SlideAbout, { data: {}, hidden: '', table: { addRow: noop, addColumn: noop } })],
   ] as const) {
     const root = settings(kind, data, about)
-    const children = root.querySelector('section')!.childNodes.filter(node => node.nodeType === 1) as unknown as Array<{ classNames?: string; textContent: string; querySelector(s: string): { getAttribute(name: string): string | null } | null }>
+    type El = { classNames?: string; textContent: string; childNodes: Array<{ nodeType: number }>; getAttribute(name: string): string | null; querySelector(s: string): El | null }
+    const elements = (node: El) => node.childNodes.filter(child => child.nodeType === 1) as unknown as El[]
+    const children = elements(root.querySelector('section') as unknown as El)
     const last = children.length - 1
     const skip = children.findIndex(node => node.textContent.includes('Skip slide'))
     assert.ok(skip > 0, `${kind}: Skip slide`)
-    assert.equal(last - skip, 3, `${kind}: Skip slide, a line, the heading, the segment, and nothing after it`)
+    assert.equal(last - skip, 2, `${kind}: Skip slide, a line, the deck's section, and nothing after it`)
     assert.ok((children[skip + 1].classNames ?? '').includes('deck-settings-sep'), `${kind}: a line after Skip slide`)
-    assert.ok((children[skip + 2].classNames ?? '').includes('deck-settings-k'), `${kind}: the popup's small uppercase label`)
-    assert.equal(children[skip + 2].textContent, 'This deck · all 15 slides', `${kind}: the heading with the count`)
-    const group = children[last].querySelector('[role="radiogroup"]')!
+    // The section is a group named by its heading (review, #764): a screen reader hears the reach with the choice.
+    const section = children[last]
+    assert.equal(section.getAttribute('role'), 'group')
+    const [heading, tip] = elements(section)
+    assert.equal(elements(section).length, 2, `${kind}: the heading, then the segment`)
+    assert.equal(section.getAttribute('aria-labelledby'), heading.getAttribute('id'), `${kind}: named by its heading`)
+    assert.equal(heading.getAttribute('id'), 'deck-reach-6')
+    assert.ok((heading.classNames ?? '').includes('deck-settings-k'), `${kind}: the popup's small uppercase label`)
+    assert.equal(heading.textContent, 'This deck · all 15 slides', `${kind}: the heading with the count`)
+    const group = tip.querySelector('[role="radiogroup"]')!
     assert.equal(group.getAttribute('aria-label'), 'How the slides look')
     assert.match(group.getAttribute('class') ?? '', /\bw-full\b/, `${kind}: the popup's full width`)
-    assert.match((children[last] as unknown as { getAttribute(name: string): string | null }).getAttribute('class') ?? '', /\bw-full\b/, `${kind}: its tooltip's span too`)
+    assert.match(tip.getAttribute('class') ?? '', /\bw-full\b/, `${kind}: its tooltip's span too`)
   }
   const radios = (look: 'card' | 'borderless') => settings('points', {}, null, { count: 15, look, onLook: noop })
     .querySelectorAll('[role="radiogroup"][aria-label="How the slides look"] input[type="radio"]')
@@ -149,6 +158,11 @@ const here = (path: string) => readFileSync(fileURLToPath(new URL(path, import.m
   assert.match(view, /const count = slides\.length/)
   assert.match(view, /const setLook = useCallback\(\(look: string\) => \{\s+const next: DocumentProperties = \{ \.\.\.properties \}\s+if \(look === 'borderless'\) next\.look = 'borderless'\s+else delete next\.look\s+onPropertiesChange\(next\)/, 'the front matter is written as before')
   assert.ok(!here('./decks.css').includes('.deck-look'), "the bar's segment rule is gone")
+  // Review, #764: the popup never grows past the room under the gear; it scrolls, so its last section stays reachable.
+  // Add to library's sheet shares the material but isn't a popover, so it is left out.
+  assert.match(here('./decks.css'), /\n\.deck-settings:not\(\.deck-addlib\) \{ max-height: var\(--radix-popover-content-available-height\); overflow-y: auto; \}/)
+  assert.match(gear, /<PopoverContent[^>]*className="deck-settings"/, 'the popup carries the rule')
+  assert.match(here('./library/AddToLibrarySheet.tsx'), /className="deck-settings deck-addlib"/)
   // Review, PR 759: Settings with no slide to belong to close, so they never reopen by themselves when it returns.
   assert.match(view, /useEffect\(\(\) => \{ if \(!slides\[shown\]\) setSettingsOpen\(false\) \}, \[slides, shown\]\)/)
   // 16 November (the Experience lead): a hidden slide is still the current one. The gear stays enabled and opens the

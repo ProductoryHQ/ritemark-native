@@ -184,6 +184,9 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-bar .deck-settings-button[data-state="active"], .deck-bar .deck-settings-button[data-state="open"] { background: var(--r-surface-soft); color: var(--r-ink-strong); }
 /* The Settings material: the popup (its card from ui/popover.tsx) and Add to library's sheet beside the slide. */
 .deck-settings { width: 316px; box-sizing: border-box; font-size: 13px; line-height: 18px; color: var(--r-ink-strong); }
+/* The popup is never taller than the room under the gear: it scrolls, so its last section (the deck's Card | Borderless)
+   is always reachable in a short window (review, #764). Add to library's sheet isn't a popover and keeps its height. */
+.deck-settings:not(.deck-addlib) { max-height: var(--radix-popover-content-available-height); overflow-y: auto; }
 .deck-addlib { position: absolute; z-index: 40; padding: 12px; border-radius: 12px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline), 0 16px 34px -10px rgba(30,27,75,.28); }
 /* Its top: the lines that sat under the slide, which wrap in the popup's width. */
 .deck-settings-about { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 4px 0 0; container-type: inline-size; }
