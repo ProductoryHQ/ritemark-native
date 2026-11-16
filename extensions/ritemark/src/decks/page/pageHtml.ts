@@ -19,7 +19,9 @@
  */
 import { createHash } from 'node:crypto';
 import { marked } from 'marked';
-import { exerciseTagOf, type SlideData } from '../deckFormat';
+import { exerciseTagOf, isBlockSlide, type SlideData } from '../deckFormat';
+import { blockSlideMarkup, lexBlockSlide, stepsTagOf } from '../blocks/slideRenderer';
+import type { FenceAttributes } from '../blocks/fencedDiv';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import { slideMarkup, escapeHtml } from '../../../webview/src/components/decks/slide/slideMarkup';
 import { themeStyle, themeVars } from '../../../webview/src/components/decks/theme/themeVars';
@@ -425,9 +427,34 @@ function fontFaces(fonts: PageFont[]): string {
 
 const titleOf = (slide: PublicSlide) => (slide.data.title ?? '').trim();
 
+/**
+ * A block slide's Steps (Sprint 161): the pill of its first Steps block ('' for none), or null when it has no Steps
+ * block. A slide with Steps is an exercise on the page, as an Exercise slide is.
+ */
+function blockStepsTag(slide: PublicSlide): string | null {
+  if (!isBlockSlide(slide.kind)) return null;
+  let found: string | null = null;
+  const visit = (tokens: ReturnType<typeof lexBlockSlide>) => {
+    for (const token of tokens) {
+      if (found !== null) return;
+      if (token.type !== 'slideDiv') continue;
+      const div = token as unknown as { attrs: FenceAttributes; tokens: ReturnType<typeof lexBlockSlide> };
+      if (div.attrs.classes.includes('steps')) { found = stepsTagOf(div.attrs); return; }
+      visit(div.tokens);
+    }
+  };
+  visit(lexBlockSlide(slide.data.markdown ?? ''));
+  return found;
+}
+
+/** An Exercise slide, or a block slide with Steps: its numbered steps get ticks, and Contents ticks it when done. */
+function isExercise(slide: PublicSlide): boolean {
+  return slide.kind === 'exercise' || blockStepsTag(slide) !== null;
+}
+
 /** An exercise's pill beside its label and in Contents: the slide's own words (`tag:`), the default, or none. */
 function pillHtml(slide: PublicSlide): string {
-  const words = slide.kind === 'exercise' ? exerciseTagOf(slide.data) : '';
+  const words = slide.kind === 'exercise' ? exerciseTagOf(slide.data) : blockStepsTag(slide) ?? '';
   return words ? `<span class="tag">${esc(words)}</span>` : '';
 }
 
@@ -436,21 +463,22 @@ function partHtml(slide: PublicSlide, index: number, options: PageOptions, partK
   const number = index + 1;
   // A part's heading is its handout's own (16 November). A part without one shows its slide's title, as the deck view
   // draws it until the first edit writes it, unless the deck is marked `handout: text`: then it shows none.
-  const { html: body, ownHeading } = handoutParts(slide.handout, { partKey, exercise: slide.kind === 'exercise', pictureUrl: options.pictureUrl, partHeading: true });
+  const exerciseSlide = isExercise(slide);
+  const { html: body, ownHeading } = handoutParts(slide.handout, { partKey, exercise: exerciseSlide, pictureUrl: options.pictureUrl, partHeading: true });
   const title = ownHeading || textHandout ? '' : titleOf(slide);
   if (slide.kind === 'section') {
     const label = `Section${slide.data.number?.trim() ? ` ${slide.data.number.trim()}` : ''}`;
     return `<section class="part sect" data-i="${index}" id="s${number}"><div class="eyebrow">${esc(label)}</div>${title ? `<h2>${esc(title)}</h2>` : ''}\n${body}</section>`;
   }
   // An exercise is marked for the page's script (Contents ticks it once its steps are done) whether or not it has a pill.
-  const exercise = slide.kind === 'exercise' ? ' data-exercise=""' : '';
+  const exercise = exerciseSlide ? ' data-exercise=""' : '';
   return `<article class="part"${exercise} data-i="${index}" id="s${number}"><div class="lab">Slide ${number}${pillHtml(slide)}</div>${title ? `<h2>${esc(title)}</h2>` : ''}\n${body}</article>`;
 }
 
 function contentsHtml(slides: PublicSlide[]): string {
   const rows = slides.map((slide, index) => {
     const title = titleOf(slide) || `Slide ${index + 1}`;
-    const mark = slide.kind === 'exercise'
+    const mark = isExercise(slide)
       ? `${pillHtml(slide)}<span class="done" aria-label="Done">${iconSvg('check-circle', 18)}</span>`
       : '';
     return `<button type="button" role="menuitem" data-go="${index}"><span class="n">${index + 1}</span><span class="${slide.kind === 'section' ? 'sec' : ''}">${esc(title)}</span>${mark}</button>`;
@@ -481,12 +509,14 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
   const borderless = deck.look === 'borderless';
   const count = deck.slides.length;
   const layers = deck.slides.map((slide, index) => {
-    const markup = slideMarkup(slide.kind, slide.data as SlideData, {
+    const drawing = {
       theme: deck.theme,
       borderless,
       step: slide.step,
-      pictureUrl: picture => options.pictureUrl(picture, 'slide'),
-    });
+      pictureUrl: (picture: string) => options.pictureUrl(picture, 'slide'),
+    };
+    // A block slide through the one block renderer (Sprint 161), a v1 slide through its layout, as the deck view draws them.
+    const markup = isBlockSlide(slide.kind) ? blockSlideMarkup(slide.data, drawing) : slideMarkup(slide.kind, slide.data as SlideData, drawing);
     return `<div class="layer${index === 0 ? ' on' : ''}" data-title="${esc(titleOf(slide))}">${markup}</div>`;
   });
   const first = deck.slides[0];

@@ -8,7 +8,7 @@
  * placeholder. Emptied, the slide has no pill (`tag: ""`); words typed here bring it back.
  */
 import type { ReactNode } from 'react'
-import { EXERCISE_TAG, exerciseTagOf, type SlideData } from '../../../../src/decks/deckFormat'
+import { EXERCISE_TAG, exerciseTagOf, isBlockSlide, type SlideData } from '../../../../src/decks/deckFormat'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Input } from '../ui/input'
@@ -79,15 +79,20 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
           </Button>
         </Tooltip>
       </header>
-      <div className="deck-settings-k">Layout</div>
-      <SegmentedControl
-        aria-label="Layout"
-        variant="picture"
-        className="deck-settings-lays"
-        value={kind}
-        onValueChange={onKind}
-        options={LAYOUTS}
-      />
+      {/* A block slide (Sprint 161) has no layout: its blocks are its layout (README frame 26). */}
+      {isBlockSlide(kind) ? null : (
+        <>
+          <div className="deck-settings-k">Layout</div>
+          <SegmentedControl
+            aria-label="Layout"
+            variant="picture"
+            className="deck-settings-lays"
+            value={kind}
+            onValueChange={onKind}
+            options={LAYOUTS}
+          />
+        </>
+      )}
       {kind === 'boxes' ? (
         <>
           <div className="deck-settings-k">Look</div>

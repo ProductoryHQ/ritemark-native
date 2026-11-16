@@ -156,6 +156,9 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       },
+      // Sprint 161: the block slide's renderer lives in `src/decks/` (shared with the host), where a bare `marked`
+      // would resolve to the extension's copy; the bundle keeps the webview's one.
+      dedupe: ['marked'],
     },
   }
 })

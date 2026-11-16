@@ -28,13 +28,17 @@
  * (`deckDigest`) is a hash of it, so an edit to anything private never shows the page as changed.
  */
 import { createHash } from 'node:crypto';
-import { marked } from 'marked';
-import { frontMatterLook, isSlideKind, isTextHandout, parseDeck, parseSlideBody, type SlideData, type SlideItem } from '../deckFormat';
+import { marked, Tokenizer, type Token } from 'marked';
+import { frontMatterLook, isBlockSlide, isSlideKind, isTextHandout, parseDeck, slideDataOf, type SlideData, type SlideItem } from '../deckFormat';
+import { BLOCK_MAX_STEP, isCoverSlide } from '../blocks/slideRenderer';
 import type { DeckTheme } from '../deckTheme';
 import { MAX_STEP } from '../../../webview/src/components/decks/slide/layoutSlide';
 
 export interface PublicSlide {
-  /** One of the nine kinds, or `other` for a kind this build doesn't draw (its title alone, as on the stage). */
+  /**
+   * One of the nine kinds, '' for a block slide (Sprint 161), or `other` for a kind this build doesn't draw (its title
+   * alone, as on the stage).
+   */
   kind: string;
   /** Only what the slide's layout draws: never its id, from, kept or skip lines, nor words kept for other layouts. */
   data: SlideData;
@@ -137,6 +141,25 @@ export function drawnData(kind: string, data: SlideData): SlideData {
   return out;
 }
 
+/**
+ * Sprint 161: the one place that decides what of a slide the room and the page see, for the wall (`presentProtocol`)
+ * and the page (`publicDeck`). A v1 slide: its kind and what its layout draws (`drawnData`). A block slide: its title,
+ * its Markdown with comments, `<mark>` tags and private fences taken out (`publicMarkdown`), and a picture beside or
+ * behind it; never its header's id, from, kept or skip. A kind this build doesn't know: `other`, its title alone.
+ */
+export function publicSlide(kind: string, data: SlideData): { kind: string; data: SlideData } {
+  if (isBlockSlide(kind)) {
+    const out: SlideData = { markdown: publicMarkdown(data.markdown ?? '') };
+    if (data.title !== undefined) out.title = data.title;
+    if (data.picture === 'left' || data.picture === 'right' || data.picture === 'behind') {
+      out.picture = data.picture;
+      if (data.image !== undefined) out.image = data.image;
+    }
+    return { kind: '', data: out };
+  }
+  return { kind: isSlideKind(kind) ? kind : 'other', data: drawnData(kind, data) };
+}
+
 export const MARKED_OPTIONS = { gfm: true, breaks: false, headerIds: false, mangle: false, smartypants: false } as const;
 
 /**
@@ -145,10 +168,10 @@ export const MARKED_OPTIONS = { gfm: true, breaks: false, headerIds: false, mang
  * <svg/onload=…>` reached the page as a live tag). The tag itself is a handout's raw HTML, which `sanitizeHtml`
  * shows as words.
  */
-function handoutTokenizer(): marked.Tokenizer {
-  const tokenizer = new marked.Tokenizer();
+function handoutTokenizer(): Tokenizer {
+  const tokenizer = new Tokenizer();
   const tag = tokenizer.tag;
-  tokenizer.tag = function (this: marked.Tokenizer & marked.TokenizerThis, src: string) {
+  tokenizer.tag = function (this: Tokenizer, src: string) {
     const token = tag.call(this, src);
     this.lexer.state.inRawBlock = false;
     return token;
@@ -223,7 +246,7 @@ function withoutPrivateContainers(text: string): string {
   const tokens = lexHandout(text);
   const holdsPrivate = (token: unknown): boolean => {
     let found = false;
-    marked.walkTokens([token as marked.Token], entry => {
+    marked.walkTokens([token as Token], entry => {
       if (entry.type === 'code' && isPrivateFence(String((entry as { lang?: string }).lang ?? ''))) found = true;
     });
     return found;
@@ -312,9 +335,9 @@ function scanPrivate(markdown: string): string {
 // The deck
 // ---------------------------------------------------------------------------
 
-function stepOf(steps: readonly number[] | undefined, index: number): number {
+function stepOf(steps: readonly number[] | undefined, index: number, max: number): number {
   const value = steps?.[index];
-  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(MAX_STEP, Math.round(value))) : 0;
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(max, Math.round(value))) : 0;
 }
 
 /** What of this deck goes public on its handout page. */
@@ -325,14 +348,14 @@ export function publicDeck(input: string, options: PublicDeckOptions): PublicDec
   const parsed = parseDeck(text);
   const slides: PublicSlide[] = [];
   parsed.slides.forEach((block, index) => {
-    const data = parseSlideBody(block.body);
+    const data = slideDataOf(block.kind, block.body);
     if (data.skip) return;
-    const kind = isSlideKind(block.kind) ? block.kind : 'other';
+    const shown = publicSlide(block.kind, data);
     slides.push({
-      kind,
-      data: drawnData(block.kind, data),
+      kind: shown.kind,
+      data: shown.data,
       handout: publicMarkdown(text.slice(block.handoutStart, block.handoutEnd)),
-      step: stepOf(options.steps, index),
+      step: stepOf(options.steps, index, isBlockSlide(block.kind) ? BLOCK_MAX_STEP : MAX_STEP),
     });
   });
   const first = parsed.slides[0];
@@ -340,7 +363,9 @@ export function publicDeck(input: string, options: PublicDeckOptions): PublicDec
   // of it goes (fail closed).
   const unclosedFrontMatter = parsed.bodyStart === 0 && /^---[ \t]*\r?\n/.test(text);
   const preamble = unclosedFrontMatter ? '' : publicMarkdown(text.slice(parsed.bodyStart, first ? first.start : text.length));
-  const titleSlide = slides.find(slide => slide.kind === 'title' && (slide.data.title ?? '').trim());
+  // The title slide's title; in a deck of block slides, a first slide that is only a title (the cover look).
+  const titleSlide = slides.find(slide => slide.kind === 'title' && (slide.data.title ?? '').trim())
+    ?? (slides[0] && isBlockSlide(slides[0].kind) && isCoverSlide(slides[0].data.markdown ?? '') && (slides[0].data.title ?? '').trim() ? slides[0] : undefined);
   return {
     title: (titleSlide?.data.title ?? '').trim() || options.deckName.trim(),
     client: options.folderName.trim(),

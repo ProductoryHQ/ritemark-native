@@ -12,7 +12,7 @@
  * Pure: counted from the deck's text, with `publicDeck` deciding what is shown and `lexHandout` reading the prompts
  * the way the page draws them.
  */
-import { parseDeck, parseSlideBody } from '../deckFormat';
+import { parseDeck, slideDataOf } from '../deckFormat';
 import type { DeckTheme } from '../deckTheme';
 import { lexHandout } from './pageHtml';
 import { publicDeck } from './publicDeck';
@@ -64,7 +64,7 @@ export function deckCounts(text: string, theme: DeckTheme): DeckCounts {
     slides: deck.slides.length,
     prompts: [deck.preamble, ...deck.slides.map(slide => slide.handout)].reduce((sum, markdown) => sum + promptsIn(markdown), 0),
     notes: parsed.slides.filter(slide => (slide.notes ?? '').trim() !== '').length,
-    skipped: parsed.slides.filter(slide => parseSlideBody(slide.body).skip === true).length,
+    skipped: parsed.slides.filter(slide => slideDataOf(slide.kind, slide.body).skip === true).length,
   };
 }
 

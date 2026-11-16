@@ -377,7 +377,8 @@ export class DeckPages implements vscode.Disposable {
           return;
         }
         case 'deck/use-library': {
-          const copied = await library.useSource(deckPath, part(request.id, request.text).body);
+          const copy = part(request.id, request.text);
+          const copied = await library.useSource(deckPath, copy.body, copy.kind);
           await this.post(webview, { type: 'deck/library-part', id: request.id, ...copied });
           return;
         }

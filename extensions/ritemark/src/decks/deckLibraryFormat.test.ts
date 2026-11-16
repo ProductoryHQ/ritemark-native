@@ -93,10 +93,12 @@ assert.equal(
   assert.notEqual(slideStamp('boxes', data, '### Smaller\n\nText.', 'Slide library'), base, 'an H3 is text, not the part\'s heading');
   // A from: line written before this counted the heading: that stamp still names the slide as it was.
   const legacy = slideStamps('boxes', data, '## Four parts\n\nText.', 'Slide library');
-  assert.equal(legacy.length, 2);
+  // Sprint 161: today's stamp first (the block stamp), then the v1 stamps without and with the heading.
+  assert.equal(legacy.length, 3);
   assert.equal(legacy[0], base);
-  assert.notEqual(legacy[1], base);
-  assert.deepEqual(slideStamps('boxes', data, 'Text.', 'Slide library'), [base], 'no heading: one stamp');
+  assert.ok(legacy.slice(1).every(stamp => stamp !== base));
+  assert.equal(slideStamps('boxes', data, 'Text.', 'Slide library')[0], base, 'no heading: today\'s stamp first');
+  assert.equal(slideStamps('boxes', data, 'Text.', 'Slide library').length, 2, 'and the one v1 stamp');
 }
 
 

@@ -14,7 +14,9 @@
  *
  * No `vscode` and no DOM: the host gives it the open document's text.
  */
-import { parseDeck, parseSlideBody, readScalar, type SlideData } from '../deckFormat';
+import { isBlockSlide, parseDeck, readScalar, slideDataOf, type SlideData } from '../deckFormat';
+import { legacyDataToBlocks } from '../blocks/legacyToBlocks';
+import { partComments, type PartComment } from './partComments';
 
 /** One slide of the deck, as presenting reads it. */
 export interface PresentSlide {
@@ -26,6 +28,11 @@ export interface PresentSlide {
   data: SlideData;
   /** The speaker notes, or null. Only the presenter view gets them; the wall never does (presentProtocol.ts). */
   notes: string | null;
+  /**
+   * Sprint 161: the comments of the slide's handout part, in order: what "Your comments" shows. An older slide's notes
+   * and the words its layout keeps hidden come last, as the one comment its deck's conversion will write there.
+   */
+  comments: PartComment[];
   skip: boolean;
 }
 
@@ -60,11 +67,13 @@ export type PresentStart = { from: 'start' } | { from: 'here'; index: number };
 export function presentSlidesOf(text: string): PresentSlide[] {
   const seen = new Map<string, number>();
   return parseDeck(text).slides.map((block, index) => {
-    const data = parseSlideBody(block.body);
+    const data = slideDataOf(block.kind, block.body);
     const base = data.id ? `id:${data.id}` : `body:${block.kind}\n${block.body.trim()}`;
     const twins = seen.get(base) ?? 0;
     seen.set(base, twins + 1);
-    return { index, key: twins ? `${base}#${twins}` : base, kind: block.kind, data, notes: block.notes, skip: data.skip === true };
+    const converted = isBlockSlide(block.kind) ? null : legacyDataToBlocks(block.kind, data, block.notes).comment;
+    const comments = partComments(text.slice(block.handoutStart, block.handoutEnd), converted);
+    return { index, key: twins ? `${base}#${twins}` : base, kind: block.kind, data, notes: block.notes, comments, skip: data.skip === true };
   });
 }
 

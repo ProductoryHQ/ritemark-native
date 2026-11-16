@@ -37,7 +37,7 @@ import { onMessage, sendToExtension } from '../../bridge'
 import { convertKind } from './slide/convertKind'
 import { SlideSettings } from './SlideSettings'
 import { SlideStrip, type StripActions, type StripMark } from './SlideStrip'
-import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, newId, parseSlideBody, withPartHeading, writeSlideBlock, writeSlideBody } from '../../../../src/decks/deckFormat'
+import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, newId, slideDataOf as readSlideData, withPartHeading, writeSlideBlock, writeSlideData } from '../../../../src/decks/deckFormat'
 import type { Transaction } from '@tiptap/pm/state'
 import { isHistoryTransaction } from '@tiptap/pm/history'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
@@ -110,7 +110,7 @@ function isNewPart(value: unknown): value is NewPart {
 function partsFragment(editor: TipTapEditor, parts: NewPart[], imageMappings: Record<string, string>): Fragment | null {
   // Making a part writes its heading (16 November): a part whose handout has none opens with its slide's title.
   const markdown = parts
-    .map(part => [writeSlideBlock(part.kind, part.body, part.notes ?? null), withPartHeading(part.kind, parseSlideBody(part.body), part.handout.trim())].filter(Boolean).join('\n\n'))
+    .map(part => [writeSlideBlock(part.kind, part.body, part.notes ?? null), withPartHeading(part.kind, readSlideData(part.kind, part.body), part.handout.trim())].filter(Boolean).join('\n\n'))
     .join('\n\n')
   let html: string
   try {
@@ -652,7 +652,7 @@ export function DeckView({
           run: () => {
             // The deleted part itself goes back where it was; what was done since stays. Only while the slide is
             // still gone: Cmd+Z may have put it back already.
-            const id = content.firstChild ? slideDataOf(content.firstChild.attrs.body).id : undefined
+            const id = content.firstChild ? slideDataOf(content.firstChild.attrs.kind, content.firstChild.attrs.body).id : undefined
             const back = !!id && slidesOf(editor.state.doc).some(entry => entry.data.id === id)
             if (!back && !editor.isDestroyed) {
               dispatch(restoreSlide(editor.state, index, content))
@@ -952,14 +952,14 @@ export function DeckView({
         // that is taken here is renewed.
         const taken = new Set(current.map(entry => entry.data.id).filter((id): id is string => !!id))
         const fresh = parts.map(part => {
-          const data = parseSlideBody(part.body)
+          const data = readSlideData(part.kind, part.body)
           if (!data.id || !taken.has(data.id)) {
             if (data.id) taken.add(data.id)
             return part
           }
           const id = newId(taken)
           taken.add(id)
-          return { ...part, body: writeSlideBody(part.body, { ...data, id }) }
+          return { ...part, body: writeSlideData(part.kind, part.body, { ...data, id }) }
         })
         const content = partsFragment(editor, fresh.map(part => ({ kind: part.kind, body: part.body, handout: part.handout })), imageMappings)
         if (!content || !dispatch(restoreSlide(editor.state, at, content))) {

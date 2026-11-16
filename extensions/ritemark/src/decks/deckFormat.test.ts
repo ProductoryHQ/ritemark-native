@@ -230,7 +230,9 @@ test('info strings, versions, ids and the from line', () => {
   assert.equal(slideKindOfInfo('js'), null);
   assert.ok(isReadableDeckVersion(null));
   assert.ok(isReadableDeckVersion('1'));
-  assert.ok(!isReadableDeckVersion('2'));
+  // Sprint 161: block slides are format 2.
+  assert.ok(isReadableDeckVersion('2'));
+  assert.ok(!isReadableDeckVersion('3'));
   assert.ok(!isReadableDeckVersion('next'));
   let n = 0;
   const sequence = [0, 0, 0, 0, 0.5, 0.5, 0.5, 0.5];

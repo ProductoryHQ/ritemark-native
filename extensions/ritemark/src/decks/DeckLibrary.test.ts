@@ -142,7 +142,7 @@ async function run() {
   // this build's format: inserting into it, updating it, adding to it and a from: line's write are refused, the file
   // left byte for byte.
   {
-    const LATER = '---\ndeck: 2\n---\n\n```slide title\nid: n1\ntitle: Newer\n```\n';
+    const LATER = '---\ndeck: 3\n---\n\n```slide title\nid: n1\ntitle: Newer\n```\n';
     const newer = project({ 'Slide library/AI assistants.deck.md': TOPIC, 'Slide library/Newer.deck.md': LATER.replace('id: n1', 'id: a1'), 'Clients/Newer.deck.md': LATER, 'Clients/Harbour/Harbour.deck.md': DECK });
     const later = new DeckLibrary(newer);
     const refused = /newer deck format/;

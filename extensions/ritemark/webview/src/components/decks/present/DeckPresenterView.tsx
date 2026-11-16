@@ -3,7 +3,7 @@
  * In Ritemark Dark whatever the app's theme, so it glows less in a dim room.
  *
  *  - The slide now, as the room sees it, and the next one.
- *  - The speaker notes in large type, with A− and A+.
+ *  - Your comments (Sprint 161): the current part's comments in large type, with A− and A+.
  *  - The slides shown, in a row: a click goes there.
  *  - The clock: time elapsed, against the session's length (`ritemark-length` in the deck's front matter) when the deck
  *    has one; a click on it asks for the length. Pause and Reset are this view's own.
@@ -173,18 +173,28 @@ export function DeckPresenterView() {
         <div className="pv-label">Next</div>
         {state.next ? canvas(state.next, SIDE_WIDTH) : <div className="pv-end">The end of the deck</div>}
         <div className="pv-notes-head">
-          <span className="pv-label">Your notes</span>
+          <span className="pv-label">Your comments</span>
           <span className="pv-sizes">
-            <Tooltip label="Smaller notes">
-              <Button variant="outline" size="compact" aria-label="Smaller notes" disabled={noteSize === 0} onClick={() => setNoteSize(size => Math.max(0, size - 1))}>A−</Button>
+            <Tooltip label="Smaller comments">
+              <Button variant="outline" size="compact" aria-label="Smaller comments" disabled={noteSize === 0} onClick={() => setNoteSize(size => Math.max(0, size - 1))}>A−</Button>
             </Tooltip>
-            <Tooltip label="Larger notes">
-              <Button variant="outline" size="compact" aria-label="Larger notes" disabled={noteSize === NOTE_SIZES.length - 1} onClick={() => setNoteSize(size => Math.min(NOTE_SIZES.length - 1, size + 1))}>A+</Button>
+            <Tooltip label="Larger comments">
+              <Button variant="outline" size="compact" aria-label="Larger comments" disabled={noteSize === NOTE_SIZES.length - 1} onClick={() => setNoteSize(size => Math.min(NOTE_SIZES.length - 1, size + 1))}>A+</Button>
             </Tooltip>
           </span>
         </div>
+        {/* Sprint 161 (decision 8): the current part's comments, read-only, in the order they are written. */}
         <div className="pv-notes" style={{ fontSize: NOTE_SIZES[noteSize], lineHeight: `${Math.round(NOTE_SIZES[noteSize] * 1.55)}px` }}>
-          {state.notes.trim() ? state.notes : <span className="pv-no-notes">No notes for this slide.</span>}
+          {state.comments.length ? (
+            <ol className="pv-comments">
+              {state.comments.map((comment, index) => (
+                <li key={index} className="pv-comment">
+                  {comment.words ? <span className="pv-comment-on">“{comment.words}”</span> : null}
+                  {comment.note}
+                </li>
+              ))}
+            </ol>
+          ) : <span className="pv-no-notes">No comments on this slide.</span>}
         </div>
         <div className="pv-held">
           <Icon name="bell-slash" size={16} tone="inherit" />
@@ -226,7 +236,7 @@ export function DeckPresenterView() {
           </Button>
         </Tooltip>
         {state.canSwap ? (
-          <Tooltip label="Show the slides on the other display, and these notes here">
+          <Tooltip label="Show the slides on the other display, and this view here">
             <Button variant="outline" onClick={() => send('present/swap')}>
               <Icon name="arrows-left-right" size={16} tone="inherit" />
               Swap displays

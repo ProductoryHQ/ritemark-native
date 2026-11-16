@@ -340,4 +340,22 @@ const blocksOf = (text: string) => text.match(/```slide[\s\S]*?\n```/g) ?? []
   for (const gone of ['deck-part-bar', 'deck-part-band', 'deck-part-eyebrow', 'deck-part-title']) assert.ok(!css.includes(gone), `${gone} is gone`)
 }
 
+// Sprint 161: a deck of block slides (`deck: 2`) and a mixed deck open as decks, each bare `slide` fence one slide node
+// with its Markdown body as written, and save byte for byte. Opening writes nothing: no slide is converted.
+{
+  for (const name of ['deck-blocks.md', 'deck-mixed.md']) {
+    const file = fs.readFileSync(path.join(here, '../../../utils/fidelity-corpus/kept', name), 'utf8')
+    const { doc, save } = open(file)
+    const nodes = slides(doc)
+    assert.ok(nodes.length >= 5, `${name}: its slides are slide nodes`)
+    for (const node of nodes) assert.ok(file.includes(node.attrs.body), `${name}: a slide's body is kept as written`)
+    let fenced = 0
+    doc.descendants(node => { if (node.type.name === 'codeBlock' && /^(---\n|# |:::)/.test(node.textContent)) fenced++ })
+    assert.equal(fenced, 0, `${name}: no block slide opens as a code block`)
+    assert.equal(save(doc), file, `${name}: opened as a deck and saved, byte for byte`)
+  }
+  const mixed = slides(open(fs.readFileSync(path.join(here, '../../../utils/fidelity-corpus/kept/deck-mixed.md'), 'utf8')).doc)
+  assert.deepEqual(mixed.map(node => node.attrs.kind), ['title', '', 'points', 'exercise', 'columns'])
+}
+
 console.log('deckRoundTrip: passed')

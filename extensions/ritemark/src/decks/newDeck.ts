@@ -63,7 +63,7 @@ export function copiedDeckText(text: string, fromFolder: string, toFolder: strin
   for (const slide of deck.slides) {
     out += rebaseText(text.slice(at, slide.start));
     const block = text.slice(slide.start, slide.end);
-    const { body, handout } = rebaseSlide(slide.body, text.slice(slide.handoutStart, slide.handoutEnd), fromFolder, toFolder);
+    const { body, handout } = rebaseSlide(slide.body, text.slice(slide.handoutStart, slide.handoutEnd), fromFolder, toFolder, slide.kind);
     const bodyAt = body === slide.body ? -1 : block.indexOf(slide.body);
     out += bodyAt < 0 ? block : block.slice(0, bodyAt) + body + block.slice(bodyAt + slide.body.length);
     out += text.slice(slide.end, slide.handoutStart) + handout;
