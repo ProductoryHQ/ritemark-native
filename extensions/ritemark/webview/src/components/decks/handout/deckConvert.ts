@@ -106,9 +106,23 @@ export function convertDeckInto(tr: Transaction): DeckConversion | null {
     result.slides++
   }
   // The handout's drawn headings are its text from now on, written with the conversion (`withWrittenHandout`'s rule).
-  tr.doc.forEach((node, pos) => {
+  // The empty line the view draws under a drawn heading with nothing under it (`derivedHeadings`) goes with it: no file
+  // holds an empty line, so the save's echo would take it out, and a host revision that replaces a range of the
+  // document (a new picture's address, Codex's P1 path on #765) would cut the conversion's Undo short.
+  const empties: number[] = []
+  let previous: PMNode | null = null
+  let previousDrawn = false
+  tr.doc.forEach((node, pos, index) => {
     if (node.type.name === 'heading' && node.attrs.deckDrawn === true) tr.setNodeMarkup(pos, undefined, { ...node.attrs, deckDrawn: false })
+    const after = index + 1 < tr.doc.childCount ? tr.doc.child(index + 1) : null
+    if (previous && previousDrawn && node.type.name === 'paragraph' && node.childCount === 0 && (!after || isSlideNode(after) || after.type.name === 'commentNode')) empties.push(pos)
+    previousDrawn = node.type.name === 'heading' && node.attrs.deckDrawn === true
+    previous = node
   })
+  for (const pos of empties.reverse()) {
+    const node = tr.doc.nodeAt(pos)
+    if (node) tr.delete(pos, pos + node.nodeSize)
+  }
   tr.setMeta(DECK_OPERATION, true).setMeta(DECK_CONVERTED, result)
   return result
 }

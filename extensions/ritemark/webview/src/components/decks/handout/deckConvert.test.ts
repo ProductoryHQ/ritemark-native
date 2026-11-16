@@ -28,6 +28,7 @@ import { deckGuardPlugin } from './deckGuard'
 import { deckLinesPlugin } from './deckLines'
 import { CONVERSION_NOTICE, commentNodeAt, conversionNoticeFor, pictureIntoSlide, handoutMarkdownOf, convertDeckInto, conversionStateOf, deckConvertPlugin, needsConversion } from './deckConvert'
 import { derivedHeadings, slidesOf } from '../deckDocument'
+import { documentReplacement } from '../../../lib/documentUpdate'
 
 installTestDocument()
 ensureCommentMarkedPipeline()
@@ -304,6 +305,21 @@ const apply = (state: EditorState, tr: Transaction) => state.apply(tr)
   assert.equal(conversionStateOf(quiet).count, 1)
   assert.deepEqual(conversionStateOf(quiet).last, { slides: 1, comments: 0, firstComment: null })
   assert.equal(conversionNoticeFor(conversionStateOf(quiet).last, false), null, 'no notes, no line')
+}
+
+// ---- The final app run on #765 found: after a picture on an old slide, the host's revision for the new picture's address
+// replaced a range of the handout (the empty lines the view draws under headings with nothing under them, which no file
+// holds), and the conversion's Undo came back short. The conversion takes those lines out: the save's echo then changes
+// nothing, and one Undo gives the file back.
+{
+  const sectioned = DECK.replace('```slide gamma.v2', '```slide section\nid: s9\ntitle: Part two\n```\n\n```slide gamma.v2')
+  const { state, save } = stateOf(sectioned, deckPlugins())
+  const now = state.apply(pictureIntoSlide(state, 'p3', 'images/dot.png')!)
+  const echo = documentReplacement(now.doc, stateOf(save(now.doc), []).state.doc)
+  assert.ok(echo === null, `the save's echo changes nothing (it replaced ${echo?.from}–${echo?.to})`)
+  let undone = now
+  undo(now, back => { undone = now.apply(back) })
+  assert.equal(save(undone.doc), sectioned, 'one Undo')
 }
 
 console.log('deckConvert: passed')
