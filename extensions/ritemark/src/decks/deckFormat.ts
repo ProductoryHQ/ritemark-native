@@ -12,6 +12,17 @@
  * (and its notes) up to the next slide block is the slide's handout; anything before the first slide is the
  * preamble, kept as written.
  *
+ * The handout is a Text document (README decision 12, 16 November): a part opens with its own heading, an H1 for a
+ * section slide and an H2 for every other kind, written in the Markdown as ordinary text. It is the handout's, not the
+ * slide's: the slide's `title:` and the heading never change each other, except that a slide with no title takes the
+ * first heading written in its part as its title, once (a slide made from a line takes the heading after the line, as it
+ * is made). A deck whose handout is written this way says so in its front matter, `handout: text` (`isTextHandout`).
+ * A deck without that mark (every deck written before this) shows each part without a heading of its own one drawn
+ * from its slide's title, in the deck view and on the handout page (`derivedHeading`); the person's first real edit
+ * writes those headings and the mark together, and from then on nothing is drawn, so a heading deleted stays deleted.
+ * A slide starts only at a slide block: a line (`***`) typed in the deck view becomes a slide block there, and a line in
+ * the file is a line.
+ *
  * The reader keeps unknown keys and lines as they were written, and the writer rewrites only the lines whose value
  * changed, so a slide nobody touched saves byte for byte.
  *
@@ -629,6 +640,133 @@ export function isReadableDeckVersion(version: string | null): boolean {
   if (version === null || version.trim() === '') return true;
   const number = Number(version);
   return Number.isFinite(number) && number <= 1;
+}
+
+// ---------------------------------------------------------------------------
+// The part's heading (16 November: the handout is a Text document)
+// ---------------------------------------------------------------------------
+
+/** The words a new deck's title slide starts with (New → Deck), selected so they are typed over. */
+export const EMPTY_DECK_TITLE = "The deck's title";
+
+/** The heading a part opens with: an H1 for a section slide, an H2 for every other kind. */
+export function partHeadingLevel(kind: string): 1 | 2 {
+  return kind === 'section' ? 1 : 2;
+}
+
+/** A part's own heading: an H1 or H2 as the handout's first block (ATX or setext), and where it ends in the handout. */
+export interface PartHeading {
+  level: 1 | 2;
+  /** The heading's Markdown, without its marks. */
+  text: string;
+  /** Where the heading's lines end in the handout (its blank lines before it included). */
+  end: number;
+}
+
+/** The handout's own heading, when it opens with an H1 or H2 (blank lines before it allowed); null otherwise. */
+export function partHeadingOf(handout: string): PartHeading | null {
+  const atx = /^(?:[ \t]*\r?\n)*[ ]{0,3}(#{1,2})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*(?:\r?\n|$)/.exec(handout);
+  if (atx) return { level: atx[1].length as 1 | 2, text: (atx[2] ?? '').trim(), end: atx[0].length };
+  return setextHeadingOf(handout);
+}
+
+/** A line that starts a block of its own, so it can't be a setext heading's text: a list item, a quote, a fence, a table. */
+const BLOCK_START = /^[ ]{0,3}(?:[-*+][ \t]|\d{1,9}[.)](?:[ \t]|$)|>|#|`{3}|~{3}|\|)/;
+
+/**
+ * A setext heading as the handout's first block, as CommonMark (and `marked`, the editor's and the page's reader) reads
+ * one: a paragraph of one or more lines, then a line of `=` (H1) or `-` (H2). Its text is the lines joined by spaces.
+ */
+function setextHeadingOf(handout: string): PartHeading | null {
+  const lines = handout.split('\n');
+  let index = 0;
+  while (index < lines.length && lines[index].trim() === '') index++;
+  const text: string[] = [];
+  for (; index < lines.length; index++) {
+    const line = lines[index].replace(/\r$/, '');
+    if (line.trim() === '') return null;
+    const underline = /^[ ]{0,3}(=+|-+)[ \t]*$/.exec(line);
+    if (underline && text.length > 0) {
+      // Its lines end after the underline's line break (the blank lines before it included).
+      const end = lines.slice(0, index + 1).reduce((sum, next) => sum + next.length + 1, 0);
+      return { level: underline[1].startsWith('=') ? 1 : 2, text: text.join(' '), end: Math.min(handout.length, end) };
+    }
+    // Its first line can't be indented code; a later one is a lazy continuation, whatever its indent.
+    if (BLOCK_START.test(line) || (text.length === 0 && /^[ ]{4}/.test(line)) || /^[ ]{0,3}(?:\*[ \t]*){3,}$/.test(line)) return null;
+    text.push(line.trim());
+  }
+  return null;
+}
+
+/** The handout without its own heading: what a library copy's stamp covers (a heading is never a change to the slide). */
+export function handoutWithoutHeading(handout: string): string {
+  const heading = partHeadingOf(handout);
+  return heading ? handout.slice(heading.end) : handout;
+}
+
+/** The heading drawn for a part without its own: its slide's title; none for a new deck's words to type over. */
+export function derivedHeading(data: SlideData): string {
+  const title = (data.title ?? '').trim();
+  return title === EMPTY_DECK_TITLE ? '' : title;
+}
+
+/** A heading's words as Markdown: the characters that would read as marks are escaped, so it reads back the same. */
+export function headingMarkdown(text: string): string {
+  return text.replace(/[\\`*_[\]<>]/g, '\\$&').replace(/(\s)#+$|^#+$/, match => match.replace(/#/g, '\\#'));
+}
+
+/** The front matter's mark of a deck whose handout is written as a Text document, with its own headings. */
+export const TEXT_HANDOUT_KEY = 'handout';
+export const TEXT_HANDOUT_VALUE = 'text';
+
+/** Is this deck's handout written with its own headings (`handout: text`)? Then no heading is ever drawn for it. */
+export function isTextHandout(text: string): boolean {
+  return frontMatterField(text.replace(/^\uFEFF/, ''), TEXT_HANDOUT_KEY) === TEXT_HANDOUT_VALUE;
+}
+
+/** The deck's text with `handout: text` in its front matter (a front matter made when it has none); else as it was. */
+export function withTextHandoutMark(text: string): string {
+  if (isTextHandout(text)) return text;
+  const bom = text.startsWith('\uFEFF') ? '\uFEFF' : '';
+  const body = text.slice(bom.length);
+  // An empty front matter (`---` twice): the mark goes between its lines, never into the text after it.
+  const empty = /^(---[ \t]*(\r?\n))(---[ \t]*(?:\r?\n|$))/.exec(body);
+  if (empty) return bom + empty[1] + `${TEXT_HANDOUT_KEY}: ${TEXT_HANDOUT_VALUE}` + empty[2] + empty[3] + body.slice(empty[0].length);
+  const match = /^(---[ \t]*(\r?\n))([\s\S]*?)(\r?\n---[ \t]*(?:\r?\n|$))/.exec(body);
+  if (!match) return `${bom}---\n${TEXT_HANDOUT_KEY}: ${TEXT_HANDOUT_VALUE}\n---\n\n${body}`;
+  const lines = match[3].split(/\r?\n/).filter(line => KEY_LINE.exec(line)?.[1] !== TEXT_HANDOUT_KEY);
+  lines.push(`${TEXT_HANDOUT_KEY}: ${TEXT_HANDOUT_VALUE}`);
+  return bom + match[1] + lines.join(match[2]) + match[4] + body.slice(match[0].length);
+}
+
+/**
+ * A deck's text with its handout written as a Text document, as the deck view's first real edit writes it: each part
+ * without a heading of its own gets the one drawn from its slide's title, and the front matter gets `handout: text`.
+ * A deck that has the mark already is returned as it is. Every slide block stays byte for byte.
+ */
+export function withWrittenHandout(text: string): string {
+  if (isTextHandout(text)) return text;
+  const deck = parseDeck(text);
+  let out = text;
+  for (const slide of [...deck.slides].reverse()) {
+    if (partHeadingOf(text.slice(slide.handoutStart, slide.handoutEnd))) continue;
+    const heading = withPartHeading(slide.kind, parseSlideBody(slide.body), '');
+    if (heading) out = `${out.slice(0, slide.end)}\n\n${heading}${out.slice(slide.end)}`;
+  }
+  return withTextHandoutMark(out);
+}
+
+/**
+ * A part's handout with its heading: the handout as it is when it opens with one, else with the heading drawn from the
+ * slide's title before it (a part an AI or the library makes: making a part writes its heading). No title, no heading.
+ */
+export function withPartHeading(kind: string, data: SlideData, handout: string): string {
+  if (partHeadingOf(handout)) return handout;
+  const text = derivedHeading(data);
+  if (!text) return handout;
+  const heading = `${'#'.repeat(partHeadingLevel(kind))} ${headingMarkdown(text)}`;
+  const rest = handout.replace(/^\s+/, '');
+  return rest ? `${heading}\n\n${rest}` : heading;
 }
 
 // ---------------------------------------------------------------------------

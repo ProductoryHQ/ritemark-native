@@ -53,68 +53,38 @@
 
 .deck-handout { position: absolute; top: 0; bottom: 0; right: 0; }
 .deck-handout.is-folded { visibility: hidden; pointer-events: none; }
+/* The handout is a Text document (Jarmo, 16 November: "very, very similar to our text editor; the only difference is
+   one line that signals the slide changes"; the prototype's `.hand`, `.hpart`): the editor's own type, headings and
+   code blocks, with no style of the deck's own. The text's edges are 48 on the left and 32 on the right; the column
+   starts at the dotted divider, so the line between slides runs from it to the right edge. */
 .deck-handout .wysiwyg-editor .ProseMirror {
   counter-reset: deck-slide;
   max-width: none !important;
-  /* The prototype's 20 on the left (no + or block handle in the handout); 22 on the right; room below to scroll the
-     last part to the top (60vh until the deck view measures the exact room) */
-  padding: 6px 22px 60vh 20px !important;
-  font-size: 14.5px !important;
-  line-height: 1.65 !important;
-  color: var(--r-ink-body);
+  /* room below to scroll the last part to the top (60vh until the deck view measures the exact room) */
+  padding: 0 32px 60vh 48px !important;
 }
 /* No block handle and no + in the handout (Jarmo, 15 November): a block dragged there could land in another slide's
    part, and / adds what the + would. The + lives on the page's body, so it is hidden by the deck view's presence. */
 .deck-handout .drag-handle { visibility: hidden !important; pointer-events: none !important; }
 body:has(.deck-view) .block-plus-btn { display: none !important; }
-.deck-handout .wysiwyg-editor .ProseMirror p { margin: 0 0 10px !important; font-size: 14.5px !important; line-height: 1.65 !important; }
-.deck-handout .wysiwyg-editor .ProseMirror li p { margin: 0 !important; }
-.deck-handout .wysiwyg-editor .ProseMirror h1 { font-size: 20px !important; margin: 16px 0 6px !important; }
-.deck-handout .wysiwyg-editor .ProseMirror h2 { font-size: 17px !important; margin: 14px 0 6px !important; }
-.deck-handout .wysiwyg-editor .ProseMirror h3,
-.deck-handout .wysiwyg-editor .ProseMirror h4,
-.deck-handout .wysiwyg-editor .ProseMirror h5,
-.deck-handout .wysiwyg-editor .ProseMirror h6 { font-size: 15.5px !important; margin: 12px 0 6px !important; }
-/* A prompt in the handout: the prototype's light block in small type, with the document's Copy */
-.deck-handout .wysiwyg-editor .ProseMirror pre.tiptap-code-block {
-  margin: 4px 0 12px !important;
-  padding: 10px 12px !important;
-  border-radius: 8px !important;
-  background: var(--r-surface-muted) !important;
-  box-shadow: inset 0 0 0 1px var(--r-hairline);
-  color: var(--r-ink-strong) !important;
-  font-family: ui-monospace, Menlo, Consolas, monospace !important;
-  font-size: 12.5px !important;
-  line-height: 1.55 !important;
-}
-.deck-handout .wysiwyg-editor .ProseMirror pre.tiptap-code-block code { white-space: pre-wrap !important; overflow-x: visible !important; }
-.deck-handout .wysiwyg-editor .ProseMirror pre.tiptap-code-block [class^="hljs-"] { color: inherit !important; font-style: normal !important; }
 
-/* each slide's part head: its title over a thin line, its number on the right */
-.deck-part-head { position: relative; counter-increment: deck-slide; padding: 14px 40px 0 0; margin: 4px 0 6px; border-top: 1px solid var(--r-hairline); }
+/* Where each slide's part starts: one 1px line in the hairline colour, the handout's full width (none above the first),
+   and the slide's number, 12px and muted at the right of the part's first line, in the accent for the current slide. */
+/* 22px of its own under the line (padding, not margin: a margin would fold through the first head, which has no line) */
+.deck-part-head { position: relative; counter-increment: deck-slide; margin: 14px -32px 0 -48px; padding: 0 0 22px; border-top: 1px solid var(--r-hairline); }
 .ProseMirror > .deck-part-head:first-child { border-top: 0; margin-top: 0; }
-.deck-part-title { padding: 1px 0; font-size: 19px; font-weight: 600; line-height: 1.4; color: var(--r-ink-strong); outline: none; text-wrap: balance; cursor: text; }
-.deck-part-title:empty::before { content: attr(data-placeholder); color: var(--r-ink-faint); font-weight: 500; }
-.deck-part-head.is-first .deck-part-title:empty::before { content: "The deck's title"; }
-.deck-part-number { position: absolute; right: 0; top: 21px; display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; line-height: 14px; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; font-family: var(--ritemark-ui-font-family); }
+.deck-part-number { position: absolute; right: 32px; top: 29px; display: flex; align-items: center; gap: 6px; font: 500 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
 .deck-part-number::after { content: counter(deck-slide); }
+/* The number sits on the part's first line: half its line box down from the part's top, whatever opens the part */
+.deck-part-head:has(+ h2) .deck-part-number { top: 34px; }
+.deck-part-head:has(+ h1) .deck-part-number { top: 41px; }
 .deck-part-head.is-current .deck-part-number { color: var(--r-accent); }
-.deck-part-head.is-skip .deck-part-title { color: var(--r-ink-muted); }
-
-/* A section slide's part is a chapter: a grey band with "Section N" over its title (the Experience lead's decision 12,
-   the prototype's `.hpart.sect`). The band is drawn behind the part by the deck view (.deck-part-band), 12 pixels into
-   both gutters, so the title keeps the column's left edge. */
-.deck-part-eyebrow { display: none; }
-.deck-part-head.is-section { border-top: 0; margin-top: 10px; padding-top: 12px; }
-.deck-part-head.is-section .deck-part-eyebrow { display: block; margin: 2px 40px 4px 0; font-family: var(--ritemark-ui-font-family); font-size: 11px; font-weight: 700; line-height: 14px; letter-spacing: .06em; text-transform: uppercase; color: var(--r-ink-muted); user-select: none; }
-.deck-part-head.is-section .deck-part-number { top: 14px; }
-.deck-part-head.is-section .deck-part-title { font-size: 21px; font-weight: 700; line-height: 1.35; }
-.deck-part-head.after-section { border-top: 0; margin-top: 14px; } /* 8 of the band's padding and 6 below it */
-.deck-part-band { position: absolute; border-radius: 8px; background: var(--r-surface-soft); pointer-events: none; z-index: 0; }
-.deck-handout .wysiwyg-editor .ProseMirror { position: relative; z-index: 1; }
-
-/* the current part's line on the left, from its head to the next part's */
-.deck-part-bar { position: absolute; width: 2px; border-radius: 1px; background: var(--r-accent-soft); pointer-events: none; }
+/* The part's own heading, as the editor writes it, starts the part: no space of its own above it, room for the number */
+.deck-handout .wysiwyg-editor .ProseMirror > .deck-part-head + :is(h1, h2, h3, p) { margin-top: 0 !important; }
+.deck-handout .wysiwyg-editor .ProseMirror > .deck-part-head + :is(h1, h2) { margin-right: 40px !important; }
+.deck-handout .wysiwyg-editor .ProseMirror > .deck-part-head.is-skip + :is(h1, h2) { color: var(--r-ink-muted) !important; }
+/* The placeholders: a part's empty heading, and the current part's empty text (deckCurrent.ts) */
+.deck-handout .wysiwyg-editor .ProseMirror .deck-empty::before { content: attr(data-deck-placeholder); float: left; height: 0; color: var(--r-ink-faint); pointer-events: none; }
 
 /* The slide itself (.deck-slide, .deck-sl): slide/slide.css, imported by SlideCanvas */
 
@@ -130,11 +100,11 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 
 /* Under the slide: quiet lines that never reach the wall (prototype `.srcl`, `.notesr`, `.notes`) */
 .deck-source .deck-line-action { height: auto; padding: 0; font-size: 12px; line-height: 16px; font-weight: 500; }
-.deck-notes-toggle { height: 24px; padding: 0 6px 0 0; gap: 6px; width: max-content; font-size: 12.5px; font-weight: 500; color: var(--r-ink-body); }
+.deck-notes-toggle { height: 24px; padding: 0 6px 0 0; gap: 6px; width: max-content; max-width: 100%; font-size: 12.5px; font-weight: 500; color: var(--r-ink-body); }
 .deck-notes-toggle:hover { background: transparent; color: var(--r-ink-strong); }
 .deck-notes-toggle svg { color: var(--r-ink-muted); transition: transform .15s; }
 .deck-notes-toggle.is-open svg { transform: rotate(90deg); }
-.deck-notes-label { overflow: hidden; text-overflow: ellipsis; }
+.deck-notes-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .deck-notes { min-height: 60px; padding: 10px 12px; border-radius: 8px; background: #FFFBEB; box-shadow: inset 0 0 0 1px #FDE68A; font: 400 13px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #713F12; outline: 0; white-space: pre-wrap; cursor: text; }
 .deck-notes:empty::before { content: attr(data-ph); color: #A16207; opacity: .7; }
 .deck-notes:focus { box-shadow: inset 0 0 0 2px #F59E0B; }
@@ -221,6 +191,14 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-change .deck-line-action { height: auto; padding: 0; font-size: 12px; line-height: 16px; font-weight: 500; white-space: nowrap; }
 .deck-line-action.is-strong { font-weight: 600; }
 .deck-change .deck-use-it { height: 26px; padding: 0 10px; font-size: 12px; white-space: nowrap; }
+/* Under a narrow slide (16 November), the line's words have a line of their own and its buttons go on the next one; it
+   never squeezes into a column beside them. */
+.deck-stage .deck-under { container-type: inline-size; }
+@container (max-width: 560px) {
+  .deck-change { flex-wrap: wrap; row-gap: 6px; }
+  .deck-change > span:first-child { flex: 1 0 100%; }
+  .deck-change .deck-grow { display: none; }
+}
 /* Add to library: a sheet beside the slide (prototype sheet "addlib"), in the Settings panel's material. */
 .deck-addlib .deck-addlib-lede { margin: 0 0 10px; font-size: 12.5px; line-height: 18px; color: var(--r-ink-body); }
 .deck-addlib .deck-addlib-topic { width: 100%; }

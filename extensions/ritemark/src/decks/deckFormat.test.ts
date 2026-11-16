@@ -4,6 +4,15 @@
 import { strict as assert } from 'node:assert';
 import * as yaml from 'js-yaml';
 import {
+  isTextHandout,
+  withTextHandoutMark,
+  withWrittenHandout,
+  derivedHeading,
+  EMPTY_DECK_TITLE,
+  handoutWithoutHeading,
+  partHeadingLevel,
+  partHeadingOf,
+  withPartHeading,
   fenceFor,
   frontMatterField,
   isReadableDeckVersion,
@@ -309,5 +318,76 @@ test("the text Publish builds from takes the view's look, still on its way to th
   const broken = '---\ndeck: 1\nsubtitle: Training: Day 1\n---\n\n```slide title\ntitle: Saved words\n```\n';
   assert.deepEqual(publishText(broken, body, broken, 'borderless'), { text: broken, fromView: false });
 });
+
+// 16 November: the handout is a Text document; a part opens with its own heading.
+test("a part's own heading: an H1 or H2 as the handout's first block, ATX or setext", () => {
+  assert.deepEqual(partHeadingOf('## Four parts\n\nText.'), { level: 2, text: 'Four parts', end: 14 });
+  assert.deepEqual(partHeadingOf('\n\n# Why agents? #\nText.'), { level: 1, text: 'Why agents?', end: 18 });
+  assert.equal(partHeadingOf('Welcome\n=======\n')?.level, 1);
+  assert.equal(partHeadingOf('Welcome\n---\n')?.text, 'Welcome');
+  assert.equal(partHeadingOf('### Smaller\n'), null, 'an H3 is a heading in the text, not the part\'s');
+  assert.equal(partHeadingOf('Text first.\n\n## Later\n'), null);
+  assert.equal(partHeadingOf('- item\n---\n'), null, 'a list item over a line is no heading');
+  // A setext heading as CommonMark (and marked, the editor's and the page's reader) reads one: several lines, marks inside.
+  assert.deepEqual(partHeadingOf('Line one\nLine two\n---\nText'), { level: 2, text: 'Line one Line two', end: 22 });
+  assert.equal(partHeadingOf('*Note* first\n===\n')?.level, 1, 'emphasis at its start is no list item');
+  assert.equal(partHeadingOf('Title\n    more\n---\n')?.text, 'Title more', 'a lazy continuation line, whatever its indent');
+  assert.equal(partHeadingOf('    code\n---\n'), null, 'indented code is no heading');
+  assert.equal(partHeadingOf('Text\n\n---\n'), null, 'a line after a blank line is a line');
+  assert.equal(partHeadingOf('***\n---\n'), null, 'a line over a line is no heading');
+  assert.equal(partHeadingOf(''), null);
+  assert.equal(handoutWithoutHeading('## Four parts\n\nText.'), '\nText.');
+  assert.equal(handoutWithoutHeading('Text.'), 'Text.');
+});
+
+test('making a part writes its heading: H1 for a section, H2 otherwise, escaped; never a second one', () => {
+  assert.equal(partHeadingLevel('section'), 1);
+  assert.equal(partHeadingLevel('boxes'), 2);
+  assert.equal(withPartHeading('boxes', { title: 'Four parts' }, 'Text.'), '## Four parts\n\nText.');
+  assert.equal(withPartHeading('section', { title: 'Why agents?' }, ''), '# Why agents?');
+  assert.equal(withPartHeading('points', { title: 'Agents *really* act' }, 'x'), '## Agents \\*really\\* act\n\nx');
+  assert.equal(withPartHeading('points', { title: 'Four parts' }, '## Its own\n\nText.'), '## Its own\n\nText.', 'a part with its heading keeps it');
+  assert.equal(withPartHeading('points', {}, 'Text.'), 'Text.', 'no title: no heading');
+  assert.equal(withPartHeading('title', { title: EMPTY_DECK_TITLE }, ''), '', "New → Deck's words to type over are no heading");
+  assert.equal(derivedHeading({ title: '  Spaced  ' }), 'Spaced');
+  // A heading written for a title reads back as that title.
+  for (const title of ['Step #1', '#hashtag', 'Under_score [link]', 'a <b> c', 'Ends with ###', 'Back\\slash']) {
+    const heading = partHeadingOf(withPartHeading('points', { title }, ''))!;
+    assert.equal(heading.text.replace(/\\(.)/g, '$1'), title, title);
+  }
+});
+
+
+// 16 November: a deck whose handout is written with its own headings says so in its front matter, `handout: text`.
+test('the handout: text mark: read, written into a front matter or a new one, never twice', () => {
+  assert.equal(isTextHandout('---\ndeck: 1\nhandout: text\n---\n'), true);
+  assert.equal(isTextHandout('---\ndeck: 1\n---\n'), false);
+  assert.equal(isTextHandout('```slide title\nid: a\n```\n'), false);
+  assert.equal(withTextHandoutMark('---\ndeck: 1\ntheme: T.theme.md\n---\n\nx\n'), '---\ndeck: 1\ntheme: T.theme.md\nhandout: text\n---\n\nx\n');
+  assert.equal(withTextHandoutMark('```slide title\nid: a\n```\n'), '---\nhandout: text\n---\n\n```slide title\nid: a\n```\n');
+  const marked = '---\ndeck: 1\nhandout: text\n---\n';
+  assert.equal(withTextHandoutMark(marked), marked, 'never twice');
+  assert.equal(withTextHandoutMark('---\nhandout: other\n---\n'), '---\nhandout: text\n---\n', 'another value is replaced');
+  // An empty front matter takes the mark between its lines, never in the text after it.
+  assert.equal(withTextHandoutMark('---\n---\n\nWords.\n\n---\n\nMore.\n'), '---\nhandout: text\n---\n\nWords.\n\n---\n\nMore.\n');
+});
+
+test('a deck written before the mark gets its headings and the mark together; its slide blocks stay byte for byte', () => {
+  const older = [
+    '---', 'deck: 1', '---', '',
+    '```slide title', 'id: t1', 'title: AI assistants', '```', '', '## Welcome', '', 'Words.', '',
+    '```slide section', 'id: s1', 'title: Why agents?', '```', '',
+    '```slide points', 'id: p1', 'title: Agents act', '```', '', '```notes', 'Say hi.', '```', '', 'An agent acts.', '',
+  ].join('\n');
+  const written = withWrittenHandout(older);
+  assert.equal(isTextHandout(written), true);
+  assert.ok(written.includes('```slide section\nid: s1\ntitle: Why agents?\n```\n\n# Why agents?\n\n```slide points'), 'a section: its H1');
+  assert.ok(written.includes('```notes\nSay hi.\n```\n\n## Agents act\n\nAn agent acts.'), 'after the notes: its H2');
+  assert.ok(written.includes('## Welcome\n\nWords.') && !written.includes('## AI assistants'), 'a part with its own heading keeps it');
+  const blocks = (text: string) => text.match(/```slide[\s\S]*?\n```/g);
+  assert.deepEqual(blocks(written), blocks(older));
+  assert.equal(withWrittenHandout(written), written, 'a marked deck is as it is');
+});
+
 
 console.log(`deckFormat: ${passed} passed`);

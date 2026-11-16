@@ -12,13 +12,13 @@
  *    library, not earlier decks, so they are left out (as the library's Other decks leaves them out).
  */
 
-import { newId, parseDeck, writeScalar } from './deckFormat';
+import { EMPTY_DECK_TITLE, newId, parseDeck, writeScalar } from './deckFormat';
 import { folderOf, newTopicText, partText, rebaseSlide } from './deckLibraryFormat';
 import { isTopicPath } from './DeckLibrary';
 import { BUILT_IN_THEME_PATH } from './deckTheme';
 
-/** The words an empty deck's title slide starts with, selected so they are typed over. */
-export const EMPTY_DECK_TITLE = "The deck's title";
+/** The words an empty deck's title slide starts with, selected so they are typed over (its part shows no heading of them). */
+export { EMPTY_DECK_TITLE };
 
 /** A new deck: one title slide, its title the words to type over, in the built-in theme. */
 export function emptyDeckText(random: () => number = Math.random): string {

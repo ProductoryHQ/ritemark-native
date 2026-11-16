@@ -29,7 +29,7 @@
  */
 import { createHash } from 'node:crypto';
 import { marked } from 'marked';
-import { frontMatterLook, isSlideKind, parseDeck, parseSlideBody, type SlideData, type SlideItem } from '../deckFormat';
+import { frontMatterLook, isSlideKind, isTextHandout, parseDeck, parseSlideBody, type SlideData, type SlideItem } from '../deckFormat';
 import type { DeckTheme } from '../deckTheme';
 import { MAX_STEP } from '../../../webview/src/components/decks/slide/layoutSlide';
 
@@ -54,6 +54,12 @@ export interface PublicDeck {
   /** The text before the first slide, as Markdown, cleaned as a handout is. */
   preamble: string;
   slides: PublicSlide[];
+  /**
+   * The deck's handout is written with its own headings (its front matter's `handout: text`, 16 November): a part
+   * without one shows none, as in the deck view. Left out for a deck without the mark, whose parts without a heading
+   * show their slides' titles. The mark itself never reaches the page: the front matter stays private.
+   */
+  textHandout?: true;
 }
 
 export interface PublicDeckOptions {
@@ -341,6 +347,7 @@ export function publicDeck(input: string, options: PublicDeckOptions): PublicDec
     theme: options.theme,
     preamble,
     slides,
+    ...(isTextHandout(text) ? { textHandout: true as const } : {}),
   };
 }
 

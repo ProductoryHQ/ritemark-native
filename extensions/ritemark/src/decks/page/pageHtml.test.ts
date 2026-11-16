@@ -257,4 +257,56 @@ assert.equal(pictureAddress('images/my picture.png'), 'images/my%20picture.png')
 assert.equal(pictureAddress('../shared/"q".png'), '../shared/%22q%22.png');
 assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'images/a%2523.png', 'never encoded twice');
 
+// 16 November: the handout is a Text document. A part's own opening heading is its heading on the page; a part not yet
+// written (no heading of its own, every part of an older deck) shows the heading the deck view draws, its slide's title,
+// an H1 for a section as an H2 for any other kind in the editor, and the page's own h2 for both. Contents keeps
+// listing the slides' titles.
+{
+  const text = [
+    '```slide title', 'id: t0a1', 'title: AI assistants and agents', '```', '',
+    '## Welcome to the day', '', 'Everything you need today.', '',
+    '```slide section', 'id: s001', 'title: Why agents?', 'number: "1"', '```', '',
+    'Unwritten part.', '',
+    '```slide points', 'id: p001', 'title: Agents act', '```', '',
+    '## Agents, in short', '', '### Smaller', '', 'Words.', '',
+  ].join('\n');
+  const headed = publicDeck(text, { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });
+  const page = parse(pageHtml(headed, assets, { digest: deckDigest(headed), pictureUrl }));
+  const parts = page.querySelectorAll('.part');
+  assert.deepEqual(parts.map(part => part.querySelectorAll('h2').map(h2 => h2.text)), [['Welcome to the day'], ['Why agents?'], ['Agents, in short']], "each part's heading as the editor shows it");
+  assert.ok(parts[1].querySelector('.eyebrow'), "a section keeps the page's own band");
+  assert.deepEqual(parts[2].querySelectorAll('h4').map(h4 => h4.text), ['Smaller'], "the handout's other headings sit under it");
+  const contents = page.querySelectorAll('[data-go]').map(row => row.text);
+  assert.ok(contents.some(row => row.includes('AI assistants and agents')) && contents.some(row => row.includes('Agents act')), "Contents lists the slides' titles");
+  assert.ok(!contents.some(row => row.includes('Welcome to the day')));
+  // An older deck (no part headings) is the page it was: the slides' titles as the parts' headings, the digest the same.
+  const older = text.replace('## Welcome to the day\n\n', '').replace('## Agents, in short\n\n', '');
+  const olderDeck = publicDeck(older, { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });
+  const olderPage = parse(pageHtml(olderDeck, assets, { digest: deckDigest(olderDeck), pictureUrl }));
+  assert.deepEqual(olderPage.querySelectorAll('.part').map(part => part.querySelectorAll('h2').map(h2 => h2.text)), [['AI assistants and agents'], ['Why agents?'], ['Agents act']]);
+}
+
+
+// A deck marked `handout: text`: a part without a heading of its own shows none (a heading the person deleted stays
+// deleted on the page too), and the mark, like all of the front matter, never reaches the page.
+{
+  const text = [
+    '---', 'deck: 1', 'theme: Slide library/Themes/Evening.theme.md', 'handout: text', '---', '',
+    '```slide title', 'id: t0a1', 'title: AI assistants and agents', '```', '', '## Welcome', '', 'Words.', '',
+    '```slide points', 'id: p001', 'title: Agents act', '```', '', 'Heading deleted, words kept.', '',
+  ].join('\n');
+  const marked = publicDeck(text, { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });
+  assert.equal(marked.textHandout, true);
+  const bytes = pageHtml(marked, assets, { digest: deckDigest(marked), pictureUrl });
+  const page = parse(bytes);
+  assert.deepEqual(page.querySelectorAll('.part').map(part => part.querySelectorAll('h2').map(h2 => h2.text)), [['Welcome'], []]);
+  assert.ok(page.querySelectorAll('[data-go]').some(row => row.text.includes('Agents act')), "Contents still lists the slide's title");
+  assert.ok(!/handout:\s*text|handout: |Evening\.theme\.md/.test(bytes), 'privacy: no line of the front matter reaches the page');
+  // Without the mark the same deck is the page it was: the slide's title as the part's heading.
+  const unmarked = publicDeck(text.replace('handout: text\n', ''), { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });
+  assert.equal(unmarked.textHandout, undefined, 'and the digest of an unmarked deck is as it was');
+  assert.deepEqual(parse(pageHtml(unmarked, assets, { digest: deckDigest(unmarked), pictureUrl })).querySelectorAll('.part').map(part => part.querySelectorAll('h2').map(h2 => h2.text)), [['Welcome'], ['Agents act']]);
+}
+
+
 console.log('pageHtml: passed');

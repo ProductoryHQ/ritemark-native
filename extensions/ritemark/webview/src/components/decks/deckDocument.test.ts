@@ -9,6 +9,8 @@ import { createEditorSchemaExtensions } from '../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../utils/markdownFidelity'
 import { DeckSlide } from './handout/deckSchema'
 import { removesSlides } from './handout/deckGuard'
+import { DEFAULT_RATIO, initialRatio } from './deckDocument'
+import { deckDecorations } from './handout/deckCurrent'
 import { DECK_OPERATION, deleteSlide, duplicateSlide, handoutHasText, insertSlide, moveSlide, partContent, partIndexAt, partRange, restoreSlide, slidesOf, updateSlide } from './deckDocument'
 import { convertKind, hiddenNote } from './slide/convertKind'
 
@@ -113,5 +115,51 @@ assert.equal(partIndexAt(doc, slidesOf(doc)[1].pos + 3), 1)
   assert.equal(handoutHasText(schema.nodes.doc.create(null, [slide('aaaa', 'T'), schema.nodes.horizontalRule.create()])), true)
   assert.equal(handoutHasText(doc), true)
 }
+
+// 16 November: a part's own heading is its heading, not its text: typing it keeps the start card.
+{
+  const heading = (level: number, text: string) => schema.nodes.heading.create({ level }, text ? schema.text(text) : null)
+  assert.equal(handoutHasText(schema.nodes.doc.create(null, [slide('aaaa', 'T'), heading(2, 'Welcome'), schema.nodes.paragraph.create()])), false)
+  assert.equal(handoutHasText(schema.nodes.doc.create(null, [slide('aaaa', 'T'), heading(2, 'Welcome'), paragraph('Words.')])), true)
+  assert.equal(handoutHasText(schema.nodes.doc.create(null, [slide('aaaa', 'T'), heading(3, 'Smaller')])), true, 'an H3 is text')
+  // A new part is its slide and room for its words: its heading is drawn by the view (drawnHeadings.ts), following
+  // the title typed on the slide, until the person writes in the handout.
+  const made = insertSlide(state, 3, 'section', () => 0.5)!
+  const names: string[] = []
+  made.doc.forEach(node => names.push(node.type.name === 'heading' ? `h${node.attrs.level}` : node.type.name))
+  assert.deepEqual(names.slice(-2), ['deckSlide', 'paragraph'])
+  // In a deck marked `handout: text` nothing is drawn: the part opens with an empty heading of its own.
+  const marked = insertSlide(state, 3, 'points', () => 0.5, true)!
+  const markedNames: string[] = []
+  marked.doc.forEach(node => markedNames.push(node.type.name === 'heading' ? `h${node.attrs.level}` : node.type.name))
+  assert.deepEqual(markedNames.slice(-3), ['deckSlide', 'h2', 'paragraph'])
+}
+
+// The handout's placeholders: "Heading" on every part's empty heading; "Write here. *** starts a new slide." only on
+// the current part's empty text.
+{
+  const heading = (level: number, text: string) => schema.nodes.heading.create({ level }, text ? schema.text(text) : null)
+  const deck = schema.nodes.doc.create(null, [slide('aaaa', 'A'), heading(2, ''), schema.nodes.paragraph.create(), slide('bbbb', 'B'), heading(2, 'B'), schema.nodes.paragraph.create()])
+  // A node decoration's attributes (prosemirror-view keeps them on its `type`).
+  const attrsOf = (found: unknown) => (found as { type: { attrs: Record<string, string> } }).type.attrs
+  const marks = (current: number | null) => deckDecorations(deck, current).find().map(found => attrsOf(found)['data-deck-placeholder'] ?? attrsOf(found).class)
+  assert.deepEqual(marks(1).filter(Boolean).sort(), ['Heading', 'Write here. *** starts a new slide.', 'is-current'].sort())
+  assert.deepEqual(marks(0).filter(Boolean).sort(), ['Heading', 'Write here. *** starts a new slide.', 'is-current'].sort())
+  assert.deepEqual(marks(null).filter(Boolean), ['Heading'], 'no current part: only the empty heading says so')
+  const written = schema.nodes.doc.create(null, [slide('aaaa', 'A'), heading(2, 'A'), paragraph('Words.')])
+  assert.deepEqual(deckDecorations(written, 0).find().length, 1, 'a written part: only its current mark')
+}
+
+// The handout's width: 60 % by default (the slide 40 %), and a share the person dragged to is kept over it.
+{
+  assert.equal(DEFAULT_RATIO, 0.4)
+  assert.equal(initialRatio(undefined), 0.4)
+  assert.equal(initialRatio(0.55), 0.55, 'a stored share stands')
+  assert.equal(initialRatio(0.6), 0.6, "even the old default's share, once the person chose it")
+  assert.equal(initialRatio('0.5'), 0.4)
+  assert.equal(initialRatio(0.95), 0.4, 'a share out of range is no share')
+  assert.equal(initialRatio(Number.NaN), 0.4)
+}
+
 
 console.log('deckDocument: passed')

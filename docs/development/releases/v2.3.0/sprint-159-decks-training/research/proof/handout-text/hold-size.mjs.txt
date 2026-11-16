@@ -1,0 +1,10 @@
+// Holds the workbench page at a fixed size (device metrics override) for as long as it runs: node hold-size.mjs <port> <w> <h>
+const [port, w, h] = process.argv.slice(2);
+const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+const target = list.find(t => t.type === 'page' && t.url.includes('workbench'));
+const socket = new WebSocket(target.webSocketDebuggerUrl);
+await new Promise(resolve => socket.addEventListener('open', resolve, { once: true }));
+socket.send(JSON.stringify({ id: 1, method: 'Emulation.setDeviceMetricsOverride', params: { width: Number(w), height: Number(h), deviceScaleFactor: 0, mobile: false } }));
+socket.addEventListener('message', event => { const m = JSON.parse(event.data); if (m.id === 1) console.log('held', w, h, m.error ? JSON.stringify(m.error) : 'ok'); });
+socket.addEventListener('close', () => process.exit(0));
+setInterval(() => {}, 1 << 30);

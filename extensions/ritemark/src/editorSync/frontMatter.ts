@@ -84,6 +84,14 @@ export function joinFrontMatter(
         const blankLines = /^\n*/.exec(split.body)?.[0] ?? '';
         return split.head + blankLines + ensureTrailingNewline(content);
       }
+      // A plain one-word key added or taken out (a deck's `handout: text`, 16 November): only that line changes.
+      const head = currentProperties !== null && typeof currentProperties === 'object'
+        ? headWithPlainKeyChanges(split.head, currentProperties as Record<string, unknown>, properties as Record<string, unknown>)
+        : null;
+      if (head !== null) {
+        const blankLines = /^\n*/.exec(split.body)?.[0] ?? '';
+        return head + blankLines + ensureTrailingNewline(content);
+      }
     }
   }
 
@@ -94,4 +102,41 @@ export function joinFrontMatter(
 
   // Use gray-matter to stringify with YAML front-matter
   return matter.stringify(content, properties as Record<string, unknown>);
+}
+
+const PLAIN_KEY = /^[A-Za-z_][\w-]{0,63}$/;
+const PLAIN_WORD = /^[A-Za-z][\w-]{0,63}$/;
+
+/**
+ * A front matter's head (`---` … `---`, LF) with only plain keys added or taken out, each a one-word string value
+ * (`handout: text`), when that is the whole change between `current` and `next`: every other line stays byte for byte,
+ * its comments and quoting with it. Null for any other change, which `gray-matter` writes.
+ */
+export function headWithPlainKeyChanges(head: string, current: Record<string, unknown>, next: Record<string, unknown>): string | null {
+  const added: string[] = [];
+  const removed: string[] = [];
+  for (const key of new Set([...Object.keys(current), ...Object.keys(next)])) {
+    const was = Object.prototype.hasOwnProperty.call(current, key);
+    const is = Object.prototype.hasOwnProperty.call(next, key);
+    if (was && is) {
+      if (canonicalJson(asTheViewHoldsThem(current[key])) !== canonicalJson(asTheViewHoldsThem(next[key]))) return null;
+      continue;
+    }
+    const value = is ? next[key] : current[key];
+    if (!PLAIN_KEY.test(key) || typeof value !== 'string' || !PLAIN_WORD.test(value)) return null;
+    (is ? added : removed).push(key);
+  }
+  if (added.length === 0 && removed.length === 0) return null;
+  const lines = head.split('\n');
+  const close = lines.length - (lines[lines.length - 1] === '' ? 2 : 1);
+  if (close < 1 || !/^---[ \t]*$/.test(lines[close]) || !/^---[ \t]*$/.test(lines[0])) return null;
+  const inner = lines.slice(1, close);
+  for (const key of removed) {
+    const at = inner.findIndex(line => new RegExp(`^${key}:[ \\t]`).test(line));
+    // Only a key on one line of its own is taken out here; anything else is gray-matter's.
+    if (at < 0 || (at + 1 < inner.length && /^[ \t-]/.test(inner[at + 1]))) return null;
+    inner.splice(at, 1);
+  }
+  for (const key of added) inner.push(`${key}: ${next[key] as string}`);
+  return [lines[0], ...inner, ...lines.slice(close)].join('\n');
 }

@@ -3,7 +3,7 @@ import { ReactRenderer } from '@tiptap/react'
 import Suggestion from '@tiptap/suggestion'
 import tippy from 'tippy.js'
 import { CommandsList } from './CommandsList'
-import { blockItems, executeSlashCommand, type BlockItemDef } from './blockItems'
+import { executeSlashCommand, slashItemsFor, type BlockItemDef } from './blockItems'
 
 export type { BlockItemDef as Command }
 
@@ -26,8 +26,9 @@ export const SlashCommands = Extension.create({
       Suggestion({
         editor: this.editor,
         ...this.options.suggestion,
-        items: ({ query }: any) => {
-          return blockItems.filter((item) =>
+        items: ({ query, editor }: any) => {
+          // A deck's handout has the slide node in its schema (Sprint 157): its Divider starts a new slide.
+          return slashItemsFor(!!editor?.schema?.nodes?.deckSlide).filter((item) =>
             item.title.toLowerCase().startsWith(query.toLowerCase())
           )
         },

@@ -7,9 +7,9 @@
  * from any other deck, is a copy carrying `from: <path>#<id> @<stamp>`. The UI and the AI's tools call the same
  * operations here (README decision 9, dual use).
  */
-import { deckVersionOf, isReadableDeckVersion, newId, parseFrom, parseSlideBody, writeFrom, writeSlideBody, type SlideData } from './deckFormat';
+import { deckVersionOf, isReadableDeckVersion, newId, parseFrom, parseSlideBody, withPartHeading, withWrittenHandout, writeFrom, writeSlideBody, type SlideData } from './deckFormat';
 import {
-  appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp,
+  appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp, slideStamps,
   slidesOfText, type DeckSlideText,
 } from './deckLibraryFormat';
 import { BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT } from './deckTheme';
@@ -207,7 +207,11 @@ export class DeckLibrary {
       // An open deck takes them only through its view: its file is never written under the person's typing.
       if (!(await intoView(parts, at - 1))) throw new Error(`${deckName(targetPath)} is open but didn't take the slides. Nothing was inserted; try again.`);
     } else {
-      await this.files.write(targetPath, insertPartsText(text, at, parts.map(part => partText(part.kind, part.body, part.handout))));
+      // Making a part writes its heading (16 November), as the deck view does: the copy's handout opens with its heading.
+      // A deck written before that gets its other parts' headings and its `handout: text` mark with it, as the view's
+      // first edit writes them, so none of its parts goes without the heading it showed.
+      const written = parts.map(part => partText(part.kind, part.body, withPartHeading(part.kind, parseSlideBody(part.body), part.handout)));
+      await this.files.write(targetPath, insertPartsText(withWrittenHandout(text), at, written));
     }
     return { first: at + 1, count: parts.length };
   }
@@ -222,15 +226,18 @@ export class DeckLibrary {
       if (!source) continue;
       if (!cache.has(source.path)) cache.set(source.path, await this.readDeck(source.path));
       const slide = cache.get(source.path)?.find(entry => entry.data.id === source.id);
-      const copyStamp = slideStamp(copy.kind, parseSlideBody(copy.body), copy.handout, folder);
-      const sourceStamp = slide ? slideStamp(slide.kind, slide.data, slide.handout, folderOf(source.path)) : null;
+      // A from: line written before 16 November counted the part's heading: either stamp is the slide as it was.
+      const copyStamps = slideStamps(copy.kind, parseSlideBody(copy.body), copy.handout, folder);
+      const sourceStamps = slide ? slideStamps(slide.kind, slide.data, slide.handout, folderOf(source.path)) : null;
       states.push({
         id: copy.id,
         library: isTopicPath(source.path),
         sourceName: deckName(source.path),
         sourcePath: source.path,
-        changed: source.stamp !== null && copyStamp !== source.stamp,
-        newer: sourceStamp !== null && source.stamp !== null && sourceStamp !== source.stamp,
+        // A copy that reads as its source, heading aside, is neither changed nor behind (Codex on #750: a heading-only
+        // edit under a from: stamp that counted the old heading matched neither stamp).
+        changed: source.stamp !== null && !copyStamps.includes(source.stamp) && copyStamps[0] !== sourceStamps?.[0],
+        newer: sourceStamps !== null && source.stamp !== null && !sourceStamps.includes(source.stamp) && sourceStamps[0] !== copyStamps[0],
         missing: !slide,
       });
     }

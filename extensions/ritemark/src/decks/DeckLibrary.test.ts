@@ -2,8 +2,8 @@
  * Sprint 157: the Slide library, with an in-memory project. Run with `npx tsx src/decks/DeckLibrary.test.ts`.
  */
 import { strict as assert } from 'node:assert';
-import { parseFrom, parseSlideBody } from './deckFormat';
-import { slidesOfText } from './deckLibraryFormat';
+import { isTextHandout, parseFrom, parseSlideBody } from './deckFormat';
+import { slideStamps, slidesOfText } from './deckLibraryFormat';
 import { DeckLibrary, isTopicPath, type DeckFiles } from './DeckLibrary';
 
 function project(files: Record<string, string>): DeckFiles & { files: Record<string, string> } {
@@ -104,6 +104,29 @@ async function run() {
   const harbour = slidesOfText(files.files['Clients/Harbour/Harbour.deck.md']);
   assert.equal(harbour[0].data.title, 'Assistant or agent?');
   assert.equal(parseFrom(harbour[0].data.from)?.id, 'a2');
+  // Making a part writes its heading (16 November): the topic's part had none, so the copy opens with its title as an
+  // H2, and the copy is still the library's (the heading is no change to it).
+  assert.equal(harbour[0].handout, '## Assistant or agent?\n\nAn agent is given a goal.');
+  // The deck had no `handout: text` mark: its own part gets its heading, and the mark comes with them (16 November).
+  assert.equal(isTextHandout(files.files['Clients/Harbour/Harbour.deck.md']), true, 'the mark is written with the headings');
+  assert.equal(harbour[1].handout, '## Harbour\n\nWelcome.', "the deck's own part gets the heading it showed");
+  const insertedStates = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: harbour[0].data.id!, from: harbour[0].data.from!, kind: harbour[0].kind, body: harbour[0].body, handout: harbour[0].handout }]);
+  assert.equal(insertedStates[0].changed, false, 'a copy with its heading written is not changed');
+  // A copy made before 16 November of a source whose handout opens with a heading: its from: stamp counted the heading,
+  // and the copy and the source, both untouched, are still as they were.
+  files.files['Slide library/Headed.deck.md'] = '---\ndeck: 1\n---\n\n```slide statement\nid: h1\ntitle: Headed\n```\n\n## Headed\n\nWords.\n';
+  const oldStamp = slideStamps('statement', { id: 'h1', title: 'Headed' }, '## Headed\n\nWords.', 'Slide library')[1];
+  const legacyStates = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: 'c9', from: `Slide library/Headed.deck.md#h1 @${oldStamp}`, kind: 'statement', body: 'id: c9\ntitle: Headed', handout: '## Headed\n\nWords.' }]);
+  assert.deepEqual([legacyStates[0].changed, legacyStates[0].newer], [false, false], 'an older from: stamp still matches');
+  // Codex on #750: under that older stamp, a heading-only edit of the copy, or of the source, shows nothing either.
+  const copyHeadingEdited = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: 'c9', from: `Slide library/Headed.deck.md#h1 @${oldStamp}`, kind: 'statement', body: 'id: c9\ntitle: Headed', handout: '## Headed, for Harbour\n\nWords.' }]);
+  assert.deepEqual([copyHeadingEdited[0].changed, copyHeadingEdited[0].newer], [false, false], "the copy's heading edited");
+  files.files['Slide library/Headed.deck.md'] = files.files['Slide library/Headed.deck.md'].replace('## Headed', '## Headed, renamed');
+  const sourceHeadingEdited = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: 'c9', from: `Slide library/Headed.deck.md#h1 @${oldStamp}`, kind: 'statement', body: 'id: c9\ntitle: Headed', handout: '## Headed\n\nWords.' }]);
+  assert.deepEqual([sourceHeadingEdited[0].changed, sourceHeadingEdited[0].newer], [false, false], "the source's heading edited");
+  // A real change still shows.
+  const wordsEdited = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: 'c9', from: `Slide library/Headed.deck.md#h1 @${oldStamp}`, kind: 'statement', body: 'id: c9\ntitle: Headed', handout: '## Headed\n\nOther words.' }]);
+  assert.equal(wordsEdited[0].changed, true);
   let viewed: { count: number; afterIndex: number } | null = null;
   const beforeView = files.files['Clients/Harbour/Harbour.deck.md'];
   const viaView = await library.insertCopies('Slide library/AI assistants.deck.md', ['a1', 'a2'], 'Clients/Harbour/Harbour.deck.md', 99, async (parts, afterIndex) => {
