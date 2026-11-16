@@ -66,6 +66,26 @@ function fakeDoc(specs: FakeSpec[]): MinimalNode {
   assert.deepEqual(sum.byAgent.map((g) => [g.alias, g.comments.length]), [['claude', 1], ['codex', 1]])
 }
 
+// #685: `@chatgpt` and the older `@codex` are one agent — one ChatGPT group,
+// and the instruction sent to the host is the note without the assignment.
+{
+  const doc = fakeDoc([
+    { kind: 'node', note: '@chatgpt, tighten the intro', pos: 10 },
+    { kind: 'text', text: 'the figures', pos: 40, mark: { id: 'c-9', note: '@codex: check these' } },
+    { kind: 'node', note: '@ChatGPT compare with @claude notes', pos: 80 },
+  ])
+  const comments = collectDocumentComments(doc)
+  assert.deepEqual(comments.map((c) => c.alias), ['codex', 'codex', 'codex'], 'both spellings assign ChatGPT')
+  assert.equal(comments[0].instruction, 'tighten the intro', 'the leading @chatgpt is not part of the instruction')
+  assert.equal(comments[1].instruction, 'check these', 'the older @codex is stripped as before')
+  assert.equal(comments[2].instruction, 'compare with @claude notes', 'another agent named in the note stays')
+  assert.deepEqual(
+    summarizeComments(comments).byAgent.map((g) => [g.alias, g.comments.length]),
+    [['codex', 3]],
+    'one ChatGPT group, not one per spelling',
+  )
+}
+
 // Id-less legacy marks: ADJACENT ranges merge (one comment split by formatting);
 // separated same-text comments stay distinct.
 {
