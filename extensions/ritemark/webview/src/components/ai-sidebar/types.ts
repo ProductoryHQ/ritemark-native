@@ -7,6 +7,7 @@
 import type { AgentSidebarProtocolMessage, SheetSignInMessage } from '../../../../src/views/agentSidebarProtocol';
 import type { ChatDocumentView } from '../../../../src/views/chatDocuments';
 import type { RuntimeErrorDetail, RuntimeErrorKind } from '../../../../src/runtime/turnFailureCopy';
+import type { CurrentSlide } from '../../../../src/decks/currentSlide';
 
 export type { RuntimeErrorDetail, RuntimeErrorKind } from '../../../../src/runtime/turnFailureCopy';
 
@@ -495,9 +496,9 @@ export type ExtensionMessage =
   | ({ type: 'thinking-effort/capability'; runtimeId: AgentId; capability: ThinkingEffortCapability } & ConversationScopedMessage)
   | ({ type: 'thinking-effort/status'; runtimeId: AgentId; requested: ThinkingEffort; applied: ThinkingEffort | null; message?: string } & ConversationScopedMessage)
   | { type: 'acp-providers'; enabled: boolean; providers: AcpProviderFlags; generation?: number; revision?: number; error?: string }
-  | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string; activeFileLabel?: string | null }
+  | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string; activeFileLabel?: string | null; activeSlide?: CurrentSlide | null }
   /** `label`: a task card's title, shown in the chip instead of its file (#477). */
-  | { type: 'active-file-changed'; path: string | null; label?: string | null }
+  | { type: 'active-file-changed'; path: string | null; label?: string | null; slide?: CurrentSlide | null }
   // Sprint 155 (PR 2): each chat's document and its icon, and the document in front (All chats' order)
   | { type: 'chat-documents'; documents: Record<string, ChatDocumentView>; front: string | null }
   | { type: 'active-browser-changed'; context: { url: string; title?: string; sharedWithAgent?: boolean; annotationMode?: boolean; error?: string } | null }

@@ -7,6 +7,7 @@
 
 import type { ExplicitThinkingEffort, ThinkingEffort } from '../runtime/thinkingEffort';
 import type { ClaudeSessionDeclaration } from '../ai/modelCatalog/runtimeDeclarations';
+import type { CurrentSlide } from '../decks/currentSlide';
 
 /**
  * Sprint 127 R1: how a Claude session declares a model the bundled CLI may not
@@ -416,6 +417,10 @@ export interface AgentSessionConfig {
 export interface ActiveFileContext {
   path: string;
   selection?: string;
+  /** A task card's title, shown on the chip instead of the file (#477). */
+  label?: string;
+  /** An open deck's slide the person is on (17 November): every AI's turn names it (`currentSlideNote`). */
+  slide?: CurrentSlide;
 }
 
 /**

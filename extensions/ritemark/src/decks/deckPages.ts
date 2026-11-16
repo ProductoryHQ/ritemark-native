@@ -19,7 +19,8 @@ import { parseImageDataUrl, writeImageRelativeTo } from '../utils/imageWriter';
 import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import { deckModeOf } from './deckMode';
 import { isThemePath } from './deckTheme';
-import { decodeDeckRequest, DeckProtocolError, type DeckHostMessage, type DeckRequest } from './deckProtocol';
+import { decodeDeckRequest, DeckProtocolError, type DeckCurrentSlide, type DeckHostMessage, type DeckRequest } from './deckProtocol';
+import { slideTitleLine, type CurrentSlide } from './currentSlide';
 import { decodeDeckPresentMenuRequest, decodeDeckPresentRequest, type DeckPresentOptions, type DeckPresentRequest } from './present/presentProtocol';
 import { parseFrom } from './deckFormat';
 import { slidesOfText } from './deckLibraryFormat';
@@ -34,6 +35,14 @@ interface DeckView {
   panel: vscode.WebviewPanel;
   current: number;
   count: number;
+  /** The slide the person is on, and the deck's slide count, as the view last told them (for the AI). */
+  slides: DeckCurrentSlide[];
+  slideCount: number;
+}
+
+/** The same slides, told again? */
+function sameSlides(a: DeckCurrentSlide[], b: DeckCurrentSlide[]): boolean {
+  return a.length === b.length && a.every((slide, i) => slide.index === b[i].index && slide.id === b[i].id && slide.title === b[i].title);
 }
 
 /** The deck the Slide library inserts into: its project-relative path, name and current slide. */
@@ -55,6 +64,9 @@ export class DeckPages implements vscode.Disposable {
   private readonly changed = new vscode.EventEmitter<void>();
   /** The active deck, or the slide it shows, changed (the Slide library says "Insert after slide N"). */
   readonly onDidChangeActive = this.changed.event;
+  private readonly slideChanged = new vscode.EventEmitter<void>();
+  /** A deck view's current slide (or the slides selected on its strip) changed: the AI's chip follows it. */
+  readonly onDidChangeCurrentSlide = this.slideChanged.event;
   private readonly revealed = new vscode.EventEmitter<{ path: string; id: string } | { section: 'topics' | 'other' }>();
   /** Show in the library: the library view shows this topic's slide. */
   readonly onDidRevealInLibrary = this.revealed.event;
@@ -141,7 +153,7 @@ export class DeckPages implements vscode.Disposable {
 
   /** A deck's panel, while it is open: the active one is where the library inserts. */
   connect(document: vscode.TextDocument, panel: vscode.WebviewPanel): vscode.Disposable {
-    const view: DeckView = { document, panel, current: 0, count: 0 };
+    const view: DeckView = { document, panel, current: 0, count: 0, slides: [], slideCount: 0 };
     this.views.add(view);
     if (panel.active) this.active = view;
     const state = panel.onDidChangeViewState(() => {
@@ -160,6 +172,7 @@ export class DeckPages implements vscode.Disposable {
         this.views.delete(view);
         if (this.active === view) this.active = [...this.views].find(other => other.panel.active) ?? null;
         this.changed.fire();
+        if (view.slides.length > 0) this.slideChanged.fire();
       },
     };
   }
@@ -172,6 +185,27 @@ export class DeckPages implements vscode.Disposable {
     // Sprint 159 (PR 2): the library inserts only while the flag is on (its place shows), into a deck this build writes
     if (!isEnabled('decks') || !view || !relative || !this.deckModeFor(view.document, true)) return null;
     return { path: relative, name: deckName(relative), current: view.current, count: view.count };
+  }
+
+  /**
+   * The slide the person is on in the open deck view of `fsPath` (17 November): what the AI's message and the
+   * composer's chip name. Null when no deck view of it is open, or it hasn't said yet. The active view first, when two
+   * panels show the same deck.
+   */
+  currentSlideOf(fsPath: string): CurrentSlide | null {
+    if (!isEnabled('decks')) return null;
+    const same = (view: DeckView) => path.normalize(view.document.uri.fsPath) === path.normalize(fsPath);
+    const active = this.activeView();
+    const view = active && same(active) ? active : [...this.views].find(same);
+    if (!view || view.slides.length === 0 || view.slideCount === 0 || !this.deckModeFor(view.document, true)) return null;
+    return {
+      deck: deckName(view.document.uri.fsPath.split(path.sep).join('/')),
+      count: view.slideCount,
+      slides: view.slides.map(slide => {
+        const title = slideTitleLine(slide.title);
+        return { number: slide.index + 1, ...(slide.id ? { id: slide.id } : {}), ...(title ? { title } : {}) };
+      }),
+    };
   }
 
   /** The active deck's text and the ids it holds (for new copies' ids). */
@@ -304,6 +338,14 @@ export class DeckPages implements vscode.Disposable {
         return;
       case 'deck/page-action':
         await this.publisher?.pageAction(document, request.action, text => void this.post(webview, { type: 'deck/page-notice', text }));
+        return;
+      // The AI's chip and line (17 November): the slide the person is on, as the view last told it
+      case 'deck/current-slide':
+        if (connected.slideCount !== request.count || !sameSlides(connected.slides, request.slides)) {
+          connected.slideCount = request.count;
+          connected.slides = request.slides;
+          this.slideChanged.fire();
+        }
         return;
       case 'deck/current': {
         if (connected.current !== request.index || connected.count !== request.count) {
@@ -441,6 +483,7 @@ export class DeckPages implements vscode.Disposable {
     for (const pending of this.pendingNotice.values()) clearTimeout(pending.timer);
     this.pendingNotice.clear();
     this.changed.dispose();
+    this.slideChanged.dispose();
     this.revealed.dispose();
     this.views.clear();
   }

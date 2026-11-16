@@ -43,6 +43,7 @@ import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandP
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
 import { type SlashCommand, type CommandAction, parseCommand, mergeCommands } from './slashCommands';
 import type { FileAttachment, AttachmentKind, ThinkingEffortCapability } from './types';
+import { currentSlideChipLabel, currentSlideChipTooltip, type SlideAtSend } from '../../../../src/decks/currentSlide';
 
 let attachmentIdCounter = 0;
 let pathChipIdCounter = 0;
@@ -251,6 +252,18 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
   const clearPinnedAgentDismissal = useAISidebarStore((s) => s.clearPinnedAgentDismissal);
   const activeFilePath = useAISidebarStore((s) => s.activeFilePath);
   const activeFileLabel = useAISidebarStore((s) => s.activeFileLabel);
+  const activeSlide = useAISidebarStore((s) => s.activeSlide);
+  // Determine if active file context chip should show
+  // Don't show if: no active file, user dismissed it, or it's already in manual path chips
+  const showActiveFileChip = activeFilePath && !hideActiveFile &&
+    !pathChips.some((p) => p.path === activeFilePath || p.path.endsWith('/' + activeFilePath));
+  // 17 November: a deck's slide, as the chip shows it. A message carries exactly that slide (`slideAtSend`), also when
+  // it waits in the queue; none when the chip shows none (dismissed, or the deck attached whole as a path chip).
+  const activeChipSlide = activeSlide && activeSlide.slides.length > 0 ? activeSlide : null;
+  const slideAtSend = useMemo<SlideAtSend | null>(
+    () => (showActiveFileChip && activeChipSlide && activeFilePath ? { path: activeFilePath, slide: activeChipSlide } : null),
+    [showActiveFileChip, activeChipSlide, activeFilePath],
+  );
   const currentBrowserContext = useAISidebarStore((s) => s.currentBrowserContext);
   // Selection state — needed to stack the queue notch under SelectedContextTab
   // without a visible seam (Sprint 74 R2 notch-stack rule).
@@ -386,13 +399,14 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
       skipActiveFile: hideActiveFile,
       skipBrowserContext,
       mentionedAgentPaths,
+      slideAtSend: hideActiveFile ? null : slideAtSend,
     });
     if (outcome === 'full') {
       setQueueFullNotice(true);
       setTimeout(() => setQueueFullNotice(false), 4000);
     }
     return outcome;
-  }, [activeConversationId, pendingRuntime, codexSelectedModel, opencodeSelectedModel, composerThinkingEffort, attachments, hideActiveFile, skipBrowserContext, enqueuePrompt]);
+  }, [activeConversationId, pendingRuntime, codexSelectedModel, opencodeSelectedModel, composerThinkingEffort, attachments, hideActiveFile, skipBrowserContext, enqueuePrompt, slideAtSend]);
 
 
   // Build final message with path chips and pinned agent prepended
@@ -466,7 +480,7 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
       sendOpenCodeMessage(
         prompt,
         attachments.length > 0 ? attachments : undefined,
-        { skipActiveFile: hideActiveFile },
+        { skipActiveFile: hideActiveFile, slideAtSend },
       );
     } else if (isCodex) {
       sendCodexMessage(
@@ -475,9 +489,10 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
         pendingRuntime.mode,
         skipBrowserContext,
         hideActiveFile,
+        slideAtSend,
       );
     } else {
-      sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile, skipBrowserContext, hiddenContext, mentionedAgentPaths: mentionedAgentPaths.length > 0 ? mentionedAgentPaths : undefined });
+      sendAgentMessage(prompt, attachments.length > 0 ? attachments : undefined, { skipActiveFile: hideActiveFile, skipBrowserContext, hiddenContext, mentionedAgentPaths: mentionedAgentPaths.length > 0 ? mentionedAgentPaths : undefined, slideAtSend });
     }
     setValue('');
     setAttachments([]);
@@ -490,7 +505,7 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
     clearPinnedAgentDismissal();
     // The composer height follows `value` (layout effect below), so clearing
     // the text is what shrinks it back.
-  }, [buildFinalPrompt, attachments, isOnline, isLoading, isRuntimeOperational, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, hideActiveFile, skipBrowserContext, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
+  }, [buildFinalPrompt, attachments, isOnline, isLoading, isRuntimeOperational, isAgentMode, isClaudeCode, isCodex, isOpenCode, openCodeHasNoKeys, hideActiveFile, skipBrowserContext, slideAtSend, pendingRuntime.mode, sendAgentMessage, sendCodexMessage, sendOpenCodeMessage, clearPinnedAgentContent, clearPinnedAgentDismissal, pinnedAgent, pinnedAgentContent, pinnedAgentDismissal, discoveredAgents, value]);
 
   // Sprint 74 R2 (#82): auto-send the queued prompt on the running → idle
   // transition. The ref-based transition check prevents double-sends on
@@ -948,11 +963,6 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
     setHideBrowserContext(false);
   }, [activeFilePath]);
 
-  // Determine if active file context chip should show
-  // Don't show if: no active file, user dismissed it, or it's already in manual path chips
-  const showActiveFileChip = activeFilePath && !hideActiveFile &&
-    !pathChips.some((p) => p.path === activeFilePath || p.path.endsWith('/' + activeFilePath));
-
   // Sprint 122 (#282): until the person sizes it, the composer fits its text —
   // up to 8 lines or 40% of the window, where it used to stop at 120 px. Its
   // top edge is a resize handle (ComposerResizeHandle): drag up for taller,
@@ -1237,10 +1247,17 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
             {showActiveFileChip && (
               <div className="inline-flex min-w-0 max-w-full items-center gap-1 px-2 py-1 rounded-md text-[10px] border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--r-surface-muted)_70%,transparent)] text-[var(--r-ink-muted)]">
                 {/* #477: a task card shows its task mark and title, as its tab does (the Experience lead). */}
-                <Icon name={activeFileLabel ? 'check-square' : fileIconOf(activeFilePath, 'file-text')} size={12} className="shrink-0" />
-                <span className="min-w-0 truncate max-w-[140px]" title={activeFileLabel ?? activeFilePath!}>
-                  {activeFileLabel ?? `Active: ${getDisplayPath(activeFilePath!)}`}
-                </span>
+                {/* 17 November: an open deck shows the slide the person is on, its name in the tooltip (the Experience lead). */}
+                <Icon name={activeChipSlide ? 'presentation' : activeFileLabel ? 'check-square' : fileIconOf(activeFilePath, 'file-text')} size={12} className="shrink-0" />
+                {activeChipSlide ? (
+                  <Tooltip label={currentSlideChipTooltip(activeChipSlide, runtimeLabel)} side="top" className="min-w-0">
+                    <span className="min-w-0 truncate max-w-[140px]">{currentSlideChipLabel(activeChipSlide)}</span>
+                  </Tooltip>
+                ) : (
+                  <span className="min-w-0 truncate max-w-[140px]" title={activeFileLabel ?? activeFilePath!}>
+                    {activeFileLabel ?? `Active: ${getDisplayPath(activeFilePath!)}`}
+                  </span>
+                )}
                 <Tooltip label="Remove from this message">
                   <Button
                     type="button"
