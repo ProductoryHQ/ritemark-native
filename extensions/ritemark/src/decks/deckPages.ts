@@ -35,8 +35,9 @@ interface DeckView {
   panel: vscode.WebviewPanel;
   current: number;
   count: number;
-  /** The slide the person is on, or the slides selected on the strip, as the view last told them (for the AI). */
+  /** The slide the person is on, and the deck's slide count, as the view last told them (for the AI). */
   slides: DeckCurrentSlide[];
+  slideCount: number;
 }
 
 /** The same slides, told again? */
@@ -152,7 +153,7 @@ export class DeckPages implements vscode.Disposable {
 
   /** A deck's panel, while it is open: the active one is where the library inserts. */
   connect(document: vscode.TextDocument, panel: vscode.WebviewPanel): vscode.Disposable {
-    const view: DeckView = { document, panel, current: 0, count: 0, slides: [] };
+    const view: DeckView = { document, panel, current: 0, count: 0, slides: [], slideCount: 0 };
     this.views.add(view);
     if (panel.active) this.active = view;
     const state = panel.onDidChangeViewState(() => {
@@ -196,10 +197,10 @@ export class DeckPages implements vscode.Disposable {
     const same = (view: DeckView) => path.normalize(view.document.uri.fsPath) === path.normalize(fsPath);
     const active = this.activeView();
     const view = active && same(active) ? active : [...this.views].find(same);
-    if (!view || view.slides.length === 0 || view.count === 0 || !this.deckModeFor(view.document, true)) return null;
+    if (!view || view.slides.length === 0 || view.slideCount === 0 || !this.deckModeFor(view.document, true)) return null;
     return {
       deck: deckName(view.document.uri.fsPath.split(path.sep).join('/')),
-      count: view.count,
+      count: view.slideCount,
       slides: view.slides.map(slide => {
         const title = slideTitleLine(slide.title);
         return { number: slide.index + 1, ...(slide.id ? { id: slide.id } : {}), ...(title ? { title } : {}) };
@@ -338,17 +339,19 @@ export class DeckPages implements vscode.Disposable {
       case 'deck/page-action':
         await this.publisher?.pageAction(document, request.action, text => void this.post(webview, { type: 'deck/page-notice', text }));
         return;
+      // The AI's chip and line (17 November): the slide the person is on, as the view last told it
+      case 'deck/current-slide':
+        if (connected.slideCount !== request.count || !sameSlides(connected.slides, request.slides)) {
+          connected.slideCount = request.count;
+          connected.slides = request.slides;
+          this.slideChanged.fire();
+        }
+        return;
       case 'deck/current': {
         if (connected.current !== request.index || connected.count !== request.count) {
           connected.current = request.index;
           connected.count = request.count;
           if (connected === this.activeView()) this.changed.fire();
-        }
-        // The AI's chip and line (17 November): the slides the person is on, kept only as they are now in the deck
-        const slides = (request.slides ?? connected.slides).filter(slide => slide.index < request.count);
-        if (!sameSlides(connected.slides, slides)) {
-          connected.slides = slides;
-          this.slideChanged.fire();
         }
         if (this.takeSelectTitle(document)) await this.post(webview, { type: 'deck/select-title' });
         const notice = this.takeNotice(document);

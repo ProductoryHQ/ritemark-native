@@ -21,9 +21,19 @@ Every `POST /v1/messages` of that turn carried:
 
 Then a new chat with `README.md` in front sent "Fix the typos here.": its requests carry `[Currently editing: README.md]` and no slide line.
 
+That run was at `337c849b`. After review round 1 the line quotes the title and deck name (a title can no longer end the bracket), so the second run (at the round-1 fix, [`capture-claude-round1.jsonl`](capture-claude-round1.jsonl)) shows:
+
+```
+[Currently editing: Slide library/Agents.deck.md]
+[Current slide: The person is on slide 2 of 2 ("A scheduled prompt, step by step", id g2) in "Agents".]
+```
+
+- [`05-round2-chip-slide-2.png`](05-round2-chip-slide-2.png): the chip on that run, "Slide 2 · A scheduled prompt, s…" (the title truncating in the chip).
+- [`04-raw-text-view-no-slide.png`](04-raw-text-view-no-slide.png): the same deck reopened in the raw text editor: the chip reads "Active: Slide library/Agents.de…" and the next message, "Fix this paragraph.", carries `[Currently editing: Slide library/Agents.deck.md]` and no slide line (review round 1's first finding).
+
 ## Not shown here
 
 - Several slides selected on the strip: the strip has no multi-select yet, so the "Slides 3–5" chip and the list line are unit-tested only (`src/decks/currentSlide.test.ts`).
-- The strip's pick: the strip was folded at this window's width (the AI column open); the pick sends the same message (`currentSlideMessage`), unit-tested.
+- The strip's pick: the strip was folded at this window's width (the AI column open); a pick changes the slide the view shows, which the same `deck/current-slide` effect sends (`currentSlideMessage`, unit-tested).
 - ChatGPT and OpenCode live turns: their prompts are unit-tested (`CodexRuntime.test.ts` 15b, `AcpRuntime.test.ts` 9b).
 - Present: the chip while presenting was not looked at.

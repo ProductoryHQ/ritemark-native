@@ -123,7 +123,7 @@ import type { OneShotSettings } from '../runtime/oneShotTurn';
 import { presentRuntimeError, type RuntimeErrorHints } from '../runtime/runtimeErrorPresentation';
 import { failureSentence, trustedBillingUrl, turnOutcome } from '../runtime/turnFailureCopy';
 import { appendStreamedText, type ActiveFileContext } from '../agent/types';
-import type { CurrentSlide } from '../decks/currentSlide';
+import { slideAtSendOf, withSlideAtSend, type CurrentSlide } from '../decks/currentSlide';
 import { modelSubstitutionForTurn } from '../runtime/modelSubstitution';
 import {
   isThinkingEffort,
@@ -146,6 +146,7 @@ import { LegacyConversationMigrator } from '../conversations/LegacyConversationM
 import { isConversationRequestMessage } from '../conversations/protocol';
 import { turnActiveDurationMs, type ConversationRecordV1 } from '../conversations/types';
 import { cardTitleOf } from '../taskBoard/cardFile';
+import { RITEMARK_EDITOR_VIEW_TYPE } from '../taskBoard/cardPages';
 import { resolveProjectScope } from '../conversations/projectScope';
 import { ConversationTitleGenerator } from '../conversations/ConversationTitleGenerator';
 import { showConversationDeleteNotification } from '../conversations/conversationDeleteNotification';
@@ -1098,11 +1099,17 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // A comment turn never consults the active tab: switching tabs while
           // the task waited in the queue used to tell the agent it was editing
           // the wrong file (audit F12).
-          const activeFile = skipActiveFile
+          const liveActiveFile = skipActiveFile
             ? undefined
             : commentTaskId && commentTaskSourcePath
               ? { path: commentTaskSourcePath }
               : this._getActiveFileContext();
+          // 17 November: a deck's slide is the one the chip showed when the person sent the message (`slideAtSend`),
+          // not the one in front when the turn starts (a queued message, the share wait); none when the chip showed
+          // none, or the file in front is no longer that deck. A message without the field keeps the live slide.
+          const activeFile = liveActiveFile && message.slideAtSend !== undefined
+            ? withSlideAtSend(liveActiveFile, slideAtSendOf(message.slideAtSend))
+            : liveActiveFile;
 
           // #658: the page this turn's browser tools act in, for every runtime: the page its context came from, or
           // else the browser page in front now (none with a document in front). Found by id from here on, so a tab or
@@ -4095,19 +4102,20 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           : undefined;
       }
 
-      return this._fileContextFor(uri);
+      // A deck's slide only while the deck view is the tab in front: never its raw text or a diff (17 November)
+      return this._fileContextFor(uri, viewType === RITEMARK_EDITOR_VIEW_TYPE);
     }
 
     return undefined;
   }
 
-  private _fileContextFor(uri: vscode.Uri): ActiveFileContext | undefined {
+  private _fileContextFor(uri: vscode.Uri, withSlide = false): ActiveFileContext | undefined {
     if (uri.scheme === 'file' && !fs.existsSync(uri.fsPath)) return undefined;
     const openDocument = vscode.workspace.textDocuments.find((document) => document.uri.toString() === uri.toString());
     // Only a file with front matter can be a card; skip the parse for every other document.
     const text = openDocument && uri.fsPath.toLowerCase().endsWith('.md') ? openDocument.getText() : '';
     const label = text.startsWith('---') ? cardTitleOf(text) : null;
-    const slide = uri.scheme === 'file' ? this._currentSlideOf?.(uri.fsPath) ?? null : null;
+    const slide = withSlide && uri.scheme === 'file' ? this._currentSlideOf?.(uri.fsPath) ?? null : null;
     return {
       path: vscode.workspace.asRelativePath(uri),
       selection: this._currentSelection.isEmpty ? undefined : this._currentSelection.text,

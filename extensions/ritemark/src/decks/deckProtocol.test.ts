@@ -41,18 +41,24 @@ assert.throws(() => decodeDeckRequest({ type: 'deck/open-library', section: 'top
 assert.throws(() => decodeDeckRequest({ type: 'deck/applied', requestId: 'r1', ok: 'yes' }), DeckProtocolError);
 assert.deepEqual(decodeDeckRequest({ type: 'deck/current', index: 2, count: 9 }), { type: 'deck/current', index: 2, count: 9 });
 assert.throws(() => decodeDeckRequest({ type: 'deck/current', index: -1, count: 9 }), DeckProtocolError);
-// 17 November: the slide the person is on, for the AI: its place, id and title, and nothing else.
+// 17 November: the slide the person is on, for the AI: its place, id and title, and nothing else; its own message,
+// so it never moves the library's insert point (`deck/current` keeps exactly its two fields).
+assert.throws(() => decodeDeckRequest({ type: 'deck/current', index: 4, count: 13, slides: [{ index: 4 }] }), DeckProtocolError);
 assert.deepEqual(
-  decodeDeckRequest({ type: 'deck/current', index: 4, count: 13, slides: [{ index: 4, id: 'k3f9', title: 'Agenda' }] }),
-  { type: 'deck/current', index: 4, count: 13, slides: [{ index: 4, id: 'k3f9', title: 'Agenda' }] },
+  decodeDeckRequest({ type: 'deck/current-slide', count: 13, slides: [{ index: 4, id: 'k3f9', title: 'Agenda' }] }),
+  { type: 'deck/current-slide', count: 13, slides: [{ index: 4, id: 'k3f9', title: 'Agenda' }] },
 );
-assert.deepEqual(decodeDeckRequest({ type: 'deck/current', index: 0, count: 2, slides: [{ index: 0 }, { index: 1 }] }).type, 'deck/current');
-assert.throws(() => decodeDeckRequest({ type: 'deck/current', index: 4, count: 13, slides: [{ index: 4, body: 'words' }] }), DeckProtocolError, 'a slide\'s words never travel');
-assert.throws(() => decodeDeckRequest({ type: 'deck/current', index: 4, count: 13, slides: [{ index: 13 }] }), DeckProtocolError, 'a slide past the end');
-assert.throws(() => decodeDeckRequest({ type: 'deck/current', index: 4, count: 13, slides: [{ index: 4, id: '../x' }] }), DeckProtocolError);
-assert.throws(() => decodeDeckRequest({ type: 'deck/current', index: 4, count: 13, slides: [{ index: 4, title: 'x'.repeat(301) }] }), DeckProtocolError);
-assert.throws(() => decodeDeckRequest({ type: 'deck/current', index: 4, count: 13, slides: [] }), DeckProtocolError);
-assert.throws(() => decodeDeckRequest({ type: 'deck/current', index: 0, count: 1, slides: [{ index: 0 }, { index: 0 }] }), DeckProtocolError, 'no more slides than the deck has');
+assert.deepEqual(decodeDeckRequest({ type: 'deck/current-slide', count: 0, slides: [] }), { type: 'deck/current-slide', count: 0, slides: [] }, 'no slide');
+for (const id of ['q3-results', 'intro_slide', '42', 'a.b']) {
+  assert.equal((decodeDeckRequest({ type: 'deck/current-slide', count: 1, slides: [{ index: 0, id }] }) as { slides: Array<{ id?: string }> }).slides[0].id, id, 'a hand-written id');
+}
+assert.throws(() => decodeDeckRequest({ type: 'deck/current-slide', count: 13, slides: [{ index: 4, body: 'words' }] }), DeckProtocolError, 'a slide\'s words never travel');
+assert.throws(() => decodeDeckRequest({ type: 'deck/current-slide', count: 13, slides: [{ index: 13 }] }), DeckProtocolError, 'a slide past the end');
+assert.throws(() => decodeDeckRequest({ type: 'deck/current-slide', count: 13, slides: [{ index: 4, id: '../x' }] }), DeckProtocolError);
+assert.throws(() => decodeDeckRequest({ type: 'deck/current-slide', count: 13, slides: [{ index: 4, id: 'x'.repeat(65) }] }), DeckProtocolError);
+assert.throws(() => decodeDeckRequest({ type: 'deck/current-slide', count: 13, slides: [{ index: 4, title: 'x'.repeat(301) }] }), DeckProtocolError);
+assert.throws(() => decodeDeckRequest({ type: 'deck/current-slide', count: 1, slides: [{ index: 0 }, { index: 0 }] }), DeckProtocolError, 'no more slides than the deck has');
+assert.throws(() => decodeDeckRequest({ type: 'deck/current-slide', count: 3, slides: [], index: 1 }), DeckProtocolError);
 assert.throws(() => decodeDeckRequest({ type: 'deck/unknown' }), DeckProtocolError);
 
 // The Slide library place's requests.

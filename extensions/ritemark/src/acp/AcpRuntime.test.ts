@@ -564,7 +564,7 @@ async function run() {
   {
     const slide = { deck: 'Training', count: 13, slides: [{ number: 5, id: 'k3f9', title: 'Agenda' }] };
     const { text } = buildAcpPromptText({ prompt: 'fix this slide', activeFile: { path: 'Training.deck.md', slide } } as any, {});
-    assert.ok(text.startsWith("[Currently editing: Training.deck.md]\n[Current slide: The person is on slide 5 of 13 ('Agenda', id k3f9) in Training.]\n\nfix this slide"), text);
+    assert.ok(text.startsWith("[Currently editing: Training.deck.md]\n[Current slide: The person is on slide 5 of 13 (\"Agenda\", id k3f9) in \"Training\".]\n\nfix this slide"), text);
     const { text: plain } = buildAcpPromptText({ prompt: 'fix', activeFile: { path: 'notes.md' } } as any, {});
     assert.ok(!plain.includes('[Current slide'), 'a Text document has no slide line');
     assert.strictEqual(plain, '[Currently editing: notes.md]\n\nfix');

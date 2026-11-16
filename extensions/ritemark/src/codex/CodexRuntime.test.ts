@@ -625,7 +625,7 @@ async function run() {
     await session.prompt({ prompt: 'fix this slide', activeFile: { path: 'Training.deck.md', slide: { deck: 'Training', count: 13, slides: [{ number: 5, id: 'k3f9', title: 'Agenda' }] } } });
     await session.prompt({ prompt: 'fix this', activeFile: { path: 'notes.md' } });
     const [deckTurn, textTurn] = capturedTurnStarts.map((args) => String(args[1]));
-    assert.ok(deckTurn.startsWith("[Currently editing: Training.deck.md]\n[Current slide: The person is on slide 5 of 13 ('Agenda', id k3f9) in Training.]\n\n"), deckTurn);
+    assert.ok(deckTurn.startsWith("[Currently editing: Training.deck.md]\n[Current slide: The person is on slide 5 of 13 (\"Agenda\", id k3f9) in \"Training\".]\n\n"), deckTurn);
     assert.ok(deckTurn.trimEnd().endsWith('fix this slide'));
     assert.ok(!textTurn.includes('[Current slide'), 'a Text document has no slide line');
     assert.ok(textTurn.startsWith('[Currently editing: notes.md]\n\n'), textTurn);

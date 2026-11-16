@@ -74,7 +74,7 @@ import { appendStreamedText } from '../../../../src/agent/types';
 import type { StartingPlace } from '../../../../src/guidance/startingPlace';
 import type { SheetSignInAi, SheetSignInRequest, SheetSignInView } from '../../../../src/views/agentSidebarProtocol';
 import { requestTurnReveal } from './turnReveal';
-import type { CurrentSlide } from '../../../../src/decks/currentSlide';
+import type { CurrentSlide, SlideAtSend } from '../../../../src/decks/currentSlide';
 import type {
   AgentId,
   AgentInfo,
@@ -479,7 +479,7 @@ interface AISidebarState {
   setPendingRuntime: (partial: Partial<PendingRuntimeSelection>) => void;
   setThinkingEffort: (effort: ThinkingEffort) => void;
   clearThinkingEffortNotice: () => void;
-  sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean; skipBrowserContext?: boolean; hiddenContext?: string; mentionedAgentPaths?: string[] }) => void;
+  sendAgentMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean; skipBrowserContext?: boolean; hiddenContext?: string; mentionedAgentPaths?: string[]; slideAtSend?: SlideAtSend | null }) => void;
   cancelRequest: () => void;
   /** Sprint 128: stop one background task (its card's stop button). */
   stopBackgroundTask: (conversationId: string, subagent: SubagentProgress) => void;
@@ -511,12 +511,13 @@ interface AISidebarState {
   rejectPlan: (turnId: string, feedback?: string) => void;
   answerAgentQuestion: (turnId: string, question: AgentQuestion, answers: Record<string, string>) => void;
   dismissWelcome: () => void;
-  sendCodexMessage: (prompt: string, attachments?: FileAttachment[], requestedMode?: 'auto' | 'ask' | 'plan', skipBrowserContext?: boolean, skipActiveFile?: boolean) => void;
+  /** `slideAtSend`: the deck slide the composer's chip showed (17 November); left out, the host reads the slide in front. */
+  sendCodexMessage: (prompt: string, attachments?: FileAttachment[], requestedMode?: 'auto' | 'ask' | 'plan', skipBrowserContext?: boolean, skipActiveFile?: boolean, slideAtSend?: SlideAtSend | null) => void;
   selectCodexModel: (modelId: string) => void;
   /** Select an OpenCode model. compositeValue is the full "opencode:<provider>/<model>" string. */
   selectOpenCodeModel: (compositeValue: string) => void;
   /** Send a message to the OpenCode (ACP) runtime. */
-  sendOpenCodeMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean }) => void;
+  sendOpenCodeMessage: (prompt: string, attachments?: FileAttachment[], options?: { skipActiveFile?: boolean; slideAtSend?: SlideAtSend | null }) => void;
   handleCodexApproval: (requestId: string | number, approved: boolean, alwaysAllow?: boolean) => void;
   /** Respond to a Claude Ask-mode file-write/shell-command approval card. */
   handleAgentToolApproval: (requestId: string, approved: boolean) => void;
@@ -812,6 +813,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           thinkingEffort: item.thinkingEffort,
           skipActiveFile: item.skipActiveFile,
           skipBrowserContext: item.skipBrowserContext,
+          slideAtSend: item.skipActiveFile ? null : item.slideAtSend,
           mentionedAgentPaths: item.mentionedAgentPaths,
           // Sprint 117 (audit F11/F12): a comment turn names its own task and
           // its own document. Composer items send neither, so the host keeps
@@ -860,6 +862,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           thinkingEffort: item.thinkingEffort,
           skipActiveFile: item.skipActiveFile,
           skipBrowserContext: item.skipBrowserContext,
+          slideAtSend: item.skipActiveFile ? null : item.slideAtSend,
           attachments: item.attachments?.map((att) => ({ id: att.id, kind: att.kind, name: att.name, data: att.data, mediaType: att.mediaType })),
           ...(item.taskId ? { taskId: item.taskId } : {}),
           ...(item.source === 'card' ? { taskKind: 'card' } : {}),
@@ -1493,6 +1496,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         skipActiveFile: options?.skipActiveFile,
         skipBrowserContext: options?.skipBrowserContext,
         mentionedAgentPaths: options?.mentionedAgentPaths,
+        slideAtSend: options?.skipActiveFile ? null : options?.slideAtSend,
       });
     },
 
@@ -1784,7 +1788,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       vscode.postMessage({ type: 'agent-setup:dismiss-welcome' });
     },
 
-    sendCodexMessage: (prompt, attachments?, requestedMode?, skipBrowserContext?, skipActiveFile?) => {
+    sendCodexMessage: (prompt, attachments?, requestedMode?, skipBrowserContext?, skipActiveFile?, slideAtSend?) => {
       const conversation = activeConversation();
       if (!conversation) return;
 
@@ -1851,6 +1855,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         thinkingEffort: turn.thinkingEffort ?? 'auto',
         skipBrowserContext,
         skipActiveFile,
+        slideAtSend: skipActiveFile ? null : slideAtSend,
         attachments: attachments?.map((attachment) => ({
           id: attachment.id,
           kind: attachment.kind,
@@ -1931,6 +1936,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         approvalMode: conversation.pendingRuntime.mode,
         thinkingEffort: turn.thinkingEffort ?? 'auto',
         skipActiveFile: options?.skipActiveFile,
+        slideAtSend: options?.skipActiveFile ? null : options?.slideAtSend,
         attachments: attachments?.map((attachment) => ({
           id: attachment.id,
           kind: attachment.kind,

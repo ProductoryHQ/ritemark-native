@@ -179,7 +179,7 @@ test('deck guidance appears exactly when a runtime has the deck tools', () => {
 test('deck guidance says what "this slide" means', () => {
   for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
     const withDecks = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true }));
-    for (const needle of ['`[Current slide: …]`', '"This slide", "here" or "siin" means that slide', '"these slides" means those', 'finding its block by its `id:`']) {
+    for (const needle of ['`[Current slide: …]`', '"This slide", "here" or "siin" means that slide', 'finding its block by its `id:`']) {
       assert.ok(withDecks.includes(needle), `${runtime}: ${needle}`);
     }
   }

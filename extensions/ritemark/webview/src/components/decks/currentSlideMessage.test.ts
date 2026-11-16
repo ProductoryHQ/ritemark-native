@@ -1,5 +1,5 @@
 /**
- * The deck view's `deck/current` (17 November): the slide the strip picked, the stage shows, or whose part holds the
+ * The deck view's `deck/current-slide` (17 November): the slide the strip picked, the stage shows, or whose part holds the
  * handout's caret, with its id and title and nothing else; and the host decodes exactly that.
  * Run: `npx tsx webview/src/components/decks/currentSlideMessage.test.ts`
  */
@@ -21,21 +21,26 @@ const doc = schema.nodes.doc.create(null, [
   slide('id: bbbb\ntitle: "Two\\n  lines"\nitems:\n  - heading: Secret words'), paragraph('the handout of b'),
   slide('title: No id here'), paragraph('c text'),
   slide('items: []'), paragraph('d text'),
+  slide('id: q3-results\ntitle: Results'), paragraph('e text'),
+  slide('id: 42\ntitle: A number'), paragraph('f text'),
 ])
 const slides = slidesOf(doc)
 
 // The strip's pick and the stage both show slide `index`: the message names it by its place, id and title.
-assert.deepEqual(currentSlideMessage(0, 4, slides), { index: 0, count: 4, slides: [{ index: 0, id: 'aaaa', title: 'Welcome' }] })
+assert.deepEqual(currentSlideMessage(0, 6, slides), { count: 6, slides: [{ index: 0, id: 'aaaa', title: 'Welcome' }] })
 // A title is one line; a slide's words (items, the handout) never travel.
-const second = currentSlideMessage(1, 4, slides)
-assert.deepEqual(second, { index: 1, count: 4, slides: [{ index: 1, id: 'bbbb', title: 'Two lines' }] })
+const second = currentSlideMessage(1, 6, slides)
+assert.deepEqual(second, { count: 6, slides: [{ index: 1, id: 'bbbb', title: 'Two lines' }] })
 assert.ok(!JSON.stringify(second).includes('Secret') && !JSON.stringify(second).includes('handout'), 'only number, id and title travel')
 // No id, no title: only what the slide has.
-assert.deepEqual(currentSlideMessage(2, 4, slides).slides, [{ index: 2, title: 'No id here' }])
-assert.deepEqual(currentSlideMessage(3, 4, slides).slides, [{ index: 3 }])
-// No slides yet, or a place past the end: only the place, as before.
-assert.deepEqual(currentSlideMessage(0, 0, []), { index: 0, count: 0 })
-assert.deepEqual(currentSlideMessage(4, 4, slides), { index: 4, count: 4 })
+assert.deepEqual(currentSlideMessage(2, 6, slides).slides, [{ index: 2, title: 'No id here' }])
+assert.deepEqual(currentSlideMessage(3, 6, slides).slides, [{ index: 3 }])
+// Hand-written ids travel too, a number among them.
+assert.deepEqual(currentSlideMessage(4, 6, slides).slides, [{ index: 4, id: 'q3-results', title: 'Results' }])
+assert.deepEqual(currentSlideMessage(5, 6, slides).slides, [{ index: 5, id: '42', title: 'A number' }])
+// No slides yet, or a place past the end: no slide.
+assert.deepEqual(currentSlideMessage(0, 0, []), { count: 0, slides: [] })
+assert.deepEqual(currentSlideMessage(6, 6, slides), { count: 6, slides: [] })
 
 // The handout's caret: the current slide is the one whose part holds it (the view's one rule, `partIndexAt`).
 const caretInB = slides[1].pos + slides[1].node.nodeSize + 2
@@ -44,9 +49,9 @@ assert.equal(caretPart, 1)
 assert.deepEqual(currentSlideMessage(caretPart!, slides.length, slides).slides, [{ index: 1, id: 'bbbb', title: 'Two lines' }])
 
 // The host decodes the view's messages exactly.
-for (const index of [0, 1, 2, 3]) {
-  const message = currentSlideMessage(index, 4, slides)
-  assert.deepEqual(decodeDeckRequest({ type: 'deck/current', ...message }), { type: 'deck/current', ...message })
+for (const index of [0, 1, 2, 3, 4, 5, 6]) {
+  const message = currentSlideMessage(index, 6, slides)
+  assert.deepEqual(decodeDeckRequest({ type: 'deck/current-slide', ...message }), { type: 'deck/current-slide', ...message })
 }
 
 console.log('currentSlideMessage tests passed')

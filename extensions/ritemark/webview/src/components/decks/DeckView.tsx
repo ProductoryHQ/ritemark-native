@@ -538,7 +538,7 @@ export function DeckView({
     makeCurrent(index)
     // Told even when this slide was already current: a + menu's "From the library…" may have moved the host's insert
     // point to a gap, and picking a slide brings it back to the slide.
-    sendToExtension('deck/current', currentSlideMessage(index, countRef.current, slidesRef.current))
+    sendToExtension('deck/current', { index, count: countRef.current })
     const container = scrollContainer()
     const tops = partTops()
     if (container && tops[index] !== undefined) container.scrollTop = scrollTopFor(tops[index])
@@ -795,12 +795,16 @@ export function DeckView({
     requestAnimationFrame(() => pick(0))
   }, [selectTitle, slides.length, pick])
 
-  // The host knows which slide is current, for the Slide library's "Insert after slide N", and the AI the slide the
-  // person is on (17 November): its id and title too, told once they settle (a scroll, a title being typed).
+  // The host knows which slide is current, for the Slide library's "Insert after slide N".
+  useEffect(() => {
+    sendToExtension('deck/current', { index: shown, count })
+  }, [shown, count])
+  // The AI knows the slide the person is on (17 November): its id and title too, told once they settle (a scroll, a
+  // title being typed). A message of its own, so it never moves the library's insert point.
   const shownId = slide?.data.id
   const shownTitle = slide?.data.title
   useEffect(() => {
-    const timer = window.setTimeout(() => sendToExtension('deck/current', currentSlideMessage(shown, count, slidesRef.current)), CURRENT_SLIDE_SETTLE_MS)
+    const timer = window.setTimeout(() => sendToExtension('deck/current-slide', currentSlideMessage(shown, count, slidesRef.current)), CURRENT_SLIDE_SETTLE_MS)
     return () => window.clearTimeout(timer)
   }, [shown, count, shownId, shownTitle])
 
