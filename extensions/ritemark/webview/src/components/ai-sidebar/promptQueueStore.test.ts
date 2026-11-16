@@ -131,6 +131,31 @@ function enqueue(conversationId: string, text: string, over: Record<string, unkn
   assert.equal(queueFor(useAISidebarStore.getState().promptQueues, 'failed-1').length, 0, 'resume dispatches the head');
 }
 
+// ── 3b. 17 November: a queued message keeps the deck slide the chip showed when it was queued ──
+{
+  resetAll();
+  seed('slide-1', { agentConversation: [turn({ isRunning: true })] });
+  const onSlide3 = { path: 'Training.deck.md', slide: { deck: 'Training', count: 13, slides: [{ number: 3, id: 'k3f9', title: 'Agenda' }] } };
+  enqueue('slide-1', 'shorten this slide', { slideAtSend: onSlide3 });
+  // The person moves on to slide 8 while the message waits.
+  useAISidebarStore.setState({ activeFilePath: 'Training.deck.md', activeSlide: { deck: 'Training', count: 13, slides: [{ number: 8 }] } });
+  useAISidebarStore.setState((s) => ({
+    conversations: { ...s.conversations, 'slide-1': { ...s.conversations['slide-1'], agentConversation: [{ ...s.conversations['slide-1'].agentConversation[0], isRunning: false, result: { text: 'ok', filesModified: [], metrics: { durationMs: 1, costUsd: null, model: null } } }] } },
+  }));
+  useAISidebarStore.getState().maybeDrainQueue('slide-1');
+  const exec = posted.find((m) => m.type === 'agent-execute');
+  assert.deepEqual(exec!.slideAtSend, onSlide3, 'the slide it was queued on, not the one in front now');
+  // A codex item, and the chip's × (skipActiveFile): no slide.
+  resetAll();
+  seed('slide-2');
+  enqueue('slide-2', 'codex on slide', { runtimeId: 'codex', slideAtSend: onSlide3 });
+  assert.deepEqual(posted.find((m) => m.type === 'agent-execute')!.slideAtSend, onSlide3);
+  resetAll();
+  seed('slide-3');
+  enqueue('slide-3', 'no file', { slideAtSend: onSlide3, skipActiveFile: true });
+  assert.equal(posted.find((m) => m.type === 'agent-execute')!.slideAtSend, null, 'removed from this message: no slide');
+}
+
 // ── 4. Captured runtime is used at dispatch, not the composer's ──
 {
   resetAll();

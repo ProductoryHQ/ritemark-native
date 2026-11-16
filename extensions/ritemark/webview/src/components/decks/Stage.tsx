@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import type { Editor as TipTapEditor } from '@tiptap/react'
-import { isBlockSlide, parseFrom, writeSlideBody, type SlideData } from '../../../../src/decks/deckFormat'
+import { isBlockSlide, parseFrom, writeSlideData, type SlideData } from '../../../../src/decks/deckFormat'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
@@ -88,7 +88,7 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
   const write = useCallback((mutate: (data: SlideData) => SlideData, focus?: string) => {
     const fresh = slidesOf(editor.state.doc)[slide.index]
     if (!fresh) return
-    const body = writeSlideBody(fresh.node.attrs.body, mutate(fresh.data))
+    const body = writeSlideData(fresh.kind, fresh.node.attrs.body, mutate(fresh.data))
     if (body !== fresh.node.attrs.body) {
       editor.view.dispatch(editor.state.tr.setNodeMarkup(fresh.pos, undefined, { ...fresh.node.attrs, body }))
     }
