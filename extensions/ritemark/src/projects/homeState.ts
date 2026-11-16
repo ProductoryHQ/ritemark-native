@@ -29,8 +29,8 @@ export const RECENT_EXTENSIONS: readonly string[] = Object.keys(KINDS);
 
 export function kindOf(fileName: string): RecentKind {
   if (fileName.toLowerCase().endsWith('.flow.json')) return 'flow';
-  // A deck is a slides file, so Last changed shows it with the deck's own icon, as its tab does (Sprint 159)
-  if (isDeckPath(fileName)) return 'slides';
+  // A deck is its own kind (not PowerPoint's `slides`), shown with the deck's own icon, as its tab is (Sprint 159)
+  if (isDeckPath(fileName)) return 'deck';
   return KINDS[path.extname(fileName).toLowerCase()] ?? 'other';
 }
 

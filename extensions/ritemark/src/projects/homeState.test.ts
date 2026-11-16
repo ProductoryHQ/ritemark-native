@@ -26,7 +26,7 @@ assert.deepEqual([...RECENT_EXTENSIONS], ['.md', '.markdown', '.txt', '.pdf', '.
 assert.equal(RECENT_LIMIT, 5);
 assert.deepEqual(
   ['Plan.md', 'NOTES.MD', 'a.markdown', 'log.txt', 'Brief.pdf', 'Offer.docx', 'old.doc', 'data.csv', 'Budget.xlsx', 'b.xls', 'Deck.pptx', 'd.ppt', 'Map.drawio', 'Weekly.flow', 'Weekly.flow.json', 'WEEKLY.FLOW.JSON', 'data.json', 'photo.png', 'Makefile', '.md', 'Talk.deck.md', 'TALK.DECK.MD', 'Slide library/Teams.deck.md'].map(kindOf),
-  ['markdown', 'markdown', 'markdown', 'markdown', 'pdf', 'word', 'word', 'sheet', 'sheet', 'sheet', 'slides', 'slides', 'drawing', 'flow', 'flow', 'flow', 'other', 'other', 'other', 'other', 'slides', 'slides', 'slides'],
+  ['markdown', 'markdown', 'markdown', 'markdown', 'pdf', 'word', 'word', 'sheet', 'sheet', 'sheet', 'slides', 'slides', 'drawing', 'flow', 'flow', 'flow', 'other', 'other', 'other', 'other', 'deck', 'deck', 'deck'],
 );
 
 // ── The AI's name: ChatGPT, never Codex (R22) ──
