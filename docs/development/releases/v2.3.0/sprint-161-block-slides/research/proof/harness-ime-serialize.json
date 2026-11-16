@@ -1,0 +1,42 @@
+{
+ "transform@698": {
+  "ime": {
+   "caretBefore": 289,
+   "mid": {
+    "composing": true,
+    "coords": {
+     "left": 564.3649291992188,
+     "top": 276.5876159667969
+    },
+    "dom": {
+     "left": 564.3649291992188,
+     "top": 276.5876159667969
+    }
+   },
+   "committed": true,
+   "caretAfter": 295,
+   "caretMoved": 6
+  },
+  "serializeMsPerKey": 0.453
+ },
+ "zoom@698": {
+  "ime": {
+   "caretBefore": 289,
+   "mid": {
+    "composing": true,
+    "coords": {
+     "left": 776.1533203125,
+     "top": 380.4799499511719
+    },
+    "dom": {
+     "left": 776.1533203125,
+     "top": 380.4799499511719
+    }
+   },
+   "committed": true,
+   "caretAfter": 295,
+   "caretMoved": 6
+  },
+  "serializeMsPerKey": 0.52
+ }
+}

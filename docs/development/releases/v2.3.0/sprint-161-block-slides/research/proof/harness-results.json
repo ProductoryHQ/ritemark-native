@@ -1,0 +1,200 @@
+{
+ "focus": true,
+ "transform": {
+  "caret": [
+   {
+    "pos": 22,
+    "coords": {
+     "left": 436.7,
+     "top": 61.8,
+     "right": 436.7,
+     "bottom": 106.5
+    },
+    "charRight": 436.8,
+    "dx": 0,
+    "dy": 0,
+    "hit": 22,
+    "hitOk": true
+   },
+   {
+    "pos": 247,
+    "coords": {
+     "left": 627.5,
+     "top": 218,
+     "right": 627.5,
+     "bottom": 240.2
+    },
+    "charRight": 627.5,
+    "dx": 0,
+    "dy": 0,
+    "hit": 247,
+    "hitOk": true
+   },
+   {
+    "pos": 179,
+    "coords": {
+     "left": 326.4,
+     "top": 276.6,
+     "right": 326.4,
+     "bottom": 298.8
+    },
+    "charRight": 326.4,
+    "dx": 0,
+    "dy": 0,
+    "hit": 179,
+    "hitOk": true
+   }
+  ],
+  "frame": {
+   "left": 24,
+   "top": 24,
+   "right": 722,
+   "bottom": 417
+  },
+  "markers": [
+   {
+    "left": 436.7447509765625,
+    "top": 61.80833435058594
+   },
+   {
+    "left": 627.5189208984375,
+    "top": 217.9949188232422
+   },
+   {
+    "left": 326.4496154785156,
+    "top": 276.5876159667969
+   }
+  ],
+  "slash": {
+   "caret": {
+    "left": 336.10052490234375,
+    "bottom": 298.763671875
+   },
+   "popup": {
+    "left": 330.5,
+    "top": 307,
+    "right": 650.5
+   }
+  },
+  "bubble": {
+   "selection": {
+    "left": 442.8,
+    "top": 251.1,
+    "right": 499.4,
+    "bottom": 273.2
+   },
+   "bubble": {
+    "left": 446,
+    "top": 221.5,
+    "right": 496.2,
+    "bottom": 241
+   },
+   "centreOffset": 0,
+   "gapAbove": 10.1,
+   "visible": true
+  }
+ },
+ "zoom": {
+  "caret": [
+   {
+    "pos": 22,
+    "coords": {
+     "left": 600.6,
+     "top": 85.1,
+     "right": 600.6,
+     "bottom": 146.3
+    },
+    "charRight": 600.6,
+    "dx": 0,
+    "dy": 0,
+    "hit": 26,
+    "hitOk": false
+   },
+   {
+    "pos": 247,
+    "coords": {
+     "left": 863,
+     "top": 299.9,
+     "right": 863,
+     "bottom": 330.8
+    },
+    "charRight": 863,
+    "dx": 0,
+    "dy": 0,
+    "hit": 247,
+    "hitOk": true
+   },
+   {
+    "pos": 179,
+    "coords": {
+     "left": 448.9,
+     "top": 380.5,
+     "right": 448.9,
+     "bottom": 411.4
+    },
+    "charRight": 448.9,
+    "dx": 0,
+    "dy": 0,
+    "hit": 179,
+    "hitOk": true
+   }
+  ],
+  "frame": {
+   "left": 24,
+   "top": 24,
+   "right": 722,
+   "bottom": 417
+  },
+  "markers": [
+   {
+    "left": 600.6339721679688,
+    "top": 85.13252258300781
+   },
+   {
+    "left": 862.9943237304688,
+    "top": 299.8818054199219
+   },
+   {
+    "left": 448.9147644042969,
+    "top": 380.4799499511719
+   }
+  ],
+  "slash": {
+   "caret": {
+    "left": 462.1741027832031,
+    "bottom": 411.4255065917969
+   },
+   "popup": {
+    "left": 454.5,
+    "top": 419.5,
+    "right": 774.5
+   }
+  },
+  "bubble": {
+   "selection": {
+    "left": 609,
+    "top": 345.4,
+    "right": 686.8,
+    "bottom": 376.3
+   },
+   "bubble": {
+    "left": 623,
+    "top": 316,
+    "right": 673.2,
+    "bottom": 335.5
+   },
+   "centreOffset": 0.2,
+   "gapAbove": 9.9,
+   "visible": true
+  }
+ },
+ "fit": {
+  "transform@698": "000013444",
+  "transform@160": "000013444",
+  "zoom@698": "000013444",
+  "zoom@160": "000013444",
+  "growThenShrink": "00000011112222233222221111000000",
+  "'Sofia Sans', sans-serif": "000013333",
+  "sans-serif": "000013444"
+ }
+}

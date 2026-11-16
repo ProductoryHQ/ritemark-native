@@ -1,0 +1,24 @@
+diff --git a/extensions/ritemark/webview/src/utils/markdownAsWritten.ts b/extensions/ritemark/webview/src/utils/markdownAsWritten.ts
+index 3089ea40..4fc218a9 100644
+--- a/extensions/ritemark/webview/src/utils/markdownAsWritten.ts
++++ b/extensions/ritemark/webview/src/utils/markdownAsWritten.ts
+@@ -537,9 +537,10 @@ function hasListItemAncestor(node: Node): boolean {
+   return false
+ }
+ 
+-type BlockKind = 'paragraph' | 'heading' | 'code' | 'quote' | 'table' | 'rule' | 'list' | 'other'
++type BlockKind = 'paragraph' | 'heading' | 'code' | 'quote' | 'table' | 'rule' | 'list' | 'other' | 'fdiv'
+ 
+ function blockKind(node: Element): BlockKind {
++  if (node.nodeName === 'DIV' && node.hasAttribute('data-fdiv')) return 'fdiv' // SPIKE 161
+   switch (node.nodeName) {
+     case 'P': case 'IMG': return 'paragraph'
+     case 'H1': case 'H2': case 'H3': case 'H4': case 'H5': case 'H6': return 'heading'
+@@ -565,6 +566,7 @@ function writtenTight(previous: Element | null, next: Element): boolean {
+   const before = blockKind(previous)
+   const after = blockKind(next)
+   if (before === 'other' || after === 'other') return false
++  if (before === 'fdiv' || after === 'fdiv') return true // SPIKE 161: a fence line never merges with a neighbour
+   if (before === 'heading' || before === 'code' || before === 'rule') return true
+   if (after === 'heading' || after === 'code') return true
+   if (after === 'rule') return before !== 'paragraph' || !(next.getAttribute('data-md-hr') ?? '-').startsWith('-')
