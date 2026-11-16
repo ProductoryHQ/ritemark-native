@@ -72,16 +72,24 @@ export interface DraftSteps {
   notice: (text: string) => void;
 }
 
-/** Draft: one message to the AI, with this deck attached. False when no AI is signed in (nothing is sent). */
+/**
+ * Draft: one message to the AI, with this deck attached; then the card goes for good. False when nothing was sent (no
+ * AI signed in, or the AI's sheet couldn't take it): the card stays, and the bar says why.
+ */
 export async function sendDraft(words: string, steps: DraftSteps): Promise<boolean> {
   const ai = await steps.ai();
   if (!ai) {
     steps.notice('No AI is signed in, so nothing was sent.');
     return false;
   }
+  try {
+    await steps.save();
+    await steps.startChat({ runtimeId: ai.id, text: draftRequest(words), send: true });
+  } catch {
+    steps.notice(`The message could not be sent to ${ai.name}.`);
+    return false;
+  }
   await steps.forget();
-  await steps.save();
-  await steps.startChat({ runtimeId: ai.id, text: draftRequest(words), send: true });
   return true;
 }
 

@@ -193,11 +193,11 @@ async function main(): Promise<void> {
     read: async relative => (relative === 'Clients/Harbour/AI assistants.deck.md' ? source : null),
     taken: fileName => fileName === 'AI assistants (copy).deck.md',
     replace: async text => { deckText = text; steps.push('replace and save'); return true; },
-    rename: async fileName => { steps.push(`rename ${fileName}`); return true; },
-    notice: (text, fileName) => { steps.push(`notice ${fileName}: ${text}`); },
+    rename: async (fileName, line) => { steps.push(`rename ${fileName}, then: ${line}`); return true; },
+    notice: text => { steps.push(`notice ${text}`); },
   });
   assert.equal(result, 'AI assistants (copy 2).deck.md');
-  assert.deepEqual(steps, ['replace and save', 'rename AI assistants (copy 2).deck.md', `notice AI assistants (copy 2).deck.md: ${copiedNotice('AI assistants')}`]);
+  assert.deepEqual(steps, ['replace and save', `rename AI assistants (copy 2).deck.md, then: ${copiedNotice('AI assistants')}`]);
   assert.equal(copiedNotice('AI assistants'), 'This deck is now a copy of AI assistants.');
   const copied = parseDeck(deckText);
   assert.deepEqual({ theme: copied.theme, look: /^look: borderless$/m.test(deckText), slides: copied.slides.length }, { theme: 'Slide library/Themes/Evening.theme.md', look: true, slides: 2 });
@@ -211,9 +211,9 @@ async function main(): Promise<void> {
     taken: () => false,
     replace: async () => { gone.push('replace'); return true; },
     rename: async () => { gone.push('rename'); return true; },
-    notice: (text, fileName) => { gone.push(`notice ${fileName}: ${text}`); },
+    notice: text => { gone.push(`notice ${text}`); },
   }), null);
-  assert.deepEqual(gone, ['notice null: Old is no longer there.']);
+  assert.deepEqual(gone, ['notice Old is no longer there.']);
   // A rename refused: the deck is the copy under its own name, and the bar says so in this tab
   const kept: string[] = [];
   assert.equal(await copyEarlierDeck('Kickoff.deck.md', {
@@ -222,9 +222,9 @@ async function main(): Promise<void> {
     taken: () => false,
     replace: async () => true,
     rename: async () => false,
-    notice: (text, fileName) => { kept.push(`notice ${fileName}: ${text}`); },
+    notice: text => { kept.push(`notice ${text}`); },
   }), 'Untitled.deck.md');
-  assert.deepEqual(kept, ['notice null: This deck is now a copy of Kickoff.']);
+  assert.deepEqual(kept, ['notice This deck is now a copy of Kickoff.']);
 }
 
 console.log('newDeck: passed');

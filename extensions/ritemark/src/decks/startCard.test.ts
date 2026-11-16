@@ -24,7 +24,8 @@ async function main(): Promise<void> {
   assert.equal(deckStarted(1, true), true);
 
   // Draft: one message, the person's words as a request to draft this deck, sent at once through the AI's sheet's own
-  // path (which opens a folded AI column, with the deck in front attached); the card goes and the deck is saved first.
+  // path (which opens a folded AI column, with the deck in front attached); the deck is saved first, and the card goes
+  // only once the message is on its way.
   {
     const log: string[] = [];
     const steps: DraftSteps = {
@@ -35,8 +36,12 @@ async function main(): Promise<void> {
       notice: text => { log.push(`notice ${text}`); },
     };
     assert.equal(await sendDraft('  A 3-hour training for the bank\'s staff  ', steps), true);
-    assert.deepEqual(log, ['forget', 'save', `startChat ${JSON.stringify({ runtimeId: 'claude-code', text: "Draft this deck: A 3-hour training for the bank's staff", send: true })}`]);
+    assert.deepEqual(log, ['save', `startChat ${JSON.stringify({ runtimeId: 'claude-code', text: "Draft this deck: A 3-hour training for the bank's staff", send: true })}`, 'forget']);
     assert.equal(log.filter(entry => entry.startsWith('startChat')).length, 1, 'one message');
+    // The AI's sheet couldn't take it: the card stays (no forget), and the bar says so
+    log.length = 0;
+    assert.equal(await sendDraft('Anything', { ...steps, startChat: async () => { throw new Error('no sheet'); } }), false);
+    assert.deepEqual(log, ['save', 'notice The message could not be sent to Claude.']);
     // No AI signed in (it signed out after the card was drawn): nothing is sent, the card stays the host's, and the bar says why
     log.length = 0;
     assert.equal(await sendDraft('Anything', { ...steps, ai: async () => null }), false);

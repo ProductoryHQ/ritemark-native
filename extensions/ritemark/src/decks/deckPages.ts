@@ -75,8 +75,9 @@ export class DeckPages implements vscode.Disposable {
   startCard: {
     state: (document: vscode.TextDocument) => Promise<StartCardState>;
     gone: (document: vscode.TextDocument) => Promise<void>;
-    draft: (document: vscode.TextDocument, text: string, notice: (text: string) => void) => Promise<void>;
-    copy: (document: vscode.TextDocument, source: string, notice: (text: string) => void) => Promise<void>;
+    /** Draft and the copy: true when the card is gone (the row was used), false when it stays (nothing was done). */
+    draft: (document: vscode.TextDocument, text: string, notice: (text: string) => void) => Promise<boolean>;
+    copy: (document: vscode.TextDocument, source: string, notice: (text: string) => void) => Promise<boolean>;
   } | null = null;
 
   /**
@@ -110,6 +111,13 @@ export class DeckPages implements vscode.Disposable {
     const key = path.normalize(fsPath);
     clearTimeout(this.pendingNotice.get(key)?.timer);
     this.pendingNotice.set(key, { text, timer: setTimeout(() => this.pendingNotice.delete(key), 60_000) });
+  }
+
+  /** The line for a deck that won't come after all (its rename was refused). */
+  dropNotice(fsPath: string): void {
+    const key = path.normalize(fsPath);
+    clearTimeout(this.pendingNotice.get(key)?.timer);
+    this.pendingNotice.delete(key);
   }
 
   private takeNotice(document: vscode.TextDocument): string | null {
@@ -316,11 +324,16 @@ export class DeckPages implements vscode.Disposable {
         await this.startCard?.gone(document);
         return;
       case 'deck/start-draft':
-        if (this.startCard && isEnabled('decks')) await this.startCard.draft(document, request.text, text => void this.post(webview, { type: 'deck/notice', text }));
+      case 'deck/start-copy': {
+        // The card waits for the answer: gone once the row was used, or as it is now when nothing was done
+        const card = this.startCard;
+        const notice = (text: string) => void this.post(webview, { type: 'deck/notice', text });
+        const gone = !card || !isEnabled('decks') || (request.type === 'deck/start-draft'
+          ? await card.draft(document, request.text, notice)
+          : await card.copy(document, request.source, notice));
+        await this.post(webview, { type: 'deck/start-card', state: gone || !card ? { fresh: false, ai: null, earlier: [] } : await card.state(document) });
         return;
-      case 'deck/start-copy':
-        if (this.startCard && isEnabled('decks')) await this.startCard.copy(document, request.source, text => void this.post(webview, { type: 'deck/notice', text }));
-        return;
+      }
       default:
         await this.handleLibrary(document, webview, request);
     }

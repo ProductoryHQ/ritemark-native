@@ -250,10 +250,15 @@ export function DeckView({
     aiReady: !!startState.ai,
     earlierCount: startState.earlier.length,
   }) : null
+  // Draft and a copy wait for the host's answer, the card's rows held meanwhile: the card goes once the row was used,
+  // and stays (the bar says why) when nothing was done.
+  const [startBusy, setStartBusy] = useState(false)
   useEffect(() => {
     if (!editor) return
     const off = onMessage(message => {
-      if (message.type === 'deck/start-card' && message.state && typeof message.state === 'object') setStartState(message.state as StartCardState)
+      if (message.type !== 'deck/start-card' || !message.state || typeof message.state !== 'object') return
+      setStartState(message.state as StartCardState)
+      setStartBusy(false)
     })
     sendToExtension('deck/start-card')
     return off
@@ -265,16 +270,22 @@ export function DeckView({
     setStartGone(true)
     sendToExtension('deck/start-card-gone')
   }, [startState, startGone, started])
-  // While it shows, the AI's sign-in is read again when the window comes back (the person may have signed in meanwhile).
+  // While it shows without an Ask row, the AI's sign-in is read again when the window comes back (the person may have
+  // signed in meanwhile).
   const startShown = !!startRows
+  const askAgain = startShown && !startState?.ai && !startBusy
   useEffect(() => {
-    if (!startShown) return
+    if (!askAgain) return
     const again = () => { if (document.visibilityState === 'visible') sendToExtension('deck/start-card') }
     window.addEventListener('focus', again)
     return () => window.removeEventListener('focus', again)
-  }, [startShown])
-  const leaveStart = useCallback((type: 'deck/start-card-gone' | 'deck/start-draft' | 'deck/start-copy', fields?: Record<string, unknown>) => {
+  }, [askAgain])
+  const hideStart = useCallback(() => {
     setStartGone(true)
+    sendToExtension('deck/start-card-gone')
+  }, [])
+  const startWith = useCallback((type: 'deck/start-draft' | 'deck/start-copy', fields: Record<string, unknown>) => {
+    setStartBusy(true)
     sendToExtension(type, fields)
   }, [])
   const countRef = useRef(count)
@@ -1090,9 +1101,10 @@ export function DeckView({
               style={startAt}
               aiName={startRows.ask ? startState.ai?.name ?? null : null}
               earlier={startRows.copy ? startState.earlier : []}
-              onDraft={words => leaveStart('deck/start-draft', { text: words })}
-              onCopy={deck => leaveStart('deck/start-copy', { source: deck.path })}
-              onHide={() => leaveStart('deck/start-card-gone')}
+              busy={startBusy}
+              onDraft={words => startWith('deck/start-draft', { text: words })}
+              onCopy={deck => startWith('deck/start-copy', { source: deck.path })}
+              onHide={hideStart}
             />,
             handoutContainer,
           ) : null}

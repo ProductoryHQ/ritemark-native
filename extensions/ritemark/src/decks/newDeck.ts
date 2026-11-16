@@ -141,10 +141,13 @@ export interface CopyDeckSteps {
   taken: (fileName: string) => boolean;
   /** Put this text in the deck in place of what it holds, and save it; false when that was refused. */
   replace: (text: string) => Promise<boolean>;
-  /** Rename the deck's file in its folder; its tab follows. False when that was refused. */
-  rename: (fileName: string) => Promise<boolean>;
-  /** A line for the deck's bar, in the tab the deck is in once renamed (`fileName`, or as it was when not renamed). */
-  notice: (text: string, fileName: string | null) => void;
+  /**
+   * Rename the deck's file in its folder; its tab follows, and its bar says `line` once the renamed deck is shown. False
+   * when that was refused.
+   */
+  rename: (fileName: string, line: string) => Promise<boolean>;
+  /** A line for the deck's bar, in the tab it is in now. */
+  notice: (text: string) => void;
 }
 
 /** The bar's line once the deck is a copy. */
@@ -161,15 +164,16 @@ export async function copyEarlierDeck(source: string, steps: CopyDeckSteps): Pro
   const sourceName = deckFileName(source);
   const written = await steps.read(source);
   if (written === null) {
-    steps.notice(`${sourceName} is no longer there.`, null);
+    steps.notice(`${sourceName} is no longer there.`);
     return null;
   }
   if (!(await steps.replace(copiedDeckText(written, folderOf(source), folderOf(steps.deck))))) {
-    steps.notice(`This deck could not become a copy of ${sourceName}.`, null);
+    steps.notice(`This deck could not become a copy of ${sourceName}.`);
     return null;
   }
   const fileName = copyFileName(sourceName, steps.taken);
-  const renamed = await steps.rename(fileName);
-  steps.notice(copiedNotice(sourceName), renamed ? fileName : null);
-  return renamed ? fileName : steps.deck.slice(steps.deck.lastIndexOf('/') + 1);
+  if (await steps.rename(fileName, copiedNotice(sourceName))) return fileName;
+  // Not renamed: the deck is the copy under its own name, and this tab's bar says so
+  steps.notice(copiedNotice(sourceName));
+  return steps.deck.slice(steps.deck.lastIndexOf('/') + 1);
 }

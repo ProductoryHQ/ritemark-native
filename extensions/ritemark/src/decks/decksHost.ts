@@ -14,7 +14,9 @@ import { DeckPresenter } from './present/DeckPresenter';
 import { setDeckToolHost } from '../runtime/ritemarkTools';
 import { copyEarlierDeck, earlierDecks, makeEmptyDeck } from './newDeck';
 import { freshDeckMarks, sendDraft, type StartCardState } from './startCard';
-import { AI_NAMES, AI_ORDER, cardAi, type AiState } from '../guidance/readyRequest';
+import { slidesOfText } from './deckLibraryFormat';
+import { AI_NAMES, AI_ORDER } from '../guidance/readyRequest';
+import { sheetAi } from '../guidance/GuidanceHost';
 import type { AgentId } from '../agent/types';
 import type { RuntimeAvailability } from '../runtime/availability';
 import type { ChatStartRequest } from '../views/UnifiedViewProvider';
@@ -87,6 +89,9 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
     vscode.commands.registerCommand('ritemark.slideLibrary.search', () => (isEnabled('decks') ? view.focusSearch() : undefined)),
     // Sprint 159 (PR 7; since 16 November it opens the deck at once): New → Deck, only with the flag on
     vscode.commands.registerCommand('ritemark.decks.new', () => (isEnabled('decks') ? newDeck(pages, options, fresh) : undefined)),
+    // A deck deleted or renamed in Ritemark takes its card's mark with it
+    vscode.workspace.onDidDeleteFiles(event => { for (const file of event.files) void fresh.remove(markOf(file.fsPath)); }),
+    vscode.workspace.onDidRenameFiles(event => { for (const file of event.files) void fresh.remove(markOf(file.oldUri.fsPath)); }),
   );
   return { pages, publisher, library };
 }
@@ -101,24 +106,27 @@ function markOf(fsPath: string): string {
   return path.normalize(fsPath);
 }
 
-/** The AI the sheet uses for new chats, when one is chosen (as Home's card reads it). */
-function sheetAi(): AgentId | undefined {
-  const value = vscode.workspace.getConfiguration('ritemark.ai').get<string>('selectedAgent');
-  return value === 'claude-code' || value === 'codex' || value === 'opencode' ? value : undefined;
+/**
+ * The AI Draft goes to, by Home's card's rule (`cardAi`, with no AI chosen on the card): the sheet's AI when it is signed
+ * in, else the first signed-in AI, Claude first. Asked one at a time, stopping at the first that is. Null when none is:
+ * then the card has no Ask row.
+ */
+async function draftingAi(options: DecksHostOptions): Promise<{ id: AgentId; name: string } | null> {
+  const sheet = sheetAi();
+  for (const id of sheet ? [sheet, ...AI_ORDER.filter(other => other !== sheet)] : AI_ORDER) {
+    const availability = await options.runtimeAvailability(id).catch(() => null);
+    if (availability?.usable) return { id, name: AI_NAMES[id] };
+  }
+  return null;
 }
 
 /**
- * The AI Draft goes to, by Home's card's rule (`cardAi`): the sheet's AI when it is signed in, else the first signed-in
- * AI, Claude first. Null when none is: then the card has no Ask row.
+ * Is the deck still as New made it, as far as the card is concerned: at most one slide, a title slide, and no handout
+ * text (`deckStarted`'s rule, read from the file). The host's own check before a copy writes over the deck.
  */
-async function draftingAi(options: DecksHostOptions): Promise<{ id: AgentId; name: string } | null> {
-  const states: Partial<Record<AgentId, AiState>> = {};
-  await Promise.all(AI_ORDER.map(async id => {
-    const availability = await options.runtimeAvailability(id).catch(() => null);
-    if (availability?.usable) states[id] = 'ready';
-  }));
-  const chosen = cardAi({ chosen: undefined, sheetAi: sheetAi(), states, lastReady: undefined, canSignIn: {} });
-  return chosen.ready ? { id: chosen.ai, name: AI_NAMES[chosen.ai] } : null;
+function deckUntouched(text: string): boolean {
+  const slides = slidesOfText(text);
+  return slides.length <= 1 && slides.every(slide => slide.kind === 'title' && !slide.handout.trim());
 }
 
 type FreshMarks = ReturnType<typeof freshDeckMarks>;
@@ -162,32 +170,47 @@ function takenIn(folder: string, fileName: string): boolean {
 
 /** The handout's start card, for `DeckPages`: its state, its going, Draft and the copy of an earlier deck. */
 function startCardHost(pages: DeckPages, options: DecksHostOptions, fresh: FreshMarks): NonNullable<DeckPages['startCard']> {
+  /**
+   * The deck still has its card: New made it, its card hasn't gone, and the file is still as New made it (a mark left
+   * by a file deleted outside Ritemark never puts a card on another deck of the same name). A mark whose deck has
+   * moved on is dropped.
+   */
+  const isFresh = async (document: vscode.TextDocument): Promise<boolean> => {
+    const mark = markOf(document.uri.fsPath);
+    if (!fresh.has(mark)) return false;
+    if (deckUntouched(document.getText())) return true;
+    await fresh.remove(mark);
+    return false;
+  };
   return {
     state: async (document): Promise<StartCardState> => {
       const root = projectRoot();
       const deck = root ? projectRelative(root, document.uri.fsPath) : null;
-      if (!root || !deck || !fresh.has(markOf(document.uri.fsPath))) return { fresh: false, ai: null, earlier: [] };
+      if (!root || !deck || !(await isFresh(document))) return { fresh: false, ai: null, earlier: [] };
       const [ai, decks] = await Promise.all([draftingAi(options), workspaceDeckFiles(root).list()]);
       return { fresh: true, ai, earlier: earlierDecks(decks, path.basename(root), dayOf, deck) };
     },
     gone: document => fresh.remove(markOf(document.uri.fsPath)),
     draft: async (document, words, notice) => {
-      await sendDraft(words, {
+      // Only from a card that is still there (another view of the deck may have started it meanwhile)
+      if (!(await isFresh(document))) return true;
+      return sendDraft(words, {
         ai: () => draftingAi(options),
-        forget: () => fresh.remove(markOf(document.uri.fsPath)),
-        // The AI reads the deck from its file: a title just typed is in it.
+        // The AI reads the deck from its file, so what the document holds is saved first
         save: async () => { if (document.isDirty) await document.save(); },
         startChat: request => options.startChat({ ...request, runtimeId: request.runtimeId as AgentId }),
+        forget: () => fresh.remove(markOf(document.uri.fsPath)),
         notice,
       });
     },
     copy: async (document, source, notice) => {
       const root = projectRoot();
       const deck = root ? projectRelative(root, document.uri.fsPath) : null;
-      if (!root || !deck) return;
+      // Never over a deck that was started: the copy takes the whole file's place
+      if (!root || !deck || !(await isFresh(document))) return true;
       const files = workspaceDeckFiles(root);
       const folder = path.dirname(document.uri.fsPath);
-      await copyEarlierDeck(source, {
+      const result = await copyEarlierDeck(source, {
         deck,
         read: relative => files.read(relative),
         taken: fileName => takenIn(folder, fileName),
@@ -195,21 +218,26 @@ function startCardHost(pages: DeckPages, options: DecksHostOptions, fresh: Fresh
           const edit = new vscode.WorkspaceEdit();
           edit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), text);
           if (!(await vscode.workspace.applyEdit(edit))) return false;
+          // The deck is the copy now, saved or not: a save refused leaves it unsaved, as any change, and the rename
+          // carries it along
           await fresh.remove(markOf(document.uri.fsPath));
-          return document.save();
+          await document.save();
+          return true;
         },
-        // A workspace edit, so the deck's tab moves with its file (as the task board moves a card's page)
-        rename: async fileName => {
+        // A workspace edit, so the deck's tab moves with its file (as the task board moves a card's page). The renamed
+        // deck opens in a view of its own: its line waits for it, set before the rename so that view can't miss it.
+        rename: async (fileName, line) => {
+          const target = path.join(folder, fileName);
+          pages.noticeWhenShown(target, line);
           const edit = new vscode.WorkspaceEdit();
-          edit.renameFile(document.uri, vscode.Uri.file(path.join(folder, fileName)), { overwrite: false });
-          return vscode.workspace.applyEdit(edit);
+          edit.renameFile(document.uri, vscode.Uri.file(target), { overwrite: false });
+          const renamed = await vscode.workspace.applyEdit(edit).then(ok => ok, () => false);
+          if (!renamed) pages.dropNotice(target);
+          return renamed;
         },
-        notice: (text, fileName) => {
-          // A renamed deck opens in a view of its own: the line waits for it
-          if (fileName) pages.noticeWhenShown(path.join(folder, fileName), text);
-          else notice(text);
-        },
+        notice,
       });
+      return result !== null;
     },
   };
 }

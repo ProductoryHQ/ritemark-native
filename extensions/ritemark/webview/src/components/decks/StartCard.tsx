@@ -17,18 +17,21 @@ interface StartCardProps {
   aiName: string | null
   /** The project's earlier decks, newest first; empty hides the copy row. */
   earlier: EarlierDeck[]
+  /** Draft or a copy is on its way: the rows wait for the host's answer. */
+  busy: boolean
   onDraft: (words: string) => void
   onCopy: (deck: EarlierDeck) => void
   onHide: () => void
 }
 
-export const StartCard = forwardRef<HTMLDivElement, StartCardProps>(function StartCard({ style, aiName, earlier, onDraft, onCopy, onHide }, ref) {
+export const StartCard = forwardRef<HTMLDivElement, StartCardProps>(function StartCard({ style, aiName, earlier, busy, onDraft, onCopy, onHide }, ref) {
   const [words, setWords] = useState('')
   const [all, setAll] = useState(false)
   const [field, setField] = useState<HTMLInputElement | null>(null)
   const shown = all ? earlier : earlier.slice(0, START_CARD_SHOWN)
   // Draft with no words asks for them: the field takes the caret, and nothing is sent.
   const draft = () => {
+    if (busy) return
     if (words.trim()) onDraft(words.trim())
     else field?.focus()
   }
@@ -62,7 +65,7 @@ export const StartCard = forwardRef<HTMLDivElement, StartCardProps>(function Sta
               }}
             />
             <Tooltip label={`${aiName} writes the slides and the handout into this deck, from the library and the project's files`}>
-              <Button className="deck-start-draft" onClick={draft}>Draft</Button>
+              <Button className="deck-start-draft" disabled={busy} onClick={draft}>Draft</Button>
             </Tooltip>
           </div>
         </>
@@ -73,7 +76,7 @@ export const StartCard = forwardRef<HTMLDivElement, StartCardProps>(function Sta
           <div className="deck-start-earlier">
             {shown.map(deck => (
               <Tooltip key={deck.path} label={`This deck becomes a copy of ${deck.name}`}>
-                <Button variant="ghost" className="deck-start-deck" onClick={() => onCopy(deck)}>
+                <Button variant="ghost" className="deck-start-deck" disabled={busy} onClick={() => onCopy(deck)}>
                   <span className="deck-start-deck-name">{deck.name}</span>
                   <span className="deck-start-deck-where">{deck.folder} · {deck.date}</span>
                 </Button>

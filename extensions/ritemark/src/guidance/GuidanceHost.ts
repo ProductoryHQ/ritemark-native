@@ -788,7 +788,7 @@ async function sampleCardWaits(folderPath: string): Promise<boolean> {
 }
 
 /** The AI the sheet uses for new chats (R4). */
-function sheetAi(): AgentId | undefined {
+export function sheetAi(): AgentId | undefined {
   const value = vscode.workspace.getConfiguration('ritemark.ai').get<string>('selectedAgent');
   return value === 'claude-code' || value === 'codex' || value === 'opencode' ? value : undefined;
 }
