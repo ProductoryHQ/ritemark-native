@@ -280,9 +280,9 @@ export function appendPart(text: string, part: string): string {
   return `${trimmed}${trimmed ? '\n\n' : ''}${part}\n`;
 }
 
-/** A new topic deck's text, holding its first part. */
-export function newTopicText(theme: string, part: string): string {
-  return `---\ndeck: 1\ntheme: ${theme}\n---\n\n${part}\n`;
+/** A new topic deck's text, holding its first part: `deck: 2` when that part is a block slide (Sprint 161). */
+export function newTopicText(theme: string, part: string, blocks = false): string {
+  return `---\ndeck: ${blocks ? 2 : 1}\ntheme: ${theme}\n---\n\n${part}\n`;
 }
 
 /**

@@ -10,7 +10,7 @@
 import type { SlideData, SlideItem } from '../deckFormat';
 import { publicSlide } from '../page/publicDeck';
 import { slidePicturePaths } from '../blocks/slideRenderer';
-import type { PartComment } from './partComments';
+import { partComments, type PartComment } from './partComments';
 import type { DeckTheme } from '../deckTheme';
 import { presentTitleOf, type PresentSlide, type PresentView } from './presentSession';
 
@@ -161,7 +161,8 @@ export function wallSlideOf(slide: PresentSlide): WallSlide {
 /** The pictures the wall's state names: the current slide's and the shown slides'. */
 export function wallPicturePaths(view: PresentView): string[] {
   const paths = new Set<string>();
-  for (const slide of [view.current, ...view.shown]) for (const picture of slidePicturePaths(slide.data)) paths.add(picture);
+  // Only what the room may see (`publicSlide`): a picture a layout doesn't draw is never asked for.
+  for (const slide of [view.current, ...view.shown]) for (const picture of slidePicturePaths(publicSlide(slide.kind, slide.data).data)) paths.add(picture);
   return [...paths].sort();
 }
 
@@ -189,7 +190,7 @@ export function wallStateOf(
 /** The pictures the presenter view names: the wall's, the next slide's, and the one on the slide the wall last got. */
 export function presenterPicturePaths(view: PresentView, onWall?: WallSlide): string[] {
   const paths = new Set(wallPicturePaths(view));
-  for (const picture of view.next ? slidePicturePaths(view.next.data) : []) paths.add(picture);
+  for (const picture of view.next ? slidePicturePaths(publicSlide(view.next.kind, view.next.data).data) : []) paths.add(picture);
   for (const picture of onWall ? slidePicturePaths(onWall.data) : []) paths.add(picture);
   return [...paths].sort();
 }
@@ -211,7 +212,7 @@ export function presenterStateOf(
     current: onWall ? { ...onWall, number: view.current.index + 1 } : wallSlideOf(view.current),
     next: view.next ? wallSlideOf(view.next) : null,
     notes: view.current.notes ?? '',
-    comments: view.current.comments.map(comment => ({ ...comment })),
+    comments: partComments(view.current.handout, view.current.converted),
     position: view.position,
     count: view.count,
     skipped: view.current.skip,

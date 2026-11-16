@@ -15,7 +15,8 @@ import { strict as assert } from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { BUILT_IN_THEME } from '../deckTheme';
-import { isBlockSlide, parseDeck, slideDataOf, splitBlockSlide, writeSlideData, isReadableDeckVersion, blockTitleOf } from '../deckFormat';
+import { isBlockSlide, parseDeck, slideDataOf, splitBlockSlide, writeSlideData, isReadableDeckVersion, blockTitleOf, withWrittenHandout } from '../deckFormat';
+import { DeckLibrary } from '../DeckLibrary';
 import { conversionComment, legacyToBlocks, withoutItemNumber } from './legacyToBlocks';
 import { blockPicturePaths, blockSlideHtml, blockSlideMarkup, isCoverSlide, stepsTagOf } from './slideRenderer';
 import { parseFenceAttributes, scanFencedDiv } from './fencedDiv';
@@ -385,4 +386,52 @@ test('S-1: a tag after <kbd>, <code>, <pre> or <script> is text on the slide and
   assert.ok(!/<meta\/http-equiv|<a\/href/i.test(page), 'no live tag on the page');
 });
 
+// ---------------------------------------------------------------------------
+// Review round 2 (code-review high on #760)
+// ---------------------------------------------------------------------------
+
+test('R2-1: a block slide\'s part gets its heading when an unmarked deck is written as a Text handout', () => {
+  const out = withWrittenHandout('```slide\n# Copilot or Cursor?\n```\n\nText.\n');
+  assert.ok(out.includes('```\n\n## Copilot or Cursor?\n\nText.'), out);
+});
+
+test('R2-4: a picture a v1 layout doesn\'t draw is never asked for by the wall', () => {
+  const session = new PresentSession('```slide points\ntitle: T\nimage: private/secret.png\n```\n', { from: 'start' });
+  assert.deepEqual(wallPicturePaths(session.view()), []);
+});
+
+test('R2-5: a line of dashes in converted words stays words', () => {
+  const html = blockSlideHtml(legacyToBlocks('title', 'title: T\nsubtitle: "Pros\\n--\\nCons\\n---"').markdown);
+  assert.ok(!/<h2|<hr/.test(html), html);
+  assert.ok(html.includes('Pros<br>--<br>Cons<br>---'), html);
+});
+
+test('R2-6: a pill with a quote keeps its words', () => {
+  const markdown = legacyToBlocks('exercise', 'title: T\ntag: \'Say "hi"\'\nitems:\n- heading: One').markdown;
+  assert.ok(blockSlideHtml(markdown).includes('<span class="blk-pill">Say &quot;hi&quot;</span>'), markdown);
+});
+
+test('R2-7: a setext H2 names a slide that has no H1', () => {
+  assert.equal(blockTitleOf(':::: columns\n::: column\nCopilot\n---\nText\n:::\n::::'), 'Copilot');
+});
+
 console.log(`blocks: ${passed} passed`);
+
+// The library refuses to put a block slide into an older deck (async, so after the synchronous tests).
+void (async () => {
+  const files: Record<string, string> = {
+    'Blocks.deck.md': '---\ndeck: 2\n---\n\n```slide\n---\nid: b1\n---\n# Block\n```\n',
+    'Old.deck.md': '---\ndeck: 1\n---\n\n```slide title\nid: t1\ntitle: Old\n```\n',
+    'New.deck.md': '---\ndeck: 2\n---\n\n```slide title\nid: t2\ntitle: New\n```\n',
+  };
+  const library = new DeckLibrary({
+    async list() { return Object.keys(files).map((path, index) => ({ path, modified: index })); },
+    async read(path) { return files[path] ?? null; },
+    async write(path, text) { files[path] = text; },
+  });
+  await assert.rejects(library.insertCopies('Blocks.deck.md', ['b1'], 'Old.deck.md', undefined), /older deck format/);
+  assert.equal(files['Old.deck.md'], '---\ndeck: 1\n---\n\n```slide title\nid: t1\ntitle: Old\n```\n', 'nothing written');
+  await library.insertCopies('Blocks.deck.md', ['b1'], 'New.deck.md', undefined);
+  assert.ok(files['New.deck.md'].includes('# Block'));
+  console.log('blocks (library): a block slide goes only into a deck: 2 deck');
+})().catch(error => { console.error(error); process.exit(1); });

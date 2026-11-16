@@ -15,8 +15,7 @@
  * No `vscode` and no DOM: the host gives it the open document's text.
  */
 import { isBlockSlide, parseDeck, readScalar, slideDataOf, type SlideData } from '../deckFormat';
-import { conversionComment, legacyDataToBlocks } from '../blocks/legacyToBlocks';
-import { partComments, type PartComment } from './partComments';
+import { conversionComment, hiddenWords } from '../blocks/legacyToBlocks';
 
 /** One slide of the deck, as presenting reads it. */
 export interface PresentSlide {
@@ -29,10 +28,11 @@ export interface PresentSlide {
   /** The speaker notes, or null. Only the presenter view gets them; the wall never does (presentProtocol.ts). */
   notes: string | null;
   /**
-   * Sprint 161: the comments of the slide's handout part, in order: what "Your comments" shows. An older slide's notes
-   * and the words its layout keeps hidden come last, as the one comment its deck's conversion will write there.
+   * Sprint 161: the slide's handout part as written, whose comments "Your comments" shows (read for the current slide
+   * only, `presenterStateOf`), and the comment an older slide's notes and hidden words make, which comes last.
    */
-  comments: PartComment[];
+  handout: string;
+  converted: string | null;
   skip: boolean;
 }
 
@@ -73,9 +73,9 @@ export function presentSlidesOf(text: string): PresentSlide[] {
     seen.set(base, twins + 1);
     // An older slide's notes and hidden words, as the comment its conversion writes; a block slide's notes block (the
     // Speaker notes fold is still under the stage in this build) the same way, so no note goes missing while presenting.
-    const converted = isBlockSlide(block.kind) ? conversionComment(block.notes, []) : legacyDataToBlocks(block.kind, data, block.notes).comment;
-    const comments = partComments(text.slice(block.handoutStart, block.handoutEnd), converted);
-    return { index, key: twins ? `${base}#${twins}` : base, kind: block.kind, data, notes: block.notes, comments, skip: data.skip === true };
+    const converted = conversionComment(block.notes, isBlockSlide(block.kind) ? [] : hiddenWords(block.kind, data));
+    const handout = text.slice(block.handoutStart, block.handoutEnd);
+    return { index, key: twins ? `${base}#${twins}` : base, kind: block.kind, data, notes: block.notes, handout, converted, skip: data.skip === true };
   });
 }
 

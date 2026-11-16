@@ -785,8 +785,9 @@ export function blockTitleOf(markdown: string): string {
     if (atx) {
       level = atx[1].length;
       words = atx[2] ?? '';
-    } else if (index > 0 && /^ {0,3}=+[ \t]*$/.test(line) && lines[index - 1].trim() && !/^ {0,3}(?:[-*+>]|\d{1,9}[.)]|:::|\|)/.test(lines[index - 1])) {
-      level = 1;
+    } else if (index > 0 && /^ {0,3}(=+|-+)[ \t]*$/.test(line) && lines[index - 1].trim() && !/^ {0,3}(?:[-*+>#]|\d{1,9}[.)]|:::|\||`{3}|~{3})/.test(lines[index - 1]) && !/^ {0,3}(?:-{2,}|={2,})[ \t]*$/.test(lines[index - 1])) {
+      // A setext heading: `=` under a line is an H1, `-` an H2 (as the renderer draws them).
+      level = line.trim().startsWith('=') ? 1 : 2;
       words = lines[index - 1];
     }
     if (!level) continue;
@@ -945,7 +946,7 @@ export function withWrittenHandout(text: string): string {
   let out = text;
   for (const slide of [...deck.slides].reverse()) {
     if (partHeadingOf(text.slice(slide.handoutStart, slide.handoutEnd))) continue;
-    const heading = withPartHeading(slide.kind, parseSlideBody(slide.body), '');
+    const heading = withPartHeading(slide.kind, slideDataOf(slide.kind, slide.body), '');
     if (heading) out = `${out.slice(0, slide.end)}\n\n${heading}${out.slice(slide.end)}`;
   }
   return withTextHandoutMark(out);

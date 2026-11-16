@@ -496,7 +496,7 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
           const lines = decks.map(deck => {
             const head = `${deck.path} · ${deck.topic ? 'library topic' : 'deck'} · ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'}${args.query ? ' matching' : ''}${deck.theme ? ` · theme ${deck.theme}` : ''} · changed ${new Date(deck.modified).toISOString().slice(0, 10)}`;
             if (!args.query) return head;
-            return [head, ...deck.slides.map(slide => `  slide ${slide.index + 1} (id ${slide.id ?? 'none'}, ${slide.kind}): ${slide.data.title ?? ''}`)].join('\n');
+            return [head, ...deck.slides.map(slide => `  slide ${slide.index + 1} (id ${slide.id ?? 'none'}, ${slide.kind || 'block slide'}): ${slide.data.title ?? ''}`)].join('\n');
           });
           return { text: lines.join('\n') };
         },

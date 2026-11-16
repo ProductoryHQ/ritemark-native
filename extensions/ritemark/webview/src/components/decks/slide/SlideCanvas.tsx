@@ -299,8 +299,10 @@ function overflows(canvas: HTMLElement): boolean {
 const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, borderless, assets }: Omit<SlideCanvasProps, 'kind' | 'editing'>) {
   const slideRef = useRef<HTMLDivElement>(null)
   const markdown = data.markdown ?? ''
-  const [fit, setFit] = useState<{ markdown: string; image?: string; picture?: string; step: number; fonts: number }>({ markdown, image: data.image, picture: data.picture, step: 0, fonts: 0 })
-  const same = fit.markdown === markdown && fit.image === data.image && fit.picture === data.picture
+  // The fit belongs to these words in this look: a theme or Card | Borderless change measures again from the top.
+  const look = `${borderless}\u0000${JSON.stringify(theme)}`
+  const [fit, setFit] = useState<{ markdown: string; image?: string; picture?: string; look: string; step: number; fonts: number }>({ markdown, image: data.image, picture: data.picture, look, step: 0, fonts: 0 })
+  const same = fit.markdown === markdown && fit.image === data.image && fit.picture === data.picture && fit.look === look
   const step = same ? fit.step : 0
   const [fonts, setFonts] = useState(0)
   // A slide measured before Sofia Sans loads can end a step too small (spike §5): measure again from the top.
@@ -314,9 +316,9 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
   useLayoutEffect(() => {
     const flow = slideRef.current?.querySelector<HTMLElement>('.blk-flow')
     if (!flow) return
-    if (same && fit.fonts !== fonts) { setFit({ markdown, image: data.image, picture: data.picture, step: 0, fonts }); return }
-    if (step < BLOCK_MAX_STEP && flow.scrollHeight > flow.clientHeight + 2) setFit({ markdown, image: data.image, picture: data.picture, step: step + 1, fonts })
-    else if (!same) setFit({ markdown, image: data.image, picture: data.picture, step, fonts })
+    if (same && fit.fonts !== fonts) { setFit({ markdown, image: data.image, picture: data.picture, look, step: 0, fonts }); return }
+    if (step < BLOCK_MAX_STEP && flow.scrollHeight > flow.clientHeight + 2) setFit({ markdown, image: data.image, picture: data.picture, look, step: step + 1, fonts })
+    else if (!same) setFit({ markdown, image: data.image, picture: data.picture, look, step, fonts })
   })
   const html = useMemo(
     () => blockCanvasMarkup(data, { step, width, pictureUrl: path => assets[path] ?? null }),

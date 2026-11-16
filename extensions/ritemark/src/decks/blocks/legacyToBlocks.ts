@@ -38,6 +38,8 @@ const INLINE = /[\\`*_[\]<>&$~|]/g;
 
 /** A line's start that would open a block: a heading, a quote, a list item, a fence, a rule, a table, a div. */
 function escapeLineStart(line: string): string {
+  // A line of dashes alone (`--`, `- - -`) would make the line above a heading, or be a rule.
+  if (/^\s*-(?:\s*-)+\s*$/.test(line)) return line.replace('-', '\\-');
   return line
     .replace(/^(\s*)(#{1,6}(?=\s|$)|>|[-+](?=\s|$)|=+\s*$)/, (_all, space: string, mark: string) => `${space}\\${mark}`)
     .replace(/^(\s*)(\d{1,9})([.)])(?=\s|$)/, '$1$2\\$3')
@@ -73,9 +75,15 @@ function pictureTarget(path: string): string {
   return /[\s()<>]/.test(value) ? `<${value.replace(/[<>]/g, encodeURIComponent)}>` : value;
 }
 
-/** An attribute value in a div's `{…}`: quoted, its quotes and backslashes made safe. */
+/**
+ * An attribute value in a div's `{…}`, which has no escapes: in double quotes, or in single quotes when it holds a
+ * double quote; a value with both keeps its words with a typographic quote. A line break is a space.
+ */
 function attributeValue(value: string): string {
-  return `"${value.replace(/["\\\n\r]/g, ' ')}"`;
+  const words = value.replace(/[\r\n]+/g, ' ');
+  if (!words.includes('"')) return `"${words}"`;
+  if (!words.includes("'")) return `'${words}'`;
+  return `"${words.replace(/"/g, '\u201d')}"`;
 }
 
 const has = (value: string | undefined): value is string => typeof value === 'string' && value.trim() !== '';

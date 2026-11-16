@@ -7,7 +7,7 @@
  * from any other deck, is a copy carrying `from: <path>#<id> @<stamp>`. The UI and the AI's tools call the same
  * operations here (README decision 9, dual use).
  */
-import { deckVersionOf, exerciseTagOf, isReadableDeckVersion, newId, parseFrom, slideDataOf, withPartHeading, withWrittenHandout, writeFrom, writeSlideData, type SlideData } from './deckFormat';
+import { deckVersionOf, exerciseTagOf, isBlockSlide, isReadableDeckVersion, newId, parseFrom, slideDataOf, withPartHeading, withWrittenHandout, writeFrom, writeSlideData, type SlideData } from './deckFormat';
 import {
   appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp, slideStamps,
   slidesOfText, type DeckSlideText,
@@ -115,6 +115,19 @@ function writableDeckText(path: string, text: string): string {
   return text;
 }
 
+/**
+ * Sprint 161: a block slide goes only into a deck that says `deck: 2`. An older Ritemark opens such a deck as a
+ * document; in a `deck: 1` deck it would take the slide for an unknown kind and could write YAML lines into its
+ * Markdown. Converting a deck is the first real edit's (PR 2), never a library write's.
+ */
+function takesBlockSlides(path: string, text: string, kinds: string[]): void {
+  if (!kinds.some(isBlockSlide)) return;
+  const version = Number(deckVersionOf(text) ?? '1');
+  if (!(Number.isFinite(version) && version >= 2)) {
+    throw new Error(`${deckName(path)} is written in the older deck format, so a block slide can't go into it yet.`);
+  }
+}
+
 export class DeckLibrary {
   constructor(private readonly files: DeckFiles) {}
 
@@ -202,6 +215,7 @@ export class DeckLibrary {
     const slides = slidesOfText(text);
     const taken = slides.map(slide => slide.data.id).filter((id): id is string => !!id);
     const parts = await this.copies(sourcePath, ids, targetPath, taken);
+    takesBlockSlides(targetPath, text, parts.map(part => part.kind));
     const at = Math.max(0, Math.min(slides.length, after ?? slides.length));
     if (intoView) {
       // An open deck takes them only through its view: its file is never written under the person's typing.
@@ -255,6 +269,7 @@ export class DeckLibrary {
     const previous = await this.files.read(source.path);
     if (previous === null) throw new Error(`${deckName(source.path)} is no longer there.`);
     writableDeckText(source.path, previous);
+    takesBlockSlides(source.path, previous, [copy.kind]);
     const { body, handout } = this.asSourcePart(copy, source.id, deckPath, source.path);
     const written = replaceSlidePart(previous, source.id, partText(copy.kind, body, handout));
     if (written === null) throw new Error(`${deckName(source.path)} no longer has that slide.`);
@@ -271,6 +286,7 @@ export class DeckLibrary {
     const slides = await this.readDeck(source.path);
     const slide = slides?.find(entry => entry.data.id === source.id);
     if (!slide) throw new Error(`${deckName(source.path)} no longer has that slide.`);
+    if (isBlockSlide(slide.kind)) takesBlockSlides(deckPath, (await this.files.read(deckPath)) ?? '', [slide.kind]);
     const stamp = slideStamp(slide.kind, slide.data, slide.handout, folderOf(source.path));
     const next: SlideData = { ...slide.data, id: data.id, from: writeFrom({ path: source.path, id: source.id, stamp }), kept: undefined, skip: data.skip };
     const rebased = rebaseSlide(writeSlideData(slide.kind, slide.body, next), slide.handout, folderOf(source.path), folderOf(deckPath), slide.kind);
@@ -285,7 +301,10 @@ export class DeckLibrary {
     const path = isTopicPath(topic) ? topic : `${LIBRARY_FOLDER}/${topic.replace(/[\\/:*?"<>|]+/g, ' ').trim()}.deck.md`;
     if (!isTopicPath(path)) throw new Error('A topic needs a name.');
     const previous = await this.files.read(path);
-    if (previous !== null) writableDeckText(path, previous);
+    if (previous !== null) {
+      writableDeckText(path, previous);
+      takesBlockSlides(path, previous, [copy.kind]);
+    }
     const taken = previous ? slidesOfText(previous).map(slide => slide.data.id).filter((id): id is string => !!id) : [];
     const id = newId(taken);
     const { body, handout } = this.asSourcePart(copy, id, deckPath, path);
@@ -297,7 +316,7 @@ export class DeckLibrary {
         // Made meanwhile: it is there, which is all that is needed.
       }
     }
-    const written = previous === null ? newTopicText(BUILT_IN_THEME_PATH, part) : appendPart(previous, part);
+    const written = previous === null ? newTopicText(BUILT_IN_THEME_PATH, part, isBlockSlide(copy.kind)) : appendPart(previous, part);
     await this.files.write(path, written, { create: previous === null });
     const stamp = slideStamp(copy.kind, slideDataOf(copy.kind, body), handout, folderOf(path));
     return { from: writeFrom({ path, id, stamp }), path, previous, written };
