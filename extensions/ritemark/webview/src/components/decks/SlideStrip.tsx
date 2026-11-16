@@ -5,7 +5,7 @@
  *  - Pointing between two thumbnails shows a +; it opens the prototype's small menu: New slide (Boxes or Points) and
  *    New exercise (the Experience lead's answer 5). "New slide" under the last one does the same at the end.
  *  - Each thumbnail's menu (its ⋯, or a right-click): Duplicate, Skip slide or Show slide, Delete slide. Delete asks
- *    nothing and has Undo (answer 6).
+ *    nothing and has Undo (answer 6). Backspace or Delete does the same to the selected slide (`stripKeys.ts`).
  *  - Dragging a thumbnail reorders, one transaction per move, with a line where it lands.
  *  - A skipped slide is dimmed with an eye; a library copy with a newer version has an amber dot (PR 4).
  */
@@ -16,10 +16,14 @@ import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, MoreActionsTrigger } from '../ui/dropdown-menu'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
+import { isMac } from '../../hooks/usePlatform'
 import type { DeckSlideEntry } from './deckDocument'
 import { SlideCanvas } from './slide/SlideCanvas'
+import { keyOrigin, stripKeyOf } from './stripKeys'
 
 const THUMB_WIDTH = 96
+/** The key beside the menu's Delete slide, so people can find it. */
+const DELETE_KEY = isMac ? '⌫' : 'Del'
 /** How far a pointer moves before a press becomes a drag. */
 const DRAG_THRESHOLD = 4
 
@@ -116,13 +120,15 @@ interface ThumbnailProps {
   /** The menu, open or closed; the strip opens it from the keyboard too. */
   menuOpen: boolean
   onMenuOpen: (index: number | null) => void
+  /** Where the focus goes when the menu closes: the strip, so its keys work at once (Backspace, the arrows). */
+  onMenuCloseFocus: (event: Event) => void
   /** A copy of a library slide; the amber dot when the library has a newer version (README frame 4). */
   fromLibrary: boolean
   newer: boolean
 }
 
 /** One numbered thumbnail, with its menu. */
-const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart, menuOpen, onMenuOpen, fromLibrary, newer }: ThumbnailProps) {
+const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, fromLibrary, newer }: ThumbnailProps) {
   const { index, kind, data } = entry
   const skipped = data.skip === true
   return (
@@ -152,7 +158,7 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
       <div className="deck-thumb-more" onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
         <DropdownMenu modal={false} open={menuOpen} onOpenChange={open => onMenuOpen(open ? entry.index : null)}>
           <MoreActionsTrigger label={`Slide ${index + 1}: more actions`} className="deck-thumb-more-button" />
-          <DropdownMenuContent align="start" side="right">
+          <DropdownMenuContent align="start" side="right" onCloseAutoFocus={onMenuCloseFocus}>
             <DropdownMenuItem onSelect={() => actions.duplicate(index)}>
               <Icon name="copy" size={14} tone="inherit" />
               Duplicate
@@ -175,7 +181,8 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
             <DropdownMenuSeparator />
             <DropdownMenuItem tone="danger" disabled={count < 2} onSelect={() => actions.remove(index)}>
               <Icon name="trash" size={14} tone="inherit" />
-              Delete slide
+              <span className="flex-1">Delete slide</span>
+              <span className="deck-menu-key">{DELETE_KEY}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -320,16 +327,21 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
     },
   }), [actions])
 
-  const onKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (count === 0 || event.target !== event.currentTarget) return
-    if (event.key === 'Home') { event.preventDefault(); actions.pick(0); return }
-    if (event.key === 'End') { event.preventDefault(); actions.pick(count - 1); return }
-    // The current slide's menu, as a right-click opens it: Shift+F10 or the menu key.
-    if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) { event.preventDefault(); setMenuFor(current); return }
-    const step = event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 0
-    if (step === 0) return
+  // A thumbnail's ⋯ shows only on hover, so the focus Radix hands back to it on close fell to the page, and no strip key
+  // arrived (Jarmo, 16 November: a selected slide couldn't be deleted with the keyboard). The strip takes it instead.
+  const onMenuCloseFocus = useCallback((event: Event) => {
     event.preventDefault()
-    actions.pick(Math.max(0, Math.min(count - 1, current + step)))
+    stripRef.current?.focus({ preventScroll: true })
+  }, [stripRef])
+
+  const onKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const origin = keyOrigin(event.target as HTMLElement, event.currentTarget)
+    const key = stripKeyOf(event, origin, count, current)
+    if (!key) return
+    event.preventDefault()
+    if (key.type === 'pick') actions.pick(key.index)
+    else if (key.type === 'menu') setMenuFor(current)
+    else actions.remove(key.index)
   }
 
   const dropAt = drag && drag.to !== null && drag.to !== drag.from && drag.to !== drag.from + 1 ? drag.to : null
@@ -358,6 +370,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
             onDragStart={onDragStart}
             menuOpen={menuFor === entry.index}
             onMenuOpen={setMenuFor}
+            onMenuCloseFocus={onMenuCloseFocus}
             fromLibrary={!!(entry.data.id && marks[entry.data.id]?.library)}
             newer={!!(entry.data.id && marks[entry.data.id]?.newer)}
           />
