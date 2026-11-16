@@ -43,6 +43,15 @@ assert.equal(
   'assigned standalone round-trips',
 )
 assert.match(roundTrip('<!--\nfirst line\nsecond line\n-->'), /first line\nsecond line/, 'multi-line keeps its line breaks')
+// #685: `@chatgpt` derives the alias `codex` on disk (the host, the protocol and
+// task records only know `codex`), and the body keeps the spelling as written.
+assert.ok(mdToHtml('<!-- @chatgpt: fix -->').includes('data-agent="codex"'), '@chatgpt derives data-agent="codex"')
+assert.ok(!mdToHtml('<!-- @chatgpt: fix -->').includes('data-agent="chatgpt"'), 'the written spelling never becomes the alias')
+assert.equal(
+  norm(roundTrip('<!-- @chatgpt: double-check these figures -->')),
+  norm('<!-- @chatgpt: double-check these figures -->'),
+  'a standalone @chatgpt note round-trips as written',
+)
 
 // ---- stable id carrier for standalone notes (Sprint 117 D3) ----
 {
@@ -105,6 +114,11 @@ assert.equal(
   norm('The <mark data-comment="verify with finance">margins</mark> line.'),
   'anchored mark round-trips',
 )
+{
+  // #685: an anchored @chatgpt comment keeps its body and the alias `codex`.
+  const md = 'The <mark data-comment="@chatgpt check the figures" data-agent="codex">margins</mark> line.'
+  assert.equal(norm(roundTrip(md)), norm(md), 'an anchored @chatgpt mark round-trips with data-agent="codex"')
+}
 assert.equal(
   norm(roundTrip('a <mark data-comment="">b</mark> c')),
   norm('a b c'),
