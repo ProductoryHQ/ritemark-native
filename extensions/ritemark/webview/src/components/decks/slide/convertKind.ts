@@ -7,23 +7,28 @@
  *    line), or its subtitle, or one empty item.
  *  - A table, from a slide that has no rows: a heading row and a row per item.
  *  - A section gets the number 1 when it has none.
+ *  - Items made here for a layout that draws its own numbers or dots leave out a list marker their words had ("1. "),
+ *    so the new items come out clean (Jarmo, 16 November: no number twice).
  *
  * When a layout can't show all the words, a quiet line under the slide says so.
  */
 import type { SlideData } from '../../../../../src/decks/deckFormat'
+import { drawsItemMarker, withoutListMarker } from './layoutSlide'
 
 const DRAWS_ITEMS = new Set(['points', 'boxes', 'columns', 'exercise'])
 
 export function convertKind(data: SlideData, to: string): SlideData {
   let next: SlideData = { ...data }
   if (DRAWS_ITEMS.has(to) && !(next.items && next.items.length)) {
+    const clean = (words: string) => drawsItemMarker(to, next.look || 'boxes') ? withoutListMarker(words) : words
     if (next.rows && next.rows.length > 1) {
       next.items = next.rows.slice(1).map(row => {
         const text = row.slice(1).filter(Boolean).join(' · ')
-        return text ? { heading: row[0] ?? '', text } : { heading: row[0] ?? '' }
+        const heading = clean(row[0] ?? '')
+        return text ? { heading, text } : { heading }
       })
     } else if (next.subtitle) {
-      next.items = [{ heading: next.subtitle }]
+      next.items = [{ heading: clean(next.subtitle) }]
     } else {
       next.items = [{ heading: '' }]
     }

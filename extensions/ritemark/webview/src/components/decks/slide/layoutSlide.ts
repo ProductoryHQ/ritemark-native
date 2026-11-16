@@ -31,6 +31,8 @@ export interface TextBox {
   style?: BoxStyle
   /** Line breaks are part of the words (a column's lines). */
   multiline?: boolean
+  /** An item heading the layout draws its own number or dot for: a list marker pasted in front of it is dropped. */
+  marked?: boolean
 }
 
 /** A mark drawn by the layout: the accent bar, a number, a dot, an icon. */
@@ -111,6 +113,27 @@ function pickTier<T>(tiers: T[], fits: (tier: T) => boolean, step: number): T {
   return tiers[Math.min(tiers.length - 1, index + step)]
 }
 
+/**
+ * A list marker at the start of an item's words: `1.`, `1)`, or a bullet (`-`, `*`, `+`, `•`), followed by a space and
+ * then words. A number that is part of the words (`2026 plan`, `3 hours`, `1.5 litres`) is no marker.
+ */
+const LIST_MARKER = /^[ \t]*(?:\d{1,9}[.)]|[-*+\u2022])[ \t]+(?=\S)/
+
+/**
+ * The words without a leading list marker (Jarmo, 16 November: "1. 1. Sisend" on a Points slide). A layout that draws
+ * its own number or dot for each item shows the words this way, so an item written "1. Sisend" shows its number once;
+ * the file keeps the words as they were written, and opening a deck writes nothing.
+ */
+export function withoutListMarker(text: string): string {
+  return text.replace(LIST_MARKER, '')
+}
+
+/** Does this layout draw its own number or dot before each item's heading? */
+export function drawsItemMarker(kind: string, look?: string): boolean {
+  if (kind === 'points' || kind === 'exercise') return true
+  return kind === 'boxes' && (look === 'steps' || look === 'line')
+}
+
 const KNOWN = new Set(['title', 'section', 'points', 'boxes', 'columns', 'statement', 'exercise', 'picture', 'table'])
 /** The kinds whose words are a list of items. */
 const ITEM_KINDS = new Set(['points', 'boxes', 'columns', 'exercise'])
@@ -158,8 +181,13 @@ export function layoutSlide(kind: string, data: SlideData, options: { editing?: 
     boxes.push(text('title', 'st', 'title', title, 'Title', { left: cx, width: cw, top, fontSize: z, lineHeight: `${z + 8}px` }))
     return top + lines * (z + 8)
   }
-  const itemHeading = (index: number, cls: string, placeholder: string, style?: BoxStyle) =>
-    text(`items.${index}.heading`, cls, `items.${index}.heading`, items[index]?.heading ?? '', placeholder, style)
+  // A layout that draws its own number or dot leaves out the marker an item was written with (never two numbers).
+  const marked = drawsItemMarker(kind, data.look || 'boxes')
+  const itemHeading = (index: number, cls: string, placeholder: string, style?: BoxStyle): TextBox => {
+    const words = items[index]?.heading ?? ''
+    const box = text(`items.${index}.heading`, cls, `items.${index}.heading`, marked ? withoutListMarker(words) : words, placeholder, style)
+    return marked ? { ...box, marked } : box
+  }
   const itemText = (index: number, cls: string, placeholder: string, style?: BoxStyle, multiline?: boolean) =>
     text(`items.${index}.text`, cls, `items.${index}.text`, items[index]?.text ?? '', placeholder, style, multiline)
   const icon = (index: number, style?: BoxStyle, small?: boolean): MarkBox | null => {

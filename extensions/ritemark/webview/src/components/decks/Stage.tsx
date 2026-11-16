@@ -113,7 +113,9 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
       // The box keeps the caret, so it shows what the undo put back itself.
       const element = event.currentTarget
       const fresh = slidesOf(editor.state.doc)[slide.index]
-      element.textContent = fresh ? valueAt(fresh.data, path) : ''
+      // As the layout draws it: an item it numbers itself shows its words without their marker.
+      const shown = fresh ? textBoxes(layoutSlide(fresh.kind, fresh.data, { editing: true })).find(box => box.path === path) : undefined
+      element.textContent = fresh ? shown?.text ?? valueAt(fresh.data, path) : ''
       const range = document.createRange()
       range.selectNodeContents(element)
       range.collapse(false)

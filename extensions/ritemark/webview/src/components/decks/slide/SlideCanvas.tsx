@@ -18,7 +18,7 @@ import { Tooltip } from '../../ui/tooltip'
 import { themeStyle } from '../theme/themeVars'
 import { SLIDE_ICONS, slideIcon } from './iconSet'
 import { oneLine } from './slideEdits'
-import { BOTTOM, CANVAS_HEIGHT, CANVAS_WIDTH, MAX_STEP, layoutSlide, type BoxStyle, type MarkBox, type SlideBox, type TextBox } from './layoutSlide'
+import { BOTTOM, CANVAS_HEIGHT, CANVAS_WIDTH, MAX_STEP, layoutSlide, withoutListMarker, type BoxStyle, type MarkBox, type SlideBox, type TextBox } from './layoutSlide'
 // The slide's rules, shared with the published handout page (Sprint 159): every view that draws a slide gets them.
 import './slide.css'
 
@@ -66,6 +66,26 @@ export function editedText(element: HTMLElement): string {
 }
 
 /** An emptied editing host without its stray children, so it reads as `:empty`; the caret stays in it when it had it. */
+/** The box's words set to `clean`, the first `removed` characters gone, with the caret where it was in the rest. */
+function dropLeading(element: HTMLElement, clean: string, removed: number) {
+  const selection = element.ownerDocument.getSelection()
+  let caret = clean.length
+  if (selection && selection.rangeCount && element.contains(selection.focusNode)) {
+    const before = element.ownerDocument.createRange()
+    before.setStart(element, 0)
+    before.setEnd(selection.focusNode as Node, selection.focusOffset)
+    caret = Math.max(0, Math.min(clean.length, before.toString().length - removed))
+  }
+  element.textContent = clean
+  if (!selection || element.ownerDocument.activeElement !== element) return
+  const range = element.ownerDocument.createRange()
+  if (element.firstChild) range.setStart(element.firstChild, caret)
+  else range.setStart(element, 0)
+  range.collapse(true)
+  selection.removeAllRanges()
+  selection.addRange(range)
+}
+
 function clearKeepingCaret(element: HTMLElement) {
   const focused = element.ownerDocument.activeElement === element
   element.replaceChildren()
@@ -118,7 +138,14 @@ function SlideText({ box, editing, tag = 'div' }: { box: TextBox; editing?: Slid
       data-path={box.path}
       onInput={event => {
         // A line typed with Enter may arrive as a <br> or a <div>: `innerText` reads each as a line break.
-        const raw = box.multiline ? editedText(event.currentTarget) : event.currentTarget.textContent ?? ''
+        let raw = box.multiline ? editedText(event.currentTarget) : event.currentTarget.textContent ?? ''
+        // Words pasted into an item the layout numbers or dots itself ("1. Sisend" from a list) leave their marker
+        // behind, so the item is written clean and never shows its number twice (Jarmo, 16 November).
+        if (box.marked && (event.nativeEvent as InputEvent).inputType === 'insertFromPaste') {
+          const clean = withoutListMarker(raw)
+          if (clean !== raw) dropLeading(event.currentTarget, clean, raw.length - clean.length)
+          raw = clean
+        }
         // Emptied, Chromium leaves a <br> behind, so the box doesn't read as :empty and its placeholder (an empty
         // pill's faint default) never shows: the box is cleared, with the caret kept in it.
         // Never mid-composition (an IME's or a dead key's marked text): the browser holds that text and would lose it.
