@@ -45,7 +45,8 @@ import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
 import { CURRENT_SLIDE_SETTLE_MS, currentSlideMessage } from './currentSlideMessage'
 import { DeckGuard } from './handout/deckGuard'
-import { DeckConvert, conversionStateOf, needsConversion, pictureIntoSlide } from './handout/deckConvert'
+import { DeckConvert, commentNodeAt, conversionNoticeFor, conversionStateOf, needsConversion, pictureIntoSlide } from './handout/deckConvert'
+import { commentBoxStorage } from '../../extensions/comment/CommentNode'
 import { blockDataOf, drawsAsBlocks, saysBlockDeck, withStepsTag } from '../../../../src/decks/blocks/convertDeck'
 import { blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
 import { hiddenWords } from '../../../../src/decks/blocks/legacyToBlocks'
@@ -313,25 +314,6 @@ export function DeckView({
     else onChange(markdown, properties => changes.reduce((current, change) => change(current), properties))
   }, [onChange])
 
-  // The conversion's line in the bar (PR 2): what became of the deck, in plain words.
-  useEffect(() => {
-    if (!editor) return
-    let seen = conversionStateOf(editor.state).count
-    const onTransaction = () => {
-      const state = conversionStateOf(editor.state)
-      if (state.count === seen) return
-      seen = state.count
-      const made = state.last
-      if (!made) return
-      setNotice({
-        text: made.comments > 0
-          ? 'This deck is now written like text. Its old notes and hidden words are comments in the handout, only for you.'
-          : 'This deck is now written like text.',
-      })
-    }
-    editor.on('transaction', onTransaction)
-    return () => { editor.off('transaction', onTransaction) }
-  }, [editor])
 
   useEffect(() => {
     if (!editor) return
@@ -628,6 +610,42 @@ export function DeckView({
     const tops = partTops()
     if (container && tops[index] !== undefined) container.scrollTop = scrollTopFor(tops[index])
   }, [makeCurrent, partTops, scrollContainer])
+
+  // The conversion's line in the bar (PR 2; the Experience lead on #765): "Old notes are now comments in the handout."
+  // with Show, once per deck (this view keeps that it said it), and only when old notes or hidden words became comments.
+  const showConvertedComment = useCallback((note: string) => {
+    if (!editor || editor.isDestroyed) return
+    const pos = commentNodeAt(editor.state.doc, note)
+    if (pos === null) return
+    const index = partIndexAt(editor.state.doc, pos)
+    if (index !== null) pick(index)
+    // The comment opens latched in the margin, as a click on its marker opens it, scrolled into view.
+    requestAnimationFrame(() => {
+      const storage = commentBoxStorage(editor)
+      const now = commentNodeAt(editor.state.doc, note)
+      if (!storage || now === null) return
+      storage.openRequest = { key: `n:${now}`, as: 'latched' }
+      storage.notifyRail?.()
+    })
+  }, [editor, pick])
+  useEffect(() => {
+    if (!editor) return
+    let seen = conversionStateOf(editor.state).count
+    const onTransaction = () => {
+      const state = conversionStateOf(editor.state)
+      if (state.count === seen) return
+      seen = state.count
+      const said = conversionNoticeFor(state.last, deckViewState().deckConversionNoticed === true)
+      if (!said) return
+      keepDeckViewState({ deckConversionNoticed: true })
+      setNotice({
+        text: said.text,
+        action: { label: 'Show', tip: 'Show the first of them in the handout', run: () => showConvertedComment(said.firstComment) },
+      })
+    }
+    editor.on('transaction', onTransaction)
+    return () => { editor.off('transaction', onTransaction) }
+  }, [editor, showConvertedComment])
 
   // Present (Sprint 159): from the current slide or from the start, on the wall; Stop brings the deck back to the slide
   // the presenter ended on.

@@ -35,6 +35,8 @@ export const DECK_CONVERTED = 'deckConverted'
 export interface DeckConversion {
   slides: number
   comments: number
+  /** The note of the first comment it made, in the deck's order (the notice's Show opens it); null without one. */
+  firstComment: string | null
 }
 
 /** Does the document hold a slide the conversion would change: a v1 slide of one of the nine kinds? */
@@ -80,7 +82,7 @@ function notesOf(comment: string): string {
 export function convertDeckInto(tr: Transaction): DeckConversion | null {
   if (!needsConversion(tr.doc)) return null
   const schema = tr.doc.type.schema
-  const result: DeckConversion = { slides: 0, comments: 0 }
+  const result: DeckConversion = { slides: 0, comments: 0, firstComment: null }
   const slides = slidesOf(tr.doc)
   // From the last part to the first, so the positions before each one still hold.
   for (let index = slides.length - 1; index >= 0; index--) {
@@ -97,6 +99,8 @@ export function convertDeckInto(tr: Transaction): DeckConversion | null {
     if (comment) {
       tr.insert(partEnd, comment)
       result.comments++
+      // From the last part to the first: the last one written is the deck's first.
+      result.firstComment = comment.attrs.note as string
     }
     tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, kind: '', body: converted.body, notes })
     result.slides++
@@ -137,6 +141,29 @@ export function pictureIntoSlide(state: EditorState, slideId: string, path: stri
     : withBlockMarkdown(node.attrs.body, `${markdown}${markdown ? '\n\n' : ''}![](${pictureTarget(path)})`)
   tr.setNodeMarkup(pos, undefined, { ...node.attrs, body })
   return tr
+}
+
+/** The conversion's line in the deck's bar (the coordinator and the Experience lead on #765). */
+export const CONVERSION_NOTICE = 'Old notes are now comments in the handout.'
+
+/**
+ * Whether the deck's bar says the conversion's line: once per deck, at its first real edit, and only when old notes or
+ * hidden words became comments (a deck with neither says nothing). `shownBefore`: this deck's view said it already.
+ */
+export function conversionNoticeFor(made: DeckConversion | null, shownBefore: boolean): { text: string; firstComment: string } | null {
+  if (!made || shownBefore || made.comments === 0 || made.firstComment === null) return null
+  return { text: CONVERSION_NOTICE, firstComment: made.firstComment }
+}
+
+/** Where the comment with this note is in the handout (Show's target): the first such comment node, or null. */
+export function commentNodeAt(doc: PMNode, note: string): number | null {
+  let found: number | null = null
+  doc.descendants((node, pos) => {
+    if (found !== null) return false
+    if (node.type.name === 'commentNode' && node.attrs.note === note) found = pos
+    return true
+  })
+  return found
 }
 
 /** A transaction that is the person's own edit: not the host's, not undo or redo, not the view's drawn headings. */

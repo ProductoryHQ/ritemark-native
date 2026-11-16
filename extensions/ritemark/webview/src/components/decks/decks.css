@@ -166,8 +166,10 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 
 /* The bar's notice: a deleted slide's Undo, the line hint (quiet, as the prototype's toasts) */
 .deck-notice { display: inline-flex; flex: 0 1 auto; align-items: center; gap: 8px; min-width: 0; overflow: hidden; margin-left: 12px; font-size: 12.5px; color: var(--r-ink-body); }
-/* A long notice gives way, never the bar's controls (PR 2: Present lost its label under the conversion's line). */
-.deck-bar > :not(.deck-notice):not(.flex-1) { flex-shrink: 0; }
+/* A notice in the bar (PR 2): the bar's controls keep their size, but Present, which folds to its icon when its word
+   doesn't fit (`iconWhenNarrow`), gives way first, as it does for the bar's other notices; the notice's words go last. */
+.deck-bar > :not(.deck-notice):not(.flex-1):not(.deck-present) { flex-shrink: 0; }
+.deck-bar > .deck-present { flex-shrink: 100; }
 .deck-notice-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Slide settings (17 November, "Nothing around the slide but the slide"): a 28 px gear (Phosphor `gear`) in the deck's bar after the

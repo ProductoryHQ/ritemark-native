@@ -26,7 +26,7 @@ import { DeckSlide } from './deckSchema'
 import { DeckDrawnHeadings, drawnHeadingsFollow } from './drawnHeadings'
 import { deckGuardPlugin } from './deckGuard'
 import { deckLinesPlugin } from './deckLines'
-import { pictureIntoSlide, handoutMarkdownOf, convertDeckInto, conversionStateOf, deckConvertPlugin, needsConversion } from './deckConvert'
+import { CONVERSION_NOTICE, commentNodeAt, conversionNoticeFor, pictureIntoSlide, handoutMarkdownOf, convertDeckInto, conversionStateOf, deckConvertPlugin, needsConversion } from './deckConvert'
 import { derivedHeadings, slidesOf } from '../deckDocument'
 
 installTestDocument()
@@ -147,7 +147,7 @@ const apply = (state: EditorState, tr: Transaction) => state.apply(tr)
   assert.equal(slides[3].node.attrs.notes, 'UNKNOWNNOTES', 'and keeps its notes')
   assert.ok(slides.slice(0, 3).every(slide => slide.node.attrs.notes === null), 'no notes block on a block slide')
   assert.equal(conversionStateOf(after).count, 1)
-  assert.deepEqual(conversionStateOf(after).last, { slides: 3, comments: 2 })
+  assert.deepEqual(conversionStateOf(after).last, { slides: 3, comments: 2, firstComment: 'NOTESWORD: say hello first. --› not the end\nHidden by the old layout: TITLEITEMWORD' })
   // Their Markdown is what the stage drew before the edit (legacyToBlocks): "1. 1." numbers as a real list.
   assert.equal(slideDataOf('', slides[2].node.attrs.body).markdown, '# The steps\n\n1. Sisend\n2. Väljund')
   assert.equal(slideDataOf('', slides[0].node.attrs.body).id, 't1', 'the header keeps the id')
@@ -274,6 +274,36 @@ const apply = (state: EditorState, tr: Transaction) => state.apply(tr)
   const pictured = stateOf('```slide picture\nid: pc1\ntitle: Shot\nimage: images/old.png\n```\n\nText.\n', deckPlugins())
   const replaced = pictured.state.apply(pictureIntoSlide(pictured.state, 'pc1', 'images/new.png')!)
   assert.equal(slideDataOf('', slidesOf(replaced.doc)[0].node.attrs.body).markdown, '# Shot\n\n![](images/new.png)')
+}
+
+// ---- The conversion's line (the Experience lead on #765): "Old notes are now comments in the handout." with Show, once
+// per deck, and only when notes or hidden words became comments; Show's target is the deck's first converted comment.
+{
+  const { state } = stateOf(DECK, deckPlugins())
+  const after = state.apply(state.tr.insertText('!', endOf(state.doc, 'Compare them.')))
+  const made = conversionStateOf(after).last
+  const said = conversionNoticeFor(made, false)
+  assert.deepEqual(said, { text: CONVERSION_NOTICE, firstComment: made!.firstComment })
+  assert.equal(CONVERSION_NOTICE, 'Old notes are now comments in the handout.')
+  assert.equal(conversionNoticeFor(made, true), null, 'once per deck: said already, it says nothing')
+  // Show's target: the first converted comment, at the end of slide 1's part (before slide 2).
+  const at = commentNodeAt(after.doc, said!.firstComment)!
+  const slides = slidesOf(after.doc)
+  assert.ok(at > slides[0].pos && at < slides[1].pos, 'in the first part with one')
+  assert.equal(after.doc.nodeAt(at)!.type.name, 'commentNode')
+  assert.equal(commentNodeAt(after.doc, 'no such note'), null)
+  // An undo and a new edit convert again: the view has said it, so nothing more is said.
+  let undone = after
+  undo(after, back => { undone = after.apply(back) })
+  const again = undone.apply(undone.tr.insertText('?', endOf(undone.doc, 'Last words.')))
+  assert.equal(conversionStateOf(again).count, 2, 'converted again')
+  assert.equal(conversionNoticeFor(conversionStateOf(again).last, true), null)
+  // A deck with no notes and no hidden words converts without a line.
+  const plain = stateOf('---\ndeck: 1\n---\n\n```slide points\nid: p1\ntitle: Plain\nitems:\n- heading: One\n```\n\nWords.\n', deckPlugins())
+  const quiet = plain.state.apply(plain.state.tr.insertText('!', endOf(plain.state.doc, 'Words.')))
+  assert.equal(conversionStateOf(quiet).count, 1)
+  assert.deepEqual(conversionStateOf(quiet).last, { slides: 1, comments: 0, firstComment: null })
+  assert.equal(conversionNoticeFor(conversionStateOf(quiet).last, false), null, 'no notes, no line')
 }
 
 console.log('deckConvert: passed')
