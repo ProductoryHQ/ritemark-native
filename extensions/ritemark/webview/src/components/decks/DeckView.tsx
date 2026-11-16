@@ -23,7 +23,6 @@ import type { DocumentApplyTarget } from '../../types/documentSync'
 import type { DocumentSyncState } from '../../../../src/editorSync/protocol'
 import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
-import { SegmentedControl } from '../ui/segmented-control'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
 import { DECK_DERIVED, DECK_OPERATION, DEFAULT_RATIO, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
@@ -215,7 +214,8 @@ export function DeckView({
   const currentRef = useRef(0)
   const assets = useDeckAssets(slides)
   const theme = useDeckTheme(properties.theme)
-  // Card or Borderless is the deck's own choice, in its front matter (Jarmo, 15 November: both are offered).
+  // Card or Borderless is the deck's own choice, in its front matter (Jarmo, 15 November: both are offered). Since 16
+  // November it is chosen in the gear's popup, its last section (SlideSettings), not on the bar.
   const borderless = properties.look === 'borderless'
   const setLook = useCallback((look: string) => {
     const next: DocumentProperties = { ...properties }
@@ -1074,6 +1074,7 @@ export function DeckView({
                 onChange={patch => changeSlide(data => ({ ...data, ...patch }))}
                 onClose={() => setSettingsOpen(false)}
                 onUndo={redo => { if (redo) editor?.commands.redo(); else editor?.commands.undo() }}
+                deck={{ count, look: borderless ? 'borderless' : 'card', onLook: setLook }}
               />
             </PopoverContent>
           ) : null}
@@ -1100,15 +1101,6 @@ export function DeckView({
           ) : null}
         </span>
         <span className="flex-1" />
-        <Tooltip label="How the slides look: as a card, or the whole column as the stage">
-          <SegmentedControl
-            aria-label="How the slides look"
-            className="deck-look"
-            value={borderless ? 'borderless' : 'card'}
-            onValueChange={setLook}
-            options={[{ value: 'card', label: 'Card' }, { value: 'borderless', label: 'Borderless' }]}
-          />
-        </Tooltip>
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>
         {status === 'action' && syncAction ? (
           <SyncActionButton action={syncAction} />

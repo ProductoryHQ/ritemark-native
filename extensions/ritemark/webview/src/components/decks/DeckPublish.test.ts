@@ -44,9 +44,10 @@ assert.equal(button(draw({ ready: true, kind: 'published', changed: false }))!.g
 assert.ok(button(draw({ ready: true, kind: 'published', changed: false }))!.classList.contains('deck-publish-chip'))
 assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.classList.contains('deck-publish'))
 
-// The bar (the Experience lead, frame 2): Card | Borderless · Saved · Publish · Present. Publish is outlined with the
-// globe, its chip takes its place once published; Present is the bar's one primary, last; every control is 30 px from
-// the shared sizes (Button `bar`, SplitButton `size="bar"`).
+// The bar (the Experience lead, frame 2): Saved · Publish · Present on the right (Card | Borderless moved into the gear's
+// popup on 16 November, slideSettingsPopup.test.ts). Publish is outlined with the globe, its chip takes its place once
+// published; Present is the bar's one primary, last; every control is 30 px from the shared sizes (Button `bar`,
+// SplitButton `size="bar"`).
 {
   const publish = button(draw({ ready: true, kind: 'unpublished', changed: false }))!
   assert.ok(publish.classList.contains('border') && publish.classList.contains('bg-background'), 'Publish is outlined')
@@ -61,7 +62,7 @@ assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.cl
   assert.ok(present.querySelectorAll('button').every((part) => part.classList.contains('h-[30px]')), 'Present: 30 px')
   const view = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8')
   const at = (marker: string) => { const index = view.indexOf(marker); assert.ok(index >= 0, marker); return index }
-  assert.ok(at('className="deck-look"') < at('deck-saved') && at('deck-saved') < at('<DeckPublish ') && at('<DeckPublish ') < at('<PresentButton '), "the bar's order")
+  assert.ok(at('className="flex-1"') < at('deck-saved') && at('deck-saved') < at('<DeckPublish ') && at('<DeckPublish ') < at('<PresentButton '), "the bar's order")
   assert.ok(/<PresentButton [^\n]*\/>\s*<\/header>/.test(view), 'Present is last on the bar')
 }
 

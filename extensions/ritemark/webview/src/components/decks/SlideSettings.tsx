@@ -13,6 +13,11 @@
  * The lines that sat under the slide come first here (`about`, `SlideAbout`): where a library copy came from with its
  * actions, the words a layout keeps for others, and a table's Add a row and Add a column; then a line, then the
  * slide's own settings.
+ *
+ * 16 November (Jarmo: "card/borderless buttons also to settings?"; the Experience lead, "Card or Borderless lives in the
+ * gear's popup"): the popup's last section, under a line, is the deck's own choice, Card or Borderless, set once per
+ * deck. Its heading names its reach ("This deck · all 15 slides"), so it is never read as this slide's alone. It writes
+ * the deck's front matter through the same `setLook` the bar's segment used. Themes join this section later.
  */
 import type { ReactNode } from 'react'
 import { EXERCISE_TAG, exerciseTagOf, isBlockSlide, parseFrom, type SlideData } from '../../../../src/decks/deckFormat'
@@ -72,6 +77,17 @@ interface SlideSettingsProps {
   onUndo: (redo: boolean) => void
   /** The lines about the slide, first (`SlideAbout`); none, and the settings start at once. */
   about?: ReactNode
+  /** The deck's own look, last: how many slides it reaches, the choice, and the change of it (`setLook`). */
+  deck: { count: number; look: 'card' | 'borderless'; onLook: (look: string) => void }
+}
+
+/** Card or Borderless, as the bar's segment offered it before 16 November: the same words and the same tooltip. */
+export const DECK_LOOKS = [{ value: 'card', label: 'Card' }, { value: 'borderless', label: 'Borderless' }]
+export const DECK_LOOK_TIP = 'How the slides look: as a card, or the whole column as the stage'
+
+/** The deck section's heading: its reach, so a deck-wide choice in a slide's popup isn't read as that slide's. */
+export function deckReach(count: number): string {
+  return count === 1 ? 'This deck · 1 slide' : `This deck · all ${count} slides`
 }
 
 /** The library's topic or the deck a copy came from, as its plain line before the host has read the copy's state. */
@@ -125,7 +141,7 @@ export function SlideAbout({ data, sourceLines, hidden, table }: SlideAboutProps
   )
 }
 
-export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about }: SlideSettingsProps) {
+export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about, deck }: SlideSettingsProps) {
   const skipId = `deck-skip-${number}`
   const tagId = `deck-tag-${number}`
   return (
@@ -210,6 +226,17 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
         <Label htmlFor={skipId}>Skip slide</Label>
         <Switch id={skipId} checked={data.skip === true} onCheckedChange={skip => onChange({ skip: skip || undefined })} />
       </div>
+      <div className="deck-settings-sep" />
+      <div className="deck-settings-k">{deckReach(deck.count)}</div>
+      <Tooltip label={DECK_LOOK_TIP} className="flex w-full">
+        <SegmentedControl
+          aria-label="How the slides look"
+          className="deck-settings-look w-full [&>label]:flex-1 [&>label>span]:w-full [&>label>span]:text-center"
+          value={deck.look}
+          onValueChange={deck.onLook}
+          options={DECK_LOOKS}
+        />
+      </Tooltip>
     </section>
   )
 }

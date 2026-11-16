@@ -20,13 +20,14 @@ const React = await import('react')
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
-const { SlideAbout, SlideSettings } = await import('./SlideSettings')
+const { DECK_LOOKS, DECK_LOOK_TIP, SlideAbout, SlideSettings, deckReach } = await import('./SlideSettings')
 const { SourceLines } = await import('./library/SourceLines')
 const { libraryBadge } = await import('./SlideStrip')
 
 const noop = () => {}
-const settings = (kind: string, data: Record<string, unknown>, about: unknown) => parse(renderToStaticMarkup(createElement(SlideSettings, {
-  number: 6, kind, data, onKind: noop, onChange: noop, onClose: noop, onUndo: noop, about: about as never,
+const cardDeck = { count: 15, look: 'card' as const, onLook: noop }
+const settings = (kind: string, data: Record<string, unknown>, about: unknown, deck: { count: number; look: 'card' | 'borderless'; onLook: (look: string) => void } = cardDeck) => parse(renderToStaticMarkup(createElement(SlideSettings, {
+  number: 6, kind, data, onKind: noop, onChange: noop, onClose: noop, onUndo: noop, about: about as never, deck,
 })))
 
 // ---- A changed library slide: its line, the sentence and the buttons first, then a line, then the slide's settings.
@@ -74,7 +75,48 @@ const settings = (kind: string, data: Record<string, unknown>, about: unknown) =
 {
   assert.equal(renderToStaticMarkup(createElement(SlideAbout, { data: {}, hidden: '' })), '')
   const root = settings('points', {}, null)
-  assert.equal(root.querySelectorAll('.deck-settings-sep').length, 1, 'only the line above Skip slide')
+  assert.equal(root.querySelectorAll('.deck-settings-sep').length, 2, 'only the lines above Skip slide and above the deck')
+  assert.ok(root.querySelector('section')!.childNodes.filter(node => node.nodeType === 1)
+    .findIndex(node => ((node as { classNames?: string }).classNames ?? '').includes('deck-settings-sep')) > 1, 'no line under the head')
+}
+
+// ---- Card or Borderless (16 November, "Card or Borderless lives in the gear's popup"): the popup's last section,
+// under a line after Skip slide: the heading that names its reach, then the segment, the popup's full width.
+{
+  for (const [kind, data, about] of [
+    ['boxes', {}, null],
+    ['exercise', {}, null],
+    ['picture', { skip: true }, null],
+    ['', {}, null],
+    ['table', {}, createElement(SlideAbout, { data: {}, hidden: '', table: { addRow: noop, addColumn: noop } })],
+  ] as const) {
+    const root = settings(kind, data, about)
+    const children = root.querySelector('section')!.childNodes.filter(node => node.nodeType === 1) as unknown as Array<{ classNames?: string; textContent: string; querySelector(s: string): { getAttribute(name: string): string | null } | null }>
+    const last = children.length - 1
+    const skip = children.findIndex(node => node.textContent.includes('Skip slide'))
+    assert.ok(skip > 0, `${kind}: Skip slide`)
+    assert.equal(last - skip, 3, `${kind}: Skip slide, a line, the heading, the segment, and nothing after it`)
+    assert.ok((children[skip + 1].classNames ?? '').includes('deck-settings-sep'), `${kind}: a line after Skip slide`)
+    assert.ok((children[skip + 2].classNames ?? '').includes('deck-settings-k'), `${kind}: the popup's small uppercase label`)
+    assert.equal(children[skip + 2].textContent, 'This deck · all 15 slides', `${kind}: the heading with the count`)
+    const group = children[last].querySelector('[role="radiogroup"]')!
+    assert.equal(group.getAttribute('aria-label'), 'How the slides look')
+    assert.match(group.getAttribute('class') ?? '', /\bw-full\b/, `${kind}: the popup's full width`)
+    assert.match((children[last] as unknown as { getAttribute(name: string): string | null }).getAttribute('class') ?? '', /\bw-full\b/, `${kind}: its tooltip's span too`)
+  }
+  const radios = (look: 'card' | 'borderless') => settings('points', {}, null, { count: 15, look, onLook: noop })
+    .querySelectorAll('[role="radiogroup"][aria-label="How the slides look"] input[type="radio"]')
+  assert.deepEqual(radios('card').map(input => [input.getAttribute('value'), input.hasAttribute('checked')]), [['card', true], ['borderless', false]])
+  assert.deepEqual(radios('borderless').map(input => [input.getAttribute('value'), input.hasAttribute('checked')]), [['card', false], ['borderless', true]])
+  assert.deepEqual(settings('points', {}, null).querySelectorAll('[aria-label="How the slides look"] label').map(label => label.textContent), ['Card', 'Borderless'])
+  // The same words and tooltip as the bar's segment had.
+  assert.deepEqual(DECK_LOOKS, [{ value: 'card', label: 'Card' }, { value: 'borderless', label: 'Borderless' }])
+  assert.equal(DECK_LOOK_TIP, 'How the slides look: as a card, or the whole column as the stage')
+  // Its reach, live: the deck's own count, and one slide said as one.
+  assert.equal(deckReach(15), 'This deck · all 15 slides')
+  assert.equal(deckReach(2), 'This deck · all 2 slides')
+  assert.equal(deckReach(1), 'This deck · 1 slide')
+  assert.equal(settings('points', {}, null, { count: 3, look: 'card', onLook: noop }).querySelectorAll('.deck-settings-k').pop()!.textContent, 'This deck · all 3 slides')
 }
 
 // ---- The thumbnail's badge: quiet, amber when changed here or newer there, with a tooltip that says which.
@@ -99,6 +141,14 @@ const here = (path: string) => readFileSync(fileURLToPath(new URL(path, import.m
   assert.match(gear, /<PopoverContent\s+align="start"/, 'the popup opens under the gear, left-aligned to it')
   assert.match(gear, /data-state=\{settingsOpen && settingsReady \? 'active'/, 'its on state while the popup is open')
   assert.doesNotMatch(gear, /\btitle=/, 'a tooltip, never a native title')
+  // Card or Borderless (16 November): off the bar, into the popup, written by the same `setLook` with the live count.
+  for (const gone of ['SegmentedControl', 'Borderless', 'How the slides look', 'deck-look']) {
+    assert.ok(!bar.replace(gear, '').includes(gone), `nothing of "${gone}" on the bar outside the popup`)
+  }
+  assert.match(gear, /deck=\{\{ count, look: borderless \? 'borderless' : 'card', onLook: setLook \}\}/)
+  assert.match(view, /const count = slides\.length/)
+  assert.match(view, /const setLook = useCallback\(\(look: string\) => \{\s+const next: DocumentProperties = \{ \.\.\.properties \}\s+if \(look === 'borderless'\) next\.look = 'borderless'\s+else delete next\.look\s+onPropertiesChange\(next\)/, 'the front matter is written as before')
+  assert.ok(!here('./decks.css').includes('.deck-look'), "the bar's segment rule is gone")
   // Review, PR 759: Settings with no slide to belong to close, so they never reopen by themselves when it returns.
   assert.match(view, /useEffect\(\(\) => \{ if \(!slideShown \|\| !slides\[shown\]\) setSettingsOpen\(false\) \}, \[slideShown, slides, shown\]\)/)
   // The Add to library sheet alone is placed by the desk's measure now.
