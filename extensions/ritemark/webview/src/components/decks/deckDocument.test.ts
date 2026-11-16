@@ -68,14 +68,18 @@ assert.equal(partIndexAt(doc, slidesOf(doc)[1].pos + 3), 1)
   assert.equal(deleteSlide(one, 0), null)
 }
 
-// Insert: a new empty slide (and a paragraph for its text) before a part, or at the end.
+// Insert: a new empty slide (and a paragraph for its text) before a part, or at the end. Since PR 2 (Sprint 161) a new
+// slide is a block slide, the strip's choice its first blocks: three empty boxes, or nothing (an empty title).
 {
   const tr = insertSlide(state, 1, 'boxes', () => 0.5)!
   const kinds = slidesOf(tr.doc).map(entry => entry.kind)
-  assert.deepEqual(kinds, ['points', 'boxes', 'points', 'points'])
+  assert.deepEqual(kinds, ['points', '', 'points', 'points'])
   assert.equal(slidesOf(tr.doc)[1].data.id, 'niii')
-  const end = insertSlide(state, 3, 'exercise')!
-  assert.equal(slidesOf(end.doc)[3].kind, 'exercise')
+  assert.equal(slidesOf(tr.doc)[1].node.attrs.body, '---\nid: niii\n---\n:::: boxes\n::: box\n:::\n::: box\n:::\n::: box\n:::\n::::')
+  const end = insertSlide(state, 3, 'exercise', () => 0.5)!
+  assert.equal(slidesOf(end.doc)[3].kind, '')
+  assert.equal(slidesOf(end.doc)[3].node.attrs.body, '---\nid: niii\n---', 'an empty slide ends at its header')
+  assert.ok(editorMarkdown(end.doc).includes('```slide\n---\nid: niii\n---\n```'))
   const first = insertSlide(state, 0, 'points')!
   assert.deepEqual(order(first.doc).slice(0, 2), ['Preamble', '[undefined]'], 'before slide 1 is after the preamble')
 }

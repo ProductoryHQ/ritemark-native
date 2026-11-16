@@ -13,7 +13,7 @@ import { joinBackward, selectNodeBackward, deleteSelection, chainCommands } from
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../../utils/markdownFidelity'
-import { parseSlideBody, writeSlideBody } from '../../../../../src/decks/deckFormat'
+import { parseSlideBody, slideDataOf, writeSlideBody } from '../../../../../src/decks/deckFormat'
 import { DeckSlide } from './deckSchema'
 import { deckGuardPlugin } from './deckGuard'
 import { deckLinesPlugin, firstHeadingTitlePlugin } from './deckLines'
@@ -24,6 +24,8 @@ const slide = (id: string, title: string, kind = 'points') => schema.nodes.deckS
 const paragraph = (text: string) => schema.nodes.paragraph.create(null, text ? schema.text(text) : null)
 const heading = (level: number, text: string) => schema.nodes.heading.create({ level }, text ? schema.text(text) : null)
 const line = () => schema.nodes.horizontalRule.create()
+/** A slide node's data, a v1 slide's or a block slide's (a line's slide is a block slide since Sprint 161's PR 2). */
+const dataOf = (node: PMNode) => slideDataOf(node.attrs.kind, node.attrs.body)
 
 /** A state with the deck's plugins; the line's plugin draws ids from a fixed sequence. */
 function stateOf(nodes: PMNode[]): EditorState {
@@ -55,15 +57,15 @@ function typeLine(state: EditorState, blockIndex: number): EditorState {
 
 const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.'), paragraph('---'), paragraph('Still in one.')]
 
-// A line typed at the top level of a part makes a Statement slide there, in one undo step. With no heading after the
+// A line typed at the top level of a part makes a block slide there (Sprint 161, PR 2: a Statement before), in one undo step. With no heading after the
 // line, the new part opens with an empty H2 (where the caret goes) and the slide has no title.
 {
   const state = stateOf(before)
   const next = typeLine(state, 3)
   const made = slides(next.doc)
   assert.equal(made.length, 2, 'the line is a slide now')
-  assert.equal(made[1].attrs.kind, 'statement')
-  const data = parseSlideBody(made[1].attrs.body)
+  assert.equal(made[1].attrs.kind, '', 'a bare block slide')
+  const data = dataOf(made[1])
   assert.match(data.id ?? '', /^[a-z][0-9a-z]{3}$/)
   assert.notEqual(data.id, 'aaaa')
   assert.equal(data.title, undefined, 'no heading after the line: no title')
@@ -78,7 +80,7 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
     '```slide points\nid: aaaa\ntitle: One\n```',
     '## One',
     'First words.',
-    `\`\`\`slide statement\nid: ${data.id}\n\`\`\``,
+    `\`\`\`slide\n---\nid: ${data.id}\n---\n\`\`\``,
     'Still in one.',
   ].join('\n\n'))
   // Undo takes the line and the slide back at once.
@@ -96,7 +98,7 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
   const next = typeLine(state, 3)
   const made = slides(next.doc)
   assert.equal(made.length, 2)
-  assert.equal(parseSlideBody(made[1].attrs.body).title, 'Two', 'the heading after the line is its title')
+  assert.equal(dataOf(made[1]).title, 'Two', 'the heading after the line is its title')
   const blockBefore = made[1].attrs.body
   // The heading is edited afterwards: the slide keeps its title, byte for byte.
   let headingPos = -1
@@ -127,7 +129,7 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
   const next = typeLine(state, 2)
   const made = slides(next.doc)
   assert.equal(made.length, 2)
-  assert.equal(parseSlideBody(made[1].attrs.body).title, undefined, 'an H3 is no title')
+  assert.equal(dataOf(made[1]).title, undefined, 'an H3 is no title')
   const names: string[] = []
   next.doc.forEach(node => names.push(node.type.name === 'heading' ? `h${node.attrs.level}` : node.type.name))
   assert.deepEqual(names, ['deckSlide', 'h2', 'deckSlide', 'h2', 'h3', 'paragraph'])
@@ -177,7 +179,7 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
   const saved = editorMarkdown(state.doc)
   // The caret at the start of the new part's heading (right after the slide).
   let at = -1
-  state.doc.forEach((node, pos) => { if (at < 0 && node.type.name === 'deckSlide' && node.attrs.kind === 'statement') at = pos + node.nodeSize + 1 })
+  state.doc.forEach((node, pos) => { if (at < 0 && node.type.name === 'deckSlide' && node.attrs.kind === '') at = pos + node.nodeSize + 1 })
   state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, at)))
   const backspace = chainCommands(deleteSelection, joinBackward, selectNodeBackward)
   for (let press = 0; press < 3; press++) {
@@ -185,14 +187,14 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
   }
   assert.equal(slides(state.doc).length, count, 'the slide count is unchanged')
   assert.deepEqual(slides(state.doc).map(node => node.attrs.body), blocks, 'and its block')
-  assert.ok(editorMarkdown(state.doc).includes('```slide statement'), 'the slide block is still in the file')
+  assert.ok(editorMarkdown(state.doc).includes('```slide\n---'), 'the slide block is still in the file')
   assert.equal(editorMarkdown(state.doc).split('```slide').length, saved.split('```slide').length)
 }
 
 // A slide with no title takes the first heading written in its part as its title, once the caret has left that heading,
 // and only once; a title that isn't empty is never overwritten (16 November, the Experience lead).
 {
-  const titleOf = (state: EditorState, index: number) => parseSlideBody(slides(state.doc)[index].attrs.body).title
+  const titleOf = (state: EditorState, index: number) => dataOf(slides(state.doc)[index]).title
   // A slide made from a line, with no heading under it: its part opens with an empty H2 and the caret in it.
   let state = typeLine(stateOf(before), 3)
   assert.equal(titleOf(state, 1), undefined)
@@ -219,7 +221,7 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
   state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, state.doc.child(0).nodeSize + 1)))
   state = state.apply(state.tr.insertText('Another heading'))
   state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, state.doc.content.size - 1)))
-  assert.equal(parseSlideBody(slides(state.doc)[0].attrs.body).title, 'One')
+  assert.equal(dataOf(slides(state.doc)[0]).title, 'One')
 }
 
 // A heading that came from the host (the file, an AI's edit) never fills a title: only the person's own writing does.
@@ -228,7 +230,7 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
   const at = state.doc.child(0).nodeSize + 1
   state = state.apply(state.tr.insertText('From the file', at).setMeta('ritemarkDocumentRevision', 2))
   state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, state.doc.content.size - 1)))
-  assert.equal(parseSlideBody(slides(state.doc)[0].attrs.body).title ?? '', '', 'opening or a host update writes nothing')
+  assert.equal(dataOf(slides(state.doc)[0]).title ?? '', '', 'opening or a host update writes nothing')
 }
 
 
@@ -240,13 +242,13 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
   state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, headingAt)))
   state = state.apply(state.tr.insertText('Pricing'))
   state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, words())))
-  assert.equal(parseSlideBody(slides(state.doc)[0].attrs.body).title, 'Pricing')
+  assert.equal(dataOf(slides(state.doc)[0]).title, 'Pricing')
   // The person clears the title on the stage, then fixes the heading: the title stays cleared.
   const node = state.doc.child(0)
   state = state.apply(state.tr.setNodeMarkup(0, undefined, { ...node.attrs, body: writeSlideBody(node.attrs.body, { ...parseSlideBody(node.attrs.body), title: undefined }) }))
   state = state.apply(state.tr.insertText('s', headingAt + 'Pricing'.length))
   state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, words())))
-  assert.equal(parseSlideBody(slides(state.doc)[0].attrs.body).title, undefined, 'a cleared title stays cleared')
+  assert.equal(dataOf(slides(state.doc)[0]).title, undefined, 'a cleared title stays cleared')
 }
 
 // A heading typed and then emptied stops the waiting: a heading the host writes there later never fills the title.
@@ -258,7 +260,7 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
   state = state.apply(state.tr.delete(headingAt, headingAt + 1))
   state = state.apply(state.tr.insertText('Summary', headingAt).setMeta('ritemarkDocumentRevision', 3))
   state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, state.doc.content.size - 1)))
-  assert.equal(parseSlideBody(slides(state.doc)[0].attrs.body).title ?? '', '')
+  assert.equal(dataOf(slides(state.doc)[0]).title ?? '', '')
 }
 
 

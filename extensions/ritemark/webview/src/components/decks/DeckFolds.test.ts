@@ -165,7 +165,7 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
     return view.slice(at)
   }
   const stage = block('{slideShown ? ( <div ref={stageRef} className={`deck-stage')
-  assert.ok(stage.includes('<Stage') && stage.includes('notesOpen={notesOpen}'), 'the stage and its notes are drawn only while the slide shows')
+  assert.ok(stage.includes('<Stage'), 'the stage is drawn only while the slide shows (Sprint 161: no notes fold under it)')
   // 17 November: Slide settings is the bar's gear, ready only while the slide shows (folded away, it's disabled).
   assert.ok(view.includes('const settingsReady = slideShown && !!slide') && view.includes('<Popover open={settingsOpen && settingsReady}'), 'Settings go with the slide')
   assert.ok(block('{handoutShown && slideShown ? (').includes('deck-divider'), 'nothing to drag with one side')

@@ -12,6 +12,7 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { isBlockSlide, type SlideData } from '../../../../../src/decks/deckFormat'
 import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, BLOCK_MAX_STEP, blockCanvasMarkup } from '../../../../../src/decks/blocks/slideRenderer'
+import { blockDataOf, drawsAsBlocks } from '../../../../../src/decks/blocks/convertDeck'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { Icon } from '../../ui/Icon'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../../ui/dropdown-menu'
@@ -293,8 +294,9 @@ function overflows(canvas: HTMLElement): boolean {
 
 /**
  * Sprint 161: a block slide (format v2), drawn by the one block renderer (`src/decks/blocks/slideRenderer.ts`) that the
- * wall, the presenter view, the library and the page draw it with. Read-only in this build: the editor on the slide is
- * the next step. The fit steps the words down while they overflow (`--fit`, 100 to 60 %), and again once the fonts load.
+ * wall, the presenter view, the library and the page draw it with. The stage edits it in its own slide editor
+ * (`blocks/SlideEditor.tsx`); this canvas draws the strip, the wall and the rest. The fit steps the words down while
+ * they overflow (`--fit`, 100 to 60 %), and again once the fonts load.
  */
 const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, borderless, assets }: Omit<SlideCanvasProps, 'kind' | 'editing'>) {
   const slideRef = useRef<HTMLDivElement>(null)
@@ -346,6 +348,9 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
 
 export const SlideCanvas = memo(function SlideCanvas({ kind, data, width, theme, borderless, assets, editing }: SlideCanvasProps) {
   if (isBlockSlide(kind)) return <BlockSlideCanvas data={data} width={width} theme={theme} borderless={borderless} assets={assets} />
+  // PR 2 (decision 8 of the approved plan): a v1 slide of the nine kinds is drawn as the block slide its first edit
+  // writes (`legacyToBlocks`), so the strip, the wall and the stage show what the conversion will write.
+  if (drawsAsBlocks(kind)) return <BlockSlideCanvas data={blockDataOf(kind, data)} width={width} theme={theme} borderless={borderless} assets={assets} />
   return <LayoutSlideCanvas kind={kind} data={data} width={width} theme={theme} borderless={borderless} assets={assets} editing={editing} />
 })
 

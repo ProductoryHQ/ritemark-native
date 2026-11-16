@@ -241,7 +241,7 @@ export function DeckWall() {
           </Button>
         </Tooltip>
         {state.presenter.available ? (
-          <Tooltip label={state.presenter.on ? 'Close the presenter view' : 'Open the presenter view: notes, the next slide and the clock'}>
+          <Tooltip label={state.presenter.on ? 'Close the presenter view' : 'Open the presenter view: your comments, the next slide and the clock'}>
             <Button variant="ghost" size="icon-sm" aria-label="Presenter view" aria-pressed={state.presenter.on} data-state={state.presenter.on ? 'active' : undefined} onClick={() => sendToExtension('present/presenter')}>
               <Icon name="monitor" size={16} tone="inherit" />
             </Button>

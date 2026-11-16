@@ -1,7 +1,7 @@
 /**
  * Sprint 159 (experience 17 frame 1, as corrected on 15 November): Present on the deck's bar. The button presents from
  * the current slide (⌘↩); its menu has From the start (⇧⌘↩) and Presenter view (PR 6), which comes on by itself with
- * a second display and names it ("Slides on Projector, notes here"). The keys work anywhere in the deck view, caught
+ * a second display and names it ("Slides on Projector, your comments here"). The keys work anywhere in the deck view, caught
  * before the handout's editor (`usePresentKeys`), so ⇧↩ stays a line break in the handout.
  */
 import { useEffect, useState } from 'react'
@@ -48,7 +48,7 @@ export function usePresentKeys(onPresent: (from: PresentFrom) => void, enabled: 
 function presenterLine(options: PresentOptions | null): string {
   if (!options) return 'Looking for a second display…'
   if (!options.available) return 'Comes on with a second display'
-  return options.wallDisplay ? `Slides on ${options.wallDisplay}, notes here` : 'Slides and notes, each in a window'
+  return options.wallDisplay ? `Slides on ${options.wallDisplay}, your comments here` : 'Slides and your comments, each in a window'
 }
 
 export function PresentButton({ slideNumber, startNumber, onPresent }: {

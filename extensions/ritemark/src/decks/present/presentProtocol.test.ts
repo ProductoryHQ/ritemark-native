@@ -84,11 +84,12 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   assert.deepEqual(state.presenter, { available: false, on: false });
   assert.equal(state.skipped, false);
   assert.deepEqual(Object.keys(state.slide).sort(), ['data', 'kind', 'number', 'title']);
+  // Sprint 161 (PR 2, decision 8): a v1 slide reaches the wall as the block slide its conversion writes.
   assert.deepEqual(state.slide, {
     number: 3,
-    kind: 'boxes',
+    kind: '',
     title: 'Three reactions',
-    data: { title: 'Three reactions', picture: 'right', image: 'images/shown.png', items: [{ heading: 'Pushing back', text: 'the plan is wrong', icon: 'warning' }] },
+    data: { title: 'Three reactions', picture: 'right', image: 'images/shown.png', markdown: '# Three reactions\n\n:::: boxes\n::: {.box icon="warning"}\n### Pushing back\nthe plan is wrong\n:::\n::::' },
   });
   assert.deepEqual(state.slides.map(entry => entry.number), [1, 3], 'the shown slides, by their thumbnail numbers');
   assert.equal(state.position, 2);
@@ -139,13 +140,14 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   assert.equal(decodeDeckPresentRequest({ type: 'deck/present', from: 'here', index: 0, presenter: true }), null);
 }
 
-// ---- The presenter view: the one state with the notes, and only the current slide's
+// ---- The presenter view: the one state with the comments ("Your comments"), and only the current slide's. Sprint 161
+// (PR 2; Jarmo, 17 November): no notes field; an older slide's notes are the comment its conversion makes.
 {
   const session = new PresentSession(TEXT, { from: 'start' });
   const clock = { wallDisplay: 'Projector', canSwap: true, length: 45, startedAt: 1000 };
   const first = presenterStateOf(session.view(), look, {}, clock);
-  assert.deepEqual(Object.keys(first).sort(), ['assets', 'borderless', 'canSwap', 'comments', 'count', 'current', 'length', 'next', 'notes', 'position', 'skipped', 'slides', 'startedAt', 'theme', 'type', 'wallDisplay']);
-  assert.equal(first.notes, 'NOTESWORD: say this only to yourself.');
+  assert.deepEqual(Object.keys(first).sort(), ['assets', 'borderless', 'canSwap', 'comments', 'count', 'current', 'length', 'next', 'position', 'skipped', 'slides', 'startedAt', 'theme', 'type', 'wallDisplay']);
+  assert.deepEqual(first.comments, [{ note: 'NOTESWORD: say this only to yourself.' }]);
   assert.equal(first.next?.number, 3, 'the next slide shown (2 is skipped)');
   assert.equal(first.wallDisplay, 'Projector');
   const bytes = JSON.stringify(first);
@@ -153,7 +155,7 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   assert.ok(!presenterPicturePaths(session.view()).some(path => path.includes('SKIPPED')));
   session.move(TEXT, { type: 'next' });
   const second = presenterStateOf(session.view(), look, {}, clock);
-  assert.equal(second.notes, 'SECONDNOTESWORD');
+  assert.deepEqual(second.comments.map(comment => comment.note), ['SECONDNOTESWORD'], 'the boxes draw its icon: nothing else is hidden');
   assert.equal(second.next, null, 'the last slide shown');
   // The wall's state for the same slide still holds no notes.
   assert.ok(!JSON.stringify(wallStateOf(session.view(), look, {}, { available: true, on: true })).includes('SECONDNOTESWORD'));

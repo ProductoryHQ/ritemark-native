@@ -88,8 +88,16 @@ const obsidian = [
   const marked = joinFrontMatter({ ...properties, handout: 'text' }, 'The body, edited.', deck);
   assert.equal(marked, '---\n# client deck\ndeck: 1\ntheme: "Slide library/Themes/Evening.theme.md"\ndate: 2026-10-20\nhandout: text\n---\n\nThe body, edited.\n');
   assert.equal(joinFrontMatter(properties, 'The body.', marked), deck, 'taken out again: the bytes as they were');
-  // Anything else is gray-matter's, as before: a changed value, a value that isn't one word.
-  assert.equal(headWithPlainKeyChanges('---\na: 1\n---\n', { a: 1 }, { a: 2 }), null);
+  // Sprint 161 (PR 2): a deck's first edit writes `deck: 2` with `handout: text`, and one Undo takes both back: only
+  // their own lines change, the blank line after the front matter stays, and the undo gives back the same bytes.
+  const converted = joinFrontMatter({ ...properties, deck: 2, handout: 'text' }, 'The body, edited.', deck);
+  assert.equal(converted, '---\n# client deck\ndeck: 2\ntheme: "Slide library/Themes/Evening.theme.md"\ndate: 2026-10-20\nhandout: text\n---\n\nThe body, edited.\n');
+  assert.equal(joinFrontMatter(properties, 'The body.', converted), deck, 'undone: the bytes as they were');
+  assert.equal(headWithPlainKeyChanges('---\na: 1\n---\n', { a: 1 }, { a: 2 }), '---\na: 2\n---\n', 'a whole number changed in place');
+  // Anything else is gray-matter's, as before: a value that isn't one word or a whole number, a quoted or commented line.
+  assert.equal(headWithPlainKeyChanges('---\na: 1.5\n---\n', { a: 1.5 }, { a: 2 }), null);
+  assert.equal(headWithPlainKeyChanges('---\na: "1"\n---\n', { a: '1' }, { a: 2 }), null);
+  assert.equal(headWithPlainKeyChanges('---\na: 1 # one\n---\n', { a: 1 }, { a: 2 }), null);
   assert.equal(headWithPlainKeyChanges('---\na: 1\n---\n', { a: 1 }, { a: 1, b: 'two words' }), null);
   assert.equal(headWithPlainKeyChanges('---\na: 1\n---\n', { a: 1 }, { a: 1 }), null);
   assert.equal(headWithPlainKeyChanges('---\nlook: borderless\n---\n', { look: 'borderless' }, {}), '---\n---\n');

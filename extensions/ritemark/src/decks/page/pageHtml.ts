@@ -20,7 +20,7 @@
 import { createHash } from 'node:crypto';
 import { marked } from 'marked';
 import { exerciseTagOf, isBlockSlide, type SlideData } from '../deckFormat';
-import { blockSlideMarkup, blockStepsTagOf } from '../blocks/slideRenderer';
+import { blockSectionNumberOf, blockSlideMarkup, blockStepsTagOf } from '../blocks/slideRenderer';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import { slideMarkup, escapeHtml } from '../../../webview/src/components/decks/slide/slideMarkup';
 import { themeStyle, themeVars } from '../../../webview/src/components/decks/theme/themeVars';
@@ -434,6 +434,15 @@ function blockStepsTag(slide: PublicSlide): string | null {
   return isBlockSlide(slide.kind) ? blockStepsTagOf(slide.data.markdown ?? '') : null;
 }
 
+/**
+ * A section: an old Section slide, or a block slide drawn as one (its number over its title, PR 2: how a Section slide
+ * converts). Its number ('' for none), or null for any other slide.
+ */
+function sectionNumberOf(slide: PublicSlide): string | null {
+  if (slide.kind === 'section') return (slide.data.number ?? '').trim();
+  return isBlockSlide(slide.kind) ? blockSectionNumberOf(slide.data.markdown ?? '') : null;
+}
+
 /** An Exercise slide, or a block slide with Steps: its numbered steps get ticks, and Contents ticks it when done. */
 function isExercise(slide: PublicSlide): boolean {
   return slide.kind === 'exercise' || blockStepsTag(slide) !== null;
@@ -453,8 +462,9 @@ function partHtml(slide: PublicSlide, index: number, options: PageOptions, partK
   const exerciseSlide = isExercise(slide);
   const { html: body, ownHeading } = handoutParts(slide.handout, { partKey, exercise: exerciseSlide, pictureUrl: options.pictureUrl, partHeading: true });
   const title = ownHeading || textHandout ? '' : titleOf(slide);
-  if (slide.kind === 'section') {
-    const label = `Section${slide.data.number?.trim() ? ` ${slide.data.number.trim()}` : ''}`;
+  const section = sectionNumberOf(slide);
+  if (section !== null) {
+    const label = `Section${section ? ` ${section}` : ''}`;
     return `<section class="part sect" data-i="${index}" id="s${number}"><div class="eyebrow">${esc(label)}</div>${title ? `<h2>${esc(title)}</h2>` : ''}\n${body}</section>`;
   }
   // An exercise is marked for the page's script (Contents ticks it once its steps are done) whether or not it has a pill.
@@ -468,7 +478,7 @@ function contentsHtml(slides: PublicSlide[]): string {
     const mark = isExercise(slide)
       ? `${pillHtml(slide)}<span class="done" aria-label="Done">${iconSvg('check-circle', 18)}</span>`
       : '';
-    return `<button type="button" role="menuitem" data-go="${index}"><span class="n">${index + 1}</span><span class="${slide.kind === 'section' ? 'sec' : ''}">${esc(title)}</span>${mark}</button>`;
+    return `<button type="button" role="menuitem" data-go="${index}"><span class="n">${index + 1}</span><span class="${sectionNumberOf(slide) !== null ? 'sec' : ''}">${esc(title)}</span>${mark}</button>`;
   });
   return `<div class="toc" id="toc" role="menu" aria-label="Contents" hidden><div class="hd">Contents</div>${rows.join('')}</div>`;
 }

@@ -105,15 +105,16 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
   // The stage's empty pill is hidden by its own rule once the caret leaves; the placeholder is faint, on the pill.
   const css = readFileSync(fileURLToPath(new URL('./slide.css', import.meta.url)), 'utf8')
   assert.match(css, /\.deck-sl \.tag\[contenteditable\]:empty:not\(:focus\) \{ display: none; \}/)
-  const stage = renderToStaticMarkup(createElement(SlideCanvas, {
-    kind: 'exercise', data, width: 960, theme: BUILT_IN_THEME, borderless: false, assets: {},
+  // Sprint 161 (PR 2, decision 8): the stage draws an Exercise slide as the Steps block its conversion writes, the pill
+  // by #752's rule: none for `tag: ""`, the words for any other (its editing on the slide comes with PR 3's blocks;
+  // Settings' Label row sets it meanwhile).
+  const drawn = (tag: string | undefined) => parse(renderToStaticMarkup(createElement(SlideCanvas, {
+    kind: 'exercise', data: { ...data, tag }, width: 960, theme: BUILT_IN_THEME, borderless: false, assets: {},
     editing: { onText: () => {}, onKey: () => false, onSetIcon: () => {}, focusPath: null, onFocused: () => {} },
-  }))
-  const tag = parse(stage).querySelector('.tag')!
-  assert.equal(tag.getAttribute('contenteditable'), 'plaintext-only')
-  assert.equal(tag.getAttribute('data-ph'), 'Exercise')
-  assert.equal(tag.getAttribute('data-path'), 'tag')
-  assert.equal(tag.getAttribute('aria-multiline'), undefined, 'one line')
+  })))
+  assert.equal(drawn('').querySelector('.blk-pill'), null, 'no pill')
+  assert.equal(drawn('Harjutus').querySelector('.blk-pill')!.text, 'Harjutus')
+  assert.equal(drawn(undefined).querySelector('.blk-pill')!.text, 'Exercise', 'no line: the default')
 }
 
 // ---- Settings' Label row: only on an exercise, the pill's words, the default as its placeholder.
@@ -157,7 +158,8 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
   assert.equal(cleared.undone, written, 'Undo puts back the words that were there')
 }
 
-// ---- The page and the wall show the same pill, or none.
+// ---- The page and the wall show the same pill, or none. Sprint 161 (PR 2): both draw the slide as the Steps block its
+// conversion writes (`.blk-pill`), the pill's words in its `tag` only when the line is written.
 {
   const deckText = (tagLine: string) => DECK.replace('title: Try it\n', `title: Try it\n${tagLine}`)
   const page = (text: string) => {
@@ -171,21 +173,21 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
   }
   for (const [line, words] of [['', 'Exercise'], ['tag: Harjutus\n', 'Harjutus'], ['tag: "Teema: <1> & 2"\n', 'Teema: <1> & 2'], ['tag: ""\n', null]] as const) {
     const { deck, root } = page(deckText(line))
-    const slide = root.querySelector('.deck-sl .tag')
+    const slide = root.querySelector('.deck-sl .blk-pill')
     const label = root.querySelector('.part .lab .tag')
     const contents = root.querySelector('.toc .tag')
-    const onWall = wall(deckText(line)).querySelector('.deck-sl .tag')
+    const onWall = wall(deckText(line)).querySelector('.deck-sl .blk-pill')
     if (words === null) {
       assert.equal(slide, null, 'the page draws no pill on the slide')
       assert.equal(label, null, 'nor beside the part')
       assert.equal(contents, null, 'nor in Contents')
       assert.equal(onWall, null, 'the wall draws none')
-      assert.equal(deck.slides[0].data.tag, '')
+      assert.match(deck.slides[0].data.markdown ?? '', /::: \{\.steps tag=""\}/)
     } else {
       for (const [where, node] of [['slide', slide], ['part', label], ['contents', contents], ['wall', onWall]] as const) {
         assert.equal(node?.text, words, `${where}: ${words}`)
       }
-      assert.equal(deck.slides[0].data.tag, line ? words : undefined, 'the page holds the line only when it is written')
+      assert.equal(/tag=/.test(deck.slides[0].data.markdown ?? ''), !!line, 'the page holds the line only when it is written')
     }
     // Contents still knows it is an exercise, pill or none, so it ticks it once its steps are done.
     assert.equal(root.querySelector('.part')!.hasAttribute('data-exercise'), true)

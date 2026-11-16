@@ -4,9 +4,9 @@
  * A line (a horizontal rule) the person puts in the handout at the top level of a part — `***` with a space or Enter,
  * `---`, or Divider from the / menu — becomes a slide there, in the same step, so one Undo takes it back:
  *
- *  - the new slide is a Statement with a new id, waiting for its layout (Jarmo, 15 November: "las ootab");
- *  - the heading right after the line (an H1 or H2, the part's own) becomes its title, once, as it is made; after that
- *    the two never change each other;
+ *  - the new slide is a block slide with a new id (Sprint 161, PR 2: it was a Statement waiting for its layout);
+ *  - the heading right after the line (an H1 or H2, the part's own) becomes its title (`# `), once, as it is made;
+ *    after that the two never change each other;
  *  - with no such heading after the line, the new part opens with an empty H2 and the caret goes there; the slide then
  *    waits, and takes the first heading the person writes in its part as its title, once (`firstHeadingTitlePlugin`,
  *    as every slide with no title does).
@@ -19,15 +19,16 @@
 import { Extension } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
-import { isBlockSlide, newId, writeSlideBody } from '../../../../../src/decks/deckFormat'
+import { headingMarkdown, isBlockSlide, newId, withBlockMarkdown, writeSlideBody } from '../../../../../src/decks/deckFormat'
+import { blockSlideBody } from '../../../../../src/decks/blocks/convertDeck'
 import { DECK_DERIVED, DECK_OPERATION, emptyPartHeading, isSlideNode, partHeadingAt, slideDataOf, slidesOf } from '../deckDocument'
 import { passes } from './drawnHeadings'
 import { isTrustedDeckTransaction } from './deckGuard'
 
 export const deckLinesKey = new PluginKey('deckLines')
 
-/** The kind a slide made from a line has, until the person (or Claude, asked) lays it out. */
-export const LINE_SLIDE_KIND = 'statement'
+/** The kind a slide made from a line has: a bare block slide (Sprint 161, PR 2; technical plan §6). */
+export const LINE_SLIDE_KIND = ''
 
 /** A line typed on an empty line of its own: `***`, `---` or `___`. */
 const LINE_TEXT = /^(?:\*{3,}|-{3,}|_{3,})$/
@@ -88,7 +89,7 @@ export function slidesFromLines(before: PMNode, state: EditorState, random: () =
   const heading = isPartHeading(next) ? next : null
   const title = heading ? heading.textContent.trim() : ''
   const id = newId(taken, random)
-  const body = writeSlideBody('', title ? { id, title } : { id })
+  const body = blockSlideBody({ id }, title ? `# ${headingMarkdown(title)}` : '')
   tr.replaceWith(at, at + 1, slideType.create({ kind: LINE_SLIDE_KIND, body, notes: null }))
   const start = at + 1
   if (heading) {
@@ -185,11 +186,16 @@ export function titlesFromHeadings(state: EditorState): Transaction | null {
   const { from, to } = state.selection
   for (const slide of slidesOf(state.doc)) {
     const id = slide.data.id
-    // A block slide's title is its own first heading (Sprint 161): the handout's heading never writes it.
-    if (!id || !titles.waiting.has(id) || (slide.data.title ?? '').trim() || isBlockSlide(slide.kind)) continue
+    if (!id || !titles.waiting.has(id) || (slide.data.title ?? '').trim()) continue
+    // A block slide's title is its own first heading (Sprint 161): the handout's heading gives one only to an empty
+    // slide (a line's, PR 2), as its `# ` title; a slide with words of its own is never written to.
+    if (isBlockSlide(slide.kind) && (slide.data.markdown ?? '').trim()) continue
     const heading = writtenHeadingOf(state.doc, slide.pos)
     if (!heading || (from >= heading.from && to <= heading.to)) continue
-    tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, body: writeSlideBody(slide.node.attrs.body, { ...slide.data, title: heading.text }) })
+    const body = isBlockSlide(slide.kind)
+      ? withBlockMarkdown(slide.node.attrs.body, `# ${headingMarkdown(heading.text)}`)
+      : writeSlideBody(slide.node.attrs.body, { ...slide.data, title: heading.text })
+    tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, body })
   }
   return tr.docChanged ? tr.setMeta(DECK_OPERATION, true) : null
 }

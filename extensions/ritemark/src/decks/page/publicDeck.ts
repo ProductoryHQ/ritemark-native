@@ -31,6 +31,7 @@ import { createHash } from 'node:crypto';
 import { marked, Tokenizer, type Token } from 'marked';
 import { blockTitleOf, frontMatterLook, isBlockSlide, isSlideKind, isTextHandout, parseDeck, slideDataOf, type SlideData, type SlideItem } from '../deckFormat';
 import { BLOCK_MAX_STEP, isCoverSlide, sidePictureOf } from '../blocks/slideRenderer';
+import { legacyDataToBlocks } from '../blocks/legacyToBlocks';
 import type { DeckTheme } from '../deckTheme';
 import { MAX_STEP } from '../../../webview/src/components/decks/slide/layoutSlide';
 
@@ -146,8 +147,16 @@ export function drawnData(kind: string, data: SlideData): SlideData {
  * and the page (`publicDeck`). A v1 slide: its kind and what its layout draws (`drawnData`). A block slide: its title,
  * its Markdown with comments, `<mark>` tags and private fences taken out (`publicMarkdown`), and a picture beside or
  * behind it; never its header's id, from, kept or skip. A kind this build doesn't know: `other`, its title alone.
+ *
+ * PR 2 (decision 8 of the approved plan): a v1 slide of the nine kinds goes out as the block slide `legacyToBlocks`
+ * draws it, as the deck view draws it and its first edit writes it. The words its layout keeps hidden are the
+ * conversion's comment, never its Markdown, so they stay private (`drawnData`'s rule, kept).
  */
 export function publicSlide(kind: string, data: SlideData): { kind: string; data: SlideData } {
+  if (isSlideKind(kind)) {
+    const blocks = legacyDataToBlocks(kind, drawnData(kind, data));
+    return publicSlide('', { ...blocks.header, markdown: blocks.markdown });
+  }
   if (isBlockSlide(kind)) {
     const markdown = publicMarkdown(data.markdown ?? '');
     const out: SlideData = { markdown };
@@ -350,15 +359,19 @@ export function publicDeck(input: string, options: PublicDeckOptions): PublicDec
   const text = input.replace(/^\uFEFF/, '').replace(/^---[ \t]*\r?\n---[ \t]*(?:\r?\n|$)/, '');
   const parsed = parseDeck(text);
   const slides: PublicSlide[] = [];
+  // The kind each shown slide was written as: a v1 Title slide goes out as blocks (PR 2), and still names the page.
+  const writtenKinds: string[] = [];
   parsed.slides.forEach((block, index) => {
     const data = slideDataOf(block.kind, block.body);
     if (data.skip) return;
     const shown = publicSlide(block.kind, data);
+    writtenKinds.push(block.kind);
     slides.push({
       kind: shown.kind,
       data: shown.data,
       handout: publicMarkdown(text.slice(block.handoutStart, block.handoutEnd)),
-      step: stepOf(options.steps, index, isBlockSlide(block.kind) ? BLOCK_MAX_STEP : MAX_STEP),
+      // A v1 slide of the nine kinds is drawn as blocks too (PR 2), so its fit is the block fit's.
+      step: stepOf(options.steps, index, isBlockSlide(block.kind) || isSlideKind(block.kind) ? BLOCK_MAX_STEP : MAX_STEP),
     });
   });
   const first = parsed.slides[0];
@@ -367,8 +380,8 @@ export function publicDeck(input: string, options: PublicDeckOptions): PublicDec
   const unclosedFrontMatter = parsed.bodyStart === 0 && /^---[ \t]*\r?\n/.test(text);
   const preamble = unclosedFrontMatter ? '' : publicMarkdown(text.slice(parsed.bodyStart, first ? first.start : text.length));
   // The title slide's title; in a deck of block slides, a first slide that is only a title (the cover look).
-  const titleSlide = slides.find(slide => slide.kind === 'title' && (slide.data.title ?? '').trim())
-    ?? (slides[0] && isBlockSlide(slides[0].kind) && isCoverSlide(slides[0].data.markdown ?? '') && (slides[0].data.title ?? '').trim() ? slides[0] : undefined);
+  const titleSlide = slides.find((slide, index) => (slide.kind === 'title' || writtenKinds[index] === 'title') && (slide.data.title ?? '').trim())
+    ?? (slides[0] && isBlockSlide(writtenKinds[0] ?? slides[0].kind) && isCoverSlide(slides[0].data.markdown ?? '') && (slides[0].data.title ?? '').trim() ? slides[0] : undefined);
   return {
     title: (titleSlide?.data.title ?? '').trim() || options.deckName.trim(),
     client: options.folderName.trim(),

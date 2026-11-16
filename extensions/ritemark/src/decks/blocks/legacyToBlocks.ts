@@ -79,7 +79,7 @@ function pictureTarget(path: string): string {
  * An attribute value in a div's `{…}`, which has no escapes: in double quotes, or in single quotes when it holds a
  * double quote; a value with both keeps its words with a typographic quote. A line break is a space.
  */
-function attributeValue(value: string): string {
+export function attributeValue(value: string): string {
   const words = value.replace(/[\r\n]+/g, ' ');
   if (!words.includes('"')) return `"${words}"`;
   if (!words.includes("'")) return `'${words}'`;

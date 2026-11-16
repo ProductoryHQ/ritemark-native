@@ -42,7 +42,6 @@
 .deck-stage { position: absolute; top: 0; bottom: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; }
 .deck-stage .deck-stage-group { margin: auto 0; padding: 8px 0 48px; }
 .deck-stage .deck-big { position: relative; margin: 0 24px; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline), 0 8px 24px -10px rgba(30, 27, 75, 0.35); }
-.deck-stage .deck-under { margin: 12px 24px 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; } /* one column no wider than the stage, so a long notes preview ends with … (Sprint 159, the Experience lead) */
 .deck-source { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--r-ink-muted); }
 
 .deck-divider { position: absolute; top: 0; bottom: 0; width: 13px; margin-left: -6px; cursor: col-resize; z-index: 3; touch-action: none; }
@@ -143,14 +142,6 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 
 /* Under the slide: quiet lines that never reach the wall (prototype `.srcl`, `.notesr`, `.notes`) */
 .deck-source .deck-line-action { height: auto; padding: 0; font-size: 12px; line-height: 16px; font-weight: 500; }
-.deck-notes-toggle { height: 24px; padding: 0 6px 0 0; gap: 6px; width: max-content; max-width: 100%; font-size: 12.5px; font-weight: 500; color: var(--r-ink-body); }
-.deck-notes-toggle:hover { background: transparent; color: var(--r-ink-strong); }
-.deck-notes-toggle svg { color: var(--r-ink-muted); transition: transform .15s; }
-.deck-notes-toggle.is-open svg { transform: rotate(90deg); }
-.deck-notes-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.deck-notes { min-height: 60px; padding: 10px 12px; border-radius: 8px; background: #FFFBEB; box-shadow: inset 0 0 0 1px #FDE68A; font: 400 13px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #713F12; outline: 0; white-space: pre-wrap; cursor: text; }
-.deck-notes:empty::before { content: attr(data-ph); color: #A16207; opacity: .7; }
-.deck-notes:focus { box-shadow: inset 0 0 0 2px #F59E0B; }
 
 /* The strip's + between thumbnails, its menus, and a thumbnail being dragged (prototype `.gapz`, `.addend`, `.menu`) */
 .deck-gap { position: relative; height: 0; }
@@ -175,8 +166,10 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-menu-key { padding-left: 16px; font-size: 12px; letter-spacing: .5px; color: var(--r-ink-faint); }
 
 /* The bar's notice: a deleted slide's Undo, the line hint (quiet, as the prototype's toasts) */
-.deck-notice { display: inline-flex; align-items: center; gap: 8px; min-width: 0; margin-left: 12px; font-size: 12.5px; color: var(--r-ink-body); }
-.deck-notice-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deck-notice { display: inline-flex; flex: 0 1 auto; align-items: center; gap: 8px; min-width: 0; overflow: hidden; margin-left: 12px; font-size: 12.5px; color: var(--r-ink-body); }
+/* A long notice gives way, never the bar's controls (PR 2: Present lost its label under the conversion's line). */
+.deck-bar > :not(.deck-notice):not(.flex-1) { flex-shrink: 0; }
+.deck-notice-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Slide settings (17 November, "Nothing around the slide but the slide"): a 28 px gear (Phosphor `gear`) in the deck's bar after the
    count, its popup under it (a Popover, DeckView). Muted; ink on a quiet fill on hover; the bar's `on` while open. */
@@ -253,7 +246,6 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-change .deck-use-it { height: 26px; padding: 0 10px; font-size: 12px; white-space: nowrap; }
 /* Under a narrow slide (16 November), the line's words have a line of their own and its buttons go on the next one; it
    never squeezes into a column beside them. */
-.deck-stage .deck-under { container-type: inline-size; }
 @container (max-width: 560px) {
   .deck-change { flex-wrap: wrap; row-gap: 6px; }
   .deck-change > span:first-child { flex: 1 0 100%; }
@@ -287,3 +279,25 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-start .deck-start-deck-where { font-weight: 400; font-size: 12px; line-height: 16px; color: var(--r-ink-muted); }
 .deck-start .deck-start-more { color: var(--r-accent); }
 .deck-start .deck-start-more:hover { color: var(--r-accent); }
+
+/* Sprint 161 (PR 2): the slide written on in place (blocks/SlideEditor.tsx). slide.css's block rules draw it, as they
+   draw its thumbnail, the wall and the page; these are only the editor's own, and undo what the document editor's
+   global `.ProseMirror` rules (index.css) would add to it. */
+.deck-sl.is-blocks.is-editing .blk-flow { white-space: pre-wrap; cursor: text; }
+.deck-sl.is-blocks.is-editing .blk-flow[contenteditable],
+.deck-sl.is-blocks.is-editing .blk-flow[contenteditable]:hover,
+.deck-sl.is-blocks.is-editing .blk-flow[contenteditable]:focus { box-shadow: none; border-radius: 0; min-height: 0; }
+.deck-sl.is-blocks.is-editing .blk-inner { display: contents; }
+.deck-sl.is-blocks.is-editing .blk-box > .blk-inner > * { margin-bottom: 0; }
+.deck-sl.is-blocks.is-editing .blk-column > :last-child, .deck-sl.is-blocks.is-editing .blk-box > .blk-inner > :last-child { margin-bottom: 0; }
+.deck-sl.is-blocks.is-editing .blk-pill, .deck-sl.is-blocks.is-editing .blk-icon, .deck-sl.is-blocks.is-editing .blk-mark { user-select: none; }
+.deck-sl.is-blocks.is-editing blockquote { border-left: 0; }
+.deck-sl.is-blocks.is-editing table { width: auto; }
+.deck-sl.is-blocks.is-editing th { border: 0; }
+.deck-sl.is-blocks.is-editing td { border-left: 0; border-right: 0; border-bottom: 0; }
+.deck-sl.is-blocks.is-editing .tableWrapper { overflow: visible; margin: 0; }
+.deck-sl.is-blocks.is-editing .blk-flow img { display: block; max-width: 100%; max-height: 310px; margin: .2em 0 .4em; border-radius: var(--s-r2, 10px); object-fit: contain; }
+.deck-sl.is-blocks.is-editing .blk-flow img.ProseMirror-selectednode { outline: 3px solid var(--s-foc, rgba(242,181,68,.7)); }
+/* An empty slide's title waits for its words. */
+.deck-sl.is-blocks.is-editing .is-empty[data-placeholder]::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--s-ph, rgba(255,255,255,.35)); }
+.deck-slide.is-borderless .deck-sl.is-blocks.is-editing .is-empty[data-placeholder]::before { color: var(--s-ph, rgba(28,31,74,.3)); }

@@ -31,6 +31,8 @@ type HTMLNode = ReturnType<typeof parse>
 const { SlideCanvas } = await import('./SlideCanvas')
 const { slideMarkup, escapeHtml, styleText } = await import('./slideMarkup')
 const { BUILT_IN_THEME } = await import('../../../../../src/decks/deckTheme')
+const { blockSlideMarkup } = await import('../../../../../src/decks/blocks/slideRenderer')
+const { publicSlide } = await import('../../../../../src/decks/page/publicDeck')
 const { PAGE_ICON_PATHS, iconSvg } = await import('./pageIcons')
 const { SLIDE_ICONS } = await import('./iconSet')
 
@@ -97,7 +99,12 @@ for (const borderless of [false, true]) {
   for (const slide of slides) {
     const label = `${slide.label}, ${borderless ? 'Borderless' : 'Card'}`
     const react = renderToStaticMarkup(createElement(SlideCanvas, { kind: slide.kind, data: slide.data, width: 960, theme: BUILT_IN_THEME, borderless, assets: pictures }))
-    const page = slideMarkup(slide.kind, slide.data, { theme: BUILT_IN_THEME, borderless, width: 960, inlineTheme: true, pictureUrl: path => pictures[path] ?? null })
+    // Sprint 161 (PR 2, decision 8): the nine kinds go to the page as the block slide their conversion writes
+    // (`publicSlide`), drawn by the one block renderer; the deck view draws them the same way. A kind this build doesn't
+    // know is still drawn by its layout on both.
+    const shown = publicSlide(slide.kind, slide.data as SlideData)
+    const drawing = { theme: BUILT_IN_THEME, borderless, width: 960, inlineTheme: true, pictureUrl: (path: string) => pictures[path] ?? null }
+    const page = shown.kind === '' ? blockSlideMarkup(shown.data, drawing) : slideMarkup(slide.kind, slide.data, drawing)
     assert.deepEqual(shape(parse(page)), shape(parse(react)), label)
     // Each icon's drawing, too: the path React's Phosphor icon draws is the one the page draws.
     const paths = (html: string) => parse(html).querySelectorAll('svg path').map(path => path.getAttribute('d'))

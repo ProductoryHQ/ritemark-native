@@ -24,20 +24,21 @@ for (const [place, word] of Object.entries(PRIVATE_WORDS)) {
 for (const word of PUBLIC_WORDS) assert.ok(json.includes(word), `"${word}" goes public`);
 
 // The slides: the skipped one is gone, the rest are in their order, renumbered as the page counts them.
-assert.deepEqual(deck.slides.map(slide => slide.kind), ['title', 'section', 'exercise', 'columns', 'boxes']);
+// Sprint 161 (PR 2, decision 8): every v1 slide goes out as the block slide its conversion writes.
+assert.deepEqual(deck.slides.map(slide => slide.kind), ['', '', '', '', '']);
 assert.equal(deck.title, 'Harbour title', 'the title slide\'s title is the page\'s title');
 assert.equal(deck.client, 'Harbour Logistics', 'the deck\'s folder is the client line');
 assert.equal(deck.look, 'borderless', 'the look holds, from the front matter (whose lines never go)');
 assert.equal(deck.theme, BUILT_IN_THEME);
 
-// Only what each layout draws: no id, from or kept line, no items a Title slide keeps for other layouts, no third
-// column, no Exercise step's line, no icon under a Line look.
+// Only what each layout draws, as blocks: no id, from or kept line, no items a Title slide keeps for other layouts, no
+// third column, no Exercise step's line, no icon under a Line look (those are the conversion's comment, never public).
 const [title, section, exercise, columns, boxes] = deck.slides;
-assert.deepEqual(title.data, { title: 'Harbour title', subtitle: 'Harbour Logistics · 3 hours' });
-assert.deepEqual(section.data, { title: 'Why agents?', number: '1' });
-assert.deepEqual(exercise.data, { title: 'Build an assistant for one task', items: [{ heading: 'Choose a task' }, { heading: 'Write it down' }] });
-assert.deepEqual(columns.data.items, [{ heading: 'Left column', text: 'Answers when you ask' }, { heading: 'Right column', text: 'Works on a goal' }]);
-assert.deepEqual(boxes.data, { title: 'Read the room', look: 'line', items: [{ heading: 'When', text: 'Every Monday' }] });
+assert.deepEqual(title.data, { title: 'Harbour title', markdown: '# Harbour title\n\nHarbour Logistics · 3 hours' });
+assert.deepEqual(section.data, { title: 'Why agents?', markdown: '1\n\n# Why agents?' });
+assert.deepEqual(exercise.data, { title: 'Build an assistant for one task', markdown: '# Build an assistant for one task\n\n::: steps\n1. Choose a task\n2. Write it down\n:::' });
+assert.equal(columns.data.markdown, '# Assistant or agent?\n\n:::: columns\n::: column\n### Left column\nAnswers when you ask\n:::\n::: column\n### Right column\nWorks on a goal\n:::\n::::');
+assert.deepEqual(boxes.data, { title: 'Read the room', markdown: '# Read the room\n\n:::: {.boxes look="line"}\n::: box\n### When\nEvery Monday\n:::\n::::' });
 
 // The handout: the words an anchored comment sat on stay; the comment, its id and the standalone note go; a stray
 // notes fence goes; an ordinary prompt stays, a comment written inside one stays as its words.
@@ -148,11 +149,12 @@ assert.equal(publicMarkdown('```notes\nsecret\n> ```\nmore secret\n```\n\nafter'
   assert.notEqual(digest(base, { folderName: 'Another client' }), same, 'the client line');
 }
 
-// The fit steps the open view measured, by the slide's place in the deck (skipped slides counted), kept within 0–3.
+// The fit steps the open view measured, by the slide's place in the deck (skipped slides counted), kept within 0–5 (a v1
+// slide is drawn as blocks since PR 2, so it has the block fit's six steps).
 {
   const text = '```slide title\ntitle: A\n```\n\n```slide points\ntitle: B\nskip: true\n```\n\n```slide points\ntitle: C\n```\n';
   const fitted: PublicDeck = publicDeck(text, { ...options, steps: [1, 3, 9] });
-  assert.deepEqual(fitted.slides.map(slide => slide.step), [1, 3]);
+  assert.deepEqual(fitted.slides.map(slide => slide.step), [1, 5]);
   assert.deepEqual(publicDeck(text, { ...options, steps: [-2, 0, Number.NaN] }).slides.map(slide => slide.step), [0, 0]);
 }
 

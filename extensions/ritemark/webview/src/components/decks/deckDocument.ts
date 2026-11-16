@@ -5,7 +5,9 @@
  */
 import type { Fragment, Node as PMNode } from '@tiptap/pm/model'
 import { EditorState, type Transaction } from '@tiptap/pm/state'
-import { derivedHeading, isBlockSlide, newId, slideDataOf as readSlideData, partHeadingLevel, writeSlideBody, writeSlideData, type SlideData } from '../../../../src/decks/deckFormat'
+import { derivedHeading, isBlockSlide, newId, slideDataOf as readSlideData, partHeadingLevel, splitBlockSlide, withBlockMarkdown, writeSlideBody, writeSlideData, type SlideData } from '../../../../src/decks/deckFormat'
+import { blockSlideBody, drawsAsBlocks } from '../../../../src/decks/blocks/convertDeck'
+import { legacyDataToBlocks } from '../../../../src/decks/blocks/legacyToBlocks'
 
 /** Meta on the deck view's own transactions (the strip's operations): the guard lets them through. */
 export const DECK_OPERATION = 'deckOperation'
@@ -260,12 +262,26 @@ export function restoreSlide(state: EditorState, at: number, content: Fragment):
   return operation(state.tr.insert(insertPoint(state.doc, at), content))
 }
 
-/** A new empty slide of `kind` before part `at` (at the end when `at` is the count); returns where it went. */
+/**
+ * The Markdown a new block slide starts with, for the strip's choice: empty boxes or steps to type into, or nothing
+ * (an empty title). As the conversion writes an empty slide of that kind (`legacyToBlocks`).
+ */
+export function starterMarkdown(kind: string): string {
+  if (kind === 'boxes') return legacyDataToBlocks('boxes', { items: [{}, {}, {}] }).markdown
+  return ''
+}
+
+/**
+ * A new empty slide of `kind` before part `at` (at the end when `at` is the count); returns where it went. Since PR 2
+ * (Sprint 161) a new slide of the nine kinds is a block slide, with the strip's choice as its first blocks.
+ */
 export function insertSlide(state: EditorState, at: number, kind: string, random: () => number = Math.random, textHandout = false): Transaction | null {
   const type = state.schema.nodes.deckSlide
   if (!type) return null
-  const body = writeSlideBody('', { id: newId(idsOf(state.doc), random) })
-  const slide = type.create({ kind, body, notes: null })
+  const id = newId(idsOf(state.doc), random)
+  const blocks = drawsAsBlocks(kind)
+  const body = blocks ? blockSlideBody({ id }, starterMarkdown(kind)) : writeSlideBody('', { id })
+  const slide = type.create({ kind: blocks ? '' : kind, body, notes: null })
   const point = insertPoint(state.doc, at)
   // Room for its words. Its heading is drawn by the deck view, following the title typed on the slide until the person
   // writes in the handout (handout/drawnHeadings.ts); in a deck marked `handout: text`, where nothing is drawn, the part
@@ -284,6 +300,18 @@ export function updateSlide(state: EditorState, index: number, data: SlideData, 
   const nextKind = kind ?? slide.kind
   if (body === slide.node.attrs.body && nextKind === slide.kind) return null
   return state.tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, body, kind: nextKind })
+}
+
+/**
+ * Change part `index`'s block slide's Markdown (Settings' Label row, a picture put in), its header kept. Null for a
+ * slide that isn't a block slide, or when the Markdown is the same.
+ */
+export function updateSlideMarkdown(state: EditorState, index: number, markdown: string): Transaction | null {
+  const slide = slidesOf(state.doc)[index]
+  if (!slide || !isBlockSlide(slide.kind)) return null
+  const parts = splitBlockSlide(slide.node.attrs.body)
+  if (parts.markdown === markdown) return null
+  return state.tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, body: withBlockMarkdown(slide.node.attrs.body, markdown) })
 }
 
 /** Put `content` in place of part `index` (the library's version of a copy, or the copy back again), as one step. */

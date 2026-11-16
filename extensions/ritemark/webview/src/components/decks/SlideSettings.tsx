@@ -72,6 +72,11 @@ interface SlideSettingsProps {
   onUndo: (redo: boolean) => void
   /** The lines about the slide, first (`SlideAbout`); none, and the settings start at once. */
   about?: ReactNode
+  /**
+   * Sprint 161 (PR 2): a slide drawn as blocks with a Steps block: its pill's words (#752's Label row, which brings an
+   * emptied pill back), and their change.
+   */
+  stepsTag?: { value: string; onChange: (tag: string) => void }
 }
 
 /** The library's topic or the deck a copy came from, as its plain line before the host has read the copy's state. */
@@ -125,7 +130,7 @@ export function SlideAbout({ data, sourceLines, hidden, table }: SlideAboutProps
   )
 }
 
-export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about }: SlideSettingsProps) {
+export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about, stepsTag }: SlideSettingsProps) {
   const skipId = `deck-skip-${number}`
   const tagId = `deck-tag-${number}`
   return (
@@ -169,6 +174,27 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
             options={LOOKS}
           />
         </>
+      ) : null}
+      {stepsTag ? (
+        <div className="deck-settings-row deck-settings-tag">
+          <Label htmlFor={tagId}>Label</Label>
+          <Input
+            id={tagId}
+            className="deck-settings-field"
+            placeholder={EXERCISE_TAG}
+            value={stepsTag.value}
+            onChange={event => {
+              const tag = oneLine(event.target.value)
+              if (tag !== stepsTag.value) stepsTag.onChange(tag)
+            }}
+            onKeyDown={event => {
+              const step = undoKeyOf({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, isComposing: event.nativeEvent.isComposing })
+              if (!step) return
+              event.preventDefault()
+              onUndo(step === 'redo')
+            }}
+          />
+        </div>
       ) : null}
       {kind === 'exercise' ? (
         <div className="deck-settings-row deck-settings-tag">

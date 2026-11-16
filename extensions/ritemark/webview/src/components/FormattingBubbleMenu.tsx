@@ -36,13 +36,20 @@ interface FormattingBubbleMenuProps {
   onExternalLinkEditDone?: () => void
   /** Sprint 94 (#81): show the "Comment" action (gated on the comment-callouts flag). */
   commentCallouts?: boolean
+  /**
+   * Sprint 161 (PR 2): put the menu in `document.body`. The deck's stage draws its slide scaled (`transform: scale`),
+   * and tippy's default puts an interactive menu beside its reference, inside the scaled frame, drawn small and
+   * offset by the scale (spike §1).
+   */
+  appendToBody?: boolean
 }
 
 export function FormattingBubbleMenu({
   editor,
   externalLinkEdit,
   onExternalLinkEditDone,
-  commentCallouts = false
+  commentCallouts = false,
+  appendToBody = false
 }: FormattingBubbleMenuProps) {
   // Link dialog state management
   const [showLinkDialog, setShowLinkDialog] = useState(false)
@@ -294,6 +301,7 @@ export function FormattingBubbleMenu({
         editor={editor}
         tippyOptions={{
           maxWidth: 'none', // Remove default max-width constraint
+          ...(appendToBody ? { appendTo: () => document.body } : {}),
           onCreate: (instance) => {
             toolbarTippy.current = instance
           },
