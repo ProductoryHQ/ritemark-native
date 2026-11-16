@@ -1,0 +1,231 @@
+---
+deck: 2
+theme: Slide library/Themes/Evening.theme.md
+---
+
+```slide
+---
+id: t001
+---
+# AI assistants and agents
+
+Harbour Logistics · 3 hours · 12 November 2026
+```
+
+## Welcome
+
+Everything you need today is on this page: the slides, the steps of each exercise and every prompt, ready to copy.
+
+<!-- Welcome everyone. Ask who has used ChatGPT at work this week. -->
+
+```slide
+---
+id: p002
+---
+# Today
+
+1. Why agents?
+2. An assistant's four parts
+3. Exercise: build an assistant
+4. Scheduled prompts
+5. Exercise: triage the inbox
+6. What to try on Monday
+```
+
+Three hours, two exercises, one break at the half.
+
+```slide
+---
+id: s003
+---
+# Shared prompt board
+
+Every prompt from today, ready to copy. It is this page.
+```
+
+Keep this page open on your own screen. Every prompt has a Copy button.
+
+```slide
+---
+id: c004
+---
+1
+
+# Why agents?
+```
+
+```slide
+---
+id: g001
+from: Slide library/Agents.deck.md#g1 @ssvkiv
+---
+# Why talk about agents?
+
+1. They work on a goal, not a question
+2. They use tools and files
+3. They report back when they are done
+```
+
+Agents change who does the steps. You still decide what good looks like.
+
+```slide
+---
+id: a001
+from: Slide library/AI assistants.deck.md#a1 @j4kptu
+---
+# An assistant's four parts
+
+:::: boxes
+::: {.box icon="list-checks"}
+### Instructions
+What it does, in what order, and what it never does
+:::
+::: {.box icon="book-open"}
+### Knowledge
+The files or folder it answers from
+:::
+::: {.box icon="puzzle"}
+### Skills
+Small skills it can call on
+:::
+::: {.box icon="wrench"}
+### Tools
+What it may open, send or change for you
+:::
+::::
+```
+
+An assistant is set up once and used every day. Its four parts decide what it does well, and what it must never do.
+
+TRY IT
+
+```
+You are an assistant for the customer service team. Answer only from the files in the Policies folder. If the answer isn't there, say so and name who to ask.
+```
+
+```slide
+---
+id: a002
+from: Slide library/AI assistants.deck.md#a2 @62g062
+---
+# Assistant or agent: which one?
+
+:::: columns
+::: column
+### Assistant
+Answers when you ask
+Works in the chat
+You check every step
+:::
+::: column
+### Agent
+Works on a goal by itself
+Uses tools and files
+You check the result
+:::
+::::
+```
+
+An agent is given a goal, not a question. It picks the steps, uses tools and files, and comes back with a result you check.
+
+```slide
+---
+id: e006
+---
+# Build an assistant for one task
+
+::: steps
+1. Choose a task from your week
+2. Write its instructions
+3. Give it two files
+4. Try it on three real questions
+:::
+```
+
+1. Choose a task you did last week and will do again.
+2. Write the instructions with the prompt below.
+3. Add two files it should answer from.
+4. Ask it three questions you were really asked.
+
+PROMPT
+
+```
+Help me write instructions for an assistant that does one task: [the task]. Ask me five questions first, then write the instructions in under 200 words.
+```
+
+```slide
+---
+id: c009
+---
+2
+
+# Scheduled prompts
+```
+
+```slide
+---
+id: g002
+from: Slide library/Agents.deck.md#g2 @3flaj0
+---
+# A scheduled prompt, step by step
+
+:::: {.boxes look="line"}
+::: box
+### When
+Every Monday at 8:00
+:::
+::: box
+### What it reads
+The week's new emails
+:::
+::: box
+### What it writes
+Three groups and two drafts
+:::
+::: box
+### Who it tells
+You, in one message
+:::
+::::
+```
+
+The first agent most people use is a prompt that runs on a schedule.
+
+```slide
+---
+id: d006
+from: Northwind/Data in Excel.deck.md#n1 @8wkbxg
+---
+# Which tool for which data
+
+| Data | In the chat | In Excel |
+| --- | --- | --- |
+| Public | Yes | Yes |
+| Anonymous | With an approved tool | Yes |
+| Internal | Company account only | Yes, on a copy |
+```
+
+The table every team asks for first. Fill in your own company's tools.
+
+```slide
+---
+id: d005
+skip: true
+---
+# What a clean table looks like
+
+One row per record, one column per field, nothing merged.
+```
+
+Paste a screenshot of your own table here when you adapt this slide.
+
+```slide
+---
+id: s013
+---
+# What to try on Monday
+
+One task, one assistant, three real questions.
+```
+
+Thank you. The page stays online after today.

@@ -28,11 +28,11 @@ assert.equal(
 
 // A copy's paths are rebased into the target deck's folder: the picture and the handout's links.
 {
-  const rebased = rebaseSlide('id: a1\ntitle: T\nimage: images/agent.png', 'Use ![shot](images/s.png) and [the brief](Brief.md).', 'Slide library', 'Clients/Harbour');
+  const rebased = rebaseSlide('id: a1\ntitle: T\nimage: images/agent.png', 'Use ![shot](images/s.png) and [the brief](Brief.md).', 'Slide library', 'Clients/Harbour', 'boxes');
   assert.equal(rebased.body, 'id: a1\ntitle: T\nimage: ../../Slide library/images/agent.png');
   assert.equal(rebased.handout, 'Use ![shot](<../../Slide library/images/s.png>) and [the brief](<../../Slide library/Brief.md>).');
   // Sprint 159 (PR 2, Codex): a path that needs quoting stays one path, quoted, and every other line as written
-  const quoted = rebaseSlide('id: a1\ntitle: T\nimage: "images/foo #1.png"\nlook: steps', '', 'Slide library', 'Clients/Harbour');
+  const quoted = rebaseSlide('id: a1\ntitle: T\nimage: "images/foo #1.png"\nlook: steps', '', 'Slide library', 'Clients/Harbour', 'boxes');
   assert.equal(parseSlideBody(quoted.body).image, '../../Slide library/images/foo #1.png');
   assert.equal(quoted.body, 'id: a1\ntitle: T\nimage: "../../Slide library/images/foo #1.png"\nlook: steps');
 }
@@ -43,7 +43,7 @@ assert.equal(
   const base = slideStamp('boxes', data, 'Text with ![x](images/s.png).', 'Slide library');
   assert.match(base, /^[0-9a-z]{6}$/);
   assert.equal(slideStamp('boxes', { ...data, id: 'zz99', from: 'x#y @z', kept: true, skip: true }, 'Text with ![x](images/s.png).', 'Slide library'), base);
-  assert.equal(slideStamp('boxes', { ...data, image: '../../Slide library/images/a.png' }, rebaseSlide('', 'Text   with\n![x](images/s.png).', 'Slide library', 'Clients/Harbour').handout, 'Clients/Harbour'), base, 'a rebased copy is not changed');
+  assert.equal(slideStamp('boxes', { ...data, image: '../../Slide library/images/a.png' }, rebaseSlide('', 'Text   with\n![x](images/s.png).', 'Slide library', 'Clients/Harbour', 'boxes').handout, 'Clients/Harbour'), base, 'a rebased copy is not changed');
   assert.notEqual(slideStamp('points', data, 'Text with ![x](images/s.png).', 'Slide library'), base, 'kind');
   assert.notEqual(slideStamp('boxes', { ...data, title: 'Five parts' }, 'Text with ![x](images/s.png).', 'Slide library'), base, 'words');
   assert.notEqual(slideStamp('boxes', data, 'Other text.', 'Slide library'), base, 'handout (answer 2)');
@@ -93,10 +93,12 @@ assert.equal(
   assert.notEqual(slideStamp('boxes', data, '### Smaller\n\nText.', 'Slide library'), base, 'an H3 is text, not the part\'s heading');
   // A from: line written before this counted the heading: that stamp still names the slide as it was.
   const legacy = slideStamps('boxes', data, '## Four parts\n\nText.', 'Slide library');
-  assert.equal(legacy.length, 2);
+  // Sprint 161: today's stamp first (the block stamp), then the v1 stamps without and with the heading.
+  assert.equal(legacy.length, 3);
   assert.equal(legacy[0], base);
-  assert.notEqual(legacy[1], base);
-  assert.deepEqual(slideStamps('boxes', data, 'Text.', 'Slide library'), [base], 'no heading: one stamp');
+  assert.ok(legacy.slice(1).every(stamp => stamp !== base));
+  assert.equal(slideStamps('boxes', data, 'Text.', 'Slide library')[0], base, 'no heading: today\'s stamp first');
+  assert.equal(slideStamps('boxes', data, 'Text.', 'Slide library').length, 2, 'and the one v1 stamp');
 }
 
 

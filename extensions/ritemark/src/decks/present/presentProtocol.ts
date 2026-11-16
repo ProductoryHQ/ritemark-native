@@ -8,6 +8,9 @@
  * new reaches the wall by accident.
  */
 import type { SlideData, SlideItem } from '../deckFormat';
+import { publicSlide } from '../page/publicDeck';
+import { slidePicturePaths } from '../blocks/slideRenderer';
+import { partComments, type PartComment } from './partComments';
 import type { DeckTheme } from '../deckTheme';
 import { presentTitleOf, type PresentSlide, type PresentView } from './presentSession';
 
@@ -57,6 +60,8 @@ export interface PresenterState {
   next: WallSlide | null;
   /** The current slide's speaker notes ('' without any). */
   notes: string;
+  /** Sprint 161: the current slide's part's comments, in order ("Your comments"). Only the presenter view gets them. */
+  comments: PartComment[];
   position: number | null;
   count: number;
   skipped: boolean;
@@ -137,17 +142,27 @@ export function wallDataOf(data: SlideData): SlideData {
     });
   }
   if (Array.isArray(data.rows)) out.rows = data.rows.map(row => row.map(cell => String(cell)));
+  if (typeof data.markdown === 'string') out.markdown = data.markdown;
   return out;
 }
 
+/**
+ * A slide as the room sees it. Sprint 161: through `publicSlide`, the page's own rule, so the wall and the page show
+ * the same: what a v1 layout draws (never the words it keeps hidden), a block slide's Markdown without its comments,
+ * and never a header's id, from, kept or skip. `wallDataOf` then copies its fields one by one.
+ */
 export function wallSlideOf(slide: PresentSlide): WallSlide {
-  return { number: slide.index + 1, kind: slide.kind, title: presentTitleOf(slide), data: wallDataOf(slide.data) };
+  const shown = publicSlide(slide.kind, slide.data);
+  // Its title as the room may see it: a block slide's from its public Markdown (`publicSlide`).
+  const title = presentTitleOf({ ...slide, data: shown.data });
+  return { number: slide.index + 1, kind: shown.kind, title, data: wallDataOf(shown.data) };
 }
 
 /** The pictures the wall's state names: the current slide's and the shown slides'. */
 export function wallPicturePaths(view: PresentView): string[] {
   const paths = new Set<string>();
-  for (const slide of [view.current, ...view.shown]) if (slide.data.image) paths.add(slide.data.image);
+  // Only what the room may see (`publicSlide`): a picture a layout doesn't draw is never asked for.
+  for (const slide of [view.current, ...view.shown]) for (const picture of slidePicturePaths(publicSlide(slide.kind, slide.data).data)) paths.add(picture);
   return [...paths].sort();
 }
 
@@ -175,8 +190,8 @@ export function wallStateOf(
 /** The pictures the presenter view names: the wall's, the next slide's, and the one on the slide the wall last got. */
 export function presenterPicturePaths(view: PresentView, onWall?: WallSlide): string[] {
   const paths = new Set(wallPicturePaths(view));
-  if (view.next?.data.image) paths.add(view.next.data.image);
-  if (onWall?.data.image) paths.add(onWall.data.image);
+  for (const picture of view.next ? slidePicturePaths(publicSlide(view.next.kind, view.next.data).data) : []) paths.add(picture);
+  for (const picture of onWall ? slidePicturePaths(onWall.data) : []) paths.add(picture);
   return [...paths].sort();
 }
 
@@ -197,6 +212,7 @@ export function presenterStateOf(
     current: onWall ? { ...onWall, number: view.current.index + 1 } : wallSlideOf(view.current),
     next: view.next ? wallSlideOf(view.next) : null,
     notes: view.current.notes ?? '',
+    comments: partComments(view.current.handout, view.current.converted),
     position: view.position,
     count: view.count,
     skipped: view.current.skip,

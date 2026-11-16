@@ -458,7 +458,9 @@ function deckPathOf(value: unknown): string {
 }
 
 /** A slide's words in one line, for read_deck. */
-function slideWords(kind: string, data: { title?: string; subtitle?: string; number?: string; tag?: string; items?: Array<{ heading?: string; text?: string }>; rows?: string[][] }): string {
+function slideWords(kind: string, data: { title?: string; subtitle?: string; number?: string; tag?: string; items?: Array<{ heading?: string; text?: string }>; rows?: string[][]; markdown?: string }): string {
+  // A block slide (Sprint 161): its Markdown as written, which is its words.
+  if (data.markdown !== undefined) return data.markdown.trim();
   return [
     // An exercise's pill, when it draws other words than the default (`isDefaultExerciseTag`), or none.
     kind === 'exercise' && !isDefaultExerciseTag(data) ? (exerciseTagOf(data) ? `pill ${JSON.stringify(data.tag)}` : 'no pill') : '',
@@ -494,7 +496,7 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
           const lines = decks.map(deck => {
             const head = `${deck.path} · ${deck.topic ? 'library topic' : 'deck'} · ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'}${args.query ? ' matching' : ''}${deck.theme ? ` · theme ${deck.theme}` : ''} · changed ${new Date(deck.modified).toISOString().slice(0, 10)}`;
             if (!args.query) return head;
-            return [head, ...deck.slides.map(slide => `  slide ${slide.index + 1} (id ${slide.id ?? 'none'}, ${slide.kind}): ${slide.data.title ?? ''}`)].join('\n');
+            return [head, ...deck.slides.map(slide => `  slide ${slide.index + 1} (id ${slide.id ?? 'none'}, ${slide.kind || 'block slide'}): ${slide.data.title ?? ''}`)].join('\n');
           });
           return { text: lines.join('\n') };
         },
@@ -519,7 +521,7 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
               slide.notes ? 'has speaker notes' : '',
               state ? `copy of ${state.sourcePath}${state.missing ? ' (no longer there)' : ''}${state.changed ? ', changed here' : ''}${state.newer ? ', the source has a newer version' : ''}` : '',
             ].filter(Boolean).join('; ');
-            lines.push('', `Slide ${slide.index + 1} · id ${slide.data.id ?? 'none'} · ${slide.kind}${marks ? ` · ${marks}` : ''}`, slideWords(slide.kind, slide.data) || '(no words)');
+            lines.push('', `Slide ${slide.index + 1} · id ${slide.data.id ?? 'none'} · ${slide.kind || 'block slide'}${marks ? ` · ${marks}` : ''}`, slideWords(slide.kind, slide.data) || '(no words)');
             if (slide.handout.trim()) lines.push('Handout:', slide.handout.trim());
           }
           return { text: lines.join('\n') };

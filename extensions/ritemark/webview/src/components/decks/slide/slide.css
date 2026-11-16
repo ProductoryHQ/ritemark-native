@@ -95,3 +95,90 @@
 .deck-sl .tag[contenteditable]:focus { text-overflow: clip; }
 .deck-slide .deck-sl .tag[contenteditable]:empty::before { color: inherit; opacity: .45; }
 .deck-sl .tag[contenteditable]:empty:not(:focus) { display: none; }
+
+/* ---- Sprint 161: the block slide (format v2), drawn by src/decks/blocks/slideRenderer.ts (README "The block slide",
+   frames 21–26; the prototype's `.sl.doc`). A small document in the theme's type: every size an `em` of one `--fit`,
+   which the drawing view steps down (100 to 60 %) while the words overflow. Its classes are `blk-*`, so the page's own
+   rules (`.steps`, `.tag`) never reach it. */
+.deck-sl.is-blocks .blk-flow { position: absolute; left: 64px; right: 64px; top: 46px; bottom: 34px; overflow: hidden; box-sizing: border-box;
+  font: 400 calc(24px * var(--fit, 1))/1.42 var(--s-fb, 'Sofia Sans'), sans-serif; color: var(--s-tx, #E4E6F7); overflow-wrap: anywhere; }
+.deck-sl.is-blocks.pic-left .blk-flow { left: 432px; }
+.deck-sl.is-blocks.pic-right .blk-flow { right: 432px; }
+.deck-sl.is-blocks.pic-left .photo { left: 0; width: 384px; }
+.deck-sl.is-blocks.pic-right .photo { right: 0; width: 384px; }
+.deck-sl.is-blocks.pic-behind .photo { left: 0; right: 0; }
+.deck-sl.is-blocks .blk-flow > :first-child { margin-top: 0; }
+.deck-sl.is-blocks .blk-flow > :last-child { margin-bottom: 0; }
+.deck-sl.is-blocks h1 { margin: 0 0 .5em; font: 700 2em/1.12 var(--s-fh, 'Sofia Sans'), sans-serif; letter-spacing: -.3px; color: var(--s-hd, #fff); }
+.deck-sl.is-blocks h2 { margin: 0 0 .7em; font: 600 1.12em/1.3 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-sub, #C7CAEB); }
+.deck-sl.is-blocks h3 { margin: 0 0 .35em; font: 700 1.25em/1.2 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }
+.deck-sl.is-blocks h4, .deck-sl.is-blocks h5, .deck-sl.is-blocks h6 { margin: 0 0 .45em; font: 600 .95em/1.3 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }
+/* The title's room (the Experience lead, #760): half its own size before whatever follows it, set on the title alone
+   (the next block adds none), so it is the same on the stage, the strip, the wall, the presenter view and the page; a
+   line under it (an H2) stays close, as frame 21 draws it. Inside the flow, so the fit measures it. */
+.deck-sl.is-blocks h1 + * { margin-top: 0; }
+.deck-sl.is-blocks h1:has(+ h2) { margin-bottom: .12em; }
+.deck-sl.is-blocks p { margin: 0 0 .55em; }
+.deck-sl.is-blocks ul, .deck-sl.is-blocks ol { margin: 0 0 .55em; padding-left: 1.25em; }
+/* Lists keep their markers wherever the slide is drawn (the webview's Tailwind preflight takes them off). */
+.deck-sl.is-blocks ul { list-style: disc outside; }
+.deck-sl.is-blocks ol { list-style: decimal outside; }
+.deck-sl.is-blocks ul ul { list-style-type: circle; }
+.deck-sl.is-blocks li { margin-bottom: .32em; }
+.deck-sl.is-blocks li > p { margin: 0; }
+.deck-sl.is-blocks li::marker { color: var(--s-acc, #F2B544); font-weight: 700; }
+.deck-sl.is-blocks strong { font-weight: 700; color: var(--s-hd, #fff); }
+.deck-sl.is-blocks code { font: 400 .85em/1.4 ui-monospace, Menlo, Consolas, monospace; padding: 1px .3em; border-radius: 4px; background: var(--s-box, rgba(255,255,255,.07)); }
+.deck-sl.is-blocks pre { margin: 0 0 .55em; padding: .6em .8em; border-radius: var(--s-r2, 10px); background: var(--s-box, rgba(255,255,255,.07)); white-space: pre-wrap; }
+.deck-sl.is-blocks pre code { padding: 0; background: none; }
+.deck-sl.is-blocks blockquote { margin: 0 0 .55em; padding-left: .8em; box-shadow: inset 3px 0 0 var(--s-accl, rgba(242,181,68,.55)); color: var(--s-sub, #C7CAEB); }
+.deck-sl.is-blocks hr { border: 0; height: 2px; margin: .6em 0; background: var(--s-row, rgba(255,255,255,.16)); }
+.deck-sl.is-blocks .blk-link { text-decoration: underline; text-decoration-color: var(--s-acc, #F2B544); text-underline-offset: 3px; }
+.deck-sl.is-blocks table { border-collapse: separate; border-spacing: 0; margin: .3em 0 .55em; border-radius: var(--s-r2, 10px); overflow: hidden; box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.14)); font-size: .82em; }
+.deck-sl.is-blocks th, .deck-sl.is-blocks td { padding: .45em .8em; text-align: left; vertical-align: top; }
+.deck-sl.is-blocks th { background: var(--s-thbg, rgba(242,181,68,.16)); color: var(--s-thfg, #F2B544); font-weight: 700; }
+.deck-sl.is-blocks td { border-top: 1px solid var(--s-row, rgba(255,255,255,.1)); }
+.deck-sl.is-blocks .blk-pic { display: block; max-width: 100%; max-height: 310px; margin: .2em 0 .4em; border-radius: var(--s-r2, 10px); object-fit: contain; }
+.deck-sl.is-blocks .blk-pic.empty { height: 200px; box-shadow: inset 0 0 0 3px var(--s-emp, rgba(255,255,255,.22)); }
+.deck-sl.is-blocks p .blk-pic { display: inline-block; vertical-align: middle; max-height: 2.4em; margin: 0; }
+/* Columns: side by side, a thin line between them (frame 23). */
+.deck-sl.is-blocks .blk-columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); margin: .3em 0 .5em; }
+.deck-sl.is-blocks .blk-column { min-width: 0; padding: .2em 1.1em; box-shadow: inset 1px 0 0 var(--s-row, rgba(255,255,255,.16)); }
+.deck-sl.is-blocks .blk-column:first-child { padding-left: 0; box-shadow: none; }
+.deck-sl.is-blocks .blk-column > :last-child, .deck-sl.is-blocks .blk-box > :last-child { margin-bottom: 0; }
+/* Boxes: a row of cards, with an icon or the look's own mark. */
+.deck-sl.is-blocks .blk-boxes { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 16px; margin: .3em 0 .5em; counter-reset: blk-box; }
+.deck-sl.is-blocks .blk-box { counter-increment: blk-box; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: 18px; border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.13)); font-size: .86em; }
+.deck-sl.is-blocks .blk-box > * { margin-bottom: 0; }
+.deck-sl.is-blocks .blk-box h3 { font-size: 1.1em; }
+.deck-sl.is-blocks .blk-icon, .deck-sl.is-blocks .blk-mark { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 10px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); }
+.deck-sl.is-blocks .blk-mark { border-radius: 8px; width: 34px; height: 34px; }
+.deck-sl.is-blocks .blk-boxes[data-look="steps"] > .blk-box::before { content: counter(blk-box); display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 10px; border-radius: 50%; box-shadow: inset 0 0 0 2.5px var(--s-acc, #F2B544); color: var(--s-acct, #F2B544); font: 700 17px/1 var(--s-fh, 'Sofia Sans'); }
+.deck-sl.is-blocks .blk-boxes[data-look="line"] > .blk-box::before { content: ''; display: block; width: 18px; height: 18px; margin-bottom: 12px; border-radius: 50%; background: var(--s-acc, #F2B544); box-shadow: 0 0 0 6px var(--s-accs, rgba(242,181,68,.18)); }
+/* Steps: the pill, then numbered steps in circles (frame 26). */
+.deck-sl.is-blocks .blk-pill { display: inline-block; max-width: 100%; margin: 0 0 .5em; padding: 3px 12px; border-radius: var(--s-rt, 20px); background: var(--s-acc, #F2B544); color: var(--s-tagfg, #1C1F4A); font: 700 14px/22px var(--s-fb, 'Sofia Sans'); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+.deck-sl.is-blocks .blk-steps ol { list-style: none; padding: 0; counter-reset: blk-step; }
+.deck-sl.is-blocks .blk-steps ol > li { position: relative; counter-increment: blk-step; padding-left: 2.1em; margin-bottom: .55em; font-weight: 600; color: var(--s-hd, #fff); }
+.deck-sl.is-blocks .blk-steps ol > li::before { content: counter(blk-step); position: absolute; left: 0; top: .05em; width: 1.45em; height: 1.45em; border-radius: 50%; display: grid; place-items: center; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); font-weight: 700; font-size: .8em; }
+/* A slide that is only a title, with a line under it or a short line over it: big and low, as the old Title slide. */
+.deck-sl.is-blocks.is-cover .blk-flow { display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 40px; }
+.deck-sl.is-blocks.is-cover h1 { font-size: 2.45em; line-height: 1.08; }
+.deck-sl.is-blocks.is-cover p { color: var(--s-sub, #C7CAEB); }
+/* A short line over the title (an old Section slide's number) is drawn big in the accent, as the Section slide drew it. */
+.deck-sl.is-blocks.is-cover .blk-flow > p:first-child:has(+ h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }
+.deck-slide.is-borderless .deck-sl.is-blocks.is-cover .blk-flow > p:first-child:has(+ h1) { color: var(--s-acc, #E0A21F); }
+
+/* Borderless: the block slide's words on white */
+.deck-slide.is-borderless .deck-sl.is-blocks .blk-flow { color: var(--s-tx, #33365A); }
+.deck-slide.is-borderless .deck-sl.is-blocks h1, .deck-slide.is-borderless .deck-sl.is-blocks h3, .deck-slide.is-borderless .deck-sl.is-blocks h4,
+.deck-slide.is-borderless .deck-sl.is-blocks strong, .deck-slide.is-borderless .deck-sl.is-blocks .blk-steps ol > li { color: var(--s-hd, #1C1F4A); }
+.deck-slide.is-borderless .deck-sl.is-blocks h2, .deck-slide.is-borderless .deck-sl.is-blocks.is-cover p, .deck-slide.is-borderless .deck-sl.is-blocks blockquote { color: var(--s-sub, #5B5F86); }
+.deck-slide.is-borderless .deck-sl.is-blocks li::marker { color: var(--s-acct, #C98A10); }
+.deck-slide.is-borderless .deck-sl.is-blocks .blk-column { box-shadow: inset 1px 0 0 var(--s-row, #E2E3EE); }
+.deck-slide.is-borderless .deck-sl.is-blocks .blk-column:first-child { box-shadow: none; }
+.deck-slide.is-borderless .deck-sl.is-blocks .blk-box, .deck-slide.is-borderless .deck-sl.is-blocks pre { background: var(--s-box, #F6F6FB); box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); }
+.deck-slide.is-borderless .deck-sl.is-blocks .blk-icon, .deck-slide.is-borderless .deck-sl.is-blocks .blk-mark, .deck-slide.is-borderless .deck-sl.is-blocks .blk-steps ol > li::before { background: var(--s-accs, rgba(242,181,68,.22)); color: var(--s-acct, #B07A12); }
+.deck-slide.is-borderless .deck-sl.is-blocks table { box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); }
+.deck-slide.is-borderless .deck-sl.is-blocks th { background: var(--s-thbg, #FFF4D6); color: var(--s-thfg, #8A5A00); }
+.deck-slide.is-borderless .deck-sl.is-blocks td { border-top-color: var(--s-row, #ECEDF5); }
+.deck-slide.is-borderless .deck-sl.is-blocks .blk-pic.empty { box-shadow: inset 0 0 0 3px var(--s-emp, #E2E3EE); }

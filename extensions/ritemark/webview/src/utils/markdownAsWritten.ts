@@ -104,6 +104,9 @@ function walkBlocks(tokens: Token[], tabs: boolean): void {
       for (const item of (token as Tokens.List).items) walkBlocks(item.tokens, tabs)
     } else if (token.type === 'blockquote') {
       walkBlocks((token as Tokens.Blockquote).tokens, tabs)
+    } else if (token.type === 'slideDiv') {
+      // Sprint 161: a block slide's `:::` block (only the slide editor's own `marked` makes one) holds blocks too.
+      walkBlocks((token as unknown as { tokens: Token[] }).tokens, tabs)
     }
   })
 }
@@ -537,9 +540,11 @@ function hasListItemAncestor(node: Node): boolean {
   return false
 }
 
-type BlockKind = 'paragraph' | 'heading' | 'code' | 'quote' | 'table' | 'rule' | 'list' | 'other'
+type BlockKind = 'paragraph' | 'heading' | 'code' | 'quote' | 'table' | 'rule' | 'list' | 'other' | 'fdiv'
 
 function blockKind(node: Element): BlockKind {
+  // Sprint 161: a block slide's `:::` block, which only the slide editor's own pipeline makes (never a Text document's).
+  if (node.nodeName === 'DIV' && node.hasAttribute('data-fdiv')) return 'fdiv'
   switch (node.nodeName) {
     case 'P': case 'IMG': return 'paragraph'
     case 'H1': case 'H2': case 'H3': case 'H4': case 'H5': case 'H6': return 'heading'
@@ -565,6 +570,8 @@ function writtenTight(previous: Element | null, next: Element): boolean {
   const before = blockKind(previous)
   const after = blockKind(next)
   if (before === 'other' || after === 'other') return false
+  // A fence line (`:::`) never merges with the block beside it, so written tight it stays tight.
+  if (before === 'fdiv' || after === 'fdiv') return true
   if (before === 'heading' || before === 'code' || before === 'rule') return true
   if (after === 'heading' || after === 'code') return true
   if (after === 'rule') return before !== 'paragraph' || !(next.getAttribute('data-md-hr') ?? '-').startsWith('-')

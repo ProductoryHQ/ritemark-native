@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { Editor as TipTapEditor } from '@tiptap/react'
-import { writeSlideBody, type SlideData } from '../../../../src/decks/deckFormat'
+import { isBlockSlide, writeSlideData, type SlideData } from '../../../../src/decks/deckFormat'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
@@ -76,7 +76,7 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
   const write = useCallback((mutate: (data: SlideData) => SlideData, focus?: string) => {
     const fresh = slidesOf(editor.state.doc)[slide.index]
     if (!fresh) return
-    const body = writeSlideBody(fresh.node.attrs.body, mutate(fresh.data))
+    const body = writeSlideData(fresh.kind, fresh.node.attrs.body, mutate(fresh.data))
     if (body !== fresh.node.attrs.body) {
       editor.view.dispatch(editor.state.tr.setNodeMarkup(fresh.pos, undefined, { ...fresh.node.attrs, body }))
     }
@@ -178,6 +178,8 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
 
   /** A picture from the computer onto the slide: pasted (unless words are being pasted into a box) or dropped. */
   const takePicture = (transfer: DataTransfer | null, pasted: boolean): boolean => {
+    // A block slide (Sprint 161) is drawn read-only in this build: a picture goes in with its editor, not as a Picture slide.
+    if (isBlockSlide(slide.kind)) return false
     const file = getClipboardImageFile(transfer)
     if (!file) return false
     if (pasted && shouldPreferTextPaste(transfer)) return false

@@ -72,6 +72,11 @@ export interface SlideData {
   from?: string;
   items?: SlideItem[];
   rows?: string[][];
+  /**
+   * A block slide's Markdown, after its header (Sprint 161, format v2): read with `slideDataOf`, in memory only. The
+   * v1 writer never writes it, and `writeSlideData` writes a block slide's header around it untouched.
+   */
+  markdown?: string;
 }
 
 /** The pill an exercise slide shows when its block has no `tag:` line. Not yet in the deck's own language. */
@@ -659,11 +664,178 @@ export function deckVersionOf(text: string): string | null {
   return frontMatterOf(text).version;
 }
 
-/** Is this front matter's `deck:` one this version reads? Absent or at most 1. */
+/**
+ * Is this front matter's `deck:` one this version reads? Absent, 1 (slides of a kind, `slide points`), or 2 (block
+ * slides, a bare `slide` whose body is Markdown: Sprint 161). A deck may mix both kinds.
+ */
 export function isReadableDeckVersion(version: string | null): boolean {
   if (version === null || version.trim() === '') return true;
   const number = Number(version);
-  return Number.isFinite(number) && number <= 1;
+  return Number.isFinite(number) && number <= 2;
+}
+
+// ---------------------------------------------------------------------------
+// Block slides (Sprint 161, format v2)
+// ---------------------------------------------------------------------------
+
+/**
+ * A block slide: a fence whose info string is a bare `slide`. Its body is an optional header between `---` lines (the
+ * keys `HEADER_KEYS`, in the same strict YAML subset as a v1 slide), then Markdown: a title (`#`), a line under it,
+ * text, lists, tables, pictures, and the `:::` blocks Columns, Boxes and Steps (Pandoc's fenced divs). `slide <kind>`
+ * is the v1 slide, read as before.
+ */
+export function isBlockSlide(kind: string): boolean {
+  return kind === '';
+}
+
+/** The picture beside or behind a slide's words (`picture:` left, right or behind), or null. */
+export function sidePictureOf(data: SlideData): 'left' | 'right' | 'behind' | null {
+  return data.picture === 'left' || data.picture === 'right' || data.picture === 'behind' ? data.picture : null;
+}
+
+/** The keys a block slide's header holds: what belongs to the slide as a whole, never its words. */
+export const HEADER_KEYS = ['id', 'from', 'skip', 'picture', 'image', 'kept'] as const;
+
+/** A block slide's body in its two parts, as written. */
+export interface BlockSlideParts {
+  /** The header's lines between its `---` lines, or null when the body has no header. */
+  header: string | null;
+  /** The header as written: its `---` lines and the line break after the closing one ('' without a header). */
+  head: string;
+  /** The Markdown after the header. */
+  markdown: string;
+}
+
+/**
+ * Split a block slide's body. A header is there only when the body's first line is `---`, a later line is `---`, every
+ * line between them is blank, a `key: value` line or a YAML comment, and one of them is a header key; anything else
+ * (`Goal: x` in a sentence, a rule, a setext heading, `---` `# Agenda` `---`) is Markdown, so a first paragraph is
+ * never read as keys.
+ */
+export function splitBlockSlide(body: string): BlockSlideParts {
+  const lines = body.split('\n');
+  if (!/^---[ \t]*\r?$/.test(lines[0] ?? '')) return { header: null, head: '', markdown: body };
+  // At least one of the header's own keys: `---`, `# Agenda`, `---` (a rule, a heading, a rule) is Markdown.
+  let ownKey = false;
+  for (let index = 1; index < lines.length; index++) {
+    const line = lines[index].replace(/\r$/, '');
+    if (/^---[ \t]*$/.test(line)) {
+      if (!ownKey) return { header: null, head: '', markdown: body };
+      const head = lines.slice(0, index + 1).join('\n');
+      const rest = body.slice(head.length);
+      return {
+        header: lines.slice(1, index).join('\n'),
+        head: rest.startsWith('\n') ? `${head}\n` : head,
+        markdown: rest.startsWith('\n') ? rest.slice(1) : rest,
+      };
+    }
+    const key = KEY_LINE.exec(line);
+    if (key && (HEADER_KEYS as readonly string[]).includes(key[1])) ownKey = true;
+    if (line.trim() === '' || /^\s*#/.test(line) || key) continue;
+    return { header: null, head: '', markdown: body };
+  }
+  return { header: null, head: '', markdown: body };
+}
+
+/** A heading's words as plain text: its emphasis, code marks, escapes and link targets taken out. */
+function plainHeading(text: string): string {
+  return text
+    .replace(/<\/?[A-Za-z][^>]*>/g, '')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\\([\\`*_{}[\]()#+\-.!>~|<&$])/g, '$1')
+    .replace(/(^|[^\\])[*_`~]+/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * A block slide's title: its first H1 outside code, else its first heading of any level (a slide made only of
+ * columns names itself by its first column's heading); '' without one. In memory only: it names the slide in the
+ * strip, the go-to box and the page's Contents, and it is never written as a key.
+ */
+export function blockTitleOf(markdown: string): string {
+  let fence: { char: string; size: number } | null = null;
+  let comment = false;
+  let first = '';
+  const lines = markdown.split('\n');
+  for (let index = 0; index < lines.length; index++) {
+    let line = lines[index].replace(/\r$/, '');
+    // A heading inside a comment is private, never the slide's title (the page and the wall show the title).
+    if (comment) {
+      const close = line.indexOf('-->');
+      if (close < 0) continue;
+      comment = false;
+      line = line.slice(close + 3);
+    }
+    if (!fence) {
+      line = line.replace(/<!--[\s\S]*?-->/g, '');
+      const open = line.indexOf('<!--');
+      if (open >= 0) { comment = true; line = line.slice(0, open); }
+    }
+    if (fence) {
+      const close = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+      if (close && close[1][0] === fence.char && close[1].length >= fence.size) fence = null;
+      continue;
+    }
+    const open = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (open) { fence = { char: open[1][0], size: open[1].length }; continue; }
+    const atx = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/.exec(line);
+    let level = 0;
+    let words = '';
+    if (atx) {
+      level = atx[1].length;
+      words = atx[2] ?? '';
+    } else if (index > 0 && /^ {0,3}(=+|-+)[ \t]*$/.test(line) && lines[index - 1].trim() && !/^ {0,3}(?:[-*+>#]|\d{1,9}[.)]|:::|\||`{3}|~{3})/.test(lines[index - 1]) && !/^ {0,3}(?:-{2,}|={2,})[ \t]*$/.test(lines[index - 1])) {
+      // A setext heading: `=` under a line is an H1, `-` an H2 (as the renderer draws them).
+      level = line.trim().startsWith('=') ? 1 : 2;
+      words = lines[index - 1];
+    }
+    if (!level) continue;
+    const text = plainHeading(words);
+    if (!text) continue;
+    if (level === 1) return text;
+    if (!first) first = text;
+  }
+  return first;
+}
+
+/**
+ * A slide's data, from its kind and its body: a v1 slide's YAML (`parseSlideBody`), or a block slide's header with its
+ * Markdown and, in memory only, its title (`blockTitleOf`).
+ */
+export function slideDataOf(kind: string, body: string): SlideData {
+  if (!isBlockSlide(kind)) return parseSlideBody(body);
+  const parts = splitBlockSlide(body);
+  const data: SlideData = {};
+  if (parts.header !== null) {
+    const header = parseSlideBody(parts.header);
+    for (const key of HEADER_KEYS) {
+      if (header[key] !== undefined) (data as Record<string, unknown>)[key] = header[key];
+    }
+  }
+  data.markdown = parts.markdown;
+  const title = blockTitleOf(parts.markdown);
+  if (title) data.title = title;
+  return data;
+}
+
+/**
+ * Write a slide's data into its body, as `writeSlideBody` does for a v1 slide. For a block slide only the header's
+ * keys are written, each line only when its value changed, and the Markdown stays byte for byte: a block slide's words
+ * are its Markdown, which this writer never touches. A header the slide no longer needs (every key gone, no other
+ * line in it) is taken out.
+ */
+export function writeSlideData(kind: string, body: string, data: SlideData): string {
+  if (!isBlockSlide(kind)) return writeSlideBody(body, data);
+  const parts = splitBlockSlide(body);
+  // The header as it reads, with the header keys from `data`: a line no header key (a `title:` someone wrote there)
+  // stays as written.
+  const keys: SlideData = parts.header === null ? {} : parseSlideBody(parts.header);
+  for (const key of HEADER_KEYS) (keys as Record<string, unknown>)[key] = data[key];
+  const inner = writeSlideBody(parts.header ?? '', keys);
+  if (inner === (parts.header ?? '')) return body;
+  if (inner.trim() === '') return parts.markdown;
+  return `---\n${inner}\n---\n${parts.markdown}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -774,7 +946,7 @@ export function withWrittenHandout(text: string): string {
   let out = text;
   for (const slide of [...deck.slides].reverse()) {
     if (partHeadingOf(text.slice(slide.handoutStart, slide.handoutEnd))) continue;
-    const heading = withPartHeading(slide.kind, parseSlideBody(slide.body), '');
+    const heading = withPartHeading(slide.kind, slideDataOf(slide.kind, slide.body), '');
     if (heading) out = `${out.slice(0, slide.end)}\n\n${heading}${out.slice(slide.end)}`;
   }
   return withTextHandoutMark(out);

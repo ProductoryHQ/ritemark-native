@@ -5,6 +5,7 @@
  * Pure: no `vscode`, so the test decodes the same messages the host does.
  */
 
+import { BLOCK_MAX_STEP } from './blocks/slideRenderer';
 import { MAX_DRAFT_WORDS, type StartCardState } from './startCard';
 
 /** At most this many picture paths in one request: a deck's slides, with room to spare. */
@@ -246,7 +247,8 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
       const look = input.look;
       if (!Array.isArray(input.steps) || input.steps.length > MAX_DECK_SLIDES) throw new DeckProtocolError('steps must be a short list');
       const steps = input.steps.map(step => {
-        if (typeof step !== 'number' || !Number.isInteger(step) || step < 0 || step > 3) throw new DeckProtocolError('Each step must be 0 to 3');
+        // A block slide's fit has six steps (Sprint 161); `publicDeck` holds a v1 slide to its own three.
+        if (typeof step !== 'number' || !Number.isInteger(step) || step < 0 || step > BLOCK_MAX_STEP) throw new DeckProtocolError(`Each step must be 0 to ${BLOCK_MAX_STEP}`);
         return step;
       });
       return { type: 'deck/publish', text, look, steps };

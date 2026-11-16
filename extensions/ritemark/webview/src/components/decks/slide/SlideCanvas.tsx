@@ -9,8 +9,9 @@
  * On the stage the words are edited in place (`editing`): each text box is a small plain-text editing host, kept
  * uncontrolled while it has the caret so typing is never redrawn under the person.
  */
-import { memo, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
-import type { SlideData } from '../../../../../src/decks/deckFormat'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import { isBlockSlide, type SlideData } from '../../../../../src/decks/deckFormat'
+import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, BLOCK_MAX_STEP, blockCanvasMarkup } from '../../../../../src/decks/blocks/slideRenderer'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { Icon } from '../../ui/Icon'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../../ui/dropdown-menu'
@@ -290,7 +291,65 @@ function overflows(canvas: HTMLElement): boolean {
   return false
 }
 
+/**
+ * Sprint 161: a block slide (format v2), drawn by the one block renderer (`src/decks/blocks/slideRenderer.ts`) that the
+ * wall, the presenter view, the library and the page draw it with. Read-only in this build: the editor on the slide is
+ * the next step. The fit steps the words down while they overflow (`--fit`, 100 to 60 %), and again once the fonts load.
+ */
+const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, borderless, assets }: Omit<SlideCanvasProps, 'kind' | 'editing'>) {
+  const slideRef = useRef<HTMLDivElement>(null)
+  const markdown = data.markdown ?? ''
+  // The fit belongs to these words in this look: a theme or Card | Borderless change measures again from the top.
+  const look = `${borderless}\u0000${JSON.stringify(theme)}`
+  const [fit, setFit] = useState<{ markdown: string; image?: string; picture?: string; look: string; step: number; fonts: number }>({ markdown, image: data.image, picture: data.picture, look, step: 0, fonts: 0 })
+  const same = fit.markdown === markdown && fit.image === data.image && fit.picture === data.picture && fit.look === look
+  const step = same ? fit.step : 0
+  const [fonts, setFonts] = useState(0)
+  // A slide measured before Sofia Sans loads can end a step too small (spike §5): measure again from the top.
+  useEffect(() => {
+    const fontSet = document.fonts
+    if (!fontSet) return
+    const again = () => setFonts(count => count + 1)
+    fontSet.addEventListener?.('loadingdone', again)
+    return () => fontSet.removeEventListener?.('loadingdone', again)
+  }, [])
+  useLayoutEffect(() => {
+    const flow = slideRef.current?.querySelector<HTMLElement>('.blk-flow')
+    if (!flow) return
+    if (same && fit.fonts !== fonts) { setFit({ markdown, image: data.image, picture: data.picture, look, step: 0, fonts }); return }
+    if (step < BLOCK_MAX_STEP && flow.scrollHeight > flow.clientHeight + 2) setFit({ markdown, image: data.image, picture: data.picture, look, step: step + 1, fonts })
+    else if (!same) setFit({ markdown, image: data.image, picture: data.picture, look, step, fonts })
+  })
+  const html = useMemo(
+    () => blockCanvasMarkup(data, { step, width, pictureUrl: path => assets[path] ?? null }),
+    [data, step, width, assets],
+  )
+  // A picture that loads after the slide is drawn takes its height then: measure again from the top (Codex on #760).
+  useEffect(() => {
+    const pending = Array.from(slideRef.current?.querySelectorAll('img') ?? []).filter(image => !image.complete)
+    if (!pending.length) return
+    const again = () => setFonts(count => count + 1)
+    for (const image of pending) image.addEventListener('load', again, { once: true })
+    return () => { for (const image of pending) image.removeEventListener('load', again) }
+  }, [html])
+  return (
+    <div
+      ref={slideRef}
+      className={`deck-slide${borderless ? ' is-borderless' : ''}`}
+      data-step={step}
+      style={{ width, height: Math.round(width * BLOCK_CANVAS_HEIGHT / BLOCK_CANVAS_WIDTH), ...(themeStyle(theme, borderless) as CSSProperties) }}
+      // The renderer's own markup: every word escaped, raw HTML never drawn, no script, no link (slideRenderer.ts).
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  )
+})
+
 export const SlideCanvas = memo(function SlideCanvas({ kind, data, width, theme, borderless, assets, editing }: SlideCanvasProps) {
+  if (isBlockSlide(kind)) return <BlockSlideCanvas data={data} width={width} theme={theme} borderless={borderless} assets={assets} />
+  return <LayoutSlideCanvas kind={kind} data={data} width={width} theme={theme} borderless={borderless} assets={assets} editing={editing} />
+})
+
+const LayoutSlideCanvas = memo(function LayoutSlideCanvas({ kind, data, width, theme, borderless, assets, editing }: SlideCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null)
   // The measuring pass's step, for these words; new words start again from the estimate.
   const [fit, setFit] = useState<{ data: SlideData; kind: string; step: number }>({ data, kind, step: 0 })
