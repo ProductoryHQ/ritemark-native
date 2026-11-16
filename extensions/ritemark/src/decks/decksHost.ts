@@ -10,6 +10,7 @@ import { projectRelative, projectRoot, workspaceDeckFiles } from './deckDocument
 import { DeckPages, SLIDE_LIBRARY_VIEW } from './deckPages';
 import { SlideLibraryViewProvider } from './SlideLibraryViewProvider';
 import { DeckPublisher } from './deckPublish';
+import { DeckPresenter } from './present/DeckPresenter';
 import { setDeckToolHost } from '../runtime/ritemarkTools';
 import { copiedDeckText, copyFileName, emptyDeckText, emptyFileName, newDeckChoices, type NewDeckChoice } from './newDeck';
 import { folderOf } from './deckLibraryFormat';
@@ -38,6 +39,9 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
   };
   const publisher = new DeckPublisher(context.extensionPath);
   const pages = new DeckPages(library, publisher);
+  // Present (Sprint 159): the wall, a window of its own over the main window.
+  const presenter = new DeckPresenter(context.extensionUri);
+  pages.presentHandler = (origin, request) => presenter.start(origin, request);
   // The AI's deck tools (PR 5): the same library, and an open deck's view to insert through as one undo step.
   setDeckToolHost(() => (isEnabled('decks') ? {
     library,
@@ -56,6 +60,7 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
   context.subscriptions.push(
     publisher,
     pages,
+    presenter,
     view,
     vscode.window.registerWebviewViewProvider(SLIDE_LIBRARY_VIEW, view, { webviewOptions: { retainContextWhenHidden: false } }),
     // The place's head row (Search), from the frame's manifest.

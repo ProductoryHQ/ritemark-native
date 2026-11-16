@@ -1,0 +1,40 @@
+/* Sprint 159 (PR 5; experience 17 frame 2): the wall. The slide at 16:9 on bands of #0E0C24; the bar, the go-to box
+   and the grid of all slides in Ritemark Dark (`.dark`), as drawn (present.html `.pbar`, `.goto`). */
+.deck-wall { position: fixed; inset: 0; overflow: hidden; background: #0E0C24; user-select: none; -webkit-user-select: none; }
+.deck-wall.is-idle, .deck-wall.is-idle * { cursor: none !important; }
+
+.wall-frame { position: absolute; overflow: hidden; }
+.wall-slide { position: absolute; inset: 0; }
+/* Borderless: the words on white, the bands around them */
+.wall-slide.is-borderless { background: #fff; }
+.wall-slide.is-entering { animation: wall-fade-in 0.3s ease both; }
+@keyframes wall-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .wall-slide.is-entering { animation: none; } }
+.vscode-reduce-motion .wall-slide.is-entering { animation: none; }
+
+.wall-bar, .wall-goto { font-family: var(--ritemark-ui-font-family); color: #F8FAFC; }
+.wall-bar { position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; height: 48px; padding: 0 6px; border-radius: 12px;
+  background: rgba(30, 27, 75, 0.9); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28); font-size: 14px; font-weight: 500; white-space: nowrap;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+.wall-bar.is-shown { opacity: 1; pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) { .wall-bar { transition: none; } }
+.vscode-reduce-motion .wall-bar { transition: none; }
+.wall-count { padding: 0 10px; font-variant-numeric: tabular-nums; }
+.wall-sep { width: 1px; height: 20px; margin: 0 6px; background: rgba(248, 250, 252, 0.22); }
+.wall-key { display: inline-block; min-width: 28px; height: 22px; padding: 0 6px; border-radius: 5px; background: rgba(248, 250, 252, 0.12); font-size: 12px; font-weight: 600; line-height: 22px; color: #F8FAFC; text-align: center; }
+.wall-stop-words { color: #C7D2FE; }
+
+.wall-goto { position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; max-width: calc(100% - 64px); height: 52px; padding: 0 18px 0 8px; border-radius: 12px;
+  background: rgba(30, 27, 75, 0.92); box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.45); font-size: 15px; font-weight: 500; white-space: nowrap; pointer-events: none; }
+.wall-goto-number { min-width: 40px; height: 36px; padding: 0 10px; border-radius: 8px; background: rgba(248, 250, 252, 0.14); font-size: 20px; font-weight: 700; line-height: 36px; text-align: center; font-variant-numeric: tabular-nums; }
+.wall-goto-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.wall-goto .wall-key { min-width: 0; margin-left: 6px; color: #C7D2FE; }
+
+.wall-grid { position: absolute; z-index: 2; inset: 0; display: flex; align-items: safe center; justify-content: center; padding: 72px 80px 120px; overflow: auto; background: #0E0C24; }
+.wall-grid-list { display: grid; gap: 28px; }
+.wall-grid-item { position: relative; }
+.wall-grid-slide { position: relative; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px rgba(248, 250, 252, 0.12); }
+.wall-grid-slide.is-borderless { background: #fff; }
+.wall-grid-item.is-picked .wall-grid-slide { box-shadow: 0 0 0 2px #0E0C24, 0 0 0 5px #818CF8; }
+.wall-grid-number { display: block; margin-top: 8px; font-family: var(--ritemark-ui-font-family); font-size: 13px; font-weight: 500; line-height: 16px; color: #C7D2FE; font-variant-numeric: tabular-nums; }
+.wall-grid-item.is-current .wall-grid-number { color: #818CF8; font-weight: 700; }
