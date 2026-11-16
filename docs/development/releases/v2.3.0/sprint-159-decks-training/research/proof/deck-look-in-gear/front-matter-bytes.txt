@@ -26,3 +26,22 @@ i.e. the front matter now reads:
   ---
 
 Then the branch's bundle was put back (git checkout HEAD -- extensions/ritemark/media/webview.js) and the window was stopped (LEFT=0).
+
+A deck with no slides (second window, 16 November, about 23:25 EET; head 5b59c960)
+Two copies of a deck with front matter only, made before the launch:
+  ---
+  deck: 1
+  theme: Slide library/Themes/Evening.theme.md
+  ---
+  Look check/Empty via the bar.deck.md   35ccdd590010bf0dbcb261c7185f6a1e35267c03036c3e19f4e2fcd8fd79d9ff
+  Look check/Empty via the gear.deck.md  35ccdd590010bf0dbcb261c7185f6a1e35267c03036c3e19f4e2fcd8fd79d9ff
+
+1. This branch's bundle: "Empty via the gear" opened ("No slides yet"), the gear pressed (enabled; the popup is
+   "THIS DECK · NO SLIDES YET" and Card | Borderless, nothing else), Borderless chosen with a real mouse press.
+     Empty via the gear.deck.md  3c68e0b80cdfe391468f321c22715e45dfce941dcad9ea751eaf6c6a193e4a99
+2. main's bundle swapped in and the window reloaded: "Empty via the bar" opened; its bar read
+   "No slides yet Card Borderless Saved Publish Present", with the gear disabled. Borderless chosen on the bar.
+     Empty via the bar.deck.md   3c68e0b80cdfe391468f321c22715e45dfce941dcad9ea751eaf6c6a193e4a99
+
+cmp: byte-identical; both gained `look: borderless` after the theme line. The branch's bundle was put back and the
+window stopped (LEFT=0).

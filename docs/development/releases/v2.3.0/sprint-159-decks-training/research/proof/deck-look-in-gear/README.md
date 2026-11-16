@@ -14,6 +14,9 @@ One dev window of this branch (after merging #761), started on 16 November at ab
 | The popup's last section, close up | `popup-deck-section-closeup.png` |
 | The slide hidden (‹): the gear stays enabled and opens the same popup, for slide 6, which the strip rings | `popup-slide-hidden-1440x900.png` |
 | Before, on main: the segment on the bar, between the notice and Saved | `before-main-bar-1440x900.png` |
+| A deck with no slides (second window): the gear is enabled and its popup is the deck's section alone, THIS DECK · NO SLIDES YET, then Card \| Borderless | `popup-empty-deck-1440x900.png` |
+| A short window (the page held at 1440 × 600): the popup stops 8 px above the bottom, 474 px of its 575, and scrolls | `short-window-popup-top-1440x600.png` |
+| The same popup after one wheel turn over it: scrolled to the end (101 px), with Card \| Borderless inside it | `short-window-popup-scrolled-1440x600.png` |
 
 ## What the window showed
 
@@ -34,9 +37,15 @@ gear with the slide hidden   popup open, the same children, "This deck · all 13
 another deck (3 slides)      "This deck · all 3 slides"
 ```
 
+## Second window (after the Development manager's ask on #764)
+
+A second isolated window of head `5b59c960` was started at about 23:25 EET and stopped right after (`LEFT=0`). It ran on the same scratch copy, with two empty decks added.
+- **A deck with no slides:** the gear was enabled. Its popup held one group, 316 × 74 px: THIS DECK · NO SLIDES YET, then Card \| Borderless. It had no line, slide head or slide section. Choosing Borderless kept it open.
+- **The short window:** the popup had `max-height: 474px` and `overflow-y: auto`. Its scrollbar takes a few pixels at the right, so there the lines between sections stop at the scrollbar instead of at the popup's edge.
+
 ## The front matter, byte for byte
 
-`front-matter-bytes.txt`: Borderless chosen through the popup on this branch and through the bar on main's own bundle (swapped in for one reload of the same window) wrote byte-identical files, each one line more than before: `look: borderless`.
+`front-matter-bytes.txt`: Borderless chosen through the popup on this branch and through the bar on main's own bundle (swapped in for one reload of the same window) wrote byte-identical files, each one line more than before: `look: borderless`. The same held for a deck with no slides, in the second window.
 
 ## Not shown
 
