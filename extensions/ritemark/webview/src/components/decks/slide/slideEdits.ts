@@ -17,8 +17,9 @@ export function oneLine(value: string): string {
 }
 
 /** The deck's undo keys, as the stage and Settings' fields take them: Cmd+Z, and Cmd+Shift+Z or Cmd+Y for redo. */
-export function undoKeyOf(event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; key: string }): 'undo' | 'redo' | null {
-  if (!event.metaKey && !event.ctrlKey) return null
+export function undoKeyOf(event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey?: boolean; key: string; isComposing?: boolean }): 'undo' | 'redo' | null {
+  // Mid-composition the field holds marked text the browser has yet to commit; Cmd+Alt+Z is another shortcut.
+  if ((!event.metaKey && !event.ctrlKey) || event.altKey || event.isComposing) return null
   const key = event.key.toLowerCase()
   if (key === 'z') return event.shiftKey ? 'redo' : 'undo'
   if (key === 'y') return 'redo'
@@ -54,7 +55,8 @@ export function setPath(data: SlideData, path: string, value: string): SlideData
   if (path === 'title' || path === 'subtitle' || path === 'number') {
     return { ...data, [path]: value === '' ? undefined : value }
   }
-  if (path === 'tag') return { ...data, tag: value }
+  // A pill of spaces draws none (`exerciseTagOf`), so it is saved as none: the file never holds `tag: " "`.
+  if (path === 'tag') return { ...data, tag: value.trim() ? value : '' }
   const item = itemPath(path)
   if (item) {
     const items: SlideItem[] = [...(data.items ?? [])]

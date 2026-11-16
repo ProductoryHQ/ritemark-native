@@ -546,6 +546,12 @@ async function main(): Promise<void> {
     // read_deck quotes the pill's words as JSON, so a quote in them can't end them.
     files['Clients/Harbour.deck.md'] = files['Clients/Harbour.deck.md'].replace('tag: Harjutus', 'tag: \'Say "hi"\'');
     assert.match((await runTool(tool('read_deck'), { deck: 'Clients/Harbour.deck.md' }, context)).text, /pill "Say \\"hi\\"" · Plain/);
+    // A pill that draws the default, written out in any case, reads as no line.
+    files['Clients/Harbour.deck.md'] = files['Clients/Harbour.deck.md'].replace('tag: \'Say "hi"\'', 'tag: EXERCISE');
+    assert.match((await runTool(tool('read_deck'), { deck: 'Clients/Harbour.deck.md' }, context)).text, /exercise[^\n]*\nPlain\n/);
+    // Search finds a slide by the pill it draws: with the line gone, the default.
+    files['Clients/Harbour.deck.md'] = files['Clients/Harbour.deck.md'].replace('\ntag: EXERCISE', '');
+    assert.match((await runTool(tool('list_decks'), { where: 'other', query: 'exercise' }, context)).text, /Harbour\.deck\.md[^\n]*1 slide matching[^\n]*\n {2}slide 4 \([^)]*exercise\): Plain/);
   }
 
   console.log('runtime/ritemarkTools: all assertions passed');

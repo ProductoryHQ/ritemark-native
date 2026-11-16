@@ -41,6 +41,7 @@ import type { BoardAnswer } from '../taskBoard/protocol';
 import { CARD_STAGES } from '../taskBoard/cardTypes';
 import { deckName, type CopiedPart, type DeckLibrary } from '../decks/DeckLibrary';
 import { normalizePath } from '../decks/deckLibraryFormat';
+import { exerciseTagOf, isDefaultExerciseTag } from '../decks/deckFormat';
 
 export interface ToolResult {
   text: string;
@@ -459,8 +460,8 @@ function deckPathOf(value: unknown): string {
 /** A slide's words in one line, for read_deck. */
 function slideWords(kind: string, data: { title?: string; subtitle?: string; number?: string; tag?: string; items?: Array<{ heading?: string; text?: string }>; rows?: string[][] }): string {
   return [
-    // An exercise's pill, when its `tag:` line says other words than the default, or none.
-    kind === 'exercise' && data.tag !== undefined ? (data.tag.trim() ? `pill ${JSON.stringify(data.tag)}` : 'no pill') : '',
+    // An exercise's pill, when it draws other words than the default (`isDefaultExerciseTag`), or none.
+    kind === 'exercise' && !isDefaultExerciseTag(data) ? (exerciseTagOf(data) ? `pill ${JSON.stringify(data.tag)}` : 'no pill') : '',
     data.number, data.title, data.subtitle,
     ...(data.items ?? []).map(item => [item.heading, item.text].filter(Boolean).join(': ')),
     ...(data.rows ?? []).map(row => row.join(' | ')),

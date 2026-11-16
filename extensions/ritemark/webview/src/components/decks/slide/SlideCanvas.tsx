@@ -128,6 +128,11 @@ function SlideText({ box, editing, tag = 'div' }: { box: TextBox; editing?: Slid
       onKeyDown={event => {
         if (editing.onKey(box.path, event)) event.preventDefault()
       }}
+      // The input that emptied the box came mid-composition, so it wasn't cleared then: it is now.
+      onCompositionEnd={event => {
+        const element = event.currentTarget
+        if (!element.textContent && element.firstChild) clearKeepingCaret(element)
+      }}
       // Emptied words may leave a stray <br> behind: cleared, so the box reads as empty (its placeholder; an empty
       // pill goes once the caret leaves).
       onBlur={event => {

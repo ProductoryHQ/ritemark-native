@@ -83,6 +83,14 @@ export function exerciseTagOf(data: SlideData): string {
   return tag.trim() ? tag : '';
 }
 
+/**
+ * Does the pill draw what a slide without a `tag:` line draws? The pill is drawn in capitals, so `tag: exercise` and
+ * `tag: Exercise` written out draw the default too (the library stamp and read_deck treat them as no line).
+ */
+export function isDefaultExerciseTag(data: SlideData): boolean {
+  return exerciseTagOf(data).replace(/\s+/g, ' ').trim().toLowerCase() === EXERCISE_TAG.toLowerCase();
+}
+
 /** The scalar keys, in the order the writer puts a new key. */
 const SCALAR_KEYS = ['id', 'title', 'subtitle', 'number', 'tag', 'look', 'picture', 'image', 'skip', 'kept', 'from'] as const;
 type ScalarKey = (typeof SCALAR_KEYS)[number];

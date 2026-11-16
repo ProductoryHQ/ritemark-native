@@ -110,7 +110,7 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
             value={exerciseTagOf(data)}
             onChange={event => onChange({ tag: oneLine(event.target.value) })}
             onKeyDown={event => {
-              const step = undoKeyOf(event)
+              const step = undoKeyOf({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, isComposing: event.nativeEvent.isComposing })
               if (!step) return
               event.preventDefault()
               onUndo(step === 'redo')

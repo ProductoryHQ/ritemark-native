@@ -26,7 +26,7 @@ const { EditorState } = await import('@tiptap/pm/state')
 const { history, undo } = await import('@tiptap/pm/history')
 const { getSchema } = await import('@tiptap/core')
 
-const { EXERCISE_TAG, exerciseTagOf, parseDeck, parseSlideBody, writeSlideBody } = await import('../../../../../src/decks/deckFormat')
+const { EXERCISE_TAG, exerciseTagOf, isDefaultExerciseTag, parseDeck, parseSlideBody, writeSlideBody } = await import('../../../../../src/decks/deckFormat')
 const { BUILT_IN_THEME } = await import('../../../../../src/decks/deckTheme')
 const { publicDeck, deckDigest } = await import('../../../../../src/decks/page/publicDeck')
 const { pageHtml } = await import('../../../../../src/decks/page/pageHtml')
@@ -234,6 +234,26 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
     undoKeyOf({ key, metaKey: !!mods.meta, ctrlKey: !!mods.ctrl, shiftKey: !!mods.shift })
   assert.deepEqual([keys('z', { meta: true }), keys('Z', { meta: true, shift: true }), keys('y', { ctrl: true }), keys('z'), keys('a', { meta: true })], ['undo', 'redo', 'redo', null, null])
   assert.equal(oneLine('Har\njutus\r\n2\u2028x'), 'Har jutus 2 x')
+}
+
+// ---- Round 2 (PR 752).
+{
+  // A blank pill is saved as none, so the file never holds `tag: " "` and the Label row shows what is stored.
+  assert.equal(setPath({ title: 'T' }, 'tag', '   ').tag, '')
+  assert.equal(writeSlideBody(BODY, setPath(parseSlideBody(BODY), 'tag', ' ')).includes('tag: ""'), true)
+  // Undo keys: never mid-composition, never with Alt.
+  assert.equal(undoKeyOf({ key: 'z', metaKey: true, ctrlKey: false, shiftKey: false, isComposing: true }), null)
+  assert.equal(undoKeyOf({ key: 'z', metaKey: true, ctrlKey: false, shiftKey: false, altKey: true }), null)
+  // The default, in any case (the pill is drawn in capitals), is the default to the stamp.
+  for (const tag of [undefined, 'Exercise', 'exercise', 'EXERCISE', ' Exercise ']) assert.equal(isDefaultExerciseTag({ tag }), true, String(tag))
+  for (const tag of ['', 'Harjutus', 'Exercises']) assert.equal(isDefaultExerciseTag({ tag }), false, tag)
+  const data = parseSlideBody(BODY)
+  const stamp = (tag?: string) => slideStamp('exercise', { ...data, ...(tag === undefined ? {} : { tag }) }, 'Do the steps.', 'Slide library')
+  assert.equal(stamp('exercise'), stamp())
+  assert.equal(stamp('EXERCISE'), 'la3q3a')
+  // The pill's CSS: no ellipsis while it is typed in (the caret's end stays in view).
+  const css = readFileSync(fileURLToPath(new URL('./slide.css', import.meta.url)), 'utf8')
+  assert.match(css, /\.deck-sl \.tag\[contenteditable\]:focus \{ text-overflow: clip; \}/)
 }
 
 console.log('exerciseTag: passed')

@@ -7,7 +7,7 @@
  * from any other deck, is a copy carrying `from: <path>#<id> @<stamp>`. The UI and the AI's tools call the same
  * operations here (README decision 9, dual use).
  */
-import { deckVersionOf, isReadableDeckVersion, newId, parseFrom, parseSlideBody, withPartHeading, withWrittenHandout, writeFrom, writeSlideBody, type SlideData } from './deckFormat';
+import { deckVersionOf, exerciseTagOf, isReadableDeckVersion, newId, parseFrom, parseSlideBody, withPartHeading, withWrittenHandout, writeFrom, writeSlideBody, type SlideData } from './deckFormat';
 import {
   appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp, slideStamps,
   slidesOfText, type DeckSlideText,
@@ -99,7 +99,7 @@ function sourceOf(from: string | undefined): { path: string; id: string; stamp: 
 }
 
 const words = (slide: DeckSlideText) => [
-  slide.data.title, slide.data.subtitle, slide.kind === 'exercise' ? slide.data.tag : undefined, ...(slide.data.items ?? []).flatMap(item => [item.heading, item.text]),
+  slide.data.title, slide.data.subtitle, slide.kind === 'exercise' ? exerciseTagOf(slide.data) : undefined, ...(slide.data.items ?? []).flatMap(item => [item.heading, item.text]),
   ...(slide.data.rows ?? []).flat(), slide.handout,
 ].filter(Boolean).join(' ').toLowerCase();
 

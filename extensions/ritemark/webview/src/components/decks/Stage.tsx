@@ -102,7 +102,7 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
   }, [editor, slide.index])
 
   const undoKey = (event: ReactKeyboardEvent<HTMLElement>): boolean => {
-    const step = undoKeyOf(event)
+    const step = undoKeyOf({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, isComposing: event.nativeEvent.isComposing })
     if (step === 'redo') editor.commands.redo()
     else if (step === 'undo') editor.commands.undo()
     return step !== null

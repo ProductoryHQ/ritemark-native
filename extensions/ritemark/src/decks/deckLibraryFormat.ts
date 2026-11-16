@@ -8,7 +8,7 @@
  *    were rebased does not show as changed, and an edit that only moves line breaks in the handout doesn't either.
  *  - Update the library writes one slide by id (`replaceSlideBlock`), and every other byte of the topic stays.
  */
-import { EXERCISE_TAG, exerciseTagOf, handoutWithoutHeading, parseDeck, parseSlideBody, writeSlideBlock, writeSlideBody, type SlideData } from './deckFormat';
+import { exerciseTagOf, handoutWithoutHeading, isDefaultExerciseTag, parseDeck, parseSlideBody, writeSlideBlock, writeSlideBody, type SlideData } from './deckFormat';
 
 // ---------------------------------------------------------------------------
 // Paths (posix, project-relative)
@@ -167,7 +167,7 @@ function stampOf(kind: string, data: SlideData, handout: string, folder: string)
     '#rows', ...(data.rows ?? []).map(row => row.map(fold).join('|')),
     // An exercise's pill (16 November) counts only when it draws other words than the default, so every stamp made
     // before it stands, and `tag: Exercise` written out is no change. A tag kept on another kind draws nothing.
-    ...(kind === 'exercise' && fold(exerciseTagOf(data)) !== EXERCISE_TAG ? ['#tag', fold(exerciseTagOf(data))] : []),
+    ...(kind === 'exercise' && !isDefaultExerciseTag(data) ? ['#tag', fold(exerciseTagOf(data))] : []),
     '#handout', foldMarkdown(resolvedHandout),
   ];
   return fnv1a(parts.join('\u0001'));
