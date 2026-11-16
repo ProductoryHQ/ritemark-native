@@ -92,6 +92,10 @@ const options = {
     __RITEMARK_GOOGLE_OAUTH__: JSON.stringify(JSON.stringify(googleOAuth)),
   },
   logLevel: 'info',
+  // Sprint 159: a `.css` import is its text. The published handout page inlines the slide's own rules
+  // (webview/src/components/decks/slide/slide.css, src/decks/page/pageAssets.ts), the same file the deck view draws with,
+  // so it ships inside out/extension.js and an extension release carries it.
+  loader: { '.css': 'text' },
   // CJS format => no code-splitting => each entry is fully self-contained (browserMcpAdapter
   // stays standalone, no shared chunk with extension.js).
 };
