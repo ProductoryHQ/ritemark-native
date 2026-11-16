@@ -61,16 +61,37 @@
 .deck-fold.is-split .deck-fold-button { width: 26px; height: 28px; color: var(--r-ink-body); transform: none; }
 .deck-fold.is-split .deck-fold-button.is-upper { border-radius: 13px 13px 0 0; }
 .deck-fold.is-split .deck-fold-button.is-lower { border-radius: 0 0 13px 13px; box-shadow: inset 0 1px 0 var(--r-hairline-strong); }
-.deck-fold.is-split .deck-fold-button:hover, .deck-fold.is-split .deck-fold-button:focus-visible { background: var(--r-accent-soft); color: var(--r-accent); }
-.deck-fold.is-split .deck-fold-button:focus-visible { outline-offset: -2px; }
+.deck-fold.is-split .deck-fold-button:hover { background: var(--r-accent-soft); color: var(--r-accent); }
+:where(:root:not([data-input-mode="pointer"])) .deck-fold.is-split .deck-fold-button:focus-visible { background: var(--r-accent-soft); color: var(--r-accent); outline-offset: -2px; }
+
+/* Split along the long side (16 November; deckLayout.ts): with the slide above the handout, the slide is centred on top
+   at its pane's full height less 32 (16 above it and 16 under it; the Experience lead, 17 November), capped by the
+   width; the line is level, runs edge to edge from the strip, and drags; the split pill lies flat at the line's right
+   end, ˄ Hide the slide beside ˅ Hide the handout (the prototype's `.foldpair`, `.divider.h`, `.stage[data-stk]`). The
+   deck view sets the top and the height of each. */
+.deck-stage.is-above { bottom: auto; align-items: center; }
+.deck-stage.is-above .deck-stage-group { max-width: 100%; padding: 16px 0; }
+.deck-divider.is-above { width: auto; right: 0; bottom: auto; height: 13px; margin-left: 0; margin-top: -6px; cursor: row-resize; }
+.deck-divider.is-above::before { left: 0; right: 0; top: 6px; bottom: auto; border-left: 0; border-top: 1.5px dotted var(--r-hairline-strong); }
+.deck-divider.is-above:hover::before, .deck-divider.is-above.is-dragging::before { border-left: 0; border-top: 2px solid var(--r-accent); }
+.deck-fold.is-above { right: 28px; bottom: auto; margin-left: 0; margin-top: -13px; }
+/* One line, not two (the Experience lead, 17 November): the scroll rule brings the current part's head 6 px under the
+   handout's top (scrollRule.ts, PART_TOP_GAP), and its hairline border then ran just under the level line. Above, the
+   handout's top 8 px are the desk's colour, over the text and under the line, so only the dotted line shows there. */
+.deck-handout.is-above::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 8px; z-index: 1; background: var(--r-surface); pointer-events: none; }
+.deck-fold.is-split.is-above { flex-direction: row; }
+.deck-fold.is-split.is-above .deck-fold-button { width: 28px; height: 26px; }
+.deck-fold.is-split.is-above .deck-fold-button.is-upper { border-radius: 13px 0 0 13px; }
+.deck-fold.is-split.is-above .deck-fold-button.is-lower { border-radius: 0 13px 13px 0; box-shadow: inset 1px 0 0 var(--r-hairline-strong); }
 
 .deck-handout { position: absolute; top: 0; bottom: 0; right: 0; --deck-text-left: 48px; --deck-text-right: 32px; }
 .deck-handout.is-folded { visibility: hidden; pointer-events: none; }
 /* The slide folded away (16 November; the prototype's `.hand.solo`): the handout is a Text document's centred column,
    the editor's own width (`--deck-text-column`, the Editor's TEXT_COLUMN_WIDTH, the Experience lead), with the
    handout's own text edges inside it, and the lines between slides still run its full width. The deck view sets the
-   handout's width, as a length percentages here could not give: they would resolve against each element's own box. */
-.deck-handout.is-solo {
+   handout's width, as a length percentages here could not give: they would resolve against each element's own box.
+   Below the slide (`.is-above`), the handout is the same column. */
+.deck-handout.is-solo, .deck-handout.is-above {
   --deck-column-gap: max(0px, calc((var(--deck-handout-width, 0px) - var(--deck-text-column, 900px)) / 2));
   --deck-text-left: calc(var(--deck-column-gap) + 48px);
   --deck-text-right: calc(var(--deck-column-gap) + 32px);
