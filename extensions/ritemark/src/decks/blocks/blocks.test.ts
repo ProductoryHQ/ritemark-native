@@ -415,6 +415,15 @@ test('R2-7: a setext H2 names a slide that has no H1', () => {
   assert.equal(blockTitleOf(':::: columns\n::: column\nCopilot\n---\nText\n:::\n::::'), 'Copilot');
 });
 
+test('the title keeps half its size of room before what follows; a line under it (H2) stays close', () => {
+  // The Experience lead on #760. One rule in the shared slide CSS, so every view that draws a block slide has it.
+  const css = assets.slideCss;
+  assert.match(css, /\.deck-sl\.is-blocks h1 \{ margin: 0 0 \.5em;/);
+  assert.match(css, /\.deck-sl\.is-blocks h1 \+ \* \{ margin-top: 0; \}/);
+  assert.match(css, /\.deck-sl\.is-blocks h1:has\(\+ h2\) \{ margin-bottom: \.12em; \}/);
+  assert.ok(!/is-blocks[^{]*h1 \+ (?:p|h2|:not)[^{]*\{[^}]*margin-top: \.5em/.test(css), 'no other rule adds to the title\'s room');
+});
+
 console.log(`blocks: ${passed} passed`);
 
 // The library refuses to put a block slide into an older deck (async, so after the synchronous tests).
