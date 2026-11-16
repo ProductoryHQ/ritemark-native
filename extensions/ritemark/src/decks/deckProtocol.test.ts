@@ -107,20 +107,23 @@ assert.ok(!isThemePath(''));
 // Sprint 159 PR 4: Publish on the bar. The steps are numbers 0 to 3, one per slide; the actions are three; exact fields.
 assert.deepEqual(decodeDeckRequest({ type: 'deck/page-state' }), { type: 'deck/page-state' });
 assert.throws(() => decodeDeckRequest({ type: 'deck/page-state', path: '/etc/passwd' }), DeckProtocolError);
-// The view sends its text (the document may not have its newest words yet), never a page or a path.
+// The view sends its text and its look (the document may not have its newest words or look yet), never a page or a path.
 const body = '```slide title\ntitle: A\n```\n';
-assert.deepEqual(decodeDeckRequest({ type: 'deck/publish', text: body, steps: [0, 1, 3] }), { type: 'deck/publish', text: body, steps: [0, 1, 3] });
-assert.deepEqual(decodeDeckRequest({ type: 'deck/publish', text: '', steps: [] }), { type: 'deck/publish', text: '', steps: [] });
+assert.deepEqual(decodeDeckRequest({ type: 'deck/publish', text: body, look: 'card', steps: [0, 1, 3] }), { type: 'deck/publish', text: body, look: 'card', steps: [0, 1, 3] });
+assert.deepEqual(decodeDeckRequest({ type: 'deck/publish', text: '', look: 'borderless', steps: [] }), { type: 'deck/publish', text: '', look: 'borderless', steps: [] });
 // A long deck is fine (more than 500 slides); a list past MAX_DECK_SLIDES is not.
-assert.equal((decodeDeckRequest({ type: 'deck/publish', text: body, steps: Array.from({ length: 501 }, () => 0) }) as { steps: number[] }).steps.length, 501);
+assert.equal((decodeDeckRequest({ type: 'deck/publish', text: body, look: 'card', steps: Array.from({ length: 501 }, () => 0) }) as { steps: number[] }).steps.length, 501);
 for (const steps of [[4], [-1], [1.5], ['1'], [null], 'all', Array.from({ length: MAX_DECK_SLIDES + 1 }, () => 0)]) {
-  assert.throws(() => decodeDeckRequest({ type: 'deck/publish', text: body, steps }), DeckProtocolError, JSON.stringify(steps).slice(0, 40));
+  assert.throws(() => decodeDeckRequest({ type: 'deck/publish', text: body, look: 'card', steps }), DeckProtocolError, JSON.stringify(steps).slice(0, 40));
 }
-assert.throws(() => decodeDeckRequest({ type: 'deck/publish', steps: [0] }), DeckProtocolError, 'the text is needed');
-assert.throws(() => decodeDeckRequest({ type: 'deck/publish', text: 7, steps: [0] }), DeckProtocolError, 'the text is words');
-assert.throws(() => decodeDeckRequest({ type: 'deck/publish', text: 'x'.repeat(MAX_DECK_TEXT + 1), steps: [0] }), DeckProtocolError, 'a short text');
-assert.throws(() => decodeDeckRequest({ type: 'deck/publish', text: body, steps: [0], pagePath: '/x.html' }), DeckProtocolError, 'no page path from the view');
-assert.throws(() => decodeDeckRequest({ type: 'deck/publish', text: body, steps: [0], html: '<p>' }), DeckProtocolError, 'no page from the view');
+assert.throws(() => decodeDeckRequest({ type: 'deck/publish', look: 'card', steps: [0] }), DeckProtocolError, 'the text is needed');
+assert.throws(() => decodeDeckRequest({ type: 'deck/publish', text: 7, look: 'card', steps: [0] }), DeckProtocolError, 'the text is words');
+assert.throws(() => decodeDeckRequest({ type: 'deck/publish', text: 'x'.repeat(MAX_DECK_TEXT + 1), look: 'card', steps: [0] }), DeckProtocolError, 'a short text');
+for (const look of [undefined, 'Borderless', 'steps', true, null]) {
+  assert.throws(() => decodeDeckRequest({ type: 'deck/publish', text: body, ...(look === undefined ? {} : { look }), steps: [0] }), DeckProtocolError, `look ${String(look)}`);
+}
+assert.throws(() => decodeDeckRequest({ type: 'deck/publish', text: body, look: 'card', steps: [0], pagePath: '/x.html' }), DeckProtocolError, 'no page path from the view');
+assert.throws(() => decodeDeckRequest({ type: 'deck/publish', text: body, look: 'card', steps: [0], html: '<p>' }), DeckProtocolError, 'no page from the view');
 for (const action of ['copy-link', 'see-online', 'unpublish'] as const) {
   assert.deepEqual(decodeDeckRequest({ type: 'deck/page-action', action }), { type: 'deck/page-action', action });
 }

@@ -6,10 +6,10 @@
  *  - On the bar after Saved, before Present (frame 2), at the bar's 30 px (`size="bar"`).
  *  - Unpublished: Publish, outlined, with the globe. Published: the chip, "Published" or "Published · changed", whose menu has See online, Copy
  *    link, Update the page (only after a public change) and Unpublish. Publishing… and Unpublishing… while they run.
- *  - Publish and Update the page send the deck's text as this view holds it (the document may not have its newest
- *    words yet) and each slide's fit, numbers only, so the page's slides fit as the deck view's do. The fit is measured
- *    on the slides drawn once out of sight (`MeasureSlides`), the way the strip draws them, so it is there with the
- *    strip hidden or the desk narrow too.
+ *  - Publish and Update the page send the deck's text and look as this view holds them (the document may not have its
+ *    newest words or look yet) and each slide's fit, numbers only, so the page's slides fit as the deck view's do. The
+ *    fit is measured on the slides drawn once out of sight (`MeasureSlides`) in that look, the way the strip draws
+ *    them, so it is there with the strip hidden or the desk narrow too.
  *
  * The host keeps the state (`deck/page-state`); this only draws it and asks.
  */
@@ -39,6 +39,11 @@ export function measuredSteps(count: number, root: ParentNode): number[] {
   return steps
 }
 
+/** What Publish sends: the view's text and look at the press, and each slide's fit measured in that look. */
+export function publishRequest(pressed: { text: string; borderless: boolean }, steps: number[]): { text: string; look: 'card' | 'borderless'; steps: number[] } {
+  return { text: pressed.text, look: pressed.borderless ? 'borderless' : 'card', steps }
+}
+
 function isState(value: unknown): value is DeckPageState {
   const state = value as DeckPageState | null
   return !!state && typeof state.ready === 'boolean' && typeof state.changed === 'boolean'
@@ -57,8 +62,8 @@ interface DeckPublishProps {
 
 export function DeckPublish({ slides, theme, borderless, assets, text, onNotice }: DeckPublishProps) {
   const [state, setState] = useState<DeckPageState | null>(null)
-  // A Publish waiting for its slides' fit: the slides and the text as they were at the press.
-  const [measuring, setMeasuring] = useState<{ slides: DeckSlideEntry[]; text: string } | null>(null)
+  // A Publish waiting for its slides' fit: the slides, the text and the look as they were at the press.
+  const [measuring, setMeasuring] = useState<{ slides: DeckSlideEntry[]; text: string; borderless: boolean } | null>(null)
 
   useEffect(() => {
     const stop = onMessage(message => {
@@ -73,17 +78,17 @@ export function DeckPublish({ slides, theme, borderless, assets, text, onNotice 
     <>
       <DeckPublishControl
         state={state}
-        onPublish={() => setMeasuring(current => current ?? { slides, text: text() })}
+        onPublish={() => setMeasuring(current => current ?? { slides, text: text(), borderless })}
         onAction={action => sendToExtension('deck/page-action', { action })}
       />
       {measuring ? createPortal(
         <MeasureSlides
           slides={measuring.slides}
           theme={theme}
-          borderless={borderless}
+          borderless={measuring.borderless}
           assets={assets}
           onMeasured={steps => {
-            sendToExtension('deck/publish', { text: measuring.text, steps })
+            sendToExtension('deck/publish', publishRequest(measuring, steps))
             setMeasuring(null)
           }}
         />,

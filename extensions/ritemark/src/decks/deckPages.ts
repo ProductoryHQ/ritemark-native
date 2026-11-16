@@ -266,7 +266,7 @@ export class DeckPages implements vscode.Disposable {
         if (this.publisher) await this.post(webview, { type: 'deck/page-state', state: await this.publisher.stateOf(document) });
         return;
       case 'deck/publish':
-        await this.publisher?.publish(document, request.text, request.steps, text => void this.post(webview, { type: 'deck/page-notice', text }));
+        await this.publisher?.publish(document, request.text, request.look, request.steps, text => void this.post(webview, { type: 'deck/page-notice', text }));
         return;
       case 'deck/page-action':
         await this.publisher?.pageAction(document, request.action, text => void this.post(webview, { type: 'deck/page-notice', text }));

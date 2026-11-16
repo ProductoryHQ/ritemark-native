@@ -1,5 +1,5 @@
 /**
- * Sprint 159 PR 4: Publish on the deck's bar, each state as it draws, and the fit steps it sends.
+ * Sprint 159 PR 4: Publish on the deck's bar, each state as it draws, and the fit steps and the look it sends.
  *
  * Run: npx tsx webview/src/components/decks/DeckPublish.test.ts
  */
@@ -19,7 +19,7 @@ const React = await import('react')
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
-const { DeckPublishControl, measuredSteps } = await import('./DeckPublish')
+const { DeckPublishControl, measuredSteps, publishRequest } = await import('./DeckPublish')
 
 const draw = (state: DeckPageState | null) => renderToStaticMarkup(createElement(DeckPublishControl, { state, onPublish: () => {}, onAction: () => {} }))
 const words = (html: string) => parse(html).text.trim()
@@ -75,6 +75,16 @@ assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.cl
   </div>`)
   assert.deepEqual(measuredSteps(5, measured as unknown as ParentNode), [0, 2, 0, 3, 0])
   assert.deepEqual(measuredSteps(0, measured as unknown as ParentNode), [])
+}
+
+// What Publish sends carries the look the view shows at the press (Codex on #737): a Card | Borderless change may still
+// be on its way to the document. The host reads exactly these fields.
+{
+  const { decodeDeckRequest } = await import('../../../../src/decks/deckProtocol')
+  const text = '```slide title\ntitle: A\n```\n'
+  const sent = (borderless: boolean) => decodeDeckRequest({ type: 'deck/publish', ...publishRequest({ text, borderless }, [0, 2]) })
+  assert.deepEqual(sent(true), { type: 'deck/publish', text, look: 'borderless', steps: [0, 2] })
+  assert.deepEqual(sent(false), { type: 'deck/publish', text, look: 'card', steps: [0, 2] })
 }
 
 console.log('DeckPublish: passed')

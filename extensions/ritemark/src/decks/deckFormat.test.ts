@@ -20,6 +20,8 @@ import {
   publishText,
   type SlideData,
 } from './deckFormat';
+import { BUILT_IN_THEME } from './deckTheme';
+import { deckDigest, publicDeck } from './page/publicDeck';
 
 let passed = 0;
 function test(name: string, run: () => void) {
@@ -265,6 +267,47 @@ test('the text Publish builds from: the document\'s front matter with the view\'
   assert.deepEqual(publishText('\uFEFF' + broken, body, '\uFEFF' + broken), { text: '\uFEFF' + broken, fromView: false });
   const earlier = '---\ndeck: 1\n---note: A\nclient: B\n---\n\nbody\n';
   assert.deepEqual(publishText(earlier, '## note: A client: B\n\nbody\n', 'note: A\nclient: B\n---\n\nbody\n'), { text: earlier, fromView: false }, 'the editor ends it at an earlier line');
+});
+
+test("the text Publish builds from takes the view's look, still on its way to the document (Codex on #737)", () => {
+  const body = '\n```slide title\ntitle: Words\n```\n';
+  const card = '---\ndeck: 1\ntheme: Slide library/Themes/Evening.theme.md\n---\n';
+  const borderless = '---\ndeck: 1\ntheme: Slide library/Themes/Evening.theme.md\nlook: borderless\n---\n';
+  const options = { folderName: 'Client', deckName: 'Talk', theme: BUILT_IN_THEME };
+  // The page Publish builds is the page the document makes once the look has reached it: the chip then reads Published
+  const samePage = (text: string, caughtUp: string, message: string) => {
+    assert.deepEqual(publicDeck(text, options), publicDeck(caughtUp, options), message);
+    assert.equal(deckDigest(publicDeck(text, options)), deckDigest(publicDeck(caughtUp, options)), message);
+  };
+  // Borderless chosen a moment before the press: the document still says Card
+  const toBorderless = publishText(card + body, body, body, 'borderless');
+  assert.equal(toBorderless.fromView, true);
+  assert.equal(publicDeck(toBorderless.text, options).look, 'borderless');
+  samePage(toBorderless.text, borderless + body, 'Borderless');
+  assert.equal(parseDeck(toBorderless.text).theme, 'Slide library/Themes/Evening.theme.md', 'the theme stays');
+  // Card chosen: the document still says Borderless
+  const toCard = publishText(borderless + body, body, body, 'card');
+  assert.equal(publicDeck(toCard.text, options).look, 'card');
+  samePage(toCard.text, card + body, 'Card');
+  assert.equal(parseDeck(toCard.text).theme, 'Slide library/Themes/Evening.theme.md', 'the theme stays');
+  // The document says the view's look already (by the view's rule): its front matter as written
+  assert.deepEqual(publishText(borderless + body, body, body, 'borderless'), { text: borderless + body, fromView: true });
+  assert.deepEqual(publishText(card + body, body, body, 'card'), { text: card + body, fromView: true });
+  const capital = '---\ndeck: 1\nlook: Borderless\n---\n';
+  assert.deepEqual(publishText(capital + body, body, body, 'card'), { text: capital + body, fromView: true }, 'the view reads it as Card too');
+  // No front matter: one with the look, for Borderless only
+  assert.equal(publishText(body, body, body, 'borderless').text, `---\nlook: borderless\n---\n${body}`);
+  assert.deepEqual(publishText(body, body, body, 'card'), { text: body, fromView: true });
+  // The look was all it held: an empty front matter that still reads as one
+  const emptied = publishText(`---\nlook: borderless\n---\n${body}`, body, body, 'card');
+  samePage(emptied.text, body, 'nothing left in the front matter');
+  assert.equal(frontMatterField(emptied.text, 'look'), null);
+  // Windows line ends, and a front matter at the end of the file
+  assert.equal(publishText(`---\r\ndeck: 1\r\n---\r\n${body}`, body, body, 'borderless').text, `---\r\ndeck: 1\r\nlook: borderless\r\n---\r\n${body}`);
+  assert.equal(publishText('---\ndeck: 1\n---', '', '', 'borderless').text, '---\ndeck: 1\nlook: borderless\n---\n');
+  // The document as saved (the editor read its front matter differently) keeps its own look, as it keeps its words
+  const broken = '---\ndeck: 1\nsubtitle: Training: Day 1\n---\n\n```slide title\ntitle: Saved words\n```\n';
+  assert.deepEqual(publishText(broken, body, broken, 'borderless'), { text: broken, fromView: false });
 });
 
 console.log(`deckFormat: ${passed} passed`);
