@@ -40,7 +40,15 @@ A copy of the demo project with two more decks: "Fit check", whose second slide 
 - **A front matter the editor can't read.** The deck view shows such a front matter as words at the top of its handout (`pr4-broken-front-matter-view-1440.png`). That is the editor's own rule, unchanged here. The page written for it has neither `FRONTWORDQXZ` nor `Training: Day`, and it has the handout's words. Cancel took it back too.
 - **Decks turned off in Settings** hid the bar's Publish at once, and turned on again showed it.
 
-Fault first for the front matter: with `withFrontMatter`'s fail-closed line taken out, `publicDeck.test.ts` fails with `the front matter's words reached the page ("subtitle: Training: Day 1")`, and passes with it back.
+The window was run twice, after round 2's fixes and again after round 3's (the page held while it is written, `publishText`), with the same results each time.
+
+Fault first for the front matter: each guard put in `publishText` in turn, then `publicDeck.test.ts` run.
+
+| `publishText`'s guard | The test |
+| --- | --- |
+| None (round 1) | fails: `the front matter's words reached the page ("---\ndeck: 1\nclient: FRONTWORDQXZ\nsubtitle: Training: Day 1\n---\n")` |
+| Round 2's: the editor's body starts with a front matter | fails: `the front matter's words reached the page ("---\ndeck: 1\n---note: FRONTWORDQXZ\nclient: FRONTWORDQXZ\n---\n")` |
+| Round 3's: the editor's body is exactly what follows the front matter `parseDeck` reads | passes |
 
 Every shot in this window carries a dev-build toast, "Activating extension 'GitHub.copilot-chat' failed…". It comes from VS Code's own built-in Copilot Chat in the development build, not from Ritemark or this PR, and Ritemark's release builds don't ship that extension.
 
@@ -49,5 +57,5 @@ Every shot in this window carries a dev-build toast, "Activating extension 'GitH
 - A real publish, Update and Unpublish against Cloudflare, and the page on a phone. Only Jarmo can run these, on his account.
 - Copy link and See online in the window. They are 2.2's commands; Copy link would have written to the computer's clipboard.
 - Publishing…, Unpublishing… and the menu's actions with a connected account in a window (they are covered by the unit tests).
-- In a window: the page built from words typed a moment before the press, before the document has them. It wasn't tried; `withFrontMatter`'s tests cover the joining.
-- In a window: a press while the page's sheet is open from the browser's bar. `isBusy` and `busy` are covered by the unit tests.
+- In a window: the page built from words typed a moment before the press, before the document has them. It wasn't tried; `publishText`'s tests cover the joining.
+- In a window: a press while the page's sheet is open from the browser's bar. `holdPage`, `isBusy` and `busy` are covered by the unit tests.

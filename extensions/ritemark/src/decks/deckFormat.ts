@@ -577,19 +577,21 @@ export function parseDeck(text: string): ParsedDeck {
 }
 
 /**
- * A deck's text from its document's front matter (the theme and the look) and a view's body, front matter left out:
- * what Publish builds the page from, since the view's newest words may not have reached the document yet (Sprint 159).
+ * The deck's text Publish builds the page from (Sprint 159): the document's front matter (the theme and the look) with
+ * the view's body, front matter left out, since the view's newest words may not have reached the document yet.
+ * `fromView` says whether the view's words are in it.
  *
- * `editorBody` is the body the editor gave the view for this document. When the editor couldn't take the front matter
- * off (its YAML doesn't read, so the view was given the whole text), the view's body holds the front matter too, in
- * the editor's own shape, and can't be told from it: the document as saved is used then, whose front matter
- * `publicDeck` reads and leaves out exactly (fails closed; its newest words may lag).
+ * `editorBody` is the body the editor gave the view for this document. The view's body stands in for the document's
+ * only where that is exactly what follows the front matter `parseDeck` reads. Anywhere else the editor read the front
+ * matter differently (its YAML doesn't read, so the view was given the whole text, or it ends at another line), so
+ * the view's words may hold some of it, in the editor's own shape: the document as saved is used then, whose front
+ * matter `publicDeck` leaves out exactly (fails closed; words typed a moment before the press may be missing).
  */
-export function withFrontMatter(documentText: string, body: string, editorBody: string): string {
+export function publishText(documentText: string, body: string, editorBody: string): { text: string; fromView: boolean } {
   const text = documentText.replace(/^\uFEFF/, '');
   const head = text.slice(0, parseDeck(text).bodyStart);
-  if (head && parseDeck(editorBody.replace(/^\uFEFF/, '')).bodyStart > 0) return documentText;
-  return head && !head.endsWith('\n') ? `${head}\n${body}` : head + body;
+  if (head && editorBody.replace(/^\uFEFF/, '') !== text.slice(head.length)) return { text: documentText, fromView: false };
+  return { text: head && !head.endsWith('\n') ? `${head}\n${body}` : head + body, fromView: true };
 }
 
 /** The front matter's `deck:` value, as written, or null: read from the front matter alone. */

@@ -5,11 +5,11 @@
  *
  *  - **Publish and Update the page** do the same three things: take the open view's text and fit steps, write the page
  *    file, and run `ritemark.page.publish` on it, waited to its end (`PublishFeature.publishPage`). An update with the
- *    same pictures and nothing key-shaped goes straight up (2.2's `sheetNeeded`). One at a time per deck, and never
- *    while the page's sheet is open from elsewhere.
- *  - **A first Publish that is cancelled** takes its page back: when the flow says `cancelled`, a page this Publish
- *    created, with no record, is removed while it is still exactly the page written. A failed one stays, so the
- *    failure's Try again finds it.
+ *    same pictures and nothing key-shaped goes straight up (2.2's `sheetNeeded`). One at a time per deck; the page is
+ *    held while its file is written (`holdPage`), and never written while its sheet is open from elsewhere.
+ *  - **A first Publish that sends nothing** takes its page back: when the flow is cancelled, refused, not reachable or
+ *    stopped by an error, a page this Publish created, with no record, is removed while it is still exactly the page
+ *    written. A failed one stays, so the failure's Try again finds it.
  *  - **The chip** reads 2.2's state for the page file (`_ritemark.publish.pageState`) and says "Published · changed"
  *    when 2.2 finds a change, or when the deck's digest is no longer the page's (an edit to notes or a skipped slide
  *    isn't one: `publicDeck`). Typing in the deck asks only the digest again; 2.2 is asked when its state changes.
@@ -25,10 +25,10 @@ import { isEnabled } from '../features';
 import { openInIntegratedBrowser } from '../browser/IntegratedBrowser';
 import type { PublishFeature } from '../publish/vscodePublish';
 import { COPY_LINK_COMMAND, PAGE_STATE_COMMAND, UNPUBLISH_PAGE_COMMAND } from '../publish/vscodePublish';
-import { WORKERS_DEV_ADDRESS, type PageBarState, type PublishOutcome } from '../publish/PublishController';
+import { PAGE_BEING_PUBLISHED, WORKERS_DEV_ADDRESS, type PageBarState, type PublishOutcome } from '../publish/PublishController';
 import { splitFrontMatter } from '../editorSync/frontMatter';
 import { normalizeForCompare, samePath } from '../utils/pathIdentity';
-import { parseDeck, withFrontMatter } from './deckFormat';
+import { parseDeck, publishText } from './deckFormat';
 import { BUILT_IN_THEME, parseTheme, type DeckTheme } from './deckTheme';
 import { readDeckTheme } from './deckPages';
 import type { DeckHostMessage, DeckPageState } from './deckProtocol';
@@ -41,8 +41,8 @@ const CHANGED_MS = 800;
 
 /** Why Publish stopped before 2.2's Publish began: the page file couldn't be made or written. */
 export const PAGE_NOT_WRITTEN = "Ritemark couldn't write the page beside this deck, so nothing was published.";
-/** Publish pressed while the page's own Publish is open or going up (from the browser's bar): 2.2's words for it. */
-export const PAGE_BUSY = 'This page is being published.';
+/** Publish stopped by an error of its own before anything was sent. */
+export const PUBLISH_STOPPED = 'Publish stopped before anything was sent. Try again.';
 
 /** One open deck view the bar's Publish speaks for, and 2.2's last answer for its page. */
 interface DeckSeat {
@@ -51,7 +51,16 @@ interface DeckSeat {
   bar?: PageBarState;
 }
 
-/** The real path of a file, or the path as given when it isn't there (yet). */
+/**
+ * A page's path as 2.2 keys it (its real path), also before the file is there: the real path of its folder with its
+ * name. Ritemark never writes the page as a link (`writeDeckPage` refuses one), so the two agree.
+ */
+async function pageKeyOf(pagePath: string): Promise<string> {
+  const folder = await fs.promises.realpath(path.dirname(pagePath)).catch(() => path.dirname(pagePath));
+  return path.join(folder, path.basename(pagePath));
+}
+
+/** The real path of a file, or the path as given when it isn't there. */
 async function realPathOf(file: string): Promise<string> {
   return fs.promises.realpath(file).catch(() => file);
 }
@@ -157,8 +166,9 @@ export class DeckPublisher implements vscode.Disposable {
   }
 
   private async refreshPage(pagePath: string): Promise<void> {
+    const changed = await pageKeyOf(pagePath);
     for (const seat of this.seats) {
-      if (samePath(await realPathOf(pagePathFor(seat.document.uri.fsPath)), pagePath)) void this.refresh(seat);
+      if (samePath(await pageKeyOf(pagePathFor(seat.document.uri.fsPath)), changed)) void this.refresh(seat);
     }
   }
 
@@ -182,58 +192,62 @@ export class DeckPublisher implements vscode.Disposable {
     this.running.add(key);
     try {
       const pagePath = pagePathFor(deckPath);
+      const pageKey = await pageKeyOf(pagePath);
       const documentText = document.getText();
-      // The body the editor gave the view: when the front matter's YAML doesn't read, that is the whole text, front
-      // matter included, and the view's words can't be told from it (withFrontMatter then takes the document as saved)
-      const text = withFrontMatter(documentText, body, splitFrontMatter(documentText).content);
+      // The view's words, under the document's front matter, where the editor read that front matter as parseDeck does;
+      // else the document as saved (publishText), whose slides take the view's fit only while they are as many
+      const { text, fromView } = publishText(documentText, body, splitFrontMatter(documentText).content);
+      const fit = fromView || parseDeck(text.replace(/^\uFEFF/, '')).slides.length === steps.length ? steps : [];
       let built: Awaited<ReturnType<typeof buildDeckPage>>;
       let theme: DeckTheme;
       try {
         theme = await this.themeFor(deckPath, text);
-        built = await buildDeckPage({ deckPath, text, theme, steps }, await loadPageAssets(this.extensionPath));
+        built = await buildDeckPage({ deckPath, text, theme, steps: fit }, await loadPageAssets(this.extensionPath));
       } catch (error) {
         console.warn('[Decks] Could not build the page:', error);
         notice(PAGE_NOT_WRITTEN);
         return;
       }
-      // The page's sheet open from the browser's bar, or the page going up: the file stays as that flow read it.
-      // Asked last, just before the write.
-      if (feature.controller.isBusy(await realPathOf(pagePath))) {
-        notice(PAGE_BUSY);
+      // The page is held while its file is written, so no sheet gathers bytes that are about to change; one open on
+      // it already (from the browser's bar), or the page going up, keeps the file as that flow read it
+      const release = feature.controller.holdPage(pageKey);
+      if (!release) {
+        notice(PAGE_BEING_PUBLISHED);
         return;
       }
       let written: Awaited<ReturnType<typeof writeDeckPage>>;
       let hadRecord: boolean;
       try {
-        hadRecord = Boolean(await feature.controller.recordFor(await realPathOf(pagePath)));
+        hadRecord = Boolean(await feature.controller.recordFor(pageKey));
         written = await writeDeckPage(nodePageFs, deckPath, built.html);
       } catch (error) {
         console.warn('[Decks] Could not write the page:', error);
         notice(PAGE_NOT_WRITTEN);
         return;
+      } finally {
+        release();
       }
       if (written.kind === 'refused') {
         notice(written.line);
         return;
       }
-      const realPage = await realPathOf(pagePath);
-      const pageKey = normalizeForCompare(realPage);
-      this.written.set(pageKey, { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme)) });
-      let outcome: PublishOutcome | undefined;
+      this.written.set(normalizeForCompare(pageKey), { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme)) });
+      let outcome: PublishOutcome | undefined | 'stopped';
       try {
         outcome = await feature.publishPage(vscode.Uri.file(pagePath));
       } catch (error) {
-        // An error past the controller's own handling: the page stays, as after a failure
+        // An error past the controller's own handling, before anything was sent (an upload's errors are its failures)
         console.warn('[Decks] Publish stopped:', error);
-        return;
+        notice(PUBLISH_STOPPED);
+        outcome = 'stopped';
       }
-      if (outcome === 'busy') notice(PAGE_BUSY);
-      // A page made for this Publish goes again when nothing was published and nothing failed: cancelled in the
-      // sheet, refused before any flow began (the command said why), or Publish not reachable. A failed one stays for
-      // Try again, and a busy one belongs to the flow holding it.
-      const takeBack = outcome === 'cancelled' || outcome === 'not-ready' || outcome === undefined;
-      if (takeBack && written.created && !hadRecord && !(await feature.controller.recordFor(realPage))) {
-        if (await removeDeckPage(nodePageFs, pagePath, built.html).catch(() => false)) this.written.delete(pageKey);
+      if (outcome === 'busy') notice(PAGE_BEING_PUBLISHED);
+      // A page made for this Publish goes again when nothing was published and nothing failed: cancelled in the sheet,
+      // refused before any flow began (the command said why), Publish not reachable, or stopped by an error. A failed
+      // one stays for Try again, and a busy one belongs to the flow that took it.
+      const takeBack = outcome === 'cancelled' || outcome === 'not-ready' || outcome === undefined || outcome === 'stopped';
+      if (takeBack && written.created && !hadRecord && !(await feature.controller.recordFor(pageKey))) {
+        if (await removeDeckPage(nodePageFs, pagePath, built.html).catch(() => false)) this.written.delete(normalizeForCompare(pageKey));
       }
     } finally {
       this.running.delete(key);

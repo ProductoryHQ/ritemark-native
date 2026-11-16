@@ -1102,6 +1102,17 @@ test('the bar\'s Publish says how it ended: cancelled, busy while its sheet is o
     assert.equal(await t.controller.publishFromBar(t.page), 'published');
     assert.ok(await t.records.get(t.page.realPath));
     assert.equal(t.controller.isBusy(t.page.realPath), false);
+    // A page held while its file is written (the deck's bar): a press does nothing, a second hold is refused, and the
+    // release lets it go
+    const release = t.controller.holdPage(t.page.realPath);
+    assert.ok(release);
+    assert.equal(t.controller.isBusy(t.page.realPath), true);
+    assert.equal(t.controller.holdPage(t.page.realPath), null);
+    const shown = t.sheets.length;
+    assert.equal(await t.controller.publishFromBar(t.page), 'busy');
+    assert.equal(t.sheets.length, shown, 'no sheet while held');
+    release!();
+    assert.equal(t.controller.isBusy(t.page.realPath), false);
   } finally { await t.cleanup(); }
   const off = await setup({ entry: false });
   try {

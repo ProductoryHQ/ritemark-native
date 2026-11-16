@@ -5,7 +5,7 @@
  * Run: npx tsx src/decks/page/publicDeck.test.ts
  */
 import { strict as assert } from 'node:assert';
-import { withFrontMatter } from '../deckFormat';
+import { publishText } from '../deckFormat';
 import { BUILT_IN_THEME, parseTheme } from '../deckTheme';
 import { splitFrontMatter } from '../../editorSync/frontMatter';
 import { deckDigest, drawnData, publicDeck, publicMarkdown, type PublicDeck } from './publicDeck';
@@ -155,25 +155,31 @@ assert.equal(publicMarkdown('```notes\nsecret\n> ```\nmore secret\n```\n\nafter'
   assert.deepEqual(publicDeck(text, { ...options, steps: [-2, 0, Number.NaN] }).slides.map(slide => slide.step), [0, 0]);
 }
 
-// Sprint 159 PR 4 (security review, round 2): Publish joins the document's front matter with the view's body. When the
-// front matter's YAML doesn't read, the editor gives the view the whole text, so the view's body holds the front matter
-// as words; none of them may reach the page.
-for (const yaml of ['subtitle: Training: Day 1', 'theme: Slide library/Themes/A.theme.md\ntheme: Slide library/Themes/B.theme.md']) {
-  const saved = `---\ndeck: 1\nclient: FRONTWORDQXZ\n${yaml}\n---\n\n\`\`\`slide title\ntitle: Harbour title\n\`\`\`\n\nThe handout.\n`;
+// Sprint 159 PR 4 (security review, round 2; code review, round 3): Publish joins the document's front matter with the
+// view's body. Where the editor reads the front matter differently from parseDeck (its YAML doesn't read, so the editor
+// keeps the whole text; or it ends the front matter at an earlier `---` line), the view's body holds front matter as
+// words; none of them may reach the page.
+const frontMatters = [
+  '---\ndeck: 1\nclient: FRONTWORDQXZ\nsubtitle: Training: Day 1\n---\n',
+  '---\ndeck: 1\nclient: FRONTWORDQXZ\ntheme: Slide library/Themes/A.theme.md\ntheme: Slide library/Themes/B.theme.md\n---\n',
+  '---\ndeck: 1\n---note: FRONTWORDQXZ\nclient: FRONTWORDQXZ\n---\n',
+];
+for (const front of frontMatters) {
+  const saved = `${front}\n\`\`\`slide title\ntitle: Harbour title\n\`\`\`\n\nThe handout.\n`;
   const editorBody = splitFrontMatter(saved).content;
-  assert.equal(editorBody, saved, `the editor couldn't read ${JSON.stringify(yaml)}, so it kept the whole text`);
-  // The view's body as the editor serialized it: the front matter as a rule and a heading, then the slides
-  const viewBody = `---\n\n## deck: 1 client: FRONTWORDQXZ ${yaml.replace(/\n/g, ' ')}\n\n\`\`\`slide title\ntitle: Harbour title\n\`\`\`\n\nThe handout, newer.\n`;
-  for (const body of [viewBody, saved]) {
-    const page = JSON.stringify(publicDeck(withFrontMatter(saved, body, editorBody), options));
-    assert.ok(!page.includes('FRONTWORDQXZ'), `the front matter's words reached the page (${JSON.stringify(yaml)})`);
+  assert.ok(editorBody.includes('FRONTWORDQXZ'), `the editor gives the view front matter words for ${JSON.stringify(front)}`);
+  // The view's body as the editor serialized it: the front matter's words as a heading, then the slides
+  const viewBody = `## ${editorBody.split('\n---')[0].replace(/\n/g, ' ')}\n\n\`\`\`slide title\ntitle: Harbour title\n\`\`\`\n\nThe handout, newer.\n`;
+  for (const body of [viewBody, editorBody]) {
+    const page = JSON.stringify(publicDeck(publishText(saved, body, editorBody).text, options));
+    assert.ok(!page.includes('FRONTWORDQXZ'), `the front matter's words reached the page (${JSON.stringify(front)})`);
     assert.ok(page.includes('The handout'));
   }
 }
 // A front matter that reads: the view's newer words go, the front matter doesn't
 {
   const saved = '---\ndeck: 1\nclient: FRONTWORDQXZ\n---\n\n```slide title\ntitle: Harbour title\n```\n\nOlder words.\n';
-  const page = JSON.stringify(publicDeck(withFrontMatter(saved, '```slide title\ntitle: Harbour title\n```\n\nNewer words.\n', splitFrontMatter(saved).content), options));
+  const page = JSON.stringify(publicDeck(publishText(saved, '```slide title\ntitle: Harbour title\n```\n\nNewer words.\n', splitFrontMatter(saved).content).text, options));
   assert.ok(page.includes('Newer words') && !page.includes('Older words') && !page.includes('FRONTWORDQXZ'));
 }
 

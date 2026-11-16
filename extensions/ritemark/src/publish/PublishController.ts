@@ -104,6 +104,9 @@ export const WORKERS_DEV_ADDRESS = /^https:\/\/[a-z0-9.-]+\.workers\.dev\//;
  */
 export type PublishOutcome = 'published' | 'failed' | 'cancelled' | 'busy' | 'not-ready';
 
+/** A second Publish of a page while one is going up, or while its file is being written for one. */
+export const PAGE_BEING_PUBLISHED = 'This page is being published.';
+
 /**
  * The adapter's lines, each made plain on its way out (plainText.ts): a failure, a wait, a toast and a connect line
  * carry a page's title, a file's name or a host's error text, and a notification would turn link syntax in them into a
@@ -245,6 +248,8 @@ export class PublishController {
   private readonly siteLines = new Map<string, string>();
   private readonly publishing = new Set<string>();
   private readonly sheets = new Set<string>();
+  /** Pages whose file is being written for a Publish (the deck's bar, `holdPage`): no flow starts on them meanwhile. */
+  private readonly held = new Set<string>();
   private readonly pageLines = new Map<string, string>();
   /** First publishes waiting for their new address to answer, with the line shown (M6). */
   private readonly waiting = new Map<string, string>();
@@ -503,7 +508,7 @@ export class PublishController {
   async publishFromBar(page: ProjectPage): Promise<PublishOutcome> {
     if (!this.canPublish()) return 'not-ready'; // ritemark.page.publish from a keybinding or code, before PR 5's sheet: nothing
     const key = page.realPath;
-    if (this.publishing.has(key) || this.sheets.has(key)) return 'busy';
+    if (this.isBusy(key)) return 'busy';
     this.sheets.add(key);
     let chosen: { plan: GatheredPlan; consent: PublishConsent; pagePart?: string; newName?: boolean } | null = null;
     try {
@@ -659,7 +664,7 @@ export class PublishController {
     if (!accountId) throw new PublishError('not-connected', CONNECT_AGAIN);
     if (plan.tooBig.length > 0 || plan.tooMany) throw new PublishError(plan.tooMany ? 'too-many' : 'too-big', 'This page is too big for Cloudflare\'s free plan. Nothing was sent.');
     const pagePath = plan.pagePath;
-    if (this.publishing.has(pagePath)) throw new PublishError('failed', 'This page is being published.');
+    if (this.publishing.has(pagePath)) throw new PublishError('failed', PAGE_BEING_PUBLISHED);
     const record = await this.liveRecord(pagePath);
     if (record && record.accountId !== accountId) throw new PublishError('failed', OTHER_ACCOUNT_UPDATE);
     if (plan.keyHits.length > 0 && consent !== 'sheet-anyway') throw new PublishError('failed', KEY_NEEDS_SHEET);
@@ -757,11 +762,21 @@ export class PublishController {
   }
 
   /**
-   * Whether a publish flow holds this page now: its sheet is open, or it is going up. The deck's bar doesn't write the
-   * page under an open sheet (Sprint 159 PR 4).
+   * Whether this page is taken now: its sheet is open, it is going up, or its file is being written for a Publish
+   * (`holdPage`, Sprint 159 PR 4). A press of Publish then does nothing (`busy`).
    */
   isBusy(pagePath: string): boolean {
-    return this.sheets.has(pagePath) || this.publishing.has(pagePath);
+    return this.sheets.has(pagePath) || this.publishing.has(pagePath) || this.held.has(pagePath);
+  }
+
+  /**
+   * Hold a page (by real path) while its file is written for a Publish: no publish flow starts on it until the returned
+   * release, so no sheet gathers bytes that are about to change. Null when a flow or another hold has it.
+   */
+  holdPage(pagePath: string): (() => void) | null {
+    if (this.isBusy(pagePath)) return null;
+    this.held.add(pagePath);
+    return () => { this.held.delete(pagePath); };
   }
 
   /** The page's record while it is online, for the bar's Copy link, Open the page and Unpublish. */
