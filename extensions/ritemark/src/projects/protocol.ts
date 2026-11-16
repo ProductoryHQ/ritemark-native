@@ -35,7 +35,7 @@ export interface HomeWaitingItem {
   quoted?: boolean;
 }
 
-export type RecentKind = 'markdown' | 'pdf' | 'word' | 'sheet' | 'slides' | 'drawing' | 'flow' | 'other';
+export type RecentKind = 'markdown' | 'pdf' | 'word' | 'sheet' | 'slides' | 'deck' | 'drawing' | 'flow' | 'other';
 
 export interface HomeRecentItem {
   id: string;

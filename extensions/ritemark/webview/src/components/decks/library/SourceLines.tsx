@@ -61,7 +61,7 @@ export function SourceLines({ source, kept, justUpdated, busy, actions }: Source
   return (
     <>
       <div className="deck-source">
-        <Icon name="books" size={12} tone="inherit" />
+        <Icon name="cards-three" size={12} tone="inherit" />
         {`From the library · ${source.sourceName}`}
         {source.missing ? <span>· no longer in the library</span> : null}
       </div>

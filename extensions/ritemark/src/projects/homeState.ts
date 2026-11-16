@@ -7,6 +7,7 @@
 import { createHash } from 'crypto';
 import * as path from 'path';
 import { isAboutFile, isRootClaudeFile, ABOUT_TITLE } from './aboutFile';
+import { isDeckPath, splitFileName } from '../decks/deckFileName';
 import type { AiName, HomeRecentItem, HomeWaitingItem, RecentKind } from './protocol';
 import type { ProjectWaiting } from './waiting';
 
@@ -28,6 +29,8 @@ export const RECENT_EXTENSIONS: readonly string[] = Object.keys(KINDS);
 
 export function kindOf(fileName: string): RecentKind {
   if (fileName.toLowerCase().endsWith('.flow.json')) return 'flow';
+  // A deck is its own kind (not PowerPoint's `slides`), shown with the deck's own icon, as its tab is (Sprint 159)
+  if (isDeckPath(fileName)) return 'deck';
   return KINDS[path.extname(fileName).toLowerCase()] ?? 'other';
 }
 
@@ -65,15 +68,16 @@ export function recentItems(
     .map((file, index) => {
       const about = isAboutFile(folder, file.path);
       const base = path.basename(file.path);
-      const dot = base.lastIndexOf('.');
+      // A deck's extension is the whole ".deck.md", as Documents splits it (patch 018's ritemarkSplitExtension)
+      const split = splitFileName(base);
       const relativeDir = path.relative(folder, path.dirname(file.path));
       return {
         path: file.path,
         item: {
           // Stable across redraws, so focus stays on the same file when the list reorders (S15); opaque to the page.
           id: `file:${createHash('sha256').update(path.relative(folder, file.path)).digest('hex').slice(0, 16)}`,
-          name: about ? ABOUT_TITLE : dot > 0 ? base.slice(0, dot) : base,
-          extension: about || dot <= 0 ? '' : base.slice(dot),
+          name: about ? ABOUT_TITLE : split.name,
+          extension: about ? '' : split.extension,
           folder: relativeDir && relativeDir !== '.' ? relativeDir.split(path.sep).join('/') : null,
           kind: kindOf(base),
           about,

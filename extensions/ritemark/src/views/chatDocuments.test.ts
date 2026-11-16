@@ -73,6 +73,14 @@ const theme = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'filei
   assert.equal(resolveFileIcon(theme, '/p/AGENTS.md', { kind: 'dark' }), './icons/dark/book-open.svg', 'fileNames (dark)');
   assert.equal(resolveFileIcon(theme, '/p/Course.flow.json', { kind: 'light' }), './icons/flow-arrow.svg', 'the longest extension first');
   assert.equal(resolveFileIcon(theme, '/p/data.json', { kind: 'light' }), './icons/braces.svg', 'then the short one');
+  // Sprint 159 (deck icons): a deck shows Phosphor's presentation, in markdown's language too; other Markdown keeps the page
+  assert.equal(resolveFileIcon(theme, '/p/Talk.deck.md', { kind: 'light', languageId: 'markdown' }), './icons/presentation.svg', 'a deck (light)');
+  assert.equal(resolveFileIcon(theme, '/p/Slide library/TEAMS.DECK.MD', { kind: 'dark', languageId: 'markdown' }), './icons/dark/presentation.svg', 'a deck (dark), case-insensitively');
+  assert.equal(resolveFileIcon(theme, '/p/deck.md', { kind: 'light', languageId: 'markdown' }), './icons/file-text.svg', 'a file named deck.md is no deck');
+  assert.equal(resolveFileIcon(theme, '/p/Talk.deck.markdown', { kind: 'light' }), './icons/file-text.svg', 'nor is a .deck.markdown');
+  for (const variant of ['icons/presentation.svg', 'icons/dark/presentation.svg']) {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', '..', 'fileicons', variant)), `${variant} is shipped`);
+  }
   assert.equal(resolveFileIcon(theme, '/p/Budget.XLSX', { kind: 'light' }), './icons/file-xls.svg', 'extensions case-insensitively');
   assert.equal(resolveFileIcon(theme, '/p/Makefile', { kind: 'light', languageId: 'yaml' }), './icons/settings.svg', 'languageIds after names and extensions');
   assert.equal(resolveFileIcon(theme, '/p/notes.txt', { kind: 'light', languageId: 'plaintext' }), './icons/file.svg', 'the default file icon (light)');

@@ -2,11 +2,10 @@
  * Which files open as decks (Sprint 157). Pure, so the test reads the same rule the editor uses.
  */
 import { deckVersionOf, isReadableDeckVersion } from './deckFormat';
+import { isDeckPath } from './deckFileName';
 
-/** A deck's file name ends `.deck.md`, in any case. */
-export function isDeckPath(fsPath: string): boolean {
-  return /\.deck\.md$/i.test(fsPath);
-}
+// The rule itself lives in deckFileName.ts (no imports), shared with the lists' names and icons (Sprint 159, deck icons)
+export { isDeckPath };
 
 /**
  * Does this file open as a deck? The flag `decks` is on, the file is on disk, its name ends `.deck.md`, and its front

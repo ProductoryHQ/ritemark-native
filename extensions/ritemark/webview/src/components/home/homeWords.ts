@@ -184,14 +184,15 @@ export function othersWords(others: HomeState['others'], hereCount: number): str
 }
 
 /** The icon for a file row. */
-export function recentIcon(item: HomeRecentItem): 'book-open-text' | 'file-text' | 'file-pdf' | 'file-doc' | 'table' | 'presentation' | 'graph' | 'flow-arrow' | 'file' {
+export function recentIcon(item: HomeRecentItem): 'book-open-text' | 'file-text' | 'file-pdf' | 'file-doc' | 'file-ppt' | 'table' | 'presentation' | 'graph' | 'flow-arrow' | 'file' {
   if (item.about) return 'book-open-text'
   switch (item.kind) {
     case 'markdown': return 'file-text'
     case 'pdf': return 'file-pdf'
     case 'word': return 'file-doc'
     case 'sheet': return 'table'
-    case 'slides': return 'presentation'
+    case 'slides': return 'file-ppt' // PowerPoint keeps the page Documents gives it; only a deck has the easel (Sprint 159)
+    case 'deck': return 'presentation'
     case 'drawing': return 'graph'
     case 'flow': return 'flow-arrow'
     default: return 'file'
