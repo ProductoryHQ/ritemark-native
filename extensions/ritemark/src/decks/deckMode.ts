@@ -2,9 +2,9 @@
  * Which files open as decks (Sprint 157). Pure, so the test reads the same rule the editor uses.
  */
 import { deckVersionOf, isReadableDeckVersion } from './deckFormat';
-import { isDeckPath } from './deckName';
+import { isDeckPath } from './deckFileName';
 
-// The rule itself lives in deckName.ts (no imports), shared with the lists' names and icons (Sprint 159, deck icons)
+// The rule itself lives in deckFileName.ts (no imports), shared with the lists' names and icons (Sprint 159, deck icons)
 export { isDeckPath };
 
 /**

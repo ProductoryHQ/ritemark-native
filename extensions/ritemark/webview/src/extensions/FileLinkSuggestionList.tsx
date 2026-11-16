@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
-import { Icon } from '../components/ui/Icon'
+import { Icon, type PhosphorIconName } from '../components/ui/Icon'
 import type { WorkspaceFileLinkResult } from '../lib/workspaceFileSearch'
 import { fileIconOf } from '../lib/fileIcon'
 
@@ -19,8 +19,10 @@ export interface FileLinkSuggestionListHandle {
 }
 
 /** A deck (`*.deck.md`) shows the deck's own icon, as everywhere a file shows (Sprint 159, deck icons). */
+const KIND_ICONS: Partial<Record<WorkspaceFileLinkResult['kind'], PhosphorIconName>> = { markdown: 'file-text', document: 'file-text', data: 'table', image: 'file-image' }
+
 export function iconForFile(kind: WorkspaceFileLinkResult['kind'] | undefined, relativePath = '') {
-  return fileIconOf(relativePath, kind === 'markdown' || kind === 'document' ? 'file-text' : kind === 'data' ? 'table' : kind === 'image' ? 'file-image' : 'file')
+  return fileIconOf(relativePath, (kind && KIND_ICONS[kind]) ?? 'file')
 }
 
 export const FileLinkSuggestionList = forwardRef<FileLinkSuggestionListHandle, FileLinkSuggestionListProps>((props, ref) => {

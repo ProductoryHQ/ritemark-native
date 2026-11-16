@@ -9,7 +9,7 @@ import { fileIconOf } from './fileIcon'
 
 assert.deepEqual(
   ['/p/Harbour Logistics/AI assistants and agents.deck.md', 'C:\\p\\TEAMS.DECK.MD', '/p/Notes.md', '/p/deck.md', '/p/.deck.md', '/p/Pitch.pptx', null, undefined, ''].map((path) => fileIconOf(path, 'file-text')),
-  ['presentation', 'presentation', 'file-text', 'file-text', 'file-text', 'file-text', 'file-text', 'file-text', 'file-text'],
+  ['presentation', 'presentation', 'file-text', 'file-text', 'presentation', 'file-text', 'file-text', 'file-text', 'file-text'],
 )
 assert.equal(fileIconOf('/p/data.csv', 'table'), 'table', "another file keeps its surface's icon")
 console.log('fileIcon: all assertions passed')

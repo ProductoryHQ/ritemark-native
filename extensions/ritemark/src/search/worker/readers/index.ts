@@ -7,7 +7,7 @@ import { readDocx } from './docx';
 import { readMarkdown } from './markdown';
 import { readPdf } from './pdf';
 import { decodeText, type ReadOutcome } from './types';
-import { splitFileName } from '../../../decks/deckName';
+import { splitFileName } from '../../../decks/deckFileName';
 
 export { READER_VERSION, type Passage, type ReadOutcome } from './types';
 

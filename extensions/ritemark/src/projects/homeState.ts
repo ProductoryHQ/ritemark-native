@@ -7,7 +7,7 @@
 import { createHash } from 'crypto';
 import * as path from 'path';
 import { isAboutFile, isRootClaudeFile, ABOUT_TITLE } from './aboutFile';
-import { isDeckPath, splitFileName } from '../decks/deckName';
+import { isDeckPath, splitFileName } from '../decks/deckFileName';
 import type { AiName, HomeRecentItem, HomeWaitingItem, RecentKind } from './protocol';
 import type { ProjectWaiting } from './waiting';
 

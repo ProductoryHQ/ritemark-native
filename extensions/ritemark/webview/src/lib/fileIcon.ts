@@ -3,7 +3,7 @@
  * presentation everywhere, as its tab and Documents do (the file icon theme); every other file keeps the icon its
  * surface gives its kind. One place, so Search, the link list and the chat's chips can't drift apart.
  */
-import { isDeckPath } from '../../../src/decks/deckName'
+import { isDeckPath } from '../../../src/decks/deckFileName'
 import type { PhosphorIconName } from '../components/ui/Icon'
 
 export function fileIconOf(path: string | null | undefined, kindIcon: PhosphorIconName): PhosphorIconName {
