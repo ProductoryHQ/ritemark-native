@@ -460,7 +460,7 @@ function deckPathOf(value: unknown): string {
 function slideWords(kind: string, data: { title?: string; subtitle?: string; number?: string; tag?: string; items?: Array<{ heading?: string; text?: string }>; rows?: string[][] }): string {
   return [
     // An exercise's pill, when its `tag:` line says other words than the default, or none.
-    kind === 'exercise' && data.tag !== undefined ? (data.tag ? `pill "${data.tag}"` : 'no pill') : '',
+    kind === 'exercise' && data.tag !== undefined ? (data.tag.trim() ? `pill ${JSON.stringify(data.tag)}` : 'no pill') : '',
     data.number, data.title, data.subtitle,
     ...(data.items ?? []).map(item => [item.heading, item.text].filter(Boolean).join(': ')),
     ...(data.rows ?? []).map(row => row.join(' | ')),

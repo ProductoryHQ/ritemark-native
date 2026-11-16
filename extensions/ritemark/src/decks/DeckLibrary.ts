@@ -99,7 +99,7 @@ function sourceOf(from: string | undefined): { path: string; id: string; stamp: 
 }
 
 const words = (slide: DeckSlideText) => [
-  slide.data.title, slide.data.subtitle, ...(slide.data.items ?? []).flatMap(item => [item.heading, item.text]),
+  slide.data.title, slide.data.subtitle, slide.kind === 'exercise' ? slide.data.tag : undefined, ...(slide.data.items ?? []).flatMap(item => [item.heading, item.text]),
   ...(slide.data.rows ?? []).flat(), slide.handout,
 ].filter(Boolean).join(' ').toLowerCase();
 

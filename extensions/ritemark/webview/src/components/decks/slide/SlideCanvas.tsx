@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Tooltip } from '../../ui/tooltip'
 import { themeStyle } from '../theme/themeVars'
 import { SLIDE_ICONS, slideIcon } from './iconSet'
+import { oneLine } from './slideEdits'
 import { BOTTOM, CANVAS_HEIGHT, CANVAS_WIDTH, MAX_STEP, layoutSlide, type BoxStyle, type MarkBox, type SlideBox, type TextBox } from './layoutSlide'
 // The slide's rules, shared with the published handout page (Sprint 159): every view that draws a slide gets them.
 import './slide.css'
@@ -120,8 +121,9 @@ function SlideText({ box, editing, tag = 'div' }: { box: TextBox; editing?: Slid
         const raw = box.multiline ? editedText(event.currentTarget) : event.currentTarget.textContent ?? ''
         // Emptied, Chromium leaves a <br> behind, so the box doesn't read as :empty and its placeholder (an empty
         // pill's faint default) never shows: the box is cleared, with the caret kept in it.
-        if (raw === '' && event.currentTarget.firstChild) clearKeepingCaret(event.currentTarget)
-        editing.onText(box.path, box.multiline ? raw : raw.replace(/[\r\n\u2028\u2029]+/g, ' '))
+        // Never mid-composition (an IME's or a dead key's marked text): the browser holds that text and would lose it.
+        if (raw === '' && event.currentTarget.firstChild && !(event.nativeEvent as InputEvent).isComposing) clearKeepingCaret(event.currentTarget)
+        editing.onText(box.path, box.multiline ? raw : oneLine(raw))
       }}
       onKeyDown={event => {
         if (editing.onKey(box.path, event)) event.preventDefault()
@@ -130,7 +132,9 @@ function SlideText({ box, editing, tag = 'div' }: { box: TextBox; editing?: Slid
       // pill goes once the caret leaves).
       onBlur={event => {
         const element = event.currentTarget
-        if (!element.textContent && element.firstChild) clearKeepingCaret(element)
+        // A pill of spaces is no pill (`exerciseTagOf`), so it reads as empty too and goes.
+        const text = element.textContent ?? ''
+        if ((box.path === 'tag' ? !text.trim() : !text) && element.firstChild) clearKeepingCaret(element)
       }}
     />
   )

@@ -77,9 +77,10 @@ export interface SlideData {
 /** The pill an exercise slide shows when its block has no `tag:` line. Not yet in the deck's own language. */
 export const EXERCISE_TAG = 'Exercise';
 
-/** The words of an exercise slide's pill: its `tag:` line, or the default when there is none; '' is no pill. */
+/** The words of an exercise slide's pill: its `tag:` line, or the default when there is none; '' (or spaces) is no pill. */
 export function exerciseTagOf(data: SlideData): string {
-  return data.tag ?? EXERCISE_TAG;
+  const tag = data.tag ?? EXERCISE_TAG;
+  return tag.trim() ? tag : '';
 }
 
 /** The scalar keys, in the order the writer puts a new key. */

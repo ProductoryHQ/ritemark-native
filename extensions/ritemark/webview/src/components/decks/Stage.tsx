@@ -22,7 +22,7 @@ import { getClipboardImageFile, getUniqueImageFilename, readFileAsBase64, should
 import { hiddenNote } from './slide/convertKind'
 import { SlideCanvas, editedText, type SlideEditing } from './slide/SlideCanvas'
 import { layoutSlide, textBoxes } from './slide/layoutSlide'
-import { addColumn, addRow, cellPath, insertItemAfter, isEmptyItem, itemPath, nextCell, removeItem, setIcon, setPath, valueAt } from './slide/slideEdits'
+import { undoKeyOf, addColumn, addRow, cellPath, insertItemAfter, isEmptyItem, itemPath, nextCell, removeItem, setIcon, setPath, valueAt } from './slide/slideEdits'
 
 interface StageProps {
   editor: TipTapEditor
@@ -102,18 +102,10 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
   }, [editor, slide.index])
 
   const undoKey = (event: ReactKeyboardEvent<HTMLElement>): boolean => {
-    const mod = event.metaKey || event.ctrlKey
-    const key = event.key.toLowerCase()
-    if (mod && key === 'z') {
-      if (event.shiftKey) editor.commands.redo()
-      else editor.commands.undo()
-      return true
-    }
-    if (mod && key === 'y') {
-      editor.commands.redo()
-      return true
-    }
-    return false
+    const step = undoKeyOf(event)
+    if (step === 'redo') editor.commands.redo()
+    else if (step === 'undo') editor.commands.undo()
+    return step !== null
   }
 
   const onKey = (path: string, event: ReactKeyboardEvent<HTMLElement>): boolean => {

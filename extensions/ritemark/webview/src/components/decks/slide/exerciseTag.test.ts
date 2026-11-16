@@ -34,7 +34,7 @@ const { PAGE_SCRIPT } = await import('../../../../../src/decks/page/pageScript')
 const { wallDataOf } = await import('../../../../../src/decks/present/presentProtocol')
 const { slideStamp } = await import('../../../../../src/decks/deckLibraryFormat')
 const { layoutSlide, textBoxes } = await import('./layoutSlide')
-const { setPath, valueAt } = await import('./slideEdits')
+const { oneLine, setPath, undoKeyOf, valueAt } = await import('./slideEdits')
 const { slideMarkup } = await import('./slideMarkup')
 const { SlideCanvas } = await import('./SlideCanvas')
 const { SlideSettings } = await import('../SlideSettings')
@@ -105,7 +105,6 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
   // The stage's empty pill is hidden by its own rule once the caret leaves; the placeholder is faint, on the pill.
   const css = readFileSync(fileURLToPath(new URL('./slide.css', import.meta.url)), 'utf8')
   assert.match(css, /\.deck-sl \.tag\[contenteditable\]:empty:not\(:focus\) \{ display: none; \}/)
-  assert.match(css, /\.deck-sl \.tag \{ white-space: nowrap; \}/)
   const stage = renderToStaticMarkup(createElement(SlideCanvas, {
     kind: 'exercise', data, width: 960, theme: BUILT_IN_THEME, borderless: false, assets: {},
     editing: { onText: () => {}, onKey: () => false, onSetIcon: () => {}, focusPath: null, onFocused: () => {} },
@@ -208,6 +207,33 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
   assert.equal(before, 'la3q3a')
   assert.notEqual(slideStamp('exercise', { ...data, tag: 'Harjutus' }, 'Do the steps.', 'Slide library'), before)
   assert.notEqual(slideStamp('exercise', { ...data, tag: '' }, 'Do the steps.', 'Slide library'), before)
+}
+
+// ---- The first review's findings (PR 752, round 1).
+{
+  // A long label stays on one line within the content's width, cut with an ellipsis, never run off the slide.
+  const long = pill('exercise', { title: 'T', tag: 'Harjutus 3: ava fail ja küsi assistendilt abi, siis veel üks samm ja veel' })!
+  assert.equal(long.style?.maxWidth, 832)
+  assert.equal(pill('exercise', { title: 'T', tag: 'X', picture: 'left' })!.style?.maxWidth, 960 - 432 - 48, 'beside a picture: the side it has')
+  const css = readFileSync(fileURLToPath(new URL('./slide.css', import.meta.url)), 'utf8')
+  assert.match(css, /\.deck-sl \.tag \{ box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; \}/)
+  // A label of spaces is no pill, anywhere.
+  assert.equal(exerciseTagOf({ tag: '   ' }), '')
+  assert.equal(pill('exercise', { title: 'T', tag: ' ' }), undefined)
+  assert.equal(pill('exercise', { title: 'T', tag: ' ' }, true)!.text, '')
+  const spaces = publicDeck(DECK.replace('title: Try it\n', 'title: Try it\ntag: " "\n'), { folderName: 'Demo', deckName: 'Demo', theme: BUILT_IN_THEME })
+  assert.equal(parse(pageHtml(spaces, { slideCss: '', fonts: [] }, { digest: deckDigest(spaces), pictureUrl: () => null })).querySelector('.tag'), null)
+  // The stamp: `tag: Exercise` written out draws what no line draws, so it is no change; a tag on another kind draws nothing.
+  const data = parseSlideBody(BODY)
+  const stamp = (kind: string, tag?: string) => slideStamp(kind, { ...data, ...(tag === undefined ? {} : { tag }) }, 'Do the steps.', 'Slide library')
+  assert.equal(stamp('exercise', 'Exercise'), stamp('exercise'))
+  assert.equal(stamp('exercise', '  '), stamp('exercise', ''), 'spaces are no pill, as empty is')
+  assert.equal(stamp('points', 'Harjutus'), stamp('points'))
+  // The undo keys and the one-line rule, shared by the stage and the Label row.
+  const keys = (key: string, mods: { meta?: boolean; ctrl?: boolean; shift?: boolean } = {}) =>
+    undoKeyOf({ key, metaKey: !!mods.meta, ctrlKey: !!mods.ctrl, shiftKey: !!mods.shift })
+  assert.deepEqual([keys('z', { meta: true }), keys('Z', { meta: true, shift: true }), keys('y', { ctrl: true }), keys('z'), keys('a', { meta: true })], ['undo', 'redo', 'redo', null, null])
+  assert.equal(oneLine('Har\njutus\r\n2\u2028x'), 'Har jutus 2 x')
 }
 
 console.log('exerciseTag: passed')

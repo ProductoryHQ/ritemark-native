@@ -294,7 +294,7 @@ svg { flex: none; }
 .toc button.on { background: var(--hl); }
 .toc .n { width: 22px; flex: none; text-align: right; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .toc .sec { font-weight: 700; }
-.toc .tag, .part .lab .tag { padding: 1px 8px; border-radius: 10px; background: var(--hl); color: var(--label); font: 700 11px/18px 'Sofia Sans', sans-serif; letter-spacing: .4px; text-transform: uppercase; }
+.toc .tag, .part .lab .tag { min-width: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: none; padding: 1px 8px; border-radius: 10px; background: var(--hl); color: var(--label); font: 700 11px/18px 'Sofia Sans', sans-serif; letter-spacing: .4px; text-transform: uppercase; }
 .toc .tag { margin-left: auto; }
 .toc .done { margin-left: auto; color: #16A34A; display: none; }
 .toc button.finished .done { display: inline-flex; }

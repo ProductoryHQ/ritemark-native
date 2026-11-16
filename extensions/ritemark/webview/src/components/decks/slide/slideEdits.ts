@@ -11,6 +11,20 @@ const CELL_PATH = /^rows\.(\d+)\.(\d+)$/
 /** A table starts with a heading row and one row, two columns, empty. */
 const EMPTY_TABLE = [['', ''], ['', '']]
 
+/** Words typed into a one-line place (a title, the pill, the Label row): their line breaks as spaces. */
+export function oneLine(value: string): string {
+  return value.replace(/[\r\n\u2028\u2029]+/g, ' ')
+}
+
+/** The deck's undo keys, as the stage and Settings' fields take them: Cmd+Z, and Cmd+Shift+Z or Cmd+Y for redo. */
+export function undoKeyOf(event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; key: string }): 'undo' | 'redo' | null {
+  if (!event.metaKey && !event.ctrlKey) return null
+  const key = event.key.toLowerCase()
+  if (key === 'z') return event.shiftKey ? 'redo' : 'undo'
+  if (key === 'y') return 'redo'
+  return null
+}
+
 export function itemPath(path: string): { index: number; field: 'heading' | 'text' } | null {
   const match = ITEM_PATH.exec(path)
   return match ? { index: Number(match[1]), field: match[2] as 'heading' | 'text' } : null

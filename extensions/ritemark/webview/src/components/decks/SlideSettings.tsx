@@ -16,6 +16,7 @@ import { Label } from '../ui/label'
 import { SegmentedControl } from '../ui/segmented-control'
 import { Switch } from '../ui/switch'
 import { Tooltip } from '../ui/tooltip'
+import { oneLine, undoKeyOf } from './slide/slideEdits'
 
 /** A small picture of a layout: a few bars, as the prototype's `.lay .pic`. */
 function Bars({ bars }: { bars: Array<[number, number, number, number]> }) {
@@ -107,14 +108,12 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
             className="deck-settings-field"
             placeholder={EXERCISE_TAG}
             value={exerciseTagOf(data)}
-            onChange={event => onChange({ tag: event.target.value.replace(/[\r\n\u2028\u2029]+/g, ' ') })}
+            onChange={event => onChange({ tag: oneLine(event.target.value) })}
             onKeyDown={event => {
-              const mod = event.metaKey || event.ctrlKey
-              const key = event.key.toLowerCase()
-              if (mod && (key === 'z' || key === 'y')) {
-                event.preventDefault()
-                onUndo(key === 'y' || event.shiftKey)
-              }
+              const step = undoKeyOf(event)
+              if (!step) return
+              event.preventDefault()
+              onUndo(step === 'redo')
             }}
           />
         </div>

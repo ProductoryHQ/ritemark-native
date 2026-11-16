@@ -540,6 +540,12 @@ async function main(): Promise<void> {
     const updated = await runTool(tool('update_library_slide'), { deck: 'Clients/Harbour.deck.md', slide_id: copyId }, context);
     assert.equal(updated.isError, undefined, updated.text);
     assert.equal(slidesOfText(files['Slide library/Practice.deck.md'])[2].data.tag, 'Harjutus');
+    // The library's search finds a slide by its pill's words.
+    const found = await runTool(tool('list_decks'), { where: 'library', query: 'Ülesanne' }, context);
+    assert.match(found.text, /Practice\.deck\.md[^\n]*1 slide matching[^\n]*\n {2}slide 1 \(id e1, exercise\): Proovi/);
+    // read_deck quotes the pill's words as JSON, so a quote in them can't end them.
+    files['Clients/Harbour.deck.md'] = files['Clients/Harbour.deck.md'].replace('tag: Harjutus', 'tag: \'Say "hi"\'');
+    assert.match((await runTool(tool('read_deck'), { deck: 'Clients/Harbour.deck.md' }, context)).text, /pill "Say \\"hi\\"" · Plain/);
   }
 
   console.log('runtime/ritemarkTools: all assertions passed');

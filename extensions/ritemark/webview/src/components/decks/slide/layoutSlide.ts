@@ -224,7 +224,8 @@ export function layoutSlide(kind: string, data: SlideData, options: { editing?: 
     // its faint placeholder; slide.css hides it once the caret leaves. The other marks (numbers, dots, lines, the bar,
     // icons) carry no words.
     const tag = exerciseTagOf(data)
-    if (tag || editing) boxes.push(text('tag', 'tag', 'tag', tag, EXERCISE_TAG, { left: cx }))
+    // At most the content's width: a long label is cut with an ellipsis, never run off the slide.
+    if (tag || editing) boxes.push(text('tag', 'tag', 'tag', tag, EXERCISE_TAG, { left: cx, maxWidth: cw }))
     const top = Math.max(196, heading(100, [46, 40, 34]) + 22)
     const gap = Math.min(72, (BOTTOM - top) / n)
     const fz = [27, 23, 20, 17][Math.min(3, (gap < 44 ? 2 : gap < 56 ? 1 : 0) + step)]
