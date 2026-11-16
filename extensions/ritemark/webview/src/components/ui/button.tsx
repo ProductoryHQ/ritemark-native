@@ -51,6 +51,8 @@ const buttonVariants = cva(
         lg: "h-auto rounded-lg px-[18px] py-[10px] has-[>svg]:px-[14px]",
         icon: "size-9",
         "icon-sm": "size-8",
+        // 17 November (the Experience lead): 28 px, a small icon-only button on a surface, as the deck slide's gear
+        "icon-xs": "size-7",
         "icon-lg": "size-10",
       },
     },

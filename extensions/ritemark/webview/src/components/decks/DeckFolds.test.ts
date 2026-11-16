@@ -165,8 +165,9 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
     return view.slice(at)
   }
   const stage = block('{slideShown ? ( <div ref={stageRef} className={`deck-stage')
-  assert.ok(stage.includes('<Stage') && stage.includes('notesOpen={notesOpen}') && stage.includes('onSettings='), 'the stage, its notes and its Settings button are drawn only while the slide shows')
-  assert.ok(block('{settingsOpen && slideShown').includes('<SlideSettings'), 'Settings go with the slide')
+  assert.ok(stage.includes('<Stage') && stage.includes('notesOpen={notesOpen}'), 'the stage and its notes are drawn only while the slide shows')
+  // 17 November: Slide settings is the bar's gear, ready only while the slide shows (folded away, it's disabled).
+  assert.ok(view.includes('const settingsReady = slideShown && !!slide') && view.includes('<Popover open={settingsOpen && settingsReady}'), 'Settings go with the slide')
   assert.ok(block('{handoutShown && slideShown ? (').includes('deck-divider'), 'nothing to drag with one side')
   assert.ok(block('{stripShown ? ( <SlideStrip').length > 0 && !block('{stripShown ? ( <SlideStrip').includes('slideShown'), 'the strip stays, whatever the fold')
   assert.ok(view.includes('useState<DeckFold>(storedFold)'), 'the fold the view kept, at mount')

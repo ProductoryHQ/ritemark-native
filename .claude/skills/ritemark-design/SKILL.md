@@ -60,6 +60,10 @@ Ritemark is a visual markdown editor for people who don't want to learn syntax. 
 - **No Space Grotesk in day-to-day chrome.** It's for moments — welcome screen titles, marketing headlines, slide covers. A settings page heading is not a moment.
 - **No bold pure-white on pure-black "dramatic" dark mode.** Ritemark dark uses Deep Space `#1E1B4B` as the surface, ivory-tending-indigo as the ink. See `references/vscode-core.md` for why.
 
+## Popups
+
+Every popup, menu, picker or settings panel closes on a press outside it and on Esc (Jarmo, 17 November 2026: a global pattern). Radix first: `Popover`, `DropdownMenu`, `Dialog`, `ContextMenu` or `Select` from `webview/src/components/ui/` close themselves. A panel Radix can't carry, because its own code places it, takes the shared hook `useDismissOnOutside(ref, onClose, { trigger })` from `webview/src/lib/dismissOnOutside.ts`, never a listener of its own. A press on the button that opened it toggles the popup, and doesn't count as outside. The focus goes back to where it came from: Esc or Close returns it to that button, and an outside press leaves it where the press put it. Only a dialog that holds unsaved input and asks before closing stays open.
+
 ## When to extend vs. when to override
 
 This skill is a living system. If you're about to invent a new component for Ritemark and none of the patterns fit cleanly, your default is to **extend the skill, not fork in-place**:

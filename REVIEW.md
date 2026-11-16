@@ -20,6 +20,7 @@ about: ritemark-dev `releases/v2.2.0/analysis/2026-10-27-review-process-plan.md`
 - A screen that restyles a `webview/src/components/ui/` control locally, or adds its own focus or open/close handling,
   instead of changing the control.
 - A fix in one place for a defect a shared control or helper has, without finding the other places.
+- A popup, menu or settings panel that doesn't close on an outside click or Esc.
 
 ## What not to report
 
