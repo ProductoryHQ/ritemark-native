@@ -40,9 +40,10 @@ assert.equal(countsLine(['a.deck.md', 'b.deck.md', 'notes.md', 'Brief.docx', 'Br
 assert.equal(countsLine(['deck.md'], false, { decks: true }), '1 file: 1 text document.', 'a file named just deck.md is a document');
 assert.equal(fileKindOf('Talk.deck.md', { decks: true }), 'deck');
 assert.equal(fileKindOf('Talk.deck.md'), 'text');
+assert.equal(countsLine(['a.docx', 'b.pdf', 'c.xlsx', 'd.pptx', 'e.deck.md', 'f.deck.md', 'g.md'], false, { decks: true }), '7 files: 2 decks, 1 Word document, 1 PDF, 1 spreadsheet and 2 others.', 'decks are one more kind: still four named, the rest others');
 assert.equal(countsLine(repeat('.md', COUNT_LIMIT + 1)), 'More than 10,000 files.', 'S11: past 10,000');
 assert.equal(countsLine(['a.md'], true), 'More than 10,000 files.', 'the walk stopped');
-assert.deepEqual(['x.docx', 'x.doc', 'x.odt', 'x.pdf', 'x.numbers', 'x.csv', 'x.key', 'x.markdown', 'x.heic', 'x.flow', 'Makefile'].map(fileKindOf), ['word', 'word', 'word', 'pdf', 'spreadsheet', 'spreadsheet', 'presentation', 'text', 'picture', 'other', 'other']);
+assert.deepEqual(['x.docx', 'x.doc', 'x.odt', 'x.pdf', 'x.numbers', 'x.csv', 'x.key', 'x.markdown', 'x.heic', 'x.flow', 'Makefile'].map((name) => fileKindOf(name)), ['word', 'word', 'word', 'pdf', 'spreadsheet', 'spreadsheet', 'presentation', 'text', 'picture', 'other', 'other']);
 
 // The walk: names only, Ritemark's own and hidden files left out (S11, E2)
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-counts-'));
