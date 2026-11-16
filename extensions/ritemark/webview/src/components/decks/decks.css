@@ -55,11 +55,13 @@
 .deck-handout { position: absolute; top: 0; bottom: 0; right: 0; --deck-text-left: 48px; --deck-text-right: 32px; }
 .deck-handout.is-folded { visibility: hidden; pointer-events: none; }
 /* The slide folded away (16 November; the prototype's `.hand.solo`): the handout is a Text document's centred column,
-   its text at most 760 wide, and the lines between slides still run its full width. The deck view sets the handout's
-   width, as a length percentages here could not give: they would resolve against each element's own box. */
+   the editor's own width (`--deck-text-column`, the Editor's TEXT_COLUMN_WIDTH, the Experience lead), with the
+   handout's own text edges inside it, and the lines between slides still run its full width. The deck view sets the
+   handout's width, as a length percentages here could not give: they would resolve against each element's own box. */
 .deck-handout.is-solo {
-  --deck-text-left: max(48px, calc((var(--deck-handout-width, 0px) - 760px) / 2));
-  --deck-text-right: max(32px, calc((var(--deck-handout-width, 0px) - 760px) / 2));
+  --deck-column-gap: max(0px, calc((var(--deck-handout-width, 0px) - var(--deck-text-column, 900px)) / 2));
+  --deck-text-left: calc(var(--deck-column-gap) + 48px);
+  --deck-text-right: calc(var(--deck-column-gap) + 32px);
 }
 /* The handout is a Text document (Jarmo, 16 November: "very, very similar to our text editor; the only difference is
    one line that signals the slide changes"; the prototype's `.hand`, `.hpart`): the editor's own type, headings and

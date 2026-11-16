@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor as TipTapEditor } from '@tiptap/react'
-import { Editor } from '../Editor'
+import { Editor, TEXT_COLUMN_WIDTH } from '../Editor'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
@@ -720,9 +720,15 @@ export function DeckView({
     if (!desk) return
     const big = desk.querySelector<HTMLElement>('.deck-big')
     const deskBox = desk.getBoundingClientRect()
-    // With the slide folded away, Add to library's sheet opens at the handout's top left, where the slide would be.
+    // With the slide folded away, Add to library's sheet opens beside the thumbnail it came from, as the strip's menus
+    // do; at the handout's top left when the strip is folded too.
     if (!big) {
-      if (!slideShown) setSettingsAt({ left: dividerLeft + 12, top: 8 })
+      if (slideShown) return
+      const thumb = addSheet ? stripRef.current?.querySelector<HTMLElement>(`[data-thumb="${addSheet.number - 1}"]`) : null
+      const thumbBox = thumb?.getBoundingClientRect()
+      setSettingsAt(thumbBox && thumbBox.height > 0
+        ? { left: Math.round(thumbBox.right - deskBox.left + 8), top: Math.round(Math.max(8, Math.min(thumbBox.top - deskBox.top, deskBox.height - 320))) }
+        : { left: dividerLeft + 12, top: 8 })
       return
     }
     const bigBox = big.getBoundingClientRect()
@@ -1128,7 +1134,7 @@ export function DeckView({
         <div
           className={`deck-handout${handoutShown ? '' : ' is-folded'}${slideShown ? '' : ' is-solo'}`}
           // The handout alone is a Text document's centred column: its width sets the text's edges (decks.css).
-          style={{ left: dividerLeft, ['--deck-handout-width' as string]: `${Math.max(0, deskWidth - dividerLeft)}px` }}
+          style={{ left: dividerLeft, ['--deck-handout-width' as string]: `${Math.max(0, deskWidth - dividerLeft)}px`, ['--deck-text-column' as string]: `${TEXT_COLUMN_WIDTH}px` }}
           aria-hidden={handoutShown ? undefined : true}
         >
           {findBar}

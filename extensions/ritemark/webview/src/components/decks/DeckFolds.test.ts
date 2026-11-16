@@ -140,6 +140,14 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
   assert.ok(/if \(slideShownRef\.current\) \{[^}]*setFocusTitleOf/.test(insert) && insert.includes('setTextSelection(pos)'), 'the caret goes to the handout')
   // The divider's share goes through the same view state as the fold.
   assert.ok(view.includes('keepDeckViewState({ deckRatio: ratio })'))
+  // The handout alone is a Text document's column: the width is the editor's own, one number in Editor.tsx.
+  assert.ok(view.includes("['--deck-text-column' as string]: `${TEXT_COLUMN_WIDTH}px`"), "the deck passes the editor's width")
+  const editorSource = readFileSync(new URL('../Editor.tsx', import.meta.url), 'utf8')
+  assert.ok(editorSource.includes('export const TEXT_COLUMN_WIDTH = 900') && editorSource.includes('max-width: ${TEXT_COLUMN_WIDTH}px !important'), "the Text editor's own rule uses the same number")
+  const css = readFileSync(new URL('./decks.css', import.meta.url), 'utf8')
+  assert.ok(/\.deck-handout\.is-solo \{[^}]*var\(--deck-text-column/.test(css) && !/760px/.test(css), 'the solo column takes it, with no second copy')
+  // Add to library with the slide hidden opens beside its thumbnail in the strip.
+  assert.ok(view.includes('[data-thumb="${addSheet.number - 1}"]'), "the sheet is anchored to its thumbnail")
 }
 
 console.log('DeckFolds: passed')
