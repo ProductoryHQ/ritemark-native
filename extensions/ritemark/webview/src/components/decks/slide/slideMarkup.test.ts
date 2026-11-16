@@ -47,7 +47,8 @@ function shape(node: HTMLNode): unknown {
     const element = child as HTMLNode & { rawTagName: string; attributes: Record<string, string> }
     const attributes: Record<string, unknown> = {}
     for (const [name, value] of Object.entries(element.attributes)) {
-      if (name === 'data-fit') continue
+      // The deck view's own measuring marks: the page sizes its slides itself
+      if (name === 'data-fit' || name === 'data-step') continue
       if (name === 'style') {
         attributes.style = Object.fromEntries(value.split(';').filter(Boolean).map(part => {
           const at = part.indexOf(':')

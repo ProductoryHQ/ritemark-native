@@ -17,6 +17,7 @@ import {
   writeScalar,
   writeSlideBlock,
   writeSlideBody,
+  publishText,
   type SlideData,
 } from './deckFormat';
 
@@ -239,6 +240,31 @@ test('a front matter value by name (Sprint 159: the look)', () => {
   assert.equal(frontMatterField(text, 'owner'), null);
   assert.equal(frontMatterField('look: borderless\n', 'look'), null, 'only in the front matter');
   assert.equal(frontMatterField('---\nlook: "borderless"\n---\n', 'look'), 'borderless');
+});
+
+test('the text Publish builds from: the document\'s front matter with the view\'s body (Sprint 159 PR 4)', () => {
+  const body = '```slide title\ntitle: Newest words\n```\n';
+  const front = '---\ndeck: 1\ntheme: Slide library/Themes/Evening.theme.md\nlook: borderless\n---\n';
+  const after = '\n```slide title\ntitle: Older words\n```\n';
+  // The editor gave the view exactly what follows the front matter: the view's words go
+  const joined = publishText(front + after, body, after);
+  assert.deepEqual(joined, { text: front + body, fromView: true });
+  assert.equal(frontMatterField(joined.text, 'look'), 'borderless');
+  assert.equal(parseDeck(joined.text).theme, 'Slide library/Themes/Evening.theme.md');
+  assert.deepEqual(parseDeck(joined.text).slides.map((slide) => parseSlideBody(slide.body).title), ['Newest words']);
+  assert.deepEqual(publishText('\uFEFF' + front + 'old', body, 'old'), { text: front + body, fromView: true }, 'a byte-order mark goes');
+  assert.deepEqual(publishText('---\ndeck: 1\n---', body, ''), { text: `---\ndeck: 1\n---\n${body}`, fromView: true }, 'a front matter at the end of the file');
+  assert.deepEqual(publishText('```slide title\ntitle: Old\n```\n', body, '```slide title\ntitle: Old\n```\n'), { text: body, fromView: true }, 'no front matter: the body alone');
+  assert.deepEqual(publishText(front, '', ''), { text: front, fromView: true }, 'an empty deck');
+  // A body that itself starts with a --- block, under a front matter that reads: still the view's words
+  const ruled = '---\nlooks: like\n---\n\nWords.\n';
+  assert.deepEqual(publishText(front + ruled, ruled + 'More.\n', ruled), { text: front + ruled + 'More.\n', fromView: true });
+  // The editor read the front matter differently, so the view's words may hold some of it: the document as saved
+  const broken = '---\ndeck: 1\nsubtitle: Training: Day 1\n---\n\n```slide title\ntitle: Saved words\n```\n';
+  assert.deepEqual(publishText(broken, '---\n\n## deck: 1 subtitle: Training: Day 1\n\n' + body, broken), { text: broken, fromView: false }, 'its YAML does not read');
+  assert.deepEqual(publishText('\uFEFF' + broken, body, '\uFEFF' + broken), { text: '\uFEFF' + broken, fromView: false });
+  const earlier = '---\ndeck: 1\n---note: A\nclient: B\n---\n\nbody\n';
+  assert.deepEqual(publishText(earlier, '## note: A client: B\n\nbody\n', 'note: A\nclient: B\n---\n\nbody\n'), { text: earlier, fromView: false }, 'the editor ends it at an earlier line');
 });
 
 console.log(`deckFormat: ${passed} passed`);

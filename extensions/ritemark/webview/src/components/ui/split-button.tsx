@@ -43,6 +43,7 @@ const VARIANT: Record<SplitTone, 'default' | 'outline' | 'ghost'> = { primary: '
 
 export function SplitButton({
   tone = 'primary',
+  size = 'sm',
   disabled,
   busy,
   className,
@@ -51,6 +52,8 @@ export function SplitButton({
   menu,
 }: {
   tone?: SplitTone
+  /** Both parts' height: `sm` (32 px), or `bar` (30 px) beside a bar's segmented control (the deck's bar). */
+  size?: 'sm' | 'bar'
   disabled?: boolean
   busy?: boolean
   className?: string
@@ -78,7 +81,7 @@ export function SplitButton({
       <Tooltip label={narrow ? wholeWordsTip(main.label as string, main.tooltip) : main.tooltip} className="rm-split-slot min-w-0">
         <Button
           type="button"
-          size="sm"
+          size={size}
           variant={VARIANT[tone]}
           className={cn('rm-split-part rm-split-main', main.className)}
           disabled={state.mainDisabled}
@@ -93,7 +96,7 @@ export function SplitButton({
       <DropdownMenu open={menu.open} onOpenChange={menu.onOpenChange} modal={false}>
         <Tooltip label={menu.tooltip} className="rm-split-slot">
           <DropdownMenuTrigger asChild>
-            <Button type="button" size="sm" variant={VARIANT[tone]} className="rm-split-part rm-split-more" aria-label={menu.label} disabled={state.menuDisabled}>
+            <Button type="button" size={size} variant={VARIANT[tone]} className="rm-split-part rm-split-more" aria-label={menu.label} disabled={state.menuDisabled}>
               <Icon name="caret-down" size={12} tone="inherit" />
             </Button>
           </DropdownMenuTrigger>

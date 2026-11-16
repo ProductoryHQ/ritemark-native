@@ -45,6 +45,7 @@ import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
 import { Stage } from './Stage'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
+import { DeckPublish } from './DeckPublish'
 import './decks.css'
 
 /** The deck's extensions, made once: the editor's extension list is fixed at mount. */
@@ -208,6 +209,9 @@ export function DeckView({
     else delete next.look
     onPropertiesChange(next)
   }, [properties, onPropertiesChange])
+
+  // Publish on the bar (Sprint 159 PR 4) says its one line here: why a page wasn't written, or that the link is copied.
+  const publishNotice = useCallback((text: string) => setNotice({ text }), [])
 
   const handleEditorReady = useCallback((instance: TipTapEditor) => {
     setEditor(instance)
@@ -881,13 +885,14 @@ export function DeckView({
             options={[{ value: 'card', label: 'Card' }, { value: 'borderless', label: 'Borderless' }]}
           />
         </Tooltip>
-        <PresentButton slideNumber={count === 0 ? null : shown + 1} startNumber={startNumber === undefined ? null : startNumber + 1} onPresent={present} />
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>
         {status === 'action' && syncAction ? (
           <SyncActionButton action={syncAction} />
         ) : (
           <span className={`deck-saved${status === 'saved' ? '' : ' invisible'}`}>Saved</span>
         )}
+        <DeckPublish slides={slides} theme={theme} borderless={borderless} assets={assets} text={currentText} onNotice={publishNotice} />
+        <PresentButton slideNumber={count === 0 ? null : shown + 1} startNumber={startNumber === undefined ? null : startNumber + 1} onPresent={present} />
       </header>
 
       <div ref={deskRef} className="deck-desk">

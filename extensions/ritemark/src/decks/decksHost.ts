@@ -9,6 +9,7 @@ import { DeckLibrary } from './DeckLibrary';
 import { projectRelative, projectRoot, workspaceDeckFiles } from './deckDocuments';
 import { DeckPages, SLIDE_LIBRARY_VIEW } from './deckPages';
 import { SlideLibraryViewProvider } from './SlideLibraryViewProvider';
+import { DeckPublisher } from './deckPublish';
 import { DeckPresenter } from './present/DeckPresenter';
 import { setDeckToolHost } from '../runtime/ritemarkTools';
 import { copiedDeckText, copyFileName, emptyDeckText, emptyFileName, newDeckChoices, type NewDeckChoice } from './newDeck';
@@ -18,6 +19,8 @@ import * as path from 'path';
 
 export interface DecksHost {
   pages: DeckPages;
+  /** Publish on the deck's bar (Sprint 159 PR 4): connected to 2.2's Publish once that is composed. */
+  publisher: DeckPublisher;
   /** The project's Slide library and decks, or null without a project folder on disk. */
   library: () => DeckLibrary | null;
 }
@@ -34,7 +37,8 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
     const root = projectRoot();
     return root ? new DeckLibrary(workspaceDeckFiles(root)) : null;
   };
-  const pages = new DeckPages(library);
+  const publisher = new DeckPublisher(context.extensionPath);
+  const pages = new DeckPages(library, publisher);
   // Present (Sprint 159): the wall, a window of its own over the main window.
   const presenter = new DeckPresenter(context.extensionUri, context.globalState);
   pages.presenter = presenter;
@@ -54,6 +58,7 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
   } : null));
   const view = new SlideLibraryViewProvider(context.extensionUri, pages, library);
   context.subscriptions.push(
+    publisher,
     pages,
     presenter,
     view,
@@ -63,7 +68,7 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
     // Sprint 159 (PR 7): New → Deck, only with the flag on
     vscode.commands.registerCommand('ritemark.decks.new', () => (isEnabled('decks') ? newDeck(pages, options) : undefined)),
   );
-  return { pages, library };
+  return { pages, publisher, library };
 }
 
 /** The day a deck was last changed, as the quick pick shows it: "15 Nov 2026". */

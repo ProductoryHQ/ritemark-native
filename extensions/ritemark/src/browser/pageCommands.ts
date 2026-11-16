@@ -15,6 +15,7 @@
 
 import * as vscode from 'vscode';
 import { isEnabled } from '../features';
+import type { PublishOutcome } from '../publish/PublishController';
 import { PageLocation, PageTarget, locatePage, localPagePath } from './localPage';
 
 export const OPEN_IN_SYSTEM_BROWSER_COMMAND = 'ritemark.page.openInSystemBrowser';
@@ -25,7 +26,7 @@ export const OUTSIDE_PROJECT_MESSAGE =
   'Only pages in this project can be published. Move the page into the project folder to publish it.';
 export const MISSING_PAGE_MESSAGE = "This page's file can't be found. It may have been moved or deleted.";
 
-type PublishHandler = (page: { realPath: string; projectFolder: string }) => Promise<void>;
+type PublishHandler = (page: { realPath: string; projectFolder: string }) => Promise<PublishOutcome>;
 let publishHandler: PublishHandler | null = null;
 
 /** PR 4: what Publish does with a project page once the boundary check passed (`PublishController.publishFromBar`). */
@@ -80,6 +81,22 @@ function unhandledLocation(location: never): never {
  * reason and returns undefined otherwise. Nothing is read beyond the paths, and nothing is sent.
  */
 export async function publishPage(arg?: unknown): Promise<PageLocation | undefined> {
+  const location = await projectPageOf(arg);
+  if (location && publishHandler) void publishHandler({ realPath: location.realPath, projectFolder: location.projectFolder });
+  return location;
+}
+
+/**
+ * The same way in, waited to its end (Sprint 159 PR 4, the deck's bar): the boundary check, then the publish flow,
+ * and how it ended. Undefined when the check refused the page (it said why).
+ */
+export async function publishPageToEnd(arg?: unknown): Promise<PublishOutcome | undefined> {
+  const location = await projectPageOf(arg);
+  if (!location) return undefined;
+  return publishHandler ? publishHandler({ realPath: location.realPath, projectFolder: location.projectFolder }) : 'not-ready';
+}
+
+async function projectPageOf(arg: unknown): Promise<Extract<PageLocation, { kind: 'project' }> | undefined> {
   // The kill switch: with `web-page-publishing` off, a direct executeCommand does nothing.
   if (!isEnabled('web-page-publishing')) return undefined;
   const fsPath = localPagePath(targetOf(arg));
@@ -99,7 +116,6 @@ export async function publishPage(arg?: unknown): Promise<PageLocation | undefin
       void vscode.window.showInformationMessage(NOT_A_PAGE_MESSAGE);
       return undefined;
     case 'project':
-      if (publishHandler) void publishHandler({ realPath: location.realPath, projectFolder: location.projectFolder });
       return location;
     default:
       return unhandledLocation(location);

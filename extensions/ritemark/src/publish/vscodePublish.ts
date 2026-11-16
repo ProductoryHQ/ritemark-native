@@ -14,17 +14,18 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { setPublishHandler } from '../browser/pageCommands';
+import { publishPageToEnd, setPublishHandler } from '../browser/pageCommands';
 import { CloudflareAccount, CONNECTION_SECRET_KEY } from './cloudflare/account';
 import { CloudflareClient } from './cloudflare/client';
 import { CloudflareHost } from './cloudflare/CloudflareHost';
 import { openExternalStubbed } from './devSheetHarness';
 import { gatherPage } from './gather';
 import { PublishRecordStore } from './publishRecords';
-import { PublishController, sheetHostAvailable, UNTITLED_PAGE, type PageBarState, type PublishUi } from './PublishController';
+import { PublishController, sheetHostAvailable, UNTITLED_PAGE, type PublishOutcome, type PageBarState, type PublishUi } from './PublishController';
 import { plainLine, plainPart } from './plainText';
 import { showPublishSheet } from './PublishSheetPanel';
 import type { WebPagesSettingsProjection } from './settingsProtocol';
+import type { SheetOptions } from './sheetModel';
 import { showBriefToast } from '../feedback/feedbackSheet';
 
 export const PUBLISH_READY_CONTEXT = 'ritemark.publish.ready';
@@ -41,6 +42,23 @@ export interface PublishFeature {
   controller: PublishController;
   /** The Settings page plugs in here while it is open. */
   setSettingsListener(listener: ((projection: WebPagesSettingsProjection) => void) | null): void;
+  /**
+   * Sprint 159 PR 4, for the deck's bar: Publish can be reached (the flag on and the whole-window sheet there), the
+   * same rule as `ritemark.publish.ready`, and when that changes.
+   */
+  isReady(): boolean;
+  readonly onDidChangeReady: vscode.Event<boolean>;
+  /** A page's state changed (by its real path): the same moments patch 010's bar is told to ask again. */
+  readonly onDidChangePageState: vscode.Event<string>;
+  /**
+   * `ritemark.page.publish` on a page, waited to its end, and how it ended (undefined: the boundary check refused the
+   * page and said why). The deck's bar takes back a page it wrote for a first Publish only on `cancelled`: the
+   * controller's state can't tell a cancel apart, since a cancel changes nothing in it, and a press that found the
+   * sheet already open (`busy`) is no cancel.
+   */
+  publishPage(page: vscode.Uri): Promise<PublishOutcome | undefined>;
+  /** The sheet's What goes and What stays rows for pages made from a deck: the deck host answers for its own pages. */
+  setPageRows(provider: ((pagePath: string) => Promise<SheetOptions['deck'] | undefined>) | null): void;
 }
 
 /** The host's own password box (answer 8): hidden text, kept open with the words under it on a failure. */
@@ -100,6 +118,10 @@ export function createPublishFeature(
   log: (message: string) => void,
 ): PublishFeature {
   let settingsListener: ((projection: WebPagesSettingsProjection) => void) | null = null;
+  let ready = false;
+  let pageRows: ((pagePath: string) => Promise<SheetOptions['deck'] | undefined>) | null = null;
+  const readyChanged = new vscode.EventEmitter<boolean>();
+  const pageStateChanged = new vscode.EventEmitter<string>();
 
   const account = new CloudflareAccount({
     secrets: context.secrets,
@@ -147,17 +169,27 @@ export function createPublishFeature(
     },
     isFeatureEnabled,
     postSettings: (projection) => settingsListener?.(projection),
-    setReady: (ready) => { void vscode.commands.executeCommand('setContext', PUBLISH_READY_CONTEXT, ready); },
-    // The bar asks again; a build without patch 010's command has no bar to tell
+    setReady: (value) => {
+      void vscode.commands.executeCommand('setContext', PUBLISH_READY_CONTEXT, value);
+      if (value !== ready) {
+        ready = value;
+        readyChanged.fire(value);
+      }
+    },
+    // The bar asks again; a build without patch 010's command has no bar to tell. The deck's bar hears it too.
     onPageState: (pagePath) => {
       void vscode.commands.executeCommand(BAR_REFRESH_COMMAND, vscode.Uri.file(pagePath).toString()).then(undefined, () => undefined);
+      pageStateChanged.fire(pagePath);
     },
+    pageRows: (pagePath) => (pageRows ? pageRows(pagePath) : Promise.resolve(undefined)),
     log,
   });
   setPublishHandler((page) => controller.publishFromBar(page));
 
   context.subscriptions.push(
     { dispose: () => setPublishHandler(null) },
+    readyChanged,
+    pageStateChanged,
     // A first publish's wait for its new address, and Unpublish's check, stop with the extension
     { dispose: () => host.dispose() },
     // Another window connected or disconnected: read the entry again, then redraw Settings and the bars (Codex's
@@ -214,5 +246,10 @@ export function createPublishFeature(
   return {
     controller,
     setSettingsListener: (listener) => { settingsListener = listener; },
+    isReady: () => ready,
+    onDidChangeReady: readyChanged.event,
+    onDidChangePageState: pageStateChanged.event,
+    publishPage: (page) => publishPageToEnd(page),
+    setPageRows: (provider) => { pageRows = provider; },
   };
 }

@@ -576,6 +576,24 @@ export function parseDeck(text: string): ParsedDeck {
   return { version: front.version, theme: front.theme, bodyStart: front.end, slides };
 }
 
+/**
+ * The deck's text Publish builds the page from (Sprint 159): the document's front matter (the theme and the look) with
+ * the view's body, front matter left out, since the view's newest words may not have reached the document yet.
+ * `fromView` says whether the view's words are in it.
+ *
+ * `editorBody` is the body the editor gave the view for this document. The view's body stands in for the document's
+ * only where that is exactly what follows the front matter `parseDeck` reads. Anywhere else the editor read the front
+ * matter differently (its YAML doesn't read, so the view was given the whole text, or it ends at another line), so
+ * the view's words may hold some of it, in the editor's own shape: the document as saved is used then, whose front
+ * matter `publicDeck` leaves out exactly (fails closed; words typed a moment before the press may be missing).
+ */
+export function publishText(documentText: string, body: string, editorBody: string): { text: string; fromView: boolean } {
+  const text = documentText.replace(/^\uFEFF/, '');
+  const head = text.slice(0, parseDeck(text).bodyStart);
+  if (head && editorBody.replace(/^\uFEFF/, '') !== text.slice(head.length)) return { text: documentText, fromView: false };
+  return { text: head && !head.endsWith('\n') ? `${head}\n${body}` : head + body, fromView: true };
+}
+
 /** The front matter's `deck:` value, as written, or null: read from the front matter alone. */
 export function deckVersionOf(text: string): string | null {
   return frontMatterOf(text).version;

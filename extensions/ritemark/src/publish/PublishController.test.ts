@@ -36,6 +36,7 @@ import {
   SHEET_HOST_COMMAND,
   SWITCHED_OFF,
   sheetHostAvailable,
+  type PublishOutcome,
   type PublishUi,
 } from './PublishController';
 import { PublishRecordStore, RECORDS_FILE, RECORDS_FOLDER } from './publishRecords';
@@ -45,6 +46,11 @@ import type { GatheredPlan, PublishPlan } from './types';
 import { FILE_CHANGED, PublishError } from './host';
 import { buildManifest } from './cloudflare/assets';
 import { hasLinkSyntax, PART_MAX } from './plainText';
+import { gatherPage } from './gather';
+import { BUILT_IN_THEME } from '../decks/deckTheme';
+import { PAGE_FONTS, buildDeckPage, nodePageFs, writeDeckPage } from '../decks/page/pageFile';
+import { deckCounts, deckSheetRows } from '../decks/page/sheetRows';
+import { PRIVATE_DECK, PRIVATE_WORDS } from '../decks/page/testing/privateDeck';
 
 const TOKEN = `t${'0123456789abcdef'.repeat(2)}Xy_${Date.now().toString(36)}`;
 const WEAK = `w${'fedcba9876543210'.repeat(2)}Zq_${Date.now().toString(36)}`;
@@ -104,7 +110,7 @@ function driveSheet(seen: SheetSeen[], presses: Array<Partial<SheetConfirm> | 'c
   };
 }
 
-async function setup(options: { flag?: boolean; entry?: boolean; pasted?: string[]; goneAfterChecks?: number; files?: Record<string, string | Uint8Array> } = {}) {
+async function setup(options: { flag?: boolean; entry?: boolean; pasted?: string[]; goneAfterChecks?: number; files?: Record<string, string | Uint8Array>; pageRows?: (pagePath: string) => Promise<SheetOptions['deck'] | undefined> } = {}) {
   const fake = await new FakeCloudflare().start();
   fake.tokens.set(TOKEN, 'ok');
   fake.tokens.set(WEAK, 'no-publish');
@@ -168,6 +174,7 @@ async function setup(options: { flag?: boolean; entry?: boolean; pasted?: string
     postSettings: (p) => posted.push(p),
     setReady: (r) => ready.push(r),
     onPageState: (p) => pageEvents.push(p),
+    pageRows: options.pageRows,
     log: (l) => log.push(l),
     now: () => 5_000,
     random: RANDOM,
@@ -1009,6 +1016,108 @@ test('the bar\'s state needs the gather only for a page shown as published', asy
     await t.controller.unpublishSite(record.siteName);
     assert.equal(await t.controller.needsCurrentHash(t.page.realPath), false, 'unpublished');
   } finally { await t.cleanup(); }
+});
+
+// ---------------------------------------------------------------- a deck's page (Sprint 159 PR 4)
+
+test('a deck\'s page: its rows in the sheet, a first publish, an update without the sheet, "changed" only after a public edit', async () => {
+  const extension = path.resolve(__dirname, '..', '..');
+  const assets = {
+    slideCss: await fs.readFile(path.join(extension, 'webview', 'src', 'components', 'decks', 'slide', 'slide.css'), 'utf8'),
+    fonts: await Promise.all(PAGE_FONTS.map(async (font) => ({ base64: (await fs.readFile(path.join(extension, 'media', 'fonts', font.file))).toString('base64'), unicodeRange: font.unicodeRange }))),
+  };
+  const picture = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  const files = { 'Harbour Logistics/AI assistants and agents.html': '<p>placeholder</p>', 'Harbour Logistics/AI assistants and agents.deck.md': PRIVATE_DECK, 'Harbour Logistics/images/which-stays.png': picture };
+  let deckText = PRIVATE_DECK;
+  let rowsAsked = 0;
+  const t = await setup({ pasted: [TOKEN], files, pageRows: async () => { rowsAsked++; return deckSheetRows(deckCounts(deckText, BUILT_IN_THEME)); } });
+  try {
+    const deckPath = path.join(t.project.dir, 'Harbour Logistics', 'AI assistants and agents.deck.md');
+    const write = async (text: string) => {
+      deckText = text;
+      const built = await buildDeckPage({ deckPath, text, theme: BUILT_IN_THEME }, assets);
+      const written = await writeDeckPage(nodePageFs, deckPath, built.html);
+      assert.equal(written.kind, 'written');
+      return built;
+    };
+    await fs.rm(t.page.realPath);
+    await write(PRIVATE_DECK);
+    // A first publish: the sheet shows the deck's rows, and the page and its one picture go
+    const record = await publishedOnce(t);
+    assert.equal(t.sheets.length, 1);
+    assert.deepEqual(t.sheets[0].options.deck, {
+      goes: '5 slides and their handout, 2 prompts with Copy, and the pictures they use.',
+      stays: 'On your computer: speaker notes on 2 slides, and 1 skipped slide.',
+    });
+    assert.deepEqual(t.sheets[0].plan.files.map((file) => file.relPath), ['AI assistants and agents.html', 'images/which-stays.png']);
+    // Nothing private reached the host
+    const sent = JSON.stringify(t.fake.requests) + [...t.fake.blobs.values()].map((blob) => blob.toString('latin1')).join('\n');
+    for (const [place, word] of Object.entries(PRIVATE_WORDS)) assert.ok(!sent.toLowerCase().includes(word.toLowerCase()), `${place} reached the host`);
+    const hash = async () => (await gatherPage(t.page.realPath, t.project.dir, { gitIgnored: async () => ({ ignored: new Set(), unchecked: new Set() }) })).contentHash;
+    assert.equal((await t.controller.pageState(t.page.realPath, await hash())).changed, false);
+    // Notes and a skipped slide changed: the same page, so not "changed", and Update goes without the sheet
+    await write(PRIVATE_DECK.replace(PRIVATE_WORDS.foldedNotes, 'other notes').replace(PRIVATE_WORDS.skippedHandout, 'other'));
+    assert.equal((await t.controller.pageState(t.page.realPath, await hash())).changed, false, 'notes and a skipped slide are no change');
+    // A public edit: "Published · changed", and Update the page goes straight up (same pictures, nothing key-shaped)
+    await write(PRIVATE_DECK.replace('Choose a task you do every week', 'Choose one task'));
+    assert.equal((await t.controller.pageState(t.page.realPath, await hash())).changed, true, 'a public edit is a change');
+    const asked = rowsAsked;
+    assert.equal(await t.controller.publishFromBar(t.page), 'published');
+    assert.equal(t.sheets.length, 1, 'an update with the same files goes without the sheet');
+    assert.equal(rowsAsked, asked, 'and without asking for the rows it wouldn\'t show');
+    const updated = await t.records.get(t.page.realPath);
+    assert.equal(updated?.siteName, record.siteName, 'the address stays');
+    assert.equal((await t.controller.pageState(t.page.realPath, await hash())).changed, false);
+  } finally { await t.cleanup(); }
+});
+
+test('the bar\'s Publish says how it ended: cancelled, busy while its sheet is open, failed, published, not ready (the deck\'s bar takes its page back only on a cancel)', async () => {
+  const t = await setup({ pasted: [TOKEN] });
+  try {
+    await t.controller.startTokenEntry();
+    const own = t.ui.showSheet;
+    // A second press while the sheet is open (a double click): it does nothing and says so; the first is still a cancel
+    let second: PublishOutcome | undefined;
+    let busy: boolean | undefined;
+    t.ui.showSheet = (async (req: SheetRequest) => {
+      busy = t.controller.isBusy(t.page.realPath);
+      second = await t.controller.publishFromBar(t.page);
+      return driveSheet(t.sheets, ['cancel'])(req);
+    }) as PublishUi['showSheet'];
+    assert.equal(await t.controller.publishFromBar(t.page), 'cancelled');
+    assert.equal(second, 'busy');
+    assert.equal(busy, true, 'the open sheet holds the page');
+    assert.equal(t.controller.isBusy(t.page.realPath), false, 'and lets it go when it closes');
+    assert.equal(t.sheets.length, 1, 'one sheet');
+    assert.equal(await t.records.get(t.page.realPath), undefined);
+    const state = await t.controller.pageState(t.page.realPath);
+    assert.equal(state.kind, 'unpublished');
+    assert.equal(state.line, null, 'a cancel is no failure');
+    // A failure has its line; a publish, none
+    t.ui.showSheet = own;
+    t.fake.failures.push({ path: /assets-upload-session$/, status: 500, times: 10 });
+    assert.equal(await t.controller.publishFromBar(t.page), 'failed');
+    assert.ok((await t.controller.pageState(t.page.realPath)).line);
+    t.fake.failures.length = 0;
+    assert.equal(await t.controller.publishFromBar(t.page), 'published');
+    assert.ok(await t.records.get(t.page.realPath));
+    assert.equal(t.controller.isBusy(t.page.realPath), false);
+    // A page held while its file is written (the deck's bar): a press does nothing, a second hold is refused, and the
+    // release lets it go
+    const release = t.controller.holdPage(t.page.realPath);
+    assert.ok(release);
+    assert.equal(t.controller.isBusy(t.page.realPath), true);
+    assert.equal(t.controller.holdPage(t.page.realPath), null);
+    const shown = t.sheets.length;
+    assert.equal(await t.controller.publishFromBar(t.page), 'busy');
+    assert.equal(t.sheets.length, shown, 'no sheet while held');
+    release!();
+    assert.equal(t.controller.isBusy(t.page.realPath), false);
+  } finally { await t.cleanup(); }
+  const off = await setup({ entry: false });
+  try {
+    assert.equal(await off.controller.publishFromBar(off.page), 'not-ready');
+  } finally { await off.cleanup(); }
 });
 
 void (async () => {

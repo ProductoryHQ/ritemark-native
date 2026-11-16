@@ -12,6 +12,8 @@ const MAX_PATH_LENGTH = 1024;
 export const MAX_PICTURE_DATA_URL = 34 * 1024 * 1024;
 /** The deck's text as the view holds it, sent with a library request: at most this many characters. */
 export const MAX_DECK_TEXT = 8 * 1024 * 1024;
+/** At most this many slides' fit steps in one Publish. */
+export const MAX_DECK_SLIDES = 10_000;
 
 export type DeckRequest =
   /** The webview URIs of the slides' pictures, by the paths the slides name (relative to the deck's folder). */
@@ -43,7 +45,27 @@ export type DeckRequest =
   /** Undo a library write this view made. */
   | { type: 'deck/undo-library'; token: string }
   /** The view's answer to a `deck/insert` or `deck/set-from` that carried a request id: done, or not. */
-  | { type: 'deck/applied'; requestId: string; ok: boolean };
+  | { type: 'deck/applied'; requestId: string; ok: boolean }
+  /** Sprint 159 PR 4: the bar's Publish control asks for the page's state. */
+  | { type: 'deck/page-state' }
+  /**
+   * Publish or Update the page: the host writes the page beside the deck and runs 2.2's Publish on it. `text` is the
+   * deck as this view holds it, front matter left out (its newest words may not have reached the document yet), and
+   * `steps` each slide's fit as the view measured it, by its place in that text: numbers only, 0 to 3.
+   */
+  | { type: 'deck/publish'; text: string; steps: number[] }
+  /** The Published chip's menu: Copy link, See online, Unpublish (2.2's commands on the page). */
+  | { type: 'deck/page-action'; action: DeckPageAction };
+
+export type DeckPageAction = 'copy-link' | 'see-online' | 'unpublish';
+
+/** The bar's Publish control: hidden until Publish can be reached; then the page's state, as 2.2 keeps it. */
+export interface DeckPageState {
+  ready: boolean;
+  kind: 'unpublished' | 'publishing' | 'published' | 'unpublishing';
+  /** "Published · changed": 2.2 finds a change, or the deck's public content is no longer the page's. */
+  changed: boolean;
+}
 
 /** The host's answers. */
 export type DeckHostMessage =
@@ -69,7 +91,11 @@ export type DeckHostMessage =
   /** A copy's `from:` after the AI's library write, set by the open view (the person may be typing in it). */
   | { type: 'deck/set-from'; id: string; from: string; requestId: string }
   /** Sprint 159 (PR 7): a deck New just made: its title slide's title, selected to be typed over. */
-  | { type: 'deck/select-title' };
+  | { type: 'deck/select-title' }
+  /** The bar's Publish control's state (Sprint 159 PR 4). */
+  | { type: 'deck/page-state'; state: DeckPageState }
+  /** A line for the deck's bar from Publish: why a page wasn't written, or that the link is copied. */
+  | { type: 'deck/page-notice'; text: string };
 
 export class DeckProtocolError extends Error {}
 
@@ -146,6 +172,25 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
     case 'deck/undo-library': {
       exactKeys(input, ['type', 'token']);
       return { type: 'deck/undo-library', token: stringOf(input.token, 64) };
+    }
+    case 'deck/page-state': {
+      exactKeys(input, ['type']);
+      return { type: 'deck/page-state' };
+    }
+    case 'deck/publish': {
+      exactKeys(input, ['type', 'text', 'steps']);
+      const text = stringOf(input.text, MAX_DECK_TEXT, true);
+      if (!Array.isArray(input.steps) || input.steps.length > MAX_DECK_SLIDES) throw new DeckProtocolError('steps must be a short list');
+      const steps = input.steps.map(step => {
+        if (typeof step !== 'number' || !Number.isInteger(step) || step < 0 || step > 3) throw new DeckProtocolError('Each step must be 0 to 3');
+        return step;
+      });
+      return { type: 'deck/publish', text, steps };
+    }
+    case 'deck/page-action': {
+      exactKeys(input, ['type', 'action']);
+      if (input.action !== 'copy-link' && input.action !== 'see-online' && input.action !== 'unpublish') throw new DeckProtocolError('Unknown page action');
+      return { type: 'deck/page-action', action: input.action };
     }
     case 'deck/applied': {
       exactKeys(input, ['type', 'requestId', 'ok']);

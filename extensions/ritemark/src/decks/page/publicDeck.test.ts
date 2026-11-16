@@ -5,7 +5,9 @@
  * Run: npx tsx src/decks/page/publicDeck.test.ts
  */
 import { strict as assert } from 'node:assert';
+import { publishText } from '../deckFormat';
 import { BUILT_IN_THEME, parseTheme } from '../deckTheme';
+import { splitFrontMatter } from '../../editorSync/frontMatter';
 import { deckDigest, drawnData, publicDeck, publicMarkdown, type PublicDeck } from './publicDeck';
 import { PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_WORDS } from './testing/privateDeck';
 
@@ -52,7 +54,7 @@ assert.equal(publicDeck('---\ndeck: 1\n---\n\n<!-- only a note -->\n\n```slide t
 // A file saved with a byte-order mark keeps its front matter private and its look; a front matter never closed sends
 // nothing before the first slide (fail closed).
 {
-  const bom = publicDeck('﻿---\ndeck: 1\ntheme: Slide library/Themes/SECRETTHEME.theme.md\nlook: borderless\n---\n\n```slide title\ntitle: T\n```\n', options);
+  const bom = publicDeck('\uFEFF---\ndeck: 1\ntheme: Slide library/Themes/SECRETTHEME.theme.md\nlook: borderless\n---\n\n```slide title\ntitle: T\n```\n', options);
   assert.equal(bom.preamble, '');
   assert.equal(bom.look, 'borderless');
   assert.ok(!JSON.stringify(bom).includes('SECRETTHEME'));
@@ -151,6 +153,34 @@ assert.equal(publicMarkdown('```notes\nsecret\n> ```\nmore secret\n```\n\nafter'
   const fitted: PublicDeck = publicDeck(text, { ...options, steps: [1, 3, 9] });
   assert.deepEqual(fitted.slides.map(slide => slide.step), [1, 3]);
   assert.deepEqual(publicDeck(text, { ...options, steps: [-2, 0, Number.NaN] }).slides.map(slide => slide.step), [0, 0]);
+}
+
+// Sprint 159 PR 4 (security review, round 2; code review, round 3): Publish joins the document's front matter with the
+// view's body. Where the editor reads the front matter differently from parseDeck (its YAML doesn't read, so the editor
+// keeps the whole text; or it ends the front matter at an earlier `---` line), the view's body holds front matter as
+// words; none of them may reach the page.
+const frontMatters = [
+  '---\ndeck: 1\nclient: FRONTWORDQXZ\nsubtitle: Training: Day 1\n---\n',
+  '---\ndeck: 1\nclient: FRONTWORDQXZ\ntheme: Slide library/Themes/A.theme.md\ntheme: Slide library/Themes/B.theme.md\n---\n',
+  '---\ndeck: 1\n---note: FRONTWORDQXZ\nclient: FRONTWORDQXZ\n---\n',
+];
+for (const front of frontMatters) {
+  const saved = `${front}\n\`\`\`slide title\ntitle: Harbour title\n\`\`\`\n\nThe handout.\n`;
+  const editorBody = splitFrontMatter(saved).content;
+  assert.ok(editorBody.includes('FRONTWORDQXZ'), `the editor gives the view front matter words for ${JSON.stringify(front)}`);
+  // The view's body as the editor serialized it: the front matter's words as a heading, then the slides
+  const viewBody = `## ${editorBody.split('\n---')[0].replace(/\n/g, ' ')}\n\n\`\`\`slide title\ntitle: Harbour title\n\`\`\`\n\nThe handout, newer.\n`;
+  for (const body of [viewBody, editorBody]) {
+    const page = JSON.stringify(publicDeck(publishText(saved, body, editorBody).text, options));
+    assert.ok(!page.includes('FRONTWORDQXZ'), `the front matter's words reached the page (${JSON.stringify(front)})`);
+    assert.ok(page.includes('The handout'));
+  }
+}
+// A front matter that reads: the view's newer words go, the front matter doesn't
+{
+  const saved = '---\ndeck: 1\nclient: FRONTWORDQXZ\n---\n\n```slide title\ntitle: Harbour title\n```\n\nOlder words.\n';
+  const page = JSON.stringify(publicDeck(publishText(saved, '```slide title\ntitle: Harbour title\n```\n\nNewer words.\n', splitFrontMatter(saved).content).text, options));
+  assert.ok(page.includes('Newer words') && !page.includes('Older words') && !page.includes('FRONTWORDQXZ'));
 }
 
 console.log('publicDeck: passed');

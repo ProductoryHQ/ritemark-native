@@ -31,6 +31,13 @@ export const SEE_THE_FILES = 'See the files'
 export const SCRIPT_BUILT_LINE = "This page loads some files from its script. Ritemark can't see which, so they won't go."
 export const WHO_CAN_SEE = "Anyone with the link can open the page. It isn't listed or searchable, and you can unpublish it any time."
 export const SUBTITLE = 'People see it in their browser as you see it on the desk.'
+/** A deck's page (Sprint 159 PR 4, the Experience lead): people open the handout page on their own computer or phone. */
+export const DECK_SUBTITLE = 'People open it in their browser, on a computer or a phone.'
+
+/** The line under the sheet's title: a deck's page says how people open it; every other page keeps 2.2's line. */
+export function subtitleFor(isDeckPage: boolean): string {
+  return isDeckPage ? DECK_SUBTITLE : SUBTITLE
+}
 
 /** The reason a file is left out, in a few words (answer 3). */
 export function reasonWords(row: Pick<SheetLeftOutRow, 'reason' | 'count'>): string {

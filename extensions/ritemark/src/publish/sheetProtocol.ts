@@ -59,6 +59,11 @@ export interface PublishSheetModel {
    * the host's suggestion ("pages" and four digits). The address's suffix then follows what is typed.
    */
   nameRow?: { suggestion: string };
+  /**
+   * A deck's handout page (Sprint 159 PR 4): What goes in the deck's words (its slides, prompts and pictures, the file
+   * list still under it), and What stays on the computer (speaker notes and skipped slides). Counts only, never words.
+   */
+  deck?: { goes: string; stays: string };
 }
 
 /** Frame 2, the first Publish with nothing set up (PR 4): Set up is the token path in 2.2 (the lead, 5 November). */

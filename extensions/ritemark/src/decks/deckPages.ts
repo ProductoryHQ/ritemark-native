@@ -25,6 +25,7 @@ import { parseFrom } from './deckFormat';
 import { slidesOfText } from './deckLibraryFormat';
 import { deckName, type DeckLibrary, type LibraryWrite } from './DeckLibrary';
 import { projectRelative, projectRoot } from './deckDocuments';
+import type { DeckPublisher } from './deckPublish';
 
 /** One open deck view: its document and panel, and the slide it shows. */
 interface DeckView {
@@ -68,8 +69,11 @@ export class DeckPages implements vscode.Disposable {
   /** Sprint 159 (PR 7): decks New just made, whose view selects the title slide's title once it is drawn; each forgotten after a minute. */
   private readonly selectTitle = new Map<string, ReturnType<typeof setTimeout>>();
 
-  /** `library` gives the project's library, or null when the window has no project folder on disk. */
-  constructor(private readonly library: () => DeckLibrary | null = () => null) {}
+  /**
+   * `library` gives the project's library, or null when the window has no project folder on disk. `publisher` is the
+   * bar's Publish (Sprint 159 PR 4).
+   */
+  constructor(private readonly library: () => DeckLibrary | null = () => null, private readonly publisher: DeckPublisher | null = null) {}
 
   /** Does this document open as a deck? `flagOn` is the flag now unless given (a connected view's, as it opened). */
   deckModeFor(document: vscode.TextDocument, flagOn = isEnabled('decks')): boolean {
@@ -113,8 +117,11 @@ export class DeckPages implements vscode.Disposable {
       }
     });
     this.changed.fire();
+    // The bar's Publish control hears the page's state while this view is open.
+    const seat = this.publisher?.attach(document, message => this.post(panel.webview, message));
     return {
       dispose: () => {
+        seat?.dispose();
         state.dispose();
         this.views.delete(view);
         if (this.active === view) this.active = [...this.views].find(other => other.panel.active) ?? null;
@@ -255,6 +262,15 @@ export class DeckPages implements vscode.Disposable {
         this.revealed.fire({ section: request.section });
         return;
       }
+      case 'deck/page-state':
+        if (this.publisher) await this.post(webview, { type: 'deck/page-state', state: await this.publisher.stateOf(document) });
+        return;
+      case 'deck/publish':
+        await this.publisher?.publish(document, request.text, request.steps, text => void this.post(webview, { type: 'deck/page-notice', text }));
+        return;
+      case 'deck/page-action':
+        await this.publisher?.pageAction(document, request.action, text => void this.post(webview, { type: 'deck/page-notice', text }));
+        return;
       case 'deck/current': {
         if (connected.current !== request.index || connected.count !== request.count) {
           connected.current = request.index;
@@ -428,7 +444,12 @@ const MAX_THEME_BYTES = 64 * 1024;
  * read from the deck's project folder, or the deck's own folder when it has none, and never from outside it.
  */
 export async function readTheme(document: vscode.TextDocument, themePath: string): Promise<string | null> {
-  return readProjectTheme(vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath ?? path.dirname(document.uri.fsPath), themePath);
+  return readDeckTheme(document.uri.fsPath, themePath);
+}
+
+/** The theme file a deck at `deckPath` names, by the same rule: the deck view's, and its page's (Sprint 159 PR 4). */
+export function readDeckTheme(deckPath: string, themePath: string): Promise<string | null> {
+  return readProjectTheme(vscode.workspace.getWorkspaceFolder(vscode.Uri.file(deckPath))?.uri.fsPath ?? path.dirname(deckPath), themePath);
 }
 
 /** The text of a theme file in the project at `root`, or null (the same limits as a deck's own theme). */

@@ -247,7 +247,8 @@ export const SlideCanvas = memo(function SlideCanvas({ kind, data, width, theme,
 
   const scale = width / CANVAS_WIDTH
   return (
-    <div className={`deck-slide${borderless ? ' is-borderless' : ''}`} style={{ width, height: Math.round(width * CANVAS_HEIGHT / CANVAS_WIDTH), ...(themeStyle(theme, borderless) as CSSProperties) }}>
+    // `data-step`: the fit the measuring pass found, which Publish sends for the page's slides (Sprint 159 PR 4).
+    <div className={`deck-slide${borderless ? ' is-borderless' : ''}`} data-step={step} style={{ width, height: Math.round(width * CANVAS_HEIGHT / CANVAS_WIDTH), ...(themeStyle(theme, borderless) as CSSProperties) }}>
       <div ref={canvasRef} className={`deck-sl${layout.known ? '' : ' is-unknown'}`} style={{ transform: `scale(${scale})` }} aria-hidden={editing ? undefined : true}>
         {layout.boxes.map(box => <Box key={box.key} box={box} editing={editing} assets={assets} />)}
       </div>
