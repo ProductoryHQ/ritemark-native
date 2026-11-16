@@ -82,7 +82,7 @@ export interface EarlierDeck {
 }
 
 /**
- * The start card's "Or start from a copy of an earlier deck": the project's decks newest first, each with its folder
+ * The start card's "Or copy an earlier deck": the project's decks newest first, each with its folder
  * (the project's name for one at its top) and the day it was last changed. The library's topics are left out, and so
  * is the deck the card is in (`self`, its project path).
  */
@@ -156,7 +156,7 @@ export function copiedNotice(sourceName: string): string {
 }
 
 /**
- * The start card's "Or start from a copy of an earlier deck": the deck becomes a copy of `source`, the same slides,
+ * The start card's "Or copy an earlier deck": the deck becomes a copy of `source`, the same slides,
  * theme and look (its front matter is the source's), its relative paths rebased to this deck's folder, and its file is
  * renamed "<name> (copy)" as New → Deck's copies were (PR 7). Returns the new file name, or null when nothing changed.
  */

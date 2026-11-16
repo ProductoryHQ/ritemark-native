@@ -188,7 +188,9 @@ function startCardHost(pages: DeckPages, options: DecksHostOptions, fresh: Fresh
       const deck = root ? projectRelative(root, document.uri.fsPath) : null;
       if (!root || !deck || !(await isFresh(document))) return { fresh: false, ai: null, earlier: [] };
       const [ai, decks] = await Promise.all([draftingAi(options), workspaceDeckFiles(root).list()]);
-      return { fresh: true, ai, earlier: earlierDecks(decks, path.basename(root), dayOf, deck) };
+      // Another deck New made that still has its card is empty: nothing to copy
+      const started = decks.filter(entry => !fresh.has(markOf(path.join(root, ...entry.path.split('/')))));
+      return { fresh: true, ai, earlier: earlierDecks(started, path.basename(root), dayOf, deck) };
     },
     gone: document => fresh.remove(markOf(document.uri.fsPath)),
     draft: async (document, words, notice) => {
@@ -197,7 +199,7 @@ function startCardHost(pages: DeckPages, options: DecksHostOptions, fresh: Fresh
       return sendDraft(words, {
         ai: () => draftingAi(options),
         // The AI reads the deck from its file, so what the document holds is saved first
-        save: async () => { if (document.isDirty) await document.save(); },
+        save: async () => !document.isDirty || document.save(),
         startChat: request => options.startChat({ ...request, runtimeId: request.runtimeId as AgentId }),
         forget: () => fresh.remove(markOf(document.uri.fsPath)),
         notice,

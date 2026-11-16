@@ -52,8 +52,8 @@ export const StartCard = forwardRef<HTMLDivElement, StartCardProps>(function Sta
             <Input
               ref={setField}
               className="deck-start-field"
-              placeholder="What is it for, and for whom?"
-              aria-label={`What the deck is for, and for whom: ${aiName} drafts it`}
+              placeholder="What is it for?"
+              aria-label={`What the deck is for: ${aiName} drafts it`}
               maxLength={MAX_DRAFT_WORDS}
               value={words}
               onChange={event => setWords(event.target.value)}
@@ -72,7 +72,7 @@ export const StartCard = forwardRef<HTMLDivElement, StartCardProps>(function Sta
       ) : null}
       {earlier.length ? (
         <>
-          <div className="deck-start-label"><Icon name="copy" size={14} tone="inherit" className="deck-start-icon" />Or start from a copy of an earlier deck</div>
+          <div className="deck-start-label"><Icon name="copy" size={14} tone="inherit" className="deck-start-icon" />Or copy an earlier deck</div>
           <div className="deck-start-earlier">
             {shown.map(deck => (
               <Tooltip key={deck.path} label={`This deck becomes a copy of ${deck.name}`}>

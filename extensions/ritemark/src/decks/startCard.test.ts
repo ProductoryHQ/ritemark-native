@@ -31,7 +31,7 @@ async function main(): Promise<void> {
     const steps: DraftSteps = {
       ai: async () => ({ id: 'claude-code', name: 'Claude' }),
       forget: async () => { log.push('forget'); },
-      save: async () => { log.push('save'); },
+      save: async () => { log.push('save'); return true; },
       startChat: async request => { log.push(`startChat ${JSON.stringify(request)}`); },
       notice: text => { log.push(`notice ${text}`); },
     };
@@ -42,6 +42,10 @@ async function main(): Promise<void> {
     log.length = 0;
     assert.equal(await sendDraft('Anything', { ...steps, startChat: async () => { throw new Error('no sheet'); } }), false);
     assert.deepEqual(log, ['save', 'notice The message could not be sent to Claude.']);
+    // The deck couldn't be saved (Codex on #749): nothing is sent, the card stays, and the bar says why
+    log.length = 0;
+    assert.equal(await sendDraft('Anything', { ...steps, save: async () => { log.push('save'); return false; } }), false);
+    assert.deepEqual(log, ['save', 'notice The deck could not be saved, so nothing was sent.']);
     // No AI signed in (it signed out after the card was drawn): nothing is sent, the card stays the host's, and the bar says why
     log.length = 0;
     assert.equal(await sendDraft('Anything', { ...steps, ai: async () => null }), false);

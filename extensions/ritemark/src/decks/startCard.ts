@@ -62,8 +62,8 @@ export interface DraftSteps {
   ai: () => Promise<{ id: string; name: string } | null>;
   /** The card goes for good. */
   forget: () => Promise<void>;
-  /** The deck is saved, so the AI reads it as the person sees it (a title just typed). */
-  save: () => Promise<void>;
+  /** The deck is saved, so the AI reads it as the person sees it; false when the save was refused. */
+  save: () => Promise<boolean>;
   /**
    * The AI's sheet's path for a visible chat with a request (Home's ready request): the AI column opens if it is folded,
    * and the words go as the person's first message, with the document in front (this deck) attached.
@@ -82,8 +82,12 @@ export async function sendDraft(words: string, steps: DraftSteps): Promise<boole
     steps.notice('No AI is signed in, so nothing was sent.');
     return false;
   }
+  // A deck that couldn't be saved is not sent: the AI would read the older file
+  if (!(await steps.save().catch(() => false))) {
+    steps.notice('The deck could not be saved, so nothing was sent.');
+    return false;
+  }
   try {
-    await steps.save();
     await steps.startChat({ runtimeId: ai.id, text: draftRequest(words), send: true });
   } catch {
     steps.notice(`The message could not be sent to ${ai.name}.`);
