@@ -41,7 +41,8 @@ import type { BoardAnswer } from '../taskBoard/protocol';
 import { CARD_STAGES } from '../taskBoard/cardTypes';
 import { deckName, type CopiedPart, type DeckLibrary } from '../decks/DeckLibrary';
 import { normalizePath } from '../decks/deckLibraryFormat';
-import { exerciseTagOf, isDefaultExerciseTag } from '../decks/deckFormat';
+import { exerciseTagOf, isDefaultExerciseTag, isSlideKind, type SlideData } from '../decks/deckFormat';
+import { legacyDataToBlocks } from '../decks/blocks/legacyToBlocks';
 
 export interface ToolResult {
   text: string;
@@ -457,10 +458,14 @@ function deckPathOf(value: unknown): string {
   return path;
 }
 
-/** A slide's words in one line, for read_deck. */
-function slideWords(kind: string, data: { title?: string; subtitle?: string; number?: string; tag?: string; items?: Array<{ heading?: string; text?: string }>; rows?: string[][]; markdown?: string }): string {
-  // A block slide (Sprint 161): its Markdown as written, which is its words.
+/**
+ * A slide's words, for read_deck. A block slide (Sprint 161): its Markdown as written. An older slide of the nine kinds
+ * (PR 2): its Markdown as blocks, as the deck view draws it and its first edit writes it, so the AI reads and writes
+ * one form. A kind this build doesn't know: its words in one line.
+ */
+function slideWords(kind: string, data: SlideData): string {
   if (data.markdown !== undefined) return data.markdown.trim();
+  if (isSlideKind(kind)) return legacyDataToBlocks(kind, data).markdown.trim();
   return [
     // An exercise's pill, when it draws other words than the default (`isDefaultExerciseTag`), or none.
     kind === 'exercise' && !isDefaultExerciseTag(data) ? (exerciseTagOf(data) ? `pill ${JSON.stringify(data.tag)}` : 'no pill') : '',
@@ -504,7 +509,7 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
       {
         name: 'read_deck',
         description:
-          "Read one deck: per slide its number, id, kind, words, whether it is skipped or has speaker notes, where a copy came from and whether it changed, and its handout text.",
+          "Read one deck: per slide its number, id, its words as block-slide Markdown, whether it is skipped, where a copy came from and whether it changed, and its handout text. An older slide (`slide <kind>`, YAML) is shown as the block slide the deck view draws it as and its first edit writes; its old speaker notes and the words its layout hid, which become a comment in its handout then, are shown as that comment.",
         input: { deck: deckPathInput('The deck') },
         run: async (args) => {
           const path = deckPathOf(args.deck);
@@ -516,13 +521,17 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
           const lines = [`${deckName(path)} (${path}), ${slides.length} slide${slides.length === 1 ? '' : 's'}`];
           for (const slide of slides) {
             const state = slide.data.id ? states.get(slide.data.id) : undefined;
+            const older = isSlideKind(slide.kind);
             const marks = [
+              older ? `older ${slide.kind} slide, written as blocks at the deck's first edit` : '',
               slide.data.skip ? 'skipped' : '',
-              slide.notes ? 'has speaker notes' : '',
               state ? `copy of ${state.sourcePath}${state.missing ? ' (no longer there)' : ''}${state.changed ? ', changed here' : ''}${state.newer ? ', the source has a newer version' : ''}` : '',
             ].filter(Boolean).join('; ');
-            lines.push('', `Slide ${slide.index + 1} · id ${slide.data.id ?? 'none'} · ${slide.kind || 'block slide'}${marks ? ` · ${marks}` : ''}`, slideWords(slide.kind, slide.data) || '(no words)');
+            lines.push('', `Slide ${slide.index + 1} · id ${slide.data.id ?? 'none'} · ${older || !slide.kind ? 'block slide' : slide.kind}${marks ? ` · ${marks}` : ''}`, slideWords(slide.kind, slide.data) || '(no words)');
             if (slide.handout.trim()) lines.push('Handout:', slide.handout.trim());
+            // What its conversion puts at the end of its handout: private, never on the slide or the page.
+            const comment = older ? legacyDataToBlocks(slide.kind, slide.data, slide.notes).comment : null;
+            if (comment) lines.push(`Comment at the end of its handout once converted (private): ${comment}`);
           }
           return { text: lines.join('\n') };
         },
@@ -530,7 +539,7 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
       {
         name: 'insert_slides',
         description:
-          "Insert copies of slides from the Slide library or another deck into a deck. Always use this for library slides: each copy gets its `from:` line, so the deck can later offer the library's newer version, and its picture and link paths are rewritten for the deck's folder. Each copy's handout opens with its own heading, as the deck's other parts do (the slide's title, when the source part had none). Answers with the new slides' numbers.",
+          "Insert copies of slides from the Slide library or another deck into a deck. Always use this for library slides: each copy gets its `from:` line, so the deck can later offer the library's newer version, and its picture and link paths are rewritten for the deck's folder. Each copy goes in as a block slide (an older slide is converted, the words its layout hid kept as a comment in its handout), and the deck says `deck: 2`. Each copy's handout opens with its own heading, as the deck's other parts do (the slide's title, when the source part had none). Answers with the new slides' numbers.",
         input: {
           deck: deckPathInput('The deck to insert into'),
           source: deckPathInput('The deck or library topic the slides come from'),

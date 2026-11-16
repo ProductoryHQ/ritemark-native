@@ -70,7 +70,7 @@ export function withoutItemNumber(words: string, position: number): string {
 }
 
 /** A path in a Markdown picture: in angle brackets when it holds a space or a bracket. */
-function pictureTarget(path: string): string {
+export function pictureTarget(path: string): string {
   const value = path.trim();
   return /[\s()<>]/.test(value) ? `<${value.replace(/[<>]/g, encodeURIComponent)}>` : value;
 }
@@ -79,7 +79,7 @@ function pictureTarget(path: string): string {
  * An attribute value in a div's `{…}`, which has no escapes: in double quotes, or in single quotes when it holds a
  * double quote; a value with both keeps its words with a typographic quote. A line break is a space.
  */
-function attributeValue(value: string): string {
+export function attributeValue(value: string): string {
   const words = value.replace(/[\r\n]+/g, ' ');
   if (!words.includes('"')) return `"${words}"`;
   if (!words.includes("'")) return `'${words}'`;
@@ -138,7 +138,10 @@ export function hiddenWords(kind: string, data: SlideData): string[] {
 export function conversionComment(notes: string | null | undefined, hidden: string[]): string | null {
   const parts = [(notes ?? '').trim(), ...hidden.map(words => `Hidden by the old layout: ${words}`)].filter(Boolean);
   if (!parts.length) return null;
-  const body = parts.join('\n').replace(/--(!?)>/g, '--$1›');
+  // A line that reads as a code fence's (```` ``` ```` or `~~~`, as a trainer's notes quoting a slide may hold) would open
+  // a fence for the deck's own reader (`parseDeck` doesn't know comments): indented four spaces it is no fence, so no
+  // slide can start inside the comment and no slide after it is swallowed (security review of #765).
+  const body = parts.join('\n').replace(/--(!?)>/g, '--$1›').replace(/^ {0,3}(?=`{3,}|~{3,})/gm, '    ');
   return `<!-- ${body} -->`;
 }
 

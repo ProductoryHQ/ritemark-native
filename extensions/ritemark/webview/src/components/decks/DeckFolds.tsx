@@ -25,7 +25,7 @@ export function foldFrom(stored: unknown): DeckFold {
 
 /** What this deck's view keeps: the slide's share of the width beside the handout (`deckRatio`), its share of the
  *  height above it (`deckAboveRatio`), and the fold. Never the file. */
-export interface DeckViewState { deckRatio?: unknown; deckAboveRatio?: unknown; deckFold?: unknown }
+export interface DeckViewState { deckRatio?: unknown; deckAboveRatio?: unknown; deckFold?: unknown; deckConversionNoticed?: unknown }
 
 /** This deck's kept view state, or nothing when the view has none. */
 export function deckViewState(): DeckViewState {

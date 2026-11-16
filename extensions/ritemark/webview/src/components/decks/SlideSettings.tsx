@@ -77,6 +77,11 @@ interface SlideSettingsProps {
   onUndo: (redo: boolean) => void
   /** The lines about the slide, first (`SlideAbout`); none, and the settings start at once. */
   about?: ReactNode
+  /**
+   * Sprint 161 (PR 2): a slide drawn as blocks with a Steps block: its pill's words (#752's Label row, which brings an
+   * emptied pill back), and their change.
+   */
+  stepsTag?: { value: string; onChange: (tag: string) => void }
   /** The deck's own look, last: how many slides it reaches, the choice, and the change of it (`setLook`). */
   deck: DeckLookChoice
 }
@@ -167,7 +172,35 @@ export function SlideAbout({ data, sourceLines, hidden, table }: SlideAboutProps
   )
 }
 
-export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about, deck }: SlideSettingsProps) {
+/**
+ * The pill's Label row (16 November): its words, the default as the placeholder; emptied, no pill. Cmd+Z in it is the
+ * deck's undo. One row for an Exercise slide's `tag:` and a block slide's Steps (PR 2).
+ */
+function LabelRow({ id, value, onWords, onUndo }: { id: string; value: string; onWords: (words: string) => void; onUndo: (redo: boolean) => void }) {
+  return (
+    <div className="deck-settings-row deck-settings-tag">
+      <Label htmlFor={id}>Label</Label>
+      <Input
+        id={id}
+        className="deck-settings-field"
+        placeholder={EXERCISE_TAG}
+        value={value}
+        onChange={event => {
+          const words = oneLine(event.target.value)
+          if (words !== value) onWords(words)
+        }}
+        onKeyDown={event => {
+          const step = undoKeyOf({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, isComposing: event.nativeEvent.isComposing })
+          if (!step) return
+          event.preventDefault()
+          onUndo(step === 'redo')
+        }}
+      />
+    </div>
+  )
+}
+
+export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about, stepsTag, deck }: SlideSettingsProps) {
   const skipId = `deck-skip-${number}`
   const tagId = `deck-tag-${number}`
   const reachId = `deck-reach-${number}`
@@ -213,27 +246,18 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
           />
         </>
       ) : null}
+      {stepsTag ? <LabelRow id={tagId} value={stepsTag.value} onWords={stepsTag.onChange} onUndo={onUndo} /> : null}
       {kind === 'exercise' ? (
-        <div className="deck-settings-row deck-settings-tag">
-          <Label htmlFor={tagId}>Label</Label>
-          <Input
-            id={tagId}
-            className="deck-settings-field"
-            placeholder={EXERCISE_TAG}
-            value={exerciseTagOf(data)}
-            onChange={event => {
-              // Through the pill's own rule (`setPath`): words as they were write nothing.
-              const next = setPath(data, 'tag', oneLine(event.target.value))
-              if (next !== data) onChange({ tag: next.tag })
-            }}
-            onKeyDown={event => {
-              const step = undoKeyOf({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, isComposing: event.nativeEvent.isComposing })
-              if (!step) return
-              event.preventDefault()
-              onUndo(step === 'redo')
-            }}
-          />
-        </div>
+        <LabelRow
+          id={tagId}
+          value={exerciseTagOf(data)}
+          // Through the pill's own rule (`setPath`): words as they were write nothing.
+          onWords={words => {
+            const next = setPath(data, 'tag', words)
+            if (next !== data) onChange({ tag: next.tag })
+          }}
+          onUndo={onUndo}
+        />
       ) : null}
       {kind !== 'picture' ? (
         <>

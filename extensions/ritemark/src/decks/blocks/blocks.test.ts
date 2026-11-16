@@ -230,7 +230,8 @@ test('a block deck: no private word reaches the page, its digest, the file list 
   }
   for (const word of PUBLIC_BLOCK_WORDS) assert.ok(html.includes(word) || files.includes(word), `${word} is missing from the page`);
   assert.equal(deck.title, 'Block cover', 'a deck of block slides takes its cover slide\'s title');
-  assert.deepEqual(deck.slides.map(slide => slide.kind), ['', '', '', 'columns'], 'the skipped block slide is left out');
+  // PR 2 (decision 8): the v1 Columns slide goes out as the block slide its conversion writes.
+  assert.deepEqual(deck.slides.map(slide => slide.kind), ['', '', '', ''], 'the skipped block slide is left out, and a v1 slide goes out as blocks');
   assert.ok(html.includes('class="deck-sl is-blocks'), 'block slides are drawn by the block renderer');
   assert.ok(html.includes('data-exercise=""'), 'a block slide with Steps is an exercise on the page');
 
@@ -426,21 +427,32 @@ test('the title keeps half its size of room before what follows; a line under it
 
 console.log(`blocks: ${passed} passed`);
 
-// The library refuses to put a block slide into an older deck (async, so after the synchronous tests).
+// PR 2: the library's writes convert the parts they write, and a deck holding a block slide says `deck: 2` (async, so
+// after the synchronous tests). Its other slides stay as written: a mixed deck is legal.
 void (async () => {
   const files: Record<string, string> = {
     'Blocks.deck.md': '---\ndeck: 2\n---\n\n```slide\n---\nid: b1\n---\n# Block\n```\n',
     'Old.deck.md': '---\ndeck: 1\n---\n\n```slide title\nid: t1\ntitle: Old\n```\n',
     'New.deck.md': '---\ndeck: 2\n---\n\n```slide title\nid: t2\ntitle: New\n```\n',
+    'Source.deck.md': '---\ndeck: 1\n---\n\n```slide columns\nid: c1\ntitle: Two ways\nitems:\n  - heading: Copilot\n    text: Mail\n  - heading: Cursor\n  - heading: THIRDCOLUMN\n```\n\n```notes\nNOTESWORD\n```\n\n## Two ways\n\nRead this.\n',
   };
   const library = new DeckLibrary({
     async list() { return Object.keys(files).map((path, index) => ({ path, modified: index })); },
     async read(path) { return files[path] ?? null; },
     async write(path, text) { files[path] = text; },
   });
-  await assert.rejects(library.insertCopies('Blocks.deck.md', ['b1'], 'Old.deck.md', undefined), /older deck format/);
-  assert.equal(files['Old.deck.md'], '---\ndeck: 1\n---\n\n```slide title\nid: t1\ntitle: Old\n```\n', 'nothing written');
+  await library.insertCopies('Blocks.deck.md', ['b1'], 'Old.deck.md', undefined);
+  assert.ok(files['Old.deck.md'].startsWith('---\ndeck: 2\n'), 'the older deck says deck: 2 with its first block slide');
+  assert.ok(files['Old.deck.md'].includes('```slide title\nid: t1\ntitle: Old\n```'), 'its own slide stays as written');
+  assert.ok(files['Old.deck.md'].includes('# Block'));
   await library.insertCopies('Blocks.deck.md', ['b1'], 'New.deck.md', undefined);
   assert.ok(files['New.deck.md'].includes('# Block'));
-  console.log('blocks (library): a block slide goes only into a deck: 2 deck');
+  // A v1 copy goes in as a block slide: the third column (hidden by its layout) a comment in its handout, never its notes.
+  await library.insertCopies('Source.deck.md', ['c1'], 'New.deck.md', undefined);
+  const written = files['New.deck.md'];
+  assert.ok(/```slide\n---\nid: \w+\nfrom: Source\.deck\.md#c1 @\w+\n---\n# Two ways\n\n:::: columns/.test(written), written);
+  assert.ok(written.includes('<!-- Hidden by the old layout: THIRDCOLUMN -->'), 'the hidden column is a comment');
+  assert.ok(!written.includes('NOTESWORD'), 'a copy never brings the notes');
+  assert.ok(!/```slide columns/.test(written), 'no v1 copy is written');
+  console.log('blocks (library): the library writes block slides, and the deck says deck: 2');
 })().catch(error => { console.error(error); process.exit(1); });

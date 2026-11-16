@@ -227,6 +227,19 @@ function coverOf(markdown: string): boolean {
   return false;
 }
 
+/**
+ * PR 2: a block slide drawn as a section, the way an old Section slide converts (`legacyToBlocks`): a short first line
+ * (its number) over its title, and nothing else. Its number ('' for none), or null for any other slide. The page draws
+ * such a slide's part as a divider, as it drew a Section slide's.
+ */
+export function blockSectionNumberOf(markdown: string): string | null {
+  const blocks = lexBlockSlide(markdown).filter(token => token.type !== 'space');
+  if (blocks.length !== 2 || blocks[0].type !== 'paragraph' || blocks[1].type !== 'heading' || (blocks[1] as Tokens.Heading).depth !== 1) return null;
+  const number = (blocks[0] as Tokens.Paragraph).text.replace(/\\(.)/g, '$1').trim();
+  // A section's number: digits (1, 2.1), a letter or a Roman numeral, never a word over a title ("Productory").
+  return /^(?:\d{1,3}(?:\.\d{1,3})*|[A-Za-z]|[IVXLC]{1,6})[.)]?$/.test(number) ? number : null;
+}
+
 const stepsCache = new Map<string, string | null>();
 
 /**

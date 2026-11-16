@@ -211,10 +211,13 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
   for (const gone of ['deck-sethead', 'onSettings', 'sourceLines', 'write(addRow)', 'hiddenNote', '`From the library']) {
     assert.ok(!stage.includes(gone), `nothing of "${gone}" on the stage`)
   }
-  const under = stage.slice(stage.indexOf('<div className="deck-under">'))
-  assert.ok(under.includes('Speaker notes'), 'under the slide, only the speaker notes')
+  // Sprint 161 (PR 2; Jarmo, 17 November): the Speaker notes fold under the slide is gone, so nothing is under it.
+  assert.ok(!stage.includes('deck-under'), 'nothing under the slide')
+  assert.ok(!stage.includes('Speaker notes') && !stage.includes('notesOpen') && !stage.includes('writeNotes'), 'no Speaker notes fold')
+  assert.ok(!view.includes('notesOpen') && !view.includes('deck-notes'), 'the deck view keeps no notes fold')
   const css = here('./decks.css')
   assert.ok(!css.includes('.deck-sethead'), 'no row above the slide')
+  assert.ok(!css.includes('.deck-notes') && !css.includes('.deck-under'), 'and no notes row under it')
   assert.ok(!css.includes('deck-thumb-dot'), 'the badge replaces the newer-version dot')
 }
 

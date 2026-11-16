@@ -1,27 +1,25 @@
 /**
  * Sprint 157: the stage, the current slide large in the middle (README frames 2 and 4).
  *
- *  - The words are typed on the slide: a click puts the caret there, and the thumbnail changes as you type. Enter adds
- *    a box, a point or a step; Backspace in an empty one removes it. A table's cells move on with Tab and Enter, with
- *    Add a row and Add a column in Slide settings. A box's icon is chosen from a grid.
- *  - Nothing sits above the slide, and under it only the speaker notes (17 November, "Nothing around the slide but the
- *    slide"): Slide settings is a gear in the deck's bar, and where a copy came from, the words a layout keeps for
- *    others and a table's two actions are at the top of its popup (`SlideAbout`).
- *  - Speaker notes fold open under the slide. They never leave the person's screen (README decision 7).
+ *  - Sprint 161 (PR 2): a block slide, and a v1 slide of the nine kinds (drawn as blocks, decision 8), is written on
+ *    like text in the slide editor (`blocks/SlideEditor.tsx`); its first edit converts the deck. A slide of a kind this
+ *    build doesn't know keeps its layout's words, typed in place: a click puts the caret there, and Enter goes on.
+ *  - Nothing sits around the slide (17 November, "Nothing around the slide but the slide"): Slide settings is a gear in
+ *    the deck's bar, and where a copy came from is at the top of its popup (`SlideAbout`). The fold for notes that
+ *    sat under it is gone (Jarmo, 17 November): anything private is a comment in the handout.
  *
  * Every change is one transaction on the slide's node in the handout's editor, so it saves, merges and undoes as the
  * rest of the deck does; Cmd+Z on the stage runs the editor's undo.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { Editor as TipTapEditor } from '@tiptap/react'
-import { isBlockSlide, writeSlideData, type SlideData } from '../../../../src/decks/deckFormat'
+import { writeSlideData, type SlideData } from '../../../../src/decks/deckFormat'
+import { drawsAsBlocks } from '../../../../src/decks/blocks/convertDeck'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
-import { Button } from '../ui/button'
-import { Icon } from '../ui/Icon'
-import { Tooltip } from '../ui/tooltip'
 import { slidesOf, type DeckSlideEntry } from './deckDocument'
-import { getClipboardImageFile, getUniqueImageFilename, readFileAsBase64, shouldPreferTextPaste } from '../../lib/pastedImage'
-import { SlideCanvas, editedText, type SlideEditing } from './slide/SlideCanvas'
+import { takeImageFile } from '../../lib/pastedImage'
+import { SlideCanvas, type SlideEditing } from './slide/SlideCanvas'
+import { SlideEditor } from './blocks/SlideEditor'
 import { itemMarksOf, layoutSlide, textBoxes, withoutListMarker } from './slide/layoutSlide'
 import { undoKeyOf, cellPath, insertItemAfter, isEmptyItem, itemPath, nextCell, removeItem, setIcon, setPath, valueAt } from './slide/slideEdits'
 
@@ -35,9 +33,8 @@ interface StageProps {
   width: number
   /** The person is writing on this slide: the handout keeps it the current one. */
   onWriting: () => void
-  /** The speaker notes fold, open or closed for the whole deck (as the prototype keeps it). */
-  notesOpen: boolean
-  onNotesOpen: (open: boolean) => void
+  /** Comments load and save on the slide as in the handout (the comment-callouts flag). */
+  commentCallouts?: boolean
   /** Words to put the caret in once the slide is drawn (a new slide's title); asked again when it changes. */
   initialFocus?: string
   /** Sprint 159 (PR 7): select those words whole, to be typed over (a deck New just made), rather than put the caret after them. */
@@ -48,14 +45,36 @@ interface StageProps {
   onPicture: (dataUrl: string, filename: string) => void
 }
 
-/** Notes' first words beside the fold, as the prototype's "Speaker notes · Ask who has used…". */
-function notesPreview(notes: string | null): string {
-  const text = (notes ?? '').replace(/\s+/g, ' ').trim()
-  if (!text) return ''
-  return text.length > 30 ? `${text.slice(0, 30)}…` : text
+export function Stage(props: StageProps) {
+  // A block slide, and a v1 slide drawn as blocks: written like text (Sprint 161, PR 2).
+  if (drawsAsBlocks(props.slide.kind)) return <BlockStage {...props} />
+  return <LayoutStage {...props} />
 }
 
-export function Stage({ editor, slide, theme, borderless, assets, width, onWriting, notesOpen, onNotesOpen, initialFocus, selectOnFocus, onFocusTaken, onPicture }: StageProps) {
+function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture }: StageProps) {
+  // A request that comes after the stage is drawn (a deck New made, already shown) is taken once it changes.
+  const focusTitle = useMemo(() => (initialFocus ? { select: !!selectOnFocus } : null), [initialFocus, selectOnFocus])
+  return (
+    <div className="deck-big" style={{ width }}>
+      <SlideEditor
+        outer={editor}
+        slide={slide}
+        width={width}
+        theme={theme}
+        borderless={borderless}
+        assets={assets}
+        commentCallouts={commentCallouts}
+        onWriting={onWriting}
+        focusTitle={focusTitle}
+        onFocusTaken={onFocusTaken}
+        onPicture={onPicture}
+      />
+    </div>
+  )
+}
+
+/** A slide of a kind this build doesn't know: its layout's words, typed in place (Sprint 157). */
+function LayoutStage({ editor, slide, theme, borderless, assets, width, onWriting, initialFocus, selectOnFocus, onFocusTaken, onPicture }: StageProps) {
   const [focusPath, setFocusPath] = useState<string | null>(initialFocus ?? null)
   const [focusSelect, setFocusSelect] = useState(!!selectOnFocus)
   // A request that comes after the stage is drawn (the deck's first slide, already shown when New's deck opens); the
@@ -70,9 +89,8 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
   }, [initialFocus, selectOnFocus])
   const onFocusTakenRef = useRef(onFocusTaken)
   onFocusTakenRef.current = onFocusTaken
-  const notesRef = useRef<HTMLDivElement>(null)
 
-  /** Change this slide's data (and its notes) in one transaction, from the editor's document as it is now. */
+  /** Change this slide's data in one transaction, from the editor's document as it is now. */
   const write = useCallback((mutate: (data: SlideData) => SlideData, focus?: string) => {
     const fresh = slidesOf(editor.state.doc)[slide.index]
     if (!fresh) return
@@ -81,12 +99,6 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
       editor.view.dispatch(editor.state.tr.setNodeMarkup(fresh.pos, undefined, { ...fresh.node.attrs, body }))
     }
     if (focus !== undefined) setFocusPath(focus)
-  }, [editor, slide.index])
-
-  const writeNotes = useCallback((notes: string | null) => {
-    const fresh = slidesOf(editor.state.doc)[slide.index]
-    if (!fresh || fresh.node.attrs.notes === notes) return
-    editor.view.dispatch(editor.state.tr.setNodeMarkup(fresh.pos, undefined, { ...fresh.node.attrs, notes }))
   }, [editor, slide.index])
 
   const undoKey = (event: ReactKeyboardEvent<HTMLElement>): boolean => {
@@ -168,24 +180,8 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
     },
   }), [onWriting, write, focusPath, focusSelect])
 
-  // The notes, uncontrolled while they have the caret, as the slide's words are.
-  useLayoutEffect(() => {
-    const element = notesRef.current
-    if (element && document.activeElement !== element && element.textContent !== (slide.notes ?? '')) element.textContent = slide.notes ?? ''
-  })
-
-  const preview = notesPreview(slide.notes)
-
   /** A picture from the computer onto the slide: pasted (unless words are being pasted into a box) or dropped. */
-  const takePicture = (transfer: DataTransfer | null, pasted: boolean): boolean => {
-    // A block slide (Sprint 161) is drawn read-only in this build: a picture goes in with its editor, not as a Picture slide.
-    if (isBlockSlide(slide.kind)) return false
-    const file = getClipboardImageFile(transfer)
-    if (!file) return false
-    if (pasted && shouldPreferTextPaste(transfer)) return false
-    void readFileAsBase64(file).then(dataUrl => onPicture(dataUrl, getUniqueImageFilename(file)))
-    return true
-  }
+  const takePicture = (transfer: DataTransfer | null, pasted: boolean): boolean => takeImageFile(transfer, pasted, onPicture)
 
   return (
     <>
@@ -197,43 +193,6 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
         onDrop={event => { if (takePicture(event.dataTransfer, false)) event.preventDefault() }}
       >
         <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={theme} borderless={borderless} assets={assets} editing={editing} />
-      </div>
-      <div className="deck-under">
-        <Tooltip label={notesOpen ? 'Hide the speaker notes' : 'Show the speaker notes: what you will say, only for you'}>
-          <Button
-            variant="ghost"
-            className={`deck-notes-toggle${notesOpen ? ' is-open' : ''}`}
-            aria-expanded={notesOpen}
-            onClick={() => onNotesOpen(!notesOpen)}
-          >
-            <Icon name="caret-right" size={12} tone="inherit" />
-            <span className="deck-notes-label">Speaker notes{preview ? ` · ${preview}` : ''}</span>
-          </Button>
-        </Tooltip>
-        {notesOpen ? (
-          <div
-            ref={notesRef}
-            className="deck-notes"
-            contentEditable="plaintext-only"
-            suppressContentEditableWarning
-            role="textbox"
-            aria-multiline
-            aria-label="Speaker notes"
-            data-ph="What you will say. Only you see it, and only here."
-            onInput={event => {
-              onWriting()
-              const text = editedText(event.currentTarget)
-              writeNotes(text === '' ? null : text)
-            }}
-            onKeyDown={event => {
-              if (undoKey(event)) {
-                event.preventDefault()
-                const fresh = slidesOf(editor.state.doc)[slide.index]
-                event.currentTarget.textContent = fresh?.notes ?? ''
-              }
-            }}
-          />
-        ) : null}
       </div>
     </>
   )

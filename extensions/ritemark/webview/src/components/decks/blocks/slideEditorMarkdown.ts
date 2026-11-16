@@ -8,8 +8,13 @@
  *  - save: the document editor's Turndown rules on their own service (`createSlideTurndownService`) plus the div's rule.
  *
  * Never registered on the document editor's `editorMarked` or `editorTurndownService`: a Text document's `:::` lines
- * stay text (the fidelity corpus proves it). In this build it is read by the parity test, which holds the renderer and
- * the editor's document to the same outline; the editor on the slide uses it next.
+ * stay text (the fidelity corpus proves it). The parity test holds the renderer and the editor's document to the same
+ * outline; the editor on the stage (`SlideEditor`, PR 2) loads and saves with it.
+ *
+ * PR 2: a typed paragraph that reads as a `:::` line (`::: columns`, `:::`) would open or close a block when the slide
+ * is opened again, so the save checks what it wrote reads back as the same blocks, and if it doesn't, writes such lines
+ * escaped (`\:::`, which CommonMark reads as `:::`). Only then: a stray `:::` written by someone else stays as written.
+ * Comments on the slide (`<!-- … -->`, `<mark data-comment>`) load and save as the handout's do, with the comment flag.
  */
 import { Node, mergeAttributes } from '@tiptap/core'
 import { Marked } from 'marked'
@@ -18,6 +23,8 @@ import { fencedDivStart, scanFencedDiv, type FenceScan } from '../../../../../sr
 import { asWrittenMarkedExtension } from '../../../utils/markdownAsWritten'
 import { mathMarkedExtension } from '../../../extensions/math/mathMarkedExtension'
 import { createEditorTurndownService, markdownToEditorHTML, preprocessTableHTML } from '../../../utils/editorMarkdown'
+import { commentMarkedExtension } from '../../../extensions/comment/commentMarkedExtension'
+import type { Node as PMNode } from '@tiptap/pm/model'
 
 function escapeAttribute(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -59,9 +66,21 @@ slideEditorMarked.use(asWrittenMarkedExtension)
 slideEditorMarked.use(mathMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 slideEditorMarked.use(slideDivMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 
-/** A block slide's Markdown as the HTML the slide editor parses. */
-export function markdownToSlideEditorHTML(markdown: string): string {
-  return markdownToEditorHTML(markdown, undefined, slideEditorMarked)
+let slideComments = false
+
+/**
+ * The comment tokenizer on the slide editor's own `marked`, once, when the comment flag is on (as the document editor's
+ * `ensureCommentMarkedPipeline`): with the flag off a comment stays the plain load's.
+ */
+export function ensureSlideCommentPipeline(): void {
+  if (slideComments) return
+  slideComments = true
+  slideEditorMarked.use(commentMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
+}
+
+/** A block slide's Markdown as the HTML the slide editor parses; `imageMappings` gives its pictures' webview addresses. */
+export function markdownToSlideEditorHTML(markdown: string, imageMappings?: Record<string, string>): string {
+  return markdownToEditorHTML(markdown, imageMappings, slideEditorMarked)
 }
 
 /** The node for a `:::` block: its lines as written, and its blocks. */
@@ -124,9 +143,45 @@ export function createSlideTurndownService(): TurndownService {
 }
 
 let slideTurndown: TurndownService | null = null
+let escapingTurndown: TurndownService | null = null
+
+/** A line of text that would read as a `:::` block's opening or closing line. */
+const FENCE_LINE = /^(\s*)(:{3,})/gm
+
+/** The slide's Turndown that escapes text reading as a `:::` line (`\:::`). */
+function createEscapingTurndownService(): TurndownService {
+  const service = createSlideTurndownService()
+  const escape = service.escape.bind(service)
+  service.escape = (text: string) => escape(text).replace(FENCE_LINE, '$1\\$2')
+  return service
+}
 
 /** The slide editor's save: its HTML as Markdown. */
 export function slideEditorHTMLToMarkdown(html: string): string {
   slideTurndown ??= createSlideTurndownService()
   return slideTurndown.turndown(preprocessTableHTML(html))
+}
+
+/** The slide editor's save with every text line that reads as a `:::` line escaped. */
+export function slideEditorHTMLToEscapedMarkdown(html: string): string {
+  escapingTurndown ??= createEscapingTurndownService()
+  return escapingTurndown.turndown(preprocessTableHTML(html))
+}
+
+/** Do two documents hold the same blocks and words (their as-written attributes aside)? */
+export function sameShape(a: PMNode, b: PMNode): boolean {
+  if (a.type !== b.type || a.childCount !== b.childCount) return false
+  if (a.isText) return a.text === b.text
+  for (let index = 0; index < a.childCount; index++) if (!sameShape(a.child(index), b.child(index))) return false
+  return true
+}
+
+/**
+ * The stage's save (PR 2): the document's Markdown, written so it reads back as the same blocks. `html` is the
+ * document's HTML, `load` the slide editor's own load of a Markdown.
+ */
+export function saveSlideMarkdown(doc: PMNode, html: string, load: (markdown: string) => PMNode): string {
+  const markdown = slideEditorHTMLToMarkdown(html)
+  if (!markdown.includes(':::') || sameShape(load(markdown), doc)) return markdown
+  return slideEditorHTMLToEscapedMarkdown(html)
 }

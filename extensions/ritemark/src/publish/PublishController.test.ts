@@ -1047,7 +1047,7 @@ test('a deck\'s page: its rows in the sheet, a first publish, an update without 
     assert.equal(t.sheets.length, 1);
     assert.deepEqual(t.sheets[0].options.deck, {
       goes: '5 slides and their handout, 2 prompts with Copy, and the pictures they use.',
-      stays: 'On your computer: speaker notes on 2 slides, and 1 skipped slide.',
+      stays: 'On your computer: comments on 5 slides, and 1 skipped slide.',
     });
     assert.deepEqual(t.sheets[0].plan.files.map((file) => file.relPath), ['AI assistants and agents.html', 'images/which-stays.png']);
     // Nothing private reached the host

@@ -835,7 +835,18 @@ export function writeSlideData(kind: string, body: string, data: SlideData): str
   const inner = writeSlideBody(parts.header ?? '', keys);
   if (inner === (parts.header ?? '')) return body;
   if (inner.trim() === '') return parts.markdown;
-  return `---\n${inner}\n---\n${parts.markdown}`;
+  // A slide with no words yet ends at its header, so its fence closes right under it.
+  return parts.markdown ? `---\n${inner}\n---\n${parts.markdown}` : `---\n${inner}\n---`;
+}
+
+/**
+ * A block slide's body with its Markdown replaced, its header kept as written (Sprint 161, PR 2: the stage's writes).
+ */
+export function withBlockMarkdown(body: string, markdown: string): string {
+  const head = splitBlockSlide(body).head;
+  if (!head) return markdown;
+  if (!markdown) return head.replace(/\r?\n$/, '');
+  return head.endsWith('\n') ? head + markdown : `${head}\n${markdown}`;
 }
 
 // ---------------------------------------------------------------------------

@@ -165,7 +165,7 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
     return view.slice(at)
   }
   const stage = block('{slideShown ? ( <div ref={stageRef} className={`deck-stage')
-  assert.ok(stage.includes('<Stage') && stage.includes('notesOpen={notesOpen}'), 'the stage and its notes are drawn only while the slide shows')
+  assert.ok(stage.includes('<Stage'), 'the stage is drawn only while the slide shows (Sprint 161: no notes fold under it)')
   // 17 November: Slide settings is the bar's gear. 16 November (the Experience lead): hiding the slide hides the stage,
   // not the current slide, so the gear stays ready and opens the same popup (and a deck with no slides opens its look, #764).
   assert.ok(view.includes('<Popover open={settingsOpen} onOpenChange={setSettingsOpen}>') && !view.includes('settingsReady'), 'Settings go with the current slide, shown or hidden')

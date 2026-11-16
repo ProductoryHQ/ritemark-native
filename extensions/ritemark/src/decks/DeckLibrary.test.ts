@@ -2,7 +2,7 @@
  * Sprint 157: the Slide library, with an in-memory project. Run with `npx tsx src/decks/DeckLibrary.test.ts`.
  */
 import { strict as assert } from 'node:assert';
-import { isTextHandout, parseFrom, parseSlideBody } from './deckFormat';
+import { isTextHandout, parseFrom, slideDataOf } from './deckFormat';
 import { slideStamps, slidesOfText } from './deckLibraryFormat';
 import { DeckLibrary, isTopicPath, type DeckFiles } from './DeckLibrary';
 
@@ -35,21 +35,23 @@ async function run() {
   assert.deepEqual((await library.listDecks({ query: 'goal' })).map(deck => deck.slides.map(slide => slide.id)), [['a2']]);
   assert.deepEqual((await library.listDecks({ where: 'other' })).map(deck => deck.name), ['Harbour']);
 
-  // A copy: a new id, the from line with the source's stamp, paths rebased, no notes.
+  // A copy: a new id, the from line with the source's stamp, paths rebased, no notes. Since Sprint 161's PR 2 it goes in
+  // as a block slide: the picture its old layout didn't draw is a comment at the end of its handout, never lost.
   const [copy] = await library.copies('Slide library/AI assistants.deck.md', ['a1'], 'Clients/Harbour/Harbour.deck.md', ['t1']);
-  const data = parseSlideBody(copy.body);
+  assert.equal(copy.kind, '', 'a block slide');
+  const data = slideDataOf(copy.kind, copy.body);
   assert.notEqual(data.id, 'a1');
   assert.equal(parseFrom(data.from)?.path, 'Slide library/AI assistants.deck.md');
   assert.equal(parseFrom(data.from)?.id, 'a1');
-  assert.equal(data.image, '../../Slide library/images/four.png');
-  assert.equal(copy.handout, 'Set up once. See ![x](<../../Slide library/images/s.png>).');
+  assert.equal(data.markdown, '# Four parts\n\n:::: boxes\n::: box\n### Instructions\n:::\n::::');
+  assert.equal(copy.handout, 'Set up once. See ![x](<../../Slide library/images/s.png>).\n\n<!-- Hidden by the old layout: picture ../../Slide library/images/four.png -->');
 
   // Its state as copied: unchanged, nothing newer.
-  const state = async (body: string, handout: string) => (await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: data.id!, from: parseSlideBody(body).from!, kind: copy.kind, body, handout }]))[0];
+  const state = async (body: string, handout: string) => (await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: data.id!, from: slideDataOf(copy.kind, body).from!, kind: copy.kind, body, handout }]))[0];
   assert.deepEqual(await state(copy.body, copy.handout), { id: data.id, library: true, sourceName: 'AI assistants', sourcePath: 'Slide library/AI assistants.deck.md', changed: false, newer: false, missing: false });
 
   // Changed here: the copy's words or handout.
-  const changedBody = copy.body.replace('title: Four parts', 'title: Four parts, again');
+  const changedBody = copy.body.replace('# Four parts', '# Four parts, again');
   assert.equal((await state(changedBody, copy.handout)).changed, true);
   assert.equal((await state(copy.body, copy.handout + ' More.')).changed, true, 'a handout change counts (answer 2)');
 
@@ -57,7 +59,10 @@ async function run() {
   const before = files.files['Slide library/AI assistants.deck.md'];
   const update = await library.updateLibrarySlide('Clients/Harbour/Harbour.deck.md', { kind: copy.kind, body: changedBody, handout: copy.handout });
   const after = files.files['Slide library/AI assistants.deck.md'];
-  assert.equal(after, before.replace('title: Four parts\n', 'title: Four parts, again\n'), 'only the changed line, paths back in the library\'s folder');
+  // The topic gets the slide as a block slide (and says deck: 2); its other slide stays byte for byte.
+  assert.ok(after.startsWith('---\ndeck: 2\n---\n\n```slide\n---\nid: a1\n---\n# Four parts, again\n\n:::: boxes\n'), after);
+  assert.ok(after.includes('Set up once. See ![x](images/s.png).'), 'paths back in the library\'s folder');
+  assert.equal(after.slice(after.indexOf('```slide statement')), before.slice(before.indexOf('```slide statement')), 'the other slide as it was');
   const updatedBody = changedBody.replace(/^from: .*$/m, `from: ${update.from}`);
   assert.deepEqual(await state(updatedBody, copy.handout), { ...(await state(updatedBody, copy.handout)), changed: false, newer: false });
 
@@ -66,8 +71,8 @@ async function run() {
   assert.equal(olderCopy.newer, true);
   assert.equal(olderCopy.changed, false);
   const used = await library.useSource('Clients/Harbour/Harbour.deck.md', copy.body, copy.kind);
-  assert.equal(parseSlideBody(used.body).id, data.id);
-  assert.equal(parseSlideBody(used.body).title, 'Four parts, again');
+  assert.equal(slideDataOf(used.kind, used.body).id, data.id);
+  assert.equal(slideDataOf(used.kind, used.body).title, 'Four parts, again');
   assert.equal((await state(used.body, used.handout)).newer, false);
 
   // Undo of the library write puts the topic back, while nothing else changed it.
@@ -79,13 +84,15 @@ async function run() {
   const added = await library.addToLibrary('Clients/Harbour/Harbour.deck.md', 'Working with data', own);
   assert.ok(files.files['Slide library/Themes/Evening.theme.md'].startsWith('---\nname: Evening'));
   const topic = files.files['Slide library/Working with data.deck.md'];
-  assert.ok(topic.startsWith('---\ndeck: 1\ntheme: Slide library/Themes/Evening.theme.md\n---\n\n```slide statement\n'));
+  assert.ok(topic.startsWith('---\ndeck: 2\ntheme: Slide library/Themes/Evening.theme.md\n---\n\n```slide\n---\nid: '), topic);
+  assert.ok(topic.includes('# Our own'), 'the library gets it as a block slide');
   const addedSlide = slidesOfText(topic)[0];
   assert.equal(addedSlide.data.skip, undefined, 'the library keeps no skip');
   assert.equal(addedSlide.handout, 'Mine, with [brief](../Clients/Harbour/Brief.md).');
   assert.equal(parseFrom(added.from)?.id, addedSlide.data.id);
   await library.addToLibrary('Clients/Harbour/Harbour.deck.md', 'Slide library/AI assistants.deck.md', own);
   assert.equal(slidesOfText(files.files['Slide library/AI assistants.deck.md']).length, 3);
+  assert.ok(files.files['Slide library/AI assistants.deck.md'].startsWith('---\ndeck: 2\n'), 'an older topic says deck: 2 with it');
 
   // A missing source.
   const missing = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: 'x1', from: 'Slide library/Gone.deck.md#a1 @aaaaaa', kind: 'title', body: 'id: x1', handout: '' }]);

@@ -107,26 +107,33 @@ export function joinFrontMatter(
 const PLAIN_KEY = /^[A-Za-z_][\w-]{0,63}$/;
 const PLAIN_WORD = /^[A-Za-z][\w-]{0,63}$/;
 
+/** A value written as one plain word or number on its key's line (`text`, `2`). */
+const plainValue = (value: unknown) => (typeof value === 'string' && PLAIN_WORD.test(value)) || (typeof value === 'number' && Number.isInteger(value) && value >= 0);
+
 /**
- * A front matter's head (`---` … `---`, LF) with only plain keys added or taken out, each a one-word string value
- * (`handout: text`), when that is the whole change between `current` and `next`: every other line stays byte for byte,
- * its comments and quoting with it. Null for any other change, which `gray-matter` writes.
+ * A front matter's head (`---` … `---`, LF) with only plain keys added, taken out or changed, each a one-word string or a
+ * whole number (`handout: text`; Sprint 161's `deck: 1` → `deck: 2` and back), when that is the whole change between
+ * `current` and `next`: every other line stays byte for byte, its comments and quoting with it, and so do the blank
+ * lines after it. Null for any other change, which `gray-matter` writes.
  */
 export function headWithPlainKeyChanges(head: string, current: Record<string, unknown>, next: Record<string, unknown>): string | null {
   const added: string[] = [];
   const removed: string[] = [];
+  const changed: string[] = [];
   for (const key of new Set([...Object.keys(current), ...Object.keys(next)])) {
     const was = Object.prototype.hasOwnProperty.call(current, key);
     const is = Object.prototype.hasOwnProperty.call(next, key);
     if (was && is) {
-      if (canonicalJson(asTheViewHoldsThem(current[key])) !== canonicalJson(asTheViewHoldsThem(next[key]))) return null;
+      if (canonicalJson(asTheViewHoldsThem(current[key])) === canonicalJson(asTheViewHoldsThem(next[key]))) continue;
+      if (!PLAIN_KEY.test(key) || !plainValue(current[key]) || !plainValue(next[key])) return null;
+      changed.push(key);
       continue;
     }
     const value = is ? next[key] : current[key];
-    if (!PLAIN_KEY.test(key) || typeof value !== 'string' || !PLAIN_WORD.test(value)) return null;
+    if (!PLAIN_KEY.test(key) || !plainValue(value)) return null;
     (is ? added : removed).push(key);
   }
-  if (added.length === 0 && removed.length === 0) return null;
+  if (added.length === 0 && removed.length === 0 && changed.length === 0) return null;
   const lines = head.split('\n');
   const close = lines.length - (lines[lines.length - 1] === '' ? 2 : 1);
   if (close < 1 || !/^---[ \t]*$/.test(lines[close]) || !/^---[ \t]*$/.test(lines[0])) return null;
@@ -137,6 +144,13 @@ export function headWithPlainKeyChanges(head: string, current: Record<string, un
     if (at < 0 || (at + 1 < inner.length && /^[ \t-]/.test(inner[at + 1]))) return null;
     inner.splice(at, 1);
   }
-  for (const key of added) inner.push(`${key}: ${next[key] as string}`);
+  for (const key of changed) {
+    const at = inner.findIndex(line => new RegExp(`^${key}:[ \\t]`).test(line));
+    if (at < 0 || (at + 1 < inner.length && /^[ \t-]/.test(inner[at + 1]))) return null;
+    // The line read back must be the value it held: a quoted or commented line is gray-matter's to write.
+    if (!new RegExp(`^${key}:[ \\t]+${String(current[key])}[ \\t]*$`).test(inner[at])) return null;
+    inner[at] = `${key}: ${String(next[key])}`;
+  }
+  for (const key of added) inner.push(`${key}: ${String(next[key])}`);
   return [lines[0], ...inner, ...lines.slice(close)].join('\n');
 }

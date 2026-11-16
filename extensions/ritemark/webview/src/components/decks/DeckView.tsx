@@ -25,7 +25,7 @@ import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
-import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
+import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, updateSlideMarkdown, type DeckSlideEntry } from './deckDocument'
 import { StartCard } from './StartCard'
 import { deckStarted, startCardRows, type StartCardState } from '../../../../src/decks/startCard'
 import { DOMParser as PMDOMParser, Fragment, type Node as PMNode } from '@tiptap/pm/model'
@@ -34,17 +34,22 @@ import { SourceLines, type CopySource } from './library/SourceLines'
 import { AddToLibrarySheet, type LibraryTopic } from './library/AddToLibrarySheet'
 import { onMessage, sendToExtension } from '../../bridge'
 import { convertKind, hiddenNote } from './slide/convertKind'
-import { addColumn, addRow } from './slide/slideEdits'
+import { addColumn, addRow, setPath } from './slide/slideEdits'
 import { DeckLook, SlideAbout, SlideSettings } from './SlideSettings'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { SlideStrip, type StripActions, type StripMark } from './SlideStrip'
-import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, newId, slideDataOf as readSlideData, withPartHeading, writeSlideBlock, writeSlideData } from '../../../../src/decks/deckFormat'
+import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, exerciseTagOf, isBlockSlide, newId, slideDataOf as readSlideData, withPartHeading, writeSlideBlock, writeSlideData } from '../../../../src/decks/deckFormat'
 import type { Transaction } from '@tiptap/pm/state'
 import { isHistoryTransaction } from '@tiptap/pm/history'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
 import { CURRENT_SLIDE_SETTLE_MS, currentSlideMessage } from './currentSlideMessage'
 import { DeckGuard } from './handout/deckGuard'
+import { DeckConvert, commentNodeAt, conversionNoticeFor, conversionStateOf, needsConversion, pictureIntoSlide } from './handout/deckConvert'
+import { commentBoxStorage } from '../../extensions/comment/CommentNode'
+import { blockDataOf, drawsAsBlocks, saysBlockDeck, withStepsTag } from '../../../../src/decks/blocks/convertDeck'
+import { blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
+import { hiddenWords } from '../../../../src/decks/blocks/legacyToBlocks'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
 import { DeckLines } from './handout/deckLines'
@@ -58,7 +63,7 @@ import { NO_GESTURE, slideKeyOf, slideKeyTarget, wheelPixels, wheelStep, type Ke
 import './decks.css'
 
 /** The deck's extensions, made once: the editor's extension list is fixed at mount. */
-const DECK_EXTENSIONS = [DeckSlideWithPartHead, DeckGuard, DeckCurrent, DeckLines, DeckDrawnHeadings]
+const DECK_EXTENSIONS = [DeckSlideWithPartHead, DeckGuard, DeckCurrent, DeckLines, DeckDrawnHeadings, DeckConvert]
 
 /** The strip's width (the prototype's 132). */
 const STRIP_WIDTH = 132
@@ -185,7 +190,6 @@ export function DeckView({
   const [stripWanted, setStripWanted] = useState(true)
   // Fold either side (16 November): the slide, the handout, or neither, as this deck's view kept it.
   const [fold, setFold] = useState<DeckFold>(storedFold)
-  const [notesOpen, setNotesOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsAt, setSettingsAt] = useState<{ left: number; top: number } | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
@@ -264,30 +268,52 @@ export function DeckView({
     editor.on('transaction', onTransaction)
     return () => { editor.off('transaction', onTransaction) }
   }, [editor])
+  // Sprint 161 (PR 2): `deck: 2` is written with the first block slide (the conversion at the first real edit), in the
+  // same change; an undo that brings this view's v1 slides back puts the deck's version back as it was.
+  const deckVersionRef = useRef(properties.deck)
+  deckVersionRef.current = properties.deck
+  const versionBefore = useRef<{ value: unknown } | null>(null)
   const handleChange = useCallback((markdown: string) => {
     const marked = textHandoutRef.current
     const doc = editorRef.current?.state.doc
+    const changes: Array<(properties: DocumentProperties) => DocumentProperties> = []
     const mark = handoutMarkFor({ marked, drawn: !doc || hasDrawnHeadings(doc), addedHere: markAdded.current, undo: lastWasHistory.current })
     if (mark === 'add') {
       // The first real edit of the handout: its headings are written, and the mark goes with them, in this one edit.
       // Nothing is drawn from now on, whatever runs before the view renders again.
       markAdded.current = true
       textHandoutRef.current = true
-      onChange(markdown, properties => ({ ...properties, [TEXT_HANDOUT_KEY]: TEXT_HANDOUT_VALUE }))
-      return
-    }
-    if (mark === 'remove') {
+      changes.push(properties => ({ ...properties, [TEXT_HANDOUT_KEY]: TEXT_HANDOUT_VALUE }))
+    } else if (mark === 'remove') {
       markAdded.current = false
       textHandoutRef.current = false
-      onChange(markdown, properties => {
+      changes.push(properties => {
         const next = { ...properties }
         delete next[TEXT_HANDOUT_KEY]
         return next
       })
-      return
     }
-    onChange(markdown)
+    const version = deckVersionRef.current
+    const hasBlocks = !!doc && slidesOf(doc).some(entry => isBlockSlide(entry.kind))
+    if (hasBlocks && !saysBlockDeck(version === undefined || version === null ? null : String(version))) {
+      if (!versionBefore.current) versionBefore.current = { value: version }
+      deckVersionRef.current = 2
+      changes.push(properties => ({ ...properties, deck: 2 }))
+    } else if (versionBefore.current && lastWasHistory.current && doc && !hasBlocks && needsConversion(doc)) {
+      const before = versionBefore.current.value
+      versionBefore.current = null
+      deckVersionRef.current = before
+      changes.push(properties => {
+        const next = { ...properties }
+        if (before === undefined) delete next.deck
+        else next.deck = before as DocumentProperties[string]
+        return next
+      })
+    }
+    if (changes.length === 0) onChange(markdown)
+    else onChange(markdown, properties => changes.reduce((current, change) => change(current), properties))
   }, [onChange])
+
 
   useEffect(() => {
     if (!editor) return
@@ -585,6 +611,42 @@ export function DeckView({
     if (container && tops[index] !== undefined) container.scrollTop = scrollTopFor(tops[index])
   }, [makeCurrent, partTops, scrollContainer])
 
+  // The conversion's line in the bar (PR 2; the Experience lead on #765): "Old notes are now comments in the handout."
+  // with Show, once per deck (this view keeps that it said it), and only when old notes or hidden words became comments.
+  const showConvertedComment = useCallback((note: string) => {
+    if (!editor || editor.isDestroyed) return
+    const pos = commentNodeAt(editor.state.doc, note)
+    if (pos === null) return
+    const index = partIndexAt(editor.state.doc, pos)
+    if (index !== null) pick(index)
+    // The comment opens latched in the margin, as a click on its marker opens it, scrolled into view.
+    requestAnimationFrame(() => {
+      const storage = commentBoxStorage(editor)
+      const now = commentNodeAt(editor.state.doc, note)
+      if (!storage || now === null) return
+      storage.openRequest = { key: `n:${now}`, as: 'latched' }
+      storage.notifyRail?.()
+    })
+  }, [editor, pick])
+  useEffect(() => {
+    if (!editor) return
+    let seen = conversionStateOf(editor.state).count
+    const onTransaction = () => {
+      const state = conversionStateOf(editor.state)
+      if (state.count === seen) return
+      seen = state.count
+      const said = conversionNoticeFor(state.last, deckViewState().deckConversionNoticed === true)
+      if (!said) return
+      keepDeckViewState({ deckConversionNoticed: true })
+      setNotice({
+        text: said.text,
+        action: { label: 'Show', tip: 'Show the first of them in the handout', run: () => showConvertedComment(said.firstComment) },
+      })
+    }
+    editor.on('transaction', onTransaction)
+    return () => { editor.off('transaction', onTransaction) }
+  }, [editor, showConvertedComment])
+
   // Present (Sprint 159): from the current slide or from the start, on the wall; Stop brings the deck back to the slide
   // the presenter ended on.
   const present = useCallback((from: PresentFrom) => {
@@ -673,9 +735,7 @@ export function DeckView({
     const onWheel = (event: WheelEvent) => {
       if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
       const target = event.target as Element | null
-      // The speaker notes scroll as text; and a stage taller than its room (a short window) still scrolls, outside the
-      // slide itself.
-      if (target?.closest?.('.deck-notes')) return
+      // A stage taller than its room (a short window) still scrolls, outside the slide itself.
       if (stage.scrollHeight > stage.clientHeight + 1 && !target?.closest?.('.deck-big')) return
       event.preventDefault()
       const step = wheelStep(gesture, wheelPixels(event, stage.clientHeight), event.timeStamp)
@@ -849,6 +909,26 @@ export function DeckView({
     })
   }, [addSheet, deskWidth, deskHeight, stageWidth, bigWidth, aboveLine, shown, slideShown, dividerLeft])
 
+  /**
+   * Settings' Label row for a slide drawn as blocks with a Steps block (PR 2): a v1 Exercise slide's `tag:` (converted
+   * with the deck's first edit), or a block slide's first Steps block's pill (`withStepsTag`).
+   */
+  const stepsTagSetting = (entry: DeckSlideEntry): { value: string; onChange: (tag: string) => void } | undefined => {
+    if (!editor) return undefined
+    if (entry.kind === 'exercise') return { value: exerciseTagOf(entry.data), onChange: tag => changeSlide(data => setPath(data, 'tag', tag)) }
+    const markdown = entry.data.markdown
+    if (!isBlockSlide(entry.kind) || markdown === undefined) return undefined
+    const tag = blockStepsTagOf(markdown)
+    if (tag === null) return undefined
+    return {
+      value: tag,
+      onChange: next => {
+        const fresh = slidesOf(editor.state.doc)[entry.index]
+        if (fresh?.data.markdown !== undefined) dispatch(updateSlideMarkdown(editor.state, entry.index, withStepsTag(fresh.data.markdown, next)))
+      },
+    }
+  }
+
   /** Settings' change, made to the slide as the document has it now. */
   const changeSlide = useCallback((change: (data: SlideData) => SlideData, kind?: string) => {
     if (!editor) return
@@ -875,6 +955,12 @@ export function DeckView({
     if (index < 0) return
     const entry = slidesOf(editor.state.doc)[index]
     const placed = entry.data.picture && entry.data.picture !== 'none'
+    // A slide drawn as blocks (Sprint 161, PR 2): the picture beside or behind it, or a picture block at the end of its
+    // words; a v1 slide's deck converts in the same step, so none of its words move.
+    if (drawsAsBlocks(entry.kind)) {
+      dispatch(pictureIntoSlide(editor.state, message.slideId, message.path))
+      return
+    }
     const kind = placed || entry.kind === 'picture' ? undefined : 'picture'
     dispatch(updateSlide(editor.state, index, kind ? { ...convertKind(entry.data, 'picture'), image: message.path } : { ...entry.data, image: message.path }, kind))
   }), [editor, dispatch])
@@ -1151,8 +1237,10 @@ export function DeckView({
             {slide ? (
               <SlideSettings
                 number={shown + 1}
-                kind={slide.kind}
-                data={slide.data}
+                // A slide drawn as blocks (a v1 slide too, PR 2) has no layout: its blocks are its layout (frame 26).
+                kind={drawsAsBlocks(slide.kind) ? '' : slide.kind}
+                data={drawsAsBlocks(slide.kind) ? { ...slide.data, ...blockDataOf(slide.kind, slide.data), skip: slide.data.skip } : slide.data}
+                stepsTag={stepsTagSetting(slide)}
                 about={(
                   <SlideAbout
                     data={slide.data}
@@ -1165,7 +1253,9 @@ export function DeckView({
                         actions={sourceActions}
                       />
                     ) : undefined}
-                    hidden={hiddenNote(slide.kind, slide.data)}
+                    hidden={drawsAsBlocks(slide.kind)
+                      ? (!isBlockSlide(slide.kind) && hiddenWords(slide.kind, slide.data).length > 0 ? 'Words its old layout hid become a comment in the handout when you first edit this deck.' : '')
+                      : hiddenNote(slide.kind, slide.data)}
                     table={slide.kind === 'table' ? { addRow: () => changeSlide(addRow), addColumn: () => changeSlide(addColumn) } : undefined}
                   />
                 )}
@@ -1183,7 +1273,9 @@ export function DeckView({
         <span className="deck-notice" role="status" aria-live="polite">
           {notice ? (
             <>
-              <span className="deck-notice-text">{notice.text}</span>
+              <Tooltip label={notice.text}>
+                <span className="deck-notice-text">{notice.text}</span>
+              </Tooltip>
               {notice.action ? (
                 <Tooltip label={notice.action.tip}>
                   <Button
@@ -1245,8 +1337,7 @@ export function DeckView({
                   assets={assets}
                   width={bigWidth}
                   onWriting={onWriting}
-                  notesOpen={notesOpen}
-                  onNotesOpen={setNotesOpen}
+                  commentCallouts={commentCallouts}
                   initialFocus={focusTitleOf?.index === slide.index ? 'title' : undefined}
                   selectOnFocus={focusTitleOf?.index === slide.index && focusTitleOf.select}
                   onFocusTaken={titleSelected}

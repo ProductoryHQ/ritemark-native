@@ -3,7 +3,7 @@
  * Present request. Pure, so the test reads the same messages the host builds and decodes.
  *
  * The wall is the room's screen. Its state carries only what the room may see: the slides shown, each with the words
- * and settings its layout draws. Never the speaker notes, never a skipped slide (unless the presenter typed its number
+ * and settings its layout draws. Never a comment, never a skipped slide (unless the presenter typed its number
  * and went there), never the `id`, `from`, `kept` or `skip` lines. `wallStateOf` builds it field by field, so nothing
  * new reaches the wall by accident.
  */
@@ -51,15 +51,13 @@ export interface WallState {
 
 /**
  * The host's state for the presenter view: the wall's, and what only the presenter sees. It is the one state that
- * carries the speaker notes, and only the presenter view's panel ever gets it.
+ * carries the current part's comments ("Your comments", Sprint 161), and only the presenter view's panel ever gets it.
  */
 export interface PresenterState {
   type: 'present/presenter';
   /** The slide on the wall now, and the one Next shows (null at the end). */
   current: WallSlide;
   next: WallSlide | null;
-  /** The current slide's speaker notes ('' without any). */
-  notes: string;
   /** Sprint 161: the current slide's part's comments, in order ("Your comments"). Only the presenter view gets them. */
   comments: PartComment[];
   position: number | null;
@@ -211,7 +209,6 @@ export function presenterStateOf(
     type: 'present/presenter',
     current: onWall ? { ...onWall, number: view.current.index + 1 } : wallSlideOf(view.current),
     next: view.next ? wallSlideOf(view.next) : null,
-    notes: view.current.notes ?? '',
     comments: partComments(view.current.handout, view.current.converted),
     position: view.position,
     count: view.count,
@@ -283,7 +280,7 @@ export interface DeckPresentOptions {
   /** A second display is connected (or a dev build's windowed mode) and the shell can place the windows. */
   available: boolean;
   on: boolean;
-  /** The display the wall goes to, by its name ("Slides on <name>, notes here"), or null. */
+  /** The display the wall goes to, by its name ("Slides on <name>, your comments here"), or null. */
   wallDisplay: string | null;
 }
 
