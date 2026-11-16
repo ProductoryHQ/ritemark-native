@@ -324,6 +324,14 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
     () => blockCanvasMarkup(data, { step, width, pictureUrl: path => assets[path] ?? null }),
     [data, step, width, assets],
   )
+  // A picture that loads after the slide is drawn takes its height then: measure again from the top (Codex on #760).
+  useEffect(() => {
+    const pending = Array.from(slideRef.current?.querySelectorAll('img') ?? []).filter(image => !image.complete)
+    if (!pending.length) return
+    const again = () => setFonts(count => count + 1)
+    for (const image of pending) image.addEventListener('load', again, { once: true })
+    return () => { for (const image of pending) image.removeEventListener('load', again) }
+  }, [html])
   return (
     <div
       ref={slideRef}
