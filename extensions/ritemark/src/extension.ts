@@ -14,7 +14,7 @@ import { initConnectivity } from './ai/connectivity';
 import { initAiStatusItem } from './ai/aiStatusItem';
 import * as modelCatalog from './ai/modelCatalog';
 import { discoverAnthropic, discoverOpenAI, discoverGemini, discoverCodex } from './ai/modelCatalog/providerDiscovery';
-import { getSetupStatus } from './agent/setup';
+import { anthropicKeyChanged, getSetupStatus, registerAnthropicKeyReader } from './agent/setup';
 import { CodexManager } from './codex/codexManager';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { registerFeedback } from './feedback/feedbackSheet';
@@ -24,6 +24,7 @@ import { madeSomething } from './guidance/madeSomething';
 import { CommentTaskStore, commentTaskStoreDir } from './commentTasks/CommentTaskStore';
 import { CommentTaskController } from './commentTasks/CommentTaskController';
 import { registerTaskBoard, type TaskBoardHost } from './taskBoard/taskBoardHost';
+import { registerDecks, type DecksHost } from './decks/decksHost';
 import { registerProjects, type ProjectsHost } from './projects/projectsHost';
 import { registerProjectSearch } from './search/SearchHost';
 import { buildCommentTaskPrompt } from './commentTasks/commentTaskPrompt';
@@ -36,6 +37,7 @@ import { createFlowScheduler, FlowScheduler } from './flows/FlowScheduler';
 import { RitemarkSettingsProvider, isSettingsSection } from './settings/RitemarkSettingsProvider';
 import { setExtensionContext as setLLMExtensionContext } from './flows/nodes/LLMNodeExecutor';
 import { setImageNodeExtensionContext } from './flows/nodes/ImageNodeExecutor';
+import { setClaudeCodeNodeKeyReader } from './flows/nodes/ClaudeCodeNodeExecutor';
 import { registerFlowTestCommand } from './flows/FlowTestRunner';
 import { registerConfigureApiKeyCommand, registerCheckApiKeyCommand } from './commands/configureApiKey';
 import {
@@ -65,6 +67,7 @@ import { BrowserNavigationRecorder, DID_NAVIGATE_COMMAND } from './browser/brows
 import { BrowserPanelProvider } from './browser/BrowserPanelProvider';
 import { initDaemon } from './daemon/index';
 import { findReplacedTextTab, findStuckMarkdownTabs } from './utils/stickyTabHealer';
+import { applyFirstRunThemeSettings } from './firstRunThemeSettings';
 import { openControlCatalogueIfAsked } from './views/ControlCataloguePanel';
 import { registerWebviewSheetDemoIfAsked } from './webviewSheet/devSheetDemo';
 import { openPublishSheetHarnessIfAsked } from './publish/devSheetHarness';
@@ -95,6 +98,8 @@ export let googleDocs: GoogleDocsFeature | undefined;
 export let publish: PublishFeature | undefined;
 /** The task board (Sprint 130): the Ritemark editor asks it which documents are card pages. */
 export let taskBoard: TaskBoardHost | undefined;
+/** Decks (Sprint 157): the Ritemark editor asks it which documents open as decks. */
+export let decks: DecksHost | undefined;
 
 // Agent Library view provider
 let agentLibraryViewProvider: AgentLibraryViewProvider | null = null;
@@ -278,6 +283,15 @@ export function activate(context: vscode.ExtensionContext) {
   // RITEMARK_TEST_KEY_* variables move from this process's environment into providerKeys.ts, so no child (Claude
   // Code, Codex, git, MCP servers) inherits them; a key reaches an agent only through the BYOK env.
   snapshotTestKeys();
+  // Sprint 160 (#541): one reader of the saved Anthropic key, for Claude's readiness (every check; only true or false
+  // comes back from setup.ts) and for a Flow's Claude step, which runs on the key. A key saved or removed anywhere,
+  // another window included, drops the cached status, so the next check reads it again.
+  const readAnthropicKey = () => readProviderKey(context.secrets, 'anthropic-api-key');
+  registerAnthropicKeyReader(readAnthropicKey);
+  setClaudeCodeNodeKeyReader(readAnthropicKey);
+  context.subscriptions.push(context.secrets.onDidChange((event) => {
+    if (event.key === 'anthropic-api-key') anthropicKeyChanged();
+  }));
 
   // === Theme & branding: fresh install, version upgrade, or design-foundation migration ===
   const currentVersion = context.extension.packageJSON.version as string;
@@ -316,12 +330,15 @@ export function activate(context: vscode.ExtensionContext) {
   const lastDesignThemeMigration = context.globalState.get<string>('ritemark.designFoundationsThemeMigration');
   if (lastDesignThemeMigration !== designFoundationsThemeMigration) {
     setTimeout(async () => {
-      const wb = vscode.workspace.getConfiguration('workbench');
-      const win = vscode.workspace.getConfiguration('window');
-      await win.update('autoDetectColorScheme', true, vscode.ConfigurationTarget.Global);
-      await wb.update('iconTheme', 'ritemark-icons', vscode.ConfigurationTarget.Global);
-      await wb.update('preferredLightColorTheme', 'ritemark-light', vscode.ConfigurationTarget.Global);
-      await wb.update('preferredDarkColorTheme', 'ritemark-dark', vscode.ConfigurationTarget.Global);
+      // #461: on a new profile, only what the person hasn't set; a value already in settings.json before the first
+      // start (the person's, or an admin's) is kept. A profile a Ritemark 1 build before Sprint 52 set up (it stored
+      // themeAppliedVersion) holds that build's light theme with auto-detect off, which this migration replaces.
+      const setUpBefore = context.globalState.get<string>('ritemark.themeAppliedVersion') !== undefined;
+      const done = await applyFirstRunThemeSettings({
+        userValue: (section, key) => vscode.workspace.getConfiguration(section).inspect(key)?.globalValue,
+        write: (section, key, value) => vscode.workspace.getConfiguration(section).update(key, value, vscode.ConfigurationTarget.Global),
+      }, setUpBefore);
+      if (!done) return;
       context.globalState.update('ritemark.themeAppliedVersion', currentVersion);
       context.globalState.update('ritemark.designFoundationsThemeMigration', designFoundationsThemeMigration);
     }, 1500);
@@ -500,6 +517,10 @@ export function activate(context: vscode.ExtensionContext) {
     oneShotSettings: (runtimeId) => unifiedViewProvider.oneShotSettings(runtimeId),
   });
 
+  // ── Decks (Sprint 157, experience 46) ───────────────────────────────────────
+  // A `.deck.md` opens as a deck in the Ritemark editor while the flag `decks` is on.
+  decks = registerDecks(context, { newFileFolder: getNewDocumentFolder, noteNewFile: filePath => madeSomething.noteDraft(filePath) });
+
   // ── Search, the words layer (Sprint 148, #591) ─────────────────────────────
   // The index of this window's project, in its own worker thread, and its results
   // view in Documents. It starts on the box's first words, or 5 s after activation
@@ -534,6 +555,8 @@ export function activate(context: vscode.ExtensionContext) {
     () => isEnabled('web-page-publishing'),
     (message) => console.log(message),
   );
+  // Sprint 159 PR 4: Publish on a deck's bar is this Publish, on the page written beside the deck.
+  decks.publisher.connect(publish);
 
   // Model catalog (Sprint 89, GH #109): resolve model lists via live provider probes
   // → remote catalog (ritemark-public) → on-disk cache → bundled baseline. The live
@@ -1131,7 +1154,7 @@ export function activate(context: vscode.ExtensionContext) {
   }
   // Sprint 149 (PR 3): the Publish sheet's dev harness, only in a development build started with its setting
   try {
-    openPublishSheetHarnessIfAsked(context);
+    openPublishSheetHarnessIfAsked(context, process.env, (pagePath) => decks?.publisher.pageRows(pagePath) ?? Promise.resolve(undefined));
   } catch (error) {
     console.warn('Ritemark: the Publish sheet harness did not open', error);
   }

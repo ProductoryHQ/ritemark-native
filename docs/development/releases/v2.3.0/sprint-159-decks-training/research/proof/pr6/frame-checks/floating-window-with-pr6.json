@@ -1,0 +1,35 @@
+{
+ "inner": [
+  1024,
+  768
+ ],
+ "title": "Brief.md — Harbour leadership programme",
+ "titlebar": "flex 44",
+ "tabsRow": [
+  8,
+  44,
+  1008,
+  44
+ ],
+ "group": [
+  0,
+  44,
+  1024,
+  692
+ ],
+ "groupPadding": "box-sizing: border-box; padding-left: 8px; padding-right: 8px; padding-top: 0px;",
+ "desk": [
+  8,
+  88,
+  1008,
+  648
+ ],
+ "deskRadius": "10px",
+ "part": [
+  0,
+  44,
+  1024,
+  692
+ ],
+ "presenting": false
+}

@@ -27,6 +27,7 @@ import { locatePage } from '../browser/localPage';
 import { isEnabled } from '../features';
 import { gatherPage } from './gather';
 import { showPublishSheet } from './PublishSheetPanel';
+import type { SheetOptions } from './sheetModel';
 
 export const HARNESS_SETTING = 'RITEMARK_PUBLISH_SHEET_HARNESS';
 export const HARNESS_FIRST_SETTING = 'RITEMARK_PUBLISH_SHEET_HARNESS_FIRST';
@@ -53,6 +54,8 @@ export function harnessPages(env: Record<string, string | undefined>, delimiter:
 export function openPublishSheetHarnessIfAsked(
   context: vscode.ExtensionContext,
   env: Record<string, string | undefined> = process.env,
+  /** Sprint 159 PR 4: a deck's page shows its What goes and What stays rows here too. */
+  pageRows: (pagePath: string) => Promise<SheetOptions['deck'] | undefined> = async () => undefined,
 ): void {
   const pages = harnessPages(env);
   if (pages.length === 0 || !isEnabled('web-page-publishing')) return;
@@ -74,6 +77,7 @@ export function openPublishSheetHarnessIfAsked(
           const title = path.basename(location.realPath).replace(/\.html?$/i, '');
           const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'page';
           const destination = { name: 'Your Cloudflare', detail: 'Test account (preview: nothing is sent)' };
+          const deck = await pageRows(location.realPath).catch(() => undefined);
           let presses = 0;
           const answer = env[HARNESS_FIRST_SETTING] === '1'
             ? await showPublishSheet(context, null, {
@@ -85,6 +89,7 @@ export function openPublishSheetHarnessIfAsked(
                       destination,
                       address: { page: `${slug}-7f3a2c`, suffix: '.pages-4821.workers.dev', editable: true },
                       nameRow: { suggestion: 'pages-4821' },
+                      ...(deck ? { deck } : {}),
                     },
                   }),
                 },
@@ -92,7 +97,7 @@ export function openPublishSheetHarnessIfAsked(
                   ? { kind: 'refuse', reason: 'nameTaken' }
                   : { kind: 'close' }),
               })
-            : await showPublishSheet(context, plan, { destination, address: { page: `${slug}-7f3a2c`, suffix: '.pages-4821.workers.dev' } });
+            : await showPublishSheet(context, plan, { destination, address: { page: `${slug}-7f3a2c`, suffix: '.pages-4821.workers.dev' }, ...(deck ? { deck } : {}) });
           console.log(
             `[publish-harness] ${path.basename(page)}: ${plan.files.length} file(s), ${plan.leftOut.length} left out, ` +
               `${plan.keyHits.length} key-shaped place(s); answered ${answer.kind}; nothing sent`,

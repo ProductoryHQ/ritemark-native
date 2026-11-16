@@ -152,11 +152,25 @@ test('task board guidance appears exactly when a runtime has the board tools', (
     const withBoard = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: true }));
     const withoutBoard = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false }));
     assert.ok(withBoard.includes('TASK BOARD'), `${runtime} with the board gets the section`);
+    assert.ok(withBoard.includes("A card's id is for the tools only"), `${runtime} is told to keep card ids out of replies (#709)`);
     assert.ok(!withoutBoard.includes('TASK BOARD'), `${runtime} without a board omits it`);
     // What the agent must do on a card: the tools, report_result with things to
     // check, decisions before long work, and never finishing or editing files.
     for (const needle of ['ritemark_board', 'report_result', 'up to three', 'ask_user', 'Before long work', 'Done when', 'Only the user marks a card done', '.ritemark/tasks/']) {
       assert.ok(withBoard.includes(needle), `${runtime}: ${needle}`);
+    }
+  }
+});
+
+// ── Sprint 157: the DECKS section follows the deck tools ─────────────────────
+test('deck guidance appears exactly when a runtime has the deck tools', () => {
+  for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
+    const withDecks = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true }));
+    const withoutDecks = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false }));
+    assert.ok(withDecks.includes('DECKS'), `${runtime} with decks gets the section`);
+    assert.ok(!withoutDecks.includes('DECKS'), `${runtime} without decks omits it`);
+    for (const needle of ['ritemark_decks', 'insert_slides', 'from:', 'Never change anything in `Slide library/` unless the user asks', 'update_library_slide', '```slide <kind>', 'speaker notes', 'made from the deck when it is published: to change the page, change the deck']) {
+      assert.ok(withDecks.includes(needle), `${runtime}: ${needle}`);
     }
   }
 });

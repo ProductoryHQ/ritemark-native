@@ -528,6 +528,12 @@ export class CodexRuntime implements AgentRuntime {
   private _appServer: CodexAppServer | null = null;
   private _auth: CodexAuth | null = null;
   private _loginInProgress = false;
+  /**
+   * Sprint 160 (#696): the ChatGPT login running now, on the app-server that started it. A second `beginLogin` (the
+   * welcome, Home, the AI's sheet, its "Open the page again") gets its page instead of starting another login. It ends
+   * with the login: Codex's answer, a stop, the 2-minute give-up, a sign-out, or that app-server going.
+   */
+  private _pendingLogin: { appServer: CodexAppServer; page: Promise<string>; url: string | null } | null = null;
   private _loginPoll: ReturnType<typeof setInterval> | null = null;
   /** Sprint 156 (#694): who hears the sign-in's polls until it stops, whoever (re)starts the poll (`listenToLoginPoll`). */
   private readonly _loginPollListeners = new Set<{ onStatus(status: CodexSidebarStatus): void; onEnd?(end: LoginPollEnd): void }>();
@@ -602,9 +608,18 @@ export class CodexRuntime implements AgentRuntime {
     return this._sessions.get(conversationId)?.getToolSetForThread() ?? '';
   }
 
-  setLoginInProgress(v: boolean): void { this._loginInProgress = v; }
+  setLoginInProgress(v: boolean): void {
+    if (v) this._loginInProgress = true;
+    else this._endLogin();
+  }
 
   isLoginInProgress(): boolean { return this._loginInProgress; }
+
+  /** Sprint 160 (#696): the sign-in has ended, or Ritemark stopped waiting for it; the next `beginLogin` starts anew. */
+  private _endLogin(): void {
+    this._loginInProgress = false;
+    this._pendingLogin = null;
+  }
 
   /**
    * Stop the sign-in's poll; its listeners go with it, each told how it ended (Sprint 156: a failed login, or a stop
@@ -648,12 +663,12 @@ export class CodexRuntime implements AgentRuntime {
         const listeners = [...this._loginPollListeners];
         notify(status, listeners);
         if (status.state === 'ready') {
-          this._loginInProgress = false;
+          this._endLogin();
           this.stopLoginPolling('ready');
           return;
         }
         if (attempts >= CODEX_LOGIN_POLL_ATTEMPTS) {
-          this._loginInProgress = false;
+          this._endLogin();
           this._clearLoginPoll();
           this._loginPollListeners.clear();
           notify(await this.getCodexSidebarStatus(), listeners);
@@ -671,7 +686,7 @@ export class CodexRuntime implements AgentRuntime {
   stopLoginServer(): boolean {
     if (!this._appServer || this._sessionsByThread.size > 0) return false;
     this.stopLoginPolling();
-    this._loginInProgress = false;
+    this._endLogin();
     const appServer = this._appServer;
     this._appServer = null;
     this._auth = null;
@@ -699,16 +714,38 @@ export class CodexRuntime implements AgentRuntime {
     }
   }
 
+  /**
+   * Start ChatGPT's login and give its sign-in page. Sprint 160 (#696): while that login runs, every later caller
+   * joins it and gets the same page, so two surfaces (or two presses) never start two logins.
+   */
   async beginLogin(): Promise<string> {
     this._ensureAppServer();
-    const login = await this._auth!.startLogin();
-    return login.authUrl;
+    const appServer = this._appServer!;
+    const running = this._pendingLogin;
+    if (running && running.appServer === appServer) return running.page;
+    const login: { appServer: CodexAppServer; page: Promise<string>; url: string | null } = {
+      appServer,
+      page: this._auth!.startLogin().then((started) => started.authUrl),
+      url: null,
+    };
+    this._pendingLogin = login;
+    login.page.then(
+      (url) => { login.url = url; },
+      () => { if (this._pendingLogin === login) this._pendingLogin = null; },
+    );
+    return login.page;
+  }
+
+  /** Sprint 160 (#696): the running login's sign-in page, once Codex has given it ("Open the page again"); else null. */
+  signInPage(): string | null {
+    const login = this._pendingLogin;
+    return login && login.appServer === this._appServer ? login.url : null;
   }
 
   async logout(): Promise<void> {
     this._ensureAppServer();
     await this._auth!.logout();
-    this._loginInProgress = false;
+    this._endLogin();
     this.stopLoginPolling();
     this.resetSession();
   }
@@ -857,7 +894,7 @@ export class CodexRuntime implements AgentRuntime {
       emitCodexStatusInvalidated('status-refresh');
     });
     this._auth.on('loginComplete', (event: { success: boolean }) => {
-      this._loginInProgress = false;
+      this._endLogin();
       this.stopLoginPolling(event.success ? 'ready' : 'failed');
       emitCodexStatusInvalidated(event.success ? 'login-finished' : 'status-refresh');
     });

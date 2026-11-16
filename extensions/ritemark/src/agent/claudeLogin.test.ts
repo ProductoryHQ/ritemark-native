@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import {
   beginClaudeLogin,
   cancelClaudeLogin,
+  claudeLoginPage,
+  followClaudeLogin,
   isClaudeLoginActive,
 } from './claudeLogin';
 
@@ -16,7 +18,42 @@ async function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void
   }
 }
 
+/**
+ * Sprint 160 (#696): Claude's "signing in" has one writer, this shared sign-in owner. A poll, a re-check, a saved key
+ * or a sign-out elsewhere used to clear it while the sign-in still ran, and the AI's sheet offered Sign in again.
+ */
+function checkSigningInHasOneWriter(): void {
+  const src = join(__dirname, '..');
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) files.push(path);
+    }
+  };
+  walk(src);
+  const writers = files
+    .filter((file) => /\bsetClaudeLoginInProgress\(/.test(readFileSync(file, 'utf-8').replace(/export function setClaudeLoginInProgress\(/, '')))
+    .map((file) => relative(src, file).split('\\').join('/'));
+  assert.deepEqual(writers, ['agent/claudeLogin.ts'], `only claudeLogin.ts writes Claude's signing-in flag (found: ${writers.join(', ')})`);
+  assert.ok(!/\bsetClaudeLoginInProgress\b/.test(readFileSync(join(src, 'agent', 'index.ts'), 'utf-8')), 'agent/index.ts no longer exports it');
+  // The sheet's and Settings' polls call a sign-in finished only on a Claude.ai sign-in: with a key saved, Claude reads
+  // ready on the key from the first tick (#541), while the browser sign-in still runs.
+  for (const rel of ['views/UnifiedViewProvider.ts', 'settings/RitemarkSettingsProvider.ts']) {
+    const finished = readFileSync(join(src, rel), 'utf-8').split('\n')
+      .filter((line) => line.includes("status.state === 'ready'"))
+      .map((line) => line.trim());
+    assert.ok(
+      finished.includes("if (status.state === 'ready' && status.authMethod === 'claude-oauth') {") && !finished.includes("if (status.state === 'ready') {"),
+      `${rel}: the poll's finish test (found: ${finished.join(' | ')})`,
+    );
+  }
+}
+
 async function run(): Promise<void> {
+  checkSigningInHasOneWriter();
+
   if (process.platform === 'win32') {
     console.log('claudeLogin tests skipped: POSIX fake binary fixture');
     return;
@@ -63,6 +100,30 @@ async function run(): Promise<void> {
     assert.deepEqual(urls.ordinary, [], 'an ordinary joiner (Settings, the AI\'s sheet) gets nothing, as before: no second toast');
     assert.equal(cancelClaudeLogin(), true);
     assert.deepEqual([urls.first.length, urls.asks.length, urls.ordinary.length], [1, 1, 0], 'nobody hears it twice');
+
+    // Sprint 160 (#696): the AI's sheet follows a login another surface started, and never starts one itself
+    const heard: string[] = [];
+    const follower = {
+      onUrl: (url: string) => heard.push(`url:${url}`),
+      onComplete: () => heard.push('complete'),
+      onError: () => heard.push('error'),
+      onTimeout: () => heard.push('timeout'),
+      onCancel: () => heard.push('cancel'),
+    };
+    assert.equal(followClaudeLogin(follower), false, 'with no login running there is nothing to follow');
+    assert.equal(isClaudeLoginActive(), false, 'and following starts none');
+    assert.equal(claudeLoginPage(), null, 'and there is no page');
+    assert.equal(beginClaudeLogin(urlBinary, {}), 'started');
+    assert.equal(followClaudeLogin(follower), true, 'a running login is followed');
+    await waitFor(() => heard.length === 1);
+    assert.deepEqual(heard, [`url:${PAGE}`], 'the follower hears the page when the CLI prints it');
+    assert.equal(claudeLoginPage(), PAGE, 'and the page is kept for "Open the page again"');
+    const late: string[] = [];
+    assert.equal(followClaudeLogin({ onUrl: (url) => late.push(url) }), true);
+    assert.deepEqual(late, [PAGE], 'a follower that comes after the page gets it at once');
+    assert.equal(cancelClaudeLogin(), true);
+    assert.deepEqual(heard, [`url:${PAGE}`, 'cancel'], 'and hears how the login ended');
+    assert.equal(claudeLoginPage(), null, 'an ended login has no page');
   } finally {
     if (isClaudeLoginActive()) cancelClaudeLogin();
     rmSync(fixtureDir, { recursive: true, force: true });

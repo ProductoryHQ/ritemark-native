@@ -20,6 +20,7 @@ import {
   withSavedModel,
   lastReplyAtOf,
   decodeChangedFiles,
+  decodeLastFailure,
   hasUnreadReply,
   type ConversationCheckpointV1,
   type ConversationCreateInputV1,
@@ -169,6 +170,10 @@ function decodeIndex(value: unknown): ConversationIndexV1 {
       ...(() => {
         const changedFiles = decodeChangedFiles(entry.changedFiles);
         return changedFiles ? { changedFiles } : {};
+      })(),
+      ...(() => {
+        const lastFailure = decodeLastFailure(entry.lastFailure);
+        return lastFailure ? { lastFailure } : {};
       })(),
     };
   });

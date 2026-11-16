@@ -130,6 +130,36 @@ test('a task card page carries its card id, and nothing else', () => {
   assert.throws(() => update('k3f9x2'), DocumentProtocolError);
 });
 
+test('a deck says so with deckMode: true, and nothing else is accepted there (Sprint 157)', () => {
+  const update = (deckMode: unknown) => parseDocumentHostMessage({
+    type: 'document:update',
+    ...identity,
+    revision: 1,
+    baseDiskHash: sha,
+    modelHash: sha,
+    payloadHash: sha,
+    reason: 'open',
+    attempt: 1,
+    payload: {
+      fileType: 'markdown',
+      filename: 'Training.deck.md',
+      content: '```slide title\nid: ab12\n```',
+      properties: { deck: 1 },
+      hasProperties: true,
+      imageMappings: {},
+      features: { voiceDictation: false, markdownExport: true },
+      ...(deckMode === undefined ? {} : { deckMode }),
+    },
+  });
+  const deck = update(true);
+  assert.equal(deck.type === 'document:update' && deck.payload.fileType === 'markdown' && deck.payload.deckMode, true);
+  const document = update(undefined);
+  assert.equal(document.type === 'document:update' && document.payload.fileType === 'markdown' && document.payload.deckMode, undefined);
+  assert.throws(() => update(false), DocumentProtocolError);
+  assert.throws(() => update('yes'), DocumentProtocolError);
+  assert.throws(() => update({}), DocumentProtocolError);
+});
+
 test('accepts exact CSV edit, applied receipt, and resolution messages', () => {
   assert.equal(parseDocumentViewMessage({
     type: 'document:edit',

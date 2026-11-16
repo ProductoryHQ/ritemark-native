@@ -5,6 +5,8 @@ import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import { parseFrontmatterFromText, serializeFrontmatter, discoverCommands } from './agent/discovery';
 import type { CardPages } from './taskBoard/cardPages';
+import type { DeckPages } from './decks/deckPages';
+import { isDeckPath, ModeFixedPerView } from './decks/deckMode';
 import { cardTabWrite } from './taskBoard/cardFile';
 import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { exportToPDFV2 } from './export/v2/pdfHtmlExporter';
@@ -166,6 +168,22 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
   private readonly documentSync: DocumentSyncCoordinator;
 
+  /**
+   * Sprint 159 (PR 2): the `decks` flag each open panel opened with, recorded as it opens and kept while it lives. A
+   * deck keeps its mode until it is opened again, whatever the flag does meanwhile: the flag never turns a document
+   * view into a deck view, nor a deck view into a document. The file is read at every payload (`deckModeFor`), so a deck
+   * that another program rewrites to a later `deck:` version shows as a document, and as a deck again once it reads.
+   */
+  private readonly deckFlags = new ModeFixedPerView<vscode.Webview>();
+
+  private deckFlagOfView(webview: vscode.Webview): boolean {
+    return this.deckFlags.of(webview, () => isEnabled('decks'));
+  }
+
+  private deckModeOfView(document: vscode.TextDocument, webview: vscode.Webview): boolean {
+    return RitemarkEditorProvider.deckPages()?.deckModeFor(document, this.deckFlagOfView(webview)) ?? false;
+  }
+
   // Voice dictation controller
   // One per editor webview: each tab dictates into its own document (Sprint 129).
   private readonly dictationControllers = new Map<vscode.Webview, DictationController>();
@@ -272,6 +290,15 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     return ext.taskBoard?.cardPages ?? null;
   }
 
+  /**
+   * Sprint 157 (experience 46): a `.deck.md` opens here as a deck while the flag is on, a mode of this one editor,
+   * so saving, conflicts, the writer's-copy merge and undo stay a document's. Lazy, as for the card pages.
+   */
+  private static deckPages(): DeckPages | null {
+    const ext = require('./extension') as typeof import('./extension');
+    return ext.decks?.pages ?? null;
+  }
+
   constructor(private readonly context: vscode.ExtensionContext) {
     this.documentSync = new DocumentSyncCoordinator(context, {
       buildPayload: (document, webview) => this.buildSyncPayload(document, webview),
@@ -330,6 +357,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     // A task card shows as a page: the board's front matter never reaches the
     // view, and the view's strip reads the card from the board (Sprint 130).
     const cardMode = RitemarkEditorProvider.cardPages()?.cardModeFor(document) ?? null;
+    // Sprint 157: a deck's view draws the slides beside their handout; its front matter stays the document's.
+    const deckMode = !cardMode && this.deckModeOfView(document, webview);
     // Views compare host payloads against their own Markdown projection, which
     // never carries the persisted trailing newline or gray-matter's leading one.
     // Send the projection form, or the echo of an accepted edit is mistaken for
@@ -382,6 +411,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       systemLanguage: systemLanguage(process.env, vscode.env.language),
       ...agentFields,
       ...(cardMode ? { cardMode } : {}),
+      ...(deckMode ? { deckMode: true } : {}),
     };
   }
 
@@ -738,6 +768,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       localResourceRoots: resourceRoots.map(root => vscode.Uri.file(root))
     };
 
+    // Sprint 159 (PR 2): the panel's `decks` flag, as it opens, before its first payload asks
+    const deckFlag = this.deckFlagOfView(webviewPanel.webview);
     const syncBootstrap = this.documentSync.prepareView(document, webviewPanel);
     webviewPanel.webview.html = this.getHtml(webviewPanel.webview, scriptUri, syncBootstrap);
 
@@ -762,6 +794,16 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     const cardPage = cardPages && document.uri.scheme === 'file' && cardPages.isCardPath(document.uri.fsPath)
       ? cardPages.connect(document, webviewPanel.webview)
       : null;
+
+    // Sprint 157: a deck's panel, while it is open, so the Slide library and the AI's tools can insert into it.
+    // Sprint 159 (PR 2): only a `.deck.md`'s panel that opened with the flag on: the same flag every payload of this
+    // panel uses. With the flag off a `.deck.md` is an ordinary document: nothing may treat its panel as a deck view,
+    // even once the flag is turned on. The deck pages answer a connected panel while its file reads as a deck this build
+    // writes and isn't shown as a card (a card page's webview sends no `deck/` request).
+    const deckPages = RitemarkEditorProvider.deckPages();
+    const deckPage = deckPages && deckFlag && document.uri.scheme === 'file' && isDeckPath(document.uri.fsPath)
+      ? deckPages.connect(document, webviewPanel)
+      : undefined;
 
     // #477: a card page's tab shows its card's title and the task mark, as
     // drawn (the Experience lead, 2026-10-20), and follows an edit of the title.
@@ -869,6 +911,15 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         // identity itself; the webview can only name an action.
         if (typeof message.type === 'string' && message.type.startsWith('google-docs/')) {
           void this.handleGoogleDocsMessage(document, message);
+          return;
+        }
+
+        // Sprint 157: a deck view's requests, decoded and answered to this webview by the deck pages.
+        // Sprint 159 (PR 2): only from a panel that is a deck view; anything else's `deck/` message is dropped.
+        if (typeof message.type === 'string' && message.type.startsWith('deck/')) {
+          if (deckPage) {
+            void RitemarkEditorProvider.deckPages()?.handle(document, webview, message);
+          }
           return;
         }
 
@@ -1193,6 +1244,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       }
       imageWatcher.dispose();
       cardPage?.dispose();
+      deckPage?.dispose();
       cardTabWatcher?.dispose();
       this.documentSync.disposeView(document, webview);
       this.dictationControllers.get(webview)?.cleanup();

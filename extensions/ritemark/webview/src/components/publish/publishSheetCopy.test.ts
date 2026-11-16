@@ -23,6 +23,9 @@ import {
   whatGoesLine,
   WHO_CAN_SEE,
   NOTHING_ELSE,
+  SUBTITLE,
+  DECK_SUBTITLE,
+  subtitleFor,
 } from './publishSheetCopy'
 import type { FileKind } from '../../../../src/publish/types'
 
@@ -135,5 +138,13 @@ assert.ok(/event\.key === 'Enter' && event\.target === event\.currentTarget/.tes
 assert.ok(/\{fold && \(/.test(source), 'See the files only when there is something to see')
 assert.ok(source.includes("name=\"shield-warning\""), 'the key warning carries shield-warning')
 assert.ok(!/text-(?:destructive|warning|amber|red)|bg-(?:destructive|warning|amber|red)/.test(source), 'the warning is in ink: no amber, no red')
+
+// Sprint 159 PR 4 (the Experience lead): the line under the title. A deck's page says how people open it; every other
+// page keeps 2.2's line. The sheet draws it from whether its model carries a deck's rows.
+assert.equal(DECK_SUBTITLE, 'People open it in their browser, on a computer or a phone.')
+assert.equal(SUBTITLE, 'People see it in their browser as you see it on the desk.')
+assert.equal(subtitleFor(true), DECK_SUBTITLE)
+assert.equal(subtitleFor(false), SUBTITLE)
+assert.ok(source.includes('{subtitleFor(Boolean(model.deck))}'), 'the sheet asks subtitleFor with its deck rows')
 
 console.log('publishSheetCopy.test: passed')

@@ -127,8 +127,8 @@ const MENU_WIDTH = 280
 const t = (state: CatalogueState, render: () => ReactNode, more: Omit<CatalogueCell, 'state' | 'render'> = {}): CatalogueCell => ({ state, render, ...more })
 
 // ── Button ───────────────────────────────────────────────────────────────────
-type ButtonVariant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'toolbar' | 'link'
-const BUTTON_VARIANTS: ButtonVariant[] = ['default', 'destructive', 'outline', 'secondary', 'ghost', 'toolbar', 'link']
+type ButtonVariant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'toolbar' | 'link' | 'warning'
+const BUTTON_VARIANTS: ButtonVariant[] = ['default', 'destructive', 'outline', 'secondary', 'ghost', 'toolbar', 'link', 'warning']
 function buttonCells(variant: ButtonVariant): CatalogueCell[] {
   const icon = variant === 'link' ? null : <Icon name="chat-circle" size={14} tone="inherit" />
   const b = (props: { disabled?: boolean; label?: string; on?: boolean; narrow?: boolean } = {}) => (
@@ -150,7 +150,7 @@ function buttonCells(variant: ButtonVariant): CatalogueCell[] {
   if (variant === 'toolbar') cells.splice(6, 0, t('on', () => b({ on: true })))
   return cells
 }
-function sizeCells(size: 'default' | 'sm' | 'compact' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'): CatalogueCell[] {
+function sizeCells(size: 'default' | 'sm' | 'compact' | 'bar' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'): CatalogueCell[] {
   const iconOnly = size === 'icon' || size === 'icon-sm' || size === 'icon-lg'
   const b = () => (
     <Button data-target variant="outline" size={size} aria-label={iconOnly ? 'Ask Claude' : undefined}>
@@ -359,7 +359,7 @@ export const CATALOGUE: CatalogueRow[] = [
     covers: ['Button'],
     variants: [
       ...BUTTON_VARIANTS.map((variant) => ({ id: variant, label: variant, cells: buttonCells(variant) })),
-      ...(['default', 'sm', 'compact', 'lg', 'icon', 'icon-sm', 'icon-lg'] as const).map((size) => ({ id: `size-${size}`, label: `size ${size}`, cells: sizeCells(size) })),
+      ...(['default', 'sm', 'compact', 'bar', 'lg', 'icon', 'icon-sm', 'icon-lg'] as const).map((size) => ({ id: `size-${size}`, label: `size ${size}`, cells: sizeCells(size) })),
     ],
   },
   {
@@ -627,7 +627,7 @@ export const CATALOGUE: CatalogueRow[] = [
     id: 'alert',
     title: 'Alert',
     covers: ['Alert', 'AlertDescription'],
-    variants: (['default', 'destructive'] as const).map((variant) => ({
+    variants: (['default', 'destructive', 'warning'] as const).map((variant) => ({
       id: variant,
       label: variant,
       cells: [t('rest', () => <Alert variant={variant}><AlertDescription>The file could not be read.</AlertDescription></Alert>, { width: 300 })],

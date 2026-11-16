@@ -99,6 +99,8 @@ product doesn't carry, and the suite's three refusal cases had failed since then
 Sprint 154 (#650; the Experience lead's check of #649): the empty area also drops Editor Actions Position ▸, which can
 move or hide the desk's actions (RITEMARK_TAB_ROW_MENU_LEAVES_OUT, with its test). Its commands (Move Editor Actions to
 Tab Bar / to Title Bar, Hide and Show Editor Actions, layoutActions.ts) are f1 and stay in All commands.
+Sprint 159 (PR 6): a presentation's window (018's isRitemarkPresentingWindow, layoutService.ts) has no desk gap: its
+group's page lies edge to edge (editorGroupView.ts ritemarkDeskGap).
 diff --git a/src/vs/workbench/browser/parts/editor/editor.ts b/src/vs/workbench/browser/parts/editor/editor.ts
 index ac63294495c..8717025e650 100644
 --- a/src/vs/workbench/browser/parts/editor/editor.ts
@@ -141,10 +143,17 @@ index da9871eaee6..c77789297d7 100644
  		}
  	}
 diff --git a/src/vs/workbench/browser/parts/editor/editorGroupView.ts b/src/vs/workbench/browser/parts/editor/editorGroupView.ts
-index 57087fd2e20..f6b9b5e8fb6 100644
+index 57087fd2e20..82b5f311c2d 100644
 --- a/src/vs/workbench/browser/parts/editor/editorGroupView.ts
 +++ b/src/vs/workbench/browser/parts/editor/editorGroupView.ts
-@@ -18,7 +18,7 @@ import { ProgressBar } from '../../../../base/browser/ui/progressbar/progressbar
+@@ -12,13 +12,14 @@ import { SideBySideEditorInput } from '../../../common/editor/sideBySideEditorIn
+ import { Emitter, Event, Relay } from '../../../../base/common/event.js';
+ import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+ import { Dimension, trackFocus, addDisposableListener, EventType, EventHelper, findParentWithClass, isAncestor, IDomNodePagePosition, isMouseEvent, isActiveElement, getWindow, getActiveElement, $ } from '../../../../base/browser/dom.js';
++import { isRitemarkPresentingWindow } from '../../../services/layout/browser/layoutService.js';
+ import { ServiceCollection } from '../../../../platform/instantiation/common/serviceCollection.js';
+ import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
+ import { ProgressBar } from '../../../../base/browser/ui/progressbar/progressbar.js';
  import { IThemeService, Themable } from '../../../../platform/theme/common/themeService.js';
  import { editorBackground, contrastBorder } from '../../../../platform/theme/common/colorRegistry.js';
  import { EDITOR_GROUP_HEADER_TABS_BACKGROUND, EDITOR_GROUP_HEADER_NO_TABS_BACKGROUND, EDITOR_GROUP_EMPTY_BACKGROUND, EDITOR_GROUP_HEADER_BORDER } from '../../../common/theme.js';
@@ -153,7 +162,7 @@ index 57087fd2e20..f6b9b5e8fb6 100644
  import { EditorPanes } from './editorPanes.js';
  import { IEditorProgressService } from '../../../../platform/progress/common/progress.js';
  import { EditorProgressIndicator } from '../../../services/progress/browser/progressIndicator.js';
-@@ -60,6 +60,12 @@ import { IEditorResolverService } from '../../../services/editor/common/editorRe
+@@ -60,6 +61,12 @@ import { IEditorResolverService } from '../../../services/editor/common/editorRe
  import { IHostService } from '../../../services/host/browser/host.js';
  import { DiffEditorInput } from '../../../common/editor/diffEditorInput.js';
  import { FileSystemProviderCapabilities, IFileService } from '../../../../platform/files/common/files.js';
@@ -166,7 +175,7 @@ index 57087fd2e20..f6b9b5e8fb6 100644
  
  export class EditorGroupView extends Themable implements IEditorGroupView {
  
-@@ -205,7 +211,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -205,7 +212,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  			this.createContainerContextMenu();
  
  			// Watermark & shortcuts
@@ -175,7 +184,7 @@ index 57087fd2e20..f6b9b5e8fb6 100644
  
  			// Progress bar
  			this.progressBar = this._register(new ProgressBar(this.element, defaultProgressBarStyles));
-@@ -1147,6 +1153,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1147,6 +1154,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doStickEditor(candidate: EditorInput | undefined, sticky: boolean): void {
@@ -186,7 +195,7 @@ index 57087fd2e20..f6b9b5e8fb6 100644
  		if (candidate && this.model.isSticky(candidate) !== sticky) {
  			const oldIndexOfEditor = this.getIndexOfEditor(candidate);
  
-@@ -1199,17 +1209,20 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1199,17 +1210,20 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  		// Fire the event letting everyone know we are about to open an editor
  		this._onWillOpenEditor.fire({ editor, groupId: this.id });
  
@@ -211,7 +220,7 @@ index 57087fd2e20..f6b9b5e8fb6 100644
  			transient: !!options?.transient,
  			inactiveSelection: internalOptions?.inactiveSelection,
  			active: this.count === 0 || !options?.inactive,
-@@ -1425,6 +1438,11 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1425,6 +1439,11 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  			return true;
  		}
  
@@ -223,7 +232,7 @@ index 57087fd2e20..f6b9b5e8fb6 100644
  		// Move across groups
  		else {
  			return this.doMoveOrCopyEditorAcrossGroups(editor, target, options, { ...internalOptions, keepCopy: false });
-@@ -1432,11 +1450,19 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1432,11 +1451,19 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doMoveEditorInsideGroup(candidate: EditorInput, options?: IEditorOpenOptions): void {
@@ -244,7 +253,7 @@ index 57087fd2e20..f6b9b5e8fb6 100644
  		// Update model and make sure to continue to use the editor we get from
  		// the model. It is possible that the editor was already opened and we
  		// want to ensure that we use the existing instance in that case.
-@@ -1556,9 +1582,37 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1556,9 +1583,37 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	//#region closeEditor()
  
  	async closeEditor(editor: EditorInput | undefined = this.activeEditor || undefined, options?: ICloseEditorOptions): Promise<boolean> {
@@ -282,7 +291,7 @@ index 57087fd2e20..f6b9b5e8fb6 100644
  	private async doCloseEditorWithConfirmationHandling(editor: EditorInput | undefined = this.activeEditor || undefined, options?: ICloseEditorOptions, internalOptions?: IInternalEditorCloseOptions): Promise<boolean> {
  		if (!editor) {
  			return false;
-@@ -1921,6 +1975,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -1921,6 +1976,10 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doGetEditorsToClose(args: EditorInput[] | ICloseEditorsFilter): EditorInput[] {
@@ -293,7 +302,7 @@ index 57087fd2e20..f6b9b5e8fb6 100644
  		if (Array.isArray(args)) {
  			return args;
  		}
-@@ -2015,7 +2073,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -2015,7 +2074,7 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  	}
  
  	private doCloseAllEditors(options?: ICloseAllEditorsOptions): void {
@@ -302,7 +311,7 @@ index 57087fd2e20..f6b9b5e8fb6 100644
  		if (options?.excludeConfirming) {
  			editors = editors.filter(editor => !this.shouldConfirmClose(editor));
  		}
-@@ -2233,6 +2291,22 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -2233,6 +2292,22 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  		this.lastLayout = { width, height, top, left };
  		this.element.classList.toggle('max-height-478px', height <= 478);
  
@@ -325,12 +334,17 @@ index 57087fd2e20..f6b9b5e8fb6 100644
  		const contentWidth = Math.max(0, width - this._contentRightInset);
  
  		// Keep tabs full-width while the header and editor pane follow the content inset.
-@@ -2265,6 +2339,27 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
+@@ -2265,6 +2340,32 @@ export class EditorGroupView extends Themable implements IEditorGroupView {
  		this.relayout();
  	}
  
 +	/** Ritemark 2.0: the desk's gaps, and which of the editor area's edges it touches (no neighbour there). */
 +	private ritemarkDeskGap(width: number, left: number): { left: number; right: number; top: number; edges: { left: boolean; right: boolean; top: boolean } } {
++		// Sprint 159: a presentation's window (018, layoutService.ts) is its page edge to edge, with no gap
++		if (isRitemarkPresentingWindow(getWindow(this.element))) {
++			return { left: 0, right: 0, top: 0, edges: { left: false, right: false, top: false } };
++		}
++
 +		let neighbours: { left: boolean; right: boolean; up: boolean };
 +		try {
 +			const find = (direction: GroupDirection) => !!this.groupsView.findGroup?.({ direction }, this);

@@ -32,6 +32,9 @@ const buttonVariants = cva(
           "hover:bg-surface-soft " +
           "data-[state=active]:bg-surface-soft data-[state=active]:text-ink-strong data-[state=active]:font-medium", // a toggle that is on: the ground's fill and ink (kit: .docbar .icon.on)
         link: "text-primary underline-offset-4 hover:underline",
+        // Sprint 158 (experience 47, frame 3): the action on a warning bar (`Alert variant="warning"`), in the bar's own tone
+        warning:
+          "border border-[var(--r-warning-action-line)] bg-[var(--r-warning-action)] text-[var(--r-warning-ink)] font-semibold hover:bg-[var(--r-warning-surface)] hover:text-[var(--r-warning-ink)]",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
@@ -39,6 +42,9 @@ const buttonVariants = cva(
         // Sprint 156 (#694): 28 px, the height of a split button's parts, for a card's small actions beside one (Home's
         // sign-in Cancel and "Open the page again", the feedback card's Send, Open in e-mail and Not now), 13 px words
         compact: "h-7 rounded-md gap-1.5 px-2.5 text-[13px] has-[>svg]:px-2",
+        // Sprint 159 (the Experience lead, frame 2): 30 px, a bar's controls beside a segmented control (also 30 px):
+        // the deck's bar, Card | Borderless, Publish or its chip, Present. A split button takes it too (`size="bar"`).
+        bar: "h-[30px] rounded-md gap-1.5 px-3 text-[13px] has-[>svg]:px-2.5",
         // `lg` matches the canonical Ritemark Settings/CTA pattern: rounded-lg
         // (8px) corners, larger 18px / 10px padding for touch comfort. Use this
         // size for prominent actions like Save / Sign Out / Refresh Status.

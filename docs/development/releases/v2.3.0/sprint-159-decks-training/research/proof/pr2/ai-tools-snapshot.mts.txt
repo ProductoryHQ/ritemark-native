@@ -1,0 +1,52 @@
+/**
+ * What the AI gets with the decks flag off: for each runtime and each browser/board combination, the tool groups,
+ * the Codex dynamic tools' names, their toolSetKey and the capability instructions. Run from extensions/ritemark with
+ * `npx tsx <this file> <extension src dir>`; prints one JSON document, compared between main and the branch.
+ * On a branch with Decks, the decks host is set as decksHost.ts sets it with the flag off (it returns null).
+ */
+import { createHash } from 'node:crypto';
+import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import Module from 'node:module';
+
+// BrowserActionTools imports vscode; nothing here reaches the workbench (as ritemarkTools.test.ts does)
+const moduleAny = Module as unknown as { _load: (request: string, parent: unknown, isMain?: boolean) => unknown };
+const originalLoad = moduleAny._load.bind(Module);
+moduleAny._load = (request: string, parent: unknown, isMain?: boolean) => request === 'vscode' ? { commands: { executeCommand: async () => undefined } } : originalLoad(request, parent, isMain);
+
+const src = path.resolve(process.argv[2]);
+const tools = await import(pathToFileURL(path.join(src, 'runtime', 'ritemarkTools.ts')).href);
+const capability = await import(pathToFileURL(path.join(src, 'ai', 'capabilityContext.ts')).href);
+
+const flagOn = false;
+if (typeof tools.setDeckToolHost === 'function') {
+  tools.setDeckToolHost(() => (flagOn ? { library: () => null } : null));
+}
+const deck = typeof tools.deckToolsAvailable === 'function' ? tools.deckToolsAvailable() : false;
+const hash = (text: string) => createHash('sha256').update(text).digest('hex').slice(0, 16);
+
+const out: Record<string, unknown> = { deckToolsAvailable: deck };
+for (const board of [false, true]) {
+  tools.setBoardToolController(() => (board ? {} : null));
+  for (const browser of [false, true]) {
+    const groups = tools.toolGroupsFor({ browser });
+    const dynamic = groups.length ? tools.codexDynamicTools(groups) : undefined;
+    out[`browser=${browser} board=${board}`] = {
+      groups: groups.map((group: { id: string }) => group.id),
+      codexTools: (dynamic ?? []).map((tool: { name: string }) => tool.name).join(' '),
+      mcpTools: hash(JSON.stringify(groups.flatMap((group: { tools: unknown[] }) => group.tools.map((tool: unknown) => tools.mcpToolDefinition(tool))))),
+      toolSetKey: tools.toolSetKey(dynamic),
+    };
+  }
+}
+const instructions: Record<string, string> = {};
+for (const runtime of ['claude-code', 'codex', 'opencode']) {
+  for (const browser of [false, true]) {
+    for (const board of [false, true]) {
+      const text = capability.renderCapabilityContext(capability.capabilityDescriptorFor(runtime, { browser, board, deck }));
+      instructions[`${runtime} browser=${browser} board=${board}`] = `${hash(text)} (${text.length} chars, DECKS ${text.includes('DECKS') ? 'present' : 'absent'})`;
+    }
+  }
+}
+out.instructions = instructions;
+console.log(JSON.stringify(out, null, 2));

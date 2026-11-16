@@ -14,6 +14,7 @@ import { PDFViewer } from './components/viewers/PDFViewer'
 import { DocumentHeader, PropertiesModal, ExportMenu, SyncActionButton } from './components/header'
 import { VoiceDictationButton } from './components/VoiceDictationButton'
 import { CardHead, CardStrip } from './components/tasks/CardPage'
+import { DeckView } from './components/decks/DeckView'
 import { AboutProjectNote } from './components/AboutProjectNote'
 import { startBoard, useBoardSnapshot } from './components/tasks/boardClient'
 import { CommentsMenuButton } from './components/header/CommentsMenuButton'
@@ -78,6 +79,7 @@ function App() {
   const [filename, setFilename] = useState<string>('')
   const [encoding, setEncoding] = useState<string | undefined>()
   const [sizeBytes, setSizeBytes] = useState<number | undefined>()
+  const [xlsxLoad, setXlsxLoad] = useState<{ id: number; pendingEdits: unknown[]; editable: boolean }>({ id: 0, pendingEdits: [], editable: true })
   const [workerSrc, setWorkerSrc] = useState<string | undefined>()
   const [workerSource, setWorkerSource] = useState<string | undefined>()
   const [properties, setProperties] = useState<DocumentProperties>({})
@@ -110,6 +112,8 @@ function App() {
   // Task card page (Sprint 130, design.md §5): the card's strip and head come
   // from the board, the body is this document.
   const [cardMode, setCardMode] = useState<{ cardId: string } | null>(null)
+  // Sprint 157: a `.deck.md` shown as a deck (the host decides: the flag, the name, the deck version).
+  const [deckMode, setDeckMode] = useState(false)
   const boardSnapshot = useBoardSnapshot()
   const cardPageOn = cardMode !== null
   useEffect(() => {
@@ -208,6 +212,7 @@ function App() {
       })
       const nextCard = payload.cardMode ?? null
       setCardMode((current) => (nextCard && current?.cardId === nextCard.cardId ? current : nextCard))
+      setDeckMode(payload.deckMode === true)
       if (payload.isAgentMode) {
         setIsAgentMode(true)
         setAgentFrontmatter((payload.agentFrontmatter as AgentFrontmatter) || {})
@@ -299,6 +304,15 @@ function App() {
           return
         case 'load':
           setContent(message.content as string)
+          // Sprint 158 (#711): a workbook's load is numbered and carries the edits the host holds unsaved
+          if (message.fileType === 'xlsx') {
+            setXlsxLoad({
+              id: typeof message.loadId === 'number' ? message.loadId : 0,
+              pendingEdits: Array.isArray(message.pendingEdits) ? (message.pendingEdits as unknown[]) : [],
+              // an older host sends no `editable`: it takes edits, as before the flag
+              editable: message.editable !== false,
+            })
+          }
           setFileType((message.fileType as FileType) || 'markdown')
           setFilename((message.filename as string) || '')
           setEncoding(message.encoding as string | undefined)
@@ -314,6 +328,7 @@ function App() {
             saveAsMarkdownFromPreview: false
           })
           setCardMode((message.cardMode as { cardId: string } | undefined) ?? null)
+          setDeckMode(message.deckMode === true)
           if (message.isAgentMode) {
             setIsAgentMode(true)
             setAgentFrontmatter((message.agentFrontmatter as AgentFrontmatter) || {})
@@ -540,14 +555,6 @@ function App() {
       sendToExtension('contentChanged', { content: newContent })
     }
   }, [sendDocumentEdit])
-
-  // Handle Excel content changes — newContent is the serialized workbook
-  // as base64. Updating local content keeps the viewer's parsed workbook in
-  // sync and makes a later revert (different base64 string) re-render.
-  const handleExcelChange = useCallback((newContent: string) => {
-    setContent(newContent)
-    sendToExtension('contentChanged', { content: newContent })
-  }, [])
 
   const handleDocumentApplied = useCallback((target: DocumentApplyTarget) => {
     if (!documentSync) return
@@ -819,7 +826,8 @@ function App() {
   // Route to SpreadsheetViewer for CSV/Excel files
   if (fileType === 'csv' || fileType === 'xlsx') {
     // .xlsx is editable; legacy .xls stays read-only (saving would re-encode it as xlsx)
-    const isXlsxEditable = fileType === 'xlsx' && filename.toLowerCase().endsWith('.xlsx')
+    // the host says whether it takes edits (the `excel-editing` kill switch); it refuses them anyway when it doesn't
+    const isXlsxEditable = fileType === 'xlsx' && filename.toLowerCase().endsWith('.xlsx') && xlsxLoad.editable
     return (
       <>
         <SpreadsheetViewer
@@ -828,7 +836,9 @@ function App() {
           fileType={fileType}
           encoding={encoding}
           sizeBytes={sizeBytes}
-          onChange={fileType === 'csv' ? handleCSVChange : (isXlsxEditable ? handleExcelChange : undefined)}
+          onChange={fileType === 'csv' ? handleCSVChange : undefined}
+          xlsxEditable={isXlsxEditable}
+          xlsxLoad={fileType === 'xlsx' ? xlsxLoad : undefined}
           syncEnabled={fileType === 'csv' && !!documentSync}
           syncAction={fileType === 'csv' ? syncAction : undefined}
           syncTarget={fileType === 'csv' ? syncTarget : undefined}
@@ -845,6 +855,51 @@ function App() {
         />
         {paragraphDialog}
       </>
+    )
+  }
+
+  // Sprint 157: a deck, as a mode of this one Markdown editor: the same content, edits, sync target and dialogs.
+  // Kept after the CSV block, away from the spreadsheet routes.
+  if (deckMode && fileType === 'markdown') {
+    return (
+      <DeckView
+        content={content}
+        onChange={handleContentChange}
+        onEditorReady={handleEditorReady}
+        onSelectionChange={handleSelectionChange}
+        imageMappings={imageMappings}
+        commentCallouts={features.commentCallouts}
+        syncTarget={syncTarget}
+        onExternalApplied={handleDocumentApplied}
+        syncAction={syncAction}
+        syncState={documentViewSync.state}
+        properties={properties}
+        onPropertiesChange={handlePropertiesChange}
+        findBar={showFindBar && editorRef.current ? (
+          <FindBar
+            editor={editorRef.current}
+            request={findRequest}
+            onClose={() => {
+              setShowFindBar(false)
+              setFindRequest(null)
+            }}
+          />
+        ) : null}
+        dialogs={
+          <>
+            <DocumentConflictDialog
+              isOpen={showConflictDialog && !!documentViewSync.conflict}
+              filename={documentViewSync.conflict?.filename || filename}
+              reason={documentViewSync.conflict?.reason}
+              onClose={() => setShowConflictDialog(false)}
+              onCompare={() => sendConflictAction('compare')}
+              onKeepLocal={() => sendConflictAction('keep-local')}
+              onUseDisk={() => sendConflictAction('use-disk')}
+            />
+            {paragraphDialog}
+          </>
+        }
+      />
     )
   }
 

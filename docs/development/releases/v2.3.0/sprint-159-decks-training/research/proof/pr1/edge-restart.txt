@@ -1,0 +1,20 @@
+# The edge of technical plan §3, in a dev window of PR 2's branch (the Decks extension, the Slide library's setting in
+# the manifest, this PR merged in): the flag on, the Slide library open, Reload Window, and the flag written off the
+# moment the page unloaded (flag-at-unload.mjs), so the closing window stored the Slide library as its place and the
+# new one read the flag off from its start. sample-left.mjs then followed the left column every 50 ms
+# (* = the checked place; head = the head's words; views = the views showing). Scripts: edge-run.sh.txt and the
+# .mjs.txt files beside it. The extension host was held at its inspector during these starts (the launch carried
+# --inspect-brk-extensions for the first-frame check); the left column's restore is the shell's alone and does not
+# wait for it.
+
+## Before the layout.ts statement (edge-before-fix-first.png)
++2.19 s {"row":["Home","Documents","Tasks","Browser","Agents","Transcribe","*Slide library","More"],"head":["PR","project"],"views":0}
++2.43 s {"row":["Home","*Documents","Tasks","Browser","Agents","Transcribe","More"],"head":["PR","project","project"],"views":1}
+The hidden Slide library drew checked, in More's slot, with an empty column, then Documents came at +0.24 s.
+
+## With it (edge-fixed-first.png)
++2.23 s {"row":["Home","*Documents","Tasks","Browser","Agents","Transcribe","More"],"head":["PR","project","project"],"views":1}
+Documents checked from the first sample; nothing moves after it.
+
+## With the flag still on at the restart
+The Slide library is restored, checked, as before this PR.

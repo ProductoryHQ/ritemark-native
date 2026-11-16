@@ -1,0 +1,47 @@
+# round2-check.sh.txt on this branch after round two's fixes: a deck opened with the flag on answers its own requests after the flag is turned off, and refuses the Slide library's then (deck/library-failed); a deck: 2 rewrite shows as a document, unserved and not rewritten; back at deck: 1 a deck.
+
+== flag on, opened as a deck: its own request, then the library's
+{
+ "deckView": true,
+ "codeBlocks": 1,
+ "answers": [
+  "deck/assets"
+ ]
+}
+{
+ "deckView": true,
+ "codeBlocks": 1,
+ "answers": [
+  "deck/library-topics"
+ ]
+}
+== the flag turned off, the same deck view: its own request, then the library's
+{
+ "deckView": true,
+ "codeBlocks": 1,
+ "answers": [
+  "deck/assets"
+ ]
+}
+{
+ "deckView": true,
+ "codeBlocks": 1,
+ "answers": [
+  "deck/library-failed"
+ ]
+}
+== flag on, the file rewritten to deck: 2 by another program:
+{
+ "deckView": false,
+ "codeBlocks": 5,
+ "answers": []
+}
+   the file's head: --- deck: 2 theme: Slide library/Themes/Evening.theme.md 
+== and back to deck: 1:
+{
+ "deckView": true,
+ "codeBlocks": 1,
+ "answers": [
+  "deck/assets"
+ ]
+}

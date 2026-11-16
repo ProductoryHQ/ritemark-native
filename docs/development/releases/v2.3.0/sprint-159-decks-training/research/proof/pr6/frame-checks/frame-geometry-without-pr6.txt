@@ -1,0 +1,39 @@
+PASS  R1 the main window has no title row
+PASS  R1 the left strip is 44 high
+PASS  R1 the left toggle sits on the line (26)
+PASS  R1 the AI toggle sits on the line (26)
+PASS  R11 You sits on the line (26)
+PASS  R11 You is a 28 circle
+PASS  R11 You ends 8 from the window's right edge (the Mac)
+PASS  R7 tab 1 is 36 high from 8
+SKIP  R1 tab 1's label sits on the line (26): measured undefined, expected 26
+PASS  R7 tab 2 is 36 high from 8
+SKIP  R1 tab 2's label sits on the line (26): measured undefined, expected 26
+PASS  R7 tab 3 is 36 high from 8
+PASS  R1 tab 3's label sits on the line (26)
+PASS  R7 tab 3 is at most 200 wide (as wide as its name)
+PASS  R7 the + sits on the line (26)
+PASS  R1 the desk starts at 44
+PASS  R1 the desk ends 8 above the status bar
+PASS  R1 the status bar is 24
+PASS  R1 the AI's sheet starts 8 from the desk
+PASS  R1 the AI's sheet starts at 44
+PASS  R1 the AI's sheet ends 8 above the status bar
+PASS  R5 the places are 32 high
+PASS  R5 the places row sits at 48 (centre 64)
+PASS  R5 the first place's fill starts 8 into the column (its icon on the text edge, 16)
+PASS  R5 places sit 34 apart (kit: ritemark.js, Ritemark.more)
+PASS  R7 the tabs start 16 into the desk (kit: .tabs at 272)
+PASS  R11 You sits 8 after the AI toggle (kit: 1368 and 1404)
+PASS  R10 New at 136
+PASS  R10 Search at 168
+PASS  R10 Documents at 214
+PASS  R10 the tree from 236
+PASS  R10 the project's name centred at 110 (92 + 36 / 2)
+PASS  R10 the head's box spans the column, 8 to 248
+PASS  R1 tree row 1 is 32 high
+PASS  R1 tree row 2 is 32 high
+PASS  R1 tree row 3 is 32 high
+
+B: 34 pass, 0 fail, 2 skipped (window 1440x900, zoom 1)
+written <scratch>/frame2B/geometry.json

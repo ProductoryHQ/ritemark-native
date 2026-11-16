@@ -22,7 +22,7 @@ import type { RuntimeAvailability } from '../runtime/availability';
 import type { AgentId } from '../agent/types';
 import type { CodexSidebarStatus } from '../codex/CodexRuntime';
 import { beginClaudeLogin, cancelClaudeLogin } from '../agent/claudeLogin';
-import { getAgentEnvironmentStatus, getSetupStatus, setAnthropicKeyAvailable } from '../agent/setup';
+import { getAgentEnvironmentStatus, getSetupStatus } from '../agent/setup';
 import { emitClaudeStatusInvalidated, onClaudeStatusInvalidated } from '../agent/claudeStatusEvents';
 import { onCodexStatusInvalidated } from '../codex';
 import { waitForCodexSignIn, type CodexSignInWait, type LoginPollEnd } from '../codex/codexStatusEvents';
@@ -872,7 +872,6 @@ class WelcomeController implements vscode.Disposable {
     for (const [name, value] of entries) {
       await this.context.secrets.store(name, value);
       if (name === 'anthropic-api-key') {
-        setAnthropicKeyAvailable(true);
         emitClaudeStatusInvalidated('settings-updated');
       }
     }

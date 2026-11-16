@@ -82,8 +82,19 @@ const ControlCatalogue = lazy(() =>
   import('./components/catalogue/ControlCatalogue').then((m) => ({ default: m.ControlCatalogue }))
 )
 // The Publish sheet (Sprint 149, R4, R5): the page that shows what will be public (src/publish/PublishSheetPanel.ts)
+const SlideLibraryPanel = lazy(() =>
+  import('./components/decks/library/SlideLibraryPanel').then((m) => ({ default: m.SlideLibraryPanel }))
+)
 const PublishSheet = lazy(() =>
   import('./components/publish/PublishSheet').then((m) => ({ default: m.PublishSheet }))
+)
+// The wall while a deck is presented (Sprint 159): the room's screen (src/decks/present/DeckPresenter.ts)
+const DeckWall = lazy(() =>
+  import('./components/decks/present/DeckWall').then((m) => ({ default: m.DeckWall }))
+)
+// The presenter view (Sprint 159, PR 6): the slide now and next, the notes and the clock, on the laptop
+const DeckPresenterView = lazy(() =>
+  import('./components/decks/present/DeckPresenterView').then((m) => ({ default: m.DeckPresenterView }))
 )
 
 // Check if this is a flow editor instance
@@ -103,7 +114,8 @@ if (
   editorType === 'flows-panel' ||
   editorType === 'ai-sidebar' ||
   editorType === 'transcribe-panel' ||
-  editorType === 'tasks-panel'
+  editorType === 'tasks-panel' ||
+  editorType === 'slide-library'
 ) {
   document.body.style.backgroundColor = 'var(--r-surface-muted)'
 }
@@ -175,9 +187,21 @@ ReactDOM.createRoot(rootElement).render(
       <Suspense fallback={null}>
         <ControlCatalogue />
       </Suspense>
+    ) : editorType === 'slide-library' ? (
+      <Suspense fallback={<LoadingFallback />}>
+        <SlideLibraryPanel />
+      </Suspense>
     ) : editorType === 'publish-sheet' ? (
       <Suspense fallback={null}>
         <PublishSheet />
+      </Suspense>
+    ) : editorType === 'deck-wall' ? (
+      <Suspense fallback={null}>
+        <DeckWall />
+      </Suspense>
+    ) : editorType === 'deck-presenter' ? (
+      <Suspense fallback={null}>
+        <DeckPresenterView />
       </Suspense>
     ) : (
       <App />
