@@ -18,7 +18,7 @@ import { Tooltip } from '../../ui/tooltip'
 import { themeStyle } from '../theme/themeVars'
 import { SLIDE_ICONS, slideIcon } from './iconSet'
 import { oneLine } from './slideEdits'
-import { BOTTOM, CANVAS_HEIGHT, CANVAS_WIDTH, MAX_STEP, layoutSlide, type BoxStyle, type MarkBox, type SlideBox, type TextBox } from './layoutSlide'
+import { BOTTOM, CANVAS_HEIGHT, CANVAS_WIDTH, MAX_STEP, editedItemWords, layoutSlide, pastedItemWords, type BoxStyle, type MarkBox, type SlideBox, type TextBox } from './layoutSlide'
 // The slide's rules, shared with the published handout page (Sprint 159): every view that draws a slide gets them.
 import './slide.css'
 
@@ -63,6 +63,18 @@ const px = (style: BoxStyle | undefined): CSSProperties | undefined => {
 export function editedText(element: HTMLElement): string {
   const text = element.innerText ?? element.textContent ?? ''
   return element.lastChild?.nodeName === 'BR' ? text.replace(/\n$/, '') : text
+}
+
+/** The box's words before the caret, or null when the caret isn't in it. */
+function wordsBeforeCaret(element: HTMLElement): string | null {
+  const selection = element.ownerDocument.getSelection()
+  if (!selection || !selection.rangeCount) return null
+  const range = selection.getRangeAt(0)
+  if (!element.contains(range.startContainer)) return null
+  const before = element.ownerDocument.createRange()
+  before.setStart(element, 0)
+  before.setEnd(range.startContainer, range.startOffset)
+  return before.toString()
 }
 
 /** An emptied editing host without its stray children, so it reads as `:empty`; the caret stays in it when it had it. */
@@ -123,7 +135,23 @@ function SlideText({ box, editing, tag = 'div' }: { box: TextBox; editing?: Slid
         // pill's faint default) never shows: the box is cleared, with the caret kept in it.
         // Never mid-composition (an IME's or a dead key's marked text): the browser holds that text and would lose it.
         if (raw === '' && event.currentTarget.firstChild && !(event.nativeEvent as InputEvent).isComposing) clearKeepingCaret(event.currentTarget)
-        editing.onText(box.path, box.multiline ? raw : oneLine(raw))
+        const words = box.multiline ? raw : oneLine(raw)
+        // An item whose marker the stage hides ("1. " before "Sisend") keeps it in the file when its words are edited.
+        editing.onText(box.path, box.marks ? editedItemWords(words, box) : words)
+      }}
+      // Words pasted at the start of an item the layout numbers or dots itself ("1. Sisend" from a list) leave their
+      // marker behind, so the item is written clean and never shows its number twice (Jarmo, 16 November).
+      onPaste={event => {
+        if (!box.marks) return
+        const pasted = event.clipboardData.getData('text/plain')
+        const before = wordsBeforeCaret(event.currentTarget)
+        if (!pasted || before === null) return
+        const clean = pastedItemWords(pasted, before, box)
+        if (clean === pasted) return
+        event.preventDefault()
+        event.stopPropagation()
+        // As typing would put it in: one input event, so the words are written as any other edit.
+        event.currentTarget.ownerDocument.execCommand('insertText', false, clean)
       }}
       onKeyDown={event => {
         if (editing.onKey(box.path, event)) event.preventDefault()

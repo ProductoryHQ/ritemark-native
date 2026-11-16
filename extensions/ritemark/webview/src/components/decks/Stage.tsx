@@ -21,7 +21,7 @@ import { slidesOf, type DeckSlideEntry } from './deckDocument'
 import { getClipboardImageFile, getUniqueImageFilename, readFileAsBase64, shouldPreferTextPaste } from '../../lib/pastedImage'
 import { hiddenNote } from './slide/convertKind'
 import { SlideCanvas, editedText, type SlideEditing } from './slide/SlideCanvas'
-import { layoutSlide, textBoxes } from './slide/layoutSlide'
+import { itemMarksOf, layoutSlide, textBoxes, withoutListMarker } from './slide/layoutSlide'
 import { undoKeyOf, addColumn, addRow, cellPath, insertItemAfter, isEmptyItem, itemPath, nextCell, removeItem, setIcon, setPath, valueAt } from './slide/slideEdits'
 
 interface StageProps {
@@ -113,7 +113,10 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
       // The box keeps the caret, so it shows what the undo put back itself.
       const element = event.currentTarget
       const fresh = slidesOf(editor.state.doc)[slide.index]
-      element.textContent = fresh ? valueAt(fresh.data, path) : ''
+      // As the layout draws it: an item it numbers itself shows its words without their marker.
+      const words = fresh ? valueAt(fresh.data, path) : ''
+      const heading = fresh && itemPath(path)?.field === 'heading' ? itemPath(path) : null
+      element.textContent = heading && fresh ? withoutListMarker(words, heading.index + 1, itemMarksOf(fresh.kind, fresh.data.look || 'boxes')) : words
       const range = document.createRange()
       range.selectNodeContents(element)
       range.collapse(false)

@@ -169,7 +169,7 @@ test('deck guidance appears exactly when a runtime has the deck tools', () => {
     const withoutDecks = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false }));
     assert.ok(withDecks.includes('DECKS'), `${runtime} with decks gets the section`);
     assert.ok(!withoutDecks.includes('DECKS'), `${runtime} without decks omits it`);
-    for (const needle of ['ritemark_decks', 'insert_slides', 'from:', 'Never change anything in `Slide library/` unless the user asks', 'update_library_slide', '```slide <kind>', 'speaker notes', 'made from the deck when it is published: to change the page, change the deck', 'The handout is a Text document', '`# ` for a section slide and `## ` for every other kind', "changing a slide\'s `title:` never changes its heading", 'A new slide is always a new slide block', 'never put `***` or `---` between slides', '`handout: text`']) {
+    for (const needle of ['ritemark_decks', 'insert_slides', 'from:', 'Never change anything in `Slide library/` unless the user asks', 'update_library_slide', '```slide <kind>', 'speaker notes', 'made from the deck when it is published: to change the page, change the deck', 'The handout is a Text document', '`# ` for a section slide and `## ` for every other kind', "changing a slide\'s `title:` never changes its heading", 'A new slide is always a new slide block', 'never put `***` or `---` between slides', '`handout: text`', 'never with a list number or bullet in front', 'draw their own numbers and dots']) {
       assert.ok(withDecks.includes(needle), `${runtime}: ${needle}`);
     }
   }
