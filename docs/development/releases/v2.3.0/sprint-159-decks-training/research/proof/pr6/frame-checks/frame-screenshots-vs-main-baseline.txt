@@ -101,5 +101,5 @@ DIFFERS  dark-settings-foot: 15.39% of pixels changed
 DIFFERS  dark-share-question: 11.58% of pixels changed
 DIFFERS  dark-many-tabs: 11.26% of pixels changed
 
-34 of 34 scenes differ; written <scratch>/frameA/compare.html
-0 of 34 scenes have a broken join or could not be checked; written <scratch>/frameA/joins.html
+34 of 34 scenes differ; written <scratch>/frame2B/compare.html
+0 of 34 scenes have a broken join or could not be checked; written <scratch>/frame2B/joins.html

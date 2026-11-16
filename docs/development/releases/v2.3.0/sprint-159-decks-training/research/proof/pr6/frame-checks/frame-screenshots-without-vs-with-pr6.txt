@@ -101,5 +101,5 @@ SAME     dark-settings-foot: 0% of pixels changed
 SAME     dark-share-question: 0% of pixels changed
 SAME     dark-many-tabs: 0% of pixels changed
 
-0 of 34 scenes differ; written <scratch>/frameB/compare.html
-0 of 34 scenes have a broken join or could not be checked; written <scratch>/frameB/joins.html
+0 of 34 scenes differ; written <scratch>/frame2A/compare.html
+0 of 34 scenes have a broken join or could not be checked; written <scratch>/frame2A/joins.html

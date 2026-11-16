@@ -20,7 +20,7 @@ A hidden dev instance on one display (the Mac's built-in), the demo project, `RI
 
 ```
 place: windows 2 (wall) and 3 (presenter view) at the windowed bounds; each page 0,0 to its window's size;
-  .part.titlebar display none; .monaco-workbench.ritemark-presenting; the group .locked
+  .part.titlebar display none; .monaco-workbench.ritemark-presenting (then a class; an attribute, `data-ritemark-presenting`, since round two's fixes); the group .locked
 presenter view: → three times, a click, → once: Slide 5 of 13, its notes, the row's current thumbnail in view
 clock: the length prompt shows in the presenter view's window; 45 ↵ wrote ritemark-length: 45 (one line added before
   the closing ---; presentProtocol.test.ts checks that the edit changes nothing else); the clock reads "elapsed, of 45 minutes"
@@ -30,13 +30,17 @@ fallback: one window of VS Code's default size, tab row 0 high, title row shown;
 
 ## The main window and an ordinary floating window, unchanged (`frame-checks/`)
 
-The presentation's look (no title row, no desk gap or edge) is set only on the window `_ritemark.present.place` opens, by that window's own entry (`markRitemarkPresentingWindow`). To prove nothing else changed, the frame checks ran twice on fresh profiles with the frame sample (`/private/tmp/ritemark-frame/Harbour leadership programme`), flag off: once with PR 6's shell (A), once with the dev build's `out/` files from before it (B: `layoutService.js`, `editorPart.js`, `editorGroupView.js`, `ritemarkSurfaces.css`, `desktop.contribution.js` and `app.js` from the Decks branch's tree), everything else the same.
+The presentation's look (no title row, no desk gap or edge) is set only on the window `_ritemark.present.place` opens, by that window's own entry (`markRitemarkPresentingWindow`) and an attribute on its container, `data-ritemark-presenting` (not a class: the auxiliary window service mirrors the main container's `class` onto every auxiliary container). Run again on 16 November after main's PRs 2, 7 and 5 came in (main `ed9ff194`) and after round two's fixes, on fresh profiles with the frame sample (`Harbour leadership programme`), flag off, twice: B with main's shell (main's 19 patches, transpiled), A with this PR's (this branch's patches), the same extension in both.
 
-- `frame-screenshots --compare`, B against A: **0 of 34 scenes differ, 0% each; every join ok** (`frame-screenshots-without-vs-with-pr6.txt`).
-- `frame-screenshots --compare docs/development/frame-baseline` (main's baseline), A: every join ok; 0.65% to 15% differ in every scene, the same in A and B. That is the isolated AI homes (the baseline was taken signed in to Claude and ChatGPT, so its AI column differs from a test profile's "Sign in" cards, about 8% as noted in the frame baseline's history), not this PR: the scenes with the AI column hidden differ least (1.9%, 0.65%), and A and B are identical (`frame-screenshots-vs-main-baseline.txt`).
-- `frame-geometry`: 34 PASS, 2 SKIP (the tabs' labels in a state without them), 0 FAIL, in A and in B; the measurements and results are identical.
-- `project-check --first-frame relaunch`: PASS in both: 19 boxes kept their place and the document stayed in front.
-- **An ordinary floating editor window** (Brief.md through View: Move Editor into New Window), A and B: the title row (44), the tab row, the group's 8 px padding, the desk's 10 px corners and the part's box are identical, `ritemark-presenting` is absent, and the screenshots are byte for byte the same (`floating-window-*`).
+- `frame-screenshots --compare`, A against B: **0 of 34 scenes differ; every join ok** (`frame-screenshots-without-vs-with-pr6.txt`).
+- `frame-screenshots --compare docs/development/frame-baseline` (main's baseline), B: every join ok; 0.65% to 15.4% differ in every scene. That is the isolated AI homes (the baseline was taken signed in to Claude and ChatGPT, so its AI column differs from a test profile's "Sign in" cards), not this PR, which changes none (`frame-screenshots-vs-main-baseline.txt`).
+- `frame-geometry`: 34 PASS, 2 SKIP, 0 FAIL, in A and in B; the measurements are identical.
+- `project-check --first-frame relaunch`: PASS in both: 19 boxes kept their place and Brief.md stayed in front.
+- **An ordinary floating editor window** (Brief.md through View: Move Editor into New Window), A and B: the title row (44), the tab row, the group's 8 px padding, the desk's 10 px corners and the part's box are identical, no presentation mark, and the screenshots are byte for byte the same (`floating-window-*`).
+
+## After main came in, and round two's fixes (16 November)
+
+A dev run, windowed mode on one display, after the fixes: Present placed the wall and the presenter view, each titled "AI assistants and agents", marked, with no title row, square corners and no desk's edge (`wall-after-main.png`, `presenter-after-main.png`); the wall's bar showed Presenter view as on. The main window's container was given a class of its own (as the AI column or the theme would change it): both presentation windows took the main window's classes, as VS Code mirrors them, and kept their mark and their look. Esc closed both.
 
 ## Not verified (Jarmo's, on real hardware)
 

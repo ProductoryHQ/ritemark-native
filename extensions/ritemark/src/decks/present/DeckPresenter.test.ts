@@ -11,6 +11,8 @@ const Module = require('module') as {
   _resolveFilename: (request: string, parent: unknown, isMain: boolean) => string;
 };
 const asked: string[] = [];
+/** The shell's command list fails this many times first (the extension host still starting). */
+let commandListFailures = 1;
 const vscodeMod = {
   window: {
     createWebviewPanel: () => {
@@ -20,7 +22,13 @@ const vscodeMod = {
   },
   commands: {
     // An older shell: VS Code's commands, none of the shell's `_ritemark.present.*`.
-    getCommands: async () => ['workbench.action.moveEditorToNewWindow', 'workbench.action.toggleFullScreen'],
+    getCommands: async () => {
+      if (commandListFailures > 0) {
+        commandListFailures--;
+        throw new Error('not ready');
+      }
+      return ['workbench.action.moveEditorToNewWindow', 'workbench.action.toggleFullScreen'];
+    },
     executeCommand: async (command: string) => {
       asked.push(`executeCommand ${command}`);
     },
@@ -40,7 +48,7 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 
 import * as assert from 'assert';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { DeckPresenter, presentFallbackAllowed } = require('./DeckPresenter') as typeof import('./DeckPresenter');
+const { DeckPresenter, presentFallbackAllowed, presenterViewAvailable } = require('./DeckPresenter') as typeof import('./DeckPresenter');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { PRESENT_NEEDS_UPDATE } = require('./presentProtocol') as typeof import('./presentProtocol');
 
@@ -65,12 +73,20 @@ async function main(): Promise<void> {
   assert.equal(presentFallbackAllowed({}), false);
   assert.equal(presentFallbackAllowed({ VSCODE_DEV: '1' }), true);
 
+  // One rule for the menu and a running presentation: the shell's commands, and two displays or the dev windowed mode.
+  assert.equal(presenterViewAvailable(false, 2, false), false);
+  assert.equal(presenterViewAvailable(true, 1, false), false);
+  assert.equal(presenterViewAvailable(true, 2, false), true);
+  assert.equal(presenterViewAvailable(true, 1, true), true);
+
   const devBefore = process.env.VSCODE_DEV;
   delete process.env.VSCODE_DEV;
   try {
     const memory = new Map<string, unknown>();
     const state = { get: (key: string, fallback?: unknown) => (memory.has(key) ? memory.get(key) : fallback), update: async (key: string, value: unknown) => { memory.set(key, value); }, keys: () => [...memory.keys()] };
     const presenter = new DeckPresenter({ fsPath: '/extension' } as never, state as never);
+    // A failed ask for the shell's commands is not kept: the next one asks again.
+    await assert.rejects(presenter.options(), /not ready/);
     // The menu: no reason to disable Present, and no presenter view without the shell.
     const options = await presenter.options();
     assert.deepEqual(Object.keys(options).sort(), ['available', 'on', 'type', 'wallDisplay']);
@@ -88,6 +104,13 @@ async function main(): Promise<void> {
       assert.deepEqual(posted, [{ type: 'deck/present-failed', message: PRESENT_NEEDS_UPDATE }], 'a notice with the words only');
     }
     assert.deepEqual(asked, [], 'no wall panel and no window command');
+
+    // Two Presents close together (⌘↩ twice): the first gives up while the shell is asked, so one answer, not two.
+    const first = origin(DECK);
+    const second = origin(DECK);
+    await Promise.all([presenter.start(first.value, { type: 'deck/present', from: 'here', index: 0 } as never), presenter.start(second.value, { type: 'deck/present', from: 'here', index: 0 } as never)]);
+    assert.equal(first.posted.length + second.posted.length, 1, 'only the later Present answers');
+    assert.equal(second.posted.length, 1);
     presenter.dispose();
   } finally {
     if (devBefore === undefined) delete process.env.VSCODE_DEV;

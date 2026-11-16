@@ -250,7 +250,8 @@ that view type into a window of its own on that display: frameless, compact, its
 build's windowed mode at the given bounds); a panel already in such a window moves with its window (Swap displays).
 Such a window is a presentation's window (layoutService.ts `markRitemarkPresentingWindow`, set as the window opens):
 no title row (shouldShowCustomTitleBar), no desk's bottom gap (editorPart.ts), no desk's edge, corners or ground
-(ritemarkSurfaces.css `.ritemark-presenting`); 019 drops its desk gap. electron-browser/parts/ritemarkPresent.ts, loaded
+(ritemarkSurfaces.css `[data-ritemark-presenting]`: an attribute, since the main window's class is mirrored onto
+auxiliary containers); 019 drops its desk gap. electron-browser/parts/ritemarkPresent.ts, loaded
 by desktop.contribution.ts. Only the window `place` opens is marked (the first to open, checked against its part's
 window; unmarked again if the part fails), so the main window and every other auxiliary window keep their frame. A
 presentation's window is titled by its page alone (the deck's name), never with the project's. The extension checks the
@@ -956,10 +957,10 @@ index 72cb1c1..a8b8807 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..4fc8b612cfb
+index 00000000000..4f7619faf68
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,2136 @@
+@@ -0,0 +1,2138 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2953,29 +2954,31 @@ index 00000000000..4fc8b612cfb
 +
 +/*
 + * Sprint 159: the windows a deck is presented in, the wall and the presenter view (electron-browser/parts/
-+ * ritemarkPresent.ts). Each is its page alone, edge to edge: no title row (layoutService.ts), no gap (019), and here no
-+ * desk's edge, corners or ground. The ground under the page, seen only while it loads, is the wall's band colour.
++ * ritemarkPresent.ts, which marks the window's container with `data-ritemark-presenting`, an attribute the auxiliary
++ * window service doesn't mirror from the main window). Each is its page alone, edge to edge: no title row
++ * (layoutService.ts), no gap (019), and here no desk's edge, corners or ground. The ground under the page, seen only
++ * while it loads, is the wall's band colour.
 + */
 +
-+.monaco-workbench.ritemark-presenting,
-+.monaco-workbench.ritemark-presenting .part.editor,
-+.monaco-workbench.ritemark-presenting .part.editor > .content,
-+.monaco-workbench.ritemark-presenting .part.editor .editor-group-container {
++.monaco-workbench[data-ritemark-presenting],
++.monaco-workbench[data-ritemark-presenting] .part.editor,
++.monaco-workbench[data-ritemark-presenting] .part.editor > .content,
++.monaco-workbench[data-ritemark-presenting] .part.editor .editor-group-container {
 +	background-color: #0E0C24 !important; /* !important: the ground's and the parts' colours are set inline from the theme */
 +}
 +
-+.monaco-workbench.ritemark-presenting .part.editor .editor-group-container > .editor-container {
++.monaco-workbench[data-ritemark-presenting] .part.editor .editor-group-container > .editor-container {
 +	background-color: #0E0C24 !important; /* !important: the desk's own rule above, and the inline editor background */
 +	border-radius: 0;
 +}
 +
-+.monaco-workbench.ritemark-presenting .part.editor .editor-group-container > .editor-container::after,
-+.monaco-workbench.ritemark-presenting .part.editor .editor-group-container > .editor-container::before,
-+.monaco-workbench.ritemark-presenting .ritemark-desk-webview::after {
++.monaco-workbench[data-ritemark-presenting] .part.editor .editor-group-container > .editor-container::after,
++.monaco-workbench[data-ritemark-presenting] .part.editor .editor-group-container > .editor-container::before,
++.monaco-workbench[data-ritemark-presenting] .ritemark-desk-webview::after {
 +	display: none; /* no desk's edge */
 +}
 +
-+.monaco-workbench.ritemark-presenting .ritemark-desk-webview {
++.monaco-workbench[data-ritemark-presenting] .ritemark-desk-webview {
 +	border-radius: 0;
 +}
 +
@@ -7123,10 +7126,10 @@ index 41250d7b714..133c8807b3f 100644
  				agentsWindow: { default: 'custom' },
 diff --git a/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts b/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts
 new file mode 100644
-index 00000000000..809c511ea4c
+index 00000000000..1c94c00de98
 --- /dev/null
 +++ b/src/vs/workbench/electron-browser/parts/ritemarkPresent.ts
-@@ -0,0 +1,212 @@
+@@ -0,0 +1,222 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -7145,13 +7148,13 @@ index 00000000000..809c511ea4c
 + *   window (layoutService.ts): frameless, no title row, no gap and no desk's edge, the page edge to edge. A panel that
 + *   is in such a window already moves with its window to the display asked for (Swap displays).
 + *
-+ * The extension checks that the commands exist. Without them (an older shell) Present says it needs a newer Ritemark;
-+ * only a dev build then presents with VS Code's own window commands, whose window would show the project's name.
++ * The extension checks that the commands exist. Without them (an older shell) Present answers with a notice that it
++ * needs a newer Ritemark; only a dev build then presents with VS Code's own window commands, whose window would show the
++ * project's name.
 + */
 +
 +import { mainWindow } from '../../../base/browser/window.js';
 +import { getWindowById } from '../../../base/browser/dom.js';
-+import { timeout } from '../../../base/common/async.js';
 +import { localize } from '../../../nls.js';
 +import { CommandsRegistry } from '../../../platform/commands/common/commands.js';
 +import { INativeHostService } from '../../../platform/native/common/native.js';
@@ -7183,8 +7186,12 @@ index 00000000000..809c511ea4c
 +}
 +
 +const WEBVIEW_INPUT_TYPE_ID = 'workbench.editors.webviewInput';
-+/** How long a window takes to leave full screen before it can be moved (the Mac's animation). */
-+const LEAVE_FULL_SCREEN_MS = 2000;
++/**
++ * A presentation's window is marked by an attribute on its container, not a class: the auxiliary window service mirrors
++ * the main window container's `class` onto every auxiliary container, so a class would go at the main window's next
++ * class change (the AI column toggled, the theme changed) and the desk's edge would come back on the projector.
++ */
++const PRESENTING_ATTRIBUTE = 'data-ritemark-presenting';
 +
 +async function ritemarkDisplays(): Promise<IRitemarkDisplay[]> {
 +	const getScreenDetails = (mainWindow as Window & { getScreenDetails?: () => Promise<IScreenDetails> }).getScreenDetails;
@@ -7210,9 +7217,16 @@ index 00000000000..809c511ea4c
 +	}];
 +}
 +
++function isRectangle(value: unknown): value is IRectangle {
++	const rectangle = value as Partial<IRectangle> | undefined;
++	return !!rectangle && [rectangle.x, rectangle.y, rectangle.width, rectangle.height].every(n => typeof n === 'number' && Number.isFinite(n))
++		&& rectangle.width! > 0 && rectangle.height! > 0;
++}
++
 +function isPlaceRequest(value: unknown): value is IRitemarkPlaceRequest {
 +	const request = value as Partial<IRitemarkPlaceRequest> | undefined;
-+	return !!request && typeof request.viewType === 'string' && request.viewType.length > 0 && typeof request.display === 'number' && typeof request.fullScreen === 'boolean';
++	return !!request && typeof request.viewType === 'string' && request.viewType.length > 0 && typeof request.display === 'number' && typeof request.fullScreen === 'boolean'
++		&& (request.windowed === undefined || isRectangle(request.windowed));
 +}
 +
 +/** The webview panel of this view type, wherever it is. */
@@ -7232,10 +7246,7 @@ index 00000000000..809c511ea4c
 + * window's title in its window lists, and the room must not read the project's name. The workbench's own window title
 + * keeps setting it, so it is set back whenever it changes.
 + */
-+function keepTitle(window: Window | undefined, title: string): void {
-+	if (!window) {
-+		return;
-+	}
++function keepTitle(window: Window, title: string): { dispose(): void } {
 +	const document = window.document;
 +	const set = () => {
 +		if (document.title !== title) {
@@ -7243,7 +7254,9 @@ index 00000000000..809c511ea4c
 +		}
 +	};
 +	set();
-+	new (window as Window & typeof globalThis).MutationObserver(set).observe(document.head, { childList: true, characterData: true, subtree: true });
++	const observer = new (window as Window & typeof globalThis).MutationObserver(set);
++	observer.observe(document.head, { childList: true, characterData: true, subtree: true });
++	return { dispose: () => observer.disconnect() };
 +}
 +
 +CommandsRegistry.registerCommand('_ritemark.present.displays', () => ritemarkDisplays());
@@ -7275,12 +7288,7 @@ index 00000000000..809c511ea4c
 +	const current = getWindowById(windowId)?.window;
 +	if (current && isRitemarkPresentingWindow(current)) {
 +		const options = { targetWindowId: windowId };
-+		if (await nativeHostService.isFullScreen(options)) {
-+			await nativeHostService.toggleFullScreen(options);
-+			for (let waited = 0; waited < LEAVE_FULL_SCREEN_MS && await nativeHostService.isFullScreen(options); waited += 100) {
-+				await timeout(100);
-+			}
-+		}
++		// positionWindow leaves full screen itself and waits for the window's own leave-full-screen event
 +		await nativeHostService.positionWindow(bounds, options);
 +		if (request.fullScreen) {
 +			await nativeHostService.toggleFullScreen(options);
@@ -7293,16 +7301,21 @@ index 00000000000..809c511ea4c
 +	// checked against the part's own window: no other window (the browser's, a floating editor, the main window) ever
 +	// takes a presentation's look, and a part that fails to open leaves no mark behind.
 +	const title = panel.editor.getName();
-+	let marked: { window: Window; container: HTMLElement } | undefined;
-+	const setPresenting = (target: { window: Window; container: HTMLElement }, presenting: boolean) => {
++	let marked: { window: Window; container: HTMLElement; title?: { dispose(): void } } | undefined;
++	const setPresenting = (target: { window: Window; container: HTMLElement; title?: { dispose(): void } }, presenting: boolean) => {
 +		markRitemarkPresentingWindow(target.window, presenting);
-+		target.container.classList.toggle('ritemark-presenting', presenting);
++		target.container.toggleAttribute(PRESENTING_ATTRIBUTE, presenting);
++		if (presenting) {
++			target.title = keepTitle(target.window, title);
++		} else {
++			target.title?.dispose();
++			target.title = undefined;
++		}
 +	};
 +	const opened = auxiliaryWindowService.onDidOpenAuxiliaryWindow(({ window }) => {
 +		if (!marked) {
 +			marked = { window: window.window, container: window.container };
 +			setPresenting(marked, true);
-+			keepTitle(window.window, title);
 +		}
 +	});
 +	let part: IAuxiliaryEditorPart;
@@ -7326,12 +7339,12 @@ index 00000000000..809c511ea4c
 +	}
 +	const own = auxiliaryWindowService.getWindow(part.windowId);
 +	if (marked && marked.window !== own?.window) {
-+		// Another window opened first: it keeps its own look, and the presentation's own window takes the mark (laid out
-+		// again when it goes full screen)
++		// Another window opened in the same moment, first: it is unmarked again and its title left to the workbench (its
++		// title row, decided as it opened, comes back at its next full-screen or layout change), and the presentation's
++		// own window takes the mark (laid out again when it goes full screen)
 +		setPresenting(marked, false);
 +		if (own) {
 +			setPresenting({ window: own.window, container: own.container }, true);
-+			keepTitle(own.window, title);
 +		}
 +	}
 +	panel.group.moveEditor(panel.editor, part.activeGroup);

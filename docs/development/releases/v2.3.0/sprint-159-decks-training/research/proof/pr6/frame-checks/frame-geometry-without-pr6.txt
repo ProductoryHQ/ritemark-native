@@ -36,4 +36,4 @@ PASS  R1 tree row 2 is 32 high
 PASS  R1 tree row 3 is 32 high
 
 B: 34 pass, 0 fail, 2 skipped (window 1440x900, zoom 1)
-written <scratch>/frameB/geometry.json
+written <scratch>/frame2B/geometry.json

@@ -137,8 +137,18 @@ export function presentWindowed(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.RITEMARK_PRESENT_WINDOWED === '1' && !!env.VSCODE_DEV;
 }
 
+/**
+ * A presenter view can show: the shell places the windows, and there is a second display (or a dev build's windowed
+ * mode). The menu and a running presentation read the same rule.
+ */
+export function presenterViewAvailable(shell: boolean, displays: number, windowed: boolean = presentWindowed()): boolean {
+  return shell && (displays > 1 || windowed);
+}
+
 export class DeckPresenter implements vscode.Disposable {
   private running: Running | null = null;
+  /** Each start takes a number; a later start, or a Stop, makes an earlier one that is still waiting give up. */
+  private starts = 0;
 
   constructor(private readonly extensionUri: vscode.Uri, private readonly state: vscode.Memento) {}
 
@@ -146,7 +156,7 @@ export class DeckPresenter implements vscode.Disposable {
   async options(): Promise<DeckPresentOptions> {
     const shell = await hasShellPlacement();
     const displays = shell ? await readDisplays() : [];
-    const available = shell && (displays.length > 1 || presentWindowed());
+    const available = presenterViewAvailable(shell, displays.length);
     const chosen = chooseDisplays(displays);
     return {
       type: 'deck/present-options',
@@ -156,11 +166,16 @@ export class DeckPresenter implements vscode.Disposable {
     };
   }
 
-  /** Presenter view on or off, kept for the next presentation (and this one, while it runs). */
+  /**
+   * Presenter view on or off, kept for the next presentation (and this one, while it runs). It returns once the choice
+   * is kept, so the menu's check changes at once; placing the window in a running presentation goes on after.
+   */
   async setPresenter(on: boolean): Promise<void> {
     await this.state.update(PRESENTER_KEY, on);
     const running = this.running;
-    if (running && running.shell && !running.ended) await this.togglePresenter(running, on);
+    if (running && running.shell && !running.ended) {
+      void this.togglePresenter(running, on).catch(error => console.error('[Decks] Presenter view could not be turned', on ? 'on' : 'off', error));
+    }
   }
 
   private presenterWanted(): boolean {
@@ -170,9 +185,12 @@ export class DeckPresenter implements vscode.Disposable {
   /** Present, from the deck view's current slide or from the start. A second Present ends the first. */
   async start(origin: DeckOrigin, request: DeckPresentRequest): Promise<void> {
     this.stop();
+    const start = ++this.starts;
     // First, before the deck is read or anything opens: a shell without the placement commands can't place the wall
     // (only a dev build may use VS Code's own), and Present answers with the notice.
     const shell = await hasShellPlacement();
+    // Another Present (⌘↩ twice, or from another deck view) or a Stop came while this one asked the shell: it gives up.
+    if (start !== this.starts) return;
     if (!shell && !presentFallbackAllowed()) {
       await post(origin.panel.webview, { type: 'deck/present-failed', message: PRESENT_NEEDS_UPDATE });
       return;
@@ -186,6 +204,7 @@ export class DeckPresenter implements vscode.Disposable {
       return;
     }
     const displays = shell ? await readDisplays() : [];
+    if (start !== this.starts) return;
     const chosen = chooseDisplays(displays);
     const running: Running = {
       session,
@@ -231,6 +250,8 @@ export class DeckPresenter implements vscode.Disposable {
     if (this.presenterAvailable(running) && this.presenterWanted() && !running.ended && !running.presenter) {
       this.addPresenter(running);
       if (running.presenter) await this.place(running, running.presenter, DECK_PRESENTER_VIEW_TYPE, running.presenterDisplay, WINDOWED_PRESENTER);
+      // The wall's bar shows the presenter view as on (the wall's first state, sent when it loaded, said off).
+      if (!running.ended) await this.showWall(running);
     }
     // The keys go to the window placed last: the focus inside its page, not only on its window.
     const focused = (running.presenter ?? running.wall).panel;
@@ -239,6 +260,8 @@ export class DeckPresenter implements vscode.Disposable {
 
   /** Stop the presentation: both windows close and the deck view returns to the slide the presenter ended on. */
   stop(): void {
+    // A start still asking the shell gives up too.
+    this.starts++;
     const running = this.running;
     if (!running) return;
     running.presenter?.panel.dispose();
@@ -246,7 +269,7 @@ export class DeckPresenter implements vscode.Disposable {
   }
 
   private presenterAvailable(running: Running): boolean {
-    return running.shell && (running.displays.length > 1 || presentWindowed());
+    return presenterViewAvailable(running.shell, running.displays.length);
   }
 
   private createScreen(origin: DeckOrigin, viewType: string): Screen {
@@ -500,7 +523,11 @@ let shellPlacement: Promise<boolean> | null = null;
 
 /** The shell can place the windows: this Ritemark's shell has the commands (patch 018, Sprint 159). */
 function hasShellPlacement(): Promise<boolean> {
-  shellPlacement ??= askShellPlacement();
+  // Only an answer is kept: a failed ask (the extension host still starting) is asked again next time.
+  shellPlacement ??= askShellPlacement().catch(error => {
+    shellPlacement = null;
+    throw error;
+  });
   return shellPlacement;
 }
 
