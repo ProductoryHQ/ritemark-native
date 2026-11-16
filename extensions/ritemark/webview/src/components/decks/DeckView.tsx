@@ -1202,7 +1202,7 @@ export function DeckView({
           />
         ) : null}
         {deskWidth >= NARROWEST_DESK ? (
-          <DeckFolds slideShown={slideShown} handoutShown={handoutShown} line={foldLine} above={above} onToggle={toggleFold} />
+          <DeckFolds slideShown={slideShown} handoutShown={handoutShown} line={foldLine} above={above} start={dividerLeft} onToggle={toggleFold} />
         ) : null}
 
         {addSheet && settingsAt ? (

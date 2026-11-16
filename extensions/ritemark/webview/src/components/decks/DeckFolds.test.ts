@@ -75,8 +75,10 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
   assert.ok(/\.deck-fold\.is-split \.deck-fold-button\.is-upper \{ border-radius: 13px 13px 0 0; \}/.test(css), "the upper half takes the pill's top")
   assert.ok(/\.deck-fold\.is-split \.deck-fold-button\.is-lower \{ border-radius: 0 0 13px 13px; box-shadow: inset 0 1px 0 var\(--r-hairline-strong\); \}/.test(css), 'a hairline between')
   assert.ok(!/\.is-split > span/.test(css), "nothing hangs on the Tooltip's wrapper")
-  assert.ok(/\.deck-fold\.is-split \.deck-fold-button:hover, \.deck-fold\.is-split \.deck-fold-button:focus-visible \{ background: var\(--r-accent-soft\); color: var\(--r-accent\); \}/.test(css), 'the hover, and keyboard focus the same')
-  assert.ok(/\.deck-fold\.is-split \.deck-fold-button:focus-visible \{ outline-offset: -2px; \}/.test(css), 'the focus ring inside its half')
+  assert.ok(/\.deck-fold\.is-split \.deck-fold-button:hover \{ background: var\(--r-accent-soft\); color: var\(--r-accent\); \}/.test(css), 'the hover')
+  // Keyboard focus looks the same, only in keyboard mode (the input-mode prefix every hand-written :focus-visible
+  // carries, inputMode.test.ts), with the focus ring inside its half.
+  assert.ok(/:where\(:root:not\(\[data-input-mode="pointer"\]\)\) \.deck-fold\.is-split \.deck-fold-button:focus-visible \{ background: var\(--r-accent-soft\); color: var\(--r-accent\); outline-offset: -2px; \}/.test(css), 'keyboard focus the same, the ring inside its half')
 }
 
 // The slide hidden: one round › at the handout's left edge, Show the slide, and nothing to hide the handout with.
@@ -187,8 +189,8 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
 
 // With the slide above the handout (split along the long side, 16 November), the pill lies flat at the level line's
 // right end: ˄ Hide the slide, then ˅ Hide the handout, each with its tooltip; the CSS turns the halves to 28×26 with a
-// hairline between them. With one side hidden, the one round button stands at the handout's top edge or at the slide's
-// bottom end.
+// hairline between them. With one side hidden, the one round button stands at the handout's top left or at the slide's
+// bottom right.
 {
   const drawAbove = (slideShown: boolean, handoutShown: boolean) =>
     parse(renderToStaticMarkup(createElement(DeckFolds, { slideShown, handoutShown, line: 380, above: true, onToggle: () => {} })))
@@ -226,6 +228,12 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
   const one = drawAbove(false, true).querySelector('.deck-fold')
   assert.ok(one && !one.classList.contains('is-split') && one.classList.contains('is-above'))
   assert.equal(drawAbove(false, true).querySelectorAll('button').length, 1)
+  // At the handout's top left, clear of the part numbers at its right: placed by its left, from the handout's edge.
+  const topLeft = parse(renderToStaticMarkup(createElement(DeckFolds, { slideShown: false, handoutShown: true, line: 0, above: true, start: 132, onToggle: () => {} }))).querySelector('.deck-fold')
+  assert.ok(topLeft && topLeft.classList.contains('is-start'))
+  assert.match(topLeft.getAttribute('style') ?? '', /top:\s*22px;\s*left:\s*154px/)
+  assert.ok(/\.deck-fold\.is-above\.is-start \{ right: auto; margin-left: -13px; \}/.test(css), 'not at the right end')
+  assert.ok(!drawAbove(true, false).querySelector('.deck-fold')?.classList.contains('is-start'), 'Show the handout stays at the right end')
   // The handout hidden, above: ˄ Show the handout at the slide's bottom end (the line at the room's bottom).
   const handoutHidden = foldControl(true, false, 700, true)
   assert.deepEqual(handoutHidden.buttons.map(b => [b.label, b.icon]), [['Show the handout', 'caret-up']])

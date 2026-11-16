@@ -76,8 +76,8 @@ interface FoldButton { label: string; icon: 'caret-left' | 'caret-right' | 'care
  * desk's left and the split pill stands upright on it: ‹ Hide the slide over › Hide the handout. With the slide above
  * (`above`), `line` is its distance from the desk's top and the pill lies flat at the line's right end: ˄ Hide the
  * slide, ˅ Hide the handout. With one side hidden, one round button, `INSET` inside the side that shows, brings the
- * folded side back: at the handout's left or top edge, or at the slide's right or bottom end. The returned `at` is
- * where the control's middle stands along the line's axis.
+ * folded side back: at the handout's left edge (its top left above), or at the slide's right or bottom end. The
+ * returned `at` is where the control's middle stands along the line's axis.
  */
 export function foldControl(slideShown: boolean, handoutShown: boolean, line: number, above = false): { at: number; buttons: FoldButton[] } {
   if (!slideShown) return { at: line + INSET, buttons: [{ label: 'Show the slide', icon: above ? 'caret-down' : 'caret-right', side: 'slide' }] }
@@ -91,25 +91,31 @@ export function foldControl(slideShown: boolean, handoutShown: boolean, line: nu
   }
 }
 
-export function DeckFolds({ slideShown, handoutShown, line, above = false, onToggle }: {
+export function DeckFolds({ slideShown, handoutShown, line, above = false, start = 0, onToggle }: {
   slideShown: boolean
   handoutShown: boolean
   /** The line between the slide and the handout: from the desk's left beside, from its top with the slide above. */
   line: number
   above?: boolean
+  /** The handout's left edge, from the desk's left: with the slide above and hidden, Show the slide stands at the
+   *  handout's top edge, `INSET` from this end, clear of the part numbers at the right. */
+  start?: number
   onToggle: (side: 'slide' | 'handout') => void
 }) {
   const control = foldControl(slideShown, handoutShown, line, above)
   // Two buttons are the split pill; one is the round button that brings a folded side back.
   const split = control.buttons.length === 2
+  // Above, Show the slide stands at the handout's top left (the part numbers are at its right); every other control
+  // above stands at the right end.
+  const atStart = above && !slideShown
   // The tooltip opens off the line: beside the upright pill, over the flat one, and into the side that shows.
   const tipSide = split ? (above ? 'top' : 'right') : above && slideShown ? 'top' : 'bottom'
   return (
     // One element whatever the fold, and each half keyed by its side: the pressed half stays the same button when the
     // pill becomes the one round button, so the keyboard's focus stays on it.
     <div
-      className={`deck-fold${split ? ' is-split' : ''}${above ? ' is-above' : ''}`}
-      style={above ? { top: control.at } : { left: control.at }}
+      className={`deck-fold${split ? ' is-split' : ''}${above ? ' is-above' : ''}${atStart ? ' is-start' : ''}`}
+      style={atStart ? { top: control.at, left: start + INSET } : above ? { top: control.at } : { left: control.at }}
       role={split ? 'group' : undefined}
       aria-label={split ? 'Fold either side' : undefined}
     >
