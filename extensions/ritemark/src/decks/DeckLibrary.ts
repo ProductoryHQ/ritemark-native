@@ -234,8 +234,10 @@ export class DeckLibrary {
         library: isTopicPath(source.path),
         sourceName: deckName(source.path),
         sourcePath: source.path,
-        changed: source.stamp !== null && !copyStamps.includes(source.stamp),
-        newer: sourceStamps !== null && source.stamp !== null && !sourceStamps.includes(source.stamp),
+        // A copy that reads as its source, heading aside, is neither changed nor behind (Codex on #750: a heading-only
+        // edit under a from: stamp that counted the old heading matched neither stamp).
+        changed: source.stamp !== null && !copyStamps.includes(source.stamp) && copyStamps[0] !== sourceStamps?.[0],
+        newer: sourceStamps !== null && source.stamp !== null && !sourceStamps.includes(source.stamp) && sourceStamps[0] !== copyStamps[0],
         missing: !slide,
       });
     }

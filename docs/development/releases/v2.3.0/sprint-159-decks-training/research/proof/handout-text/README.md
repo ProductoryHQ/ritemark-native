@@ -34,3 +34,11 @@ More shots:
 - `new-deck-start-card-ai-open-1440.png`: New → Deck. The part's heading shows "Heading", the text shows "Write here. *** starts a new slide.", and the start card sits at the text's edges. The file has no heading in it.
 
 In the demo deck, "TRY IT" and "PROMPT" are capitals in the file's own text. The deck no longer styles labels.
+
+## A deleted heading stays deleted (the `handout: text` mark)
+
+On a fresh copy of the demo project, I typed in part 2 of "AI assistants and agents".
+- **First edit:** wrote the headings and added `handout: text` as one more line of the front matter. The other front matter lines stayed byte for byte.
+- **Deleting part 3's heading:** I deleted the words of "Shared prompt board" in the handout, and the file was saved with part 3 having no heading.
+- **After Developer: Reload Window:** the deck drew no heading (`data-deck-drawn`: 0), and part 3 opens with its text (`deleted-heading-after-reload-ai-open-1440.png`). The file's SHA-256 was the same before and after the reload.
+- The words "Bring water." landed mid-sentence because End went to the end of the first wrapped line. That was this test's input, not a fault.

@@ -118,6 +118,15 @@ async function run() {
   const oldStamp = slideStamps('statement', { id: 'h1', title: 'Headed' }, '## Headed\n\nWords.', 'Slide library')[1];
   const legacyStates = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: 'c9', from: `Slide library/Headed.deck.md#h1 @${oldStamp}`, kind: 'statement', body: 'id: c9\ntitle: Headed', handout: '## Headed\n\nWords.' }]);
   assert.deepEqual([legacyStates[0].changed, legacyStates[0].newer], [false, false], 'an older from: stamp still matches');
+  // Codex on #750: under that older stamp, a heading-only edit of the copy, or of the source, shows nothing either.
+  const copyHeadingEdited = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: 'c9', from: `Slide library/Headed.deck.md#h1 @${oldStamp}`, kind: 'statement', body: 'id: c9\ntitle: Headed', handout: '## Headed, for Harbour\n\nWords.' }]);
+  assert.deepEqual([copyHeadingEdited[0].changed, copyHeadingEdited[0].newer], [false, false], "the copy's heading edited");
+  files.files['Slide library/Headed.deck.md'] = files.files['Slide library/Headed.deck.md'].replace('## Headed', '## Headed, renamed');
+  const sourceHeadingEdited = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: 'c9', from: `Slide library/Headed.deck.md#h1 @${oldStamp}`, kind: 'statement', body: 'id: c9\ntitle: Headed', handout: '## Headed\n\nWords.' }]);
+  assert.deepEqual([sourceHeadingEdited[0].changed, sourceHeadingEdited[0].newer], [false, false], "the source's heading edited");
+  // A real change still shows.
+  const wordsEdited = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: 'c9', from: `Slide library/Headed.deck.md#h1 @${oldStamp}`, kind: 'statement', body: 'id: c9\ntitle: Headed', handout: '## Headed\n\nOther words.' }]);
+  assert.equal(wordsEdited[0].changed, true);
   let viewed: { count: number; afterIndex: number } | null = null;
   const beforeView = files.files['Clients/Harbour/Harbour.deck.md'];
   const viaView = await library.insertCopies('Slide library/AI assistants.deck.md', ['a1', 'a2'], 'Clients/Harbour/Harbour.deck.md', 99, async (parts, afterIndex) => {
