@@ -703,6 +703,9 @@ export function DeckView({
 
   // Slide settings: closed when the slide changes. Add to library's sheet is placed beside the slide (over the handout when it must).
   useEffect(() => { setSettingsOpen(false) }, [shown])
+  // Settings with no slide to belong to (an undo took it away, the window folded it) close, so they never come back
+  // by themselves when it returns.
+  useEffect(() => { if (!slideShown || !slides[shown]) setSettingsOpen(false) }, [slideShown, slides, shown])
   // The Add to library sheet belongs to its slide: another slide closes it.
   useEffect(() => { setAddSheet(sheet => (sheet && sheet.number - 1 !== shown ? null : sheet)) }, [shown])
   // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one. A
@@ -722,7 +725,7 @@ export function DeckView({
   }, [shown, focusTitleOf, slideShown])
   const titleSelected = useCallback(() => setFocusTitleOf(current => (current?.select ? null : current)), [])
   useLayoutEffect(() => {
-    if (!settingsOpen && !addSheet) { setSettingsAt(null); return }
+    if (!addSheet) { setSettingsAt(null); return }
     const desk = deskRef.current
     if (!desk) return
     const big = desk.querySelector<HTMLElement>('.deck-big')
@@ -743,7 +746,7 @@ export function DeckView({
       left: Math.max(8, Math.min(bigBox.right - deskBox.left + 12, deskBox.width - SETTINGS_WIDTH - 8)),
       top: Math.max(8, bigBox.top - deskBox.top - 4),
     })
-  }, [settingsOpen, addSheet, deskWidth, stageWidth, shown, slideShown, dividerLeft])
+  }, [addSheet, deskWidth, stageWidth, shown, slideShown, dividerLeft])
 
   /** Settings' change, made to the slide as the document has it now. */
   const changeSlide = useCallback((change: (data: SlideData) => SlideData, kind?: string) => {
@@ -1165,6 +1168,7 @@ export function DeckView({
             topics={topics}
             style={{ left: settingsAt.left, top: settingsAt.top }}
             onClose={() => setAddSheet(null)}
+            returnFocus={() => stripRef.current}
             onAdd={topic => {
               const id = addSheet.id
               setAddSheet(null)

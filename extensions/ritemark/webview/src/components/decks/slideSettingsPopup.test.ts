@@ -99,6 +99,14 @@ const here = (path: string) => readFileSync(fileURLToPath(new URL(path, import.m
   assert.match(gear, /<PopoverContent\s+align="start"/, 'the popup opens under the gear, left-aligned to it')
   assert.match(gear, /data-state=\{settingsOpen && settingsReady \? 'active'/, 'its on state while the popup is open')
   assert.doesNotMatch(gear, /\btitle=/, 'a tooltip, never a native title')
+  // Review, PR 759: Settings with no slide to belong to close, so they never reopen by themselves when it returns.
+  assert.match(view, /useEffect\(\(\) => \{ if \(!slideShown \|\| !slides\[shown\]\) setSettingsOpen\(false\) \}, \[slideShown, slides, shown\]\)/)
+  // The Add to library sheet alone is placed by the desk's measure now.
+  assert.match(view, /if \(!addSheet\) \{ setSettingsAt\(null\); return \}/)
+  // The thumbnail's badge goes in as plain values, so the memoised thumbnail keeps its memo.
+  const strip = here('./SlideStrip.tsx')
+  assert.match(strip, /badgeLabel=\{[^}]*\}\s+badgeAmber=\{/)
+  assert.doesNotMatch(strip, /badge=\{/)
   assert.match(here('../ui/button.tsx'), /"icon-xs": "size-7"/, 'the 28 px icon button is a size of the shared Button')
 
   const stage = here('./Stage.tsx')

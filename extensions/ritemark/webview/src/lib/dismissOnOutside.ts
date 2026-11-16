@@ -17,8 +17,8 @@ import { useCallback, useEffect, useRef, type RefObject } from 'react'
 
 /** The Radix layers portalled out of a popup (Select, DropdownMenu, Popover, Tooltip content). */
 const RADIX_LAYER = '[data-radix-popper-content-wrapper]'
-/** An open Radix list or menu (a Select's, a DropdownMenu's). */
-const OPEN_RADIX_LIST = `${RADIX_LAYER} [role="listbox"], ${RADIX_LAYER} [role="menu"]`
+/** An open Radix list or menu (a Select's, a DropdownMenu's); one animating out (`data-state="closed"`) no longer counts. */
+const OPEN_RADIX_LIST = `${RADIX_LAYER} [role="listbox"][data-state="open"], ${RADIX_LAYER} [role="menu"][data-state="open"]`
 /** What can take the focus when the trigger is a row rather than a button (a field and its button). */
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -28,6 +28,9 @@ export interface DismissOptions {
   /** What opened the popup (its button, or the field and button that open it): a press on it is not outside, and Esc
    *  gives it the focus back (its first focusable element when it is a row). */
   trigger?: ElementSource
+  /** Where Esc or Close puts the focus when no trigger opened the popup (a sheet opened from a menu item): unlike a
+   *  trigger, a press on it is outside. */
+  returnFocus?: ElementSource
   /** false: the popup is closed, nothing is listened to. */
   enabled?: boolean
 }
@@ -78,6 +81,7 @@ export function attachDismissOnOutside(
   getPanel: () => NodeLike | null | undefined,
   getTrigger: () => NodeLike | null | undefined,
   onClose: () => void,
+  getReturnFocus: () => NodeLike | null | undefined = getTrigger,
 ): () => void {
   const onPointerDown = (event: Event) => {
     const target = event.target
@@ -92,7 +96,7 @@ export function attachDismissOnOutside(
     const panel = getPanel()
     if (!panel || inRadixLayer(key.target)) return
     key.preventDefault()
-    if (focusWasIn(doc, panel)) focusTrigger(getTrigger())
+    if (focusWasIn(doc, panel)) focusTrigger(getReturnFocus())
     onClose()
   }
   // Capture: a press that something below stops (an editor, a drag handle) still closes the popup.
@@ -109,9 +113,10 @@ export function attachDismissOnOutside(
  * for the popup's own Close button: it gives the focus back to the trigger, as Esc does.
  */
 export function useDismissOnOutside(ref: RefObject<HTMLElement | null>, onClose: () => void, options: DismissOptions = {}): () => void {
-  const { trigger, enabled = true } = options
-  const latest = useRef({ onClose, trigger })
-  latest.current = { onClose, trigger }
+  const { trigger, returnFocus, enabled = true } = options
+  const latest = useRef({ onClose, trigger, returnFocus })
+  latest.current = { onClose, trigger, returnFocus }
+  const focusBack = () => resolve(latest.current.returnFocus ?? latest.current.trigger)
 
   useEffect(() => {
     if (!enabled || typeof document === 'undefined') return
@@ -120,11 +125,14 @@ export function useDismissOnOutside(ref: RefObject<HTMLElement | null>, onClose:
       () => ref.current,
       () => resolve(latest.current.trigger),
       () => latest.current.onClose(),
+      focusBack,
     )
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- focusBack reads the latest options through the ref
   }, [enabled, ref])
 
   return useCallback(() => {
-    focusTrigger(resolve(latest.current.trigger))
+    focusTrigger(focusBack())
     latest.current.onClose()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- as above
   }, [])
 }

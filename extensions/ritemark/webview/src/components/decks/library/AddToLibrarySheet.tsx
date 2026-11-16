@@ -30,16 +30,18 @@ interface AddToLibrarySheetProps {
   style: CSSProperties
   onAdd: (topic: string) => void
   onClose: () => void
+  /** Where the focus goes back to on Esc, Close or Cancel: the strip the sheet was opened from, so its keys work at once. */
+  returnFocus?: () => HTMLElement | null | undefined
 }
 
-export function AddToLibrarySheet({ number, topics, style, onAdd, onClose }: AddToLibrarySheetProps) {
+export function AddToLibrarySheet({ number, topics, style, onAdd, onClose, returnFocus }: AddToLibrarySheetProps) {
   const [choice, setChoice] = useState<string>('')
   const [name, setName] = useState('')
   const nameField = useRef<HTMLInputElement>(null)
   // 17 November (Jarmo): a press outside the sheet closes it, as Esc does. A Select's list is its own layer: choosing
   // a topic keeps the sheet open.
   const ref = useRef<HTMLDivElement>(null)
-  useDismissOnOutside(ref, onClose)
+  const dismiss = useDismissOnOutside(ref, onClose, { returnFocus })
 
   // The first topic is chosen once the topics come; with none, a new topic.
   useEffect(() => {
@@ -68,7 +70,7 @@ export function AddToLibrarySheet({ number, topics, style, onAdd, onClose }: Add
       <header className="deck-settings-head">
         <span>Add slide {number} to the library</span>
         <Tooltip label="Close without adding">
-          <Button variant="ghost" size="icon-sm" aria-label="Close" onClick={onClose}>
+          <Button variant="ghost" size="icon-sm" aria-label="Close" onClick={dismiss}>
             <Icon name="x" size={14} tone="inherit" />
           </Button>
         </Tooltip>
@@ -104,7 +106,7 @@ export function AddToLibrarySheet({ number, topics, style, onAdd, onClose }: Add
       ) : null}
       <footer className="deck-addlib-foot">
         <Tooltip label="Close without adding">
-          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" size="sm" onClick={dismiss}>Cancel</Button>
         </Tooltip>
         <Tooltip label={ready ? 'Add this slide to the topic; the slide here becomes a copy of it' : nameProblem ?? 'Choose a topic first'}>
           <Button size="sm" disabled={!ready} onClick={add}>Add to library</Button>

@@ -23,7 +23,8 @@ export function AddPropertyMenu({ existingKeys, onAdd, onClose }: AddPropertyMen
   // the "Add" button beside it (the shared rule, `lib/dismissOnOutside`). A
   // press on that button is not outside: it toggles the menu by itself.
   useDismissOnOutside(menuRef, onClose, {
-    trigger: () => menuRef.current?.parentElement?.querySelector<HTMLElement>(':scope > button'),
+    // The wrapper's first button, also when a tooltip's span wraps it (the menu is drawn after it).
+    trigger: () => menuRef.current?.parentElement?.querySelector<HTMLElement>('button'),
   })
 
   useEffect(() => {

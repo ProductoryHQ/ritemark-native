@@ -134,20 +134,21 @@ interface ThumbnailProps {
   onMenuOpen: (index: number | null) => void
   /** Where the focus goes when the menu closes: the strip, so its keys work at once (Backspace, the arrows). */
   onMenuCloseFocus: (event: Event) => void
-  /** A copy of a library slide (its menu has Show in the library), and its badge. */
-  fromLibrary: boolean
-  badge: { label: string; amber: boolean } | null
+  /** A copy of a library slide: its badge's tooltip (its menu then has Show in the library), and whether it is amber. */
+  badgeLabel: string | null
+  badgeAmber: boolean
 }
 
 /** One numbered thumbnail, with its menu. */
-const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, fromLibrary, badge }: ThumbnailProps) {
+const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber }: ThumbnailProps) {
   const { index, kind, data } = entry
   const skipped = data.skip === true
+  const fromLibrary = badgeLabel !== null
   return (
     <div
       role="option"
       aria-selected={current}
-      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}${badge ? `, ${badge.label.toLowerCase()}` : ''}`}
+      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}${badgeLabel ? `, ${badgeLabel.toLowerCase()}` : ''}`}
       data-thumb={index}
       className={`deck-thumb${current ? ' is-current' : ''}${skipped ? ' is-skip' : ''}${dragging ? ' is-dragging' : ''}${menuOpen ? ' is-menu' : ''}`}
       onPointerDown={event => onDragStart(index, event)}
@@ -163,9 +164,9 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
         <SlideCanvas kind={kind} data={data as SlideData} width={THUMB_WIDTH} theme={theme} borderless={borderless} assets={assets} />
       </div>
       {skipped ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}
-      {badge ? (
+      {badgeLabel ? (
         // The tooltip's own wrapper is placed (absolute), so the badge never joins the thumbnail's row.
-        <Tooltip label={badge.label} className={`deck-thumb-badge${badge.amber ? ' is-amber' : ''}`}>
+        <Tooltip label={badgeLabel} className={`deck-thumb-badge${badgeAmber ? ' is-amber' : ''}`}>
           <span><Icon name="cards-three" size={12} tone="inherit" /></span>
         </Tooltip>
       ) : null}
@@ -391,8 +392,8 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
             menuOpen={menuFor === entry.index}
             onMenuOpen={setMenuFor}
             onMenuCloseFocus={onMenuCloseFocus}
-            fromLibrary={!!(entry.data.id && marks[entry.data.id]?.library)}
-            badge={entry.data.id ? libraryBadge(marks[entry.data.id]) : null}
+            badgeLabel={(entry.data.id && libraryBadge(marks[entry.data.id])?.label) || null}
+            badgeAmber={!!(entry.data.id && libraryBadge(marks[entry.data.id])?.amber)}
           />
         </div>
       ))}

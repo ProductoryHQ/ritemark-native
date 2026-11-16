@@ -21,9 +21,11 @@ class FakeNode implements NodeLike {
   }
   private is(selector: string): boolean {
     return selector.split(',').some(part => {
-      const last = part.trim().split(/\s+/).pop()!
-      if (last === '[data-radix-popper-content-wrapper]') return 'data-radix-popper-content-wrapper' in this.attrs
-      if (last.startsWith('[role=')) return this.attrs.role === last.slice(7, -2)
+      const last = part.trim().split(/\s+/).pop()!.replace(/:not\([^)]*\)/g, "")
+      if (last.startsWith('[')) {
+        // Attribute selectors, one or several: [name] or [name="value"].
+        return [...last.matchAll(/\[([\w-]+)(?:="([^"]*)")?\]/g)].every(([, name, value]) => value === undefined ? name in this.attrs : this.attrs[name] === value)
+      }
       const tag = last.split(':')[0]
       return tag.toUpperCase() === this.tagName
     })
@@ -153,7 +155,7 @@ function desk() {
 {
   const d = desk()
   const wrapper = d.doc.body.add(new FakeNode('DIV', { 'data-radix-popper-content-wrapper': '' }))
-  const list = wrapper.add(new FakeNode('DIV', { role: 'listbox' }))
+  const list = wrapper.add(new FakeNode('DIV', { role: 'listbox', 'data-state': 'open' }))
   const option = list.add(new FakeNode('DIV', { role: 'option' }))
   d.doc.press(option)
   assert.equal(d.open, true, 'choosing from a Select inside the popup keeps it open')
@@ -171,6 +173,33 @@ function desk() {
   option.focus()
   d.doc.key('Escape')
   assert.equal(d.open, true, "Esc in a Select's list closes the list, not the popup")
+}
+
+{
+  // A list animating out (data-state="closed") is no longer open: the press closes the popup at once (review, PR 759).
+  const d = desk()
+  const wrapper = d.doc.body.add(new FakeNode('DIV', { 'data-radix-popper-content-wrapper': '' }))
+  wrapper.add(new FakeNode('DIV', { role: 'listbox', 'data-state': 'closed' }))
+  d.doc.press(d.handout)
+  assert.equal(d.open, false, 'an exiting list takes no press')
+}
+
+// ---- A popup opened from a menu item has no trigger: Esc gives the focus to where it came from (the strip), and a
+// press on that place is outside, unlike a trigger (review, PR 759).
+{
+  const doc = new FakeDoc()
+  const strip = doc.body.add(new FakeNode('DIV', { tabindex: '0' }))
+  const sheet = doc.body.add(new FakeNode('DIV'))
+  const field = sheet.add(new FakeNode('INPUT'))
+  let open = true
+  attachDismissOnOutside(doc, () => (open ? sheet : null), () => null, () => { open = false }, () => strip)
+  field.focus()
+  doc.key('Escape')
+  assert.equal(open, false)
+  assert.equal(doc.activeElement, strip, 'Esc gives the strip the focus, so its keys work at once')
+  open = true
+  doc.press(strip)
+  assert.equal(open, false, 'a press on the strip closes the sheet')
 }
 
 // ---- Closed or detached: nothing more happens, and no listener is left behind.
@@ -201,7 +230,10 @@ function desk() {
 // ---- The popups that use it (the deck slide's Settings is a Radix Popover: slideSettingsPopup.test.ts).
 const here = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
 {
-  assert.match(here('../components/decks/library/AddToLibrarySheet.tsx'), /useDismissOnOutside\(ref, onClose\)/)
+  const sheet = here('../components/decks/library/AddToLibrarySheet.tsx')
+  assert.match(sheet, /const dismiss = useDismissOnOutside\(ref, onClose, \{ returnFocus \}\)/)
+  assert.equal((sheet.match(/onClick=\{dismiss\}/g) ?? []).length, 2, 'Close and Cancel give the focus back too')
+  assert.match(here('../components/decks/DeckView.tsx'), /returnFocus=\{\(\) => stripRef\.current\}/)
   assert.match(here('../components/header/CommentsMenuButton.tsx'), /useDismissOnOutside\(rootRef,/)
   const property = here('../components/properties/AddPropertyMenu.tsx')
   assert.match(property, /useDismissOnOutside\(menuRef, onClose, \{/)
