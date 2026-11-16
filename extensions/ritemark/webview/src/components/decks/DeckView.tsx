@@ -26,7 +26,9 @@ import type { DocumentProperties } from '../properties'
 import { SegmentedControl } from '../ui/segmented-control'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
-import { deleteSlide, duplicateSlide, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
+import { deleteSlide, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
+import { StartCard } from './StartCard'
+import { deckStarted, startCardRows, type StartCardState } from '../../../../src/decks/startCard'
 import { DOMParser as PMDOMParser, Fragment, type Node as PMNode, type Slice } from '@tiptap/pm/model'
 import { editorHTMLToMarkdown, markdownToEditorHTML } from '../../utils/editorMarkdown'
 import { SourceLines, type CopySource } from './library/SourceLines'
@@ -74,6 +76,8 @@ const WRITE_LOCK_MS = 1200
 /** The copies' sources are asked again this long after the deck stops changing; "Updated in the library" stays this long. */
 const SOURCES_MS = 700
 const UPDATED_MS = 4000
+/** The start card's distance below the first part's text, and above the room's end (frame 20). */
+const START_CARD_GAP = 8
 
 /** A notice in the deck's bar, with one action (Undo) when it has one. */
 interface Notice {
@@ -218,15 +222,61 @@ export function DeckView({
     onEditorReady(instance)
   }, [onEditorReady])
 
-  // The slides, from the editor's document, after every change (the host's too).
+  // The slides, from the editor's document, after every change (the host's too); and whether the handout holds words.
+  const [handoutText, setHandoutText] = useState(false)
   useEffect(() => {
     if (!editor) return
-    const refresh = () => setSlides(slidesOf(editor.state.doc))
+    const refresh = () => {
+      setSlides(slidesOf(editor.state.doc))
+      setHandoutText(handoutHasText(editor.state.doc))
+    }
     refresh()
     return onDocChanged(editor, refresh)
   }, [editor])
 
   const count = slides.length
+
+  // The handout's start card (16 November, the Experience lead's frame 20) on a deck New made: the host says whether
+  // this deck is New's, which AI drafts it and the project's earlier decks. Once it goes it never comes back.
+  const [startState, setStartState] = useState<StartCardState | null>(null)
+  const [startGone, setStartGone] = useState(false)
+  const [startAt, setStartAt] = useState<{ left: number; top: number; width: number } | null>(null)
+  const startRef = useRef<HTMLDivElement | null>(null)
+  const startRows = startState ? startCardRows({
+    fresh: startState.fresh,
+    dismissed: startGone,
+    slideCount: count,
+    handoutHasText: handoutText,
+    aiReady: !!startState.ai,
+    earlierCount: startState.earlier.length,
+  }) : null
+  useEffect(() => {
+    if (!editor) return
+    const off = onMessage(message => {
+      if (message.type === 'deck/start-card' && message.state && typeof message.state === 'object') setStartState(message.state as StartCardState)
+    })
+    sendToExtension('deck/start-card')
+    return off
+  }, [editor])
+  // The card goes for good once the deck is started (a second slide, words in the handout), and the host forgets it.
+  const started = count > 0 && deckStarted(count, handoutText)
+  useEffect(() => {
+    if (!startState?.fresh || startGone || !started) return
+    setStartGone(true)
+    sendToExtension('deck/start-card-gone')
+  }, [startState, startGone, started])
+  // While it shows, the AI's sign-in is read again when the window comes back (the person may have signed in meanwhile).
+  const startShown = !!startRows
+  useEffect(() => {
+    if (!startShown) return
+    const again = () => { if (document.visibilityState === 'visible') sendToExtension('deck/start-card') }
+    window.addEventListener('focus', again)
+    return () => window.removeEventListener('focus', again)
+  }, [startShown])
+  const leaveStart = useCallback((type: 'deck/start-card-gone' | 'deck/start-draft' | 'deck/start-copy', fields?: Record<string, unknown>) => {
+    setStartGone(true)
+    sendToExtension(type, fields)
+  }, [])
   const countRef = useRef(count)
   countRef.current = count
   const shown = count === 0 ? 0 : Math.min(current, count - 1)
@@ -294,8 +344,15 @@ export function DeckView({
       const padding = parseFloat(getComputedStyle(dom).paddingBottom) || 0
       const textEnd = dom.getBoundingClientRect().bottom - origin - padding
       const lastHeight = textEnd - tops[tops.length - 1]
-      const room = Math.round(Math.max(40, container.clientHeight - lastHeight - PART_TOP_GAP))
+      // The start card sits in that room, under the text: the room is never shorter than the card
+      const card = startShown ? (startRef.current?.offsetHeight ?? 0) + START_CARD_GAP * 2 : 0
+      const room = Math.round(Math.max(40, card, container.clientHeight - lastHeight - PART_TOP_GAP))
       if (Math.abs(room - padding) > 1) dom.style.setProperty('padding-bottom', `${room}px`, 'important')
+      const head = editor.view.dom.querySelector<HTMLElement>(':scope > .deck-part-head')
+      const next = startShown && head
+        ? { left: Math.round(head.getBoundingClientRect().left - container.getBoundingClientRect().left), width: Math.round(head.getBoundingClientRect().width), top: Math.round(textEnd + START_CARD_GAP) }
+        : null
+      setStartAt(at => (at && next && at.left === next.left && at.width === next.width && at.top === next.top) || at === next ? at : next)
     }
     /** Where part `index` ends: the next part's head, or for the last part, where the text does (above the room left
      *  for scrolling it to the top). */
@@ -323,7 +380,7 @@ export function DeckView({
     if (shown >= tops.length || heads[shown]?.classList.contains('is-section')) { setBar(null); return }
     const top = tops[shown] + 16
     setBar({ left, top, height: Math.max(0, endOf(shown, 6) - top) })
-  }, [partTops, scrollContainer, shown, editor])
+  }, [partTops, scrollContainer, shown, editor, startShown])
 
   useEffect(() => {
     measureBar()
@@ -336,6 +393,15 @@ export function DeckView({
 
     return () => observer.disconnect()
   }, [editor, measureBar, slides])
+  // The start card's own height (All decks… shows the rest) changes the room under the text.
+  const startPlaced = startShown && !!startAt
+  useEffect(() => {
+    const card = startRef.current
+    if (!startPlaced || !card) return
+    const observer = new ResizeObserver(() => measureBar())
+    observer.observe(card)
+    return () => observer.disconnect()
+  }, [startPlaced, measureBar])
 
   // Scrolling the handout changes the slide, unless a pick or writing holds it.
   useEffect(() => {
@@ -646,6 +712,8 @@ export function DeckView({
   // host says so once this view has told it which slide it shows; the slides may not be read yet, so it waits for them.
   useEffect(() => onMessage(message => {
     if (message.type === 'deck/select-title') setSelectTitle(true)
+    // The start card's line: "This deck is now a copy of <name>.", or why it couldn't be
+    else if (message.type === 'deck/notice' && typeof message.text === 'string') setNotice({ text: message.text })
   }), [])
   useEffect(() => {
     if (!selectTitle || slides.length === 0) return
@@ -1016,6 +1084,18 @@ export function DeckView({
           />
           {handoutContainer && bar ? createPortal(<div className="deck-part-bar" style={{ left: bar.left, top: bar.top, height: bar.height }} />, handoutContainer) : null}
           {handoutContainer && bands.length ? createPortal(bands.map(band => <div key={band.top} className="deck-part-band" style={band} />), handoutContainer) : null}
+          {handoutContainer && startRows && startState && startAt ? createPortal(
+            <StartCard
+              ref={startRef}
+              style={startAt}
+              aiName={startRows.ask ? startState.ai?.name ?? null : null}
+              earlier={startRows.copy ? startState.earlier : []}
+              onDraft={words => leaveStart('deck/start-draft', { text: words })}
+              onCopy={deck => leaveStart('deck/start-copy', { source: deck.path })}
+              onHide={() => leaveStart('deck/start-card-gone')}
+            />,
+            handoutContainer,
+          ) : null}
         </div>
       </div>
       {dialogs}

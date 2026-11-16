@@ -227,3 +227,25 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-addlib .deck-addlib-name { margin-top: 8px; }
 .deck-addlib .deck-addlib-problem { margin: 4px 0 0; font-size: 12px; line-height: 16px; color: var(--r-ink-muted); }
 .deck-addlib .deck-addlib-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
+/* The handout's start card (16 November, the Experience lead's frame 20, the prototype's `.hstart`): under the first part of a
+   deck New made, a hairline card, radius 10, padding 14. Drawn by the deck view in the handout's scrolled content, over
+   the room below the text, so it sits above the editor's padding (z-index 2). */
+.deck-start { position: absolute; z-index: 2; box-sizing: border-box; display: grid; gap: 10px; padding: 14px 14px 12px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--r-hairline-strong); background: var(--r-surface); font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.deck-start .deck-start-x { position: absolute; right: 8px; top: 8px; width: 24px; height: 24px; padding: 0; border-radius: 6px; color: var(--r-ink-muted); }
+.deck-start .deck-start-x:hover { color: var(--r-ink-strong); }
+.deck-start-eyebrow { font: 700 11px/14px var(--ritemark-ui-font-family); letter-spacing: .06em; text-transform: uppercase; color: var(--r-ink-muted); user-select: none; }
+.deck-start-label { display: flex; align-items: center; gap: 8px; margin-top: 2px; font: 600 13.5px/18px var(--ritemark-ui-font-family); color: var(--r-ink-strong); user-select: none; }
+.deck-start-label .deck-start-icon { color: var(--r-accent); }
+.deck-start-ask { display: flex; gap: 8px; align-items: center; }
+.deck-start .deck-start-ask .deck-start-field { flex: 1; min-width: 0; height: 34px; padding: 0 10px; border: 0; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--r-hairline-strong); background: var(--r-surface); font: 400 13px/34px var(--ritemark-ui-font-family); color: var(--r-ink-strong); outline: 0; }
+.deck-start .deck-start-ask .deck-start-field:focus { box-shadow: inset 0 0 0 2px var(--r-accent); --tw-ring-shadow: 0 0 #0000; }
+.deck-start .deck-start-ask .deck-start-field::placeholder { color: var(--r-ink-faint); }
+.deck-start .deck-start-draft { height: 34px; padding: 0 11px; border-radius: 7px; font-size: 13px; }
+.deck-start-earlier { display: grid; margin: -2px 0 0; }
+.deck-start .deck-start-deck { display: grid; justify-items: start; height: auto; margin: 0 -8px; padding: 5px 8px; border-radius: 6px; gap: 0; text-align: left; white-space: normal; font: 500 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.deck-start .deck-start-deck:active { transform: none; }
+.deck-start .deck-start-deck-name, .deck-start .deck-start-deck-where { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deck-start .deck-start-deck-where { font-weight: 400; font-size: 12px; line-height: 16px; color: var(--r-ink-muted); }
+.deck-start .deck-start-more { color: var(--r-accent); }
+.deck-start .deck-start-more:hover { color: var(--r-accent); }

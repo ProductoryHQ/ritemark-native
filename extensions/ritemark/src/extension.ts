@@ -519,7 +519,13 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── Decks (Sprint 157, experience 46) ───────────────────────────────────────
   // A `.deck.md` opens as a deck in the Ritemark editor while the flag `decks` is on.
-  decks = registerDecks(context, { newFileFolder: getNewDocumentFolder, noteNewFile: filePath => madeSomething.noteDraft(filePath) });
+  decks = registerDecks(context, {
+    newFileFolder: getNewDocumentFolder,
+    noteNewFile: filePath => madeSomething.noteDraft(filePath),
+    // The start card's Draft (16 November): Home's own path for a chat sent as the person's first message
+    startChat: request => unifiedViewProvider.startChat(request),
+    runtimeAvailability: runtimeId => unifiedViewProvider.runtimeAvailability(runtimeId),
+  });
 
   // ── Search, the words layer (Sprint 148, #591) ─────────────────────────────
   // The index of this window's project, in its own worker thread, and its results

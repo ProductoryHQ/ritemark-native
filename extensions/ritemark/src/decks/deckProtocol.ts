@@ -5,6 +5,8 @@
  * Pure: no `vscode`, so the test decodes the same messages the host does.
  */
 
+import { MAX_DRAFT_WORDS, type StartCardState } from './startCard';
+
 /** At most this many picture paths in one request: a deck's slides, with room to spare. */
 export const MAX_ASSET_PATHS = 500;
 const MAX_PATH_LENGTH = 1024;
@@ -56,7 +58,15 @@ export type DeckRequest =
    */
   | { type: 'deck/publish'; text: string; look: 'card' | 'borderless'; steps: number[] }
   /** The Published chip's menu: Copy link, See online, Unpublish (2.2's commands on the page). */
-  | { type: 'deck/page-action'; action: DeckPageAction };
+  | { type: 'deck/page-action'; action: DeckPageAction }
+  /** The start card (16 November, frame 20): is this deck New's, which AI drafts it, and the project's earlier decks. */
+  | { type: 'deck/start-card' }
+  /** The card went (× or the deck was started): it never comes back to this deck. */
+  | { type: 'deck/start-card-gone' }
+  /** Draft: the person's words go to the AI as a message with this deck attached. */
+  | { type: 'deck/start-draft'; text: string }
+  /** This deck becomes a copy of the earlier deck at this project path. */
+  | { type: 'deck/start-copy'; source: string };
 
 export type DeckPageAction = 'copy-link' | 'see-online' | 'unpublish';
 
@@ -96,7 +106,11 @@ export type DeckHostMessage =
   /** The bar's Publish control's state (Sprint 159 PR 4). */
   | { type: 'deck/page-state'; state: DeckPageState }
   /** A line for the deck's bar from Publish: why a page wasn't written, or that the link is copied. */
-  | { type: 'deck/page-notice'; text: string };
+  | { type: 'deck/page-notice'; text: string }
+  /** The start card's state for this deck (`startCard.ts`). */
+  | { type: 'deck/start-card'; state: StartCardState }
+  /** A line for the deck's bar from the start card: "This deck is now a copy of <name>.", or why it couldn't be. */
+  | { type: 'deck/notice'; text: string };
 
 export class DeckProtocolError extends Error {}
 
@@ -194,6 +208,23 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
       exactKeys(input, ['type', 'action']);
       if (input.action !== 'copy-link' && input.action !== 'see-online' && input.action !== 'unpublish') throw new DeckProtocolError('Unknown page action');
       return { type: 'deck/page-action', action: input.action };
+    }
+    case 'deck/start-card':
+    case 'deck/start-card-gone': {
+      exactKeys(input, ['type']);
+      return { type: input.type };
+    }
+    case 'deck/start-draft': {
+      exactKeys(input, ['type', 'text']);
+      const text = stringOf(input.text, MAX_DRAFT_WORDS);
+      if (!text.trim()) throw new DeckProtocolError('text must hold words');
+      return { type: 'deck/start-draft', text };
+    }
+    case 'deck/start-copy': {
+      exactKeys(input, ['type', 'source']);
+      const source = stringOf(input.source, MAX_PATH_LENGTH);
+      if (!/\.deck\.md$/i.test(source)) throw new DeckProtocolError('source must be a deck');
+      return { type: 'deck/start-copy', source };
     }
     case 'deck/applied': {
       exactKeys(input, ['type', 'requestId', 'ok']);
