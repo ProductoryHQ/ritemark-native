@@ -198,29 +198,9 @@ function desk() {
   focusTrigger(null)
 }
 
-// ---- The popups that use it, and the deck slide's gear (Jarmo, 17 November; the Experience lead).
+// ---- The popups that use it (the deck slide's Settings is a Radix Popover: slideSettingsPopup.test.ts).
 const here = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
 {
-  const settings = here('../components/decks/SlideSettings.tsx')
-  assert.match(settings, /useDismissOnOutside\(ref, onClose, \{ trigger \}\)/, 'Settings use the shared rule, with the gear as its trigger')
-  assert.match(settings, /onClick=\{dismiss\}/, "Settings' Close gives the focus back to the gear")
-  assert.doesNotMatch(settings, /event\.key === 'Escape'/, 'no Esc of its own beside the shared one')
-  const view = here('../components/decks/DeckView.tsx')
-  assert.match(view, /trigger=\{\(\) => deskRef\.current\?\.querySelector<HTMLElement>\('\.deck-settings-button'\)\}/)
-
-  const stage = here('../components/decks/Stage.tsx')
-  const gear = stage.slice(stage.indexOf('<div className="deck-sethead">'), stage.indexOf('className="deck-big"'))
-  assert.match(gear, /<Tooltip label="Slide settings">/)
-  assert.match(gear, /aria-label="Slide settings"/)
-  assert.match(gear, /size="icon-xs"/)
-  assert.match(gear, /variant="ghost"/)
-  assert.match(gear, /<Icon name="gear" size=\{16\}/)
-  assert.doesNotMatch(gear, />\s*Settings\s*</, 'no words beside the gear')
-  assert.doesNotMatch(gear, /\btitle=/, 'a tooltip, never a native title')
-  assert.match(here('../components/ui/button.tsx'), /"icon-xs": "size-7"/, 'the 28 px icon button is a size of the shared Button')
-  const css = here('../components/decks/decks.css')
-  assert.match(css, /\.deck-sethead \{ display: flex; justify-content: flex-end;[^}]*padding: 0 24px; \}/, 'the gear sits right-aligned to the frame (its 24 px margin), above it')
-
   assert.match(here('../components/decks/library/AddToLibrarySheet.tsx'), /useDismissOnOutside\(ref, onClose\)/)
   assert.match(here('../components/header/CommentsMenuButton.tsx'), /useDismissOnOutside\(rootRef,/)
   const property = here('../components/properties/AddPropertyMenu.tsx')

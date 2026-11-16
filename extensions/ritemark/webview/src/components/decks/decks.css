@@ -158,13 +158,17 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-notice-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Settings above the slide's right corner, and its panel beside the slide (prototype `.sethead`, `.setp`) */
-/* The slide's gear (17 November): on the desk just above the frame, right-aligned to its edge (the frame's 24 px
-   margin), never over the slide. Its place is this one rule: inside the frame's corner would change only this line. */
-.deck-sethead { display: flex; justify-content: flex-end; align-items: center; height: 36px; padding: 0 24px; }
-.deck-sethead .deck-settings-button { color: var(--r-ink-muted); }
-.deck-sethead .deck-settings-button:hover { background: var(--r-surface-muted); color: var(--r-ink-strong); }
-.deck-sethead .deck-settings-button[data-state="active"] { background: var(--r-surface-soft); color: var(--r-ink-strong); }
-.deck-settings { position: absolute; z-index: 40; width: 316px; padding: 12px; box-sizing: border-box; border-radius: 12px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline), 0 16px 34px -10px rgba(30,27,75,.28); font-size: 13px; line-height: 18px; color: var(--r-ink-strong); }
+/* Slide settings (17 November, "Nothing around the slide but the slide"): a 28 px gear in the deck's bar after the
+   count, its popup under it (a Popover, DeckView). Muted; ink on a quiet fill on hover; the bar's `on` while open. */
+.deck-bar .deck-settings-button { color: var(--r-ink-muted); }
+.deck-bar .deck-settings-button:hover { background: var(--r-surface-muted); color: var(--r-ink-strong); }
+.deck-bar .deck-settings-button[data-state="active"], .deck-bar .deck-settings-button[data-state="open"] { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+/* The Settings material: the popup (its card from ui/popover.tsx) and Add to library's sheet beside the slide. */
+.deck-settings { width: 316px; box-sizing: border-box; font-size: 13px; line-height: 18px; color: var(--r-ink-strong); }
+.deck-addlib { position: absolute; z-index: 40; padding: 12px; border-radius: 12px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline), 0 16px 34px -10px rgba(30,27,75,.28); }
+/* Its top: the lines that sat under the slide, which wrap in the popup's width. */
+.deck-settings-about { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 4px 0 0; container-type: inline-size; }
+.deck-settings-about .deck-source { flex-wrap: wrap; }
 .deck-settings-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 4px; font-weight: 600; line-height: 24px; }
 .deck-settings-k { margin: 12px 0 6px; font-size: 11px; font-weight: 600; line-height: 14px; letter-spacing: .5px; text-transform: uppercase; color: var(--r-ink-muted); }
 .deck-settings .deck-settings-lays { grid-template-columns: repeat(5, 1fr); gap: 8px 5px; }
@@ -212,8 +216,12 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-lib-menu-head { padding: 6px 8px 4px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
 .deck-lib-menu-note { padding: 4px 8px 6px; max-width: 240px; font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
 .deck-lib-notice { position: fixed; left: 8px; right: 8px; bottom: 12px; padding: 8px 12px; border-radius: 8px; background: var(--r-ink-strong); color: var(--r-surface); font: 12px/1.4 var(--ritemark-ui-font-family); }
-/* Sprint 157, PR 4: a copy's lines under the slide (prototype .chgl, .srcl) and the amber dot on its thumbnail (.th .dot). */
-.deck-thumb .deck-thumb-dot { position: absolute; left: 8px; top: 22px; width: 6px; height: 6px; border-radius: 50%; background: #F2B544; }
+/* Sprint 157, PR 4: a copy's lines (prototype .chgl, .srcl), at the top of Slide settings since 17 November. */
+/* A library slide's badge (17 November): bottom left of the thumbnail; quiet, amber when changed here or newer there. */
+.deck-thumb .deck-thumb-badge { position: absolute; left: 34px; bottom: 9px; z-index: 1; display: flex; }
+.deck-thumb .deck-thumb-badge > span { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 5px; background: rgba(255, 255, 255, .92); box-shadow: 0 0 0 1px var(--r-hairline); color: var(--r-ink-muted); }
+.deck-thumb .deck-thumb-badge > span svg { width: 11px; height: 11px; }
+.deck-thumb .deck-thumb-badge.is-amber > span { background: #F2B544; box-shadow: none; color: #1C1F4A; }
 .deck-change { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 12px; border-radius: 8px; background: var(--r-surface-muted); font-size: 12.5px; line-height: 18px; color: var(--r-ink-body); }
 .deck-change.is-new { background: #FFF7E6; }
 .deck-change.is-question { background: none; padding: 2px 0; font-size: 12px; color: var(--r-ink-muted); gap: 12px; }

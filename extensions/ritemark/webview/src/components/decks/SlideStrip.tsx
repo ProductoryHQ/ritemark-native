@@ -7,7 +7,8 @@
  *  - Each thumbnail's menu (its ⋯, or a right-click): Duplicate, Skip slide or Show slide, Delete slide. Delete asks
  *    nothing and has Undo (answer 6). Backspace or Delete does the same to the selected slide (`stripKeys.ts`).
  *  - Dragging a thumbnail reorders, one transaction per move, with a line where it lands.
- *  - A skipped slide is dimmed with an eye; a library copy with a newer version has an amber dot (PR 4).
+ *  - A skipped slide is dimmed with an eye. A library copy carries the library's badge at its bottom left (17 November,
+ *    replacing PR 4's amber dot): quiet, and amber when it was changed here or the library has a newer version.
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import type { SlideData } from '../../../../src/decks/deckFormat'
@@ -45,10 +46,19 @@ export interface StripActions {
   undo: (redo: boolean) => void
 }
 
-/** What the strip shows of a copy's source: from a library topic, and whether the library has a newer version. */
+/** What the strip shows of a copy's source: from a library topic, changed in this deck, or newer in the library. */
 export interface StripMark {
   library: boolean
   newer: boolean
+  changed?: boolean
+}
+
+/** The badge's tooltip, and whether it is amber (the Experience lead, 17 November). */
+export function libraryBadge(mark: StripMark | undefined): { label: string; amber: boolean } | null {
+  if (!mark?.library) return null
+  if (mark.changed) return { label: 'From the library, changed in this deck', amber: true }
+  if (mark.newer) return { label: 'From the library, which has a newer version', amber: true }
+  return { label: 'From the library', amber: false }
 }
 
 /** A new slide takes the caret in its title: the menu doesn't hand the focus back to its + when it closes. */
@@ -124,20 +134,20 @@ interface ThumbnailProps {
   onMenuOpen: (index: number | null) => void
   /** Where the focus goes when the menu closes: the strip, so its keys work at once (Backspace, the arrows). */
   onMenuCloseFocus: (event: Event) => void
-  /** A copy of a library slide; the amber dot when the library has a newer version (README frame 4). */
+  /** A copy of a library slide (its menu has Show in the library), and its badge. */
   fromLibrary: boolean
-  newer: boolean
+  badge: { label: string; amber: boolean } | null
 }
 
 /** One numbered thumbnail, with its menu. */
-const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, fromLibrary, newer }: ThumbnailProps) {
+const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, fromLibrary, badge }: ThumbnailProps) {
   const { index, kind, data } = entry
   const skipped = data.skip === true
   return (
     <div
       role="option"
       aria-selected={current}
-      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}${newer ? ', the library has a newer version' : ''}`}
+      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}${badge ? `, ${badge.label.toLowerCase()}` : ''}`}
       data-thumb={index}
       className={`deck-thumb${current ? ' is-current' : ''}${skipped ? ' is-skip' : ''}${dragging ? ' is-dragging' : ''}${menuOpen ? ' is-menu' : ''}`}
       onPointerDown={event => onDragStart(index, event)}
@@ -153,9 +163,11 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
         <SlideCanvas kind={kind} data={data as SlideData} width={THUMB_WIDTH} theme={theme} borderless={borderless} assets={assets} />
       </div>
       {skipped ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}
-      {newer ? (
-        // The tooltip's own wrapper is the dot: a child inside it would join the thumbnail's row and push the slide over.
-        <Tooltip label="The library has a newer version" className="deck-thumb-dot">{null}</Tooltip>
+      {badge ? (
+        // The tooltip's own wrapper is placed (absolute), so the badge never joins the thumbnail's row.
+        <Tooltip label={badge.label} className={`deck-thumb-badge${badge.amber ? ' is-amber' : ''}`}>
+          <span><Icon name="cards-three" size={12} tone="inherit" /></span>
+        </Tooltip>
       ) : null}
       <div className="deck-thumb-more" onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
         <DropdownMenu modal={false} open={menuOpen} onOpenChange={open => onMenuOpen(open ? entry.index : null)}>
@@ -380,7 +392,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
             onMenuOpen={setMenuFor}
             onMenuCloseFocus={onMenuCloseFocus}
             fromLibrary={!!(entry.data.id && marks[entry.data.id]?.library)}
-            newer={!!(entry.data.id && marks[entry.data.id]?.newer)}
+            badge={entry.data.id ? libraryBadge(marks[entry.data.id]) : null}
           />
         </div>
       ))}
