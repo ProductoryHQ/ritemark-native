@@ -525,7 +525,7 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
       {
         name: 'insert_slides',
         description:
-          "Insert copies of slides from the Slide library or another deck into a deck. Always use this for library slides: each copy gets its `from:` line, so the deck can later offer the library's newer version, and its picture and link paths are rewritten for the deck's folder. Answers with the new slides' numbers.",
+          "Insert copies of slides from the Slide library or another deck into a deck. Always use this for library slides: each copy gets its `from:` line, so the deck can later offer the library's newer version, and its picture and link paths are rewritten for the deck's folder. Each copy's handout opens with its own heading, as the deck's other parts do (the slide's title, when the source part had none). Answers with the new slides' numbers.",
         input: {
           deck: deckPathInput('The deck to insert into'),
           source: deckPathInput('The deck or library topic the slides come from'),

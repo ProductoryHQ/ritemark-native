@@ -151,8 +151,15 @@ class HandoutRenderer extends marked.Renderer {
     return text.replace(/</g, '&lt;');
   }
 
+  /** The handout's own opening heading (an H1 or H2 as its first block) is the part's heading, its h2. */
+  partHeading = false;
+
   heading(text: string, level: number): string {
-    // The part's own title is its heading (h2); the handout's headings sit under it.
+    if (this.partHeading) {
+      this.partHeading = false;
+      return `<h2>${text}</h2>\n`;
+    }
+    // The part's own heading is its h2 (its title, or its handout's own); the handout's headings sit under it.
     const tag = level <= 2 ? 'h3' : level === 3 ? 'h4' : 'h5';
     return `<${tag}>${text}</${tag}>\n`;
   }
@@ -211,10 +218,18 @@ const PROMPT_LABEL = /^[A-Z0-9][A-Z0-9 .,'’&:!?-]{0,28}$/;
 type Token = ReturnType<typeof marked.lexer>[number];
 
 /** One part's handout as HTML. In an Exercise, a numbered list at the top level is its steps, each with a tick. */
-export function handoutHtml(markdown: string, options: { partKey: string; exercise: boolean; pictureUrl: PictureUrl }): string {
+/** Does this handout open with its own heading, an H1 or H2 (16 November: the part's heading is the handout's)? */
+export function opensWithHeading(markdown: string): boolean {
+  const first = lexHandout(markdown).find((token: Token) => token.type !== 'space');
+  return first?.type === 'heading' && (first as { depth: number }).depth <= 2;
+}
+
+export function handoutHtml(markdown: string, options: { partKey: string; exercise: boolean; pictureUrl: PictureUrl; ownHeading?: boolean }): string {
   if (!markdown.trim()) return '';
   const renderer = new HandoutRenderer(options.partKey, options.pictureUrl);
   const tokens = lexHandout(markdown);
+  // A part with its own heading: its opening H1 or H2 is the part's h2 on the page.
+  renderer.partHeading = options.ownHeading === true;
   // The parser only renders tokens; the lexer above is where the handout is read, and the one place raw mode is kept out.
   const parser = new marked.Parser({ ...MARKED_OPTIONS, renderer });
   let out = '';
@@ -410,8 +425,11 @@ const titleOf = (slide: PublicSlide) => (slide.data.title ?? '').trim();
 /** The text column's part for one shown slide. */
 function partHtml(slide: PublicSlide, index: number, options: PageOptions, partKey: string): string {
   const number = index + 1;
-  const title = titleOf(slide);
-  const body = handoutHtml(slide.handout, { partKey, exercise: slide.kind === 'exercise', pictureUrl: options.pictureUrl });
+  // A part's heading is its handout's own (16 November). A part without one (every part of a deck written before this)
+  // shows its slide's title, as the deck view draws it until the first edit writes it.
+  const ownHeading = opensWithHeading(slide.handout);
+  const title = ownHeading ? '' : titleOf(slide);
+  const body = handoutHtml(slide.handout, { partKey, exercise: slide.kind === 'exercise', pictureUrl: options.pictureUrl, ownHeading });
   if (slide.kind === 'section') {
     const label = `Section${slide.data.number?.trim() ? ` ${slide.data.number.trim()}` : ''}`;
     return `<section class="part sect" data-i="${index}" id="s${number}"><div class="eyebrow">${esc(label)}</div>${title ? `<h2>${esc(title)}</h2>` : ''}\n${body}</section>`;

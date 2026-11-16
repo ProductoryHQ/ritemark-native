@@ -26,50 +26,66 @@ import type { DocumentProperties } from '../properties'
 import { SegmentedControl } from '../ui/segmented-control'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
-import { deleteSlide, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
+import { DECK_DERIVED, DEFAULT_RATIO, RATIO_MAX, RATIO_MIN, initialRatio, isRealChange, deleteSlide, derivedHeadings, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
 import { StartCard } from './StartCard'
 import { deckStarted, startCardRows, type StartCardState } from '../../../../src/decks/startCard'
-import { DOMParser as PMDOMParser, Fragment, type Node as PMNode, type Slice } from '@tiptap/pm/model'
+import { DOMParser as PMDOMParser, Fragment, type Node as PMNode } from '@tiptap/pm/model'
 import { editorHTMLToMarkdown, markdownToEditorHTML } from '../../utils/editorMarkdown'
 import { SourceLines, type CopySource } from './library/SourceLines'
 import { AddToLibrarySheet, type LibraryTopic } from './library/AddToLibrarySheet'
-import { onMessage, sendToExtension } from '../../bridge'
-import { isTrustedDeckTransaction } from './handout/deckGuard'
+import { getState, onMessage, saveState, sendToExtension } from '../../bridge'
 import { convertKind } from './slide/convertKind'
 import { SlideSettings } from './SlideSettings'
 import { SlideStrip, type StripActions, type StripMark } from './SlideStrip'
-import { newId, parseSlideBody, writeSlideBlock, writeSlideBody } from '../../../../src/decks/deckFormat'
+import { newId, parseSlideBody, withPartHeading, writeSlideBlock, writeSlideBody } from '../../../../src/decks/deckFormat'
 import type { Transaction } from '@tiptap/pm/state'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
 import { DeckGuard } from './handout/deckGuard'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
+import { DeckLines } from './handout/deckLines'
 import { Stage } from './Stage'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
 import './decks.css'
 
 /** The deck's extensions, made once: the editor's extension list is fixed at mount. */
-const DECK_EXTENSIONS = [DeckSlideWithPartHead, DeckGuard, DeckCurrent]
+const DECK_EXTENSIONS = [DeckSlideWithPartHead, DeckGuard, DeckCurrent, DeckLines]
 
 /** The strip's width (the prototype's 132). */
 const STRIP_WIDTH = 132
 /** Settings beside the slide: its width, and how long a notice stays in the bar. */
 const SETTINGS_WIDTH = 316
 const NOTICE_MS = 8000
-/** The quiet hint when a line is typed in the handout (the Experience lead's answer 10). */
-const LINE_HINT = 'In this version a line stays a line. Add a slide with + between the thumbnails.'
 /** The slide's room on the stage: 24 on each side, at most 900 wide. */
 const STAGE_MARGIN = 24
 const BIG_MAX = 900
 /** The handout is never narrower than this (the Experience lead's answer 4). */
 const HANDOUT_MIN = 300
 const STAGE_MIN = 300
-/** Below this desk width the strip folds and the slide and the handout split 60:40; below the next, the handout folds. */
+/** Below this desk width the strip folds and the slide and the handout split 40:60; below the next, the handout folds. */
 const NARROW_DESK = 900
 const NARROWEST_DESK = 600
-const DEFAULT_RATIO = 0.6
+
+/** The view's kept state, as `getState` gives it, with the slide's share. */
+interface DeckViewState { deckRatio?: number }
+
+function storedRatio(): unknown {
+  try {
+    return getState<DeckViewState | null>()?.deckRatio
+  } catch {
+    return undefined
+  }
+}
+
+function keepRatio(ratio: number) {
+  try {
+    saveState({ ...((getState<object | null>() ?? {}) as object), deckRatio: ratio })
+  } catch {
+    // The share is kept for this view only; without the view's state the default stands next time.
+  }
+}
 /** How long a thumbnail's scroll holds the slide, and how long writing does (the prototype's `syncLock`). */
 const PICK_LOCK_MS = 500
 const WRITE_LOCK_MS = 1200
@@ -104,8 +120,9 @@ function isNewPart(value: unknown): value is NewPart {
  * the page. Each slide gets a paragraph after it when its handout is empty, as a new slide does.
  */
 function partsFragment(editor: TipTapEditor, parts: NewPart[], imageMappings: Record<string, string>): Fragment | null {
+  // Making a part writes its heading (16 November): a part whose handout has none opens with its slide's title.
   const markdown = parts
-    .map(part => [writeSlideBlock(part.kind, part.body, part.notes ?? null), part.handout.trim()].filter(Boolean).join('\n\n'))
+    .map(part => [writeSlideBlock(part.kind, part.body, part.notes ?? null), withPartHeading(part.kind, parseSlideBody(part.body), part.handout.trim())].filter(Boolean).join('\n\n'))
     .join('\n\n')
   let html: string
   try {
@@ -192,13 +209,11 @@ export function DeckView({
   const [focusTitleOf, setFocusTitleOf] = useState<{ index: number; select: boolean } | null>(null)
   // Sprint 159 (PR 7): the host asked to select the title slide's title, once the deck's slides are there
   const [selectTitle, setSelectTitle] = useState(false)
-  const lineHintShown = useRef(false)
-  const [ratio, setRatio] = useState(DEFAULT_RATIO)
+  const [ratio, setRatio] = useState(() => initialRatio(storedRatio()))
+  const ratioRef = useRef(ratio)
+  ratioRef.current = ratio
   const [deskWidth, setDeskWidth] = useState(0)
   const [dragging, setDragging] = useState(false)
-  const [bar, setBar] = useState<{ left: number; top: number; height: number } | null>(null)
-  /** Each section part's grey band in the handout (the Experience lead's decision 12). */
-  const [bands, setBands] = useState<Array<{ left: number; width: number; top: number; height: number }>>([])
   const deskRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
   const lockUntil = useRef(0)
@@ -221,6 +236,47 @@ export function DeckView({
     setEditor(instance)
     onEditorReady(instance)
   }, [onEditorReady])
+
+  // An older deck's part headings, drawn from its slides' titles (16 November): put in after the document arrives and
+  // after every host update, never as an edit. Opening a deck writes nothing: while the document differs from the file
+  // only by these headings, a change the editor reports is no change and isn't passed on. The person's first real edit
+  // is, and the headings go into the file with it, as ordinary text from then on.
+  const derivedOnly = useRef<string | null>(null)
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+  const handleChange = useCallback((markdown: string) => {
+    if (!isRealChange(derivedOnly.current, markdown)) return
+    derivedOnly.current = null
+    onChangeRef.current(markdown)
+  }, [])
+  useEffect(() => {
+    if (!editor) return
+    let queued = false
+    const derive = () => {
+      queued = false
+      if (editor.isDestroyed) return
+      const tr = derivedHeadings(editor.state)
+      if (!tr) return
+      const before = editorHTMLToMarkdown(editor.getHTML())
+      editor.view.dispatch(tr)
+      const after = editorHTMLToMarkdown(editor.getHTML())
+      // Headings with words change the Markdown; empty ones (a new deck's) don't, and nothing waits for an edit.
+      if (after !== before) derivedOnly.current = after
+    }
+    const later = () => {
+      if (queued) return
+      queued = true
+      queueMicrotask(derive)
+    }
+    // The document as it arrives, and again as the host replaces it (its updates never come from the person).
+    const onTransaction = ({ transaction }: { transaction: Transaction }) => {
+      if (!transaction.docChanged || transaction.getMeta(DECK_DERIVED) === true) return
+      if (transaction.getMeta('preventUpdate') === true || transaction.getMeta('ritemarkDocumentRevision') !== undefined) later()
+    }
+    later()
+    editor.on('transaction', onTransaction)
+    return () => { editor.off('transaction', onTransaction) }
+  }, [editor])
 
   // The slides, from the editor's document, after every change (the host's too); and whether the handout holds words.
   const [handoutText, setHandoutText] = useState(false)
@@ -341,57 +397,30 @@ export function DeckView({
     }
   }, [editor, shown, count])
 
-  // The current part's line on the left of the handout, from its head to the next one's; and each section part's band.
+  // The room below the text, so the last part can be scrolled to the top; and the start card's place under the text.
   const measureBar = useCallback(() => {
     const tops = partTops()
     const container = scrollContainer()
-    if (!container || !editor || tops.length === 0) { setBar(null); setBands([]); return }
-    const heads = Array.from(editor.view.dom.querySelectorAll<HTMLElement>(':scope > .deck-part-head'))
+    if (!container || !editor || tops.length === 0) return
     // Room below the text so the last part can be scrolled to the top, and no more (the prototype's `.hand`
     // padding): every part can then become the current one by scrolling.
-    {
-      const dom = editor.view.dom
-      const origin = container.getBoundingClientRect().top - container.scrollTop
-      const padding = parseFloat(getComputedStyle(dom).paddingBottom) || 0
-      const textEnd = dom.getBoundingClientRect().bottom - origin - padding
-      const lastHeight = textEnd - tops[tops.length - 1]
-      // The start card sits in that room, under the text: the room is never shorter than the card
-      const card = startShown ? (startRef.current?.offsetHeight ?? 0) + START_CARD_GAP * 2 : 0
-      const room = Math.round(Math.max(40, card, container.clientHeight - lastHeight - PART_TOP_GAP))
-      if (Math.abs(room - padding) > 1) dom.style.setProperty('padding-bottom', `${room}px`, 'important')
-      const head = editor.view.dom.querySelector<HTMLElement>(':scope > .deck-part-head')
-      const next = startShown && head
-        ? { left: Math.round(head.getBoundingClientRect().left - container.getBoundingClientRect().left), width: Math.round(head.getBoundingClientRect().width), top: Math.round(textEnd + START_CARD_GAP) }
-        : null
-      setStartAt(at => (at && next && at.left === next.left && at.width === next.width && at.top === next.top) || at === next ? at : next)
-    }
-    /** Where part `index` ends: the next part's head, or for the last part, where the text does (above the room left
-     *  for scrolling it to the top). */
-    const endOf = (index: number, gap: number): number => {
-      if (index + 1 < tops.length) return tops[index + 1] - gap
-      const dom = editor.view.dom
-      const origin = container.getBoundingClientRect().top - container.scrollTop
-      return dom.getBoundingClientRect().bottom - origin - (parseFloat(getComputedStyle(dom).paddingBottom) || 0) - 10
-    }
-    // 12 to the left of the part's text, as the prototype's `.hpart.cur::before` and `.hpart.sect`.
-    const first = heads[0]
-    const left = first ? first.getBoundingClientRect().left - container.getBoundingClientRect().left - 12 : 8
-    const width = first ? first.getBoundingClientRect().width + 24 : 0
-    // A band from its head's top to 8 below the part's last block (the prototype's padding), its text inside; the
-    // next head keeps 6 below it (`.after-section`).
+    const dom = editor.view.dom
     const origin = container.getBoundingClientRect().top - container.scrollTop
-    setBands(heads.flatMap((head, index) => {
-      if (!head.classList.contains('is-section') || index >= tops.length) return []
-      let last: Element = head
-      for (let next = head.nextElementSibling; next && !next.classList.contains('deck-part-head'); next = next.nextElementSibling) last = next
-      const top = tops[index]
-      return [{ left, width, top, height: Math.max(0, last.getBoundingClientRect().bottom - origin + 8 - top) }]
-    }))
-    // The band marks a section's part; the current one shows by its accent number, as every part does.
-    if (shown >= tops.length || heads[shown]?.classList.contains('is-section')) { setBar(null); return }
-    const top = tops[shown] + 16
-    setBar({ left, top, height: Math.max(0, endOf(shown, 6) - top) })
-  }, [partTops, scrollContainer, shown, editor, startShown])
+    const style = getComputedStyle(dom)
+    const padding = parseFloat(style.paddingBottom) || 0
+    const textEnd = dom.getBoundingClientRect().bottom - origin - padding
+    const lastHeight = textEnd - tops[tops.length - 1]
+    // The start card sits in that room, under the text: the room is never shorter than the card
+    const card = startShown ? (startRef.current?.offsetHeight ?? 0) + START_CARD_GAP * 2 : 0
+    const room = Math.round(Math.max(40, card, container.clientHeight - lastHeight - PART_TOP_GAP))
+    if (Math.abs(room - padding) > 1) dom.style.setProperty('padding-bottom', `${room}px`, 'important')
+    // The card's sides are the text's own edges (frame 20: 48 left, 32 right), never the column's.
+    const box = dom.getBoundingClientRect()
+    const left = Math.round(box.left - container.getBoundingClientRect().left + (parseFloat(style.paddingLeft) || 0))
+    const width = Math.round(box.width - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0))
+    const next = startShown ? { left, width, top: Math.round(textEnd + START_CARD_GAP) } : null
+    setStartAt(at => (at && next && at.left === next.left && at.width === next.width && at.top === next.top) || at === next ? at : next)
+  }, [partTops, scrollContainer, editor, startShown])
 
   useEffect(() => {
     measureBar()
@@ -456,7 +485,7 @@ export function DeckView({
     }
   }, [scrollContainer, partTops, makeCurrent])
 
-  // Writing in a part makes its slide the current one: the caret in its text, or the cursor in its title.
+  // Writing in a part makes its slide the current one: the caret in its heading or its text.
   useEffect(() => {
     if (!editor) return
     const fromSelection = () => {
@@ -466,25 +495,11 @@ export function DeckView({
       lockUntil.current = Date.now() + WRITE_LOCK_MS
       if (index !== currentRef.current) makeCurrent(index)
     }
-    const onFocusIn = (event: FocusEvent) => {
-      const head = (event.target as HTMLElement | null)?.closest?.('.deck-part-head')
-      if (!head) return
-      const heads = Array.from(editor.view.dom.querySelectorAll(':scope > .deck-part-head'))
-      const index = heads.indexOf(head)
-      if (index < 0) return
-      lockUntil.current = Date.now() + WRITE_LOCK_MS
-      makeCurrent(index)
-    }
-    const onTitleInput = () => { lockUntil.current = Date.now() + WRITE_LOCK_MS }
     editor.on('selectionUpdate', fromSelection)
     editor.on('update', fromSelection)
-    editor.view.dom.addEventListener('focusin', onFocusIn)
-    editor.view.dom.addEventListener('input', onTitleInput, true)
     return () => {
       editor.off('selectionUpdate', fromSelection)
       editor.off('update', fromSelection)
-      editor.view.dom.removeEventListener('focusin', onFocusIn)
-      editor.view.dom.removeEventListener('input', onTitleInput, true)
     }
   }, [editor, makeCurrent])
 
@@ -528,10 +543,11 @@ export function DeckView({
     const move = (moveEvent: PointerEvent) => {
       const left = desk.getBoundingClientRect().left + stripWidth
       const x = moveEvent.clientX - left
-      if (avail > 0) setRatio(Math.max(0.3, Math.min(0.82, x / avail)))
+      if (avail > 0) setRatio(Math.max(RATIO_MIN, Math.min(RATIO_MAX, x / avail)))
     }
     const up = () => {
       setDragging(false)
+      keepRatio(ratioRef.current)
       target.removeEventListener('pointermove', move)
       target.removeEventListener('pointerup', up)
       target.removeEventListener('pointercancel', up)
@@ -629,29 +645,6 @@ export function DeckView({
     const timer = window.setTimeout(() => setNotice(null), NOTICE_MS)
     return () => window.clearTimeout(timer)
   }, [notice])
-
-  // A line typed in the handout stays a line in this cut; the first time, one quiet hint says how a slide is added.
-  useEffect(() => {
-    if (!editor) return
-    const onTransaction = ({ transaction }: { transaction: Transaction }) => {
-      if (lineHintShown.current || !transaction.docChanged || isTrustedDeckTransaction(transaction)) return
-      // Only what the steps put in is looked at, not the whole deck.
-      const addsLine = transaction.steps.some(step => {
-        let found = false
-        ;(step as { slice?: Slice }).slice?.content.descendants(node => {
-          if (node.type.name === 'horizontalRule') found = true
-          return !found
-        })
-        return found
-      })
-      if (addsLine) {
-        lineHintShown.current = true
-        setNotice({ text: LINE_HINT })
-      }
-    }
-    editor.on('transaction', onTransaction)
-    return () => { editor.off('transaction', onTransaction) }
-  }, [editor])
 
   // Settings beside the slide: closed when the slide changes, and placed beside it (over the handout when it must).
   useEffect(() => { setSettingsOpen(false) }, [shown])
@@ -1078,14 +1071,14 @@ export function DeckView({
           />
         ) : null}
 
-        <div className={`deck-handout${handoutShown ? '' : ' is-folded'}`} style={{ left: dividerLeft + 8 }} aria-hidden={handoutShown ? undefined : true}>
+        <div className={`deck-handout${handoutShown ? '' : ' is-folded'}`} style={{ left: dividerLeft }} aria-hidden={handoutShown ? undefined : true}>
           {findBar}
           <Editor
             value={content}
-            onChange={onChange}
+            onChange={handleChange}
             onSelectionChange={onSelectionChange}
             onEditorReady={handleEditorReady}
-            placeholder="Text and prompts for this slide."
+            placeholder="Write here. *** starts a new slide."
             className="h-full"
             imageMappings={imageMappings}
             commentCallouts={commentCallouts}
@@ -1093,8 +1086,6 @@ export function DeckView({
             onExternalApplied={onExternalApplied}
             extensions={DECK_EXTENSIONS}
           />
-          {handoutContainer && bar ? createPortal(<div className="deck-part-bar" style={{ left: bar.left, top: bar.top, height: bar.height }} />, handoutContainer) : null}
-          {handoutContainer && bands.length ? createPortal(bands.map(band => <div key={band.top} className="deck-part-band" style={band} />), handoutContainer) : null}
           {handoutContainer && startRows && startState && startAt ? createPortal(
             <StartCard
               ref={startRef}

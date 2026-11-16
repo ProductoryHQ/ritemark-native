@@ -8,7 +8,7 @@
  *    were rebased does not show as changed, and an edit that only moves line breaks in the handout doesn't either.
  *  - Update the library writes one slide by id (`replaceSlideBlock`), and every other byte of the topic stays.
  */
-import { parseDeck, parseSlideBody, writeSlideBlock, writeSlideBody, type SlideData } from './deckFormat';
+import { handoutWithoutHeading, parseDeck, parseSlideBody, writeSlideBlock, writeSlideBody, type SlideData } from './deckFormat';
 
 // ---------------------------------------------------------------------------
 // Paths (posix, project-relative)
@@ -138,10 +138,14 @@ export function foldMarkdown(text: string): string {
 /**
  * The stamp of a slide as a person sees it: kind, words, look, picture and handout. Not its id, its `from:`, whether
  * it is kept or skipped, or its notes. Paths are resolved from `folder` (the deck's project-relative folder).
+ *
+ * Not the part's own heading either (16 November): a heading is the handout's, and typing one never marks a library
+ * slide changed. So an older copy whose heading the editor writes in at the first edit, or a copy made with its heading
+ * from a topic written before headings, keeps its source's stamp.
  */
 export function slideStamp(kind: string, data: SlideData, handout: string, folder: string): string {
   const image = data.image ? projectPath(data.image, folder) ?? data.image : '';
-  const resolvedHandout = rewriteMarkdownTargets(handout, target => projectPath(target, folder) ?? target);
+  const resolvedHandout = rewriteMarkdownTargets(handoutWithoutHeading(handout), target => projectPath(target, folder) ?? target);
   const parts = [
     kind,
     fold(data.title), fold(data.subtitle), fold(data.number), data.look ?? '', data.picture ?? '', image,

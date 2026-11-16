@@ -7,7 +7,7 @@
  * from any other deck, is a copy carrying `from: <path>#<id> @<stamp>`. The UI and the AI's tools call the same
  * operations here (README decision 9, dual use).
  */
-import { deckVersionOf, isReadableDeckVersion, newId, parseFrom, parseSlideBody, writeFrom, writeSlideBody, type SlideData } from './deckFormat';
+import { deckVersionOf, isReadableDeckVersion, newId, parseFrom, parseSlideBody, withPartHeading, writeFrom, writeSlideBody, type SlideData } from './deckFormat';
 import {
   appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp,
   slidesOfText, type DeckSlideText,
@@ -207,7 +207,9 @@ export class DeckLibrary {
       // An open deck takes them only through its view: its file is never written under the person's typing.
       if (!(await intoView(parts, at - 1))) throw new Error(`${deckName(targetPath)} is open but didn't take the slides. Nothing was inserted; try again.`);
     } else {
-      await this.files.write(targetPath, insertPartsText(text, at, parts.map(part => partText(part.kind, part.body, part.handout))));
+      // Making a part writes its heading (16 November), as the deck view does: the copy's handout opens with its heading.
+      const written = parts.map(part => partText(part.kind, part.body, withPartHeading(part.kind, parseSlideBody(part.body), part.handout)));
+      await this.files.write(targetPath, insertPartsText(text, at, written));
     }
     return { first: at + 1, count: parts.length };
   }

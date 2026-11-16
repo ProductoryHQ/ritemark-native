@@ -33,6 +33,18 @@ export const blockItems: BlockItemDef[] = [
   { title: 'Divider', description: 'Horizontal rule', icon: 'minus', nodeType: 'horizontalRule' },
 ]
 
+/** Divider's name in a deck's / menu, where the line starts a new slide (experience 46, 16 November). */
+export const DECK_DIVIDER_TITLE = 'Divider · a new slide'
+
+/**
+ * The / menu's items: the Text editor's own, the same in a deck (Jarmo, 16 November: the traditional slash menu), where
+ * only Divider's name says what the line does there. Nothing is added or taken away.
+ */
+export function slashItemsFor(inDeck: boolean): BlockItemDef[] {
+  if (!inDeck) return blockItems
+  return blockItems.map(item => (item.nodeType === 'horizontalRule' ? { ...item, title: DECK_DIVIDER_TITLE } : item))
+}
+
 /**
  * Execute a block item via slash command (deletes the /query range first).
  */

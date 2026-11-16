@@ -81,4 +81,17 @@ assert.equal(
   assert.ok(insertPartsText(text, 1, [part]).startsWith(text.slice(0, text.indexOf('```slide title\nid: b'))));
 }
 
+// 16 November: a part's own heading is the handout's, and never marks a library copy changed. So an older copy whose
+// heading the editor writes in at the first edit keeps its source's stamp, and so does any edit of that heading.
+{
+  const data = { id: 'a1', title: 'Four parts' };
+  const base = slideStamp('boxes', data, 'Text.', 'Slide library');
+  assert.equal(slideStamp('boxes', data, '## Four parts\n\nText.', 'Slide library'), base, 'the heading written in');
+  assert.equal(slideStamp('boxes', data, '## Four parts, in short\n\nText.', 'Slide library'), base, 'the heading edited');
+  assert.equal(slideStamp('boxes', data, 'Four parts\n---\n\nText.', 'Slide library'), base, 'a setext heading too');
+  assert.notEqual(slideStamp('boxes', data, '## Four parts\n\nOther text.', 'Slide library'), base, 'the text under it still counts');
+  assert.notEqual(slideStamp('boxes', data, '### Smaller\n\nText.', 'Slide library'), base, 'an H3 is text, not the part\'s heading');
+}
+
+
 console.log('deckLibraryFormat: passed');

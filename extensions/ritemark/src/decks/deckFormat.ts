@@ -12,6 +12,14 @@
  * (and its notes) up to the next slide block is the slide's handout; anything before the first slide is the
  * preamble, kept as written.
  *
+ * The handout is a Text document (README decision 12, 16 November): a part opens with its own heading, an H1 for a
+ * section slide and an H2 for every other kind, written in the Markdown as ordinary text. It is the handout's, not the
+ * slide's: the slide's `title:` and the heading never change each other, and a slide made from a line takes the heading
+ * after the line as its title once, when it is made. A part without a heading of its own (every part of a deck written
+ * before this) shows one drawn from its slide's title, in the deck view and on the handout page (`derivedHeading`); it
+ * reaches the file only with the person's first real edit. A slide starts only at a slide block: a line (`***`) typed
+ * in the deck view becomes a slide block there, and a line in the file is a line.
+ *
  * The reader keeps unknown keys and lines as they were written, and the writer rewrites only the lines whose value
  * changed, so a slide nobody touched saves byte for byte.
  *
@@ -629,6 +637,69 @@ export function isReadableDeckVersion(version: string | null): boolean {
   if (version === null || version.trim() === '') return true;
   const number = Number(version);
   return Number.isFinite(number) && number <= 1;
+}
+
+// ---------------------------------------------------------------------------
+// The part's heading (16 November: the handout is a Text document)
+// ---------------------------------------------------------------------------
+
+/** The words a new deck's title slide starts with (New → Deck), selected so they are typed over. */
+export const EMPTY_DECK_TITLE = "The deck's title";
+
+/** The heading a part opens with: an H1 for a section slide, an H2 for every other kind. */
+export function partHeadingLevel(kind: string): 1 | 2 {
+  return kind === 'section' ? 1 : 2;
+}
+
+/** A part's own heading: an H1 or H2 as the handout's first block (ATX or setext), and where it ends in the handout. */
+export interface PartHeading {
+  level: 1 | 2;
+  /** The heading's Markdown, without its marks. */
+  text: string;
+  /** Where the heading's lines end in the handout (its blank lines before it included). */
+  end: number;
+}
+
+/** The handout's own heading, when it opens with an H1 or H2 (blank lines before it allowed); null otherwise. */
+export function partHeadingOf(handout: string): PartHeading | null {
+  const atx = /^(?:[ \t]*\r?\n)*[ ]{0,3}(#{1,2})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*(?:\r?\n|$)/.exec(handout);
+  if (atx) return { level: atx[1].length as 1 | 2, text: (atx[2] ?? '').trim(), end: atx[0].length };
+  const setext = /^(?:[ \t]*\r?\n)*[ ]{0,3}(\S[^\n]*?)[ \t]*\r?\n[ ]{0,3}(=+|-+)[ \t]*(?:\r?\n|$)/.exec(handout);
+  // A setext heading's text is one line that isn't a block of its own (a list item, a quote, a fence, a table row).
+  if (setext && !/^(?:[-*+>|#]|\d+[.)]|`{3}|~{3})/.test(setext[1])) {
+    return { level: setext[2].startsWith('=') ? 1 : 2, text: setext[1].trim(), end: setext[0].length };
+  }
+  return null;
+}
+
+/** The handout without its own heading: what a library copy's stamp covers (a heading is never a change to the slide). */
+export function handoutWithoutHeading(handout: string): string {
+  const heading = partHeadingOf(handout);
+  return heading ? handout.slice(heading.end) : handout;
+}
+
+/** The heading drawn for a part without its own: its slide's title; none for a new deck's words to type over. */
+export function derivedHeading(data: SlideData): string {
+  const title = (data.title ?? '').trim();
+  return title === EMPTY_DECK_TITLE ? '' : title;
+}
+
+/** A heading's words as Markdown: the characters that would read as marks are escaped, so it reads back the same. */
+export function headingMarkdown(text: string): string {
+  return text.replace(/[\\`*_[\]<>]/g, '\\$&').replace(/(\s)#+$|^#+$/, match => match.replace(/#/g, '\\#'));
+}
+
+/**
+ * A part's handout with its heading: the handout as it is when it opens with one, else with the heading drawn from the
+ * slide's title before it (a part an AI or the library makes: making a part writes its heading). No title, no heading.
+ */
+export function withPartHeading(kind: string, data: SlideData, handout: string): string {
+  if (partHeadingOf(handout)) return handout;
+  const text = derivedHeading(data);
+  if (!text) return handout;
+  const heading = `${'#'.repeat(partHeadingLevel(kind))} ${headingMarkdown(text)}`;
+  const rest = handout.replace(/^\s+/, '');
+  return rest ? `${heading}\n\n${rest}` : heading;
 }
 
 // ---------------------------------------------------------------------------

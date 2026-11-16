@@ -13,7 +13,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createDocument } from '@mixmark-io/domino'
 import { getSchema } from '@tiptap/core'
-import { DOMParser as PMDOMParser, type Node as PMNode } from '@tiptap/pm/model'
+import { DOMParser as PMDOMParser, DOMSerializer, type Node as PMNode } from '@tiptap/pm/model'
 import { EditorState } from '@tiptap/pm/state'
 import { canonicalMarkdownProjection } from '../../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync/frontMatter'
@@ -21,6 +21,7 @@ import { parseSlideBody, writeSlideBody } from '../../../../../src/decks/deckFor
 import { createEditorSchemaExtensions, ensureCommentMarkedPipeline, markdownToEditorHTML } from '../../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../../utils/markdownFidelity'
 import { DeckSlide } from './deckSchema'
+import { DECK_DERIVED, derivedHeadings, isRealChange } from '../deckDocument'
 
 installTestDocument()
 ensureCommentMarkedPipeline()
@@ -139,6 +140,120 @@ const slides = (doc: PMNode) => {
   let notesBlocks = 0
   parsed.descendants(node => { if (node.type.name === 'codeBlock') notesBlocks++ })
   assert.equal(notesBlocks, 1, 'and the notes block stays, as a code block')
+}
+
+
+// ---------------------------------------------------------------------------
+// 16 November: the handout is a Text document, and its headings are its own
+// ---------------------------------------------------------------------------
+
+const headed = [
+  '---', 'deck: 1', 'theme: Slide library/Themes/Evening.theme.md', '---', '',
+  '```slide boxes', 'id: b7k2', 'title: Four parts', '```', '',
+  '## An assistant\'s four parts', '',
+  'An assistant is set up once.', '',
+  '```slide section', 'id: s001', 'title: Why agents?', 'number: "1"', '```', '',
+  '# Why agents?', '',
+  'Prompt', '',
+  '```', 'You are an assistant for the customer service team.', '```', '',
+].join('\n')
+
+const blocksOf = (text: string) => text.match(/```slide[\s\S]*?\n```/g) ?? []
+
+// A heading edit leaves the slide block's bytes unchanged.
+{
+  const { doc, save } = open(headed)
+  assert.equal(save(doc), headed, 'a deck with headings opens and saves byte for byte')
+  let at = -1
+  doc.forEach((node, offset) => { if (at < 0 && node.type.name === 'heading') at = offset })
+  const edited = save(EditorState.create({ doc }).tr.insertText(', in short', at + 1 + doc.nodeAt(at)!.content.size).doc)
+  assert.deepEqual(blocksOf(edited), blocksOf(headed), 'the slide blocks are byte for byte as they were')
+  assert.ok(edited.includes("## An assistant's four parts, in short"))
+  assert.equal(edited.split('\n').filter((line, index) => line !== headed.split('\n')[index]).length, 1, 'only the heading line changed')
+}
+
+// A title edit leaves the handout unchanged.
+{
+  const { doc, save } = open(headed)
+  let at = -1
+  doc.forEach((node, offset) => { if (at < 0 && node.type.name === 'deckSlide') at = offset })
+  const node = doc.nodeAt(at)!
+  const body = writeSlideBody(node.attrs.body, { ...parseSlideBody(node.attrs.body), title: 'The four parts of an assistant' })
+  const edited = save(EditorState.create({ doc }).tr.setNodeMarkup(at, undefined, { ...node.attrs, body }).doc)
+  const changed = edited.split('\n').filter((line, index) => line !== headed.split('\n')[index])
+  assert.deepEqual(changed, ['title: The four parts of an assistant'], 'only the title line: the handout and its heading stay')
+}
+
+// An older deck (no part headings): opening draws them from the slides' titles (H1 for a section, H2 otherwise) and
+// writes nothing; a change that is only those headings is no change; the first real edit writes them.
+{
+  const older = [
+    '```slide title', 'id: t0a1', 'title: AI assistants and agents', '```', '',
+    '## Welcome', '',
+    'Everything you need today.', '',
+    '```slide section', 'id: s001', 'title: Why agents?', '```', '',
+    '```slide points', 'id: p001', 'title: "Agents *really* act"', '```', '',
+    'An agent is given a goal.', '',
+  ].join('\n')
+  const { doc, save } = open(older)
+  assert.equal(save(doc), older, 'opened: byte for byte')
+  const state = EditorState.create({ doc })
+  const tr = derivedHeadings(state)!
+  assert.ok(tr, 'the older deck gets its headings drawn')
+  assert.equal(tr.getMeta(DECK_DERIVED), true)
+  assert.equal(tr.getMeta('addToHistory'), false, 'never in the undo history')
+  assert.equal(tr.getMeta('preventUpdate'), true, 'never an update the editor publishes')
+  const drawn = state.apply(tr)
+  assert.equal(derivedHeadings(drawn), null, 'drawn once: every part has its heading now')
+  const headings: string[] = []
+  drawn.doc.forEach(node => { if (node.type.name === 'heading') headings.push(`h${node.attrs.level} ${node.textContent}`) })
+  // The first part opens with its own "Welcome": no heading is drawn over it.
+  assert.deepEqual(headings, ['h2 Welcome', 'h1 Why agents?', 'h2 Agents *really* act'])
+  const drawnMarkdown = editorMarkdown(drawn.doc)
+  // Opening writes nothing: what the editor reports while only the drawn headings differ is no change.
+  assert.equal(isRealChange(drawnMarkdown, drawnMarkdown), false, 'the drawn headings alone are no change')
+  assert.equal(isRealChange(null, editorMarkdown(doc)), true)
+  // The first real edit writes them, as ordinary text.
+  let end = -1
+  drawn.doc.forEach((node, offset) => { if (node.type.name === 'paragraph' && node.textContent === 'An agent is given a goal.') end = offset + node.nodeSize - 1 })
+  const edited = drawn.apply(drawn.tr.insertText(' It acts.', end))
+  const markdown = editorMarkdown(edited.doc)
+  assert.equal(isRealChange(drawnMarkdown, markdown), true, 'a real edit is a change')
+  const written = save(edited.doc)
+  assert.ok(written.includes('```slide section\nid: s001\ntitle: Why agents?\n```\n\n# Why agents?\n\n'), 'a section part: its H1')
+  assert.ok(written.includes('```\n\n## Agents \\*really\\* act\n\nAn agent is given a goal. It acts.'), 'another part: its H2, escaped as Markdown')
+  assert.ok(written.includes('## Welcome\n\nEverything you need today.'), 'a part with its own heading keeps it, and gets no second one')
+  assert.deepEqual(blocksOf(written), blocksOf(older), 'and every slide block is as it was')
+  // Reopened, the headings are the file's: nothing more is drawn.
+  const reopened = open(written)
+  assert.equal(derivedHeadings(EditorState.create({ doc: reopened.doc })), null)
+  assert.equal(reopened.save(reopened.doc), written)
+}
+
+// A new deck's title slide ("The deck's title", to be typed over): its part's heading is drawn empty, so it shows the
+// placeholder and writes nothing.
+{
+  const fresh = '```slide title\nid: t0a1\ntitle: The deck\'s title\n```\n'
+  const { doc, save } = open(fresh)
+  const drawn = EditorState.create({ doc }).apply(derivedHeadings(EditorState.create({ doc }))!)
+  let empty = 0
+  drawn.doc.forEach(node => { if (node.type.name === 'heading' && node.childCount === 0) empty++ })
+  assert.equal(empty, 1)
+  assert.equal(save(drawn.doc), fresh, 'an empty heading is never written')
+}
+
+// A prompt in the handout is the editor's own code block: `pre.tiptap-code-block`, as in a Text document.
+{
+  const { doc } = open(headed)
+  let code: PMNode | null = null
+  doc.descendants(node => { if (!code && node.type.name === 'codeBlock') code = node })
+  assert.ok(code, 'the prompt is a code block of the handout')
+  const element = DOMSerializer.fromSchema(schema).serializeNode(code!, { document: createDocument('<body></body>') as unknown as Document }) as HTMLElement
+  assert.equal(element.nodeName, 'PRE')
+  assert.ok((element.getAttribute('class') ?? '').split(/\s+/).includes('tiptap-code-block'))
+  const css = fs.readFileSync(path.join(here, '../decks.css'), 'utf8')
+  assert.ok(!/tiptap-code-block|deck-copy|hljs/.test(css), 'the deck has no style or Copy of its own for a prompt')
+  for (const gone of ['deck-part-bar', 'deck-part-band', 'deck-part-eyebrow', 'deck-part-title']) assert.ok(!css.includes(gone), `${gone} is gone`)
 }
 
 console.log('deckRoundTrip: passed')

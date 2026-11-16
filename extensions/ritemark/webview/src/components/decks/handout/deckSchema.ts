@@ -11,6 +11,9 @@
  *    and its notes block after it.
  *
  * Without these extensions (the flag off) a slide fence is an ordinary code block, written back as it was.
+ *
+ * The node holds the slide alone. The part's heading is the handout's own text after it (16 November): an H1 for a
+ * section, an H2 for every other kind, never drawn from the node's `title:` once written (`deckFormat.ts`).
  */
 import { Node, mergeAttributes } from '@tiptap/core'
 import type TurndownService from 'turndown'

@@ -123,23 +123,26 @@ export function guardFixes(before: PMNode, after: PMNode, tr: Transaction, rando
   return changed
 }
 
+/** The guard's plugin: what the handout's editor runs (and the tests, with the editor's own commands). */
+export function deckGuardPlugin(): Plugin {
+  return new Plugin({
+    key: deckGuardKey,
+    filterTransaction(tr, state) {
+      if (!tr.docChanged || isTrustedDeckTransaction(tr)) return true
+      return !touchesSlides(tr) || !removesSlides(state.doc, tr.doc)
+    },
+    appendTransaction(transactions, oldState, newState) {
+      if (!transactions.some(tr => tr.docChanged && !isTrustedDeckTransaction(tr))) return null
+      const tr = newState.tr
+      return guardFixes(oldState.doc, newState.doc, tr) ? tr : null
+    },
+  })
+}
+
 export const DeckGuard = Extension.create({
   name: 'deckGuard',
 
   addProseMirrorPlugins() {
-    return [
-      new Plugin({
-        key: deckGuardKey,
-        filterTransaction(tr, state) {
-          if (!tr.docChanged || isTrustedDeckTransaction(tr)) return true
-          return !touchesSlides(tr) || !removesSlides(state.doc, tr.doc)
-        },
-        appendTransaction(transactions, oldState, newState) {
-          if (!transactions.some(tr => tr.docChanged && !isTrustedDeckTransaction(tr))) return null
-          const tr = newState.tr
-          return guardFixes(oldState.doc, newState.doc, tr) ? tr : null
-        },
-      }),
-    ]
+    return [deckGuardPlugin()]
   },
 })

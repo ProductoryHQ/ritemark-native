@@ -104,6 +104,11 @@ async function run() {
   const harbour = slidesOfText(files.files['Clients/Harbour/Harbour.deck.md']);
   assert.equal(harbour[0].data.title, 'Assistant or agent?');
   assert.equal(parseFrom(harbour[0].data.from)?.id, 'a2');
+  // Making a part writes its heading (16 November): the topic's part had none, so the copy opens with its title as an
+  // H2, and the copy is still the library's (the heading is no change to it).
+  assert.equal(harbour[0].handout, '## Assistant or agent?\n\nAn agent is given a goal.');
+  const insertedStates = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: harbour[0].data.id!, from: harbour[0].data.from!, kind: harbour[0].kind, body: harbour[0].body, handout: harbour[0].handout }]);
+  assert.equal(insertedStates[0].changed, false, 'a copy with its heading written is not changed');
   let viewed: { count: number; afterIndex: number } | null = null;
   const beforeView = files.files['Clients/Harbour/Harbour.deck.md'];
   const viaView = await library.insertCopies('Slide library/AI assistants.deck.md', ['a1', 'a2'], 'Clients/Harbour/Harbour.deck.md', 99, async (parts, afterIndex) => {

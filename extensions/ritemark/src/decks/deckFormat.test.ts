@@ -4,6 +4,12 @@
 import { strict as assert } from 'node:assert';
 import * as yaml from 'js-yaml';
 import {
+  derivedHeading,
+  EMPTY_DECK_TITLE,
+  handoutWithoutHeading,
+  partHeadingLevel,
+  partHeadingOf,
+  withPartHeading,
   fenceFor,
   frontMatterField,
   isReadableDeckVersion,
@@ -309,5 +315,37 @@ test("the text Publish builds from takes the view's look, still on its way to th
   const broken = '---\ndeck: 1\nsubtitle: Training: Day 1\n---\n\n```slide title\ntitle: Saved words\n```\n';
   assert.deepEqual(publishText(broken, body, broken, 'borderless'), { text: broken, fromView: false });
 });
+
+// 16 November: the handout is a Text document; a part opens with its own heading.
+test("a part's own heading: an H1 or H2 as the handout's first block, ATX or setext", () => {
+  assert.deepEqual(partHeadingOf('## Four parts\n\nText.'), { level: 2, text: 'Four parts', end: 14 });
+  assert.deepEqual(partHeadingOf('\n\n# Why agents? #\nText.'), { level: 1, text: 'Why agents?', end: 18 });
+  assert.equal(partHeadingOf('Welcome\n=======\n')?.level, 1);
+  assert.equal(partHeadingOf('Welcome\n---\n')?.text, 'Welcome');
+  assert.equal(partHeadingOf('### Smaller\n'), null, 'an H3 is a heading in the text, not the part\'s');
+  assert.equal(partHeadingOf('Text first.\n\n## Later\n'), null);
+  assert.equal(partHeadingOf('- item\n---\n'), null, 'a list item over a line is no heading');
+  assert.equal(partHeadingOf(''), null);
+  assert.equal(handoutWithoutHeading('## Four parts\n\nText.'), '\nText.');
+  assert.equal(handoutWithoutHeading('Text.'), 'Text.');
+});
+
+test('making a part writes its heading: H1 for a section, H2 otherwise, escaped; never a second one', () => {
+  assert.equal(partHeadingLevel('section'), 1);
+  assert.equal(partHeadingLevel('boxes'), 2);
+  assert.equal(withPartHeading('boxes', { title: 'Four parts' }, 'Text.'), '## Four parts\n\nText.');
+  assert.equal(withPartHeading('section', { title: 'Why agents?' }, ''), '# Why agents?');
+  assert.equal(withPartHeading('points', { title: 'Agents *really* act' }, 'x'), '## Agents \\*really\\* act\n\nx');
+  assert.equal(withPartHeading('points', { title: 'Four parts' }, '## Its own\n\nText.'), '## Its own\n\nText.', 'a part with its heading keeps it');
+  assert.equal(withPartHeading('points', {}, 'Text.'), 'Text.', 'no title: no heading');
+  assert.equal(withPartHeading('title', { title: EMPTY_DECK_TITLE }, ''), '', "New → Deck's words to type over are no heading");
+  assert.equal(derivedHeading({ title: '  Spaced  ' }), 'Spaced');
+  // A heading written for a title reads back as that title.
+  for (const title of ['Step #1', '#hashtag', 'Under_score [link]', 'a <b> c', 'Ends with ###', 'Back\\slash']) {
+    const heading = partHeadingOf(withPartHeading('points', { title }, ''))!;
+    assert.equal(heading.text.replace(/\\(.)/g, '$1'), title, title);
+  }
+});
+
 
 console.log(`deckFormat: ${passed} passed`);
