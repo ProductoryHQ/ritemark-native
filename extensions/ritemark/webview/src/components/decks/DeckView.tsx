@@ -885,7 +885,6 @@ export function DeckView({
             options={[{ value: 'card', label: 'Card' }, { value: 'borderless', label: 'Borderless' }]}
           />
         </Tooltip>
-        <PresentButton slideNumber={count === 0 ? null : shown + 1} startNumber={startNumber === undefined ? null : startNumber + 1} onPresent={present} />
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>
         {status === 'action' && syncAction ? (
           <SyncActionButton action={syncAction} />
@@ -893,6 +892,7 @@ export function DeckView({
           <span className={`deck-saved${status === 'saved' ? '' : ' invisible'}`}>Saved</span>
         )}
         <DeckPublish slides={slides} theme={theme} borderless={borderless} assets={assets} text={currentText} onNotice={publishNotice} />
+        <PresentButton slideNumber={count === 0 ? null : shown + 1} startNumber={startNumber === undefined ? null : startNumber + 1} onPresent={present} />
       </header>
 
       <div ref={deskRef} className="deck-desk">

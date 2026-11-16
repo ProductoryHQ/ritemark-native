@@ -18,7 +18,6 @@ Nothing was sent anywhere. Two kinds of proof:
 
 | Shot | Shows |
 | --- | --- |
-| `pr4-bar-publish-1440.png` | The deck's bar: Card and Borderless, Saved, then **Publish**, ready because the whole-window sheet is there. |
 | `pr4-setup-sheet-1440.png` | Publish pressed with no account: 2.2's frame 2, Set up. This one came from the Preamble check deck, open behind the main tab. Its page, `Preamble check.html`, was written beside the deck. Cancel took it back: the folder afterwards held only the two decks. |
 | `pr4-sheet-what-goes-1440.png` | Frame 3 for the demo deck's page, from the sheet harness. What goes: "12 slides and their handout, 2 prompts with Copy, and the pictures they use. Nothing else from the project." What stays: "On your computer: speaker notes on 1 slide, and 1 skipped slide." The harness logged `1 file(s), 0 left out, 0 key-shaped place(s); answered cancel; nothing sent`. |
 | `pr4-chip-published-1440.png` | The chip, "Published". It was drawn after a speaker-notes change on disk, which is no change. |
@@ -50,7 +49,17 @@ Fault first for the front matter: each guard put in `publishText` in turn, then 
 | Round 2's: the editor's body starts with a front matter | fails: `the front matter's words reached the page ("---\ndeck: 1\n---note: FRONTWORDQXZ\nclient: FRONTWORDQXZ\n---\n")` |
 | Round 3's: the editor's body is exactly what follows the front matter `parseDeck` reads | passes |
 
-**The bar with Present** (`pr4-bar-with-present-1440.png`), after merging main with PR 5: Card and Borderless, Present, Saved, Publish. Their heights differ (30, 32 and 28 px), each its own component's size, and all are centred on one line.
+## The bar and the sheet's line (the Experience lead, frame 2)
+
+These come after PR 3 reached main and Present (PRs 5 and 6) joined the bar. A dev window again, at 1440 × 900.
+
+| Shot | Shows |
+| --- | --- |
+| `pr4-bar-unpublished-1440.png`, `pr4-bar-unpublished-closeup.png` | Not yet published, left to right: Card \| Borderless, Saved, **Publish** (outlined, with the globe), **Present** (the filled indigo split button, the bar's one primary, at the right end). |
+| `pr4-bar-published-1440.png`, `pr4-bar-published-closeup.png` | Published: the chip, "Published" with its caret, in Publish's place. A stand-in record was written into the run's own profile; nothing was sent. |
+| `pr4-sheet-deck-line-1440.png` | The sheet for the deck's page, from the sheet harness: "People open it in their browser, on a computer or a phone." under the title. Every other page keeps 2.2's line, which the tests check. |
+
+Measured in the window, every control is 30 px tall with its top at 7 px, so all are centred on the bar's line. That covers Card \| Borderless, Publish and the chip, and both parts of Present. The sizes are the shared ones: the Button's new `bar` size, which a split button takes as `size="bar"`, and nothing set by hand.
 
 Every other shot in these windows carries a dev-build toast, "Activating extension 'GitHub.copilot-chat' failed…". It comes from VS Code's own built-in Copilot Chat in the development build, not from Ritemark or this PR, and Ritemark's release builds don't ship that extension.
 

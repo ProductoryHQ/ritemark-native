@@ -4,6 +4,7 @@
  * Run: npx tsx webview/src/components/decks/DeckPublish.test.ts
  */
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { register } from 'node:module'
 import type { DeckPageState } from '../../../../src/decks/deckProtocol'
 
@@ -42,6 +43,27 @@ assert.equal(button(draw({ ready: true, kind: 'published', changed: false }))!.g
 // The chip is the accent's (decks.css), the Publish button the bar's own.
 assert.ok(button(draw({ ready: true, kind: 'published', changed: false }))!.classList.contains('deck-publish-chip'))
 assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.classList.contains('deck-publish'))
+
+// The bar (the Experience lead, frame 2): Card | Borderless · Saved · Publish · Present. Publish is outlined with the
+// globe, its chip takes its place once published; Present is the bar's one primary, last; every control is 30 px from
+// the shared sizes (Button `bar`, SplitButton `size="bar"`).
+{
+  const publish = button(draw({ ready: true, kind: 'unpublished', changed: false }))!
+  assert.ok(publish.classList.contains('border') && publish.classList.contains('bg-background'), 'Publish is outlined')
+  assert.ok(parse(draw({ ready: true, kind: 'unpublished', changed: false })).querySelector('svg'), 'with the globe')
+  for (const state of [{ kind: 'unpublished' }, { kind: 'publishing' }, { kind: 'published' }, { kind: 'unpublishing' }] as const) {
+    const control = button(draw({ ready: true, kind: state.kind, changed: false }))!
+    assert.ok(control.classList.contains('h-[30px]'), `${state.kind}: 30 px`)
+  }
+  const { PresentButton } = await import('./present/PresentButton')
+  const present = parse(renderToStaticMarkup(createElement(PresentButton, { slideNumber: 1, startNumber: 1, onPresent: () => {} }))).querySelector('.rm-split')!
+  assert.equal(present.getAttribute('data-tone'), 'primary', 'Present is the filled primary')
+  assert.ok(present.querySelectorAll('button').every((part) => part.classList.contains('h-[30px]')), 'Present: 30 px')
+  const view = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8')
+  const at = (marker: string) => { const index = view.indexOf(marker); assert.ok(index >= 0, marker); return index }
+  assert.ok(at('className="deck-look"') < at('deck-saved') && at('deck-saved') < at('<DeckPublish ') && at('<DeckPublish ') < at('<PresentButton '), "the bar's order")
+  assert.ok(/<PresentButton [^\n]*\/>\s*<\/header>/.test(view), 'Present is last on the bar')
+}
 
 // The fit steps: each measured slide's `data-step`, by its place; 0 where there is none, never outside 0 to 3.
 {

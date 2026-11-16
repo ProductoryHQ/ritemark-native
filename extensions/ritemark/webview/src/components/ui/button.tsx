@@ -42,6 +42,9 @@ const buttonVariants = cva(
         // Sprint 156 (#694): 28 px, the height of a split button's parts, for a card's small actions beside one (Home's
         // sign-in Cancel and "Open the page again", the feedback card's Send, Open in e-mail and Not now), 13 px words
         compact: "h-7 rounded-md gap-1.5 px-2.5 text-[13px] has-[>svg]:px-2",
+        // Sprint 159 (the Experience lead, frame 2): 30 px, a bar's controls beside a segmented control (also 30 px):
+        // the deck's bar, Card | Borderless, Publish or its chip, Present. A split button takes it too (`size="bar"`).
+        bar: "h-[30px] rounded-md gap-1.5 px-3 text-[13px] has-[>svg]:px-2.5",
         // `lg` matches the canonical Ritemark Settings/CTA pattern: rounded-lg
         // (8px) corners, larger 18px / 10px padding for touch comfort. Use this
         // size for prominent actions like Save / Sign Out / Refresh Status.

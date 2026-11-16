@@ -34,7 +34,7 @@ import {
   NOTHING_ELSE,
   SCRIPT_BUILT_LINE,
   SEE_THE_FILES,
-  SUBTITLE,
+  subtitleFor,
   WHO_CAN_SEE,
   keyWarning,
   leftOutCount,
@@ -199,7 +199,7 @@ export function PublishSheetView({
       >
         <div className="px-5 pt-4 pb-1">
           <DialogTitle className="text-[15px] font-semibold leading-5">Publish {model.title}</DialogTitle>
-          <DialogDescription id="publish-sheet-subtitle" className="mt-1 text-[13px] leading-[18px]">{SUBTITLE}</DialogDescription>
+          <DialogDescription id="publish-sheet-subtitle" className="mt-1 text-[13px] leading-[18px]">{subtitleFor(Boolean(model.deck))}</DialogDescription>
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-1">
           {model.destination && (

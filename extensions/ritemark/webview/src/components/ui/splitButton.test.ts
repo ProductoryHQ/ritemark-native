@@ -40,6 +40,18 @@ assert.equal(parts.length, 2, 'two parts')
 assert.ok(parts.every((part) => part.hasAttribute('disabled')), 'busy turns off both parts')
 assert.ok(parts[0].classList.contains('rm-split-main') && parts[1].classList.contains('rm-split-more'))
 assert.equal(parts[1].getAttribute('aria-label'), 'Ask with')
+// Both parts at the button's own size: 32 px by default, 30 px beside a bar's segmented control (Sprint 159, the deck's bar)
+assert.ok(parts.every((part) => part.classList.contains('h-8')), 'sm: both parts 32 px')
+{
+  const bar = parse(renderToStaticMarkup(React.createElement(SplitButton, {
+    tone: 'primary',
+    size: 'bar',
+    main: { label: 'Present', tooltip: 'Present from this slide', onClick: () => {} },
+    menu: { label: 'More ways to present', tooltip: 'More ways to present', content: null },
+  }))).querySelectorAll('.rm-split button')
+  assert.equal(bar.length, 2)
+  assert.ok(bar.every((part) => part.classList.contains('h-[30px]') && !part.classList.contains('h-8')), 'bar: both parts 30 px')
+}
 
 // The board's agent button (R5c, Q2)
 const runtimes = [

@@ -3,7 +3,8 @@
  * writes beside the deck.
  *
  *  - Hidden until Publish can be reached (the flag on and the whole-window sheet there), as the browser bar's is.
- *  - Unpublished: Publish. Published: the chip, "Published" or "Published · changed", whose menu has See online, Copy
+ *  - On the bar after Saved, before Present (frame 2), at the bar's 30 px (`size="bar"`).
+ *  - Unpublished: Publish, outlined, with the globe. Published: the chip, "Published" or "Published · changed", whose menu has See online, Copy
  *    link, Update the page (only after a public change) and Unpublish. Publishing… and Unpublishing… while they run.
  *  - Publish and Update the page send the deck's text as this view holds it (the document may not have its newest
  *    words yet) and each slide's fit, numbers only, so the page's slides fit as the deck view's do. The fit is measured
@@ -136,7 +137,7 @@ export function DeckPublishControl({ state, onPublish: publish, onAction: act }:
   if (state.kind === 'unpublished') {
     return (
       <Tooltip label="Publish the slides and their handout as a web page">
-        <Button variant="toolbar" size="compact" className="deck-publish" onClick={publish}>
+        <Button variant="outline" size="bar" className="deck-publish" onClick={publish}>
           <Icon name="globe" size={14} tone="inherit" />
           Publish
         </Button>
@@ -148,7 +149,7 @@ export function DeckPublishControl({ state, onPublish: publish, onAction: act }:
     const publishing = state.kind === 'publishing'
     return (
       <Tooltip label={publishing ? 'The page is going online' : 'The page is being taken down'}>
-        <Button variant="toolbar" size="compact" className="deck-publish-chip" disabled>
+        <Button variant="toolbar" size="bar" className="deck-publish-chip" disabled>
           <Icon name="circle-notch" size={14} tone="inherit" className="animate-spin" />
           {publishing ? 'Publishing…' : 'Unpublishing…'}
         </Button>
@@ -160,7 +161,7 @@ export function DeckPublishControl({ state, onPublish: publish, onAction: act }:
     <DropdownMenu modal={false}>
       <Tooltip label={state.changed ? 'The deck changed since it was published: update the page from here' : 'The page is online: see it, copy its link or take it down'}>
         <DropdownMenuTrigger asChild>
-          <Button variant="toolbar" size="compact" className="deck-publish-chip">
+          <Button variant="toolbar" size="bar" className="deck-publish-chip">
             <Icon name="globe" size={14} tone="inherit" />
             {state.changed ? 'Published · changed' : 'Published'}
             <Icon name="caret-down" size={12} tone="inherit" />

@@ -70,8 +70,10 @@ export function PresentButton({ slideNumber, startNumber, onPresent }: {
   useEffect(() => { sendToExtension('deck/present-options') }, [])
 
   return (
+    // The bar's one primary, last on the bar, at the bar's 30 px (the Experience lead, frame 2)
     <SplitButton
-      tone="outline"
+      tone="primary"
+      size="bar"
       disabled={disabled}
       className="deck-present"
       main={{
