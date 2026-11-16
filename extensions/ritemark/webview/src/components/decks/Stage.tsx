@@ -3,26 +3,27 @@
  *
  *  - The words are typed on the slide: a click puts the caret there, and the thumbnail changes as you type. Enter adds
  *    a box, a point or a step; Backspace in an empty one removes it. A table's cells move on with Tab and Enter, with
- *    Add a row and Add a column under it. A box's icon is chosen from a grid.
- *  - Under the slide, quiet lines that never reach the wall: where a copy came from, and the table's two actions.
- *  - Speaker notes fold open under that. They never leave the person's screen (README decision 7).
+ *    Add a row and Add a column in Slide settings. A box's icon is chosen from a grid.
+ *  - Nothing sits above the slide, and under it only the speaker notes (17 November, "Nothing around the slide but the
+ *    slide"): Slide settings is a gear in the deck's bar, and where a copy came from, the words a layout keeps for
+ *    others and a table's two actions are at the top of its popup (`SlideAbout`).
+ *  - Speaker notes fold open under the slide. They never leave the person's screen (README decision 7).
  *
  * Every change is one transaction on the slide's node in the handout's editor, so it saves, merges and undoes as the
  * rest of the deck does; Cmd+Z on the stage runs the editor's undo.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { Editor as TipTapEditor } from '@tiptap/react'
-import { isBlockSlide, parseFrom, writeSlideData, type SlideData } from '../../../../src/decks/deckFormat'
+import { isBlockSlide, writeSlideData, type SlideData } from '../../../../src/decks/deckFormat'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { slidesOf, type DeckSlideEntry } from './deckDocument'
 import { getClipboardImageFile, getUniqueImageFilename, readFileAsBase64, shouldPreferTextPaste } from '../../lib/pastedImage'
-import { hiddenNote } from './slide/convertKind'
 import { SlideCanvas, editedText, type SlideEditing } from './slide/SlideCanvas'
 import { itemMarksOf, layoutSlide, textBoxes, withoutListMarker } from './slide/layoutSlide'
-import { undoKeyOf, addColumn, addRow, cellPath, insertItemAfter, isEmptyItem, itemPath, nextCell, removeItem, setIcon, setPath, valueAt } from './slide/slideEdits'
+import { undoKeyOf, cellPath, insertItemAfter, isEmptyItem, itemPath, nextCell, removeItem, setIcon, setPath, valueAt } from './slide/slideEdits'
 
 interface StageProps {
   editor: TipTapEditor
@@ -37,9 +38,6 @@ interface StageProps {
   /** The speaker notes fold, open or closed for the whole deck (as the prototype keeps it). */
   notesOpen: boolean
   onNotesOpen: (open: boolean) => void
-  /** Settings beside the slide: open, and the button that opens and closes it. */
-  settingsOpen: boolean
-  onSettings: () => void
   /** Words to put the caret in once the slide is drawn (a new slide's title); asked again when it changes. */
   initialFocus?: string
   /** Sprint 159 (PR 7): select those words whole, to be typed over (a deck New just made), rather than put the caret after them. */
@@ -48,16 +46,6 @@ interface StageProps {
   onFocusTaken?: () => void
   /** A picture pasted or dropped on the slide, read as a data URL. */
   onPicture: (dataUrl: string, filename: string) => void
-  /** The lines about where a copy came from, with their actions (Sprint 157, PR 4); else the plain source line. */
-  sourceLines?: ReactNode
-}
-
-/** The library's topic or the deck a copy came from, for the quiet line under the slide. */
-function sourceLine(from: string | undefined): { library: boolean; name: string } | null {
-  const source = parseFrom(from)
-  if (!source) return null
-  const name = source.path.split('/').pop()?.replace(/\.deck\.md$/i, '') ?? source.path
-  return { library: /^Slide library\//.test(source.path), name }
 }
 
 /** Notes' first words beside the fold, as the prototype's "Speaker notes · Ask who has used…". */
@@ -67,7 +55,7 @@ function notesPreview(notes: string | null): string {
   return text.length > 30 ? `${text.slice(0, 30)}…` : text
 }
 
-export function Stage({ editor, slide, theme, borderless, assets, width, onWriting, notesOpen, onNotesOpen, settingsOpen, onSettings, initialFocus, selectOnFocus, onFocusTaken, onPicture, sourceLines }: StageProps) {
+export function Stage({ editor, slide, theme, borderless, assets, width, onWriting, notesOpen, onNotesOpen, initialFocus, selectOnFocus, onFocusTaken, onPicture }: StageProps) {
   const [focusPath, setFocusPath] = useState<string | null>(initialFocus ?? null)
   const [focusSelect, setFocusSelect] = useState(!!selectOnFocus)
   // A request that comes after the stage is drawn (the deck's first slide, already shown when New's deck opens); the
@@ -186,9 +174,7 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
     if (element && document.activeElement !== element && element.textContent !== (slide.notes ?? '')) element.textContent = slide.notes ?? ''
   })
 
-  const source = sourceLine(slide.data.from)
   const preview = notesPreview(slide.notes)
-  const hidden = hiddenNote(slide.kind, slide.data)
 
   /** A picture from the computer onto the slide: pasted (unless words are being pasted into a box) or dropped. */
   const takePicture = (transfer: DataTransfer | null, pasted: boolean): boolean => {
@@ -203,21 +189,6 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
 
   return (
     <>
-      <div className="deck-sethead">
-        <Tooltip label={settingsOpen ? 'Close the settings' : "The slide's layout, look and picture"}>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="deck-settings-button"
-            data-state={settingsOpen ? 'active' : undefined}
-            aria-pressed={settingsOpen}
-            onClick={onSettings}
-          >
-            <Icon name="gear" size={14} tone="inherit" />
-            Settings
-          </Button>
-        </Tooltip>
-      </div>
       <div
         className="deck-big"
         style={{ width }}
@@ -228,29 +199,6 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
         <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={theme} borderless={borderless} assets={assets} editing={editing} />
       </div>
       <div className="deck-under">
-        {sourceLines ?? (source ? (
-          <div className="deck-source">
-            <Icon name={source.library ? 'cards-three' : 'presentation'} size={12} tone="inherit" />
-            {source.library ? `From the library · ${source.name}` : `From ${source.name}`}
-          </div>
-        ) : null)}
-        {hidden ? (
-          <div className="deck-source">
-            <Icon name="eye-slash" size={12} tone="inherit" />
-            {hidden}
-          </div>
-        ) : null}
-        {slide.kind === 'table' ? (
-          <div className="deck-source">
-            <Tooltip label="Add an empty row at the bottom of the table">
-              <Button variant="link" className="deck-line-action" onClick={() => write(addRow)}>Add a row</Button>
-            </Tooltip>
-            <span aria-hidden="true">·</span>
-            <Tooltip label="Add an empty column on the right of the table">
-              <Button variant="link" className="deck-line-action" onClick={() => write(addColumn)}>Add a column</Button>
-            </Tooltip>
-          </div>
-        ) : null}
         <Tooltip label={notesOpen ? 'Hide the speaker notes' : 'Show the speaker notes: what you will say, only for you'}>
           <Button
             variant="ghost"

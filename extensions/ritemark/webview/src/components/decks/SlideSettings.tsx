@@ -1,14 +1,21 @@
 /**
- * Sprint 157 (README frame 4): Settings opens beside the slide, not over it, so a change is seen as it is made.
+ * Sprint 157 (README frame 4): the slide's settings, seen on the slide as they change. Since 17 November a popup under
+ * the gear in the deck's bar (it sat beside the slide before).
  * Layout (nine kinds as small pictures), the look of a row of boxes, Picture (None, Left, Right, Behind) and Skip
  * slide. A change of kind keeps the words (`convertKind`). Built from the shared controls: the segmented control (its
  * picture variant for the layouts and the picture places) and the switch.
  *
  * An exercise slide also has Label (16 November): its pill's words, as on the slide, with the default as the
  * placeholder. Emptied, the slide has no pill (`tag: ""`); words typed here bring it back.
+ *
+ * 17 November (Jarmo; the Experience lead, "Nothing around the slide but the slide"): Settings open from the gear in the
+ * deck's bar, as a Popover (DeckView), which closes on a press outside and on Esc and gives the gear the focus back.
+ * The lines that sat under the slide come first here (`about`, `SlideAbout`): where a library copy came from with its
+ * actions, the words a layout keeps for others, and a table's Add a row and Add a column; then a line, then the
+ * slide's own settings.
  */
 import type { ReactNode } from 'react'
-import { EXERCISE_TAG, exerciseTagOf, isBlockSlide, type SlideData } from '../../../../src/decks/deckFormat'
+import { EXERCISE_TAG, exerciseTagOf, isBlockSlide, parseFrom, type SlideData } from '../../../../src/decks/deckFormat'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Input } from '../ui/input'
@@ -63,14 +70,66 @@ interface SlideSettingsProps {
   onClose: () => void
   /** Cmd+Z (redo: Cmd+Shift+Z, Cmd+Y) in a field: the deck's undo, as on the stage, not the field's own. */
   onUndo: (redo: boolean) => void
-  style?: React.CSSProperties
+  /** The lines about the slide, first (`SlideAbout`); none, and the settings start at once. */
+  about?: ReactNode
 }
 
-export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, style }: SlideSettingsProps) {
+/** The library's topic or the deck a copy came from, as its plain line before the host has read the copy's state. */
+function sourceLine(from: string | undefined): { library: boolean; name: string } | null {
+  const source = parseFrom(from)
+  if (!source) return null
+  const name = source.path.split('/').pop()?.replace(/\.deck\.md$/i, '') ?? source.path
+  return { library: /^Slide library\//.test(source.path), name }
+}
+
+interface SlideAboutProps {
+  data: SlideData
+  /** The copy's lines with their actions, once the host has read its state (`SourceLines`); else the plain line. */
+  sourceLines?: ReactNode
+  /** The words this layout keeps for others (`hiddenNote`), or ''. */
+  hidden: string
+  /** A table slide: its two actions. */
+  table?: { addRow: () => void; addColumn: () => void }
+}
+
+/** The top of Settings: what sat under the slide before 17 November. Null when there is nothing to say. */
+export function SlideAbout({ data, sourceLines, hidden, table }: SlideAboutProps) {
+  const source = sourceLine(data.from)
+  if (!sourceLines && !source && !hidden && !table) return null
+  return (
+    <div className="deck-settings-about">
+      {sourceLines ?? (source ? (
+        <div className="deck-source">
+          <Icon name={source.library ? 'cards-three' : 'presentation'} size={12} tone="inherit" />
+          {source.library ? `From the library · ${source.name}` : `From ${source.name}`}
+        </div>
+      ) : null)}
+      {hidden ? (
+        <div className="deck-source">
+          <Icon name="eye-slash" size={12} tone="inherit" />
+          {hidden}
+        </div>
+      ) : null}
+      {table ? (
+        <div className="deck-source">
+          <Tooltip label="Add an empty row at the bottom of the table">
+            <Button variant="link" className="deck-line-action" onClick={table.addRow}>Add a row</Button>
+          </Tooltip>
+          <span aria-hidden="true">·</span>
+          <Tooltip label="Add an empty column on the right of the table">
+            <Button variant="link" className="deck-line-action" onClick={table.addColumn}>Add a column</Button>
+          </Tooltip>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about }: SlideSettingsProps) {
   const skipId = `deck-skip-${number}`
   const tagId = `deck-tag-${number}`
   return (
-    <section className="deck-settings" style={style} aria-label={`Settings of slide ${number}`} onKeyDown={event => { if (event.key === 'Escape') onClose() }}>
+    <section aria-label={`Settings of slide ${number}`}>
       <header className="deck-settings-head">
         <span>Slide {number}</span>
         <Tooltip label="Close the settings">
@@ -79,6 +138,12 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
           </Button>
         </Tooltip>
       </header>
+      {about ? (
+        <>
+          {about}
+          <div className="deck-settings-sep" />
+        </>
+      ) : null}
       {/* A block slide (Sprint 161) has no layout: its blocks are its layout (README frame 26). */}
       {isBlockSlide(kind) ? null : (
         <>

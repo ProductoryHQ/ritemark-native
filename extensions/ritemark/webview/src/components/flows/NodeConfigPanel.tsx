@@ -5,7 +5,7 @@
  * Shows different fields based on node type.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Icon } from '../ui/Icon';
 import { stepInfo } from './stepKinds';
 import { PanelHeader } from './PanelHeader';
@@ -31,6 +31,7 @@ import type {
   FlowInput,
 } from './stores/flowEditorStore';
 import { cn } from '../../lib/utils';
+import { useDismissOnOutside } from '../../lib/dismissOnOutside';
 import { vscode } from '../../lib/vscode';
 import { PromptTextArea } from './PromptTextArea';
 import {
@@ -1099,6 +1100,11 @@ function SaveFileNodeConfig({ data, onUpdate }: SaveFileNodeConfigProps) {
   const otherNodes = nodes.filter((n) => n.type !== 'saveFileNode');
   const triggerNode = nodes.find((n) => n.type === 'triggerNode');
   const [showVarPicker, setShowVarPicker] = useState(false);
+  // A press outside the list closes it, and Esc does (the shared rule, `lib/dismissOnOutside`). The filename and
+  // its "/" button open the list, so a press on them is not outside; Esc from the list gives the field the focus back.
+  const varPickerRef = useRef<HTMLDivElement>(null);
+  const varFieldRef = useRef<HTMLDivElement>(null);
+  useDismissOnOutside(varPickerRef, () => setShowVarPicker(false), { enabled: showVarPicker, trigger: varFieldRef });
 
   // Get available variables for filename
   const availableVars = React.useMemo(() => {
@@ -1219,7 +1225,7 @@ function SaveFileNodeConfig({ data, onUpdate }: SaveFileNodeConfigProps) {
 
       <Field label="Filename" description="Type / to use what an earlier step made.">
         <div className="relative">
-          <div className="flex gap-2">
+          <div ref={varFieldRef} className="flex gap-2">
             <Input
               value={data.filename || ''}
               onChange={(e) => {
@@ -1247,7 +1253,7 @@ function SaveFileNodeConfig({ data, onUpdate }: SaveFileNodeConfigProps) {
 
           {/* Variable picker dropdown */}
           {showVarPicker && (
-            <div className="absolute z-50 mt-1 w-full bg-[var(--r-surface)] border border-[var(--r-hairline)] rounded shadow-lg max-h-48 overflow-y-auto">
+            <div ref={varPickerRef} className="absolute z-50 mt-1 w-full bg-[var(--r-surface)] border border-[var(--r-hairline)] rounded shadow-lg max-h-48 overflow-y-auto">
               {availableVars.map((v, i) => (
                 // #577 (Sprint 147): the shared Button, laid out as the list's row it was
                 <Tooltip key={i} label={`Inserts ${v.value} at the cursor`} side="left" hoverOnly className="flex w-full">
