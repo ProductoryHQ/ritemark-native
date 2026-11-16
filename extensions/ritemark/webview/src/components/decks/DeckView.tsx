@@ -667,6 +667,11 @@ export function DeckView({
     move: (from, to) => {
       if (editor && dispatch(moveSlide(editor.state, from, to))) requestAnimationFrame(() => pick(to > from ? to - 1 : to))
     },
+    undo: redo => {
+      if (!editor) return
+      if (redo) editor.commands.redo()
+      else editor.commands.undo()
+    },
     addToLibrary: index => {
       const id = idOf(index)
       if (!id) return
