@@ -40,6 +40,7 @@ import type { AcceptedTurn, ChatOrigin, ChatStartRequest } from '../views/Unifie
 import { saveAiForNewChats } from '../welcome/welcomeHost';
 import { homeReopenNotOpened, signInProblem, type SignInProblem } from '../welcome/words';
 import { countsLine, listFileNames } from './folderCounts';
+import { isEnabled } from '../features/featureGate';
 import { feedbackDue, guidanceCard, localDay } from './guidanceState';
 import { GuidanceStore, noteLastReadyAi, readLastReadyAi, seedLastReadyAiForTest } from './guidanceStore';
 import { madeSomething } from './madeSomething';
@@ -741,10 +742,13 @@ export class GuidanceHost implements vscode.Disposable {
    * walked on every Home redraw.
    */
   private countsOf(root: string, skipAtRoot: ReadonlySet<string>): Promise<string> {
-    const key = `${root}\n${[...skipAtRoot].sort().join('\n')}`;
+    // Sprint 159: with the `decks` flag on, a .deck.md counts as a deck; the flag is in the key, so turning it
+    // over gives the other line
+    const decks = isEnabled('decks');
+    const key = `${root}\n${decks ? 'decks' : ''}\n${[...skipAtRoot].sort().join('\n')}`;
     let line = this.counts.get(key);
     if (!line) {
-      line = listFileNames(root, { skipAtRoot }).then((listed) => countsLine(listed.names, listed.more));
+      line = listFileNames(root, { skipAtRoot }).then((listed) => countsLine(listed.names, listed.more, { decks }));
       line.catch(() => this.counts.delete(key));
       this.counts.set(key, line);
     }

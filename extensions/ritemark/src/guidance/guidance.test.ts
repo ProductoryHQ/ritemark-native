@@ -30,6 +30,16 @@ assert.equal(countsLine(['a.docx', 'b.pdf', 'c.csv', 'd.pptx', 'e.txt', 'f.jpg']
 assert.equal(countsLine(['a.zip', 'b.exe']), '2 files.', 'only unknown kinds: the total alone');
 assert.equal(countsLine(['notes.MD', 'Deck.KEY']), '2 files: 1 presentation and 1 text document.', 'extensions in any case; a tie keeps the kind order');
 assert.equal(countsLine([], false), '0 files.');
+// Sprint 159: with the `decks` flag on, a .deck.md is a deck in the line's own pattern; off, a text document
+assert.equal(countsLine(['Talk.deck.md'], false, { decks: true }), '1 file: 1 deck.', 'one deck, flag on');
+assert.equal(countsLine(['Talk.deck.md'], false, { decks: false }), '1 file: 1 text document.', 'flag off: a text document, as before');
+assert.equal(countsLine(['Talk.deck.md']), '1 file: 1 text document.', 'no options: as before');
+assert.equal(countsLine(['a.deck.md', 'B.DECK.MD'], false, { decks: true }), '2 files: 2 decks.', 'plural, any case');
+assert.equal(countsLine(['a.deck.md', 'b.deck.md', 'notes.md', 'Brief.docx', 'Brief.pdf', 'Plan.pdf'], false, { decks: true }), '6 files: 2 PDFs, 2 decks, 1 Word document and 1 text document.', 'a mixed folder: decks counted apart from the text documents');
+assert.equal(countsLine(['a.deck.md', 'b.deck.md', 'notes.md', 'Brief.docx', 'Brief.pdf', 'Plan.pdf'], false, { decks: false }), '6 files: 3 text documents, 2 PDFs and 1 Word document.', 'the same folder, flag off');
+assert.equal(countsLine(['deck.md'], false, { decks: true }), '1 file: 1 text document.', 'a file named just deck.md is a document');
+assert.equal(fileKindOf('Talk.deck.md', { decks: true }), 'deck');
+assert.equal(fileKindOf('Talk.deck.md'), 'text');
 assert.equal(countsLine(repeat('.md', COUNT_LIMIT + 1)), 'More than 10,000 files.', 'S11: past 10,000');
 assert.equal(countsLine(['a.md'], true), 'More than 10,000 files.', 'the walk stopped');
 assert.deepEqual(['x.docx', 'x.doc', 'x.odt', 'x.pdf', 'x.numbers', 'x.csv', 'x.key', 'x.markdown', 'x.heic', 'x.flow', 'Makefile'].map(fileKindOf), ['word', 'word', 'word', 'pdf', 'spreadsheet', 'spreadsheet', 'presentation', 'text', 'picture', 'other', 'other']);
