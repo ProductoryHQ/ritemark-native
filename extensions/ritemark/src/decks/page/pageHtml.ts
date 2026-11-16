@@ -19,7 +19,7 @@
  */
 import { createHash } from 'node:crypto';
 import { marked } from 'marked';
-import type { SlideData } from '../deckFormat';
+import { exerciseTagOf, type SlideData } from '../deckFormat';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import { slideMarkup, escapeHtml } from '../../../webview/src/components/decks/slide/slideMarkup';
 import { themeStyle, themeVars } from '../../../webview/src/components/decks/theme/themeVars';
@@ -425,6 +425,12 @@ function fontFaces(fonts: PageFont[]): string {
 
 const titleOf = (slide: PublicSlide) => (slide.data.title ?? '').trim();
 
+/** An exercise's pill beside its label and in Contents: the slide's own words (`tag:`), the default, or none. */
+function pillHtml(slide: PublicSlide): string {
+  const words = slide.kind === 'exercise' ? exerciseTagOf(slide.data) : '';
+  return words ? `<span class="tag">${esc(words)}</span>` : '';
+}
+
 /** The text column's part for one shown slide. */
 function partHtml(slide: PublicSlide, index: number, options: PageOptions, partKey: string, textHandout: boolean): string {
   const number = index + 1;
@@ -436,15 +442,16 @@ function partHtml(slide: PublicSlide, index: number, options: PageOptions, partK
     const label = `Section${slide.data.number?.trim() ? ` ${slide.data.number.trim()}` : ''}`;
     return `<section class="part sect" data-i="${index}" id="s${number}"><div class="eyebrow">${esc(label)}</div>${title ? `<h2>${esc(title)}</h2>` : ''}\n${body}</section>`;
   }
-  const tag = slide.kind === 'exercise' ? '<span class="tag">Exercise</span>' : '';
-  return `<article class="part" data-i="${index}" id="s${number}"><div class="lab">Slide ${number}${tag}</div>${title ? `<h2>${esc(title)}</h2>` : ''}\n${body}</article>`;
+  // An exercise is marked for the page's script (Contents ticks it once its steps are done) whether or not it has a pill.
+  const exercise = slide.kind === 'exercise' ? ' data-exercise=""' : '';
+  return `<article class="part"${exercise} data-i="${index}" id="s${number}"><div class="lab">Slide ${number}${pillHtml(slide)}</div>${title ? `<h2>${esc(title)}</h2>` : ''}\n${body}</article>`;
 }
 
 function contentsHtml(slides: PublicSlide[]): string {
   const rows = slides.map((slide, index) => {
     const title = titleOf(slide) || `Slide ${index + 1}`;
     const mark = slide.kind === 'exercise'
-      ? `<span class="tag">Exercise</span><span class="done" aria-label="Done">${iconSvg('check-circle', 18)}</span>`
+      ? `${pillHtml(slide)}<span class="done" aria-label="Done">${iconSvg('check-circle', 18)}</span>`
       : '';
     return `<button type="button" role="menuitem" data-go="${index}"><span class="n">${index + 1}</span><span class="${slide.kind === 'section' ? 'sec' : ''}">${esc(title)}</span>${mark}</button>`;
   });

@@ -2,9 +2,9 @@
  * Sprint 157: the edits typing on the slide makes to its data. Pure: each returns new data, and the deck view writes
  * it into the slide's block (`writeSlideBody`, which rewrites only the lines that changed).
  *
- * Paths are the layout's: `title`, `subtitle`, `number`, `items.2.heading`, `items.2.text`, `rows.1.0`.
+ * Paths are the layout's: `title`, `subtitle`, `number`, `tag`, `items.2.heading`, `items.2.text`, `rows.1.0`.
  */
-import type { SlideData, SlideItem } from '../../../../../src/decks/deckFormat'
+import { exerciseTagOf, type SlideData, type SlideItem } from '../../../../../src/decks/deckFormat'
 
 const ITEM_PATH = /^items\.(\d+)\.(heading|text)$/
 const CELL_PATH = /^rows\.(\d+)\.(\d+)$/
@@ -24,6 +24,7 @@ export function cellPath(path: string): { row: number; column: number } | null {
 /** The words at `path`, as the slide holds them now. */
 export function valueAt(data: SlideData, path: string): string {
   if (path === 'title' || path === 'subtitle' || path === 'number') return data[path] ?? ''
+  if (path === 'tag') return exerciseTagOf(data)
   const item = itemPath(path)
   if (item) return data.items?.[item.index]?.[item.field] ?? ''
   const cell = cellPath(path)
@@ -31,11 +32,15 @@ export function valueAt(data: SlideData, path: string): string {
   return ''
 }
 
-/** The words at `path` set to `value`. An emptied title, subtitle or number leaves the file. */
+/**
+ * The words at `path` set to `value`. An emptied title, subtitle or number leaves the file; an emptied pill stays as
+ * `tag: ""`, no pill, since a missing line shows the default.
+ */
 export function setPath(data: SlideData, path: string, value: string): SlideData {
   if (path === 'title' || path === 'subtitle' || path === 'number') {
     return { ...data, [path]: value === '' ? undefined : value }
   }
+  if (path === 'tag') return { ...data, tag: value }
   const item = itemPath(path)
   if (item) {
     const items: SlideItem[] = [...(data.items ?? [])]

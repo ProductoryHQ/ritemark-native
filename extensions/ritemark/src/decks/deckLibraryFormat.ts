@@ -165,6 +165,8 @@ function stampOf(kind: string, data: SlideData, handout: string, folder: string)
     fold(data.title), fold(data.subtitle), fold(data.number), data.look ?? '', data.picture ?? '', image,
     ...(data.items ?? []).map(item => `${fold(item.heading)}|${fold(item.text)}|${item.icon ?? ''}`),
     '#rows', ...(data.rows ?? []).map(row => row.map(fold).join('|')),
+    // An exercise's pill (16 November) counts only when its line is there, so every stamp made before it stands.
+    ...(data.tag !== undefined ? ['#tag', fold(data.tag)] : []),
     '#handout', foldMarkdown(resolvedHandout),
   ];
   return fnv1a(parts.join('\u0001'));

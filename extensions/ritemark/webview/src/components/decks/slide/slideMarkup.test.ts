@@ -84,6 +84,9 @@ const slides: Array<{ kind: string; data: SlideData; label: string }> = [
   { label: 'arrows', kind: 'boxes', data: { title: 'Arrows', look: 'arrows', items: items(3) } },
   { label: 'columns', kind: 'columns', data: { title: 'Assistant or agent?', items: [{ heading: 'Assistant', text: 'Answers when you ask\nWorks in the chat' }, { heading: 'Agent', text: 'Works on a goal\nUses tools' }] } },
   { label: 'exercise', kind: 'exercise', data: { title: 'Build an assistant', items: items(4) } },
+  // 16 November: the pill's own words, or none (`tag: ""`), drawn alike on the stage, the wall and the page.
+  { label: 'exercise with its own pill', kind: 'exercise', data: { title: 'Proovi ise', tag: 'Harjutus <1> & "2"', items: items(2) } },
+  { label: 'exercise with no pill', kind: 'exercise', data: { title: 'Proovi ise', tag: '', items: items(2) } },
   { label: 'picture', kind: 'picture', data: { title: 'A clean table', subtitle: 'One row per record.', image: 'images/team.png' } },
   { label: 'an empty picture', kind: 'picture', data: { title: 'No picture yet' } },
   { label: 'table', kind: 'table', data: { title: 'Which tool', rows: [['Data', 'In the chat', 'In Excel'], ['Public', 'Yes', 'Yes'], ['Internal', 'Company <account>', 'Yes, on a copy']] } },

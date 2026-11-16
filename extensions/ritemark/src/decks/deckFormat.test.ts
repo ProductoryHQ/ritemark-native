@@ -389,5 +389,19 @@ test('a deck written before the mark gets its headings and the mark together; it
   assert.equal(withWrittenHandout(written), written, 'a marked deck is as it is');
 });
 
+// 16 November: an exercise's pill, `tag:`. Its words read back as the same string here and in any YAML reader, and
+// `tag: ""` is kept as an empty string (no pill), never dropped as a missing line (the default).
+test("an exercise's pill is written through writeScalar and read back by any YAML reader", () => {
+  const body = 'id: ex01\ntitle: Try it\nitems:\n- heading: Open';
+  for (const words of ['Harjutus', 'Step: one', 'Note:', '#1 of 3', 'Try it # now', 'yes', '2', '', ' padded ', 'Ülesanne']) {
+    const written = writeSlideBody(body, { ...parseSlideBody(body), tag: words });
+    assert.match(written, /^id: ex01\ntitle: Try it\ntag: .*\nitems:/, `${JSON.stringify(words)} goes after the title`);
+    assert.equal(parseSlideBody(written).tag, words);
+    assert.equal((yaml.load(written) as { tag: unknown }).tag, words, `${JSON.stringify(words)} in js-yaml`);
+  }
+  assert.equal(parseSlideBody(body).tag, undefined);
+  assert.equal(writeSlideBody(body, parseSlideBody(body)), body);
+  assert.equal(writeSlideBody(`${body.replace('Try it', 'Try it\ntag: ""')}`, { ...parseSlideBody(body), tag: undefined }), body, 'a line taken out leaves nothing behind');
+});
 
 console.log(`deckFormat: ${passed} passed`);

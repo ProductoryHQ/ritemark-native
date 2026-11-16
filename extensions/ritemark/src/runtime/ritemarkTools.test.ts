@@ -506,6 +506,42 @@ async function main(): Promise<void> {
     assert.equal(tools.deckToolsAvailable(), false);
   }
 
+  // ── 16 November: an exercise slide's pill (`tag:`) goes through the deck tools as written ──
+  {
+    const { DeckLibrary } = await import('../decks/DeckLibrary');
+    const { slidesOfText } = await import('../decks/deckLibraryFormat');
+    const files: Record<string, string> = {
+      'Slide library/Practice.deck.md': '---\ndeck: 1\n---\n\n```slide exercise\nid: e1\ntitle: Proovi\ntag: "Ülesanne: 1"\nitems:\n- heading: Ava fail\n```\n\n```slide exercise\nid: e2\ntitle: Quiet\ntag: ""\nitems:\n- heading: Read\n```\n\n```slide exercise\nid: e3\ntitle: Plain\n```\n',
+      'Clients/Harbour.deck.md': '---\ndeck: 1\n---\n\n```slide title\nid: t1\ntitle: Harbour\n```\n',
+    };
+    const library = new DeckLibrary({
+      async list() { return Object.keys(files).map((path) => ({ path, modified: 0 })); },
+      async read(path) { return files[path] ?? null; },
+      async write(path, text) { files[path] = text; },
+    });
+    const group = tools.createDeckToolGroup(() => ({ library: () => library, viewInsert: () => undefined }));
+    const tool = (name: string) => group.tools.find((item) => item.name === name)!;
+    const context = { runtimeId: 'claude-code' as const };
+    const inserted = await runTool(tool('insert_slides'), { deck: 'Clients/Harbour.deck.md', source: 'Slide library/Practice.deck.md', slide_ids: ['e1', 'e2', 'e3'] }, context);
+    assert.equal(inserted.isError, undefined, inserted.text);
+    const copies = slidesOfText(files['Clients/Harbour.deck.md']).slice(1);
+    assert.deepEqual(copies.map((slide) => slide.data.tag), ['Ülesanne: 1', '', undefined], 'insert_slides keeps the pill, an empty one, and no line');
+    assert.match(files['Clients/Harbour.deck.md'], /\ntag: "Ülesanne: 1"\n/);
+    assert.match(files['Clients/Harbour.deck.md'], /\ntag: ""\n/);
+    // read_deck says the pill's words, or none; a slide without the line shows the default and says nothing of it.
+    const read = (await runTool(tool('read_deck'), { deck: 'Clients/Harbour.deck.md' }, context)).text;
+    assert.match(read, /exercise[^\n]*\npill "Ülesanne: 1" · Proovi · Ava fail/);
+    assert.match(read, /exercise[^\n]*\nno pill · Quiet · Read/);
+    assert.match(read, /exercise[^\n]*\nPlain\n/);
+    // An edit to the copy's pill is a change to the slide: Update the library writes it back.
+    const copyId = copies[2].data.id as string;
+    files['Clients/Harbour.deck.md'] = files['Clients/Harbour.deck.md'].replace('title: Plain', 'title: Plain\ntag: Harjutus');
+    assert.match((await runTool(tool('read_deck'), { deck: 'Clients/Harbour.deck.md' }, context)).text, /changed here[^\n]*\npill "Harjutus" · Plain/);
+    const updated = await runTool(tool('update_library_slide'), { deck: 'Clients/Harbour.deck.md', slide_id: copyId }, context);
+    assert.equal(updated.isError, undefined, updated.text);
+    assert.equal(slidesOfText(files['Slide library/Practice.deck.md'])[2].data.tag, 'Harjutus');
+  }
+
   console.log('runtime/ritemarkTools: all assertions passed');
 }
 

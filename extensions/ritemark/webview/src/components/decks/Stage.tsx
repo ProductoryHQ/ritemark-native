@@ -155,8 +155,8 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
       write(current => removeItem(current, item.index), item.index > 0 ? `items.${item.index - 1}.heading` : 'title')
       return true
     }
-    if (event.key === 'Enter' && !event.shiftKey && !item && !cell) {
-      // From the title or a line under it, on to the next words on the slide.
+    if (event.key === 'Enter' && (!event.shiftKey || path === 'tag') && !item && !cell) {
+      // From the title or a line under it, on to the next words on the slide (the pill stays on one line).
       const order = textBoxes(layoutSlide(slide.kind, data, { editing: true })).map(box => box.path)
       const next = order[order.indexOf(path) + 1]
       if (next) setFocusPath(next)

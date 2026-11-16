@@ -3,11 +3,15 @@
  * Layout (nine kinds as small pictures), the look of a row of boxes, Picture (None, Left, Right, Behind) and Skip
  * slide. A change of kind keeps the words (`convertKind`). Built from the shared controls: the segmented control (its
  * picture variant for the layouts and the picture places) and the switch.
+ *
+ * An exercise slide also has Label (16 November): its pill's words, as on the slide, with the default as the
+ * placeholder. Emptied, the slide has no pill (`tag: ""`); words typed here bring it back.
  */
 import type { ReactNode } from 'react'
-import type { SlideData } from '../../../../src/decks/deckFormat'
+import { EXERCISE_TAG, exerciseTagOf, type SlideData } from '../../../../src/decks/deckFormat'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
+import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { SegmentedControl } from '../ui/segmented-control'
 import { Switch } from '../ui/switch'
@@ -56,11 +60,14 @@ interface SlideSettingsProps {
   /** The settings changed, as a patch on the slide's data (an undefined value takes the line out). */
   onChange: (patch: Partial<SlideData>) => void
   onClose: () => void
+  /** Cmd+Z (redo: Cmd+Shift+Z, Cmd+Y) in a field: the deck's undo, as on the stage, not the field's own. */
+  onUndo: (redo: boolean) => void
   style?: React.CSSProperties
 }
 
-export function SlideSettings({ number, kind, data, onKind, onChange, onClose, style }: SlideSettingsProps) {
+export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, style }: SlideSettingsProps) {
   const skipId = `deck-skip-${number}`
+  const tagId = `deck-tag-${number}`
   return (
     <section className="deck-settings" style={style} aria-label={`Settings of slide ${number}`} onKeyDown={event => { if (event.key === 'Escape') onClose() }}>
       <header className="deck-settings-head">
@@ -91,6 +98,26 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, s
             options={LOOKS}
           />
         </>
+      ) : null}
+      {kind === 'exercise' ? (
+        <div className="deck-settings-row deck-settings-tag">
+          <Label htmlFor={tagId}>Label</Label>
+          <Input
+            id={tagId}
+            className="deck-settings-field"
+            placeholder={EXERCISE_TAG}
+            value={exerciseTagOf(data)}
+            onChange={event => onChange({ tag: event.target.value.replace(/[\r\n\u2028\u2029]+/g, ' ') })}
+            onKeyDown={event => {
+              const mod = event.metaKey || event.ctrlKey
+              const key = event.key.toLowerCase()
+              if (mod && (key === 'z' || key === 'y')) {
+                event.preventDefault()
+                onUndo(key === 'y' || event.shiftKey)
+              }
+            }}
+          />
+        </div>
       ) : null}
       {kind !== 'picture' ? (
         <>

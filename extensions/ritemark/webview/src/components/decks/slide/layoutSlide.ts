@@ -8,7 +8,7 @@
  * `step` asks for each choice that many sizes smaller, which the canvas's measuring pass uses when real font metrics
  * still overflow.
  */
-import type { SlideData, SlideItem } from '../../../../../src/decks/deckFormat'
+import { EXERCISE_TAG, exerciseTagOf, type SlideData, type SlideItem } from '../../../../../src/decks/deckFormat'
 
 export const CANVAS_WIDTH = 960
 export const CANVAS_HEIGHT = 540
@@ -24,7 +24,7 @@ export interface TextBox {
   type: 'text'
   key: string
   cls: string
-  /** `title`, `subtitle`, `number`, `items.2.heading`, `items.2.text`, `rows.1.0`. */
+  /** `title`, `subtitle`, `number`, `tag`, `items.2.heading`, `items.2.text`, `rows.1.0`. */
   path: string
   text: string
   placeholder: string
@@ -218,7 +218,13 @@ export function layoutSlide(kind: string, data: SlideData, options: { editing?: 
       })),
     })
   } else if (kind === 'exercise') {
-    boxes.push({ type: 'mark', key: 'tag', cls: 'tag', text: 'Exercise', style: { left: cx } })
+    // The pill is words like the title's, edited in place (16 November). The rule for it, and for any later fixed word
+    // a layout draws: an optional line in the slide's block; the default (`EXERCISE_TAG`) when the line is missing;
+    // empty means none. An emptied pill is still drawn on the stage, so the caret can stay in it with the default as
+    // its faint placeholder; slide.css hides it once the caret leaves. The other marks (numbers, dots, lines, the bar,
+    // icons) carry no words.
+    const tag = exerciseTagOf(data)
+    if (tag || editing) boxes.push(text('tag', 'tag', 'tag', tag, EXERCISE_TAG, { left: cx }))
     const top = Math.max(196, heading(100, [46, 40, 34]) + 22)
     const gap = Math.min(72, (BOTTOM - top) / n)
     const fz = [27, 23, 20, 17][Math.min(3, (gap < 44 ? 2 : gap < 56 ? 1 : 0) + step)]
