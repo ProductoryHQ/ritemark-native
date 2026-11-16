@@ -474,10 +474,10 @@ export class DeckPresenter implements vscode.Disposable {
     const serial = ++running.presenterSerial;
     running.session.read(running.origin.document.getText());
     const view = running.session.view();
-    const read = await this.look(running);
-    if (running.ended || running.presenter !== screen || serial !== running.presenterSerial) return;
+    // Before the wall has a state, the deck's look as it is now (the wall's first state then sends this view its own).
     const onWall = running.wallState;
-    const look = onWall ? { borderless: onWall.borderless, theme: onWall.theme } : read;
+    const look = onWall ? { borderless: onWall.borderless, theme: onWall.theme } : await this.look(running);
+    if (running.ended || running.presenter !== screen || serial !== running.presenterSerial) return;
     const assets = this.assets(running, screen, presenterPicturePaths(view, onWall?.slide));
     const twoDisplays = running.displays.length > 1;
     await post(screen.panel.webview, presenterStateOf(view, look, assets, {

@@ -536,6 +536,14 @@ export function frontMatterField(text: string, name: string): string | null {
   return frontMatterEntries(text)?.entries.find(([key]) => key === name)?.[1] ?? null;
 }
 
+/**
+ * Card or Borderless, as the front matter says it: `look: borderless` is Borderless, anything else (or none) Card. The
+ * deck view's own rule (`properties.look === 'borderless'`), so the page Publish builds has the look the view draws.
+ */
+export function frontMatterLook(text: string): 'card' | 'borderless' {
+  return frontMatterField(text, 'look') === 'borderless' ? 'borderless' : 'card';
+}
+
 /** The info string's kind: `slide boxes` → `boxes`; null when the block is no slide. */
 export function slideKindOfInfo(info: string): string | null {
   const match = /^slide(?:\s+(\S+))?\s*$/.exec(info.trim());
@@ -598,12 +606,11 @@ export function publishText(documentText: string, body: string, editorBody: stri
 }
 
 /**
- * A front matter (`head`, as `parseDeck` reads it, or '') saying the view's look: unchanged where it says it already,
- * by the view's own rule (`look: borderless` is Borderless, anything else Card); else without its `look:` lines, and
- * with `look: borderless` for Borderless.
+ * A front matter (`head`, as `parseDeck` reads it, or '') saying the view's look: unchanged where it says it already
+ * (`frontMatterLook`); else without its `look:` lines, and with `look: borderless` for Borderless.
  */
 function withLook(head: string, look: 'card' | 'borderless'): string {
-  if ((frontMatterField(head, 'look') === 'borderless') === (look === 'borderless')) return head;
+  if (frontMatterLook(head) === look) return head;
   if (!head) return '---\nlook: borderless\n---\n';
   const match = /^(---[ \t]*(\r?\n))([\s\S]*?)(\r?\n---[ \t]*(?:\r?\n)?)$/.exec(head);
   if (!match) return head;
