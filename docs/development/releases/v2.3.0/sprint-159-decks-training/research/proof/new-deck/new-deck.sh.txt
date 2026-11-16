@@ -1,0 +1,26 @@
+#!/bin/bash
+# new-deck.sh <port> <folder row in Documents> <shot file>: chooses the folder in Documents, opens New → Deck, and
+# shoots the deck that opens (no pick before it).
+S=$(dirname "$0")
+export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
+P=$1
+FOLDER=$2
+SHOT=$3
+at() { node "$S/cdp.mjs" "$P" js "$1" | tr -d '"'; }
+XY=$(at "(() => { const r = [...document.querySelectorAll('.part.sidebar .monaco-list-row')].find(r => r.getAttribute('aria-label') === '$FOLDER'); if (!r) return ''; const b = r.getBoundingClientRect(); return (b.x + 60) + ' ' + (b.y + b.height/2); })()")
+[[ -n $XY ]] || { echo "no row $FOLDER"; exit 1; }
+node "$S/cdp.mjs" "$P" click $XY
+sleep 0.8
+XY=$(at "(() => { const r = [...document.querySelectorAll('.part.sidebar .ritemark-project-row')].find(e => e.textContent.trim() === 'New'); const b = r.getBoundingClientRect(); return (b.x + b.width/2) + ' ' + (b.y + b.height/2); })()")
+node "$S/cdp.mjs" "$P" click $XY
+sleep 0.8
+XY=$(at "(() => { const r = [...document.querySelectorAll('[role=menuitem]')].find(e => (e.getAttribute('aria-label') || e.textContent || '').trim() === 'Deck'); if (!r) return ''; const b = r.getBoundingClientRect(); return (b.x + b.width/2) + ' ' + (b.y + b.height/2); })()")
+[[ -n $XY ]] || { echo "no Deck in New"; exit 1; }
+node "$S/cdp.mjs" "$P" click $XY
+sleep 5
+echo "quick pick open: $(at "!!document.querySelector('.quick-input-widget') && getComputedStyle(document.querySelector('.quick-input-widget')).display !== 'none'")"
+node "$S/cdp.mjs" "$P" move 700 880
+sleep 1
+node "$S/cdp.mjs" "$P" shot "$SHOT" > /dev/null
+echo "tabs: $(at "[...document.querySelectorAll('.part.editor .tabs-container > .tab')].map(t => t.getAttribute('aria-label')).join(' | ')")"
+node "$S/cdp.mjs" "$P" wv "Slide 1 of" "({ card: d.querySelector('.deck-start')?.innerText, selection: w.getSelection().toString() })"

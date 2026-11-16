@@ -26,6 +26,7 @@ import { slidesOfText } from './deckLibraryFormat';
 import { deckName, type DeckLibrary, type LibraryWrite } from './DeckLibrary';
 import { projectRelative, projectRoot } from './deckDocuments';
 import type { DeckPublisher } from './deckPublish';
+import type { StartCardState } from './startCard';
 
 /** One open deck view: its document and panel, and the slide it shows. */
 interface DeckView {
@@ -68,6 +69,16 @@ export class DeckPages implements vscode.Disposable {
   } | null = null;
   /** Sprint 159 (PR 7): decks New just made, whose view selects the title slide's title once it is drawn; each forgotten after a minute. */
   private readonly selectTitle = new Map<string, ReturnType<typeof setTimeout>>();
+  /** A line for the bar of a deck whose view is still to come (a deck renamed into a copy); each forgotten after a minute. */
+  private readonly pendingNotice = new Map<string, { text: string; timer: ReturnType<typeof setTimeout> }>();
+  /** The handout's start card (16 November, frame 20): set once at activation (`decksHost.ts`). */
+  startCard: {
+    state: (document: vscode.TextDocument) => Promise<StartCardState>;
+    gone: (document: vscode.TextDocument) => Promise<void>;
+    /** Draft and the copy: true when the card is gone (the row was used), false when it stays (nothing was done). */
+    draft: (document: vscode.TextDocument, text: string, notice: (text: string) => void) => Promise<boolean>;
+    copy: (document: vscode.TextDocument, source: string, notice: (text: string) => void) => Promise<boolean>;
+  } | null = null;
 
   /**
    * `library` gives the project's library, or null when the window has no project folder on disk. `publisher` is the
@@ -93,6 +104,29 @@ export class DeckPages implements vscode.Disposable {
     const key = path.normalize(fsPath);
     clearTimeout(this.selectTitle.get(key));
     this.selectTitle.set(key, setTimeout(() => this.selectTitle.delete(key), 60_000));
+  }
+
+  /** Once the view of the deck at `fsPath` says which slide it shows, its bar says `text` (the view may be on its way). */
+  noticeWhenShown(fsPath: string, text: string): void {
+    const key = path.normalize(fsPath);
+    clearTimeout(this.pendingNotice.get(key)?.timer);
+    this.pendingNotice.set(key, { text, timer: setTimeout(() => this.pendingNotice.delete(key), 60_000) });
+  }
+
+  /** The line for a deck that won't come after all (its rename was refused). */
+  dropNotice(fsPath: string): void {
+    const key = path.normalize(fsPath);
+    clearTimeout(this.pendingNotice.get(key)?.timer);
+    this.pendingNotice.delete(key);
+  }
+
+  private takeNotice(document: vscode.TextDocument): string | null {
+    const key = path.normalize(document.uri.fsPath);
+    const pending = this.pendingNotice.get(key);
+    if (!pending) return null;
+    clearTimeout(pending.timer);
+    this.pendingNotice.delete(key);
+    return pending.text;
   }
 
   /** The deck's request to select its title, taken once; none for a deck with no slides (nothing to select). */
@@ -278,6 +312,26 @@ export class DeckPages implements vscode.Disposable {
           if (connected === this.activeView()) this.changed.fire();
         }
         if (this.takeSelectTitle(document)) await this.post(webview, { type: 'deck/select-title' });
+        const notice = this.takeNotice(document);
+        if (notice) await this.post(webview, { type: 'deck/notice', text: notice });
+        return;
+      }
+      // The start card (16 November, frame 20): only with the flag on, as New → Deck is.
+      case 'deck/start-card':
+        await this.post(webview, { type: 'deck/start-card', state: this.startCard && isEnabled('decks') ? await this.startCard.state(document) : { fresh: false, ai: null, earlier: [] } });
+        return;
+      case 'deck/start-card-gone':
+        await this.startCard?.gone(document);
+        return;
+      case 'deck/start-draft':
+      case 'deck/start-copy': {
+        // The card waits for the answer: gone once the row was used, or as it is now when nothing was done
+        const card = this.startCard;
+        const notice = (text: string) => void this.post(webview, { type: 'deck/notice', text });
+        const gone = !card || !isEnabled('decks') || (request.type === 'deck/start-draft'
+          ? await card.draft(document, request.text, notice)
+          : await card.copy(document, request.source, notice));
+        await this.post(webview, { type: 'deck/start-card', state: gone || !card ? { fresh: false, ai: null, earlier: [] } : await card.state(document) });
         return;
       }
       default:
@@ -384,6 +438,8 @@ export class DeckPages implements vscode.Disposable {
   dispose(): void {
     for (const timer of this.selectTitle.values()) clearTimeout(timer);
     this.selectTitle.clear();
+    for (const pending of this.pendingNotice.values()) clearTimeout(pending.timer);
+    this.pendingNotice.clear();
     this.changed.dispose();
     this.revealed.dispose();
     this.views.clear();

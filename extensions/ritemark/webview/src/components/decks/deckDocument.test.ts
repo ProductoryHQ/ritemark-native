@@ -9,7 +9,7 @@ import { createEditorSchemaExtensions } from '../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../utils/markdownFidelity'
 import { DeckSlide } from './handout/deckSchema'
 import { removesSlides } from './handout/deckGuard'
-import { DECK_OPERATION, deleteSlide, duplicateSlide, insertSlide, moveSlide, partContent, partIndexAt, partRange, restoreSlide, slidesOf, updateSlide } from './deckDocument'
+import { DECK_OPERATION, deleteSlide, duplicateSlide, handoutHasText, insertSlide, moveSlide, partContent, partIndexAt, partRange, restoreSlide, slidesOf, updateSlide } from './deckDocument'
 import { convertKind, hiddenNote } from './slide/convertKind'
 
 installTestDocument()
@@ -100,6 +100,18 @@ assert.equal(partIndexAt(doc, slidesOf(doc)[1].pos + 3), 1)
   assert.equal(hiddenNote('columns', boxes), '1 more item is kept for other layouts')
   assert.equal(hiddenNote('title', boxes), '3 items are kept for other layouts')
   assert.equal(hiddenNote('boxes', boxes), '')
+}
+
+// The start card (16 November): a new deck's handout holds nothing but an empty paragraph; a word, a line or a list is
+// handout text. The slide's title is in its node and never counts.
+{
+  const empty = schema.nodes.doc.create(null, [slide('aaaa', 'The deck title typed'), schema.nodes.paragraph.create()])
+  assert.equal(handoutHasText(empty), false)
+  const spaces = schema.nodes.doc.create(null, [slide('aaaa', 'T'), schema.nodes.paragraph.create(null, [schema.text('  '), schema.nodes.hardBreak.create()])])
+  assert.equal(handoutHasText(spaces), false, 'blanks and a line break are no text')
+  assert.equal(handoutHasText(schema.nodes.doc.create(null, [slide('aaaa', 'T'), paragraph('Welcome')])), true)
+  assert.equal(handoutHasText(schema.nodes.doc.create(null, [slide('aaaa', 'T'), schema.nodes.horizontalRule.create()])), true)
+  assert.equal(handoutHasText(doc), true)
 }
 
 console.log('deckDocument: passed')

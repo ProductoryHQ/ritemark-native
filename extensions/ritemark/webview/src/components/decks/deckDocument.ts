@@ -61,6 +61,22 @@ export function partIndexAt(doc: PMNode, pos: number): number | null {
   return found < 0 ? null : found
 }
 
+/**
+ * Does the handout hold anything: a block outside the slide nodes that isn't an empty paragraph (words, a picture, a
+ * line). The slides' own titles are in their nodes, so a deck with only its title typed holds none (the start card).
+ */
+export function handoutHasText(doc: PMNode): boolean {
+  let found = false
+  doc.forEach(node => {
+    if (found || isSlideNode(node)) return
+    if (node.type.name !== 'paragraph') { found = true; return }
+    node.forEach(child => {
+      if (child.isText ? !!child.text?.trim() : child.type.name !== 'hardBreak') found = true
+    })
+  })
+  return found
+}
+
 /** A slide's title as the strip and the part head show it. */
 export function slideTitle(data: SlideData): string {
   return (data.title ?? '').trim()
