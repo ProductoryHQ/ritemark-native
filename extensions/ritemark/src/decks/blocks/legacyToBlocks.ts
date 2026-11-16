@@ -138,7 +138,10 @@ export function hiddenWords(kind: string, data: SlideData): string[] {
 export function conversionComment(notes: string | null | undefined, hidden: string[]): string | null {
   const parts = [(notes ?? '').trim(), ...hidden.map(words => `Hidden by the old layout: ${words}`)].filter(Boolean);
   if (!parts.length) return null;
-  const body = parts.join('\n').replace(/--(!?)>/g, '--$1›');
+  // A line that reads as a code fence's (```` ``` ```` or `~~~`, as a trainer's notes quoting a slide may hold) would open
+  // a fence for the deck's own reader (`parseDeck` doesn't know comments): indented four spaces it is no fence, so no
+  // slide can start inside the comment and no slide after it is swallowed (security review of #765).
+  const body = parts.join('\n').replace(/--(!?)>/g, '--$1›').replace(/^ {0,3}(?=`{3,}|~{3,})/gm, '    ');
   return `<!-- ${body} -->`;
 }
 

@@ -91,6 +91,24 @@ assert.equal(convertDeckText(converted), converted, 'converting again changes no
   assert.equal(blockSectionNumberOf('B\n\n# Workshop'), 'B');
 }
 
+// ---- Security review of #765: notes that quote slide syntax never become a slide, nor swallow the next one, once they
+// are a comment: their fence lines are indented, and the converted deck has the slides it had, none of the notes public.
+{
+  const quoting = [
+    '```slide points', 'id: s1', 'title: Public title', '```', '',
+    '````notes', 'Remember how a slide is written:', '```slide', '# SECRET PRICE 40k', '```', '~~~slide', '# SECRET TILDE', '~~~', 'and SECRETTAIL', '```', '````', '',
+    'Part one.', '',
+    '```slide points', 'id: s2', 'title: Second', '```', '',
+    'Part two.', '',
+  ].join('\n');
+  const after = convertDeckText(quoting);
+  assert.deepEqual(parseDeck(after).slides.map(slide => slideDataOf(slide.kind, slide.body).id), ['s1', 's2'], 'two slides, as before');
+  assert.ok(after.includes('\n    ```slide\n# SECRET PRICE 40k\n    ```\n    ~~~slide\n'), after);
+  assert.ok(after.includes('\n    ``` -->'), 'the last line closes no fence and opens none');
+  const page = JSON.stringify(publicDeck(after, { folderName: 'Demo', deckName: 'Demo', theme: BUILT_IN_THEME }));
+  for (const word of ['SECRET PRICE', 'SECRET TILDE', 'SECRETTAIL']) assert.ok(!page.includes(word), `${word} reached the page`);
+}
+
 // ---- A copy's stamp: renewed to the block stamp when it still matches (an older v1 stamp), kept when it was changed.
 {
   const data = { id: 'c1', title: 'Four parts', items: [{ heading: 'One' }] };
