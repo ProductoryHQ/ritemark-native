@@ -1,0 +1,60 @@
+/* Sprint 159 (PR 6; experience 17 frame 3, present.html `.pv`): the presenter view, in Ritemark Dark whatever the app's
+   theme (`.dark`'s tokens; the desk's colour pinned to Dark's, which `.dark` reads from the theme). At 1440 × 900 the
+   slide now is 960 wide at 32, 56; the next slide and the notes take the 384 on the right; the row sits at 648. */
+.deck-presenter {
+  --vscode-ritemark-desk: #1E1B4B;
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: auto 384px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: 32px;
+  padding: 32px 32px 28px;
+  overflow: hidden;
+  background: #16132F;
+  color: #F8FAFC;
+  font-family: var(--ritemark-ui-font-family);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.pv-main { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; min-height: 0; }
+.pv-side { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; min-height: 0; }
+.pv-foot { grid-column: 1 / -1; grid-row: 2; display: flex; align-items: center; gap: 12px; height: 56px; font-size: 15px; }
+
+.pv-label { margin-bottom: 10px; font-size: 11px; font-weight: 600; line-height: 14px; letter-spacing: 0.5px; text-transform: uppercase; color: #C7D2FE; }
+
+.pv-slide { position: relative; border-radius: 8px; overflow: hidden; }
+.pv-slide.is-borderless { background: #fff; }
+.pv-now { position: relative; }
+
+.pv-row { display: flex; gap: 12px; margin: 45px 0 0 -7px; padding: 7px; overflow-x: auto; scrollbar-width: none; }
+.pv-row::-webkit-scrollbar { display: none; }
+.pv-thumb { flex: none; opacity: 0.8; }
+.pv-thumb .pv-slide { border-radius: 6px; }
+.pv-thumb.is-past { opacity: 0.45; }
+.pv-thumb.is-current { opacity: 1; }
+.pv-thumb.is-current .pv-slide { box-shadow: 0 0 0 7px rgba(129, 140, 248, 0.35); }
+.pv-thumb:hover { opacity: 1; }
+
+.pv-end { display: grid; place-items: center; height: 216px; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(248, 250, 252, 0.16); font-size: 14px; color: #94A3B8; }
+
+.pv-notes-head { display: flex; align-items: center; justify-content: space-between; margin-top: 26px; }
+.pv-notes-head .pv-label { margin-bottom: 0; }
+.pv-sizes { display: flex; gap: 4px; }
+.pv-notes { flex: 1; min-height: 0; margin-top: 18px; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #F8FAFC; user-select: text; -webkit-user-select: text; }
+.pv-no-notes { color: #94A3B8; }
+
+.pv-held { display: flex; flex: none; align-items: center; gap: 10px; height: 40px; margin-top: 16px; padding: 0 14px; border-radius: 8px; background: rgba(248, 250, 252, 0.06); font-size: 14px; color: #C7D2FE; }
+
+.pv-clock { height: auto; padding: 0 6px; gap: 10px; }
+.pv-time { font-size: 32px; font-weight: 600; line-height: 40px; color: #F8FAFC; font-variant-numeric: tabular-nums; }
+.pv-of { font-size: 15px; font-weight: 500; color: #C7D2FE; }
+.pv-grow { flex: 1; }
+.pv-count { margin-right: 4px; color: #C7D2FE; font-variant-numeric: tabular-nums; }
+
+.pv-goto { position: absolute; z-index: 2; top: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; max-width: calc(100% - 48px); height: 52px; padding: 0 18px 0 8px; border-radius: 12px;
+  background: rgba(30, 27, 75, 0.92); box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.45); font-size: 15px; font-weight: 500; white-space: nowrap; }
+.pv-goto-number { min-width: 40px; height: 36px; padding: 0 10px; border-radius: 8px; background: rgba(248, 250, 252, 0.14); font-size: 20px; font-weight: 700; line-height: 36px; text-align: center; font-variant-numeric: tabular-nums; }
+.pv-goto-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pv-key { height: 22px; margin-left: 6px; padding: 0 6px; border-radius: 5px; background: rgba(248, 250, 252, 0.12); font-size: 12px; font-weight: 600; line-height: 22px; color: #C7D2FE; }

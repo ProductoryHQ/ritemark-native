@@ -20,7 +20,7 @@ import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import { deckModeOf } from './deckMode';
 import { isThemePath } from './deckTheme';
 import { decodeDeckRequest, DeckProtocolError, type DeckHostMessage, type DeckRequest } from './deckProtocol';
-import { decodeDeckPresentRequest, type DeckPresentRequest } from './present/presentProtocol';
+import { decodeDeckPresentMenuRequest, decodeDeckPresentRequest, type DeckPresentOptions, type DeckPresentRequest } from './present/presentProtocol';
 import { parseFrom } from './deckFormat';
 import { slidesOfText } from './deckLibraryFormat';
 import { deckName, type DeckLibrary, type LibraryWrite } from './DeckLibrary';
@@ -60,7 +60,11 @@ export class DeckPages implements vscode.Disposable {
   private readonly waiting = new Map<string, (ok: boolean) => void>();
   private requests = 0;
   /** Present on the deck's bar (Sprint 159): the presenter, set once at activation (`decksHost.ts`). */
-  presentHandler: ((origin: { document: vscode.TextDocument; panel: vscode.WebviewPanel }, request: DeckPresentRequest) => Promise<void>) | null = null;
+  presenter: {
+    start: (origin: { document: vscode.TextDocument; panel: vscode.WebviewPanel }, request: DeckPresentRequest) => Promise<void>;
+    options: () => Promise<DeckPresentOptions>;
+    setPresenter: (on: boolean) => Promise<void>;
+  } | null = null;
   /** Sprint 159 (PR 7): decks New just made, whose view selects the title slide's title once it is drawn; each forgotten after a minute. */
   private readonly selectTitle = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -199,11 +203,23 @@ export class DeckPages implements vscode.Disposable {
     // now, since its place shows only then.
     const connected = this.viewFor(webview);
     if (!connected || !this.deckModeFor(document, true)) return;
-    // Present (Sprint 159) has its own decoder, beside the presenter's other messages.
-    if ((message as { type?: unknown } | null)?.type === 'deck/present') {
+    // Present (Sprint 159) has its own decoders, beside the presenter's other messages.
+    const type = (message as { type?: unknown } | null)?.type;
+    if (type === 'deck/present') {
       const present = decodeDeckPresentRequest(message);
-      if (present && this.presentHandler) await this.presentHandler({ document, panel: connected.panel }, present);
+      if (present && this.presenter) await this.presenter.start({ document, panel: connected.panel }, present);
       else if (!present) console.warn('[Decks] Dropped a malformed Present request');
+      return;
+    }
+    if (type === 'deck/present-options' || type === 'deck/present-presenter') {
+      const menu = decodeDeckPresentMenuRequest(message);
+      if (!menu || !this.presenter) return;
+      if (menu.type === 'deck/present-presenter') await this.presenter.setPresenter(menu.on);
+      try {
+        await webview.postMessage(await this.presenter.options());
+      } catch {
+        // The view closed meanwhile.
+      }
       return;
     }
     let request: DeckRequest;

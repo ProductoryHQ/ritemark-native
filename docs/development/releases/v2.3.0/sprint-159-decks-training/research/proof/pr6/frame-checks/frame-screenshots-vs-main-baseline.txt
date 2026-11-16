@@ -1,0 +1,105 @@
+captured light-base (1440x900)
+JOINS    light-base: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-two-desks (1440x900)
+JOINS    light-two-desks: ok (2 desks; the ground at the corners is 14 levels from the desk's colour)
+captured light-left-hidden (1440x900)
+JOINS    light-left-hidden: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-ai-hidden (1440x900)
+JOINS    light-ai-hidden: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-both-hidden (1440x900)
+JOINS    light-both-hidden: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-new-tab-menu (1440x900)
+JOINS    light-new-tab-menu: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-more-menu (1440x900)
+JOINS    light-more-menu: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-terminal (1440x900)
+JOINS    light-terminal: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-home (1440x900)
+JOINS    light-home: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-switcher (1440x900)
+JOINS    light-switcher: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-tasks (1440x900)
+JOINS    light-tasks: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-browser (1440x900)
+JOINS    light-browser: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-transcribe (1440x900)
+JOINS    light-transcribe: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-agents (1440x900)
+JOINS    light-agents: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-settings-foot (1440x900)
+JOINS    light-settings-foot: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-share-question (1440x900)
+JOINS    light-share-question: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured light-many-tabs (1440x900)
+JOINS    light-many-tabs: ok (1 desk; the ground at the corners is 14 levels from the desk's colour)
+captured dark-base (1440x900)
+JOINS    dark-base: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-two-desks (1440x900)
+JOINS    dark-two-desks: ok (2 desks; the ground at the corners is 28 levels from the desk's colour)
+captured dark-left-hidden (1440x900)
+JOINS    dark-left-hidden: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-ai-hidden (1440x900)
+JOINS    dark-ai-hidden: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-both-hidden (1440x900)
+JOINS    dark-both-hidden: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-new-tab-menu (1440x900)
+JOINS    dark-new-tab-menu: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-more-menu (1440x900)
+JOINS    dark-more-menu: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-terminal (1440x900)
+JOINS    dark-terminal: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-home (1440x900)
+JOINS    dark-home: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-switcher (1440x900)
+JOINS    dark-switcher: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-tasks (1440x900)
+JOINS    dark-tasks: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-browser (1440x900)
+JOINS    dark-browser: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-transcribe (1440x900)
+JOINS    dark-transcribe: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-agents (1440x900)
+JOINS    dark-agents: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-settings-foot (1440x900)
+JOINS    dark-settings-foot: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-share-question (1440x900)
+JOINS    dark-share-question: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+captured dark-many-tabs (1440x900)
+JOINS    dark-many-tabs: ok (1 desk; the ground at the corners is 28 levels from the desk's colour)
+DIFFERS  light-base: 9.87% of pixels changed
+DIFFERS  light-two-desks: 10.14% of pixels changed
+DIFFERS  light-left-hidden: 8.59% of pixels changed
+DIFFERS  light-ai-hidden: 1.92% of pixels changed
+DIFFERS  light-both-hidden: 0.65% of pixels changed
+DIFFERS  light-new-tab-menu: 10.83% of pixels changed
+DIFFERS  light-more-menu: 10.22% of pixels changed
+DIFFERS  light-terminal: 8.01% of pixels changed
+DIFFERS  light-home: 11.09% of pixels changed
+DIFFERS  light-switcher: 9.46% of pixels changed
+DIFFERS  light-tasks: 9.71% of pixels changed
+DIFFERS  light-browser: 8.49% of pixels changed
+DIFFERS  light-transcribe: 8.91% of pixels changed
+DIFFERS  light-agents: 8.49% of pixels changed
+DIFFERS  light-settings-foot: 15.34% of pixels changed
+DIFFERS  light-share-question: 11.41% of pixels changed
+DIFFERS  light-many-tabs: 10.97% of pixels changed
+DIFFERS  dark-base: 10.16% of pixels changed
+DIFFERS  dark-two-desks: 10.43% of pixels changed
+DIFFERS  dark-left-hidden: 8.85% of pixels changed
+DIFFERS  dark-ai-hidden: 1.94% of pixels changed
+DIFFERS  dark-both-hidden: 0.66% of pixels changed
+DIFFERS  dark-new-tab-menu: 11.09% of pixels changed
+DIFFERS  dark-more-menu: 10.48% of pixels changed
+DIFFERS  dark-terminal: 8.02% of pixels changed
+DIFFERS  dark-home: 11.06% of pixels changed
+DIFFERS  dark-switcher: 9.76% of pixels changed
+DIFFERS  dark-tasks: 9.72% of pixels changed
+DIFFERS  dark-browser: 8.75% of pixels changed
+DIFFERS  dark-transcribe: 9.17% of pixels changed
+DIFFERS  dark-agents: 8.75% of pixels changed
+DIFFERS  dark-settings-foot: 15.39% of pixels changed
+DIFFERS  dark-share-question: 11.58% of pixels changed
+DIFFERS  dark-many-tabs: 11.26% of pixels changed
+
+34 of 34 scenes differ; written <scratch>/frame2B/compare.html
+0 of 34 scenes have a broken join or could not be checked; written <scratch>/frame2B/joins.html
