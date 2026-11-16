@@ -47,6 +47,7 @@ import { isExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import { toolSetKey } from '../runtime/ritemarkTools';
 import { codexTurnErrorCode } from '../runtime/runtimeErrorPresentation';
+import { activeFileLines } from '../decks/currentSlide';
 
 // ── Codex-specific constants ────────────────────────────────────────────────
 
@@ -340,7 +341,7 @@ export class CodexSession implements RuntimeSession {
     // Inject active file context into prompt (mirrors Claude Code pattern)
     let enrichedPrompt = turn.prompt;
     if (turn.activeFile) {
-      enrichedPrompt = `[Currently editing: ${turn.activeFile.path}]\n\n${enrichedPrompt}`;
+      enrichedPrompt = `${activeFileLines(turn.activeFile).join('\n')}\n\n${enrichedPrompt}`;
     }
     // Inject plan reminder for plan mode turns
     if (shouldUsePlanMode) {

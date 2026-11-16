@@ -615,6 +615,23 @@ async function run() {
     console.log('✓ Test 15: every advertised Codex effort reaches turn/start unchanged');
   }
 
+  // ── 17 November: a deck's current slide reaches Codex's turn after the active file; a Text document has none ──
+  {
+    const { runtime } = makeRuntime(['thread-slide']);
+    capturedTurnStarts.length = 0;
+    const session = new CodexSession('conv-slide', dummyConfig, runtime);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (runtime as any)._sessions.set('conv-slide', session);
+    await session.prompt({ prompt: 'fix this slide', activeFile: { path: 'Training.deck.md', slide: { deck: 'Training', count: 13, slides: [{ number: 5, id: 'k3f9', title: 'Agenda' }] } } });
+    await session.prompt({ prompt: 'fix this', activeFile: { path: 'notes.md' } });
+    const [deckTurn, textTurn] = capturedTurnStarts.map((args) => String(args[1]));
+    assert.ok(deckTurn.startsWith("[Currently editing: Training.deck.md]\n[Current slide: The person is on slide 5 of 13 (\"Agenda\", id k3f9) in \"Training\".]\n\n"), deckTurn);
+    assert.ok(deckTurn.trimEnd().endsWith('fix this slide'));
+    assert.ok(!textTurn.includes('[Current slide'), 'a Text document has no slide line');
+    assert.ok(textTurn.startsWith('[Currently editing: notes.md]\n\n'), textTurn);
+    console.log('✓ Test 15b: Codex gets the deck\'s current slide, a Text document none');
+  }
+
   // ── Test 16: the welcome's ChatGPT check tells a sign-in failure from a network one (Sprint 133) ──
   {
     for (const message of ['HTTP 401 Unauthorized', 'Your access token could not be refreshed', 'token expired', 'Please log in again', 'You are signed out']) {

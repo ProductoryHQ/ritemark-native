@@ -49,6 +49,7 @@ import { thinkingEffortLabel } from '../runtime/thinkingEffort';
 import { acpTurnErrorCode } from '../runtime/runtimeErrorPresentation';
 import { noteOpenCodeModels } from '../ai/modelCatalog';
 import { workspaceFilesOnly } from '../runtime/turnFiles';
+import { activeFileLines } from '../decks/currentSlide';
 
 type PendingApproval = (result: { approved: boolean; alwaysAllow: boolean }) => void;
 
@@ -113,7 +114,7 @@ export function buildAcpPromptText(
   // Active file context — same `[Currently editing: …]` preamble Claude Code and
   // Codex inject, so "edit this file" prompts know the target.
   if (turn.activeFile) {
-    promptText = `[Currently editing: ${turn.activeFile.path}]\n\n${promptText}`;
+    promptText = `${activeFileLines(turn.activeFile).join('\n')}\n\n${promptText}`;
   }
   let imageAttachmentCount = 0;
   if (turn.attachments && turn.attachments.length > 0) {

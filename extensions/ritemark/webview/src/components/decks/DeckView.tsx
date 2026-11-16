@@ -42,6 +42,7 @@ import type { Transaction } from '@tiptap/pm/state'
 import { isHistoryTransaction } from '@tiptap/pm/history'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
+import { CURRENT_SLIDE_SETTLE_MS, currentSlideMessage } from './currentSlideMessage'
 import { DeckGuard } from './handout/deckGuard'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
@@ -380,6 +381,8 @@ export function DeckView({
   }, [])
   const countRef = useRef(count)
   countRef.current = count
+  const slidesRef = useRef(slides)
+  slidesRef.current = slides
   const shown = count === 0 ? 0 : Math.min(current, count - 1)
   const slide = slides[shown]
 
@@ -886,6 +889,14 @@ export function DeckView({
   useEffect(() => {
     sendToExtension('deck/current', { index: shown, count })
   }, [shown, count])
+  // The AI knows the slide the person is on (17 November): its id and title too, told once they settle (a scroll, a
+  // title being typed). A message of its own, so it never moves the library's insert point.
+  const shownId = slide?.data.id
+  const shownTitle = slide?.data.title
+  useEffect(() => {
+    const timer = window.setTimeout(() => sendToExtension('deck/current-slide', currentSlideMessage(shown, count, slidesRef.current)), CURRENT_SLIDE_SETTLE_MS)
+    return () => window.clearTimeout(timer)
+  }, [shown, count, shownId, shownTitle])
 
   // Each copy's source, asked a moment after the deck stops changing, and again when the window comes back (another
   // deck may have updated the library meanwhile).

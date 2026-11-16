@@ -13,6 +13,7 @@
  *   review / question / approval is NOT ready (Sprint 103 state model).
  */
 
+import type { SlideAtSend } from '../../../../src/decks/currentSlide';
 import type { ConversationActivityState } from './activityState';
 import type { FileAttachment, ThinkingEffort } from './types';
 
@@ -37,6 +38,8 @@ export interface QueueItem {
   attachments?: FileAttachment[];
   skipActiveFile?: boolean;
   skipBrowserContext?: boolean;
+  /** The deck slide the composer's chip showed when this was queued (17 November): the turn's "this slide". */
+  slideAtSend?: SlideAtSend | null;
   mentionedAgentPaths?: string[];
   /**
    * Sprint 117 (R1/R6): comment-originated identity, all HOST-MINTED.
