@@ -31,6 +31,14 @@ export interface TextBox {
   style?: BoxStyle
   /** Line breaks are part of the words (a column's lines). */
   multiline?: boolean
+  /**
+   * An item heading the layout draws its own number or dot for: `marks` says which, `position` is the number drawn.
+   * A list marker pasted in front of it is dropped.
+   */
+  marks?: ItemMarks
+  position?: number
+  /** The list marker the drawn words leave out ("1. "): an edit on the stage keeps it in the file. */
+  marker?: string
 }
 
 /** A mark drawn by the layout: the accent bar, a number, a dot, an icon. */
@@ -111,6 +119,59 @@ function pickTier<T>(tiers: T[], fits: (tier: T) => boolean, step: number): T {
   return tiers[Math.min(tiers.length - 1, index + step)]
 }
 
+/** What a layout draws before each item's heading: its number, a dot, or nothing. */
+export type ItemMarks = 'numbers' | 'dots'
+
+/** Points, Exercise and the Steps look number their items; the Line look gives each a dot. */
+export function itemMarksOf(kind: string, look?: string): ItemMarks | null {
+  if (kind === 'points' || kind === 'exercise') return 'numbers'
+  if (kind === 'boxes' && look === 'steps') return 'numbers'
+  if (kind === 'boxes' && look === 'line') return 'dots'
+  return null
+}
+
+// A marker is followed by a space (a non-breaking one too, as Word and Docs paste it) and then words.
+const BULLET = /^[ \t\u00a0]*[-*+\u2022\u2013\u2014][ \t\u00a0]+(?=\S)/
+const NUMBER = /^[ \t\u00a0]*(\d{1,9})[.)][ \t\u00a0]+(?=\S)/
+
+/**
+ * The list marker at the start of an item's words that its layout draws itself, or '' (Jarmo, 16 November: "1. 1.
+ * Sisend" on a Points slide). A bullet (`-`, `*`, `+`, `•`, `–`, `—`) on any kind that numbers or dots its items; a
+ * number (`1.`, `1)`) only where the layout numbers them, and only the number it draws there (`position`): Estonian
+ * writes ordinals and dates with a dot, so "15. november" or "2026. aasta" as a first point are words, not a marker.
+ * A number that is part of the words ("2026 plan", "3 hours", "1.5 litres") is no marker.
+ */
+export function listMarkerOf(text: string, position: number, marks: ItemMarks | null | undefined): string {
+  if (!marks) return ''
+  const bullet = BULLET.exec(text)
+  if (bullet) return bullet[0]
+  const number = marks === 'numbers' ? NUMBER.exec(text) : null
+  return number && Number(number[1]) === position ? number[0] : ''
+}
+
+/** The words as the layout draws them: without the marker it draws itself. The file keeps them as written. */
+export function withoutListMarker(text: string, position: number, marks: ItemMarks | null | undefined): string {
+  return text.slice(listMarkerOf(text, position, marks).length)
+}
+
+/**
+ * Words typed into an item's heading on the stage, as the file gets them: the marker the stage hid ("1. " in front of
+ * "Sisend") stays in front of them, so an edit changes only what the person changed. Emptied, the item is empty.
+ */
+export function editedItemWords(raw: string, box: Pick<TextBox, 'marker' | 'marks' | 'position'>): string {
+  if (!box.marker || !raw.trim() || listMarkerOf(raw, box.position ?? 0, box.marks)) return raw
+  return box.marker + raw
+}
+
+/**
+ * Words pasted into an item's heading, at the start of it (`before`: its words before the caret): without the marker
+ * the layout draws itself, so a pasted "1. Sisend" is saved as "Sisend". Pasted after other words, they stay as they are.
+ */
+export function pastedItemWords(pasted: string, before: string, box: Pick<TextBox, 'marks' | 'position'>): string {
+  if (!box.marks || before.trim()) return pasted
+  return withoutListMarker(pasted, box.position ?? 0, box.marks)
+}
+
 const KNOWN = new Set(['title', 'section', 'points', 'boxes', 'columns', 'statement', 'exercise', 'picture', 'table'])
 /** The kinds whose words are a list of items. */
 const ITEM_KINDS = new Set(['points', 'boxes', 'columns', 'exercise'])
@@ -158,8 +219,17 @@ export function layoutSlide(kind: string, data: SlideData, options: { editing?: 
     boxes.push(text('title', 'st', 'title', title, 'Title', { left: cx, width: cw, top, fontSize: z, lineHeight: `${z + 8}px` }))
     return top + lines * (z + 8)
   }
-  const itemHeading = (index: number, cls: string, placeholder: string, style?: BoxStyle) =>
-    text(`items.${index}.heading`, cls, `items.${index}.heading`, items[index]?.heading ?? '', placeholder, style)
+  // A layout that draws its own number or dot leaves out the marker an item was written with (never two numbers).
+  const marks = itemMarksOf(kind, data.look || 'boxes')
+  const itemHeading = (index: number, cls: string, placeholder: string, style?: BoxStyle): TextBox => {
+    const words = items[index]?.heading ?? ''
+    if (!marks) return text(`items.${index}.heading`, cls, `items.${index}.heading`, words, placeholder, style)
+    const marker = listMarkerOf(words, index + 1, marks)
+    const box = text(`items.${index}.heading`, cls, `items.${index}.heading`, words.slice(marker.length), placeholder, style)
+    return { ...box, marks, position: index + 1, ...(marker ? { marker } : {}) }
+  }
+  // The fit is measured on the words as drawn.
+  const drawn: SlideItem[] = marks ? items.map((item, index) => ({ ...item, heading: withoutListMarker(item.heading ?? '', index + 1, marks) })) : items
   const itemText = (index: number, cls: string, placeholder: string, style?: BoxStyle, multiline?: boolean) =>
     text(`items.${index}.text`, cls, `items.${index}.text`, items[index]?.text ?? '', placeholder, style, multiline)
   const icon = (index: number, style?: BoxStyle, small?: boolean): MarkBox | null => {
@@ -203,7 +273,7 @@ export function layoutSlide(kind: string, data: SlideData, options: { editing?: 
     const avail = BOTTOM - top
     const w = cw - 40
     const tiers = [[28, 40, 20, 26, 12], [24, 32, 18, 22, 8], [20, 27, 16, 20, 6], [17, 23, 14, 18, 4]]
-    const need = (t: number[]) => items.reduce((sum, item) => sum + linesOf(item.heading, t[0], w - 40) * t[1] + (item.text ? linesOf(item.text, t[2], w - 40) * t[3] : 0) + t[4], 0)
+    const need = (t: number[]) => drawn.reduce((sum, item) => sum + linesOf(item.heading, t[0], w - 40) * t[1] + (item.text ? linesOf(item.text, t[2], w - 40) * t[3] : 0) + t[4], 0)
     const t = pickTier(tiers, tier => need(tier) <= avail, step)
     boxes.push({
       type: 'list',
@@ -292,7 +362,7 @@ export function layoutSlide(kind: string, data: SlideData, options: { editing?: 
       const w = (cw - (cols - 1) * gap) / cols
       const rh = (avail - (rows - 1) * gap) / rows
       const hasMark = look !== 'boxes' || items.some(item => item.icon) || editing
-      const markHeight = (t: number[]) => Math.max(...items.map(item => linesOf(item.heading, t[0], w - 36) * t[1] + linesOf(item.text, t[2], w - 36) * t[3]), 0)
+      const markHeight = (t: number[]) => Math.max(...drawn.map(item => linesOf(item.heading, t[0], w - 36) * t[1] + linesOf(item.text, t[2], w - 36) * t[3]), 0)
       const small = 36 + (hasMark ? (look === 'boxes' ? 72 : 44) : 0) + markHeight([25, 31, 19, 26]) > rh || step > 0
       const tz = pickTier([[20, 25, 16, 21], [17, 21, 14, 18], [15, 19, 12, 16]], t => 24 + (hasMark ? 42 : 0) + markHeight(t) <= rh, Math.max(0, step - 1))
       items.forEach((_item, index) => {
@@ -316,7 +386,7 @@ export function layoutSlide(kind: string, data: SlideData, options: { editing?: 
         })
       })
     } else {
-      const longest = (t: number[]) => Math.max(...items.map(item => linesOf(item.heading, t[0], 140) * t[1] + linesOf(item.text, t[2], 140) * t[3]), 0)
+      const longest = (t: number[]) => Math.max(...drawn.map(item => linesOf(item.heading, t[0], 140) * t[1] + linesOf(item.text, t[2], 140) * t[3]), 0)
       if (look === 'steps') {
         const w = (cw - (n - 1) * 16) / n
         if (n > 1) boxes.push({ type: 'mark', key: 'ln', cls: 'ln', style: { left: cx + w / 2, width: (n - 1) * (w + 16), top: top + 42 } })
