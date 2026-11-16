@@ -1128,6 +1128,7 @@ export function DeckView({
             onKind={kind => changeSlide(data => convertKind(data, kind), kind)}
             onChange={patch => changeSlide(data => ({ ...data, ...patch }))}
             onClose={() => setSettingsOpen(false)}
+            onUndo={redo => { if (redo) editor?.commands.redo(); else editor?.commands.undo() }}
           />
         ) : null}
 

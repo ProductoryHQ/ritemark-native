@@ -41,6 +41,7 @@ import type { BoardAnswer } from '../taskBoard/protocol';
 import { CARD_STAGES } from '../taskBoard/cardTypes';
 import { deckName, type CopiedPart, type DeckLibrary } from '../decks/DeckLibrary';
 import { normalizePath } from '../decks/deckLibraryFormat';
+import { exerciseTagOf, isDefaultExerciseTag } from '../decks/deckFormat';
 
 export interface ToolResult {
   text: string;
@@ -457,8 +458,10 @@ function deckPathOf(value: unknown): string {
 }
 
 /** A slide's words in one line, for read_deck. */
-function slideWords(data: { title?: string; subtitle?: string; number?: string; items?: Array<{ heading?: string; text?: string }>; rows?: string[][] }): string {
+function slideWords(kind: string, data: { title?: string; subtitle?: string; number?: string; tag?: string; items?: Array<{ heading?: string; text?: string }>; rows?: string[][] }): string {
   return [
+    // An exercise's pill, when it draws other words than the default (`isDefaultExerciseTag`), or none.
+    kind === 'exercise' && !isDefaultExerciseTag(data) ? (exerciseTagOf(data) ? `pill ${JSON.stringify(data.tag)}` : 'no pill') : '',
     data.number, data.title, data.subtitle,
     ...(data.items ?? []).map(item => [item.heading, item.text].filter(Boolean).join(': ')),
     ...(data.rows ?? []).map(row => row.join(' | ')),
@@ -516,7 +519,7 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
               slide.notes ? 'has speaker notes' : '',
               state ? `copy of ${state.sourcePath}${state.missing ? ' (no longer there)' : ''}${state.changed ? ', changed here' : ''}${state.newer ? ', the source has a newer version' : ''}` : '',
             ].filter(Boolean).join('; ');
-            lines.push('', `Slide ${slide.index + 1} · id ${slide.data.id ?? 'none'} · ${slide.kind}${marks ? ` · ${marks}` : ''}`, slideWords(slide.data) || '(no words)');
+            lines.push('', `Slide ${slide.index + 1} · id ${slide.data.id ?? 'none'} · ${slide.kind}${marks ? ` · ${marks}` : ''}`, slideWords(slide.kind, slide.data) || '(no words)');
             if (slide.handout.trim()) lines.push('Handout:', slide.handout.trim());
           }
           return { text: lines.join('\n') };

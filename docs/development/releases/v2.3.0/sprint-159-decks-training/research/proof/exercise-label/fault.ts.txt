@@ -1,0 +1,12 @@
+import { parseSlideBody, writeSlideBody } from '../../../../../../../../extensions/ritemark/src/decks/deckFormat'
+import { layoutSlide } from '../../../../../../../../extensions/ritemark/webview/src/components/decks/slide/layoutSlide'
+import { slideMarkup } from '../../../../../../../../extensions/ritemark/webview/src/components/decks/slide/slideMarkup'
+import { BUILT_IN_THEME } from '../../../../../../../../extensions/ritemark/src/decks/deckTheme'
+
+for (const body of ['id: ex01\ntitle: Proovi ise\ntag: Harjutus', 'id: ex01\ntitle: Proovi ise\ntag: ""']) {
+  const data = parseSlideBody(body)
+  const pill = layoutSlide('exercise', data, { editing: true }).boxes.find(b => b.key === 'tag') as { type: string; text?: string } | undefined
+  const page = /class="tag"[^>]*>([^<]*)</.exec(slideMarkup('exercise', data, { theme: BUILT_IN_THEME, borderless: false }))?.[1]
+  console.log(JSON.stringify(body), '-> data.tag =', JSON.stringify((data as { tag?: string }).tag), '; stage pill:', pill?.type, JSON.stringify(pill?.text), '; page pill:', JSON.stringify(page))
+}
+console.log('an edit setting tag: Harjutus writes ->', JSON.stringify(writeSlideBody('id: ex01\ntitle: T', { ...parseSlideBody('id: ex01\ntitle: T'), tag: 'Harjutus' } as never)))

@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Tooltip } from '../../ui/tooltip'
 import { themeStyle } from '../theme/themeVars'
 import { SLIDE_ICONS, slideIcon } from './iconSet'
+import { oneLine } from './slideEdits'
 import { BOTTOM, CANVAS_HEIGHT, CANVAS_WIDTH, MAX_STEP, layoutSlide, type BoxStyle, type MarkBox, type SlideBox, type TextBox } from './layoutSlide'
 // The slide's rules, shared with the published handout page (Sprint 159): every view that draws a slide gets them.
 import './slide.css'
@@ -64,6 +65,19 @@ export function editedText(element: HTMLElement): string {
   return element.lastChild?.nodeName === 'BR' ? text.replace(/\n$/, '') : text
 }
 
+/** An emptied editing host without its stray children, so it reads as `:empty`; the caret stays in it when it had it. */
+function clearKeepingCaret(element: HTMLElement) {
+  const focused = element.ownerDocument.activeElement === element
+  element.replaceChildren()
+  if (!focused) return
+  const selection = element.ownerDocument.getSelection()
+  selection?.removeAllRanges()
+  const range = element.ownerDocument.createRange()
+  range.setStart(element, 0)
+  range.collapse(true)
+  selection?.addRange(range)
+}
+
 /** One of the slide's words: plain text, or a small editing host on the stage. */
 function SlideText({ box, editing, tag = 'div' }: { box: TextBox; editing?: SlideEditing; tag?: 'div' | 'span' }) {
   const ref = useRef<HTMLElement>(null)
@@ -105,10 +119,27 @@ function SlideText({ box, editing, tag = 'div' }: { box: TextBox; editing?: Slid
       onInput={event => {
         // A line typed with Enter may arrive as a <br> or a <div>: `innerText` reads each as a line break.
         const raw = box.multiline ? editedText(event.currentTarget) : event.currentTarget.textContent ?? ''
-        editing.onText(box.path, box.multiline ? raw : raw.replace(/[\r\n\u2028\u2029]+/g, ' '))
+        // Emptied, Chromium leaves a <br> behind, so the box doesn't read as :empty and its placeholder (an empty
+        // pill's faint default) never shows: the box is cleared, with the caret kept in it.
+        // Never mid-composition (an IME's or a dead key's marked text): the browser holds that text and would lose it.
+        if (raw === '' && event.currentTarget.firstChild && !(event.nativeEvent as InputEvent).isComposing) clearKeepingCaret(event.currentTarget)
+        editing.onText(box.path, box.multiline ? raw : oneLine(raw))
       }}
       onKeyDown={event => {
         if (editing.onKey(box.path, event)) event.preventDefault()
+      }}
+      // The input that emptied the box came mid-composition, so it wasn't cleared then: it is now.
+      onCompositionEnd={event => {
+        const element = event.currentTarget
+        if (!element.textContent && element.firstChild) clearKeepingCaret(element)
+      }}
+      // Emptied words may leave a stray <br> behind: cleared, so the box reads as empty (its placeholder; an empty
+      // pill goes once the caret leaves).
+      onBlur={event => {
+        const element = event.currentTarget
+        // A pill of spaces is no pill (`exerciseTagOf`), so it reads as empty too and goes.
+        const text = element.textContent ?? ''
+        if ((box.path === 'tag' ? !text.trim() : !text) && element.firstChild) clearKeepingCaret(element)
       }}
     />
   )

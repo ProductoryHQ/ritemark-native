@@ -126,7 +126,7 @@ const ITEM_KEYS = ['heading', 'text', 'icon'] as const;
 /** Only the words and settings a slide's layout draws, copied one by one. */
 export function wallDataOf(data: SlideData): SlideData {
   const out: SlideData = {};
-  for (const key of ['title', 'subtitle', 'number', 'look', 'picture', 'image'] as const) {
+  for (const key of ['title', 'subtitle', 'number', 'tag', 'look', 'picture', 'image'] as const) {
     if (typeof data[key] === 'string') out[key] = data[key];
   }
   if (Array.isArray(data.items)) {

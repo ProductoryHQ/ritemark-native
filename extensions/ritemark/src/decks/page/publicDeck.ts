@@ -114,6 +114,8 @@ export function drawnData(kind: string, data: SlideData): SlideData {
       out.items = itemsOf(data.items, ['heading', 'text']);
       break;
     case 'exercise':
+      // The pill's words, or `tag: ""` for none; without the line the page draws the default, as the slide does.
+      if (data.tag !== undefined) out.tag = data.tag;
       out.items = itemsOf(data.items, ['heading']);
       break;
     case 'columns':

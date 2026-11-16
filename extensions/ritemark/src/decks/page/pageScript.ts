@@ -163,7 +163,7 @@ const PAGE_BEHAVIOUR = String.raw`
   function finished() {
     goers.forEach(function (button) {
       var part = parts[Number(button.getAttribute('data-go'))];
-      if (!part || !part.querySelector('.lab .tag')) return;
+      if (!part || !part.hasAttribute('data-exercise')) return;
       var ticks = list(part.querySelectorAll('input[data-tick]'));
       button.classList.toggle('finished', ticks.length > 0 && ticks.every(function (tick) { return tick.checked; }));
     });
