@@ -11,7 +11,6 @@
 /* ---- the bar */
 .deck-bar { height: var(--deck-bar); display: flex; align-items: center; gap: 4px; padding: 0 8px; box-sizing: border-box; flex: none; }
 .deck-bar .deck-count { margin-left: 4px; font-size: 12.5px; line-height: 1; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.deck-bar .deck-look { margin-right: 8px; }
 .deck-bar .deck-saved { margin-right: 6px; font-size: 12px; line-height: 1; color: var(--r-ink-muted); white-space: nowrap; }
 /* Publish on the bar (Sprint 159 PR 4): the Published chip in the accent, as the browser bar's (frame 6) */
 .deck-bar .deck-publish-chip { background: var(--r-accent-soft); color: var(--r-accent); }
@@ -178,12 +177,17 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-bar .deck-settings-button[data-state="active"], .deck-bar .deck-settings-button[data-state="open"] { background: var(--r-surface-soft); color: var(--r-ink-strong); }
 /* The Settings material: the popup (its card from ui/popover.tsx) and Add to library's sheet beside the slide. */
 .deck-settings { width: 316px; box-sizing: border-box; font-size: 13px; line-height: 18px; color: var(--r-ink-strong); }
+/* The popup is never taller than the room under the gear: it scrolls, so its last section (the deck's Card | Borderless)
+   is always reachable in a short window (review, #764). Add to library's sheet isn't a popover and keeps its height. */
+.deck-settings:not(.deck-addlib) { max-height: var(--radix-popover-content-available-height); overflow-y: auto; }
 .deck-addlib { position: absolute; z-index: 40; padding: 12px; border-radius: 12px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline), 0 16px 34px -10px rgba(30,27,75,.28); }
 /* Its top: the lines that sat under the slide, which wrap in the popup's width. */
 .deck-settings-about { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 4px 0 0; container-type: inline-size; }
 .deck-settings-about .deck-source { flex-wrap: wrap; }
 .deck-settings-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 4px; font-weight: 600; line-height: 24px; }
 .deck-settings-k { margin: 12px 0 6px; font-size: 11px; font-weight: 600; line-height: 14px; letter-spacing: .5px; text-transform: uppercase; color: var(--r-ink-muted); }
+/* A deck with no slides: the popup is the deck's section alone, its heading at the top (#764) */
+.deck-settings-only > .deck-settings-k { margin-top: 0; }
 .deck-settings .deck-settings-lays { grid-template-columns: repeat(5, 1fr); gap: 8px 5px; }
 .deck-settings .deck-settings-pics { grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .deck-settings .deck-settings-lays > label, .deck-settings .deck-settings-pics > label { padding: 2px 2px 4px; }

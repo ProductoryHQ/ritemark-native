@@ -23,7 +23,6 @@ import type { DocumentApplyTarget } from '../../types/documentSync'
 import type { DocumentSyncState } from '../../../../src/editorSync/protocol'
 import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
-import { SegmentedControl } from '../ui/segmented-control'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
 import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, updateSlideMarkdown, type DeckSlideEntry } from './deckDocument'
@@ -36,7 +35,7 @@ import { AddToLibrarySheet, type LibraryTopic } from './library/AddToLibraryShee
 import { onMessage, sendToExtension } from '../../bridge'
 import { convertKind, hiddenNote } from './slide/convertKind'
 import { addColumn, addRow, setPath } from './slide/slideEdits'
-import { SlideAbout, SlideSettings } from './SlideSettings'
+import { DeckLook, SlideAbout, SlideSettings } from './SlideSettings'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { SlideStrip, type StripActions, type StripMark } from './SlideStrip'
 import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, exerciseTagOf, isBlockSlide, newId, slideDataOf as readSlideData, withPartHeading, writeSlideBlock, writeSlideData } from '../../../../src/decks/deckFormat'
@@ -228,7 +227,8 @@ export function DeckView({
   const currentRef = useRef(0)
   const assets = useDeckAssets(slides)
   const theme = useDeckTheme(properties.theme)
-  // Card or Borderless is the deck's own choice, in its front matter (Jarmo, 15 November: both are offered).
+  // Card or Borderless is the deck's own choice, in its front matter (Jarmo, 15 November: both are offered). Since 16
+  // November it is chosen in the gear's popup, its last section (SlideSettings), not on the bar.
   const borderless = properties.look === 'borderless'
   const setLook = useCallback((look: string) => {
     const next: DocumentProperties = { ...properties }
@@ -681,12 +681,11 @@ export function DeckView({
   }, [above, avail, stripWidth, pick])
 
   /** A fold button: that side folds away, or comes back; the deck's view keeps the choice, and the part being read
-   *  stays at the top. Settings belong to the slide, so they close with it. */
+   *  stays at the top. Slide settings stay: they belong to the current slide, which the strip still rings. */
   const toggleFold = useCallback((side: 'slide' | 'handout') => {
     const next = toggledFold(fold, side)
     setFold(next)
     keepFold(next)
-    if (next === 'slide') setSettingsOpen(false)
     requestAnimationFrame(() => pick(currentRef.current))
   }, [fold, pick])
 
@@ -848,9 +847,8 @@ export function DeckView({
 
   // Slide settings: closed when the slide changes. Add to library's sheet is placed beside the slide (over the handout when it must).
   useEffect(() => { setSettingsOpen(false) }, [shown])
-  // Settings with no slide to belong to (an undo took it away, the window folded it) close, so they never come back
-  // by themselves when it returns.
-  useEffect(() => { if (!slideShown || !slides[shown]) setSettingsOpen(false) }, [slideShown, slides, shown])
+  // The popup always has something to show (the deck's section when the deck has no slides), so it never stays open
+  // unseen: no effect closes it when the slide goes, and a hidden slide keeps its settings (the Experience lead).
   // The Add to library sheet belongs to its slide: another slide closes it.
   useEffect(() => { setAddSheet(sheet => (sheet && sheet.number - 1 !== shown ? null : sheet)) }, [shown])
   // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one. A
@@ -1169,8 +1167,10 @@ export function DeckView({
   }), [editor, dispatch, done, slideById, sources, imageMappings, pick])
 
   const status = documentBarStatus(syncState, syncAction)
-  // Slide settings belong to the slide on the stage: none while it is folded away or the deck has no slides.
-  const settingsReady = slideShown && !!slide
+  // The gear is always ready (#764). Slide settings belong to the current slide (the Experience lead, 16 November):
+  // hiding the slide hides the stage, not the current slide, which the strip still rings. A deck with no slides still
+  // chooses its look there, as the bar's segment allowed at any count: its popup is the deck's section alone.
+  const deckLook = { count, look: borderless ? 'borderless' as const : 'card' as const, onLook: setLook }
   const handoutContainer = scrollContainer()
   // Writing on the slide keeps it the current one while the handout is still.
   const onWriting = useCallback(() => { lockUntil.current = Date.now() + WRITE_LOCK_MS }, [])
@@ -1195,31 +1195,30 @@ export function DeckView({
         {/* 17 November (the Experience lead, "Nothing around the slide but the slide"): Slide settings is a gear here,
             after the count, its popup under it, left-aligned; nothing sits above or beside the slide. A Popover: a
             press outside or Esc closes it and the gear gets the focus back; choosing a layout keeps it open. */}
-        <Popover open={settingsOpen && settingsReady} onOpenChange={setSettingsOpen}>
-          <Tooltip label={settingsReady ? 'Slide settings' : 'Show the slide to change its settings'}>
+        <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <Tooltip label="Slide settings">
             <PopoverTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon-xs"
                 className="deck-settings-button"
-                data-state={settingsOpen && settingsReady ? 'active' : undefined}
+                data-state={settingsOpen ? 'active' : undefined}
                 aria-label="Slide settings"
-                disabled={!settingsReady}
               >
                 <Icon name="gear" size={16} tone="inherit" />
               </Button>
             </PopoverTrigger>
           </Tooltip>
-          {settingsReady && slide ? (
-            <PopoverContent
-              align="start"
-              sideOffset={6}
-              collisionPadding={8}
-              className="deck-settings"
-              // The popup takes the focus itself, not its Close button, so no tooltip opens with it.
-              onOpenAutoFocus={event => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus() }}
-              tabIndex={-1}
-            >
+          <PopoverContent
+            align="start"
+            sideOffset={6}
+            collisionPadding={8}
+            className="deck-settings"
+            // The popup takes the focus itself, not its Close button, so no tooltip opens with it.
+            onOpenAutoFocus={event => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus() }}
+            tabIndex={-1}
+          >
+            {slide ? (
               <SlideSettings
                 number={shown + 1}
                 // A slide drawn as blocks (a v1 slide too, PR 2) has no layout: its blocks are its layout (frame 26).
@@ -1248,9 +1247,12 @@ export function DeckView({
                 onChange={patch => changeSlide(data => ({ ...data, ...patch }))}
                 onClose={() => setSettingsOpen(false)}
                 onUndo={redo => { if (redo) editor?.commands.redo(); else editor?.commands.undo() }}
+                deck={deckLook}
               />
-            </PopoverContent>
-          ) : null}
+            ) : (
+              <DeckLook id="deck-reach-none" only {...deckLook} />
+            )}
+          </PopoverContent>
         </Popover>
         <span className="deck-notice" role="status" aria-live="polite">
           {notice ? (
@@ -1276,15 +1278,6 @@ export function DeckView({
           ) : null}
         </span>
         <span className="flex-1" />
-        <Tooltip label="How the slides look: as a card, or the whole column as the stage">
-          <SegmentedControl
-            aria-label="How the slides look"
-            className="deck-look"
-            value={borderless ? 'borderless' : 'card'}
-            onValueChange={setLook}
-            options={[{ value: 'card', label: 'Card' }, { value: 'borderless', label: 'Borderless' }]}
-          />
-        </Tooltip>
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>
         {status === 'action' && syncAction ? (
           <SyncActionButton action={syncAction} />
