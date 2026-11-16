@@ -190,7 +190,7 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
 
 // With the slide above the handout (split along the long side, 16 November), the pill lies flat at the level line's
 // right end: ˄ Hide the slide, then ˅ Hide the handout, each with its tooltip; the CSS turns the halves to 28×26 with a
-// hairline between them. With one side hidden, the one round button stands at the handout's top left or at the slide's
+// hairline between them. With one side hidden, the one round button stands at the handout's top right or at the slide's
 // bottom right.
 {
   const drawAbove = (slideShown: boolean, handoutShown: boolean) =>
@@ -221,6 +221,12 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
   assert.ok(/\.deck-fold\.is-split\.is-above \.deck-fold-button\.is-upper \{ border-radius: 13px 0 0 13px; \}/.test(css))
   assert.ok(/\.deck-fold\.is-split\.is-above \.deck-fold-button\.is-lower \{ border-radius: 0 13px 13px 0; box-shadow: inset 1px 0 0 var\(--r-hairline-strong\); \}/.test(css), 'an upright hairline between')
   assert.ok(/\.deck-divider\.is-above \{[^}]*right: 0;[^}]*cursor: row-resize;/.test(css), 'a level line, edge to edge, that drags')
+  // One line, not two: above, the handout's top 8 px (more than the scroll rule's 6 px gap and the head's 1 px border)
+  // are the desk's colour, over the text and under the line, so a part head's hairline never runs just under it.
+  assert.ok(/\.deck-handout\.is-above::before \{[^}]*top: 0; height: 8px; z-index: 1; background: var\(--r-surface\); pointer-events: none; \}/.test(css), 'the handout top masked above')
+  const { PART_TOP_GAP } = await import('./scrollRule')
+  assert.ok(PART_TOP_GAP + 1 < 8, 'the mask covers the current head\'s border')
+  assert.ok(!/\.deck-handout:not\(\.is-above\)::before|\.deck-handout::before/.test(css), 'beside keeps its handout as it was')
 
   // The slide hidden, above: ˅ Show the slide at the handout's top edge (the line at the room's top).
   const slideHidden = foldControl(false, true, 0, true)
@@ -229,12 +235,12 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
   const one = drawAbove(false, true).querySelector('.deck-fold')
   assert.ok(one && !one.classList.contains('is-split') && one.classList.contains('is-above'))
   assert.equal(drawAbove(false, true).querySelectorAll('button').length, 1)
-  // At the handout's top left, clear of the part numbers at its right: placed by its left, from the handout's edge.
-  const topLeft = parse(renderToStaticMarkup(createElement(DeckFolds, { slideShown: false, handoutShown: true, line: 0, above: true, start: 132, onToggle: () => {} }))).querySelector('.deck-fold')
-  assert.ok(topLeft && topLeft.classList.contains('is-start'))
-  assert.match(topLeft.getAttribute('style') ?? '', /top:\s*22px;\s*left:\s*154px/)
-  assert.ok(/\.deck-fold\.is-above\.is-start \{ right: auto; margin-left: -13px; \}/.test(css), 'not at the right end')
-  assert.ok(!drawAbove(true, false).querySelector('.deck-fold')?.classList.contains('is-start'), 'Show the handout stays at the right end')
+  // At the handout's top right, where the flat pill stood (the Experience lead, 17 November: the hand returns to the
+  // same spot): placed by its top only, so it takes the pill's right 28 px (CSS), never by a left.
+  const topRight = parse(renderToStaticMarkup(createElement(DeckFolds, { slideShown: false, handoutShown: true, line: 0, above: true, onToggle: () => {} }))).querySelector('.deck-fold')
+  assert.match(topRight?.getAttribute('style') ?? '', /top:\s*22px/)
+  assert.doesNotMatch(topRight?.getAttribute('style') ?? '', /left/)
+  assert.ok(!/is-start/.test(css), 'no top-left place of its own')
   // The handout hidden, above: ˄ Show the handout at the slide's bottom end (the line at the room's bottom).
   const handoutHidden = foldControl(true, false, 700, true)
   assert.deepEqual(handoutHidden.buttons.map(b => [b.label, b.icon]), [['Show the handout', 'caret-up']])

@@ -54,7 +54,7 @@ import { Stage } from './Stage'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
 import { DeckFolds, deckViewState, foldedSides, keepDeckViewState, keepFold, storedFold, toggledFold, type DeckFold } from './DeckFolds'
-import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, initialAboveRatio, orientationFor, slideWidthFor, type DeckOrientation } from './deckLayout'
+import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
 import { NO_GESTURE, slideKeyOf, slideKeyTarget, wheelPixels, wheelStep, type KeyTargetElement } from './slideNav'
 import './decks.css'
 
@@ -419,9 +419,19 @@ export function DeckView({
   const aboveLine = above && split ? aboveLineFor(deskHeight, aboveRatio) : 0
   const stageWidth = above ? (slideShown ? avail : 0) : stageWidthFor(avail, ratio, handoutShown, slideShown)
   const stageHeight = above && split ? aboveLine : deskHeight
-  // Above, the slide keeps one size from slide to slide (the pane's height less a fixed room for Settings and one line
-  // under it); a slide with more lines under it scrolls them in its pane rather than shrinking.
-  const bigWidth = slideWidthFor(stageWidth, stageHeight, above)
+  // Above, the slide takes its pane's height less 32 and less whatever row is still under it (today the speaker notes'),
+  // measured from the stage as drawn, so the stage never overflows its pane. With no row under it, it's the pane less 32.
+  const [aboveUnder, setAboveUnder] = useState(0)
+  const bigWidth = slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
+  useLayoutEffect(() => {
+    if (!above) return
+    const group = stageRef.current?.querySelector<HTMLElement>('.deck-stage-group')
+    const big = group?.querySelector<HTMLElement>('.deck-big')
+    if (!group || !big) return
+    const under = rowsUnder(group.offsetHeight, big.offsetHeight)
+    // Only a real change, so a row that wraps differently at the new width can't set the size swinging.
+    if (Math.abs(under - aboveUnder) > 1) setAboveUnder(under)
+  })
   /** The handout's left edge; beside, the line between the slide and the handout too. */
   const dividerLeft = above ? stripWidth : stripWidth + stageWidth
   /** Where the fold's control stands: on the line beside (from the left), on the level line above (from the top); with
@@ -1266,7 +1276,7 @@ export function DeckView({
           />
         ) : null}
         {deskWidth >= NARROWEST_DESK ? (
-          <DeckFolds slideShown={slideShown} handoutShown={handoutShown} line={foldLine} above={above} start={dividerLeft} onToggle={toggleFold} />
+          <DeckFolds slideShown={slideShown} handoutShown={handoutShown} line={foldLine} above={above} onToggle={toggleFold} />
         ) : null}
 
         {addSheet && settingsAt ? (

@@ -69,12 +69,22 @@ export const BIG_MAX = 900
 export const ABOVE_STAGE_ROOM = 32
 
 /**
- * The slide's width on a stage `width` × `height`. Beside, the slide is bound by its width (and sits centred in its
- * pane's height); above, it takes its pane's full height less 32, at 16:9, capped by the width. It keeps one size from
- * slide to slide.
+ * The height of what the stage holds under the slide (a row still there, such as the speaker notes', with its margin),
+ * from the stage group's height and the slide's as drawn: the group is the slide, the rows under it and 16 above and
+ * under them. Never negative.
  */
-export function slideWidthFor(width: number, height: number, above: boolean): number {
+export function rowsUnder(groupHeight: number, slideHeight: number): number {
+  return Number.isFinite(groupHeight) && Number.isFinite(slideHeight) ? Math.max(0, Math.round(groupHeight - slideHeight - ABOVE_STAGE_ROOM)) : 0
+}
+
+/**
+ * The slide's width on a stage `width` × `height`. Beside, the slide is bound by its width (and sits centred in its
+ * pane's height); above, it takes its pane's full height less 32 and less `under`, the rows still under it (measured,
+ * `rowsUnder`), at 16:9, capped by the width, so the stage never overflows its pane. With no row under it, the slide
+ * is the pane less 32.
+ */
+export function slideWidthFor(width: number, height: number, above: boolean, under = 0): number {
   const byWidth = Math.min(width - STAGE_MARGIN * 2, BIG_MAX)
-  const byHeight = above ? Math.floor(((height - ABOVE_STAGE_ROOM) * 16) / 9) : Infinity
+  const byHeight = above ? Math.floor(((height - ABOVE_STAGE_ROOM - Math.max(0, under)) * 16) / 9) : Infinity
   return Math.max(0, Math.min(byWidth, byHeight))
 }

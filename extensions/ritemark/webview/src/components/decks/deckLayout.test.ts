@@ -25,7 +25,7 @@ Object.assign(globalThis, {
 })
 
 const {
-  ABOVE_PANE_MIN, ABOVE_RATIO_DEFAULT, ABOVE_STAGE_ROOM, ABOVE_RATIO_MAX, ABOVE_RATIO_MIN, BESIDE_ROOM, BESIDE_SLIDE_MIN, BESIDE_TEXT_MIN,
+  ABOVE_PANE_MIN, ABOVE_RATIO_DEFAULT, ABOVE_STAGE_ROOM, rowsUnder, ABOVE_RATIO_MAX, ABOVE_RATIO_MIN, BESIDE_ROOM, BESIDE_SLIDE_MIN, BESIDE_TEXT_MIN,
   BIG_MAX, ORIENTATION_HYSTERESIS, aboveLineFor, clampAboveRatio, initialAboveRatio, orientationFor, slideWidthFor,
 } = await import('./deckLayout')
 const { deckViewState, keepDeckViewState, keepFold } = await import('./DeckFolds')
@@ -102,6 +102,26 @@ const { initialRatio, DEFAULT_RATIO } = await import('./deckDocument')
   assert.equal(slideWidthFor(1000, 800, true), 900, 'a tall pane: the width and 900 cap it')
   assert.equal(slideWidthFor(600, 800, true), 552, 'a narrow pane: the width caps it')
   assert.equal(slideWidthFor(1000, 20, true), 0, 'never negative')
+  // A row still under the slide (today the speaker notes', 48 px with its margin), measured from the stage as drawn:
+  // the slide shrinks so the stage fits its pane, never overflowing it. With no row, it is the pane less 32 again.
+  assert.equal(rowsUnder(16 + 358 + 48 + 16, 358), 48, 'the notes row, measured')
+  assert.equal(rowsUnder(16 + 358 + 16, 358), 0, 'no row')
+  assert.equal(rowsUnder(300, 358), 0, 'never negative')
+  assert.equal(rowsUnder(Number.NaN, 358), 0)
+  const withRow = slideWidthFor(900, 390, true, 48)
+  assert.equal(withRow, 551, 'a row present: (390 - 32 - 48) × 16/9')
+  assert.ok(Math.round(withRow * 9 / 16) + ABOVE_STAGE_ROOM + 48 <= 390, 'the stage fits its pane: no overflow, no scrollbar')
+  assert.equal(slideWidthFor(900, 390, true, 0), 636, 'the row gone: back to the pane less 32')
+  assert.equal(slideWidthFor(900, 390, true, -5), 636, 'a negative row counts as none')
+  // The handout hidden, above: the full room, the slide bound by the width, the row under it fits.
+  assert.equal(slideWidthFor(900, 780, true, 48), 852)
+  assert.ok(Math.round(852 * 9 / 16) + ABOVE_STAGE_ROOM + 48 <= 780)
+  // Beside, the row changes nothing: the slide is bound by its width and its pane scrolls as before.
+  assert.equal(slideWidthFor(517, 780, false, 48), 469)
+  // The deck view measures it from the stage as drawn, above only, and only a real change moves the slide.
+  const viewSource = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8').replace(/\s+/g, ' ')
+  assert.ok(viewSource.includes('slideWidthFor(stageWidth, stageHeight, above, aboveUnder)'))
+  assert.ok(viewSource.includes('const under = rowsUnder(group.offsetHeight, big.offsetHeight)') && viewSource.includes('if (Math.abs(under - aboveUnder) > 1) setAboveUnder(under)'))
   // Above, the slide always fits its pane's height, with 32 to spare.
   for (const height of [200, 300, 414, 600]) assert.ok(Math.round(slideWidthFor(1200, height, true) * 9 / 16) + ABOVE_STAGE_ROOM <= height)
 }

@@ -75,7 +75,10 @@
 .deck-divider.is-above::before { left: 0; right: 0; top: 6px; bottom: auto; border-left: 0; border-top: 1.5px dotted var(--r-hairline-strong); }
 .deck-divider.is-above:hover::before, .deck-divider.is-above.is-dragging::before { border-left: 0; border-top: 2px solid var(--r-accent); }
 .deck-fold.is-above { right: 28px; bottom: auto; margin-left: 0; margin-top: -13px; }
-.deck-fold.is-above.is-start { right: auto; margin-left: -13px; }
+/* One line, not two (the Experience lead, 17 November): the scroll rule brings the current part's head 6 px under the
+   handout's top (scrollRule.ts, PART_TOP_GAP), and its hairline border then ran just under the level line. Above, the
+   handout's top 8 px are the desk's colour, over the text and under the line, so only the dotted line shows there. */
+.deck-handout.is-above::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 8px; z-index: 1; background: var(--r-surface); pointer-events: none; }
 .deck-fold.is-split.is-above { flex-direction: row; }
 .deck-fold.is-split.is-above .deck-fold-button { width: 28px; height: 26px; }
 .deck-fold.is-split.is-above .deck-fold-button.is-upper { border-radius: 13px 0 0 13px; }
