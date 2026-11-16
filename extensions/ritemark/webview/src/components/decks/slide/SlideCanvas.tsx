@@ -64,6 +64,19 @@ export function editedText(element: HTMLElement): string {
   return element.lastChild?.nodeName === 'BR' ? text.replace(/\n$/, '') : text
 }
 
+/** An emptied editing host without its stray children, so it reads as `:empty`; the caret stays in it when it had it. */
+function clearKeepingCaret(element: HTMLElement) {
+  const focused = element.ownerDocument.activeElement === element
+  element.replaceChildren()
+  if (!focused) return
+  const selection = element.ownerDocument.getSelection()
+  selection?.removeAllRanges()
+  const range = element.ownerDocument.createRange()
+  range.setStart(element, 0)
+  range.collapse(true)
+  selection?.addRange(range)
+}
+
 /** One of the slide's words: plain text, or a small editing host on the stage. */
 function SlideText({ box, editing, tag = 'div' }: { box: TextBox; editing?: SlideEditing; tag?: 'div' | 'span' }) {
   const ref = useRef<HTMLElement>(null)
@@ -105,6 +118,9 @@ function SlideText({ box, editing, tag = 'div' }: { box: TextBox; editing?: Slid
       onInput={event => {
         // A line typed with Enter may arrive as a <br> or a <div>: `innerText` reads each as a line break.
         const raw = box.multiline ? editedText(event.currentTarget) : event.currentTarget.textContent ?? ''
+        // Emptied, Chromium leaves a <br> behind, so the box doesn't read as :empty and its placeholder (an empty
+        // pill's faint default) never shows: the box is cleared, with the caret kept in it.
+        if (raw === '' && event.currentTarget.firstChild) clearKeepingCaret(event.currentTarget)
         editing.onText(box.path, box.multiline ? raw : raw.replace(/[\r\n\u2028\u2029]+/g, ' '))
       }}
       onKeyDown={event => {
@@ -114,7 +130,7 @@ function SlideText({ box, editing, tag = 'div' }: { box: TextBox; editing?: Slid
       // pill goes once the caret leaves).
       onBlur={event => {
         const element = event.currentTarget
-        if (!element.textContent && element.firstChild) element.replaceChildren()
+        if (!element.textContent && element.firstChild) clearKeepingCaret(element)
       }}
     />
   )

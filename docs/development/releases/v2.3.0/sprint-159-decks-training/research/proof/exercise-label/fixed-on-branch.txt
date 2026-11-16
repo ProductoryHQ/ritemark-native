@@ -1,0 +1,3 @@
+"id: ex01\ntitle: Proovi ise\ntag: Harjutus" -> data.tag = "Harjutus" ; stage pill: text "Harjutus" ; page pill: "Harjutus"
+"id: ex01\ntitle: Proovi ise\ntag: \"\"" -> data.tag = "" ; stage pill: text "" ; page pill: undefined
+an edit setting tag: Harjutus writes -> "id: ex01\ntitle: T\ntag: Harjutus"
