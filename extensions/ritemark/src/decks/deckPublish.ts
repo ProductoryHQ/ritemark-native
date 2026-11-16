@@ -3,18 +3,20 @@
  * beside it (`<deck name>.html`, `page/pageFile.ts`), through 2.2's own Publish: the gather, the key scan, the sheet,
  * the upload and the records are 2.2's, unchanged.
  *
- *  - **Publish and Update the page** do the same three things: take the open view's fit steps, write the page file,
- *    and run `ritemark.page.publish` on it. An update with the same pictures and nothing key-shaped goes straight up
- *    (2.2's `sheetNeeded`).
- *  - **A first Publish that is cancelled** takes its page back: when the publish flow ends (`onDidEndPublishFlow`), a
- *    page this deck's Publish created, with no record and no failure line, is removed, unless it changed since. A failed
- *    one stays, so the failure's Try again finds it.
+ *  - **Publish and Update the page** do the same three things: take the open view's text and fit steps, write the page
+ *    file, and run `ritemark.page.publish` on it, waited to its end (`PublishFeature.publishPage`). An update with the
+ *    same pictures and nothing key-shaped goes straight up (2.2's `sheetNeeded`). One at a time per deck, and never
+ *    while the page's sheet is open from elsewhere.
+ *  - **A first Publish that is cancelled** takes its page back: when the flow says `cancelled`, a page this Publish
+ *    created, with no record, is removed while it is still exactly the page written. A failed one stays, so the
+ *    failure's Try again finds it.
  *  - **The chip** reads 2.2's state for the page file (`_ritemark.publish.pageState`) and says "Published · changed"
  *    when 2.2 finds a change, or when the deck's digest is no longer the page's (an edit to notes or a skipped slide
- *    isn't one: `publicDeck`).
+ *    isn't one: `publicDeck`). Typing in the deck asks only the digest again; 2.2 is asked when its state changes.
  *  - **Copy link, See online and Unpublish** are 2.2's commands on the page file.
  *  - **The sheet's What goes and What stays rows** for a page made from a deck come from here (`pageRows`), wherever
- *    the page is published from.
+ *    the page is published from, and only while they describe that page: its digest is the one written with them, or
+ *    the deck's own now.
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -23,11 +25,11 @@ import { isEnabled } from '../features';
 import { openInIntegratedBrowser } from '../browser/IntegratedBrowser';
 import type { PublishFeature } from '../publish/vscodePublish';
 import { COPY_LINK_COMMAND, PAGE_STATE_COMMAND, UNPUBLISH_PAGE_COMMAND } from '../publish/vscodePublish';
-import { PUBLISH_PAGE_COMMAND } from '../browser/pageCommands';
-import type { PageBarState } from '../publish/PublishController';
-import { parseDeck } from './deckFormat';
+import { WORKERS_DEV_ADDRESS, type PageBarState } from '../publish/PublishController';
+import { normalizeForCompare, sameFile } from '../utils/pathIdentity';
+import { parseDeck, withFrontMatter } from './deckFormat';
 import { BUILT_IN_THEME, parseTheme, type DeckTheme } from './deckTheme';
-import { readProjectTheme } from './deckPages';
+import { readDeckTheme } from './deckPages';
 import type { DeckHostMessage, DeckPageState } from './deckProtocol';
 import { loadPageAssets } from './page/pageAssets';
 import { buildDeckPage, currentPageDigest, deckNameOf, nodePageFs, pagePathFor, readPageMeta, removeDeckPage, writeDeckPage } from './page/pageFile';
@@ -36,10 +38,14 @@ import { deckCounts, deckSheetRows, type DeckSheetRows } from './page/sheetRows'
 /** How long after the deck stops changing the chip asks again whether the page has changed. */
 const CHANGED_MS = 800;
 
-/** One open deck view the bar's Publish speaks for. */
+/** Why Publish stopped before 2.2's Publish began: the page file couldn't be made or written. */
+export const PAGE_NOT_WRITTEN = "Ritemark couldn't write the page beside this deck, so nothing was published.";
+
+/** One open deck view the bar's Publish speaks for, and 2.2's last answer for its page. */
 interface DeckSeat {
   document: vscode.TextDocument;
   post: (message: DeckHostMessage) => Promise<boolean>;
+  bar?: PageBarState;
 }
 
 /** The real path of a file, or the path as given when it isn't there (yet). */
@@ -47,18 +53,26 @@ async function realPathOf(file: string): Promise<string> {
   return fs.promises.realpath(file).catch(() => file);
 }
 
-const samePath = (a: string, b: string) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
-
 export class DeckPublisher implements vscode.Disposable {
   private readonly seats = new Set<DeckSeat>();
   private readonly disposables: vscode.Disposable[] = [];
   private readonly timers = new Map<DeckSeat, ReturnType<typeof setTimeout>>();
+  /** Decks whose Publish is running, by their path compared as the system compares it. */
+  private readonly running = new Set<string>();
+  /** The sheet's rows for each page this window wrote, with the digest written beside them, by the page's real path. */
+  private readonly written = new Map<string, { digest: string; rows: DeckSheetRows }>();
   private feature: PublishFeature | null = null;
 
   constructor(private readonly extensionPath: string) {
-    this.disposables.push(vscode.workspace.onDidChangeTextDocument(event => {
-      for (const seat of this.seats) if (seat.document === event.document) this.refreshSoon(seat);
-    }));
+    this.disposables.push(
+      vscode.workspace.onDidChangeTextDocument(event => {
+        for (const seat of this.seats) if (seat.document === event.document) this.refreshSoon(seat);
+      }),
+      // Decks turned off or on in Settings: the control hides or shows at once.
+      vscode.workspace.onDidChangeConfiguration(event => {
+        if (event.affectsConfiguration('ritemark.features.decks')) this.refreshAll();
+      }),
+    );
   }
 
   /** 2.2's Publish, once it is composed (after Decks, at activation): its events reach the deck's bar from then on. */
@@ -67,10 +81,10 @@ export class DeckPublisher implements vscode.Disposable {
     feature.setPageRows(pagePath => this.pageRows(pagePath));
     this.disposables.push(
       { dispose: () => feature.setPageRows(null) },
-      feature.onDidChangeReady(() => { for (const seat of this.seats) void this.refresh(seat); }),
+      feature.onDidChangeReady(() => this.refreshAll()),
       feature.onDidChangePageState(pagePath => void this.refreshPage(pagePath)),
     );
-    for (const seat of this.seats) void this.refresh(seat);
+    this.refreshAll();
   }
 
   /** An open deck view: its bar's chip is kept up to date until the returned disposable. */
@@ -82,28 +96,41 @@ export class DeckPublisher implements vscode.Disposable {
 
   // ------------------------------------------------------------------ the chip
 
+  private ready(): PublishFeature | null {
+    const feature = this.feature;
+    return feature && feature.isReady() && isEnabled('decks') ? feature : null;
+  }
+
   /** The deck bar's Publish control: hidden until Publish can be reached; else the page's state. */
   async stateOf(document: vscode.TextDocument): Promise<DeckPageState> {
-    const feature = this.feature;
-    if (!feature || !feature.isReady() || !isEnabled('decks')) return { ready: false, kind: 'unpublished', changed: false };
+    return (await this.readState(document, true)).state;
+  }
+
+  /**
+   * The state, with 2.2 asked again (`ask`) or its last answer (`last`) kept: a deck edit changes the deck's digest,
+   * never the page file 2.2 compares.
+   */
+  private async readState(document: vscode.TextDocument, ask: boolean, last?: PageBarState): Promise<{ state: DeckPageState; bar?: PageBarState }> {
+    if (!this.ready()) return { state: { ready: false, kind: 'unpublished', changed: false } };
     const pagePath = pagePathFor(document.uri.fsPath);
-    let bar: PageBarState | undefined;
-    try {
-      bar = await vscode.commands.executeCommand<PageBarState | undefined>(PAGE_STATE_COMMAND, vscode.Uri.file(pagePath));
-    } catch {
-      bar = undefined;
+    let bar = last;
+    if (ask || !bar) {
+      try {
+        bar = await vscode.commands.executeCommand<PageBarState | undefined>(PAGE_STATE_COMMAND, vscode.Uri.file(pagePath));
+      } catch {
+        bar = undefined;
+      }
     }
     const kind = bar?.kind ?? 'unpublished';
     let changed = bar?.changed === true;
     if (kind === 'published' && !changed) changed = await this.deckChanged(document, pagePath);
-    return { ready: true, kind, changed };
+    return { state: { ready: true, kind, changed }, bar };
   }
 
   /** Whether the deck's public content is no longer what its page was written from. */
   private async deckChanged(document: vscode.TextDocument, pagePath: string): Promise<boolean> {
     try {
-      const head = await readHead(pagePath);
-      const written = readPageMeta(head).digest;
+      const written = readPageMeta(await readHead(pagePath)).digest;
       if (!written) return false;
       return written !== await currentPageDigest(document.uri.fsPath, document.getText(), await this.themeOf(document));
     } catch {
@@ -111,61 +138,78 @@ export class DeckPublisher implements vscode.Disposable {
     }
   }
 
-  private async refresh(seat: DeckSeat): Promise<void> {
-    await seat.post({ type: 'deck/page-state', state: await this.stateOf(seat.document) });
+  private async refresh(seat: DeckSeat, ask = true): Promise<void> {
+    const { state, bar } = await this.readState(seat.document, ask, seat.bar);
+    seat.bar = bar;
+    await seat.post({ type: 'deck/page-state', state });
+  }
+
+  private refreshAll(): void {
+    for (const seat of this.seats) void this.refresh(seat);
   }
 
   private refreshSoon(seat: DeckSeat): void {
     clearTimeout(this.timers.get(seat));
-    this.timers.set(seat, setTimeout(() => { this.timers.delete(seat); void this.refresh(seat); }, CHANGED_MS));
+    this.timers.set(seat, setTimeout(() => { this.timers.delete(seat); void this.refresh(seat, false); }, CHANGED_MS));
   }
 
   private async refreshPage(pagePath: string): Promise<void> {
     for (const seat of this.seats) {
-      if (samePath(await realPathOf(pagePathFor(seat.document.uri.fsPath)), pagePath)) void this.refresh(seat);
+      if (sameFile(pagePathFor(seat.document.uri.fsPath), pagePath, fs.realpathSync.native)) void this.refresh(seat);
     }
+  }
+
+  private refreshDocument(document: vscode.TextDocument): void {
+    for (const seat of this.seats) if (seat.document === document) void this.refresh(seat);
   }
 
   // ------------------------------------------------------------------ Publish, Update the page
 
-  /** Publish or Update the page: write it beside the deck from the open text, then 2.2's Publish on it. */
-  async publish(document: vscode.TextDocument, steps: readonly number[], notice: (text: string) => void): Promise<void> {
-    const feature = this.feature;
-    if (!feature || !feature.isReady() || !isEnabled('decks')) return;
+  /**
+   * Publish or Update the page: write it beside the deck from the view's text (`body`, front matter left out) and fit
+   * steps, then 2.2's Publish on it.
+   */
+  async publish(document: vscode.TextDocument, body: string, steps: readonly number[], notice: (text: string) => void): Promise<void> {
+    const feature = this.ready();
+    // Turned off since the control was drawn: it hides
+    if (!feature) return this.refreshDocument(document);
     const deckPath = document.uri.fsPath;
-    const pagePath = pagePathFor(deckPath);
-    const built = await buildDeckPage({ deckPath, text: document.getText(), theme: await this.themeOf(document), steps }, await loadPageAssets(this.extensionPath));
-    const hadRecord = Boolean(await feature.controller.recordFor(await realPathOf(pagePath)));
-    const written = await writeDeckPage(nodePageFs, deckPath, built.html);
-    if (written.kind === 'refused') {
-      notice(written.line);
-      void vscode.window.showWarningMessage(written.line);
-      return;
-    }
-    // A page made for a first Publish goes again if that Publish is cancelled.
-    const takeBack = written.created && !hadRecord;
-    const realPage = await realPathOf(pagePath);
-    let ended: () => void = () => undefined;
-    const flowEnded = new Promise<void>(resolve => { ended = resolve; });
-    const listener = feature.onDidEndPublishFlow(endedPath => { if (samePath(endedPath, realPage)) ended(); });
+    const key = normalizeForCompare(deckPath);
+    if (this.running.has(key)) return; // a second press while the first is still going
+    this.running.add(key);
     try {
-      const location = await vscode.commands.executeCommand(PUBLISH_PAGE_COMMAND, vscode.Uri.file(pagePath));
-      // Refused before any flow began (the command said why): nothing will end
-      if (location) await flowEnded;
+      const pagePath = pagePathFor(deckPath);
+      // The page's sheet open from the browser's bar, or the page going up: the file stays as that flow read it
+      if (feature.controller.isBusy(await realPathOf(pagePath))) return;
+      const text = withFrontMatter(document.getText(), body);
+      let built: Awaited<ReturnType<typeof buildDeckPage>>;
+      let theme: DeckTheme;
+      let written: Awaited<ReturnType<typeof writeDeckPage>>;
+      let hadRecord: boolean;
+      try {
+        theme = await this.themeFor(deckPath, text);
+        built = await buildDeckPage({ deckPath, text, theme, steps }, await loadPageAssets(this.extensionPath));
+        hadRecord = Boolean(await feature.controller.recordFor(await realPathOf(pagePath)));
+        written = await writeDeckPage(nodePageFs, deckPath, built.html);
+      } catch {
+        notice(PAGE_NOT_WRITTEN);
+        return;
+      }
+      if (written.kind === 'refused') {
+        notice(written.line);
+        return;
+      }
+      const realPage = await realPathOf(pagePath);
+      this.written.set(normalizeForCompare(realPage), { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme)) });
+      const outcome = await feature.publishPage(vscode.Uri.file(pagePath));
+      // A page made for a first Publish goes again if that Publish is cancelled
+      if (outcome === 'cancelled' && written.created && !hadRecord && !(await feature.controller.recordFor(realPage))) {
+        await removeDeckPage(nodePageFs, pagePath, built.html).catch(() => false);
+      }
     } finally {
-      listener.dispose();
+      this.running.delete(key);
+      this.refreshDocument(document);
     }
-    if (takeBack) await this.takeBackIfCancelled(feature, pagePath, realPage, built.html);
-    const seat = [...this.seats].find(entry => entry.document === document);
-    if (seat) void this.refresh(seat);
-  }
-
-  /** After a first Publish's flow: no record and no failure line is a cancel, and the page it wrote goes again. */
-  private async takeBackIfCancelled(feature: PublishFeature, pagePath: string, realPage: string, html: string): Promise<void> {
-    if (await feature.controller.recordFor(realPage)) return;
-    const state = await feature.controller.pageState(realPage);
-    if (state.kind !== 'unpublished' || state.line) return;
-    await removeDeckPage(nodePageFs, pagePath, html).catch(() => false);
   }
 
   // ------------------------------------------------------------------ Copy link, See online, Unpublish
@@ -181,7 +225,7 @@ export class DeckPublisher implements vscode.Disposable {
         return;
       case 'see-online': {
         const record = await feature.controller.recordFor(await realPathOf(page.fsPath));
-        if (record && /^https:\/\/[a-z0-9.-]+\.workers\.dev\//.test(record.address)) await openInIntegratedBrowser(record.address);
+        if (record && WORKERS_DEV_ADDRESS.test(record.address)) await openInIntegratedBrowser(record.address);
         return;
       }
       case 'unpublish':
@@ -192,17 +236,27 @@ export class DeckPublisher implements vscode.Disposable {
 
   // ------------------------------------------------------------------ the sheet's rows
 
-  /** What goes and What stays for a page Ritemark made from the deck beside it; undefined for any other page. */
+  /**
+   * What goes and What stays for a page Ritemark made from the deck beside it; undefined for any other page, and for a
+   * deck's page the deck no longer makes (it changed since and the page wasn't written again), whose rows would
+   * describe other words than the ones going up. 2.2's own rows show then.
+   */
   async pageRows(pagePath: string): Promise<DeckSheetRows | undefined> {
     // Only `<deck name>.html` beside its `<deck name>.deck.md`, holding Ritemark's marks, is a deck's page.
     if (!isEnabled('decks') || !/\.html$/.test(pagePath)) return undefined;
-    const deckPath = path.join(path.dirname(pagePath), `${path.basename(pagePath, '.html')}.deck.md`);
-    if (deckNameOf(deckPath) === '') return undefined;
+    const besidePath = path.join(path.dirname(pagePath), `${path.basename(pagePath, '.html')}.deck.md`);
+    if (deckNameOf(besidePath) === '') return undefined;
     try {
-      if (!readPageMeta(await readHead(pagePath)).ritemark) return undefined;
-      const open = vscode.workspace.textDocuments.find(doc => doc.uri.scheme === 'file' && samePath(doc.uri.fsPath, deckPath));
+      const meta = readPageMeta(await readHead(pagePath));
+      if (!meta.ritemark || !meta.digest) return undefined;
+      const registered = this.written.get(normalizeForCompare(pagePath));
+      if (registered?.digest === meta.digest) return registered.rows;
+      const open = vscode.workspace.textDocuments.find(doc => doc.uri.scheme === 'file' && sameFile(doc.uri.fsPath, besidePath, fs.realpathSync.native));
+      const deckPath = open ? open.uri.fsPath : besidePath;
       const text = open ? open.getText() : await fs.promises.readFile(deckPath, 'utf8');
-      return deckSheetRows(deckCounts(text, await this.themeFor(deckPath, text)));
+      const theme = await this.themeFor(deckPath, text);
+      if (await currentPageDigest(deckPath, text, theme) !== meta.digest) return undefined;
+      return deckSheetRows(deckCounts(text, theme));
     } catch {
       return undefined;
     }
@@ -214,12 +268,11 @@ export class DeckPublisher implements vscode.Disposable {
     return this.themeFor(document.uri.fsPath, document.getText());
   }
 
-  /** The theme the deck names, read from its project (as the deck view reads it), or the built-in one. */
+  /** The theme the deck names, read as the deck view reads it (`readDeckTheme`), or the built-in one. */
   private async themeFor(deckPath: string, text: string): Promise<DeckTheme> {
     const named = parseDeck(text.replace(/^﻿/, '')).theme;
     if (!named) return BUILT_IN_THEME;
-    const root = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(deckPath))?.uri.fsPath ?? path.dirname(deckPath);
-    const themeText = await readProjectTheme(root, named);
+    const themeText = await readDeckTheme(deckPath, named);
     return themeText === null ? BUILT_IN_THEME : parseTheme(themeText);
   }
 
@@ -228,6 +281,7 @@ export class DeckPublisher implements vscode.Disposable {
     this.timers.clear();
     this.disposables.forEach(disposable => disposable.dispose());
     this.seats.clear();
+    this.written.clear();
   }
 }
 

@@ -5,25 +5,34 @@
  *  - Hidden until Publish can be reached (the flag on and the whole-window sheet there), as the browser bar's is.
  *  - Unpublished: Publish. Published: the chip, "Published" or "Published · changed", whose menu has See online, Copy
  *    link, Update the page (only after a public change) and Unpublish. Publishing… and Unpublishing… while they run.
- *  - Publish and Update the page send each slide's fit as the strip's thumbnails measured it (`data-step`, numbers
- *    only), so the page's slides fit as the deck view's do.
+ *  - Publish and Update the page send the deck's text as this view holds it (the document may not have its newest
+ *    words yet) and each slide's fit, numbers only, so the page's slides fit as the deck view's do. The fit is measured
+ *    on the slides drawn once out of sight (`MeasureSlides`), the way the strip draws them, so it is there with the
+ *    strip hidden or the desk narrow too.
  *
  * The host keeps the state (`deck/page-state`); this only draws it and asks.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { DeckPageAction, DeckPageState } from '../../../../src/decks/deckProtocol'
+import type { DeckTheme } from '../../../../src/decks/deckTheme'
 import { onMessage, sendToExtension } from '../../bridge'
 import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
+import type { DeckSlideEntry } from './deckDocument'
+import { SlideCanvas } from './slide/SlideCanvas'
 
-/** Each slide's fit as its thumbnail measured it, by its place in the deck; 0 where there is no thumbnail to ask. */
-export function measuredSteps(count: number, root: ParentNode = document): number[] {
+/** The measuring slides' width: any will do, since the fit is measured on the 960 × 540 layout before it is scaled. */
+const MEASURE_WIDTH = 192
+
+/** Each slide's fit as `MeasureSlides` measured it, by its place in the deck; 0 where a slide wasn't measured. */
+export function measuredSteps(count: number, root: ParentNode): number[] {
   const steps = Array.from({ length: count }, () => 0)
-  root.querySelectorAll<HTMLElement>('.deck-strip [data-thumb]').forEach(thumb => {
-    const index = Number(thumb.getAttribute('data-thumb'))
-    const step = Number(thumb.querySelector('.deck-slide')?.getAttribute('data-step'))
+  root.querySelectorAll<HTMLElement>('[data-measure]').forEach(slot => {
+    const index = Number(slot.getAttribute('data-measure'))
+    const step = Number(slot.querySelector('.deck-slide')?.getAttribute('data-step'))
     if (Number.isInteger(index) && index >= 0 && index < count && Number.isInteger(step)) steps[index] = Math.max(0, Math.min(3, step))
   })
   return steps
@@ -35,8 +44,20 @@ function isState(value: unknown): value is DeckPageState {
     && ['unpublished', 'publishing', 'published', 'unpublishing'].includes(state.kind)
 }
 
-export function DeckPublish({ count, onNotice }: { count: number; onNotice: (text: string) => void }) {
+interface DeckPublishProps {
+  slides: DeckSlideEntry[]
+  theme: DeckTheme
+  borderless: boolean
+  assets: Record<string, string>
+  /** The deck's text as this view holds it now, front matter left out. */
+  text: () => string
+  onNotice: (text: string) => void
+}
+
+export function DeckPublish({ slides, theme, borderless, assets, text, onNotice }: DeckPublishProps) {
   const [state, setState] = useState<DeckPageState | null>(null)
+  // A Publish waiting for its slides' fit: the slides and the text as they were at the press.
+  const [measuring, setMeasuring] = useState<{ slides: DeckSlideEntry[]; text: string } | null>(null)
 
   useEffect(() => {
     const stop = onMessage(message => {
@@ -48,11 +69,59 @@ export function DeckPublish({ count, onNotice }: { count: number; onNotice: (tex
   }, [onNotice])
 
   return (
-    <DeckPublishControl
-      state={state}
-      onPublish={() => sendToExtension('deck/publish', { steps: measuredSteps(count) })}
-      onAction={action => sendToExtension('deck/page-action', { action })}
-    />
+    <>
+      <DeckPublishControl
+        state={state}
+        onPublish={() => setMeasuring(current => current ?? { slides, text: text() })}
+        onAction={action => sendToExtension('deck/page-action', { action })}
+      />
+      {measuring ? createPortal(
+        <MeasureSlides
+          slides={measuring.slides}
+          theme={theme}
+          borderless={borderless}
+          assets={assets}
+          onMeasured={steps => {
+            sendToExtension('deck/publish', { text: measuring.text, steps })
+            setMeasuring(null)
+          }}
+        />,
+        document.body,
+      ) : null}
+    </>
+  )
+}
+
+/**
+ * The deck's slides drawn once out of sight, as the strip draws them, so their measuring pass finds each one's fit
+ * (`data-step`). The pass runs in layout effects, which finish before the next frame; the fit is read after it.
+ */
+function MeasureSlides({ slides, theme, borderless, assets, onMeasured }: {
+  slides: DeckSlideEntry[]
+  theme: DeckTheme
+  borderless: boolean
+  assets: Record<string, string>
+  onMeasured: (steps: number[]) => void
+}) {
+  const root = useRef<HTMLDivElement>(null)
+  const measured = useRef(onMeasured)
+  measured.current = onMeasured
+  useEffect(() => {
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        if (root.current) measured.current(measuredSteps(slides.length, root.current))
+      })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [slides])
+  return (
+    <div ref={root} className="deck-measure" aria-hidden="true">
+      {slides.map(entry => (
+        <div key={entry.index} data-measure={entry.index}>
+          <SlideCanvas kind={entry.kind} data={entry.data} width={MEASURE_WIDTH} theme={theme} borderless={borderless} assets={assets} />
+        </div>
+      ))}
+    </div>
   )
 }
 

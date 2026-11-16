@@ -93,6 +93,17 @@ export function pageTitleOf(upload: { files: readonly { urlPath: string; bytes: 
 /** A page whose title and file name are both empty once cleaned. */
 export const UNTITLED_PAGE = 'Untitled page';
 
+/** A published page's address as Cloudflare gives it: only such an address is ever opened. */
+export const WORKERS_DEV_ADDRESS = /^https:\/\/[a-z0-9.-]+\.workers\.dev\//;
+
+/**
+ * How the bar's Publish ended (Sprint 159 PR 4: the deck's bar takes back a page it wrote for a first Publish only when
+ * that Publish was cancelled): `published`; `failed`, its line shown; `cancelled` in the sheet, or the sheet's plan
+ * no longer the one prepared, with nothing sent; `busy`, the page's sheet already open or the page going up, so this
+ * press did nothing; `not-ready`, Publish can't be reached yet.
+ */
+export type PublishOutcome = 'published' | 'failed' | 'cancelled' | 'busy' | 'not-ready';
+
 /**
  * The adapter's lines, each made plain on its way out (plainText.ts): a failure, a wait, a toast and a connect line
  * carry a page's title, a file's name or a host's error text, and a notification would turn link syntax in them into a
@@ -403,7 +414,7 @@ export class PublishController {
 
   async openSite(id: string): Promise<void> {
     const record = await this.bySite(id);
-    if (!record || record.unpublished || this.gone.has(id) || !/^https:\/\/[a-z0-9.-]+\.workers\.dev\//.test(record.address)) return;
+    if (!record || record.unpublished || this.gone.has(id) || !WORKERS_DEV_ADDRESS.test(record.address)) return;
     await this.ui.openExternal(record.address);
   }
 
@@ -487,12 +498,12 @@ export class PublishController {
   /**
    * The bar's Publish, and the chip's Update the page: frame 2 while nothing is set up, then the gather and the key
    * scan, then frame 3 (or, for an update with the same files and nothing key-shaped, straight up), then the upload.
-   * `page` is a project page by real path (`pageCommands.publishPage` refused anything else).
+   * `page` is a project page by real path (`pageCommands.publishPage` refused anything else). Says how it ended.
    */
-  async publishFromBar(page: ProjectPage): Promise<void> {
-    if (!this.canPublish()) return; // ritemark.page.publish from a keybinding or code, before PR 5's sheet: nothing
+  async publishFromBar(page: ProjectPage): Promise<PublishOutcome> {
+    if (!this.canPublish()) return 'not-ready'; // ritemark.page.publish from a keybinding or code, before PR 5's sheet: nothing
     const key = page.realPath;
-    if (this.publishing.has(key) || this.sheets.has(key)) return;
+    if (this.publishing.has(key) || this.sheets.has(key)) return 'busy';
     this.sheets.add(key);
     let chosen: { plan: GatheredPlan; consent: PublishConsent; pagePart?: string; newName?: boolean } | null = null;
     try {
@@ -536,25 +547,27 @@ export class PublishController {
           },
         });
         if (stopLine) return this.fail(key, stopLine, page);
-        if (answer.kind === 'cancel' || !current) return;
-        if (answer.plan !== current.plan) return; // never another plan than the one prepared here
+        if (answer.kind === 'cancel' || !current) return 'cancelled';
+        if (answer.plan !== current.plan) return 'cancelled'; // never another plan than the one prepared here
         chosen = { plan: current.plan, consent: answer.kind === 'publishAnyway' ? 'sheet-anyway' : 'sheet', pagePart: answer.pagePart, newName: current.newName };
       }
     } finally {
       this.sheets.delete(key);
     }
-    if (!chosen) return;
+    if (!chosen) return 'cancelled';
     try {
       await this.publishPage(chosen);
+      return 'published';
     } catch (error) {
-      this.fail(key, error instanceof PublishError ? error.message : COULD_NOT_REACH_PUBLISH, page);
+      return this.fail(key, error instanceof PublishError ? error.message : COULD_NOT_REACH_PUBLISH, page);
     }
   }
 
-  private fail(pagePath: string, line: string, page: ProjectPage): void {
+  private fail(pagePath: string, line: string, page: ProjectPage): 'failed' {
     this.pageLines.set(pagePath, line);
     this.deps.onPageState?.(pagePath);
     this.ui.showFailure(line, () => { void this.publishFromBar(page); });
+    return 'failed';
   }
 
   /** The account's name read again, the gather and scan, and the sheet's rows (R5, answer 5). */
@@ -569,8 +582,11 @@ export class PublishController {
     const options: SheetOptions = {
       destination: { name: 'Your Cloudflare', detail: accountName ?? 'Your account' },
     };
-    const deck = await this.deps.pageRows?.(page.realPath).catch(() => undefined);
-    if (deck) options.deck = deck;
+    // A deck's rows only when the sheet will show: an unchanged update goes without it
+    if (!record || sheetNeeded(record, plan)) {
+      const deck = await this.deps.pageRows?.(page.realPath).catch(() => undefined);
+      if (deck) options.deck = deck;
+    }
     if (record) {
       options.address = { page: record.siteName, suffix: `.${subdomain ?? 'workers'}.workers.dev`, editable: false };
     } else {
@@ -738,6 +754,14 @@ export class PublishController {
       line: going?.slow ? SLOW_UNPUBLISH : line,
       tooltip: null,
     };
+  }
+
+  /**
+   * Whether a publish flow holds this page now: its sheet is open, or it is going up. The deck's bar doesn't write the
+   * page under an open sheet (Sprint 159 PR 4).
+   */
+  isBusy(pagePath: string): boolean {
+    return this.sheets.has(pagePath) || this.publishing.has(pagePath);
   }
 
   /** The page's record while it is online, for the bar's Copy link, Open the page and Unpublish. */

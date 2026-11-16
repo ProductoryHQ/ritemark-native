@@ -36,6 +36,7 @@ import {
   SHEET_HOST_COMMAND,
   SWITCHED_OFF,
   sheetHostAvailable,
+  type PublishOutcome,
   type PublishUi,
 } from './PublishController';
 import { PublishRecordStore, RECORDS_FILE, RECORDS_FOLDER } from './publishRecords';
@@ -1028,7 +1029,8 @@ test('a deck\'s page: its rows in the sheet, a first publish, an update without 
   const picture = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
   const files = { 'Harbour Logistics/AI assistants and agents.html': '<p>placeholder</p>', 'Harbour Logistics/AI assistants and agents.deck.md': PRIVATE_DECK, 'Harbour Logistics/images/which-stays.png': picture };
   let deckText = PRIVATE_DECK;
-  const t = await setup({ pasted: [TOKEN], files, pageRows: async () => deckSheetRows(deckCounts(deckText, BUILT_IN_THEME)) });
+  let rowsAsked = 0;
+  const t = await setup({ pasted: [TOKEN], files, pageRows: async () => { rowsAsked++; return deckSheetRows(deckCounts(deckText, BUILT_IN_THEME)); } });
   try {
     const deckPath = path.join(t.project.dir, 'Harbour Logistics', 'AI assistants and agents.deck.md');
     const write = async (text: string) => {
@@ -1059,26 +1061,52 @@ test('a deck\'s page: its rows in the sheet, a first publish, an update without 
     // A public edit: "Published · changed", and Update the page goes straight up (same pictures, nothing key-shaped)
     await write(PRIVATE_DECK.replace('Choose a task you do every week', 'Choose one task'));
     assert.equal((await t.controller.pageState(t.page.realPath, await hash())).changed, true, 'a public edit is a change');
-    await t.controller.publishFromBar(t.page);
+    const asked = rowsAsked;
+    assert.equal(await t.controller.publishFromBar(t.page), 'published');
     assert.equal(t.sheets.length, 1, 'an update with the same files goes without the sheet');
+    assert.equal(rowsAsked, asked, 'and without asking for the rows it wouldn\'t show');
     const updated = await t.records.get(t.page.realPath);
     assert.equal(updated?.siteName, record.siteName, 'the address stays');
     assert.equal((await t.controller.pageState(t.page.realPath, await hash())).changed, false);
   } finally { await t.cleanup(); }
 });
 
-test('a deck\'s first publish cancelled in the sheet leaves no record and no failure line (the deck\'s bar then takes its page back)', async () => {
+test('the bar\'s Publish says how it ended: cancelled, busy while its sheet is open, failed, published, not ready (the deck\'s bar takes its page back only on a cancel)', async () => {
   const t = await setup({ pasted: [TOKEN] });
   try {
     await t.controller.startTokenEntry();
-    t.ui.showSheet = driveSheet(t.sheets, ['cancel']) as PublishUi['showSheet'];
-    await t.controller.publishFromBar(t.page);
-    assert.equal(t.sheets.length, 1, 'the sheet was shown');
+    const own = t.ui.showSheet;
+    // A second press while the sheet is open (a double click): it does nothing and says so; the first is still a cancel
+    let second: PublishOutcome | undefined;
+    let busy: boolean | undefined;
+    t.ui.showSheet = (async (req: SheetRequest) => {
+      busy = t.controller.isBusy(t.page.realPath);
+      second = await t.controller.publishFromBar(t.page);
+      return driveSheet(t.sheets, ['cancel'])(req);
+    }) as PublishUi['showSheet'];
+    assert.equal(await t.controller.publishFromBar(t.page), 'cancelled');
+    assert.equal(second, 'busy');
+    assert.equal(busy, true, 'the open sheet holds the page');
+    assert.equal(t.controller.isBusy(t.page.realPath), false, 'and lets it go when it closes');
+    assert.equal(t.sheets.length, 1, 'one sheet');
     assert.equal(await t.records.get(t.page.realPath), undefined);
     const state = await t.controller.pageState(t.page.realPath);
     assert.equal(state.kind, 'unpublished');
     assert.equal(state.line, null, 'a cancel is no failure');
+    // A failure has its line; a publish, none
+    t.ui.showSheet = own;
+    t.fake.failures.push({ path: /assets-upload-session$/, status: 500, times: 10 });
+    assert.equal(await t.controller.publishFromBar(t.page), 'failed');
+    assert.ok((await t.controller.pageState(t.page.realPath)).line);
+    t.fake.failures.length = 0;
+    assert.equal(await t.controller.publishFromBar(t.page), 'published');
+    assert.ok(await t.records.get(t.page.realPath));
+    assert.equal(t.controller.isBusy(t.page.realPath), false);
   } finally { await t.cleanup(); }
+  const off = await setup({ entry: false });
+  try {
+    assert.equal(await off.controller.publishFromBar(off.page), 'not-ready');
+  } finally { await off.cleanup(); }
 });
 
 void (async () => {

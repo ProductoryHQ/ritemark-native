@@ -14,14 +14,14 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { setPublishHandler } from '../browser/pageCommands';
+import { publishPageToEnd, setPublishHandler } from '../browser/pageCommands';
 import { CloudflareAccount, CONNECTION_SECRET_KEY } from './cloudflare/account';
 import { CloudflareClient } from './cloudflare/client';
 import { CloudflareHost } from './cloudflare/CloudflareHost';
 import { openExternalStubbed } from './devSheetHarness';
 import { gatherPage } from './gather';
 import { PublishRecordStore } from './publishRecords';
-import { PublishController, sheetHostAvailable, UNTITLED_PAGE, type PageBarState, type PublishUi } from './PublishController';
+import { PublishController, sheetHostAvailable, UNTITLED_PAGE, type PublishOutcome, type PageBarState, type PublishUi } from './PublishController';
 import { plainLine, plainPart } from './plainText';
 import { showPublishSheet } from './PublishSheetPanel';
 import type { WebPagesSettingsProjection } from './settingsProtocol';
@@ -51,12 +51,12 @@ export interface PublishFeature {
   /** A page's state changed (by its real path): the same moments patch 010's bar is told to ask again. */
   readonly onDidChangePageState: vscode.Event<string>;
   /**
-   * A publish flow for a page (by its real path) ended, whatever its end: published, failed, refused or cancelled in
-   * the sheet. The page's record then says whether it is online. The deck's bar uses it to take back a page it wrote
-   * for a first Publish that was cancelled; the controller's state can't tell a cancel apart, since a cancel changes
-   * nothing in it.
+   * `ritemark.page.publish` on a page, waited to its end, and how it ended (undefined: the boundary check refused the
+   * page and said why). The deck's bar takes back a page it wrote for a first Publish only on `cancelled`: the
+   * controller's state can't tell a cancel apart, since a cancel changes nothing in it, and a press that found the
+   * sheet already open (`busy`) is no cancel.
    */
-  readonly onDidEndPublishFlow: vscode.Event<string>;
+  publishPage(page: vscode.Uri): Promise<PublishOutcome | undefined>;
   /** The sheet's What goes and What stays rows for pages made from a deck: the deck host answers for its own pages. */
   setPageRows(provider: ((pagePath: string) => Promise<SheetOptions['deck'] | undefined>) | null): void;
 }
@@ -122,7 +122,6 @@ export function createPublishFeature(
   let pageRows: ((pagePath: string) => Promise<SheetOptions['deck'] | undefined>) | null = null;
   const readyChanged = new vscode.EventEmitter<boolean>();
   const pageStateChanged = new vscode.EventEmitter<string>();
-  const flowEnded = new vscode.EventEmitter<string>();
 
   const account = new CloudflareAccount({
     secrets: context.secrets,
@@ -185,18 +184,12 @@ export function createPublishFeature(
     pageRows: (pagePath) => (pageRows ? pageRows(pagePath) : Promise.resolve(undefined)),
     log,
   });
-  // Every way into Publish (patch 010's bar, the deck's bar) goes through `ritemark.page.publish`; its flow's end is told.
-  setPublishHandler((page) => {
-    const flow = controller.publishFromBar(page);
-    void flow.then(() => flowEnded.fire(page.realPath), () => flowEnded.fire(page.realPath));
-    return flow;
-  });
+  setPublishHandler((page) => controller.publishFromBar(page));
 
   context.subscriptions.push(
     { dispose: () => setPublishHandler(null) },
     readyChanged,
     pageStateChanged,
-    flowEnded,
     // A first publish's wait for its new address, and Unpublish's check, stop with the extension
     { dispose: () => host.dispose() },
     // Another window connected or disconnected: read the entry again, then redraw Settings and the bars (Codex's
@@ -256,7 +249,7 @@ export function createPublishFeature(
     isReady: () => ready,
     onDidChangeReady: readyChanged.event,
     onDidChangePageState: pageStateChanged.event,
-    onDidEndPublishFlow: flowEnded.event,
+    publishPage: (page) => publishPageToEnd(page),
     setPageRows: (provider) => { pageRows = provider; },
   };
 }

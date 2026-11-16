@@ -43,16 +43,16 @@ assert.equal(button(draw({ ready: true, kind: 'published', changed: false }))!.g
 assert.ok(button(draw({ ready: true, kind: 'published', changed: false }))!.classList.contains('deck-publish-chip'))
 assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.classList.contains('deck-publish'))
 
-// The fit steps: each thumbnail's `data-step`, by its place; 0 where there is none, never outside 0 to 3.
+// The fit steps: each measured slide's `data-step`, by its place; 0 where there is none, never outside 0 to 3.
 {
-  const strip = parse(`<div class="deck-strip">
-    <div data-thumb="0"><div class="deck-slide" data-step="0"></div></div>
-    <div data-thumb="1"><div class="deck-slide" data-step="2"></div></div>
-    <div data-thumb="3"><div class="deck-slide" data-step="7"></div></div>
-    <div data-thumb="9"><div class="deck-slide" data-step="1"></div></div>
+  const measured = parse(`<div class="deck-measure">
+    <div data-measure="0"><div class="deck-slide" data-step="0"></div></div>
+    <div data-measure="1"><div class="deck-slide" data-step="2"></div></div>
+    <div data-measure="3"><div class="deck-slide" data-step="7"></div></div>
+    <div data-measure="9"><div class="deck-slide" data-step="1"></div></div>
   </div>`)
-  assert.deepEqual(measuredSteps(5, strip as unknown as ParentNode), [0, 2, 0, 3, 0])
-  assert.deepEqual(measuredSteps(0, strip as unknown as ParentNode), [])
+  assert.deepEqual(measuredSteps(5, measured as unknown as ParentNode), [0, 2, 0, 3, 0])
+  assert.deepEqual(measuredSteps(0, measured as unknown as ParentNode), [])
 }
 
 console.log('DeckPublish: passed')

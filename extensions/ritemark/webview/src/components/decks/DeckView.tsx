@@ -850,7 +850,7 @@ export function DeckView({
         ) : (
           <span className={`deck-saved${status === 'saved' ? '' : ' invisible'}`}>Saved</span>
         )}
-        <DeckPublish count={count} onNotice={publishNotice} />
+        <DeckPublish slides={slides} theme={theme} borderless={borderless} assets={assets} text={currentText} onNotice={publishNotice} />
       </header>
 
       <div ref={deskRef} className="deck-desk">

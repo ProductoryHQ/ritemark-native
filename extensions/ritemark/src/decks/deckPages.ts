@@ -218,7 +218,7 @@ export class DeckPages implements vscode.Disposable {
         if (this.publisher) await this.post(webview, { type: 'deck/page-state', state: await this.publisher.stateOf(document) });
         return;
       case 'deck/publish':
-        await this.publisher?.publish(document, request.steps, text => void this.post(webview, { type: 'deck/page-notice', text }));
+        await this.publisher?.publish(document, request.text, request.steps, text => void this.post(webview, { type: 'deck/page-notice', text }));
         return;
       case 'deck/page-action':
         await this.publisher?.pageAction(document, request.action, text => void this.post(webview, { type: 'deck/page-notice', text }));
@@ -393,7 +393,12 @@ const MAX_THEME_BYTES = 64 * 1024;
  * read from the deck's project folder, or the deck's own folder when it has none, and never from outside it.
  */
 async function readTheme(document: vscode.TextDocument, themePath: string): Promise<string | null> {
-  return readProjectTheme(vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath ?? path.dirname(document.uri.fsPath), themePath);
+  return readDeckTheme(document.uri.fsPath, themePath);
+}
+
+/** The theme file a deck at `deckPath` names, by the same rule: the deck view's, and its page's (Sprint 159 PR 4). */
+export function readDeckTheme(deckPath: string, themePath: string): Promise<string | null> {
+  return readProjectTheme(vscode.workspace.getWorkspaceFolder(vscode.Uri.file(deckPath))?.uri.fsPath ?? path.dirname(deckPath), themePath);
 }
 
 /** The text of a theme file in the project at `root`, or null (the same limits as a deck's own theme). */

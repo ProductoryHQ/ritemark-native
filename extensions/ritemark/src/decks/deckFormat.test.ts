@@ -17,6 +17,7 @@ import {
   writeScalar,
   writeSlideBlock,
   writeSlideBody,
+  withFrontMatter,
   type SlideData,
 } from './deckFormat';
 
@@ -239,6 +240,20 @@ test('a front matter value by name (Sprint 159: the look)', () => {
   assert.equal(frontMatterField(text, 'owner'), null);
   assert.equal(frontMatterField('look: borderless\n', 'look'), null, 'only in the front matter');
   assert.equal(frontMatterField('---\nlook: "borderless"\n---\n', 'look'), 'borderless');
+});
+
+test('the text Publish builds from: the document\'s front matter with the view\'s body (Sprint 159 PR 4)', () => {
+  const body = '```slide title\ntitle: Newest words\n```\n';
+  const front = '---\ndeck: 1\ntheme: Slide library/Themes/Evening.theme.md\nlook: borderless\n---\n';
+  const joined = withFrontMatter(`${front}\n\`\`\`slide title\ntitle: Older words\n\`\`\`\n`, body);
+  assert.equal(joined, front + body);
+  assert.equal(frontMatterField(joined, 'look'), 'borderless');
+  assert.equal(parseDeck(joined).theme, 'Slide library/Themes/Evening.theme.md');
+  assert.deepEqual(parseDeck(joined).slides.map((slide) => parseSlideBody(slide.body).title), ['Newest words']);
+  assert.equal(withFrontMatter('﻿' + front + 'old', body), front + body, 'a byte-order mark goes');
+  assert.equal(withFrontMatter('---\ndeck: 1\n---', body), `---\ndeck: 1\n---\n${body}`, 'a front matter at the end of the file');
+  assert.equal(withFrontMatter('```slide title\ntitle: Old\n```\n', body), body, 'no front matter: the body alone');
+  assert.equal(withFrontMatter(front, ''), front, 'an empty deck');
 });
 
 console.log(`deckFormat: ${passed} passed`);

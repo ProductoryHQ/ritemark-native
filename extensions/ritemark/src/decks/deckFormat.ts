@@ -576,6 +576,16 @@ export function parseDeck(text: string): ParsedDeck {
   return { version: front.version, theme: front.theme, bodyStart: front.end, slides };
 }
 
+/**
+ * A deck's text from its document's front matter (the theme and the look) and a view's body, front matter left out:
+ * what Publish builds the page from, since the view's newest words may not have reached the document yet (Sprint 159).
+ */
+export function withFrontMatter(documentText: string, body: string): string {
+  const text = documentText.replace(/^﻿/, '');
+  const head = text.slice(0, parseDeck(text).bodyStart);
+  return head && !head.endsWith('\n') ? `${head}\n${body}` : head + body;
+}
+
 /** The front matter's `deck:` value, as written, or null: read from the front matter alone. */
 export function deckVersionOf(text: string): string | null {
   return frontMatterOf(text).version;
