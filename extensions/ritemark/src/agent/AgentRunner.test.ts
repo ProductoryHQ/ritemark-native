@@ -350,6 +350,34 @@ async function testWarmSessionThinkingEffortUpdatesBeforeInput(): Promise<void> 
   session.close();
 }
 
+async function testCurrentSlideReachesClaudesTurn(): Promise<void> {
+  // 17 November: a deck's current slide follows the active file in Claude's message; a Text document has none.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const session = new AgentSession({ workspacePath: process.cwd() }) as any;
+  const inputs: string[] = [];
+  session._queryStream = { applyFlagSettings: async () => {}, interrupt: async () => {}, close: () => {} };
+  session._enqueueInput = (msg: { message?: { content?: unknown } }) => inputs.push(JSON.stringify(msg));
+  const completeTurn = () => session._forceResolveTurn(session._turnId, { text: 'ok', filesModified: [], metrics: { durationMs: 1, costUsd: null, model: null } });
+  const slide = { deck: 'Training', count: 13, slides: [{ number: 5, id: 'k3f9', title: 'Agenda' }] };
+  const sends: Array<{ prompt: string; activeFile: { path: string; slide?: typeof slide } }> = [
+    { prompt: 'fix this', activeFile: { path: 'Training.deck.md', slide } },
+    { prompt: 'fix this', activeFile: { path: 'notes.md' } },
+    // The deck attached whole as a path chip: the chip shows no slide, and Claude gets none
+    { prompt: '[File: Training.deck.md]\n\ntighten the wording', activeFile: { path: 'Training.deck.md', slide } },
+  ];
+  for (const { prompt, activeFile } of sends) {
+    const turn = session.sendMessage({ prompt, activeFile });
+    await new Promise((resolve) => setImmediate(resolve));
+    completeTurn();
+    await turn;
+  }
+  assert.ok(inputs[0].includes(JSON.stringify('[Currently editing: Training.deck.md]\n[Current slide: The person is on slide 5 of 13 ("Agenda", id k3f9) in "Training".]\n\n').slice(1, -1)), inputs[0]);
+  assert.ok(inputs[1].includes('[Currently editing: notes.md]'), inputs[1]);
+  assert.ok(!inputs[1].includes('[Current slide'), 'a Text document has no slide line');
+  assert.ok(!inputs[2].includes('[Current slide'), 'a deck attached as a path chip has no slide line');
+  session.close();
+}
+
 async function testWarmSessionUnsupportedEffortFallsBackToAuto(): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const session = new AgentSession({ workspacePath: process.cwd() }) as any;
@@ -485,6 +513,7 @@ async function main() {
   await testSprint103KeepPlanningFeedbackDeny();
   await testWarmSessionThinkingEffortUpdatesBeforeInput();
   await testWarmSessionUnsupportedEffortFallsBackToAuto();
+  await testCurrentSlideReachesClaudesTurn();
   await testSyntheticAuthSuccessEnvelopeFailsTheTurn();
   testSprint127ClaudeRuntimeOptions();
   console.log('AgentRunner lifecycle tests passed.');

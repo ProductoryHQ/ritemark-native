@@ -526,6 +526,8 @@ export function activate(context: vscode.ExtensionContext) {
     startChat: request => unifiedViewProvider.startChat(request),
     runtimeAvailability: runtimeId => unifiedViewProvider.runtimeAvailability(runtimeId),
   });
+  // The AI knows the slide the person is on in the deck in front (17 November): its chip and every message's context.
+  context.subscriptions.push(unifiedViewProvider.connectCurrentSlide(decks.pages));
 
   // ── Search, the words layer (Sprint 148, #591) ─────────────────────────────
   // The index of this window's project, in its own worker thread, and its results
