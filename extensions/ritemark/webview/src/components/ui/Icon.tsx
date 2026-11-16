@@ -78,7 +78,6 @@ import {
   FolderOpen,
   FolderPlus,
   Gear,
-  SlidersHorizontal,
   GitBranch,
   Globe,
   GlobeSimple,
@@ -250,8 +249,6 @@ const iconMap = {
   'folder-open': FolderOpen,
   'folder-plus': FolderPlus,
   'gear': Gear,
-  // 17 November (the Experience lead): Slide settings in the deck's bar (the prototype's lucide settings-2)
-  'sliders-horizontal': SlidersHorizontal,
   'git-branch': GitBranch,
   'globe': Globe,
   'globe-simple': GlobeSimple,

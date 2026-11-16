@@ -1036,7 +1036,7 @@ export function DeckView({
                 aria-label="Slide settings"
                 disabled={!settingsReady}
               >
-                <Icon name="sliders-horizontal" size={16} tone="inherit" />
+                <Icon name="gear" size={16} tone="inherit" />
               </Button>
             </PopoverTrigger>
           </Tooltip>

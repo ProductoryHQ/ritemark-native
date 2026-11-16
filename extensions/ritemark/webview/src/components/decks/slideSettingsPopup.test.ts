@@ -95,7 +95,7 @@ const here = (path: string) => readFileSync(fileURLToPath(new URL(path, import.m
   assert.match(gear, /<Tooltip label=\{settingsReady \? 'Slide settings'/)
   assert.match(gear, /aria-label="Slide settings"/)
   assert.match(gear, /variant="ghost"\s+size="icon-xs"/, 'a 28 px ghost icon button')
-  assert.match(gear, /<Icon name="sliders-horizontal" size=\{16\}/)
+  assert.match(gear, /<Icon name="gear" size=\{16\}/, 'a gear (Jarmo: "gear-icon"), the one the old Settings button drew')
   assert.match(gear, /<PopoverContent\s+align="start"/, 'the popup opens under the gear, left-aligned to it')
   assert.match(gear, /data-state=\{settingsOpen && settingsReady \? 'active'/, 'its on state while the popup is open')
   assert.doesNotMatch(gear, /\btitle=/, 'a tooltip, never a native title')

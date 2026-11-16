@@ -157,7 +157,7 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-notice { display: inline-flex; align-items: center; gap: 8px; min-width: 0; margin-left: 12px; font-size: 12.5px; color: var(--r-ink-body); }
 .deck-notice-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Slide settings (17 November, "Nothing around the slide but the slide"): a 28 px gear in the deck's bar after the
+/* Slide settings (17 November, "Nothing around the slide but the slide"): a 28 px gear (Phosphor `gear`) in the deck's bar after the
    count, its popup under it (a Popover, DeckView). Muted; ink on a quiet fill on hover; the bar's `on` while open. */
 .deck-bar .deck-settings-button { color: var(--r-ink-muted); }
 .deck-bar .deck-settings-button:hover { background: var(--r-surface-muted); color: var(--r-ink-strong); }
