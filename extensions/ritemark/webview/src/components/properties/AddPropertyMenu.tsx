@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { COMMON_PROPERTIES, type PropertyType } from './types'
+import { useDismissOnOutside } from '../../lib/dismissOnOutside'
 
 interface AddPropertyMenuProps {
   existingKeys: string[]
@@ -18,15 +19,12 @@ export function AddPropertyMenu({ existingKeys, onAdd, onClose }: AddPropertyMen
     p => !existingKeys.includes(p.key)
   )
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose()
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onClose])
+  // A press outside the menu closes it, and Esc does, with the focus back on
+  // the "Add" button beside it (the shared rule, `lib/dismissOnOutside`). A
+  // press on that button is not outside: it toggles the menu by itself.
+  useDismissOnOutside(menuRef, onClose, {
+    trigger: () => menuRef.current?.parentElement?.querySelector<HTMLElement>(':scope > button'),
+  })
 
   useEffect(() => {
     if (showCustomInput && customInputRef.current) {
@@ -59,14 +57,12 @@ export function AddPropertyMenu({ existingKeys, onAdd, onClose }: AddPropertyMen
     if (e.key === 'Enter') {
       e.preventDefault()
       handleAddCustom()
-    } else if (e.key === 'Escape') {
-      if (showCustomInput) {
-        setShowCustomInput(false)
-        setCustomKey('')
-        setError('')
-      } else {
-        onClose()
-      }
+    } else if (e.key === 'Escape' && showCustomInput) {
+      // The first Esc leaves the custom name; the next closes the menu (the hook).
+      e.preventDefault()
+      setShowCustomInput(false)
+      setCustomKey('')
+      setError('')
     }
   }
 

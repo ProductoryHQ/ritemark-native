@@ -9,6 +9,7 @@ import { Icon } from '../../ui/Icon'
 import { Input } from '../../ui/input'
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '../../ui/select'
 import { Tooltip } from '../../ui/tooltip'
+import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 
 export interface LibraryTopic {
   path: string
@@ -35,6 +36,10 @@ export function AddToLibrarySheet({ number, topics, style, onAdd, onClose }: Add
   const [choice, setChoice] = useState<string>('')
   const [name, setName] = useState('')
   const nameField = useRef<HTMLInputElement>(null)
+  // 17 November (Jarmo): a press outside the sheet closes it, as Esc does. A Select's list is its own layer: choosing
+  // a topic keeps the sheet open.
+  const ref = useRef<HTMLDivElement>(null)
+  useDismissOnOutside(ref, onClose)
 
   // The first topic is chosen once the topics come; with none, a new topic.
   useEffect(() => {
@@ -51,12 +56,12 @@ export function AddToLibrarySheet({ number, topics, style, onAdd, onClose }: Add
 
   return (
     <div
+      ref={ref}
       className="deck-settings deck-addlib"
       style={style}
       role="dialog"
       aria-label={`Add slide ${number} to the library`}
       onKeyDown={event => {
-        if (event.key === 'Escape') { event.preventDefault(); onClose() }
         if (event.key === 'Enter' && (event.target as HTMLElement).tagName === 'INPUT') { event.preventDefault(); add() }
       }}
     >

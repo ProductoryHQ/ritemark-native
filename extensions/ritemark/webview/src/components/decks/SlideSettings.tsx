@@ -7,7 +7,7 @@
  * An exercise slide also has Label (16 November): its pill's words, as on the slide, with the default as the
  * placeholder. Emptied, the slide has no pill (`tag: ""`); words typed here bring it back.
  */
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { EXERCISE_TAG, exerciseTagOf, type SlideData } from '../../../../src/decks/deckFormat'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
@@ -16,6 +16,7 @@ import { Label } from '../ui/label'
 import { SegmentedControl } from '../ui/segmented-control'
 import { Switch } from '../ui/switch'
 import { Tooltip } from '../ui/tooltip'
+import { useDismissOnOutside } from '../../lib/dismissOnOutside'
 import { oneLine, setPath, undoKeyOf } from './slide/slideEdits'
 
 /** A small picture of a layout: a few bars, as the prototype's `.lay .pic`. */
@@ -64,17 +65,23 @@ interface SlideSettingsProps {
   /** Cmd+Z (redo: Cmd+Shift+Z, Cmd+Y) in a field: the deck's undo, as on the stage, not the field's own. */
   onUndo: (redo: boolean) => void
   style?: React.CSSProperties
+  /** The gear that opened Settings: a press on it toggles them, and Esc or Close gives it the focus back. */
+  trigger?: () => HTMLElement | null | undefined
 }
 
-export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, style }: SlideSettingsProps) {
+export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, style, trigger }: SlideSettingsProps) {
   const skipId = `deck-skip-${number}`
   const tagId = `deck-tag-${number}`
+  // 17 November (Jarmo): a press outside closes Settings, and Esc does (the focus back on the gear); choosing a layout
+  // or a picture place is inside, so Settings stay open while the change is seen.
+  const ref = useRef<HTMLElement>(null)
+  const dismiss = useDismissOnOutside(ref, onClose, { trigger })
   return (
-    <section className="deck-settings" style={style} aria-label={`Settings of slide ${number}`} onKeyDown={event => { if (event.key === 'Escape') onClose() }}>
+    <section ref={ref} className="deck-settings" style={style} aria-label={`Settings of slide ${number}`}>
       <header className="deck-settings-head">
         <span>Slide {number}</span>
         <Tooltip label="Close the settings">
-          <Button variant="ghost" size="icon-sm" aria-label="Close the settings" onClick={onClose}>
+          <Button variant="ghost" size="icon-sm" aria-label="Close the settings" onClick={dismiss}>
             <Icon name="x" size={14} tone="inherit" />
           </Button>
         </Tooltip>

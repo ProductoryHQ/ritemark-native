@@ -158,9 +158,12 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-notice-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Settings above the slide's right corner, and its panel beside the slide (prototype `.sethead`, `.setp`) */
+/* The slide's gear (17 November): on the desk just above the frame, right-aligned to its edge (the frame's 24 px
+   margin), never over the slide. Its place is this one rule: inside the frame's corner would change only this line. */
 .deck-sethead { display: flex; justify-content: flex-end; align-items: center; height: 36px; padding: 0 24px; }
-.deck-settings-button { height: 28px; padding: 0 9px; gap: 6px; font-size: 12.5px; color: var(--r-ink-body); }
-.deck-settings-button[data-state="active"] { background: var(--r-accent-soft); color: var(--r-accent); }
+.deck-sethead .deck-settings-button { color: var(--r-ink-muted); }
+.deck-sethead .deck-settings-button:hover { background: var(--r-surface-muted); color: var(--r-ink-strong); }
+.deck-sethead .deck-settings-button[data-state="active"] { background: var(--r-surface-soft); color: var(--r-ink-strong); }
 .deck-settings { position: absolute; z-index: 40; width: 316px; padding: 12px; box-sizing: border-box; border-radius: 12px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline), 0 16px 34px -10px rgba(30,27,75,.28); font-size: 13px; line-height: 18px; color: var(--r-ink-strong); }
 .deck-settings-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 4px; font-weight: 600; line-height: 24px; }
 .deck-settings-k { margin: 12px 0 6px; font-size: 11px; font-weight: 600; line-height: 14px; letter-spacing: .5px; text-transform: uppercase; color: var(--r-ink-muted); }

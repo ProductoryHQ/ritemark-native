@@ -202,17 +202,19 @@ export function Stage({ editor, slide, theme, borderless, assets, width, onWriti
   return (
     <>
       <div className="deck-sethead">
-        <Tooltip label={settingsOpen ? 'Close the settings' : "The slide's layout, look and picture"}>
+        {/* 17 November (Jarmo; the Experience lead): the gear alone, on the desk above the slide's top-right corner,
+            right-aligned to the frame (decks.css `.deck-sethead`). Settings open beside the slide from it. */}
+        <Tooltip label="Slide settings">
           <Button
             variant="ghost"
-            size="sm"
+            size="icon-xs"
             className="deck-settings-button"
             data-state={settingsOpen ? 'active' : undefined}
+            aria-label="Slide settings"
             aria-pressed={settingsOpen}
             onClick={onSettings}
           >
-            <Icon name="gear" size={14} tone="inherit" />
-            Settings
+            <Icon name="gear" size={16} tone="inherit" />
           </Button>
         </Tooltip>
       </div>
