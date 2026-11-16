@@ -61,10 +61,10 @@ Mention an agent inside a comment note:
 | Mention | Agent |
 |-------|-------|
 | `@claude` | Claude (Anthropic) |
-| `@codex` | ChatGPT (OpenAI) |
+| `@chatgpt` | ChatGPT (OpenAI) |
 | `@opencode` | OpenCode (bring-your-own-key) |
 
-ChatGPT keeps the handle `@codex`, so comments you assigned before still work; the `@` list shows ChatGPT beside it.
+The older `@codex` still assigns a comment to ChatGPT, so comments you assigned before keep working; the `@` list offers `@chatgpt`.
 
 A **Send to Claude** (or ChatGPT, or OpenCode) button appears on the comment. Above it, one line names where the work will go. Pressing the button sends:
 

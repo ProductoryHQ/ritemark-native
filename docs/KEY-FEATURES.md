@@ -57,7 +57,7 @@ These follow the Microsoft Store checklist's rules.
 - The AI's control of the in-app browser is **macOS only**. Never claim it on Windows.
 - PowerPoint files are read-only previews. "Make an editable copy" is for PDF and Word only.
 - Excel: `.xlsx` cells can be edited; `.xls` opens as a preview.
-- Ritemark says ChatGPT where it names the AI. Codex is named only as what ChatGPT runs (OpenAI's Codex) or as `@codex` in comments.
+- Ritemark says ChatGPT where it names the AI. Codex is named only as what ChatGPT runs (OpenAI's Codex). In comments `@chatgpt` assigns ChatGPT; the older `@codex` still works but is never offered.
 
 ## Gaps this list shows
 
