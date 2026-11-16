@@ -129,10 +129,16 @@ export const DeckSlide = Node.create({
 })
 
 /**
- * The save half: a slide node is written as its fence (and its notes fence) from its attributes. Registered on the
- * editor's one Turndown service, where it is harmless without slide nodes, as the comment rules are.
+ * The save half: a slide node is written as its fence (and its notes fence) from its attributes, and a drawn heading
+ * not at all. Registered on the editor's one Turndown service, where it is harmless without them, as the comment rules
+ * are.
  */
 export function addDeckTurndownRules(service: TurndownService): void {
+  // A heading the deck view draws for a part without one (`drawnHeadings.ts`) is never saved: opening writes nothing.
+  service.addRule('deckDrawnHeading', {
+    filter: node => /^H[1-6]$/.test(node.nodeName) && (node as HTMLElement).hasAttribute('data-deck-drawn'),
+    replacement: () => '',
+  })
   service.addRule('deckSlide', {
     filter: node => node.nodeName === 'DIV' && (node as HTMLElement).hasAttribute(DECK_SLIDE_ATTRIBUTE),
     replacement: (_content, node) => {

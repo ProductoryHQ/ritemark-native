@@ -5,7 +5,7 @@ import { strict as assert } from 'node:assert';
 import { parseDeck, parseSlideBody } from './deckFormat';
 import {
   appendPart, folderOf, newTopicText, normalizePath, partText, projectPath, rebasePath, rebaseSlide,
-  foldMarkdown, insertPartsText, replaceSlidePart, rewriteMarkdownTargets, slideStamp, slidesOfText,
+  foldMarkdown, insertPartsText, replaceSlidePart, rewriteMarkdownTargets, slideStamp, slideStamps, slidesOfText,
 } from './deckLibraryFormat';
 
 // Paths.
@@ -91,6 +91,12 @@ assert.equal(
   assert.equal(slideStamp('boxes', data, 'Four parts\n---\n\nText.', 'Slide library'), base, 'a setext heading too');
   assert.notEqual(slideStamp('boxes', data, '## Four parts\n\nOther text.', 'Slide library'), base, 'the text under it still counts');
   assert.notEqual(slideStamp('boxes', data, '### Smaller\n\nText.', 'Slide library'), base, 'an H3 is text, not the part\'s heading');
+  // A from: line written before this counted the heading: that stamp still names the slide as it was.
+  const legacy = slideStamps('boxes', data, '## Four parts\n\nText.', 'Slide library');
+  assert.equal(legacy.length, 2);
+  assert.equal(legacy[0], base);
+  assert.notEqual(legacy[1], base);
+  assert.deepEqual(slideStamps('boxes', data, 'Text.', 'Slide library'), [base], 'no heading: one stamp');
 }
 
 

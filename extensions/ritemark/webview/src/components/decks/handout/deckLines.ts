@@ -5,12 +5,14 @@
  * `---`, or Divider from the / menu — becomes a slide there, in the same step, so one Undo takes it back:
  *
  *  - the new slide is a Statement with a new id, waiting for its layout (Jarmo, 15 November: "las ootab");
- *  - the heading right after the line becomes its title, once, as it is made; after that the two never change each other;
- *  - with no heading after the line, the new part opens with an empty H2 and the caret goes there.
+ *  - the heading right after the line (an H1 or H2, the part's own) becomes its title, once, as it is made; after that
+ *    the two never change each other;
+ *  - with no such heading after the line, the new part opens with an empty H2 and the caret goes there.
  *
  * A line inside a list, a quote or any other block stays a line, and so does a line that arrives by paste or drop
- * (pasted text with lines in it isn't turned into slides in this cut), by undo or redo, or from the host. A slide
- * block is never saved as a line: it is the slide block that marks a new slide in the file.
+ * (pasted text with lines in it isn't turned into slides in this cut), by undo or redo, from the host, or from a
+ * tool's insert or replace (more than one line at once, or one away from the caret). A slide block is never saved as a
+ * line: it is the slide block that marks a new slide in the file.
  */
 import { Extension } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
@@ -27,57 +29,74 @@ export const LINE_SLIDE_KIND = 'statement'
 /** A line typed on an empty line of its own: `***`, `---` or `___`. */
 const LINE_TEXT = /^(?:\*{3,}|-{3,}|_{3,})$/
 
-/** Did this transaction come from a paste or a drop (whose lines stay lines in this cut)? */
+/** Did this transaction come from a paste or a drop (whose lines stay lines in this cut), or replace the content
+ *  without an update (`setContent`, a tool's)? */
 function pastedOrDropped(tr: Transaction): boolean {
   const event = tr.getMeta('uiEvent')
-  return tr.getMeta('paste') === true || event === 'paste' || event === 'drop'
+  return tr.getMeta('paste') === true || event === 'paste' || event === 'drop' || tr.getMeta('preventUpdate') === true
+}
+
+/** A heading that can be a part's own: an H1 or an H2. */
+function isPartHeading(node: PMNode | null | undefined): node is PMNode {
+  return !!node && node.type.name === 'heading' && node.attrs.level <= 2
 }
 
 /**
- * The slides made from the lines the person just put in at the top level, as one transaction on `state`; null when
- * there are none. `before` is the document before the person's transactions: a line that was there already (written
- * in the file, say) stays a line.
+ * The slide made from the line the person just put in at the top level, as one transaction on `state`; null when
+ * there is none. `before` is the document before the person's transactions: a line that was anywhere in it already
+ * (written in the file, or lifted out of a quote or a list) stays a line. Only one new line, with the caret in the block
+ * right after it, is the person's: that is what typing `***`, `---` or Divider leaves. Several lines at once, or one
+ * away from the caret, came from somewhere else (a tool's insert, a replace) and stay lines.
  */
 export function slidesFromLines(before: PMNode, state: EditorState, random: () => number = Math.random): Transaction | null {
   const slideType = state.schema.nodes.deckSlide
   if (!slideType) return null
   const kept = new Set<PMNode>()
-  before.forEach(node => kept.add(node))
-  const lines: number[] = []
-  state.doc.forEach((node, pos) => {
-    if (node.type.name === 'horizontalRule' && !kept.has(node)) lines.push(pos)
+  before.descendants(node => {
+    if (node.type.name === 'horizontalRule') kept.add(node)
+    return !node.isTextblock
   })
-  if (lines.length === 0) return null
+  const lines: Array<{ pos: number; index: number }> = []
+  state.doc.forEach((node, pos, index) => {
+    if (node.type.name === 'horizontalRule' && !kept.has(node)) lines.push({ pos, index })
+  })
+  if (lines.length !== 1) return null
+  const [{ pos: at, index }] = lines
+  if (state.selection.$from.index(0) !== index + 1) return null
+
   const taken: string[] = []
   state.doc.forEach(node => {
     const id = isSlideNode(node) ? slideDataOf(node.attrs.body).id : undefined
     if (id) taken.push(id)
   })
   const tr = state.tr
-  let caret: number | null = null
-  // From the last line to the first, so the earlier lines' positions still hold.
-  for (const at of [...lines].reverse()) {
-    const next = tr.doc.nodeAt(at + 1)
-    const heading = next && next.type.name === 'heading' ? next : null
-    const title = heading ? heading.textContent.trim() : ''
-    const id = newId(taken, random)
-    taken.push(id)
-    const body = writeSlideBody('', title ? { id, title } : { id })
-    tr.replaceWith(at, at + 1, slideType.create({ kind: LINE_SLIDE_KIND, body, notes: null }))
-    if (heading) continue
-    // No heading after the line: the new part opens with an empty one, for the person to write.
-    const after = at + 1
-    const following = tr.doc.nodeAt(after)
-    const empty = emptyPartHeading(state, LINE_SLIDE_KIND)
-    if (!empty) continue
-    if (following && following.type.name === 'paragraph' && following.childCount === 0) {
-      tr.setNodeMarkup(after, empty.type, empty.attrs)
-    } else {
-      tr.insert(after, empty)
-    }
-    if (caret === null) caret = after + 1
+  // The heading right under the line is the new part's, and the slide's title, once. Typing `***` on an empty line over
+  // a heading leaves an empty paragraph between them: it goes.
+  let next = tr.doc.nodeAt(at + 1)
+  const after = next ? tr.doc.nodeAt(at + 1 + next.nodeSize) : null
+  if (next && next.type.name === 'paragraph' && next.childCount === 0 && isPartHeading(after)) {
+    tr.delete(at + 1, at + 1 + next.nodeSize)
+    next = tr.doc.nodeAt(at + 1)
   }
-  if (caret !== null) tr.setSelection(TextSelection.create(tr.doc, caret))
+  const heading = isPartHeading(next) ? next : null
+  const title = heading ? heading.textContent.trim() : ''
+  const id = newId(taken, random)
+  const body = writeSlideBody('', title ? { id, title } : { id })
+  tr.replaceWith(at, at + 1, slideType.create({ kind: LINE_SLIDE_KIND, body, notes: null }))
+  const start = at + 1
+  if (heading) {
+    // The caret at the end of the heading, ready to go on into the text.
+    tr.setSelection(TextSelection.create(tr.doc, start + heading.nodeSize - 1))
+    return tr.setMeta(DECK_OPERATION, true)
+  }
+  // No heading under the line: the new part opens with an empty one, for the person to write, and the caret goes there.
+  const empty = emptyPartHeading(state, LINE_SLIDE_KIND)
+  if (empty) {
+    const following = tr.doc.nodeAt(start)
+    if (following && following.type.name === 'paragraph' && following.childCount === 0) tr.setNodeMarkup(start, empty.type, empty.attrs)
+    else tr.insert(start, empty)
+    tr.setSelection(TextSelection.create(tr.doc, start + 1))
+  }
   return tr.setMeta(DECK_OPERATION, true)
 }
 
@@ -107,7 +126,11 @@ export const DeckLines = Extension.create({
         if (!state.schema.nodes.horizontalRule) return false
         const from = $from.before()
         return editor.chain().command(({ tr }) => {
+          // The line, then the caret in the block after it (a new paragraph at the end), as the `*** ` rule leaves it.
           tr.replaceWith(from, from + $from.parent.nodeSize, state.schema.nodes.horizontalRule.create())
+          const after = from + 1
+          if (!tr.doc.nodeAt(after)?.isTextblock) tr.insert(after, state.schema.nodes.paragraph.create())
+          tr.setSelection(TextSelection.create(tr.doc, after + 1))
           return true
         }).run()
       },

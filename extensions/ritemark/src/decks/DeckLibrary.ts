@@ -9,7 +9,7 @@
  */
 import { deckVersionOf, isReadableDeckVersion, newId, parseFrom, parseSlideBody, withPartHeading, writeFrom, writeSlideBody, type SlideData } from './deckFormat';
 import {
-  appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp,
+  appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp, slideStamps,
   slidesOfText, type DeckSlideText,
 } from './deckLibraryFormat';
 import { BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT } from './deckTheme';
@@ -224,15 +224,16 @@ export class DeckLibrary {
       if (!source) continue;
       if (!cache.has(source.path)) cache.set(source.path, await this.readDeck(source.path));
       const slide = cache.get(source.path)?.find(entry => entry.data.id === source.id);
-      const copyStamp = slideStamp(copy.kind, parseSlideBody(copy.body), copy.handout, folder);
-      const sourceStamp = slide ? slideStamp(slide.kind, slide.data, slide.handout, folderOf(source.path)) : null;
+      // A from: line written before 16 November counted the part's heading: either stamp is the slide as it was.
+      const copyStamps = slideStamps(copy.kind, parseSlideBody(copy.body), copy.handout, folder);
+      const sourceStamps = slide ? slideStamps(slide.kind, slide.data, slide.handout, folderOf(source.path)) : null;
       states.push({
         id: copy.id,
         library: isTopicPath(source.path),
         sourceName: deckName(source.path),
         sourcePath: source.path,
-        changed: source.stamp !== null && copyStamp !== source.stamp,
-        newer: sourceStamp !== null && source.stamp !== null && sourceStamp !== source.stamp,
+        changed: source.stamp !== null && !copyStamps.includes(source.stamp),
+        newer: sourceStamps !== null && source.stamp !== null && !sourceStamps.includes(source.stamp),
         missing: !slide,
       });
     }

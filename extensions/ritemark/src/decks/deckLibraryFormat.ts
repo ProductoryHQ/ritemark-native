@@ -144,8 +144,22 @@ export function foldMarkdown(text: string): string {
  * from a topic written before headings, keeps its source's stamp.
  */
 export function slideStamp(kind: string, data: SlideData, handout: string, folder: string): string {
+  return stampOf(kind, data, handoutWithoutHeading(handout), folder);
+}
+
+/**
+ * The stamps a `from:` line may hold for this slide: today's, and for a handout that opens with a heading, the stamp a
+ * copy made before 16 November got (its heading counted then). A copy or a source matching either is as it was.
+ */
+export function slideStamps(kind: string, data: SlideData, handout: string, folder: string): string[] {
+  const now = slideStamp(kind, data, handout, folder);
+  const before = stampOf(kind, data, handout, folder);
+  return before === now ? [now] : [now, before];
+}
+
+function stampOf(kind: string, data: SlideData, handout: string, folder: string): string {
   const image = data.image ? projectPath(data.image, folder) ?? data.image : '';
-  const resolvedHandout = rewriteMarkdownTargets(handoutWithoutHeading(handout), target => projectPath(target, folder) ?? target);
+  const resolvedHandout = rewriteMarkdownTargets(handout, target => projectPath(target, folder) ?? target);
   const parts = [
     kind,
     fold(data.title), fold(data.subtitle), fold(data.number), data.look ?? '', data.picture ?? '', image,

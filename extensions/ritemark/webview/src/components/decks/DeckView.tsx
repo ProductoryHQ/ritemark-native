@@ -26,7 +26,7 @@ import type { DocumentProperties } from '../properties'
 import { SegmentedControl } from '../ui/segmented-control'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
-import { DECK_DERIVED, DEFAULT_RATIO, RATIO_MAX, RATIO_MIN, initialRatio, isRealChange, deleteSlide, derivedHeadings, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
+import { DECK_DERIVED, DEFAULT_RATIO, RATIO_MAX, RATIO_MIN, initialRatio, deleteSlide, derivedHeadings, partHeadingAt, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
 import { StartCard } from './StartCard'
 import { deckStarted, startCardRows, type StartCardState } from '../../../../src/decks/startCard'
 import { DOMParser as PMDOMParser, Fragment, type Node as PMNode } from '@tiptap/pm/model'
@@ -45,13 +45,14 @@ import { DeckGuard } from './handout/deckGuard'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
 import { DeckLines } from './handout/deckLines'
+import { DeckDrawnHeadings } from './handout/drawnHeadings'
 import { Stage } from './Stage'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
 import './decks.css'
 
 /** The deck's extensions, made once: the editor's extension list is fixed at mount. */
-const DECK_EXTENSIONS = [DeckSlideWithPartHead, DeckGuard, DeckCurrent, DeckLines]
+const DECK_EXTENSIONS = [DeckSlideWithPartHead, DeckGuard, DeckCurrent, DeckLines, DeckDrawnHeadings]
 
 /** The strip's width (the prototype's 132). */
 const STRIP_WIDTH = 132
@@ -237,36 +238,22 @@ export function DeckView({
     onEditorReady(instance)
   }, [onEditorReady])
 
-  // An older deck's part headings, drawn from its slides' titles (16 November): put in after the document arrives and
-  // after every host update, never as an edit. Opening a deck writes nothing: while the document differs from the file
-  // only by these headings, a change the editor reports is no change and isn't passed on. The person's first real edit
-  // is, and the headings go into the file with it, as ordinary text from then on.
-  const derivedOnly = useRef<string | null>(null)
-  const onChangeRef = useRef(onChange)
-  onChangeRef.current = onChange
-  const handleChange = useCallback((markdown: string) => {
-    if (!isRealChange(derivedOnly.current, markdown)) return
-    derivedOnly.current = null
-    onChangeRef.current(markdown)
-  }, [])
+  // The headings of parts without their own (every part of an older deck), drawn from the slides' titles (16
+  // November): put in after the document arrives and after every host update, never as an edit, and never saved until
+  // the person's first edit of the handout writes them (handout/drawnHeadings.ts). Opening a deck writes nothing.
   useEffect(() => {
     if (!editor) return
     let queued = false
-    const derive = () => {
+    const draw = () => {
       queued = false
       if (editor.isDestroyed) return
       const tr = derivedHeadings(editor.state)
-      if (!tr) return
-      const before = editorHTMLToMarkdown(editor.getHTML())
-      editor.view.dispatch(tr)
-      const after = editorHTMLToMarkdown(editor.getHTML())
-      // Headings with words change the Markdown; empty ones (a new deck's) don't, and nothing waits for an edit.
-      if (after !== before) derivedOnly.current = after
+      if (tr) editor.view.dispatch(tr)
     }
     const later = () => {
       if (queued) return
       queued = true
-      queueMicrotask(derive)
+      queueMicrotask(draw)
     }
     // The document as it arrives, and again as the host replaces it (its updates never come from the person).
     const onTransaction = ({ transaction }: { transaction: Transaction }) => {
@@ -842,7 +829,12 @@ export function DeckView({
         const entry = id ? slideById(id) : null
         if (!id || !entry || !isNewPart(message)) return
         const previous = partContent(editor.state.doc, entry.index)
-        const content = partsFragment(editor, [{ kind: message.kind, body: message.body, handout: message.handout, notes: entry.notes }], imageMappings)
+        const fetched = partsFragment(editor, [{ kind: message.kind, body: message.body, handout: message.handout, notes: entry.notes }], imageMappings)
+        // The part's heading is the handout's own, not the slide's (16 November): the copy keeps the one it has.
+        const own = partHeadingAt(editor.state.doc, entry.pos)
+        const content = fetched && own && !own.node.attrs.deckDrawn && fetched.childCount > 1 && fetched.child(1).type.name === 'heading'
+          ? fetched.replaceChild(1, own.node)
+          : fetched
         if (!previous || !content || !dispatch(replacePart(editor.state, entry.index, content))) {
           setNotice({ text: "The library's version could not be put in." })
           return
@@ -1075,7 +1067,7 @@ export function DeckView({
           {findBar}
           <Editor
             value={content}
-            onChange={handleChange}
+            onChange={onChange}
             onSelectionChange={onSelectionChange}
             onEditorReady={handleEditorReady}
             placeholder="Write here. *** starts a new slide."

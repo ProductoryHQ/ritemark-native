@@ -664,10 +664,32 @@ export interface PartHeading {
 export function partHeadingOf(handout: string): PartHeading | null {
   const atx = /^(?:[ \t]*\r?\n)*[ ]{0,3}(#{1,2})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*(?:\r?\n|$)/.exec(handout);
   if (atx) return { level: atx[1].length as 1 | 2, text: (atx[2] ?? '').trim(), end: atx[0].length };
-  const setext = /^(?:[ \t]*\r?\n)*[ ]{0,3}(\S[^\n]*?)[ \t]*\r?\n[ ]{0,3}(=+|-+)[ \t]*(?:\r?\n|$)/.exec(handout);
-  // A setext heading's text is one line that isn't a block of its own (a list item, a quote, a fence, a table row).
-  if (setext && !/^(?:[-*+>|#]|\d+[.)]|`{3}|~{3})/.test(setext[1])) {
-    return { level: setext[2].startsWith('=') ? 1 : 2, text: setext[1].trim(), end: setext[0].length };
+  return setextHeadingOf(handout);
+}
+
+/** A line that starts a block of its own, so it can't be a setext heading's text: a list item, a quote, a fence, a table. */
+const BLOCK_START = /^[ ]{0,3}(?:[-*+][ \t]|\d{1,9}[.)](?:[ \t]|$)|>|#|`{3}|~{3}|\|)/;
+
+/**
+ * A setext heading as the handout's first block, as CommonMark (and `marked`, the editor's and the page's reader) reads
+ * one: a paragraph of one or more lines, then a line of `=` (H1) or `-` (H2). Its text is the lines joined by spaces.
+ */
+function setextHeadingOf(handout: string): PartHeading | null {
+  const lines = handout.split('\n');
+  let index = 0;
+  while (index < lines.length && lines[index].trim() === '') index++;
+  const text: string[] = [];
+  for (; index < lines.length; index++) {
+    const line = lines[index].replace(/\r$/, '');
+    if (line.trim() === '') return null;
+    const underline = /^[ ]{0,3}(=+|-+)[ \t]*$/.exec(line);
+    if (underline && text.length > 0) {
+      // Its lines end after the underline's line break (the blank lines before it included).
+      const end = lines.slice(0, index + 1).reduce((sum, next) => sum + next.length + 1, 0);
+      return { level: underline[1].startsWith('=') ? 1 : 2, text: text.join(' '), end: Math.min(handout.length, end) };
+    }
+    if (BLOCK_START.test(line) || /^[ ]{4}/.test(line) || /^[ ]{0,3}(?:\*[ \t]*){3,}$/.test(line)) return null;
+    text.push(line.trim());
   }
   return null;
 }

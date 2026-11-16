@@ -45,11 +45,12 @@ function posOf(doc: PMNode, index: number): number {
   return pos
 }
 
-/** The input rule's own step: the paragraph it was typed in becomes a line with an empty paragraph after it. */
+/** The input rule's own step: a line before the paragraph it was typed in, which is left empty with the caret in it. */
 function typeLine(state: EditorState, blockIndex: number): EditorState {
   const from = posOf(state.doc, blockIndex)
   const to = from + state.doc.child(blockIndex).nodeSize
-  return state.apply(state.tr.replaceWith(from, to, [line(), paragraph('')]))
+  const tr = state.tr.replaceWith(from, to, [line(), paragraph('')])
+  return state.apply(tr.setSelection(TextSelection.create(tr.doc, from + 2)))
 }
 
 const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.'), paragraph('---'), paragraph('Still in one.')]
@@ -91,8 +92,8 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
 // heading; the slide block's bytes stay.
 {
   const state = stateOf([slide('aaaa', 'One'), heading(2, 'One'), paragraph('Words.'), paragraph('***'), heading(2, 'Two'), paragraph('More.')])
-  const from = posOf(state.doc, 3)
-  const next = state.apply(state.tr.replaceWith(from, from + state.doc.child(3).nodeSize, line()))
+  // `***` typed on the empty line over the heading: the rule leaves an empty paragraph between, which goes.
+  const next = typeLine(state, 3)
   const made = slides(next.doc)
   assert.equal(made.length, 2)
   assert.equal(parseSlideBody(made[1].attrs.body).title, 'Two', 'the heading after the line is its title')
@@ -117,6 +118,37 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
   assert.equal(slides(inCode.doc).length, 1, 'a line in a code block is its text')
   const pasted = state.apply(state.tr.insert(end, [line(), paragraph('pasted')]).setMeta('paste', true).setMeta('uiEvent', 'paste'))
   assert.equal(slides(pasted.doc).length, 1, 'a pasted line stays a line in this cut')
+}
+
+// Only an H1 or H2 under the line is the part's heading, and the title: an H3 stays a heading in the text, and the new
+// part opens with an empty H2 over it.
+{
+  const state = stateOf([slide('aaaa', 'One'), heading(2, 'One'), paragraph('---'), heading(3, 'Smaller'), paragraph('x')])
+  const next = typeLine(state, 2)
+  const made = slides(next.doc)
+  assert.equal(made.length, 2)
+  assert.equal(parseSlideBody(made[1].attrs.body).title, undefined, 'an H3 is no title')
+  const names: string[] = []
+  next.doc.forEach(node => names.push(node.type.name === 'heading' ? `h${node.attrs.level}` : node.type.name))
+  assert.deepEqual(names, ['deckSlide', 'h2', 'deckSlide', 'h2', 'h3', 'paragraph'])
+}
+
+// Lines from somewhere else stay lines: two at once (a tool's insert), one away from the caret, one lifted out of a quote.
+{
+  const state = stateOf([slide('aaaa', 'One'), heading(2, 'One'), paragraph('x')])
+  const end = state.doc.content.size
+  const two = state.tr.insert(end, [line(), paragraph('a'), line(), paragraph('b')])
+  assert.equal(slides(state.apply(two.setSelection(TextSelection.create(two.doc, two.doc.content.size - 1))).doc).length, 1, 'two lines at once stay lines')
+  const away = state.tr.insert(end, [line(), paragraph('a')])
+  assert.equal(slides(state.apply(away.setSelection(TextSelection.create(away.doc, 1 + state.doc.child(0).nodeSize))).doc).length, 1, 'a line away from the caret stays a line')
+  const quoted = stateOf([slide('aaaa', 'One'), heading(2, 'One'), schema.nodes.blockquote.create(null, [paragraph('q'), line(), paragraph('after')])])
+  let quotePos = -1
+  quoted.doc.forEach((node, pos) => { if (node.type.name === 'blockquote') quotePos = pos })
+  const quote = quoted.doc.nodeAt(quotePos)!
+  // The quote taken away, its blocks lifted to the top level (the same line node, now at the top).
+  const lifted = quoted.tr.replaceWith(quotePos, quotePos + quote.nodeSize, quote.content)
+  const liftedState = quoted.apply(lifted.setSelection(TextSelection.create(lifted.doc, lifted.doc.content.size - 1)))
+  assert.equal(slides(liftedState.doc).length, 1, 'a line already in the file stays a line when lifted out of a quote')
 }
 
 // A line already in the file stays a line when the person types elsewhere.

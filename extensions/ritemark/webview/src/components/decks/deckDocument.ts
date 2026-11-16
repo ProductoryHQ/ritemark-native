@@ -114,8 +114,9 @@ export function partHeadingAt(doc: PMNode, slidePos: number): { node: PMNode; po
  * their slides' titles: an H1 for a section, an H2 for every other kind, and an empty paragraph under a heading that
  * has nothing under it, for the part's words. Null when every part has its heading.
  *
- * The transaction is no edit (`DECK_DERIVED`, out of the history, no update): opening a deck writes nothing. The
- * headings reach the file with the person's first real edit, as ordinary text from then on.
+ * The transaction is no edit (`DECK_DERIVED`, out of the history, no update), and the headings are marked as drawn
+ * (`handout/drawnHeadings.ts`): the save leaves them out, so opening a deck writes nothing. They reach the file with the
+ * person's first edit of the handout, as ordinary text from then on.
  */
 export function derivedHeadings(state: EditorState): Transaction | null {
   const { doc, schema } = state
@@ -128,7 +129,9 @@ export function derivedHeadings(state: EditorState): Transaction | null {
     if (partHeadingAt(doc, slide.pos)) continue
     const after = slide.pos + slide.node.nodeSize
     const text = derivedHeading(slide.data)
-    const heading = schema.nodes.heading.create({ level: partHeadingLevel(slide.kind) }, text ? schema.text(text) : null)
+    // Marked as drawn where the deck's schema has the mark (the deck view's always does).
+    const drawn = schema.nodes.heading.spec.attrs?.deckDrawn ? { deckDrawn: true } : {}
+    const heading = schema.nodes.heading.create({ level: partHeadingLevel(slide.kind), ...drawn }, text ? schema.text(text) : null)
     const next = doc.nodeAt(after)
     const nodes = [heading]
     if (!next || isSlideNode(next)) nodes.push(schema.nodes.paragraph.create())
@@ -136,15 +139,6 @@ export function derivedHeadings(state: EditorState): Transaction | null {
   }
   if (!tr.docChanged) return null
   return tr.setMeta(DECK_DERIVED, true).setMeta('addToHistory', false).setMeta('preventUpdate', true)
-}
-
-/**
- * Is a change the editor reports a real one? Not while the document differs from the file only by an older deck's drawn
- * headings (`drawnOnly` is the Markdown right after they were drawn): opening a deck writes nothing, whatever the editor
- * reports meanwhile. Any other Markdown is the person's first real edit, and the headings go with it.
- */
-export function isRealChange(drawnOnly: string | null, markdown: string): boolean {
-  return drawnOnly === null || markdown !== drawnOnly
 }
 
 /** The empty heading a new part opens with, for its kind. */
@@ -159,13 +153,13 @@ export function emptyPartHeading(state: EditorState, kind: string): PMNode | nul
  */
 export function handoutHasText(doc: PMNode): boolean {
   let found = false
-  const headings = new Set<PMNode>()
-  for (const slide of slidesOf(doc)) {
-    const heading = partHeadingAt(doc, slide.pos)
-    if (heading) headings.add(heading.node)
-  }
+  // Right after a slide node, until the part's first block that isn't an empty paragraph: where its heading may stand.
+  let headingMayFollow = false
   doc.forEach(node => {
-    if (found || isSlideNode(node) || headings.has(node)) return
+    if (found) return
+    if (isSlideNode(node)) { headingMayFollow = true; return }
+    if (headingMayFollow && node.type.name === 'heading' && node.attrs.level <= 2) { headingMayFollow = false; return }
+    if (!isEmptyParagraph(node)) headingMayFollow = false
     if (node.type.name !== 'paragraph') { found = true; return }
     node.forEach(child => {
       if (child.isText ? !!child.text?.trim() : child.type.name !== 'hardBreak') found = true

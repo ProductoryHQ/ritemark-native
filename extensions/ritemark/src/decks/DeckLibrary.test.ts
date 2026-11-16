@@ -3,7 +3,7 @@
  */
 import { strict as assert } from 'node:assert';
 import { parseFrom, parseSlideBody } from './deckFormat';
-import { slidesOfText } from './deckLibraryFormat';
+import { slideStamps, slidesOfText } from './deckLibraryFormat';
 import { DeckLibrary, isTopicPath, type DeckFiles } from './DeckLibrary';
 
 function project(files: Record<string, string>): DeckFiles & { files: Record<string, string> } {
@@ -109,6 +109,12 @@ async function run() {
   assert.equal(harbour[0].handout, '## Assistant or agent?\n\nAn agent is given a goal.');
   const insertedStates = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: harbour[0].data.id!, from: harbour[0].data.from!, kind: harbour[0].kind, body: harbour[0].body, handout: harbour[0].handout }]);
   assert.equal(insertedStates[0].changed, false, 'a copy with its heading written is not changed');
+  // A copy made before 16 November of a source whose handout opens with a heading: its from: stamp counted the heading,
+  // and the copy and the source, both untouched, are still as they were.
+  files.files['Slide library/Headed.deck.md'] = '---\ndeck: 1\n---\n\n```slide statement\nid: h1\ntitle: Headed\n```\n\n## Headed\n\nWords.\n';
+  const oldStamp = slideStamps('statement', { id: 'h1', title: 'Headed' }, '## Headed\n\nWords.', 'Slide library')[1];
+  const legacyStates = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: 'c9', from: `Slide library/Headed.deck.md#h1 @${oldStamp}`, kind: 'statement', body: 'id: c9\ntitle: Headed', handout: '## Headed\n\nWords.' }]);
+  assert.deepEqual([legacyStates[0].changed, legacyStates[0].newer], [false, false], 'an older from: stamp still matches');
   let viewed: { count: number; afterIndex: number } | null = null;
   const beforeView = files.files['Clients/Harbour/Harbour.deck.md'];
   const viaView = await library.insertCopies('Slide library/AI assistants.deck.md', ['a1', 'a2'], 'Clients/Harbour/Harbour.deck.md', 99, async (parts, afterIndex) => {

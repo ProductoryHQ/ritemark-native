@@ -14,18 +14,20 @@ import { fileURLToPath } from 'node:url'
 import { createDocument } from '@mixmark-io/domino'
 import { getSchema } from '@tiptap/core'
 import { DOMParser as PMDOMParser, DOMSerializer, type Node as PMNode } from '@tiptap/pm/model'
-import { EditorState } from '@tiptap/pm/state'
+import { EditorState, Plugin, type Transaction } from '@tiptap/pm/state'
+import { history, undo } from '@tiptap/pm/history'
 import { canonicalMarkdownProjection } from '../../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync/frontMatter'
 import { parseSlideBody, writeSlideBody } from '../../../../../src/decks/deckFormat'
 import { createEditorSchemaExtensions, ensureCommentMarkedPipeline, markdownToEditorHTML } from '../../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../../utils/markdownFidelity'
 import { DeckSlide } from './deckSchema'
-import { DECK_DERIVED, derivedHeadings, isRealChange } from '../deckDocument'
+import { DECK_DERIVED, derivedHeadings } from '../deckDocument'
+import { DeckDrawnHeadings, drawnHeadingsFollow } from './drawnHeadings'
 
 installTestDocument()
 ensureCommentMarkedPipeline()
-const schema = getSchema(createEditorSchemaExtensions({ commentCallouts: true, deck: [DeckSlide] }))
+const schema = getSchema(createEditorSchemaExtensions({ commentCallouts: true, deck: [DeckSlide, DeckDrawnHeadings] }))
 
 function elementFromString(html: string): HTMLElement {
   const body = createDocument(`<body>${html}</body>`).body as unknown as HTMLElement
@@ -184,8 +186,9 @@ const blocksOf = (text: string) => text.match(/```slide[\s\S]*?\n```/g) ?? []
   assert.deepEqual(changed, ['title: The four parts of an assistant'], 'only the title line: the handout and its heading stay')
 }
 
-// An older deck (no part headings): opening draws them from the slides' titles (H1 for a section, H2 otherwise) and
-// writes nothing; a change that is only those headings is no change; the first real edit writes them.
+// An older deck (parts without their own headings): opening draws them from the slides' titles (H1 for a section, H2
+// otherwise) and saves none of them; a slide edit alone saves without them, its drawn heading following the title; the
+// first edit of the handout writes them all, and Undo takes that step back whole.
 {
   const older = [
     '```slide title', 'id: t0a1', 'title: AI assistants and agents', '```', '',
@@ -197,7 +200,8 @@ const blocksOf = (text: string) => text.match(/```slide[\s\S]*?\n```/g) ?? []
   ].join('\n')
   const { doc, save } = open(older)
   assert.equal(save(doc), older, 'opened: byte for byte')
-  const state = EditorState.create({ doc })
+  const plugins = [history(), new Plugin({ appendTransaction: (trs, _old, next) => drawnHeadingsFollow(trs, next) })]
+  const state = EditorState.create({ doc, plugins })
   const tr = derivedHeadings(state)!
   assert.ok(tr, 'the older deck gets its headings drawn')
   assert.equal(tr.getMeta(DECK_DERIVED), true)
@@ -205,26 +209,40 @@ const blocksOf = (text: string) => text.match(/```slide[\s\S]*?\n```/g) ?? []
   assert.equal(tr.getMeta('preventUpdate'), true, 'never an update the editor publishes')
   const drawn = state.apply(tr)
   assert.equal(derivedHeadings(drawn), null, 'drawn once: every part has its heading now')
-  const headings: string[] = []
-  drawn.doc.forEach(node => { if (node.type.name === 'heading') headings.push(`h${node.attrs.level} ${node.textContent}`) })
+  const headings = (next: PMNode) => {
+    const found: string[] = []
+    next.forEach(node => { if (node.type.name === 'heading') found.push(`h${node.attrs.level}${node.attrs.deckDrawn ? ' drawn' : ''} ${node.textContent}`) })
+    return found
+  }
   // The first part opens with its own "Welcome": no heading is drawn over it.
-  assert.deepEqual(headings, ['h2 Welcome', 'h1 Why agents?', 'h2 Agents *really* act'])
-  const drawnMarkdown = editorMarkdown(drawn.doc)
-  // Opening writes nothing: what the editor reports while only the drawn headings differ is no change.
-  assert.equal(isRealChange(drawnMarkdown, drawnMarkdown), false, 'the drawn headings alone are no change')
-  assert.equal(isRealChange(null, editorMarkdown(doc)), true)
-  // The first real edit writes them, as ordinary text.
+  assert.deepEqual(headings(drawn.doc), ['h2 Welcome', 'h1 drawn Why agents?', 'h2 drawn Agents *really* act'])
+  assert.equal(save(drawn.doc), older, 'opening writes nothing: drawn headings are never saved')
+
+  // A slide edit alone (its title on the stage): saved without the drawn headings, and the part's drawn heading follows.
+  let slideAt = -1
+  drawn.doc.forEach((node, offset) => { if (node.type.name === 'deckSlide' && node.attrs.kind === 'section') slideAt = offset })
+  const slideNode = drawn.doc.nodeAt(slideAt)!
+  const retitled = drawn.apply(drawn.tr.setNodeMarkup(slideAt, undefined, { ...slideNode.attrs, body: writeSlideBody(slideNode.attrs.body, { ...parseSlideBody(slideNode.attrs.body), title: 'Why agents now?' }) }))
+  assert.deepEqual(headings(retitled.doc), ['h2 Welcome', 'h1 drawn Why agents now?', 'h2 drawn Agents *really* act'], 'a drawn heading is its slide\'s title')
+  const retitledText = save(retitled.doc)
+  assert.equal(retitledText, older.replace('title: Why agents?', 'title: Why agents now?'), 'and the save is the title line alone')
+
+  // The first real edit of the handout writes them, as ordinary text.
   let end = -1
-  drawn.doc.forEach((node, offset) => { if (node.type.name === 'paragraph' && node.textContent === 'An agent is given a goal.') end = offset + node.nodeSize - 1 })
-  const edited = drawn.apply(drawn.tr.insertText(' It acts.', end))
-  const markdown = editorMarkdown(edited.doc)
-  assert.equal(isRealChange(drawnMarkdown, markdown), true, 'a real edit is a change')
+  retitled.doc.forEach((node, offset) => { if (node.type.name === 'paragraph' && node.textContent === 'An agent is given a goal.') end = offset + node.nodeSize - 1 })
+  const edited = retitled.apply(retitled.tr.insertText(' It acts.', end))
+  assert.deepEqual(headings(edited.doc), ['h2 Welcome', 'h1 Why agents now?', 'h2 Agents *really* act'], 'written: no longer drawn')
   const written = save(edited.doc)
-  assert.ok(written.includes('```slide section\nid: s001\ntitle: Why agents?\n```\n\n# Why agents?\n\n'), 'a section part: its H1')
+  assert.ok(written.includes('```slide section\nid: s001\ntitle: Why agents now?\n```\n\n# Why agents now?\n\n'), 'a section part: its H1')
   assert.ok(written.includes('```\n\n## Agents \\*really\\* act\n\nAn agent is given a goal. It acts.'), 'another part: its H2, escaped as Markdown')
   assert.ok(written.includes('## Welcome\n\nEverything you need today.'), 'a part with its own heading keeps it, and gets no second one')
-  assert.deepEqual(blocksOf(written), blocksOf(older), 'and every slide block is as it was')
-  // Reopened, the headings are the file's: nothing more is drawn.
+  assert.deepEqual(blocksOf(written), blocksOf(retitledText), 'and every slide block is as it was')
+  // Undo takes the edit back with the headings it wrote: drawn again, and the save is the file before it.
+  let undone: EditorState = edited
+  undo(edited, (step: Transaction) => { undone = edited.apply(step) })
+  assert.deepEqual(headings(undone.doc), ['h2 Welcome', 'h1 drawn Why agents now?', 'h2 drawn Agents *really* act'])
+  assert.equal(save(undone.doc), retitledText)
+  // Reopened after the edit, the headings are the file's: nothing more is drawn.
   const reopened = open(written)
   assert.equal(derivedHeadings(EditorState.create({ doc: reopened.doc })), null)
   assert.equal(reopened.save(reopened.doc), written)
