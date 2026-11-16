@@ -40,6 +40,7 @@ import {
 import { ALIAS_LABEL, type CommentAgentAlias } from '../../extensions/comment/commentModel'
 import type { CommentTaskError } from '../../../../src/commentTasks/protocol'
 import { onDocChanged } from '../../lib/docChange'
+import { useDismissOnOutside } from '../../lib/dismissOnOutside'
 import { Tooltip } from '../ui/tooltip'
 
 type GroupStates = Partial<Record<CommentAgentAlias, GroupSendState>>
@@ -80,19 +81,14 @@ export function CommentsMenuButton({ getEditor }: { getEditor: () => TipTapEdito
     return () => { disposed = true; window.clearTimeout(timer); offDocChanged?.() }
   }, [getEditor, recompute])
 
-  // Click-away closes the popover.
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        // Send results describe one dispatch; reopening the menu should not
-        // replay them. The task's own state lives on the comment from here on.
-        setOpen(false); setConfirming(false); setGroupStates({})
-      }
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [open])
+  // A press outside the popover closes it, and Esc does, with the focus back on
+  // the button (the shared rule, `lib/dismissOnOutside`). Send results describe
+  // one dispatch; reopening the menu should not replay them. The task's own
+  // state lives on the comment from here on.
+  useDismissOnOutside(rootRef, () => { setOpen(false); setConfirming(false); setGroupStates({}) }, {
+    enabled: open,
+    trigger: () => rootRef.current?.querySelector<HTMLElement>('button'),
+  })
 
   // The destination caption (D5): the conversation open in the AI sidebar. It
   // is a caption, not a choice — there is no picker and no confirmation.

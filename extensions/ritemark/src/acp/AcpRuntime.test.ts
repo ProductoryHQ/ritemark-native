@@ -560,6 +560,17 @@ async function run() {
     console.log('✓ Test 9: buildAcpPromptText — context prefix, order, image count');
   }
 
+  // ── 17 November: a deck's current slide follows the active file; a Text document has none ──
+  {
+    const slide = { deck: 'Training', count: 13, slides: [{ number: 5, id: 'k3f9', title: 'Agenda' }] };
+    const { text } = buildAcpPromptText({ prompt: 'fix this slide', activeFile: { path: 'Training.deck.md', slide } } as any, {});
+    assert.ok(text.startsWith("[Currently editing: Training.deck.md]\n[Current slide: The person is on slide 5 of 13 (\"Agenda\", id k3f9) in \"Training\".]\n\nfix this slide"), text);
+    const { text: plain } = buildAcpPromptText({ prompt: 'fix', activeFile: { path: 'notes.md' } } as any, {});
+    assert.ok(!plain.includes('[Current slide'), 'a Text document has no slide line');
+    assert.strictEqual(plain, '[Currently editing: notes.md]\n\nfix');
+    console.log('✓ Test 9b: OpenCode gets the deck\'s current slide, a Text document none');
+  }
+
   // ── Test 10: capability context reaches OpenCode on the first turn only ──
   // Drives prompt() and captures what OpenCode is actually sent. The previous
   // version re-implemented the injected-flag ternary instead of calling

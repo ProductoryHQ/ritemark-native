@@ -34,14 +34,17 @@ import { editorHTMLToMarkdown, markdownToEditorHTML } from '../../utils/editorMa
 import { SourceLines, type CopySource } from './library/SourceLines'
 import { AddToLibrarySheet, type LibraryTopic } from './library/AddToLibrarySheet'
 import { onMessage, sendToExtension } from '../../bridge'
-import { convertKind } from './slide/convertKind'
-import { SlideSettings } from './SlideSettings'
+import { convertKind, hiddenNote } from './slide/convertKind'
+import { addColumn, addRow } from './slide/slideEdits'
+import { SlideAbout, SlideSettings } from './SlideSettings'
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { SlideStrip, type StripActions, type StripMark } from './SlideStrip'
 import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, newId, parseSlideBody, withPartHeading, writeSlideBlock, writeSlideBody } from '../../../../src/decks/deckFormat'
 import type { Transaction } from '@tiptap/pm/state'
 import { isHistoryTransaction } from '@tiptap/pm/history'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
+import { CURRENT_SLIDE_SETTLE_MS, currentSlideMessage } from './currentSlideMessage'
 import { DeckGuard } from './handout/deckGuard'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
@@ -58,7 +61,7 @@ const DECK_EXTENSIONS = [DeckSlideWithPartHead, DeckGuard, DeckCurrent, DeckLine
 
 /** The strip's width (the prototype's 132). */
 const STRIP_WIDTH = 132
-/** Settings beside the slide: its width, and how long a notice stays in the bar. */
+/** The Add to library sheet beside the slide: its width (the Settings material), and how long a notice stays in the bar. */
 const SETTINGS_WIDTH = 316
 const NOTICE_MS = 8000
 /** The slide's room on the stage: 24 on each side, at most 900 wide. */
@@ -370,6 +373,8 @@ export function DeckView({
   }, [])
   const countRef = useRef(count)
   countRef.current = count
+  const slidesRef = useRef(slides)
+  slidesRef.current = slides
   const shown = count === 0 ? 0 : Math.min(current, count - 1)
   const slide = slides[shown]
 
@@ -699,8 +704,11 @@ export function DeckView({
     return () => window.clearTimeout(timer)
   }, [notice])
 
-  // Settings beside the slide: closed when the slide changes, and placed beside it (over the handout when it must).
+  // Slide settings: closed when the slide changes. Add to library's sheet is placed beside the slide (over the handout when it must).
   useEffect(() => { setSettingsOpen(false) }, [shown])
+  // Settings with no slide to belong to (an undo took it away, the window folded it) close, so they never come back
+  // by themselves when it returns.
+  useEffect(() => { if (!slideShown || !slides[shown]) setSettingsOpen(false) }, [slideShown, slides, shown])
   // The Add to library sheet belongs to its slide: another slide closes it.
   useEffect(() => { setAddSheet(sheet => (sheet && sheet.number - 1 !== shown ? null : sheet)) }, [shown])
   // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one. A
@@ -720,7 +728,7 @@ export function DeckView({
   }, [shown, focusTitleOf, slideShown])
   const titleSelected = useCallback(() => setFocusTitleOf(current => (current?.select ? null : current)), [])
   useLayoutEffect(() => {
-    if (!settingsOpen && !addSheet) { setSettingsAt(null); return }
+    if (!addSheet) { setSettingsAt(null); return }
     const desk = deskRef.current
     if (!desk) return
     const big = desk.querySelector<HTMLElement>('.deck-big')
@@ -741,7 +749,7 @@ export function DeckView({
       left: Math.max(8, Math.min(bigBox.right - deskBox.left + 12, deskBox.width - SETTINGS_WIDTH - 8)),
       top: Math.max(8, bigBox.top - deskBox.top - 4),
     })
-  }, [settingsOpen, addSheet, deskWidth, stageWidth, shown, slideShown, dividerLeft])
+  }, [addSheet, deskWidth, stageWidth, shown, slideShown, dividerLeft])
 
   /** Settings' change, made to the slide as the document has it now. */
   const changeSlide = useCallback((change: (data: SlideData) => SlideData, kind?: string) => {
@@ -796,6 +804,14 @@ export function DeckView({
   useEffect(() => {
     sendToExtension('deck/current', { index: shown, count })
   }, [shown, count])
+  // The AI knows the slide the person is on (17 November): its id and title too, told once they settle (a scroll, a
+  // title being typed). A message of its own, so it never moves the library's insert point.
+  const shownId = slide?.data.id
+  const shownTitle = slide?.data.title
+  useEffect(() => {
+    const timer = window.setTimeout(() => sendToExtension('deck/current-slide', currentSlideMessage(shown, count, slidesRef.current)), CURRENT_SLIDE_SETTLE_MS)
+    return () => window.clearTimeout(timer)
+  }, [shown, count, shownId, shownTitle])
 
   // Each copy's source, asked a moment after the deck stops changing, and again when the window comes back (another
   // deck may have updated the library meanwhile).
@@ -823,7 +839,7 @@ export function DeckView({
 
   const marks = useMemo(() => {
     const result: Record<string, StripMark> = {}
-    for (const [id, source] of Object.entries(sources)) result[id] = { library: source.library, newer: source.library && source.newer && !source.changed && !source.missing }
+    for (const [id, source] of Object.entries(sources)) result[id] = { library: source.library, newer: source.library && source.newer && !source.changed && !source.missing, changed: source.library && source.changed && !source.missing }
     return result
   }, [sources])
 
@@ -983,6 +999,8 @@ export function DeckView({
   }), [editor, dispatch, done, slideById, sources, imageMappings, pick])
 
   const status = documentBarStatus(syncState, syncAction)
+  // Slide settings belong to the slide on the stage: none while it is folded away or the deck has no slides.
+  const settingsReady = slideShown && !!slide
   const handoutContainer = scrollContainer()
   // Writing on the slide keeps it the current one while the handout is still.
   const onWriting = useCallback(() => { lockUntil.current = Date.now() + WRITE_LOCK_MS }, [])
@@ -1004,6 +1022,62 @@ export function DeckView({
           </Button>
         </Tooltip>
         <span className="deck-count">{count === 0 ? 'No slides yet' : `Slide ${shown + 1} of ${count}`}</span>
+        {/* 17 November (the Experience lead, "Nothing around the slide but the slide"): Slide settings is a gear here,
+            after the count, its popup under it, left-aligned; nothing sits above or beside the slide. A Popover: a
+            press outside or Esc closes it and the gear gets the focus back; choosing a layout keeps it open. */}
+        <Popover open={settingsOpen && settingsReady} onOpenChange={setSettingsOpen}>
+          <Tooltip label={settingsReady ? 'Slide settings' : 'Show the slide to change its settings'}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="deck-settings-button"
+                data-state={settingsOpen && settingsReady ? 'active' : undefined}
+                aria-label="Slide settings"
+                disabled={!settingsReady}
+              >
+                <Icon name="gear" size={16} tone="inherit" />
+              </Button>
+            </PopoverTrigger>
+          </Tooltip>
+          {settingsReady && slide ? (
+            <PopoverContent
+              align="start"
+              sideOffset={6}
+              collisionPadding={8}
+              className="deck-settings"
+              // The popup takes the focus itself, not its Close button, so no tooltip opens with it.
+              onOpenAutoFocus={event => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus() }}
+              tabIndex={-1}
+            >
+              <SlideSettings
+                number={shown + 1}
+                kind={slide.kind}
+                data={slide.data}
+                about={(
+                  <SlideAbout
+                    data={slide.data}
+                    sourceLines={slide.data.id && sources[slide.data.id] ? (
+                      <SourceLines
+                        source={sources[slide.data.id]}
+                        kept={slide.data.kept === true}
+                        justUpdated={justUpdated === slide.data.id}
+                        busy={!!busy[slide.data.id]}
+                        actions={sourceActions}
+                      />
+                    ) : undefined}
+                    hidden={hiddenNote(slide.kind, slide.data)}
+                    table={slide.kind === 'table' ? { addRow: () => changeSlide(addRow), addColumn: () => changeSlide(addColumn) } : undefined}
+                  />
+                )}
+                onKind={kind => changeSlide(data => convertKind(data, kind), kind)}
+                onChange={patch => changeSlide(data => ({ ...data, ...patch }))}
+                onClose={() => setSettingsOpen(false)}
+                onUndo={redo => { if (redo) editor?.commands.redo(); else editor?.commands.undo() }}
+              />
+            </PopoverContent>
+          ) : null}
+        </Popover>
         <span className="deck-notice" role="status" aria-live="polite">
           {notice ? (
             <>
@@ -1075,21 +1149,10 @@ export function DeckView({
                   onWriting={onWriting}
                   notesOpen={notesOpen}
                   onNotesOpen={setNotesOpen}
-                  settingsOpen={settingsOpen}
-                  onSettings={() => setSettingsOpen(open => !open)}
                   initialFocus={focusTitleOf?.index === slide.index ? 'title' : undefined}
                   selectOnFocus={focusTitleOf?.index === slide.index && focusTitleOf.select}
                   onFocusTaken={titleSelected}
                   onPicture={onPicture}
-                  sourceLines={slide.data.id && sources[slide.data.id] ? (
-                    <SourceLines
-                      source={sources[slide.data.id]}
-                      kept={slide.data.kept === true}
-                      justUpdated={justUpdated === slide.data.id}
-                      busy={!!busy[slide.data.id]}
-                      actions={sourceActions}
-                    />
-                  ) : undefined}
                 />
               ) : null}
             </div>
@@ -1116,6 +1179,7 @@ export function DeckView({
             topics={topics}
             style={{ left: settingsAt.left, top: settingsAt.top }}
             onClose={() => setAddSheet(null)}
+            returnFocus={() => stripRef.current}
             onAdd={topic => {
               const id = addSheet.id
               setAddSheet(null)
@@ -1124,19 +1188,6 @@ export function DeckView({
             }}
           />
         ) : null}
-        {settingsOpen && slideShown && slide && settingsAt ? (
-          <SlideSettings
-            number={shown + 1}
-            kind={slide.kind}
-            data={slide.data}
-            style={{ left: settingsAt.left, top: settingsAt.top }}
-            onKind={kind => changeSlide(data => convertKind(data, kind), kind)}
-            onChange={patch => changeSlide(data => ({ ...data, ...patch }))}
-            onClose={() => setSettingsOpen(false)}
-            onUndo={redo => { if (redo) editor?.commands.redo(); else editor?.commands.undo() }}
-          />
-        ) : null}
-
         <div
           className={`deck-handout${handoutShown ? '' : ' is-folded'}${slideShown ? '' : ' is-solo'}`}
           // The handout alone is a Text document's centred column: its width sets the text's edges (decks.css).
