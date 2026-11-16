@@ -65,11 +65,12 @@
 .deck-fold.is-split .deck-fold-button:focus-visible { outline-offset: -2px; }
 
 /* Split along the long side (16 November; deckLayout.ts): with the slide above the handout, the slide is centred on top
-   and its size is capped by its pane's height; the line is level and runs edge to edge from the strip, and drags; the
-   split pill lies flat at the line's right end, ˄ Hide the slide beside ˅ Hide the handout (the prototype's `.foldpair`,
-   `.divider.h`, `.stage[data-stk]`). The deck view sets the top and the height of each. */
+   at its pane's full height less 32 (16 above it and 16 under it; the Experience lead, 17 November), capped by the
+   width; the line is level, runs edge to edge from the strip, and drags; the split pill lies flat at the line's right
+   end, ˄ Hide the slide beside ˅ Hide the handout (the prototype's `.foldpair`, `.divider.h`, `.stage[data-stk]`). The
+   deck view sets the top and the height of each. */
 .deck-stage.is-above { bottom: auto; align-items: center; }
-.deck-stage.is-above .deck-stage-group { max-width: 100%; padding-bottom: 12px; }
+.deck-stage.is-above .deck-stage-group { max-width: 100%; padding: 16px 0; }
 .deck-divider.is-above { width: auto; right: 0; bottom: auto; height: 13px; margin-left: 0; margin-top: -6px; cursor: row-resize; }
 .deck-divider.is-above::before { left: 0; right: 0; top: 6px; bottom: auto; border-left: 0; border-top: 1.5px dotted var(--r-hairline-strong); }
 .deck-divider.is-above:hover::before, .deck-divider.is-above.is-dragging::before { border-left: 0; border-top: 2px solid var(--r-accent); }

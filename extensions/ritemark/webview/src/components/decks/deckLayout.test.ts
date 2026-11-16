@@ -25,7 +25,7 @@ Object.assign(globalThis, {
 })
 
 const {
-  ABOVE_PANE_MIN, ABOVE_RATIO_DEFAULT, ABOVE_RATIO_MAX, ABOVE_RATIO_MIN, BESIDE_ROOM, BESIDE_SLIDE_MIN, BESIDE_TEXT_MIN,
+  ABOVE_PANE_MIN, ABOVE_RATIO_DEFAULT, ABOVE_STAGE_ROOM, ABOVE_RATIO_MAX, ABOVE_RATIO_MIN, BESIDE_ROOM, BESIDE_SLIDE_MIN, BESIDE_TEXT_MIN,
   BIG_MAX, ORIENTATION_HYSTERESIS, aboveLineFor, clampAboveRatio, initialAboveRatio, orientationFor, slideWidthFor,
 } = await import('./deckLayout')
 const { deckViewState, keepDeckViewState, keepFold } = await import('./DeckFolds')
@@ -94,14 +94,16 @@ const { initialRatio, DEFAULT_RATIO } = await import('./deckDocument')
 {
   assert.equal(slideWidthFor(500, 300, false), 452)
   assert.equal(slideWidthFor(2000, 300, false), BIG_MAX, 'at most 900')
-  // The prototype's 1440 × 900 with the AI open: a room of 900 × 828, the line at half, a slide of about 500.
-  const line = aboveLineFor(828, 0.5)
-  const above = slideWidthFor(900, line, true)
-  assert.ok(above >= 480 && above <= 560, `about 500 wide above (${above})`)
+  // 1440 × 900 with the AI open (the dev window's desk: 900 × 780 beside the strip), the line at half: the slide takes
+  // the pane's height less 32, at 16:9 (the Experience lead measured 636, up from 498 with the rows around it).
+  const line = aboveLineFor(780, 0.5)
+  assert.equal(line, 390)
+  assert.equal(slideWidthFor(900, line, true), 636)
   assert.equal(slideWidthFor(1000, 800, true), 900, 'a tall pane: the width and 900 cap it')
-  assert.equal(slideWidthFor(1000, 100, true), 0, 'never negative')
-  // Above, the slide always fits its pane's height: its height plus the stage's chrome.
-  for (const height of [200, 300, 414, 600]) assert.ok(Math.round(slideWidthFor(1200, height, true) * 9 / 16) + 110 <= height)
+  assert.equal(slideWidthFor(600, 800, true), 552, 'a narrow pane: the width caps it')
+  assert.equal(slideWidthFor(1000, 20, true), 0, 'never negative')
+  // Above, the slide always fits its pane's height, with 32 to spare.
+  for (const height of [200, 300, 414, 600]) assert.ok(Math.round(slideWidthFor(1200, height, true) * 9 / 16) + ABOVE_STAGE_ROOM <= height)
 }
 
 // Each orientation keeps its own share in the view state, beside the fold, and both come back after a reload (the

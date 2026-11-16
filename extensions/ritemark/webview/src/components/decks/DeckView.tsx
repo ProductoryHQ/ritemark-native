@@ -414,6 +414,8 @@ export function DeckView({
   const aboveLine = above && split ? aboveLineFor(deskHeight, aboveRatio) : 0
   const stageWidth = above ? (slideShown ? avail : 0) : stageWidthFor(avail, ratio, handoutShown, slideShown)
   const stageHeight = above && split ? aboveLine : deskHeight
+  // Above, the slide keeps one size from slide to slide (the pane's height less a fixed room for Settings and one line
+  // under it); a slide with more lines under it scrolls them in its pane rather than shrinking.
   const bigWidth = slideWidthFor(stageWidth, stageHeight, above)
   /** The handout's left edge; beside, the line between the slide and the handout too. */
   const dividerLeft = above ? stripWidth : stripWidth + stageWidth

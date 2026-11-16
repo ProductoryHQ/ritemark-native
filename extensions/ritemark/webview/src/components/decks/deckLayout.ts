@@ -61,18 +61,20 @@ export function aboveLineFor(height: number, ratio: number): number {
   return Math.max(ABOVE_PANE_MIN, Math.min(height - ABOVE_PANE_MIN, line))
 }
 
-/** The slide's side margin on the stage, its widest, and the height the stage needs beside the slide itself (Settings
- *  over it, the lines under it, the room around them: the prototype's 110). */
+/** The slide's side margin on the stage and its widest; and, above, the room the pane keeps around the slide: its full
+ *  height less 32 (the Experience lead, 17 November, "Nothing around the slide but the slide": the rows above and under
+ *  the slide leave the stage, so the slide gets that height). */
 export const STAGE_MARGIN = 24
 export const BIG_MAX = 900
-export const ABOVE_STAGE_CHROME = 110
+export const ABOVE_STAGE_ROOM = 32
 
 /**
- * The slide's width on a stage `width` × `height`. Beside, the stage scrolls, so only the width counts; above, the
- * slide's size is capped by its pane's height too, so it never needs scrolling to be seen whole.
+ * The slide's width on a stage `width` × `height`. Beside, the slide is bound by its width (and sits centred in its
+ * pane's height); above, it takes its pane's full height less 32, at 16:9, capped by the width. It keeps one size from
+ * slide to slide.
  */
 export function slideWidthFor(width: number, height: number, above: boolean): number {
   const byWidth = Math.min(width - STAGE_MARGIN * 2, BIG_MAX)
-  const byHeight = above ? Math.floor(((height - ABOVE_STAGE_CHROME) * 16) / 9) : Infinity
+  const byHeight = above ? Math.floor(((height - ABOVE_STAGE_ROOM) * 16) / 9) : Infinity
   return Math.max(0, Math.min(byWidth, byHeight))
 }
