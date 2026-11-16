@@ -26,7 +26,7 @@ const React = await import('react')
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
-const { DeckFolds, foldButtons, foldFrom, foldedSides, keepFold, storedFold, toggledFold } = await import('./DeckFolds')
+const { DeckFolds, foldButtons, foldFrom, foldedSides, keepDeckViewState, keepFold, storedFold, toggledFold } = await import('./DeckFolds')
 
 const draw = (slideShown: boolean, handoutShown: boolean) =>
   parse(renderToStaticMarkup(createElement(DeckFolds, { slideShown, handoutShown, left: 500, onToggle: () => {} })))
@@ -96,6 +96,9 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
   assert.deepEqual(viewState, { deckRatio: 0.55, deckFold: 'handout' })
   keepFold(null)
   assert.deepEqual(viewState, { deckRatio: 0.55 }, 'both sides shown is no entry at all')
+  keepFold('handout')
+  keepDeckViewState({ deckRatio: 0.5 })
+  assert.deepEqual(viewState, { deckRatio: 0.5, deckFold: 'handout' }, "dragging the divider keeps the fold")
   viewState = undefined
   keepFold('slide')
   assert.deepEqual(viewState, { deckFold: 'slide' })
@@ -111,18 +114,32 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
 // view state at mount and written only there, so opening a deck writes nothing.
 {
   const { readFileSync } = await import('node:fs')
-  const view = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8')
-  const stage = view.indexOf("{slideShown ? (\n          <div className={`deck-stage")
-  assert.ok(stage >= 0, 'the stage, with Settings and the notes in it, is drawn only while the slide shows')
-  const stageEnd = view.indexOf('{handoutShown && slideShown ? (', stage)
-  const inStage = view.slice(stage, stageEnd)
-  assert.ok(inStage.includes('<Stage') && inStage.includes('notesOpen={notesOpen}') && inStage.includes('onSettings='), 'the Stage, its notes and its Settings button sit in that block')
-  assert.ok(view.includes('{settingsOpen && slideShown && slide && settingsAt ? ('), 'Settings go with the slide')
-  assert.ok(view.includes('{handoutShown && slideShown ? (\n          <div\n            className={`deck-divider'), 'nothing to drag with one side')
-  assert.ok(/\{stripShown \? \(\s*<SlideStrip/.test(view), 'the strip stays, whatever the fold')
+  // Whitespace folded to one space, so a reformat doesn't fail the test. `block` is the JSX expression `{…}` that opens
+  // with the given words, to its matching brace.
+  const view = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8').replace(/\s+/g, ' ')
+  const block = (open: string) => {
+    const at = view.indexOf(open)
+    assert.ok(at >= 0, open)
+    let depth = 0
+    for (let i = at; i < view.length; i++) {
+      if (view[i] === '{') depth++
+      else if (view[i] === '}' && --depth === 0) return view.slice(at, i + 1)
+    }
+    return view.slice(at)
+  }
+  const stage = block('{slideShown ? ( <div className={`deck-stage')
+  assert.ok(stage.includes('<Stage') && stage.includes('notesOpen={notesOpen}') && stage.includes('onSettings='), 'the stage, its notes and its Settings button are drawn only while the slide shows')
+  assert.ok(block('{settingsOpen && slideShown').includes('<SlideSettings'), 'Settings go with the slide')
+  assert.ok(block('{handoutShown && slideShown ? (').includes('deck-divider'), 'nothing to drag with one side')
+  assert.ok(block('{stripShown ? ( <SlideStrip').length > 0 && !block('{stripShown ? ( <SlideStrip').includes('slideShown'), 'the strip stays, whatever the fold')
   assert.ok(view.includes('useState<DeckFold>(storedFold)'), 'the fold the view kept, at mount')
-  assert.equal(view.match(/keepFold\(/g)?.length, 1, 'kept only when a fold button is pressed')
-  assert.ok(!/deckFold|fold[^\n]*sendToExtension|sendToExtension[^\n]*fold/i.test(view.replace(/DeckFolds?|storedFold|keepFold|toggledFold|foldedSides|toggleFold/g, '')), 'never sent to the host')
+  assert.ok(view.includes('onToggle={toggleFold}') && block('const toggleFold = useCallback(').includes('keepFold(next)'), 'kept when a fold button is pressed')
+  assert.ok(!/sendToExtension\([^)]*fold/i.test(view), 'never sent to the host')
+  // A slide added from the strip with the slide hidden puts the caret in its part's first line, in the handout.
+  const insert = block('insert: (at, kind) => {')
+  assert.ok(/if \(slideShownRef\.current\) \{[^}]*setFocusTitleOf/.test(insert) && insert.includes('setTextSelection(pos)'), 'the caret goes to the handout')
+  // The divider's share goes through the same view state as the fold.
+  assert.ok(view.includes('keepDeckViewState({ deckRatio: ratio })'))
 }
 
 console.log('DeckFolds: passed')

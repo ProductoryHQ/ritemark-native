@@ -20,26 +20,34 @@ export function foldFrom(stored: unknown): DeckFold {
   return stored === 'slide' || stored === 'handout' ? stored : null
 }
 
-/** The fold this deck's view kept, if any. */
-export function storedFold(): DeckFold {
+/** What this deck's view keeps: the slide's share (the divider) and the fold. Never the file. */
+export interface DeckViewState { deckRatio?: unknown; deckFold?: unknown }
+
+/** This deck's kept view state, or nothing when the view has none. */
+export function deckViewState(): DeckViewState {
   try {
-    return foldFrom(getState<{ deckFold?: unknown } | null>()?.deckFold)
+    return getState<DeckViewState | null>() ?? {}
   } catch {
-    return null
+    return {}
   }
 }
 
-/** Keeps the fold in this deck's view state, beside what the view already keeps there (the divider's share). */
-export function keepFold(fold: DeckFold) {
+/** Keeps a change in this deck's view state, beside what is already kept there; an undefined value removes its key. */
+export function keepDeckViewState(change: DeckViewState) {
   try {
-    const next: Record<string, unknown> = { ...((getState<object | null>() ?? {}) as object) }
-    if (fold) next.deckFold = fold
-    else delete next.deckFold
+    const next: Record<string, unknown> = { ...((getState<object | null>() ?? {}) as object), ...change }
+    for (const key of Object.keys(change) as (keyof DeckViewState)[]) if (change[key] === undefined) delete next[key]
     saveState(next)
   } catch {
-    // Kept for this view only; without the view's state the deck opens with both sides.
+    // Kept for this view only; without the view's state the defaults stand next time.
   }
 }
+
+/** The fold this deck's view kept, if any. */
+export const storedFold = (): DeckFold => foldFrom(deckViewState().deckFold)
+
+/** Keeps the fold in this deck's view state; both sides shown is no entry at all. */
+export const keepFold = (fold: DeckFold) => keepDeckViewState({ deckFold: fold ?? undefined })
 
 /** The fold a button press makes: pressing a side's button folds it, or brings it back when it is the folded one. */
 export function toggledFold(current: DeckFold, side: 'slide' | 'handout'): DeckFold {

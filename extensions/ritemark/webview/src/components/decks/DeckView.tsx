@@ -33,7 +33,7 @@ import { DOMParser as PMDOMParser, Fragment, type Node as PMNode } from '@tiptap
 import { editorHTMLToMarkdown, markdownToEditorHTML } from '../../utils/editorMarkdown'
 import { SourceLines, type CopySource } from './library/SourceLines'
 import { AddToLibrarySheet, type LibraryTopic } from './library/AddToLibrarySheet'
-import { getState, onMessage, saveState, sendToExtension } from '../../bridge'
+import { onMessage, sendToExtension } from '../../bridge'
 import { convertKind } from './slide/convertKind'
 import { SlideSettings } from './SlideSettings'
 import { SlideStrip, type StripActions, type StripMark } from './SlideStrip'
@@ -50,7 +50,7 @@ import { DeckDrawnHeadings, handoutMarkFor, hasDrawnHeadings } from './handout/d
 import { Stage } from './Stage'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
-import { DeckFolds, foldedSides, keepFold, storedFold, toggledFold, type DeckFold } from './DeckFolds'
+import { DeckFolds, deckViewState, foldedSides, keepDeckViewState, keepFold, storedFold, toggledFold, type DeckFold } from './DeckFolds'
 import './decks.css'
 
 /** The deck's extensions, made once: the editor's extension list is fixed at mount. */
@@ -71,24 +71,9 @@ const STAGE_MIN = 300
 const NARROW_DESK = 900
 const NARROWEST_DESK = 600
 
-/** The view's kept state, as `getState` gives it, with the slide's share. */
-interface DeckViewState { deckRatio?: number }
-
-function storedRatio(): unknown {
-  try {
-    return getState<DeckViewState | null>()?.deckRatio
-  } catch {
-    return undefined
-  }
-}
-
-function keepRatio(ratio: number) {
-  try {
-    saveState({ ...((getState<object | null>() ?? {}) as object), deckRatio: ratio })
-  } catch {
-    // The share is kept for this view only; without the view's state the default stands next time.
-  }
-}
+/** The slide's share, as this deck's view kept it (`deckViewState`, with the fold). */
+const storedRatio = () => deckViewState().deckRatio
+const keepRatio = (ratio: number) => keepDeckViewState({ deckRatio: ratio })
 /** How long a thumbnail's scroll holds the slide, and how long writing does (the prototype's `syncLock`). */
 const PICK_LOCK_MS = 500
 const WRITE_LOCK_MS = 1200
@@ -401,6 +386,8 @@ export function DeckView({
   const narrow = deskWidth > 0 && deskWidth < NARROW_DESK
   const stripShown = stripWanted && !narrow
   const { slideShown, handoutShown } = foldedSides(fold, !(deskWidth > 0 && deskWidth < NARROWEST_DESK))
+  const slideShownRef = useRef(slideShown)
+  slideShownRef.current = slideShown
   const stripWidth = stripShown ? STRIP_WIDTH : 0
   const avail = Math.max(0, deskWidth - stripWidth)
   const stageWidth = stageWidthFor(avail, narrow ? DEFAULT_RATIO : ratio, handoutShown, slideShown)
@@ -630,8 +617,20 @@ export function DeckView({
     pick,
     insert: (at, kind) => {
       if (!editor || !dispatch(insertSlide(editor.state, at, kind, Math.random, textHandoutRef.current))) return
-      setFocusTitleOf({ index: at, select: false })
-      requestAnimationFrame(() => pick(at))
+      if (slideShownRef.current) {
+        setFocusTitleOf({ index: at, select: false })
+        requestAnimationFrame(() => pick(at))
+        return
+      }
+      // With the slide folded away, the caret goes to the new part's first line in the handout, as a line typed there does.
+      requestAnimationFrame(() => {
+        pick(at)
+        const entry = slidesOf(editor.state.doc)[at]
+        const pos = entry ? entry.pos + entry.node.nodeSize + 1 : -1
+        if (pos > 0 && pos <= editor.state.doc.content.size && editor.state.doc.resolve(pos).parent.isTextblock) {
+          editor.chain().focus().setTextSelection(pos).run()
+        }
+      })
     },
     duplicate: index => {
       if (editor && dispatch(duplicateSlide(editor.state, index))) requestAnimationFrame(() => pick(index + 1))
