@@ -3,7 +3,7 @@
  * Run with `npx tsx webview/src/components/decks/present/wallKeys.test.ts`.
  */
 import { strict as assert } from 'node:assert'
-import { countLabel, goToKey, MAX_GOTO_DIGITS, presentKeyOf, wallKeyOf, wallSlideSize } from './wallKeys'
+import { clockText, countLabel, goToKey, MAX_GOTO_DIGITS, presentKeyOf, wallKeyOf, wallSlideSize } from './wallKeys'
 
 // ---- On, back, the ends, stop
 for (const key of ['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter']) assert.deepEqual(wallKeyOf({ key }), { type: 'next' }, key)
@@ -51,5 +51,11 @@ assert.equal(presentKeyOf({ key: 'Enter', ctrlKey: true }, false), 'here', 'Ctrl
 assert.equal(presentKeyOf({ key: 'Enter', ctrlKey: true, shiftKey: true }, false), 'start')
 assert.equal(presentKeyOf({ key: 'Enter', metaKey: true }, false), null)
 assert.equal(presentKeyOf({ key: 'a', metaKey: true }, true), null)
+
+// ---- The presenter view's clock
+assert.equal(clockText(0), '0:00')
+assert.equal(clockText(-500), '0:00')
+assert.equal(clockText(760_000), '12:40', 'the drawing\'s 12:40')
+assert.equal(clockText(3_725_000), '1:02:05')
 
 console.log('wallKeys: all tests passed')

@@ -240,6 +240,13 @@ export function DeckWall() {
             <Icon name="squares-four" size={16} tone="inherit" />
           </Button>
         </Tooltip>
+        {state.presenter.available ? (
+          <Tooltip label={state.presenter.on ? 'Close the presenter view' : 'Open the presenter view: notes, the next slide and the clock'}>
+            <Button variant="ghost" size="icon-sm" aria-label="Presenter view" aria-pressed={state.presenter.on} data-state={state.presenter.on ? 'active' : undefined} onClick={() => sendToExtension('present/presenter')}>
+              <Icon name="monitor" size={16} tone="inherit" />
+            </Button>
+          </Tooltip>
+        ) : null}
         <span className="wall-sep" aria-hidden="true" />
         <Tooltip label="Stop presenting and go back to the deck">
           <Button variant="ghost" size="sm" className="wall-stop" onClick={() => send('present/stop')}>
