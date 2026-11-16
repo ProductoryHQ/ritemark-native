@@ -287,4 +287,26 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
 }
 
 
+// A deck marked `handout: text`: a part without a heading of its own shows none (a heading the person deleted stays
+// deleted on the page too), and the mark, like all of the front matter, never reaches the page.
+{
+  const text = [
+    '---', 'deck: 1', 'theme: Slide library/Themes/Evening.theme.md', 'handout: text', '---', '',
+    '```slide title', 'id: t0a1', 'title: AI assistants and agents', '```', '', '## Welcome', '', 'Words.', '',
+    '```slide points', 'id: p001', 'title: Agents act', '```', '', 'Heading deleted, words kept.', '',
+  ].join('\n');
+  const marked = publicDeck(text, { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });
+  assert.equal(marked.textHandout, true);
+  const bytes = pageHtml(marked, assets, { digest: deckDigest(marked), pictureUrl });
+  const page = parse(bytes);
+  assert.deepEqual(page.querySelectorAll('.part').map(part => part.querySelectorAll('h2').map(h2 => h2.text)), [['Welcome'], []]);
+  assert.ok(page.querySelectorAll('[data-go]').some(row => row.text.includes('Agents act')), "Contents still lists the slide's title");
+  assert.ok(!/handout:\s*text|handout: |Evening\.theme\.md/.test(bytes), 'privacy: no line of the front matter reaches the page');
+  // Without the mark the same deck is the page it was: the slide's title as the part's heading.
+  const unmarked = publicDeck(text.replace('handout: text\n', ''), { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });
+  assert.equal(unmarked.textHandout, undefined, 'and the digest of an unmarked deck is as it was');
+  assert.deepEqual(parse(pageHtml(unmarked, assets, { digest: deckDigest(unmarked), pictureUrl })).querySelectorAll('.part').map(part => part.querySelectorAll('h2').map(h2 => h2.text)), [['Welcome'], ['Agents act']]);
+}
+
+
 console.log('pageHtml: passed');

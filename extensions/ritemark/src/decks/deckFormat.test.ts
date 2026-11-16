@@ -4,6 +4,9 @@
 import { strict as assert } from 'node:assert';
 import * as yaml from 'js-yaml';
 import {
+  isTextHandout,
+  withTextHandoutMark,
+  withWrittenHandout,
   derivedHeading,
   EMPTY_DECK_TITLE,
   handoutWithoutHeading,
@@ -352,6 +355,36 @@ test('making a part writes its heading: H1 for a section, H2 otherwise, escaped;
     const heading = partHeadingOf(withPartHeading('points', { title }, ''))!;
     assert.equal(heading.text.replace(/\\(.)/g, '$1'), title, title);
   }
+});
+
+
+// 16 November: a deck whose handout is written with its own headings says so in its front matter, `handout: text`.
+test('the handout: text mark: read, written into a front matter or a new one, never twice', () => {
+  assert.equal(isTextHandout('---\ndeck: 1\nhandout: text\n---\n'), true);
+  assert.equal(isTextHandout('---\ndeck: 1\n---\n'), false);
+  assert.equal(isTextHandout('```slide title\nid: a\n```\n'), false);
+  assert.equal(withTextHandoutMark('---\ndeck: 1\ntheme: T.theme.md\n---\n\nx\n'), '---\ndeck: 1\ntheme: T.theme.md\nhandout: text\n---\n\nx\n');
+  assert.equal(withTextHandoutMark('```slide title\nid: a\n```\n'), '---\nhandout: text\n---\n\n```slide title\nid: a\n```\n');
+  const marked = '---\ndeck: 1\nhandout: text\n---\n';
+  assert.equal(withTextHandoutMark(marked), marked, 'never twice');
+  assert.equal(withTextHandoutMark('---\nhandout: other\n---\n'), '---\nhandout: text\n---\n', 'another value is replaced');
+});
+
+test('a deck written before the mark gets its headings and the mark together; its slide blocks stay byte for byte', () => {
+  const older = [
+    '---', 'deck: 1', '---', '',
+    '```slide title', 'id: t1', 'title: AI assistants', '```', '', '## Welcome', '', 'Words.', '',
+    '```slide section', 'id: s1', 'title: Why agents?', '```', '',
+    '```slide points', 'id: p1', 'title: Agents act', '```', '', '```notes', 'Say hi.', '```', '', 'An agent acts.', '',
+  ].join('\n');
+  const written = withWrittenHandout(older);
+  assert.equal(isTextHandout(written), true);
+  assert.ok(written.includes('```slide section\nid: s1\ntitle: Why agents?\n```\n\n# Why agents?\n\n```slide points'), 'a section: its H1');
+  assert.ok(written.includes('```notes\nSay hi.\n```\n\n## Agents act\n\nAn agent acts.'), 'after the notes: its H2');
+  assert.ok(written.includes('## Welcome\n\nWords.') && !written.includes('## AI assistants'), 'a part with its own heading keeps it');
+  const blocks = (text: string) => text.match(/```slide[\s\S]*?\n```/g);
+  assert.deepEqual(blocks(written), blocks(older));
+  assert.equal(withWrittenHandout(written), written, 'a marked deck is as it is');
 });
 
 

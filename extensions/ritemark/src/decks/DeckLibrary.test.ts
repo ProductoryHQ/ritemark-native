@@ -2,7 +2,7 @@
  * Sprint 157: the Slide library, with an in-memory project. Run with `npx tsx src/decks/DeckLibrary.test.ts`.
  */
 import { strict as assert } from 'node:assert';
-import { parseFrom, parseSlideBody } from './deckFormat';
+import { isTextHandout, parseFrom, parseSlideBody } from './deckFormat';
 import { slideStamps, slidesOfText } from './deckLibraryFormat';
 import { DeckLibrary, isTopicPath, type DeckFiles } from './DeckLibrary';
 
@@ -107,6 +107,9 @@ async function run() {
   // Making a part writes its heading (16 November): the topic's part had none, so the copy opens with its title as an
   // H2, and the copy is still the library's (the heading is no change to it).
   assert.equal(harbour[0].handout, '## Assistant or agent?\n\nAn agent is given a goal.');
+  // The deck had no `handout: text` mark: its own part gets its heading, and the mark comes with them (16 November).
+  assert.equal(isTextHandout(files.files['Clients/Harbour/Harbour.deck.md']), true, 'the mark is written with the headings');
+  assert.equal(harbour[1].handout, '## Harbour\n\nWelcome.', "the deck's own part gets the heading it showed");
   const insertedStates = await library.sourceStates('Clients/Harbour/Harbour.deck.md', [{ id: harbour[0].data.id!, from: harbour[0].data.from!, kind: harbour[0].kind, body: harbour[0].body, handout: harbour[0].handout }]);
   assert.equal(insertedStates[0].changed, false, 'a copy with its heading written is not changed');
   // A copy made before 16 November of a source whose handout opens with a heading: its from: stamp counted the heading,

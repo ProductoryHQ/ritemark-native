@@ -118,9 +118,10 @@ export function partHeadingAt(doc: PMNode, slidePos: number): { node: PMNode; po
  * (`handout/drawnHeadings.ts`): the save leaves them out, so opening a deck writes nothing. They reach the file with the
  * person's first edit of the handout, as ordinary text from then on.
  */
-export function derivedHeadings(state: EditorState): Transaction | null {
+export function derivedHeadings(state: EditorState, textHandout = false): Transaction | null {
   const { doc, schema } = state
-  if (!schema.nodes.heading) return null
+  // A deck marked `handout: text` is written with its own headings: nothing is drawn, a heading deleted stays deleted.
+  if (!schema.nodes.heading || textHandout) return null
   const tr = state.tr
   const slides = slidesOf(doc)
   // From the last part to the first, so each slide's position still holds.

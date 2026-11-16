@@ -37,7 +37,7 @@ import { getState, onMessage, saveState, sendToExtension } from '../../bridge'
 import { convertKind } from './slide/convertKind'
 import { SlideSettings } from './SlideSettings'
 import { SlideStrip, type StripActions, type StripMark } from './SlideStrip'
-import { newId, parseSlideBody, withPartHeading, writeSlideBlock, writeSlideBody } from '../../../../src/decks/deckFormat'
+import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, newId, parseSlideBody, withPartHeading, writeSlideBlock, writeSlideBody } from '../../../../src/decks/deckFormat'
 import type { Transaction } from '@tiptap/pm/state'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
@@ -45,7 +45,7 @@ import { DeckGuard } from './handout/deckGuard'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
 import { DeckLines } from './handout/deckLines'
-import { DeckDrawnHeadings } from './handout/drawnHeadings'
+import { DeckDrawnHeadings, handoutMarkFor, hasDrawnHeadings } from './handout/drawnHeadings'
 import { Stage } from './Stage'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
@@ -144,7 +144,8 @@ function partsFragment(editor: TipTapEditor, parts: NewPart[], imageMappings: Re
 
 interface DeckViewProps {
   content: string
-  onChange: (value: string) => void
+  /** The editor's Markdown; with the deck's front matter when this edit changes it too (its `handout: text` mark). */
+  onChange: (value: string, properties?: DocumentProperties) => void
   onEditorReady: (editor: TipTapEditor) => void
   onSelectionChange?: (selection: EditorSelection) => void
   imageMappings: Record<string, string>
@@ -240,14 +241,46 @@ export function DeckView({
 
   // The headings of parts without their own (every part of an older deck), drawn from the slides' titles (16
   // November): put in after the document arrives and after every host update, never as an edit, and never saved until
-  // the person's first edit of the handout writes them (handout/drawnHeadings.ts). Opening a deck writes nothing.
+  // the person's first edit of the handout writes them (handout/drawnHeadings.ts). Opening a deck writes nothing. A
+  // deck marked `handout: text` in its front matter is written that way already: nothing is drawn for it, so a heading
+  // deleted stays deleted.
+  const textHandout = properties[TEXT_HANDOUT_KEY] === TEXT_HANDOUT_VALUE
+  const textHandoutRef = useRef(textHandout)
+  textHandoutRef.current = textHandout
+  const propertiesRef = useRef(properties)
+  propertiesRef.current = properties
+  const editorRef = useRef<TipTapEditor | null>(null)
+  editorRef.current = editor
+  // The mark this view wrote with the first edit: taken out again when Undo brings the drawn headings back.
+  const markAdded = useRef(false)
+  const handleChange = useCallback((markdown: string) => {
+    const current = propertiesRef.current
+    const marked = current[TEXT_HANDOUT_KEY] === TEXT_HANDOUT_VALUE
+    const doc = editorRef.current?.state.doc
+    const mark = handoutMarkFor({ marked, drawn: !doc || hasDrawnHeadings(doc), addedHere: markAdded.current })
+    if (mark === 'add') {
+      // The first real edit of the handout: its headings are written, and the mark goes with them, in this one edit.
+      markAdded.current = true
+      onChange(markdown, { ...current, [TEXT_HANDOUT_KEY]: TEXT_HANDOUT_VALUE })
+      return
+    }
+    if (mark === 'remove') {
+      markAdded.current = false
+      const next = { ...current }
+      delete next[TEXT_HANDOUT_KEY]
+      onChange(markdown, next)
+      return
+    }
+    onChange(markdown)
+  }, [onChange])
+
   useEffect(() => {
     if (!editor) return
     let queued = false
     const draw = () => {
       queued = false
       if (editor.isDestroyed) return
-      const tr = derivedHeadings(editor.state)
+      const tr = derivedHeadings(editor.state, textHandoutRef.current)
       if (tr) editor.view.dispatch(tr)
     }
     const later = () => {
@@ -1076,7 +1109,7 @@ export function DeckView({
           {findBar}
           <Editor
             value={content}
-            onChange={onChange}
+            onChange={handleChange}
             onSelectionChange={onSelectionChange}
             onEditorReady={handleEditorReady}
             placeholder="Write here. *** starts a new slide."
@@ -1086,7 +1119,7 @@ export function DeckView({
             syncTarget={syncTarget}
             onExternalApplied={onExternalApplied}
             extensions={DECK_EXTENSIONS}
-            viewOfIncoming={withDrawnHeadings}
+            viewOfIncoming={textHandout ? undefined : withDrawnHeadings}
           />
           {handoutContainer && startRows && startState && startAt ? createPortal(
             <StartCard

@@ -426,12 +426,12 @@ function fontFaces(fonts: PageFont[]): string {
 const titleOf = (slide: PublicSlide) => (slide.data.title ?? '').trim();
 
 /** The text column's part for one shown slide. */
-function partHtml(slide: PublicSlide, index: number, options: PageOptions, partKey: string): string {
+function partHtml(slide: PublicSlide, index: number, options: PageOptions, partKey: string, textHandout: boolean): string {
   const number = index + 1;
-  // A part's heading is its handout's own (16 November). A part without one (every part of a deck written before this)
-  // shows its slide's title, as the deck view draws it until the first edit writes it.
+  // A part's heading is its handout's own (16 November). A part without one shows its slide's title, as the deck view
+  // draws it until the first edit writes it, unless the deck is marked `handout: text`: then it shows none.
   const { html: body, ownHeading } = handoutParts(slide.handout, { partKey, exercise: slide.kind === 'exercise', pictureUrl: options.pictureUrl, partHeading: true });
-  const title = ownHeading ? '' : titleOf(slide);
+  const title = ownHeading || textHandout ? '' : titleOf(slide);
   if (slide.kind === 'section') {
     const label = `Section${slide.data.number?.trim() ? ` ${slide.data.number.trim()}` : ''}`;
     return `<section class="part sect" data-i="${index}" id="s${number}"><div class="eyebrow">${esc(label)}</div>${title ? `<h2>${esc(title)}</h2>` : ''}\n${body}</section>`;
@@ -491,7 +491,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     const title = titleOf(slide);
     const nth = (titles.get(title) ?? 0) + 1;
     titles.set(title, nth);
-    return partHtml(slide, index, options, `part\u0000${title}\u0000${nth}`);
+    return partHtml(slide, index, options, `part\u0000${title}\u0000${nth}`, deck.textHandout === true);
   });
   const who = `<div class="who"><b>${esc(deck.client)}</b><span>${esc(deck.title)}</span></div>`;
   const foot = [deck.client, deck.title].filter(Boolean).map(esc).join(' · ');

@@ -18,13 +18,13 @@ import { EditorState, Plugin, type Transaction } from '@tiptap/pm/state'
 import { history, undo } from '@tiptap/pm/history'
 import { canonicalMarkdownProjection } from '../../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync/frontMatter'
-import { parseSlideBody, writeSlideBody } from '../../../../../src/decks/deckFormat'
+import { isTextHandout, parseSlideBody, writeSlideBody } from '../../../../../src/decks/deckFormat'
 import { createEditorSchemaExtensions, ensureCommentMarkedPipeline, markdownToEditorHTML } from '../../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../../utils/markdownFidelity'
 import { DeckSlide } from './deckSchema'
 import { DECK_DERIVED, derivedHeadings, withDrawnHeadings } from '../deckDocument'
 import { documentReplacement } from '../../../lib/documentUpdate'
-import { DeckDrawnHeadings, drawnHeadingsFollow } from './drawnHeadings'
+import { DeckDrawnHeadings, drawnHeadingsFollow, handoutMarkFor, hasDrawnHeadings } from './drawnHeadings'
 
 installTestDocument()
 ensureCommentMarkedPipeline()
@@ -280,6 +280,37 @@ const blocksOf = (text: string) => text.match(/```slide[\s\S]*?\n```/g) ?? []
   assert.equal(section.doc.child(1).attrs.level, 1, 'a section\'s drawn heading is an H1')
   assert.equal(section.doc.child(1).attrs.deckDrawn, true)
   assert.equal(save(section.doc), older.replace('```slide points', '```slide section'), 'still not saved')
+}
+
+// The `handout: text` mark (16 November): the first real edit writes the headings and asks for the mark in the same
+// edit; Undo of that edit brings the drawn headings back and takes the mark out again; a marked deck draws nothing, so a
+// heading the person deleted stays deleted when the deck is opened again.
+{
+  const older = '```slide points\nid: p001\ntitle: Agents act\n```\n\nAn agent is given a goal.\n'
+  const { doc, save } = open(older)
+  const plugins = [history(), new Plugin({ appendTransaction: (trs, _old, next) => drawnHeadingsFollow(trs, next) })]
+  const state = EditorState.create({ doc, plugins })
+  const drawn = state.apply(derivedHeadings(state)!)
+  assert.equal(save(drawn.doc), older, 'opening a deck with no mark: byte for byte')
+  assert.equal(handoutMarkFor({ marked: false, drawn: hasDrawnHeadings(drawn.doc), addedHere: false }), null, 'and no mark is asked for')
+  // The first real edit: the heading is written, and the mark goes with it in that same edit.
+  const end = drawn.doc.content.size - 1
+  const edited = drawn.apply(drawn.tr.insertText(' It acts.', end))
+  assert.ok(save(edited.doc).includes('## Agents act\n\nAn agent is given a goal. It acts.'))
+  assert.equal(handoutMarkFor({ marked: false, drawn: hasDrawnHeadings(edited.doc), addedHere: false }), 'add')
+  // One undo: the edit and its headings go back together, and the mark with them.
+  let undone: EditorState = edited
+  undo(edited, (tr: Transaction) => { undone = edited.apply(tr) })
+  assert.equal(save(undone.doc), older)
+  assert.equal(handoutMarkFor({ marked: true, drawn: hasDrawnHeadings(undone.doc), addedHere: true }), 'remove')
+  assert.equal(handoutMarkFor({ marked: true, drawn: true, addedHere: false }), null, "a mark this view didn't add stays")
+
+  // A marked deck whose part's heading the person deleted: reopened, nothing is drawn, so the heading stays deleted.
+  const marked = '---\ndeck: 1\nhandout: text\n---\n\n```slide points\nid: p001\ntitle: Agents act\n```\n\nAn agent is given a goal.\n'
+  const reopened = open(marked)
+  assert.equal(isTextHandout(marked), true)
+  assert.equal(derivedHeadings(EditorState.create({ doc: reopened.doc }), isTextHandout(marked)), null, 'a marked deck draws nothing')
+  assert.equal(reopened.save(reopened.doc), marked)
 }
 
 // A new deck's title slide ("The deck's title", to be typed over): its part's heading is drawn empty, so it shows the

@@ -7,7 +7,9 @@
  *  - the new slide is a Statement with a new id, waiting for its layout (Jarmo, 15 November: "las ootab");
  *  - the heading right after the line (an H1 or H2, the part's own) becomes its title, once, as it is made; after that
  *    the two never change each other;
- *  - with no such heading after the line, the new part opens with an empty H2 and the caret goes there.
+ *  - with no such heading after the line, the new part opens with an empty H2 and the caret goes there; the slide then
+ *    waits, and takes the first heading the person writes in its part as its title, once (`firstHeadingTitlePlugin`,
+ *    as every slide with no title does).
  *
  * A line inside a list, a quote or any other block stays a line, and so does a line that arrives by paste or drop
  * (pasted text with lines in it isn't turned into slides in this cut), by undo or redo, from the host, or from a
@@ -18,7 +20,8 @@ import { Extension } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { newId, writeSlideBody } from '../../../../../src/decks/deckFormat'
-import { DECK_DERIVED, DECK_OPERATION, emptyPartHeading, isSlideNode, slideDataOf } from '../deckDocument'
+import { DECK_DERIVED, DECK_OPERATION, emptyPartHeading, isSlideNode, partHeadingAt, slideDataOf, slidesOf } from '../deckDocument'
+import { passes } from './drawnHeadings'
 import { isTrustedDeckTransaction } from './deckGuard'
 
 export const deckLinesKey = new PluginKey('deckLines')
@@ -116,6 +119,75 @@ export function deckLinesPlugin(random: () => number = Math.random): Plugin {
   })
 }
 
+// ---------------------------------------------------------------------------
+// A slide with no title takes the first heading written in its part (16 November, the Experience lead)
+// ---------------------------------------------------------------------------
+
+export const firstHeadingTitleKey = new PluginKey<ReadonlySet<string>>('deckFirstHeadingTitle')
+
+/** A part's own heading, written (not drawn), with words: its text, and where it lies. */
+function writtenHeadingOf(doc: PMNode, slidePos: number): { text: string; from: number; to: number } | null {
+  const heading = partHeadingAt(doc, slidePos)
+  if (!heading || heading.node.attrs.deckDrawn === true) return null
+  const text = heading.node.textContent.trim()
+  return text ? { text, from: heading.pos, to: heading.pos + heading.node.nodeSize } : null
+}
+
+/**
+ * The slides waiting for a title from their part's first heading: a slide with no title whose part's own heading the
+ * person just wrote or changed. Its title is set once the caret has left that heading (so a heading typed letter by
+ * letter gives its whole words, not its first letter), and never again: a slide with a title is never waiting, and
+ * the title is never overwritten. Undo, redo, the host's updates and drawn headings never make a slide wait.
+ */
+export function waitingAfter(waiting: ReadonlySet<string>, tr: Transaction, before: PMNode, after: PMNode): ReadonlySet<string> {
+  if (!tr.docChanged) return waiting
+  const person = !passes(tr)
+  const was = new Map<string, string>()
+  if (person) {
+    for (const slide of slidesOf(before)) {
+      if (slide.data.id) was.set(slide.data.id, writtenHeadingOf(before, slide.pos)?.text ?? '')
+    }
+  }
+  const next = new Set<string>()
+  for (const slide of slidesOf(after)) {
+    const id = slide.data.id
+    if (!id || (slide.data.title ?? '').trim()) continue
+    if (waiting.has(id)) { next.add(id); continue }
+    if (!person) continue
+    const heading = writtenHeadingOf(after, slide.pos)
+    if (heading && heading.text !== (was.get(id) ?? '')) next.add(id)
+  }
+  return next.size === waiting.size && [...next].every(id => waiting.has(id)) ? waiting : next
+}
+
+/** The titles of the waiting slides whose heading the caret has left, as one transaction; null when there are none. */
+export function titlesFromHeadings(state: EditorState): Transaction | null {
+  const waiting = firstHeadingTitleKey.getState(state)
+  if (!waiting || waiting.size === 0) return null
+  const tr = state.tr
+  const { from, to } = state.selection
+  for (const slide of slidesOf(state.doc)) {
+    const id = slide.data.id
+    if (!id || !waiting.has(id) || (slide.data.title ?? '').trim()) continue
+    const heading = writtenHeadingOf(state.doc, slide.pos)
+    if (!heading || (from >= heading.from && to <= heading.to)) continue
+    tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, body: writeSlideBody(slide.node.attrs.body, { ...slide.data, title: heading.text }) })
+  }
+  return tr.docChanged ? tr.setMeta(DECK_OPERATION, true) : null
+}
+
+/** The plugin that gives a slide with no title its part's first heading (the tests run it with the editor's history). */
+export function firstHeadingTitlePlugin(): Plugin<ReadonlySet<string>> {
+  return new Plugin<ReadonlySet<string>>({
+    key: firstHeadingTitleKey,
+    state: {
+      init: () => new Set<string>(),
+      apply: (tr, waiting, oldState, newState) => waitingAfter(waiting, tr, oldState.doc, newState.doc),
+    },
+    appendTransaction: (_transactions, _oldState, newState) => titlesFromHeadings(newState),
+  })
+}
+
 export const DeckLines = Extension.create({
   name: 'deckLines',
 
@@ -142,6 +214,6 @@ export const DeckLines = Extension.create({
   },
 
   addProseMirrorPlugins() {
-    return [deckLinesPlugin()]
+    return [deckLinesPlugin(), firstHeadingTitlePlugin()]
   },
 })

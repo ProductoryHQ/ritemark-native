@@ -27,6 +27,22 @@ function isDrawn(node: PMNode): boolean {
   return node.type.name === 'heading' && node.attrs.deckDrawn === true
 }
 
+/** Does the document hold a drawn heading, one not written yet? */
+export function hasDrawnHeadings(doc: PMNode): boolean {
+  return drawnAt(doc).length > 0
+}
+
+/**
+ * The deck's `handout: text` mark for an edit the editor reports (16 November): added with the first edit after which
+ * no heading is drawn (its headings written), and taken out again when Undo brings drawn headings back, if this view
+ * added it. Null: the front matter stays as it is.
+ */
+export function handoutMarkFor(input: { marked: boolean; drawn: boolean; addedHere: boolean }): 'add' | 'remove' | null {
+  if (!input.marked && !input.drawn) return 'add'
+  if (input.marked && input.drawn && input.addedHere) return 'remove'
+  return null
+}
+
 /** The drawn headings at the top level: each one's position. */
 function drawnAt(doc: PMNode): number[] {
   const found: number[] = []
@@ -35,7 +51,7 @@ function drawnAt(doc: PMNode): number[] {
 }
 
 /** A transaction the drawn headings leave alone: theirs, the host's, undo and redo. */
-function passes(tr: Transaction): boolean {
+export function passes(tr: Transaction): boolean {
   return tr.getMeta(DECK_DERIVED) === true
     || tr.getMeta('ritemarkDocumentRevision') !== undefined
     || tr.getMeta('preventUpdate') === true

@@ -7,7 +7,7 @@
  * from any other deck, is a copy carrying `from: <path>#<id> @<stamp>`. The UI and the AI's tools call the same
  * operations here (README decision 9, dual use).
  */
-import { deckVersionOf, isReadableDeckVersion, newId, parseFrom, parseSlideBody, withPartHeading, writeFrom, writeSlideBody, type SlideData } from './deckFormat';
+import { deckVersionOf, isReadableDeckVersion, newId, parseFrom, parseSlideBody, withPartHeading, withWrittenHandout, writeFrom, writeSlideBody, type SlideData } from './deckFormat';
 import {
   appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp, slideStamps,
   slidesOfText, type DeckSlideText,
@@ -208,8 +208,10 @@ export class DeckLibrary {
       if (!(await intoView(parts, at - 1))) throw new Error(`${deckName(targetPath)} is open but didn't take the slides. Nothing was inserted; try again.`);
     } else {
       // Making a part writes its heading (16 November), as the deck view does: the copy's handout opens with its heading.
+      // A deck written before that gets its other parts' headings and its `handout: text` mark with it, as the view's
+      // first edit writes them, so none of its parts goes without the heading it showed.
       const written = parts.map(part => partText(part.kind, part.body, withPartHeading(part.kind, parseSlideBody(part.body), part.handout)));
-      await this.files.write(targetPath, insertPartsText(text, at, written));
+      await this.files.write(targetPath, insertPartsText(withWrittenHandout(text), at, written));
     }
     return { first: at + 1, count: parts.length };
   }

@@ -515,12 +515,19 @@ function App() {
     return true
   }, [documentSync, postDocumentEdit])
 
-  const handleContentChange = (newContent: string) => {
+  /** `nextProperties`: a mode's front matter change that belongs to this very edit (a deck's `handout: text` mark), sent
+   *  with it as one document edit. */
+  const handleContentChange = (newContent: string, nextProperties?: DocumentProperties) => {
     // Defense in depth: an editor update identical to the accepted host value
     // is not a document edit and must never make the tab dirty.
-    if (newContent === contentRef.current) return
+    if (newContent === contentRef.current && !nextProperties) return
     contentRef.current = newContent
     setContent(newContent)
+    if (nextProperties) {
+      propertiesRef.current = nextProperties
+      setProperties(nextProperties)
+      setHasProperties(Object.keys(nextProperties).length > 0)
+    }
     const currentProperties = propertiesRef.current
     if (!sendDocumentEdit({ fileType: 'markdown', content: newContent, properties: currentProperties })) {
       sendToExtension('contentChanged', { content: newContent, properties: currentProperties })

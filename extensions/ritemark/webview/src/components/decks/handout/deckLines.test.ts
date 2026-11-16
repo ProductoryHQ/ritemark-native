@@ -16,7 +16,7 @@ import { editorMarkdown, installTestDocument } from '../../../utils/markdownFide
 import { parseSlideBody } from '../../../../../src/decks/deckFormat'
 import { DeckSlide } from './deckSchema'
 import { deckGuardPlugin } from './deckGuard'
-import { deckLinesPlugin } from './deckLines'
+import { deckLinesPlugin, firstHeadingTitlePlugin } from './deckLines'
 
 installTestDocument()
 const schema = getSchema(createEditorSchemaExtensions({ deck: [DeckSlide] }))
@@ -29,7 +29,7 @@ const line = () => schema.nodes.horizontalRule.create()
 function stateOf(nodes: PMNode[]): EditorState {
   let seed = 0
   const random = () => ((seed++ * 7) % 36) / 36
-  return EditorState.create({ doc: schema.nodes.doc.create(null, nodes), plugins: [history(), deckGuardPlugin(), deckLinesPlugin(random)] })
+  return EditorState.create({ doc: schema.nodes.doc.create(null, nodes), plugins: [history(), deckGuardPlugin(), deckLinesPlugin(random), firstHeadingTitlePlugin()] })
 }
 
 const slides = (doc: PMNode) => {
@@ -188,5 +188,48 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
   assert.ok(editorMarkdown(state.doc).includes('```slide statement'), 'the slide block is still in the file')
   assert.equal(editorMarkdown(state.doc).split('```slide').length, saved.split('```slide').length)
 }
+
+// A slide with no title takes the first heading written in its part as its title, once the caret has left that heading,
+// and only once; a title that isn't empty is never overwritten (16 November, the Experience lead).
+{
+  const titleOf = (state: EditorState, index: number) => parseSlideBody(slides(state.doc)[index].attrs.body).title
+  // A slide made from a line, with no heading under it: its part opens with an empty H2 and the caret in it.
+  let state = typeLine(stateOf(before), 3)
+  assert.equal(titleOf(state, 1), undefined)
+  const typeAt = (text: string) => { state = state.apply(state.tr.insertText(text)) }
+  typeAt('Q')
+  typeAt('uestions')
+  assert.equal(titleOf(state, 1), undefined, 'while the heading is being typed, the slide waits')
+  // The caret leaves the heading (into the words under it): the heading is the title now, whole.
+  let end = -1
+  state.doc.forEach((node, pos) => { if (node.type.name === 'paragraph' && node.textContent === 'Still in one.') end = pos + 1 })
+  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, end)))
+  assert.equal(titleOf(state, 1), 'Questions', 'the first heading written is the title')
+  // Once: changing the heading later leaves the title as it is.
+  let headingPos = -1
+  state.doc.forEach((node, pos) => { if (node.type.name === 'heading' && node.textContent === 'Questions') headingPos = pos })
+  state = state.apply(state.tr.insertText(' and answers', headingPos + 1 + 'Questions'.length))
+  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, end)))
+  assert.equal(titleOf(state, 1), 'Questions', 'only once: the heading and the title are their own from then on')
+}
+
+// A title that isn't empty stays as it is, whatever heading is written in its part.
+{
+  let state = stateOf([slide('aaaa', 'One'), heading(2, ''), paragraph('Words.')])
+  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, state.doc.child(0).nodeSize + 1)))
+  state = state.apply(state.tr.insertText('Another heading'))
+  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, state.doc.content.size - 1)))
+  assert.equal(parseSlideBody(slides(state.doc)[0].attrs.body).title, 'One')
+}
+
+// A heading that came from the host (the file, an AI's edit) never fills a title: only the person's own writing does.
+{
+  let state = stateOf([slide('aaaa', ''), heading(2, ''), paragraph('Words.')])
+  const at = state.doc.child(0).nodeSize + 1
+  state = state.apply(state.tr.insertText('From the file', at).setMeta('ritemarkDocumentRevision', 2))
+  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, state.doc.content.size - 1)))
+  assert.equal(parseSlideBody(slides(state.doc)[0].attrs.body).title ?? '', '', 'opening or a host update writes nothing')
+}
+
 
 console.log('deckLines: passed')
