@@ -71,6 +71,9 @@ interface EditorProps {
   viewOfIncoming?: (doc: PMNode) => PMNode
 }
 
+/** A Text document's column: the editor's box is at most this wide, centred (a deck's handout alone takes it too). */
+export const TEXT_COLUMN_WIDTH = 900
+
 export function Editor({
   value,
   onChange,
@@ -811,7 +814,7 @@ export function Editor({
           color: var(--r-ink-body) !important;
           caret-color: var(--r-ink-body) !important;
           max-width: 100% !important;
-          max-width: 900px !important;
+          max-width: ${TEXT_COLUMN_WIDTH}px !important;
           margin: 0 auto !important;
           padding: 2rem 2rem 0 4rem !important; /* Extra left padding for drag handle */
         }
