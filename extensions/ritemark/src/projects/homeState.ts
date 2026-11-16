@@ -7,6 +7,7 @@
 import { createHash } from 'crypto';
 import * as path from 'path';
 import { isAboutFile, isRootClaudeFile, ABOUT_TITLE } from './aboutFile';
+import { isDeckPath } from '../decks/deckMode';
 import type { AiName, HomeRecentItem, HomeWaitingItem, RecentKind } from './protocol';
 import type { ProjectWaiting } from './waiting';
 
@@ -28,6 +29,8 @@ export const RECENT_EXTENSIONS: readonly string[] = Object.keys(KINDS);
 
 export function kindOf(fileName: string): RecentKind {
   if (fileName.toLowerCase().endsWith('.flow.json')) return 'flow';
+  // A deck is a slides file, so Last changed shows it with the deck's own icon, as its tab does (Sprint 159)
+  if (isDeckPath(fileName)) return 'slides';
   return KINDS[path.extname(fileName).toLowerCase()] ?? 'other';
 }
 

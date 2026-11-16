@@ -113,6 +113,12 @@
     },
     "_file_audio_dark": {
       "iconPath": "./icons/dark/waveform.svg"
+    },
+    "_file_deck": {
+      "iconPath": "./icons/presentation.svg"
+    },
+    "_file_deck_dark": {
+      "iconPath": "./icons/dark/presentation.svg"
     }
   },
   "file": "_file_dark",
@@ -120,6 +126,7 @@
   "folderExpanded": "_folder_open_dark",
   "fileExtensions": {
     "flow.json": "_file_flow_dark",
+    "deck.md": "_file_deck_dark",
     "md": "_file_markdown_dark",
     "mdx": "_file_markdown_dark",
     "markdown": "_file_markdown_dark",
@@ -195,6 +202,7 @@
     "folderExpanded": "_folder_open",
     "fileExtensions": {
       "flow.json": "_file_flow",
+      "deck.md": "_file_deck",
       "md": "_file_markdown",
       "mdx": "_file_markdown",
       "markdown": "_file_markdown",

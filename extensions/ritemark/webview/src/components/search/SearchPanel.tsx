@@ -51,6 +51,7 @@ import './search.css'
 const ROWS_AT_A_TIME = 60
 
 const FORMAT_ICONS: Record<string, PhosphorIconName> = { markdown: 'file-text', docx: 'file-doc', pdf: 'file-pdf', csv: 'table' }
+const DECK_FILE = /\.deck\.md$/i
 
 function Marked({ text, marks }: MarkedText) {
   const parts: ReactNode[] = []
@@ -68,7 +69,8 @@ function Marked({ text, marks }: MarkedText) {
 
 function KindIcon({ result }: { result: SearchResult }) {
   if (result.kind === 'chat') return <ConversationBubbleIcon identityColorSlot={result.colorSlot ?? 0} size={14} />
-  const name: PhosphorIconName = result.kind === 'task' ? 'check-square' : FORMAT_ICONS[result.format ?? 'markdown'] ?? 'file-text'
+  // A deck (`*.deck.md`) shows Phosphor's presentation wherever a file shows, as in its tab (Sprint 159, deck icons)
+  const name: PhosphorIconName = result.kind === 'task' ? 'check-square' : DECK_FILE.test(result.path ?? '') ? 'presentation' : FORMAT_ICONS[result.format ?? 'markdown'] ?? 'file-text'
   return <Icon name={name} size={14} tone="inherit" />
 }
 
