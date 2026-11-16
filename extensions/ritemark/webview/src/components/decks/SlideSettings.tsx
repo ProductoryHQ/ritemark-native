@@ -16,7 +16,7 @@ import { Label } from '../ui/label'
 import { SegmentedControl } from '../ui/segmented-control'
 import { Switch } from '../ui/switch'
 import { Tooltip } from '../ui/tooltip'
-import { oneLine, undoKeyOf } from './slide/slideEdits'
+import { oneLine, setPath, undoKeyOf } from './slide/slideEdits'
 
 /** A small picture of a layout: a few bars, as the prototype's `.lay .pic`. */
 function Bars({ bars }: { bars: Array<[number, number, number, number]> }) {
@@ -108,7 +108,11 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
             className="deck-settings-field"
             placeholder={EXERCISE_TAG}
             value={exerciseTagOf(data)}
-            onChange={event => onChange({ tag: oneLine(event.target.value) })}
+            onChange={event => {
+              // Through the pill's own rule (`setPath`): words as they were write nothing.
+              const next = setPath(data, 'tag', oneLine(event.target.value))
+              if (next !== data) onChange({ tag: next.tag })
+            }}
             onKeyDown={event => {
               const step = undoKeyOf({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, isComposing: event.nativeEvent.isComposing })
               if (!step) return

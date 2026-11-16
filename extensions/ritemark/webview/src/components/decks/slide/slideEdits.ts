@@ -55,8 +55,12 @@ export function setPath(data: SlideData, path: string, value: string): SlideData
   if (path === 'title' || path === 'subtitle' || path === 'number') {
     return { ...data, [path]: value === '' ? undefined : value }
   }
-  // A pill of spaces draws none (`exerciseTagOf`), so it is saved as none: the file never holds `tag: " "`.
-  if (path === 'tag') return { ...data, tag: value.trim() ? value : '' }
+  if (path === 'tag') {
+    // A pill of spaces draws none (`exerciseTagOf`), so it is saved as none: the file never holds `tag: " "`.
+    const tag = value.trim() ? value : ''
+    // Words as they were write nothing: a deck without the line keeps it missing (never `tag: Exercise`).
+    return tag === exerciseTagOf(data) ? data : { ...data, tag }
+  }
   const item = itemPath(path)
   if (item) {
     const items: SlideItem[] = [...(data.items ?? [])]

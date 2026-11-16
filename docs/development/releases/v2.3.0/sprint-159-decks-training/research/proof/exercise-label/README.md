@@ -30,6 +30,14 @@ When main's source files are put back under this branch's tests, the tests fail:
    - Cmd+Z in the field put back `tag: ""` in one step, and Cmd+Shift+Z put back `tag: Harjutus`.
 8. **The file after it all** (`deck-after-edits.diff.txt`) differs from the demo deck only by that one line, `tag: ""`.
 
+## Focusing and leaving without typing writes nothing (the Experience lead's guard)
+
+This was run on the merged head with the guard in place (`focus-writes-nothing.txt`). On a fresh copy of the deck, which has no `tag:` line:
+- I clicked into the Label field, which shows "Exercise", and left it.
+- I clicked into the pill and left it.
+
+The file kept its SHA-256 and has no `tag:` line (`guard-label-focused-1440.png`, `guard-pill-focused-1440.png`). Writing the words already shown is now no write at all: `setPath` returns the same data, and the Label row goes through it.
+
 ## Found while shooting
 
 When its words are deleted, Chromium leaves a `<br>` in the pill, so the pill never read as `:empty` and the faint "Exercise" didn't show. The first try showed an empty pill with no placeholder. `SlideCanvas` now clears a box that empties, keeping the caret in it. Step 4 was shot after that fix. The fix applies to every box on the stage, the title too. I did not check whether the title's placeholder had the same fault.

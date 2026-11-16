@@ -256,4 +256,34 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
   assert.match(css, /\.deck-sl \.tag\[contenteditable\]:focus \{ text-overflow: clip; \}/)
 }
 
+// ---- The Experience lead's guard (16 November): focusing the Label row or the pill and leaving it without typing
+// writes nothing. The DOM writes only on `input` (the pill) and `change` (the row), never on focus or blur; and a write
+// of the words as they were is no write at all, through the one rule both use (`setPath`).
+{
+  installTestDocument()
+  const schema = getSchema(createEditorSchemaExtensions({ deck: [DeckSlide] }))
+  const unchanged = (body: string, label: string) => {
+    const data = parseSlideBody(body)
+    const shown = valueAt(data, 'tag')
+    // The Label row's onChange and the pill's onText both go through setPath with the words they show.
+    assert.equal(setPath(data, 'tag', oneLine(shown)), data, `${label}: the same words are the same data`)
+    // The stage's write: the body is rewritten from that data, and is the body as it was, so nothing is dispatched.
+    assert.equal(writeSlideBody(body, setPath(data, 'tag', shown)), body, `${label}: the stage writes nothing`)
+    // The deck view's write (Settings): no transaction at all, so the document, the undo history and the file stay.
+    const doc = schema.nodes.doc.create(null, [schema.nodes.deckSlide.create({ kind: 'exercise', body, notes: null })])
+    const state = EditorState.create({ doc })
+    assert.equal(updateSlide(state, 0, setPath(slidesOf(state.doc)[0].data, 'tag', shown)), null, `${label}: Settings dispatches nothing`)
+  }
+  unchanged(BODY, 'no tag: line (the field and the pill show "Exercise")')
+  unchanged(BODY.replace('title: Try it', 'title: Try it\ntag: Harjutus'), 'tag: Harjutus')
+  unchanged(BODY.replace('title: Try it', 'title: Try it\ntag: ""'), 'tag: ""')
+  unchanged(BODY.replace('title: Try it', 'title: Try it\ntag: "  "'), 'tag of spaces')
+  // The deck file as a whole: no line written, byte for byte.
+  const body = parseDeck(DECK).slides[0].body
+  assert.equal(DECK.replace(body, writeSlideBody(body, setPath(parseSlideBody(body), 'tag', 'Exercise'))), DECK)
+  // Typing the default over a missing line writes nothing either; any other words do.
+  assert.equal(setPath(parseSlideBody(BODY), 'tag', 'Exercise').tag, undefined)
+  assert.equal(setPath(parseSlideBody(BODY), 'tag', 'Exercis').tag, 'Exercis')
+}
+
 console.log('exerciseTag: passed')
