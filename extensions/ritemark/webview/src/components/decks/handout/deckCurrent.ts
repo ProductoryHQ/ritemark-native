@@ -41,7 +41,7 @@ export function deckDecorations(doc: PMNode, current: number | null): Decoration
     if (index === current) found.push(Decoration.node(slide.pos, slide.pos + slide.size, { class: 'is-current' }))
     const heading = partHeadingAt(doc, slide.pos)
     if (heading && heading.node.childCount === 0) {
-      found.push(Decoration.node(heading.pos, heading.pos + heading.node.nodeSize, { class: 'deck-empty', 'data-placeholder': HEADING_PLACEHOLDER }))
+      found.push(Decoration.node(heading.pos, heading.pos + heading.node.nodeSize, { class: 'deck-empty', 'data-deck-placeholder': HEADING_PLACEHOLDER }))
     }
     if (index !== current) return
     // The part's own words: every block after its heading, up to the next slide. Empty: the first empty paragraph says how.
@@ -55,7 +55,7 @@ export function deckDecorations(doc: PMNode, current: number | null): Decoration
       if (!first) first = { pos, size: node.nodeSize }
       pos += node.nodeSize
     }
-    if (first) found.push(Decoration.node(first.pos, first.pos + first.size, { class: 'deck-empty', 'data-placeholder': PART_PLACEHOLDER }))
+    if (first) found.push(Decoration.node(first.pos, first.pos + first.size, { class: 'deck-empty', 'data-deck-placeholder': PART_PLACEHOLDER }))
   })
   return found.length ? DecorationSet.create(doc, found) : DecorationSet.empty
 }

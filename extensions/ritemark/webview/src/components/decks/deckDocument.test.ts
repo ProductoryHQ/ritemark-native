@@ -137,7 +137,7 @@ assert.equal(partIndexAt(doc, slidesOf(doc)[1].pos + 3), 1)
   const deck = schema.nodes.doc.create(null, [slide('aaaa', 'A'), heading(2, ''), schema.nodes.paragraph.create(), slide('bbbb', 'B'), heading(2, 'B'), schema.nodes.paragraph.create()])
   // A node decoration's attributes (prosemirror-view keeps them on its `type`).
   const attrsOf = (found: unknown) => (found as { type: { attrs: Record<string, string> } }).type.attrs
-  const marks = (current: number | null) => deckDecorations(deck, current).find().map(found => attrsOf(found)['data-placeholder'] ?? attrsOf(found).class)
+  const marks = (current: number | null) => deckDecorations(deck, current).find().map(found => attrsOf(found)['data-deck-placeholder'] ?? attrsOf(found).class)
   assert.deepEqual(marks(1).filter(Boolean).sort(), ['Heading', 'Write here. *** starts a new slide.', 'is-current'].sort())
   assert.deepEqual(marks(0).filter(Boolean).sort(), ['Heading', 'Write here. *** starts a new slide.', 'is-current'].sort())
   assert.deepEqual(marks(null).filter(Boolean), ['Heading'], 'no current part: only the empty heading says so')

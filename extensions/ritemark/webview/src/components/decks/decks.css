@@ -84,7 +84,7 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-handout .wysiwyg-editor .ProseMirror > .deck-part-head + :is(h1, h2) { margin-right: 40px !important; }
 .deck-handout .wysiwyg-editor .ProseMirror > .deck-part-head.is-skip + :is(h1, h2) { color: var(--r-ink-muted) !important; }
 /* The placeholders: a part's empty heading, and the current part's empty text (deckCurrent.ts) */
-.deck-handout .wysiwyg-editor .ProseMirror .deck-empty::before { content: attr(data-placeholder); float: left; height: 0; color: var(--r-ink-faint); pointer-events: none; }
+.deck-handout .wysiwyg-editor .ProseMirror .deck-empty::before { content: attr(data-deck-placeholder); float: left; height: 0; color: var(--r-ink-faint); pointer-events: none; }
 
 /* The slide itself (.deck-slide, .deck-sl): slide/slide.css, imported by SlideCanvas */
 

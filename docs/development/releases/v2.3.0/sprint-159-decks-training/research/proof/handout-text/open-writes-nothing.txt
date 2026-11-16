@@ -1,0 +1,5 @@
+checked 18:08:35
+6e7c409db4ad41a965c5a26bee77a62378527342c3fa9a5575504746dfbd93fc  <copy taken before the launch>
+6e7c409db4ad41a965c5a26bee77a62378527342c3fa9a5575504746dfbd93fc  <demo project>/Harbour Logistics/AI assistants and agents.deck.md
+cmp: byte-identical
+mtime: Nov 16 17:37:20 2026

@@ -1,0 +1,40 @@
+32c32
+< Three hours, two exercises, one break at the half.
+---
+> ## Today
+33a34,35
+> Three hours, two exercises, one break at the half. Bring water.
+> 
+39a42,43
+> ## Shared prompt board
+> 
+47a52,53
+> # Why agents?
+> 
+57a64,65
+> ## Why talk about agents?
+> 
+78a87,88
+> ## An assistant's four parts
+> 
+97a108,109
+> ## Assistant or agent: which one?
+> 
+109a122,123
+> ## Build an assistant for one task
+> 
+126a141,142
+> # Scheduled prompts
+> 
+142a159,160
+> ## A scheduled prompt, step by step
+> 
+155a174,175
+> ## Which tool for which data
+> 
+164a185,186
+> ## What a clean table looks like
+> 
+172a195,196
+> ## What to try on Monday
+> 
