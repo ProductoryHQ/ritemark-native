@@ -579,10 +579,16 @@ export function parseDeck(text: string): ParsedDeck {
 /**
  * A deck's text from its document's front matter (the theme and the look) and a view's body, front matter left out:
  * what Publish builds the page from, since the view's newest words may not have reached the document yet (Sprint 159).
+ *
+ * `editorBody` is the body the editor gave the view for this document. When the editor couldn't take the front matter
+ * off (its YAML doesn't read, so the view was given the whole text), the view's body holds the front matter too, in
+ * the editor's own shape, and can't be told from it: the document as saved is used then, whose front matter
+ * `publicDeck` reads and leaves out exactly (fails closed; its newest words may lag).
  */
-export function withFrontMatter(documentText: string, body: string): string {
-  const text = documentText.replace(/^﻿/, '');
+export function withFrontMatter(documentText: string, body: string, editorBody: string): string {
+  const text = documentText.replace(/^\uFEFF/, '');
   const head = text.slice(0, parseDeck(text).bodyStart);
+  if (head && parseDeck(editorBody.replace(/^\uFEFF/, '')).bodyStart > 0) return documentText;
   return head && !head.endsWith('\n') ? `${head}\n${body}` : head + body;
 }
 

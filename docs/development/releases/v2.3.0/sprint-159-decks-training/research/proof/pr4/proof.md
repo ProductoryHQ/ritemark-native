@@ -11,7 +11,8 @@ Nothing was sent anywhere. Two kinds of proof:
 - **Edits to the deck.**
   - A change to the speaker notes and to a skipped slide writes the same page. It doesn't show as changed.
   - A public edit shows "changed". Update the page then goes without the sheet (same pictures, nothing key-shaped), keeps the address, and the change is gone after it.
-- **A first publish cancelled in the sheet** leaves no record and no failure line. The deck's bar reads that state as a cancel and takes its page back.
+- **How the bar's Publish ends.** `publishFromBar` says how it ended. A cancel in the sheet is `cancelled`, with no record and no failure line. A second press while the sheet is open is `busy` and changes nothing, and the first press is still a cancel. A failed upload is `failed`, with its line, and the next press is `published`. Before the whole-window sheet, Publish is `not-ready`. The deck's bar takes its page back only on a cancel, a refusal or `not-ready`, never on `busy` or `failed`.
+- **The sheet's rows only when the sheet shows.** An unchanged Update goes without the sheet and without asking for its rows.
 
 ## In the dev window, at 1440 × 900
 
@@ -25,10 +26,28 @@ Nothing was sent anywhere. Two kinds of proof:
 | `pr4-chip-changed-1440.png` | After a public edit on disk ("two short breaks"): "Published · changed". |
 | `pr4-chip-menu-changed-1440.png` | The menu, with Update the page available. |
 
-The thumbnails carry their fit for Publish (`data-step`, all 0 for the demo deck).
+The thumbnails carry their fit (`data-step`, all 0 for the demo deck).
+
+## The review's fixes, in a second dev window (same isolation, Decks on, no account)
+
+A copy of the demo project with two more decks: "Fit check", whose second slide needs one size smaller to fit, and "Broken front", whose front matter has a colon in a value (`subtitle: Training: Day 1`) and a test word (`client: FRONTWORDQXZ`).
+
+- **The fit, with the strip hidden.**
+  - With the strip shown, the thumbnails measured `[0, 1, 0]`.
+  - The strip was hidden, so no thumbnail was there, and Publish was pressed twice in one go. `Fit check.html` was written, and one sheet opened (`pr4-two-presses-one-sheet-1440.png`).
+  - The written page was compared with the page built for each possible list of steps. It is byte for byte the page for `[0, 1, 0]`, and differs from `[0, 0, 0]`, which is what the bar sent before this fix.
+- **Cancel takes the page back.** After Cancel, the folder held only the decks again. The take-back now comes from the flow's own `cancelled`.
+- **A front matter the editor can't read.** The deck view shows such a front matter as words at the top of its handout (`pr4-broken-front-matter-view-1440.png`). That is the editor's own rule, unchanged here. The page written for it has neither `FRONTWORDQXZ` nor `Training: Day`, and it has the handout's words. Cancel took it back too.
+- **Decks turned off in Settings** hid the bar's Publish at once, and turned on again showed it.
+
+Fault first for the front matter: with `withFrontMatter`'s fail-closed line taken out, `publicDeck.test.ts` fails with `the front matter's words reached the page ("subtitle: Training: Day 1")`, and passes with it back.
+
+Every shot in this window carries a dev-build toast, "Activating extension 'GitHub.copilot-chat' failed…". It comes from VS Code's own built-in Copilot Chat in the development build, not from Ritemark or this PR, and Ritemark's release builds don't ship that extension.
 
 ## Not verified
 
 - A real publish, Update and Unpublish against Cloudflare, and the page on a phone. Only Jarmo can run these, on his account.
 - Copy link and See online in the window. They are 2.2's commands; Copy link would have written to the computer's clipboard.
 - Publishing…, Unpublishing… and the menu's actions with a connected account in a window (they are covered by the unit tests).
+- In a window: the page built from words typed a moment before the press, before the document has them. It wasn't tried; `withFrontMatter`'s tests cover the joining.
+- In a window: a press while the page's sheet is open from the browser's bar. `isBusy` and `busy` are covered by the unit tests.

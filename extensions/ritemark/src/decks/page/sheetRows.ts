@@ -58,7 +58,7 @@ function* walk(tokens: ReadonlyArray<{ type: string; tokens?: unknown; items?: u
 
 /** The deck's counts for the sheet. */
 export function deckCounts(text: string, theme: DeckTheme): DeckCounts {
-  const parsed = parseDeck(text.replace(/^﻿/, ''));
+  const parsed = parseDeck(text.replace(/^\uFEFF/, ''));
   const deck = publicDeck(text, { folderName: '', deckName: '', theme });
   return {
     slides: deck.slides.length,

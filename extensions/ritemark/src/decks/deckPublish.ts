@@ -25,8 +25,9 @@ import { isEnabled } from '../features';
 import { openInIntegratedBrowser } from '../browser/IntegratedBrowser';
 import type { PublishFeature } from '../publish/vscodePublish';
 import { COPY_LINK_COMMAND, PAGE_STATE_COMMAND, UNPUBLISH_PAGE_COMMAND } from '../publish/vscodePublish';
-import { WORKERS_DEV_ADDRESS, type PageBarState } from '../publish/PublishController';
-import { normalizeForCompare, sameFile } from '../utils/pathIdentity';
+import { WORKERS_DEV_ADDRESS, type PageBarState, type PublishOutcome } from '../publish/PublishController';
+import { splitFrontMatter } from '../editorSync/frontMatter';
+import { normalizeForCompare, samePath } from '../utils/pathIdentity';
 import { parseDeck, withFrontMatter } from './deckFormat';
 import { BUILT_IN_THEME, parseTheme, type DeckTheme } from './deckTheme';
 import { readDeckTheme } from './deckPages';
@@ -40,6 +41,8 @@ const CHANGED_MS = 800;
 
 /** Why Publish stopped before 2.2's Publish began: the page file couldn't be made or written. */
 export const PAGE_NOT_WRITTEN = "Ritemark couldn't write the page beside this deck, so nothing was published.";
+/** Publish pressed while the page's own Publish is open or going up (from the browser's bar): 2.2's words for it. */
+export const PAGE_BUSY = 'This page is being published.';
 
 /** One open deck view the bar's Publish speaks for, and 2.2's last answer for its page. */
 interface DeckSeat {
@@ -155,7 +158,7 @@ export class DeckPublisher implements vscode.Disposable {
 
   private async refreshPage(pagePath: string): Promise<void> {
     for (const seat of this.seats) {
-      if (sameFile(pagePathFor(seat.document.uri.fsPath), pagePath, fs.realpathSync.native)) void this.refresh(seat);
+      if (samePath(await realPathOf(pagePathFor(seat.document.uri.fsPath)), pagePath)) void this.refresh(seat);
     }
   }
 
@@ -175,23 +178,37 @@ export class DeckPublisher implements vscode.Disposable {
     if (!feature) return this.refreshDocument(document);
     const deckPath = document.uri.fsPath;
     const key = normalizeForCompare(deckPath);
-    if (this.running.has(key)) return; // a second press while the first is still going
+    if (this.running.has(key)) return; // a second press while the first is still going: its sheet is on its way
     this.running.add(key);
     try {
       const pagePath = pagePathFor(deckPath);
-      // The page's sheet open from the browser's bar, or the page going up: the file stays as that flow read it
-      if (feature.controller.isBusy(await realPathOf(pagePath))) return;
-      const text = withFrontMatter(document.getText(), body);
+      const documentText = document.getText();
+      // The body the editor gave the view: when the front matter's YAML doesn't read, that is the whole text, front
+      // matter included, and the view's words can't be told from it (withFrontMatter then takes the document as saved)
+      const text = withFrontMatter(documentText, body, splitFrontMatter(documentText).content);
       let built: Awaited<ReturnType<typeof buildDeckPage>>;
       let theme: DeckTheme;
-      let written: Awaited<ReturnType<typeof writeDeckPage>>;
-      let hadRecord: boolean;
       try {
         theme = await this.themeFor(deckPath, text);
         built = await buildDeckPage({ deckPath, text, theme, steps }, await loadPageAssets(this.extensionPath));
+      } catch (error) {
+        console.warn('[Decks] Could not build the page:', error);
+        notice(PAGE_NOT_WRITTEN);
+        return;
+      }
+      // The page's sheet open from the browser's bar, or the page going up: the file stays as that flow read it.
+      // Asked last, just before the write.
+      if (feature.controller.isBusy(await realPathOf(pagePath))) {
+        notice(PAGE_BUSY);
+        return;
+      }
+      let written: Awaited<ReturnType<typeof writeDeckPage>>;
+      let hadRecord: boolean;
+      try {
         hadRecord = Boolean(await feature.controller.recordFor(await realPathOf(pagePath)));
         written = await writeDeckPage(nodePageFs, deckPath, built.html);
-      } catch {
+      } catch (error) {
+        console.warn('[Decks] Could not write the page:', error);
         notice(PAGE_NOT_WRITTEN);
         return;
       }
@@ -200,11 +217,23 @@ export class DeckPublisher implements vscode.Disposable {
         return;
       }
       const realPage = await realPathOf(pagePath);
-      this.written.set(normalizeForCompare(realPage), { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme)) });
-      const outcome = await feature.publishPage(vscode.Uri.file(pagePath));
-      // A page made for a first Publish goes again if that Publish is cancelled
-      if (outcome === 'cancelled' && written.created && !hadRecord && !(await feature.controller.recordFor(realPage))) {
-        await removeDeckPage(nodePageFs, pagePath, built.html).catch(() => false);
+      const pageKey = normalizeForCompare(realPage);
+      this.written.set(pageKey, { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme)) });
+      let outcome: PublishOutcome | undefined;
+      try {
+        outcome = await feature.publishPage(vscode.Uri.file(pagePath));
+      } catch (error) {
+        // An error past the controller's own handling: the page stays, as after a failure
+        console.warn('[Decks] Publish stopped:', error);
+        return;
+      }
+      if (outcome === 'busy') notice(PAGE_BUSY);
+      // A page made for this Publish goes again when nothing was published and nothing failed: cancelled in the
+      // sheet, refused before any flow began (the command said why), or Publish not reachable. A failed one stays for
+      // Try again, and a busy one belongs to the flow holding it.
+      const takeBack = outcome === 'cancelled' || outcome === 'not-ready' || outcome === undefined;
+      if (takeBack && written.created && !hadRecord && !(await feature.controller.recordFor(realPage))) {
+        if (await removeDeckPage(nodePageFs, pagePath, built.html).catch(() => false)) this.written.delete(pageKey);
       }
     } finally {
       this.running.delete(key);
@@ -251,7 +280,7 @@ export class DeckPublisher implements vscode.Disposable {
       if (!meta.ritemark || !meta.digest) return undefined;
       const registered = this.written.get(normalizeForCompare(pagePath));
       if (registered?.digest === meta.digest) return registered.rows;
-      const open = vscode.workspace.textDocuments.find(doc => doc.uri.scheme === 'file' && sameFile(doc.uri.fsPath, besidePath, fs.realpathSync.native));
+      const open = await this.openDocumentAt(besidePath);
       const deckPath = open ? open.uri.fsPath : besidePath;
       const text = open ? open.getText() : await fs.promises.readFile(deckPath, 'utf8');
       const theme = await this.themeFor(deckPath, text);
@@ -262,6 +291,17 @@ export class DeckPublisher implements vscode.Disposable {
     }
   }
 
+  /** The deck at `deckPath` if it is open (by real path, so a link or another spelling of its folder finds it). */
+  private async openDocumentAt(deckPath: string): Promise<vscode.TextDocument | undefined> {
+    const name = path.basename(deckPath).toLowerCase();
+    const real = await realPathOf(deckPath);
+    for (const doc of vscode.workspace.textDocuments) {
+      if (doc.uri.scheme !== 'file' || path.basename(doc.uri.fsPath).toLowerCase() !== name) continue;
+      if (samePath(doc.uri.fsPath, deckPath) || samePath(await realPathOf(doc.uri.fsPath), real)) return doc;
+    }
+    return undefined;
+  }
+
   // ------------------------------------------------------------------ the theme
 
   private themeOf(document: vscode.TextDocument): Promise<DeckTheme> {
@@ -270,7 +310,7 @@ export class DeckPublisher implements vscode.Disposable {
 
   /** The theme the deck names, read as the deck view reads it (`readDeckTheme`), or the built-in one. */
   private async themeFor(deckPath: string, text: string): Promise<DeckTheme> {
-    const named = parseDeck(text.replace(/^﻿/, '')).theme;
+    const named = parseDeck(text.replace(/^\uFEFF/, '')).theme;
     if (!named) return BUILT_IN_THEME;
     const themeText = await readDeckTheme(deckPath, named);
     return themeText === null ? BUILT_IN_THEME : parseTheme(themeText);
