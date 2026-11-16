@@ -50,7 +50,9 @@ Fault first for the front matter: each guard put in `publishText` in turn, then 
 | Round 2's: the editor's body starts with a front matter | fails: `the front matter's words reached the page ("---\ndeck: 1\n---note: FRONTWORDQXZ\nclient: FRONTWORDQXZ\n---\n")` |
 | Round 3's: the editor's body is exactly what follows the front matter `parseDeck` reads | passes |
 
-Every shot in this window carries a dev-build toast, "Activating extension 'GitHub.copilot-chat' failed…". It comes from VS Code's own built-in Copilot Chat in the development build, not from Ritemark or this PR, and Ritemark's release builds don't ship that extension.
+**The bar with Present** (`pr4-bar-with-present-1440.png`), after merging main with PR 5: Card and Borderless, Present, Saved, Publish. Their heights differ (30, 32 and 28 px), each its own component's size, and all are centred on one line.
+
+Every other shot in these windows carries a dev-build toast, "Activating extension 'GitHub.copilot-chat' failed…". It comes from VS Code's own built-in Copilot Chat in the development build, not from Ritemark or this PR, and Ritemark's release builds don't ship that extension.
 
 ## Not verified
 
