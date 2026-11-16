@@ -19,7 +19,7 @@
 import { Extension } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
-import { newId, writeSlideBody } from '../../../../../src/decks/deckFormat'
+import { isBlockSlide, newId, writeSlideBody } from '../../../../../src/decks/deckFormat'
 import { DECK_DERIVED, DECK_OPERATION, emptyPartHeading, isSlideNode, partHeadingAt, slideDataOf, slidesOf } from '../deckDocument'
 import { passes } from './drawnHeadings'
 import { isTrustedDeckTransaction } from './deckGuard'
@@ -73,7 +73,7 @@ export function slidesFromLines(before: PMNode, state: EditorState, random: () =
 
   const taken: string[] = []
   state.doc.forEach(node => {
-    const id = isSlideNode(node) ? slideDataOf(node.attrs.body).id : undefined
+    const id = isSlideNode(node) ? slideDataOf(node.attrs.kind, node.attrs.body).id : undefined
     if (id) taken.push(id)
   })
   const tr = state.tr
@@ -185,7 +185,8 @@ export function titlesFromHeadings(state: EditorState): Transaction | null {
   const { from, to } = state.selection
   for (const slide of slidesOf(state.doc)) {
     const id = slide.data.id
-    if (!id || !titles.waiting.has(id) || (slide.data.title ?? '').trim()) continue
+    // A block slide's title is its own first heading (Sprint 161): the handout's heading never writes it.
+    if (!id || !titles.waiting.has(id) || (slide.data.title ?? '').trim() || isBlockSlide(slide.kind)) continue
     const heading = writtenHeadingOf(state.doc, slide.pos)
     if (!heading || (from >= heading.from && to <= heading.to)) continue
     tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, body: writeSlideBody(slide.node.attrs.body, { ...slide.data, title: heading.text }) })

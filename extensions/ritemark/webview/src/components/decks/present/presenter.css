@@ -44,6 +44,10 @@
 .pv-sizes { display: flex; gap: 4px; }
 .pv-notes { flex: 1; min-height: 0; margin-top: 18px; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #F8FAFC; user-select: text; -webkit-user-select: text; }
 .pv-no-notes { color: #94A3B8; }
+/* Sprint 161: "Your comments", one after another; an anchored comment shows the words it is on above it. */
+.pv-comments { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.9em; }
+.pv-comment { padding-left: 14px; box-shadow: inset 3px 0 0 rgba(129, 140, 248, 0.55); }
+.pv-comment-on { display: block; margin-bottom: 2px; font-size: 0.8em; color: #A5B4FC; }
 
 .pv-held { display: flex; flex: none; align-items: center; gap: 10px; height: 40px; margin-top: 16px; padding: 0 14px; border-radius: 8px; background: rgba(248, 250, 252, 0.06); font-size: 14px; color: #C7D2FE; }
 

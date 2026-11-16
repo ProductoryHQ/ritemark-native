@@ -8,7 +8,9 @@
  *    were rebased does not show as changed, and an edit that only moves line breaks in the handout doesn't either.
  *  - Update the library writes one slide by id (`replaceSlideBlock`), and every other byte of the topic stays.
  */
-import { exerciseTagOf, handoutWithoutHeading, isDefaultExerciseTag, parseDeck, parseSlideBody, writeSlideBlock, writeSlideBody, type SlideData } from './deckFormat';
+import { EXERCISE_TAG, exerciseTagOf, handoutWithoutHeading, isBlockSlide, sidePictureOf, isDefaultExerciseTag, isSlideKind, parseDeck, slideDataOf, splitBlockSlide, writeSlideBlock, writeSlideData, type SlideData } from './deckFormat';
+import { legacyDataToBlocks } from './blocks/legacyToBlocks';
+import { OPEN_FENCE, parseFenceAttributes } from './blocks/fencedDiv';
 
 // ---------------------------------------------------------------------------
 // Paths (posix, project-relative)
@@ -93,13 +95,23 @@ export function rewriteMarkdownTargets(markdown: string, rewrite: (target: strin
   });
 }
 
-/** A slide's body and handout as written in `fromFolder`, with every relative path rewritten for `toFolder`. */
-export function rebaseSlide(body: string, handout: string, fromFolder: string, toFolder: string): { body: string; handout: string } {
+/**
+ * A slide's body and handout as written in `fromFolder`, with every relative path rewritten for `toFolder`. `kind` is
+ * the slide's: a block slide's header `image:` and the pictures and links in its Markdown are rebased too, the rest of
+ * its body byte for byte.
+ */
+export function rebaseSlide(body: string, handout: string, fromFolder: string, toFolder: string, kind: string): { body: string; handout: string } {
   if (fromFolder === toFolder) return { body, handout };
-  const data = parseSlideBody(body);
+  const slideKind = kind;
+  const data = slideDataOf(slideKind, body);
+  // Sprint 159 (PR 2, Codex): through the slide writer, so a path that needs quoting (`images/foo #1.png`) stays one
+  let next = data.image ? writeSlideData(slideKind, body, { ...data, image: rebasePath(data.image, fromFolder, toFolder) }) : body;
+  if (isBlockSlide(slideKind)) {
+    const parts = splitBlockSlide(next);
+    next = parts.head + rewriteMarkdownTargets(parts.markdown, target => rebasePath(target, fromFolder, toFolder));
+  }
   return {
-    // Sprint 159 (PR 2, Codex): through the slide writer, so a path that needs quoting (`images/foo #1.png`) stays one
-    body: data.image ? writeSlideBody(body, { ...data, image: rebasePath(data.image, fromFolder, toFolder) }) : body,
+    body: next,
     handout: rewriteMarkdownTargets(handout, target => rebasePath(target, fromFolder, toFolder)),
   };
 }
@@ -135,26 +147,66 @@ export function foldMarkdown(text: string): string {
     .replace(/(?<![\p{L}\p{N}])[*_]+|[*_]+(?![\p{L}\p{N}])/gu, ''));
 }
 
+/** Text without its comments (`<!-- … -->`) and anchored comments' `<mark>` tags: what is private is no change. */
+function withoutComments(text: string): string {
+  // Only an unescaped `<` opens one: a v1 slide's words through the converter write a typed `<!--` as `\<!--`.
+  return text.replace(/(?<!\\)<!--[\s\S]*?(?:-->|$)/g, ' ').replace(/(?<!\\)<\/?mark\b(?:"[^"]*"|'[^']*'|[^'">])*>?/gi, '');
+}
+
 /**
- * The stamp of a slide as a person sees it: kind, words, look, picture and handout. Not its id, its `from:`, whether
- * it is kept or skipped, or its notes. Paths are resolved from `folder` (the deck's project-relative folder).
+ * Sprint 161: the stamp of a slide as blocks. A block slide's Markdown, or a v1 slide's as `legacyToBlocks` draws it,
+ * its picture beside or behind, and its handout, each with paths resolved and Markdown forms folded; comments left out
+ * (the hidden words and old notes the conversion writes are a comment). So a v1 copy and its source converted later
+ * still read as the same slide.
+ */
+/**
+ * A Steps block's opening line as its pill draws it (#752's rule): no label and `tag="Exercise"` (in any case) are the
+ * same pill, and so are an empty label and one of spaces, so writing out what the slide already shows is no change.
+ */
+function canonicalStepsLines(markdown: string): string {
+  return markdown.split('\n').map(line => {
+    const open = OPEN_FENCE.exec(line);
+    const attrs = open ? parseFenceAttributes(open[2]) : null;
+    if (!attrs || !attrs.classes.includes('steps')) return line;
+    const tag = (attrs.values.tag ?? EXERCISE_TAG).replace(/\s+/g, ' ').trim();
+    if (tag.toLowerCase() === EXERCISE_TAG.toLowerCase()) return '::: steps';
+    return `::: {.steps tag="${tag}"}`;
+  }).join('\n');
+}
+
+function blockStampOf(kind: string, data: SlideData, handout: string, folder: string): string {
+  const converted = isBlockSlide(kind) ? { markdown: data.markdown ?? '', header: data } : legacyDataToBlocks(kind, data);
+  const blocks = { ...converted, markdown: canonicalStepsLines(converted.markdown) };
+  const side = sidePictureOf(blocks.header) ?? '';
+  const image = side && blocks.header.image ? projectPath(blocks.header.image, folder) ?? blocks.header.image : '';
+  const resolve = (markdown: string) => foldMarkdown(withoutComments(rewriteMarkdownTargets(markdown, target => projectPath(target, folder) ?? target)));
+  return fnv1a(['blocks', resolve(blocks.markdown), side, image, '#handout', resolve(handout)].join('\u0001'));
+}
+
+/**
+ * The stamp of a slide as a person sees it, written in a new `from:` line. Sprint 161: the block stamp
+ * (`blockStampOf`), for a block slide and for a v1 slide of one of the nine kinds through the converter; a kind this
+ * build doesn't know keeps the v1 stamp. Not its id, its `from:`, whether it is kept or skipped, or its notes. Paths
+ * are resolved from `folder` (the deck's project-relative folder).
  *
  * Not the part's own heading either (16 November): a heading is the handout's, and typing one never marks a library
  * slide changed. So an older copy whose heading the editor writes in at the first edit, or a copy made with its heading
  * from a topic written before headings, keeps its source's stamp.
  */
 export function slideStamp(kind: string, data: SlideData, handout: string, folder: string): string {
+  if (isBlockSlide(kind) || isSlideKind(kind)) return blockStampOf(kind, data, handoutWithoutHeading(handout), folder);
   return stampOf(kind, data, handoutWithoutHeading(handout), folder);
 }
 
 /**
- * The stamps a `from:` line may hold for this slide: today's, and for a handout that opens with a heading, the stamp a
- * copy made before 16 November got (its heading counted then). A copy or a source matching either is as it was.
+ * The stamps a `from:` line may hold for this slide: today's (`slideStamp`), then the v1 stamps every `from:` written
+ * before Sprint 161 holds: its words without the part's heading, and for a handout that opens with a heading, the stamp
+ * a copy made before 16 November got (its heading counted then). A copy or a source matching any is as it was.
  */
 export function slideStamps(kind: string, data: SlideData, handout: string, folder: string): string[] {
-  const now = slideStamp(kind, data, handout, folder);
-  const before = stampOf(kind, data, handout, folder);
-  return before === now ? [now] : [now, before];
+  const stamps = [slideStamp(kind, data, handout, folder)];
+  if (!isBlockSlide(kind)) stamps.push(stampOf(kind, data, handoutWithoutHeading(handout), folder), stampOf(kind, data, handout, folder));
+  return [...new Set(stamps)];
 }
 
 function stampOf(kind: string, data: SlideData, handout: string, folder: string): string {
@@ -194,7 +246,7 @@ export function slidesOfText(text: string): DeckSlideText[] {
     index,
     kind: slide.kind,
     body: slide.body,
-    data: parseSlideBody(slide.body),
+    data: slideDataOf(slide.kind, slide.body),
     notes: slide.notes,
     handout: text.slice(slide.handoutStart, slide.handoutEnd).replace(/^\n+/, '').replace(/\s+$/, ''),
   }));
@@ -212,7 +264,7 @@ export function partText(kind: string, body: string, handout: string, notes: str
  */
 export function replaceSlidePart(text: string, id: string, part: string): string | null {
   const deck = parseDeck(text);
-  const index = deck.slides.findIndex(slide => parseSlideBody(slide.body).id === id);
+  const index = deck.slides.findIndex(slide => slideDataOf(slide.kind, slide.body).id === id);
   if (index < 0) return null;
   const slide = deck.slides[index];
   const last = index === deck.slides.length - 1;
@@ -228,9 +280,9 @@ export function appendPart(text: string, part: string): string {
   return `${trimmed}${trimmed ? '\n\n' : ''}${part}\n`;
 }
 
-/** A new topic deck's text, holding its first part. */
-export function newTopicText(theme: string, part: string): string {
-  return `---\ndeck: 1\ntheme: ${theme}\n---\n\n${part}\n`;
+/** A new topic deck's text, holding its first part: `deck: 2` when that part is a block slide (Sprint 161). */
+export function newTopicText(theme: string, part: string, blocks = false): string {
+  return `---\ndeck: ${blocks ? 2 : 1}\ntheme: ${theme}\n---\n\n${part}\n`;
 }
 
 /**

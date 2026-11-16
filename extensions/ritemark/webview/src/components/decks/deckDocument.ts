@@ -5,7 +5,7 @@
  */
 import type { Fragment, Node as PMNode } from '@tiptap/pm/model'
 import { EditorState, type Transaction } from '@tiptap/pm/state'
-import { derivedHeading, newId, parseSlideBody, partHeadingLevel, writeSlideBody, type SlideData } from '../../../../src/decks/deckFormat'
+import { derivedHeading, isBlockSlide, newId, slideDataOf as readSlideData, partHeadingLevel, writeSlideBody, writeSlideData, type SlideData } from '../../../../src/decks/deckFormat'
 
 /** Meta on the deck view's own transactions (the strip's operations): the guard lets them through. */
 export const DECK_OPERATION = 'deckOperation'
@@ -29,13 +29,17 @@ export interface DeckSlideEntry {
 
 const parsed = new Map<string, SlideData>()
 
-/** A slide body's data, read once per distinct body (the deck is read again on every keystroke). */
-export function slideDataOf(body: string): SlideData {
-  let data = parsed.get(body)
+/**
+ * A slide body's data, read once per distinct kind and body (the deck is read again on every keystroke): a v1 slide's
+ * YAML, or a block slide's header and Markdown (Sprint 161, `slideDataOf` in the deck format).
+ */
+export function slideDataOf(kind: string, body: string): SlideData {
+  const key = `${isBlockSlide(kind) ? 'b' : 'v1'}\u0000${body}`
+  let data = parsed.get(key)
   if (!data) {
     if (parsed.size > 2000) parsed.clear()
-    data = parseSlideBody(body)
-    parsed.set(body, data)
+    data = readSlideData(kind, body)
+    parsed.set(key, data)
   }
   return data
 }
@@ -49,7 +53,7 @@ export function slidesOf(doc: PMNode): DeckSlideEntry[] {
   const slides: DeckSlideEntry[] = []
   doc.forEach((node, pos) => {
     if (!isSlideNode(node)) return
-    slides.push({ index: slides.length, pos, node, kind: node.attrs.kind, data: slideDataOf(node.attrs.body), notes: node.attrs.notes })
+    slides.push({ index: slides.length, pos, node, kind: node.attrs.kind, data: slideDataOf(node.attrs.kind, node.attrs.body), notes: node.attrs.notes })
   })
   return slides
 }
@@ -232,7 +236,7 @@ export function duplicateSlide(state: EditorState, index: number, random: () => 
   const first = content.firstChild
   if (!first || !isSlideNode(first)) return null
   const id = newId(idsOf(state.doc), random)
-  const copy = first.type.create({ ...first.attrs, body: writeSlideBody(first.attrs.body, { ...slideDataOf(first.attrs.body), id }) })
+  const copy = first.type.create({ ...first.attrs, body: writeSlideData(first.attrs.kind, first.attrs.body, { ...slideDataOf(first.attrs.kind, first.attrs.body), id }) })
   const tr = state.tr.insert(range.to, content.replaceChild(0, copy))
   return operation(tr)
 }
@@ -274,7 +278,9 @@ export function insertSlide(state: EditorState, at: number, kind: string, random
 export function updateSlide(state: EditorState, index: number, data: SlideData, kind?: string): Transaction | null {
   const slide = slidesOf(state.doc)[index]
   if (!slide) return null
-  const body = writeSlideBody(slide.node.attrs.body, data)
+  // A block slide never becomes a v1 kind here, nor the other way: its words are Markdown, not a v1 body (Sprint 161).
+  if (kind !== undefined && isBlockSlide(kind) !== isBlockSlide(slide.kind)) return null
+  const body = writeSlideData(slide.kind, slide.node.attrs.body, data)
   const nextKind = kind ?? slide.kind
   if (body === slide.node.attrs.body && nextKind === slide.kind) return null
   return state.tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, body, kind: nextKind })

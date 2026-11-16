@@ -7,6 +7,7 @@
  * The webview is the shared React bundle (`data-editor-type="slide-library"`); the library's work is `DeckLibrary`'s,
  * the same operations the deck view and the AI's tools use.
  */
+import { slidePicturePaths } from './blocks/slideRenderer';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { isEnabled } from '../features';
@@ -197,7 +198,7 @@ async function looksOf(webview: vscode.Webview, decks: DeckSummary[]): Promise<{
   const themes: Record<string, string | null> = {};
   if (!root) return { assets, themes };
   for (const deck of decks) {
-    const images = [...new Set(deck.slides.map(slide => slide.data.image).filter((image): image is string => !!image))];
+    const images = [...new Set(deck.slides.flatMap(slide => slidePicturePaths(slide.data)))];
     if (images.length) assets[deck.path] = resolveAssetsIn(path.join(root, ...folderOf(deck.path).split('/').filter(Boolean)), webview, images);
     if (deck.theme && !(deck.theme in themes)) themes[deck.theme] = await readProjectTheme(root, deck.theme);
   }

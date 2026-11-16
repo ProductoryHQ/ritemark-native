@@ -29,7 +29,7 @@ class SlidePartHeadView implements NodeView {
   }
 
   private render() {
-    const skip = slideDataOf(this.node.attrs.body).skip === true
+    const skip = slideDataOf(this.node.attrs.kind, this.node.attrs.body).skip === true
     this.dom.classList.toggle('is-skip', skip)
     this.mark.innerHTML = skip ? EYE_SLASH_SVG : ''
   }

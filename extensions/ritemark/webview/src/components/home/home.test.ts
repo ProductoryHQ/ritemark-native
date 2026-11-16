@@ -123,7 +123,7 @@ assert.deepEqual(posted, [], 'drawing Home sends nothing')
   assert.equal(startCards(true)[2].tip, 'Make a new deck in this project')
 }
 
-// ── The four-card grid (the Experience lead): four across while each card can be 180 wide, else two by two ──
+// ── The four-card grid (the Experience lead, 17 November): four across while each card can be 150 wide, two by two, one across ──
 
 {
   const { readFileSync } = await import('node:fs')
@@ -135,19 +135,21 @@ assert.deepEqual(posted, [], 'drawing Home sends nothing')
   const query = /@container rh-start \(min-width: (\d+)px\) \{\s*\.rh-tiles\.rh-tiles-4 \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\); \}/.exec(css)
   assert.ok(query, 'four across from a width up')
   const step = Number(query[1])
-  assert.equal(step, 4 * 180 + 3 * gap, 'four across exactly while each of four cards can be 180 wide')
+  assert.equal(step, 4 * 150 + 3 * gap, 'four across exactly while each of four cards can be 150 wide')
+  assert.ok(step <= 640, 'so Home’s 640 column holds the four in one row')
   const narrow = /@container rh-start \(max-width: ([\d.]+)px\) \{\s*\.rh-tiles\.rh-tiles-4 \{ grid-template-columns: minmax\(0, 1fr\); \}/.exec(css)
   assert.ok(narrow, 'one across on a very narrow desk (#535)')
   const oneUnder = Math.ceil(Number(narrow[1]))
-  assert.equal(oneUnder, 2 * 168 + gap, 'one across once two cards can no longer each be 168 wide, as three cards go')
+  assert.equal(oneUnder, 2 * 150 + gap, 'one across once two cards can no longer each be 150 wide')
   // The rule as a function of the row's width: four, two or one, never three and one
   const columns = (width: number) => (width >= step ? 4 : width >= oneUnder ? 2 : 1)
   const cardWidth = (width: number) => (width - (columns(width) - 1) * gap) / columns(width)
-  for (const width of [120, 300, 347]) assert.equal(columns(width), 1, `${width}: one across`)
-  for (const width of [348, 600, 640, 755]) assert.equal(columns(width), 2, `${width}: two by two`)
-  for (const width of [756, 900, 1200]) assert.equal(columns(width), 4, `${width}: four across`)
-  assert.equal(cardWidth(756), 180, 'at the step, each of the four is 180')
-  for (const width of [756, 900, 1200]) assert.ok(cardWidth(width) >= 180)
+  for (const width of [120, 300, 311]) assert.equal(columns(width), 1, `${width}: one across`)
+  for (const width of [312, 500, 635]) assert.equal(columns(width), 2, `${width}: two by two`)
+  for (const width of [636, 640, 900]) assert.equal(columns(width), 4, `${width}: four across`)
+  assert.equal(cardWidth(636), 150, 'at the step, each of the four is 150')
+  for (const width of [636, 640, 900]) assert.ok(cardWidth(width) >= 150)
+  for (const width of [312, 500, 635]) assert.ok(cardWidth(width) >= 150, `${width}: two by two, each at least 150`)
 }
 
 // ── What moved (Sprint 136, Windows round 5): Copilot Chat's line only while it is installed ──

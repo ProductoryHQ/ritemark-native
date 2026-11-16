@@ -24,6 +24,7 @@ import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import type { DeckSlideEntry } from './deckDocument'
 import { SlideCanvas } from './slide/SlideCanvas'
+import { BLOCK_MAX_STEP } from '../../../../src/decks/blocks/slideRenderer'
 
 /** The measuring slides' width: any will do, since the fit is measured on the 960 × 540 layout before it is scaled. */
 const MEASURE_WIDTH = 192
@@ -34,7 +35,7 @@ export function measuredSteps(count: number, root: ParentNode): number[] {
   root.querySelectorAll<HTMLElement>('[data-measure]').forEach(slot => {
     const index = Number(slot.getAttribute('data-measure'))
     const step = Number(slot.querySelector('.deck-slide')?.getAttribute('data-step'))
-    if (Number.isInteger(index) && index >= 0 && index < count && Number.isInteger(step)) steps[index] = Math.max(0, Math.min(3, step))
+    if (Number.isInteger(index) && index >= 0 && index < count && Number.isInteger(step)) steps[index] = Math.max(0, Math.min(BLOCK_MAX_STEP, step))
   })
   return steps
 }
