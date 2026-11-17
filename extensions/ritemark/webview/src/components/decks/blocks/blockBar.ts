@@ -105,11 +105,13 @@ interface Parts {
   items: Item[]
   before: PMNode[]
   after: PMNode[]
+  /** The list the items came from (List, Numbered, Steps): what it was written as, for a list it turns into. */
+  list: PMNode | null
 }
 
 function partsOf(block: ChosenBlock): Parts {
-  const parts: Parts = { items: [], before: [], after: [] }
-  const fromList = (list: PMNode) => list.forEach(item => parts.items.push({ from: 'li', node: item }))
+  const parts: Parts = { items: [], before: [], after: [], list: null }
+  const fromList = (list: PMNode) => { parts.list = list; list.forEach(item => parts.items.push({ from: 'li', node: item })) }
   if (block.kind === 'list' || block.kind === 'numbered') {
     fromList(block.node)
     return parts
@@ -216,8 +218,11 @@ function build(schema: Schema, kind: BarKind, parts: Parts, tag: string | null):
   }
   const items = parts.items.map(item => itemAsListItem(schema, item))
   if (!items.length) items.push(schema.nodes.listItem.create(null, [schema.nodes.paragraph.create()]))
-  if (kind === 'list') return schema.nodes.bulletList.createChecked(null, items)
-  const list = schema.nodes.orderedList.createChecked(null, items)
+  // A list into a list of its own kind keeps what it was written as: a numbered list's start and `)`, between Numbered
+  // and Steps (Codex on #773). A bullet list never turns into another bullet list, so its `*` has nowhere to go.
+  const same = (type: string) => (parts.list?.type.name === type ? parts.list.attrs : null)
+  if (kind === 'list') return schema.nodes.bulletList.createChecked(same('bulletList'), items)
+  const list = schema.nodes.orderedList.createChecked(same('orderedList'), items)
   if (kind === 'numbered') return list
   return div(schema, tag === null ? '::: steps' : withFenceValue('::: steps', 'tag', tag)!, ':::', [list])
 }

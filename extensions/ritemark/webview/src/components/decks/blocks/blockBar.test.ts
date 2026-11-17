@@ -32,6 +32,7 @@ import { loadSlide, loadSlideWithComments, saveSlide } from './slideEditorHarnes
 import { saveSlideMarkdown } from './slideEditorMarkdown'
 import { editorHTML } from '../../../utils/markdownFidelity'
 import { SlideSync } from './slideSync'
+import { markableBox } from './slideDivView'
 import { SLIDE_COMMAND, setBlockValue } from './slideCommands'
 import {
   BAR_KINDS, HANDLE_SIZE, addItem, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, moveBlock, nearestGap, plusSpot, removeColumn,
@@ -478,6 +479,27 @@ stable(COLUMNS, 'three columns')
   const vars = themeVars(BUILT_IN_THEME, true)
   assert.equal(BUILT_IN_THEME.boxes, 'filled')
   assert.notEqual(vars.boxo, vars.boxl, 'the outline line is stronger than the filled theme\'s box line')
+}
+
+// ---- Codex on #773: a numbered list keeps its start and `)` between Numbered and Steps, both ways, byte for byte.
+{
+  const numbered = '# N\n\n5) Five\n6) Six'
+  stable(numbered, 'a numbered list from five')
+  const state = stateWith(numbered, 'Five')
+  const steps = after(turnInto(state, blockPos(state), 'steps'))
+  assert.ok(steps.includes('5) Five'), steps)
+  const back = stateWith(steps, 'Five')
+  assert.equal(after(turnInto(back, blockPos(back), 'numbered')), numbered, 'Numbered → Steps → Numbered: the same bytes')
+}
+
+// ---- The hang on changing slides: the caret's mark goes only on a box the slide draws, in the page.
+{
+  const element = (classes: string[], connected = true) => ({ isConnected: connected, classList: { contains: (name: string) => classes.includes(name) } })
+  const box = element(['blk-box'])
+  assert.equal(markableBox(box), box, 'a box is marked')
+  assert.equal(markableBox(element([])), null, 'another node\'s element at a stale place is never marked')
+  assert.equal(markableBox(element(['blk-box'], false)), null, 'a box no longer in the page is never marked')
+  assert.equal(markableBox(null), null)
 }
 
 console.log('blockBar: Turn into, Width, Style, alignment, Columns, the split, Add, Delete, the drag, Tab and the handles pass')

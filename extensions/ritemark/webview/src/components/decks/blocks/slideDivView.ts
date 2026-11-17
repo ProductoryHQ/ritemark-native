@@ -244,6 +244,15 @@ export function caretBoxPos(state: EditorState): number | null {
   return null
 }
 
+/**
+ * The element the caret's mark may go on: a box this view draws, in the page. Anything else (another node's element
+ * at a stale place while a slide is swapped in) would be read back by ProseMirror as a change, drawn again and marked
+ * again, without end: the block bar's app run hung the deck on changing slides.
+ */
+export function markableBox<T extends { isConnected?: boolean; classList?: { contains(name: string): boolean } }>(found: T | null | undefined): T | null {
+  return found && found.isConnected && found.classList?.contains('blk-box') ? found : null
+}
+
 const slideCaretBoxKey = new PluginKey('slideCaretBox')
 
 /** Marks the caret's box (`is-caret`) as the selection moves; nothing in the document changes. */
@@ -254,7 +263,7 @@ function slideCaretBox(): Plugin {
     const found = pos === null ? null : (view.nodeDOM(pos) as HTMLElement | null)
     // Only a box this view draws (`blk-box`): a class put on any other element is a change ProseMirror reads back and
     // draws again, and the mark put back, without end (the block bar's app run: the deck hung on changing slides).
-    const dom = found && found.isConnected && found.classList?.contains('blk-box') ? found : null
+    const dom = markableBox(found)
     if (dom === marked && dom?.classList.contains(CARET_CLASS)) return
     marked?.classList.remove(CARET_CLASS)
     marked = dom
