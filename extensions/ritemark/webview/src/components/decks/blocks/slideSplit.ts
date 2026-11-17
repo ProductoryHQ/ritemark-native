@@ -6,6 +6,7 @@
  * converted in the same step first, as every first real edit converts it.
  */
 import type { EditorState, Transaction } from '@tiptap/pm/state'
+import { closeHistory } from '@tiptap/pm/history'
 import { isBlockSlide, newId, withBlockMarkdown } from '../../../../../src/decks/deckFormat'
 import { blockSlideBody } from '../../../../../src/decks/blocks/convertDeck'
 import { DECK_OPERATION, emptyPartHeading, slidesOf } from '../deckDocument'
@@ -20,7 +21,8 @@ export function splitSlide(state: EditorState, index: number, before: string, af
   const entry = slidesOf(state.doc)[index]
   const type = state.schema.nodes.deckSlide
   if (!entry || !type) return null
-  const tr = state.tr
+  // An undo step of its own, never joined to the typing just before it on the same slide (Codex on #769).
+  const tr = closeHistory(state.tr)
   convertDeckInto(tr)
   const pos = tr.mapping.map(entry.pos)
   const node = tr.doc.nodeAt(pos)

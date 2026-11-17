@@ -34,7 +34,7 @@ import { derivedHeadings, insertSlide, slidesOf, starterMarkdown } from '../deck
 import { loadSlide, loadSlideWithComments, saveSlide, slideSchema } from './slideEditorHarness'
 import { saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
 import { SlideSync } from './slideSync'
-import { SLIDE_COMMAND, SLIDE_ITEMS, addToTable, lastPillLabel, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
+import { SLIDE_COMMAND, SLIDE_ITEMS, addToTable, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
 import { splitSlide } from './slideSplit'
 import { webPageAddress } from './SlideBlockTools'
 import { isFullAt, nextFitStep } from './slideFit'
@@ -259,6 +259,49 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
   assert.equal(webPageAddress('example.com:8080/x'), 'https://example.com:8080/x')
   assert.equal(webPageAddress('mailto:a@b.com'), null, 'no credentials in a page address')
   assert.equal(webPageAddress('https://user:pw@example.com'), null)
+}
+
+// ---- Codex on #769: a row Enter adds, a split and a new slide are undo steps of their own, never joined to the typing
+// just before them on the same slide.
+{
+  const table = EditorState.create({ doc: loadSlide('# Plan\n\n| A | B |\n| --- | --- |\n| x | y |') })
+  let last = -1
+  table.doc.descendants((node, pos) => { if (node.isText && node.text === 'y') last = pos + 1; return true })
+  const down = cellBelow(table.apply(table.tr.setSelection(TextSelection.create(table.doc, last))))!
+  assert.equal(down.getMeta(SLIDE_COMMAND), true, 'a new row is its own step')
+  const deck = openDeck(DECK)
+  const entry = slidesOf(deck.state.doc)[1]
+  const typed = deck.state.apply(deck.state.tr.setNodeMarkup(entry.pos, undefined, { ...entry.node.attrs, body: entry.node.attrs.body.replace('Three', 'Three!') }))
+  for (const op of ['split', 'new'] as const) {
+    const tr = op === 'split'
+      ? splitSlide(typed, 1, '# What the pilot taught us\n\nOne', 'Two\n\nThree!', () => 0.4, true)!
+      : insertSlide(typed, 2, '', () => 0.4, true)!
+    const after = typed.apply(tr)
+    let undone = after
+    undo(after, back => { undone = after.apply(back) })
+    assert.equal(deck.save(undone.doc), deck.save(typed.doc), `${op}: one Undo takes only it back; the typing stays`)
+  }
+}
+
+// ---- Split slide here from the menu on the empty line (or list item) the / stood on: that line is in neither half
+// (the final app run left an empty `-` at the first half's end).
+{
+  const listed = EditorState.create({ doc: loadSlide('# T\n\n- a\n- b\n-\n- c') })
+  let at = -1
+  listed.doc.descendants((node, pos) => { if (node.type.name === 'listItem' && node.textContent === '' && at < 0) at = pos + 2; return true })
+  const cut = withoutEmptyLineAt(listed, at)
+  const halves = splitSlideHalves(cut.state, cut.pos)
+  assert.equal(slideSave(halves.before), '# T\n\n- a\n- b')
+  assert.equal(slideSave(halves.after), '- c')
+  const lined = EditorState.create({ doc: loadSlide('# T\n\nOne\n\nTwo') })
+  const withEmpty = lined.apply(lined.tr.split(lined.doc.child(1).nodeSize + lined.doc.child(0).nodeSize - 1))
+  let empty = -1
+  withEmpty.doc.forEach((node, pos) => { if (node.type.name === 'paragraph' && !node.textContent) empty = pos + 1 })
+  const top = withoutEmptyLineAt(withEmpty, empty)
+  const parts = splitSlideHalves(top.state, top.pos)
+  assert.equal(slideSave(parts.before), '# T\n\nOne')
+  assert.equal(slideSave(parts.after), 'Two')
+  assert.equal(withoutEmptyLineAt(lined, 3).state, lined, 'a line with words stays')
 }
 
 // ---- The lead on #769: a new Columns block starts empty, each column an empty heading over an empty line ("Heading"

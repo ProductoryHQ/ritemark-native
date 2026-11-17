@@ -34,6 +34,30 @@ One dev run on 17 November, 10:25–11:00 EET. Jarmo allowed daytime launches fo
 | `section-no-number-converted-slide-and-handout-h1-ai-folded-…`, `…-ai-open-…` | After the first edit: the slide is `section: true` and title-only, with `# Scheduled prompts` in the handout. One Undo gave the v1 deck back byte for byte. |
 | `page-section-no-number-band-1440x900.png`, `…-390x844.png` | The page: the band reads "SECTION" with no number, and the slide is drawn big and low. The page has 0 `<!--` (the converted notes stay private). |
 
+## The final run (17 November, 12:15–12:45 EET)
+
+One more launch, on dd42bee9 (the lead's four fixes) plus two fixes the run found, which were rebuilt and reloaded into the same instance and are committed in the head after it. It was stopped with `LEFT=0`, and its run folder (profile included) was deleted, as was the first run's. The copy's slide 11 was set to the Arrows look to check its arrow.
+
+| Shot | What it shows |
+| --- | --- |
+| `retake-full-slide-title-whole-ai-folded-1440x900.png` | The full slide 18 with the caret at its bottom, typed at: the flow's `scrollTop` stays 0, so the title is whole and the words overflow at the bottom, behind the bar's line. |
+| `retake-part-15-not-collapsed-ai-folded-1440x900.png` | Part 15 (a new slide's empty part, saved before its words) has its line and "Write here." after a reopen; it had no height before. Parts 16–18 have their height too. |
+| `retake-new-columns-placeholders-ai-folded-1440x900.png` | A new Columns block: two empty columns, "Heading" over "Text" faint, the file's lines `::: column` / `:::` only. Shown after a Reload Window, so this is the column as it reopens. |
+| `split-at-cursor-no-caret-notice-ai-folded-1440x900.png` | Split at the cursor on the full slide with no caret put there: "Click on the slide where it should split, then Split at the cursor." The file was unchanged. |
+| `new-steps-carries-the-label-ai-folded-1440x900.png` | A new Steps block on slide 16 gets `tag="Harjutus 1"`, slide 15's label. One Undo took it out. |
+| `split-slide-here-from-the-menu-open-ai-folded-1440x900.png`, `split-slide-here-from-the-menu-ai-folded-1440x900.png` | Split slide here chosen from the / menu on an empty list item. The file's only change is the empty `-` replaced by the slide boundary, and one Undo gave the slide back whole (`cmp`). |
+
+**Checked in the final run:**
+- A / block is one Undo: Columns, then one Undo, and the file was as before the / (`cmp`).
+- Leaving the slide writes what the open menu held: `/2025` typed and not written while the menu was open (0 lines). After going to another slide it was written (1 line); one Undo took it out.
+- The Arrows look's arrow no longer opens the icon picker (`.deck-icon-grid` absent after the click).
+
+**Found in the final run, fixed (with tests where they hold headless):**
+- An empty block's `::before` placeholder took a grid column of its own, pushing the new columns right. Placeholders are now drawn only on text lines.
+- Split slide here from the menu on an empty list item left that empty `-` at the first half's end. The empty line the / stood on is now in neither half (`withoutEmptyLineAt`).
+
+**After the final run (headless tests only):** Codex's two fixes: a row Enter adds is its own undo step, and a split or a new slide doesn't join the typing before it (`closeHistory`).
+
 **Found in the run, fixed:**
 - The pill, as an editable host nested in ProseMirror, lost its focus at the editor's next redraw (a field over the pill now).
 - After a picture, the fit stayed at step 0 until the next key.
@@ -42,10 +66,10 @@ One dev run on 17 November, 10:25–11:00 EET. Jarmo allowed daytime launches fo
 **Noted, not changed:**
 - A `Activating extension 'GitHub.copilot-chat' failed` toast appeared after a reload. It comes from the cloned dev tree's built-in extension and is unrelated to this PR.
 - In the CDP-driven, possibly occluded window, `requestAnimationFrame` ran late, so the stage sometimes switched to a new slide seconds later. The strip's own insert has the same pattern; driven by hand, the window is visible.
-- At the floor, a full slide's title was clipped at the top (the slide is full by definition there).
+- At the floor, a full slide's title was clipped at the top: fixed in the final run (above).
 
 **Not verified:**
-- The review-fix head was not run in the app.
+- Codex's two undo-step fixes, made after the final run: headless tests only.
 - A real person's file picker: CDP answered it.
 - Windows.
 - Web page in the app: unit tests only.

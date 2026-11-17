@@ -173,6 +173,26 @@ export function splitSlideHalves(state: EditorState, pos: number): SlideHalves {
   return { before: half(nodes.slice(0, index)), after: half(nodes.slice(index)) }
 }
 
+/**
+ * Split slide here from the / menu: the empty line the / stood on is the place of the cut, not a line of either half
+ * (the app run: an empty list item was left at the first half's end). The state without it, and the place mapped;
+ * the state as it was when the caret's line has words.
+ */
+export function withoutEmptyLineAt(state: EditorState, pos: number): { state: EditorState; pos: number } {
+  const $pos = state.doc.resolve(pos)
+  if ($pos.depth === 0 || !$pos.parent.isTextblock || $pos.parent.content.size > 0 || $pos.parent.type.name === 'heading') return { state, pos }
+  let depth = $pos.depth
+  // The list item that holds only this line, and the list when it is its only item.
+  if (depth >= 2 && $pos.node(depth - 1).type.name === 'listItem' && $pos.node(depth - 1).childCount === 1) {
+    depth -= 1
+    if (depth >= 2 && $pos.node(depth - 1).childCount === 1) depth -= 1
+  }
+  // Never the only block of its parent (a column keeps its line).
+  if ($pos.node(depth - 1).childCount < 2) return { state, pos }
+  const tr = state.tr.delete($pos.before(depth), $pos.after(depth))
+  return { state: state.apply(tr), pos: tr.mapping.map(pos, -1) }
+}
+
 // ---------------------------------------------------------------------------
 // A box's icon and the Steps pill
 // ---------------------------------------------------------------------------
@@ -254,6 +274,8 @@ export function cellBelow(state: EditorState): Transaction | null {
   let tableMap = map
   if (rect.bottom >= map.height) {
     addRow(tr, { map, tableStart, table, left: 0, top: 0, right: map.width, bottom: map.height }, map.height)
+    // A new row is an undo step of its own, as Settings' Add a row is (Codex on #769).
+    tr.setMeta(SLIDE_COMMAND, true)
     tableNode = tr.doc.nodeAt(tableStart - 1)!
     tableMap = TableMap.get(tableNode)
   }

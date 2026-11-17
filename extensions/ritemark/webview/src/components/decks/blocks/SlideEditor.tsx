@@ -50,7 +50,7 @@ import { SLIDE_SYNC, SlideSync } from './slideSync'
 import { slideDivWithView, type SlideDivHandlers } from './slideDivView'
 import { ensureSlideCommentPipeline, markdownToSlideEditorHTML, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
 import { contentHeightOf, fitValue, isFullAt, nextFitStep } from './slideFit'
-import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, addToTable, lastPillLabel, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
+import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, addToTable, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
 import { PillField, SlideIconPicker, WebPageDialog, type IconPick, type PillEdit } from './SlideBlockTools'
 import { SlideCommentNode, SlideComments, caretTarget, clickTarget, startSlideComment } from '../SlideComments'
 import { keyPastNotes, type SlideTarget } from './slideCommentPlace'
@@ -577,10 +577,13 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
           chain().run()
           actionsRef.current.onNewSlideBelow?.()
           return
-        case 'splitSlide':
+        case 'splitSlide': {
           chain().run()
-          splitAt(editor.state, editor.state.selection.from)
+          // The empty line the / stood on is the cut's place, in neither half.
+          const cut = withoutEmptyLineAt(editor.state, editor.state.selection.from)
+          splitAt(cut.state, cut.pos)
           return
+        }
       }
     },
     enter: () => {

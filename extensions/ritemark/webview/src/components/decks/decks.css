@@ -304,9 +304,10 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing .tableWrapper { overflow: visible; margin: 0; }
 .deck-sl.is-blocks.is-editing .blk-flow img { display: block; max-width: 100%; max-height: 310px; margin: .2em 0 .4em; border-radius: var(--s-r2, 10px); object-fit: contain; }
 .deck-sl.is-blocks.is-editing .blk-flow img.ProseMirror-selectednode { outline: 3px solid var(--s-foc, rgba(242,181,68,.7)); }
-/* An empty slide's title waits for its words. */
-.deck-sl.is-blocks.is-editing .is-empty[data-placeholder]::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--s-ph, rgba(255,255,255,.35)); }
-.deck-slide.is-borderless .deck-sl.is-blocks.is-editing .is-empty[data-placeholder]::before { color: var(--s-ph, rgba(28,31,74,.3)); }
+/* An empty line waits for its words: the title's, an empty column's heading and text. Only a line: an empty block (a new
+   Columns block's, PR 3) is marked empty too, and a ::before on its grid would take a column of its own (the app run). */
+.deck-sl.is-blocks.is-editing :is(p, h1, h2, h3, h4, h5, h6).is-empty[data-placeholder]::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--s-ph, rgba(255,255,255,.35)); }
+.deck-slide.is-borderless .deck-sl.is-blocks.is-editing :is(p, h1, h2, h3, h4, h5, h6).is-empty[data-placeholder]::before { color: var(--s-ph, rgba(28,31,74,.3)); }
 
 /* Sprint 161 (experience 46, "Comments on the slide, for Claude"; frames 27 and 28). A comment on a block or on the
    whole slide is a standalone note (`ritemark-comment`) in the slide editor: never drawn, and taking no place, so the

@@ -5,6 +5,7 @@
  */
 import type { Fragment, Node as PMNode } from '@tiptap/pm/model'
 import { EditorState, type Transaction } from '@tiptap/pm/state'
+import { closeHistory } from '@tiptap/pm/history'
 import { derivedHeading, isBlockSlide, newId, slideDataOf as readSlideData, partHeadingLevel, splitBlockSlide, withBlockMarkdown, writeSlideBody, writeSlideData, type SlideData } from '../../../../src/decks/deckFormat'
 import { blockSlideBody, drawsAsBlocks } from '../../../../src/decks/blocks/convertDeck'
 import { legacyDataToBlocks } from '../../../../src/decks/blocks/legacyToBlocks'
@@ -299,7 +300,8 @@ export function insertSlide(state: EditorState, at: number, kind: string, random
   // writes in the handout (handout/drawnHeadings.ts); in a deck marked `handout: text`, where nothing is drawn, the part
   // opens with an empty heading of its own, which gives the slide its title once written (`firstHeadingTitlePlugin`).
   const heading = textHandout ? emptyPartHeading(state, kind) : null
-  return operation(state.tr.insert(point, [slide, ...(heading ? [heading] : []), state.schema.nodes.paragraph.create()]))
+  // An undo step of its own (the slide's New slide below follows typing on the same slide; Codex on #769).
+  return operation(closeHistory(state.tr.insert(point, [slide, ...(heading ? [heading] : []), state.schema.nodes.paragraph.create()])))
 }
 
 /** Change part `index`'s slide: its data (written line by line), and its kind when given. */
