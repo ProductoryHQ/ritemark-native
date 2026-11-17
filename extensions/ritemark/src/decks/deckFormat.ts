@@ -945,6 +945,18 @@ export function isTextHandout(text: string): boolean {
   return frontMatterField(text.replace(/^\uFEFF/, ''), TEXT_HANDOUT_KEY) === TEXT_HANDOUT_VALUE;
 }
 
+/**
+ * The handout page's "Open in Claude" and "Open in ChatGPT" beside each prompt's Copy (Decks README item 10) are on
+ * unless the deck's front matter says `open-in: none`.
+ */
+export const OPEN_IN_KEY = 'open-in';
+export const OPEN_IN_NONE = 'none';
+
+/** Does this deck turn the page's "Open in" links off (`open-in: none`)? Read as `isTextHandout` reads its mark. */
+export function isOpenInOff(text: string): boolean {
+  return frontMatterField(text.replace(/^\uFEFF/, ''), OPEN_IN_KEY) === OPEN_IN_NONE;
+}
+
 /** The deck's text with `handout: text` in its front matter (a front matter made when it has none); else as it was. */
 export function withTextHandoutMark(text: string): string {
   if (isTextHandout(text)) return text;

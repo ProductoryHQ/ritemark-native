@@ -76,6 +76,15 @@ async function realPathOf(file: string): Promise<string> {
   return fs.promises.realpath(file).catch(() => file);
 }
 
+/**
+ * A page's address while it is online: published (an Update going up keeps it), and only an address Cloudflare gave
+ * (`WORKERS_DEV_ADDRESS`, the one rule for opening one). Null otherwise.
+ */
+export function publishedAddress(bar: PageBarState | undefined): string | null {
+  if (!bar || (bar.kind !== 'published' && bar.kind !== 'publishing')) return null;
+  return bar.address && WORKERS_DEV_ADDRESS.test(bar.address) ? bar.address : null;
+}
+
 export class DeckPublisher implements vscode.Disposable {
   private readonly seats = new Set<DeckSeat>();
   private readonly disposables: vscode.Disposable[] = [];
@@ -86,6 +95,9 @@ export class DeckPublisher implements vscode.Disposable {
   private readonly written = new Map<string, { digest: string; rows: DeckSheetRows }>();
   /** The app's own font files, read once per window (they never change while it runs). */
   private readonly fontBytes = new Map<string, Promise<Buffer>>();
+  /** A page's state changed in Publish (by its real path): Present asks again whether the deck is published. */
+  private readonly pageChanged = new vscode.EventEmitter<string>();
+  readonly onDidChangePage = this.pageChanged.event;
   /** Font files beside a page that a Publish running in this window uses: never taken back by another's cancel. */
   private readonly fontsHeld = new Map<string, number>();
   private feature: PublishFeature | null = null;
@@ -109,7 +121,7 @@ export class DeckPublisher implements vscode.Disposable {
     this.disposables.push(
       { dispose: () => feature.setPageRows(null) },
       feature.onDidChangeReady(() => this.refreshAll()),
-      feature.onDidChangePageState(pagePath => void this.refreshPage(pagePath)),
+      feature.onDidChangePageState(pagePath => { void this.refreshPage(pagePath); this.pageChanged.fire(pagePath); }),
     );
     this.refreshAll();
   }
@@ -152,6 +164,21 @@ export class DeckPublisher implements vscode.Disposable {
     let changed = bar?.changed === true;
     if (kind === 'published' && !changed) changed = await this.deckChanged(document, pagePath);
     return { state: { ready: true, kind, changed }, bar };
+  }
+
+  /**
+   * Small details item 3: the deck's published page, by its address, for Present's QR code; null while it isn't
+   * published (or Publish can't be reached). Publish's own record, read now (never the chip's last answer), without
+   * the gather the chip's "changed" needs, so a Q on the wall answers at once.
+   */
+  async pageAddressOf(document: vscode.TextDocument): Promise<string | null> {
+    const feature = this.ready();
+    if (!feature) return null;
+    try {
+      return publishedAddress(await feature.controller.pageState(await pageKeyOf(pagePathFor(document.uri.fsPath))));
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -444,6 +471,7 @@ export class DeckPublisher implements vscode.Disposable {
     for (const timer of this.timers.values()) clearTimeout(timer);
     this.timers.clear();
     this.disposables.forEach(disposable => disposable.dispose());
+    this.pageChanged.dispose();
     this.seats.clear();
     this.written.clear();
   }

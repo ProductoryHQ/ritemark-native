@@ -22,7 +22,17 @@ const none = () => ({ dispose() {} });
 const changeListeners: Array<(event: { document: unknown }) => void> = [];
 let pageStateAsks = 0;
 let bar: { kind: 'unpublished' | 'published'; changed: boolean } = { kind: 'unpublished', changed: false };
+class EventEmitter<T> {
+  private listeners: Array<(value: T) => void> = [];
+  event = (listener: (value: T) => void) => {
+    this.listeners.push(listener);
+    return { dispose: () => { this.listeners = this.listeners.filter(entry => entry !== listener); } };
+  };
+  fire(value: T): void { for (const listener of [...this.listeners]) listener(value); }
+  dispose(): void { this.listeners = []; }
+}
 const vscodeStub = {
+  EventEmitter,
   Uri: { file: (fsPath: string) => ({ scheme: 'file', fsPath, toString: () => `file://${fsPath}` }) },
   workspace: {
     get workspaceFolders() { return [{ uri: { scheme: 'file', fsPath: root } }]; },
