@@ -30,7 +30,7 @@
 import { createHash } from 'node:crypto';
 import { pictureBlockTokenizer } from '../../markdown/pictureLook';
 import { Marked, marked, Tokenizer, type Token } from 'marked';
-import { blockTitleOf, frontMatterLook, isBlockSlide, isSlideKind, isTextHandout, parseDeck, slideDataOf, type SlideData, type SlideItem } from '../deckFormat';
+import { blockTitleOf, frontMatterLook, isBlockSlide, isOpenInOff, isSlideKind, isTextHandout, parseDeck, slideDataOf, type SlideData, type SlideItem } from '../deckFormat';
 import { BLOCK_MAX_STEP, isCoverSlide, sidePictureOf } from '../blocks/slideRenderer';
 import { legacyDataToBlocks } from '../blocks/legacyToBlocks';
 import type { DeckTheme } from '../deckTheme';
@@ -71,6 +71,11 @@ export interface PublicDeck {
    * show their slides' titles. The mark itself never reaches the page: the front matter stays private.
    */
   textHandout?: true;
+  /**
+   * The deck turns off the page's "Open in Claude" and "Open in ChatGPT" links (its front matter's `open-in: none`):
+   * its prompts keep Copy only. Left out for every other deck, whose prompts get both. The front matter stays private.
+   */
+  openInOff?: true;
 }
 
 export interface PublicDeckOptions {
@@ -409,6 +414,7 @@ export function publicDeck(input: string, options: PublicDeckOptions): PublicDec
     preamble,
     slides,
     ...(isTextHandout(text) ? { textHandout: true as const } : {}),
+    ...(isOpenInOff(text) ? { openInOff: true as const } : {}),
   };
 }
 

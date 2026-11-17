@@ -31,6 +31,51 @@ export interface DeckTheme {
   card?: Record<string, string>;
   /** Hand-picked shades on Ritemark's white surface (borderless). */
   borderless?: Record<string, string>;
+  /**
+   * Sprint 162 PR 4: the theme's logo, a picture beside the theme file (`logo:`, a path relative to the theme file's
+   * folder), its corner (`logo-place:`) and where it shows (`logo-on:`). Absent when the theme has none, so a theme
+   * without a logo reads as it did before (and a page's digest stays the same).
+   */
+  logo?: ThemeLogo;
+  /**
+   * The logo's address where it is drawn, worked out by whoever draws it (the host's webview URI, the page's file
+   * beside it); never read from the theme file. No address, no logo: a missing file draws nothing.
+   */
+  logoUrl?: string;
+  /** The logo picture's width to its height, read from it where it is drawn; never from the theme file. */
+  logoAspect?: number;
+}
+
+/** Sprint 162 PR 4 (step-3-themes.md, "Logo"): top left, top right or bottom right, of the slide's 16:9 area. */
+export type LogoPlace = 'top-left' | 'top-right' | 'bottom-right';
+/** On every slide, or on the title slides only (a slide drawn big and low: its title alone, `isCoverSlide`). */
+export type LogoOn = 'every-slide' | 'title-slides';
+
+export interface ThemeLogo {
+  /** The picture, relative to the theme file's folder: `Fernhollow Bank logo.svg`. */
+  file: string;
+  place: LogoPlace;
+  on: LogoOn;
+}
+
+export const LOGO_PLACES: readonly LogoPlace[] = ['top-left', 'top-right', 'bottom-right'];
+export const LOGO_ONS: readonly LogoOn[] = ['every-slide', 'title-slides'];
+/** The prototype's defaults: top right, on every slide. */
+export const DEFAULT_LOGO_PLACE: LogoPlace = 'top-right';
+export const DEFAULT_LOGO_ON: LogoOn = 'every-slide';
+
+/**
+ * Is this a logo path a theme may name: relative to the theme's folder and inside it (no `..`, no drive, no address),
+ * an SVG or a PNG? Anything else is no logo.
+ */
+export function isLogoPath(value: string | null | undefined): value is string {
+  if (!value) return false;
+  const file = value.trim();
+  if (!/\.(svg|png)$/i.test(file)) return false;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(file) || file.startsWith('/') || file.startsWith('\\')) return false;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(file)) return false;
+  return !file.split(/[\\/]/).some(part => part === '..' || part === '');
 }
 
 /**
@@ -210,6 +255,11 @@ export function parseTheme(text: string, fallback: DeckTheme = EVENING_DEFAULTS)
     // A theme's own shades only when its colours are the ones they were picked for: changed colours work them out.
     card: shades(nested.card),
     borderless: shades(nested.borderless),
+    ...(isLogoPath(top.logo) ? { logo: {
+      file: top.logo.trim(),
+      place: LOGO_PLACES.includes(top['logo-place'] as LogoPlace) ? top['logo-place'] as LogoPlace : DEFAULT_LOGO_PLACE,
+      on: LOGO_ONS.includes(top['logo-on'] as LogoOn) ? top['logo-on'] as LogoOn : DEFAULT_LOGO_ON,
+    } } : {}),
   };
 }
 
@@ -264,7 +314,7 @@ export function themeKeyOf(named: unknown, entries: ReadonlyArray<Pick<ThemeEntr
 
 /**
  * The theme file a deck's view, wall, page and thumbnails read, by its `theme:` value: the file it names, or Evening's
- * path when it names none. The readers fall back to Evening's file, then to the built-in theme (`readDeckTheme`).
+ * path when it names none. The readers fall back to Evening's file, then to the built-in theme (`deckPages.deckThemeFor`).
  */
 export function themePathOf(named: unknown): string {
   const path = typeof named === 'string' ? named.trim() : '';
