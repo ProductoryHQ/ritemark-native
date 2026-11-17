@@ -28,6 +28,13 @@
 @media (prefers-reduced-motion: reduce) { .wall-slide.is-leaving { visibility: hidden; } }
 .vscode-reduce-motion .wall-slide.is-leaving { visibility: hidden; }
 
+/* Item 11: a picture fills the wall, whole and uncropped, centred on the theme's ground; it fades as the blank does. */
+.wall-fill { position: absolute; z-index: 1; inset: 0; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+.wall-fill.is-shown { opacity: 1; }
+.wall-fill img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+@media (prefers-reduced-motion: reduce) { .wall-fill { transition: none; } }
+.vscode-reduce-motion .wall-fill { transition: none; }
+
 /* The blank wall (B, ".", W): over the slide, under the bar and the go-to box; it fades as a move does. */
 .wall-blank { position: absolute; z-index: 1; inset: 0; display: grid; place-items: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
 .wall-blank.is-shown { opacity: 1; }

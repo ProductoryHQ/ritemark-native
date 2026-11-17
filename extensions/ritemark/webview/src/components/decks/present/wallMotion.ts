@@ -50,9 +50,12 @@ export function transitionValue(transition: DeckTransition): { present: true; va
   return transition === 'fade' ? { present: false } : { present: true, value: transition }
 }
 
-/** What a step does: nothing moves with reduced motion; where elements match, the smooth move; else the deck's own. */
-export function stepOf(transition: DeckTransition, reducedMotion: boolean, matched: boolean): MotionStep {
-  if (reducedMotion) return 'none'
+/**
+ * What a step does: nothing moves with reduced motion, or while the wall is covered (blank, the page's QR code, a picture
+ * filling it: `still`); where elements match, the smooth move; else the deck's own.
+ */
+export function stepOf(transition: DeckTransition, still: boolean, matched: boolean): MotionStep {
+  if (still) return 'none'
   if (matched) return 'move'
   return transition
 }
