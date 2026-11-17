@@ -444,11 +444,29 @@ export function logoTitleMargin(logo: Pick<SlideLogo, 'width'>): number {
   return Math.max(0, Math.ceil(logo.width + LOGO_CLEARANCE + LOGO_RIGHT - FLOW_RIGHT));
 }
 
-/** The canvas's class and style for a top-right logo on this slide (`slide.css`, `.logo-tr`); none otherwise. */
+/** The room kept between a top-left or bottom-right logo and the words, beside its height (the Experience lead). */
+export const LOGO_GAP = 12;
+/** The words' top and bottom edges on the canvas (`slide.css` `.blk-flow`: 46 px from the top, 34 from the bottom). */
+export const FLOW_TOP = 46;
+export const FLOW_BOTTOM = 34;
+
+/** How much lower a slide's words start beside a top-left logo, and how much higher they end above a bottom-right one. */
+export function logoDrop(): number {
+  return LOGO_HEIGHT + LOGO_GAP;
+}
+
+/**
+ * The canvas's class and style for the room the logo keeps on this slide ("never touch", the Experience lead, step-3-themes.md,
+ * 18 November), only on a slide that shows it; the fit then makes the room:
+ *  - top right (`.logo-tr`): the first block ends the logo's width and 16 px short of it, on every slide but a title
+ *    slide (its words sit low);
+ *  - top left (`.logo-tl`): the words start lower by the logo's height and 12 px (38 px), so every line keeps its left edge;
+ *  - bottom right (`.logo-br`): the words end higher by the same.
+ */
 export function logoCanvasMarks(logo: SlideLogo | null | undefined, cover: boolean): { cls: string; style: Record<string, string> } {
-  // A title slide's words sit low, far from the top margin: only the others keep the room.
-  if (cover || !drawsLogo(logo, cover) || logo.place !== 'top-right') return { cls: '', style: {} };
-  return { cls: 'logo-tr', style: { '--logo-room': `${logoTitleMargin(logo)}px` } };
+  if (!drawsLogo(logo, cover)) return { cls: '', style: {} };
+  if (logo.place === 'top-right') return cover ? { cls: '', style: {} } : { cls: 'logo-tr', style: { '--logo-room': `${logoTitleMargin(logo)}px` } };
+  return { cls: logo.place === 'top-left' ? 'logo-tl' : 'logo-br', style: { '--logo-drop': `${logoDrop()}px` } };
 }
 
 /** The theme's logo to draw, or null: a theme with no logo, or whose picture has no address (a missing file). */
