@@ -50,13 +50,16 @@ import { SLIDE_SYNC, SlideSync } from './slideSync'
 import { slideDivWithView, type SlideDivHandlers } from './slideDivView'
 import { ensureSlideCommentPipeline, markdownToSlideEditorHTML, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
 import { contentHeightOf, fitValue, isFullAt, nextFitStep } from './slideFit'
-import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, addToTable, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
+import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, isOwnStep, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
 import { PillField, SlideIconPicker, WebPageDialog, type IconPick, type PillEdit } from './SlideBlockTools'
 import { SlideCommentNode, SlideComments, caretTarget, clickTarget, startSlideComment } from '../SlideComments'
 import { keyPastNotes, type SlideTarget } from './slideCommentPlace'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuTrigger } from '../../ui/context-menu'
 import { Icon } from '../../ui/Icon'
 import { isMac } from '../../../hooks/usePlatform'
+import { TableHandles, tableMenuTargetAt } from '../../../extensions/tables/TableHandles'
+import { TableHandlesLayer, useAltHeld } from '../../tables/TableHandlesLayer'
+import { TableMenuItems, type MenuKit, type TableMenuTarget } from '../../tables/TableMenuItems'
 import { readClipboard } from '../../../lib/clipboard'
 
 export interface SlideEditorProps {
@@ -95,8 +98,6 @@ export interface SlideEditorProps {
   onSlideSettings?: (at: { x: number; y: number }) => void
   /** PR 3: the deck bar's Split at the cursor: each new number splits the slide at the caret. */
   splitRequest?: number
-  /** PR 3: Settings' Add a row or Add a column, on the slide's table; each new serial adds one. */
-  tableRequest?: { what: 'row' | 'column'; serial: number } | null
   /** PR 3: the picture the / menu's Picture asked for, saved beside the deck: it goes where the / was. */
   picture?: { path: string; url: string; serial: number } | null
 }
@@ -179,7 +180,7 @@ function titleRange(doc: PMNode): { from: number; to: number } | null {
   return found
 }
 
-export function SlideEditor({ outer, slide, width, theme, borderless, assets, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, tableRequest, picture }: SlideEditorProps) {
+export function SlideEditor({ outer, slide, width, theme, borderless, assets, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, picture }: SlideEditorProps) {
   // The latest of the stage's callbacks, for the editor's extensions (made once per editor).
   const actionsRef = useRef({ onNewSlideBelow, onSplit, onFull, onNeedCaret })
   actionsRef.current = { onNewSlideBelow, onSplit, onFull, onNeedCaret }
@@ -284,6 +285,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     run: (_editor, range, item) => toolsRef.current?.runItem(range, item),
     pluginKey: slideSlashKey,
   }), [])
+  // Experience 48: the table's handles and keys. A right-click in a cell opens the slide's own menu, with the cell's
+  // table items first (below), so Comment and Slide settings stay where they are.
+  const SlideTableHandles = useMemo(() => TableHandles.configure({ contextMenu: false }), [])
 
   // The handout's comment node, with the slide's own storage and ⌘/ (`SlideCommentNode`).
   const extensions = useMemo(() => createEditorSchemaExtensions({
@@ -293,14 +297,15 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
       showOnlyCurrent: false,
       includeChildren: true,
     })],
-    afterImage: [OuterHistory, SlideKeys, SlideSlash],
+    // Experience 48: the table's own handles and keys; its right-click items join the slide's own menu below.
+    afterImage: [OuterHistory, SlideKeys, SlideSlash, SlideTableHandles],
     commentCallouts,
     deck: [slideDivWithView(divHandlers)],
   }).map(extension => {
     if (extension.name === 'starterKit') return extension.configure({ history: false })
     if (extension.name === 'commentNode') return SlideCommentNode.extend()
     return extension
-  }), [OuterHistory, SlideKeys, SlideSlash, divHandlers, commentCallouts])
+  }), [OuterHistory, SlideKeys, SlideSlash, SlideTableHandles, divHandlers, commentCallouts])
 
   const editor = useEditor({
     extensions,
@@ -327,7 +332,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     onUpdate: ({ editor: updated, transaction }) => {
       if (transaction.getMeta(SLIDE_SYNC)) return
       syncRef.current?.track(transaction)
-      if (transaction.getMeta(SLIDE_COMMAND)) stepRef.current = 'command'
+      // A table's row, column, move, sort or alignment (experience 48) is an undo step of its own too.
+      if (isOwnStep(transaction)) stepRef.current = 'command'
       // An input method's word is written once it is composed (the composition's end), never mid-word; the / menu's
       // query once the menu has closed (PR 3).
       if (updated.view.composing || slashOpen(updated.state)) {
@@ -655,13 +661,6 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     const at = lastCaret.current
     if (at === null || at > editor.state.doc.content.size || !splitAt(editor.state, at)) actionsRef.current.onNeedCaret?.()
   })
-  // Settings' Add a row or Add a column, on the slide's table.
-  const tableSeen = useRef(tableRequest?.serial)
-  useEffect(() => {
-    if (!tableRequest || tableRequest.serial === tableSeen.current) return
-    tableSeen.current = tableRequest.serial
-    if (editor && !editor.isDestroyed) apply(addToTable(editor.state, tableRequest.what))
-  })
   // The / menu's picture, saved: where the / was (the slide's end when that place is gone).
   const pictureSeen = useRef(picture?.serial)
   useEffect(() => {
@@ -693,6 +692,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     if (target && editor && !editor.isDestroyed) startSlideComment(editor, target)
   }
   const [hasSelection, setHasSelection] = useState(false)
+  /** Experience 48: the table cell (or the whole table) the right-click was on; its items lead the menu. */
+  const [tableTarget, setTableTarget] = useState<TableMenuTarget | null>(null)
+  const altHeld = useAltHeld()
   const runEdit = (command: 'cut' | 'copy' | 'paste') => {
     if (!editor || editor.isDestroyed) return
     editor.view.focus()
@@ -728,6 +730,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
             menuPoint.current = { x: event.clientX, y: event.clientY }
             menuTarget.current = clickTarget(editor, event)
             setHasSelection(!editor.state.selection.empty)
+            setTableTarget(tableMenuTargetAt(editor.view, event.target))
           }}
         >
           <div className={classes} style={{ transform: `scale(${width / BLOCK_CANVAS_WIDTH})` }}>
@@ -762,6 +765,12 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
           }
         }}
       >
+        {tableTarget ? (
+          <>
+            <TableMenuItems editor={editor!} target={tableTarget} kit={contextKit} sortDescending={altHeld} />
+            <ContextMenuSeparator />
+          </>
+        ) : null}
         <ContextMenuItem disabled={!hasSelection} onSelect={() => runEdit('cut')}>
           Cut
           <ContextMenuShortcut>{KEYS.cut}</ContextMenuShortcut>
@@ -803,6 +812,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
         ) : null}
       </ContextMenuContent>
     </ContextMenu>
+    {/* Experience 48: the table's grips, + bars and menus, drawn in the table's own element. */}
+    <TableHandlesLayer editor={editor} />
     {/* PR 3: a box's icon from the grid, the Steps pill's words typed in place, and the / menu's Web page. */}
     <PillField
       edit={pillEdit}
@@ -837,6 +848,12 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     />
     </>
   )
+}
+
+/** The slide's right-click menu draws the table's items with its own primitives. */
+const contextKit: MenuKit = {
+  Item: ContextMenuItem as unknown as MenuKit['Item'],
+  Separator: ContextMenuSeparator as unknown as MenuKit['Separator'],
 }
 
 /** The slide editor's own load of a Markdown, as its first content was parsed, with the pictures' addresses it has. */

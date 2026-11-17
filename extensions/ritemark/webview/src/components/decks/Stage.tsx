@@ -56,7 +56,6 @@ interface StageProps {
   /** The slide's right-click menu's Slide settings… (17 November): the popover at that point. */
   onSlideSettings?: (at: { x: number; y: number }) => void
   splitRequest?: number
-  tableRequest?: { what: 'row' | 'column'; serial: number } | null
   picture?: { path: string; url: string; serial: number } | null
 }
 
@@ -66,7 +65,7 @@ export function Stage(props: StageProps) {
   return <LayoutStage {...props} />
 }
 
-function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, tableRequest, picture }: StageProps) {
+function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, picture }: StageProps) {
   // A request that comes after the stage is drawn (a deck New made, already shown) is taken once it changes.
   const focusTitle = useMemo(() => (initialFocus ? { select: !!selectOnFocus } : null), [initialFocus, selectOnFocus])
   return (
@@ -91,7 +90,6 @@ function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting
         onNeedCaret={onNeedCaret}
         onSlideSettings={onSlideSettings}
         splitRequest={splitRequest}
-        tableRequest={tableRequest}
         picture={picture}
       />
     </div>

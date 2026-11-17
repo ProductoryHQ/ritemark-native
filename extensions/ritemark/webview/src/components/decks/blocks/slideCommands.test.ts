@@ -34,10 +34,11 @@ import { derivedHeadings, insertSlide, slidesOf, starterMarkdown } from '../deck
 import { loadSlide, loadSlideWithComments, saveSlide, slideSchema } from './slideEditorHarness'
 import { saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
 import { SlideSync } from './slideSync'
-import { SLIDE_COMMAND, SLIDE_ITEMS, addToTable, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
+import { SLIDE_COMMAND, SLIDE_ITEMS, isOwnStep, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
 import { splitSlide } from './slideSplit'
 import { webPageAddress } from './SlideBlockTools'
 import { isFullAt, nextFitStep } from './slideFit'
+import { TABLE_COMMAND, alignColumn, deleteColumn, deleteRow, insertColumn, insertRow, moveColumn, moveRow, nextCellOrNewRow, sortByColumn, tableAt } from '../../../extensions/tables/tableOps'
 
 installTestDocument()
 ensureCommentMarkedPipeline()
@@ -109,7 +110,7 @@ function stageOn(deck: ReturnType<typeof openDeck>, index: number) {
     apply(tr: Transaction, held = false) {
       inner = inner.apply(tr)
       sync.track(tr)
-      if (!held) write(tr.getMeta(SLIDE_COMMAND) === true)
+      if (!held) write(isOwnStep(tr))
     },
     caretAfter(text: string) {
       let at = -1
@@ -423,27 +424,32 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
   assert.equal(pill(withStepsTag(saved, 'Harjutus')), 'Harjutus')
 }
 
-// ---- Tables: Settings' Add a row and Add a column write valid Markdown tables; Enter goes to the cell below.
+// ---- Tables: the + bars (experience 48, in place of Settings' Add a row and Add a column) write valid Markdown
+// tables; Enter goes to the cell below.
 {
   const markdown = '# Plan\n\n| Who | What |\n| --- | --- |\n| Ann | Mail |'
   assert.equal(blockHasTable(markdown), true)
   assert.equal(blockHasTable('# Plan\n\n```\n| a | b |\n| - | - |\n```'), false, 'a table in code is no table')
   let state = EditorState.create({ doc: loadSlide(markdown) })
   const read = (text: string) => lexBlockSlide(text).find(token => token.type === 'table') as { header: { text: string }[]; rows: { text: string }[][] }
-  const row = addToTable(state, 'row')!
-  assert.equal(row.getMeta(SLIDE_COMMAND), true, 'an undo step of its own')
+  let tablePos = -1
+  state.doc.descendants((node, pos) => { if (node.type.name === 'table') tablePos = pos; return tablePos < 0 })
+  const height = () => tableAt(state.doc, tablePos)!.node.childCount
+  const width = () => tableAt(state.doc, tablePos)!.node.firstChild!.childCount
+  const row = insertRow(state, tablePos, height())!
+  assert.equal(row.getMeta(TABLE_COMMAND), true, 'an undo step of its own')
   state = state.apply(row)
   let saved = slideSave(state.doc)
   assert.equal(read(saved).rows.length, 2, saved)
   assert.equal(read(saved).header.length, 2)
-  state = state.apply(addToTable(state, 'column')!)
+  state = state.apply(insertColumn(state, tablePos, width())!)
   saved = slideSave(state.doc)
   const table = read(saved)
   assert.equal(table.header.length, 3, saved)
   assert.ok(table.rows.every(cells => cells.length === 3), 'every row has the new column')
   assert.equal(table.rows[0][0].text, 'Ann', 'the words stay where they were')
   assert.equal(slideSave(loadSlide(saved)), saved, 'reads back as written')
-  assert.equal(addToTable(EditorState.create({ doc: loadSlide('# No table') }), 'row'), null)
+  assert.equal(insertRow(EditorState.create({ doc: loadSlide('# No table') }), 0, 1), null, 'no table there: nothing')
 
   // Enter in a row: the cell below, in the same column; in the last row, a new row under it.
   let at = -1
@@ -459,6 +465,48 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
   assert.equal(column(state), 1)
   assert.equal(state.selection.$from.parent.textContent, '', 'the caret is in the new row')
   assert.equal(cellBelow(EditorState.create({ doc: loadSlide('# Plan') })), null, 'outside a table: Enter is the editor\'s')
+}
+
+// ---- Experience 48: the table's handles on a slide in a deck. Each change, made after typing on the slide, is written to
+// the deck as an undo step of its own (`isOwnStep`): one Undo takes it back and keeps the typing; the deck reads back
+// byte for byte.
+{
+  const TABLE_DECK = [
+    '---', 'deck: 1', 'handout: text', '---', '',
+    '```slide', '---', 'id: t1', '---', '# Chat, add-in or Work', '', '| Tool | Files |', '| --- | :-- |', '| Work | The folder |', '| Chat | Uploaded |', '```', '',
+    '## Chat, add-in or Work', '', 'Compare them.', '',
+  ].join('\n')
+  const ops: [string, (state: EditorState, pos: number) => Transaction | null][] = [
+    ['the right + bar', (state, pos) => insertColumn(state, pos, 2, 0)],
+    ['the bottom + bar', (state, pos) => insertRow(state, pos, 3, 0)],
+    ['Move down', (state, pos) => moveRow(state, pos, 1, 2)],
+    ['Move right', (state, pos) => moveColumn(state, pos, 0, 1)],
+    ['Align right', (state, pos) => alignColumn(state, pos, 0, 'right')],
+    ['Sort A to Z', (state, pos) => sortByColumn(state, pos, 0, 'asc')],
+    ['Delete column', (state, pos) => deleteColumn(state, pos, 1)],
+    ['Delete row', (state, pos) => deleteRow(state, pos, 1)],
+    ['Insert above the header', (state, pos) => insertRow(state, pos, 0, 0)],
+    ['Tab in the last cell', state => nextCellOrNewRow(state)],
+  ]
+  for (const [label, make] of ops) {
+    const stage = stageOn(openDeck(TABLE_DECK), 0)
+    stage.caretAfter('Uploaded')
+    stage.apply(stage.inner.tr.insertText(' file'))
+    const typed = stage.save()
+    let tablePos = -1
+    stage.inner.doc.descendants((node, pos) => { if (node.type.name === 'table') tablePos = pos; return tablePos < 0 })
+    const tr = make(stage.inner, tablePos)!
+    assert.ok(tr && isOwnStep(tr), `${label}: an undo step of its own`)
+    stage.apply(tr)
+    const saved = stage.save()
+    assert.notEqual(saved, typed, `${label}: a change`)
+    const markdown = slideDataOf('', slidesOf(stage.outer.doc)[0].node.attrs.body).markdown!
+    const table = lexBlockSlide(markdown).find(token => token.type === 'table') as { header: unknown[]; rows: unknown[][] } | undefined
+    assert.ok(table && table.rows.every(row => row.length === table.header.length), `${label}: a valid table\n${markdown}`)
+    assertStable(saved, label)
+    stage.undo()
+    assert.equal(stage.save(), typed, `${label}: one Undo takes it back and keeps the words typed before it`)
+  }
 }
 
 // ---- Split slide here: the words before the caret stay, the rest is a new slide below; one Undo gives the slide back

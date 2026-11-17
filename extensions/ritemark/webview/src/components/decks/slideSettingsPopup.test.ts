@@ -63,23 +63,22 @@ const settings = (kind: string, data: Record<string, unknown>, about: unknown, d
 }
 
 // ---- The popover's order (README, "Nothing around the slide", 17 November): the library section, Picture, a Steps
-// label, a table's Add a row and Add a column, then the deck's look last. Skip slide is only in the menu.
+// label, then the deck's look last. Skip slide is only in the menu. A table's rows and columns are the table's own + bars
+// and grips (experience 48): Settings has no Add a row or Add a column.
 {
-  let rows = 0
-  let columns = 0
   const data = { from: 'Slide library/Agents.deck.md#p1 @k2' }
   const about = createElement(SlideAbout, { data, hidden: '' })
-  const root = settings('', data, about, cardDeck, { stepsTag: { value: 'Exercise', onChange: noop }, table: { addRow: () => rows++, addColumn: () => columns++ } })
+  const root = settings('', data, about, cardDeck, { stepsTag: { value: 'Exercise', onChange: noop } })
   const text = root.textContent
-  const order = ['From the library · Agents', 'Picture', 'Label', 'Add a row', 'Add a column', 'This deck · all 15 slides'].map(words => {
+  const order = ['From the library · Agents', 'Picture', 'Label', 'This deck · all 15 slides'].map(words => {
     const at = text.indexOf(words)
     assert.ok(at >= 0, words)
     return at
   })
-  assert.deepEqual([...order].sort((a, b) => a - b), order, 'library, Picture, Label, the table, the deck')
+  assert.deepEqual([...order].sort((a, b) => a - b), order, 'library, Picture, Label, the deck')
   assert.ok(!text.includes('Skip slide'), 'Skip slide is only in the menu')
-  assert.deepEqual(root.querySelectorAll('.deck-settings-table button').map(button => button.textContent), ['Add a row', 'Add a column'])
-  assert.equal(rows + columns, 0)
+  assert.ok(!text.includes('Add a row') && !text.includes('Add a column'), 'no Add a row or Add a column: the table has its + bars')
+  assert.equal(root.querySelectorAll('.deck-settings-table').length, 0)
   // The words a layout keeps for others stay at the top.
   const hidden = settings('table', {}, createElement(SlideAbout, { data: {}, hidden: '2 more items are kept for other layouts' }))
   assert.match(hidden.querySelector('.deck-settings-about')!.textContent, /2 more items are kept for other layouts/)
@@ -104,7 +103,7 @@ const settings = (kind: string, data: Record<string, unknown>, about: unknown, d
     ['', {}, null],
     ['table', {}, createElement(SlideAbout, { data: {}, hidden: '2 more items are kept for other layouts' })],
   ] as const) {
-    const root = settings(kind, data, about, cardDeck, kind === 'table' ? { table: { addRow: noop, addColumn: noop } } : {})
+    const root = settings(kind, data, about, cardDeck)
     type El = { classNames?: string; textContent: string; childNodes: Array<{ nodeType: number }>; getAttribute(name: string): string | null; querySelector(s: string): El | null }
     const elements = (node: El) => node.childNodes.filter(child => child.nodeType === 1) as unknown as El[]
     const children = elements(root.querySelector('section') as unknown as El)

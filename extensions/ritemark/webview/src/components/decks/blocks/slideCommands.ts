@@ -12,8 +12,8 @@
  *    comment on a block goes with its block.
  *  - **A box's icon and the Steps pill** are one value each on the block's opening line (`withFenceValue`): changing one
  *    rewrites that line only.
- *  - **A table** in a slide: Enter moves to the cell below (a new row under the last), as Tab moves to the next cell;
- *    Settings' Add a row and Add a column add one at the bottom and on the right.
+ *  - **A table** in a slide: Enter moves to the cell below (a new row under the last), as Tab moves to the next cell.
+ *    Its rows and columns are changed with the table's own handles (`extensions/tables/`), as in a Text document.
  *
  * Every change made here carries `SLIDE_COMMAND`: the stage writes it to the deck as an undo step of its own, so one
  * Undo takes the block (or the icon, or the row) back and leaves the words typed before it.
@@ -21,7 +21,8 @@
 import type { Node as PMNode, Schema } from '@tiptap/pm/model'
 import { TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { canSplit } from '@tiptap/pm/transform'
-import { TableMap, addColumn, addRow, cellAround } from '@tiptap/pm/tables'
+import { TableMap, addRow, cellAround } from '@tiptap/pm/tables'
+import { TABLE_COMMAND } from '../../../extensions/tables/tableOps'
 import type { BlockItemDef } from '../../../extensions/blockItems'
 import { OPEN_FENCE, parseFenceAttributes, withFenceValue } from '../../../../../src/decks/blocks/fencedDiv'
 import { EXERCISE_TAG } from '../../../../../src/decks/deckFormat'
@@ -29,6 +30,11 @@ import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
 
 /** Meta on a slide editor transaction that the stage writes to the deck as an undo step of its own. */
 export const SLIDE_COMMAND = 'deckSlideCommand'
+
+/** Is a slide editor transaction an undo step of its own: a block, an icon, a row, or a table's handles (experience 48)? */
+export function isOwnStep(tr: Transaction): boolean {
+  return tr.getMeta(SLIDE_COMMAND) === true || tr.getMeta(TABLE_COMMAND) === true
+}
 
 /** The slide's / menu (frame 22), in its groups, with the shortcuts the design shows. */
 export const SLIDE_ITEMS: BlockItemDef[] = [
@@ -274,7 +280,7 @@ export function cellBelow(state: EditorState): Transaction | null {
   let tableMap = map
   if (rect.bottom >= map.height) {
     addRow(tr, { map, tableStart, table, left: 0, top: 0, right: map.width, bottom: map.height }, map.height)
-    // A new row is an undo step of its own, as Settings' Add a row is (Codex on #769).
+    // A new row is an undo step of its own, as the table's + bar makes one (Codex on #769).
     tr.setMeta(SLIDE_COMMAND, true)
     tableNode = tr.doc.nodeAt(tableStart - 1)!
     tableMap = TableMap.get(tableNode)
@@ -282,29 +288,4 @@ export function cellBelow(state: EditorState): Transaction | null {
   const cellPos = tableStart + tableMap.map[rect.bottom * tableMap.width + rect.left]
   tr.setSelection(TextSelection.near(tr.doc.resolve(cellPos + 1)))
   return tr.scrollIntoView()
-}
-
-/** The table Settings' Add a row and Add a column act on: the one with the caret, else the slide's first. */
-function tableAt(state: EditorState): { table: PMNode; tableStart: number } | null {
-  const $cell = cellAround(state.selection.$from)
-  if ($cell) return { table: $cell.node(-1), tableStart: $cell.start(-1) }
-  let found: { table: PMNode; tableStart: number } | null = null
-  state.doc.descendants((node, pos) => {
-    if (found) return false
-    if (node.type.name === 'table') { found = { table: node, tableStart: pos + 1 }; return false }
-    return true
-  })
-  return found
-}
-
-/** Settings' Add a row (at the bottom) or Add a column (on the right) of the slide's table; null without a table. */
-export function addToTable(state: EditorState, what: 'row' | 'column'): Transaction | null {
-  const at = tableAt(state)
-  if (!at) return null
-  const map = TableMap.get(at.table)
-  const rect = { map, tableStart: at.tableStart, table: at.table, left: 0, top: 0, right: map.width, bottom: map.height }
-  const tr = state.tr
-  if (what === 'row') addRow(tr, rect, map.height)
-  else addColumn(tr, rect, map.width)
-  return tr.setMeta(SLIDE_COMMAND, true)
 }

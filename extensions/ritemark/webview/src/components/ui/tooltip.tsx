@@ -68,6 +68,7 @@ export function Tooltip({
   side = 'bottom',
   className,
   hoverOnly = false,
+  suppressed = false,
   children,
 }: {
   label: ReactNode;
@@ -75,11 +76,13 @@ export function Tooltip({
   className?: string;
   /** Open on hover only, never on focus (a list the arrow keys move through). */
   hoverOnly?: boolean;
+  /** Kept closed while true (a table's grip being pressed or dragged: the tooltip would cover where it lands). */
+  suppressed?: boolean;
   children: ReactNode;
 }) {
   return (
     <TooltipPrimitive.Provider delayDuration={300} skipDelayDuration={100}>
-      <TooltipPrimitive.Root>
+      <TooltipPrimitive.Root open={suppressed ? false : undefined}>
         <TooltipPrimitive.Trigger asChild onFocus={hoverOnly ? onTriggerFocusHoverOnly : onTriggerFocus}>
           <span className={cn('inline-flex', className)}>{children}</span>
         </TooltipPrimitive.Trigger>

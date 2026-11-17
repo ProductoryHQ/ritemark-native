@@ -25,7 +25,9 @@ import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
 import AutoJoiner from 'tiptap-extension-auto-joiner'
 import { FormattingBubbleMenu } from './FormattingBubbleMenu'
 import { MarginCommentRail } from './MarginCommentRail'
-import { TableOverlayControls } from './TableOverlayControls'
+import { TableHandlesLayer } from './tables/TableHandlesLayer'
+import { TableHandles } from '../extensions/tables/TableHandles'
+import { cellAtSelection, deleteColumn, deleteRow, insertColumn, insertRow } from '../extensions/tables/tableOps'
 import { BlockMenu } from './BlockMenu'
 import type { EditorSelection } from '../types/editor'
 import type { DocumentApplyTarget } from '../types/documentSync'
@@ -169,6 +171,8 @@ export function Editor({
         }),
         // Sprint 138 (#481): writing and editing equations.
         MathEditing,
+        // Tables you can change (experience 48): the grips, menus, + bars and keys of a table.
+        TableHandles,
       ],
       commentCallouts,
       // Sprint 138 (#481): the equation nodes with their typesetting views.
@@ -249,43 +253,26 @@ export function Editor({
         // Users will insert tables via toolbar button (Phase 2)
         // No safe keyboard shortcut exists (Cmd+Shift+T = reopen tab, Cmd+Option+T conflicts with apps)
 
-        // Table row/column operations (only when inside a table)
-        if (editor?.isActive('table')) {
-          // Cmd+Shift+↑ - Add row before
-          if (isMod && event.shiftKey && event.key === 'ArrowUp') {
+        // Table row/column operations (only when inside a table), through the table's own operations (experience 48),
+        // so the header row stays first and the delimiter row (alignment, column widths) follows the change.
+        const tableCell = cellAtSelection(view.state)
+        if (tableCell && isMod) {
+          const tableKey = (make: (state: typeof view.state) => ReturnType<typeof insertRow>) => {
             event.preventDefault()
-            return editor?.commands.addRowBefore() || false
+            const tr = make(view.state)
+            if (tr) view.dispatch(tr)
+            return true
           }
-
-          // Cmd+Shift+↓ - Add row after
-          if (isMod && event.shiftKey && event.key === 'ArrowDown') {
-            event.preventDefault()
-            return editor?.commands.addRowAfter() || false
-          }
-
-          // Cmd+Shift+← - Add column before
-          if (isMod && event.shiftKey && event.key === 'ArrowLeft') {
-            event.preventDefault()
-            return editor?.commands.addColumnBefore() || false
-          }
-
-          // Cmd+Shift+→ - Add column after
-          if (isMod && event.shiftKey && event.key === 'ArrowRight') {
-            event.preventDefault()
-            return editor?.commands.addColumnAfter() || false
-          }
-
-          // Cmd+Backspace - Delete row
-          if (isMod && event.key === 'Backspace') {
-            event.preventDefault()
-            return editor?.commands.deleteRow() || false
-          }
-
-          // Cmd+Delete - Delete column
-          if (isMod && event.key === 'Delete') {
-            event.preventDefault()
-            return editor?.commands.deleteColumn() || false
-          }
+          const { pos: tablePos, row, col } = tableCell
+          // Cmd+Shift+↑ / ↓ - Add row before / after
+          if (event.shiftKey && event.key === 'ArrowUp') return tableKey(state => insertRow(state, tablePos, row, col))
+          if (event.shiftKey && event.key === 'ArrowDown') return tableKey(state => insertRow(state, tablePos, row + 1, col))
+          // Cmd+Shift+← / → - Add column before / after
+          if (event.shiftKey && event.key === 'ArrowLeft') return tableKey(state => insertColumn(state, tablePos, col, row))
+          if (event.shiftKey && event.key === 'ArrowRight') return tableKey(state => insertColumn(state, tablePos, col + 1, row))
+          // Cmd+Backspace - Delete row (never the header row); Cmd+Delete - Delete column
+          if (event.key === 'Backspace') return tableKey(state => deleteRow(state, tablePos, row, col))
+          if (event.key === 'Delete') return tableKey(state => deleteColumn(state, tablePos, col))
         }
 
         // Ordered list shortcut: Mod+Shift+7
@@ -781,7 +768,7 @@ export function Editor({
           {commentCallouts && (
             <MarginCommentRail editor={editor} container={scrollContainer} />
           )}
-          <TableOverlayControls editor={editor} />
+          <TableHandlesLayer editor={editor} />
           {/* Block insertion menu (triggered by + button) */}
           {showBlockMenu && (
             <div
@@ -1446,9 +1433,18 @@ export function Editor({
 
         /* Table styling - Based on Sprint 11 research with user-requested colors */
         /* Table container */
+        /* Tables you can change (experience 48): the table's element holds its handles beside it. It reaches 24 px
+           into the page's margin, so the row grips sit there and the block drag handle sits left of them. */
+        .wysiwyg-editor .ProseMirror .rm-table {
+          margin-left: -24px;
+          padding-left: 24px;
+        }
+
+        /* A column is never narrower than its longest word, and words never break inside (experience 48): the
+           columns take their width from their words, the table the page's width at least. */
         .wysiwyg-editor .ProseMirror table.tiptap-table-node {
           border-collapse: collapse !important;
-          table-layout: fixed !important;
+          table-layout: auto !important;
           width: 100% !important;
           margin: 1em 0 !important;
           overflow: hidden !important;
@@ -1464,6 +1460,19 @@ export function Editor({
           vertical-align: top !important;
           box-sizing: border-box !important;
           position: relative !important;
+          overflow-wrap: normal !important;
+          word-break: normal !important;
+          hyphens: manual !important;
+        }
+
+        /* A column's alignment as the file writes it (\`:---:\`, \`---:\`), shown as it reads. */
+        .wysiwyg-editor .ProseMirror td.tiptap-table-cell[data-md-align="center"],
+        .wysiwyg-editor .ProseMirror th.tiptap-table-header[data-md-align="center"] {
+          text-align: center !important;
+        }
+        .wysiwyg-editor .ProseMirror td.tiptap-table-cell[data-md-align="right"],
+        .wysiwyg-editor .ProseMirror th.tiptap-table-header[data-md-align="right"] {
+          text-align: right !important;
         }
 
         /* Header cells */
