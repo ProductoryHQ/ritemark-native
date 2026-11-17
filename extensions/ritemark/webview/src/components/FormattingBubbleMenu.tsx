@@ -1,3 +1,4 @@
+import { isPictureSelection } from '../extensions/pictures/pictureCommands'
 import { BubbleMenu, type Editor as TipTapEditor } from '@tiptap/react'
 import { useState, useEffect, useRef } from 'react'
 import { Icon } from './ui/Icon'
@@ -319,6 +320,8 @@ export function FormattingBubbleMenu({
             // Sprint 138 (experience 38): a selected equation shows its focus ring
             // or opens in place; text formatting does not apply to it.
             equationSelected: isEquationNodeSelection(state.selection),
+            // Experience 49: a picture has its own bar (PictureBar), never the text's.
+            pictureSelected: isPictureSelection(state.selection),
             // Sprint 143 (#513): only while the editor (or the toolbar) has the focus, never over a comment's box.
             editorHasFocus: view.hasFocus(),
             focusInToolbar: element.contains(element.ownerDocument.activeElement),

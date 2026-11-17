@@ -33,7 +33,7 @@ import type { DocumentEditPayload, DocumentRenderPayload, DocumentSyncBootstrap 
 import { canonicalMarkdownProjection } from './editorSync/state';
 import { joinFrontMatter, splitFrontMatter, type DocumentProperties } from './editorSync/frontMatter';
 import { versionedWebviewAssetUri } from './views/webviewAssetUri';
-import { isRelativeImagePath } from './utils/imagePaths';
+import { isRelativeImagePath, pictureFileInside } from './utils/imagePaths';
 import { resolveDocumentResourceRoots, resolveDocumentRoot, toMarkdownRelativePath } from './webviewResourceRoots';
 import { resolveProjectScope } from './conversations/projectScope';
 import type { CommentTaskProjectionV1 } from './commentTasks/types';
@@ -408,6 +408,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         saveAsMarkdownFromPreview: isEnabled('save-as-markdown-from-preview'),
         commentCallouts: isEnabled('comment-callouts'),
         tableHandles: isEnabled('table-handles'),
+        pictureEditor: isEnabled('picture-editor'),
       },
       systemLanguage: systemLanguage(process.env, vscode.env.language),
       ...agentFields,
@@ -1005,11 +1006,6 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
             this.selectImageFile(document, webview);
             return;
 
-          case 'resizeImage':
-            // Resize image file (user confirmed resize in webview)
-            this.resizeImage(document, message.relativePath, message.dataUrl);
-            return;
-
           case 'insertDiagram':
             // Sprint 82 R5: create a new .drawio.svg in ./images/ and open its editor
             this.insertDiagram(document, webview);
@@ -1023,6 +1019,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
           case 'openDrawioDiagram':
             // Sprint 82 R4: click-to-edit a draw.io diagram from the markdown preview
             this.openDrawioDiagram(document, message.relativePath);
+            return;
+
+          case 'revealImage':
+            // Experience 49: the picture's ⋯ menu, Show in Finder (Explorer on Windows)
+            void this.revealImage(document, message.relativePath);
             return;
 
           case 'selectionChanged':
@@ -1469,41 +1470,6 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   /**
-   * Resize an image file (called after user confirms resize in webview)
-   * The webview has already resized the image using Canvas, we just save it
-   */
-  private async resizeImage(
-    document: vscode.TextDocument,
-    relativePath: string,
-    dataUrl: string
-  ): Promise<void> {
-    try {
-      // Get full path from relative path
-      const docDir = path.dirname(document.uri.fsPath);
-      const imagePath = path.join(docDir, relativePath);
-
-      // Verify the file exists
-      if (!fs.existsSync(imagePath)) {
-        throw new Error(`Image file not found: ${relativePath}`);
-      }
-
-      // Parse the data URL (handles svg+xml and other compound subtypes).
-      const parsed = parseImageDataUrl(dataUrl);
-      if (!parsed) {
-        throw new Error('Invalid image data URL');
-      }
-
-      // Overwrite the original file with resized image
-      fs.writeFileSync(imagePath, Buffer.from(parsed.base64, 'base64'));
-    } catch (error) {
-      console.error('Failed to resize image:', error);
-      vscode.window.showErrorMessage(
-        `Failed to resize image: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }
-
-  /**
    * Sprint 82 R5: create a new empty .drawio.svg in ./images/ relative to the
    * markdown file, insert its image reference via the existing imageSaved flow,
    * and open the draw.io editor for it.
@@ -1582,6 +1548,19 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         `Failed to open diagram: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
+  }
+
+  /**
+   * Experience 49: show a picture's file in the system's file manager, only a file beside the document and inside its
+   * project (`pictureFileInside`): a path that climbs out of the project, an absolute path or a web address does nothing.
+   */
+  private async revealImage(document: vscode.TextDocument, relativePath: unknown): Promise<void> {
+    if (document.uri.scheme !== 'file') return;
+    const folder = path.dirname(document.uri.fsPath);
+    const root = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath ?? folder;
+    const file = pictureFileInside(folder, root, relativePath, path);
+    if (!file || !fs.existsSync(file)) return;
+    await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(file));
   }
 
   /**

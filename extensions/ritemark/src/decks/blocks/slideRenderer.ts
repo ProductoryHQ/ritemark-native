@@ -22,6 +22,7 @@ import { slideIcon } from '../../../webview/src/components/decks/slide/iconSet';
 import { iconSvg, isPageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
 import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, fencedDivStart, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
 import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
+import { lookOf, pictureBlockTokenizer, pictureMarkup, readSideFocus, type ImageTokenWithLook } from '../../markdown/pictureLook';
 
 export { sidePictureOf };
 
@@ -146,12 +147,15 @@ function divHtml(token: SlideDivToken, inner: () => string): string {
   }
 }
 
-/** A picture: drawn from beside the deck, or its empty place. Never loaded from the web. */
-function pictureHtml(href: string, text: string): string {
+/**
+ * A picture: drawn from beside the deck, or its empty place. Never loaded from the web. Experience 49: its size, place
+ * in the column, crop and caption from the block after it (`pictureLook.ts`), drawn as the editors draw them.
+ */
+function pictureHtml(href: string, text: string, block?: string): string {
   const path = picturePathOf(href);
   const relative = isRelativeTarget(path);
   const url = relative ? state.pictureUrl(path) : null;
-  if (url) return `<img class="blk-pic" src="${esc(url)}" alt="${text}">`;
+  if (url) return pictureMarkup(`<img class="blk-pic" src="${esc(url)}" alt="${text}">`, lookOf(block), { frameClass: 'blk-pic', caption: text });
   // A picture whose file is gone says so, with its name, rather than leaving an empty place (17 November).
   if (relative && state.missing(path)) return `<span class="blk-pic empty is-missing">${missingHtml(path)}</span>`;
   return '<span class="blk-pic empty"></span>';
@@ -199,6 +203,22 @@ function createSlideMarked(): Marked {
         if (!widths) return html;
         const group = `<colgroup>${widths.map(width => `<col style="width:${width}%">`).join('')}</colgroup>`;
         return html.replace(/^<table>\n?/, `<table class="has-widths" style="width:100%">\n${group}\n`);
+      },
+    }, pictureBlockTokenizer, {
+      // Experience 49: a picture with the attribute block after it is drawn with its look.
+      name: 'image',
+      renderer(token) {
+        const image = token as unknown as ImageTokenWithLook;
+        return pictureHtml(image.href, image.text, image.picture);
+      },
+    }, {
+      // Experience 49: a picture alone in its paragraph (its attribute block beside it) is a block of its own, decided
+      // from the tokens, so a look's markup never has to be read back (review of #774). Any other paragraph: as before.
+      name: 'paragraph',
+      renderer(this: { parser: { parseInline: (tokens: Token[]) => string } }, token) {
+        const paragraph = token as Tokens.Paragraph;
+        if (!isAlonePicture(paragraph)) return false;
+        return `${this.parser.parseInline(paragraph.tokens ?? []).trim()}\n`;
       },
     }, {
       name: 'slideDiv',
@@ -296,9 +316,16 @@ export function isCoverSlide(markdown: string): boolean {
   return cover;
 }
 
+/** A paragraph that is one picture with a look (its attribute block, experience 49) and nothing else but space. */
+function isAlonePicture(paragraph: Tokens.Paragraph): boolean {
+  const parts = (paragraph.tokens ?? []).filter(token => !(token.type === 'text' && !token.raw.trim()) && token.type !== 'br');
+  return parts.length === 2 && parts[0].type === 'image' && parts[1].type === 'pictureBlock';
+}
+
 /** A paragraph that holds only pictures (and space): the renderer draws it as a Picture block. */
 function isPictureParagraph(paragraph: Tokens.Paragraph): boolean {
-  const parts = (paragraph.tokens ?? []).filter(token => !(token.type === 'text' && !token.raw.trim()) && token.type !== 'br');
+  // A picture's attribute block (experience 49) is the picture's own.
+  const parts = (paragraph.tokens ?? []).filter(token => !(token.type === 'text' && !token.raw.trim()) && token.type !== 'br' && token.type !== 'pictureBlock');
   return parts.length > 0 && parts.every(token => token.type === 'image');
 }
 
@@ -400,7 +427,10 @@ export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarku
   if (side) {
     const path = data.image?.trim();
     const url = path ? pictureUrl(path) : null;
-    const background = url ? ` style="background-image:url(&quot;${esc(url.replace(/"/g, '%22'))}&quot;)"` : '';
+    // Experience 49: the side picture fills its place around its focus point (`focus: x,y`), the middle by default.
+    const focus = readSideFocus(data.focus);
+    const position = focus ? `;background-position:${focus.x}% ${focus.y}%` : '';
+    const background = url ? ` style="background-image:url(&quot;${esc(url.replace(/"/g, '%22'))}&quot;)${position}"` : '';
     const gone = !url && !!path && missing(path);
     photo = `<div class="photo${url ? '' : ' empty'}${gone ? ' is-missing' : ''}"${background}>${gone ? missingHtml(path) : ''}</div>${side === 'behind' ? '<div class="veil"></div>' : ''}`;
   }

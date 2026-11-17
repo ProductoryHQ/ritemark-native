@@ -18,6 +18,8 @@ assert.equal(formattingToolbarShows({ ...base, editorHasFocus: false, focusInToo
 // The rules that were there stay.
 assert.equal(formattingToolbarShows({ ...base, empty: true }), false)
 assert.equal(formattingToolbarShows({ ...base, inCodeBlock: true }), false)
+// Experience 49: never over a picture; the picture's own bar opens under it.
+assert.equal(formattingToolbarShows({ ...base, pictureSelected: true }), false)
 assert.equal(formattingToolbarShows({ ...base, equationSelected: true }), false)
 
 // #687: the re-check right after a click on a toolbar button.

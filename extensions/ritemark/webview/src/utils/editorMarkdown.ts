@@ -42,6 +42,7 @@ import { mathMarkedExtension } from '../extensions/math/mathMarkedExtension'
 import { LiteralDollar, MathBlock, MathInline } from '../extensions/math/mathNodes'
 import { classifyLinkTarget, isSafeRelativePath } from '../lib/linkTargets'
 import { createTurndownService } from './turndownService'
+import { pictureMarkedExtension } from '../extensions/pictures/pictureMarked'
 import { preprocessTaskListHTML } from './taskListRoundTrip'
 import {
   annotateAsWritten,
@@ -70,6 +71,8 @@ editorMarked.use(asWrittenMarkedExtension)
 // is what keeps formulas safe on save: without it, `$\bar{x}$` is Markdown
 // text whose backslashes and underscores a save would rewrite.
 editorMarked.use(mathMarkedExtension as Parameters<typeof editorMarked.use>[0])
+// Experience 49: a picture's size, crop and caption, kept in the block after its image line.
+editorMarked.use(pictureMarkedExtension as Parameters<typeof editorMarked.use>[0])
 
 let commentMarkedRegistered = false
 
@@ -226,6 +229,8 @@ export const MarkdownAsWritten = Extension.create({
       { types: ['link'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.link) },
       { types: ['table'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.table) },
       { types: ['codeBlock'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.codeBlock, false) },
+      // Experience 49: a picture's attribute block as written (`{width=50%}`), written back after its image line.
+      { types: ['image'], attributes: { picture: dataAttribute('data-picture', false) } },
       // A block split off with Enter is new writing: a blank line before it.
       { types: TIGHT_BLOCKS, attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.tight, false) },
       {

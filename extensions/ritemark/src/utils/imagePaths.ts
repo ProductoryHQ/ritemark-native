@@ -29,3 +29,29 @@ export function sameRelativeImagePath(a: string, b: string): boolean {
   const normal = (p: string) => p.trim().replace(/\\/g, '/').replace(/^(\.\/)+/, '');
   return normal(a) === normal(b);
 }
+
+/**
+ * Experience 49 (the picture's ⋯, Show in Finder): the file a picture names, as an absolute path, only when it is
+ * beside the document and inside `root` (the project). Null for anything else: a web address, an absolute path, a path
+ * that climbs out of the project. `resolve`, `relative` and `isAbsolute` are Node's `path` functions, passed in so this
+ * stays pure.
+ */
+export function pictureFileInside(
+  documentFolder: string,
+  root: string,
+  written: unknown,
+  paths: { resolve: (...parts: string[]) => string; relative: (from: string, to: string) => string; isAbsolute: (p: string) => boolean },
+): string | null {
+  if (typeof written !== 'string' || written.length > 1024 || !isRelativeImagePath(written)) return null;
+  let target = written.trim().replace(/[?#].*$/, '');
+  try {
+    target = decodeURI(target);
+  } catch {
+    // A path with a stray % is read as written.
+  }
+  if (!target || target.includes('\0')) return null;
+  const absolute = paths.resolve(documentFolder, target);
+  const inside = paths.relative(paths.resolve(root), absolute);
+  if (!inside || inside.startsWith('..') || paths.isAbsolute(inside)) return null;
+  return absolute;
+}

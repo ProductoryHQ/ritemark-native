@@ -158,7 +158,8 @@ export function pictureIntoSlide(state: EditorState, slideId: string, path: stri
   const placed = data.picture && data.picture !== 'none'
   const markdown = (data.markdown ?? '').replace(/\s+$/, '')
   const body = placed
-    ? writeSlideData(node.attrs.kind, node.attrs.body, { ...data, image: path })
+    // Experience 49: the place keeps its side; the new picture's description and focus point start fresh.
+    ? writeSlideData(node.attrs.kind, node.attrs.body, { ...data, image: path, alt: undefined, focus: undefined })
     : withBlockMarkdown(node.attrs.body, `${markdown}${markdown ? '\n\n' : ''}![](${pictureTarget(path)})`)
   tr.setNodeMarkup(pos, undefined, { ...node.attrs, body })
   return tr

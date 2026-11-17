@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useReducer, useRef } from 'react'
 import { setTableHandlesEnabled } from './extensions/tables/TableHandles'
+import { setPictureEditorEnabled } from './extensions/pictures/pictureCommands'
 import {
   getDocumentSyncBootstrap,
   onMessage,
@@ -72,6 +73,8 @@ interface Features {
   commentCallouts?: boolean
   /** Experience 48: the table's own handles (the `table-handles` kill switch), read once into `setTableHandlesEnabled`. */
   tableHandles?: boolean
+  /** Experience 49: the picture's own tools (the `picture-editor` kill switch), read into `setPictureEditorEnabled`. */
+  pictureEditor?: boolean
 }
 
 function App() {
@@ -209,6 +212,7 @@ function App() {
       setDictationSystemLanguage(payload.systemLanguage)
       // Before the editor is made: it reads the switch then.
       setTableHandlesEnabled(payload.features.tableHandles !== false)
+      setPictureEditorEnabled(payload.features.pictureEditor !== false)
       setFeatures({
         voiceDictation: payload.features.voiceDictation,
         markdownExport: payload.features.markdownExport,
@@ -328,6 +332,7 @@ function App() {
           setHasProperties(message.hasProperties as boolean || false)
           setImageMappings((message.imageMappings as Record<string, string>) || {})
           setTableHandlesEnabled((message.features as Features | undefined)?.tableHandles !== false)
+          setPictureEditorEnabled((message.features as Features | undefined)?.pictureEditor !== false)
           setFeatures((message.features as Features) || {
             voiceDictation: false,
             markdownExport: false,
