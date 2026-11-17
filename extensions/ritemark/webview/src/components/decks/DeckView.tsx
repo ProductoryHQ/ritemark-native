@@ -511,11 +511,12 @@ export function DeckView({
   // measured from the stage as drawn, so the stage never overflows its pane. With no row under it, it's the pane less 32.
   const [aboveUnder, setAboveUnder] = useState(0)
   // Slide only gives the slide the whole room (the design; Jarmo, 17 November: "align slide to center... and fill the
-  // space"): the largest 16:9 between the strip and the AI pane, centred both ways, never the side-by-side 900 cap.
+  // space"): the largest 16:9 between the strip and the AI pane, centred both ways, never the side-by-side 900 cap. A
+  // row under it, if any, scrolls with the stage as beside: sizing by it would shrink the slide as the row wraps (review).
   const slideAlone = slideShown && !handoutShown
-  const bigWidth = slideAlone ? fullSlideWidthFor(stageWidth, stageHeight, aboveUnder) : slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
+  const bigWidth = slideAlone ? fullSlideWidthFor(stageWidth, stageHeight) : slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
   useLayoutEffect(() => {
-    if (!above && !slideAlone) return
+    if (!above || slideAlone) return
     const group = stageRef.current?.querySelector<HTMLElement>('.deck-stage-group')
     const big = group?.querySelector<HTMLElement>('.deck-big')
     if (!group || !big) return

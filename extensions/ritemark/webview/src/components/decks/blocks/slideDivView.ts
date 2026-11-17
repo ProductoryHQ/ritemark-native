@@ -4,9 +4,11 @@
  * look, `blk-box` with its icon, `blk-steps` with its pill. The block's words are the editor's own content.
  *
  * PR 3 (README frame 4 and "The 'Exercise' pill is the person's own word"; the plan's "Added to PR 3"):
- *  - **A box's icon** is clicked to choose another from the grid (`handlers.pickIcon`); a box with none shows a place
- *    for one, on the stage only, under the looks that draw icons, and (17 November) only on the box being edited: the
- *    caret's box, marked `is-caret` by `slideCaretBox`. It sits over the box's top edge, so it takes no room.
+ *  - **A box's icon** is clicked to choose another from the grid (`handlers.pickIcon`). A box with none gets a place
+ *    for one, on the stage only, under the looks that draw icons. Since the follow-up to #773 the place is never drawn
+ *    (`display: none`): it tells the block bar that the caret's box has room for an icon, and the bar draws the icon
+ *    handle there (`SlideBlockBar`, the `smile-plus` handle over the box's top edge). `slideCaretBox` still marks the
+ *    caret's box `is-caret`; no rule draws it now.
  *  - **The Steps pill** is edited in place, like every other word on the slide. Emptying it hides the pill; while the
  *    caret is in an empty pill, "Exercise" shows faint as its placeholder. Settings' Label row brings it back. Its words
  *    are the block's `tag` (the stage's field over the pill, `handlers.editPill`; #752's rule in `setStepsTag`).
