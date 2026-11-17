@@ -12,7 +12,7 @@
  * for a new theme's name and file. Pure: the host, the webview and the tests read the same rules.
  */
 import { writeScalar } from './deckFormat';
-import { DECK_FONT_LIST, deckFont, isDeckFontName, parseTheme, THEMES_FOLDER, type DeckTheme } from './deckTheme';
+import { DECK_FONT_LIST, DEFAULT_LOGO_ON, DEFAULT_LOGO_PLACE, deckFont, isDeckFontName, isLogoPath, LOGO_ONS, LOGO_PLACES, parseTheme, THEMES_FOLDER, type DeckTheme, type LogoOn, type LogoPlace } from './deckTheme';
 
 /** The fields the theme's tab changes, as `DeckTheme` names them. */
 export interface ThemeChanges {
@@ -27,6 +27,15 @@ export interface ThemeChanges {
   fb?: string;
   round?: DeckTheme['round'];
   boxes?: DeckTheme['boxes'];
+  /**
+   * Sprint 162 PR 4: the logo, a picture beside the theme file (its path from the theme's folder), or null to take it
+   * out (with its place and where it shows). Only the host names a picture, once it has copied it beside the theme:
+   * the tab may only take the logo out (`isThemeChanges`).
+   */
+  logo?: string | null;
+  /** The logo's corner and where it shows; written only while the theme has a logo. */
+  logoAt?: LogoPlace;
+  logoOn?: LogoOn;
 }
 
 export type ThemeField = keyof ThemeChanges;
@@ -43,7 +52,13 @@ export const THEME_KEYS: Record<ThemeField, string> = {
   fb: 'text-font',
   round: 'corners',
   boxes: 'boxes',
+  logo: 'logo',
+  logoAt: 'logo-place',
+  logoOn: 'logo-on',
 };
+
+/** The logo's lines, which go together when the logo is taken out. */
+const LOGO_KEYS = [THEME_KEYS.logo, THEME_KEYS.logoAt, THEME_KEYS.logoOn];
 
 const FIELDS = Object.keys(THEME_KEYS) as ThemeField[];
 const COLOUR_FIELDS: ThemeField[] = ['bg', 'head', 'text', 'accent'];
@@ -75,6 +90,10 @@ export function isThemeChanges(value: unknown): value is ThemeChanges {
       case 'boxes': return field === 'filled' || field === 'outline';
       case 'fh':
       case 'fb': return typeof field === 'string' && DECK_FONT_LIST.some(font => font.name === field);
+      // The tab only takes a logo out; a picture is named by the host, which copied it (`ThemePages.takeLogo`).
+      case 'logo': return field === null;
+      case 'logoAt': return LOGO_PLACES.includes(field as LogoPlace);
+      case 'logoOn': return LOGO_ONS.includes(field as LogoOn);
       default: return typeof field === 'string' && COLOUR.test(field);
     }
   });
@@ -88,7 +107,7 @@ export function changedFields(theme: DeckTheme, changes: ThemeChanges): ThemeCha
     if (value === undefined) continue;
     if (COLOUR_FIELDS.includes(field)) {
       const colour = normalColour(String(value));
-      if (colour && colour !== theme[field]) (out as Record<string, unknown>)[field] = colour;
+      if (colour && colour !== theme[field as 'bg' | 'head' | 'text' | 'accent']) (out as Record<string, unknown>)[field] = colour;
     } else if (field === 'fh' || field === 'fb') {
       // A font is the one the slide draws: "inter" in the file is Inter already, and needs no new line. A name that
       // isn't one of the six ("Futura", drawn in Sofia Sans) is replaced by any pick, Sofia Sans too.
@@ -97,6 +116,13 @@ export function changedFields(theme: DeckTheme, changes: ThemeChanges): ThemeCha
     } else if (field === 'name') {
       const name = String(value).trim();
       if (name && name !== theme.name) out.name = name;
+    } else if (field === 'logo') {
+      // A picture the theme can name, or null to take the logo out (only when it has one).
+      if (value === null ? theme.logo !== undefined : isLogoPath(String(value)) && String(value).trim() !== theme.logo?.file) out.logo = value === null ? null : String(value).trim();
+    } else if (field === 'logoAt' || field === 'logoOn') {
+      // A logo's place and where it shows, against what the theme reads (the default when its line is missing).
+      const now = field === 'logoAt' ? theme.logo?.place ?? DEFAULT_LOGO_PLACE : theme.logo?.on ?? DEFAULT_LOGO_ON;
+      if (value !== now) (out as Record<string, unknown>)[field] = value;
     } else if (value !== theme[field]) {
       (out as Record<string, unknown>)[field] = value;
     }
@@ -108,7 +134,7 @@ const FRONT = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 const TOP = /^([A-Za-z0-9_-]+):(\s*)(.*)$/;
 
 /** A value written in the quotes its line had (`"#1C1F4A"`, `'Evening'`, bare). */
-function written(field: ThemeField, value: string | boolean, quote: string): string {
+function written(field: ThemeField, value: string | boolean | null, quote: string): string {
   if (field === 'glow') return value ? 'true' : 'false';
   const text = String(value);
   if (quote === '"') return JSON.stringify(text);
@@ -148,8 +174,15 @@ function valueParts(raw: string): { quote: string; rest: string } {
 export function themeTextWith(text: string, changes: ThemeChanges): string {
   const before = parseTheme(text);
   const changed = changedFields(before, changes);
-  const fields = FIELDS.filter(field => changed[field] !== undefined);
-  if (fields.length === 0) return text;
+  // A logo's place and where it shows belong to a logo: with none (or with the logo going), they aren't written.
+  const hasLogo = changed.logo === undefined ? before.logo !== undefined : changed.logo !== null;
+  if (!hasLogo) {
+    delete changed.logoAt;
+    delete changed.logoOn;
+  }
+  const removeLogo = changed.logo === null;
+  const fields = FIELDS.filter(field => changed[field] !== undefined && changed[field] !== null);
+  if (fields.length === 0 && !removeLogo) return text;
   const eol = text.includes('\r\n') ? '\r\n' : '\n';
   const match = FRONT.exec(text);
   if (!match) {
@@ -160,6 +193,13 @@ export function themeTextWith(text: string, changes: ThemeChanges): string {
   const innerEnd = innerStart + match[1].length;
   const lines = match[1].split(/\r?\n/);
   const isSection = (line: string) => { const top = TOP.exec(line); return !!top && top[3].trim() === ''; };
+  // Sprint 162 PR 4: Remove takes out the logo's lines, every one of them (a key written twice too), and nothing else.
+  if (removeLogo) {
+    for (let index = lines.length - 1; index >= 0; index--) {
+      const top = TOP.exec(lines[index]);
+      if (top && LOGO_KEYS.includes(top[1]) && top[3].trim() !== '') lines.splice(index, 1);
+    }
+  }
   for (const field of fields) {
     const key = THEME_KEYS[field];
     let at = -1;

@@ -10,6 +10,9 @@
  * Small details (decks README, item 1, 17 November): B or "." blanks the wall to the theme's ground, W to white; while
  * it is blank any key brings the slide back, and that key does nothing else (`blankKeyOf`).
  *
+ * Item 3: for a published deck, Q shows the page's QR code on the wall the same way; any key brings the slide back. An
+ * unpublished deck's Q does nothing.
+ *
  * The spotlight and a filled wall (decks README, items 11 and 16, 17 November): F spotlights the slide's first item, Tab
  * and Shift+Tab move the spotlight, Esc clears it (`spotKeyOf`); → and a clicker clear it and go on, as any move does.
  * While a picture fills the wall any key returns to the slide, and does nothing else (`fillKeyOf`). A click acts on
@@ -68,11 +71,12 @@ export type BlankStep = { type: 'blank'; to: WallBlank } | { type: 'show' }
 const HELD_KEYS = new Set(['Shift', 'Meta', 'Control', 'Alt', 'AltGraph', 'CapsLock', 'Fn', 'FnLock', 'Hyper', 'Super', 'OS', 'NumLock', 'ScrollLock', 'Dead'])
 
 /**
- * B or "." blanks the wall to the theme's ground, W to white (a clicker's blank button sends B or "."). While the wall
- * is blank, any key brings the slide back (Esc, a digit and → too), and that key does nothing else. A key with ⌘, Ctrl
+ * B or "." blanks the wall to the theme's ground, W to white (a clicker's blank button sends B or "."), and Q shows the
+ * published page's QR code (`page`: the deck has one; else Q is no key of the wall's). While the wall is blank or shows
+ * the code, any key brings the slide back (Esc, a digit and → too), and that key does nothing else. A key with ⌘, Ctrl
  * or ⌥ is still the app's. Null: the key is not about blanking, and does what it does.
  */
-export function blankKeyOf(event: KeyInput, blank: WallBlank | null): BlankStep | null {
+export function blankKeyOf(event: KeyInput, blank: WallBlank | null, page = false): BlankStep | null {
   if (event.metaKey || event.ctrlKey || event.altKey) return null
   if (blank !== null) return HELD_KEYS.has(event.key) ? null : { type: 'show' }
   switch (event.key) {
@@ -83,6 +87,9 @@ export function blankKeyOf(event: KeyInput, blank: WallBlank | null): BlankStep 
     case 'w':
     case 'W':
       return { type: 'blank', to: 'white' }
+    case 'q':
+    case 'Q':
+      return page ? { type: 'blank', to: 'page' } : null
     default:
       return null
   }
@@ -96,8 +103,13 @@ export function blankNow<T>(host: T, asked: { to: T } | null): T {
   return asked ? asked.to : host
 }
 
-/** The ask kept until a state from the host carries it (the blank, the spotlight, a filled wall). */
-export function settleAsked<T>(asked: { to: T } | null, host: T): { to: T } | null {
+/**
+ * The ask kept until a state from the host carries it (the blank, the spotlight, a filled wall). A Q the host refused
+ * (the deck no longer has a page, `hostPage` false) is settled too: the host never shows the code then, and the next
+ * key must not be read against it.
+ */
+export function settleAsked<T>(asked: { to: T } | null, host: T, hostPage = true): { to: T } | null {
+  if (asked && (asked.to as unknown) === 'page' && !hostPage) return null
   return asked && asked.to === host ? null : asked
 }
 
@@ -143,14 +155,17 @@ export type SpotClick = { type: 'spot'; item: number } | { type: 'clear' } | { t
 /**
  * Items 11 and 16: a click acts on what it hits (`hit`, the item under the pointer, or null outside any item). A click on
  * an item spotlights it, and on another item moves the spotlight there. A click on the spotlit item, or outside any
- * item, clears it; a click on a spotlit picture fills the wall. With no spotlight, a click outside any item does what
- * it did before: on the wall it goes on (`outside` 'next'); in the presenter view's Now nothing.
+ * item, clears it; a click on a spotlit picture fills the wall. A picture that is the slide's only item (`alone`: only
+ * the title beside it) fills the wall at the first click, since a spotlight on it would change nothing to see (the
+ * Experience lead, 18 November). With no spotlight, a click outside any item does what it did before: on the wall it
+ * goes on (`outside` 'next'); in the presenter view's Now nothing.
  */
-export function spotClickOf(hit: { item: number; picture: boolean } | null, spot: number | null, outside: 'next' | 'none'): SpotClick {
+export function spotClickOf(hit: { item: number; picture: boolean; alone?: boolean } | null, spot: number | null, outside: 'next' | 'none'): SpotClick {
   if (!hit) {
     if (spot !== null) return { type: 'clear' }
     return outside === 'next' ? { type: 'next' } : null
   }
+  if (hit.picture && hit.alone) return { type: 'fill', item: hit.item }
   if (hit.item !== spot) return { type: 'spot', item: hit.item }
   return hit.picture ? { type: 'fill', item: hit.item } : { type: 'clear' }
 }

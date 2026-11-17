@@ -38,13 +38,15 @@ import { isShellPageSignal } from '../../shellPageSignals';
 import { resolveDocumentResourceRoots } from '../../webviewResourceRoots';
 import { parseDeck } from '../deckFormat';
 import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from '../deckTheme';
-import { readTheme, resolveAssetsIn } from '../deckPages';
+import { deckThemeFor, resolveAssetsIn } from '../deckPages';
 import {
   DECK_PRESENTER_VIEW_TYPE,
   DECK_WALL_VIEW_TYPE,
   decodeWallRequest,
   frontMatterEdit,
   lengthMinutesOf,
+  shownBlank,
+  wallPageAddress,
   MAX_LENGTH_MINUTES,
   presenterPicturePaths,
   presenterStateOf,
@@ -114,6 +116,10 @@ interface Running {
   focus: WallFocus;
   /** The system's clock, read once at the start, for the presenter view's time of day (the webview's own until then). */
   clock: ClockLocale;
+  /** The deck's published page, by its address (Q shows its QR code), or null while it isn't published. */
+  page: string | null;
+  /** Each blank request and move takes a number: a Q still asking for the page gives way to a later key or move. */
+  blankSerial: number;
 }
 
 /** The shell's commands (patch 018). */
@@ -145,10 +151,21 @@ export function presenterViewAvailable(shell: boolean, displays: number, windowe
   return shell && (displays > 1 || windowed);
 }
 
+
+/** A theme path no deck names: the wall's theme before its first look. */
+const UNREAD_THEME = '\u0000unread';
 export class DeckPresenter implements vscode.Disposable {
   private running: Running | null = null;
   /** Each start takes a number; a later start, or a Stop, makes an earlier one that is still waiting give up. */
   private starts = 0;
+
+  /**
+   * Small details item 3: the deck's published page's address, or null (Publish's page state, `deckPublish.ts`). Set
+   * once at activation; without it no deck is published here, and Q and "Show the page" are not offered.
+   */
+  pageAddress: ((document: vscode.TextDocument) => Promise<string | null>) | null = null;
+  /** Publish's page state changed (a page published or unpublished): the running presentation asks again. */
+  onPageChange: ((listener: () => void) => vscode.Disposable) | null = null;
 
   constructor(private readonly extensionUri: vscode.Uri, private readonly state: vscode.Memento) {}
 
@@ -212,7 +229,9 @@ export class DeckPresenter implements vscode.Disposable {
       wall: this.createScreen(origin, DECK_WALL_VIEW_TYPE),
       presenter: null,
       subscriptions: [],
-      theme: { path: null, value: BUILT_IN_THEME },
+      // Nothing read yet: the first look reads the theme, also for a deck naming none (the project's own Evening file, as
+      // the deck view draws it; the review of #785).
+      theme: { path: UNREAD_THEME, value: BUILT_IN_THEME },
       wallState: null,
       shell,
       displays,
@@ -226,8 +245,14 @@ export class DeckPresenter implements vscode.Disposable {
       blank: null,
       focus: NO_FOCUS,
       clock: { locale: null, hourCycle: null },
+      page: null,
+      blankSerial: 0,
     };
     this.running = running;
+    // Whether the deck is published, and where: the wall and the presenter view get it once it is known, and again
+    // whenever Publish's page state changes (published from the main window during the talk, or unpublished).
+    void this.readPage(running);
+    if (this.onPageChange) running.subscriptions.push(this.onPageChange(() => { void this.readPage(running); }));
     // The system's clock comes a moment later (macOS's `defaults`): the presenter view gets it then.
     void readSystemClock().then(clock => {
       running.clock = clock;
@@ -408,10 +433,20 @@ export class DeckPresenter implements vscode.Disposable {
       case 'present/set-length':
         if (screen === running.presenter) await this.setLength(running);
         return;
-      case 'present/blank':
+      case 'present/blank': {
+        const serial = ++running.blankSerial;
+        // Q: the page's QR code, only for a deck that is published now (Publish asked again, never an old address).
+        // Refused, the windows still get a state, so the ask they keep settles (`settleAsked`).
+        if (request.to === 'page' && !(await this.readPage(running))) {
+          if (!running.ended && serial === running.blankSerial) await this.showSameSlide(running);
+          return;
+        }
+        // A key or a move that came while Q was asking wins: the code never shows after the slide came back.
+        if (running.ended || serial !== running.blankSerial) return;
         running.blank = request.to;
         await this.showSameSlide(running);
         return;
+      }
       case 'present/spot':
         // A new spotlight (or none) is never a filled wall.
         running.focus = { spot: request.item, fill: null };
@@ -430,6 +465,7 @@ export class DeckPresenter implements vscode.Disposable {
       default: {
         // A move (a button, the row, the grid) brings the slide back too, on the slide it moves to.
         running.blank = null;
+        running.blankSerial++;
         // A move clears the spotlight and the filled wall: → and a clicker clear it and go on, in one press.
         running.focus = NO_FOCUS;
         running.session.move(running.origin.document.getText(), moveOf(request));
@@ -445,9 +481,11 @@ export class DeckPresenter implements vscode.Disposable {
     const text = running.origin.document.getText();
     const themePath = parseDeck(text).theme;
     if (running.theme.path !== themePath) {
-      // The deck view's own reading of the theme file, from the same project folder.
-      const themeText = await readTheme(running.origin.document, themePathOf(themePath));
-      running.theme = { path: themePath, value: themeText === null ? BUILT_IN_THEME : parseTheme(themeText) };
+      // The deck view's own reading of the theme file, from the same project folder, with its logo's address in the
+      // wall's window (Sprint 162 PR 4; the presenter view draws the wall's state, and the same address).
+      const read = await deckThemeFor(running.origin.document.uri.fsPath, themePathOf(themePath), running.wall.panel.webview);
+      const theme = read.text === null ? BUILT_IN_THEME : parseTheme(read.text);
+      running.theme = { path: themePath, value: read.logo ? { ...theme, logoUrl: read.logo, ...(read.logoAspect ? { logoAspect: read.logoAspect } : {}) } : theme };
     }
     return { borderless: deckLookOf(text) === 'borderless', theme: running.theme.value };
   }
@@ -473,7 +511,7 @@ export class DeckPresenter implements vscode.Disposable {
     // An item's place names an item of the slide the wall has: when this draw brings the slide in another form (an edit
     // since, drawn now by a reload, the presenter view turned on or off), the spotlight and a filled wall go, rather
     // than land on another item (review of #790).
-    let state = wallStateOf(view, look, assets, presenter, running.blank, running.focus);
+    let state = wallStateOf(view, look, assets, presenter, running.blank, running.page, running.focus);
     if (running.wallState && JSON.stringify(running.wallState.slide) !== JSON.stringify(state.slide)) {
       running.focus = NO_FOCUS;
       state = { ...state, spot: null, fill: null };
@@ -494,7 +532,7 @@ export class DeckPresenter implements vscode.Disposable {
       await this.showWall(running);
       return;
     }
-    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: running.blank, spot: running.focus.spot, fill: running.focus.fill };
+    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: shownBlank(running.blank, running.page), page: running.page, spot: running.focus.spot, fill: running.focus.fill };
     running.wallState = state;
     await post(running.wall.panel.webview, state);
     await this.showPresenter(running);
@@ -525,7 +563,29 @@ export class DeckPresenter implements vscode.Disposable {
       blank: running.blank,
       focus: running.focus,
       clock: running.clock,
+      page: running.page,
     }, onWall?.slide));
+  }
+
+  /**
+   * The deck's published page, asked again: kept for the wall and the presenter view, and sent to both when it changed
+   * (not a move: the wall keeps the slide it last got). A page gone takes its QR code off the wall.
+   */
+  private async readPage(running: Running): Promise<string | null> {
+    let page: string | null = null;
+    try {
+      page = wallPageAddress(this.pageAddress ? await this.pageAddress(running.origin.document) : null);
+    } catch {
+      page = null;
+    }
+    if (running.ended) return null;
+    if (page !== running.page) {
+      running.page = page;
+      if (!page && running.blank === 'page') running.blank = null;
+      // Before the wall's first state, that state carries it.
+      if (running.wallState) await this.showSameSlide(running);
+    }
+    return page;
   }
 
   /**

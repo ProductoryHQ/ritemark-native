@@ -71,3 +71,7 @@
 .pv-goto-number { min-width: 40px; height: 36px; padding: 0 10px; border-radius: 8px; background: rgba(248, 250, 252, 0.14); font-size: 20px; font-weight: 700; line-height: 36px; text-align: center; font-variant-numeric: tabular-nums; }
 .pv-goto-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .pv-key { height: 22px; margin-left: 6px; padding: 0 6px; border-radius: 5px; background: rgba(248, 250, 252, 0.12); font-size: 12px; font-weight: 600; line-height: 22px; color: #C7D2FE; }
+/* Small details item 3: the page's QR code in Now, as the room sees it; the words under it, at the bottom. */
+.pv-blank.is-page .pv-blank-ground { opacity: 1; }
+.pv-blank.is-page .page-code { position: relative; }
+.pv-blank.is-page .pv-blank-words { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); }

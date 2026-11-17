@@ -2,7 +2,8 @@
  * Sprint 159 PR 4: the Publish sheet's What goes and What stays rows for a deck's page, in the brief's words:
  *
  *   What goes:  "14 slides and their handout, 6 prompts with Copy, and the pictures they use. Nothing else from the project."
- *               (with a theme in other fonts than Sofia Sans: "…, the pictures they use, and the theme's fonts.")
+ *               (with a theme in other fonts than Sofia Sans: "…, the pictures they use, and the theme's fonts.";
+ *               with its logo too, Sprint 162 PR 4: "…, and the theme's fonts and logo.", or "…, and the theme's logo.")
  *   What stays: "On your computer: comments on 9 slides, and 2 skipped slides."
  *
  * A count of one is singular ("1 slide and its handout", "1 prompt"), and a part that is 0 is left out. With no comments
@@ -39,6 +40,8 @@ export interface DeckCounts {
   skipped: number;
   /** The theme's fonts beyond Sofia Sans, which go as files beside the page (Sprint 162 PR 3); left out when none. */
   fonts?: number;
+  /** Sprint 162 PR 4: the theme's logo goes as a file beside the page; left out when it doesn't. */
+  logo?: boolean;
 }
 
 const PRIVATE_LANGS: ReadonlySet<string> = new Set(['notes', 'slide']);
@@ -68,7 +71,7 @@ function* walk(tokens: ReadonlyArray<{ type: string; tokens?: unknown; items?: u
  * The deck's counts for the sheet. `fontFiles`: the theme's font files the page names (`themeFontFiles`), when known;
  * else the theme's fonts beyond Sofia Sans, by name.
  */
-export function deckCounts(text: string, theme: DeckTheme, fontFiles?: ReadonlyArray<{ family: string }>): DeckCounts {
+export function deckCounts(text: string, theme: DeckTheme, fontFiles?: ReadonlyArray<{ family: string }>, logo = false): DeckCounts {
   const parsed = parseDeck(text.replace(/^\uFEFF/, ''));
   const deck = publicDeck(text, { folderName: '', deckName: '', theme });
   const fonts = fontFiles ? new Set(fontFiles.map(file => file.family)).size : themeFonts(theme).filter(font => font.name !== DEFAULT_DECK_FONT).length;
@@ -83,6 +86,7 @@ export function deckCounts(text: string, theme: DeckTheme, fontFiles?: ReadonlyA
     }).length,
     skipped: parsed.slides.filter(slide => slideDataOf(slide.kind, slide.body).skip === true).length,
     ...(fonts > 0 ? { fonts } : {}),
+    ...(logo ? { logo: true } : {}),
   };
 }
 
@@ -96,7 +100,9 @@ export function deckSheetRows(counts: DeckCounts): DeckSheetRows {
   ].filter((part): part is string => part !== null);
   const pictures = counts.slides === 1 || goes.length === 0 ? 'the pictures it uses' : 'the pictures they use';
   // Sprint 162 PR 3: the theme's fonts go too, as files beside the page.
-  const fonts = counts.fonts ? (counts.fonts === 1 ? 'the theme\'s font' : 'the theme\'s fonts') : null;
+  const fonts = counts.fonts
+    ? `${counts.fonts === 1 ? 'the theme\'s font' : 'the theme\'s fonts'}${counts.logo ? ' and logo' : ''}`
+    : counts.logo ? 'the theme\'s logo' : null;
   const tail = fonts ? `${pictures}, and ${fonts}` : `and ${pictures}`;
   const goesLine = goes.length ? `${goes.join(', ')}, ${tail}.` : `The handout's text, ${tail}.`;
   const stays = [

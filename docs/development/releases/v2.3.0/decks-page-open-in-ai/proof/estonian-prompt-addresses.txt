@@ -1,0 +1,9 @@
+Prompt:
+Kirjuta lühike kiri klienditeenindusele: "Tere! Kas saaksite öelda, millal mu tellimus #1043 kohale jõuab?"
+Lisa lõppu viisakas tänu. Ära saada midagi.
+
+Open in Claude:
+https://claude.ai/new?q=Kirjuta%20l%C3%BChike%20kiri%20klienditeenindusele%3A%20%22Tere!%20Kas%20saaksite%20%C3%B6elda%2C%20millal%20mu%20tellimus%20%231043%20kohale%20j%C3%B5uab%3F%22%0ALisa%20l%C3%B5ppu%20viisakas%20t%C3%A4nu.%20%C3%84ra%20saada%20midagi.
+
+Open in ChatGPT:
+https://chatgpt.com/?q=Kirjuta%20l%C3%BChike%20kiri%20klienditeenindusele%3A%20%22Tere!%20Kas%20saaksite%20%C3%B6elda%2C%20millal%20mu%20tellimus%20%231043%20kohale%20j%C3%B5uab%3F%22%0ALisa%20l%C3%B5ppu%20viisakas%20t%C3%A4nu.%20%C3%84ra%20saada%20midagi.

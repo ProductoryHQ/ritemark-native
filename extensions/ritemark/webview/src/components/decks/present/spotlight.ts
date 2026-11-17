@@ -103,12 +103,12 @@ export function spotDimmed(item: HTMLElement): HTMLElement[] {
 
 /**
  * The item a click hit in a view's drawn slide, and whether it is a picture that can fill the wall (one drawn, with its
- * address); null outside any item.
+ * address), and whether it is the slide's only item; null outside any item.
  */
-export function spotHit(root: ParentNode | null, x: number, y: number): { item: number; picture: boolean } | null {
+export function spotHit(root: ParentNode | null, x: number, y: number): { item: number; picture: boolean; alone: boolean } | null {
   const items = spotItems(root)
   const index = itemAt(items.map(item => item.getBoundingClientRect()), x, y)
-  return index === null ? null : { item: index, picture: pictureUrlOf(items[index]) !== null }
+  return index === null ? null : { item: index, picture: pictureUrlOf(items[index]) !== null, alone: items.length === 1 }
 }
 
 /** A picture item's address as the slide draws it (its `<img>`, or a side picture's background), or null. */

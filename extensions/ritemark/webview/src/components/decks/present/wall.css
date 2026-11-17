@@ -36,7 +36,7 @@
 .vscode-reduce-motion .wall-fill { transition: none; }
 
 /* The blank wall (B, ".", W): over the slide, under the bar and the go-to box; it fades as a move does. */
-.wall-blank { position: absolute; z-index: 1; inset: 0; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+.wall-blank { position: absolute; z-index: 1; inset: 0; display: grid; place-items: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
 .wall-blank.is-shown { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .wall-blank { transition: none; } }
 .vscode-reduce-motion .wall-blank { transition: none; }

@@ -80,19 +80,28 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   session.move(TEXT, { type: 'next' });
   const state = wallStateOf(session.view(), look, {});
-  assert.deepEqual(Object.keys(state).sort(), ['assets', 'blank', 'borderless', 'count', 'fill', 'position', 'presenter', 'skipped', 'slide', 'slides', 'spot', 'theme', 'type']);
+  assert.deepEqual(Object.keys(state).sort(), ['assets', 'blank', 'borderless', 'count', 'fill', 'page', 'position', 'presenter', 'skipped', 'slide', 'slides', 'spot', 'theme', 'type']);
   // Items 11 and 16: no spotlight and no filled wall unless asked; only an item's place gets through.
   assert.equal(state.spot, null);
   assert.equal(state.fill, null);
-  const focused = wallStateOf(session.view(), look, {}, undefined, null, { spot: 2, fill: 2 });
+  const focused = wallStateOf(session.view(), look, {}, undefined, null, null, { spot: 2, fill: 2 });
   assert.equal(focused.spot, 2);
   assert.equal(focused.fill, 2);
-  assert.equal(wallStateOf(session.view(), look, {}, undefined, null, { spot: -1 as never, fill: 1.5 as never }).spot, null, 'never a place that is not one');
+  assert.equal(wallStateOf(session.view(), look, {}, undefined, null, null, { spot: -1 as never, fill: 1.5 as never }).spot, null, 'never a place that is not one');
   assert.deepEqual(state.presenter, { available: false, on: false });
   assert.equal(state.blank, null, 'the slide, not a blank wall');
   assert.equal(wallStateOf(session.view(), look, {}, undefined, 'white').blank, 'white');
   assert.equal(wallStateOf(session.view(), look, {}, undefined, 'ground').blank, 'ground');
-  assert.equal(wallStateOf(session.view(), look, {}, undefined, 'black' as never).blank, null, 'only the two blanks');
+  assert.equal(wallStateOf(session.view(), look, {}, undefined, 'black' as never).blank, null, 'only the known blanks');
+  // Small details item 3: the page's QR code, only for a deck with a published page, and only an https address.
+  assert.equal(state.page, null, 'an unpublished deck: no page');
+  assert.equal(wallStateOf(session.view(), look, {}, undefined, 'page').blank, null, 'no code without a page');
+  const shown = wallStateOf(session.view(), look, {}, undefined, 'page', 'https://talk.example.workers.dev/');
+  assert.equal(shown.blank, 'page');
+  assert.equal(shown.page, 'https://talk.example.workers.dev/');
+  for (const bad of ['http://talk.example.workers.dev/', 'javascript:alert(1)', 'https://', '', `https://x.workers.dev/${'a'.repeat(3000)}`, 42]) {
+    assert.equal(wallStateOf(session.view(), look, {}, undefined, 'page', bad as never).page, null, `not a page address: ${String(bad).slice(0, 30)}`);
+  }
   assert.equal(state.skipped, false);
   assert.deepEqual(Object.keys(state.slide).sort(), ['data', 'kind', 'number', 'title']);
   // Sprint 161 (PR 2, decision 8): a v1 slide reaches the wall as the block slide its conversion writes.
@@ -139,7 +148,7 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   assert.equal(decodeWallRequest(null), null);
   assert.equal(decodeWallRequest([{ type: 'present/next' }]), null);
   // B, "." or W blanks the wall; any key shows the slide again.
-  for (const to of ['ground', 'white', null] as const) assert.deepEqual(decodeWallRequest({ type: 'present/blank', to }), { type: 'present/blank', to });
+  for (const to of ['ground', 'white', 'page', null] as const) assert.deepEqual(decodeWallRequest({ type: 'present/blank', to }), { type: 'present/blank', to });
   assert.equal(decodeWallRequest({ type: 'present/blank' }), null);
   assert.equal(decodeWallRequest({ type: 'present/blank', to: 'black' }), null);
   assert.equal(decodeWallRequest({ type: 'present/blank', to: true }), null);
@@ -169,10 +178,15 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   const clock = { wallDisplay: 'Projector', canSwap: true, length: 45, startedAt: 1000 };
   const first = presenterStateOf(session.view(), look, {}, clock);
-  assert.deepEqual(Object.keys(first).sort(), ['assets', 'blank', 'borderless', 'canSwap', 'clock', 'comments', 'count', 'current', 'fill', 'length', 'next', 'position', 'skipped', 'slides', 'spot', 'startedAt', 'theme', 'type', 'wallDisplay']);
+  assert.deepEqual(Object.keys(first).sort(), ['assets', 'blank', 'borderless', 'canSwap', 'clock', 'comments', 'count', 'current', 'fill', 'length', 'next', 'page', 'position', 'skipped', 'slides', 'spot', 'startedAt', 'theme', 'type', 'wallDisplay']);
   assert.equal(first.spot, null);
   assert.equal(presenterStateOf(session.view(), look, {}, { ...clock, focus: { spot: 1, fill: null } }).spot, 1, 'Now shows the wall\'s spotlight');
   assert.equal(first.blank, null);
+  assert.equal(first.page, null, 'no "Show the page" for an unpublished deck');
+  const paged = presenterStateOf(session.view(), look, {}, { ...clock, blank: 'page', page: 'https://talk.example.workers.dev/' });
+  assert.equal(paged.blank, 'page');
+  assert.equal(paged.page, 'https://talk.example.workers.dev/');
+  assert.equal(presenterStateOf(session.view(), look, {}, { ...clock, blank: 'page' }).blank, null, 'no code without a page');
   assert.deepEqual(first.clock, { locale: null, hourCycle: null }, "no system clock yet: the webview's own");
   const blanked = presenterStateOf(session.view(), look, {}, { ...clock, blank: 'ground', clock: { locale: 'et-EE', hourCycle: 'h23' } });
   assert.equal(blanked.blank, 'ground', 'the presenter view knows the wall is blank');

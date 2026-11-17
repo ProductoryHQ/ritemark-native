@@ -18,10 +18,14 @@
  *    with reduced motion.
  *  - B or "." blanks the wall to the theme's ground (white on Borderless), W to white, with the same fade. Any key or a
  *    click brings the slide back, and does nothing else (`blankKeyOf`); the presenter view says the wall is blank.
+ *  - Small details item 3: for a published deck, Q (or the presenter view's "Show the page") shows the page's QR code
+ *    and its short address on the theme's ground (`PageCode`), the same way: any key or a click brings the slide back
+ *    without a step. An unpublished deck's Q does nothing.
  *  - The spotlight (decks README item 16): a click acts on what it hits (`spotClickOf`). A click on an item spotlights
  *    it and the rest of the slide dims (`useSpotlight`); a click on the spotlit item or outside any item clears it; with
  *    no spotlight a click outside any item goes on, as before. F, Tab, Shift+Tab and Esc (`spotKeyOf`).
- *  - A click on a spotlit picture fills the wall with it, whole, on the theme's ground (item 11). Any key or click
+ *  - A click on a spotlit picture (a picture alone on its slide: the first click) fills the wall with it, whole, on
+ *    the theme's ground (item 11). Any key or click
  *    returns to the slide, and does nothing else (`fillKeyOf`).
  *
  * The host is the only source of state: every move is a request, and the wall draws what the host sends back.
@@ -36,6 +40,7 @@ import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { CANVAS_WIDTH } from '../slide/layoutSlide'
 import { wallGround } from '../theme/themeVars'
+import { PageCode } from './PageCodeView'
 import { blankKeyOf, blankNow, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, wallBleed, wallKeyOf, wallSlideSize, type SpotClick, type WallBlank } from './wallKeys'
 import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
 import '../decks.css'
@@ -113,7 +118,7 @@ export function DeckWall() {
   useEffect(() => onMessage(message => {
     if (message.type === 'present/wall') {
       const next = message as unknown as WallState
-      askedBlank.current = settleAsked(askedBlank.current, next.blank)
+      askedBlank.current = settleAsked(askedBlank.current, next.blank, next.page !== null)
       const previous = stateRef.current
       // Another slide has no spotlight: an ask made on the one before is let go.
       focus.settle(next, !previous || previous.slide.number === next.slide.number)
@@ -220,7 +225,7 @@ export function DeckWall() {
         askFill(null)
         return
       }
-      const blankStep = gridOpen ? null : blankKeyOf(event, blankNow(current.blank, askedBlank.current))
+      const blankStep = gridOpen ? null : blankKeyOf(event, blankNow(current.blank, askedBlank.current), current.page !== null)
       if (blankStep) {
         take()
         heldKey.current = event.key
@@ -301,7 +306,8 @@ export function DeckWall() {
   const gotoMissing = gotoNumber !== null && (gotoNumber < 1 || gotoTitle === null)
   const blank = state.blank
   if (blank) lastBlank.current = blank
-  const blankColour = (blank ?? lastBlank.current) === 'white' ? '#FFFFFF' : ground
+  const blankShown = blank ?? lastBlank.current
+  const blankColour = blankShown === 'white' ? '#FFFFFF' : ground
   if (fillUrl) lastFillUrl.current = fillUrl
   const filledUrl = fillUrl ?? lastFillUrl.current
 
@@ -329,7 +335,7 @@ export function DeckWall() {
         className="wall-frame deck-spot"
         style={{ left: frame.left, top: frame.top, width: frame.width, height: frame.height, '--wall-bleed-x': `${bleed.x}px`, '--wall-bleed-y': `${bleed.y}px` } as CSSProperties}
         aria-live="polite"
-        aria-label={blank ? 'The wall is blank' : fillUrl ? 'A picture fills the wall' : `Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
+        aria-label={blank === 'page' ? 'The page’s QR code' : blank ? 'The wall is blank' : fillUrl ? 'A picture fills the wall' : `Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
       >
         {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, leaving.from) : null}
         {layer(state.slide, leaving ? 'is-entering' : '', `slide-${serial}`)}
@@ -340,8 +346,11 @@ export function DeckWall() {
         {filledUrl ? <img src={filledUrl} alt="" draggable={false} /> : null}
       </div>
 
-      {/* The blank: the theme's ground (the wall's own, white on Borderless) or white, over the whole screen. */}
-      <div className={`wall-blank${blank ? ' is-shown' : ''}`} style={{ background: blankColour }} aria-hidden="true" />
+      {/* The blank: the theme's ground (the wall's own, white on Borderless) or white, over the whole screen; for Q, the
+          page's QR code on the ground (kept while it fades out). */}
+      <div className={`wall-blank${blank ? ' is-shown' : ''}`} style={{ background: blankColour }} aria-hidden={blank === 'page' ? undefined : true}>
+        {blankShown === 'page' && state.page ? <PageCode address={state.page} theme={state.theme} borderless={state.borderless} height={screen.height} width={screen.width} /> : null}
+      </div>
 
       {digits !== null ? (
         <div className="wall-goto dark" style={{ top: frame.top + GOTO_FROM_TOP }} role="status">
