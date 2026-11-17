@@ -153,7 +153,7 @@ export function fitFlow(flow: HTMLElement, current = 0): { step: number; full: b
  * measuring of the same slide in the same look takes this step, so they match the stage even where the stage's step
  * stays put at the edge while typing (its 3 % hysteresis). Only the stage's one slide is kept.
  */
-let stageFit: { key: string; step: number } | null = null
+let stageFit: { key: string; step: number; owner?: object } | null = null
 const stageFitListeners = new Set<() => void>()
 
 /** What a fit belongs to: the slide's Markdown, its picture and place, and the look. */
@@ -166,11 +166,22 @@ export function fitLookOf(borderless: boolean, theme: unknown): string {
   return `${borderless}\u0000${JSON.stringify(theme)}`
 }
 
-/** The stage tells its step; null as its slide leaves the stage. */
-export function setStageFit(fit: { key: string; step: number } | null) {
-  if (stageFit?.key === fit?.key && stageFit?.step === fit?.step) return
+/** The stage tells its step (`owner`: the stage editor telling it); null as its slide leaves the stage. */
+export function setStageFit(fit: { key: string; step: number; owner?: object } | null) {
+  if (stageFit?.key === fit?.key && stageFit?.step === fit?.step) {
+    if (stageFit && fit) stageFit.owner = fit.owner
+    return
+  }
   stageFit = fit
   for (const listener of stageFitListeners) listener()
+}
+
+/**
+ * A stage editor leaving: its step goes, but only if it is still the one that told it. A new stage on a slide with
+ * the same words (two new empty slides, a duplicate) has told its own by then (review of #771).
+ */
+export function clearStageFit(owner: object) {
+  if (stageFit?.owner === owner) setStageFit(null)
 }
 
 /** The stage's step for this key, or null when the stage shows another slide or look. */

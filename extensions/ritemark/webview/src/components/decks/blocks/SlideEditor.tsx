@@ -49,7 +49,7 @@ import { convertDeckInto } from '../handout/deckConvert'
 import { SLIDE_SYNC, SlideSync } from './slideSync'
 import { slideDivWithView, type SlideDivHandlers } from './slideDivView'
 import { ensureSlideCommentPipeline, markdownToSlideEditorHTML, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
-import { fitFlow, fitKeyOf, fitLookOf, setStageFit, stageFitFor } from './slideFit'
+import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, setStageFit } from './slideFit'
 import { SLIDE_MISSING_PICTURES, SlidePicture, imagePathOf, slideMissingPictures } from './slidePictures'
 import { missingHtml } from '../../../../../src/decks/blocks/slideRenderer'
 import { Button } from '../../ui/button'
@@ -225,6 +225,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   // unwritten (the / menu's query), since the slide drawn elsewhere doesn't have them yet.
   const header = isBlockSlide(slide.kind) ? slide.data : blockDataOf(slide.kind, slide.data)
   const fitKeyRef = useRef<string | null>(null)
+  /** This stage, as the owner of the step it tells (`clearStageFit`). */
+  const fitOwner = useRef({})
   fitKeyRef.current = shownMarkdown === nodeMarkdown ? fitKeyOf(nodeMarkdown, header.image, header.picture, fitLookOf(borderless, theme)) : null
   /** Lays Replace picture… over each missing picture (set below, once the editor is made). */
   const placeMissingRef = useRef<() => void>(() => {})
@@ -476,7 +478,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     const { step, full } = fitFlow(flow, fresh ? 0 : fitStepRef.current)
     fitStepRef.current = step
     frameRef.current?.setAttribute('data-step', String(step))
-    if (fitKeyRef.current) setStageFit({ key: fitKeyRef.current, step })
+    if (fitKeyRef.current) setStageFit({ key: fitKeyRef.current, step, owner: fitOwner.current })
     // PR 3 (frame 24): at the floor with words still past the slide's edge, the deck's bar says the slide is full.
     if (full !== fullRef.current) {
       fullRef.current = full
@@ -487,8 +489,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   // A slide that leaves the stage is no longer the full one, and its step is no longer the stage's.
   useEffect(() => () => {
     if (fullRef.current) actionsRef.current.onFull?.(false)
-    const key = fitKeyRef.current
-    if (key && stageFitFor(key) !== null) setStageFit(null)
+    // Only this stage's own: a new stage with the same words has told its step already (review of #771).
+    clearStageFit(fitOwner.current)
   }, [])
   // Once per change of the words (the editor's update), and when the size, the look or the cover look change.
   const lookKey = `${width}\u0000${borderless}\u0000${JSON.stringify(theme)}\u0000${isCoverSlide(shownMarkdown)}\u0000${slide.data.picture ?? ""}`
@@ -496,7 +498,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   // The words just written reach the slide's node, and its thumbnail, after the update that measured them: the step is
   // told again under their key.
   useLayoutEffect(() => {
-    if (fitKeyRef.current) setStageFit({ key: fitKeyRef.current, step: fitStepRef.current })
+    if (fitKeyRef.current) setStageFit({ key: fitKeyRef.current, step: fitStepRef.current, owner: fitOwner.current })
   })
   // The host said which pictures it didn't find: they are drawn as missing (17 November). Nothing in the slide changes.
   const missingKey = [...missing].sort().join('\n')
@@ -582,6 +584,11 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       if (!file) return
       void readFileAsBase64(file).then(dataUrl => onPictureRef.current(dataUrl, getUniqueImageFilename(file), atCaret))
     })
+    // Cancelled: nothing waits for a picture any more, so a later one goes where it is asked for.
+    input.addEventListener('cancel', () => {
+      replaceAt.current = null
+      pictureAt.current = null
+    })
     input.click()
   }
 
@@ -655,6 +662,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
         case 'picture':
           chain().run()
           pictureAt.current = range.from
+          // A Replace picture… whose picker was cancelled never takes this picture (review of #771).
+          replaceAt.current = null
           choosePicture()
           return
         case 'webPage':

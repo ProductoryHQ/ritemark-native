@@ -10,7 +10,7 @@ import { strict as assert } from 'node:assert'
 import { readFileSync } from 'node:fs'
 import { EditorState, TextSelection } from '@tiptap/pm/state'
 import { BLOCK_FIT_STEPS, blockCanvasMarkup, blockSlideHtml, isCoverSlide } from '../../../../../src/decks/blocks/slideRenderer'
-import { fitFlow, fitKeyOf, fitLookOf, measureFlowAt, overflowsSideways, setStageFit, stageFitFor, subscribeStageFit } from './slideFit'
+import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, measureFlowAt, overflowsSideways, setStageFit, stageFitFor, subscribeStageFit } from './slideFit'
 import { loadSlide } from './slideEditorHarness'
 import { CARET_CLASS, caretBoxPos } from './slideDivView'
 import { imagePathOf, missingDecorations } from './slidePictures'
@@ -88,13 +88,28 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
   assert.equal(told, 1, 'told once per change')
   setStageFit(null)
   assert.equal(stageFitFor(key), null)
+  // Review of #771: two stages on slides with the same words (two new empty slides). The new one tells its step before
+  // the old one leaves; the old one's leaving takes away only its own.
+  const oldStage = {}
+  const newStage = {}
+  setStageFit({ key, step: 2, owner: oldStage })
+  setStageFit({ key, step: 2, owner: newStage })
+  clearStageFit(oldStage)
+  assert.equal(stageFitFor(key), 2, "the new stage's step stays")
+  clearStageFit(newStage)
+  assert.equal(stageFitFor(key), null, 'and goes with it')
   stop()
   // Both views use the one measure: the thumbnail's canvas and the stage's editor (their sources, as they need a DOM).
   const canvas = readFileSync(new URL('../slide/SlideCanvas.tsx', import.meta.url), 'utf8')
   const stage = readFileSync(new URL('./SlideEditor.tsx', import.meta.url), 'utf8')
   assert.ok(/const found = fitFlow\(flow, 0\)\.step/.test(canvas) && /stageFitFor\(key\)/.test(canvas), 'the canvas: the one measure, or the stage\'s step')
   assert.ok(!/scrollHeight > flow\.clientHeight/.test(canvas), 'not its own scrollHeight measure')
-  assert.ok(/fitFlow\(flow, fresh \? 0 : fitStepRef\.current\)/.test(stage) && /editor\.on\(.update., typed\)/.test(stage) && /setStageFit\(\{ key: fitKeyRef\.current, step \}\)/.test(stage), 'the stage: the one measure, told on')
+  assert.ok(/fitFlow\(flow, fresh \? 0 : fitStepRef\.current\)/.test(stage) && /editor\.on\(.update., typed\)/.test(stage) && /setStageFit\(\{ key: fitKeyRef\.current, step, owner: fitOwner\.current \}\)/.test(stage), 'the stage: the one measure, told on')
+  assert.ok(/clearStageFit\(fitOwner\.current\)/.test(stage), 'the stage takes away only its own step')
+  // Review of #771: a cancelled Replace picture… never takes the / menu's next picture.
+  const pictureItem = stage.slice(stage.indexOf("case 'picture':"), stage.indexOf("case 'webPage':"))
+  assert.ok(pictureItem.includes('replaceAt.current = null'), "the / menu's Picture never replaces")
+  assert.ok(/addEventListener\('cancel', \(\) => \{\s*replaceAt\.current = null/.test(stage), 'a cancelled picker forgets what it would replace')
 }
 
 // The renderer: a title over a picture is no cover slide (the picture pushed the title up and off the slide); a title
@@ -103,6 +118,7 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
   assert.equal(isCoverSlide('# Kuidas assistent vastuse koostab\n\n![](images/tall.png)'), false, 'a title over a picture')
   assert.equal(isCoverSlide('# Title\n\nFernhollow Bank · 3 tundi'), true, 'a title with a line')
   assert.equal(isCoverSlide('2\n\n# Section'), true, 'a section with its number')
+  assert.equal(isCoverSlide('![](a.png)\n\n# Title'), false, 'a picture over a title (review of #771)')
   const html = blockCanvasMarkup({ markdown: '# Kuidas assistent\n\n![](images/tall.png)' }, { step: 0, pictureUrl: () => 'u' })
   assert.ok(!html.includes('is-cover'))
 }

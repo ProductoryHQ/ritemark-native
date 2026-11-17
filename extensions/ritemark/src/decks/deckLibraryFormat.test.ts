@@ -148,4 +148,20 @@ assert.equal(
   assert.ok(rewritePictureTargets('![](<images/a b.png>)', () => 'x/a b.png').includes('(<x/a b.png>)'), 'a space in the new path is bracketed');
 }
 
+// Review of #771: every way Markdown writes a picture is followed, and no code is touched.
+{
+  const up = (target: string) => (target.startsWith('images/') ? `../${target}` : target);
+  const check = (input: string, expected: string, what: string) => assert.equal(rewritePictureTargets(input, up), expected, what);
+  check("![a](images/a.png 'title')", "![a](../images/a.png 'title')", 'a title in single quotes');
+  check('![a](images/a.png (title))', '![a](../images/a.png (title))', 'a title in parentheses');
+  check('![a [b] c](images/a.png)', '![a [b] c](../images/a.png)', 'brackets in the alt text');
+  check('<img src="images/a.png" alt="x">', '<img src="../images/a.png" alt="x">', 'an HTML picture');
+  check('![chart][c]\n\n[c]: images/c.png "C"', '![chart][c]\n\n[c]: ../images/c.png "C"', 'a reference picture: its definition');
+  check('![C]\n\n[c]: <images/c.png>', '![C]\n\n[c]: <../images/c.png>', 'a shortcut reference, matched without case');
+  check('[notes][n]\n\n[n]: images/notes.md', '[notes][n]\n\n[n]: images/notes.md', "a link's definition stays");
+  check('Words.\n\n    ![](images/code.png)\n\nMore.', 'Words.\n\n    ![](images/code.png)\n\nMore.', 'an indented code block stays');
+  check('- An item\n\n    ![](images/in-item.png)', '- An item\n\n    ![](../images/in-item.png)', "a list item's own picture is followed");
+  check('Words\n    ![](images/lazy.png)', 'Words\n    ../images/lazy.png'.replace('../images/lazy.png', '![](../images/lazy.png)'), 'an indented line inside a paragraph is no code');
+}
+
 console.log('deckLibraryFormat: passed');

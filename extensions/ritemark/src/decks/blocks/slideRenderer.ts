@@ -263,7 +263,7 @@ function coverOf(markdown: string): boolean {
   // picture can't push the title up and off the slide (17 November, Jarmo's shot).
   const isLine = (token: Token | undefined) => (token?.type === 'paragraph' && !isPictureParagraph(token as Tokens.Paragraph)) || (token?.type === 'heading' && (token as Tokens.Heading).depth === 2);
   if (blocks.length === 1) return isTitle(blocks[0]);
-  if (blocks.length === 2) return (isTitle(blocks[0]) && isLine(blocks[1])) || (blocks[0].type === 'paragraph' && (blocks[0] as Tokens.Paragraph).text.length <= 12 && isTitle(blocks[1]));
+  if (blocks.length === 2) return (isTitle(blocks[0]) && isLine(blocks[1])) || (blocks[0].type === 'paragraph' && !isPictureParagraph(blocks[0] as Tokens.Paragraph) && (blocks[0] as Tokens.Paragraph).text.length <= 12 && isTitle(blocks[1]));
   return false;
 }
 

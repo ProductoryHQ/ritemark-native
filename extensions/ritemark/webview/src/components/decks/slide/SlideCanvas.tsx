@@ -311,8 +311,9 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
     const flow = slideRef.current?.querySelector<HTMLElement>('.blk-flow')
     if (!flow) return
     const found = fitFlow(flow, 0).step
-    if (fit.key !== key || fit.step !== found) setFit({ key, step: found })
-  }, [html, again, stageStep, key, fit])
+    // Measured again only when what it draws changes (its words, look, fonts or pictures), never for its own answer.
+    setFit(current => (current.key === key && current.step === found ? current : { key, step: found }))
+  }, [html, again, stageStep, key])
   // A picture that loads after the slide is drawn takes its height then: measure again from the top (Codex on #760).
   useEffect(() => {
     const pending = Array.from(slideRef.current?.querySelectorAll('img') ?? []).filter(image => !image.complete)

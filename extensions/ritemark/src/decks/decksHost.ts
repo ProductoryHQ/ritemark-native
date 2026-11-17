@@ -148,9 +148,22 @@ async function rebaseMovedDecks(files: ReadonlyArray<{ oldUri: vscode.Uri; newUr
   for (const deck of await movedDecks(files)) {
     const oldFolder = path.posix.dirname(rootless(deck.before));
     const newFolder = path.posix.dirname(rootless(deck.uri.fsPath));
-    const document = await vscode.workspace.openTextDocument(deck.uri);
+    const rebase = (text: string) => rewriteDeckPictures(text, target => movedTarget(target, oldFolder, newFolder, after));
+    // A deck that isn't open is read from disk first, and opened only when its text changes (review of #771): a folder
+    // of decks moved never opens the ones that need nothing.
+    const open = vscode.workspace.textDocuments.find(document => document.uri.toString() === deck.uri.toString());
+    if (!open) {
+      let onDisk: string;
+      try {
+        onDisk = await fs.promises.readFile(deck.uri.fsPath, 'utf8');
+      } catch {
+        continue;
+      }
+      if (rebase(onDisk) === onDisk) continue;
+    }
+    const document = open ?? await vscode.workspace.openTextDocument(deck.uri);
     const text = document.getText();
-    const next = rewriteDeckPictures(text, target => movedTarget(target, oldFolder, newFolder, after));
+    const next = rebase(text);
     if (next === text) continue;
     // Only the changed stretch is replaced, so the deck's editor keeps everything around it as it was.
     let start = 0;

@@ -146,6 +146,8 @@
    so a picture can't push it off the slide. The stage's picture (its editor's `img`) is under the same rule. */
 .deck-sl.is-blocks .blk-flow:has(> .blk-pic, > img) { display: flex; flex-direction: column; }
 .deck-sl.is-blocks .blk-flow:has(> .blk-pic, > img) > * { flex: none; }
+/* As in the flow, a table keeps its own width (a column flex would stretch it to the slide's). */
+.deck-sl.is-blocks .blk-flow:has(> .blk-pic, > img) > table { align-self: flex-start; }
 .deck-sl.is-blocks .blk-flow:has(> .blk-pic, > img) > :is(.blk-pic, img) { flex: 0 1 auto; min-height: 96px; align-self: flex-start; object-position: left center; }
 .deck-sl.is-blocks .blk-flow:has(> .blk-pic, > img) > .blk-pic.empty { align-self: stretch; }
 /* A picture whose file is gone (17 November): its place says so, with the file's name. */

@@ -371,9 +371,6 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing .blk-box.is-caret > .blk-icon.is-place svg { width: 14px; height: 14px; }
 .deck-slide.is-borderless .deck-sl.is-blocks.is-editing .blk-box.is-caret > .blk-icon.is-place { background: var(--s-nm, #fff); box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); color: var(--s-ph, rgba(28,31,74,.45)); }
 .deck-sl.is-blocks.is-editing .blk-box.is-caret > .blk-icon.is-place:hover { box-shadow: inset 0 0 0 1.5px var(--s-foc, rgba(242,181,68,.7)); }
-/* A picture whose file is gone, on the stage: its place, its name and Replace picture… (17 November). */
-.deck-sl.is-blocks.is-editing .blk-flow > .blk-pic.is-missing { position: relative; }
-.deck-sl .deck-replace-picture { margin-top: 6px; pointer-events: auto; }
 .deck-pill-field::placeholder { color: inherit; opacity: .45; }
 /* A table's empty cells keep a width on the stage, so a column just added (Settings' Add a column) can be typed in
    (the app run: an empty column had none, and was invisible). */
