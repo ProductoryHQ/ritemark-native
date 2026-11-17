@@ -226,6 +226,23 @@ async function main(): Promise<void> {
       fs.rmSync(path.join(folder, 'fonts'), { recursive: true });
     }
 
+    // Where the system gives no second names, the fonts are written create-only: all of them, and a file arriving at a
+    // font's name between the last check and the write is never replaced (Codex on #777).
+    {
+      const noLinks = { ...nodeFontFs, link: async () => { throw Object.assign(new Error('no links here'), { code: 'EPERM' }); } };
+      const result = await writePageFonts(noLinks, deckPath, files);
+      assert.ok(result.kind === 'written' && result.created.length === 4, 'all four, without second names');
+      for (const file of files) assert.ok(fs.readFileSync(path.join(folder, ...file.address.split('/'))).equals(file.bytes));
+      fs.rmSync(path.join(folder, 'fonts'), { recursive: true });
+      const arriving = { ...noLinks, writeFile: async (target: string, data: Buffer) => {
+        if (target.endsWith('Inter-4.001-latin.woff2')) fs.writeFileSync(target, 'arrived meanwhile');
+        return nodeFontFs.writeFile(target, data);
+      } };
+      assert.deepEqual(await writePageFonts(arriving, deckPath, files), { kind: 'refused', line: foreignFontLine('fonts/Inter-4.001-latin.woff2') });
+      assert.equal(fs.readFileSync(path.join(folder, 'fonts', 'Inter-4.001-latin.woff2'), 'utf8'), 'arrived meanwhile', 'never replaced');
+      fs.rmSync(path.join(folder, 'fonts'), { recursive: true });
+    }
+
     // The digest counts the font files the page names: a page written without them reads as changed once they can go.
     const withoutFonts = await buildDeckPage({ deckPath, text: PRIVATE_DECK, theme }, assets);
     assert.notEqual(withoutFonts.digest, built.digest, 'the same deck with and without its font files');

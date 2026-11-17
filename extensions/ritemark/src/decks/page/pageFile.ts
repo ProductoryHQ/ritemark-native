@@ -314,7 +314,6 @@ export interface FontFs {
   mkdir(target: string): Promise<void>;
   readdir(target: string): Promise<string[]>;
   link(from: string, to: string): Promise<void>;
-  rename(from: string, to: string): Promise<void>;
   unlink(target: string): Promise<void>;
   rmdir(target: string): Promise<void>;
 }
@@ -326,7 +325,6 @@ export const nodeFontFs: FontFs = {
   mkdir: async target => { await fs.promises.mkdir(target); },
   readdir: target => fs.promises.readdir(target),
   link: (from, to) => fs.promises.link(from, to),
-  rename: (from, to) => fs.promises.rename(from, to),
   unlink: target => fs.promises.unlink(target),
   rmdir: target => fs.promises.rmdir(target),
 };
@@ -364,8 +362,7 @@ async function plainFolder(fontFs: FontFs, folder: string): Promise<boolean> {
 
 /**
  * Write the theme's font files beside the deck (`fonts/`), each where nothing is, in one step (a second name, which
- * the system refuses when the name is taken; a move after a last check where it can't give one), as the page is
- * written. A file already there with the same bytes stays. Anything else at a font's place, or a `fonts` that isn't a
+ * the system refuses when the name is taken; a create-only write where it can't give one), as the page is written. A file already there with the same bytes stays. Anything else at a font's place, or a `fonts` that isn't a
  * plain folder, stops it: what this call wrote is taken back, and the result says why in one line.
  */
 export async function writePageFonts(fontFs: FontFs, deckPath: string, files: readonly PageFontFile[]): Promise<FontWriteResult> {
@@ -408,14 +405,22 @@ export async function writePageFonts(fontFs: FontFs, deckPath: string, files: re
         created.push(target);
       } catch {
         // Taken meanwhile: the same font from another window is fine, anything else stops the page. Where the system
-        // can't give a second name (FAT, exFAT, some network folders), or the name was freed again meanwhile, a move
-        // after a last check stands in.
-        const now = await fontAt(fontFs, target, file.bytes);
-        if (now === 'other') return await refused(shown);
+        // can't give a second name (FAT, exFAT, some network folders), or the name was freed again meanwhile, the
+        // file is written at its name with the system's own create-only (`wx`), never a move that could replace a
+        // file arriving in between (Codex on #777).
+        let now = await fontAt(fontFs, target, file.bytes);
         if (now === 'none') {
-          await fontFs.rename(temporary, target);
-          created.push(target);
+          try {
+            await fontFs.writeFile(target, file.bytes);
+            created.push(target);
+            continue;
+          } catch (error) {
+            // A write that failed part way leaves what it wrote: a later Publish names it and stops, never guesses.
+            if ((error as NodeJS.ErrnoException)?.code !== 'EEXIST') throw error;
+            now = await fontAt(fontFs, target, file.bytes);
+          }
         }
+        if (now !== 'same') return await refused(shown);
       } finally {
         await fontFs.unlink(temporary).catch(() => undefined);
       }
