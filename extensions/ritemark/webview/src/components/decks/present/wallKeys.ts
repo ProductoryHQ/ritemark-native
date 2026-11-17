@@ -11,6 +11,10 @@
  * it is blank any key brings the slide back, and that key does nothing else (`blankKeyOf`).
  */
 
+import type { ClockLocale, WallBlank } from '../../../../../src/decks/present/presentProtocol'
+
+export type { WallBlank }
+
 export type WallKey =
   | { type: 'next' }
   | { type: 'back' }
@@ -52,9 +56,6 @@ export function wallKeyOf(event: KeyInput): WallKey | null {
   }
 }
 
-/** What the wall shows instead of the slide: the theme's ground (white on Borderless), or white. */
-export type WallBlank = 'ground' | 'white'
-
 /** What a key does to a blank wall, or to one that isn't. */
 export type BlankStep = { type: 'blank'; to: WallBlank } | { type: 'show' }
 
@@ -80,6 +81,19 @@ export function blankKeyOf(event: KeyInput, blank: WallBlank | null): BlankStep 
     default:
       return null
   }
+}
+
+/**
+ * The blank a window's next key is read against: the one it last asked for (`asked`) until the host's state says so,
+ * else the host's. A clicker's second press (Page Down right after ".") then never reads the wall as not yet blank.
+ */
+export function blankNow(hostBlank: WallBlank | null, asked: { to: WallBlank | null } | null): WallBlank | null {
+  return asked ? asked.to : hostBlank
+}
+
+/** The ask kept until a state from the host carries it. */
+export function settleAsked(asked: { to: WallBlank | null } | null, hostBlank: WallBlank | null): { to: WallBlank | null } | null {
+  return asked && asked.to === hostBlank ? null : asked
 }
 
 /** The go-to box's digits; at most this many. */
@@ -162,23 +176,21 @@ export function clockText(ms: number): string {
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`
 }
 
-/** The system's clock: its locale, and its 12- or 24-hour choice when the system makes one (`systemClock.ts`). */
-export interface ClockLocaleInput {
-  locale: string | null
-  hourCycle: 'h12' | 'h23' | null
-}
-
 /**
  * The presenter view's time of day, hours and minutes in the locale's own format ("14:05", "2:05 PM"), with the
  * system's 12- or 24-hour choice over the locale's when it has one. A locale the webview can't read falls back to its
  * own.
  */
-export function timeOfDayText(date: Date, clock: ClockLocaleInput | null): string {
+export function timeOfDayFormat(clock: ClockLocale | null): Intl.DateTimeFormat {
   const options: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' }
   if (clock?.hourCycle) options.hourCycle = clock.hourCycle
   try {
-    return new Intl.DateTimeFormat(clock?.locale ?? undefined, options).format(date)
+    return new Intl.DateTimeFormat(clock?.locale ?? undefined, options)
   } catch {
-    return new Intl.DateTimeFormat(undefined, options).format(date)
+    return new Intl.DateTimeFormat(undefined, options)
   }
+}
+
+export function timeOfDayText(date: Date, clock: ClockLocale | null): string {
+  return timeOfDayFormat(clock).format(date)
 }

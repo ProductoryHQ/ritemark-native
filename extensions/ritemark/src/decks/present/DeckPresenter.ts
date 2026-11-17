@@ -405,7 +405,7 @@ export class DeckPresenter implements vscode.Disposable {
         return;
       case 'present/blank':
         running.blank = request.to;
-        await this.showWall(running);
+        await this.showBlank(running);
         return;
       case 'present/peek': {
         running.session.read(running.origin.document.getText());
@@ -455,6 +455,22 @@ export class DeckPresenter implements vscode.Disposable {
     if (running.ended) return;
     const presenter = { available: this.presenterAvailable(running), on: !!running.presenter };
     const state = wallStateOf(view, look, assets, presenter, running.blank);
+    running.wallState = state;
+    await post(running.wall.panel.webview, state);
+    await this.showPresenter(running);
+  }
+
+  /**
+   * Blanking is not a move: the wall gets the slide it last got, blank or not, so an edit made since still waits for the
+   * next move (and a key that brings the slide back never looks like a step).
+   */
+  private async showBlank(running: Running): Promise<void> {
+    const onWall = running.wallState;
+    if (!onWall) {
+      await this.showWall(running);
+      return;
+    }
+    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: running.blank };
     running.wallState = state;
     await post(running.wall.panel.webview, state);
     await this.showPresenter(running);

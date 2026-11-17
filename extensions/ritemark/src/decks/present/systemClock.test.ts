@@ -3,7 +3,7 @@
  * choice, as macOS's `defaults` say them. Run: npx tsx src/decks/present/systemClock.test.ts
  */
 import { strict as assert } from 'node:assert';
-import { clockLocaleOf, localeTagOf, readSystemClock } from './systemClock';
+import { clockLocaleOf, localeTagOf, readSystemClock, windowsClockOf } from './systemClock';
 
 assert.equal(localeTagOf('et_EE'), 'et-EE');
 assert.equal(localeTagOf('en_US\n'), 'en-US', "defaults' newline");
@@ -18,6 +18,14 @@ assert.deepEqual(clockLocaleOf({ appleLocale: 'en_US', force24: '1\n' }), { loca
 assert.deepEqual(clockLocaleOf({ appleLocale: 'et_EE', force12: '1' }), { locale: 'et-EE', hourCycle: 'h12' }, '12-hour time on a 24-hour region');
 assert.deepEqual(clockLocaleOf({ appleLocale: 'et_EE', force24: '0', force12: null }), { locale: 'et-EE', hourCycle: null }, "the region's own");
 assert.deepEqual(clockLocaleOf({}), { locale: null, hourCycle: null });
+
+// Windows' regional settings, as `reg query "HKCU\Control Panel\International"` prints them.
+const reg = (locale: string, shortTime: string) => `\r\nHKEY_CURRENT_USER\\Control Panel\\International\r\n    Locale    REG_SZ    00000409\r\n    LocaleName    REG_SZ    ${locale}\r\n    sShortTime    REG_SZ    ${shortTime}\r\n    sTimeFormat    REG_SZ    h:mm:ss tt\r\n`;
+assert.deepEqual(windowsClockOf(reg('en-US', 'h:mm tt')), { locale: 'en-US', hourCycle: 'h12' });
+assert.deepEqual(windowsClockOf(reg('en-US', 'HH:mm')), { locale: 'en-US', hourCycle: 'h23' }, 'a 24-hour short time on a 12-hour region');
+assert.deepEqual(windowsClockOf(reg('et-EE', 'H:mm')), { locale: 'et-EE', hourCycle: 'h23' });
+assert.deepEqual(windowsClockOf(reg('de-DE', "HH:mm 'h'")), { locale: 'de-DE', hourCycle: 'h23' }, 'quoted text is not the pattern');
+assert.deepEqual(windowsClockOf(null), { locale: null, hourCycle: null });
 
 async function main(): Promise<void> {
   // Off macOS, the host's own locale; never a failure.

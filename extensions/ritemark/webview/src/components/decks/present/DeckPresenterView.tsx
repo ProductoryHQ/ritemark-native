@@ -15,7 +15,7 @@
  * The keys are the wall's (`wallKeys.ts`): the presenter's keyboard or clicker moves the wall from here. The host is
  * the only source of state; this is the one window that gets the notes.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { PresenterState, WallSlide } from '../../../../../src/decks/present/presentProtocol'
 import { onMessage, sendToExtension } from '../../../bridge'
 import { usePageDrawn } from '../../../lib/pageDrawn'
@@ -24,7 +24,7 @@ import { Icon } from '../../ui/Icon'
 import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { wallGround } from '../theme/themeVars'
-import { blankKeyOf, clockText, countLabel, goToKey, timeOfDayText, wallKeyOf } from './wallKeys'
+import { blankKeyOf, blankNow, clockText, countLabel, goToKey, settleAsked, timeOfDayFormat, wallKeyOf, type WallBlank } from './wallKeys'
 import '../decks.css'
 import './presenter.css'
 
@@ -79,11 +79,21 @@ export function DeckPresenterView() {
   const rowRef = useRef<HTMLDivElement>(null)
   // The key that blanked the wall or brought the slide back: held down, its repeats do nothing (never a step).
   const heldKey = useRef<string | null>(null)
+  // The blank this window last asked for, until the host's state carries it (`blankNow`).
+  const askedBlank = useRef<{ to: WallBlank | null } | null>(null)
+  // The time of day's format, made again only when the system's clock changes.
+  const clockLocale = state?.clock.locale ?? null
+  const hourCycle = state?.clock.hourCycle ?? null
+  const dayFormat = useMemo(() => timeOfDayFormat({ locale: clockLocale, hourCycle }), [clockLocale, hourCycle])
 
   usePageDrawn(state !== null)
 
   useEffect(() => onMessage(message => {
-    if (message.type === 'present/presenter') setState(message as unknown as PresenterState)
+    if (message.type === 'present/presenter') {
+      const next = message as unknown as PresenterState
+      askedBlank.current = settleAsked(askedBlank.current, next.blank)
+      setState(next)
+    }
     else if (message.type === 'present/peeked' && typeof message.number === 'number') {
       setPeeked({ number: message.number, title: typeof message.title === 'string' ? message.title : null })
     }
@@ -109,13 +119,15 @@ export function DeckPresenterView() {
       if (event.repeat && heldKey.current === event.key) { take(); return }
       // B, "." or W blanks the wall; while it is blank, any key brings the slide back and does nothing else (Return and
       // space on one of this view's buttons still press that button).
-      const blankStep = blankKeyOf(event, state.blank)
       const onButton = (event.key === 'Enter' || event.key === ' ') && !!(event.target as Element | null)?.closest?.('button')
+      const blankStep = blankKeyOf(event, blankNow(state.blank, askedBlank.current))
       if (blankStep && !(blankStep.type === 'show' && onButton)) {
         take()
         heldKey.current = event.key
         if (digits !== null) { setDigits(null); setPeeked(null) }
-        send('present/blank', { to: blankStep.type === 'show' ? null : blankStep.to })
+        const to = blankStep.type === 'show' ? null : blankStep.to
+        askedBlank.current = { to }
+        send('present/blank', { to })
         return
       }
       const step = goToKey(digits, event)
@@ -130,7 +142,7 @@ export function DeckPresenterView() {
       const key = wallKeyOf(event)
       if (!key || key.type === 'digit') return
       // Return and space on one of this view's buttons press that button.
-      if ((key.type === 'next') && (event.key === 'Enter' || event.key === ' ') && (event.target as Element | null)?.closest?.('button')) return
+      if (key.type === 'next' && onButton) return
       take()
       send(key.type === 'stop' ? 'present/stop' : `present/${key.type}`)
     }
@@ -152,6 +164,7 @@ export function DeckPresenterView() {
 
   // The slide now takes what the right column and the row leave, at 16:9.
   const nowWidth = Math.max(240, Math.min(screen.width - EDGE * 3 - SIDE_WIDTH, Math.round((screen.height - 56 - 136 - 112) * 16 / 9)))
+  const timeOfDay = dayFormat.format(new Date(clock.now))
   const shownIndex = state.slides.findIndex(slide => slide.number === state.current.number)
   const gotoNumber = digits === null ? null : Number(digits)
   const gotoTitle = gotoNumber !== null && peeked?.number === gotoNumber ? peeked.title : undefined
@@ -239,7 +252,7 @@ export function DeckPresenterView() {
             <span className="pv-of">{state.length ? `elapsed, of ${state.length} minutes` : 'elapsed'}</span>
           </Button>
         </Tooltip>
-        <span className="pv-daytime" aria-label={`The time: ${timeOfDayText(new Date(clock.now), state.clock)}`}>{timeOfDayText(new Date(clock.now), state.clock)}</span>
+        <span className="pv-daytime" aria-label={`The time: ${timeOfDay}`}>{timeOfDay}</span>
         <Tooltip label={clock.paused ? 'Start the clock again' : 'Pause the clock'}>
           <Button variant="outline" onClick={clock.pause}>
             <Icon name={clock.paused ? 'play' : 'pause'} size={16} tone="inherit" />

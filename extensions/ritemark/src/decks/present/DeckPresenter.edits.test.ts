@@ -212,6 +212,12 @@ async function main(): Promise<void> {
     // comes back with the webview's next key (`to` null), and a move from a button or the row brings it back too.
     const presenterView = reopened[0];
     const onWallNow = (last(wall, 'present/wall').slide as { title: string }).title;
+    // An edit to the slide on the wall, made during the talk: blanking is not a move, so it still waits.
+    document.text = document.text.replace(`title: ${onWallNow}\n`, `title: ${onWallNow}, edited\n`);
+    document.version = 4;
+    changeListener({ document });
+    await settle(400);
+    assert.ok(titles(last(presenterView, 'present/presenter').slides).includes(`${onWallNow}, edited`), 'the row has the edit');
     presenterView.send({ type: 'present/blank', to: 'white' });
     await settle();
     assert.equal(last(wall, 'present/wall').blank, 'white');
@@ -229,9 +235,11 @@ async function main(): Promise<void> {
     await settle();
     assert.equal(last(wall, 'present/wall').blank, null, 'a move brings the slide back');
     assert.equal((last(wall, 'present/wall').slide as { title: string }).title, 'Zero');
+    wall.send({ type: 'present/blank', to: 'white' });
+    await settle();
     wall.send({ type: 'present/blank', to: 'black' });
     await settle();
-    assert.equal(last(wall, 'present/wall').blank, null, 'an unknown colour is not a request');
+    assert.equal(last(wall, 'present/wall').blank, 'white', 'an unknown colour is not a request');
     // The presenter view's clock: the system's locale, never missing.
     const clockSent = last(presenterView, 'present/presenter').clock as { locale: unknown; hourCycle: unknown };
     assert.ok(clockSent && 'locale' in clockSent && 'hourCycle' in clockSent);

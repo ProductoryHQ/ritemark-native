@@ -31,7 +31,7 @@ import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { CANVAS_WIDTH } from '../slide/layoutSlide'
 import { wallGround } from '../theme/themeVars'
-import { blankKeyOf, countLabel, goToKey, wallBleed, wallKeyOf, wallSlideSize, type WallBlank } from './wallKeys'
+import { blankKeyOf, blankNow, countLabel, goToKey, settleAsked, wallBleed, wallKeyOf, wallSlideSize, type WallBlank } from './wallKeys'
 import '../decks.css'
 import './wall.css'
 
@@ -77,6 +77,8 @@ export function DeckWall() {
   const barTimer = useRef<number | null>(null)
   // The key that blanked the wall or brought the slide back: held down, its repeats do nothing (never a step).
   const heldKey = useRef<string | null>(null)
+  // The blank this window last asked for, until the host's state carries it (`blankNow`).
+  const askedBlank = useRef<{ to: WallBlank | null } | null>(null)
   // The colour the wall last blanked to, kept while the blank fades out.
   const lastBlank = useRef<WallBlank>('ground')
   const screen = useScreenSize()
@@ -94,6 +96,7 @@ export function DeckWall() {
   useEffect(() => onMessage(message => {
     if (message.type === 'present/wall') {
       const next = message as unknown as WallState
+      askedBlank.current = settleAsked(askedBlank.current, next.blank)
       const previous = stateRef.current
       if (previous && previous.slide.number !== next.slide.number) {
         const shown = enteringRef.current ? Number.parseFloat(getComputedStyle(enteringRef.current).opacity) : 1
@@ -122,6 +125,10 @@ export function DeckWall() {
   }, [leaving])
 
   const send = useCallback((type: Move) => sendToExtension(type), [])
+  const askBlank = useCallback((to: WallBlank | null) => {
+    askedBlank.current = { to }
+    sendToExtension('present/blank', { to })
+  }, [])
   const goTo = useCallback((number: number) => sendToExtension('present/go', { number }), [])
 
   // ---- the bar: shown when the pointer moves, faded 2 s after it stops (not while the pointer is on it)
@@ -157,14 +164,15 @@ export function DeckWall() {
       const current = stateRef.current
       if (!current) return
       const take = () => { event.preventDefault(); event.stopPropagation() }
-      // A blank wall: any key brings the slide back and does nothing else; B, "." or W blanks it (not over the grid).
+      // A blank wall: any key brings the slide back and does nothing else; B, "." or W blanks it. The grid, open over a
+      // blank wall, keeps its own keys (Esc closes it, Return goes to the slide, which brings the slide back).
       if (event.repeat && heldKey.current === event.key) { take(); return }
-      const blankStep = blankKeyOf(event, current.blank)
-      if (blankStep && (blankStep.type === 'show' || !gridOpen)) {
+      const blankStep = gridOpen ? null : blankKeyOf(event, blankNow(current.blank, askedBlank.current))
+      if (blankStep) {
         take()
         heldKey.current = event.key
         if (digits !== null) { setDigits(null); setPeeked(null) }
-        sendToExtension('present/blank', { to: blankStep.type === 'show' ? null : blankStep.to })
+        askBlank(blankStep.type === 'show' ? null : blankStep.to)
         return
       }
       if (gridOpen) {
@@ -210,15 +218,15 @@ export function DeckWall() {
       window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('keyup', onKeyUp, true)
     }
-  }, [digits, gridOpen, gridPick, goTo, send, screen.width])
+  }, [digits, gridOpen, gridPick, goTo, send, askBlank, screen.width])
 
   // A click on the slide goes on (not on the bar, the box or the grid); on a blank wall it only brings the slide back.
   const onWallClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest('.wall-bar, .wall-goto, .wall-grid')) return
     if (event.button !== 0) return
-    if (stateRef.current?.blank) sendToExtension('present/blank', { to: null })
+    if (stateRef.current && blankNow(stateRef.current.blank, askedBlank.current)) askBlank(null)
     else send('present/next')
-  }, [send])
+  }, [send, askBlank])
 
   if (!state) return <div className="deck-wall" />
 

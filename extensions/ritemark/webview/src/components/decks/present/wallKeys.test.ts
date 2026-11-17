@@ -3,7 +3,7 @@
  * Run with `npx tsx webview/src/components/decks/present/wallKeys.test.ts`.
  */
 import { strict as assert } from 'node:assert'
-import { blankKeyOf, clockText, countLabel, goToKey, MAX_GOTO_DIGITS, presentKeyOf, timeOfDayText, wallKeyOf, wallSlideSize, wallBleed } from './wallKeys'
+import { blankKeyOf, blankNow, settleAsked, clockText, countLabel, goToKey, MAX_GOTO_DIGITS, presentKeyOf, timeOfDayText, wallKeyOf, wallSlideSize, wallBleed } from './wallKeys'
 
 // ---- On, back, the ends, stop
 for (const key of ['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter']) assert.deepEqual(wallKeyOf({ key }), { type: 'next' }, key)
@@ -99,6 +99,18 @@ for (const blank of ['ground', 'white'] as const) {
   assert.deepEqual(route('PageDown', null), { type: 'next' }, 'on the slide, Page Down steps')
   assert.equal(route('4', null), 'go-to box')
 }
+
+// ---- A key right after another, before the host answers, is read against what this window asked for
+assert.equal(blankNow(null, null), null)
+assert.equal(blankNow('ground', null), 'ground')
+assert.equal(blankNow(null, { to: 'ground' }), 'ground', '"." then Page Down at once: the wall is taken as blank')
+assert.deepEqual(blankKeyOf({ key: 'PageDown' }, blankNow(null, { to: 'ground' })), { type: 'show' }, 'so Page Down shows it and does not step')
+assert.deepEqual(blankKeyOf({ key: '.' }, blankNow(null, { to: 'ground' })), { type: 'show' }, 'and a second "." shows it again')
+assert.equal(blankNow('ground', { to: null }), null)
+assert.deepEqual(settleAsked({ to: 'ground' }, null), { to: 'ground' }, 'a state from before the ask keeps it')
+assert.equal(settleAsked({ to: 'ground' }, 'ground'), null, 'the state that carries it settles it')
+assert.equal(settleAsked({ to: null }, null), null)
+assert.equal(settleAsked(null, 'white'), null)
 
 // ---- The time of day, in the locale's own format and the system's 12- or 24-hour choice
 {
