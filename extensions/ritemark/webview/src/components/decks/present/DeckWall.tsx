@@ -18,6 +18,9 @@
  *    with reduced motion.
  *  - B or "." blanks the wall to the theme's ground (white on Borderless), W to white, with the same fade. Any key or a
  *    click brings the slide back, and does nothing else (`blankKeyOf`); the presenter view says the wall is blank.
+ *  - Small details item 3: for a published deck, Q (or the presenter view's "Show the page") shows the page's QR code
+ *    and its short address on the theme's ground (`PageCode`), the same way: any key or a click brings the slide back
+ *    without a step. An unpublished deck's Q does nothing.
  *
  * The host is the only source of state: every move is a request, and the wall draws what the host sends back.
  */
@@ -31,6 +34,7 @@ import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { CANVAS_WIDTH } from '../slide/layoutSlide'
 import { wallGround } from '../theme/themeVars'
+import { PageCode } from './PageCodeView'
 import { blankKeyOf, blankNow, countLabel, goToKey, settleAsked, wallBleed, wallKeyOf, wallSlideSize, type WallBlank } from './wallKeys'
 import '../decks.css'
 import './wall.css'
@@ -96,7 +100,7 @@ export function DeckWall() {
   useEffect(() => onMessage(message => {
     if (message.type === 'present/wall') {
       const next = message as unknown as WallState
-      askedBlank.current = settleAsked(askedBlank.current, next.blank)
+      askedBlank.current = settleAsked(askedBlank.current, next.blank, next.page !== null)
       const previous = stateRef.current
       if (previous && previous.slide.number !== next.slide.number) {
         const shown = enteringRef.current ? Number.parseFloat(getComputedStyle(enteringRef.current).opacity) : 1
@@ -167,7 +171,7 @@ export function DeckWall() {
       // A blank wall: any key brings the slide back and does nothing else; B, "." or W blanks it. The grid, open over a
       // blank wall, keeps its own keys (Esc closes it, Return goes to the slide, which brings the slide back).
       if (event.repeat && heldKey.current === event.key) { take(); return }
-      const blankStep = gridOpen ? null : blankKeyOf(event, blankNow(current.blank, askedBlank.current))
+      const blankStep = gridOpen ? null : blankKeyOf(event, blankNow(current.blank, askedBlank.current), current.page !== null)
       if (blankStep) {
         take()
         heldKey.current = event.key
@@ -235,7 +239,8 @@ export function DeckWall() {
   const gotoMissing = gotoNumber !== null && (gotoNumber < 1 || gotoTitle === null)
   const blank = state.blank
   if (blank) lastBlank.current = blank
-  const blankColour = (blank ?? lastBlank.current) === 'white' ? '#FFFFFF' : ground
+  const blankShown = blank ?? lastBlank.current
+  const blankColour = blankShown === 'white' ? '#FFFFFF' : ground
 
   const layer = (slide: WallSlide, className: string, key: string, from?: number) => (
     <div
@@ -260,14 +265,17 @@ export function DeckWall() {
         className="wall-frame"
         style={{ left: frame.left, top: frame.top, width: frame.width, height: frame.height, '--wall-bleed-x': `${bleed.x}px`, '--wall-bleed-y': `${bleed.y}px` } as CSSProperties}
         aria-live="polite"
-        aria-label={blank ? 'The wall is blank' : `Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
+        aria-label={blank === 'page' ? 'The page’s QR code' : blank ? 'The wall is blank' : `Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
       >
         {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, leaving.from) : null}
         {layer(state.slide, leaving ? 'is-entering' : '', `slide-${serial}`)}
       </div>
 
-      {/* The blank: the theme's ground (the wall's own, white on Borderless) or white, over the whole screen. */}
-      <div className={`wall-blank${blank ? ' is-shown' : ''}`} style={{ background: blankColour }} aria-hidden="true" />
+      {/* The blank: the theme's ground (the wall's own, white on Borderless) or white, over the whole screen; for Q, the
+          page's QR code on the ground (kept while it fades out). */}
+      <div className={`wall-blank${blank ? ' is-shown' : ''}`} style={{ background: blankColour }} aria-hidden={blank === 'page' ? undefined : true}>
+        {blankShown === 'page' && state.page ? <PageCode address={state.page} theme={state.theme} borderless={state.borderless} height={screen.height} width={screen.width} /> : null}
+      </div>
 
       {digits !== null ? (
         <div className="wall-goto dark" style={{ top: frame.top + GOTO_FROM_TOP }} role="status">

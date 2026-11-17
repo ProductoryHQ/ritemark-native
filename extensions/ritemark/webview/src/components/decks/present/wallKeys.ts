@@ -9,6 +9,9 @@
  *
  * Small details (decks README, item 1, 17 November): B or "." blanks the wall to the theme's ground, W to white; while
  * it is blank any key brings the slide back, and that key does nothing else (`blankKeyOf`).
+ *
+ * Item 3: for a published deck, Q shows the page's QR code on the wall the same way; any key brings the slide back. An
+ * unpublished deck's Q does nothing.
  */
 
 import type { ClockLocale, WallBlank } from '../../../../../src/decks/present/presentProtocol'
@@ -63,11 +66,12 @@ export type BlankStep = { type: 'blank'; to: WallBlank } | { type: 'show' }
 const HELD_KEYS = new Set(['Shift', 'Meta', 'Control', 'Alt', 'AltGraph', 'CapsLock', 'Fn', 'FnLock', 'Hyper', 'Super', 'OS', 'NumLock', 'ScrollLock', 'Dead'])
 
 /**
- * B or "." blanks the wall to the theme's ground, W to white (a clicker's blank button sends B or "."). While the wall
- * is blank, any key brings the slide back (Esc, a digit and → too), and that key does nothing else. A key with ⌘, Ctrl
+ * B or "." blanks the wall to the theme's ground, W to white (a clicker's blank button sends B or "."), and Q shows the
+ * published page's QR code (`page`: the deck has one; else Q is no key of the wall's). While the wall is blank or shows
+ * the code, any key brings the slide back (Esc, a digit and → too), and that key does nothing else. A key with ⌘, Ctrl
  * or ⌥ is still the app's. Null: the key is not about blanking, and does what it does.
  */
-export function blankKeyOf(event: KeyInput, blank: WallBlank | null): BlankStep | null {
+export function blankKeyOf(event: KeyInput, blank: WallBlank | null, page = false): BlankStep | null {
   if (event.metaKey || event.ctrlKey || event.altKey) return null
   if (blank !== null) return HELD_KEYS.has(event.key) ? null : { type: 'show' }
   switch (event.key) {
@@ -78,6 +82,9 @@ export function blankKeyOf(event: KeyInput, blank: WallBlank | null): BlankStep 
     case 'w':
     case 'W':
       return { type: 'blank', to: 'white' }
+    case 'q':
+    case 'Q':
+      return page ? { type: 'blank', to: 'page' } : null
     default:
       return null
   }
@@ -91,8 +98,12 @@ export function blankNow(hostBlank: WallBlank | null, asked: { to: WallBlank | n
   return asked ? asked.to : hostBlank
 }
 
-/** The ask kept until a state from the host carries it. */
-export function settleAsked(asked: { to: WallBlank | null } | null, hostBlank: WallBlank | null): { to: WallBlank | null } | null {
+/**
+ * The ask kept until a state from the host carries it. A Q the host refused (the deck no longer has a page, `hostPage`
+ * false) is settled too: the host never shows the code then, and the next key must not be read against it.
+ */
+export function settleAsked(asked: { to: WallBlank | null } | null, hostBlank: WallBlank | null, hostPage = true): { to: WallBlank | null } | null {
+  if (asked && asked.to === 'page' && !hostPage) return null
   return asked && asked.to === hostBlank ? null : asked
 }
 
