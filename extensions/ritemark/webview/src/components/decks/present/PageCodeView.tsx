@@ -18,7 +18,8 @@ export function PageCode({ address, theme, borderless, height, width }: {
 }) {
   const code = useMemo(() => pageCodeOf(address), [address])
   const path = useMemo(() => pageCodePath(code), [code])
-  const { ink, ground } = pageCodeColours(theme, borderless)
+  // Dark modules on a light field: straight on a light ground, on a tile of the ink on a dark one.
+  const { ink, modules: moduleColour, field, tile } = pageCodeColours(theme, borderless)
   const modules = code.size + QUIET_ZONE * 2
   const side = codeSide(code.size, height, width)
   const short = shortAddress(address)
@@ -33,8 +34,8 @@ export function PageCode({ address, theme, borderless, height, width }: {
         role="img"
         aria-label={`QR code for ${short}`}
       >
-        <rect width={modules} height={modules} fill={ground} />
-        <path d={path} fill={ink} />
+        {tile ? <rect width={modules} height={modules} rx={1} fill={field} /> : null}
+        <path d={path} fill={moduleColour} />
       </svg>
       <span
         className="page-code-address"

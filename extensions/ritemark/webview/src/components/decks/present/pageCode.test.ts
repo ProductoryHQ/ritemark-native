@@ -10,6 +10,7 @@ import { BUILT_IN_THEME, type DeckTheme } from '../../../../../src/decks/deckThe
 import { contrast } from '../theme/themeVars'
 import { CODE_CONTRAST, CODE_SHARE, codeSide, codeText, pageCodeColours, pageCodeOf, pageCodePath, QUIET_ZONE, shortAddress, type PageCode } from './pageCode'
 
+const BLACK = '#000000'
 const hex = (colour: string) => [1, 3, 5].map(at => parseInt(colour.slice(at, at + 2), 16))
 
 /** The modules the path draws, read back from its `M x y h w v1 h-w z` rectangles. */
@@ -45,10 +46,10 @@ function pixelsOf(code: PageCode, ink: string, ground: string, scale = 6): { dat
   return { data, width: side }
 }
 
-function read(code: PageCode, ink: string, ground: string): string | null {
-  const { data, width } = pixelsOf(code, ink, ground)
-  // A dark ground's code is light on dark (what a phone's camera reads too); jsQR is told to try both.
-  return jsQR(data, width, width, { inversionAttempts: 'attemptBoth' })?.data ?? null
+function read(code: PageCode, modules: string, field: string): string | null {
+  const { data, width } = pixelsOf(code, modules, field)
+  // Dark modules on a light field, as every phone reads: jsQR is never told to try the code inverted.
+  return jsQR(data, width, width, { inversionAttempts: 'dontInvert' })?.data ?? null
 }
 
 const ADDRESSES = [
@@ -61,39 +62,45 @@ const DARK: DeckTheme = BUILT_IN_THEME
 const LIGHT: DeckTheme = { ...BUILT_IN_THEME, name: 'Paper', bg: '#FAF7F0', head: '#1F2937', text: '#374151', glow: false }
 // Headings too faint on their ground for a camera: the code takes black or white instead.
 const FAINT: DeckTheme = { ...BUILT_IN_THEME, name: 'Faint', bg: '#8090A0', head: '#A0B0C0', text: '#B0C0D0', glow: false }
+// A mid-dark ground, where a light-on-dark code is missed (jsQR, inverted, on #3D428F at 6 px a module).
+const DUSK: DeckTheme = { ...BUILT_IN_THEME, name: 'Dusk', bg: '#3D428F', head: '#FFFFFF', text: '#E4E6F7', glow: false }
+const THEMES = [DARK, LIGHT, FAINT, DUSK]
 
 // ---- the code encodes the exact address, read back by an independent decoder, in every look
 for (const address of ADDRESSES) {
   const code = pageCodeOf(address)
   assert.ok(code.size >= 21 && code.size % 4 === 1, `a QR code's size (${code.size})`)
   assert.deepEqual(modulesOfPath(pageCodePath(code), code.size), code.dark, 'the path draws exactly the dark modules')
-  for (const theme of [DARK, LIGHT, FAINT]) {
+  for (const theme of THEMES) {
     for (const borderless of [false, true]) {
-      const { ink, ground } = pageCodeColours(theme, borderless)
-      assert.equal(read(code, ink, ground), address, `${address} on ${theme.name}${borderless ? ' Borderless' : ''}`)
+      const { modules, field } = pageCodeColours(theme, borderless)
+      assert.equal(read(code, modules, field), address, `${address} on ${theme.name}${borderless ? ' Borderless' : ''}`)
     }
   }
 }
 
-// ---- the theme's ink on its ground, with the contrast a camera needs
+// ---- the theme's two colours, dark modules on a light field, with the contrast a camera needs
 {
   const card = pageCodeColours(DARK, false)
-  assert.deepEqual(card, { ink: '#FFFFFF', ground: '#1C1F4A' }, "Evening: its white headings on its own ground")
+  assert.deepEqual(card, { ink: '#FFFFFF', ground: '#1C1F4A', modules: '#1C1F4A', field: '#FFFFFF', tile: true }, 'Evening: a white tile, the modules in its ground')
   const borderless = pageCodeColours(DARK, true)
-  assert.equal(borderless.ground, '#FFFFFF', 'Borderless: on white')
+  assert.equal(borderless.field, '#FFFFFF', 'Borderless: straight on white')
+  assert.equal(borderless.tile, false)
+  assert.equal(borderless.modules, borderless.ink)
   assert.notEqual(borderless.ink, '#FFFFFF')
-  assert.equal(pageCodeColours(LIGHT, false).ink, '#1F2937', 'a light theme: its dark headings')
+  assert.deepEqual(pageCodeColours(LIGHT, false), { ink: '#1F2937', ground: '#FAF7F0', modules: '#1F2937', field: '#FAF7F0', tile: false }, 'a light theme: its headings on its ground')
   const faint = pageCodeColours(FAINT, false)
   assert.equal(faint.ground, '#8090A0', 'the ground stays the theme’s')
   assert.ok(['#000000', '#FFFFFF'].includes(faint.ink), 'faint headings give way to black or white')
-  for (const theme of [DARK, LIGHT, FAINT]) {
+  for (const theme of THEMES) {
     for (const look of [false, true]) {
-      const { ink, ground } = pageCodeColours(theme, look)
-      if (theme !== FAINT) assert.ok(contrast(ink, ground) >= CODE_CONTRAST, `${theme.name}: ${contrast(ink, ground).toFixed(1)} to 1`)
+      const { modules, field } = pageCodeColours(theme, look)
+      assert.ok(contrast(modules, BLACK) <= contrast(field, BLACK), `${theme.name}: the modules are the darker`)
+      if (theme !== FAINT) assert.ok(contrast(modules, field) >= CODE_CONTRAST, `${theme.name}: ${contrast(modules, field).toFixed(1)} to 1`)
     }
   }
   // The fallback is the better of black and white, even when neither reaches the mark.
-  assert.ok(contrast(faint.ink, faint.ground) >= 3)
+  assert.ok(contrast(faint.modules, faint.field) >= 3)
 }
 
 // ---- the size on the wall: the modules fill at least 40% of the wall's height, in whole pixels per module

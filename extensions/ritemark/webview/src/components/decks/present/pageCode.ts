@@ -6,9 +6,11 @@
  *    below, a legal comment kept in the bundle). Error correction M, the size the address needs.
  *  - `pageCodePath`: the dark modules as one SVG path, a unit square each, for a `viewBox` that includes the quiet
  *    zone (`QUIET_ZONE` modules on every side, the standard's 4), so the code scales to any size without a seam.
- *  - `pageCodeColours`: the theme's ink on its ground (the headings' colour; white on a dark ground), on a solid
- *    square of the ground's own colour under the soft light. Ink too faint for a camera on that ground is taken to
- *    black or white, whichever reads.
+ *  - `pageCodeColours`: the theme's two colours, its ink (the headings' colour) and its ground, always dark modules on
+ *    a light field, the way every phone's camera reads a QR code (a light-on-dark code is missed by some scanners, and
+ *    by jsQR on a mid-dark ground). On a light ground the code is the ink straight on the wall's ground; on a dark
+ *    ground (Evening) it is a tile of the ink, white, with the modules in the ground's colour, its quiet zone inside the
+ *    tile. Ink too faint against its ground is taken to black or white, whichever reads.
  *  - `shortAddress`: the address as the room reads it under the code: no `https://`, no trailing slash.
  */
 import qrcode from 'qrcode-generator'
@@ -80,14 +82,32 @@ export function codeSide(modules: number, height: number, width: number): number
 const WHITE = '#FFFFFF'
 const BLACK = '#000000'
 
-/** The code's ink and the solid ground under it: the theme's ink on its ground, unless a camera couldn't tell them. */
-export function pageCodeColours(theme: DeckTheme, borderless: boolean): { ink: string; ground: string } {
-  const ground = borderless ? WHITE : theme.bg
+export interface PageCodeColours {
+  /** The theme's ink (the address under the code is in it too) and its ground. */
+  ink: string
+  ground: string
+  /** The modules' colour and the field's (the quiet zone and the light modules): always dark on light. */
+  modules: string
+  field: string
+  /** The field is a tile of its own (a dark ground); else the code is drawn straight on the wall's ground. */
+  tile: boolean
+}
+
+/** The code's colours: the theme's ink and ground, dark modules on a light field, unless a camera couldn't tell them. */
+export function pageCodeColours(theme: DeckTheme, borderless: boolean): PageCodeColours {
+  const ground = isHex(borderless ? WHITE : theme.bg) ? (borderless ? WHITE : theme.bg) : WHITE
   // The headings' colour: on a dark ground the theme's own (white in the built-in), on Borderless its darkest.
-  const ink = themeVars(theme, borderless).hd
-  if (isHex(ink) && isHex(ground) && contrast(ink, ground) >= CODE_CONTRAST) return { ink, ground }
-  const safeGround = isHex(ground) ? ground : WHITE
-  return { ink: contrast(WHITE, safeGround) >= contrast(BLACK, safeGround) ? WHITE : BLACK, ground: safeGround }
+  const headings = themeVars(theme, borderless).hd
+  const ink = isHex(headings) && contrast(headings, ground) >= CODE_CONTRAST
+    ? headings
+    : contrast(WHITE, ground) >= contrast(BLACK, ground) ? WHITE : BLACK
+  const tile = luminance(ink) > luminance(ground)
+  return tile ? { ink, ground, modules: ground, field: ink, tile } : { ink, ground, modules: ink, field: ground, tile }
+}
+
+function luminance(colour: string): number {
+  // The ordering is all that matters here: the two colours' WCAG contrast against black says which is lighter.
+  return contrast(colour, BLACK)
 }
 
 function isHex(colour: string): boolean {
