@@ -15,7 +15,7 @@ import { BUILT_IN_THEME } from '../deckTheme';
 import { cssReferences, pageReferences, scriptBuildsReferences } from '../../publish/references';
 import { scanText } from '../../publish/secretScan';
 import { PAGE_FONTS } from './pageFile';
-import { DIGEST_META, OPEN_IN_MAX_ADDRESS, PAGE_CSP, handoutHtml, openInAddresses, isSlideOnly, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
+import { DIGEST_META, OPEN_IN_MAX_ADDRESS, PAGE_CSP, PAGE_CSS, handoutHtml, isSlideOnly, openInAddresses, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
 import { PAGE_SCRIPT } from './pageScript';
 import { deckDigest, publicDeck } from './publicDeck';
 import { PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_WORDS } from './testing/privateDeck';
@@ -107,6 +107,23 @@ const steps = root.querySelectorAll('#s3 ol.steps > li.step input[type="checkbox
 assert.equal(steps.length, 2);
 assert.notEqual(steps[0].getAttribute('data-tick'), steps[1].getAttribute('data-tick'));
 assert.match(root.querySelector('#text')!.getAttribute('data-store')!, /^ritemark-ticks-[0-9a-f]{12}$/);
+// Small details 7: the reader's place is kept under the page's own name (the ticks' name), and "Start from the beginning"
+// waits hidden in the bar for the script.
+assert.equal(root.querySelector('#text')!.getAttribute('data-place')!.replace('ritemark-place-', ''), root.querySelector('#text')!.getAttribute('data-store')!.replace('ritemark-ticks-', ''));
+const restart = root.querySelector('.top #restart')!;
+assert.equal(restart.text, 'Start from the beginning');
+assert.ok(restart.hasAttribute('hidden') && restart.getAttribute('type') === 'button');
+// Under 600 px the notice leaves the bar (the client's name stays whole): a pill at the bottom centre, above the safe area.
+{
+  const phone = /@media \(max-width: 599px\) \{([\s\S]*?)\n\}/.exec(PAGE_CSS);
+  assert.ok(phone, 'the page has a phone rule for the notice');
+  const pill = /\.restart \{([^}]*)\}/.exec(phone![1])![1];
+  for (const rule of ['position: fixed', 'left: 50%', 'transform: translateX(-50%)', 'bottom: calc(16px + env(safe-area-inset-bottom, 0px))', 'border-radius: 18px']) assert.ok(pill.includes(rule), rule);
+  // The bar's backdrop filter would make it the pill's containing block (the pill would sit in the bar): none there.
+  assert.match(phone![1], /\.top \{[^}]*backdrop-filter: none/);
+  // At 600 px and up it stays in the bar.
+  assert.ok(!/\.restart \{[^}]*position: fixed/.test(PAGE_CSS.replace(phone![0], '')), 'only the phone rule takes it out of the bar');
+}
 // A prompt that shows a comment shows it as words.
 assert.ok(html.includes('&lt;!-- a prompt that shows a comment stays as written --&gt;'));
 
