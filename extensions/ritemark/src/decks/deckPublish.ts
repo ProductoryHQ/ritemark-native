@@ -86,6 +86,9 @@ export class DeckPublisher implements vscode.Disposable {
   private readonly written = new Map<string, { digest: string; rows: DeckSheetRows }>();
   /** The app's own font files, read once per window (they never change while it runs). */
   private readonly fontBytes = new Map<string, Promise<Buffer>>();
+  /** A page's state changed in Publish (by its real path): Present asks again whether the deck is published. */
+  private readonly pageChanged = new vscode.EventEmitter<string>();
+  readonly onDidChangePage = this.pageChanged.event;
   /** Font files beside a page that a Publish running in this window uses: never taken back by another's cancel. */
   private readonly fontsHeld = new Map<string, number>();
   private feature: PublishFeature | null = null;
@@ -109,7 +112,7 @@ export class DeckPublisher implements vscode.Disposable {
     this.disposables.push(
       { dispose: () => feature.setPageRows(null) },
       feature.onDidChangeReady(() => this.refreshAll()),
-      feature.onDidChangePageState(pagePath => void this.refreshPage(pagePath)),
+      feature.onDidChangePageState(pagePath => { void this.refreshPage(pagePath); this.pageChanged.fire(pagePath); }),
     );
     this.refreshAll();
   }
@@ -156,19 +159,17 @@ export class DeckPublisher implements vscode.Disposable {
 
   /**
    * Small details item 3: the deck's published page, by its address, for Present's QR code; null while it isn't
-   * published (or Publish can't be reached). 2.2's last answer for an open deck view, else 2.2 asked.
+   * published (or Publish can't be reached). Publish's own record, read now (never the chip's last answer), without
+   * the gather the chip's "changed" needs, so a Q on the wall answers at once.
    */
   async pageAddressOf(document: vscode.TextDocument): Promise<string | null> {
-    if (!this.ready()) return null;
-    let bar = [...this.seats].find(seat => seat.document === document && seat.bar)?.bar;
-    if (!bar) {
-      try {
-        bar = await vscode.commands.executeCommand<PageBarState | undefined>(PAGE_STATE_COMMAND, vscode.Uri.file(pagePathFor(document.uri.fsPath)));
-      } catch {
-        bar = undefined;
-      }
+    const feature = this.ready();
+    if (!feature) return null;
+    try {
+      return publishedAddress(await feature.controller.pageState(await pageKeyOf(pagePathFor(document.uri.fsPath))));
+    } catch {
+      return null;
     }
-    return publishedAddress(bar);
   }
 
   /** Whether the deck's public content is no longer what its page was written from. */
@@ -429,6 +430,7 @@ export class DeckPublisher implements vscode.Disposable {
     for (const timer of this.timers.values()) clearTimeout(timer);
     this.timers.clear();
     this.disposables.forEach(disposable => disposable.dispose());
+    this.pageChanged.dispose();
     this.seats.clear();
     this.written.clear();
   }

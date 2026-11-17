@@ -60,4 +60,3 @@
 .wall-grid-item.is-picked .wall-grid-slide { box-shadow: 0 0 0 2px #0E0C24, 0 0 0 5px #818CF8; }
 .wall-grid-number { display: block; margin-top: 8px; font-family: var(--ritemark-ui-font-family); font-size: 13px; font-weight: 500; line-height: 16px; color: #C7D2FE; font-variant-numeric: tabular-nums; }
 .wall-grid-item.is-current .wall-grid-number { color: #818CF8; font-weight: 700; }
-

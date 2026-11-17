@@ -189,7 +189,7 @@ export function wallStateOf(
   blank: WallBlank | null = null,
   page: string | null = null,
 ): WallState {
-  const address = pageAddressOf(page);
+  const address = wallPageAddress(page);
   return {
     type: 'present/wall',
     slide: wallSlideOf(view.current),
@@ -226,7 +226,7 @@ export function presenterStateOf(
   session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number; blank?: WallBlank | null; clock?: ClockLocale; page?: string | null },
   onWall?: WallSlide,
 ): PresenterState {
-  const address = pageAddressOf(session.page ?? null);
+  const address = wallPageAddress(session.page ?? null);
   return {
     type: 'present/presenter',
     current: onWall ? { ...onWall, number: view.current.index + 1 } : wallSlideOf(view.current),
@@ -256,13 +256,16 @@ function blankOf(value: unknown): WallBlank | null {
 /** The longest page address the wall is sent. */
 const MAX_ADDRESS = 2048;
 
-/** A published page's address as the wall may show it: an https address, or null. */
-export function pageAddressOf(value: unknown): string | null {
+/**
+ * A published page's address as the wall may show it: an https address, or null. (Only Publish's own addresses ever
+ * reach here: `DeckPublisher.pageAddressOf` keeps to `WORKERS_DEV_ADDRESS`; this is the message's shape.)
+ */
+export function wallPageAddress(value: unknown): string | null {
   return typeof value === 'string' && value.length <= MAX_ADDRESS && /^https:\/\/[^\s/]+/.test(value) ? value : null;
 }
 
-/** The blank the wall shows: the page's QR code only while the deck has a published page. */
-function shownBlank(value: unknown, page: string | null): WallBlank | null {
+/** The blank the wall shows: the page's QR code only while the deck has a published page. The one rule for it. */
+export function shownBlank(value: unknown, page: string | null): WallBlank | null {
   const blank = blankOf(value);
   return blank === 'page' && page === null ? null : blank;
 }

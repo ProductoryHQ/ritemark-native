@@ -128,6 +128,11 @@ assert.deepEqual(settleAsked({ to: 'ground' }, null), { to: 'ground' }, 'a state
 assert.equal(settleAsked({ to: 'ground' }, 'ground'), null, 'the state that carries it settles it')
 assert.equal(settleAsked({ to: null }, null), null)
 assert.equal(settleAsked(null, 'white'), null)
+// A Q the host refused (the deck has no page now): settled, so the next key is read against the slide, not the code.
+assert.deepEqual(settleAsked({ to: 'page' }, null), { to: 'page' }, 'a state from before Q keeps it')
+assert.equal(settleAsked({ to: 'page' }, null, false), null, 'refused: no page, so no code to dismiss')
+assert.equal(settleAsked({ to: 'page' }, 'page', true), null)
+assert.deepEqual(blankKeyOf({ key: 'ArrowRight' }, blankNow(null, settleAsked({ to: 'page' }, null, false)), false), null, '→ after a refused Q is a step again')
 
 // ---- The time of day, in the locale's own format and the system's 12- or 24-hour choice
 {

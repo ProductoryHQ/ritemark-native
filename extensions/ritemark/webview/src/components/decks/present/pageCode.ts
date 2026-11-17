@@ -10,7 +10,8 @@
  *    a light field, the way every phone's camera reads a QR code (a light-on-dark code is missed by some scanners, and
  *    by jsQR on a mid-dark ground). On a light ground the code is the ink straight on the wall's ground; on a dark
  *    ground (Evening) it is a tile of the ink, white, with the modules in the ground's colour, its quiet zone inside the
- *    tile. Ink too faint against its ground is taken to black or white, whichever reads.
+ *    tile. Ink too faint against its ground is taken to black or white, whichever reads; on a mid-tone ground where
+ *    neither reaches `CODE_CONTRAST`, the code is black on a white tile.
  *  - `shortAddress`: the address as the room reads it under the code: no `https://`, no trailing slash.
  */
 import qrcode from 'qrcode-generator'
@@ -95,12 +96,15 @@ export interface PageCodeColours {
 
 /** The code's colours: the theme's ink and ground, dark modules on a light field, unless a camera couldn't tell them. */
 export function pageCodeColours(theme: DeckTheme, borderless: boolean): PageCodeColours {
-  const ground = isHex(borderless ? WHITE : theme.bg) ? (borderless ? WHITE : theme.bg) : WHITE
+  // A theme's colours are `#RRGGBB` (`parseTheme`), and so is the headings' colour worked out from them.
+  const ground = borderless ? WHITE : theme.bg
   // The headings' colour: on a dark ground the theme's own (white in the built-in), on Borderless its darkest.
   const headings = themeVars(theme, borderless).hd
-  const ink = isHex(headings) && contrast(headings, ground) >= CODE_CONTRAST
+  const ink = contrast(headings, ground) >= CODE_CONTRAST
     ? headings
     : contrast(WHITE, ground) >= contrast(BLACK, ground) ? WHITE : BLACK
+  // A mid-tone ground that neither black nor white reads on: black on a white tile.
+  if (contrast(ink, ground) < CODE_CONTRAST) return { ink, ground, modules: BLACK, field: WHITE, tile: true }
   const tile = luminance(ink) > luminance(ground)
   return tile ? { ink, ground, modules: ground, field: ink, tile } : { ink, ground, modules: ink, field: ground, tile }
 }
@@ -108,10 +112,6 @@ export function pageCodeColours(theme: DeckTheme, borderless: boolean): PageCode
 function luminance(colour: string): number {
   // The ordering is all that matters here: the two colours' WCAG contrast against black says which is lighter.
   return contrast(colour, BLACK)
-}
-
-function isHex(colour: string): boolean {
-  return /^#[0-9a-f]{6}$/i.test(colour)
 }
 
 /** The address as the room reads it: `name.example.workers.dev`, or with its path when it has one. */

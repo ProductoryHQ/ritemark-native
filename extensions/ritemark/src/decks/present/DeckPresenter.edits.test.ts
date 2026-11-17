@@ -262,6 +262,8 @@ async function main(): Promise<void> {
     const published = new DeckPresenter({ fsPath: '/extension' } as never, state as never);
     const asked: unknown[] = [];
     published.pageAddress = async askedFor => { asked.push(askedFor); return address; };
+    let pageListener: (() => void) | null = null;
+    published.onPageChange = listener => { pageListener = listener; return { dispose() { pageListener = null; } } as never; };
     const panelsBefore = panels.length;
     await published.start(origin as never, { type: 'deck/present', from: 'here', index: 1 } as never);
     await settle(50);
@@ -288,6 +290,18 @@ async function main(): Promise<void> {
     laptop2.send({ type: 'present/next' });
     await settle();
     assert.equal(last(wall2, 'present/wall').blank, null, 'a move takes the code away');
+    // A key that comes while Q is still asking wins: the code never shows after the slide came back.
+    let answer: ((value: string | null) => void) | null = null;
+    published.pageAddress = () => new Promise(resolve => { answer = resolve; });
+    wall2.send({ type: 'present/blank', to: 'page' });
+    await settle();
+    wall2.send({ type: 'present/blank', to: null });
+    await settle();
+    assert.ok(answer, 'Q asked Publish again');
+    answer!(address);
+    await settle();
+    assert.equal(last(wall2, 'present/wall').blank, null, 'the later key wins over the slow Q');
+    published.pageAddress = async askedFor => { asked.push(askedFor); return address; };
     // Unpublished meanwhile: Q asks again, shows nothing, and the button goes.
     address = null;
     wall2.send({ type: 'present/blank', to: 'page' });
@@ -295,6 +309,18 @@ async function main(): Promise<void> {
     assert.equal(last(wall2, 'present/wall').blank, null, 'no code for a page that is gone');
     assert.equal(last(wall2, 'present/wall').page, null);
     assert.equal(last(laptop2, 'present/presenter').page, null, 'the button goes with the page');
+    // A refused Q still sends both windows a state, so the ask they keep settles.
+    const refusedBefore = wall2.posted.length;
+    wall2.send({ type: 'present/blank', to: 'page' });
+    await settle();
+    assert.ok(wall2.posted.length > refusedBefore, 'a refused Q is answered');
+    // Published again from the main window during the talk: Publish's page state changes, and the button comes back.
+    address = 'https://talk.example.workers.dev/';
+    assert.ok(pageListener, 'the presenter listens for page changes');
+    pageListener!();
+    await settle();
+    assert.equal(last(wall2, 'present/wall').page, address, 'Q works again');
+    assert.equal(last(laptop2, 'present/presenter').page, address, '"Show the page" is back');
     published.dispose();
     await settle();
   } finally {

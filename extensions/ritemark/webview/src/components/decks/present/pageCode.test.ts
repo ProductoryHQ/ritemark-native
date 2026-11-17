@@ -60,11 +60,13 @@ const ADDRESSES = [
 
 const DARK: DeckTheme = BUILT_IN_THEME
 const LIGHT: DeckTheme = { ...BUILT_IN_THEME, name: 'Paper', bg: '#FAF7F0', head: '#1F2937', text: '#374151', glow: false }
-// Headings too faint on their ground for a camera: the code takes black or white instead.
+// Headings too faint on their ground, which neither black nor white reads on at 7:1: black on a white tile.
 const FAINT: DeckTheme = { ...BUILT_IN_THEME, name: 'Faint', bg: '#8090A0', head: '#A0B0C0', text: '#B0C0D0', glow: false }
 // A mid-dark ground, where a light-on-dark code is missed (jsQR, inverted, on #3D428F at 6 px a module).
 const DUSK: DeckTheme = { ...BUILT_IN_THEME, name: 'Dusk', bg: '#3D428F', head: '#FFFFFF', text: '#E4E6F7', glow: false }
-const THEMES = [DARK, LIGHT, FAINT, DUSK]
+// A mid-tone grey: white 4.5 and black 4.7 to 1.
+const GREY: DeckTheme = { ...BUILT_IN_THEME, name: 'Grey', bg: '#777777', head: '#888888', text: '#999999', glow: false }
+const THEMES = [DARK, LIGHT, FAINT, DUSK, GREY]
 
 // ---- the code encodes the exact address, read back by an independent decoder, in every look
 for (const address of ADDRESSES) {
@@ -92,15 +94,17 @@ for (const address of ADDRESSES) {
   const faint = pageCodeColours(FAINT, false)
   assert.equal(faint.ground, '#8090A0', 'the ground stays the theme’s')
   assert.ok(['#000000', '#FFFFFF'].includes(faint.ink), 'faint headings give way to black or white')
+  for (const theme of [FAINT, GREY]) {
+    const { modules, field, tile } = pageCodeColours(theme, false)
+    assert.deepEqual({ modules, field, tile }, { modules: '#000000', field: '#FFFFFF', tile: true }, `${theme.name}: black on a white tile`)
+  }
   for (const theme of THEMES) {
     for (const look of [false, true]) {
       const { modules, field } = pageCodeColours(theme, look)
       assert.ok(contrast(modules, BLACK) <= contrast(field, BLACK), `${theme.name}: the modules are the darker`)
-      if (theme !== FAINT) assert.ok(contrast(modules, field) >= CODE_CONTRAST, `${theme.name}: ${contrast(modules, field).toFixed(1)} to 1`)
+      assert.ok(contrast(modules, field) >= CODE_CONTRAST, `${theme.name}: ${contrast(modules, field).toFixed(1)} to 1`)
     }
   }
-  // The fallback is the better of black and white, even when neither reaches the mark.
-  assert.ok(contrast(faint.modules, faint.field) >= 3)
 }
 
 // ---- the size on the wall: the modules fill at least 40% of the wall's height, in whole pixels per module

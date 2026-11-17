@@ -98,8 +98,12 @@ export function blankNow(hostBlank: WallBlank | null, asked: { to: WallBlank | n
   return asked ? asked.to : hostBlank
 }
 
-/** The ask kept until a state from the host carries it. */
-export function settleAsked(asked: { to: WallBlank | null } | null, hostBlank: WallBlank | null): { to: WallBlank | null } | null {
+/**
+ * The ask kept until a state from the host carries it. A Q the host refused (the deck no longer has a page, `hostPage`
+ * false) is settled too: the host never shows the code then, and the next key must not be read against it.
+ */
+export function settleAsked(asked: { to: WallBlank | null } | null, hostBlank: WallBlank | null, hostPage = true): { to: WallBlank | null } | null {
+  if (asked && asked.to === 'page' && !hostPage) return null
   return asked && asked.to === hostBlank ? null : asked
 }
 

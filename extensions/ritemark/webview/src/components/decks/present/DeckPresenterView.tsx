@@ -94,7 +94,7 @@ export function DeckPresenterView() {
   useEffect(() => onMessage(message => {
     if (message.type === 'present/presenter') {
       const next = message as unknown as PresenterState
-      askedBlank.current = settleAsked(askedBlank.current, next.blank)
+      askedBlank.current = settleAsked(askedBlank.current, next.blank, next.page !== null)
       setState(next)
     }
     else if (message.type === 'present/peeked' && typeof message.number === 'number') {
@@ -173,7 +173,8 @@ export function DeckPresenterView() {
   const gotoTitle = gotoNumber !== null && peeked?.number === gotoNumber ? peeked.title : undefined
   const gotoMissing = gotoNumber !== null && (gotoNumber < 1 || gotoTitle === null)
   const nowHeight = Math.round(nowWidth * 9 / 16)
-  const pageShown = state.blank === 'page' && state.page !== null
+  // The page on the wall now: its address while the code shows, else null.
+  const pageShown = state.blank === 'page' ? state.page : null
   const togglePage = () => {
     const to = blankNow(state.blank, askedBlank.current) === 'page' ? null : 'page'
     askedBlank.current = { to }
@@ -191,11 +192,11 @@ export function DeckPresenterView() {
         <div className="pv-label">{state.wallDisplay ? `Now, on ${state.wallDisplay}` : 'Now, on the wall'}</div>
         <div className="pv-now">
           {canvas(state.current, nowWidth)}
-          {pageShown && state.page ? (
+          {pageShown ? (
             // What the room sees: the page's QR code on the theme's ground (any key brings the slide back).
             <div className="pv-blank is-page">
               <div className="pv-blank-ground" style={{ background: wallGround(state.theme, state.borderless) }} />
-              <PageCode address={state.page} theme={state.theme} borderless={state.borderless} height={Math.round(nowHeight * 0.8)} width={nowWidth} />
+              <PageCode address={pageShown} theme={state.theme} borderless={state.borderless} height={Math.round(nowHeight * 0.8)} width={nowWidth} />
               <span className="pv-blank-words" role="status">The page’s QR code is on the wall · Q to show the slide</span>
             </div>
           ) : state.blank && state.blank !== 'page' ? (
@@ -298,7 +299,7 @@ export function DeckPresenterView() {
         </Tooltip>
         {state.page ? (
           <Tooltip label={pageShown ? 'Show the slide on the wall again (Q)' : 'Show the page’s QR code on the wall, so phones in the room open it (Q)'}>
-            <Button variant="outline" aria-pressed={pageShown} data-state={pageShown ? 'active' : undefined} onClick={togglePage}>
+            <Button variant="outline" aria-pressed={pageShown !== null} data-state={pageShown ? 'active' : undefined} onClick={togglePage}>
               <Icon name="qr-code" size={16} tone="inherit" />
               Show the page
             </Button>

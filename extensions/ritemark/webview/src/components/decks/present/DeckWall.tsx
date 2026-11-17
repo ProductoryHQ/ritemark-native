@@ -100,7 +100,7 @@ export function DeckWall() {
   useEffect(() => onMessage(message => {
     if (message.type === 'present/wall') {
       const next = message as unknown as WallState
-      askedBlank.current = settleAsked(askedBlank.current, next.blank)
+      askedBlank.current = settleAsked(askedBlank.current, next.blank, next.page !== null)
       const previous = stateRef.current
       if (previous && previous.slide.number !== next.slide.number) {
         const shown = enteringRef.current ? Number.parseFloat(getComputedStyle(enteringRef.current).opacity) : 1
