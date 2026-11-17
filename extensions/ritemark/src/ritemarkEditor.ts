@@ -408,6 +408,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         saveAsMarkdownFromPreview: isEnabled('save-as-markdown-from-preview'),
         commentCallouts: isEnabled('comment-callouts'),
         tableHandles: isEnabled('table-handles'),
+        pictureEditor: isEnabled('picture-editor'),
       },
       systemLanguage: systemLanguage(process.env, vscode.env.language),
       ...agentFields,

@@ -66,7 +66,7 @@ import { TableHandles, tableHandlesEnabled, tableMenuTargetAt } from '../../../e
 import { TableHandlesLayer, useAltHeld } from '../../tables/TableHandlesLayer'
 import { TableMenuItems, runClipboardEdit, type MenuKit, type TableMenuTarget } from '../../tables/TableMenuItems'
 import { PictureTools } from '../../pictures/PictureTools'
-import { chosenPicture, leavePicture, replacePicture as pictureReplaced } from '../../../extensions/pictures/pictureCommands'
+import { chosenPicture, chosenPictureUnder, leavePicture, replacePicture as pictureReplaced } from '../../../extensions/pictures/pictureCommands'
 import { topBlockAt } from './slideCommentPlace'
 import { sendToExtension } from '../../../bridge'
 import { SidePicture } from './SidePicture'
@@ -348,7 +348,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       // The slide never scrolls (the lead on #769: at the fit's floor the caret at the bottom scrolled the slide's words up
       // and cut its title at the top): it may overflow at the bottom only. See also the flow's scroll reset below.
       handleScrollToSelection: () => true,
-      handleDrop: (_view, event) => takePicture((event as DragEvent).dataTransfer, false),
+      handleDrop: (_view, event) => takePicture((event as DragEvent).dataTransfer, false, event.target),
       handleDOMEvents: {
         // The Edit menu's Undo and Redo, and the system's: the deck's history.
         beforeinput: (_view, event) => {
@@ -431,8 +431,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
    * A picture from the computer onto the slide: pasted (unless words are being pasted) or dropped. Onto a chosen picture
    * it replaces it (experience 49); onto the chosen side picture, the slide's place takes it, as before.
    */
-  function takePicture(transfer: DataTransfer | null, pasted: boolean): boolean {
-    const chosen = editor && !editor.isDestroyed ? chosenPicture(editor.state) : null
+  function takePicture(transfer: DataTransfer | null, pasted: boolean, dropTarget: EventTarget | null = null): boolean {
+    // A drop replaces the chosen picture only when it lands on it (Codex on #774); a paste always does.
+    const chosen = !editor || editor.isDestroyed ? null : pasted ? chosenPicture(editor.state) : chosenPictureUnder(editor.view, dropTarget)
     return takeImageFile(transfer, pasted, (dataUrl, filename) => {
       if (!chosen) return onPictureRef.current(dataUrl, filename)
       replaceAt.current = chosen.pos

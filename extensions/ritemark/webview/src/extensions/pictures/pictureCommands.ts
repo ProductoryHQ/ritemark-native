@@ -14,6 +14,20 @@ import { lookOf, withLook, type PictureLook, type Region } from '../../../../src
 // The slide editor's "an undo step of its own" meta, set by every command (harmless in the document editor).
 import { SLIDE_COMMAND } from '../../components/decks/blocks/slideCommands'
 
+/**
+ * The `picture-editor` flag (the kill switch), as the host sent it with the document. Off, a picture has no ring,
+ * handles or bar (`PictureTools` draws nothing); its look is still read, drawn and written back as it was.
+ */
+let pictureEditorOn = true
+
+export function setPictureEditorEnabled(enabled: boolean): void {
+  pictureEditorOn = enabled
+}
+
+export function pictureEditorEnabled(): boolean {
+  return pictureEditorOn
+}
+
 export interface ChosenPicture {
   pos: number
   node: PMNode
@@ -24,6 +38,18 @@ export function chosenPicture(state: EditorState): ChosenPicture | null {
   const selection = state.selection
   if (!(selection instanceof NodeSelection) || selection.node.type.name !== 'image') return null
   return { pos: selection.from, node: selection.node }
+}
+
+/**
+ * The chosen picture a drop lands on: only when the drop's target is inside the chosen picture's own element, so a
+ * picture dropped elsewhere is inserted there and never replaces the chosen one (Codex on #774). A paste has no place:
+ * it replaces the chosen picture.
+ */
+export function chosenPictureUnder(view: { state: EditorState; nodeDOM: (pos: number) => globalThis.Node | null }, target: EventTarget | null): ChosenPicture | null {
+  const chosen = chosenPicture(view.state)
+  if (!chosen) return null
+  const dom = view.nodeDOM(chosen.pos)
+  return dom && target instanceof globalThis.Node && dom.contains(target) ? chosen : null
 }
 
 /** Is the selection a picture? The text's bubble menu never shows over one (experience 49). */

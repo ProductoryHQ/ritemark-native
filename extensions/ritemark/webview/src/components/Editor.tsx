@@ -27,7 +27,7 @@ import { FormattingBubbleMenu } from './FormattingBubbleMenu'
 import { MarginCommentRail } from './MarginCommentRail'
 import { TableHandlesLayer } from './tables/TableHandlesLayer'
 import { PictureTools } from './pictures/PictureTools'
-import { caretBeforePicture, chosenPicture, replacePicture } from '../extensions/pictures/pictureCommands'
+import { caretBeforePicture, chosenPicture, chosenPictureUnder, replacePicture } from '../extensions/pictures/pictureCommands'
 import { startComment } from '../extensions/comment/CommentNode'
 import { TableHandles, tableHandlesEnabled } from '../extensions/tables/TableHandles'
 import { cellAtSelection, deleteColumn, deleteRow, insertColumn, insertRow } from '../extensions/tables/tableOps'
@@ -216,8 +216,8 @@ export function Editor({
           const file = event.dataTransfer.files[0]
           if (file.type.startsWith('image/')) {
             event.preventDefault()
-            // Experience 49: dropped onto the chosen picture, it replaces it.
-            replaceImagePosRef.current = chosenPicture(_view.state)?.pos ?? null
+            // Experience 49: dropped onto the chosen picture, it replaces it; dropped anywhere else, it goes there.
+            replaceImagePosRef.current = chosenPictureUnder(_view, event.target)?.pos ?? null
             // Read file and send to extension
             readFileAsBase64(file).then(dataUrl => {
               const filename = getUniqueImageFilename(file)

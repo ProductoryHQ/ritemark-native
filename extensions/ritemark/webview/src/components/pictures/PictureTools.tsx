@@ -31,7 +31,7 @@ import {
 } from '../../../../src/markdown/pictureLook'
 import { sendToExtension } from '../../bridge'
 import { commitCrop, imagePathOf } from '../../extensions/pictures/PictureNode'
-import { chosenPicture, cropMeta, cropOf, leavePicture, removePicture, setPictureLook, setPictureWords, type CropState } from '../../extensions/pictures/pictureCommands'
+import { chosenPicture, cropMeta, pictureEditorEnabled, cropOf, leavePicture, removePicture, setPictureLook, setPictureWords, type CropState } from '../../extensions/pictures/pictureCommands'
 import { runClipboardEdit } from '../tables/TableMenuItems'
 import { PictureBar, type PicturePlace } from './PictureBar'
 import { CORNERS, cornerOf, cropHandleAt, frameBox, localBox, resizedWidth, scaleOf, wholeBox, type Box, type Corner } from './pictureGeometry'
@@ -180,7 +180,8 @@ export function PictureTools({ editor, context, comments, onComment, onReplace, 
     if (focus) editor.view.focus()
   }, [editor])
 
-  if (!editor || editor.isDestroyed || !chosen) return null
+  // The `picture-editor` kill switch: off, no tools (the picture's look is still drawn and kept).
+  if (!editor || editor.isDestroyed || !chosen || !pictureEditorEnabled()) return null
   const parts = partsOf(editor, chosen.pos, context)
   if (!parts) return null
   const { root, image, target, host } = parts

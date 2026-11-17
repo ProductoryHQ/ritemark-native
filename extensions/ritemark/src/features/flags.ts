@@ -72,7 +72,9 @@ export type FlagId =
   // Sprint 158 (#711): editing an .xlsx in place, saved cell by cell; the kill switch for it
   | 'excel-editing'
   // Experience 48: a table's grips, menus, + bars and column widths, in a Text document and on a slide; the kill switch
-  | 'table-handles';
+  | 'table-handles'
+  // Experience 49: a picture's ring, handles, crop and bar, in a Text document and on a slide; the kill switch
+  | 'picture-editor';
 
 /**
  * Feature flag registry
@@ -345,6 +347,15 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
   // switch an extension release can flip, not in Settings. 'disabled': the editors draw tables as before this work, with
   // no grips, menus, + bars, column lines or column widths (a file's widths are kept as written, and a presented slide
   // still draws them); Tab, Shift+Tab and the Cmd+Shift+arrow keys still work.
+  // Experience 49 (Codex on #774): ON by default (HARD RULE #2), a kill switch for the picture editor. Off, a picture has
+  // no ring, handles or bar; its look (the attribute block) is still read, drawn and written back as it was.
+  'picture-editor': {
+    id: 'picture-editor',
+    label: 'Picture Editor',
+    description: 'Change a picture in place: its size, alignment, crop, place on a slide, description and comment.',
+    status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
   'table-handles': {
     id: 'table-handles',
     label: 'Table Handles',

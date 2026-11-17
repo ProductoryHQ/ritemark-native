@@ -28,7 +28,7 @@ import { slideDataOf, splitBlockSlide, withBlockMarkdown, writeSlideData } from 
 import { BUILT_IN_THEME as DEFAULT_THEME } from '../../../../src/decks/deckTheme'
 import { EMPTY_SIDE, flowToSide, sideToText } from '../../components/decks/blocks/slidePicturePlace'
 import { CORNERS, cornerOf, frameBox, localBox, resizedWidth, screenPoint, wholeBox } from '../../components/pictures/pictureGeometry'
-import { caretBeforePicture, chosenPicture, leavePicture, removePicture, replacePicture, setPictureAlt, setPictureLook } from './pictureCommands'
+import { caretBeforePicture, chosenPicture, chosenPictureUnder, leavePicture, pictureEditorEnabled, removePicture, setPictureEditorEnabled, replacePicture, setPictureAlt, setPictureLook } from './pictureCommands'
 
 let failures = 0
 function check(name: string, run: () => void) {
@@ -268,6 +268,33 @@ check('a slide whose words open with ---, focus: …, --- keeps them as words', 
   const words = '---\nfocus: what matters this week\n---\n# Title'
   assert.equal(splitBlockSlide(words).header, null)
   assert.equal(splitBlockSlide('---\npicture: left\nfocus: 30,60\n---\n# Title').header, 'picture: left\nfocus: 30,60')
+})
+
+// ---- Codex on #774
+
+check('a drop replaces the chosen picture only when it lands on it', () => {
+  const state = chooseFirst(docState(DOC))
+  const picture = { contains: (other: unknown) => other === inside } as unknown as globalThis.Node
+  const inside = { nodeType: 1 } as unknown as globalThis.Node
+  const outside = { nodeType: 1 } as unknown as globalThis.Node
+  // The test's DOM has its own Node class: stand in for it while the check runs.
+  const real = (globalThis as { Node?: unknown }).Node
+  ;(globalThis as { Node?: unknown }).Node = Object
+  try {
+    const view = { state, nodeDOM: () => picture }
+    assert.equal(chosenPictureUnder(view, inside)?.pos, firstPicture(state.doc))
+    assert.equal(chosenPictureUnder(view, outside), null)
+    assert.equal(chosenPictureUnder({ state: docState(DOC), nodeDOM: () => picture }, inside), null, 'no picture chosen')
+  } finally {
+    ;(globalThis as { Node?: unknown }).Node = real
+  }
+})
+
+check('the picture-editor kill switch is on by default and can be turned off', () => {
+  assert.equal(pictureEditorEnabled(), true)
+  setPictureEditorEnabled(false)
+  assert.equal(pictureEditorEnabled(), false)
+  setPictureEditorEnabled(true)
 })
 
 // ---- Place on a slide: the same picture between the words and the slide-wide place

@@ -7,6 +7,8 @@ export interface DocumentFeaturePayload {
   commentCallouts?: boolean;
   /** Experience 48: the table's own handles (the `table-handles` kill switch). */
   tableHandles?: boolean;
+  /** Experience 49: the picture's own tools (the `picture-editor` kill switch). */
+  pictureEditor?: boolean;
 }
 
 export type DocumentRenderPayload =
@@ -388,7 +390,7 @@ function parseRenderPayload(value: unknown): DocumentRenderPayload {
   if (input.isAgentMode !== undefined && typeof input.isAgentMode !== 'boolean') throw new DocumentProtocolError('isAgentMode must be boolean');
   if (input.deckMode !== undefined && input.deckMode !== true) throw new DocumentProtocolError('deckMode must be true when present');
   const features = record(input.features, 'features');
-  exactKeys(features, ['voiceDictation', 'markdownExport', 'saveAsMarkdownFromPreview', 'commentCallouts', 'tableHandles']);
+  exactKeys(features, ['voiceDictation', 'markdownExport', 'saveAsMarkdownFromPreview', 'commentCallouts', 'tableHandles', 'pictureEditor']);
   if (typeof features.voiceDictation !== 'boolean' || typeof features.markdownExport !== 'boolean') {
     throw new DocumentProtocolError('Document features are malformed');
   }
@@ -400,6 +402,9 @@ function parseRenderPayload(value: unknown): DocumentRenderPayload {
   }
   if (features.tableHandles !== undefined && typeof features.tableHandles !== 'boolean') {
     throw new DocumentProtocolError('tableHandles must be boolean');
+  }
+  if (features.pictureEditor !== undefined && typeof features.pictureEditor !== 'boolean') {
+    throw new DocumentProtocolError('pictureEditor must be boolean');
   }
   return {
     fileType,
@@ -414,6 +419,7 @@ function parseRenderPayload(value: unknown): DocumentRenderPayload {
       ...(typeof features.saveAsMarkdownFromPreview === 'boolean' ? { saveAsMarkdownFromPreview: features.saveAsMarkdownFromPreview } : {}),
       ...(typeof features.commentCallouts === 'boolean' ? { commentCallouts: features.commentCallouts } : {}),
       ...(typeof features.tableHandles === 'boolean' ? { tableHandles: features.tableHandles } : {}),
+      ...(typeof features.pictureEditor === 'boolean' ? { pictureEditor: features.pictureEditor } : {}),
     },
     ...(input.isAgentMode === true ? { isAgentMode: true } : {}),
     ...(input.agentFrontmatter === undefined ? {} : { agentFrontmatter: record(input.agentFrontmatter, 'agentFrontmatter') }),
