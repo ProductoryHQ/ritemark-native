@@ -588,7 +588,7 @@ body.bl .stage { border-right: 1px solid var(--line); padding-right: 40px; }
 export const PRINT_CSS = `
 .paddr, .foot.addr-only { display: none; }
 @media print {
-  @page { margin: 14mm 15mm 18mm; }
+  @page { margin: 14mm 15mm; }
   html, body { background: #FFFFFF; }
   body { font-size: 10.5pt; line-height: 1.5; }
   .top, .toc, .under, .toast, .zoom, .restart, .copy, .prompt .open { display: none !important; }
@@ -612,9 +612,10 @@ export const PRINT_CSS = `
   .prompt pre, .prompt.ai pre { padding: 3mm 4mm; border: 1px solid #C9CBD6; border-radius: 8px; background: none; white-space: pre-wrap; overflow-wrap: anywhere; }
   .steps label { background: none; box-shadow: none; border: 1px solid #DADCE4; break-inside: avoid; page-break-inside: avoid; }
   .steps input { box-shadow: none; border: 1.5px solid #8A8DA3; }
-  .foot { order: 2147483647; margin-top: 2mm; padding-top: 3mm; break-inside: avoid; page-break-inside: avoid; }
+  .foot { order: 2147483647; margin-top: 0; padding-top: 3mm; break-before: avoid; page-break-before: avoid; break-inside: avoid; page-break-inside: avoid; }
   .foot.addr-only { display: block; border-top: 0; }
-  .paddr { display: block; overflow-wrap: anywhere; }
+  .paddr { display: inline; overflow-wrap: anywhere; }
+  .foot > span + .paddr::before { content: ' · '; }
   .paddr:empty { display: none; }
 }
 `;

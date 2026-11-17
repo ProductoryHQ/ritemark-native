@@ -144,7 +144,7 @@ const assets: PageAssets = {
   assert.ok(!/print-color-adjust/.test(PAGE_CSS));
   // A4 and Letter: no paper size forced, and the slide fits the narrower printed width (A4) at these margins.
   assert.ok(!/@page[^}]*size:/.test(PRINT_CSS), 'the reader\'s own paper');
-  const margins = /@page \{ margin: (\d+)mm (\d+)mm (\d+)mm; \}/.exec(PRINT_CSS)!;
+  const margins = /@page \{ margin: (\d+)mm (\d+)mm; \}/.exec(PRINT_CSS)!;
   const side = Number(margins[2]);
   const slideWidth = Number(/width: (\d+)px; height: (\d+)px;/.exec(rule('.layer'))![1]);
   const mm = slideWidth / 96 * 25.4;
