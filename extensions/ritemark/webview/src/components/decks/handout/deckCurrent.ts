@@ -5,6 +5,11 @@
  *
  * 16 November (the handout is a Text document): the placeholders are marks too. A part's empty heading says "Heading",
  * and the current part's empty text says how to write on: "Write here. *** starts a new slide."
+ *
+ * 17 November ("A slide with no handout"): a part with no heading and no text is a slide with no handout, as a slide
+ * with no speaker notes simply has none. While it isn't the current one it folds to one thin row: its head is marked
+ * `is-only` and its empty blocks `deck-only-fold` (decks.css). There's no switch: typing a heading or text makes it a
+ * part again, and emptying it folds it again.
  */
 import { Extension } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
@@ -28,6 +33,37 @@ export function currentSlideOf(state: EditorState): number | null {
 }
 
 /**
+ * Is this run of a part's blocks empty: no heading and no text? Each block an empty paragraph or an empty heading (a
+ * line break is no text). A drawn heading (a deck written before 16 November shows its slide's title until the first
+ * edit) is text, so such a part is never slide-only until the person empties it.
+ */
+export function blocksAreBare(blocks: readonly PMNode[]): boolean {
+  return blocks.every(node => {
+    if (node.type.name !== 'paragraph' && node.type.name !== 'heading') return false
+    let bare = true
+    node.forEach(child => {
+      if (child.isText ? !!child.text?.trim() : child.type.name !== 'hardBreak') bare = false
+    })
+    return bare
+  })
+}
+
+/** The blocks of each part, in order: what follows each slide node, up to the next one. */
+function partBlocks(doc: PMNode): Array<{ pos: number; size: number; blocks: Array<{ node: PMNode; pos: number }> }> {
+  const parts: Array<{ pos: number; size: number; blocks: Array<{ node: PMNode; pos: number }> }> = []
+  doc.forEach((node, pos) => {
+    if (node.type.name === 'deckSlide') parts.push({ pos, size: node.nodeSize, blocks: [] })
+    else parts[parts.length - 1]?.blocks.push({ node, pos })
+  })
+  return parts
+}
+
+/** The parts that are slides with no handout (no heading and no text), by their place. */
+export function slideOnlyParts(doc: PMNode): number[] {
+  return partBlocks(doc).flatMap((part, index) => (blocksAreBare(part.blocks.map(block => block.node)) ? [index] : []))
+}
+
+/**
  * The current slide's head (`is-current`); each part's empty heading ("Heading"); and the current part's first empty
  * paragraph when the part has no words yet.
  */
@@ -37,8 +73,16 @@ export function deckDecorations(doc: PMNode, current: number | null): Decoration
   doc.forEach((node, pos) => {
     if (node.type.name === 'deckSlide') slides.push({ pos, size: node.nodeSize })
   })
+  const parts = partBlocks(doc)
   slides.forEach((slide, index) => {
     if (index === current) found.push(Decoration.node(slide.pos, slide.pos + slide.size, { class: 'is-current' }))
+    // A slide with no handout, not the current one: one thin row, its empty blocks folded away.
+    const blocks = parts[index]?.blocks ?? []
+    if (index !== current && blocksAreBare(blocks.map(block => block.node))) {
+      found.push(Decoration.node(slide.pos, slide.pos + slide.size, { class: 'is-only' }))
+      for (const block of blocks) found.push(Decoration.node(block.pos, block.pos + block.node.nodeSize, { class: 'deck-only-fold' }))
+      return
+    }
     const heading = partHeadingAt(doc, slide.pos)
     if (heading && heading.node.childCount === 0) {
       found.push(Decoration.node(heading.pos, heading.pos + heading.node.nodeSize, { class: 'deck-empty', 'data-deck-placeholder': HEADING_PLACEHOLDER }))

@@ -45,7 +45,7 @@
 /* ---- the desk: strip, stage, divider, handout */
 .deck-desk { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 
-.deck-strip { position: absolute; left: 0; top: 0; bottom: 0; width: var(--deck-strip); border-right: 1px solid var(--r-hairline); overflow-y: auto; overflow-x: hidden; padding: 6px 0 40px; box-sizing: border-box; outline: none; user-select: none; -webkit-user-select: none; }
+.deck-strip { position: absolute; left: 0; top: 0; bottom: 0; width: var(--deck-strip); overflow-y: auto; overflow-x: hidden; padding: 6px 0 40px; box-sizing: border-box; outline: none; user-select: none; -webkit-user-select: none; }
 /* A thumbnail is moved by the strip's own drag: never a native drag of its words or pictures. */
 .deck-thumb, .deck-thumb * { -webkit-user-drag: none; }
 .deck-thumb { touch-action: none; }
@@ -57,7 +57,7 @@
 .deck-thumb.is-current .deck-thumb-slide { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
 .deck-thumb.is-current .deck-thumb-no { color: var(--r-accent); font-weight: 700; }
 .deck-thumb.is-skip .deck-thumb-slide { opacity: 0.4; }
-.deck-thumb .deck-thumb-eye { position: absolute; left: 58px; top: 22px; width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.92); display: grid; place-items: center; color: var(--r-ink-strong); }
+.deck-thumb .deck-thumb-eye { position: absolute; left: 58px; top: 22px; width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.92); display: grid; place-items: center; color: #1C1F4A; } /* the ink on its own white, in Ritemark Dark too (the ink token is white there) */
 :where(:root:not([data-input-mode="pointer"])) .deck-strip:focus-visible .deck-thumb.is-current .deck-thumb-slide { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent), 0 0 0 6px var(--r-accent-soft); }
 
 .deck-stage { position: absolute; top: 0; bottom: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; }
@@ -65,8 +65,11 @@
 .deck-stage .deck-big { position: relative; margin: 0 24px; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline), 0 8px 24px -10px rgba(30, 27, 75, 0.35); }
 .deck-source { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--r-ink-muted); }
 
+/* Space, not lines (Jarmo, 17 November: "usage of different borders are disturbing me"): the line between the panes
+   shows only while it is pointed at or dragged, as the 2 px accent line with the resize pointer; at rest the space
+   between the slide and the handout is all there is. The hit area stays 13 px. */
 .deck-divider { position: absolute; top: 0; bottom: 0; width: 13px; margin-left: -6px; cursor: col-resize; z-index: 3; touch-action: none; }
-.deck-divider::before { content: ''; position: absolute; left: 6px; top: 12px; bottom: 12px; border-left: 1.5px dotted var(--r-hairline-strong); }
+.deck-divider::before { content: ''; position: absolute; left: 6px; top: 12px; bottom: 12px; border-left: 2px solid transparent; }
 .deck-divider:hover::before, .deck-divider.is-dragging::before { border-left: 2px solid var(--r-accent); }
 
 /* Split along the long side (16 November; deckLayout.ts): with the slide above the handout, the slide is centred on top
@@ -81,14 +84,13 @@
 .deck-stage.is-alone { align-items: center; }
 .deck-stage.is-alone .deck-stage-group { max-width: 100%; padding: 16px 0; }
 .deck-divider.is-above { width: auto; right: 0; bottom: auto; height: 13px; margin-left: 0; margin-top: -6px; cursor: row-resize; }
-.deck-divider.is-above::before { left: 0; right: 0; top: 6px; bottom: auto; border-left: 0; border-top: 1.5px dotted var(--r-hairline-strong); }
+.deck-divider.is-above::before { left: 0; right: 0; top: 6px; bottom: auto; border-left: 0; border-top: 2px solid transparent; }
 .deck-divider.is-above:hover::before, .deck-divider.is-above.is-dragging::before { border-left: 0; border-top: 2px solid var(--r-accent); }
-/* One line, not two (the Experience lead, 17 November): the scroll rule brings the current part's head 6 px under the
-   handout's top (scrollRule.ts, PART_TOP_GAP), and its hairline border then ran just under the level line. Above, the
-   handout's top 8 px are the desk's colour, over the text and under the line, so only the dotted line shows there. */
+/* Above, the handout's top 8 px are the desk's colour, over the text and under the level line, so text scrolled up
+   never runs into the line while it shows (the Experience lead, 17 November). */
 .deck-handout.is-above::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 8px; z-index: 1; background: var(--r-surface); pointer-events: none; }
 
-.deck-handout { position: absolute; top: 0; bottom: 0; right: 0; --deck-text-left: 48px; --deck-text-right: 32px; }
+.deck-handout { position: absolute; top: 0; bottom: 0; right: 0; --deck-text-left: 56px; --deck-text-right: 32px; }
 .deck-handout.is-folded { visibility: hidden; pointer-events: none; }
 /* The slide folded away (16 November; the prototype's `.hand.solo`): the handout is a Text document's centred column,
    the editor's own width (`--deck-text-column`, the Editor's TEXT_COLUMN_WIDTH, the Experience lead), with the
@@ -97,13 +99,13 @@
    Below the slide (`.is-above`), the handout is the same column. */
 .deck-handout.is-solo, .deck-handout.is-above {
   --deck-column-gap: max(0px, calc((var(--deck-handout-width, 0px) - var(--deck-text-column, 900px)) / 2));
-  --deck-text-left: calc(var(--deck-column-gap) + 48px);
+  --deck-text-left: calc(var(--deck-column-gap) + 56px);
   --deck-text-right: calc(var(--deck-column-gap) + 32px);
 }
 /* The handout is a Text document (Jarmo, 16 November: "very, very similar to our text editor; the only difference is
    one line that signals the slide changes"; the prototype's `.hand`, `.hpart`): the editor's own type, headings and
-   code blocks, with no style of the deck's own. The text's edges are 48 on the left and 32 on the right; the column
-   starts at the dotted divider, so the line between slides runs from it to the right edge. */
+   code blocks, with no style of the deck's own. The text's edges are 56 on the left (the number's rail is in that
+   margin) and 32 on the right. */
 .deck-handout .wysiwyg-editor .ProseMirror {
   counter-reset: deck-slide;
   max-width: none !important;
@@ -115,39 +117,70 @@
 .deck-handout .drag-handle { visibility: hidden !important; pointer-events: none !important; }
 body:has(.deck-view) .block-plus-btn { display: none !important; }
 
-/* Where each slide's part starts: one 1px line in the hairline colour, the handout's full width (none above the first),
-   and the slide's number, 12px and muted at the right of the part's first line, in the accent for the current slide. */
-/* 22px of its own under the line (padding, not margin: a margin would fold through the first head, which has no line) */
-.deck-part-head { position: relative; counter-increment: deck-slide; margin: 14px calc(-1 * var(--deck-text-right, 32px)) 0 calc(-1 * var(--deck-text-left, 48px)); padding: 0 0 22px; border-top: 1px solid var(--r-hairline); }
-.ProseMirror > .deck-part-head:first-child { border-top: 0; margin-top: 0; }
-.deck-part-number { position: absolute; right: var(--deck-text-right, 32px); top: 29px; display: flex; align-items: center; gap: 6px; font: 500 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
-.deck-part-number::after { content: counter(deck-slide); }
-/* The number sits on the part's first line: half its line box down from the part's top, whatever opens the part */
-.deck-part-head:has(+ h2) .deck-part-number { top: 34px; }
-.deck-part-head:has(+ h1) .deck-part-number { top: 41px; }
-.deck-part-head.is-current .deck-part-number { color: var(--r-accent); }
-/* The part number's ⋯ (experience 46, "Removing a slide from the handout"): the strip's slide menu, shown on hover in the
-   handout's right margin beside the number, never over the text; it stays while its menu is open or it has the focus.
-   Transparent rather than hidden, so pointing at it (outside the head's own box) is pointing at the head. */
-.deck-part-more { position: absolute; right: 6px; top: 25px; display: flex; opacity: 0; }
-.deck-part-head:has(+ h2) .deck-part-more { top: 30px; }
-.deck-part-head:has(+ h1) .deck-part-more { top: 37px; }
-.deck-part-head:hover .deck-part-more, .deck-part-more:focus-within, .deck-part-more:has([data-state="open"]) { opacity: 1; }
+/* Where each slide's part starts: space, not a line (Jarmo, 17 November: "I thing current whitespaces are enough"). A part
+   starts after 40 px of space (the 18 px under a paragraph, which the head's 10 px margin folds into, and the head's
+   22 px), with its number on the rail at the left. The `***` stays in the file and still makes the slide; the handout
+   draws it as this space. A plain Text document's `***` is still a line (the Text editor's own). The head spans the
+   handout's full width, so the rail sits in the text's left margin. */
+.deck-part-head { position: relative; counter-increment: deck-slide; margin: 10px calc(-1 * var(--deck-text-right, 32px)) 0 calc(-1 * var(--deck-text-left, 56px)); padding: 22px 0 0; }
+.ProseMirror > .deck-part-head:first-child { margin-top: 0; }
+/* The number's rail (Jarmo, 17 November: "give it its own almost invisible back-rail, mis näitab mis slaid on aktiivne";
+   "trackbar võiks olla rounded otstega"; "mitte aktiivsetel ei peaks track üldse bg coloriga olema"): each part's own
+   track, 22 px wide with round ends, 18 px from the column's left edge, from 10 px above the heading to the end of the
+   part's text (its height is the deck view's, `measureRail`). Only the current slide's track has a colour, the accent
+   at about 10 % (14 % in Ritemark Dark); another part's track is tinted faintly while it's pointed at, to show a click
+   makes its slide the current one. */
+.deck-part-track { position: absolute; left: calc(var(--deck-column-gap, 0px) + 18px); top: 12px; width: 22px; height: 40px; border-radius: 11px; cursor: pointer; transition: background-color .2s; }
+.deck-part-head:not(.is-current) .deck-part-track:hover { background: color-mix(in srgb, var(--r-ink-strong) 4%, transparent); }
+.deck-part-head.is-current .deck-part-track { background: color-mix(in srgb, var(--r-accent) 10%, transparent); }
+:is(body.vscode-dark, body.ritemark-dark, body[data-vscode-theme-kind='vscode-dark'], .dark) .deck-part-head.is-current .deck-part-track { background: color-mix(in srgb, var(--r-accent) 14%, transparent); }
+/* The number, 12 px and centred in its track, level with the heading's first line, and sticky (Jarmo: "number võiks
+   olla sticky, et kui on pikem text siis ta kenasti püsib nähtaval"): while a long part scrolls it stays at the top of
+   the handout's view, inside its own track, and leaves with the track's end. A skipped slide's mark sits under it, and
+   the ⋯ under that. */
+.deck-part-pin { position: sticky; top: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px 0 6px; }
+.deck-part-head:has(+ h2) .deck-part-pin { padding-top: 22px; }
+.deck-part-head:has(+ h1) .deck-part-pin { padding-top: 28px; }
+.deck-part-number { display: flex; flex-direction: column; align-items: center; gap: 4px; font: 500 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
+.deck-part-number::after { content: counter(deck-slide); order: -1; }
+.deck-part-head.is-current .deck-part-number { color: var(--r-accent); font-weight: 650; }
+/* The part number's ⋯ (experience 46, "Removing a slide from the handout"): the strip's slide menu, shown under the
+   number while its track is pointed at; it stays while its menu is open or it has the focus. Transparent rather than
+   hidden, so pointing at it is pointing at the track. */
+.deck-part-more { display: flex; opacity: 0; }
+.deck-part-track:hover .deck-part-more, .deck-part-more:focus-within, .deck-part-more:has([data-state="open"]) { opacity: 1; }
 .deck-part-more .deck-part-more-button { width: 20px; height: 20px; min-width: 20px; padding: 0; border-radius: 5px; }
 .deck-part-more .deck-part-more-button svg { width: 13px; height: 13px; }
-/* A join's first press: the line between the parts in the accent, and the note at the line (deckRemove.ts). */
-/* The accent line keeps the hairline's 1px and adds a second, inset, so nothing under it moves. */
-.deck-part-head.is-join { border-top-color: var(--r-accent); box-shadow: inset 0 1px 0 var(--r-accent); }
+/* A join's first press: an accent line where the parts meet, and the note on it (deckRemove.ts). A state, like a drag,
+   so it is the one line between parts. */
+.deck-part-head.is-join { box-shadow: inset 0 2px 0 var(--r-accent); }
 /* A join that can't be made (a skipped slide): the note says why, in the ink, not the accent. */
-.deck-part-head.is-join.is-blocked { border-top-color: var(--r-hairline-strong); box-shadow: none; }
+.deck-part-head.is-join.is-blocked { box-shadow: inset 0 1px 0 var(--r-hairline-strong); }
 .deck-part-head.is-join.is-blocked::before { color: var(--r-ink-body); }
-.deck-part-head.is-join::before { content: attr(data-join-note); position: absolute; left: var(--deck-text-left, 48px); top: 3px; font: 500 12px/16px var(--ritemark-ui-font-family); color: var(--r-accent); white-space: nowrap; pointer-events: none; }
+.deck-part-head.is-join::before { content: attr(data-join-note); position: absolute; left: var(--deck-text-left, 56px); top: 3px; font: 500 12px/16px var(--ritemark-ui-font-family); color: var(--r-accent); white-space: nowrap; pointer-events: none; }
 .deck-thumb.is-join { background: var(--r-accent-soft); border-radius: 6px; }
 .deck-thumb.is-join .deck-thumb-slide { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
-/* The part's own heading, as the editor writes it, starts the part: no space of its own above it, room for the number */
+/* A slide with no handout (Jarmo, 17 November: "mitte iga slaid ei pea näitama handouti"): a part with no heading and
+   no text, while it isn't the current one, folds to one thin row, about 28 px with 22 px above it: the number on its
+   track, SLIDE ONLY, and the slide's title in grey (deckCurrent.ts marks it, the deck view draws the row). A click on
+   the row opens the part to write in. */
+.deck-part-only { display: none; }
+.deck-part-head.is-only { margin-top: 22px; padding-top: 0; }
+.ProseMirror > .deck-part-head.is-only:first-child { margin-top: 0; }
+.deck-part-head.is-only .deck-part-track { top: -6px; }
+.deck-part-head.is-only .deck-part-pin { padding-top: 12px; }
+.deck-part-head.is-only .deck-part-only { display: block; margin-left: var(--deck-text-left, 56px); margin-right: var(--deck-text-right, 32px); }
+.deck-handout .wysiwyg-editor .ProseMirror > .deck-only-fold { display: none !important; }
+.deck-part-only .deck-part-only-row { display: flex; align-items: baseline; justify-content: flex-start; gap: 10px; width: 100%; min-height: 28px; height: auto; padding: 5px 0 3px; border-radius: 0; background: transparent; box-shadow: none; font: 400 14px/20px var(--ritemark-ui-font-family); color: var(--r-ink-faint); text-align: left; white-space: nowrap; overflow: hidden; }
+.deck-part-only .deck-part-only-row:hover { background: transparent; color: var(--r-ink-body); }
+.deck-part-only .deck-part-only-key { flex: none; font: 500 11px/20px var(--ritemark-ui-font-family); letter-spacing: .04em; text-transform: uppercase; color: var(--r-ink-muted); }
+.deck-part-only .deck-part-only-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The part's own heading, as the editor writes it, starts the part: no space of its own above it */
 .deck-handout .wysiwyg-editor .ProseMirror > .deck-part-head + :is(h1, h2, h3, p) { margin-top: 0 !important; }
-.deck-handout .wysiwyg-editor .ProseMirror > .deck-part-head + :is(h1, h2) { margin-right: 40px !important; }
 .deck-handout .wysiwyg-editor .ProseMirror > .deck-part-head.is-skip + :is(h1, h2) { color: var(--r-ink-muted) !important; }
+/* A wide table scrolls sideways inside its own frame, never cut at the handout's edge (Jarmo, 17 November). The frame
+   keeps the 24 px on its left where the row grips sit; what scrolls under it stops 6 px in, clear of the number's rail. */
+.deck-handout .wysiwyg-editor .ProseMirror > .rm-table { max-width: calc(100% + 24px); overflow-x: auto; overflow-y: hidden; clip-path: inset(0 0 0 6px); }
 /* The placeholders: a part's empty heading, and the current part's empty text (deckCurrent.ts) */
 .deck-handout .wysiwyg-editor .ProseMirror .deck-empty::before { content: attr(data-deck-placeholder); float: left; height: 0; color: var(--r-ink-faint); pointer-events: none; }
 
@@ -413,8 +446,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-slide .deck-block-plus { position: relative; min-width: 0; padding: 0; border-radius: 50%; background: var(--r-surface); color: var(--r-accent); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 5px -2px rgba(30, 27, 75, .3); }
 .deck-slide .deck-block-icon { position: relative; min-width: 0; padding: 0; border-radius: 50%; background: var(--r-surface); color: var(--r-ink-body); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 5px -2px rgba(30, 27, 75, .3); }
 .deck-slide .deck-block-split { position: relative; width: 12px; min-width: 0; padding: 0; border: 0; border-radius: 3px; background: transparent; cursor: col-resize; touch-action: none; }
-.deck-slide .deck-block-split::after { content: ''; position: absolute; left: 5px; top: 20%; bottom: 20%; width: 2px; border-radius: 1px; background: var(--r-accent); opacity: .45; }
-.deck-slide .deck-block-split:hover::after { opacity: 1; }
+.deck-slide .deck-block-split::after { content: ''; position: absolute; left: 5px; top: 20%; bottom: 20%; width: 2px; border-radius: 1px; background: var(--r-accent); opacity: 0; } /* no line at rest (17 November): pointed at, or the guide while it drags */
+.deck-slide .deck-block-split:is(:hover, :focus-visible)::after { opacity: 1; }
 .deck-block-drop { position: absolute; z-index: 6; height: 2px; border-radius: 1px; background: var(--r-accent); pointer-events: none; }
 .deck-block-guide { position: absolute; z-index: 6; width: 2px; background: var(--r-accent); pointer-events: none; }
 .deck-block-bar { position: fixed; z-index: 40; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 10px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 10px 24px -8px rgba(30, 27, 75, .35); white-space: nowrap; }

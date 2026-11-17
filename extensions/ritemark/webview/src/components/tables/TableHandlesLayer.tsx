@@ -134,9 +134,11 @@ export function measureTable(view: TableHandlesView): Geometry | null {
   if (!dom.isConnected || !dom.offsetWidth) return null
   const box = dom.getBoundingClientRect()
   const scale = box.width / dom.offsetWidth || 1
+  // The handles' layer is in the element's content, which scrolls when the element is its own sideways frame (a wide
+  // table in a deck's handout, 17 November): its coordinates are the content's, so they count what is scrolled away.
   const local = (rect: DOMRect): Rect => ({
-    left: (rect.left - box.left) / scale,
-    top: (rect.top - box.top) / scale,
+    left: (rect.left - box.left) / scale + dom.scrollLeft,
+    top: (rect.top - box.top) / scale + dom.scrollTop,
     width: rect.width / scale,
     height: rect.height / scale,
   })

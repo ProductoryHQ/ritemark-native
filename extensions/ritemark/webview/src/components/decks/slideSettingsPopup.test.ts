@@ -140,9 +140,9 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
   assert.match(popover, /side=\{settingsFor\?\.side \?\? 'right'\}\s+align="start"/, 'beside, top-aligned')
   assert.match(popover, /onCloseAutoFocus=\{event => \{[\s\S]*?back\.focus\(/, 'the focus back to where the menu was opened')
   assert.match(popover, /<PopoverContent[^>]*className="deck-settings"/, 'the popup carries the scroll rule')
-  // Its anchors: beside the thumbnail (right), beside the part number (left), at the slide's right-click point.
+  // Its anchors: beside the thumbnail (right), beside the part number (right: the number is on the rail at the handout's left), at the slide's right-click point.
   assert.match(view, /settings: index => openSettings\(index, \(\) => \{\s+const thumb = stripRef\.current\?\.querySelector<HTMLElement>\(`\[data-thumb="\$\{index\}"\] \.deck-thumb-slide`\)\s+return thumb \? \{ anchor: thumb, side: 'right', back: stripRef\.current \} : null/)
-  assert.match(view, /const partSettings = useCallback\(\(index: number, slot: PartMenuSlot\) => openSettings\(index, \(\) => \(\s+slot\.element\.isConnected\s+\? \{ anchor: slot\.element\.parentElement\?\.querySelector<HTMLElement>\('\.deck-part-number'\) \?\? slot\.element, side: 'left', back: slot\.element\.querySelector\('button'\) \}/)
+  assert.match(view, /const partSettings = useCallback\(\(index: number, slot: PartMenuSlot\) => openSettings\(index, \(\) => \(\s+slot\.element\.isConnected\s+\? \{ anchor: slot\.element\.parentElement\?\.querySelector<HTMLElement>\('\.deck-part-number'\) \?\? slot\.element, side: 'right', back: slot\.element\.querySelector\('button'\) \}/)
   assert.match(view, /anchor: \{ getBoundingClientRect: \(\) => new DOMRect\(at\.x, at\.y, 0, 0\) \}/)
   assert.match(view, /onSlideSettings=\{stageSettings\}/)
   // The stage's right-click menu: Slide settings… at its end, after Comment, under a line.

@@ -1,13 +1,19 @@
 /**
- * Each slide node draws where its part starts in the handout (16 November: the handout is a Text document): one thin
- * line, the full width of the handout, and the slide's number, small and muted at the right of the part's first line
- * (a CSS counter, so numbers follow any reorder without a redraw), in the accent for the current slide. A skipped
- * slide's number has the skipped mark beside it. That's all: the part's heading is the handout's own text under it.
+ * Each slide node draws where its part starts in the handout (16 November: the handout is a Text document). Since
+ * 17 November that is space, not a line (Jarmo: "I thing current whitespaces are enough"), and the slide's number sits
+ * on a rail at the left (Jarmo: "change the number position from right side to left side. give it its own almost
+ * invisible back-rail"): each part has its own track, a rounded 22 px segment from just above its heading to the end of
+ * its text, and the gaps between tracks show where one slide ends and the next begins. The number (a CSS counter, so
+ * numbers follow any reorder without a redraw) is sticky inside its track: while a long part scrolls it stays at the
+ * top of the handout's view and leaves with the track's end. A skipped slide's number has the skipped mark under it.
+ * The track's height is the deck view's to set (`measureRail`), as only the laid-out page knows where a part's text
+ * ends; a click on a track makes its slide the current one (the deck view, `railPick`).
  *
- * The number shows a ⋯ on hover (experience 46, "Removing a slide from the handout"): the strip's own slide menu, so a
- * slide can be removed from where the person is writing. The ⋯ is the deck view's (React, with its tooltip and menu),
- * drawn into this head's slot: each head lists its slot with the editor (`partMenuSlots`), and the deck view draws one
- * menu into each.
+ * Pointing at the track shows a ⋯ under the number (experience 46, "Removing a slide from the handout"): the strip's
+ * own slide menu. The ⋯ is the deck view's (React, with its tooltip and menu), drawn into this head's slot: each head
+ * lists its slot with the editor (`partMenuSlots`), and the deck view draws one menu into each. The same slot has a
+ * place for the row a slide with no handout folds to (17 November, "A slide with no handout"), drawn by the deck view
+ * too, so it has its tooltip.
  */
 import type { Node as PMNode } from '@tiptap/pm/model'
 import type { NodeView } from '@tiptap/pm/view'
@@ -20,6 +26,8 @@ export interface PartMenuSlot {
   /** Its own, for as long as the head stands (a React key). */
   id: number
   element: HTMLElement
+  /** Where the folded row of a slide with no handout is drawn ("Slide only" and the slide's title). */
+  row: HTMLElement
   getPos: () => number | undefined
 }
 
@@ -60,6 +68,7 @@ export const partMenuSlots = {
 class SlidePartHeadView implements NodeView {
   dom: HTMLElement
   private mark: HTMLElement
+  private track: HTMLElement
   private slot: PartMenuSlot
   private node: PMNode
   private owner: object
@@ -71,13 +80,22 @@ class SlidePartHeadView implements NodeView {
     this.dom.className = 'deck-part-head'
     this.dom.setAttribute('data-deck-part', '')
     this.dom.setAttribute('contenteditable', 'false')
+    // The track, and in it the sticky column of the number (with the skipped mark under it) and the ⋯.
+    this.track = document.createElement('div')
+    this.track.className = 'deck-part-track'
+    const pin = document.createElement('div')
+    pin.className = 'deck-part-pin'
     this.mark = document.createElement('span')
     this.mark.className = 'deck-part-number'
     this.mark.setAttribute('aria-hidden', 'true')
     const more = document.createElement('span')
     more.className = 'deck-part-more'
-    this.dom.append(this.mark, more)
-    this.slot = { id: ++nextSlot, element: more, getPos }
+    pin.append(this.mark, more)
+    this.track.append(pin)
+    const row = document.createElement('div')
+    row.className = 'deck-part-only'
+    this.dom.append(this.track, row)
+    this.slot = { id: ++nextSlot, element: more, row, getPos }
     const store = storeOf(owner)
     store.slots = [...store.slots, this.slot]
     changed(store)
@@ -97,10 +115,10 @@ class SlidePartHeadView implements NodeView {
     return true
   }
 
-  /** The ⋯ and its menu are the deck view's: the editor leaves their events alone. */
+  /** The track (its click, its ⋯ and menu) and the folded row are the deck view's: the editor leaves their events alone. */
   stopEvent(event: Event): boolean {
     const target = event.target as Node | null
-    return !!target && this.slot.element.contains(target)
+    return !!target && (this.track.contains(target) || this.slot.row.contains(target))
   }
 
   ignoreMutation(): boolean {
