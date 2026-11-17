@@ -144,6 +144,7 @@ assert.equal(slideKeyTarget(stageTarget('DIV', ['.deck-stage'], true), body), nu
 assert.equal(slideKeyTarget(stageTarget('DIV', ['.deck-strip']), body), null, 'the strip has its own')
 assert.equal(slideKeyTarget(stageTarget('DIV', ['[role="menu"]', '.deck-stage']), body), null, "a menu's keys stay the menu's")
 assert.equal(slideKeyTarget(stageTarget('BUTTON', ['.deck-bar', 'button']), body), null, "the deck's bar: not the stage's")
+assert.equal(slideKeyTarget(stageTarget('BUTTON', ['.deck-view-switch', 'button']), body), 'button', "the view switch's button: the deck view takes the order keys only from 'page' (Codex on #784)")
 
 // ---- The slide menu's Duplicate shows its key, as Delete slide shows ⌫
 const menu = slideMenuItems({ index: 1, count: 3, skipped: false, fromLibrary: false, deleteKey: '⌫', duplicateKey: '⌘D' })
@@ -157,7 +158,7 @@ assert.ok(source.includes('deck-menu-key'), 'Delete slide shows its key')
 assert.ok(source.includes("duplicateKey: DUPLICATE_KEY") && source.includes('isMac)'), 'the strip passes its keys and the platform')
 assert.ok(source.includes('onKeyDownCapture={onKeyCapture}'), "Cmd+↓ is the strip's before a thumbnail's ⋯ opens its menu on ↓")
 const view = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8')
-assert.ok(view.includes('slideOrderKeyOf(event, isMac)') && view.includes('slideKeyTarget(event.target'), 'the stage takes the same keys where its words don\'t')
+assert.ok(view.includes('slideOrderKeyOf(event, isMac)') && view.includes("stageKeyFrom(event) !== 'page'") && view.includes('slideKeyTarget(event.target'), 'the stage takes the same keys where its words don\'t')
 assert.ok(view.includes('partChangedBy(transaction)') && view.includes('setFlash('), 'an undo shows the slide it changed')
 
 console.log('stripKeys: ok')

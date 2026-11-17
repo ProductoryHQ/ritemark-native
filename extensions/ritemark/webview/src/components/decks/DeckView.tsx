@@ -1190,8 +1190,9 @@ export function DeckView({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const key = slideOrderKeyOf(event, isMac)
-      // With the slide folded away there is no slide on the stage to choose: the keys are the handout's view's.
-      if (!key || countRef.current === 0 || !slideShownRef.current || stageKeyFrom(event) === null) return
+      // With the slide folded away there is no slide on the stage to choose: the keys are the handout's view's. A button
+      // with the focus (the view switch just pressed, a tool on the stage) keeps them too (Codex on #784).
+      if (!key || countRef.current === 0 || !slideShownRef.current || stageKeyFrom(event) !== 'page') return
       event.preventDefault()
       const index = Math.min(currentRef.current, countRef.current - 1)
       if (key.type === 'duplicate') stripActions.duplicate(index)
