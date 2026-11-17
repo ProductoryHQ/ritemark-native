@@ -194,7 +194,8 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   assert.equal(splitFrontMatter(deck.file).properties.transition, 'push', 'Redo writes it again')
   // Push, then Zoom: the line changes in place; Undo goes back to Push, then to no line.
   deck.transition('zoom')
-  assert.equal(deck.file.split('\n').filter(line => line.startsWith('transition:')).join('|'), 'transition: zoom')
+  const zoomed: string = deck.file
+  assert.equal(zoomed.split('\n').filter(line => line.startsWith('transition:')).join('|'), 'transition: zoom')
   deck.undo()
   assert.equal(splitFrontMatter(deck.file).properties.transition, 'push')
   deck.undo()
@@ -395,6 +396,12 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   assert.deepEqual(withTransition('push').querySelectorAll('[aria-label="How one slide becomes the next"] label').map(label => label.textContent), ['Fade', 'Push', 'Zoom', 'None'])
   assert.match(DECK_TRANSITION_TIP, /plays it/, 'its tooltip says a choice plays it')
   assert.ok(!labels.includes('Transition'), 'only where the deck view gives it')
+  // The one already chosen plays again when clicked, writing nothing (review of #792).
+  const menuSource = readFileSync(fileURLToPath(new URL('./ThemeMenu.tsx', import.meta.url)), 'utf8')
+  assert.match(menuSource, /inputProps=\{\{ \[transition \?\? 'fade'\]: \{ onClick: \(\) => onTransition\(transition \?\? 'fade'\) \} \}\}/)
+  // Each move on the wall gets a number that only counts up, so a move arriving as a step ends still gets its own step.
+  const wallSource = readFileSync(fileURLToPath(new URL('./present/DeckWall.tsx', import.meta.url)), 'utf8')
+  assert.match(wallSource, /moves\.current \+= 1\n\s+setLeaving\(\{ slide: previous\.slide, serial: moves\.current, direction \}\)/)
   // A deck naming no theme, or a missing one, has Evening ticked.
   assert.equal(body(undefined).querySelectorAll('.deck-theme-row')[0].getAttribute('aria-pressed'), 'true')
   assert.equal(body('Slide library/Themes/Gone.theme.md').querySelectorAll('.deck-theme-row')[0].getAttribute('aria-pressed'), 'true')

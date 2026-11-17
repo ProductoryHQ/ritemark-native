@@ -37,7 +37,7 @@ import { convertKind, hiddenNote } from './slide/convertKind'
 import { setPath, undoKeyOf } from './slide/slideEdits'
 import { SlideAbout, SlideSettings } from './SlideSettings'
 import { ThemeMenu, themePickedNotice } from './ThemeMenu'
-import { TransitionPreview, type TransitionPreviewRequest } from './TransitionPreview'
+import { TransitionPreview, previewTarget, type TransitionPreviewRequest } from './TransitionPreview'
 import { transitionOf, transitionValue } from './present/wallMotion'
 import { ThemeChangeSheet, themeChangeFrom } from './theme/ThemeChangeSheet'
 import type { ThemeChangeView } from '../../../../src/decks/themeChange'
@@ -1881,7 +1881,8 @@ export function DeckView({
                   request={transitionPreview}
                   target={() => stageRef.current?.querySelector<HTMLElement>('.deck-big') ?? null}
                   from={slide}
-                  to={slides[shown + 1] ?? slides[shown - 1] ?? null}
+                  to={previewTarget(slides, shown)?.to ?? null}
+                  direction={previewTarget(slides, shown)?.direction ?? 'next'}
                   width={bigWidth}
                   theme={theme}
                   borderless={borderless}

@@ -12,7 +12,8 @@ import { publicSlide } from '../page/publicDeck';
 import { slidePicturePaths } from '../blocks/slideRenderer';
 import { partComments, type PartComment } from './partComments';
 import type { DeckTheme } from '../deckTheme';
-import { presentTitleOf, type DeckTransition, type PresentSlide, type PresentView } from './presentSession';
+import { presentTitleOf, type PresentSlide, type PresentView } from './presentSession';
+import { transitionOf, type DeckTransition } from './deckTransition';
 
 /** The webview panel that is the wall. */
 export const DECK_WALL_VIEW_TYPE = 'ritemark.deckWall';
@@ -210,11 +211,6 @@ export function wallStateOf(
     page: address,
     transition: transitionOf(look.transition),
   };
-}
-
-/** A transition the wall knows, or Fade. */
-function transitionOf(value: unknown): DeckTransition {
-  return value === 'push' || value === 'zoom' || value === 'none' ? value : 'fade';
 }
 
 /** The pictures the presenter view names: the wall's, the next slide's, and the one on the slide the wall last got. */

@@ -226,6 +226,8 @@ export function ThemeMenuBody({ entries, named, look, onLook, transition, onTran
                 value={transition ?? 'fade'}
                 onValueChange={onTransition}
                 options={DECK_TRANSITIONS as Array<{ value: string; label: string }>}
+                // The one already chosen plays again when clicked (it writes nothing), so Fade can be seen too.
+                inputProps={{ [transition ?? 'fade']: { onClick: () => onTransition(transition ?? 'fade') } }}
               />
             </Tooltip>
           </div>

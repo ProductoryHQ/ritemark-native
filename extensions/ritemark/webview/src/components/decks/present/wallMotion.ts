@@ -15,8 +15,10 @@
  * the same rules the wall runs. The drawing of a step is `playMotion.ts`.
  */
 
-/** The deck's transition (`transition:` in its front matter). */
-export type DeckTransition = 'fade' | 'push' | 'zoom' | 'none'
+import { transitionOf, type DeckTransition } from '../../../../../src/decks/present/deckTransition'
+
+/** The deck's transition (`transition:` in its front matter), one list with the host's (`deckTransition.ts`). */
+export { transitionOf, type DeckTransition }
 
 /** What one step on the wall does: the deck's transition, or the smooth move where elements match. */
 export type MotionStep = DeckTransition | 'move'
@@ -40,11 +42,6 @@ export const MOVE_FADE_MS = MOTION_MS.fade
 /** Zoom's new slide starts at this size. */
 export const ZOOM_FROM = 0.96
 
-/** The deck's transition from its front matter's value: Fade unless it is `push`, `zoom` or `none` as written. */
-export function transitionOf(value: unknown): DeckTransition {
-  return value === 'push' || value === 'zoom' || value === 'none' ? value : 'fade'
-}
-
 /**
  * The front-matter change for a choice: Fade writes nothing (the line taken out), any other writes `transition: <it>`.
  * As `{ present, value }`, the shape the deck's property steps carry (`theme/themePick.ts`).
@@ -63,6 +60,18 @@ export function stepOf(transition: DeckTransition, reducedMotion: boolean, match
 /** A later slide is going on; an earlier one is going back (so Push moves the other way). */
 export function directionOf(fromNumber: number, toNumber: number): MotionDirection {
   return toNumber < fromNumber ? 'back' : 'next'
+}
+
+/** README 19's preview on the stage (`TransitionPreview`). */
+/**
+ * The slide a preview goes to from the one at `index`, and which way: the next slide shown, else the one before, never
+ * a skipped one (the wall's Next never shows it); null when the deck has no other slide shown.
+ */
+export function previewTarget<T extends { data: { skip?: unknown } }>(slides: readonly T[], index: number): { to: T; direction: MotionDirection } | null {
+  const after = slides.slice(index + 1).find(slide => slide.data.skip !== true)
+  if (after) return { to: after, direction: 'next' }
+  const before = slides.slice(0, Math.max(0, index)).reverse().find(slide => slide.data.skip !== true)
+  return before ? { to: before, direction: 'back' } : null
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

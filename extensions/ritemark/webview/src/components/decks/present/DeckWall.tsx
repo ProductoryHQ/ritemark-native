@@ -76,6 +76,9 @@ export function DeckWall() {
   if (!motion.current) motion.current = new MotionRun({ setTimeout: (run, ms) => window.setTimeout(run, ms), clearTimeout: id => window.clearTimeout(id) })
   // A press never waits: whatever is moving is put at its end at once, and the press goes on.
   const jump = useCallback(() => { motion.current?.finish() }, [])
+  // Each move's own number, only ever counting up: a move that arrives as the step before ends (its end clears the
+  // slide going) still gets a new number, so its own step always starts (review of #792).
+  const moves = useRef(0)
   const [serial, setSerial] = useState(0)
   const [barShown, setBarShown] = useState(false)
   const [overBar, setOverBar] = useState(false)
@@ -114,7 +117,8 @@ export function DeckWall() {
         motion.current?.finish()
         const direction = directionOf(previous.slide.number, next.slide.number)
         setSerial(value => value + 1)
-        setLeaving(leavingNow => ({ slide: previous.slide, serial: (leavingNow?.serial ?? 0) + 1, direction }))
+        moves.current += 1
+        setLeaving({ slide: previous.slide, serial: moves.current, direction })
       }
       setState(next)
       return
@@ -289,7 +293,7 @@ export function DeckWall() {
         aria-label={blank === 'page' ? 'The page’s QR code' : blank ? 'The wall is blank' : `Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
       >
         {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, true) : null}
-        {layer(state.slide, leaving ? 'is-entering' : '', `slide-${serial}`, false)}
+        {layer(state.slide, '', `slide-${serial}`, false)}
       </div>
 
       {/* The blank: the theme's ground (the wall's own, white on Borderless) or white, over the whole screen; for Q, the

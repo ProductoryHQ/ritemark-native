@@ -14,7 +14,7 @@ import { blockCanvasMarkup } from '../../../../../src/decks/blocks/slideRenderer
 import { deckTransitionOf } from '../../../../../src/decks/present/presentSession'
 import type { SlideData } from '../../../../../src/decks/deckFormat'
 import {
-  DECK_TRANSITIONS, MOTION_MS, MotionRun, directionOf, matchMotion, motionKeysOf, stepOf, transitionOf, transitionValue,
+  DECK_TRANSITIONS, MOTION_MS, MotionRun, directionOf, matchMotion, motionKeysOf, previewTarget, stepOf, transitionOf, transitionValue,
   type MotionClock, type MotionElement,
 } from './wallMotion'
 import { playStep } from './playMotion'
@@ -46,6 +46,15 @@ import { playStep } from './playMotion'
   assert.equal(directionOf(4, 3), 'back')
   assert.equal(directionOf(2, 9), 'next', 'a go-to forward')
   assert.equal(directionOf(9, 1), 'back', 'Home')
+}
+
+// ---- The stage's preview goes to the next slide shown, else back to the one before; never to a skipped one
+{
+  const slides = [{ data: { title: 'A' } }, { data: { title: 'B', skip: true } }, { data: { title: 'C' } }, { data: { title: 'D', skip: true } }]
+  assert.deepEqual(previewTarget(slides, 0), { to: slides[2], direction: 'next' }, 'past the skipped slide')
+  assert.deepEqual(previewTarget(slides, 2), { to: slides[0], direction: 'back' }, 'the last slide shown: back, so Push moves the way the wall does')
+  assert.equal(previewTarget([{ data: {} }], 0), null, 'one slide: nothing to preview')
+  assert.equal(previewTarget([{ data: {} }, { data: { skip: true } }], 0), null)
 }
 
 // ---- Which elements match

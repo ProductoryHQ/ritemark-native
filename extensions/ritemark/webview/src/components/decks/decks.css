@@ -65,6 +65,7 @@
 /* README item 19: the Theme menu's transition, played once over the stage's slide (TransitionPreview). */
 .deck-transition-preview { position: absolute; inset: 0; z-index: 6; overflow: hidden; pointer-events: none; }
 .deck-transition-layer { position: absolute; inset: 0; }
+.deck-transition-layer .deck-sl { background: transparent; }
 .deck-stage .deck-big { position: relative; margin: 0 24px; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline), 0 8px 24px -10px rgba(30, 27, 75, 0.35); }
 .deck-source { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--r-ink-muted); }
 
