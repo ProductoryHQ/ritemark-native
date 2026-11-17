@@ -426,8 +426,10 @@ const requestedId = (storage: Storage) => {
   // Ritemark's own menu replaces the system's (frame 27): Radix's context menu closes on a press outside and on Esc.
   const menu = editorSource.slice(editorSource.indexOf('<ContextMenu>'), editorSource.indexOf('</ContextMenu>'))
   const items = menu.slice(menu.indexOf('<ContextMenuContent'))
-  const order = ['Cut\n', 'Copy\n', 'Paste\n', '<ContextMenuSeparator />', 'Comment\n'].map(word => items.indexOf(word))
-  assert.ok(order.every((index, i) => index > 0 && (i === 0 || index > order[i - 1])), `Cut, Copy, Paste, then Comment: ${order}`)
+  // Each found after the one before it. In a table cell the table's items lead (experience 48), under a line of their own.
+  let from = 0
+  const order = ['<TableMenuItems', 'Cut\n', 'Copy\n', 'Paste\n', '<ContextMenuSeparator />', 'Comment\n'].map(word => (from = items.indexOf(word, from)))
+  assert.ok(order.every((index, i) => index > 0 && (i === 0 || index > order[i - 1])), `the table's items, then Cut, Copy, Paste, then Comment: ${order}`)
   assert.match(items, /<ContextMenuShortcut>\{KEYS\.comment\}<\/ContextMenuShortcut>/)
   assert.match(editorSource, /comment: '⌘\/'/)
   // The app run (17 November): after Paste from the menu the caret was gone (⌘Z then did nothing), and Comment's box

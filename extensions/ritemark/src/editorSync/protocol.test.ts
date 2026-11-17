@@ -270,6 +270,20 @@ test('rejects malformed optional feature fields instead of silently dropping the
   }), DocumentProtocolError);
 });
 
+// Experience 48 (Codex on #772): the table handles' kill switch travels with the document's features, as a boolean only.
+test('the table handles\' switch is a boolean feature of the document', () => {
+  const message = (tableHandles: unknown) => ({
+    type: 'document:update', ...identity, revision: 3, baseDiskHash: sha, modelHash: sha, payloadHash: sha,
+    reason: 'open', attempt: 1,
+    payload: { fileType: 'markdown', filename: 'example.md', content: '# Example', properties: {}, hasProperties: false, imageMappings: {}, features: { voiceDictation: false, markdownExport: true, tableHandles } },
+  });
+  const on = parseDocumentHostMessage(message(true));
+  assert.equal(on.type === 'document:update' && on.payload.fileType === 'markdown' && on.payload.features.tableHandles, true);
+  const off = parseDocumentHostMessage(message(false));
+  assert.equal(off.type === 'document:update' && off.payload.fileType === 'markdown' && off.payload.features.tableHandles, false);
+  assert.throws(() => parseDocumentHostMessage(message('yes')), DocumentProtocolError);
+});
+
 // Sprint 145 R1 (revised 1 November, #588): a merge, Review changes for the places both changed, and the person's answer.
 test('a merge is an update reason, and Review changes\' paragraphs and answers are exact messages', () => {
   const update = parseDocumentHostMessage({

@@ -405,6 +405,60 @@ html.rm-ground [data-scrolling] { scrollbar-color: var(--vscode-scrollbarSlider-
 #root[data-editor-type="settings"]::-webkit-scrollbar-thumb:hover { background-color: var(--vscode-scrollbarSlider-hoverBackground); }
 #root[data-editor-type="settings"]::-webkit-scrollbar-thumb:active { background-color: var(--vscode-scrollbarSlider-activeBackground); }
 
+/* Tables you can change (experience 48, frame 1; TableHandles.ts, TableHandlesLayer.tsx). The table's element holds the
+   <table> and a layer the handles are drawn in, in the table's own coordinates, so on a slide they scale with it. The
+   column's grip is a pill on the top edge, the row's on the left edge; the + bars are quiet and grey, the accent on
+   hover; a dragged column or row shows an accent line where it lands. On a slide the accent is the slide's own. */
+.rm-table { position: relative; --rm-table-accent: var(--r-accent); --rm-table-tint: rgba(67, 56, 202, .12); }
+.deck-sl .rm-table { --rm-table-accent: var(--s-acc, #F2B544); --rm-table-tint: rgba(242, 181, 68, .16); }
+/* On a slide the table's element takes the table's place among the blocks, so the slide's rules for a block's margins
+   (the first and last block, the block after the title, a box's last) reach it as they reach the table in the
+   thumbnail: its margins (slide.css: .3em and .55em of the table's .82em) move from the table to it, at the lowest
+   weight, so every one of those rules still wins. */
+:where(.deck-sl.is-blocks.is-editing) .rm-table { margin: .246em 0 .451em; }
+.deck-sl.is-blocks.is-editing .rm-table > table { margin: 0; }
+/* While a slide is edited, its text area clips only up and down (the fit measures that), so a row's grip sits in the
+   slide's margin, left of the table, never over the first column's words (the Experience lead on #772). Sideways the
+   slide's own edge clips, and the fit keeps words from running sideways (`overflowsSideways`). */
+.deck-sl.is-blocks.is-editing .blk-flow { overflow-x: visible; overflow-y: clip; }
+.rm-table-ui { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 4; user-select: none; }
+.rm-table-grip-spot, .rm-table-add-spot { position: absolute; display: flex; }
+.rm-table-ui button.rm-table-grip { width: 100%; height: 100%; min-width: 0; padding: 0; border-radius: 5px; background: var(--r-surface); color: var(--r-ink-muted); box-shadow: 0 0 0 1px var(--r-hairline-strong); cursor: grab; }
+.rm-table-ui button.rm-table-grip:hover { color: var(--r-ink-strong); background: var(--r-surface); }
+.rm-table-ui button.rm-table-grip.is-on { background: var(--rm-table-accent); color: #fff; box-shadow: none; }
+.rm-table-ui button.rm-table-grip:active { transform: none; cursor: grabbing; }
+.rm-table-ui button.rm-table-add { width: 100%; height: 100%; min-width: 0; padding: 0; border-radius: 5px; background: var(--r-surface-muted); color: var(--r-ink-muted); box-shadow: 0 0 0 1px var(--r-hairline); }
+.rm-table-ui button.rm-table-add:hover { background: var(--r-accent-soft); color: var(--r-accent); box-shadow: 0 0 0 1px var(--r-accent); }
+.rm-table-ui button.rm-table-add:active { transform: none; }
+/* Quiet on any surface (experience 48; Jarmo: "handles should probly be semitransparent"). On a slide the grips and
+   + bars are see-through in the slide's own ink (its heading colour: white on a dark slide, the ink on Borderless or a
+   light theme), never the brightest thing on it. Grips: fill 12 %, hairline 20 %, icon 65 %; on hover fill 22 % and the
+   icon whole; a chosen grip takes the slide's accent. + bars: a faint track (8 %) and a faint +, the hover values on
+   hover. In a document they keep the ground grey above. */
+.deck-sl .rm-table { --rm-ink: var(--s-hd, #fff); }
+.deck-slide.is-borderless .deck-sl .rm-table { --rm-ink: var(--s-hd, #1C1F4A); }
+.deck-sl .rm-table-ui button.rm-table-grip:not(.is-on) { background: color-mix(in srgb, var(--rm-ink) 12%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--rm-ink) 20%, transparent); color: color-mix(in srgb, var(--rm-ink) 65%, transparent); }
+.deck-sl .rm-table-ui button.rm-table-grip:not(.is-on):hover { background: color-mix(in srgb, var(--rm-ink) 22%, transparent); color: var(--rm-ink); }
+.deck-sl .rm-table-ui button.rm-table-grip.is-on { color: #1C1F4A; }
+.deck-sl .rm-table-ui button.rm-table-add { background: color-mix(in srgb, var(--rm-ink) 8%, transparent); box-shadow: none; color: color-mix(in srgb, var(--rm-ink) 35%, transparent); }
+.deck-sl .rm-table-ui button.rm-table-add:hover { background: color-mix(in srgb, var(--rm-ink) 22%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--rm-ink) 20%, transparent); color: var(--rm-ink); }
+.rm-table-drop { position: absolute; border-radius: 2px; background: var(--rm-table-accent); pointer-events: none; }
+/* The line between two columns (Column widths): the resize cursor, and the accent line on it while pointed at. */
+.rm-table-resize { position: absolute; cursor: col-resize; touch-action: none; }
+.rm-table-resize::after { content: ""; position: absolute; top: 0; bottom: 0; left: calc(50% - 1px); width: 2px; border-radius: 1px; background: var(--rm-table-accent); opacity: 0; transition: opacity 120ms ease; }
+.rm-table-resize:hover::after { opacity: .6; }
+.rm-table-resize.is-on::after { opacity: 0; }
+/* A handle drawn larger on a small slide keeps its glyph in proportion. */
+.rm-table-ui :is(.rm-table-grip, .rm-table-add) svg { width: calc(12px * var(--rm-k, 1)) !important; height: calc(12px * var(--rm-k, 1)) !important; }
+/* The chosen column or row, tinted (prosemirror-tables marks its cells). The Text editor draws its own (Editor.tsx). */
+.deck-sl .rm-table :is(td, th).selectedCell { box-shadow: inset 0 0 0 999px var(--rm-table-tint); }
+/* The menu opens under its grip or at the pointer: its anchor is a fixed, empty box there. */
+.rm-table-menu-anchor { position: fixed; pointer-events: none; }
+.rm-table-align { display: flex; gap: 2px; margin: 2px 4px 4px; padding: 2px; border-radius: 8px; background: var(--r-surface-muted); }
+.rm-table-align > span { flex: 1; }
+.rm-table-align [role="menuitem"].rm-table-align-choice { width: 100%; justify-content: center; height: 26px; padding: 0; border-radius: 6px; color: var(--r-ink-muted); }
+.rm-table-align [role="menuitem"].rm-table-align-choice[data-on] { background: var(--r-surface); color: var(--r-ink-strong); box-shadow: 0 1px 2px rgba(30, 27, 75, .15); }
+
 /* Ritemark 2.0: a table without Add row closes on its area's border, with no line after its last row (DataTable.tsx) */
 .rm-grid-closed > tbody > tr:last-child > td {
   border-bottom-width: 0;

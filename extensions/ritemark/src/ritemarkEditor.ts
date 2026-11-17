@@ -406,7 +406,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         voiceDictation: isEnabled('voice-dictation'),
         markdownExport: isEnabled('markdown-export'),
         saveAsMarkdownFromPreview: isEnabled('save-as-markdown-from-preview'),
-        commentCallouts: isEnabled('comment-callouts')
+        commentCallouts: isEnabled('comment-callouts'),
+        tableHandles: isEnabled('table-handles'),
       },
       systemLanguage: systemLanguage(process.env, vscode.env.language),
       ...agentFields,

@@ -3,8 +3,9 @@
  * the slide's own menu opens, "Slide settings…" (Jarmo, 17 November: "slaidi settings peaks olema siin: mitte kuskil
  * ülal tööriistaribas"): the thumbnail's ⋯ or right-click, the handout part number's ⋯ and the end of the slide's own
  * right-click menu, anchored beside where it came from. The gear in the bar is gone. Its order (README, "Nothing around
- * the slide"): the library section, Picture, a Steps label, a table's Add a row and Add a column, then the deck's own
- * look. Skip slide is only in the menu, so it isn't in two places.
+ * the slide"): the library section, Picture, a Steps label, then the deck's own look. A table's rows and columns are
+ * added with the table's own + bars and grips (experience 48), so Settings no longer has Add a row and Add a column.
+ * Skip slide is only in the menu, so it isn't in two places.
  * Layout (nine kinds as small pictures), the look of a row of boxes, Picture (None, Left, Right, Behind) and Skip
  * slide. A change of kind keeps the words (`convertKind`). Built from the shared controls: the segmented control (its
  * picture variant for the layouts and the picture places) and the switch.
@@ -78,8 +79,6 @@ interface SlideSettingsProps {
   onUndo: (redo: boolean) => void
   /** The lines about the slide, first (`SlideAbout`); none, and the settings start at once. */
   about?: ReactNode
-  /** A slide with a table: Add a row and Add a column, after the Label row. */
-  table?: { addRow: () => void; addColumn: () => void }
   /**
    * Sprint 161 (PR 2): a slide drawn as blocks with a Steps block: its pill's words (#752's Label row, which brings an
    * emptied pill back), and their change.
@@ -162,21 +161,6 @@ export function SlideAbout({ data, sourceLines, hidden }: SlideAboutProps) {
   )
 }
 
-/** A table's two actions, as one line of links. */
-function TableRow({ table }: { table: { addRow: () => void; addColumn: () => void } }) {
-  return (
-    <div className="deck-source deck-settings-table">
-      <Tooltip label="Add an empty row at the bottom of the table">
-        <Button variant="link" className="deck-line-action" onClick={table.addRow}>Add a row</Button>
-      </Tooltip>
-      <span aria-hidden="true">·</span>
-      <Tooltip label="Add an empty column on the right of the table">
-        <Button variant="link" className="deck-line-action" onClick={table.addColumn}>Add a column</Button>
-      </Tooltip>
-    </div>
-  )
-}
-
 /**
  * The pill's Label row (16 November): its words, the default as the placeholder; emptied, no pill. Cmd+Z in it is the
  * deck's undo. One row for an Exercise slide's `tag:` and a block slide's Steps (PR 2).
@@ -205,7 +189,7 @@ function LabelRow({ id, value, onWords, onUndo }: { id: string; value: string; o
   )
 }
 
-export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about, table, stepsTag, deck }: SlideSettingsProps) {
+export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about, stepsTag, deck }: SlideSettingsProps) {
   const tagId = `deck-tag-${number}`
   const reachId = `deck-reach-${number}`
   return (
@@ -276,7 +260,6 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
           onUndo={onUndo}
         />
       ) : null}
-      {table ? <TableRow table={table} /> : null}
       <div className="deck-settings-sep" />
       <DeckLook id={reachId} {...deck} />
     </section>

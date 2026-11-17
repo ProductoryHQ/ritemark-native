@@ -24,6 +24,7 @@
  * Nothing here changes what the editor shows or how it reads Markdown (spec R7):
  * the HTML `marked` makes is the same apart from the added attributes.
  */
+import { tableHasWidths } from '../../../src/markdown/tableWidths'
 import type TurndownService from 'turndown'
 import type { MarkedExtension, Token, Tokens } from 'marked'
 
@@ -330,6 +331,8 @@ export const asWrittenMarkedExtension: MarkedExtension = {
         return withAttributes(html, 'table', attributes({
           'data-md-delims': form?.delimiterRow,
           'data-md-spacing': form?.spacing,
+          // Experience 48: the delimiter row's dashes are the columns' widths (`tableWidths.ts` says when).
+          'data-md-widths': form && tableHasWidths(table.raw) ? 'true' : undefined,
           'data-md-tight': tightAttribute(token),
         }))
       },
@@ -366,7 +369,7 @@ export const AS_WRITTEN_ATTRIBUTES = {
   hardBreak: ['data-md-break'],
   horizontalRule: ['data-md-hr'],
   link: ['data-md-link'],
-  table: ['data-md-delims', 'data-md-spacing'],
+  table: ['data-md-delims', 'data-md-spacing', 'data-md-widths'],
   codeBlock: ['data-md-info'],
   /** No blank line between a block and the one before it. */
   tight: ['data-md-tight'],

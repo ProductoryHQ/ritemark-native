@@ -70,7 +70,9 @@ export type FlagId =
   // Sprint 157 (experience 46): a `.deck.md` opens as a deck, with the Slide library and the AI's deck tools
   | 'decks'
   // Sprint 158 (#711): editing an .xlsx in place, saved cell by cell; the kill switch for it
-  | 'excel-editing';
+  | 'excel-editing'
+  // Experience 48: a table's grips, menus, + bars and column widths, in a Text document and on a slide; the kill switch
+  | 'table-handles';
 
 /**
  * Feature flag registry
@@ -336,6 +338,17 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     id: 'scheduled-tasks-daemon',
     label: 'Scheduled Tasks Daemon',
     description: 'Run AI agents on a schedule while Ritemark is open',
+    status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
+  // Experience 48 (Codex on #772): kill switch for the table's own handles. ON ('stable', HARD RULE #2); a code-level
+  // switch an extension release can flip, not in Settings. 'disabled': the editors draw tables as before this work, with
+  // no grips, menus, + bars, column lines or column widths (a file's widths are kept as written, and a presented slide
+  // still draws them); Tab, Shift+Tab and the Cmd+Shift+arrow keys still work.
+  'table-handles': {
+    id: 'table-handles',
+    label: 'Table Handles',
+    description: 'Change a table with its own handles: grips to move and edit rows and columns, + bars, and column widths.',
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },

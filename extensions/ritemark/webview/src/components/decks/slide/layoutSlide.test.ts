@@ -5,7 +5,7 @@ import { strict as assert } from 'node:assert'
 import { SLIDE_KINDS, type SlideData } from '../../../../../src/decks/deckFormat'
 import { BUILT_IN_THEME, parseTheme } from '../../../../../src/decks/deckTheme'
 import { BOTTOM, fitSize, layoutSlide, linesOf, textBoxes, type GroupBox, type SlideBox } from './layoutSlide'
-import { addColumn, addRow, insertItemAfter, isEmptyItem, nextCell, removeItem, setIcon, setPath } from './slideEdits'
+import { addRow, insertItemAfter, isEmptyItem, nextCell, removeItem, setIcon, setPath } from './slideEdits'
 import { contrast, themeVars } from '../theme/themeVars'
 import { slideIcon } from './iconSet'
 
@@ -91,7 +91,6 @@ for (const kind of SLIDE_KINDS) {
   assert.deepEqual(setPath(table, 'rows.1.1', 'No').rows, [['Data', 'Chat'], ['Public', 'No']])
   assert.deepEqual(setPath({ title: 'New' }, 'rows.0.0', 'H').rows, [['H', ''], ['', '']], 'a new table starts with its empty cells')
   assert.deepEqual(addRow(table).rows, [['Data', 'Chat'], ['Public', 'Yes'], ['', '']])
-  assert.deepEqual(addColumn(table).rows, [['Data', 'Chat', ''], ['Public', 'Yes', '']])
   assert.equal(nextCell(table, 'rows.0.0', 'tab')?.path, 'rows.0.1')
   assert.equal(nextCell(table, 'rows.0.1', 'tab')?.path, 'rows.1.0')
   assert.equal(nextCell(table, 'rows.1.0', 'shift-tab')?.path, 'rows.0.1')
