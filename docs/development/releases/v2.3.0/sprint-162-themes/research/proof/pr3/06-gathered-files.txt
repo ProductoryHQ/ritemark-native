@@ -1,0 +1,10 @@
+GATHERED FILES:
+  page    Launch plan.html  142834 bytes
+  font    fonts/SpaceGrotesk-2.000-latin.woff2  22288 bytes
+  font    fonts/SpaceGrotesk-2.000-latin-ext.woff2  18940 bytes
+  font    fonts/Inter-4.001-latin.woff2  48256 bytes
+  font    fonts/Inter-4.001-latin-ext.woff2  85068 bytes
+left out: [] key hits: 0
+published as https://launch-plan-fonts.pages-4821.workers.dev/
+ON THE FAKE HOST: /index.html, /fonts/SpaceGrotesk-2.000-latin.woff2, /fonts/SpaceGrotesk-2.000-latin-ext.woff2, /fonts/Inter-4.001-latin.woff2, /fonts/Inter-4.001-latin-ext.woff2
+In the browser, from the page's own address only (one origin, 127.0.0.1): fonts/SpaceGrotesk-2.000-latin.woff2, fonts/Inter-4.001-latin.woff2, fonts/SpaceGrotesk-2.000-latin-ext.woff2, fonts/Inter-4.001-latin-ext.woff2; loaded faces: Sofia Sans (inline), Space Grotesk, Inter (latin and latin-ext each).
