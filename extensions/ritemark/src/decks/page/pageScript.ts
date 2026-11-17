@@ -76,7 +76,7 @@ export const PAGE_PLACE_RULE = String.raw`
   var PLACE_NOTICE_MS = 5000;
   // #6 is part 6 (and 2.2's #s6 still works); a number with no part opens the top (0); any other address names no part.
   function linkedPart(hash, count) {
-    var match = /^#s?(\d{1,6})$/.exec(hash || '');
+    var match = /^#s?(\d+)$/.exec(hash || '');
     if (!match || count <= 0) return null;
     var index = Number(match[1]) - 1;
     return index >= 0 && index < count ? index : 0;
@@ -117,9 +117,10 @@ const PAGE_BEHAVIOUR = String.raw`
   var cur = -1, lockUntil = 0, frame = 0;
   // Where this reader is: the page's own place in this browser's storage (its client and title, as the ticks are).
   var storage = storageOf(window), placeKey = text.getAttribute('data-place') || 'ritemark-place';
-  var restart = doc.getElementById('restart'), restartTimer = 0, restartHeld = false;
-  // The part the page opened at, until the reader moves: the fonts settling may move it, and the page goes back to it.
-  var landing = null;
+  var restart = doc.getElementById('restart'), restartTimer = 0, pointerHeld = false, focusHeld = false;
+  // The part the page opened at, until the reader moves: the fonts settling or a picture loading above it may move it,
+  // and the page goes back to it. landedAt is where the page put it, so any other scroll is the reader's.
+  var landing = null, landedAt = -1;
 
   // ---- where the text is read: under the top bar, or on a phone under the band that holds the slide
   var phone = function () { return window.innerWidth <= 860; };
@@ -255,7 +256,7 @@ const PAGE_BEHAVIOUR = String.raw`
   // ---- an exercise's ticks: kept in this browser only
   var store = text.getAttribute('data-store') || 'ritemark-ticks';
   var kept = {};
-  try { kept = JSON.parse(window.localStorage.getItem(store) || '{}') || {}; } catch (error) { kept = {}; }
+  try { kept = JSON.parse(storage.getItem(store) || '{}') || {}; } catch (error) { kept = {}; }
   list(text.querySelectorAll('input[data-tick]')).forEach(function (tick) {
     var id = tick.getAttribute('data-tick');
     if (Object.prototype.hasOwnProperty.call(kept, id)) tick.checked = kept[id] === true;
@@ -265,7 +266,7 @@ const PAGE_BEHAVIOUR = String.raw`
     var id = tick && tick.getAttribute ? tick.getAttribute('data-tick') : null;
     if (!id) return;
     kept[id] = tick.checked === true;
-    try { window.localStorage.setItem(store, JSON.stringify(kept)); } catch (error) { /* a browser that keeps nothing keeps the tick until the page closes */ }
+    try { storage.setItem(store, JSON.stringify(kept)); } catch (error) { /* a browser that keeps nothing keeps the tick until the page closes */ }
     finished();
   });
 
@@ -361,25 +362,43 @@ const PAGE_BEHAVIOUR = String.raw`
     if (!restart) return;
     restart.hidden = false;
     window.clearTimeout(restartTimer);
-    restartTimer = window.setTimeout(function () { restartTimer = 0; if (!restartHeld) hideRestart(); }, PLACE_NOTICE_MS);
+    restartTimer = window.setTimeout(function () { restartTimer = 0; if (!pointerHeld && !focusHeld) hideRestart(); }, PLACE_NOTICE_MS);
   }
   if (restart) {
-    var hold = function () { restartHeld = true; };
-    var letGo = function () { restartHeld = false; if (!restartTimer) hideRestart(); };
-    restart.addEventListener('mouseenter', hold);
-    restart.addEventListener('mouseleave', letGo);
-    restart.addEventListener('focus', hold);
-    restart.addEventListener('blur', letGo);
-    restart.addEventListener('click', function () { restartHeld = false; hideRestart(); landing = null; go(0, false, true); });
+    var letGo = function () { if (!restartTimer && !pointerHeld && !focusHeld) hideRestart(); };
+    restart.addEventListener('mouseenter', function () { pointerHeld = true; });
+    restart.addEventListener('mouseleave', function () { pointerHeld = false; letGo(); });
+    restart.addEventListener('focus', function () { focusHeld = true; });
+    restart.addEventListener('blur', function () { focusHeld = false; letGo(); });
+    restart.addEventListener('click', function () {
+      // The focus goes on to Contents beside it, not to the page's start, before the button goes.
+      if (doc.activeElement === restart && tocbtn) tocbtn.focus();
+      pointerHeld = focusHeld = false;
+      hideRestart();
+      landing = null;
+      go(0, false, true);
+    });
   }
 
-  // A part's address typed or followed while the page is open goes to that part.
+  // A part's address typed or followed while the page is open (Back to the page's own address too) goes to that part.
   window.addEventListener('hashchange', function () {
-    var index = linkedPart(window.location.hash, count);
-    if (index !== null) go(index, false, true);
+    var index = window.location.hash ? linkedPart(window.location.hash, count) : 0;
+    if (index === null || !count) return;
+    landing = null;
+    hideRestart();
+    go(index, false, true);
   });
+  // The reader moving lets the page's opening part go: a wheel, a touch, a key, a click, or a scroll the page didn't
+  // make (a dragged scroll bar).
   var moved = function () { landing = null; };
   ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(function (type) { window.addEventListener(type, moved, { passive: true }); });
+  window.addEventListener('scroll', function () { if (landing !== null && Math.abs(window.scrollY - landedAt) > 1) landing = null; }, { passive: true });
+  function land() {
+    if (landing === null) return;
+    go(landing, true, true);
+    landedAt = window.scrollY;
+  }
+  doc.addEventListener('load', function (event) { if (event.target && event.target.tagName === 'IMG') land(); }, true);
 
   // ---- start: the slide sized and the room set; then the part the address names (#6), else this reader's last part
   // with "Start from the beginning", else the part in view
@@ -389,10 +408,10 @@ const PAGE_BEHAVIOUR = String.raw`
   var linked = linkedPart(window.location.hash, count);
   var returned = linked === null ? readPlace(storage, placeKey, count) : null;
   landing = linked !== null ? linked : returned;
-  if (landing !== null) go(landing, true, true);
+  if (landing !== null) land();
   else show(count ? currentPart(state()) || 0 : null);
   if (returned !== null) offerRestart();
-  if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(function () { settle(); if (landing !== null) go(landing, true, true); });
+  if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(function () { settle(); land(); });
 `;
 
 /** The whole script, in its own scope. */

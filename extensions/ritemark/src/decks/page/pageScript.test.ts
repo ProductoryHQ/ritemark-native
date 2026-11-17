@@ -110,7 +110,8 @@ const place = new Function(`${PAGE_PLACE_RULE}\nreturn { linkedPart, addressFor,
   assert.equal(place.linkedPart('#8', 8), 7);
   assert.equal(place.linkedPart('#9', 8), 0, 'a part that does not exist opens the top');
   assert.equal(place.linkedPart('#0', 8), 0);
-  assert.equal(place.linkedPart('#99999999', 8), null, 'a number too long to be a part is no part');
+  assert.equal(place.linkedPart('#99999999', 8), 0, 'any number with no part opens the top');
+  assert.equal(place.linkedPart(`#${'9'.repeat(400)}`, 8), 0);
   for (const none of ['', '#', '#six', '#6a', '#-1', '#borderless', '6']) assert.equal(place.linkedPart(none, 8), null, none);
   assert.equal(place.linkedPart('#3', 0), null, 'a page with no parts has no part to open');
   assert.equal(place.addressFor(0), '', 'the top part is the page\'s own address');
@@ -172,6 +173,9 @@ interface PageRun {
   kept: Map<string, string>;
   advance(ms: number): void;
   window: Node & Record<string, unknown>;
+  document: Node & Record<string, unknown>;
+  /** A layout change above the parts (a picture loading): every part moves down by `by`. */
+  grow(by: number): void;
 }
 
 /**
@@ -181,7 +185,7 @@ interface PageRun {
 function runPage(options: { hash?: string; kept?: Record<string, string>; storage?: 'ok' | 'throws' | 'refused'; replaceThrows?: boolean; slideOnly?: boolean }): PageRun {
   const BAR = 59;
   const tops: number[] = [];
-  let top = 28;
+  let top = 28, shift = 0;
   for (let index = 0; index < 6; index++) {
     tops.push(top);
     top += options.slideOnly && index === 2 ? 0 : 400;
@@ -193,7 +197,7 @@ function runPage(options: { hash?: string; kept?: Record<string, string>; storag
   const kept = new Map(Object.entries(options.kept ?? {}));
   const timers = new Map<number, { at: number; run: () => void }>();
   let now = 0, ids = 0;
-  const parts = tops.map((partTop, index) => new Node({ 'data-i': String(index) }, () => ({ top: partTop - scrollY + BAR, bottom: partTop - scrollY + BAR })));
+  const parts = tops.map((partTop, index) => new Node({ 'data-i': String(index) }, () => ({ top: partTop + shift - scrollY + BAR, bottom: partTop + shift - scrollY + BAR })));
   const layers = tops.map((_, index) => new Node({ 'data-title': `Slide ${index + 1}` }));
   const text = new Node({ 'data-store': 'ritemark-ticks-abc', 'data-place': 'ritemark-place-abc' }, () => ({ top: BAR - scrollY, bottom: end + 900 - scrollY + BAR }), { '.part[data-i]': parts, 'input[data-tick]': [] });
   const box = new Node({}, undefined, { '.layer': layers });
@@ -229,11 +233,19 @@ function runPage(options: { hash?: string; kept?: Record<string, string>; storag
   if (options.storage === 'refused') Object.defineProperty(win, 'localStorage', { get() { throw new Error('SecurityError'); } });
   else win.localStorage = options.storage === 'throws' ? throwing : storage;
   const document = new Node() as Node & Record<string, unknown>;
+  let active: unknown = null;
+  restart.focus = () => { active = restart; };
+  const tocbtn = new Node();
+  tocbtn.focus = () => { active = tocbtn; };
+  byId.tocbtn = tocbtn;
   Object.assign(document, {
     documentElement: { get scrollHeight() { return end + 900 + BAR; } },
     getElementById: (id: string) => byId[id] ?? null,
+
     querySelector: (selector: string) => (selector === '.top' ? header : selector === '.stage' ? stage : null),
   });
+  Object.defineProperty(document, 'activeElement', { get: () => active });
+  (restart as unknown as { focusNow(): void }).focusNow = () => { active = restart; };
   vm.runInNewContext(PAGE_SCRIPT, { window: win, document, navigator: {} });
   return {
     shown: () => layers.findIndex(layer => layer.classes.has('on')),
@@ -247,6 +259,8 @@ function runPage(options: { hash?: string; kept?: Record<string, string>; storag
       for (const [id, timer] of [...timers]) if (timer.at <= now) { timers.delete(id); timer.run(); }
     },
     window: win,
+    document,
+    grow(by: number) { shift += by; },
   };
 }
 
@@ -361,6 +375,56 @@ for (const value of ['1', '7', 'junk']) {
   const page = runPage({ kept: { 'ritemark-place-abc': value } });
   assert.equal(page.shown(), 0, value);
   assert.equal(page.restart.hidden, true, value);
+}
+// Back to the page's own address (an empty hash) goes to the top; a part's address hides the notice and keeps the
+// reader there, even when the fonts settle afterwards.
+{
+  const page = runPage({ kept: { 'ritemark-place-abc': '4' } });
+  assert.equal(page.restart.hidden, false);
+  (page.window.location as { hash: string }).hash = '#2';
+  page.window.fire('hashchange');
+  assert.equal(page.shown(), 1);
+  assert.equal(page.restart.hidden, true, 'the notice goes when the reader goes elsewhere');
+  page.document.fire('load', { target: { tagName: 'IMG' } });
+  assert.equal(page.shown(), 1, 'a picture loading later doesn\'t pull the reader back to the kept place');
+  (page.window.location as { hash: string }).hash = '';
+  page.window.fire('hashchange');
+  assert.equal(page.shown(), 0);
+  assert.equal(page.scrollY(), 0);
+}
+// A picture loading above the opening part moves it down: the page goes back to it until the reader moves.
+{
+  const page = runPage({ hash: '#5' });
+  assert.equal(page.scrollY(), 28 + 4 * 400 - 6);
+  page.grow(240);
+  page.document.fire('load', { target: { tagName: 'IMG' } });
+  assert.equal(page.scrollY(), 28 + 240 + 4 * 400 - 6, 'back at part 5');
+  assert.equal(page.shown(), 4);
+  // The reader scrolls (a dragged scroll bar fires only scroll): the page leaves the place to them.
+  page.window.scrollTo(500);
+  page.window.fire('scroll');
+  page.grow(100);
+  page.document.fire('load', { target: { tagName: 'IMG' } });
+  assert.equal(page.scrollY(), 500, 'the reader\'s own scroll stays');
+}
+// The notice is held by the pointer and by the focus separately; the pointer leaving doesn't hide it under the focus.
+{
+  const page = runPage({ kept: { 'ritemark-place-abc': '4' } });
+  page.restart.fire('focus');
+  page.restart.fire('mouseenter');
+  page.advance(6000);
+  page.restart.fire('mouseleave');
+  assert.equal(page.restart.hidden, false, 'still focused');
+  page.restart.fire('blur');
+  assert.equal(page.restart.hidden, true);
+}
+// A click with the focus on it gives the focus to Contents beside it before it goes.
+{
+  const page = runPage({ kept: { 'ritemark-place-abc': '4' } });
+  (page.restart as unknown as { focusNow(): void }).focusNow();
+  page.restart.fire('click');
+  assert.equal((page.document as unknown as { activeElement: unknown }).activeElement !== page.restart, true);
+  assert.equal(page.restart.hidden, true);
 }
 // Nothing leaves the page: the script still loads nothing and builds no address beyond its own fragment.
 assert.ok(!/\bfetch\b|XMLHttpRequest|sendBeacon|WebSocket|EventSource|navigator\.(?!clipboard)/.test(PAGE_SCRIPT), 'nothing is sent anywhere');
