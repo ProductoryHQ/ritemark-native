@@ -19,6 +19,17 @@ export const DECK_WALL_VIEW_TYPE = 'ritemark.deckWall';
 /** The webview panel that is the presenter view (Sprint 159, PR 6). */
 export const DECK_PRESENTER_VIEW_TYPE = 'ritemark.deckPresenter';
 
+/** What the wall shows instead of the slide (B or "." the theme's ground, W white), or null: the slide. */
+export type WallBlank = 'ground' | 'white';
+
+/** The system's clock for the presenter view's time of day (`systemClock.ts`). */
+export interface ClockLocale {
+  /** The system's locale tag, or null for the webview's own. */
+  locale: string | null;
+  /** The system's 12- or 24-hour choice over the locale's, or null for the locale's own. */
+  hourCycle: 'h12' | 'h23' | null;
+}
+
 /** A slide as the wall draws it: the layout's words and settings, and its thumbnail number. */
 export interface WallSlide {
   /** The thumbnail's number (the slide's place in the deck, from 1). */
@@ -47,6 +58,8 @@ export interface WallState {
   assets: Record<string, string>;
   /** The bar offers the presenter view (a second display, or a dev build's windowed mode), and whether it is on. */
   presenter: { available: boolean; on: boolean };
+  /** The wall is blank (to the theme's ground, or white), or null. */
+  blank: WallBlank | null;
 }
 
 /**
@@ -76,6 +89,10 @@ export interface PresenterState {
   length: number | null;
   /** When the presentation started (ms since the epoch), for the clock. */
   startedAt: number;
+  /** The wall is blank: "The wall is blank · B to show it". */
+  blank: WallBlank | null;
+  /** The system's clock, for the time of day beside the elapsed time. */
+  clock: ClockLocale;
 }
 
 /** The host's answer to a typed number: the title of the slide with that number, or null when the deck has none. */
@@ -102,7 +119,9 @@ export type WallRequest =
   /** The presenter view: the wall and the presenter view change displays. */
   | { type: 'present/swap' }
   /** The presenter view's clock: ask the session's length and keep it in the deck's front matter. */
-  | { type: 'present/set-length' };
+  | { type: 'present/set-length' }
+  /** B, "." or W blanks the wall; any key brings the slide back (`to` null). */
+  | { type: 'present/blank'; to: WallBlank | null };
 
 /** The deck view's Present: from its current slide (`index`, from 0) or from the start. */
 export interface DeckPresentRequest {
@@ -160,6 +179,7 @@ export function wallStateOf(
   look: { borderless: boolean; theme: DeckTheme },
   assets: Record<string, string>,
   presenter: { available: boolean; on: boolean } = { available: false, on: false },
+  blank: WallBlank | null = null,
 ): WallState {
   return {
     type: 'present/wall',
@@ -172,6 +192,7 @@ export function wallStateOf(
     theme: look.theme,
     assets,
     presenter: { available: presenter.available, on: presenter.on },
+    blank: blankOf(blank),
   };
 }
 
@@ -192,7 +213,7 @@ export function presenterStateOf(
   view: PresentView,
   look: { borderless: boolean; theme: DeckTheme },
   assets: Record<string, string>,
-  session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number },
+  session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number; blank?: WallBlank | null; clock?: ClockLocale },
   onWall?: WallSlide,
 ): PresenterState {
   return {
@@ -211,7 +232,13 @@ export function presenterStateOf(
     canSwap: session.canSwap,
     length: session.length,
     startedAt: session.startedAt,
+    blank: blankOf(session.blank ?? null),
+    clock: { locale: session.clock?.locale ?? null, hourCycle: session.clock?.hourCycle ?? null },
   };
+}
+
+function blankOf(value: unknown): WallBlank | null {
+  return value === 'ground' || value === 'white' ? value : null;
 }
 
 function exactKeys(input: Record<string, unknown>, keys: readonly string[]): boolean {
@@ -240,6 +267,8 @@ export function decodeWallRequest(value: unknown): WallRequest | null {
     case 'present/go':
     case 'present/peek':
       return exactKeys(input, ['type', 'number']) && isNumber(input.number) ? { type: input.type, number: input.number } : null;
+    case 'present/blank':
+      return exactKeys(input, ['type', 'to']) && (input.to === null || blankOf(input.to) !== null) ? { type: 'present/blank', to: blankOf(input.to) } : null;
     default:
       return null;
   }
