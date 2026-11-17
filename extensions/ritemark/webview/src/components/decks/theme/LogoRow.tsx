@@ -90,7 +90,7 @@ export function LogoRows({ theme, logo, ground, onChange }: LogoRowsProps) {
   if (!theme.logo) {
     return (
       <>
-        <Tooltip label="Choose an SVG or a PNG picture, or drop one here. It's copied beside the theme file.">
+        <Tooltip label="Choose an SVG or a PNG picture, or drop one here. It's copied beside the theme file." className="flex w-full">
           <Button variant="ghost" className={`theme-logo-drop${over ? ' is-over' : ''}`} onClick={choose} {...drop}>
             <Icon name="image" size={20} tone="inherit" />
             <span>Drop a logo here, or <b>choose a file</b></span>

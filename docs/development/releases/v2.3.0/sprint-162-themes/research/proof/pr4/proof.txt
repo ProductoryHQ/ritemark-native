@@ -1,0 +1,31 @@
+Sprint 162 PR 4: a theme's logo. Proof from one isolated dev instance (scripts/qa/dev-launch-isolated.sh, the
+patches applied to the worktree's own vscode copy), on a synthetic project "Harbour Logistics": a made-up SVG logo
+("Fernhollow", a fern mark and a word) and a made-up PNG (three bars), 18 November 2026.
+
+01  The theme's tab after the SVG was dropped on the Logo row (a DOM drop of the file, as the Finder's): the picture on
+    the theme's ground with Replace and Remove, Where (Top right) and On (Every slide); the preview draws it on every
+    slide. The host copied it beside the theme as "Slide library/Themes/Fernhollow Bank logo.svg" (cmp: the same bytes
+    as the dropped file), and the draft has one new line, "logo: Fernhollow Bank logo.svg". Dropped again: the same file
+    is used, nothing new is written. An SVG with onload and <script> dropped: refused with "That SVG has scripts or
+    links to other files in it, so it can't be the logo. ...", nothing written, the draft unchanged.
+02  The deck after Save: the stage and every strip slide draw the logo top right.
+03a On: Title slides, saved ("logo-on: title-slides"): the title slide draws it, and so does the section slide in the
+    strip (a number over its title is a title slide too).
+03b The body slide draws none.
+04  The wall (Present) at 1440 x 900: the slide's ground runs to the screen's edges, the logo sits in the corner of the
+    16:9 area (#779), not of the screen.
+05  The published page, built with the real page builder (buildDeckPage, writePageFonts for the fonts and, with
+    LOGO_PLACE, the logo, writeDeckPage) and served on 127.0.0.1 only, shown in the instance's own browser: the logo on
+    the title slide. Beside the page: fonts/ (Inter, Source Serif 4) and logos/logo-dd90cde9aa61fe6e.svg; the page names
+    the logo twice (slides 1 and 3) as <img class="slide-logo is-top-right" src="logos/logo-dd90cde9aa61fe6e.svg">, and
+    the SVG's own markup is nowhere in it.
+05b The same page at 390 x 844.
+06  A theme whose logo file is missing (the PNG moved away, the window reloaded): the tab says "The logo's file, Harbour
+    Paper logo.png, isn't beside the theme. ...", with Choose a file… and Remove; the preview draws no logo and no
+    error. (The toast at the bottom right is the dev build's own GitHub.copilot-chat activation notice, not this PR.)
+
+Byte for byte: Untouched.deck.md and "Slide library/Themes/Harbour Paper.theme.md" (written by hand, with a quoted logo
+line, a comment and logo-place) were opened (the deck, then the theme's tab), the window reloaded with both open, and
+closed: cmp with their copies taken before the launch: both the same.
+
+The instance was stopped (LEFT=0) and its run folder deleted.
