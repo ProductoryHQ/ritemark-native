@@ -22,7 +22,7 @@ register(`data:text/javascript,${encodeURIComponent(
 Object.assign(globalThis, { acquireVsCodeApi: () => ({ postMessage: () => {}, getState: () => undefined, setState: () => {} }) })
 const React = await import('react')
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
-const { COLOUR_ROWS, CORNER_OPTIONS, BOX_OPTIONS, THEME_PALETTE, decksWords, themeDecksFrom, themeFileNote, themeUndoKey, usedByWords } = await import('./ThemeTab')
+const { COLOUR_ROWS, FONT_ROWS, CORNER_OPTIONS, BOX_OPTIONS, THEME_PALETTE, decksWords, themeDecksFrom, themeFileNote, themeUndoKey, usedByWords } = await import('./ThemeTab')
 
 // ---- The ratio: WCAG's own pairs, and Evening's as frame 11 reads them (text 12.6, headings 15.6).
 {
@@ -65,11 +65,16 @@ const { COLOUR_ROWS, CORNER_OPTIONS, BOX_OPTIONS, THEME_PALETTE, decksWords, the
   assert.match(themeFileNote('Evening'), /^Evening is a file in Slide library › Themes\. Nothing changes in the decks until you save;/)
   const tab = readFileSync(fileURLToPath(new URL('./ThemeTab.tsx', import.meta.url)), 'utf8')
   const sheet = readFileSync(fileURLToPath(new URL('./NewThemeSheet.tsx', import.meta.url)), 'utf8')
-  // Fonts (PR 3) and the logo (PR 4) aren't in this part, not even greyed; nor Claude's row (PR 5).
+  // The logo (PR 4) isn't in this part, not even greyed; nor Claude's row (PR 5).
   for (const source of [tab, sheet]) {
     const shown = source.replace(/\/\*\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
-    assert.doesNotMatch(shown, /Fonts|Heading font|Drop a logo|Logo|Ask Claude/, 'nothing of a later part shows')
+    assert.doesNotMatch(shown, /Drop a logo|Logo|Ask Claude/, 'nothing of a later part shows')
   }
+  // Fonts (PR 3): the prototype's Fonts, Headings and Text, each a choice of the six, between the contrast line and Shape.
+  assert.deepEqual(FONT_ROWS.map(row => [row.field, row.label]), [['fh', 'Headings'], ['fb', 'Text']])
+  assert.ok(FONT_ROWS.every(row => row.tip.length > 0), 'each font row has a tooltip')
+  assert.ok(tab.indexOf('>Fonts</div>') > tab.indexOf('theme-contrast') && tab.indexOf('>Fonts</div>') < tab.indexOf('>Shape</div>'))
+  assert.match(tab, /DECK_FONT_LIST\.map\(font =>/, 'the choices are the six')
   // The draft's bar (frame 18): Not saved, Discard, Save ▾ with Save as a new theme… and Discard the changes.
   assert.match(tab, /<span className="deck-saved theme-not-saved">/)
   assert.match(tab, />Discard<\/Button>/)

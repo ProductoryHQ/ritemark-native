@@ -1,8 +1,9 @@
 /**
  * Sprint 159 (technical plan §2.3): the handout page as the learner page draws it (experience 46's `learner.html`),
  * without its look toggle, made from `publicDeck`'s output and nothing else. One HTML file carrying its CSS, its
- * fonts, its icons and its one script; pictures stay separate files at the deck's relative paths, which 2.2's gather
- * finds in the page and sends under its own rules.
+ * fonts, its icons and its one script; pictures stay separate files at the deck's relative paths, and so do the
+ * theme's fonts beyond Sofia Sans (`fonts/`, Sprint 162 PR 3), which 2.2's gather finds in the page and sends under its
+ * own rules.
  *
  *  - Nothing of Ritemark on it: the client and the session at the top, how far along it is, and Contents.
  *  - On a computer the slide stays on the left, centred, with arrows under it, and the text scrolls on the right; on a
@@ -39,11 +40,22 @@ export interface PageFont {
   unicodeRange: string;
 }
 
+/** One part of a theme font the page names as a file beside it (Sprint 162 PR 3, `pageFile.themeFontFiles`). */
+export interface PageThemeFont {
+  /** The font's family, one of the six (`deckTheme.DECK_FONT_LIST`). */
+  family: string;
+  unicodeRange: string;
+  /** Its address beside the page: `fonts/Inter-4.001-latin.woff2`. */
+  address: string;
+}
+
 export interface PageAssets {
   /** `slide/slide.css`: the slide's own rules, the deck view's. */
   slideCss: string;
   /** Sofia Sans, as the app's own fonts: latin and latin-ext. */
   fonts: PageFont[];
+  /** The theme's other fonts, as files beside the page; none when the theme draws in Sofia Sans only. */
+  themeFonts?: readonly PageThemeFont[];
 }
 
 export interface PageOptions {
@@ -350,7 +362,7 @@ svg { flex: none; }
 .top .in { max-width: 1320px; margin: 0 auto; padding: 0 24px; height: 56px; display: flex; align-items: center; gap: 14px; }
 .top .who { min-width: 0; display: flex; align-items: baseline; gap: 10px; font-family: 'Sofia Sans', sans-serif; }
 .top .who b { font: 700 15px/1.2 'Sofia Sans', sans-serif; color: var(--ink); white-space: nowrap; }
-.top .who span { font: 400 14.5px/1.2 'Sofia Sans', sans-serif; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top .who span { font: 400 14.5px/1.2 var(--fh); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top .grow { flex: 1; }
 .top .pos { font: 600 13px/1 'Sofia Sans', sans-serif; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cbtn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-radius: 9px; background: var(--soft); color: var(--ink); font: 600 13.5px/34px 'Sofia Sans', sans-serif; white-space: nowrap; }
@@ -360,7 +372,7 @@ svg { flex: none; }
 .toc { position: fixed; z-index: 30; top: 64px; right: max(16px, calc((100vw - 1320px) / 2 + 24px)); width: min(360px, calc(100vw - 32px)); max-height: min(70vh, 560px); overflow: auto; padding: 8px; border-radius: 14px; background: #fff; box-shadow: 0 0 0 1px var(--line), 0 18px 40px -12px rgba(28,31,74,.3); }
 .toc[hidden] { display: none; }
 .toc .hd { padding: 8px 10px 6px; font: 700 11.5px/16px 'Sofia Sans', sans-serif; letter-spacing: .7px; text-transform: uppercase; color: var(--muted); }
-.toc button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 6px 10px; border-radius: 8px; text-align: left; font: 500 14.5px/20px 'Sofia Sans', sans-serif; color: var(--ink); }
+.toc button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 6px 10px; border-radius: 8px; text-align: left; font: 500 14.5px/20px var(--fh); color: var(--ink); }
 .toc button:hover { background: var(--soft); }
 .toc button.on { background: var(--hl); }
 .toc .n { width: 22px; flex: none; text-align: right; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -383,7 +395,8 @@ svg { flex: none; }
 .nav button { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--soft); color: var(--ink); }
 .nav button:hover { background: var(--soft2); }
 .nav button[disabled] { opacity: .35; pointer-events: none; }
-.text { padding: 28px 0 55vh; min-width: 0; }
+.text { padding: 28px 0 55vh; min-width: 0; font-family: var(--fb); }
+.pre h1, .pre h2, .pre h3, .pre h4, .pre h5 { font-family: var(--fh); }
 .pre { padding: 0 0 18px; }
 .part { padding: 26px 0 18px; border-top: 1px solid var(--line); scroll-margin-top: 80px; transition: opacity .3s; }
 .text > .part:first-child, .pre + .part { border-top: 0; padding-top: 8px; }
@@ -397,9 +410,9 @@ svg { flex: none; }
 .sect > * { transition: opacity .3s; }
 .sect.dim > * { opacity: .5; }
 .part .lab { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font: 700 12px/16px 'Sofia Sans', sans-serif; letter-spacing: .7px; text-transform: uppercase; color: var(--label); }
-.part h2 { margin: 0 0 10px; font: 700 25px/1.25 'Sofia Sans', sans-serif; color: var(--ink); text-wrap: balance; }
-.part h3 { margin: 18px 0 8px; font: 700 19px/1.3 'Sofia Sans', sans-serif; color: var(--ink); }
-.part h4, .part h5 { margin: 16px 0 6px; font: 700 16.5px/1.35 'Sofia Sans', sans-serif; color: var(--ink); }
+.part h2 { margin: 0 0 10px; font: 700 25px/1.25 var(--fh); color: var(--ink); text-wrap: balance; }
+.part h3 { margin: 18px 0 8px; font: 700 19px/1.3 var(--fh); color: var(--ink); }
+.part h4, .part h5 { margin: 16px 0 6px; font: 700 16.5px/1.35 var(--fh); color: var(--ink); }
 .part p, .pre p { margin: 0 0 14px; }
 .part ol, .part ul, .pre ol, .pre ul { margin: 0 0 14px; padding-left: 24px; }
 .part li { margin-bottom: 6px; }
@@ -508,6 +521,10 @@ function pageColours(deck: PublicDeck): string {
     stepbg: '#FFFBF0',
     stepline: onWhite.thbg,
     slidebg: deck.look === 'borderless' ? 'transparent' : deck.theme.bg,
+    // Sprint 162 PR 3 (step-3-themes.md, 16 November): the content wears the theme's fonts; the page's own controls
+    // keep Sofia Sans (their rules name it).
+    fh: onWhite.fh,
+    fb: onWhite.fb,
   };
   const page = Object.entries(vars).map(([key, value]) => `--${key}:${value}`).join(';');
   const slide = Object.entries(themeStyle(deck.theme, deck.look === 'borderless')).map(([key, value]) => `${key}:${value}`).join(';');
@@ -515,8 +532,13 @@ function pageColours(deck: PublicDeck): string {
   return `:root{${page}}\n.deck-slide{${slide}}`.replace(/</g, '\\3c ');
 }
 
-function fontFaces(fonts: PageFont[]): string {
-  return fonts.map(font => `@font-face{font-family:'Sofia Sans';font-style:normal;font-weight:100 900;font-display:swap;src:url(data:font/woff2;base64,${font.base64}) format('woff2');unicode-range:${font.unicodeRange};}`).join('\n');
+function fontFaces(fonts: PageFont[], themeFonts: readonly PageThemeFont[] = []): string {
+  const sofia = fonts.map(font => `@font-face{font-family:'Sofia Sans';font-style:normal;font-weight:100 900;font-display:swap;src:url(data:font/woff2;base64,${font.base64}) format('woff2');unicode-range:${font.unicodeRange};}`);
+  // The theme's own fonts, as files beside the page (relative addresses only: a font is never loaded from elsewhere).
+  const theme = themeFonts
+    .filter(font => /^fonts\/[A-Za-z0-9.-]+\.woff2$/.test(font.address) && /^[A-Za-z0-9 ]+$/.test(font.family))
+    .map(font => `@font-face{font-family:'${font.family}';font-style:normal;font-weight:100 900;font-display:swap;src:url(${font.address}) format('woff2');unicode-range:${font.unicodeRange};}`);
+  return [...sofia, ...theme].join('\n');
 }
 
 const titleOf = (slide: PublicSlide) => (slide.data.title ?? '').trim();
@@ -610,14 +632,15 @@ const SCRIPT_TEXT = `\n${PAGE_SCRIPT}\n`;
 
 /**
  * The page's Content Security Policy: its one script by its hash, so nothing else runs (no inline handler, no other
- * script); styles and fonts its own (inline, data:); pictures from beside it (and from disk when the file is opened
+ * script); styles its own (inline), fonts its own (inline, and the theme's beside it); pictures from beside it (and from disk when the file is opened
  * there, as in the room without a network); and nothing loaded from anywhere else. It goes first in the head.
  */
 export const PAGE_CSP = [
   "default-src 'none'",
   `script-src 'sha256-${createHash('sha256').update(SCRIPT_TEXT).digest('base64')}'`,
   "style-src 'unsafe-inline'",
-  'font-src data:',
+  // Sofia Sans inline, and the theme's fonts from beside the page (`'self'` online, `file:` when opened from disk).
+  "font-src 'self' data: file:",
   "img-src 'self' data: file:",
   "base-uri 'none'",
   "form-action 'none'",
@@ -663,7 +686,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     `<meta name="generator" content="${GENERATOR_META}">`,
     `<meta name="${DIGEST_META}" content="${esc(options.digest)}">`,
     `<title>${esc(deck.title)}</title>`,
-    `<style>\n${fontFaces(assets.fonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n</style>`,
+    `<style>\n${fontFaces(assets.fonts, assets.themeFonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n</style>`,
     '</head>',
     `<body class="${borderless ? 'bl' : 'card'}">`,
     `<header class="top"><div class="in">${who}<span class="grow"></span><span class="pos" id="pos">${count ? `1 / ${count}` : ''}</span>`
