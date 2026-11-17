@@ -122,4 +122,14 @@ const { COLOUR_ROWS, FONT_ROWS, CORNER_OPTIONS, BOX_OPTIONS, THEME_PALETTE, deck
   assert.match(readFileSync(fileURLToPath(new URL('../../../../../fileicons/icons/palette.svg', import.meta.url)), 'utf8'), /M12 22a1 1 0 0 1 0-20/)
 }
 
+// ---- Sprint 162 PR 4, the review of #785: a dropped file the host would refuse unread is refused in the tab, with why.
+{
+  const { droppedLogoProblem, logoMimeOf } = await import('./LogoRow')
+  assert.deepEqual([logoMimeOf('A.SVG'), logoMimeOf('a.png'), logoMimeOf('a.jpg')], ['image/svg+xml', 'image/png', null])
+  assert.equal(droppedLogoProblem({ name: 'Logo.svg', size: 700 }), null)
+  assert.match(droppedLogoProblem({ name: 'Logo.png', size: 0 }) ?? '', /empty/)
+  assert.match(droppedLogoProblem({ name: 'Logo.png', size: 6 * 1024 * 1024 }) ?? '', /at most 5 MB/)
+  assert.match(droppedLogoProblem({ name: 'Logo.gif', size: 10 }) ?? '', /SVG or a PNG/)
+}
+
 console.log('themeTab.test.ts — all assertions passed')

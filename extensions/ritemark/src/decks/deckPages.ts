@@ -252,6 +252,17 @@ export class DeckPages implements vscode.Disposable {
     }));
   }
 
+  /**
+   * Sprint 162 PR 4: a picture in a Themes folder was written, made or removed (a logo put back, replaced in place): each
+   * open deck draws its theme again, so its logo (or its missing logo) follows at once.
+   */
+  async logoFilesChanged(): Promise<void> {
+    await Promise.all([...this.views].map(async view => {
+      const named = themePathOf(frontMatterField(view.document.getText().replace(/^\uFEFF/, ''), 'theme'));
+      await this.post(view.panel.webview, { type: 'deck/theme', path: named, ...(await deckThemeFor(view.document.uri.fsPath, named, view.panel.webview)) });
+    }));
+  }
+
   /** The active deck's text and the ids it holds (for new copies' ids). */
   activeDocument(): vscode.TextDocument | null {
     return this.activeView()?.document ?? null;
@@ -450,7 +461,7 @@ export class DeckPages implements vscode.Disposable {
 
   /**
    * Sprint 162: the project's themes for the deck's Theme menu: the files in `Slide library/Themes` of the folder the
-   * deck reads its theme from (`readDeckTheme`'s rule), and the built-in theme, each with the number of the project's
+   * deck reads its theme from (`deckThemeFor`'s rule), and the built-in theme, each with the number of the project's
    * decks that draw it. A deck outside the open project counts only itself.
    */
   private async themesFor(document: vscode.TextDocument): Promise<ThemeEntry[]> {
@@ -637,19 +648,6 @@ export function resolveAssetsIn(folder: string, webview: vscode.Webview, paths: 
 const MAX_THEME_BYTES = 64 * 1024;
 
 /**
- * The text of the theme file a deck names, or null. The path is project-relative (`Slide library/Themes/…`), so it is
- * read from the deck's project folder, or the deck's own folder when it has none, and never from outside it.
- */
-export async function readTheme(document: vscode.TextDocument, themePath: string): Promise<string | null> {
-  return readDeckTheme(document.uri.fsPath, themePath);
-}
-
-/** The theme file a deck at `deckPath` names, by the same rule: the deck view's, and its page's (Sprint 159 PR 4). */
-export function readDeckTheme(deckPath: string, themePath: string): Promise<string | null> {
-  return readThemeOrEvening(themeRootOf(deckPath), themePath);
-}
-
-/**
  * Sprint 162 (step-3-themes.md, "A project's own file takes a built-in's place"): the theme file named, or, when the
  * project has no such file (or none is named), the project's own `Evening.theme.md`; null when it has neither, and the
  * reader draws the built-in theme.
@@ -678,6 +676,9 @@ export type ThemeLogoFile =
   | { state: 'missing'; file: string }
   | { state: 'refused'; file: string; problem: string };
 
+/** The logo files read lately, by their real path and name, with the time and size they were read at. */
+const logoFileCache = new Map<string, { modified: number; size: number; answer: ThemeLogoFile }>();
+
 export async function themeLogoFile(root: string, themePath: string, theme: Pick<DeckTheme, 'logo'>): Promise<ThemeLogoFile> {
   const logo = theme.logo;
   if (!logo) return { state: 'none' };
@@ -699,9 +700,16 @@ export async function themeLogoFile(root: string, themePath: string, theme: Pick
     const stat = await fs.promises.stat(realFile);
     if (!stat.isFile()) return { state: 'missing', file };
     if (stat.size > MAX_LOGO_BYTES) return refused(LOGO_TOO_LARGE);
+    // Read and checked once for each version of the file (the review of #785: the tab asks at every change of the draft).
+    const key = `${realFile}\u0000${file}`;
+    const seen = logoFileCache.get(key);
+    if (seen && seen.modified === stat.mtimeMs && seen.size === stat.size) return seen.answer;
     const bytes = await fs.promises.readFile(realFile);
     const problem = logoProblem(file, bytes);
-    return problem ? refused(problem) : { state: 'found', absolute, file, kind, bytes, modified: Math.round(stat.mtimeMs) };
+    const answer: ThemeLogoFile = problem ? refused(problem) : { state: 'found', absolute, file, kind, bytes, modified: Math.round(stat.mtimeMs) };
+    if (logoFileCache.size >= 16) logoFileCache.delete(logoFileCache.keys().next().value!);
+    logoFileCache.set(key, { modified: stat.mtimeMs, size: stat.size, answer });
+    return answer;
   } catch {
     return { state: 'missing', file };
   }
@@ -713,7 +721,7 @@ export function logoWebviewUri(webview: vscode.Webview, found: Extract<ThemeLogo
 }
 
 /**
- * The theme a deck at `deckPath` draws (`readDeckTheme`'s rule), as the deck view and the wall are sent it: the theme
+ * The theme a deck at `deckPath` draws, as the deck view and the wall are sent it: the theme
  * file's text (null: the built-in theme), and its logo's address in this webview (null: none, or a missing file).
  */
 export async function deckThemeFor(deckPath: string, themePath: string, webview: vscode.Webview): Promise<{ text: string | null; logo: string | null }> {

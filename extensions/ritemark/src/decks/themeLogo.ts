@@ -33,26 +33,45 @@ export function logoKindOfName(name: string): LogoKind | null {
 /**
  * What would make this SVG's text unsafe as a file of its own on the published page, or null: a script, an event
  * handler, `javascript:`, an embedded page or object, an entity declaration, or a reference to anything outside the
- * file (an `href` or `url()` that isn't the file's own `#id` or a `data:` picture, a style's `@import`).
+ * file (an `href` or `url()` that isn't the file's own `#id` or a `data:` picture, a style's `@import` or
+ * `image-set()`, an animation that sets an `href`).
+ *
+ * Read after its character references are decoded (`javascript&#x3a;` is `javascript:`), with any namespace prefix on
+ * an element or an `href` counted (`<svg:script>`, `x:href`), and an SVG that declares a namespace prefix other than
+ * `xlink` and `svg` is refused outright, so a prefix can't hide an element of another language (the review of #785).
  */
-export function svgProblem(text: string): string | null {
-  if (!/<svg[\s>]/i.test(text)) return 'That file isn\'t an SVG picture.';
+export function svgProblem(raw: string): string | null {
+  if (!/<(?:svg:)?svg[\s>]/i.test(raw)) return 'That file isn\'t an SVG picture.';
   const unsafe = 'That SVG has scripts or links to other files in it, so it can\'t be the logo. Save it as a PNG, or as a plain SVG.';
-  if (/<script[\s>/]/i.test(text)) return unsafe;
+  const text = decodeReferences(raw);
   if (/<!ENTITY/i.test(text)) return unsafe;
-  if (/<(foreignObject|iframe|embed|object|audio|video)[\s>/]/i.test(text)) return unsafe;
-  // An event handler on any element (`onload=`, `onclick =`).
-  if (/<[^>]*[\s/"']on[a-z]+\s*=/i.test(text)) return unsafe;
+  for (const match of text.matchAll(/xmlns:([\w.-]+)\s*=/gi)) {
+    if (!['xlink', 'svg'].includes(match[1].toLowerCase())) return unsafe;
+  }
+  // An element that runs, embeds or animates, with or without a prefix.
+  if (/<(?:[\w.-]+:)?(script|foreignObject|iframe|embed|object|audio|video|set|animate|animateMotion|animateTransform|handler|listener)[\s>/]/i.test(text)) return unsafe;
+  // An event handler on any element (`onload=`, `onclick =`, `x:onload=`).
+  if (/<[^>]*[\s/"':]on[a-z]+\s*=/i.test(text)) return unsafe;
   if (/javascript\s*:/i.test(text)) return unsafe;
-  if (/@import/i.test(text)) return unsafe;
+  if (/@import|image-set\s*\(|\bsrc\s*\(/i.test(text)) return unsafe;
   // Every reference stays inside the file: `href="#id"`, `url(#id)`, or a picture as `data:image/…`.
-  for (const match of text.matchAll(/(?:^|[\s"'])(?:xlink:)?href\s*=\s*["']?\s*([^"'\s>]*)/gi)) {
+  for (const match of text.matchAll(/(?:^|[\s"':])href\s*=\s*["']?\s*([^"'\s>]*)/gi)) {
     if (!/^(#|data:image\/(png|jpe?g|gif|webp);)/i.test(match[1])) return unsafe;
   }
   for (const match of text.matchAll(/url\(\s*["']?\s*([^"')\s]*)/gi)) {
     if (!/^(#|data:image\/(png|jpe?g|gif|webp);)/i.test(match[1])) return unsafe;
   }
   return null;
+}
+
+/** The text with its numeric character references (`&#58;`, `&#x3a;`) and the five named ones read as characters. */
+function decodeReferences(text: string): string {
+  const named: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", colon: ':', lpar: '(', rpar: ')' };
+  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, code: string) => {
+    if (code[0] !== '#') return named[code.toLowerCase()] ?? whole;
+    const value = code[1] === 'x' || code[1] === 'X' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
+    return Number.isFinite(value) && value > 0 && value <= 0x10ffff ? String.fromCodePoint(value) : '';
+  });
 }
 
 /**

@@ -251,16 +251,18 @@ export class DeckPublisher implements vscode.Disposable {
         hadRecord = Boolean(await feature.controller.recordFor(pageKey));
         // The fonts first, so the page never names a font that isn't beside it yet.
         const fontsWritten = await writePageFonts(nodeFontFs, deckPath, fontFiles);
-        const logoWritten = fontsWritten.kind === 'refused' ? null : await writePageFonts(nodeFontFs, deckPath, logoFiles, LOGO_PLACE);
         if (fontsWritten.kind === 'refused') {
           written = { kind: 'refused', pagePath, line: fontsWritten.line };
-        } else if (logoWritten?.kind === 'refused') {
-          fonts = fontsWritten;
-          written = { kind: 'refused', pagePath, line: logoWritten.line };
         } else {
+          // Kept before the logo is written, so a logo that can't be written takes the fonts back with it (the review of #785).
           fonts = fontsWritten;
-          if (logoWritten) logos = logoWritten;
-          written = await writeDeckPage(nodePageFs, deckPath, built.html);
+          const logoWritten = await writePageFonts(nodeFontFs, deckPath, logoFiles, LOGO_PLACE);
+          if (logoWritten.kind === 'refused') {
+            written = { kind: 'refused', pagePath, line: logoWritten.line };
+          } else {
+            logos = logoWritten;
+            written = await writeDeckPage(nodePageFs, deckPath, built.html);
+          }
         }
       } catch (error) {
         console.warn('[Decks] Could not write the page:', error);
@@ -401,7 +403,7 @@ export class DeckPublisher implements vscode.Disposable {
   }
 
   /**
-   * The theme the deck names, read as the deck view reads it (`readDeckTheme`), or the built-in one; and its logo as
+   * The theme the deck names, read as the deck view reads it (`deckThemeAndLogo`), or the built-in one; and its logo as
    * the page's file (Sprint 162 PR 4), only when the theme has one and its file is there and can go.
    */
   private async lookFor(deckPath: string, text: string): Promise<{ theme: DeckTheme; logo: PageFile | null }> {

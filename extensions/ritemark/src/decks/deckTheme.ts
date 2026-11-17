@@ -312,7 +312,7 @@ export function themeKeyOf(named: unknown, entries: ReadonlyArray<Pick<ThemeEntr
 
 /**
  * The theme file a deck's view, wall, page and thumbnails read, by its `theme:` value: the file it names, or Evening's
- * path when it names none. The readers fall back to Evening's file, then to the built-in theme (`readDeckTheme`).
+ * path when it names none. The readers fall back to Evening's file, then to the built-in theme (`deckPages.deckThemeFor`).
  */
 export function themePathOf(named: unknown): string {
   const path = typeof named === 'string' ? named.trim() : '';

@@ -134,6 +134,20 @@ export class ThemePages implements vscode.Disposable {
     this.subscriptions.push(watcher, watcher.onDidChange(changed), watcher.onDidCreate(changed), watcher.onDidDelete(changed), {
       dispose: () => { for (const timer of timers.values()) clearTimeout(timer); },
     });
+    // Sprint 162 PR 4 (the review of #785): a logo picture put back, replaced in place or removed beside a theme: the
+    // open theme tabs and decks draw it (or its absence) again, at once.
+    const logos = vscode.workspace.createFileSystemWatcher(`**/${THEMES_FOLDER}/**/*.{svg,png,SVG,PNG}`);
+    let logoTimer: ReturnType<typeof setTimeout> | undefined;
+    const logoChanged = () => {
+      clearTimeout(logoTimer);
+      logoTimer = setTimeout(() => {
+        for (const view of this.views) this.postState(view);
+        void this.decks.logoFilesChanged();
+      }, 120);
+    };
+    this.subscriptions.push(logos, logos.onDidChange(logoChanged), logos.onDidCreate(logoChanged), logos.onDidDelete(logoChanged), {
+      dispose: () => clearTimeout(logoTimer),
+    });
   }
 
   private isSaving(key: string): boolean {

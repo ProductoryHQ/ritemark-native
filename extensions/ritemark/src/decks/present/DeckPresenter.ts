@@ -141,6 +141,9 @@ export function presenterViewAvailable(shell: boolean, displays: number, windowe
   return shell && (displays > 1 || windowed);
 }
 
+
+/** A theme path no deck names: the wall's theme before its first look. */
+const UNREAD_THEME = '\u0000unread';
 export class DeckPresenter implements vscode.Disposable {
   private running: Running | null = null;
   /** Each start takes a number; a later start, or a Stop, makes an earlier one that is still waiting give up. */
@@ -208,7 +211,9 @@ export class DeckPresenter implements vscode.Disposable {
       wall: this.createScreen(origin, DECK_WALL_VIEW_TYPE),
       presenter: null,
       subscriptions: [],
-      theme: { path: null, value: BUILT_IN_THEME },
+      // Nothing read yet: the first look reads the theme, also for a deck naming none (the project's own Evening file, as
+      // the deck view draws it; the review of #785).
+      theme: { path: UNREAD_THEME, value: BUILT_IN_THEME },
       wallState: null,
       shell,
       displays,

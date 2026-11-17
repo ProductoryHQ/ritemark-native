@@ -14,6 +14,7 @@ import { useState, type DragEvent } from 'react'
 import { DEFAULT_LOGO_ON, DEFAULT_LOGO_PLACE, type DeckTheme, type LogoOn, type LogoPlace } from '../../../../../src/decks/deckTheme'
 import type { ThemeChanges } from '../../../../../src/decks/themeFile'
 import type { ThemeLogoState } from '../../../../../src/decks/themeProtocol'
+import { LOGO_TOO_LARGE, logoKindOfName, MAX_LOGO_BYTES } from '../../../../../src/decks/themeLogo'
 import { sendToExtension } from '../../../bridge'
 import { Button } from '../../ui/button'
 import { Icon } from '../../ui/Icon'
@@ -30,10 +31,17 @@ export const LOGO_ON_OPTIONS: Array<{ value: LogoOn; label: string }> = [
   { value: 'title-slides', label: 'Title slides' },
 ]
 
-/** The MIME type a logo's file name says, for its data URL: an SVG or a PNG; null for anything else. */
+/** The MIME type a logo's file name says, for its data URL (the host's own rule, `logoKindOfName`); null for any other. */
 export function logoMimeOf(name: string): 'image/svg+xml' | 'image/png' | null {
-  if (/\.svg$/i.test(name)) return 'image/svg+xml'
-  if (/\.png$/i.test(name)) return 'image/png'
+  const kind = logoKindOfName(name)
+  return kind === 'svg' ? 'image/svg+xml' : kind === 'png' ? 'image/png' : null
+}
+
+/** Why a dropped file can't be sent as the logo before it is read (its name, empty, too large), or null. */
+export function droppedLogoProblem(file: { name: string; size: number }): string | null {
+  if (!logoMimeOf(file.name)) return 'A logo is an SVG or a PNG picture.'
+  if (file.size === 0) return 'That file is empty.'
+  if (file.size > MAX_LOGO_BYTES) return LOGO_TOO_LARGE
   return null
 }
 
@@ -44,9 +52,11 @@ function carriesFiles(event: DragEvent): boolean {
 
 /** A dropped file as the host takes it: its bytes as an SVG or PNG data URL (whatever type the system gave it). */
 function sendLogoFile(file: File, onWrong: (text: string) => void) {
+  const problem = droppedLogoProblem(file)
   const mime = logoMimeOf(file.name)
-  if (!mime) {
-    onWrong('A logo is an SVG or a PNG picture.')
+  if (problem || !mime) {
+    // Said here: the host never gets a file it would refuse unread (the review of #785).
+    onWrong(problem ?? 'A logo is an SVG or a PNG picture.')
     return
   }
   const reader = new FileReader()

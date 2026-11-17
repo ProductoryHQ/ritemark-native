@@ -150,7 +150,16 @@ async function main(): Promise<void> {
       '<svg><rect style="fill:url(https://x.test/a.svg#p)"/></svg>',
       '<!DOCTYPE svg [<!ENTITY x "y">]><svg></svg>',
       '<svg><iframe src="x"/></svg>',
+      // The review of #785: a prefix, an animation, `image-set()` and a character reference don't hide them.
+      '<svg xmlns:x="http://www.w3.org/1999/xlink"><image x:href="https://tracker.test/p.png"/></svg>',
+      '<svg><svg:script>alert(1)</svg:script></svg>',
+      '<svg xmlns:h="http://www.w3.org/1999/xhtml"><h:script>alert(1)</h:script></svg>',
+      '<svg><image><set attributeName="href" to="https://tracker.test/p.png"/></image></svg>',
+      '<svg><rect style="fill:image-set(\'https://x.test/a.png\' 1x)"/></svg>',
+      '<svg><a href="javascript&#x3a;alert(1)"><text>x</text></a></svg>',
+      '<svg><image href="&#104;ttps://tracker.test/p.png"/></svg>',
     ]) assert.match(svgProblem(unsafe) ?? '', /scripts or links/, unsafe);
+    assert.equal(svgProblem('<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a"/><text>Fish &amp; Chips</text></svg>'), null, 'xlink, its own ids and an escaped & are fine');
     assert.equal(svgProblem('<svg><use href="#a"/><rect fill="url(#g)"/><image href="data:image/png;base64,AAAA"/></svg>'), null, 'its own parts and an embedded picture are fine');
     assert.match(svgProblem('<html>not a picture</html>') ?? '', /isn't an SVG/);
   });
@@ -163,6 +172,14 @@ async function main(): Promise<void> {
     assert.equal(logoKindOfName('A.PNG'), 'png');
     const long = [...logoNames(`${'ö'.repeat(150)}.theme.md`, 'png')][0];
     assert.ok(Buffer.byteLength(long) < 255, 'within a file name\'s 255 bytes');
+  });
+
+  await test('the review of #785: the fonts go back with a logo that can\'t be written; the wall reads the theme at its first look', () => {
+    const publish = fs.readFileSync(path.join(extension, 'src/decks/deckPublish.ts'), 'utf8');
+    assert.ok(publish.indexOf('fonts = fontsWritten;') < publish.indexOf('await writePageFonts(nodeFontFs, deckPath, logoFiles, LOGO_PLACE)'), 'the fonts are kept for taking back before the logo is written');
+    const presenter = fs.readFileSync(path.join(extension, 'src/decks/present/DeckPresenter.ts'), 'utf8');
+    assert.match(presenter, /theme: \{ path: UNREAD_THEME, value: BUILT_IN_THEME \}/, 'a deck naming no theme reads the project\'s own Evening on the wall too');
+    assert.match(fs.readFileSync(path.join(extension, 'src/decks/themePages.ts'), 'utf8'), /createFileSystemWatcher\(`\*\*\/\$\{THEMES_FOLDER\}\/\*\*\/\*\.\{svg,png,SVG,PNG\}`\)/, 'a logo put back is drawn again');
   });
 
   // ---- The place and title-only rules, and a missing file
