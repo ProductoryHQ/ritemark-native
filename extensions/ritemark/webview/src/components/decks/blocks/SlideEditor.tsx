@@ -89,6 +89,8 @@ export interface SlideEditorProps {
   onSplit?: (before: string, after: string) => void
   /** PR 3: the slide is full (its words at their smallest step and still more than the slide holds), or no longer. */
   onFull?: (full: boolean) => void
+  /** PR 3: the bar's Split at the cursor found no caret on the slide to split at. */
+  onNeedCaret?: () => void
   /** PR 3: the deck bar's Split at the cursor: each new number splits the slide at the caret. */
   splitRequest?: number
   /** PR 3: Settings' Add a row or Add a column, on the slide's table; each new serial adds one. */
@@ -175,10 +177,10 @@ function titleRange(doc: PMNode): { from: number; to: number } | null {
   return found
 }
 
-export function SlideEditor({ outer, slide, width, theme, borderless, assets, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, splitRequest, tableRequest, picture }: SlideEditorProps) {
+export function SlideEditor({ outer, slide, width, theme, borderless, assets, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, splitRequest, tableRequest, picture }: SlideEditorProps) {
   // The latest of the stage's callbacks, for the editor's extensions (made once per editor).
-  const actionsRef = useRef({ onNewSlideBelow, onSplit, onFull })
-  actionsRef.current = { onNewSlideBelow, onSplit, onFull }
+  const actionsRef = useRef({ onNewSlideBelow, onSplit, onFull, onNeedCaret })
+  actionsRef.current = { onNewSlideBelow, onSplit, onFull, onNeedCaret }
   const slideRef = useRef(slide)
   slideRef.current = slide
   const assetsRef = useRef(assets)
@@ -198,6 +200,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   const heldRef = useRef(false)
   /** Is the slide full: its words at the smallest step and still more than it holds (told to the deck's bar). */
   const fullRef = useRef(false)
+  /** PR 3: where the person last had the caret on this slide (the bar's Split at the cursor splits there); null before. */
+  const lastCaret = useRef<number | null>(null)
   const outerRef = useRef(outer)
   outerRef.current = outer
 
@@ -320,11 +324,23 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
         heldRef.current = true
         return
       }
-      writeNow(updated)
+      // The change that closed the menu (its item, a space): what waited is written with it, as one step.
+      if (heldRef.current) flushHeld(updated)
+      else writeNow(updated)
     },
-    // The / menu closed without a change (Esc, the caret moved away): what waited is written now.
-    onTransaction: ({ editor: updated }) => flushHeld(updated),
-    onBlur: ({ editor: updated }) => flushHeld(updated),
+    // The / menu closed with no change of the words (the caret moved away): what waited is written now. A change of
+    // the words is the update's (above), so a block's own undo step is known before it is written (review of #769).
+    onTransaction: ({ editor: updated, transaction }) => {
+      if (!transaction.docChanged) flushHeld(updated)
+      // The / menu's Picture goes where the / was, through whatever changes while the host saves it.
+      if (transaction.docChanged && pictureAt.current !== null) pictureAt.current = transaction.mapping.map(pictureAt.current)
+      if (transaction.docChanged && lastCaret.current !== null) lastCaret.current = transaction.mapping.map(lastCaret.current)
+    },
+    // Leaving the slide writes what waited even with the menu still open (its query is words then, as typed): a slide
+    // left for another is never left with words unwritten (review of #769).
+    onBlur: ({ editor: updated }) => flushHeld(updated, true),
+    onFocus: ({ editor: updated }) => { lastCaret.current = updated.state.selection.from },
+    onSelectionUpdate: ({ editor: updated }) => { if (updated.isFocused) lastCaret.current = updated.state.selection.from },
   }, [extensions])
   // The slide's sync, made with the editor from the Markdown it was made with.
   if (editor && syncEditor.current !== editor) {
@@ -349,8 +365,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   }
 
   /** Words held while the / menu was open (or an input method composed): written once neither is so. */
-  function flushHeld(current: TipTapEditor | CoreEditor) {
-    if (!heldRef.current || current.isDestroyed || current.view.composing || slashOpen(current.state)) return
+  function flushHeld(current: TipTapEditor | CoreEditor, leaving = false) {
+    if (!heldRef.current || current.isDestroyed || current.view.composing || (!leaving && slashOpen(current.state))) return
     heldRef.current = false
     const sync = syncRef.current
     if (!sync) return
@@ -479,9 +495,13 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   }
 
   /** Split slide here, at `pos` in `state`: the deck keeps the words before it on this slide and makes a new one below. */
-  const splitAt = (state: EditorState, pos: number) => {
+  const splitAt = (state: EditorState, pos: number): boolean => {
     const halves = splitSlideHalves(state, pos)
-    actionsRef.current.onSplit?.(markdownOfDoc(halves.before), markdownOfDoc(halves.after))
+    const before = markdownOfDoc(halves.before)
+    // A cut before everything would leave this slide empty and move it whole: nothing is split (review of #769).
+    if (!before.trim()) return false
+    actionsRef.current.onSplit?.(before, markdownOfDoc(halves.after))
+    return true
   }
 
   /** The / menu's Picture: the computer's file picker, then the host saves the picture beside the deck. */
@@ -593,7 +613,11 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   useEffect(() => {
     if (splitRequest === undefined || splitRequest === splitSeen.current) return
     splitSeen.current = splitRequest
-    if (editor && !editor.isDestroyed) splitAt(editor.state, editor.state.selection.from)
+    if (!editor || editor.isDestroyed) return
+    // Where the person last put the caret on this slide; without one (or before all its words) the bar says where to
+    // click instead of moving the slide whole (review of #769).
+    const at = lastCaret.current
+    if (at === null || at > editor.state.doc.content.size || !splitAt(editor.state, at)) actionsRef.current.onNeedCaret?.()
   })
   // Settings' Add a row or Add a column, on the slide's table.
   const tableSeen = useRef(tableRequest?.serial)

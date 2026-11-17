@@ -72,11 +72,18 @@ export function slideBlockNode(schema: Schema, kind: SlideBlockKind): PMNode {
 /**
  * Put `node` where the / was (`at`, after its text is taken out): in place of the empty line it stood on, else after
  * the block the caret is in, at the first level that can hold it. The caret goes into the new block's first line.
+ * An empty heading (the slide's title waiting for its words) is never replaced: the block goes after it. Nothing goes
+ * inside a table: a Markdown table's cell holds one line, so the block goes after the table (review of #769).
  */
 export function insertSlideBlock(tr: Transaction, at: number, node: PMNode): Transaction {
   const $pos = tr.doc.resolve(Math.max(0, Math.min(at, tr.doc.content.size)))
+  // The shallowest table on the way down: the levels from there on can't hold a block.
+  let tableDepth = -1
+  for (let depth = 1; depth <= $pos.depth; depth++) {
+    if (isTablePart($pos.node(depth))) { tableDepth = depth; break }
+  }
   let placed = -1
-  if ($pos.depth > 0 && $pos.parent.isTextblock && $pos.parent.content.size === 0) {
+  if (tableDepth < 0 && $pos.depth > 0 && $pos.parent.type.name === 'paragraph' && $pos.parent.content.size === 0) {
     const depth = $pos.depth
     const holder = $pos.node(depth - 1)
     const index = $pos.index(depth - 1)
@@ -89,7 +96,7 @@ export function insertSlideBlock(tr: Transaction, at: number, node: PMNode): Tra
     placed = $pos.pos
     tr.insert(placed, node)
   }
-  for (let depth = $pos.depth - 1; placed < 0 && depth >= 0; depth--) {
+  for (let depth = (tableDepth < 0 ? $pos.depth : tableDepth) - 1; placed < 0 && depth >= 0; depth--) {
     // After the child that holds the caret at this level, where that level can hold the block.
     const index = $pos.index(depth) + 1
     if (!$pos.node(depth).canReplaceWith(index, index, node.type)) continue

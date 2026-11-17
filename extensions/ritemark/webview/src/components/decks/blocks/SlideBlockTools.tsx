@@ -137,10 +137,12 @@ function PillInput({ edit, placeholder, onWords, onDone, onUndo }: PillFieldProp
 /** A web page's address as the slide keeps it: http or https only, as typed; null for anything else. */
 export function webPageAddress(typed: string): string | null {
   const text = typed.trim()
-  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`
+  // A scheme only before `//` (`https://`, `file:///`): `localhost:3000` is a host and its port (review of #769), and
+  // a `javascript:` or `data:` text read as a host never parses as one.
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`
   try {
     const url = new URL(withScheme)
-    if ((url.protocol !== 'https:' && url.protocol !== 'http:') || !url.hostname || /\s/.test(text)) return null
+    if ((url.protocol !== 'https:' && url.protocol !== 'http:') || !url.hostname || url.username || url.password || /\s/.test(text)) return null
     return withScheme
   } catch {
     return null

@@ -102,7 +102,8 @@ class SlideDivView implements NodeView {
   private onIconClick = (event: MouseEvent) => {
     event.preventDefault()
     const pos = this.getPos()
-    if (pos === undefined || !this.handlers || !this.deco || this.deco.hidden) return
+    // Only an icon or its place: the Arrows look's arrow is drawn, never chosen (review of #769).
+    if (pos === undefined || !this.handlers || !this.deco || this.deco.hidden || !this.deco.classList.contains('is-pickable')) return
     this.handlers.pickIcon(pos, this.deco, slideIcon(attributesOf(this.node).values.icon)?.name ?? null)
   }
 

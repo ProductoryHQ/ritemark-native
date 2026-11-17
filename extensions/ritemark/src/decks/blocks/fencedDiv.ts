@@ -126,7 +126,8 @@ export function fencedDivStart(src: string): number | undefined {
  * double quote; a value with both keeps its words with a typographic quote. A line break is a space.
  */
 export function fenceAttributeValue(value: string): string {
-  const words = value.replace(/[\r\n]+/g, ' ');
+  // A brace would end the {…} block early and the block would read as text (security review of #769): a full-width one.
+  const words = value.replace(/[\r\n]+/g, ' ').replace(/}/g, '\uff5d').replace(/{/g, '\uff5b');
   if (!words.includes('"')) return `"${words}"`;
   if (!words.includes("'")) return `'${words}'`;
   return `"${words.replace(/"/g, '”')}"`;

@@ -51,6 +51,7 @@ interface StageProps {
   onNewSlideBelow?: () => void
   onSplit?: (before: string, after: string) => void
   onFull?: (full: boolean) => void
+  onNeedCaret?: () => void
   splitRequest?: number
   tableRequest?: { what: 'row' | 'column'; serial: number } | null
   picture?: { path: string; url: string; serial: number } | null
@@ -62,7 +63,7 @@ export function Stage(props: StageProps) {
   return <LayoutStage {...props} />
 }
 
-function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, splitRequest, tableRequest, picture }: StageProps) {
+function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, splitRequest, tableRequest, picture }: StageProps) {
   // A request that comes after the stage is drawn (a deck New made, already shown) is taken once it changes.
   const focusTitle = useMemo(() => (initialFocus ? { select: !!selectOnFocus } : null), [initialFocus, selectOnFocus])
   return (
@@ -84,6 +85,7 @@ function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting
         onNewSlideBelow={onNewSlideBelow}
         onSplit={onSplit}
         onFull={onFull}
+        onNeedCaret={onNeedCaret}
         splitRequest={splitRequest}
         tableRequest={tableRequest}
         picture={picture}

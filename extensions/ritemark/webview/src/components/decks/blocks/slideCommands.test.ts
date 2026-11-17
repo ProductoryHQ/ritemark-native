@@ -233,6 +233,34 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
   assertStable(saved, 'picture')
 }
 
+// ---- Review of #769: a block chosen in a table cell goes after the table (a Markdown cell holds one line), and one
+// chosen on an empty title goes after it (the title stays); a host and its port is a web address.
+{
+  const inTable = EditorState.create({ doc: loadSlide('# Plan\n\n| A | B |\n| --- | --- |\n|  | x |') })
+  let cell = -1
+  inTable.doc.descendants((node, pos) => { if (cell < 0 && node.type.name === 'tableCell') cell = pos + 2; return cell < 0 })
+  for (const kind of ['boxes', 'table'] as SlideBlockKind[]) {
+    const tr = insertSlideBlock(inTable.tr, cell, slideBlockNode(inTable.schema, kind))
+    const saved = slideSave(tr.doc)
+    assert.ok(saved.startsWith('# Plan\n\n| A | B |\n| --- | --- |\n| | x |\n\n'), `${kind} after the table: ${saved}`)
+    assert.equal(lexBlockSlide(saved).filter(token => token.type === 'table').length, kind === 'table' ? 2 : 1)
+  }
+  const titled = EditorState.create({ doc: loadSlide('') })
+  const emptyTitle = titled.doc.type.schema.nodes.doc.create(null, [titled.schema.nodes.heading.create({ level: 1 })])
+  const state = EditorState.create({ doc: emptyTitle })
+  const tr = insertSlideBlock(state.tr, 1, slideBlockNode(state.schema, 'boxes'))
+  assert.equal(tr.doc.firstChild?.type.name, 'heading', 'the empty title stays')
+  assert.equal(tr.doc.child(1).type.name, 'slideDiv', 'the block under it')
+  // A brace in a typed pill can't end the {…} block: the block stays a block.
+  const braced = withFenceValue('::: steps', 'tag', 'a}b')!
+  assert.equal(braced, '::: {.steps tag="a｝b"}')
+  assert.equal(OPEN_FENCE.test(braced), true)
+  assert.equal(webPageAddress('localhost:3000'), 'https://localhost:3000')
+  assert.equal(webPageAddress('example.com:8080/x'), 'https://example.com:8080/x')
+  assert.equal(webPageAddress('mailto:a@b.com'), null, 'no credentials in a page address')
+  assert.equal(webPageAddress('https://user:pw@example.com'), null)
+}
+
 // ---- Empty boxes survive save and reopen (PR 2's gap: a new Boxes slide's boxes dropped out at its first write).
 {
   const boxes = starterMarkdown('boxes')

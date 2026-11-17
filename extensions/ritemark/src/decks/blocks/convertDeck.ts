@@ -16,8 +16,8 @@
  */
 import { isSlideKind, parseDeck, parseFrom, slideDataOf, writeFrom, writeSlideBlock, writeSlideData, type SlideData } from '../deckFormat';
 import { slideStamp, slideStamps } from '../deckLibraryFormat';
-import { attributeValue, legacyDataToBlocks } from './legacyToBlocks';
-import { OPEN_FENCE, parseFenceAttributes } from './fencedDiv';
+import { legacyDataToBlocks } from './legacyToBlocks';
+import { OPEN_FENCE, parseFenceAttributes, withFenceValue } from './fencedDiv';
 
 /** Does a slide of this kind convert to a block slide: a v1 slide of one of the nine kinds. */
 export function convertsToBlocks(kind: string): boolean {
@@ -168,11 +168,10 @@ export function withStepsTag(markdown: string, tag: string): string {
     const open = OPEN_FENCE.exec(line);
     const attrs = open ? parseFenceAttributes(open[2]) : null;
     if (!open || !attrs || !attrs.classes.includes('steps')) continue;
-    if ((attrs.values.tag ?? null) === tag) return markdown;
-    const indent = /^ */.exec(line)?.[0] ?? '';
-    const others = Object.entries(attrs.values).filter(([key]) => key !== 'tag').map(([key, value]) => ` ${key}=${attributeValue(value)}`).join('');
-    const classes = attrs.classes.map(name => `.${name}`).join(' ');
-    lines[index] = `${indent}${open[1]} {${attrs.id ? `#${attrs.id} ` : ''}${classes} tag=${attributeValue(tag)}${others}}`;
+    // The one writer of an opening line's value, as the stage's pill field uses it (review of #769).
+    const next = withFenceValue(line, 'tag', tag);
+    if (next === null || next === line) return markdown;
+    lines[index] = next;
     return lines.join('\n');
   }
   return markdown;

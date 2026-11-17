@@ -1252,6 +1252,8 @@ export function DeckView({
     setFocusTitleOf({ index: shown + 1, select: false })
     requestAnimationFrame(() => pick(shown + 1))
   }, [editor, dispatch, shown, pick])
+  // The bar's Split at the cursor with no caret on the slide: it says where to click, and splits nothing.
+  const needCaret = useCallback(() => setNotice({ text: 'Click on the slide where it should split, then Split at the cursor.' }), [])
   /** A block slide with a table: Settings' Add a row and Add a column act on it through the slide editor. */
   const blockTable = slideShown && !!slide && isBlockSlide(slide.kind) && blockHasTable(slide.data.markdown ?? '')
 
@@ -1432,6 +1434,7 @@ export function DeckView({
                   onNewSlideBelow={onNewSlideBelow}
                   onSplit={onSplit}
                   onFull={setSlideFull}
+                  onNeedCaret={needCaret}
                   splitRequest={splitRequest}
                   tableRequest={tableRequest}
                   picture={stagePicture && stagePicture.slideId === slide.data.id ? stagePicture : null}
