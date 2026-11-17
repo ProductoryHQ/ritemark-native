@@ -25,7 +25,8 @@ import { isRelativeTarget } from '../deckLibraryFormat';
 import { slideMarkup, escapeHtml } from '../../../webview/src/components/decks/slide/slideMarkup';
 import { themeStyle, themeVars } from '../../../webview/src/components/decks/theme/themeVars';
 import { iconSvg } from '../../../webview/src/components/decks/slide/pageIcons';
-import { MARKED_OPTIONS, lexHandout, type PublicDeck, type PublicSlide } from './publicDeck';
+import { MARKED_OPTIONS, PICTURE_EXTENSIONS, lexHandout, type PublicDeck, type PublicSlide } from './publicDeck';
+import { lookOf, pictureMarkup, type ImageTokenWithLook } from '../../markdown/pictureLook';
 import { PAGE_SCRIPT } from './pageScript';
 
 export { lexHandout };
@@ -213,6 +214,18 @@ class HandoutRenderer extends marked.Renderer {
   }
 }
 
+/** The handout's pictures with their looks: the renderer's own picture, then its size, crop and caption around it. */
+const handoutPictureExtensions = {
+  ...PICTURE_EXTENSIONS,
+  renderers: {
+    ...(PICTURE_EXTENSIONS?.renderers ?? {}),
+    image(this: { parser: { renderer: InstanceType<typeof marked.Renderer> } }, token: ImageTokenWithLook): string {
+      const html = this.parser.renderer.image(token.href, token.title, token.text);
+      return token.picture ? pictureMarkup(html, lookOf(token.picture), { caption: token.text }) : html;
+    },
+  },
+} as unknown as typeof PICTURE_EXTENSIONS;
+
 /** A label over a prompt: a short paragraph in capitals ("TRY IT", "PROMPT") just before a code block. */
 const PROMPT_LABEL = /^[A-Z0-9][A-Z0-9 .,'’&:!?-]{0,28}$/;
 
@@ -235,7 +248,8 @@ function handoutParts(markdown: string, options: { partKey: string; exercise: bo
   const ownHeading = first?.type === 'heading' && (first as { depth: number }).depth <= 2;
   renderer.partHeading = ownHeading && options.partHeading === true;
   // The parser only renders tokens; the lexer above is where the handout is read, and the one place raw mode is kept out.
-  const parser = new marked.Parser({ ...MARKED_OPTIONS, renderer });
+  // Experience 49: a picture drawn with its look (size, alignment, crop, caption), its block never as words.
+  const parser = new marked.Parser({ ...MARKED_OPTIONS, renderer, extensions: handoutPictureExtensions });
   let out = '';
   tokens.forEach((token: Token, index: number) => {
     if (token.type === 'list' && token.ordered && options.exercise) {
@@ -332,6 +346,18 @@ svg { flex: none; }
 .part li > p { margin: 0 0 6px; }
 .part a, .pre a { color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: 2px; }
 .part img, .pre img { display: block; max-width: 100%; height: auto; margin: 4px 0 14px; border-radius: 8px; }
+/* Experience 49: a picture's look (pictureLook.ts): its frame crops it in its box and holds its caption. */
+.part .pic, .pre .pic { margin: 4px 0 14px; }
+.part .pic img, .pre .pic img { margin: 0; border-radius: 0; }
+.pic-box { border-radius: 8px; }
+.deck-sl .pic-box { border-radius: var(--s-r2, 10px); }
+.pic-cap { display: block; margin-top: 6px; font-size: .88em; line-height: 1.4; opacity: .75; }
+/* A click on a picture opens it full size (always on the page, never in the editor). */
+.part img, .pre img, .stage .deck-sl .blk-pic, .stage .deck-sl .pic img, .stage .deck-sl .photo:not(.empty) { cursor: zoom-in; }
+.zoom { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(10, 11, 30, .86); cursor: zoom-out; }
+.zoom[hidden] { display: none; }
+.zoom > img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; margin: 0; border-radius: 8px; box-shadow: 0 18px 60px rgba(0, 0, 0, .45); object-fit: contain; }
+.zoom > .zoom-photo { width: 100%; height: 100%; background-size: contain; background-repeat: no-repeat; background-position: center; }
 .part blockquote, .pre blockquote { margin: 0 0 14px; padding: 2px 0 2px 14px; border-left: 3px solid var(--line); color: var(--muted); }
 .part hr, .pre hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
 .part code, .pre code { font: 400 .9em/1.5 ui-monospace, Menlo, Consolas, monospace; background: var(--soft); padding: 1px 5px; border-radius: 5px; }
@@ -563,6 +589,8 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     '</section>',
     '</main>',
     '<div class="toast" id="toast" role="status" hidden></div>',
+    // Experience 49: the full-size view of a picture; the page's script puts a copy of the clicked picture in it.
+    '<div class="zoom" id="zoom" role="dialog" aria-modal="true" aria-label="The picture, full size" tabindex="-1" hidden></div>',
     `<script>${SCRIPT_TEXT}</script>`,
     '</body>',
     '</html>',

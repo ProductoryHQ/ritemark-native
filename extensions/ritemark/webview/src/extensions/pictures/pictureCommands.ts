@@ -1,0 +1,150 @@
+/**
+ * One picture editor (experience 49): what the picture's bar, its handles and its keys do, as ProseMirror
+ * transactions. The same commands for the Text editor and the slide editor; each is one undo step of its own (the
+ * document editor's history, or the deck's through the slide's `SLIDE_COMMAND`).
+ *
+ * A picture's file is never changed: size, alignment, crop and caption go into the image node's `picture` attribute
+ * (its attribute block, `pictureLook.ts`), its description into `alt`, and Remove takes the node away, never the file.
+ */
+import type { Node as PMNode } from '@tiptap/pm/model'
+import { NodeSelection, PluginKey, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
+import { closeHistory } from '@tiptap/pm/history'
+import { lookOf, withLook, type PictureLook, type Region } from '../../../../src/markdown/pictureLook'
+
+/** The slide editor's "an undo step of its own" meta (`slideCommands.ts`' `SLIDE_COMMAND`), set by every command. */
+const SLIDE_COMMAND = 'deckSlideCommand'
+
+/** A transaction from the picture's tools (the bar keeps it open across its own changes). */
+export const PICTURE_COMMAND = 'pictureCommand'
+
+export interface ChosenPicture {
+  pos: number
+  node: PMNode
+}
+
+/** The picture the selection holds (a click on a picture selects it whole), or null. */
+export function chosenPicture(state: EditorState): ChosenPicture | null {
+  const selection = state.selection
+  if (!(selection instanceof NodeSelection) || selection.node.type.name !== 'image') return null
+  return { pos: selection.from, node: selection.node }
+}
+
+/** Is the selection a picture? The text's bubble menu never shows over one (experience 49). */
+export function isPictureSelection(selection: EditorState['selection']): boolean {
+  return selection instanceof NodeSelection && selection.node.type.name === 'image'
+}
+
+function ownStep(tr: Transaction): Transaction {
+  closeHistory(tr)
+  tr.setMeta(SLIDE_COMMAND, true)
+  tr.setMeta(PICTURE_COMMAND, true)
+  return tr
+}
+
+function pictureAt(state: EditorState, pos: number): PMNode | null {
+  const node = state.doc.nodeAt(pos)
+  return node && node.type.name === 'image' ? node : null
+}
+
+/** The look with `change` laid over it; a key set to undefined goes. */
+export function changedLook(look: PictureLook, change: Partial<PictureLook>): PictureLook {
+  const next: PictureLook = { ...look }
+  for (const [key, value] of Object.entries(change) as [keyof PictureLook, PictureLook[keyof PictureLook]][]) {
+    if (value === undefined) delete next[key]
+    else (next as Record<string, unknown>)[key] = value
+  }
+  return next
+}
+
+/** Set part of a picture's look (size, alignment, crop, caption). Null when nothing would change. */
+export function setPictureLook(state: EditorState, pos: number, change: Partial<PictureLook>): Transaction | null {
+  const node = pictureAt(state, pos)
+  if (!node) return null
+  const written = (node.attrs.picture as string | null) ?? ''
+  const block = withLook(written, changedLook(lookOf(written), change))
+  if (block === written) return null
+  const tr = state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, picture: block || null })
+  tr.setSelection(NodeSelection.create(tr.doc, pos))
+  return ownStep(tr)
+}
+
+/** The picture's description (its `alt`): what a screen reader and a published page read, and its caption. */
+export function setPictureAlt(state: EditorState, pos: number, alt: string): Transaction | null {
+  const node = pictureAt(state, pos)
+  const words = alt.replace(/[\r\n]+/g, ' ')
+  if (!node || (node.attrs.alt ?? '') === words) return null
+  const tr = state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, alt: words })
+  tr.setSelection(NodeSelection.create(tr.doc, pos))
+  return ownStep(tr)
+}
+
+/** The Description's Done: the words and whether they show as a caption, together, as one undo step. */
+export function setPictureWords(state: EditorState, pos: number, alt: string, caption: boolean): Transaction | null {
+  const node = pictureAt(state, pos)
+  if (!node) return null
+  const words = alt.replace(/[\r\n]+/g, ' ')
+  const written = (node.attrs.picture as string | null) ?? ''
+  const block = withLook(written, changedLook(lookOf(written), { caption: caption || undefined }))
+  if ((node.attrs.alt ?? '') === words && block === written) return null
+  const tr = state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, alt: words, picture: block || null })
+  tr.setSelection(NodeSelection.create(tr.doc, pos))
+  return ownStep(tr)
+}
+
+/** Remove the picture from the document (its file stays where it is); the caret goes where it was. */
+export function removePicture(state: EditorState, pos: number): Transaction | null {
+  const node = pictureAt(state, pos)
+  if (!node) return null
+  const tr = state.tr.delete(pos, pos + node.nodeSize)
+  tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(pos, tr.doc.content.size))))
+  return ownStep(tr)
+}
+
+/**
+ * Another picture in this one's place (Replace picture…, or a paste or drop onto it): its size, alignment and
+ * description stay; the crop, made for the old picture's shape, goes.
+ */
+export function replacePicture(state: EditorState, pos: number, picture: { src: string; title: string }): Transaction | null {
+  const node = pictureAt(state, pos)
+  if (!node) return null
+  const written = (node.attrs.picture as string | null) ?? ''
+  const block = withLook(written, changedLook(lookOf(written), { crop: undefined, zoom: undefined, focus: undefined }))
+  const tr = state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: picture.src, title: picture.title, picture: block || null })
+  tr.setSelection(NodeSelection.create(tr.doc, pos))
+  return ownStep(tr)
+}
+
+/** Esc on a chosen picture: the caret right after it, so typing goes on there. */
+export function leavePicture(state: EditorState): Transaction | null {
+  const chosen = chosenPicture(state)
+  if (!chosen) return null
+  const after = chosen.pos + chosen.node.nodeSize
+  return state.tr.setSelection(TextSelection.near(state.doc.resolve(after), 1))
+}
+
+// ---------------------------------------------------------------------------
+// Crop mode: a frame over the picture, kept outside the document until Done
+// ---------------------------------------------------------------------------
+
+export interface CropState {
+  /** The picture being cropped. */
+  pos: number
+  /** The picture's own shape, width over height. */
+  aspect: number
+  /** The frame as it is being drawn. */
+  region: Region
+  /** The shape chosen (a preset's ratio, `null` for Original), or undefined for a free frame. */
+  ratio: string | null | undefined
+}
+
+export const PICTURE_CROP = new PluginKey<CropState | null>('pictureCrop')
+
+/** The crop being drawn, if any. */
+export function cropOf(state: EditorState): CropState | null {
+  return PICTURE_CROP.getState(state) ?? null
+}
+
+/** A transaction that starts, changes or ends crop mode (no change to the document, nothing to undo). */
+export function cropMeta(state: EditorState, crop: CropState | null): Transaction {
+  return state.tr.setMeta(PICTURE_CROP, { crop }).setMeta('addToHistory', false)
+}

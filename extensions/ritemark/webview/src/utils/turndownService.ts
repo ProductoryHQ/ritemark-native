@@ -1,6 +1,7 @@
 import TurndownService from 'turndown'
 import { tables, taskListItems } from 'turndown-plugin-gfm'
 import { isRelativeImagePath, isWebviewResourceUri } from '../../../src/utils/imagePaths'
+import { parsePictureBlock } from '../../../src/markdown/pictureLook'
 import { addMathTurndownRules } from '../extensions/math/mathTurndownRules'
 import { addAsWrittenTurndownRules, blockImage, escapeTextRun, neutraliseBrackets, wrapMarked } from './markdownAsWritten'
 
@@ -106,7 +107,9 @@ export function createTurndownService(): TurndownService {
       const src = title.startsWith('./') || (isRelativeImagePath(title) && isWebviewResourceUri(displaySrc))
         ? title
         : displaySrc
-      return blockImage(`![${alt}](${src})`, el)
+      // Experience 49: the picture's look, as written beside it, only a block the editors read (never other words).
+      const block = el.getAttribute('data-picture') ?? ''
+      return blockImage(`![${alt}](${src})${parsePictureBlock(block) ? block : ''}`, el)
     },
   })
 

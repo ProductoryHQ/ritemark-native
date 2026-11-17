@@ -33,7 +33,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { PluginKey, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { closeHistory } from '@tiptap/pm/history'
-import { blockTitleOf, isBlockSlide, withBlockMarkdown, type SlideData } from '../../../../../src/decks/deckFormat'
+import { blockTitleOf, isBlockSlide, slideDataOf, withBlockMarkdown, writeSlideData, type SlideData } from '../../../../../src/decks/deckFormat'
 import { blockDataOf } from '../../../../../src/decks/blocks/convertDeck'
 import { OPEN_FENCE, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, isCoverSlide, sidePictureOf, stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
@@ -51,7 +51,6 @@ import { slideDivWithView, type SlideDivHandlers } from './slideDivView'
 import { ensureSlideCommentPipeline, markdownToSlideEditorHTML, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
 import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, setStageFit } from './slideFit'
 import { SLIDE_MISSING_PICTURES, SlidePicture, imagePathOf, slideMissingPictures } from './slidePictures'
-import { missingHtml } from '../../../../../src/decks/blocks/slideRenderer'
 import { Button } from '../../ui/button'
 import { Tooltip } from '../../ui/tooltip'
 import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, isOwnStep, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
@@ -64,6 +63,12 @@ import { isMac } from '../../../hooks/usePlatform'
 import { TableHandles, tableHandlesEnabled, tableMenuTargetAt } from '../../../extensions/tables/TableHandles'
 import { TableHandlesLayer, useAltHeld } from '../../tables/TableHandlesLayer'
 import { TableMenuItems, runClipboardEdit, type MenuKit, type TableMenuTarget } from '../../tables/TableMenuItems'
+import { PictureTools } from '../../pictures/PictureTools'
+import { chosenPicture, leavePicture, replacePicture as pictureReplaced } from '../../../extensions/pictures/pictureCommands'
+import { topBlockAt } from './slideCommentPlace'
+import { sendToExtension } from '../../../bridge'
+import { SidePicture } from './SidePicture'
+import { EMPTY_SIDE, flowToSide, sideToText, type SideHeader } from './slidePicturePlace'
 
 export interface SlideEditorProps {
   /** The handout's editor, which holds the deck: the slide is written to its node there, and its history is the undo. */
@@ -414,9 +419,17 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     writeNow(current)
   }
 
-  /** A picture from the computer onto the slide: pasted (unless words are being pasted) or dropped. */
+  /**
+   * A picture from the computer onto the slide: pasted (unless words are being pasted) or dropped. Onto a chosen picture
+   * it replaces it (experience 49); onto the chosen side picture, the slide's place takes it, as before.
+   */
   function takePicture(transfer: DataTransfer | null, pasted: boolean): boolean {
-    return takeImageFile(transfer, pasted, (dataUrl, filename) => onPictureRef.current(dataUrl, filename))
+    const chosen = editor && !editor.isDestroyed ? chosenPicture(editor.state) : null
+    return takeImageFile(transfer, pasted, (dataUrl, filename) => {
+      if (!chosen) return onPictureRef.current(dataUrl, filename)
+      replaceAt.current = chosen.pos
+      onPictureRef.current(dataUrl, filename, true)
+    })
   }
 
   // A change of the node from elsewhere (an undo, an AI's edit): its smallest replacement, once no input method composes.
@@ -775,8 +788,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     replaceAt.current = null
     const old = replacing === null ? null : editor.state.doc.nodeAt(replacing)
     if (replacing !== null && old?.type.name === 'image') {
-      // A / menu picture still on its way keeps its place (review of #771).
-      apply(editor.state.tr.setNodeMarkup(replacing, undefined, { ...old.attrs, src: picture.url, title: picture.path }))
+      // A / menu picture still on its way keeps its place (review of #771). Experience 49: its size and words stay, a
+      // crop made for the old picture's shape goes.
+      apply(pictureReplaced(editor.state, replacing, { src: picture.url, title: picture.path }))
       return
     }
     const at = Math.min(pictureAt.current ?? editor.state.doc.content.size, editor.state.doc.content.size)
@@ -814,6 +828,59 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     if (editor) runClipboardEdit(editor, command)
   }
 
+  // ---- Experience 49: the picture's place (In text · Left · Right · Behind), and the side picture's own tools
+
+  /**
+   * Write the slide's words (null: as they are) and header keys together, as one undo step in the deck, converting the
+   * deck first when it holds v1 slides. The stage takes the new words in as a change from elsewhere.
+   */
+  const writeSlide = (markdown: string | null, change: SideHeader) => {
+    const deck = outerRef.current
+    if (deck.isDestroyed) return
+    const entry = freshEntry(deck, slideRef.current)
+    if (!entry) return
+    const tr = deck.state.tr
+    closeHistory(tr)
+    convertDeckInto(tr)
+    const pos = tr.mapping.map(entry.pos)
+    const node = tr.doc.nodeAt(pos)
+    if (!node || node.type.name !== 'deckSlide' || !isBlockSlide(node.attrs.kind)) return
+    let body = String(node.attrs.body ?? '')
+    if (markdown !== null) body = withBlockMarkdown(body, markdown)
+    body = writeSlideData(node.attrs.kind, body, { ...slideDataOf(node.attrs.kind, body), ...change })
+    if (body === node.attrs.body && !tr.docChanged) return
+    tr.setNodeMarkup(pos, undefined, { ...node.attrs, body })
+    deck.view.dispatch(tr)
+    onWritingRef.current()
+  }
+  const [sideChosen, setSideChosen] = useState(false)
+  /** Place on a picture in the words: Left, Right or Behind moves it to the slide's place (In text is where it is). */
+  const placeFlowPicture = (pos: number, place: 'text' | 'left' | 'right' | 'behind') => {
+    if (!editor || editor.isDestroyed || place === 'text') return
+    const current = sidePictureOf(header) && header.image?.trim() ? { image: header.image.trim(), alt: header.alt, url: assets[header.image.trim()] } : {}
+    const moved = flowToSide(editor.state, pos, place, current)
+    if (!moved) return
+    writeSlide(markdownOfDoc(moved.doc), moved.header)
+  }
+  /** Place on the side picture: another side, or In text (its line after the slide's words, and the place goes). */
+  const placeSidePicture = (place: 'text' | 'left' | 'right' | 'behind') => {
+    if (place !== 'text') {
+      writeSlide(null, { picture: place })
+      return
+    }
+    const moved = sideToText(editor && !editor.isDestroyed ? markdownOfDoc(editor.state.doc) : stageMarkdownOf(slide.kind, slide.data), header)
+    setSideChosen(false)
+    writeSlide(moved.markdown, moved.header)
+  }
+  /** The side picture chosen: the words' own picture is left, so one picture is chosen at a time. */
+  const chooseSide = () => {
+    if (editor && !editor.isDestroyed) {
+      const tr = leavePicture(editor.state)
+      if (tr) editor.view.dispatch(tr)
+    }
+    setSideChosen(true)
+  }
+
   const side = sidePictureOf(header)
   const sideUrl = side && header.image ? assets[header.image.trim()] : undefined
   const sideMissing = !!side && !sideUrl && !!header.image && missing.has(header.image.trim())
@@ -843,15 +910,29 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
         >
           <div className={classes} style={{ transform: `scale(${width / BLOCK_CANVAS_WIDTH})` }}>
             {side ? (
-              <>
-                {sideMissing && header.image ? (
-                  // The renderer's own words for a missing picture (escaped there), so the stage and its thumbnail agree.
-                  <div className="photo empty is-missing" data-picture={header.image.trim()} dangerouslySetInnerHTML={{ __html: missingHtml(header.image.trim()) }} />
-                ) : (
-                  <div className={`photo${sideUrl ? '' : ' empty'}`} style={sideUrl ? { backgroundImage: `url("${sideUrl.replace(/"/g, '%22')}")` } : undefined} />
-                )}
-                {side === 'behind' ? <div className="veil" /> : null}
-              </>
+              // Experience 49: the slide's picture beside or behind the words, with its own tools when chosen.
+              <SidePicture
+                side={side}
+                url={sideUrl}
+                path={header.image?.trim() ?? ''}
+                missing={sideMissing}
+                alt={header.alt ?? ''}
+                focus={header.focus}
+                chosen={sideChosen}
+                comments={!!commentCallouts}
+                onChoose={chooseSide}
+                onLeave={() => setSideChosen(false)}
+                onPlace={placeSidePicture}
+                onWords={alt => writeSlide(null, { alt: alt || undefined })}
+                onComment={() => {
+                  setSideChosen(false)
+                  if (editor && !editor.isDestroyed) startSlideComment(editor, { kind: 'slide' })
+                }}
+                onReplace={() => choosePicture(false)}
+                onReveal={() => { if (header.image?.trim()) sendToExtension('revealImage', { relativePath: header.image.trim() }) }}
+                onRemove={() => writeSlide(null, EMPTY_SIDE)}
+                onFocus={focus => writeSlide(null, { focus })}
+              />
             ) : null}
             <EditorContent editor={editor} />
           </div>
@@ -942,6 +1023,22 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     </ContextMenu>
     {/* Experience 48: the table's grips, + bars and menus, drawn in the table's own element. */}
     {SlideTableHandles ? <TableHandlesLayer editor={editor} /> : null}
+    {/* Experience 49: a chosen picture's ring, handles, crop frame and bar, drawn in the slide's canvas. */}
+    <PictureTools
+      editor={editor}
+      context="slide"
+      comments={!!commentCallouts}
+      onComment={pos => {
+        if (!editor || editor.isDestroyed) return
+        const top = topBlockAt(editor.state.doc, pos)
+        startSlideComment(editor, top === null ? { kind: 'slide' } : { kind: 'block', pos: top })
+      }}
+      onReplace={pos => {
+        pendingReplace.current = pos
+        choosePicture(true, true)
+      }}
+      onPlace={placeFlowPicture}
+    />
     {/* PR 3: a box's icon from the grid, the Steps pill's words typed in place, and the / menu's Web page. */}
     <PillField
       edit={pillEdit}

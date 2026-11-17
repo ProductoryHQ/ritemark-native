@@ -28,6 +28,7 @@
  * (`deckDigest`) is a hash of it, so an edit to anything private never shows the page as changed.
  */
 import { createHash } from 'node:crypto';
+import { pictureBlockTokenizer } from '../../markdown/pictureLook';
 import { marked, Tokenizer, type Token } from 'marked';
 import { blockTitleOf, frontMatterLook, isBlockSlide, isSlideKind, isTextHandout, parseDeck, slideDataOf, type SlideData, type SlideItem } from '../deckFormat';
 import { BLOCK_MAX_STEP, isCoverSlide, sidePictureOf } from '../blocks/slideRenderer';
@@ -171,6 +172,8 @@ export function publicSlide(kind: string, data: SlideData): { kind: string; data
     if (sidePictureOf(data)) {
       out.picture = data.picture;
       if (data.image !== undefined) out.image = data.image;
+      // Experience 49: what stays in view of it (its description is no part of the drawing: the slide is aria-hidden).
+      if (data.image !== undefined && data.focus !== undefined) out.focus = data.focus;
     }
     // A section (PR 3: the header's mark, no words): the page keeps its band, with or without a number.
     if (data.section === true) out.section = true;
@@ -201,8 +204,17 @@ function handoutTokenizer(): Tokenizer {
 
 /** A handout's Markdown as tokens, read the one way the page reads it (`pageFile.ts` finds its pictures with it too). */
 export function lexHandout(markdown: string): ReturnType<typeof marked.lexer> {
-  return marked.lexer(markdown, { ...MARKED_OPTIONS, tokenizer: handoutTokenizer() });
+  return marked.lexer(markdown, { ...MARKED_OPTIONS, tokenizer: handoutTokenizer(), extensions: PICTURE_EXTENSIONS });
 }
+
+/**
+ * Experience 49: a picture's attribute block (`{width=50% crop=16:9}`, `pictureLook.ts`) is read as the picture's, so it
+ * never shows on the page as words; the page draws the picture with its look (`pageHtml.ts`).
+ */
+export const PICTURE_EXTENSIONS = {
+  inline: [pictureBlockTokenizer.tokenizer],
+  renderers: { pictureBlock: () => '' },
+} as unknown as NonNullable<Parameters<typeof marked.lexer>[1]>['extensions'];
 
 // ---------------------------------------------------------------------------
 // A handout's Markdown

@@ -30,6 +30,9 @@ import {
   TextAlignCenter,
   TextAlignLeft,
   TextAlignRight,
+  Crop,
+  Rectangle,
+  SquareHalf,
   ArrowRight,
   ArrowUpRight,
   ArrowsClockwise,
@@ -370,6 +373,10 @@ const iconMap = {
   'text-align-center': TextAlignCenter,
   'text-align-left': TextAlignLeft,
   'text-align-right': TextAlignRight,
+  // Experience 49: the picture's bar (Crop; Place In text, and Left / Right as one half of a square, drawn mirrored).
+  'crop': Crop,
+  'rectangle': Rectangle,
+  'square-half': SquareHalf,
 } as const satisfies Record<string, PhosphorIconComponent>
 
 export type PhosphorIconName = keyof typeof iconMap

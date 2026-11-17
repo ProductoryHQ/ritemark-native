@@ -214,7 +214,8 @@ export function look(doc: PMNode): { json: unknown; html: string } {
     if (Array.isArray(value)) return value.map(strip)
     if (value && typeof value === 'object') {
       return Object.fromEntries(Object.entries(value as Record<string, unknown>)
-        .filter(([key]) => !/^md[A-Z]/.test(key))
+        // A picture with no look (experience 49's `picture`, null) looks as a picture did before it had one.
+        .filter(([key, item]) => !/^md[A-Z]/.test(key) && !(key === 'picture' && item === null))
         .map(([key, item]) => [key, strip(item)])
         // A node whose only attributes were as-written ones has none.
         .filter(([key, item]) => !(key === 'attrs' && item && typeof item === 'object' && Object.keys(item).length === 0)))

@@ -1,0 +1,299 @@
+/**
+ * One picture editor (experience 49, frames 31 and 32 of experience 46): the bar under a chosen picture, the same in a
+ * Text document and on a slide. Size S · M · L · Full, Align, Crop, the slide's Place, Description, Comment and ⋯;
+ * in crop mode the crop's shapes, Reset and Done.
+ *
+ * Presentational: what each control does comes in as a callback (`PictureTools` for a picture in the words, the slide
+ * editor for its side picture). The bar is drawn in the window (`document.body`) under the picture, at the window's own
+ * size, so it reads the same on a slide drawn small. A press on it keeps the editor's caret and selection; Esc leaves
+ * crop mode or the picture, and Enter is Done in crop mode. Its menu and its Description close on a press outside and
+ * on Esc (Radix).
+ *
+ * Room for the next PR: ChatGPT's "Make a new picture…" and "Change this picture…" go between Comment and ⋯.
+ */
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { CROP_PRESETS, PICTURE_SIZES, sizeOf, type PictureAlign, type PictureContext, type PictureLook, type PictureSize } from '../../../../src/markdown/pictureLook'
+import { Button } from '../ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { Icon, type PhosphorIconName } from '../ui/Icon'
+import { Input } from '../ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
+import { Switch } from '../ui/switch'
+import { Tooltip } from '../ui/tooltip'
+import { isMac } from '../../hooks/usePlatform'
+
+export type PicturePlace = 'text' | 'left' | 'right' | 'behind'
+
+export interface PictureBarProps {
+  /** The picture on the screen; null hides the bar. */
+  anchor: { left: number; top: number; width: number; height: number } | null
+  context: PictureContext
+  /** A picture in the words, or the slide's picture beside or behind them (it fills its place: no size or crop). */
+  kind: 'flow' | 'side'
+  look: PictureLook
+  alt: string
+  /** The picture has loaded (crop needs its shape). */
+  canCrop: boolean
+  /** Crop mode, with the shape chosen (`null` Original, undefined a free frame); null outside it. */
+  crop: { ratio: string | null | undefined } | null
+  /** The slide's Place group (slides only). */
+  place?: PicturePlace
+  /** Comments are on: the bar offers one on the picture. */
+  comments: boolean
+  /** An empty side place: there is no picture to describe, copy or show. */
+  empty?: boolean
+  onSize: (size: PictureSize) => void
+  onAlign: (align: PictureAlign) => void
+  onCrop: () => void
+  onCropShape: (ratio: string | null) => void
+  onCropReset: () => void
+  onCropDone: () => void
+  onCropCancel: () => void
+  onPlace?: (place: PicturePlace) => void
+  onWords: (alt: string, caption: boolean) => void
+  onComment?: () => void
+  onReplace: () => void
+  onCopy: () => void
+  onReveal: () => void
+  onRemove: () => void
+  /** Esc: the picture is left (the caret after it). */
+  onLeave: () => void
+  /** The bar's own element, so a press on it is never "outside". */
+  barRef?: (element: HTMLDivElement | null) => void
+}
+
+const SIZE_WORDS: Record<PictureSize, string> = { S: 'Small', M: 'Medium', L: 'Large', Full: 'The full width' }
+const ALIGNS: { value: PictureAlign; icon: PhosphorIconName; label: string }[] = [
+  { value: 'left', icon: 'text-align-left', label: 'Left' },
+  { value: 'center', icon: 'text-align-center', label: 'Centre' },
+  { value: 'right', icon: 'text-align-right', label: 'Right' },
+]
+const PLACES: { value: PicturePlace; icon: PhosphorIconName; mirrored?: boolean; label: string; tip: string }[] = [
+  { value: 'text', icon: 'rectangle', label: 'In text', tip: 'In the slide\'s words, where it is' },
+  // Phosphor's half square fills its right half: drawn mirrored for Left.
+  { value: 'left', icon: 'square-half', mirrored: true, label: 'Left', tip: 'The whole left side of the slide' },
+  { value: 'right', icon: 'square-half', label: 'Right', tip: 'The whole right side of the slide' },
+  { value: 'behind', icon: 'image', label: 'Behind', tip: 'Behind the slide\'s words' },
+]
+
+/** The file manager's name, as VS Code's own Reveal says it. */
+export const SHOW_IN_FILES = isMac ? 'Show in Finder' : 'Show in Explorer'
+
+function Divider() {
+  return <span aria-hidden className="mx-0.5 h-5 w-px shrink-0 bg-hairline" />
+}
+
+function Group({ label, children }: { label: string; children: ReactNode }) {
+  return <div role="group" aria-label={label} className="inline-flex shrink-0 items-center rounded-lg bg-surface-muted p-0.5">{children}</div>
+}
+
+function BarButton({ tip, active, onClick, children, disabled, label }: { tip: string; active?: boolean; onClick?: () => void; children: ReactNode; disabled?: boolean; label?: string }) {
+  return (
+    <Tooltip label={tip} side="bottom">
+      <Button
+        type="button"
+        variant="toolbar"
+        size="compact"
+        aria-label={label}
+        aria-pressed={active === undefined ? undefined : active}
+        data-state={active ? 'active' : undefined}
+        disabled={disabled}
+        className={active ? 'bg-surface shadow-[0_0_0_1px_var(--r-hairline)]' : undefined}
+        onClick={onClick}
+      >
+        {children}
+      </Button>
+    </Tooltip>
+  )
+}
+
+/** The Description: its words, and whether they show under the picture. */
+function DescriptionField({ alt, caption, onWords, disabled, withCaption }: { alt: string; caption: boolean; onWords: (alt: string, caption: boolean) => void; disabled?: boolean; withCaption: boolean }) {
+  const [open, setOpen] = useState(false)
+  const [words, setWords] = useState(alt)
+  const [shown, setShown] = useState(caption)
+  const done = () => {
+    onWords(words.trim(), shown && !!words.trim())
+    setOpen(false)
+  }
+  return (
+    <Popover
+      open={open}
+      onOpenChange={next => {
+        if (next) {
+          setWords(alt)
+          setShown(caption)
+        }
+        setOpen(next)
+      }}
+    >
+      <Tooltip label={disabled ? 'Add a picture first' : 'The words a screen reader and a published page read'}>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="toolbar" size="compact" disabled={disabled} data-state={open ? 'active' : undefined}>
+            <Icon name="text-t" size={14} tone="inherit" />
+            Description
+          </Button>
+        </PopoverTrigger>
+      </Tooltip>
+      <PopoverContent align="center" className="w-[300px]" onKeyDown={event => event.stopPropagation()}>
+        <form
+          className="flex flex-col gap-2.5"
+          onSubmit={event => {
+            event.preventDefault()
+            done()
+          }}
+        >
+          <label className="text-[12.5px] font-semibold text-ink-strong" htmlFor="picture-description">Description</label>
+          <Input id="picture-description" autoFocus value={words} placeholder="What the picture shows" onChange={event => setWords(event.target.value)} />
+          <p className="m-0 text-[12px] leading-[17px] text-ink-muted">What a screen reader and a published page read.</p>
+          {withCaption ? (
+            <label className="flex items-center justify-between gap-3 text-[13px] text-ink-body">
+              Show it as a caption
+              <Switch checked={shown} onCheckedChange={setShown} disabled={!words.trim()} aria-label="Show the description as a caption" />
+            </label>
+          ) : null}
+          <div className="flex justify-end gap-2 pt-1">
+            <Button type="button" variant="ghost" size="compact" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button type="submit" size="compact">Done</Button>
+          </div>
+        </form>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+export function PictureBar(props: PictureBarProps) {
+  const { anchor, context, kind, look, alt, canCrop, crop, place, comments, empty } = props
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [left, setLeft] = useState<number | null>(null)
+  const [top, setTop] = useState(0)
+
+  // Under the picture, centred on it, inside the window; over the picture's lower edge when there is no room below.
+  useLayoutEffect(() => {
+    const bar = ref.current
+    if (!anchor || !bar) return
+    const width = bar.offsetWidth
+    const height = bar.offsetHeight
+    const x = Math.max(8, Math.min(window.innerWidth - width - 8, anchor.left + anchor.width / 2 - width / 2))
+    const below = anchor.top + anchor.height + 10
+    const y = below + height + 8 <= window.innerHeight ? below : Math.max(8, anchor.top + anchor.height - height - 10)
+    setLeft(Math.round(x))
+    setTop(Math.round(y))
+  })
+
+  if (!anchor) return null
+  const size = sizeOf(look.width, context)
+  const keys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      if (crop) props.onCropCancel()
+      else props.onLeave()
+    } else if (event.key === 'Enter' && crop && !(event.target as HTMLElement).closest('input, textarea')) {
+      event.preventDefault()
+      props.onCropDone()
+    }
+  }
+
+  const bar = (
+    <div
+      ref={element => {
+        ref.current = element
+        props.barRef?.(element)
+      }}
+      role="toolbar"
+      aria-label={crop ? 'Crop the picture' : 'The picture'}
+      className="picture-bar fixed z-[60] flex items-center gap-1 rounded-xl bg-surface px-1.5 py-1 font-ui text-ink-strong shadow-[0_0_0_1px_var(--r-hairline),0_10px_28px_-10px_rgba(30,27,75,.3)]"
+      style={{ left: left ?? -9999, top }}
+      // The picture stays chosen and the caret where it is: a press on the bar never takes the editor's selection.
+      onMouseDown={event => { if (!(event.target as HTMLElement).closest('input, textarea')) event.preventDefault() }}
+      onKeyDown={keys}
+    >
+      {crop ? (
+        <>
+          <span className="px-1.5 text-[11px] font-semibold uppercase tracking-[.06em] text-ink-muted">Crop</span>
+          <Group label="Shape">
+            {CROP_PRESETS.map(preset => (
+              <BarButton key={preset.label} tip={preset.ratio ? `A ${preset.ratio} frame` : 'The picture\'s own shape'} active={crop.ratio === preset.ratio} onClick={() => props.onCropShape(preset.ratio)}>
+                {preset.label}
+              </BarButton>
+            ))}
+          </Group>
+          <Divider />
+          <BarButton tip="The whole picture again" onClick={props.onCropReset}>
+            <Icon name="arrow-counter-clockwise" size={14} tone="inherit" />
+            Reset
+          </BarButton>
+          <Tooltip label="Keep this crop (Enter)">
+            <Button type="button" size="compact" onClick={props.onCropDone}>
+              <Icon name="check" size={14} tone="inherit" />
+              Done
+            </Button>
+          </Tooltip>
+        </>
+      ) : (
+        <>
+          {kind === 'flow' ? (
+            <>
+              <Group label="Size">
+                {PICTURE_SIZES.map(option => (
+                  <BarButton key={option} tip={SIZE_WORDS[option]} active={size === option} onClick={() => props.onSize(option)}>
+                    {option}
+                  </BarButton>
+                ))}
+              </Group>
+              <Divider />
+              {ALIGNS.map(option => (
+                <BarButton key={option.value} tip={`Align ${option.label.toLowerCase()}`} label={`Align ${option.label.toLowerCase()}`} active={look.align === option.value} onClick={() => props.onAlign(option.value)}>
+                  <Icon name={option.icon} size={14} tone="inherit" />
+                </BarButton>
+              ))}
+              <Divider />
+              <BarButton tip={canCrop ? 'Crop the picture: its file stays as it is' : 'The picture is still loading'} disabled={!canCrop} onClick={props.onCrop}>
+                <Icon name="crop" size={14} tone="inherit" />
+                Crop
+              </BarButton>
+            </>
+          ) : null}
+          {context === 'slide' && props.onPlace ? (
+            <>
+              {kind === 'flow' ? <Divider /> : null}
+              <Group label="Place">
+                {PLACES.map(option => (
+                  <BarButton key={option.value} tip={option.tip} active={place === option.value} onClick={() => props.onPlace?.(option.value)}>
+                    <Icon name={option.icon} size={14} tone="inherit" className={option.mirrored ? '-scale-x-100' : undefined} />
+                    {option.label}
+                  </BarButton>
+                ))}
+              </Group>
+            </>
+          ) : null}
+          <Divider />
+          <DescriptionField alt={alt} caption={!!look.caption} onWords={props.onWords} disabled={empty} withCaption={kind === 'flow'} />
+          {comments && props.onComment ? (
+            <BarButton tip="Comment on the picture, for Claude or for yourself" label="Comment" onClick={props.onComment}>
+              <Icon name="chat-text" size={14} tone="inherit" />
+            </BarButton>
+          ) : null}
+          <DropdownMenu>
+            <Tooltip label="More">
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="toolbar" size="compact" aria-label="More for the picture">
+                  <Icon name="dots-three" size={14} tone="inherit" />
+                </Button>
+              </DropdownMenuTrigger>
+            </Tooltip>
+            <DropdownMenuContent align="end" onCloseAutoFocus={event => event.preventDefault()}>
+              <DropdownMenuItem onSelect={props.onReplace}>Replace picture…</DropdownMenuItem>
+              <DropdownMenuItem disabled={empty} onSelect={props.onCopy}>Copy</DropdownMenuItem>
+              <DropdownMenuItem disabled={empty} onSelect={props.onReveal}>{SHOW_IN_FILES}</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled={empty} onSelect={props.onRemove}>Remove</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
+      )}
+    </div>
+  )
+  return createPortal(bar, document.body)
+}

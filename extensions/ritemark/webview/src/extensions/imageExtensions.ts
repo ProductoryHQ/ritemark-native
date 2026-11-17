@@ -1,19 +1,17 @@
 /**
- * ResizableImageExtension
+ * The Text editor's image node: the one picture node both editors use (experience 49), drawn as a block of the
+ * document, with its size, alignment, crop and caption kept beside its image line. A draw.io diagram opens its own
+ * editor on a double click (Sprint 82).
  *
- * Extends TipTap Image with custom NodeView that has resize handles.
- * Resizing permanently changes the image file (not just display size).
- *
- * @see Sprint 26: Image Resize
+ * Sprint 26's resize rewrote the picture's file after a confirmation; experience 49 replaces it: the file is never
+ * changed, and the size is kept in the document.
  */
-
-import Image from '@tiptap/extension-image'
-import { ReactNodeViewRenderer } from '@tiptap/react'
-import { ResizableImage } from '../components/ResizableImage'
+import { sendToExtension } from '../bridge'
 import { editorImageOptions } from '../utils/editorMarkdown'
+import { PictureImage } from './pictures/PictureNode'
 
-export const ImageExtension = Image.extend({
-  addNodeView() {
-    return ReactNodeViewRenderer(ResizableImage as any)
-  },
-}).configure(editorImageOptions)
+export const ImageExtension = PictureImage.configure({
+  ...editorImageOptions,
+  context: 'document',
+  openDiagram: relativePath => sendToExtension('openDrawioDiagram', { relativePath }),
+})
