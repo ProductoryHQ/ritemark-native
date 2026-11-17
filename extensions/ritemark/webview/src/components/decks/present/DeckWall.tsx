@@ -1,7 +1,7 @@
 /**
  * Sprint 159 (PR 5; experience 17 frame 2): the wall, the room's screen while a deck is presented.
  *
- * Only the slide, at 16:9 and as large as fits, with bands in #0E0C24 on other screen shapes. A Card deck shows its
+ * Only the slide, at 16:9 and as large as fits, with bands on other screen shapes in the theme's ground (`wallBand`). A Card deck shows its
  * card; a Borderless deck its words on white. It is drawn by the deck view's own `SlideCanvas`, so a slide looks the
  * same on the stage and on the wall. Nothing of Ritemark is on it.
  *
@@ -22,6 +22,7 @@ import { Button } from '../../ui/button'
 import { Icon } from '../../ui/Icon'
 import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
+import { wallBand } from '../theme/themeVars'
 import { countLabel, goToKey, wallKeyOf, wallSlideSize } from './wallKeys'
 import '../decks.css'
 import './wall.css'
@@ -200,6 +201,8 @@ export function DeckWall() {
   return (
     <div
       className={`deck-wall${barVisible || gridOpen ? '' : ' is-idle'}`}
+      // Sprint 162: the bands follow the deck's theme (its ground's darker end; a Borderless deck's white).
+      style={{ background: wallBand(state.theme, state.borderless) }}
       onPointerMove={showBar}
       onClick={onWallClick}
     >

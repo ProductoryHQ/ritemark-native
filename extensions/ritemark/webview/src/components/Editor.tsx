@@ -26,6 +26,9 @@ import AutoJoiner from 'tiptap-extension-auto-joiner'
 import { FormattingBubbleMenu } from './FormattingBubbleMenu'
 import { MarginCommentRail } from './MarginCommentRail'
 import { TableHandlesLayer } from './tables/TableHandlesLayer'
+import { PictureTools } from './pictures/PictureTools'
+import { caretBeforePicture, chosenPicture, chosenPictureUnder, replacePicture } from '../extensions/pictures/pictureCommands'
+import { startComment } from '../extensions/comment/CommentNode'
 import { TableHandles, tableHandlesEnabled } from '../extensions/tables/TableHandles'
 import { cellAtSelection, deleteColumn, deleteRow, insertColumn, insertRow } from '../extensions/tables/tableOps'
 import { BlockMenu } from './BlockMenu'
@@ -103,6 +106,8 @@ export function Editor({
   const lastOnChangeValue = useRef<string>('')
   const lastImageMappingsRef = useRef<Record<string, string>>({})
   const pendingImagePosRef = useRef<number | null>(null)
+  /** Experience 49: the chosen picture a paste, a drop or Replace picture… replaces once the host has saved the new one. */
+  const replaceImagePosRef = useRef<number | null>(null)
 
   // State for external link editing (triggered by clicking links)
   const [externalLinkEdit, setExternalLinkEdit] = useState<{ url: string } | null>(null)
@@ -211,6 +216,8 @@ export function Editor({
           const file = event.dataTransfer.files[0]
           if (file.type.startsWith('image/')) {
             event.preventDefault()
+            // Experience 49: dropped onto the chosen picture, it replaces it; dropped anywhere else, it goes there.
+            replaceImagePosRef.current = chosenPictureUnder(_view, event.target)?.pos ?? null
             // Read file and send to extension
             readFileAsBase64(file).then(dataUrl => {
               const filename = getUniqueImageFilename(file)
@@ -225,6 +232,8 @@ export function Editor({
         const file = getClipboardImageFile(event.clipboardData)
         if (file && !shouldPreferTextPaste(event.clipboardData)) {
           event.preventDefault()
+          // Experience 49: pasted onto the chosen picture, it replaces it.
+          replaceImagePosRef.current = chosenPicture(_view.state)?.pos ?? null
           readFileAsBase64(file).then(dataUrl => {
             const filename = getUniqueImageFilename(file)
             sendToExtension('saveImage', { dataUrl, filename })
@@ -372,6 +381,19 @@ export function Editor({
     }
   }, [editorSelection, onSelectionChange])
 
+  // Experience 49: the picture being replaced follows its place through edits made while the host saves the new one.
+  useEffect(() => {
+    if (!editor) return
+    // A picture deleted meanwhile is no longer replaced: nothing else takes its place (review of #774).
+    const follow = ({ transaction }: { transaction: { docChanged: boolean; mapping: { mapResult: (pos: number, assoc?: number) => { pos: number; deleted: boolean } } } }) => {
+      if (!transaction.docChanged || replaceImagePosRef.current === null) return
+      const mapped = transaction.mapping.mapResult(replaceImagePosRef.current, 1)
+      replaceImagePosRef.current = mapped.deleted ? null : mapped.pos
+    }
+    editor.on('transaction', follow)
+    return () => { editor.off('transaction', follow) }
+  }, [editor])
+
   // Listen for pending image position from slash command
   useEffect(() => {
     const handler = ((e: CustomEvent) => {
@@ -387,6 +409,17 @@ export function Editor({
 
     const handleMessage = (message: { type: string; path?: string; displaySrc?: string; error?: string; filename?: string; isDirty?: boolean }) => {
       if (message.type === 'imageSaved' && message.displaySrc && message.path) {
+        // Experience 49: a paste, a drop or Replace picture… on a chosen picture puts the new one in its place, keeping
+        // its size and description, as one undo step.
+        const replacing = replaceImagePosRef.current
+        replaceImagePosRef.current = null
+        const replaced = replacing === null ? null : replacePicture(editor.state, replacing, { src: message.displaySrc, title: message.path })
+        if (replaced) {
+          editor.view.dispatch(replaced)
+          editor.view.focus()
+          sendToExtension('imageInserted', { path: message.path })
+          return
+        }
         const savedPos = pendingImagePosRef.current
         pendingImagePosRef.current = null
 
@@ -437,7 +470,11 @@ export function Editor({
           tr.setMeta('addToHistory', false)
           view.dispatch(tr)
         }
+      } else if (message.type === 'imageSelectionCancelled') {
+        // Replace picture… cancelled: the picture stays, and a later paste goes where the caret is.
+        replaceImagePosRef.current = null
       } else if (message.type === 'imageError' && message.error) {
+        replaceImagePosRef.current = null
         console.error('Failed to save image:', message.error)
       }
       // Note: fileChanged is handled at App level, not here
@@ -771,6 +808,17 @@ export function Editor({
             <MarginCommentRail editor={editor} container={scrollContainer} />
           )}
           {tableHandlesEnabled() ? <TableHandlesLayer editor={editor} /> : null}
+          {/* Experience 49: the chosen picture's ring, handles, crop frame and bar. */}
+          <PictureTools
+            editor={editor}
+            context="document"
+            comments={commentCallouts}
+            onComment={pos => commentOnPicture(editor, pos)}
+            onReplace={pos => {
+              replaceImagePosRef.current = pos
+              sendToExtension('selectImageFile')
+            }}
+          />
           {/* Block insertion menu (triggered by + button) */}
           {showBlockMenu && (
             <div
@@ -1638,4 +1686,18 @@ export function getSelectionHTML(editor: TipTapEditor): string {
   const div = document.createElement('div')
   div.appendChild(dom)
   return div.innerHTML
+}
+
+/**
+ * Experience 49: Comment on a chosen picture: a margin note just before the picture's block, through the editor's one
+ * door for comments (`startComment`), so it reads and saves as every other comment does.
+ */
+function commentOnPicture(editor: TipTapEditor, pos: number): void {
+  // A note is placed at a caret, never over a selection: the picture's selection collapses beside it first.
+  const { tr, top } = caretBeforePicture(editor.state, pos)
+  editor.view.dispatch(tr)
+  startComment(editor, (tr, id) => {
+    const type = tr.doc.type.schema.nodes.commentNode
+    if (type) tr.insert(tr.mapping.map(top), type.create({ id, note: '', agentAlias: null }))
+  })
 }

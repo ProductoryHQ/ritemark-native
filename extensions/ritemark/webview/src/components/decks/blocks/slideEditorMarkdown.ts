@@ -24,6 +24,7 @@ import { asWrittenMarkedExtension } from '../../../utils/markdownAsWritten'
 import { mathMarkedExtension } from '../../../extensions/math/mathMarkedExtension'
 import { createEditorTurndownService, markdownToEditorHTML, preprocessTableHTML } from '../../../utils/editorMarkdown'
 import { commentMarkedExtension } from '../../../extensions/comment/commentMarkedExtension'
+import { pictureMarkedExtension } from '../../../extensions/pictures/pictureMarked'
 import type { Node as PMNode } from '@tiptap/pm/model'
 
 function escapeAttribute(value: string): string {
@@ -65,6 +66,8 @@ export const slideEditorMarked = new Marked({ breaks: true, gfm: true })
 slideEditorMarked.use(asWrittenMarkedExtension)
 slideEditorMarked.use(mathMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 slideEditorMarked.use(slideDivMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
+// Experience 49: a picture's look, as the document editor reads it.
+slideEditorMarked.use(pictureMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 
 let slideComments = false
 

@@ -34,8 +34,10 @@ import { SourceLines, type CopySource } from './library/SourceLines'
 import { AddToLibrarySheet, type LibraryTopic } from './library/AddToLibrarySheet'
 import { onMessage, sendToExtension } from '../../bridge'
 import { convertKind, hiddenNote } from './slide/convertKind'
-import { setPath } from './slide/slideEdits'
-import { DeckLook, SlideAbout, SlideSettings } from './SlideSettings'
+import { setPath, undoKeyOf } from './slide/slideEdits'
+import { SlideAbout, SlideSettings } from './SlideSettings'
+import { ThemeMenu, themePickedNotice } from './ThemeMenu'
+import { applicableChanges, propertyChangesOf, propertyTransaction, propertyValue, sameValue, withPropertyChanges } from './theme/themePick'
 import { Popover, PopoverAnchor, PopoverContent } from '../ui/popover'
 import { SlideMenuItems, SlideStrip, libraryBadge, type StripActions, type StripMark } from './SlideStrip'
 import { DropdownMenu, DropdownMenuContent, MoreActionsTrigger } from '../ui/dropdown-menu'
@@ -290,14 +292,26 @@ export function DeckView({
   const { assets, missing: missingPictures } = useDeckAssets(slides)
   const theme = useDeckTheme(properties.theme)
   // Card or Borderless is the deck's own choice, in its front matter (Jarmo, 15 November: both are offered). Since 16
-  // November it is chosen in the Slide settings popover, its last section (SlideSettings), not on the bar.
+  // November it was chosen in the Slide settings popover; since Sprint 162 in the Theme menu on the bar (ThemeMenu).
   const borderless = properties.look === 'borderless'
+  // The deck's front matter as last written from here: a pick, its Undo and its Redo each change it from what it is now.
+  const propertiesRef = useRef(properties)
+  propertiesRef.current = properties
+  // Sprint 162: the look is a step of the deck's Undo too, as a theme pick is (theme/themePick.ts), so Cmd+Z on the bar
+  // after a change in the Theme menu takes back that change and nothing else. It writes the same `look: borderless` line.
   const setLook = useCallback((look: string) => {
-    const next: DocumentProperties = { ...properties }
+    const before = propertyValue(propertiesRef.current, 'look')
+    const after = look === 'borderless' ? { present: true, value: 'borderless' } : { present: false }
+    if (sameValue(before, after)) return
+    if (editor && !editor.isDestroyed) {
+      editor.view.dispatch(propertyTransaction(editor.state, 'look', before, after))
+      return
+    }
+    const next: DocumentProperties = { ...propertiesRef.current }
     if (look === 'borderless') next.look = 'borderless'
     else delete next.look
     onPropertiesChange(next)
-  }, [properties, onPropertiesChange])
+  }, [editor, onPropertiesChange])
 
   // Publish on the bar (Sprint 159 PR 4) says its one line here: why a page wasn't written, or that the link is copied.
   const publishNotice = useCallback((text: string) => setNotice({ text }), [])
@@ -930,16 +944,16 @@ export function DeckView({
   /**
    * Slide settings… from a slide's menu (17 November): the slide is made current (its part scrolled to, unless it is
    * the current one already), then, once the menu has closed and handed its focus back, the popover opens beside where
-   * the menu came from. Index -1: the deck's look alone (a deck with no slides).
+   * the menu came from.
    */
   const openSettings = useCallback((index: number, place: () => SettingsPlace | null) => {
-    if (index >= 0 && index !== currentRef.current) pick(index)
+    if (index !== currentRef.current) pick(index)
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const where = place()
       if (!where) return
       settingsReturn.current = where.back
       // The slide's id too, so a popover never shows or changes another slide that came to stand at its number.
-      const id = index >= 0 && editor ? slidesOf(editor.state.doc)[index]?.data.id : undefined
+      const id = editor ? slidesOf(editor.state.doc)[index]?.data.id : undefined
       setSettingsFor({ index, id, anchor: where.anchor, side: where.side })
     }))
   }, [pick, editor])
@@ -1045,11 +1059,6 @@ export function DeckView({
       const thumb = stripRef.current?.querySelector<HTMLElement>(`[data-thumb="${index}"] .deck-thumb-slide`)
       return thumb ? { anchor: thumb, side: 'right', back: stripRef.current } : null
     }),
-    // A deck with no slides: its look from the strip's + menu at the end, beside that button.
-    deckLook: () => openSettings(-1, () => {
-      const button = stripRef.current?.querySelector<HTMLElement>('.deck-add-end')
-      return button ? { anchor: button, side: 'right', back: button } : null
-    }),
   }), [editor, dispatch, pick, idOf, openSettings])
 
   // A notice in the bar fades after a while.
@@ -1062,17 +1071,15 @@ export function DeckView({
   // Slide settings belong to their slide: another slide made current closes them. Add to library's sheet is placed
   // beside the slide (over the handout when it must).
   // By the slide's id: a slide removed or put in above it (an AI's edit, the host's) never moves the popover onto
-  // another slide; and the deck's look alone (a deck with no slides) closes once the deck has a slide.
+  // another slide, and a popover whose slide is gone (the deck's last slide deleted) closes.
   const shownSlideId = slides[shown]?.data.id
   useEffect(() => {
     setSettingsFor(open => {
       if (!open) return open
-      if (open.index < 0) return count === 0 ? open : null
-      return open.index === shown && (open.id === undefined || open.id === shownSlideId) ? open : null
+      return open.index === shown && open.index < count && (open.id === undefined || open.id === shownSlideId) ? open : null
     })
   }, [shown, shownSlideId, count])
-  // The popup always has something to show (the deck's section when the deck has no slides), so it never stays open
-  // unseen: no effect closes it when the slide goes, and a hidden slide keeps its settings (the Experience lead).
+  // A hidden slide keeps its settings (the Experience lead): hiding the slide hides the stage, not the slide.
   // The Add to library sheet belongs to its slide: another slide closes it.
   useEffect(() => { setAddSheet(sheet => (sheet && sheet.number - 1 !== shown ? null : sheet)) }, [shown])
   // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one. A
@@ -1403,10 +1410,60 @@ export function DeckView({
   }), [editor, dispatch, done, slideById, sources, imageMappings, pick])
 
   const status = documentBarStatus(syncState, syncAction)
-  // Slide settings belong to their slide (the Experience lead, 16 November): hiding the slide hides the stage, not the
-  // slide, so its menus still open them. A deck with no slides still chooses its look, as the bar's segment allowed at
-  // any count: the strip's + menu at the end has Deck look…, whose popover is the deck's section alone (#764).
-  const deckLook = { count, look: borderless ? 'borderless' as const : 'card' as const, onLook: setLook }
+
+  // ---- Sprint 162 (step-3-themes.md): the Theme menu's pick, one step of the deck's Undo (theme/themePick.ts)
+
+  // A pick or a look, and its Undo and Redo, write the front matter. An Undo or Redo whose line was changed since by
+  // someone else (the host, an AI, another program) leaves the newer value, and the bar says so.
+  useEffect(() => {
+    if (!editor) return
+    const onTransaction = ({ transaction }: { transaction: Transaction }) => {
+      const changes = propertyChangesOf(transaction)
+      if (changes.length === 0) return
+      const { apply, stale } = applicableChanges(propertiesRef.current, changes)
+      if (stale.length > 0) setNotice({ text: "The deck's theme or look was changed since, so it is left as it is now." })
+      if (apply.length === 0) return
+      const next = withPropertyChanges(propertiesRef.current, apply)
+      propertiesRef.current = next
+      onPropertiesChange(next)
+    }
+    editor.on('transaction', onTransaction)
+    return () => { editor.off('transaction', onTransaction) }
+  }, [editor, onPropertiesChange])
+  const pickTheme = useCallback((path: string, name: string) => {
+    if (!editor || editor.isDestroyed) return
+    editor.view.dispatch(propertyTransaction(editor.state, 'theme', propertyValue(propertiesRef.current, 'theme'), { present: true, value: path }))
+    // The bar says so, with Undo, while Undo would still take back this pick (as the strip's and the joins' notices).
+    const depth = undoDepth(editor.state)
+    const valid = () => !editor.isDestroyed && undoDepth(editor.state) === depth
+    setNotice({
+      text: themePickedNotice(name),
+      action: { label: 'Undo', tip: 'Put the deck back in the theme it had', run: () => { if (valid()) editor.commands.undo() } },
+      valid,
+    })
+  }, [editor])
+  // Cmd+Z (redo: Cmd+Shift+Z, Cmd+Y) with the focus on the deck's bar or nowhere in particular (after a pick the focus is
+  // back on the Theme button) is the deck's Undo, as on the slide, the strip and the handout, which keep their own. In the
+  // capture phase: the webview's own script marks an undo outside a text field handled (for the workbench, whose undo
+  // here does nothing) before a listener in the bubble phase would see it. Only the bar and the page itself are taken.
+  useEffect(() => {
+    if (!editor) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return
+      const step = undoKeyOf({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, isComposing: event.isComposing })
+      if (!step) return
+      const target = event.target instanceof HTMLElement ? event.target : null
+      if (target && target !== document.body && !target.closest('.deck-bar')) return
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return
+      event.preventDefault()
+      if (step === 'redo') editor.commands.redo()
+      else editor.commands.undo()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [editor])
+
   const handoutContainer = scrollContainer()
   // Writing on the slide keeps it the current one while the handout is still.
   const onWriting = useCallback(() => { lockUntil.current = Date.now() + WRITE_LOCK_MS }, [])
@@ -1493,6 +1550,8 @@ export function DeckView({
         {/* Only with the slide shown: a comment opens on the slide, under what it is on. */}
         {slideShown ? <DeckComments stops={commentStops} at={stopIndexOf(commentStops, commentAtKey)} current={shown} onGo={goToComment} /> : null}
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>
+        {/* Sprint 162 (frame 12): the deck's one look control, on the right before Saved. */}
+        <ThemeMenu theme={theme} named={properties.theme} look={borderless ? 'borderless' : 'card'} onLook={setLook} onPick={pickTheme} />
         {status === 'action' && syncAction ? (
           <SyncActionButton action={syncAction} />
         ) : (
@@ -1693,11 +1752,8 @@ export function DeckView({
               onChange={patch => changeSlide(data => ({ ...data, ...patch }))}
               onClose={() => setSettingsFor(null)}
               onUndo={redo => { if (redo) editor?.commands.redo(); else editor?.commands.undo() }}
-              deck={deckLook}
             />
-          ) : (
-            <DeckLook id="deck-reach-none" only {...deckLook} />
-          )}
+          ) : null}
         </PopoverContent>
       </Popover>
       {dialogs}

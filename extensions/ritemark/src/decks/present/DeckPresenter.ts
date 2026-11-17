@@ -37,7 +37,7 @@ import * as vscode from 'vscode';
 import { isShellPageSignal } from '../../shellPageSignals';
 import { resolveDocumentResourceRoots } from '../../webviewResourceRoots';
 import { parseDeck } from '../deckFormat';
-import { BUILT_IN_THEME, parseTheme, type DeckTheme } from '../deckTheme';
+import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from '../deckTheme';
 import { readTheme, resolveAssetsIn } from '../deckPages';
 import {
   DECK_PRESENTER_VIEW_TYPE,
@@ -433,7 +433,7 @@ export class DeckPresenter implements vscode.Disposable {
     const themePath = parseDeck(text).theme;
     if (running.theme.path !== themePath) {
       // The deck view's own reading of the theme file, from the same project folder.
-      const themeText = themePath ? await readTheme(running.origin.document, themePath) : null;
+      const themeText = await readTheme(running.origin.document, themePathOf(themePath));
       running.theme = { path: themePath, value: themeText === null ? BUILT_IN_THEME : parseTheme(themeText) };
     }
     return { borderless: deckLookOf(text) === 'borderless', theme: running.theme.value };

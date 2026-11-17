@@ -16,6 +16,8 @@ export function formattingToolbarShows(input: {
   inCodeBlock: boolean
   /** An equation is selected (Sprint 138): it has its own focus ring. */
   equationSelected: boolean
+  /** A picture is selected (experience 49): it has its own bar, under it. */
+  pictureSelected?: boolean
   /** The editor's view has the keyboard focus. */
   editorHasFocus: boolean
   /** The focus is inside the toolbar itself. */
@@ -25,6 +27,7 @@ export function formattingToolbarShows(input: {
   if (input.empty) return false
   if (input.inCodeBlock) return false
   if (input.equationSelected) return false
+  if (input.pictureSelected) return false
   return true
 }
 

@@ -255,6 +255,47 @@ const PAGE_BEHAVIOUR = String.raw`
     } catch (error) { select(); }
   });
 
+  // ---- a picture, full size (experience 49): a click on a picture in the text or on the slide shows a copy of it over
+  // the page, whole; a click anywhere or Esc closes it. The copy is the page's own picture (no new address, nothing
+  // loaded), without its crop.
+  var zoom = doc.getElementById('zoom'), zoomPic = zoom ? zoom.querySelector('.zoom-pic') : null, zoomFrom = null;
+  function closeZoom() {
+    if (!zoom || zoom.hidden) return;
+    zoom.hidden = true;
+    while (zoomPic && zoomPic.firstChild) zoomPic.removeChild(zoomPic.firstChild);
+    if (zoomFrom && zoomFrom.focus) zoomFrom.focus();
+    zoomFrom = null;
+  }
+  function openZoom(picture) {
+    if (!zoom || !zoomPic) return;
+    var copy = picture.cloneNode(false);
+    copy.removeAttribute('style');
+    copy.removeAttribute('class');
+    copy.removeAttribute('loading');
+    if (picture.tagName !== 'IMG') {
+      // A slide's picture beside or behind its words is its place's background: shown whole.
+      copy.className = 'zoom-photo';
+      copy.style.backgroundImage = picture.style.backgroundImage;
+    }
+    while (zoomPic && zoomPic.firstChild) zoomPic.removeChild(zoomPic.firstChild);
+    zoomPic.appendChild(copy);
+    zoomFrom = doc.activeElement;
+    zoom.hidden = false;
+    zoom.focus();
+  }
+  if (zoom) zoom.addEventListener('click', closeZoom);
+  doc.addEventListener('click', function (event) {
+    var target = event.target && event.target.closest ? event.target : null;
+    if (!target || (zoom && zoom.contains(target))) return;
+    var picture = target.closest('.part img, .pre img, .stage .deck-sl img, .stage .deck-sl .photo');
+    if (!picture || (picture.classList.contains('photo') && (picture.classList.contains('empty') || !picture.style.backgroundImage))) return;
+    // A picture that is a link's words opens the link, as before.
+    if (picture.closest('a')) return;
+    event.preventDefault();
+    openZoom(picture);
+  });
+  window.addEventListener('keydown', function (event) { if (event.key === 'Escape') closeZoom(); }, true);
+
   // ---- start: the slide sized, the room set, and the part in view shown (an address's #s4 goes to slide 4)
   function settle() { scale(); room(); }
   window.addEventListener('resize', function () { settle(); show(currentPart(state())); });

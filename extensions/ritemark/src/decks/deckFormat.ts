@@ -65,6 +65,10 @@ export interface SlideData {
   picture?: string;
   /** The picture's path, relative to the deck's folder. */
   image?: string;
+  /** Experience 49: the side picture's description (what a screen reader and the page read), kept when it moves. */
+  alt?: string;
+  /** Experience 49: what stays in view of a side picture that fills its place, `x,y` in percent (50,50 the middle). */
+  focus?: string;
   skip?: boolean;
   /** Keep it here: a changed library copy that stays changed (written by Keep it here). */
   kept?: boolean;
@@ -102,7 +106,7 @@ export function isDefaultExerciseTag(data: SlideData): boolean {
 }
 
 /** The scalar keys, in the order the writer puts a new key. */
-const SCALAR_KEYS = ['id', 'section', 'title', 'subtitle', 'number', 'tag', 'look', 'picture', 'image', 'skip', 'kept', 'from'] as const;
+const SCALAR_KEYS = ['id', 'section', 'title', 'subtitle', 'number', 'tag', 'look', 'picture', 'image', 'alt', 'focus', 'skip', 'kept', 'from'] as const;
 type ScalarKey = (typeof SCALAR_KEYS)[number];
 const BOOLEAN_KEYS: ReadonlySet<string> = new Set(['skip', 'kept', 'section']);
 const ITEM_KEYS = ['heading', 'text', 'icon'] as const;
@@ -699,7 +703,7 @@ export function sidePictureOf(data: SlideData): 'left' | 'right' | 'behind' | nu
 }
 
 /** The keys a block slide's header holds: what belongs to the slide as a whole, never its words. */
-export const HEADER_KEYS = ['id', 'from', 'skip', 'picture', 'image', 'kept', 'section'] as const;
+export const HEADER_KEYS = ['id', 'from', 'skip', 'picture', 'image', 'alt', 'focus', 'kept', 'section'] as const;
 
 /** A block slide's body in its two parts, as written. */
 export interface BlockSlideParts {
@@ -735,7 +739,9 @@ export function splitBlockSlide(body: string): BlockSlideParts {
       };
     }
     const key = KEY_LINE.exec(line);
-    if (key && (HEADER_KEYS as readonly string[]).includes(key[1])) ownKey = true;
+    // `alt:` and `focus:` come only with a side picture's `picture:`/`image:`: alone they never make a header, so a
+    // slide's words written `---`, `focus: this week`, `---` stay words (review of #774).
+    if (key && (HEADER_KEYS as readonly string[]).includes(key[1]) && key[1] !== 'alt' && key[1] !== 'focus') ownKey = true;
     if (line.trim() === '' || /^\s*#/.test(line) || key) continue;
     return { header: null, head: '', markdown: body };
   }

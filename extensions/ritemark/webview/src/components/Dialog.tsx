@@ -2,7 +2,7 @@
  * Reusable Dialog Component
  *
  * Shared modal dialog with consistent styling across the app.
- * Used by: DictationSettingsModal, ResizableImage confirmation, etc.
+ * Used by: DictationSettingsModal, etc.
  */
 
 import React, { useEffect, useCallback } from 'react'

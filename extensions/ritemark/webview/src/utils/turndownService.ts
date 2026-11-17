@@ -1,6 +1,7 @@
 import TurndownService from 'turndown'
 import { tables, taskListItems } from 'turndown-plugin-gfm'
 import { isRelativeImagePath, isWebviewResourceUri } from '../../../src/utils/imagePaths'
+import { markdownAlt, parsePictureBlock } from '../../../src/markdown/pictureLook'
 import { addMathTurndownRules } from '../extensions/math/mathTurndownRules'
 import { addAsWrittenTurndownRules, blockImage, escapeTextRun, neutraliseBrackets, wrapMarked } from './markdownAsWritten'
 
@@ -100,13 +101,16 @@ export function createTurndownService(): TurndownService {
     filter: 'img',
     replacement(_content, node) {
       const el = node as HTMLImageElement
-      const alt = el.alt || ''
+      // Experience 49: a description typed in the bar is written so it never breaks the image line (markdownAlt).
+      const alt = markdownAlt(el.alt || '')
       const title = el.getAttribute('title') || ''
       const displaySrc = el.getAttribute('src') || el.src
       const src = title.startsWith('./') || (isRelativeImagePath(title) && isWebviewResourceUri(displaySrc))
         ? title
         : displaySrc
-      return blockImage(`![${alt}](${src})`, el)
+      // Experience 49: the picture's look, as written beside it, only a block the editors read (never other words).
+      const block = el.getAttribute('data-picture') ?? ''
+      return blockImage(`![${alt}](${src})${parsePictureBlock(block) ? block : ''}`, el)
     },
   })
 
