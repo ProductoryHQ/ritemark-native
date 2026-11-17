@@ -274,6 +274,8 @@ export class DeckPages implements vscode.Disposable {
       const named = themePathOf(frontMatterField(view.document.getText().replace(/^﻿/, ''), 'theme'));
       if (!evening && key(named) !== key(changed)) return;
       await this.post(view.panel.webview, { type: 'deck/theme', path: named, ...(await deckThemeFor(view.document.uri.fsPath, named, view.panel.webview)) });
+      // Sprint 162 PR 6: its page keeps the theme it was published with; the chip says whether that is still this one.
+      this.publisher?.lookChanged(view.document);
     }));
   }
 
@@ -285,6 +287,7 @@ export class DeckPages implements vscode.Disposable {
     await Promise.all([...this.views].map(async view => {
       const named = themePathOf(frontMatterField(view.document.getText().replace(/^\uFEFF/, ''), 'theme'));
       await this.post(view.panel.webview, { type: 'deck/theme', path: named, ...(await deckThemeFor(view.document.uri.fsPath, named, view.panel.webview)) });
+      this.publisher?.lookChanged(view.document);
     }));
   }
 
