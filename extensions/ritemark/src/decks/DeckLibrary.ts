@@ -175,9 +175,26 @@ export class DeckLibrary {
    * only, for the Theme menu's "N decks". An open deck's unsaved text counts, as everywhere in the library.
    */
   async deckThemes(): Promise<Array<string | null>> {
+    return (await this.deckThemeList()).map(deck => deck.theme);
+  }
+
+  /**
+   * Sprint 162 PR 2: each of the project's decks, by path, with its `theme:` value (null for none): which decks a theme's
+   * tab says use it, and which deck it previews. Each deck's text with it (an open deck's unsaved text).
+   */
+  async deckThemeList(): Promise<Array<{ path: string; theme: string | null; text: string; modified: number }>> {
     // Read side by side: the menu waits on them each time it opens.
-    const texts = await Promise.all((await this.files.list()).map(file => this.files.read(file.path)));
-    return texts.filter((text): text is string => text !== null).map(text => frontMatterField(text.replace(/^\uFEFF/, ''), 'theme'));
+    const files = await this.files.list();
+    const texts = await Promise.all(files.map(file => this.files.read(file.path)));
+    return files.flatMap((file, index) => {
+      const text = texts[index];
+      return text === null ? [] : [{ path: file.path, theme: frontMatterField(text.replace(/^\uFEFF/, ''), 'theme'), text, modified: file.modified }];
+    });
+  }
+
+  /** Sprint 162 PR 2: a deck's text (an open deck's unsaved text), or null. */
+  readDeckText(path: string): Promise<string | null> {
+    return this.files.read(path);
   }
 
   /** A deck's slides as written. */

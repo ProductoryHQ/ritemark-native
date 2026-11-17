@@ -1,0 +1,128 @@
+/* Sprint 162 PR 2 (frames 11, 18): the theme's own tab, as the prototype's `.te`, `.tecol` and `.tepv` draw it. The
+   bar is the deck's bar; the settings sit on the left in a 340 px column on the desk's white, and the preview fills
+   the rest on the ground. */
+
+.theme-tab {
+  --deck-bar: 44px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--r-surface);
+  color: var(--r-ink-strong);
+  font-family: var(--ritemark-ui-font-family);
+}
+
+/* ---- the bar */
+.theme-bar { border-bottom: 1px solid var(--r-hairline); gap: 8px; padding: 0 10px 0 14px; }
+.theme-bar > .deck-theme-swatch { width: 26px; height: 18px; border-radius: 5px; }
+.theme-bar > .deck-theme-swatch > i:first-child { top: 5px; left: 5px; width: 9px; }
+.theme-bar > .deck-theme-swatch > i:last-child { top: 10px; left: 5px; width: 14px; }
+.theme-bar-name { margin-left: 2px; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; flex: 0 1 auto; min-width: 0; }
+.theme-bar .theme-used-by { margin-left: 18px; font-size: 13px; font-weight: 400; color: var(--r-ink-muted); gap: 4px; }
+.theme-bar .theme-used-by.is-none { display: inline-flex; align-items: center; white-space: nowrap; }
+.theme-bar .theme-used-by[data-state="open"] { background: var(--r-surface-muted); color: var(--r-ink-strong); }
+.theme-bar > :not(.flex-1):not(.theme-notice):not(.theme-bar-name) { flex-shrink: 0; }
+.theme-bar > .theme-notice { flex: 0 1 auto; margin-left: 0; margin-right: 8px; }
+.theme-bar .deck-saved { margin-right: 4px; }
+/* The prototype's `.saved.no`: amber ink, as the draft's mark (frame 18) */
+.theme-tab .theme-bar .theme-not-saved { color: #92400E; font-weight: 500; }
+
+.theme-menu-two { display: flex; flex-direction: column; gap: 1px; }
+.theme-menu-two > span { font-size: 12px; color: var(--r-ink-muted); }
+
+/* ---- the body: settings on the left, the preview on the right */
+.theme-body { flex: 1; min-height: 0; display: flex; }
+
+.theme-settings {
+  flex: none;
+  width: 340px;
+  box-sizing: border-box;
+  padding: 10px 20px 28px;
+  border-right: 1px solid var(--r-hairline);
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 18px;
+}
+.theme-settings > .deck-settings-k { margin: 18px 0 10px; }
+.theme-settings > .deck-settings-k:first-child { margin-top: 14px; }
+
+.theme-row { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+.theme-row-label { flex: 1; min-width: 0; display: flex; flex-direction: column; color: var(--r-ink-strong); }
+.theme-row-note { font-size: 11.5px; line-height: 15px; color: var(--r-ink-muted); margin-top: 1px; }
+
+.theme-tab .theme-swatch-button,
+.theme-tab .theme-swatch-button:hover {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .16);
+}
+.theme-tab .theme-swatch-button[data-state="open"] { box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .16), 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
+.theme-tab .theme-hex { width: 84px; height: 30px; padding: 0 8px; font-family: var(--ritemark-mono-font-family, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 12.5px; text-transform: uppercase; }
+.theme-tab .theme-hex.is-wrong { border-color: var(--r-error, #DC2626); }
+
+.theme-palette { display: grid; grid-template-columns: repeat(8, 24px); gap: 6px; }
+.theme-palette .theme-palette-colour,
+.theme-palette .theme-palette-colour:hover {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .16);
+}
+.theme-palette .theme-palette-colour.is-on { box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .16), 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
+
+.theme-glow { cursor: pointer; }
+
+.theme-contrast {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--r-success-soft);
+  color: var(--r-success);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+.theme-contrast > svg { flex: none; margin-top: 1px; }
+.theme-contrast.is-low { background: var(--r-warning-surface); color: var(--r-warning-ink); }
+
+.theme-seg { display: inline-flex; }
+.theme-seg-control { min-width: 0; }
+
+.theme-note { display: flex; gap: 8px; margin: 22px 0 0; font-size: 12px; line-height: 17px; color: var(--r-ink-muted); }
+.theme-note > svg { flex: none; margin-top: 1px; }
+
+/* ---- the preview */
+.theme-preview { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow-y: auto; background: var(--r-surface-muted); }
+.theme-preview.is-borderless { background: var(--r-surface); }
+.theme-preview-head { display: flex; align-items: center; gap: 10px; padding: 12px 28px 0; min-height: 44px; font-size: 12.5px; color: var(--r-ink-muted); }
+.theme-preview-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.theme-preview-what b { font-weight: 600; color: var(--r-ink-strong); }
+/* The grid's rows are its slides' own height (16:9 at their width); the preview scrolls, never the rows. */
+.theme-preview-grid { display: grid; flex: none; grid-auto-rows: max-content; align-content: start; padding: 16px 28px 32px; }
+.theme-preview-slide { border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(30, 27, 75, .12), 0 6px 18px rgba(30, 27, 75, .1); }
+.theme-preview.is-borderless .theme-preview-slide { border-radius: 0; box-shadow: none; }
+
+/* ---- "Used by N decks" */
+.theme-decks .theme-deck-row { width: 100%; height: 32px; justify-content: flex-start; gap: 9px; padding: 0 8px; font-size: 13px; font-weight: 400; color: var(--r-ink-strong); }
+.theme-deck-name { flex: 1; min-width: 0; overflow: hidden; text-align: left; text-overflow: ellipsis; }
+
+/* ---- Save as a new theme… and New theme… */
+.theme-sheet { display: flex; flex-direction: column; gap: 14px; font-size: 13px; }
+.theme-sheet-lede { margin: 0; color: var(--r-ink-muted); line-height: 19px; }
+.theme-sheet-row { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 12px; }
+.theme-sheet-k { color: var(--r-ink-muted); }
+.theme-sheet-problem { margin: -6px 0 0 108px; font-size: 12px; color: var(--r-error, #DC2626); }
+.theme-sheet-use { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.theme-starts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.theme-start { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 0; text-align: left; height: auto; white-space: normal; background: transparent; font-weight: 500; }
+.theme-start:hover { background: transparent; }
+.theme-start-pic { display: block; flex: none; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline-strong); }
+.theme-start[aria-pressed="true"] .theme-start-pic { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
+.theme-start-note { font-size: 12px; font-weight: 400; color: var(--r-ink-muted); line-height: 16px; }

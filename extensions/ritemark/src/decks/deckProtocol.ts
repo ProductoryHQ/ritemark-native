@@ -7,7 +7,7 @@
 
 import { BLOCK_MAX_STEP } from './blocks/slideRenderer';
 import { MAX_DRAFT_WORDS, type StartCardState } from './startCard';
-import type { ThemeEntry } from './deckTheme';
+import { isThemePath, type ThemeEntry } from './deckTheme';
 
 /** At most this many picture paths in one request: a deck's slides, with room to spare. */
 export const MAX_ASSET_PATHS = 500;
@@ -26,6 +26,13 @@ export type DeckRequest =
   | { type: 'deck/theme'; path: string }
   /** Sprint 162: the project's themes, each with how many decks draw it, for the deck's Theme menu. */
   | { type: 'deck/themes' }
+  /** Sprint 162 PR 2: the Theme menu's Edit <Name>: the theme file at this project path opens in its own tab. */
+  | { type: 'deck/edit-theme'; path: string }
+  /**
+   * Sprint 162 PR 2: New theme… (frame 14): a theme file by this name in `Slide library/Themes`, started from the deck's
+   * theme, Paper or Ember; with `use`, this deck's `theme:` line names it (through the view, one Undo). Then its tab opens.
+   */
+  | { type: 'deck/new-theme'; name: string; start: 'copy' | 'paper' | 'ember'; use: boolean }
   /** A picture pasted or dropped on a slide: saved in `images/` beside the deck, for the slide with this id. */
   | { type: 'deck/save-image'; slideId: string; dataUrl: string; filename: string }
   /** The deck's current slide, for the Slide library's "Insert after slide N". */
@@ -96,6 +103,14 @@ export type DeckHostMessage =
   | { type: 'deck/theme'; path: string; text: string | null }
   /** Sprint 162: the project's themes (`themeEntries`), for the Theme menu. */
   | { type: 'deck/themes'; themes: ThemeEntry[] }
+  /** Sprint 162 PR 2: New theme…'s answer: the theme is made, or why not (the sheet stays open and says so). */
+  | { type: 'deck/new-theme'; ok: true; path: string; name: string }
+  | { type: 'deck/new-theme'; ok: false; problem: string }
+  /**
+   * Sprint 162 PR 2: this deck uses the theme at `path` now (New theme… or Save as a new theme… with "Use it in this
+   * deck"): the view writes its `theme:` line as a pick, one step of its Undo, and says so on its bar.
+   */
+  | { type: 'deck/use-theme'; path: string; name: string }
   /** The picture is saved: its path relative to the deck, and its webview URI; or it could not be. */
   | { type: 'deck/image-saved'; slideId: string; path: string; url: string }
   | { type: 'deck/image-failed'; slideId: string; message: string }
@@ -230,6 +245,19 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
     case 'deck/themes': {
       exactKeys(input, ['type']);
       return { type: 'deck/themes' };
+    }
+    case 'deck/edit-theme': {
+      exactKeys(input, ['type', 'path']);
+      const path = stringOf(input.path, MAX_PATH_LENGTH);
+      if (!isThemePath(path)) throw new DeckProtocolError('path must be a theme file');
+      return { type: 'deck/edit-theme', path };
+    }
+    case 'deck/new-theme': {
+      exactKeys(input, ['type', 'name', 'start', 'use']);
+      const name = stringOf(input.name, 200);
+      if (input.start !== 'copy' && input.start !== 'paper' && input.start !== 'ember') throw new DeckProtocolError('start must be copy, paper or ember');
+      if (typeof input.use !== 'boolean') throw new DeckProtocolError('use must be a boolean');
+      return { type: 'deck/new-theme', name, start: input.start, use: input.use };
     }
     case 'deck/open-library': {
       exactKeys(input, ['type', 'section', 'after']);

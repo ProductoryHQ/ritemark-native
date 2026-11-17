@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Added
 - **A deck's look is one button on its bar.** The Theme button shows the deck's theme as a small swatch and its name ("Evening ▾"). Its menu has Card | Borderless and the project's themes, each with how many decks use it. Pick one and the deck changes at once; the bar says so, with Undo, and Cmd+Z takes it back too. Card | Borderless is no longer in a slide's settings.
+- **Change a theme in its own tab.** Edit <Name> in the Theme menu, or a theme file in `Slide library/Themes`, opens the theme's tab: its four colours, each a swatch and a hex code, the soft light, a line that says whether the text is easy to read, the corners and the boxes, with six of the deck's own slides showing the changes. Changes wait for Save, and then every deck that uses the theme follows; until then the tab has a dot and the bar says Not saved, with Discard. Save as a new theme… keeps the old look for the decks that stay on it. New theme… in the Theme menu starts one from the deck's theme, Paper or Ember, and can put this deck in it.
 
 #### Fixed
 - **A page that failed to load opens when you open its file again (#710).** If a web page's `.html` file was missing when Ritemark opened, its tab showed "Failed to Load Page", and opening the file again from Documents once it was back only brought that failed tab forward. Now opening the file loads the page again in the same tab, as the bar's Reload does. A page that loaded fine is only brought forward, as before.

@@ -22,6 +22,8 @@ import { Icon } from '../ui/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { SegmentedControl } from '../ui/segmented-control'
 import { Tooltip } from '../ui/tooltip'
+import type { SlideData } from '../../../../src/decks/deckFormat'
+import { NewThemeSheet } from './theme/NewThemeSheet'
 
 /** Card or Borderless, with the words and the tooltip they have had since the bar's segment (16 November). */
 export const DECK_LOOKS = [{ value: 'card', label: 'Card' }, { value: 'borderless', label: 'Borderless' }]
@@ -60,11 +62,25 @@ interface ThemeMenuProps {
   onLook: (look: string) => void
   /** A theme picked: its path and name. Never called for the theme the deck already draws. */
   onPick: (path: string, name: string) => void
+  /**
+   * Sprint 162 PR 2: what New theme… shows of this deck: its name, and one of its slides (a slide with boxes when it has
+   * one, as frame 14) with its pictures. Without it the menu has no Edit or New theme….
+   */
+  newTheme?: { deckName: string; slide: { kind: string; data: SlideData } | null; assets: Record<string, string> }
 }
 
-export function ThemeMenu({ theme, named, look, onLook, onPick }: ThemeMenuProps) {
+/** The names and files the project's themes have, for a new theme's name (the host checks again as it writes). */
+export function takenThemeNames(entries: readonly ThemeEntry[]): { names: string[]; files: string[] } {
+  return {
+    names: entries.map(entry => themeOfEntry(entry).name),
+    files: entries.filter(entry => entry.text !== null).map(entry => entry.path.slice(entry.path.lastIndexOf('/') + 1)),
+  }
+}
+
+export function ThemeMenu({ theme, named, look, onLook, onPick, newTheme }: ThemeMenuProps) {
   const [open, setOpen] = useState(false)
   const [entries, setEntries] = useState<ThemeEntry[] | null>(null)
+  const [making, setMaking] = useState(false)
 
   useEffect(() => onMessage(message => {
     if (message.type === 'deck/themes') setEntries(themeEntriesFrom(message.themes))
@@ -98,8 +114,21 @@ export function ThemeMenu({ theme, named, look, onLook, onPick }: ThemeMenuProps
             onPick(path, name)
           }}
           onCurrent={() => setOpen(false)}
+          onEdit={newTheme ? path => { setOpen(false); sendToExtension('deck/edit-theme', { path }) } : undefined}
+          onNew={newTheme ? () => { setOpen(false); setMaking(true) } : undefined}
         />
       </PopoverContent>
+      {making && newTheme ? (
+        <NewThemeSheet
+          deckTheme={theme}
+          deckName={newTheme.deckName}
+          slide={newTheme.slide}
+          assets={newTheme.assets}
+          borderless={look === 'borderless'}
+          taken={takenThemeNames(entries ?? [])}
+          onClose={() => setMaking(false)}
+        />
+      ) : null}
     </Popover>
   )
 }
@@ -113,13 +142,23 @@ interface ThemeMenuBodyProps {
   onPick: (path: string, name: string) => void
   /** The theme the deck already draws, picked: the menu closes and nothing is written. */
   onCurrent: () => void
+  /** Sprint 162 PR 2: Edit <Name>: the theme file the deck draws opens in its own tab. */
+  onEdit?: (path: string) => void
+  /** Sprint 162 PR 2: New theme…: the sheet that names a new theme and starts it (frame 14). */
+  onNew?: () => void
 }
 
-/** The menu's two sections: LOOK, then THEME with the project's themes, the one the deck draws ticked. */
-export function ThemeMenuBody({ entries, named, look, onLook, onPick, onCurrent }: ThemeMenuBodyProps) {
+/**
+ * The menu's sections: LOOK, then THEME with the project's themes, the one the deck draws ticked; then (Sprint 162 PR 2,
+ * frame 12) Edit <Name> for the theme the deck draws, and New theme…. Edit shows only for a theme the project has a file
+ * for: the built-in Evening has none to open until the project makes one (a copy, from New theme…).
+ */
+export function ThemeMenuBody({ entries, named, look, onLook, onPick, onCurrent, onEdit, onNew }: ThemeMenuBodyProps) {
   const current = entries ? themeKeyOf(named, entries) : null
   // Each theme file read once per list, not at every render of the open menu.
   const themes = useMemo(() => new Map((entries ?? []).map(entry => [entry.path, themeOfEntry(entry)])), [entries])
+  const currentEntry = entries?.find(entry => entry.path === current) ?? null
+  const editable = currentEntry && currentEntry.text !== null ? currentEntry : null
   return (
     <>
       <div role="group" aria-labelledby="deck-theme-look">
@@ -163,6 +202,27 @@ export function ThemeMenuBody({ entries, named, look, onLook, onPick, onCurrent 
           )
         })}
       </div>
+      {entries !== null && (onEdit || onNew) ? (
+        <>
+          <div className="deck-theme-sep" />
+          {editable && onEdit ? (
+            <Tooltip label={`Change ${themes.get(editable.path)?.name ?? 'the theme'}'s colours and shape in its own tab`} className="flex w-full">
+              <Button variant="ghost" className="deck-theme-row" onClick={() => onEdit(editable.path)}>
+                <Icon name="palette" size={14} tone="inherit" />
+                <span className="deck-theme-row-name">Edit {themes.get(editable.path)?.name}</span>
+              </Button>
+            </Tooltip>
+          ) : null}
+          {onNew ? (
+            <Tooltip label="Make a theme of your own, from this deck's theme, Paper or Ember" className="flex w-full">
+              <Button variant="ghost" className="deck-theme-row" onClick={onNew}>
+                <Icon name="plus" size={14} tone="inherit" />
+                <span className="deck-theme-row-name">New theme…</span>
+              </Button>
+            </Tooltip>
+          ) : null}
+        </>
+      ) : null}
     </>
   )
 }
