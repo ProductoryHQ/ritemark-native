@@ -85,21 +85,11 @@ export interface WallPeeked {
   title: string | null;
 }
 
-/** After the move into its own window: the host asks whether the wall's window has the focus yet. */
-export interface WallFocusCheck {
-  type: 'present/focus-check';
-}
-
-export type WallHostMessage = WallState | WallPeeked | WallFocusCheck | PresenterState;
+export type WallHostMessage = WallState | WallPeeked | PresenterState;
 
 /** The wall's requests. */
 export type WallRequest =
   | { type: 'present/ready' }
-  /**
-   * The answer to a focus check: the wall's window has the focus, so the host may make it compact and full screen;
-   * `fullScreen` says whether that window is full screen already (full screen is a toggle).
-   */
-  | { type: 'present/focus'; fullScreen: boolean }
   | { type: 'present/next' }
   | { type: 'present/back' }
   | { type: 'present/first' }
@@ -237,8 +227,6 @@ export function decodeWallRequest(value: unknown): WallRequest | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const input = value as Record<string, unknown>;
   switch (input.type) {
-    case 'present/focus':
-      return exactKeys(input, ['type', 'fullScreen']) && typeof input.fullScreen === 'boolean' ? { type: 'present/focus', fullScreen: input.fullScreen } : null;
     case 'present/ready':
     case 'present/presenter':
     case 'present/swap':
@@ -273,6 +261,12 @@ export function decodeDeckPresentRequest(value: unknown): DeckPresentRequest | n
  * opens.
  */
 export const PRESENT_NEEDS_UPDATE = 'Presenting needs a newer Ritemark. Update it, then present again.';
+
+/**
+ * The same answer in a dev build, whose `vscode/` may be older than its extension (a light worktree's copied tree): what
+ * to run, so a builder never takes the missing commands for a Present fault.
+ */
+export const PRESENT_NEEDS_PATCHES = 'Run ./scripts/apply-patches.sh: this dev build has no Present commands.';
 
 /** The deck view's Present menu: whether a presenter view can show, where, and whether it is on. */
 export interface DeckPresentOptions {

@@ -108,6 +108,18 @@ export function wallSlideSize(width: number, height: number): { width: number; h
   return { width: slideWidth, height: slideHeight, left: Math.round((width - slideWidth) / 2), top: Math.round((height - slideHeight) / 2) }
 }
 
+/**
+ * How far the slide's ground and its picture run past the 16:9 area to the screen's edges (step-3-themes.md, "No bands
+ * on the wall"), in the slide canvas's own pixels (`canvasWidth` wide), each side; a pixel more, so a rounded frame
+ * never leaves a hairline at an edge.
+ */
+export function wallBleed(frame: { width: number; left: number; top: number }, canvasWidth: number): { x: number; y: number } {
+  if (frame.width <= 0) return { x: 0, y: 0 }
+  const scale = frame.width / canvasWidth
+  const side = (band: number) => (band > 0 ? Math.ceil((band + 1) / scale) : 0)
+  return { x: side(frame.left), y: side(frame.top) }
+}
+
 /** The presenter view's clock: elapsed time as m:ss, or h:mm:ss past an hour. */
 export function clockText(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000))
