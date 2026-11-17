@@ -26,6 +26,8 @@ import {
   commentBoxStorage,
   liftCommentLine,
   nextRailBox,
+  otherBoxesGiveWay,
+  registerOpenBox,
   startComment,
   yieldOpenBox,
   type OpenCommentBox,
@@ -99,14 +101,14 @@ export function clickTarget(editor: TipTapEditor, event: { clientX: number; clie
 }
 
 /**
- * Start a comment on the slide (the right-click menu's Comment, ⌘/). The handout's open box gives way first, as any
- * other box does (#687): an empty one closes, one with unsaved words comes forward and nothing new opens. Then the
- * handout's one door: words get the comment mark; a block or the whole slide gets a note in its place.
+ * Start a comment on the slide (the right-click menu's Comment, ⌘/). Another editor's open box (the handout's) gives
+ * way first, as any other box does (#687, `otherBoxesGiveWay`): an empty one closes, one with unsaved words comes
+ * forward and nothing new opens. Then the handout's one door: words get the comment mark; a block or the whole slide
+ * gets a note in its place.
  */
-export function startSlideComment(editor: TipTapEditor, target: SlideTarget, outer?: TipTapEditor | null): boolean {
+export function startSlideComment(editor: TipTapEditor, target: SlideTarget): boolean {
   if (editor.isDestroyed) return false
-  const outerBox = outer && !outer.isDestroyed ? commentBoxStorage(outer)?.openBox ?? null : null
-  if (outer && outerBox && yieldOpenBox(outer, outerBox.key) === null) return true
+  if (!otherBoxesGiveWay(editor)) return true
   if (target.kind === 'words' && !editor.state.selection.empty) return startComment(editor)
   // A block or the whole slide: the words selected aren't what it is on, so the selection collapses to its caret.
   const { selection } = editor.state
@@ -175,9 +177,20 @@ export interface SlideCommentsProps {
   slideNumber: number
   /** Open a saved comment, latched (the deck's bar, Prev and Next): its place among the slide's comments; a new serial asks again. */
   open?: { ordinal: number; serial: number } | null
+  /** The `open` request was taken: the asker forgets it, so a slide shown again never opens it by itself. */
+  onOpenTaken?: () => void
 }
 
-export function SlideComments({ editor, frame, slideNumber, open }: SlideCommentsProps) {
+/** After a note's card saves or cancels, the caret is never left on the hidden note (a key would take it). */
+export function leaveHiddenNote(editor: TipTapEditor): void {
+  if (editor.isDestroyed) return
+  const { selection, doc } = editor.state
+  const node = 'node' in selection ? (selection as { node?: { type: { name: string } } }).node : undefined
+  if (node?.type.name !== 'commentNode') return
+  editor.view.dispatch(editor.state.tr.setSelection(TextSelection.near(doc.resolve(selection.to))))
+}
+
+export function SlideComments({ editor, frame, slideNumber, open, onOpenTaken }: SlideCommentsProps) {
   const [markers, setMarkers] = useState<SlideMarker[]>([])
   /** A saved comment's card, opened by a click (on its marker or its words), the bar, or the door. */
   const [openKey, setOpenKey] = useState<string | null>(null)
@@ -249,16 +262,14 @@ export function SlideComments({ editor, frame, slideNumber, open }: SlideComment
       bringForward: () => boxHandle.current?.focusEnd(),
       close: () => setComposeKey(current => (current === key ? null : current)),
     }
-    storage.openBox = entry
-    return () => {
-      if (storage.openBox === entry) storage.openBox = null
-    }
+    // Registered, so the handout's door and rail see it too (one box across the deck view).
+    return registerOpenBox(editor!, entry)
   }, [editor, boxMarker])
 
-  /** Open a saved comment's card, once the open box gives way (#687). */
+  /** Open a saved comment's card, once the open box gives way (#687): this slide's, or the handout's. */
   const openSaved = useCallback((key: string) => {
     if (!editor) return
-    const target = composeKey && editor ? yieldOpenBox(editor, key) : key
+    const target = yieldOpenBox(editor, key)
     if (!target) return
     const marker = markers.find(candidate => candidate.key === target)
     if (marker && marker.note === '') {
@@ -277,9 +288,11 @@ export function SlideComments({ editor, frame, slideNumber, open }: SlideComment
     const marker = saved[open.ordinal]
     if (!marker) return
     takenSerial.current = open.serial
-    const target = composeKey ? yieldOpenBox(editor, marker.key) : marker.key
+    // Taken: the bar forgets it, so this slide shown again later opens nothing by itself.
+    onOpenTaken?.()
+    const target = yieldOpenBox(editor, marker.key)
     if (target) setOpenKey(target)
-  }, [open, editor, markers, composeKey])
+  }, [open, editor, markers, onOpenTaken])
 
   // A click on a comment's words opens its card, as a click on its highlight does in the handout.
   useEffect(() => {
@@ -400,7 +413,15 @@ export function SlideComments({ editor, frame, slideNumber, open }: SlideComment
   if (!editor || !frame) return null
 
   const card: ReactNode = openMarker && layout.card ? createPortal(
-    <div ref={cardRef} className="deck-comment-card" style={{ left: layout.card.left, top: layout.card.top, width: CARD_WIDTH }}>
+    <div
+      ref={cardRef}
+      className="deck-comment-card"
+      style={{ left: layout.card.left, top: layout.card.top, width: CARD_WIDTH }}
+      // The card is in `document.body`, but React passes its events up to the slide's frame: the slide's right-click
+      // menu and its right-press rule are the slide's, never the card's (its box keeps the system menu, for Paste).
+      onContextMenu={event => event.stopPropagation()}
+      onMouseDown={event => event.stopPropagation()}
+    >
       {boxMarker ? (
         <ComposeBubble
           key={boxMarker.key}
@@ -412,12 +433,14 @@ export function SlideComments({ editor, frame, slideNumber, open }: SlideComment
           onDirtyChange={onBoxDirtyChange}
           onSave={text => {
             applyCommentNote(editor, boxMarker, text)
+            leaveHiddenNote(editor)
             setComposeKey(null)
             rescan()
           }}
           onCancel={() => {
             // A new comment's box: its empty comment goes. An Edit: back to how it was.
             if (boxMarker.note === '') applyCommentNote(editor, boxMarker, '')
+            leaveHiddenNote(editor)
             setComposeKey(null)
             rescan()
           }}
@@ -458,7 +481,13 @@ export function SlideComments({ editor, frame, slideNumber, open }: SlideComment
         const spot = layout.markers[marker.key]
         const preview = marker.note.length > 40 ? `${marker.note.slice(0, 39)}…` : marker.note
         return (
-          <div key={marker.key} className="deck-comment-spot" style={{ left: spot.left, top: spot.top }}>
+          <div
+            key={marker.key}
+            className="deck-comment-spot"
+            style={{ left: spot.left, top: spot.top }}
+            // A marker is not the slide: no menu of the slide's (nor the system's) on it.
+            onContextMenu={event => { event.preventDefault(); event.stopPropagation() }}
+          >
             <Tooltip label={`Comment: ${preview}`}>
               <button
                 type="button"

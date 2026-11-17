@@ -211,7 +211,10 @@ export function DeckView({
   const [focusTitleOf, setFocusTitleOf] = useState<{ index: number; select: boolean } | null>(null)
   // Sprint 161: the slide comment the bar's Previous and Next stand on, and the one it asked the stage to open.
   const [commentAt, setCommentAt] = useState<number | null>(null)
-  const [commentOpen, setCommentOpen] = useState<{ slide: number; ordinal: number; serial: number } | null>(null)
+  const [commentOpen, setCommentOpen] = useState<{ slide: number; slideId?: string; ordinal: number; serial: number } | null>(null)
+  // Once the stage has opened it, the request is forgotten: a slide shown again later opens nothing by itself.
+  const commentOpened = useCallback(() => setCommentOpen(null), [])
+  const commentSerial = useRef(0)
   // Sprint 159 (PR 7): the host asked to select the title slide's title, once the deck's slides are there
   const [selectTitle, setSelectTitle] = useState(false)
   const [ratio, setRatio] = useState(() => initialRatio(storedRatio()))
@@ -623,8 +626,9 @@ export function DeckView({
     if (!stop) return
     setCommentAt(index)
     if (stop.slide !== currentRef.current) pick(stop.slide)
-    setCommentOpen(open => ({ slide: stop.slide, ordinal: stop.ordinal, serial: (open?.serial ?? 0) + 1 }))
-  }, [commentStops, pick])
+    commentSerial.current += 1
+    setCommentOpen({ slide: stop.slide, slideId: slides[stop.slide]?.data.id, ordinal: stop.ordinal, serial: commentSerial.current })
+  }, [commentStops, pick, slides])
 
   // The conversion's line in the bar (PR 2; the Experience lead on #765): "Old notes are now comments in the handout."
   // with Show, once per deck (this view keeps that it said it), and only when old notes or hidden words became comments.
@@ -1309,7 +1313,8 @@ export function DeckView({
           ) : null}
         </span>
         <span className="flex-1" />
-        <DeckComments stops={commentStops} at={commentAt} current={shown} onGo={goToComment} />
+        {/* Only with the slide shown: a comment opens on the slide, under what it is on. */}
+        {slideShown ? <DeckComments stops={commentStops} at={commentAt} current={shown} onGo={goToComment} /> : null}
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>
         {status === 'action' && syncAction ? (
           <SyncActionButton action={syncAction} />
@@ -1331,6 +1336,7 @@ export function DeckView({
             actions={stripActions}
             stripRef={stripRef}
             marks={marks}
+            commentCounts={!!commentCallouts}
           />
         ) : null}
 
@@ -1358,7 +1364,9 @@ export function DeckView({
                   selectOnFocus={focusTitleOf?.index === slide.index && focusTitleOf.select}
                   onFocusTaken={titleSelected}
                   onPicture={onPicture}
-                  commentOpen={commentOpen && commentOpen.slide === slide.index ? commentOpen : null}
+                  // By the slide's id where it has one, so a slide moved meanwhile never opens another's comment.
+                  commentOpen={commentOpen && (commentOpen.slideId !== undefined ? commentOpen.slideId === slide.data.id : commentOpen.slide === slide.index) ? commentOpen : null}
+                  onCommentOpened={commentOpened}
                 />
               ) : null}
             </div>

@@ -16,7 +16,8 @@
  */
 import type { Token, Tokens } from 'marked';
 import { isBlockSlide, parseDeck, slideDataOf } from '../deckFormat';
-import { slideTitleLine, type CurrentSlideEntry, type SlideAtSend } from '../currentSlide';
+import { quotedForAI, slideTitleLine, type CurrentSlideEntry, type SlideAtSend } from '../currentSlide';
+import { isDeckPath, splitFileName } from '../deckFileName';
 import { isCurrentSlideId } from '../deckProtocol';
 import { slideBlockClassOf, type FenceAttributes } from './fencedDiv';
 import { isCommentBlock, lexBlockSlide } from './slideRenderer';
@@ -163,9 +164,21 @@ function visit(tokens: Token[], container: SlideAnchor, out: SlideComment[], tit
 /**
  * Every comment on a block slide, in the order it is written, each with what it is on. Empty notes are kept (a new
  * comment whose box is open); an anchored comment over several blocks (one id) is one comment, its words joined.
+ * Read once per Markdown (the strip and the bar ask on every change): the list is shared, so it is never changed.
  */
-export function slideCommentsOf(markdown: string): SlideComment[] {
+export function slideCommentsOf(markdown: string): readonly SlideComment[] {
   if (!markdown.includes('<!--') && !/<mark\b/i.test(markdown)) return [];
+  const cached = commentsCache.get(markdown);
+  if (cached) return cached;
+  if (commentsCache.size > 500) commentsCache.clear();
+  const comments = readSlideComments(markdown);
+  commentsCache.set(markdown, comments);
+  return comments;
+}
+
+const commentsCache = new Map<string, readonly SlideComment[]>();
+
+function readSlideComments(markdown: string): readonly SlideComment[] {
   const out: SlideComment[] = [];
   visit(lexBlockSlide(markdown), { kind: 'slide' }, out, { value: false });
   const merged: SlideComment[] = [];
@@ -243,18 +256,48 @@ export interface CommentOnSlide {
   comment: SlideComment;
 }
 
-/** Is this a deck's file (`.deck.md`): only a deck's comments can be on a slide. */
-function isDeckFile(path: string): boolean {
-  return /\.deck\.md$/i.test(path);
+/**
+ * Every comment on a deck's block slides, by its id, with the slide it is on: the deck read once (a task with many
+ * comments reads it once too). A handout comment, or one without an id, isn't in it.
+ */
+export function commentsOnSlides(deckText: string): Map<string, CommentOnSlide> {
+  const found = new Map<string, CommentOnSlide>();
+  if (!deckText.includes('<!--') && !/<mark\b/i.test(deckText)) return found;
+  const slides = parseDeck(deckText).slides;
+  slides.forEach((slide, index) => {
+    if (!isBlockSlide(slide.kind)) return;
+    const data = slideDataOf(slide.kind, slide.body);
+    for (const comment of slideCommentsOf(data.markdown ?? '')) {
+      if (!comment.id || found.has(comment.id)) continue;
+      found.set(comment.id, {
+        number: index + 1,
+        count: slides.length,
+        ...(data.id ? { id: data.id } : {}),
+        ...(data.title ? { title: data.title } : {}),
+        comment,
+      });
+    }
+  });
+  return found;
+}
+
+/**
+ * The slide a comment (by its id) is on in a deck's text, or null when it isn't on a slide (a handout comment, or
+ * none).
+ */
+export function commentOnSlide(deckText: string, commentId: string): CommentOnSlide | null {
+  if (!commentId || !deckText.includes(commentId)) return null;
+  return commentsOnSlides(deckText).get(commentId) ?? null;
 }
 
 /**
  * The prompt's line for a comment on a slide: `On slide 6 of 15 ("An assistant's four parts", id k3f9), on the four
- * boxes.` The title is quoted as the current slide's line quotes it, so it can't end the line.
+ * boxes.` The title is one line and quoted as the current slide's line quotes it (`quotedForAI`), so it can't end the
+ * line.
  */
 export function commentPlaceLine(found: CommentOnSlide): string {
-  const title = found.title ? JSON.stringify(found.title.replace(/\s+/g, ' ').trim().replace(/\[/g, '(').replace(/\]/g, ')')) : '';
-  const facts = [title, found.id ? `id ${found.id}` : ''].filter(Boolean).join(', ');
+  const title = found.title ? slideTitleLine(found.title) : '';
+  const facts = [title ? quotedForAI(title) : '', found.id ? `id ${found.id}` : ''].filter(Boolean).join(', ');
   const anchor = found.comment.anchor;
   const what = anchor.kind === 'slide' ? 'on the whole slide' : anchor.kind === 'block' ? `on ${blockWords(anchor.block)}` : 'on the words below';
   return `On slide ${found.number} of ${found.count}${facts ? ` (${facts})` : ''}, ${what}.`;
@@ -263,12 +306,18 @@ export function commentPlaceLine(found: CommentOnSlide): string {
 /** The prompt's place lines for a deck's comments, by comment id: only those on a slide. */
 export function slideCommentPlaces(displayPath: string, deckText: string, commentIds: readonly string[]): Map<string, string> {
   const places = new Map<string, string>();
-  if (!isDeckFile(displayPath)) return places;
+  if (!isDeckPath(displayPath)) return places;
+  const all = commentsOnSlides(deckText);
   for (const id of commentIds) {
-    const found = commentOnSlide(deckText, id);
+    const found = all.get(id);
     if (found) places.set(id, commentPlaceLine(found));
   }
   return places;
+}
+
+/** A deck's name from its path, as the library names it: the file's name without `.deck.md`, on any platform. */
+function deckNameOf(path: string): string {
+  return splitFileName(path.split(/[\\/]/).pop() ?? path).name;
 }
 
 /**
@@ -277,41 +326,17 @@ export function slideCommentPlaces(displayPath: string, deckText: string, commen
  * comments is on a slide.
  */
 export function slideAtSendForComments(displayPath: string, deckText: string, commentIds: readonly string[]): SlideAtSend | null {
-  if (!isDeckFile(displayPath)) return null;
+  if (!isDeckPath(displayPath)) return null;
+  const all = commentsOnSlides(deckText);
   const entries: CurrentSlideEntry[] = [];
   let count = 0;
   for (const id of commentIds) {
-    const found = commentOnSlide(deckText, id);
+    const found = all.get(id);
     if (!found || entries.some(entry => entry.number === found.number)) continue;
     count = found.count;
     entries.push({ number: found.number, ...(isCurrentSlideId(found.id) ? { id: found.id } : {}), ...(found.title ? { title: slideTitleLine(found.title) } : {}) });
   }
   if (!entries.length) return null;
   entries.sort((a, b) => a.number - b.number);
-  const deck = (displayPath.split('/').pop() ?? displayPath).replace(/\.deck\.md$/i, '');
-  return { path: displayPath, slide: { deck: slideTitleLine(deck), count, slides: entries } };
-}
-
-/**
- * The slide a comment (by its id) is on in a deck's text, or null when it isn't on a slide (a handout comment, or
- * none). The host names the slide with it in a comment task's prompt and in its message's chip.
- */
-export function commentOnSlide(deckText: string, commentId: string): CommentOnSlide | null {
-  if (!commentId || !deckText.includes(commentId)) return null;
-  const slides = parseDeck(deckText).slides;
-  for (let index = 0; index < slides.length; index++) {
-    const slide = slides[index];
-    if (!isBlockSlide(slide.kind) || !slide.body.includes(commentId)) continue;
-    const data = slideDataOf(slide.kind, slide.body);
-    const comment = slideCommentsOf(data.markdown ?? '').find(candidate => candidate.id === commentId);
-    if (!comment) continue;
-    return {
-      number: index + 1,
-      count: slides.length,
-      ...(data.id ? { id: data.id } : {}),
-      ...(data.title ? { title: data.title } : {}),
-      comment,
-    };
-  }
-  return null;
+  return { path: displayPath, slide: { deck: slideTitleLine(deckNameOf(displayPath)), count, slides: entries } };
 }

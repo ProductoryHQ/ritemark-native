@@ -41,7 +41,7 @@ import { SlideDivWithView } from './slideDivView'
 import { ensureSlideCommentPipeline, markdownToSlideEditorHTML, saveSlideMarkdown } from './slideEditorMarkdown'
 import { contentHeightOf, fitValue, nextFitStep } from './slideFit'
 import { SlideCommentNode, SlideComments, caretTarget, clickTarget, startSlideComment } from '../SlideComments'
-import { notesOutOfTheWay, type SlideTarget } from './slideCommentPlace'
+import { keyPastNotes, type SlideTarget } from './slideCommentPlace'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuTrigger } from '../../ui/context-menu'
 import { Icon } from '../../ui/Icon'
 import { isMac } from '../../../hooks/usePlatform'
@@ -66,6 +66,8 @@ export interface SlideEditorProps {
   onPicture: (dataUrl: string, filename: string) => void
   /** Sprint 161: open one of the slide's saved comments (the deck's bar, Prev and Next), by its place; a new serial asks again. */
   commentOpen?: { ordinal: number; serial: number } | null
+  /** The comment asked for in `commentOpen` was opened: the asker forgets the request. */
+  onCommentOpened?: () => void
 }
 
 /** The right-click menu's shortcuts, as the platform writes them. */
@@ -122,7 +124,7 @@ function titleRange(doc: PMNode): { from: number; to: number } | null {
   return found
 }
 
-export function SlideEditor({ outer, slide, width, theme, borderless, assets, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen }: SlideEditorProps) {
+export function SlideEditor({ outer, slide, width, theme, borderless, assets, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened }: SlideEditorProps) {
   const slideRef = useRef(slide)
   slideRef.current = slide
   const assetsRef = useRef(assets)
@@ -173,12 +175,13 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     addKeyboardShortcuts() {
       const undo = () => { outerRef.current.commands.undo(); return true }
       const redo = () => { outerRef.current.commands.redo(); return true }
-      const comment = () => (commentCallouts ? startSlideComment(this.editor as TipTapEditor, caretTarget(this.editor as TipTapEditor), outerRef.current) : false)
+      const comment = () => (commentCallouts ? startSlideComment(this.editor as TipTapEditor, caretTarget(this.editor as TipTapEditor)) : false)
       // A comment on a block is a hidden note before it: Backspace and Delete join the blocks around it and keep it.
+      // The notes move only when the ordinary key then joins (`keyPastNotes` tries it first); it runs next, as always.
       const pastNotes = (direction: 'backward' | 'forward') => () => {
-        const step = notesOutOfTheWay(this.editor.state, direction)
+        const step = keyPastNotes(this.editor.state, direction)
         if (step === 'stop') return true
-        if (step) this.editor.view.dispatch(step)
+        if (step) this.editor.view.dispatch(step[0])
         return false
       }
       return { 'Mod-z': undo, 'Mod-Shift-z': redo, 'Mod-y': redo, 'Shift-Mod-z': redo, 'Mod-/': comment, Backspace: pastNotes('backward'), Delete: pastNotes('forward') }
@@ -374,7 +377,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
           </div>
           {editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}
           {commentCallouts && editor ? (
-            <SlideComments editor={editor} frame={frame} slideNumber={slide.index + 1} open={commentOpen} />
+            <SlideComments editor={editor} frame={frame} slideNumber={slide.index + 1} open={commentOpen} onOpenTaken={onCommentOpened} />
           ) : null}
         </div>
       </ContextMenuTrigger>
@@ -399,7 +402,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
                 const target = menuTarget.current
                 // After the menu has closed and given the focus back, so the card's box keeps it.
                 window.setTimeout(() => {
-                  if (editor && !editor.isDestroyed) startSlideComment(editor, target, outerRef.current)
+                  if (editor && !editor.isDestroyed) startSlideComment(editor, target)
                 }, 0)
               }}
             >

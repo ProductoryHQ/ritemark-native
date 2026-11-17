@@ -10,10 +10,10 @@ import { register } from 'node:module'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import type { Node as PMNode } from '@tiptap/pm/model'
-import { EditorState, TextSelection, type Selection, type Transaction } from '@tiptap/pm/state'
+import { EditorState, NodeSelection, TextSelection, type Selection, type Transaction } from '@tiptap/pm/state'
 import { loadSlideWithComments, saveSlide, slideCommentSchema } from './slideEditorHarness'
 import { SlideSync } from './slideSync'
-import { notesOutOfTheWay, placeSlideNote, slideMarkersOf, topBlockAt, noteTarget } from './slideCommentPlace'
+import { keyPastNotes, notesOutOfTheWay, placeSlideNote, slideMarkersOf, topBlockAt, noteTarget } from './slideCommentPlace'
 import { joinBackward, joinForward } from '@tiptap/pm/commands'
 import { slideCommentsOf } from '../../../../../src/decks/blocks/slideComments'
 import { saveSlideMarkdown } from './slideEditorMarkdown'
@@ -27,7 +27,8 @@ register(`data:text/javascript,${encodeURIComponent(
 Object.assign(globalThis, { acquireVsCodeApi: () => ({ postMessage: () => {}, getState: () => undefined, setState: () => {} }) })
 const React = await import('react')
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
-const { caretTarget, startSlideComment } = await import('../SlideComments')
+const { caretTarget, leaveHiddenNote, startSlideComment } = await import('../SlideComments')
+const { registerOpenBox, startComment, yieldOpenBox } = await import('../../../extensions/comment/CommentNode')
 const { stripCommentCount } = await import('../SlideStrip')
 const { DeckComments, deckCommentStops, nextCommentStop, deckCommentsLabel } = await import('../DeckComments')
 const { renderToStaticMarkup } = await import('react-dom/server')
@@ -249,7 +250,19 @@ function fill(tr: Transaction, id: string, note: string): Transaction {
   // Anywhere else, the keys are the ordinary ones.
   assert.equal(notesOutOfTheWay(caretAt(load(md), 'First line.'), 'backward'), null)
   assert.equal(notesOutOfTheWay(caretAt(load(md), 'Second line.', true), 'forward'), null)
+  // Review round 1: next to a picture or a line the notes moved and nothing joined, so the comment changed what it
+  // was on. The notes now move only when the ordinary key then acts; it takes the picture before, as it does without
+  // a note, and the comment stays on the words.
+  const withPicture = `# Title\n\n![A chart](images/chart.png)\n\n<!-- {id:${ID_B}} On the line -->\n\nThe line.`
+  let pictureState = caretAt(load(withPicture), 'The line.')
+  const step = keyPastNotes(pictureState, 'backward')
+  assert.ok(Array.isArray(step), 'the ordinary key acts here')
+  for (const tr of step as Transaction[]) pictureState = pictureState.apply(tr)
+  assert.deepEqual(slideCommentsOf(save(pictureState.doc)).map(comment => comment.anchor), [{ kind: 'block', block: { kind: 'text' } }], 'still on the line')
+  const nothingBefore = `<!-- {id:${ID_B}} On the title -->\n\n# Title`
+  assert.equal(keyPastNotes(caretAt(load(nothingBefore), 'Title'), 'backward'), 'stop')
   const source = here('./SlideEditor.tsx')
+  assert.match(source, /const step = keyPastNotes\(this\.editor\.state, direction\)/)
   assert.match(source, /Backspace: pastNotes\('backward'\), Delete: pastNotes\('forward'\)/)
   assert.match(source, /priority: 1000,/, "before the editor's own Backspace and Delete")
   assert.match(here('../SlideComments.tsx'), /export const SlideCommentNode = CommentNode\.extend\(\{\n  selectable: false,/, 'the caret and the arrows never select a hidden note')
@@ -268,7 +281,7 @@ function fakeEditor(doc: PMNode, select: (doc: PMNode) => Selection, openBox: un
     storage: { commentNode: storage },
     view: { dispatch(tr: Transaction) { transactions.push(tr); state = state.apply(tr) } },
   }
-  return { editor: editor as never, storage, transactions, get state() { return state } }
+  return { editor: editor as never, storage, transactions, dispatch: (tr: Transaction) => editor.view.dispatch(tr), get state() { return state } }
 }
 const requestedId = (storage: Storage) => {
   assert.ok(storage.openRequest && storage.openRequest.as === 'box' && storage.openRequest.key.startsWith('c:'))
@@ -316,17 +329,52 @@ const requestedId = (storage: Storage) => {
   assert.deepEqual(now[0].target, { kind: 'block', pos: blockOf(first.state.doc, 'Instructions') })
 
   // The handout's box with words not saved comes forward, and nothing new is made.
+  // (Review round 1: the rule held one way only. Every editor's open box is registered, so it holds both ways.)
   let forward = 0
-  const handout = fakeEditor(plain, doc => TextSelection.create(doc, 1), { key: 'c:x', kind: 'new', anchor: 'node', dirty: true, bringForward: () => { forward++ }, close: () => {} })
+  const handout = fakeEditor(plain, doc => TextSelection.create(doc, 1))
+  const handoutBox = { key: 'c:x', kind: 'new' as const, anchor: 'node' as const, dirty: true, bringForward: () => { forward++ }, close: () => {} }
+  const unregisterHandout = registerOpenBox(handout.editor, handoutBox)
   const slideOne = fakeEditor(plain, doc => TextSelection.create(doc, at(doc, 'Closing')))
-  assert.equal(startSlideComment(slideOne.editor, { kind: 'slide' }, handout.editor), true)
+  assert.equal(startSlideComment(slideOne.editor, { kind: 'slide' }), true)
   assert.equal(forward, 1)
   assert.equal(slideOne.transactions.length, 0, 'nothing new on the slide')
+  unregisterHandout()
+  // The other way: the slide's box with unsaved words comes forward when the handout starts a comment (⌘/, the
+  // bubble menu's Comment, the rail's Edit), and nothing new opens there.
+  let slideForward = 0
+  const slideBox = { key: 'c:y', kind: 'new' as const, anchor: 'node' as const, dirty: true, bringForward: () => { slideForward++ }, close: () => {} }
+  const unregisterSlide = registerOpenBox(slideOne.editor, slideBox)
+  const handoutTwo = fakeEditor(plain, doc => TextSelection.create(doc, at(doc, 'Closing')))
+  assert.equal(startComment(handoutTwo.editor), true)
+  assert.equal(slideForward, 1)
+  assert.equal(handoutTwo.transactions.length, 0, 'nothing new in the handout')
+  assert.equal(yieldOpenBox(handoutTwo.editor, 'c:z'), null, "the rail's Edit and clicks wait too")
+  unregisterSlide()
+  // A clean box elsewhere closes as Cancel does, in its own editor, and the new one opens.
+  let closed = 0
+  const cleanSlide = fakeEditor(plain, doc => TextSelection.create(doc, at(doc, 'Closing')))
+  startSlideComment(cleanSlide.editor, { kind: 'slide' })
+  const cleanId = requestedId(cleanSlide.storage)
+  registerOpenBox(cleanSlide.editor, { key: `c:${cleanId}`, commentId: cleanId, kind: 'new', anchor: 'node', dirty: false, bringForward: () => {}, close: () => { closed++ } })
+  const handoutThree = fakeEditor(plain, doc => TextSelection.create(doc, at(doc, 'Closing')))
+  assert.equal(startComment(handoutThree.editor), true)
+  assert.equal(closed, 1)
+  assert.equal(slideMarkersOf(cleanSlide.state.doc).length, 0, "the slide's empty comment went")
+  assert.equal(slideMarkersOf(handoutThree.state.doc).length, 1, 'the new one is there')
+
+  // Saving a note's card leaves no hidden note selected (a key would take it).
+  const saved = fakeEditor(plain, doc => TextSelection.create(doc, at(doc, 'Closing')))
+  startSlideComment(saved.editor, { kind: 'block', pos: blockOf(plain, 'Closing') })
+  const savedId = requestedId(saved.storage)
+  saved.dispatch(saved.state.tr.setSelection(NodeSelection.create(saved.state.doc, notePos(saved.state.doc, savedId))))
+  leaveHiddenNote(saved.editor)
+  assert.equal(saved.state.selection instanceof TextSelection, true)
+  assert.equal(saved.state.selection.from, at(saved.state.doc, 'Closing'), 'the caret at the start of the block the note is on')
 
   // The menu and the key, as the stage wires them.
   const editorSource = here('./SlideEditor.tsx')
   assert.match(editorSource, /'Mod-\/': comment/, '⌘/ comments on the slide')
-  assert.match(editorSource, /startSlideComment\(this\.editor as TipTapEditor, caretTarget\(this\.editor as TipTapEditor\), outerRef\.current\)/)
+  assert.match(editorSource, /startSlideComment\(this\.editor as TipTapEditor, caretTarget\(this\.editor as TipTapEditor\)\)/)
   assert.match(editorSource, /extension\.name === 'commentNode'\) return SlideCommentNode\.extend\(\)/, "the handout's comment node, with the slide's own storage")
   assert.doesNotMatch(here('../SlideComments.tsx').slice(here('../SlideComments.tsx').indexOf('export const SlideCommentNode'), here('../SlideComments.tsx').indexOf('/** The card')), /Mod-\//, "the handout's ⌘/ (a note inside the words) is not the slide's")
   // Ritemark's own menu replaces the system's (frame 27): Radix's context menu closes on a press outside and on Esc.
@@ -370,6 +418,19 @@ const requestedId = (storage: Storage) => {
   assert.equal(bar.querySelector('[aria-label="Previous comment"]')?.hasAttribute('disabled'), false)
   assert.equal(renderToStaticMarkup(React.createElement(DeckComments, { stops: [], at: null, current: 0, onGo: () => {} })), '', 'no comments, no button')
   assert.equal(deckCommentsLabel(1), '1 comment on the slides')
+  // Review round 1: a request the stage opened is forgotten (a slide shown again opens nothing by itself), it is
+  // matched by the slide's id, the bar's control shows only with the slide shown, and the strip's dots follow the
+  // comment flag as the bar and the markers do.
+  const view = here('../DeckView.tsx')
+  assert.match(view, /const commentOpened = useCallback\(\(\) => setCommentOpen\(null\), \[\]\)/)
+  assert.match(view, /onCommentOpened=\{commentOpened\}/)
+  assert.match(view, /commentOpen\.slideId !== undefined \? commentOpen\.slideId === slide\.data\.id/)
+  assert.match(view, /\{slideShown \? <DeckComments /)
+  assert.match(view, /commentCounts=\{!!commentCallouts\}/)
+  assert.match(here('../SlideStrip.tsx'), /comments=\{commentCounts \? stripCommentCount\(entry\) : 0\}/)
+  assert.match(here('../SlideComments.tsx'), /onOpenTaken\?\.\(\)/)
+  // The card is in document.body but its events reach the slide's frame through React: they stop at the card.
+  assert.match(here('../SlideComments.tsx'), /onContextMenu=\{event => event\.stopPropagation\(\)\}\n      onMouseDown=\{event => event\.stopPropagation\(\)\}/)
   console.log('slideComments (counts): the strip counts a slide\'s comments, the bar goes through them across slides')
 }
 

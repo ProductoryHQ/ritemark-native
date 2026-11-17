@@ -315,9 +315,11 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing ritemark-comment { display: none !important; }
 .deck-sl.is-blocks.is-editing .blk-flow > :nth-child(1 of :not(ritemark-comment)) { margin-top: 0; }
 .deck-sl.is-blocks.is-editing .blk-flow > :nth-last-child(1 of :not(ritemark-comment)) { margin-bottom: 0; }
-.deck-sl.is-blocks.is-editing h1 + ritemark-comment + * { margin-top: 0; }
-.deck-sl.is-blocks.is-editing h1 + ritemark-comment + ritemark-comment + * { margin-top: 0; }
+/* The first block after a title with any number of notes between (review of #766: `h1 + *` with notes skipped). */
+.deck-sl.is-blocks.is-editing h1 ~ :not(ritemark-comment):not(h1 ~ :not(ritemark-comment) ~ *) { margin-top: 0; }
 .deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + h2) { margin-bottom: .12em; }
+.deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + ritemark-comment + h2) { margin-bottom: .12em; }
+.deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + ritemark-comment + ritemark-comment + h2) { margin-bottom: .12em; }
 .deck-sl.is-blocks.is-editing .blk-column:nth-child(1 of .blk-column) { padding-left: 0; box-shadow: none; }
 .deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }
 .deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ ritemark-comment + h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }

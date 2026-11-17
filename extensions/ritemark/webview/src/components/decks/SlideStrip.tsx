@@ -249,9 +249,11 @@ interface SlideStripProps {
   stripRef: React.RefObject<HTMLDivElement>
   /** Each copy's source marks, by the slide's id. */
   marks: Record<string, StripMark>
+  /** Sprint 161: count each slide's comments in its dot (the comment flag on). */
+  commentCounts?: boolean
 }
 
-export function SlideStrip({ slides, current, theme, borderless, assets, actions, stripRef, marks }: SlideStripProps) {
+export function SlideStrip({ slides, current, theme, borderless, assets, actions, stripRef, marks, commentCounts }: SlideStripProps) {
   const count = slides.length
   const [drag, setDrag] = useState<{ from: number; to: number | null } | null>(null)
   const [menuFor, setMenuFor] = useState<number | null>(null)
@@ -408,7 +410,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
             onMenuCloseFocus={onMenuCloseFocus}
             badgeLabel={(entry.data.id && libraryBadge(marks[entry.data.id])?.label) || null}
             badgeAmber={!!(entry.data.id && libraryBadge(marks[entry.data.id])?.amber)}
-            comments={stripCommentCount(entry)}
+            comments={commentCounts ? stripCommentCount(entry) : 0}
           />
         </div>
       ))}

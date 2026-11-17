@@ -37,6 +37,7 @@ import {
   composerIsDirty,
   leastScrollDelta,
   nextRailBox,
+  registerOpenBox,
   yieldOpenBox,
   type OpenCommentBox,
   type ScreenSpan,
@@ -1125,10 +1126,8 @@ export function MarginCommentRail({
       },
       close: () => setComposeKey((k) => (k === key ? null : k)),
     }
-    storage.openBox = entry
-    return () => {
-      if (storage.openBox === entry) storage.openBox = null
-    }
+    // Sprint 161: registered, so a slide's box on a deck's stage sees it too.
+    return registerOpenBox(editor!, entry)
   }, [editor, container, boxMarker])
 
   const onBoxDirtyChange = useCallback((dirty: boolean) => {

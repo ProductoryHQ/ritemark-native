@@ -11,6 +11,7 @@
  */
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
+import { joinBackward, joinForward } from '@tiptap/pm/commands'
 import type { SlideAnchor, SlideBlockShape } from '../../../../../src/decks/blocks/slideComments'
 import { OPEN_FENCE, parseFenceAttributes, slideBlockClassOf, type SlideBlockClass } from '../../../../../src/decks/blocks/fencedDiv'
 
@@ -107,6 +108,22 @@ export function notesOutOfTheWay(state: EditorState, direction: 'backward' | 'fo
     return tr.setSelection(TextSelection.create(tr.doc, tr.mapping.map(selection.from)))
   }
   return null
+}
+
+/**
+ * Backspace or Delete next to a hidden note, as the stage runs it: the notes move (`notesOutOfTheWay`) only when the
+ * ordinary key then does what it would do without them (join the two blocks, or take the picture or line before),
+ * tried first on the moved document. Returns the move and the key's own step, `'stop'` (the key does nothing, and the
+ * note stays where it is), or null when the key is the ordinary one.
+ */
+export function keyPastNotes(state: EditorState, direction: 'backward' | 'forward'): [Transaction, Transaction] | 'stop' | null {
+  const move = notesOutOfTheWay(state, direction)
+  if (move === null || move === 'stop') return move
+  const moved = state.apply(move)
+  let step: Transaction | null = null
+  const command = direction === 'backward' ? joinBackward : joinForward
+  command(moved, tr => { step = tr })
+  return step ? [move, step] : 'stop'
 }
 
 /** What a note at `notePos` is on: the next block that isn't a note in its parent, or its parent (the slide, a block). */

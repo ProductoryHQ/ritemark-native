@@ -4,7 +4,7 @@
  * Run with `npx tsx src/decks/blocks/slideComments.test.ts`.
  */
 import { strict as assert } from 'node:assert';
-import { anchorLine, commentOnSlide, slideCommentCount, slideCommentsOf } from './slideComments';
+import { anchorLine, commentOnSlide, commentsOnSlides, slideAtSendForComments, slideCommentCount, slideCommentsOf } from './slideComments';
 import { blockSectionNumberOf, blockSlideHtml, isCoverSlide } from './slideRenderer';
 
 const ID_A = '11111111-1111-4111-8111-111111111111';
@@ -157,6 +157,19 @@ Handout two.
   assert.equal(commentOnSlide(deck, ID_D), null, 'a handout comment is not on a slide');
   assert.equal(commentOnSlide(deck, 'missing'), null);
   console.log('slideComments: the host finds the slide a comment is on');
+}
+
+// ── Review round 1: the chip's deck name on Windows, and the deck read once ──
+{
+  const deck = `\`\`\`slide\n${SLIDE}\n\`\`\`\n`;
+  const windows = slideAtSendForComments('C:\\Users\\me\\Decks\\Training.deck.md', deck, [ID_B, ID_C]);
+  assert.equal(windows?.slide.deck, 'Training', 'the name, not the whole path');
+  assert.deepEqual(windows?.slide.slides, [{ number: 1, title: "An assistant's four parts" }], 'two comments on one slide name it once');
+  assert.equal(slideAtSendForComments('notes/Plan.md', deck, [ID_B]), null, 'only a deck has slides');
+  const all = commentsOnSlides(deck);
+  assert.deepEqual([...all.keys()], [ID_A, ID_B, ID_C]);
+  assert.equal(slideCommentsOf(SLIDE), slideCommentsOf(SLIDE), 'read once per Markdown');
+  console.log('slideComments: a Windows path names its deck; the deck is read once');
 }
 
 console.log('slideComments: all tests passed');
