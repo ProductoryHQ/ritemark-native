@@ -27,9 +27,9 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { closeHistory } from '@tiptap/pm/history'
 import { isBlockSlide, withBlockMarkdown } from '../../../../../src/decks/deckFormat'
 import { blockDataOf, convertsToBlocks, drawsAsBlocks } from '../../../../../src/decks/blocks/convertDeck'
-import { joinedSlideMarkdown, slideHasNothing } from '../../../../../src/decks/blocks/joinSlides'
+import { joinedSlideMarkdown, joinsCleanly, slideHasNothing } from '../../../../../src/decks/blocks/joinSlides'
 import { DECK_OPERATION, isSlideNode, partIndexAt, partRange, slidesOf, type DeckSlideEntry } from '../deckDocument'
-import { convertDeckInto } from './deckConvert'
+import { convertDeckInto, writeDrawnHeadings } from './deckConvert'
 
 export const deckRemoveKey = new PluginKey<JoinMark | null>('deckRemove')
 
@@ -43,6 +43,9 @@ export type DeckRemoval = { what: 'deleted'; number: number } | { what: 'joined'
 export interface JoinMark {
   index: number
   id: string | undefined
+  /** The join can't be made, and the note says why: the lower slide is skipped and the upper one isn't, or a code block
+   *  in one of them is never closed. */
+  blocked?: JoinBlock
 }
 
 /** The bar's line for a removal. */
@@ -50,8 +53,13 @@ export function removalNotice(removal: DeckRemoval): string {
   return removal.what === 'deleted' ? `Slide ${removal.number} is deleted.` : `Slide ${removal.number} is joined to slide ${removal.into}.`
 }
 
+/** Why a join isn't made. */
+export type JoinBlock = 'skipped' | 'unclosed'
+
 /** The note at the line on the first press (the numbers are the slides' own, from 1). */
-export function joinNote(index: number): string {
+export function joinNote(index: number, blocked?: JoinBlock): string {
+  if (blocked === 'skipped') return `Slide ${index + 1} is skipped, so it can't join slide ${index}. Show it first, from its ⋯.`
+  if (blocked === 'unclosed') return `Slide ${index + 1} can't join slide ${index}: a code block on one of them is never closed.`
   return `Backspace again joins slide ${index + 1} into slide ${index}. Nothing is lost.`
 }
 
@@ -111,8 +119,23 @@ export function canJoin(doc: PMNode, index: number): boolean {
   return !!upper && !!lower && drawsAsBlocks(upper.kind) && drawsAsBlocks(lower.kind)
 }
 
+/**
+ * Why a join of part `index` into the one above isn't made, or null when it can be. A skipped slide joined into a
+ * shown one would put its words on the wall and the page, which a skipped slide's words never reach: it is shown
+ * first, by the person, or deleted.
+ */
+export function joinBlocked(doc: PMNode, index: number): JoinBlock | null {
+  const slides = slidesOf(doc)
+  const upper = slides[index - 1]
+  const lower = slides[index]
+  if (!upper || !lower) return null
+  if (lower.data.skip === true && upper.data.skip !== true) return 'skipped'
+  // A code fence left open would take the other slide's words, comments too, into code, which the page shows as written.
+  return joinsCleanly(drawnMarkdownOf(upper) ?? '', drawnMarkdownOf(lower) ?? '') ? null : 'unclosed'
+}
+
 /** What Backspace means where the caret is: remove the empty part, mark or make a join, or nothing of the deck's. */
-export function backspaceAt(state: EditorState): { what: 'remove' | 'join'; index: number } | null {
+export function backspaceAt(state: EditorState): { what: 'remove' | 'join'; index: number; blocked?: JoinBlock } | null {
   const { selection, doc } = state
   if (!selection.empty || !(selection instanceof TextSelection)) return null
   const index = partIndexAt(doc, selection.from)
@@ -120,8 +143,9 @@ export function backspaceAt(state: EditorState): { what: 'remove' | 'join'; inde
   const entry = slidesOf(doc)[index]
   if (!entry || selection.from <= entry.pos) return null
   if (slidesOf(doc).length > 1 && isEmptyPart(doc, index)) return { what: 'remove', index }
-  if (partStartOf(doc, index) === selection.from && canJoin(doc, index)) return { what: 'join', index }
-  return null
+  if (partStartOf(doc, index) !== selection.from || !canJoin(doc, index)) return null
+  const blocked = joinBlocked(doc, index)
+  return blocked ? { what: 'join', index, blocked } : { what: 'join', index }
 }
 
 /** A caret in the line nearest `pos`, looking that way first (never a slide's node, which a caret can't stand in). */
@@ -148,24 +172,25 @@ export function removeEmptyPart(state: EditorState, index: number): Transaction 
  * part above. Drawn headings are written, as with every edit of the handout's text. Null when the two can't be joined.
  */
 export function joinPartUp(state: EditorState, index: number): Transaction | null {
-  if (!canJoin(state.doc, index)) return null
+  if (!canJoin(state.doc, index) || joinBlocked(state.doc, index)) return null
   const tr = closeHistory(state.tr)
   const caret = state.selection.from
   convertDeckInto(tr)
+  // The positions below are read from the converted document: only the steps after the conversion move them.
+  const converted = tr.steps.length
   const slides = slidesOf(tr.doc)
   const upper = slides[index - 1]
   const lower = slides[index]
   if (!upper || !lower || !isBlockSlide(upper.kind) || !isBlockSlide(lower.kind)) return null
   const markdown = joinedSlideMarkdown(upper.data.markdown ?? '', lower.data.markdown ?? '', lower.data)
   tr.setNodeMarkup(upper.pos, undefined, { ...upper.node.attrs, body: withBlockMarkdown(upper.node.attrs.body, markdown) })
-  const lowerPos = tr.mapping.map(lower.pos)
+  const lowerPos = tr.mapping.slice(converted).map(lower.pos)
   const lowerNode = tr.doc.nodeAt(lowerPos)
   if (!lowerNode || !isSlideNode(lowerNode)) return null
   tr.delete(lowerPos, lowerPos + lowerNode.nodeSize)
-  // The part's drawn headings (a deck written before 16 November) are its text now, written with the join.
-  tr.doc.forEach((node, pos) => {
-    if (node.type.name === 'heading' && node.attrs.deckDrawn === true) tr.setNodeMarkup(pos, undefined, { ...node.attrs, deckDrawn: false })
-  })
+  // The parts' drawn headings (a deck written before 16 November) are their text now, written with the join, as the
+  // conversion writes them.
+  writeDrawnHeadings(tr)
   const at = Math.max(0, Math.min(tr.mapping.map(caret), tr.doc.content.size))
   tr.setSelection(textSelectionNear(tr.doc, at, 1))
   const removal: DeckRemoval = { what: 'joined', number: index + 1, into: index }
@@ -213,6 +238,11 @@ export function handleRemoveKey(view: EditorView, event: Pick<KeyboardEvent, 'ke
     return true
   }
   const id = slidesOf(state.doc)[at.index]?.data.id
+  // A join that can't be made: its note says why; another press changes nothing.
+  if (at.blocked) {
+    if (!mark || mark.index !== at.index || mark.id !== id) view.dispatch(markJoin(state.tr, { index: at.index, id, blocked: at.blocked }))
+    return true
+  }
   if (mark && mark.index === at.index && mark.id === id) {
     const tr = joinPartUp(state, at.index)
     if (!tr) {
@@ -232,7 +262,7 @@ function joinDecorations(state: EditorState): DecorationSet {
   const entry = mark ? slidesOf(state.doc)[mark.index] : undefined
   if (!mark || !entry) return DecorationSet.empty
   return DecorationSet.create(state.doc, [
-    Decoration.node(entry.pos, entry.pos + entry.node.nodeSize, { class: 'is-join', 'data-join-note': joinNote(mark.index) }),
+    Decoration.node(entry.pos, entry.pos + entry.node.nodeSize, { class: mark.blocked ? 'is-join is-blocked' : 'is-join', 'data-join-note': joinNote(mark.index, mark.blocked) }),
   ])
 }
 

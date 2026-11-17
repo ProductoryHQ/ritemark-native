@@ -99,7 +99,7 @@ function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting
 }
 
 /** A slide of a kind this build doesn't know: its layout's words, typed in place (Sprint 157). */
-function LayoutStage({ editor, slide, theme, borderless, assets, width, onWriting, initialFocus, selectOnFocus, onFocusTaken, onPicture }: StageProps) {
+function LayoutStage({ editor, slide, theme, borderless, assets, width, onWriting, initialFocus, selectOnFocus, onFocusTaken, onPicture, onSlideSettings }: StageProps) {
   const [focusPath, setFocusPath] = useState<string | null>(initialFocus ?? null)
   const [focusSelect, setFocusSelect] = useState(!!selectOnFocus)
   // A request that comes after the stage is drawn (the deck's first slide, already shown when New's deck opens); the
@@ -216,6 +216,13 @@ function LayoutStage({ editor, slide, theme, borderless, assets, width, onWritin
         onPaste={event => { if (takePicture(event.clipboardData, true)) event.preventDefault() }}
         onDragOver={event => { if (Array.from(event.dataTransfer.types).includes('Files')) event.preventDefault() }}
         onDrop={event => { if (takePicture(event.dataTransfer, false)) event.preventDefault() }}
+        // A slide of a kind this build doesn't know has no menu of its own: a right-click opens its Slide settings, so
+        // they stay reachable with the strip and the handout both out of view (the gear left the bar, 17 November).
+        onContextMenu={event => {
+          if (!onSlideSettings) return
+          event.preventDefault()
+          onSlideSettings({ x: event.clientX, y: event.clientY })
+        }}
       >
         <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={theme} borderless={borderless} assets={assets} editing={editing} />
       </div>

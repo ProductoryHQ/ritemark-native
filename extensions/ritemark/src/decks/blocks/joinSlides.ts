@@ -81,7 +81,9 @@ export function joinedSlideMarkdown(upper: string, lower: string, lowerData: Pic
     // Kept whole (a Markdown the lexer doesn't give back as written): nothing is moved inside either slide.
     return [trimmed(top), titledWhole(bottom), picture].filter((piece): piece is string => !!piece).join('\n\n');
   }
-  const moved = lowerBlocks.blocks.map(block => block.raw);
+  // A block's first line indented by 1 to 3 spaces means nothing at a block's start, but after a list it would make the
+  // block part of the list's last item: the indent goes (never from code, where it is the code's).
+  const moved = lowerBlocks.blocks.map(block => (block.token.type === 'code' ? block.raw : block.raw.replace(/^ {1,3}(?=\S)/, '')));
   const title = titleIndexOf(lowerBlocks.blocks);
   if (title >= 0) moved[title] = asHeading3(lowerBlocks.blocks[title].raw, lowerBlocks.blocks[title].token as Tokens.Heading);
   if (picture) moved.push(picture);
@@ -89,13 +91,43 @@ export function joinedSlideMarkdown(upper: string, lower: string, lowerData: Pic
   // slide N. With nothing of slide N moving, they're on the joined slide's whole slide.
   const notesAt = title >= 0 ? title : 0;
   const lowerNotes = lowerBlocks.slideNotes;
+  const upperRaw = upperBlocks.blocks.map(block => block.raw);
+  const lowerRaw = moved.length ? [...moved.slice(0, notesAt), ...lowerNotes, ...moved.slice(notesAt)] : [];
+  // An upper slide ending in a list, and a lower one whose first block (no title, no note before it) is a list of the
+  // same kind: a blank line between them would make one loose list of both, spacing the upper slide's own items out.
+  // Written as one tight list instead, the items in their order (the editor makes one list of two touching lists).
+  const lastUpper = upperBlocks.blocks[upperBlocks.blocks.length - 1]?.token;
+  const firstLower = lowerBlocks.blocks[0]?.token;
+  const touching = !!lastUpper && !!firstLower && lowerRaw[0] === moved[0] && title !== 0
+    && lastUpper.type === 'list' && firstLower.type === 'list'
+    && (lastUpper as Tokens.List).ordered === (firstLower as Tokens.List).ordered;
+  const joint = touching && upperRaw.length && lowerRaw.length ? [`${upperRaw.pop()}\n${lowerRaw.shift()}`] : [];
   const pieces = [
-    ...upperBlocks.blocks.map(block => block.raw),
-    ...(moved.length ? [...moved.slice(0, notesAt), ...lowerNotes, ...moved.slice(notesAt)] : []),
+    ...upperRaw,
+    ...joint,
+    ...lowerRaw,
     ...upperBlocks.slideNotes,
     ...(moved.length ? [] : lowerNotes),
   ].filter(piece => piece !== '');
   return pieces.join('\n\n');
+}
+
+const PROBE = 'RitemarkJoinProbe';
+
+/** Does a slide's Markdown end where a block may start: no code fence, comment or other block left open at its end? */
+function endsClosed(markdown: string): boolean {
+  const tokens = lexBlockSlide(`${markdown.replace(/\r\n?/g, '\n').replace(/\s+$/, '')}\n\n${PROBE}`).filter(token => token.type !== 'space');
+  const last = tokens[tokens.length - 1];
+  return !!last && last.type === 'paragraph' && last.raw.trim() === PROBE;
+}
+
+/**
+ * Can these two slides be joined without one's words falling inside the other's open block? A slide that ends in a
+ * code fence never closed would take everything after it, comments too, as code: shown as words on the stage, the wall
+ * and the page (security review of this PR). Such a join isn't made.
+ */
+export function joinsCleanly(upper: string, lower: string): boolean {
+  return endsClosed(upper) && endsClosed(lower);
 }
 
 /** Slide N's Markdown kept whole, its first line's H1 (outside a fence) written as an H3. */

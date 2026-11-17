@@ -219,7 +219,7 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
   assert.match(here('./decks.css'), /\n\.deck-settings:not\(\.deck-addlib\) \{ max-height: var\(--radix-popover-content-available-height\); overflow-y: auto; \}/)
   assert.match(here('./library/AddToLibrarySheet.tsx'), /className="deck-settings deck-addlib"/)
   // Settings belong to their slide: another slide made current closes them; a slide that goes leaves the deck's section.
-  assert.match(view, /useEffect\(\(\) => \{ setSettingsFor\(open => \(open && open\.index >= 0 && open\.index !== shown \? null : open\)\) \}, \[shown\]\)/)
+  assert.match(view, /if \(open\.index < 0\) return count === 0 \? open : null\s+return open\.index === shown && \(open\.id === undefined \|\| open\.id === shownSlideId\) \? open : null/, 'by the slide id, never another slide at its number')
   assert.doesNotMatch(view, /settingsReady|The deck has no slides yet|Show the slide to change its settings/, 'no disabled state or its words')
   for (const line of view.split('\n').filter(text => text.includes('setSettingsFor(null)'))) {
     assert.doesNotMatch(line, /slideShown|fold|'slide'/, `nothing about the fold closes Settings: ${line.trim()}`)

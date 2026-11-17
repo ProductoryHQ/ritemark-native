@@ -17,8 +17,9 @@ import type { EditorView } from '@tiptap/pm/view'
 import { history, undo, undoDepth } from '@tiptap/pm/history'
 import { canonicalMarkdownProjection } from '../../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync/frontMatter'
-import { joinedSlideMarkdown, slideHasNothing } from '../../../../../src/decks/blocks/joinSlides'
+import { joinedSlideMarkdown, joinsCleanly, slideHasNothing } from '../../../../../src/decks/blocks/joinSlides'
 import { slideCommentsOf } from '../../../../../src/decks/blocks/slideComments'
+import { lexBlockSlide } from '../../../../../src/decks/blocks/slideRenderer'
 import { deckDigest, publicDeck } from '../../../../../src/decks/page/publicDeck'
 import { pageHtml } from '../../../../../src/decks/page/pageHtml'
 import { BUILT_IN_THEME } from '../../../../../src/decks/deckTheme'
@@ -29,7 +30,7 @@ import { DeckDrawnHeadings, drawnHeadingsFollow } from './drawnHeadings'
 import { deckGuardPlugin } from './deckGuard'
 import { deckLinesPlugin } from './deckLines'
 import { deckConvertPlugin } from './deckConvert'
-import { DECK_REMOVED, backspaceAt, deckRemovePlugin, handleRemoveKey, isEmptyPart, joinMarkOf, joinNote, partStartOf, removalNotice, type DeckRemoval } from './deckRemove'
+import { DECK_REMOVED, backspaceAt, joinPartUp, deckRemovePlugin, handleRemoveKey, isEmptyPart, joinMarkOf, joinNote, partStartOf, removalNotice, type DeckRemoval } from './deckRemove'
 import { derivedHeadings, slidesOf } from '../deckDocument'
 import { slideMenuItems, type SlideMenuActions } from '../slideMenuItems'
 
@@ -333,8 +334,8 @@ const DECK = [
   const view = readFileSync(join(here, 'DeckView.tsx'), 'utf8')
   assert.match(strip, /<DropdownMenuContent[^>]*onCloseAutoFocus=\{onMenuCloseFocus\}>\s*<SlideMenuItems /, "the thumbnail's menu")
   // The strip's own actions; Slide settings… anchored beside this part's number.
-  assert.match(view, /function PartMenu[\s\S]*?<SlideMenuItems index=\{entry\.index\}[^>]*actions=\{\{ \.\.\.actions, settings: index => onSettings\(index, slot\) \}\}/, "the part number's menu")
-  assert.match(view, /<PartMenu key=\{slot\.id\} slot=\{slot\} slides=\{slides\} actions=\{stripActions\}/, "with the strip's own actions")
+  assert.match(view, /function PartMenu[\s\S]*?<SlideMenuItems index=\{index\}[^>]*actions=\{\{ \.\.\.actions, settings: at => onSettings\(at, slot\) \}\}/, "the part number's menu")
+  assert.match(view, /<PartMenu\s+key=\{slot\.id\}\s+slot=\{slot\}\s+index=\{entry \? entry\.index : -1\}[\s\S]*?actions=\{stripActions\}/, "with the strip's own actions, for its own slide")
 }
 
 // ---- A deck of today's slides: the join converts it first, in the same step, and one Undo gives the file back.
@@ -380,6 +381,92 @@ const DECK = [
   assert.equal(joinedSlideMarkdown('', '# Down', { picture: 'behind', image: 'images/a b.png' }), '### Down\n\n![](<images/a b.png>)', 'a picture behind, with a space in its path')
   assert.equal(joinedSlideMarkdown('# Up', '# Down', { picture: 'none', image: 'images/kept.png' }), '# Up\n\n### Down', 'a picture placed nowhere is no slide-wide picture')
   assert.equal(joinedSlideMarkdown('# Up', '```\n# not a title\n```\n\n# Down'), '# Up\n\n```\n# not a title\n```\n\n### Down', 'a heading in code stays')
+}
+
+// ---- Review round 1, finding 1: a deck of today's slides whose upper slide has notes. The conversion puts their comment
+// in front of the lower slide, and the join's position for the lower slide is read after the conversion: it is not
+// moved again by the conversion's own steps (it was, and the second press removed nothing, or the upper slide).
+{
+  const V1 = [
+    '---', 'deck: 1', '---', '',
+    '```slide points', 'id: p1', 'title: Where assistants help', 'items:', '- heading: Mail', '```', '',
+    '```notes', 'NOTESWORD: say it slowly', '```', '',
+    'Ask who has done one.', '',
+    '```slide statement', 'id: s2', 'title: What it taught us', 'subtitle: Twice as fast.', '```', '',
+    'Two lessons.', '',
+  ].join('\n')
+  const deck = openDeck(V1)
+  const second = slidesOf(deck.state.doc)[1]
+  deck.caret(second.pos + second.node.nodeSize + 1)
+  deck.key('Backspace')
+  deck.key('Backspace')
+  assert.deepEqual(deck.removals, [{ what: 'joined', number: 2, into: 1 }], 'the second press joins')
+  const slides = slidesOf(deck.state.doc)
+  assert.deepEqual(slides.map(entry => entry.data.id), ['p1'], 'the lower slide went, the upper one stayed')
+  assert.equal(slides[0].data.markdown, '# Where assistants help\n\n1. Mail\n\n### What it taught us\n\nTwice as fast.')
+  const saved = deck.save()
+  assert.ok(saved.includes('NOTESWORD') && saved.includes('Ask who has done one.') && saved.includes('Two lessons.'), 'nothing lost')
+  deck.undo()
+  assert.equal(deck.save(), V1, 'one Undo: byte for byte')
+}
+
+// ---- Finding 2: an upper slide ending in a list and a lower one starting with a list of the same kind make one tight
+// list (a blank line between them would space the upper slide's own items out); an indent of 1 to 3 spaces at a moved
+// block's start never makes it part of the list above.
+{
+  assert.equal(joinedSlideMarkdown('# A\n\n- a\n- b', '- c\n- d'), '# A\n\n- a\n- b\n- c\n- d', 'one tight list')
+  assert.equal(joinedSlideMarkdown('1. a\n2. b', '1. c'), '1. a\n2. b\n1. c', 'ordered: one list, its numbers the renderer counts')
+  assert.equal(joinedSlideMarkdown('- a', '1. c'), '- a\n\n1. c', 'a bullet list and a numbered one stay two')
+  assert.equal(joinedSlideMarkdown('- a', '# T\n\n- c'), '- a\n\n### T\n\n- c', 'a title between: nothing to merge')
+  assert.equal(joinedSlideMarkdown('- a', '  continued'), '- a\n\ncontinued', 'the indent goes, so it is a paragraph of its own')
+  assert.equal(joinedSlideMarkdown('- a', '    code'), '- a\n\n    code', "code keeps its indent")
+  const tokens = (markdown: string) => lexBlockSlide(markdown).filter(token => token.type !== 'space').map(token => token.type)
+  assert.deepEqual(tokens(joinedSlideMarkdown('- a\n- b', '- c')), ['list'], 'one list')
+  assert.equal((lexBlockSlide(joinedSlideMarkdown('- a\n- b', '- c'))[0] as { loose?: boolean }).loose, false, 'and a tight one, as the upper slide had it')
+  assert.deepEqual(tokens(joinedSlideMarkdown('- a', '  continued')), ['list', 'paragraph'])
+}
+
+// ---- Finding 3: a skipped slide is never joined into a shown one (its words would reach the wall and the page): the
+// first press says why, and no press writes anything. A shown slide may join a skipped one (its words stay off the page).
+{
+  const skipped = DECK.replace('image: images/upper.png\nskip: true', 'image: images/upper.png').replace('id: l4\npicture: left', 'id: l4\nskip: true\npicture: left')
+  assert.notEqual(skipped, DECK)
+  const deck = openDeck(skipped)
+  deck.caret(startOf(deck.state.doc, 'What it taught us'))
+  const before = deck.state.doc
+  assert.equal(deck.key('Backspace'), true)
+  assert.deepEqual(joinMarkOf(deck.state), { index: 3, id: 'l4', blocked: 'skipped' })
+  assert.equal(joinNote(3, 'skipped'), "Slide 4 is skipped, so it can't join slide 3. Show it first, from its ⋯.")
+  assert.equal(deck.key('Backspace'), true, 'the second press is taken too')
+  assert.equal(deck.state.doc, before, 'and writes nothing')
+  assert.equal(deck.removals.length, 0)
+  assert.equal(joinPartUp(deck.state, 3), null)
+  // The fixture's slide 3 is skipped, slide 4 shown.
+  const upperSkipped = openDeck(DECK)
+  upperSkipped.caret(startOf(upperSkipped.state.doc, 'What it taught us'))
+  upperSkipped.key('Backspace')
+  upperSkipped.key('Backspace')
+  assert.equal(upperSkipped.removals.length, 1, 'into a skipped slide: joined, its words stay off the page')
+}
+
+// ---- Security review: a slide that ends in a code fence never closed would take the other slide's words, its private
+// comments too, into code, which the page shows as written. Such a join isn't made, and the note says why.
+{
+  assert.equal(joinsCleanly('# A\n\n```\ncode', '# B'), false, 'an open fence above')
+  assert.equal(joinsCleanly('# A', '# B\n\n```\ncode'), false, 'an open fence below (the upper slide\'s notes go after it)')
+  assert.equal(joinsCleanly('# A\n\n```\ncode\n```', '# B\n\n<!-- {id:x} n -->'), true, 'closed fences and notes are fine')
+  assert.equal(joinsCleanly('', ''), true)
+  const open = DECK.replace('Six weeks with the bank.', 'Six weeks with the bank.\n\n~~~\nan open fence')
+  const deck = openDeck(open)
+  deck.caret(startOf(deck.state.doc, 'What it taught us'))
+  const before = deck.state.doc
+  deck.key('Backspace')
+  assert.equal(joinMarkOf(deck.state)?.blocked, 'unclosed')
+  assert.equal(joinNote(3, 'unclosed'), "Slide 4 can't join slide 3: a code block on one of them is never closed.")
+  deck.key('Backspace')
+  assert.equal(deck.state.doc, before, 'nothing written')
+  const page = JSON.stringify(publicDeck(deck.save(), { folderName: 'Demo', deckName: 'Demo', theme: BUILT_IN_THEME }))
+  assert.ok(!page.includes('TITLENOTE') && !page.includes('LOWERWHOLE'), "the lower slide's comments stay off the page")
 }
 
 console.log('deckRemove.test.ts: all passed')

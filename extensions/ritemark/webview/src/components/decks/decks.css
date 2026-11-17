@@ -130,7 +130,11 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-part-more .deck-part-more-button { width: 20px; height: 20px; min-width: 20px; padding: 0; border-radius: 5px; }
 .deck-part-more .deck-part-more-button svg { width: 13px; height: 13px; }
 /* A join's first press: the line between the parts in the accent, and the note at the line (deckRemove.ts). */
-.deck-part-head.is-join { border-top: 2px solid var(--r-accent); }
+/* The accent line keeps the hairline's 1px and adds a second, inset, so nothing under it moves. */
+.deck-part-head.is-join { border-top-color: var(--r-accent); box-shadow: inset 0 1px 0 var(--r-accent); }
+/* A join that can't be made (a skipped slide): the note says why, in the ink, not the accent. */
+.deck-part-head.is-join.is-blocked { border-top-color: var(--r-hairline-strong); box-shadow: none; }
+.deck-part-head.is-join.is-blocked::before { color: var(--r-ink-body); }
 .deck-part-head.is-join::before { content: attr(data-join-note); position: absolute; left: var(--deck-text-left, 48px); top: 3px; font: 500 12px/16px var(--ritemark-ui-font-family); color: var(--r-accent); white-space: nowrap; pointer-events: none; }
 .deck-thumb.is-join { background: var(--r-accent-soft); border-radius: 6px; }
 .deck-thumb.is-join .deck-thumb-slide { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }

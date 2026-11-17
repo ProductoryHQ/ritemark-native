@@ -10,7 +10,7 @@
  * Kept in step (README decision 5): scrolling the handout changes the slide; choosing a thumbnail scrolls the handout
  * to its part; writing in a part makes its slide the current one.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { Editor, TEXT_COLUMN_WIDTH } from '../Editor'
@@ -46,7 +46,7 @@ import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
 import { CURRENT_SLIDE_SETTLE_MS, currentSlideMessage } from './currentSlideMessage'
 import { DeckGuard } from './handout/deckGuard'
-import { DeckConvert, commentNodeAt, conversionNoticeFor, conversionStateOf, needsConversion, pictureIntoSlide } from './handout/deckConvert'
+import { CONVERSION_NOTICE, DeckConvert, commentNodeAt, conversionNoticeFor, conversionStateOf, needsConversion, pictureIntoSlide } from './handout/deckConvert'
 import { commentBoxStorage } from '../../extensions/comment/CommentNode'
 import { blockDataOf, drawsAsBlocks, saysBlockDeck, withStepsTag } from '../../../../src/decks/blocks/convertDeck'
 import { blockHasTable, blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
@@ -122,21 +122,29 @@ type SettingsPlace = { anchor: SettingsAnchor; side: 'right' | 'left'; back: HTM
  * items and actions, for the slide whose part head holds the slot. Drawn into the head's slot (a portal); nothing when
  * the slot's slide isn't one of the deck's slides as this view last read them.
  */
-function PartMenu({ slot, slides, actions, marks, onSettings }: { slot: PartMenuSlot; slides: DeckSlideEntry[]; actions: StripActions; marks: Record<string, StripMark>; onSettings: (index: number, slot: PartMenuSlot) => void }) {
-  const pos = slot.getPos()
-  const entry = pos === undefined ? undefined : slides.find(slide => slide.pos === pos)
-  if (!entry) return null
-  const fromLibrary = !!(entry.data.id && libraryBadge(marks[entry.data.id]))
+interface PartMenuProps {
+  slot: PartMenuSlot
+  /** The slide's place (from 0), as this view last read the deck; -1 when the slot's slide isn't one of them. */
+  index: number
+  count: number
+  skipped: boolean
+  fromLibrary: boolean
+  actions: StripActions
+  onSettings: (index: number, slot: PartMenuSlot) => void
+}
+
+const PartMenu = memo(function PartMenu({ slot, index, count, skipped, fromLibrary, actions, onSettings }: PartMenuProps) {
+  if (index < 0) return null
   return createPortal(
     <DropdownMenu modal={false}>
-      <MoreActionsTrigger label={`Slide ${entry.index + 1}: more actions`} className="deck-part-more-button" />
+      <MoreActionsTrigger label={`Slide ${index + 1}: more actions`} className="deck-part-more-button" />
       <DropdownMenuContent align="end" side="bottom">
-        <SlideMenuItems index={entry.index} count={slides.length} skipped={entry.data.skip === true} fromLibrary={fromLibrary} actions={{ ...actions, settings: index => onSettings(index, slot) }} />
+        <SlideMenuItems index={index} count={count} skipped={skipped} fromLibrary={fromLibrary} actions={{ ...actions, settings: at => onSettings(at, slot) }} />
       </DropdownMenuContent>
     </DropdownMenu>,
     slot.element,
   )
-}
+})
 
 /** A part to put in the deck: its slide block's kind and body, its handout, and its notes when it keeps some. */
 interface NewPart {
@@ -231,7 +239,7 @@ export function DeckView({
   const [fold, setFold] = useState<DeckFold>(storedFold)
   // Slide settings… (17 November): the slide whose popover is open (-1: the deck's look alone, a deck with no slides),
   // where it is anchored and on which side; and where the focus goes back when it closes (where the menu was opened).
-  const [settingsFor, setSettingsFor] = useState<{ index: number; anchor: SettingsAnchor; side: 'right' | 'left' } | null>(null)
+  const [settingsFor, setSettingsFor] = useState<{ index: number; id?: string; anchor: SettingsAnchor; side: 'right' | 'left' } | null>(null)
   const settingsAnchor = useRef<SettingsAnchor>({ getBoundingClientRect: () => new DOMRect() })
   if (settingsFor) settingsAnchor.current = settingsFor.anchor
   const settingsReturn = useRef<HTMLElement | null>(null)
@@ -405,6 +413,7 @@ export function DeckView({
   }, [editor])
 
   const count = slides.length
+  const slideAtPos = useMemo(() => new Map(slides.map(entry => [entry.pos, entry])), [slides])
 
   // The handout's start card (16 November, the Experience lead's frame 20) on a deck New made: the host says whether
   // this deck is New's, which AI drafts it and the project's earlier decks. Once it goes it never comes back.
@@ -727,7 +736,13 @@ export function DeckView({
   noticeRef.current = notice
   useEffect(() => {
     if (!editor) return
+    let conversions = conversionStateOf(editor.state).count
     const onTransaction = ({ transaction }: { transaction: Transaction }) => {
+      // A removal that converted a deck of today's slides (its first real edit) keeps the conversion's line too: the
+      // conversion's own notice, said a moment before, would otherwise be replaced, and it is said once per deck.
+      const conversion = conversionStateOf(editor.state)
+      const convertedHere = conversion.count !== conversions
+      conversions = conversion.count
       const mark = joinMarkOf(editor.state)
       setJoinAt(mark ? mark.index : null)
       const removal = transaction.getMeta(DECK_REMOVED) as DeckRemoval | undefined
@@ -741,8 +756,9 @@ export function DeckView({
         }
         const depth = undoDepth(editor.state)
         const valid = () => !editor.isDestroyed && undoDepth(editor.state) === depth
+        const converted = convertedHere && conversion.last && conversion.last.comments > 0 ? ` ${CONVERSION_NOTICE}` : ''
         setNotice({
-          text: removalNotice(removal),
+          text: `${removalNotice(removal)}${converted}`,
           valid,
           withFull: removal.what === 'joined',
           action: {
@@ -900,9 +916,11 @@ export function DeckView({
       const where = place()
       if (!where) return
       settingsReturn.current = where.back
-      setSettingsFor({ index, anchor: where.anchor, side: where.side })
+      // The slide's id too, so a popover never shows or changes another slide that came to stand at its number.
+      const id = index >= 0 && editor ? slidesOf(editor.state.doc)[index]?.data.id : undefined
+      setSettingsFor({ index, id, anchor: where.anchor, side: where.side })
     }))
-  }, [pick])
+  }, [pick, editor])
   /** From a part number's ⋯: beside the number, the focus back to its ⋯. */
   const partSettings = useCallback((index: number, slot: PartMenuSlot) => openSettings(index, () => (
     slot.element.isConnected ? { anchor: slot.element, side: 'left', back: slot.element.querySelector('button') } : null
@@ -1018,7 +1036,16 @@ export function DeckView({
 
   // Slide settings belong to their slide: another slide made current closes them. Add to library's sheet is placed
   // beside the slide (over the handout when it must).
-  useEffect(() => { setSettingsFor(open => (open && open.index >= 0 && open.index !== shown ? null : open)) }, [shown])
+  // By the slide's id: a slide removed or put in above it (an AI's edit, the host's) never moves the popover onto
+  // another slide; and the deck's look alone (a deck with no slides) closes once the deck has a slide.
+  const shownSlideId = slides[shown]?.data.id
+  useEffect(() => {
+    setSettingsFor(open => {
+      if (!open) return open
+      if (open.index < 0) return count === 0 ? open : null
+      return open.index === shown && (open.id === undefined || open.id === shownSlideId) ? open : null
+    })
+  }, [shown, shownSlideId, count])
   // The popup always has something to show (the deck's section when the deck has no slides), so it never stays open
   // unseen: no effect closes it when the slide goes, and a hidden slide keeps its settings (the Experience lead).
   // The Add to library sheet belongs to its slide: another slide closes it.
@@ -1466,7 +1493,23 @@ export function DeckView({
             joinAt={joinAt}
           />
         ) : null}
-        {editor ? partSlots.map(slot => <PartMenu key={slot.id} slot={slot} slides={slides} actions={stripActions} marks={marks} onSettings={partSettings} />) : null}
+        {editor ? partSlots.map(slot => {
+          // Each part's menu by its slide's place (one map lookup), drawn again only when what it shows changes.
+          const pos = slot.getPos()
+          const entry = pos === undefined ? undefined : slideAtPos.get(pos)
+          return (
+            <PartMenu
+              key={slot.id}
+              slot={slot}
+              index={entry ? entry.index : -1}
+              count={count}
+              skipped={entry?.data.skip === true}
+              fromLibrary={!!(entry?.data.id && libraryBadge(marks[entry.data.id]))}
+              actions={stripActions}
+              onSettings={partSettings}
+            />
+          )
+        }) : null}
 
         {slideShown ? (
           <div
