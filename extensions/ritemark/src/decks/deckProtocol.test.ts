@@ -17,6 +17,16 @@ assert.throws(() => decodeDeckRequest({ type: 'deck/theme', path: 'a.theme.md', 
 // Sprint 162: the Theme menu asks for the project's themes, and nothing else.
 assert.deepEqual(decodeDeckRequest({ type: 'deck/themes' }), { type: 'deck/themes' });
 assert.throws(() => decodeDeckRequest({ type: 'deck/themes', path: 'Slide library/Themes' }), DeckProtocolError);
+// Sprint 162 PR 2: Edit <Name> names a theme file; New theme… a name, a start and "Use it in this deck".
+assert.deepEqual(decodeDeckRequest({ type: 'deck/edit-theme', path: 'Slide library/Themes/Evening.theme.md' }), { type: 'deck/edit-theme', path: 'Slide library/Themes/Evening.theme.md' });
+for (const path of ['../outside.theme.md', '/etc/x.theme.md', 'Slide library/Themes/Evening.md', 'file:///x.theme.md', '']) {
+  assert.throws(() => decodeDeckRequest({ type: 'deck/edit-theme', path }), DeckProtocolError, path);
+}
+assert.deepEqual(decodeDeckRequest({ type: 'deck/new-theme', name: 'Fernhollow Bank', start: 'paper', use: true }), { type: 'deck/new-theme', name: 'Fernhollow Bank', start: 'paper', use: true });
+assert.throws(() => decodeDeckRequest({ type: 'deck/new-theme', name: 'X', start: 'gamma', use: true }), DeckProtocolError);
+assert.throws(() => decodeDeckRequest({ type: 'deck/new-theme', name: 'X', start: 'copy', use: 'yes' }), DeckProtocolError);
+assert.throws(() => decodeDeckRequest({ type: 'deck/new-theme', name: '', start: 'copy', use: true }), DeckProtocolError);
+assert.throws(() => decodeDeckRequest({ type: 'deck/new-theme', name: 'X', start: 'copy', use: true, text: 'x' }), DeckProtocolError);
 assert.deepEqual(decodeDeckRequest({ type: 'deck/save-image', slideId: 'ab12', dataUrl: 'data:image/png;base64,AAA=', filename: 'shot.png' }), { type: 'deck/save-image', slideId: 'ab12', dataUrl: 'data:image/png;base64,AAA=', filename: 'shot.png' });
 assert.throws(() => decodeDeckRequest({ type: 'deck/save-image', slideId: '../x', dataUrl: 'data:image/png;base64,AAA=', filename: 'a.png' }), DeckProtocolError);
 assert.throws(() => decodeDeckRequest({ type: 'deck/save-image', slideId: 'ab12', dataUrl: 'data:text/html,<b>', filename: 'a.png' }), DeckProtocolError);

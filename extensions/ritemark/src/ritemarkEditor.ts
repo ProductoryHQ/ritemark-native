@@ -6,6 +6,7 @@ import * as fsp from 'fs/promises';
 import { parseFrontmatterFromText, serializeFrontmatter, discoverCommands } from './agent/discovery';
 import type { CardPages } from './taskBoard/cardPages';
 import type { DeckPages } from './decks/deckPages';
+import type { ThemePages } from './decks/themePages';
 import { isDeckPath, ModeFixedPerView } from './decks/deckMode';
 import { cardTabWrite } from './taskBoard/cardFile';
 import type { UnifiedViewProvider } from './views/UnifiedViewProvider';
@@ -184,6 +185,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     return RitemarkEditorProvider.deckPages()?.deckModeFor(document, this.deckFlagOfView(webview)) ?? false;
   }
 
+  /** Sprint 162 PR 2: a theme in the project's Slide library shows as the theme's tab, with the panel's `decks` flag. */
+  private themeModeOfView(document: vscode.TextDocument, webview: vscode.Webview): boolean {
+    return RitemarkEditorProvider.themePages()?.themeModeFor(document, this.deckFlagOfView(webview)) ?? false;
+  }
+
   // Voice dictation controller
   // One per editor webview: each tab dictates into its own document (Sprint 129).
   private readonly dictationControllers = new Map<vscode.Webview, DictationController>();
@@ -299,6 +305,16 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     return ext.decks?.pages ?? null;
   }
 
+  /**
+   * Sprint 162 PR 2: a `Slide library/Themes/<Name>.theme.md` opens here as the theme's own tab while the flag is on, a
+   * mode of this one editor as a deck is: the draft is the document's unsaved text, so the tab's dot, Save, the close
+   * question and a writer's change on disk stay a document's. Lazy, as for the deck pages.
+   */
+  private static themePages(): ThemePages | null {
+    const ext = require('./extension') as typeof import('./extension');
+    return ext.decks?.themes ?? null;
+  }
+
   constructor(private readonly context: vscode.ExtensionContext) {
     this.documentSync = new DocumentSyncCoordinator(context, {
       buildPayload: (document, webview) => this.buildSyncPayload(document, webview),
@@ -359,6 +375,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     const cardMode = RitemarkEditorProvider.cardPages()?.cardModeFor(document) ?? null;
     // Sprint 157: a deck's view draws the slides beside their handout; its front matter stays the document's.
     const deckMode = !cardMode && this.deckModeOfView(document, webview);
+    // Sprint 162 PR 2: a theme's view draws the theme's tab; the theme's front matter stays the document's.
+    const themeMode = !cardMode && !deckMode && this.themeModeOfView(document, webview);
     // Views compare host payloads against their own Markdown projection, which
     // never carries the persisted trailing newline or gray-matter's leading one.
     // Send the projection form, or the echo of an accepted edit is mistaken for
@@ -414,6 +432,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       ...agentFields,
       ...(cardMode ? { cardMode } : {}),
       ...(deckMode ? { deckMode: true } : {}),
+      ...(themeMode ? { themeMode: true } : {}),
     };
   }
 
@@ -806,6 +825,12 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     const deckPage = deckPages && deckFlag && document.uri.scheme === 'file' && isDeckPath(document.uri.fsPath)
       ? deckPages.connect(document, webviewPanel)
       : undefined;
+    // Sprint 162 PR 2: a theme's panel, while it is open (only one that opened with the flag on, as a deck's): its
+    // `theme/` requests are answered, and its tab is named after the theme.
+    const themePages = RitemarkEditorProvider.themePages();
+    const themePage = themePages && !deckPage && themePages.themeModeFor(document, deckFlag)
+      ? themePages.connect(document, webviewPanel)
+      : undefined;
 
     // #477: a card page's tab shows its card's title and the task mark, as
     // drawn (the Experience lead, 2026-10-20), and follows an edit of the title.
@@ -921,6 +946,14 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         if (typeof message.type === 'string' && message.type.startsWith('deck/')) {
           if (deckPage) {
             void RitemarkEditorProvider.deckPages()?.handle(document, webview, message);
+          }
+          return;
+        }
+
+        // Sprint 162 PR 2: a theme's tab's requests, only from a panel that is a theme's view.
+        if (typeof message.type === 'string' && message.type.startsWith('theme/')) {
+          if (themePage) {
+            void RitemarkEditorProvider.themePages()?.handle(document, webview, message);
           }
           return;
         }
@@ -1247,6 +1280,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       imageWatcher.dispose();
       cardPage?.dispose();
       deckPage?.dispose();
+      themePage?.dispose();
       cardTabWatcher?.dispose();
       this.documentSync.disposeView(document, webview);
       this.dictationControllers.get(webview)?.cleanup();

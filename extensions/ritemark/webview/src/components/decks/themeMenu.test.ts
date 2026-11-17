@@ -367,4 +367,65 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   assert.match(menu, /if \(open\) sendToExtension\('deck\/themes'\)/, 'the themes are asked for each time it opens')
 }
 
+// ---- Sprint 162 PR 2 (frame 12): after the themes, Edit <Name> for the theme the deck draws, and New theme…. Edit only
+// for a theme the project has a file for: never for the built-in Evening until the project has its own file.
+{
+  const edits: string[] = []
+  let news = 0
+  const body = (list: ReturnType<typeof themeEntries>, named: unknown) => parse(renderToStaticMarkup(createElement(ThemeMenuBody, {
+    entries: list, named, look: 'card', onLook: () => {}, onPick: () => {}, onCurrent: () => {}, onEdit: (path: string) => { edits.push(path) }, onNew: () => { news += 1 },
+  })))
+  const list = themeEntries([{ path: FERN, text: FERN_TEXT }], [null, FERN])
+  const fern = body(list, FERN)
+  assert.deepEqual(fern.querySelectorAll('.deck-theme-row').map(row => row.textContent.trim()).slice(-2), ['Edit Fern Hollow', 'New theme…'])
+  assert.equal(fern.querySelectorAll('.deck-theme-sep').length, 2, 'a line between the themes and the two actions')
+  const evening = body(list, undefined)
+  assert.doesNotMatch(evening.textContent, /Edit/, 'the built-in Evening has no file to edit')
+  assert.match(evening.textContent, /New theme…/)
+  const own = themeEntries([{ path: EVENING, text: '---\nname: Evening\naccent: "#FF8800"\n---\n' }], [null])
+  assert.match(body(own, undefined).textContent, /Edit Evening/, "the project's own Evening file is edited in its tab")
+  assert.doesNotMatch(body(list, FERN).textContent, /Reading the project's themes/)
+  assert.equal(edits.length + news, 0, 'drawing it opens nothing')
+  // While the themes are read, neither shows (nothing greyed).
+  assert.doesNotMatch(parse(renderToStaticMarkup(createElement(ThemeMenuBody, { entries: null, named: FERN, look: 'card', onLook: () => {}, onPick: () => {}, onCurrent: () => {}, onEdit: () => {}, onNew: () => {} }))).textContent, /Edit|New theme/)
+  const { takenThemeNames } = await import('./ThemeMenu')
+  assert.deepEqual(takenThemeNames(list), { names: ['Evening', 'Fern Hollow'], files: ['Fern Hollow.theme.md'] })
+}
+
+// ---- Sprint 162 PR 2: New theme… with "Use it in this deck" (ticked by default) writes the deck's `theme:` line naming
+// the new file, as a pick: one Undo gives the file back byte for byte. The new file reads as a theme from each start.
+{
+  const { newThemeText, themePathFor } = await import('../../../../src/decks/themeFile')
+  const { BUILT_IN_THEME_TEXT } = await import('../../../../src/decks/deckTheme')
+  const name = 'Fernhollow Bank'
+  const path = themePathFor(name)
+  assert.equal(path, 'Slide library/Themes/Fernhollow Bank.theme.md')
+  for (const text of [`---\ndeck: 2\ntheme: ${EVENING}\n---\n\n${SLIDE}`, `---\ndeck: 1\n---\n\n${SLIDE}`]) {
+    const deck = openDeck(text)
+    deck.pick(path)
+    assert.equal(splitFrontMatter(deck.file).properties.theme, path)
+    assert.equal(deck.file.split('\n').filter(line => line.startsWith('theme:')).length, 1)
+    deck.undo()
+    assert.equal(deck.file, text, 'one Undo: the deck as it was')
+  }
+  for (const start of ['copy', 'paper', 'ember'] as const) {
+    const made = parseTheme(newThemeText(name, start, BUILT_IN_THEME_TEXT))
+    assert.equal(made.name, name, start)
+  }
+  // The host's line reaches the view as a pick (one Undo, the bar's line); a theme the deck draws already is left.
+  const view = readFileSync(fileURLToPath(new URL('./DeckView.tsx', import.meta.url)), 'utf8')
+  assert.match(view, /if \(message\.type !== 'deck\/use-theme' \|\| typeof message\.path !== 'string' \|\| typeof message\.name !== 'string'\) return\s+if \(propertiesRef\.current\.theme === message\.path\) return\s+pickTheme\(message\.path, message\.name\)/)
+  const { NewThemeSheet, firstThemeName, themeStarts } = await import('./theme/NewThemeSheet')
+  assert.equal(firstThemeName({ names: ['Evening'], files: [] }), 'New theme')
+  assert.equal(firstThemeName({ names: ['Evening', 'New theme'], files: [] }), 'New theme 2')
+  assert.deepEqual(themeStarts(BUILT_IN_THEME).map(start => [start.name, start.note]), [
+    ['A copy of Evening', 'The one this deck uses'],
+    ['Paper', 'Light, a serif for headings'],
+    ['Ember', 'Dark, warm, round corners'],
+  ])
+  const sheet = readFileSync(fileURLToPath(new URL('./theme/NewThemeSheet.tsx', import.meta.url)), 'utf8')
+  assert.match(sheet, /const \[use, setUse\] = useState\(true\)/, '"Use it in this deck" is ticked')
+  assert.equal(typeof NewThemeSheet, 'function')
+}
+
 console.log('themeMenu.test.ts — all assertions passed')

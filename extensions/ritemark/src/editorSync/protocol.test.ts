@@ -160,6 +160,35 @@ test('a deck says so with deckMode: true, and nothing else is accepted there (Sp
   assert.throws(() => update({}), DocumentProtocolError);
 });
 
+test('a theme says so with themeMode: true, and nothing else is accepted there (Sprint 162 PR 2)', () => {
+  const update = (themeMode: unknown) => parseDocumentHostMessage({
+    type: 'document:update',
+    ...identity,
+    revision: 1,
+    baseDiskHash: sha,
+    modelHash: sha,
+    payloadHash: sha,
+    reason: 'open',
+    attempt: 1,
+    payload: {
+      fileType: 'markdown',
+      filename: 'Evening.theme.md',
+      content: '',
+      properties: { name: 'Evening' },
+      hasProperties: true,
+      imageMappings: {},
+      features: { voiceDictation: false, markdownExport: true },
+      ...(themeMode === undefined ? {} : { themeMode }),
+    },
+  });
+  const theme = update(true);
+  assert.equal(theme.type === 'document:update' && theme.payload.fileType === 'markdown' && theme.payload.themeMode, true);
+  const document = update(undefined);
+  assert.equal(document.type === 'document:update' && document.payload.fileType === 'markdown' && document.payload.themeMode, undefined);
+  assert.throws(() => update(false), DocumentProtocolError);
+  assert.throws(() => update('yes'), DocumentProtocolError);
+});
+
 test('accepts exact CSV edit, applied receipt, and resolution messages', () => {
   assert.equal(parseDocumentViewMessage({
     type: 'document:edit',
