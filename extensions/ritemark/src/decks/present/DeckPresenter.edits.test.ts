@@ -240,6 +240,47 @@ async function main(): Promise<void> {
     wall.send({ type: 'present/blank', to: 'black' });
     await settle();
     assert.equal(last(wall, 'present/wall').blank, 'white', 'an unknown colour is not a request');
+    wall.send({ type: 'present/blank', to: null });
+    await settle();
+
+    // Decks README items 11 and 16: a click on an item in Now spotlights it on the wall, and Now shows it too; a
+    // spotlight is not a move, and the next move (→ or a clicker) clears it and goes on in one press.
+    const spotOn = (last(wall, 'present/wall').slide as { title: string }).title;
+    presenterView.send({ type: 'present/spot', item: 1 });
+    await settle();
+    assert.equal(last(wall, 'present/wall').spot, 1, 'the wall has the spotlight');
+    assert.equal(last(presenterView, 'present/presenter').spot, 1, 'Now shows the same');
+    assert.equal((last(wall, 'present/wall').slide as { title: string }).title, spotOn, 'a spotlight is not a move');
+    wall.send({ type: 'present/spot', item: 2 });
+    await settle();
+    assert.equal(last(wall, 'present/wall').spot, 2, 'another item: the spotlight moves');
+    // A click on a spotlit picture fills the wall; any key returns, still on the same slide, still spotlit.
+    presenterView.send({ type: 'present/fill', item: 2 });
+    await settle();
+    assert.equal(last(wall, 'present/wall').fill, 2);
+    assert.equal(last(presenterView, 'present/presenter').fill, 2, 'Now says the picture fills the wall');
+    wall.send({ type: 'present/fill', item: null });
+    await settle();
+    assert.equal(last(wall, 'present/wall').fill, null);
+    assert.equal(last(wall, 'present/wall').spot, 2, 'returning keeps the spotlight');
+    assert.equal((last(wall, 'present/wall').slide as { title: string }).title, spotOn, 'returning does not step');
+    // A new spotlight is never a filled wall.
+    wall.send({ type: 'present/fill', item: 2 });
+    await settle();
+    wall.send({ type: 'present/spot', item: 0 });
+    await settle();
+    assert.equal(last(wall, 'present/wall').fill, null);
+    // → clears it and goes on, once.
+    const spotStates = wall.posted.filter(message => (message as { type?: string }).type === 'present/wall').length;
+    wall.send({ type: 'present/next' });
+    await settle();
+    assert.equal(last(wall, 'present/wall').spot, null, 'a move clears the spotlight');
+    assert.equal(last(presenterView, 'present/presenter').spot, null);
+    assert.notEqual((last(wall, 'present/wall').slide as { title: string }).title, spotOn, 'and goes on');
+    assert.equal(wall.posted.filter(message => (message as { type?: string }).type === 'present/wall').length, spotStates + 1, 'in one press');
+    wall.send({ type: 'present/spot', item: 'x' });
+    await settle();
+    assert.equal(last(wall, 'present/wall').spot, null, 'a place that is not one is not a request');
     // The presenter view's clock: the system's locale, never missing.
     const clockSent = last(presenterView, 'present/presenter').clock as { locale: unknown; hourCycle: unknown };
     assert.ok(clockSent && 'locale' in clockSent && 'hourCycle' in clockSent);

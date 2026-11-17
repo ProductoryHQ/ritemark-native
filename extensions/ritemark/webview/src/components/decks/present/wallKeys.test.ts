@@ -3,7 +3,7 @@
  * Run with `npx tsx webview/src/components/decks/present/wallKeys.test.ts`.
  */
 import { strict as assert } from 'node:assert'
-import { blankKeyOf, blankNow, settleAsked, clockText, countLabel, goToKey, MAX_GOTO_DIGITS, presentKeyOf, timeOfDayText, wallKeyOf, wallSlideSize, wallBleed } from './wallKeys'
+import { blankKeyOf, blankNow, settleAsked, clockText, countLabel, fillKeyOf, goToKey, MAX_GOTO_DIGITS, presentKeyOf, spotClickOf, spotKeyOf, timeOfDayText, wallKeyOf, wallSlideSize, wallBleed } from './wallKeys'
 
 // ---- On, back, the ends, stop
 for (const key of ['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter']) assert.deepEqual(wallKeyOf({ key }), { type: 'next' }, key)
@@ -129,6 +129,65 @@ assert.equal(settleAsked(null, 'white'), null)
   const own = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(afternoon)
   assert.equal(timeOfDayText(afternoon, { locale: 'not a locale!', hourCycle: null }), own)
   assert.equal(timeOfDayText(afternoon, null), own)
+}
+
+// ---- Decks README item 16: the spotlight's click rule (the wall's and the presenter view's Now)
+{
+  const box = (item: number) => ({ item, picture: false })
+  const picture = (item: number) => ({ item, picture: true })
+  // A click on an item spotlights it, on the wall and in Now.
+  assert.deepEqual(spotClickOf(box(1), null, 'next'), { type: 'spot', item: 1 }, 'an item: spotlit')
+  assert.deepEqual(spotClickOf(box(1), null, 'none'), { type: 'spot', item: 1 })
+  // A click on another item moves the spotlight there.
+  assert.deepEqual(spotClickOf(box(2), 1, 'next'), { type: 'spot', item: 2 }, 'another item: the spotlight moves')
+  assert.deepEqual(spotClickOf(picture(0), 2, 'next'), { type: 'spot', item: 0 }, 'a picture not spotlit is spotlit first')
+  // A click on the spotlit item clears it.
+  assert.deepEqual(spotClickOf(box(2), 2, 'next'), { type: 'clear' }, 'the same item: cleared')
+  // Outside any item: cleared; with no spotlight the wall goes on, as before, and Now does nothing.
+  assert.deepEqual(spotClickOf(null, 2, 'next'), { type: 'clear' }, 'outside: cleared, not a step')
+  assert.deepEqual(spotClickOf(null, 2, 'none'), { type: 'clear' })
+  assert.deepEqual(spotClickOf(null, null, 'next'), { type: 'next' }, 'no spotlight, outside: the wall goes on')
+  assert.equal(spotClickOf(null, null, 'none'), null, 'no spotlight, outside Now: nothing')
+  // Item 11: a click on a spotlit picture fills the wall.
+  assert.deepEqual(spotClickOf(picture(3), 3, 'next'), { type: 'fill', item: 3 }, 'a spotlit picture fills the wall')
+  assert.deepEqual(spotClickOf(picture(3), 3, 'none'), { type: 'fill', item: 3 }, 'from Now too')
+}
+
+// ---- Item 16's keys: F, Tab, Shift+Tab, Esc; → and a clicker only step
+{
+  assert.deepEqual(spotKeyOf({ key: 'f' }, null, 4), { type: 'spot', item: 0 }, 'F spotlights the first item')
+  assert.deepEqual(spotKeyOf({ key: 'F', shiftKey: true }, 2, 4), { type: 'spot', item: 0 })
+  assert.equal(spotKeyOf({ key: 'f' }, null, 0), null, 'a slide with no items: F does nothing')
+  assert.deepEqual(spotKeyOf({ key: 'Tab' }, 0, 4), { type: 'spot', item: 1 }, 'Tab: the next item')
+  assert.deepEqual(spotKeyOf({ key: 'Tab', shiftKey: true }, 2, 4), { type: 'spot', item: 1 }, 'Shift+Tab: the one before')
+  assert.deepEqual(spotKeyOf({ key: 'Tab' }, 3, 4), { type: 'spot', item: 3 }, 'Tab stops at the last item')
+  assert.deepEqual(spotKeyOf({ key: 'Tab', shiftKey: true }, 0, 4), { type: 'spot', item: 0 }, 'Shift+Tab stops at the first')
+  assert.deepEqual(spotKeyOf({ key: 'Tab' }, 9, 4), { type: 'spot', item: 3 }, 'a place past the slide (edited) comes back to its last item')
+  assert.equal(spotKeyOf({ key: 'Tab' }, null, 4), null, 'without a spotlight Tab is the window\'s own')
+  assert.deepEqual(spotKeyOf({ key: 'Escape' }, 1, 4), { type: 'clear' }, 'Esc clears the spotlight')
+  assert.equal(spotKeyOf({ key: 'Escape' }, null, 4), null, 'without one Esc stops, as before')
+  assert.deepEqual(wallKeyOf({ key: 'Escape' }), { type: 'stop' })
+  assert.equal(spotKeyOf({ key: 'f', metaKey: true }, null, 4), null, '⌘F is the app\'s')
+  assert.equal(spotKeyOf({ key: 'Tab', ctrlKey: true }, 1, 4), null)
+  // → and a clicker (Page Down, Page Up) are never the spotlight's: they step once, and the host's move clears it.
+  for (const key of ['ArrowRight', 'PageDown', 'PageUp', ' ', 'Enter', 'ArrowLeft']) {
+    assert.equal(spotKeyOf({ key }, 1, 4), null, key)
+    assert.notEqual(wallKeyOf({ key }), null, key)
+  }
+  assert.deepEqual(wallKeyOf({ key: 'ArrowRight' }), { type: 'next' }, '→ goes on in one press')
+  assert.deepEqual(wallKeyOf({ key: 'PageDown' }), { type: 'next' }, 'a clicker press only steps')
+}
+
+// ---- Item 11: a filled wall returns with any key, and that key does nothing else
+{
+  for (const key of ['ArrowRight', 'PageDown', 'Escape', 'b', 'f', 'Tab', '4', ' ']) assert.equal(fillKeyOf({ key }, 2), 'return', key)
+  for (const key of ['Shift', 'Meta', 'Alt', 'Control']) assert.equal(fillKeyOf({ key }, 2), null, `${key} alone`)
+  assert.equal(fillKeyOf({ key: 'w', metaKey: true }, 2), null, '⌘W is the app\'s')
+  assert.equal(fillKeyOf({ key: 'ArrowRight' }, null), null, 'not filled: the key does what it does')
+  // The ask kept until the host's state carries it works for an item's place too.
+  assert.equal(blankNow<number | null>(null, { to: 2 }), 2)
+  assert.equal(settleAsked<number | null>({ to: 2 }, 2), null)
+  assert.deepEqual(settleAsked<number | null>({ to: 2 }, null), { to: 2 })
 }
 
 console.log('wallKeys: all tests passed')

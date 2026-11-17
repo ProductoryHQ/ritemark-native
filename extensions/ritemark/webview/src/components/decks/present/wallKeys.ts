@@ -9,6 +9,11 @@
  *
  * Small details (decks README, item 1, 17 November): B or "." blanks the wall to the theme's ground, W to white; while
  * it is blank any key brings the slide back, and that key does nothing else (`blankKeyOf`).
+ *
+ * The spotlight and a filled wall (decks README, items 11 and 16, 17 November): F spotlights the slide's first item, Tab
+ * and Shift+Tab move the spotlight, Esc clears it (`spotKeyOf`); → and a clicker clear it and go on, as any move does.
+ * While a picture fills the wall any key returns to the slide, and does nothing else (`fillKeyOf`). A click acts on
+ * what it hits (`spotClickOf`): the same rule in the wall and in the presenter view's Now.
  */
 
 import type { ClockLocale, WallBlank } from '../../../../../src/decks/present/presentProtocol'
@@ -87,13 +92,67 @@ export function blankKeyOf(event: KeyInput, blank: WallBlank | null): BlankStep 
  * The blank a window's next key is read against: the one it last asked for (`asked`) until the host's state says so,
  * else the host's. A clicker's second press (Page Down right after ".") then never reads the wall as not yet blank.
  */
-export function blankNow(hostBlank: WallBlank | null, asked: { to: WallBlank | null } | null): WallBlank | null {
+export function blankNow<T>(hostBlank: T, asked: { to: T } | null): T {
   return asked ? asked.to : hostBlank
 }
 
-/** The ask kept until a state from the host carries it. */
-export function settleAsked(asked: { to: WallBlank | null } | null, hostBlank: WallBlank | null): { to: WallBlank | null } | null {
+/** The ask kept until a state from the host carries it (the blank, the spotlight, a filled wall). */
+export function settleAsked<T>(asked: { to: T } | null, hostBlank: T): { to: T } | null {
   return asked && asked.to === hostBlank ? null : asked
+}
+
+/** What a key does to the spotlight: an item spotlit (its place among the slide's items), or the spotlight cleared. */
+export type SpotStep = { type: 'spot'; item: number } | { type: 'clear' }
+
+/**
+ * Item 16's keys, with `spot` the item spotlit now (or null) and `count` the slide's items. F spotlights the first item.
+ * Tab and Shift+Tab move to the next and previous item while one is spotlit, and stop at the ends (without a spotlight
+ * Tab is the window's own, so the presenter view's buttons are still reached by Tab). Esc clears the spotlight; without
+ * one it stops, as before. Null: the key is not the spotlight's (→ and a clicker step, and the move clears it).
+ */
+export function spotKeyOf(event: KeyInput & { shiftKey?: boolean }, spot: number | null, count: number): SpotStep | null {
+  if (event.metaKey || event.ctrlKey || event.altKey) return null
+  switch (event.key) {
+    case 'f':
+    case 'F':
+      return count > 0 ? { type: 'spot', item: 0 } : null
+    case 'Tab': {
+      if (spot === null || count <= 0) return null
+      const at = Math.min(spot, count - 1)
+      return { type: 'spot', item: event.shiftKey ? Math.max(0, at - 1) : Math.min(count - 1, at + 1) }
+    }
+    case 'Escape':
+      return spot === null ? null : { type: 'clear' }
+    default:
+      return null
+  }
+}
+
+/**
+ * Item 11: while a picture fills the wall, any key returns to the slide and does nothing else (as on a blank wall); a
+ * key with ⌘, Ctrl or ⌥ is still the app's, and a key that is only held with another does nothing.
+ */
+export function fillKeyOf(event: KeyInput, fill: number | null): 'return' | null {
+  if (fill === null || event.metaKey || event.ctrlKey || event.altKey) return null
+  return HELD_KEYS.has(event.key) ? null : 'return'
+}
+
+/** What a click does: an item spotlit, the spotlight cleared, a picture filling the wall, the next slide, or nothing. */
+export type SpotClick = { type: 'spot'; item: number } | { type: 'clear' } | { type: 'fill'; item: number } | { type: 'next' } | null
+
+/**
+ * Items 11 and 16: a click acts on what it hits (`hit`, the item under the pointer, or null outside any item). A click on
+ * an item spotlights it, and on another item moves the spotlight there. A click on the spotlit item, or outside any
+ * item, clears it; a click on a spotlit picture fills the wall. With no spotlight, a click outside any item does what
+ * it did before: on the wall it goes on (`outside` 'next'); in the presenter view's Now nothing.
+ */
+export function spotClickOf(hit: { item: number; picture: boolean } | null, spot: number | null, outside: 'next' | 'none'): SpotClick {
+  if (!hit) {
+    if (spot !== null) return { type: 'clear' }
+    return outside === 'next' ? { type: 'next' } : null
+  }
+  if (hit.item !== spot) return { type: 'spot', item: hit.item }
+  return hit.picture ? { type: 'fill', item: hit.item } : { type: 'clear' }
 }
 
 /** The go-to box's digits; at most this many. */
