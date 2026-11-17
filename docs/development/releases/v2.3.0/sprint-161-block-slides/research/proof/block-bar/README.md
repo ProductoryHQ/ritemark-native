@@ -28,10 +28,11 @@ The workbench was held at 1440 × 900 CSS px (the files are 2880 × 1800). "AI f
 | `06-columns-bar-…` | Columns chosen: the count 2 · 3 · 4, top · middle · bottom, Add, Delete and ⋯. |
 | `07-columns-count-2-…` | Two columns: the third column's words are in the second. |
 | `08-split-drag-…` | The line between the first two columns being dragged, with its guide at the snapped third. |
-| `09-columns-more-menu-…` | Frame 23's ⋯: Add a column, Remove a column and Delete block. The split from shot 08 is drawn (22 / 44 / 33). |
 | `10-steps-bar-…`, `11-list-bar-…` | Steps and a list: the type, Add and Delete only. |
 | `12-plus-adds-a-list-item-…` | The + on the list's bottom edge added an empty item, with the caret in it. |
-| `13-grip-drag-bar-hidden-…` | The ⋮ dragged (final run): a line under "Next steps for the team" shows where the list lands, and the bar is hidden while it drags. |
+| `01-boxes-bar-in-pane-…`, `06-columns-bar-in-pane-…` | The Experience lead's fixes, AI folded: the bar stays in the slide's pane, 8 px from the divider. Boxes' group is folded into menus that show their value (Filled ▾, Auto ▾, alignment ▾). Columns has no ⋯. |
+| `08-split-drag-guide-only-…`, `13-grip-drag-drop-line-only-…` | While a handle drags, only its guide or drop line shows: no ring, no other handle, no tooltip, no bar. |
+| `11-list-bar-plus-under-bullets-…` | The list's + on its bottom edge under the bullets, with the bar under it and a gap. |
 | `04-style-outline-borderless-…` | Final run: Outline on a Borderless deck, with the outline's own line, visible on white. |
 | `14-turned-into-steps-…` | Boxes turned into Steps: each box's heading is a step and its line sits under it. |
 
