@@ -25,6 +25,21 @@ export const DECK_PRESENTER_VIEW_TYPE = 'ritemark.deckPresenter';
  */
 export type WallBlank = 'ground' | 'white' | 'page';
 
+/**
+ * Decks README items 11 and 16 (17 November): the spotlight on one item of the slide on the wall, and a picture that
+ * fills the wall. An item is named by its place among the slide's items (`spotItems` in the webview, from 0): the wall
+ * and the presenter view draw the same slide, so the same place is the same item in both. A move clears both; nothing
+ * of it goes in the file.
+ */
+export interface WallFocus {
+  /** The item that stays as it is while the rest of the slide dims, or null. */
+  spot: number | null;
+  /** The picture shown whole on the wall, or null. */
+  fill: number | null;
+}
+
+export const NO_FOCUS: WallFocus = { spot: null, fill: null };
+
 /** The system's clock for the presenter view's time of day (`systemClock.ts`). */
 export interface ClockLocale {
   /** The system's locale tag, or null for the webview's own. */
@@ -65,6 +80,9 @@ export interface WallState {
   blank: WallBlank | null;
   /** The deck's published page, by its address, for Q's QR code; null while the deck isn't published. */
   page: string | null;
+  /** Items 11 and 16: the spotlit item and the picture filling the wall (`WallFocus`). */
+  spot: number | null;
+  fill: number | null;
 }
 
 /**
@@ -98,6 +116,9 @@ export interface PresenterState {
   blank: WallBlank | null;
   /** The deck's published page, by its address: "Show the page" shows its QR code on the wall. Null: no button. */
   page: string | null;
+  /** Items 11 and 16: Now shows the wall's spotlight, and says when a picture fills the wall. */
+  spot: number | null;
+  fill: number | null;
   /** The system's clock, for the time of day beside the elapsed time. */
   clock: ClockLocale;
 }
@@ -128,7 +149,11 @@ export type WallRequest =
   /** The presenter view's clock: ask the session's length and keep it in the deck's front matter. */
   | { type: 'present/set-length' }
   /** B, "." or W blanks the wall, Q shows the page's QR code; any key brings the slide back (`to` null). */
-  | { type: 'present/blank'; to: WallBlank | null };
+  | { type: 'present/blank'; to: WallBlank | null }
+  /** Item 16: a click or F, Tab, Shift+Tab spotlights an item; a click outside or Esc clears it (`item` null). */
+  | { type: 'present/spot'; item: number | null }
+  /** Item 11: a click on a spotlit picture fills the wall with it; any key or click returns (`item` null). */
+  | { type: 'present/fill'; item: number | null };
 
 /** The deck view's Present: from its current slide (`index`, from 0) or from the start. */
 export interface DeckPresentRequest {
@@ -139,6 +164,8 @@ export interface DeckPresentRequest {
 
 /** A slide number a person can type: at most this. */
 const MAX_NUMBER = 99_999;
+/** An item's place on a slide: at most this. */
+const MAX_ITEM = 9_999;
 
 const ITEM_KEYS = ['heading', 'text', 'icon'] as const;
 
@@ -188,6 +215,7 @@ export function wallStateOf(
   presenter: { available: boolean; on: boolean } = { available: false, on: false },
   blank: WallBlank | null = null,
   page: string | null = null,
+  focus: WallFocus = NO_FOCUS,
 ): WallState {
   const address = wallPageAddress(page);
   return {
@@ -203,6 +231,8 @@ export function wallStateOf(
     presenter: { available: presenter.available, on: presenter.on },
     blank: shownBlank(blank, address),
     page: address,
+    spot: itemOf(focus.spot),
+    fill: itemOf(focus.fill),
   };
 }
 
@@ -223,7 +253,7 @@ export function presenterStateOf(
   view: PresentView,
   look: { borderless: boolean; theme: DeckTheme },
   assets: Record<string, string>,
-  session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number; blank?: WallBlank | null; clock?: ClockLocale; page?: string | null },
+  session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number; blank?: WallBlank | null; clock?: ClockLocale; page?: string | null; focus?: WallFocus },
   onWall?: WallSlide,
 ): PresenterState {
   const address = wallPageAddress(session.page ?? null);
@@ -245,6 +275,8 @@ export function presenterStateOf(
     startedAt: session.startedAt,
     blank: shownBlank(session.blank ?? null, address),
     page: address,
+    spot: itemOf(session.focus?.spot ?? null),
+    fill: itemOf(session.focus?.fill ?? null),
     clock: { locale: session.clock?.locale ?? null, hourCycle: session.clock?.hourCycle ?? null },
   };
 }
@@ -268,6 +300,14 @@ export function wallPageAddress(value: unknown): string | null {
 export function shownBlank(value: unknown, page: string | null): WallBlank | null {
   const blank = blankOf(value);
   return blank === 'page' && page === null ? null : blank;
+}
+
+function isItem(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_ITEM;
+}
+
+function itemOf(value: unknown): number | null {
+  return isItem(value) ? value : null;
 }
 
 function exactKeys(input: Record<string, unknown>, keys: readonly string[]): boolean {
@@ -298,6 +338,9 @@ export function decodeWallRequest(value: unknown): WallRequest | null {
       return exactKeys(input, ['type', 'number']) && isNumber(input.number) ? { type: input.type, number: input.number } : null;
     case 'present/blank':
       return exactKeys(input, ['type', 'to']) && (input.to === null || blankOf(input.to) !== null) ? { type: 'present/blank', to: blankOf(input.to) } : null;
+    case 'present/spot':
+    case 'present/fill':
+      return exactKeys(input, ['type', 'item']) && (input.item === null || isItem(input.item)) ? { type: input.type, item: itemOf(input.item) } : null;
     default:
       return null;
   }

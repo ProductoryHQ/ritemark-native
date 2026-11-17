@@ -61,6 +61,9 @@
 .pv-blank { position: absolute; z-index: 1; inset: 0; display: grid; place-items: center; }
 .pv-blank-ground { position: absolute; inset: 0; border-radius: 8px; opacity: 0.9; }
 .pv-blank-words { position: relative; padding: 0 18px; height: 44px; border-radius: 12px; background: #1E1B4B; box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.45); font-size: 15px; font-weight: 500; line-height: 44px; color: #F8FAFC; white-space: nowrap; }
+/* Item 11: a picture fills the wall; Now shows it whole on the theme's ground, and how to return. */
+.pv-blank-ground.pv-fill { overflow: hidden; opacity: 1; }
+.pv-fill img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .pv-count { margin-right: 4px; color: #C7D2FE; font-variant-numeric: tabular-nums; }
 
 .pv-goto { position: absolute; z-index: 2; top: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; max-width: calc(100% - 48px); height: 52px; padding: 0 18px 0 8px; border-radius: 12px;
