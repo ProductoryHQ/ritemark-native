@@ -7,7 +7,7 @@
 //
 // macOS/Linux only (bash); no CI workflow runs it, and validate-qa.sh is a Mac-side check.
 
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -32,8 +32,13 @@ const PROVIDERS = {
   openrouter: ['fake', 'or', 'L1k0'].join('-'),
 };
 
+// Every world's folder, removed once the file's tests have run, pass or fail
+const worlds = [];
+after(() => { for (const root of worlds) fs.rmSync(root, { recursive: true, force: true }); });
+
 function makeWorld(vault) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wtk-'));
+  worlds.push(root);
   const vaultDir = path.join(root, 'vault');
   fs.mkdirSync(vaultDir);
   for (const [name, value] of Object.entries(vault)) fs.writeFileSync(path.join(vaultDir, name), value);

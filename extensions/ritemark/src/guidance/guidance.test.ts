@@ -7,13 +7,13 @@
 
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import { COUNT_LIMIT, countsLine, fileKindOf, listFileNames } from './folderCounts';
 import { feedbackDue, guidanceCard, localDay, releaseOf, withSavedDay } from './guidanceState';
 import { decodeGuidanceState, GUIDANCE_KEY, GuidanceStore, type MementoLike } from './guidanceStore';
 import { AI_NAMES, cardAi, EVENT_KIND, FILES_PRESS_SETTLE_MS, FIRST_LOOK_READS_DOCUMENTS, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyPressAction, readyRequestDue, readyRequestWords } from './readyRequest';
 import { READ_KINDS_EVERY_AI_PASSED, startingPlaceOf, wordCount, STARTING_PLACES, startingPlaceFrom } from './startingPlace';
+import { makeTempDir } from '../testing/tempDir';
 
 const repeat = (name: string, n: number) => Array.from({ length: n }, (_, i) => `${i}${name}`);
 
@@ -46,7 +46,7 @@ assert.equal(countsLine(['a.md'], true), 'More than 10,000 files.', 'the walk st
 assert.deepEqual(['x.docx', 'x.doc', 'x.odt', 'x.pdf', 'x.numbers', 'x.csv', 'x.key', 'x.markdown', 'x.heic', 'x.flow', 'Makefile'].map((name) => fileKindOf(name)), ['word', 'word', 'word', 'pdf', 'spreadsheet', 'spreadsheet', 'presentation', 'text', 'picture', 'other', 'other']);
 
 // The walk: names only, Ritemark's own and hidden files left out (S11, E2)
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-counts-'));
+const tmp = makeTempDir('rm-counts-');
 for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Plan.pdf', 'Sub/.hidden.md', '.ritemark/tasks/m4d7r2-x.md', '.git/HEAD', 'node_modules/x/y.js', 'Sub/Deep/Notes.md']) {
   fs.mkdirSync(path.dirname(path.join(tmp, file)), { recursive: true });
   fs.writeFileSync(path.join(tmp, file), 'x');

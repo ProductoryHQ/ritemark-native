@@ -12,9 +12,9 @@
  */
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import Module from 'node:module';
+import { makeTempDir } from '../testing/tempDir';
 
 // ── A small vscode for the host module: a project folder on disk, documents the test opens ──
 class EventEmitter<T> {
@@ -26,7 +26,7 @@ class EventEmitter<T> {
   fire(value: T): void { for (const listener of [...this.listeners]) listener(value); }
   dispose(): void { this.listeners = []; }
 }
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-theme-ai-'));
+const root = makeTempDir('ritemark-theme-ai-');
 const textDocuments: Array<{ uri: { scheme: string; fsPath: string }; getText(): string; isDirty: boolean }> = [];
 const none = () => ({ dispose() {} });
 const vscodeStub = {

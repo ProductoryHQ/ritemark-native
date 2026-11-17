@@ -16,8 +16,8 @@ import assert from 'node:assert/strict';
 import * as fs from 'fs';
 import Module from 'node:module';
 import { mock } from 'node:test';
-import * as os from 'os';
 import * as path from 'path';
+import { makeTempDir } from '../testing/tempDir';
 
 class EventEmitter<T> {
   private listeners: Array<(value: T) => void> = [];
@@ -105,7 +105,7 @@ async function main(): Promise<void> {
     openLandingChat: async () => undefined,
   };
 
-  const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-welcome-signin-'));
+  const storage = makeTempDir('rm-welcome-signin-');
   // A ChatGPT home of the run's own, with no sign-in ever made, so this computer's own sign-in plays no part
   process.env.CODEX_HOME = storage;
   const state = new Map<string, unknown>();

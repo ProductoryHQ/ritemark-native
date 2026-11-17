@@ -8,7 +8,6 @@
  */
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import {
   CommentTaskController,
@@ -20,6 +19,7 @@ import { CommentTaskStore, commentTaskStoreDir } from './CommentTaskStore';
 import { resolveProjectScope } from '../conversations/projectScope';
 import type { CommentTaskEnqueueMessage, CommentTaskEnqueueOutcome, CommentTaskResultMessage } from './protocol';
 import type { DestinationChatFacts } from './commentTaskDestination';
+import { makeTempDir } from '../testing/tempDir';
 
 const scope = resolveProjectScope({ folderUris: ['file:///p'], platform: 'darwin' });
 const C1 = '11111111-1111-4111-8111-111111111111';
@@ -81,7 +81,7 @@ function harness(world: Partial<World> = {}, overrides: Partial<CommentTaskContr
   let clock = Date.parse('2026-11-07T12:00:00.000Z');
   /** Move the clock on, so a later comment is accepted later. */
   const tick = (ms = 1000) => { clock += ms; };
-  const store = new CommentTaskStore(commentTaskStoreDir(fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-route-'))), {
+  const store = new CommentTaskStore(commentTaskStoreDir(makeTempDir('ritemark-route-')), {
     now: () => new Date(clock),
   });
   const dependencies: CommentTaskControllerDependencies = {

@@ -12,13 +12,13 @@
  */
 import { strict as assert } from 'node:assert';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { gatherPage } from '../../publish/gather';
 import { BUILT_IN_THEME } from '../deckTheme';
 import { PAGE_FONTS, buildDeckPage, currentPageDigest, deckNameOf, foreignPageLine, nodePageFs, pagePathFor, picturePaths, readPageMeta, removeDeckPage, writeDeckPage, type PageFs } from './pageFile';
 import type { PageAssets } from './pageHtml';
 import { PRIVATE_DECK, PRIVATE_WORDS } from './testing/privateDeck';
+import { makeTempDir } from '../../testing/tempDir';
 
 const extension = path.resolve(__dirname, '..', '..', '..');
 const assets: PageAssets = {
@@ -32,7 +32,7 @@ async function main(): Promise<void> {
   assert.equal(deckNameOf('/p/Talk.DECK.MD'), 'Talk');
   assert.equal(pagePathFor('/p/Harbour Logistics/AI assistants and agents.deck.md'), path.join('/p/Harbour Logistics', 'AI assistants and agents.html'));
 
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'deck-page-')));
+  const root = fs.realpathSync(makeTempDir('deck-page-'));
   const project = path.join(root, 'Training');
   const folder = path.join(project, 'Harbour Logistics');
   fs.mkdirSync(path.join(folder, 'images'), { recursive: true });
