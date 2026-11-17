@@ -319,7 +319,8 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
           {drag?.kind === 'split' ? <div className="deck-block-guide" style={{ left: drag.x - 1, top: drag.top, height: drag.height }} aria-hidden="true" /> : null}
         </>
       ) : null, layer)}
-      {showing
+      {/* Hidden while a handle drags, so it never covers where the block lands (the app run's drag shot). */}
+      {showing && !drag
         ? createPortal(
             <div
               ref={barRef}
@@ -356,8 +357,9 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
                 <>
                   <Sep />
                   <Segment label="Style">
-                    <Choice on={fill === 'filled'} label="Filled" tip="Boxes filled with the theme's colour" onPick={() => setValue('fill', fill === 'filled' ? null : 'filled')} />
-                    <Choice on={fill === 'outline'} label="Outline" tip="Boxes drawn as an outline" onPick={() => setValue('fill', fill === 'outline' ? null : 'outline')} />
+                    {/* The theme's own style writes nothing: only a block that differs from it carries `fill`. */}
+                    <Choice on={fill === 'filled'} label="Filled" tip="Boxes filled with the theme's colour" onPick={() => setValue('fill', theme.boxes === 'filled' ? null : 'filled')} />
+                    <Choice on={fill === 'outline'} label="Outline" tip="Boxes drawn as an outline" onPick={() => setValue('fill', theme.boxes === 'outline' ? null : 'outline')} />
                   </Segment>
                   <Sep />
                   <Segment label="Width">
