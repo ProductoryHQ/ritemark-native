@@ -59,7 +59,7 @@ export type JoinBlock = 'skipped' | 'unclosed'
 /** The note at the line on the first press (the numbers are the slides' own, from 1). */
 export function joinNote(index: number, blocked?: JoinBlock): string {
   if (blocked === 'skipped') return `Slide ${index + 1} is skipped, so it can't join slide ${index}. Show it first, from its ⋯.`
-  if (blocked === 'unclosed') return `Slide ${index + 1} can't join slide ${index}: a code block on one of them is never closed.`
+  if (blocked === 'unclosed') return `Slide ${index + 1} can't join slide ${index}: one of them ends in a block that is never closed.`
   return `Backspace again joins slide ${index + 1} into slide ${index}. Nothing is lost.`
 }
 

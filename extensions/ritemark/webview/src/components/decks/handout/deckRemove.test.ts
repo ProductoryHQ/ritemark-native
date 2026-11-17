@@ -419,11 +419,17 @@ const DECK = [
   assert.equal(joinedSlideMarkdown('- a', '1. c'), '- a\n\n1. c', 'a bullet list and a numbered one stay two')
   assert.equal(joinedSlideMarkdown('- a', '# T\n\n- c'), '- a\n\n### T\n\n- c', 'a title between: nothing to merge')
   assert.equal(joinedSlideMarkdown('- a', '  continued'), '- a\n\ncontinued', 'the indent goes, so it is a paragraph of its own')
-  assert.equal(joinedSlideMarkdown('- a', '    code'), '- a\n\n    code', "code keeps its indent")
+  assert.equal(joinedSlideMarkdown('- a', '    code'), '- a\n\n```\ncode\n```', 'indented code moves fenced, never into the item above')
+  assert.equal(joinedSlideMarkdown('Para', '  - c\n  - d'), 'Para\n\n- c\n- d', 'an indented list moves whole: its items stay siblings')
+  assert.equal(joinedSlideMarkdown('- a\n- b', '- c\n\n- d'), '- a\n- b\n\n- c\n\n- d', 'a loose list below is not merged into a tight one')
+  assert.equal(joinedSlideMarkdown('- a', '    x ``` y'), '- a\n\n````\nx ``` y\n````', 'the fence sized past the code')
   const tokens = (markdown: string) => lexBlockSlide(markdown).filter(token => token.type !== 'space').map(token => token.type)
   assert.deepEqual(tokens(joinedSlideMarkdown('- a\n- b', '- c')), ['list'], 'one list')
   assert.equal((lexBlockSlide(joinedSlideMarkdown('- a\n- b', '- c'))[0] as { loose?: boolean }).loose, false, 'and a tight one, as the upper slide had it')
   assert.deepEqual(tokens(joinedSlideMarkdown('- a', '  continued')), ['list', 'paragraph'])
+  assert.deepEqual(tokens(joinedSlideMarkdown('- a\n- b', '    code here')), ['list', 'code'], 'code after a list stays code')
+  const items = (lexBlockSlide(joinedSlideMarkdown('Para', '  - c\n  - d')).find(token => token.type === 'list') as { items: unknown[] }).items
+  assert.equal(items.length, 2, 'two items')
 }
 
 // ---- Finding 3: a skipped slide is never joined into a shown one (its words would reach the wall and the page): the
@@ -462,7 +468,7 @@ const DECK = [
   const before = deck.state.doc
   deck.key('Backspace')
   assert.equal(joinMarkOf(deck.state)?.blocked, 'unclosed')
-  assert.equal(joinNote(3, 'unclosed'), "Slide 4 can't join slide 3: a code block on one of them is never closed.")
+  assert.equal(joinNote(3, 'unclosed'), "Slide 4 can't join slide 3: one of them ends in a block that is never closed.")
   deck.key('Backspace')
   assert.equal(deck.state.doc, before, 'nothing written')
   const page = JSON.stringify(publicDeck(deck.save(), { folderName: 'Demo', deckName: 'Demo', theme: BUILT_IN_THEME }))

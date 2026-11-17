@@ -81,11 +81,13 @@ export function joinedSlideMarkdown(upper: string, lower: string, lowerData: Pic
     // Kept whole (a Markdown the lexer doesn't give back as written): nothing is moved inside either slide.
     return [trimmed(top), titledWhole(bottom), picture].filter((piece): piece is string => !!piece).join('\n\n');
   }
-  // A block's first line indented by 1 to 3 spaces means nothing at a block's start, but after a list it would make the
-  // block part of the list's last item: the indent goes (never from code, where it is the code's).
-  const moved = lowerBlocks.blocks.map(block => (block.token.type === 'code' ? block.raw : block.raw.replace(/^ {1,3}(?=\S)/, '')));
+  // A moved block indented by 1 to 3 spaces means the same at column 0, but after a list it would become part of the
+  // list's last item: the whole block is shifted left by its first line's indent (every line, so a list's items stay
+  // siblings). An indented code block would become a paragraph inside that item: it moves as a fenced one, its words
+  // as they were.
+  const moved = lowerBlocks.blocks.map(block => movedBlock(block.raw, block.token));
   const title = titleIndexOf(lowerBlocks.blocks);
-  if (title >= 0) moved[title] = asHeading3(lowerBlocks.blocks[title].raw, lowerBlocks.blocks[title].token as Tokens.Heading);
+  if (title >= 0) moved[title] = asHeading3(moved[title], lowerBlocks.blocks[title].token as Tokens.Heading);
   if (picture) moved.push(picture);
   // Slide N's notes on its whole slide go onto its title (or its first block that moved), so they stay on what was
   // slide N. With nothing of slide N moving, they're on the joined slide's whole slide.
@@ -98,9 +100,11 @@ export function joinedSlideMarkdown(upper: string, lower: string, lowerData: Pic
   // Written as one tight list instead, the items in their order (the editor makes one list of two touching lists).
   const lastUpper = upperBlocks.blocks[upperBlocks.blocks.length - 1]?.token;
   const firstLower = lowerBlocks.blocks[0]?.token;
+  // Only two tight lists: a loose one would make the joined list loose as a whole anyway.
   const touching = !!lastUpper && !!firstLower && lowerRaw[0] === moved[0] && title !== 0
     && lastUpper.type === 'list' && firstLower.type === 'list'
-    && (lastUpper as Tokens.List).ordered === (firstLower as Tokens.List).ordered;
+    && (lastUpper as Tokens.List).ordered === (firstLower as Tokens.List).ordered
+    && !(lastUpper as Tokens.List).loose && !(firstLower as Tokens.List).loose;
   const joint = touching && upperRaw.length && lowerRaw.length ? [`${upperRaw.pop()}\n${lowerRaw.shift()}`] : [];
   const pieces = [
     ...upperRaw,
@@ -110,6 +114,19 @@ export function joinedSlideMarkdown(upper: string, lower: string, lowerData: Pic
     ...(moved.length ? [] : lowerNotes),
   ].filter(piece => piece !== '');
   return pieces.join('\n\n');
+}
+
+/** A moved block as written at column 0 (see `joinedSlideMarkdown`). */
+function movedBlock(raw: string, token: Token): string {
+  if (token.type === 'code' && !/^ {0,3}(`{3,}|~{3,})/.test(raw)) {
+    const text = (token as Tokens.Code).text;
+    const fence = '`'.repeat(Math.max(3, ...[...text.matchAll(/`{3,}/g)].map(match => match[0].length + 1)));
+    return `${fence}\n${text}\n${fence}`;
+  }
+  const indent = /^( {1,3})\S/.exec(raw)?.[1].length ?? 0;
+  if (!indent) return raw;
+  const strip = new RegExp(`^ {1,${indent}}`);
+  return raw.split('\n').map(line => line.replace(strip, '')).join('\n');
 }
 
 const PROBE = 'RitemarkJoinProbe';

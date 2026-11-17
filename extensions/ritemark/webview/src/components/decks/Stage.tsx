@@ -219,7 +219,8 @@ function LayoutStage({ editor, slide, theme, borderless, assets, width, onWritin
         // A slide of a kind this build doesn't know has no menu of its own: a right-click opens its Slide settings, so
         // they stay reachable with the strip and the handout both out of view (the gear left the bar, 17 November).
         onContextMenu={event => {
-          if (!onSlideSettings) return
+          // Inside a box being typed in, the system's own menu (Cut, Copy, Paste) stays.
+          if (!onSlideSettings || (event.target as Element | null)?.closest?.('[contenteditable="true"]')) return
           event.preventDefault()
           onSlideSettings({ x: event.clientX, y: event.clientY })
         }}

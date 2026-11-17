@@ -708,6 +708,8 @@ export function DeckView({
       storage.notifyRail?.()
     })
   }, [editor, pick])
+  // The conversion whose line the bar said (its count), so a removal made in the same edit keeps that line, once per deck.
+  const conversionSaid = useRef(-1)
   useEffect(() => {
     if (!editor) return
     let seen = conversionStateOf(editor.state).count
@@ -718,6 +720,7 @@ export function DeckView({
       const said = conversionNoticeFor(state.last, deckViewState().deckConversionNoticed === true)
       if (!said) return
       keepDeckViewState({ deckConversionNoticed: true })
+      conversionSaid.current = state.count
       setNotice({
         text: said.text,
         action: { label: 'Show', tip: 'Show the first of them in the handout', run: () => showConvertedComment(said.firstComment) },
@@ -744,7 +747,8 @@ export function DeckView({
       const convertedHere = conversion.count !== conversions
       conversions = conversion.count
       const mark = joinMarkOf(editor.state)
-      setJoinAt(mark ? mark.index : null)
+      // A join that can't be made lights nothing up on the strip: its note says why.
+      setJoinAt(mark && !mark.blocked ? mark.index : null)
       const removal = transaction.getMeta(DECK_REMOVED) as DeckRemoval | undefined
       if (removal) {
         // The slide whose part holds the caret now (the part above) is the current one, held as writing holds it, so
@@ -756,7 +760,7 @@ export function DeckView({
         }
         const depth = undoDepth(editor.state)
         const valid = () => !editor.isDestroyed && undoDepth(editor.state) === depth
-        const converted = convertedHere && conversion.last && conversion.last.comments > 0 ? ` ${CONVERSION_NOTICE}` : ''
+        const converted = convertedHere && conversionSaid.current === conversion.count ? ` ${CONVERSION_NOTICE}` : ''
         setNotice({
           text: `${removalNotice(removal)}${converted}`,
           valid,
@@ -929,7 +933,8 @@ export function DeckView({
   const stageSettings = useCallback((at: { x: number; y: number }) => openSettings(currentRef.current, () => ({
     anchor: { getBoundingClientRect: () => new DOMRect(at.x, at.y, 0, 0) },
     side: 'right',
-    back: stageRef.current?.querySelector<HTMLElement>('.ProseMirror') ?? null,
+    // A slide of a kind this build doesn't know has no editor of its own: the strip takes the focus then.
+    back: stageRef.current?.querySelector<HTMLElement>('.ProseMirror') ?? stripRef.current,
   })), [openSettings])
 
   // ---- the strip's operations: each one transaction, so Undo takes it back whole
