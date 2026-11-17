@@ -126,10 +126,22 @@ export function partHeadingAt(doc: PMNode, slidePos: number): { node: PMNode; po
  */
 export function derivedHeadings(state: EditorState, textHandout = false): Transaction | null {
   const { doc, schema } = state
-  // A deck marked `handout: text` is written with its own headings: nothing is drawn, a heading deleted stays deleted.
-  if (!schema.nodes.heading || textHandout) return null
+  if (!schema.nodes.heading) return null
   const tr = state.tr
   const slides = slidesOf(doc)
+  // A deck marked `handout: text` is written with its own headings: nothing is drawn, a heading deleted stays deleted.
+  // A part with nothing in it at all (a new slide's, saved before its words: the file holds no empty line) gets only
+  // its empty line back, so it shows "Write here." and can be written in; on main and before Sprint 161's PR 3 it had
+  // no height, its number sitting on the line between parts (the Development manager, #769).
+  if (textHandout) {
+    for (let index = slides.length - 1; index >= 0; index--) {
+      const after = slides[index].pos + slides[index].node.nodeSize
+      const next = doc.nodeAt(after)
+      if (!next || isSlideNode(next)) tr.insert(after, schema.nodes.paragraph.create())
+    }
+    if (!tr.docChanged) return null
+    return tr.setMeta(DECK_DERIVED, true).setMeta('addToHistory', false).setMeta('preventUpdate', true)
+  }
   // From the last part to the first, so each slide's position still holds.
   for (let index = slides.length - 1; index >= 0; index--) {
     const slide = slides[index]

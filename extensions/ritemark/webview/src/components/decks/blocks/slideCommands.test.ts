@@ -31,10 +31,10 @@ import { deckGuardPlugin } from '../handout/deckGuard'
 import { deckLinesPlugin } from '../handout/deckLines'
 import { convertDeckInto, deckConvertPlugin } from '../handout/deckConvert'
 import { derivedHeadings, insertSlide, slidesOf, starterMarkdown } from '../deckDocument'
-import { loadSlide, loadSlideWithComments, saveSlide } from './slideEditorHarness'
-import { saveSlideMarkdown } from './slideEditorMarkdown'
+import { loadSlide, loadSlideWithComments, saveSlide, slideSchema } from './slideEditorHarness'
+import { saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
 import { SlideSync } from './slideSync'
-import { SLIDE_COMMAND, SLIDE_ITEMS, addToTable, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
+import { SLIDE_COMMAND, SLIDE_ITEMS, addToTable, lastPillLabel, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
 import { splitSlide } from './slideSplit'
 import { webPageAddress } from './SlideBlockTools'
 import { isFullAt, nextFitStep } from './slideFit'
@@ -259,6 +259,47 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
   assert.equal(webPageAddress('example.com:8080/x'), 'https://example.com:8080/x')
   assert.equal(webPageAddress('mailto:a@b.com'), null, 'no credentials in a page address')
   assert.equal(webPageAddress('https://user:pw@example.com'), null)
+}
+
+// ---- The lead on #769: a new Columns block starts empty, each column an empty heading over an empty line ("Heading"
+// over "Text" faint on the stage); none of it is written, and it reopens the same.
+{
+  const columns = slideBlockNode(slideSchema, 'columns')
+  const shape = (node: PMNode) => { const out: string[] = []; node.descendants(child => { out.push(`${child.type.name}${child.textContent ? ':' + child.textContent : ''}`); return true }); return out.join(' ') }
+  assert.equal(shape(columns), 'slideDiv heading paragraph slideDiv heading paragraph', 'two empty columns')
+  const doc = slideSchema.nodes.doc.create(null, [columns])
+  const saved = slideSave(doc)
+  assert.equal(saved, ':::: columns\n::: column\n:::\n\n::: column\n:::\n::::', 'no placeholder words in the file')
+  const reopened = loadSlide(saved)
+  assert.equal(shape(reopened), shape(doc), 'it reopens the same')
+  assert.equal(slideSave(reopened), saved)
+  assert.equal(slidePlaceholderOf(columns.child(0).child(0), columns.child(0), false), 'Heading')
+  assert.equal(slidePlaceholderOf(columns.child(0).child(1), columns.child(0), false), 'Text')
+  assert.equal(slidePlaceholderOf(columns.child(0).child(1), null, true), 'Title')
+  assert.equal(slidePlaceholderOf(columns.child(0).child(1), null, false), '')
+  // A column with words of its own is never given the empty heading.
+  assert.equal(shape(loadSlide(':::: columns\n::: column\nWords\n:::\n::::')), 'slideDiv:Words slideDiv:Words paragraph:Words text:Words', 'no empty heading added')
+}
+
+// ---- The lead on #769: a new Steps block carries the deck's last pill label, written as its own tag; with none it shows
+// "Exercise" (#752's rule) and writes no tag.
+{
+  const deck = [
+    { kind: 'exercise', tag: 'Harjutus' },
+    { kind: '', markdown: '# Two\n\n::: steps\n1. A\n:::' },
+    { kind: '', markdown: '# Three\n\n```\n::: {.steps tag="In code"}\n```' },
+  ]
+  assert.equal(lastPillLabel(deck), 'Harjutus', 'the last label written in words of its own')
+  assert.equal(lastPillLabel([...deck, { kind: '', markdown: '::: {.steps tag="Ülesanne"}\n1. B\n:::' }]), 'Ülesanne')
+  assert.equal(lastPillLabel([{ kind: '', markdown: '::: {.steps tag=""}\n1. B\n:::' }]), null, 'a hidden pill is no label')
+  assert.equal(lastPillLabel([{ kind: 'exercise' }, { kind: '', markdown: '# No steps' }]), null)
+  const schema = slideSchema
+  const carried = slideSave(schema.nodes.doc.create(null, [slideBlockNode(schema, 'steps', 'Harjutus')]))
+  assert.equal(carried, '::: {.steps tag="Harjutus"}\n1.\n:::')
+  assert.equal(/<span class="blk-pill">([^<]*)</.exec(blockSlideHtml(carried))?.[1], 'Harjutus')
+  const plain = slideSave(schema.nodes.doc.create(null, [slideBlockNode(schema, 'steps', null)]))
+  assert.equal(plain, '::: steps\n1.\n:::', 'no label: no tag, the pill shows "Exercise"')
+  assert.equal(/<span class="blk-pill">([^<]*)</.exec(blockSlideHtml(plain))?.[1], 'Exercise')
 }
 
 // ---- Empty boxes survive save and reopen (PR 2's gap: a new Boxes slide's boxes dropped out at its first write).

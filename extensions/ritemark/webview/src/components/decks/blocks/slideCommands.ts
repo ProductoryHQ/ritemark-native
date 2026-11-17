@@ -53,15 +53,17 @@ const div = (schema: Schema, open: string, close: string, content: PMNode[]) =>
   schema.nodes.slideDiv.create({ open, close, gapOpen: 'false', gapClose: 'false', class: parseFenceAttributes(OPEN_FENCE.exec(open)![2])!.classes.join(' ') }, content)
 
 /** A new block, empty, as the conversion writes one: two columns, three boxes, Steps with one step, a 3 × 3 table. */
-export function slideBlockNode(schema: Schema, kind: SlideBlockKind): PMNode {
+export function slideBlockNode(schema: Schema, kind: SlideBlockKind, tag: string | null = null): PMNode {
   const paragraph = () => schema.nodes.paragraph.create()
   switch (kind) {
     case 'columns':
-      return div(schema, ':::: columns', '::::', [div(schema, '::: column', ':::', [paragraph()]), div(schema, '::: column', ':::', [paragraph()])])
+      // Each column an empty heading over an empty line: "Heading" over "Text" faint, nothing written (the lead on #769).
+      return div(schema, ':::: columns', '::::', [0, 1].map(() => div(schema, '::: column', ':::', [schema.nodes.heading.create({ level: 3 }), paragraph()])))
     case 'boxes':
       return div(schema, ':::: boxes', '::::', [0, 1, 2].map(() => div(schema, '::: box', ':::', [paragraph()])))
     case 'steps':
-      return div(schema, '::: steps', ':::', [schema.nodes.orderedList.create(null, [schema.nodes.listItem.create(null, [paragraph()])])])
+      // A label carried from the deck's earlier pill is written as its own tag (the lead on #769).
+      return div(schema, tag === null ? '::: steps' : withFenceValue('::: steps', 'tag', tag)!, ':::', [schema.nodes.orderedList.create(null, [schema.nodes.listItem.create(null, [paragraph()])])])
     case 'table': {
       const row = (header: boolean) => schema.nodes.tableRow.create(null, [0, 1, 2].map(() => (header ? schema.nodes.tableHeader : schema.nodes.tableCell).create(null, [paragraph()])))
       return schema.nodes.table.create(null, [row(true), row(false), row(false)])
@@ -201,6 +203,35 @@ export function setStepsTag(state: EditorState, pos: number, words: string): Tra
   if (typed === shown || (!typed.trim() && !shown)) return null
   // Typed like any other words on the slide: the pill's keys join one undo step as typing does.
   return setBlockValue(state, pos, 'tag', typed.trim() ? typed : '')?.setMeta(SLIDE_COMMAND, false) ?? null
+}
+
+/**
+ * The label a new Steps block takes (the Experience lead on #769): the deck's last pill label written in words of its
+ * own, up to and including the slide being written on (a v1 Exercise slide's `tag:`, a block slide's Steps `tag`);
+ * null when there is none, so the new pill shows "Exercise" by #752's rule. An emptied (hidden) pill and the default
+ * word are no label to carry.
+ */
+export function lastPillLabel(slides: Array<{ kind: string; markdown?: string; tag?: string }>): string | null {
+  let label: string | null = null
+  const take = (tag: string | undefined) => {
+    if (tag === undefined || !tag.trim() || tag.trim().toLowerCase() === EXERCISE_TAG.toLowerCase()) return
+    label = tag
+  }
+  for (const slide of slides) {
+    if (slide.kind === 'exercise') { take(slide.tag); continue }
+    if (slide.kind !== '' || !slide.markdown) continue
+    let code: string | null = null
+    for (const line of slide.markdown.split('\n')) {
+      // A `:::` line inside a code block is the code's words.
+      const fence = /^ {0,3}(`{3,}|~{3,})/.exec(line)
+      if (code !== null) { if (fence && fence[1][0] === code[0] && fence[1].length >= code.length) code = null; continue }
+      if (fence) { code = fence[1]; continue }
+      const open = OPEN_FENCE.exec(line)
+      const attrs = open ? parseFenceAttributes(open[2]) : null
+      if (attrs?.classes.includes('steps')) take(attrs.values.tag)
+    }
+  }
+  return label
 }
 
 /** The pill's placeholder while it is empty and the caret is in it: the default word, faint. */

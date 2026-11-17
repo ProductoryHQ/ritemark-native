@@ -80,7 +80,24 @@ export function ensureSlideCommentPipeline(): void {
 
 /** A block slide's Markdown as the HTML the slide editor parses; `imageMappings` gives its pictures' webview addresses. */
 export function markdownToSlideEditorHTML(markdown: string, imageMappings?: Record<string, string>): string {
-  return markdownToEditorHTML(markdown, imageMappings, slideEditorMarked)
+  return withColumnPlaces(markdownToEditorHTML(markdown, imageMappings, slideEditorMarked))
+}
+
+/**
+ * PR 3 (the Experience lead on #769): an empty column opens with an empty heading over an empty line, where the stage
+ * shows "Heading" over "Text" faint, as a new Columns block starts. Neither is ever written (an empty heading and an
+ * empty line save as nothing), so the column's lines read back as they were, and it opens the same again.
+ */
+export function withColumnPlaces(html: string): string {
+  return html.replace(/(<div data-fdiv=""[^>]*\sdata-class="column"[^>]*>)(<\/div>)/g, '$1<h3></h3><p></p>$2')
+}
+
+/** The faint words an empty line on the stage shows: the title's, and an empty column's heading and text. */
+export function slidePlaceholderOf(node: PMNode, parent: PMNode | null, isTitle: boolean): string {
+  if (isTitle) return 'Title'
+  if (parent?.type.name !== 'slideDiv' || String(parent.attrs.class ?? '').split(' ')[0] !== 'column') return ''
+  if (node.type.name === 'heading') return 'Heading'
+  return node.type.name === 'paragraph' ? 'Text' : ''
 }
 
 /** The node for a `:::` block: its lines as written, and its blocks. */

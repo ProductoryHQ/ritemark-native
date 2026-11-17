@@ -312,6 +312,22 @@ const blocksOf = (text: string) => text.match(/```slide[\s\S]*?\n```/g) ?? []
   assert.equal(isTextHandout(marked), true)
   assert.equal(derivedHeadings(EditorState.create({ doc: reopened.doc }), isTextHandout(marked)), null, 'a marked deck draws nothing')
   assert.equal(reopened.save(reopened.doc), marked)
+
+  // A part with nothing in it (a new slide's, saved before its words) gets its empty line back as it opens, so it has
+  // a height and its "Write here." (#769: part 15 had none, its number on the line between parts); still nothing is
+  // drawn and nothing is written.
+  const bare = '---\ndeck: 2\nhandout: text\n---\n\n```slide\n---\nid: a001\n---\n# One\n```\n\n```slide\n---\nid: a002\n---\n# Two\n```\n\nTwo\'s words.\n\n```slide\n---\nid: a003\n---\n```\n'
+  const opened = open(bare)
+  const bareState = EditorState.create({ doc: opened.doc })
+  const lines = derivedHeadings(bareState, true)
+  assert.ok(lines, 'the two empty parts get their line')
+  const lined = bareState.apply(lines!)
+  const kinds: string[] = []
+  lined.doc.forEach(node => kinds.push(node.type.name === 'paragraph' ? (node.childCount ? 'words' : 'empty') : node.type.name))
+  assert.deepEqual(kinds.filter(kind => kind !== 'heading'), ['deckSlide', 'empty', 'deckSlide', 'words', 'deckSlide', 'empty'])
+  assert.equal(lines!.getMeta('addToHistory'), false, 'no edit')
+  assert.equal(opened.save(lined.doc), bare, 'nothing is written')
+  assert.equal(derivedHeadings(lined, true), null, 'once')
 }
 
 // A new deck's title slide ("The deck's title", to be typed over): its part's heading is drawn empty, so it shows the

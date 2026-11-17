@@ -48,9 +48,9 @@ import { slidesOf, type DeckSlideEntry } from '../deckDocument'
 import { convertDeckInto } from '../handout/deckConvert'
 import { SLIDE_SYNC, SlideSync } from './slideSync'
 import { slideDivWithView, type SlideDivHandlers } from './slideDivView'
-import { ensureSlideCommentPipeline, markdownToSlideEditorHTML, saveSlideMarkdown } from './slideEditorMarkdown'
+import { ensureSlideCommentPipeline, markdownToSlideEditorHTML, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
 import { contentHeightOf, fitValue, isFullAt, nextFitStep } from './slideFit'
-import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, addToTable, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
+import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, addToTable, lastPillLabel, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
 import { PillField, SlideIconPicker, WebPageDialog, type IconPick, type PillEdit } from './SlideBlockTools'
 import { SlideCommentNode, SlideComments, caretTarget, clickTarget, startSlideComment } from '../SlideComments'
 import { keyPastNotes, type SlideTarget } from './slideCommentPlace'
@@ -285,7 +285,12 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
 
   // The handout's comment node, with the slide's own storage and ⌘/ (`SlideCommentNode`).
   const extensions = useMemo(() => createEditorSchemaExtensions({
-    beforeLink: [Placeholder.configure({ placeholder: ({ node, pos }) => (pos === 0 && node.type.name === 'heading' ? 'Title' : ''), showOnlyCurrent: false })],
+    beforeLink: [Placeholder.configure({
+      // The title's, and an empty column's "Heading" over "Text" (PR 3), nested ones included.
+      placeholder: ({ editor: current, node, pos }) => slidePlaceholderOf(node, pos > 0 ? current.state.doc.resolve(pos).parent : null, pos === 0 && node.type.name === 'heading'),
+      showOnlyCurrent: false,
+      includeChildren: true,
+    })],
     afterImage: [OuterHistory, SlideKeys, SlideSlash],
     commentCallouts,
     deck: [slideDivWithView(divHandlers)],
@@ -301,6 +306,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     editorProps: {
       attributes: { class: 'blk-flow', spellcheck: 'true', 'aria-label': 'The slide' },
       handlePaste: (_view, event) => takePicture(event.clipboardData, true),
+      // The slide never scrolls (the lead on #769: at the fit's floor the caret at the bottom scrolled the slide's words up
+      // and cut its title at the top): it may overflow at the bottom only. See also the flow's scroll reset below.
+      handleScrollToSelection: () => true,
       handleDrop: (_view, event) => takePicture((event as DragEvent).dataTransfer, false),
       handleDOMEvents: {
         // The Edit menu's Undo and Redo, and the system's: the deck's history.
@@ -467,10 +475,14 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     // the / menu left the slide at its first step, overflowing, until the next key).
     const flow = editor.view.dom
     flow.addEventListener('load', refit, true)
+    // The browser keeps a caret in view by scrolling the clipped flow itself: it is put back, so the title stays whole.
+    const unscroll = () => { if (flow.scrollTop || flow.scrollLeft) { flow.scrollTop = 0; flow.scrollLeft = 0 } }
+    flow.addEventListener('scroll', unscroll)
     return () => {
       editor.off('update', refit)
       fonts?.removeEventListener?.('loadingdone', refit)
       flow.removeEventListener('load', refit, true)
+      flow.removeEventListener('scroll', unscroll)
     }
   }, [editor, refit])
 
@@ -517,6 +529,15 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     input.click()
   }
 
+  /** The deck's last pill label up to this slide, for a new Steps block (`lastPillLabel`). */
+  const pillLabelSoFar = (): string | null => {
+    const deck = outerRef.current
+    if (deck.isDestroyed) return null
+    const here = freshEntry(deck, slideRef.current)
+    const slides = slidesOf(deck.state.doc).slice(0, here ? here.index + 1 : undefined)
+    return lastPillLabel(slides.map(entry => ({ kind: entry.kind, markdown: entry.data.markdown, tag: entry.data.tag })))
+  }
+
   toolsRef.current = {
     runItem: (range, item) => {
       if (!editor || editor.isDestroyed) return
@@ -538,7 +559,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
         case 'steps':
         case 'table': {
           const kind = item.nodeType as SlideBlockKind
-          chain().command(({ tr }) => { insertSlideBlock(tr, range.from, slideBlockNode(editor.schema, kind)); return true }).run()
+          // A new Steps block carries the deck's last pill label (the lead on #769).
+          const tag = kind === 'steps' ? pillLabelSoFar() : null
+          chain().command(({ tr }) => { insertSlideBlock(tr, range.from, slideBlockNode(editor.schema, kind, tag)); return true }).run()
           return
         }
         case 'picture':
