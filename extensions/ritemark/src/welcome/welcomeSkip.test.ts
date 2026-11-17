@@ -22,6 +22,7 @@ import Module from 'node:module';
 import { mock } from 'node:test';
 import * as os from 'os';
 import * as path from 'path';
+import { makeTempDir } from '../testing/tempDir';
 
 class EventEmitter<T> {
   private listeners: Array<(value: T) => void> = [];
@@ -113,7 +114,7 @@ async function main(): Promise<void> {
   mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: 1_000_000 });
   const { registerWelcome } = await import('./welcomeHost');
   const { emitCodexStatusInvalidated } = await import('../codex/codexStatusEvents');
-  const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-welcome-skip-'));
+  const storage = makeTempDir('rm-welcome-skip-');
   // A ChatGPT home of the run's own, with no sign-in ever made, so this computer's own plays no part
   process.env.CODEX_HOME = storage;
 

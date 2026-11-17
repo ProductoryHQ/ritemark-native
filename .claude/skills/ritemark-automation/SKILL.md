@@ -59,7 +59,7 @@ project has drawn, printing `RUN_DIR`, `BUILD_ROOT`, `PORT`, `PID`. It runs this
 checkout's when this is a light worktree with an empty `vscode/` (that build runs the main checkout's extension).
 It refuses a build that isn't of the pinned VS Code (the main checkout's can be months old): rebuild, or give the
 worktree its own vscode. Flags after `--` go after the folder. `scripts/qa/dev-launch-isolated.sh stop <RUN_DIR>` ends the
-whole process tree and prints `LEFT=0`. From 08:00 to 18:00 Tallinn time it refuses unless Jarmo said yes in chat.
+whole process tree, prints `LEFT=0` and removes the run folder (copy out any log or capture first; a second `stop` is harmless). From 08:00 to 18:00 Tallinn time it refuses unless Jarmo said yes in chat.
 The hand-written shape below is what the script does, for when you need to depart from it.
 
 ### With test keys (AI and providers in an isolated window)

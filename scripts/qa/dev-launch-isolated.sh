@@ -24,7 +24,16 @@
 # RUN_DIR, PORT, PID and FOLDER lines (also in <run-dir>/run.env) and returns, leaving the instance running.
 #
 # `stop` ends that instance: SIGTERM, then SIGKILL after 5 s, then every process still naming the run folder,
-# and prints LEFT=0 when nothing is left (exit 1 otherwise). The run folder is kept for its logs and captures.
+# and prints LEFT=0 when nothing is left (exit 1 otherwise). Then it removes the run folder (180–440 MB after a run;
+# 3,100 left-behind folders filled the disk on 17–18 Nov), so copy any log or capture out of it first. It removes
+# only that folder, and only when it is a run folder `start` made: directly in $TMPDIR (or in the system temp
+# folder start recorded in run.env as TEMP_ROOT), named rm-<run>.XXXX, its run.env naming it. It also removes it
+# when the instance already quit by itself, and a second `stop` on a removed folder just checks that nothing runs on
+# its profile or extensions folder and says the folder is gone. While a process is left, the folder is kept: run
+# `stop` again. A caller's own --user-data-dir outside the run folder is never removed (the caller removes it).
+# A `start` that fails removes its run folder too: before the launch, or through `stop` after it (printing the end
+# of stdout.log first). A --dry-run leaves its run folder (run.env says DRY_RUN=1) for the caller to look at, and
+# `stop` removes it without looking for any process.
 #
 # Jarmo's rule (2 and 3 Nov): no test window while he is at the keyboard. From 08:00 to 18:00 Tallinn time
 # `start` refuses unless RITEMARK_LAUNCH_DAYTIME_OK=1, which a run sets only after he has said yes in chat.
@@ -77,58 +86,146 @@ patch_digest() {
 	(cd "$1/patches/vscode" 2>/dev/null && find . -type f -name '*.patch' -print0 | sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -d" " -f1) || true
 }
 
+# The temp folder run folders go in, resolved (pwd -P), as start uses it.
+temp_root() {
+	(cd "${TMPDIR:-/private/tmp}" 2>/dev/null && pwd -P)
+}
+
+# Whether a folder may be removed as a run folder: given resolved, directly in the temp folder (this shell's, or
+# the one start recorded in run.env when that is a system temp folder: a stop from a shell with another TMPDIR),
+# named rm-<run>.XXXX (start's mktemp template), not a link. Prints why not and fails otherwise.
+run_dir_check() {
+	local dir=$1 recorded=${2:-} tmp parent
+	tmp=$(temp_root) || tmp=""
+	parent=$(dirname "$dir")
+	if [[ -z $tmp || $parent != "$tmp" ]]; then
+		case $recorded in
+			/tmp|/tmp/*|/private/tmp|/private/tmp/*|/private/var/folders/*) ;;
+			*) recorded="" ;;
+		esac
+		[[ -n $recorded && $parent == "$recorded" ]] || { echo "is not directly in the temp folder ${tmp:-(none: TMPDIR '${TMPDIR:-/private/tmp}')}"; return 1; }
+	fi
+	[[ $(basename "$dir") =~ ^rm-[A-Za-z0-9._-]+\.[A-Za-z0-9]{4}$ ]] || { echo "is not named rm-<run>.XXXX"; return 1; }
+	[[ ! -L $dir ]] || { echo "is a link"; return 1; }
+}
+
+# Removes a run folder that passes run_dir_check, and nothing else.
+remove_run_dir() {
+	local dir=$1 recorded=${2:-} why
+	[[ -e $dir || -L $dir ]] || return 0
+	if ! why=$(run_dir_check "$dir" "$recorded"); then
+		echo "dev-launch-isolated: the run folder is not removed: '$dir' $why" >&2
+		return 1
+	fi
+	rm -rf -- "$dir"
+	if [[ -e $dir ]]; then
+		echo "dev-launch-isolated: could not remove the run folder $dir" >&2
+		return 1
+	fi
+}
+
+# A command-line flag matched whole: the exact value, after the start of the line or a space and before a space or
+# the end, and literally (a `.` in the folder is a dot). A run on …/rm-a.b/profile2 or …/rm-aXb/profile is another run's.
+flag_re() {
+	printf '(^| )%s( |$)' "$(ere_escape "$1")"
+}
+
 stop_run() {
-	local run_dir=${1:-}
-	[[ -n $run_dir && -f $run_dir/run.env ]] || die "stop: no run.env in '${run_dir}'"
+	local run_dir=${1:-} gone=0
+	[[ -n $run_dir ]] || die "stop: give the run folder (RUN_DIR)"
+	# A link is followed: the folder it names is judged by the rules below, the link itself is left
+	if [[ ! -e $run_dir ]]; then
+		# A second stop, or a run folder removed some other way (or a wrong path: said below): only a run folder's
+		# name in this shell's temp folder is taken, and the processes on its default profile and its extensions
+		# folder are looked for (a caller's own profile is unknown without run.env).
+		local parent why
+		parent=$(cd "$(dirname "$run_dir")" 2>/dev/null && pwd -P) || die "stop: no run folder '$run_dir'"
+		run_dir="$parent/$(basename "$run_dir")"
+		why=$(run_dir_check "$run_dir") || die "stop: no run folder '$run_dir' (and it $why)"
+		gone=1
+	fi
+	(( gone )) || [[ -f $run_dir/run.env ]] || die "stop: no run.env in '${run_dir}'"
 	# One spelling of the folder: the profile flag names it as start resolved it (pwd -P, e.g. /private/var/…), and
 	# a /var/… or …//… form of the same folder would match no process and report LEFT=0 with the instance running.
-	run_dir=$(cd "$run_dir" && pwd -P)
-	local profile_dir
-	profile_dir=$(sed -n 's/^PROFILE=//p' "$run_dir/run.env")
+	(( gone )) || run_dir=$(cd "$run_dir" && pwd -P)
+	local env_file="$run_dir/run.env"
+	(( gone )) && env_file=/dev/null
+	local profile_dir dry recorded_tmp
+	profile_dir=$(sed -n 's/^PROFILE=//p' "$env_file")
+	dry=$(sed -n 's/^DRY_RUN=//p' "$env_file")
+	recorded_tmp=$(sed -n 's/^TEMP_ROOT=//p' "$env_file")
 	[[ -n $profile_dir ]] || profile_dir="$run_dir/profile"
 	local profile="--user-data-dir=$profile_dir"
-	# The flag matched whole: the exact value, after the start of the line or a space and before a space or the end,
-	# and literally (a `.` in the folder is a dot). A run on …/rm-a.b/profile2 or …/rm-aXb/profile is another run's.
-	local profile_re
-	profile_re="(^| )$(ere_escape "$profile")( |\$)"
-	local pid cmdline=""
-	pid=$(sed -n 's/^PID=//p' "$run_dir/run.env")
+	local profile_re ext_re
+	profile_re=$(flag_re "$profile")
+	# The instance's own command line also names the run's extensions folder, whatever its profile
+	ext_re=$(flag_re "--extensions-dir=$run_dir/extensions")
+	local pid="" cmdline=""
+	pid=$(sed -n 's/^PID=//p' "$env_file")
 	# run.env's PID is used only while it is still this instance: a number, and a process whose command line
 	# names the run's profile. A PID the system has since given to another process is never walked or signalled.
 	[[ $pid =~ ^[0-9]+$ ]] && cmdline=$(ps -o command= -p "$pid" 2>/dev/null || true)
 	[[ " $cmdline " == *" $profile "* ]] || pid=""
-	# The instance's own tree (helpers, the extension host, the AI runtimes it started), gathered before the
-	# main process goes and its children are re-parented; then every process naming the run's profile.
-	# Never a pattern that matches this script's own command line, which names the run folder but not the profile flag.
-	local tree="" p
-	[[ -n $pid ]] && tree=$(descendants "$pid")
-	if [[ -n $pid ]] && alive "$pid"; then
-		kill -TERM "$pid" 2>/dev/null || true
-		for _ in 1 2 3 4 5 6 7 8 9 10; do
-			alive "$pid" || break
-			sleep 0.5
-		done
-	fi
-	# Walk again just before the KILL pass: runtimes started during the grace period hang under a pid already seen.
-	local live="" more all
-	for p in $tree; do alive "$p" && live="$live $p"; done
-	more=$(pgrep -f -- "$profile_re" 2>/dev/null || true)
-	all=$(descendants $live $more | sort -u)
-	for p in $all; do
-		[[ $p == "$$" ]] && continue
-		kill -KILL "$p" 2>/dev/null || true
-	done
-	sleep 1
 	local left=0
-	for p in $all; do
-		[[ $p == "$$" ]] && continue
-		alive "$p" && left=$((left + 1))
-	done
-	more=$(pgrep -f -- "$profile_re" 2>/dev/null || true)
-	[[ -n $more ]] && left=$((left + $(wc -l <<< "$more")))
+	# A dry run launched nothing: no process is looked for (its PROFILE may since be a real run's)
+	if [[ $dry != 1 ]]; then
+		# The instance's own tree (helpers, the extension host, the AI runtimes it started), gathered before the
+		# main process goes and its children are re-parented; then every process naming the run's profile or its
+		# extensions folder. Never a pattern that matches this script's own command line, which names the run
+		# folder but neither flag.
+		local tree="" p
+		[[ -n $pid ]] && tree=$(descendants "$pid")
+		if [[ -n $pid ]] && alive "$pid"; then
+			kill -TERM "$pid" 2>/dev/null || true
+			for _ in 1 2 3 4 5 6 7 8 9 10; do
+				alive "$pid" || break
+				sleep 0.5
+			done
+		fi
+		# Walk again just before the KILL pass: runtimes started during the grace period hang under a pid already seen.
+		local live="" more all
+		for p in $tree; do alive "$p" && live="$live $p"; done
+		more=$( (pgrep -f -- "$profile_re"; pgrep -f -- "$ext_re") 2>/dev/null || true)
+		all=$(descendants $live $more | sort -u)
+		for p in $all; do
+			[[ $p == "$$" ]] && continue
+			kill -KILL "$p" 2>/dev/null || true
+		done
+		# A moment for the KILLed to go; nothing to wait for when nothing was signalled
+		[[ -n $all ]] && sleep 1
+		for p in $all; do
+			[[ $p == "$$" ]] && continue
+			alive "$p" && left=$((left + 1))
+		done
+		more=$( (pgrep -f -- "$profile_re"; pgrep -f -- "$ext_re") 2>/dev/null | sort -u || true)
+		[[ -n $more ]] && left=$((left + $(wc -l <<< "$more")))
+	fi
 	echo "LEFT=$left"
-	[[ $left == 0 ]]
+	if [[ $left != 0 ]]; then
+		echo "dev-launch-isolated: $left processes are left, so the run folder is kept: run stop again" >&2
+		return 1
+	fi
+	if (( gone )); then
+		echo "dev-launch-isolated: no run folder at $run_dir: removed by an earlier stop, or a wrong path (nothing runs on its profile or extensions folder)" >&2
+		echo "REMOVED=$run_dir (already)"
+		return 0
+	fi
+	# Only the folder start made for this run: run.env names it, as start resolved it
+	if [[ $(sed -n 's/^RUN_DIR=//p' "$run_dir/run.env") != "$run_dir" ]]; then
+		echo "dev-launch-isolated: the run folder is not removed: its run.env does not name $run_dir" >&2
+		return 1
+	fi
+	remove_run_dir "$run_dir" "$recorded_tmp" || return 1
+	echo "REMOVED=$run_dir"
 }
+
+# The run folder of a start that has not launched yet, removed if start exits early (a refusal, a busy port).
+# Cleared once an instance runs: from then on only stop removes it, after the instance has ended.
+PENDING_RUN_DIR=""
+remove_pending_run_dir() {
+	[[ -n $PENDING_RUN_DIR ]] && remove_run_dir "$PENDING_RUN_DIR" || true
+}
+trap remove_pending_run_dir EXIT
 
 start_run() {
 	local name="" folder="" port="" dry_run=0 profile_arg=""
@@ -230,6 +327,7 @@ start_run() {
 	local run_dir
 	run_dir=$(mktemp -d "${tmp%/}/rm-${name}.XXXX")
 	run_dir=$(cd "$run_dir" && pwd -P)
+	PENDING_RUN_DIR=$run_dir
 	local profile_dir="$run_dir/profile"
 	if [[ -n $profile_arg ]]; then
 		# A profile of the caller's (a test profile, checked above): new or empty, never reused
@@ -289,6 +387,10 @@ start_run() {
 		echo "RUN_DIR=$run_dir"
 		echo "BUILD_ROOT=$build_root"
 		echo "BUILD_VSCODE=$built"
+		# Kept for the caller to look at; `stop` removes it, and looks for no process (DRY_RUN=1: nothing launched)
+		printf 'RUN_DIR=%s\nTEMP_ROOT=%s\nBUILD_ROOT=%s\nBUILD_VSCODE=%s\nFOLDER=%s\nPROFILE=%s\nDRY_RUN=1\n' \
+			"$run_dir" "$(dirname "$run_dir")" "$build_root" "$built" "$folder" "$profile_dir" > "$run_dir/run.env"
+		PENDING_RUN_DIR=""
 		return 0
 	fi
 
@@ -296,8 +398,11 @@ start_run() {
 	# holding this script's stdout open (a caller's $(...) would wait on it for ever).
 	(cd "$build_root/vscode" && exec nohup "${cmd[@]}") > "$run_dir/stdout.log" 2>&1 < /dev/null &
 	local pid=$!
+	# An instance runs on the folder now: only stop removes it, once nothing is left running on it
+	PENDING_RUN_DIR=""
 	{
 		echo "RUN_DIR=$run_dir"
+		echo "TEMP_ROOT=$(dirname "$run_dir")"
 		echo "BUILD_ROOT=$build_root"
 		echo "BUILD_VSCODE=$built"
 		echo "PORT=$port"
@@ -309,8 +414,11 @@ start_run() {
 	local ready=0
 	for _ in $(seq 1 120); do
 		if ! alive "$pid"; then
-			echo "dev-launch-isolated: the instance exited; see $run_dir/stdout.log" >&2
+			echo "dev-launch-isolated: the instance exited; the end of its stdout.log:" >&2
+			tail -n 40 "$run_dir/stdout.log" >&2 || true
 			cat "$run_dir/run.env"
+			# Anything it left running is ended, and the run folder removed
+			stop_run "$run_dir" >&2 || true
 			exit 1
 		fi
 		local targets
@@ -333,7 +441,8 @@ sys.exit(0 if any(ready(x) for x in targets) else 1)' "$(basename "$folder")" <<
 	done
 	cat "$run_dir/run.env"
 	if (( ! ready )); then
-		echo "dev-launch-isolated: no workbench page on port $port after 60 s; stopping it" >&2
+		echo "dev-launch-isolated: no workbench page on port $port after 60 s; stopping it (it removes the run folder). The end of its stdout.log:" >&2
+		tail -n 40 "$run_dir/stdout.log" >&2 || true
 		stop_run "$run_dir" || true
 		exit 1
 	fi

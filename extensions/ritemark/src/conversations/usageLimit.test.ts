@@ -10,7 +10,6 @@
  */
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import { ConversationController } from './ConversationController';
 import { ConversationStore } from './ConversationStore';
@@ -18,6 +17,7 @@ import { buildNormalizedContextPack } from './contextPack';
 import { resolveProjectScope } from './projectScope';
 import { decodeLastFailure, lastFailureOf, summarizeConversationRecord, type ConversationRecordV1 } from './types';
 import { transcriptRestoredState } from '../runtime/continuation';
+import { makeTempDir } from '../testing/tempDir';
 
 function uuid(value: number): string {
   return `30000000-0000-4000-8000-${value.toString().padStart(12, '0')}`;
@@ -26,7 +26,7 @@ function uuid(value: number): string {
 const LIMIT_SENTENCE = "You've used Gemini 3.8 Flash's limit for now. Try again later, or use another model.";
 
 async function run(): Promise<void> {
-  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-usage-limit-'));
+  const temp = makeTempDir('ritemark-usage-limit-');
   const scope = resolveProjectScope({ folderUris: ['file:///p'], platform: 'darwin' });
   let nextId = 1;
   let clock = Date.parse('2026-11-16T01:00:00.000Z');
