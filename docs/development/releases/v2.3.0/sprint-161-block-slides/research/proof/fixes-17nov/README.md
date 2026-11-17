@@ -72,6 +72,9 @@ With Slide only pressed and the focus still on it, ↓ ↓ ↑ took the deck fro
 
 ## Not verified
 
+- **The full app run was at 2b373143,** after both review rounds. Codex's three fixes came after it (e395b05a: the rebase's parentheses and list-item code, and which missing picture a button replaces). They are covered by unit tests only.
+  - A last launch on e395b05a opened the deck. Its strip and stage matched on slides 1 and 2 (steps 0 and 2), and then the window went to the background (`visibilityState: hidden`). The webview stopped answering, so the remaining slides were not measured. I quit the window rather than bring it forward over the desktop.
+
 - **One Undo inside the deck editor after a move.** Tried; it does not restore the paths (see above).
 - **The explorer's own Undo of a move (⌘Z in Documents).** Not tried, because the automation's key events don't reach VS Code's keybindings. That Undo is a move back, which is verified.
 - **Windows:** paths with drive letters are covered only by the unit test that refuses a path between two drives.
