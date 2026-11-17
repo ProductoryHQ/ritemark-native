@@ -417,6 +417,10 @@ html.rm-ground [data-scrolling] { scrollbar-color: var(--vscode-scrollbarSlider-
    weight, so every one of those rules still wins. */
 :where(.deck-sl.is-blocks.is-editing) .rm-table { margin: .246em 0 .451em; }
 .deck-sl.is-blocks.is-editing .rm-table > table { margin: 0; }
+/* While a slide is edited, its text area clips only up and down (the fit measures that), so a row's grip sits in the
+   slide's margin, left of the table, never over the first column's words (the Experience lead on #772). Sideways the
+   slide's own edge clips, and the fit keeps words from running sideways (`overflowsSideways`). */
+.deck-sl.is-blocks.is-editing .blk-flow { overflow-x: visible; overflow-y: clip; }
 .rm-table-ui { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 4; user-select: none; }
 .rm-table-grip-spot, .rm-table-add-spot { position: absolute; display: flex; }
 .rm-table-ui button.rm-table-grip { width: 100%; height: 100%; min-width: 0; padding: 0; border-radius: 5px; background: var(--r-surface); color: var(--r-ink-muted); box-shadow: 0 0 0 1px var(--r-hairline-strong); cursor: grab; }

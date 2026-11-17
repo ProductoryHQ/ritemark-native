@@ -40,6 +40,7 @@ import {
   wholeTableChosen,
 } from './tableOps'
 import { dropTarget } from '../../components/tables/dropTarget'
+import { blockSlideHtml } from '../../../../src/decks/blocks/slideRenderer'
 
 installTestDocument()
 
@@ -469,6 +470,16 @@ for (const surface of SURFACES) {
   const cellRule = /td\.tiptap-table-cell,\s*\.wysiwyg-editor \.ProseMirror th\.tiptap-table-header \{[^}]*\}/.exec(editorSource)?.[0] ?? ''
   assert.match(cellRule, /overflow-wrap: normal/)
   assert.match(cellRule, /word-break: normal/)
+}
+
+// ---- A slide's column alignment is drawn (the Experience lead on #772): the renderer writes it on every cell, and
+// slide.css draws it, there and on the stage (the editor's `data-md-align`).
+{
+  const html = blockSlideHtml('# T\n\n| a | b | c |\n| :-- | :-: | --: |\n| 1 | 2 | 3 |')
+  assert.ok(html.includes('<th align="center">b</th>') && html.includes('<td align="right">3</td>'), html)
+  const css = readFileSync(fileURLToPath(new URL('../../components/decks/slide/slide.css', import.meta.url)), 'utf8')
+  assert.match(css, /:is\(th, td\):is\(\[align="center"\], \[data-md-align="center"\]\) \{ text-align: center; \}/)
+  assert.match(css, /:is\(th, td\):is\(\[align="right"\], \[data-md-align="right"\]\) \{ text-align: right; \}/)
 }
 
 console.log('tableOps: all checks passed')

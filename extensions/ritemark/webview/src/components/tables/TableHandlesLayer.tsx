@@ -82,7 +82,7 @@ interface Geometry {
   rows: Rect[]
   cols: Rect[]
   /** The container that clips the table (a slide's text area), in the table's coordinates; null when nothing does. */
-  clip: Rect | null
+  clip: { x: Rect | null; y: Rect | null }
 }
 
 interface DragState {
@@ -106,16 +106,24 @@ function registryOf(editor: Editor | null): TableRegistry | null {
   return storage?.registry ?? null
 }
 
-const clipAncestors = new WeakMap<HTMLElement, HTMLElement | null>()
+const clipAncestors = new WeakMap<HTMLElement, { x: HTMLElement | null; y: HTMLElement | null }>()
 
-/** The nearest ancestor that clips its content, looked up once per table element (a table doesn't move between them). */
-function clipAncestor(element: HTMLElement): HTMLElement | null {
-  if (clipAncestors.has(element)) return clipAncestors.get(element) ?? null
-  let found: HTMLElement | null = null
-  for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
+/**
+ * The nearest ancestors that clip the table's content sideways and up and down, looked up once per table element (a
+ * table doesn't move between them). On a slide the text area clips only up and down while it is edited, so a row's grip
+ * can sit in the slide's margin, left of the table; the slide's own edge clips it sideways.
+ */
+function clipAncestor(element: HTMLElement): { x: HTMLElement | null; y: HTMLElement | null } {
+  const known = clipAncestors.get(element)
+  if (known) return known
+  let x: HTMLElement | null = null
+  let y: HTMLElement | null = null
+  for (let node = element.parentElement; node && node !== document.body && (!x || !y); node = node.parentElement) {
     const style = getComputedStyle(node)
-    if (style.overflowX !== 'visible' || style.overflowY !== 'visible') { found = node; break }
+    if (!x && style.overflowX !== 'visible') x = node
+    if (!y && style.overflowY !== 'visible') y = node
   }
+  const found = { x, y }
   clipAncestors.set(element, found)
   return found
 }
@@ -140,7 +148,7 @@ export function measureTable(view: TableHandlesView): Geometry | null {
     table: local(view.table.getBoundingClientRect()),
     rows: rows.map(row => local(row.getBoundingClientRect())),
     cols: Array.from(rows[0]?.cells ?? []).map(cell => local(cell.getBoundingClientRect())),
-    clip: clip ? local(clip.getBoundingClientRect()) : null,
+    clip: { x: clip.x ? local(clip.x.getBoundingClientRect()) : null, y: clip.y ? local(clip.y.getBoundingClientRect()) : null },
   }
 }
 
@@ -414,10 +422,10 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
     ? box.left + (box.width * resize.percents.slice(0, resize.boundary).reduce((sum, value) => sum + value, 0)) / 100
     : null
 
-  const clipLeft = clip?.left
-  const clipTop = clip?.top
-  const clipRight = clip ? clip.left + clip.width : undefined
-  const clipBottom = clip ? clip.top + clip.height : undefined
+  const clipLeft = clip.x?.left
+  const clipTop = clip.y?.top
+  const clipRight = clip.x ? clip.x.left + clip.x.width : undefined
+  const clipBottom = clip.y ? clip.y.top + clip.y.height : undefined
   const tableRight = box.left + box.width
   const tableBottom = box.top + box.height
   const col = activeCol !== null ? cols[activeCol] : null

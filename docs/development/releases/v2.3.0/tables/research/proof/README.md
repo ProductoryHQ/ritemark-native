@@ -11,9 +11,10 @@ Experience 48 (ritemark-dev `product/design/experience/experiences/tables/README
 | `05-slide-settings-no-add-row.png` | Slide settings for a slide with a table: no Add a row or Add a column. |
 | `07-text-cell-menu.png` | A right-click in a cell: the row's and the column's items together (round 1). |
 | `08-text-cell-menu-clipboard.png` | Final head: the cell's menu starts with Cut, Copy and Paste (review of #772), and scrolls inside the window. With a word chosen, Cut and Copy are enabled; the right-click puts the caret where it was made. |
-| `40-slide-handles-rest.png` | Final head, "Quiet on any surface": a dark slide's grips and + bars at rest, see-through white (fill 12 %, hairline 20 %, icon 65 %; the + bars a faint 8 % track). |
+| `40-slide-handles-rest.png` | Final head, "Quiet on any surface": the row's grip in the slide's margin, left of the table, clear of the first column's words; a dark slide's grips and + bars at rest, see-through white (fill 12 %, hairline 20 %, icon 65 %; the + bars a faint 8 % track). |
 | `41-slide-handles-hover.png` | The column grip on hover: fill 22 %, the icon whole; the app's own tooltip. |
 | `42-borderless-slide-handles.png` | A Borderless slide: the same steps in the slide's ink. |
+| `43-slide-aligned-columns.png` | A slide's column alignment drawn (`:-:` centred, `--:` right), on the stage and, by the same rule in slide.css, in the strip, the wall and the page. |
 | `20-text-column-resize.png` | The line between two columns being dragged: the resize cursor and the accent line. |
 | `21-text-widths-applied.png` | The widths after the drag (10, 40, 20 and 30 %). |
 | `22-text-after-double-click.png` | A double-click on the line: automatic widths again. |
