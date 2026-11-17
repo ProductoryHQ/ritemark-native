@@ -19,5 +19,7 @@ Taken in isolated dev instances on the PR's last two heads (06, 07, 09, 11, 12, 
 | 13-page-slide-before / -zoom | The published page, made from the same deck as 12: the slide's picture whole, as in the editor; a click opens it full size, with an × (44 px) at the top right | |
 | 14-page-handout-before / -zoom | A handout picture at half width with its caption; a click opens it full size | |
 | 15-page-phone-before / -zoom | The same at 390×844 | |
+| 16-doc-double-click-picker | A double click on the chosen picture opens the file picker, as ⋯ → Replace picture… does (the in-window dialog of the test run; its address box, which showed a temporary folder, is covered in this shot) | |
+| 17-doc-after-swap | evening.png chosen: the same size and centre, a fresh description; the picked file is copied into images/ beside the document, as paste and drop do | `![](./images/evening-2.png){width=75% align=center}` |
 
 The picture files' modification times were the same after the run as when they were made: no picture file was written.
